@@ -57,6 +57,7 @@ from ..materials.crystal import reciprocal_g_vector
 from ..montecarlo.case import Case
 from ..montecarlo.transport import spliced_stopping_keV_per_ang
 from ..montecarlo.transverse import TransverseDistribution, resolve_transverse_distribution
+from .bremsstrahlung_cases import radiative_case_keys, resolve_auto_bremsstrahlung
 from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is the stable import path)
     BlazedGrooves,
     Footprint,
@@ -73,6 +74,7 @@ from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is th
     _seq,
     crystal_params,
     film_on_substrate_layers,
+    geometry_table,
     layer_radiator,
     retired_flat_input,
     stack_layers,
@@ -662,49 +664,21 @@ def _line_grid_for_energy(
     return grid, policy.payload()
 
 
-def _case_elements(case: Case) -> tuple[str, ...]:
-    """Every element the case's crystal and absorber layers radiate from."""
-    compositions = [case["composition"]]
-    if case.get("abs_layers"):
-        compositions.extend(comp for _, _, comp in case["abs_layers"])
-    return tuple(dict.fromkeys(str(row[0]) for comp in compositions for row in comp))
-
-
-def _resolve_auto_bremsstrahlung(cases: list[Case]) -> list[Case]:
-    """Replace ``bremsstrahlung_model="auto"`` by the source each case will use.
-
-    A case records only the resolved choice, so identity and content keys
-    never depend on what happened to be installed unless BremsLib really ran.
-    """
-    from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
-
-    resolved: dict[tuple[str, ...], str] = {}
-    out = []
-    for case in cases:
-        elements = _case_elements(case)
-        if elements not in resolved:
-            resolved[elements] = resolve_bremsstrahlung_model("auto", elements)
-        out.append(
-            replace(case, bremsstrahlung_model="bremslib")
-            if resolved[elements] == "bremslib"
-            else case
-        )
-    return out
-
-
 def build_cases(
     sweep: Sweep,
     n_electrons=450,
     n_electrons_brem=100,
     coherent_emission=False,
     straggling=False,
-    energy_model="frozen",
+    energy_model="midpoint",
     max_dE_frac=0.0,
     inelastic_model="continuous",
     inelastic_cutoff_eV=None,
     elastic_model="elsepa",
     bremsstrahlung_model="auto",
     secondary_threshold_eV=None,
+    radiative_model="auto",
+    radiative_cutoff_eV=None,
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -729,6 +703,10 @@ def build_cases(
     )
     validate_elastic_model(elastic_model)
     validate_bremsstrahlung_model(bremsstrahlung_model)
+    # Opt-in coupled radiative keys (#172); under "auto" they join after resolution.
+    radiative = radiative_case_keys(
+        radiative_model, radiative_cutoff_eV, energy_model, straggling, bremsstrahlung_model
+    )
     target = sweep.target
     cp = sweep_crystal_params(sweep)
     # line grid: fine + narrow (per-material default or detector mapping/fixed
@@ -915,6 +893,15 @@ def build_cases(
         cp, name_stem=name_stem, beam_uvw=beam_uvw, n_families=sweep.n_families
     )
 
+    if radiative and any(g.case_keys().get("groove_spacing_ang") is not None for g in geometries):
+        warnings.warn(
+            "coupled BremsLib radiative transport is unavailable for grooves; "
+            "using uncoupled bremsstrahlung scoring",
+            UserWarning,
+            stacklevel=2,
+        )
+        radiative = {}
+
     if gdf is not None and any(
         g.case_keys().get("groove_spacing_ang") is not None for g in geometries
     ):
@@ -1024,7 +1011,7 @@ def build_cases(
                         **({"elastic_model": "elsepa"} if elastic_model == "elsepa" else {}),
                         # Opt-in BremsLib continuum: divergence-only, like the above.
                         **(
-                            {"bremsstrahlung_model": "bremslib"}
+                            {"bremsstrahlung_model": "bremslib", **radiative}
                             if bremsstrahlung_model == "bremslib"
                             else {}
                         ),
@@ -1045,51 +1032,8 @@ def build_cases(
                     )
                 )
     if bremsstrahlung_model == "auto":
-        cases = _resolve_auto_bremsstrahlung(cases)
+        cases = resolve_auto_bremsstrahlung(cases, radiative)
     return cases
-
-
-def geometry_table(cases):
-    """A one-row-per-config DataFrame summarizing the geometry of a case list,
-    for a quick sanity check before running."""
-    import pandas as pd
-
-    def _grid(encoded):
-        """Compact label for a legacy uniform triple or an exact grid array."""
-        if encoded is None:
-            return "-"
-        values = decode_energy_grid(encoded)
-        if isinstance(encoded, tuple):
-            return f"{values[0] / 1e3:g}-{values[-1] / 1e3:g} keV @ {encoded[2]:g} eV"
-        if values.size == 1:
-            return f"{values[0] / 1e3:g} keV (1 value)"
-        return f"{values[0] / 1e3:g}-{values[-1] / 1e3:g} keV ({values.size} values)"
-
-    rows, seen = [], set()
-    for c in cases:
-        if c["name"] in seen:
-            continue
-        seen.add(c["name"])
-        same = [k for k in cases if k["name"] == c["name"]]
-        rows.append(
-            {
-                "config": c["name"],
-                "beam_uvw": c["beam_uvw"],
-                "surface_hkl": c.get("surface_hkl"),
-                "refl": len(c["hkl_list"]),
-                "t [um]": c["thickness_ang"] / 1e4,
-                "width [mm]": c.get("crystal_width_mm"),
-                "height [mm]": c.get("crystal_height_mm"),
-                "polar [deg]": round(c["tilt_deg"], 2),
-                "azim [deg]": round(c["tilt_azim_deg"], 2),
-                "energies [keV]": [k["E0_keV"] for k in same],
-                "line grid": _grid(c.get("E_grid_line", c["E_grid"])),
-                "brem grid": _grid(c.get("E_grid_brem")),
-                "theta_obs [deg]": round(np.degrees(c["theta_obs_rad"]), 1),
-                "dOmega [sr]": c["domega_sr"],
-            }
-        )
-    return pd.DataFrame(rows)
 
 
 # ---- compute-cost proxy (progress weighting; instrumentation, not physics) ----

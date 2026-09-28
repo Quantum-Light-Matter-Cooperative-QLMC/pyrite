@@ -925,7 +925,8 @@ def mc_brem_spectrum(
     """
     if segments.get("radiative", {}).get("model") == "bremslib-soft-hard":
         raise ValueError(
-            "coupled radiative tracks require mc_soft_brem_spectrum and mc_hard_brem_event_spectrum"
+            "coupled radiative tracks require mc_coupled_brem_spectrum (or the soft and hard "
+            "event scorers)"
         )
     comp = _normalize_composition(element, n_atoms_per_ang3, composition)
     if cross_section_model == "auto":

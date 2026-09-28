@@ -86,7 +86,7 @@ def iter_electron_blocks(segments, n_blocks):
             cuts.append(cut)
     cuts.append(n)
     for start, stop in zip(cuts[:-1], cuts[1:], strict=True):
-        rows = slice(start, stop) if ordered else np.sort(order[start:stop])
+        rows = slice(start, stop) if order is None else np.sort(order[start:stop])
         block = dict(segments)
         for key in _SEG_ARRAYS:
             if key in block:
@@ -94,20 +94,25 @@ def iter_electron_blocks(segments, n_blocks):
         yield block
 
 
+#: Audit entries that blocks append to rather than sum into.
+_APPENDED = ("collect", "attribution")
+
+
 def snapshot_audit(audit):
     """State needed to undo a partially accumulated truncation audit."""
     if audit is None:
         return None
-    return {k: v for k, v in audit.items() if k != "collect"}, len(audit.get("collect", ()))
+    lists = {k: len(v) for k, v in audit.items() if k in _APPENDED}
+    return {k: v for k, v in audit.items() if k not in _APPENDED}, lists
 
 
 def restore_audit(audit, snapshot):
     """Undo accumulations made since :func:`snapshot_audit`."""
     if audit is None:
         return
-    values, collected = snapshot
-    for key in [k for k in audit if k != "collect" and k not in values]:
+    values, lists = snapshot
+    for key in [k for k in audit if k not in _APPENDED and k not in values]:
         del audit[key]
     audit.update(values)
-    if "collect" in audit:
-        del audit["collect"][collected:]
+    for key in [k for k in audit if k in _APPENDED]:
+        del audit[key][lists.get(key, 0) :]

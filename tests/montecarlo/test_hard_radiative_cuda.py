@@ -79,16 +79,18 @@ def _photon_rows(result):
     )
 
 
-def test_cuda_radiative_mode_is_deterministic():
-    a = _run(**CUDA)
-    b = _run(**CUDA)
+@pytest.mark.parametrize("straggling", [False, True])
+def test_cuda_radiative_mode_is_deterministic(straggling):
+    a = _run(**CUDA, straggling=straggling)
+    b = _run(**CUDA, straggling=straggling)
     for key in ("L_ang", "E_end_keV", "r_mid", "event_kind", "hard_radiative_k_eV"):
         np.testing.assert_array_equal(a[key], b[key], err_msg=key)
 
 
-def test_cuda_first_row_matches_the_per_electron_cpu_core():
-    cpu = _run(**HOST)
-    gpu = _run(**CUDA)
+@pytest.mark.parametrize("straggling", [False, True])
+def test_cuda_first_row_matches_the_per_electron_cpu_core(straggling):
+    cpu = _run(**HOST, straggling=straggling)
+    gpu = _run(**CUDA, straggling=straggling)
     c, g = _first_rows(cpu), _first_rows(gpu)
     np.testing.assert_array_equal(cpu["electron_id"][c], gpu["electron_id"][g])
     np.testing.assert_array_equal(cpu["event_kind"][c], gpu["event_kind"][g])
@@ -99,8 +101,9 @@ def test_cuda_first_row_matches_the_per_electron_cpu_core():
     assert np.count_nonzero(gpu["event_kind"][g] == EVENT_HARD_RADIATIVE) > 0
 
 
-def test_cuda_hard_photons_honour_contract_and_debit_energy():
-    result = _run(**CUDA)
+@pytest.mark.parametrize("straggling", [False, True])
+def test_cuda_hard_photons_honour_contract_and_debit_energy(straggling):
+    result = _run(**CUDA, straggling=straggling)
     check_segment_event_contract(result)
     kind = result["event_kind"]
     photons = result["hard_radiative_k_eV"]

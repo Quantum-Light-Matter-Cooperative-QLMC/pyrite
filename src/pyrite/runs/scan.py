@@ -652,11 +652,13 @@ def _resolved_run(args, material):
         and catalog_profile == "standard"
         and settings.emission == "incoherent"
         and not settings.straggling
-        and settings.energy_model == "frozen"
+        and settings.energy_model == "midpoint"
         and settings.max_dE_frac == 0.0
         and settings.inelastic_model == "continuous"
         and settings.elastic_model == "elsepa"
         and settings.bremsstrahlung_model == "bremslib"
+        and settings.radiative_model == "auto"
+        and settings.radiative_cutoff_eV is None
     )
     stem = variant_stem(identity, canonical_full=canonical_full)
     return settings, sweep, identity, stem

@@ -663,7 +663,13 @@ def _accumulate_reflection(
         targets += [(pref * A2_pxr * wm, spec_pxr), (pref * A2_cbs * wm, spec_cbs)]
     a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
     good = xp.isfinite(weight) & (weight > 0)
-    _accumulate_edge_truncation(st.request.truncation_audit, E_r[good], a_width[good], weight[good])
+    _accumulate_edge_truncation(
+        st.request.truncation_audit,
+        E_r[good],
+        a_width[good],
+        weight[good],
+        st.seg_elec_id[idx][good],
+    )
     if st.request.truncation_audit is not None and "collect" in st.request.truncation_audit:
         _nsys_pop()
         return

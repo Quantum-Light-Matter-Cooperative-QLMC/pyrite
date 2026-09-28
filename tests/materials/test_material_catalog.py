@@ -604,7 +604,7 @@ def test_packaged_profiles_have_explicit_membership():
 
     assert all(CATALOG.profile_materials(name) is not None for name in CATALOG.profile_names)
     assert CATALOG.profile_materials("standard") == CATALOG.profile_materials("sub_100keV")
-    assert CATALOG.profile_materials("high_energy") == ("tise2", "gep", "ges", "rese2")
+    assert CATALOG.profile_materials("high_energy") == ("hbn", "mose2", "mos2")
 
 
 def test_material_validation_metadata_is_typed_and_validated(tmp_path):

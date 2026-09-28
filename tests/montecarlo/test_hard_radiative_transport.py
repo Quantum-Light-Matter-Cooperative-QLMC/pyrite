@@ -3,7 +3,8 @@
 Both exact CPU cores run the mode: lockstep, and the per-electron reference
 of the CUDA kernel (whose device half is ``test_hard_radiative_cuda.py``).
 
-Validation: bremslib-radiative-partition, bremslib-radiative-event-spectrum
+Validation: bremslib-radiative-partition, bremslib-radiative-event-spectrum,
+bremslib-coupled-expected-spectrum
 """
 
 from dataclasses import replace
@@ -16,6 +17,7 @@ from pyrite.montecarlo import shell_configuration
 from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
 from pyrite.montecarlo.spectrum.brem_events import (
+    mc_coupled_brem_spectrum,
     mc_hard_brem_event_spectrum,
     mc_soft_brem_spectrum,
 )
@@ -60,9 +62,10 @@ def _run(table, core="lockstep", **kwargs):
 
 
 @pytest.mark.parametrize("core", CPU_CORES)
-def test_hard_radiative_events_debit_energy_and_close_cpu_flights(core):
+@pytest.mark.parametrize("straggling", [False, True])
+def test_hard_radiative_events_debit_energy_and_close_cpu_flights(core, straggling):
     table = _table(1e5)
-    result = _run(table, core)
+    result = _run(table, core, straggling=straggling)
     check_segment_event_contract(result)
     photons = result["hard_radiative_k_eV"]
     events = result["event_kind"] == EVENT_HARD_RADIATIVE
@@ -123,10 +126,36 @@ def test_hard_radiative_events_debit_energy_and_close_cpu_flights(core):
 
 
 @pytest.mark.parametrize("core", CPU_CORES)
-def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks(core):
+def test_expected_value_continuum_matches_the_sampled_photons_on_the_same_tracks(core):
+    """Track length over the full DDCS is the expectation of the analog sum.
+
+    On one set of coupled tracks, the soft bins are the soft scorer's exactly
+    and the hard photons' yield agrees with the expected-value estimate within
+    four standard errors of the ~370 sampled events (seeded, so deterministic).
+    """
+    table = _table(1e6)
+    result = _run(table, core)
+    grid = np.arange(500.0, 60_500.0, 1_000.0)
+    scoring = dict(cutoff_eV=1_000.0, bremslib_tables={"C": table}, composition=[("C", 0.1)])
+    expected = mc_coupled_brem_spectrum(result, grid, **scoring)
+    soft = mc_soft_brem_spectrum(result, grid, **scoring)
+    hard = mc_hard_brem_event_spectrum(result, grid, **scoring)
+
+    assert expected[0] == soft[0] > 0.0
+    events = np.count_nonzero(result["hard_radiative_k_eV"] > 0.0)
+    assert events > 300
+    relative = hard[1:].sum() / expected[1:].sum() - 1.0
+    assert abs(relative) < 4.0 / np.sqrt(events)
+    with pytest.raises(ValueError, match="spectrum cutoff must match"):
+        mc_coupled_brem_spectrum(result, grid, **(scoring | {"cutoff_eV": 2_000.0}))
+
+
+@pytest.mark.parametrize("core", CPU_CORES)
+@pytest.mark.parametrize("straggling", [False, True])
+def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks(core, straggling):
     table = _table(1e5)
-    first = _run(table, core)
-    replay = _run(table, core)
+    first = _run(table, core, straggling=straggling)
+    replay = _run(table, core, straggling=straggling)
     for field in (
         "event_kind",
         "L_ang",
@@ -141,7 +170,7 @@ def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks(c
         np.testing.assert_array_equal(first[field], replay[field])
 
     zero = _table(0.0)
-    coupled = _run(zero, core)
+    coupled = _run(zero, core, straggling=straggling)
     legacy = simulate_trajectories(
         E0_keV=60.0,
         Ne=80,
@@ -152,13 +181,15 @@ def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks(c
         energy_model="midpoint",
         transport_core=core,
         transport_lut_config=TransportLUTConfig(enabled=False),
+        straggling=straggling,
     )
     for field in ("event_kind", "L_ang", "E_start_keV", "E_end_keV", "v_hat"):
         np.testing.assert_array_equal(coupled[field], legacy[field])
 
 
 @pytest.mark.parametrize("core", CPU_CORES)
-def test_radiative_and_shell_collision_modes_share_the_cpu_event_contract(core):
+@pytest.mark.parametrize("straggling", [False, True])
+def test_radiative_and_shell_collision_modes_share_the_cpu_event_contract(core, straggling):
     if not shell_configuration._default_path().is_file():
         pytest.skip("pinned SBETHE reference data have not been fetched")
     from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
@@ -178,6 +209,7 @@ def test_radiative_and_shell_collision_modes_share_the_cpu_event_contract(core):
         seed=17,
         energy_model="midpoint",
         transport_core=core,
+        straggling=straggling,
         stopping_tables=[resolve_catalog_table("silicon").arrays()],
         inelastic_model="shell-soft-hard",
         inelastic_cutoff_eV=50.0,

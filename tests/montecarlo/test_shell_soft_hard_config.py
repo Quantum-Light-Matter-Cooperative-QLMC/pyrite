@@ -26,7 +26,12 @@ def test_inelastic_settings_validate_coupling(owner):
     assert owner().inelastic_model == "continuous"
     owner(energy_model="midpoint", inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
     with pytest.raises(ValueError, match="requires energy_model='midpoint'"):
-        owner(inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
+        owner(
+            energy_model="frozen",
+            radiative_model="uncoupled",
+            inelastic_model="shell-soft-hard",
+            inelastic_cutoff_eV=50.0,
+        )
     with pytest.raises(ValueError, match="finite positive inelastic_cutoff_eV"):
         owner(energy_model="midpoint", inelastic_model="shell-soft-hard")
     with pytest.raises(ValueError, match="requires inelastic_model"):

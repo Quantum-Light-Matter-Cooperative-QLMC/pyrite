@@ -1302,7 +1302,8 @@ Usage: pyrite profile numerics reset [OPTIONS] NAME [line-electrons|bremsstrahlu
                                      route|straggling|energy-model|maximum-fractional-
                                      energy-loss|inelastic-model|inelastic-cutoff-
                                      ev|secondary-threshold-ev|elastic-
-                                     model|bremsstrahlung-model]...
+                                     model|bremsstrahlung-model|radiative-
+                                     model|radiative-cutoff-ev]...
 
   Reset selected FIELDs, or every explicit numeric when none are named.
 
@@ -1356,6 +1357,16 @@ Options:
                                   and falls back to EEDL otherwise; bremslib requires
                                   them; eedl is the packaged EEDL continuum with an
                                   isotropic photon angle.
+  --radiative-model [auto|uncoupled|bremslib-soft-hard]
+                                  Radiative energy loss: auto (default) couples when
+                                  BremsLib resolves; uncoupled scores after transport;
+                                  bremslib-soft-hard uses soft loss plus sampled hard
+                                  photons. Coupling requires midpoint energy and
+                                  BremsLib. Missing tables and grooved targets fall back
+                                  to uncoupled scoring.
+  --radiative-cutoff-ev EV        Hard-photon cutoff k_c in eV for coupled transport
+                                  (default 1000); must not exceed the continuum electron
+                                  cutoff (1000 eV by default).  [x>0.0]
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.

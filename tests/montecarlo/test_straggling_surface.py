@@ -15,7 +15,7 @@ from pyrite.montecarlo.runner import _transport_case
 
 def test_numerics_validates_coupled_energy_controls():
     with pytest.raises(ValueError, match="requires energy_model='midpoint'"):
-        Numerics(max_dE_frac=0.02)
+        Numerics(energy_model="frozen", max_dE_frac=0.02)
     with pytest.raises(ValueError, match="finite and non-negative"):
         Numerics(energy_model="midpoint", max_dE_frac=float("nan"))
 
@@ -33,7 +33,7 @@ def test_transport_controls_lower_into_case_and_content_identity():
     )[0]
 
     assert "straggling" not in base
-    assert "energy_model" not in base
+    assert base["energy_model"] == "midpoint"
     assert "max_dE_frac" not in base
     assert active["straggling"] is True
     assert active["energy_model"] == "midpoint"
@@ -81,6 +81,8 @@ def test_case_rejects_inconsistent_manual_transport_controls():
         material_sweep("hopg", energy_keV=[30.0], thickness_ang=[1000.0]),
         n_electrons=1,
         n_electrons_brem=1,
+        energy_model="frozen",
+        radiative_model="uncoupled",
     )[0]
     with pytest.raises(ValueError, match="requires energy_model='midpoint'"):
         replace(case, max_dE_frac=0.02)

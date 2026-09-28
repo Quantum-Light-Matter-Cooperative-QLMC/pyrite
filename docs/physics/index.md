@@ -22,7 +22,7 @@ These pages describe **how the simulated physical system is represented**. For e
 ### Incoherent emission
 
 - The continuum defaults to the direction-resolved BremsLib backend when its tables are installed, and otherwise (with a warning) to isotropic EEDL bremsstrahlung — the ENDF-6 MF=23/MT=527 total cross section multiplied by the normalized MF=26/MT=527 photon-energy density. Unscreened Born Bethe--Heitler with an Elwert correction remains an optional/fallback backend; see [Bremsstrahlung](radiation-physics/bremsstrahlung.md).
-- The opt-in coupled BremsLib mode debits soft radiative loss continuously and samples hard photons that debit electron energy. It currently requires straggling to be disabled; see [Hard BremsLib photon events](radiation-physics/hard-bremsstrahlung-events.md).
+- The default coupled BremsLib mode debits soft radiative loss continuously and samples hard photons that debit electron energy; see [Hard BremsLib photon events](radiation-physics/hard-bremsstrahlung-events.md).
 - Characteristic radiation is modeled: electron-impact vacancies from EEDL subshell ionization cross sections relax through xraydb fluorescence yields with L-shell Coster--Kronig redistribution, and each line carries its natural-width Lorentzian as a separate incoherent component; see [Characteristic radiation](radiation-physics/characteristic-radiation.md). Secondary fluorescence and Auger-fed daughter vacancies are not modeled.
 
 ### Photon and detector transport

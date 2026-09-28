@@ -77,7 +77,7 @@ where a study needs it.
 
 ## Assumptions and limits
 
-- The default transport uses continuous SBETHE **collision** stopping. Without an explicit radiative transport mode, bremsstrahlung and characteristic radiation are scored from the electron histories and do not debit electron energy. The opt-in [BremsLib soft/hard radiative mode](../radiation-physics/hard-bremsstrahlung-events.md) adds its separate soft loss and sampled hard-photon debits.
+- Transport uses continuous SBETHE **collision** stopping by default. When BremsLib tables are unavailable or uncoupled transport is selected, bremsstrahlung and characteristic radiation are scored from the electron histories and do not debit electron energy. The default [BremsLib soft/hard radiative mode](../radiation-physics/hard-bremsstrahlung-events.md) adds its separate soft loss and sampled hard-photon debits.
 - With `straggling=True`, Urban fluctuations are scaled to the SBETHE mean; the default is deterministic. See `Validation: energy-loss-straggling` and the [derivation and observable checks](../../validation/beam-transport/energy-loss-straggling.md).
 - The continuous model omits discrete knock-on electrons. The opt-in [shell soft/hard mode](shell-soft-hard-transport.md) samples hard inelastic transfers and can launch secondaries above its threshold; it uses SBETHE to close the mean collision loss.
 - SBETHE includes shell and density-effect corrections above its material-dependent `ECUT`; below that it supplies an empirical extrapolation. PyRITE accepts its table only from 1 keV to 1 GeV and does not extrapolate outside those nodes.

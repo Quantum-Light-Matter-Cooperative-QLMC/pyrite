@@ -93,7 +93,7 @@ def test_bash_block_is_checked_or_explicitly_skipped(block: FencedBlock):
 def test_guides_contain_the_expected_number_of_bash_blocks():
     # Guards against the parametrized test above silently collecting zero
     # cases (e.g. a glob typo) and passing vacuously.
-    assert len(_bash_blocks()) == 48
+    assert len(_bash_blocks()) == 50
 
 
 # --- tier 2: python blocks execute as one accumulating namespace ---------

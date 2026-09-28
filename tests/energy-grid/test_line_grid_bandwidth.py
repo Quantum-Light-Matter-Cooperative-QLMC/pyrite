@@ -5,12 +5,13 @@ refusals, case construction where the ceiling alone overflows the budget, and
 the production-weight truncation audit.
 """
 
+import warnings
 from dataclasses import replace
 
 import numpy as np
 import pytest
 
-from pyrite._backend import xp
+from pyrite._backend import _to_cpu, xp
 from pyrite._line_grid_policy import (
     AUTOMATIC_BANDWIDTH_POLICY,
     DEFAULT_BANDWIDTH_TRUNCATION,
@@ -18,6 +19,7 @@ from pyrite._line_grid_policy import (
     RESONANCE_BANDWIDTH_POLICY,
     RESONANCE_LINE_GRID_POLICY_SCHEMA,
     LineGridToleranceError,
+    LineYieldStatisticsWarning,
     resolve_line_grid_policy,
     resolved_coordinates,
 )
@@ -25,9 +27,11 @@ from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import build_cases
 from pyrite.energy_grid.bandwidth_check import reference_axis
 from pyrite.montecarlo.runner.line_grid import (
+    LINE_YIELD_RELATIVE_SE_LIMIT,
     _measured_line_grid,
     check_line_truncation,
     line_truncation_audit,
+    line_yield_statistics,
 )
 from pyrite.montecarlo.spectrum.line_seeds import (
     ResonancePopulation,
@@ -215,10 +219,57 @@ def test_audit_accumulates_and_gates_the_upper_edge():
     assert record["lower_fraction_bound"] > 0.0
 
 
+def test_audit_sums_line_mass_per_electron_when_counted():
+    audit = line_truncation_audit(_audited_case(), np.linspace(50.0, 1000.0, 5), n_electrons=3)
+    assert audit["n_electrons"] == 3
+    E_r = xp.asarray([500.0, 600.0, 700.0])
+    a_width = xp.asarray([np.pi, np.pi, np.pi / 2.0])
+    _accumulate_edge_truncation(audit, E_r, a_width, xp.ones(3), xp.asarray([0, 2, 0]))
+    np.testing.assert_allclose(_to_cpu(audit["electron_mass"]), [3.0, 0.0, 1.0])
+    assert float(audit["line_mass"]) == pytest.approx(4.0)
+    with pytest.raises(ValueError, match="outside the 3 line electrons"):
+        _accumulate_edge_truncation(audit, E_r[:1], a_width[:1], xp.ones(1), xp.asarray([3]))
+
+
+def test_line_yield_statistics_is_the_relative_standard_error_of_the_mean():
+    mass = np.array([1.0, 2.0, 3.0, 0.0])
+    stats = line_yield_statistics(mass)
+    expected = mass.std(ddof=1) / np.sqrt(mass.size) / mass.mean()
+    assert stats["relative_se"] == pytest.approx(expected)
+    assert stats["max_electron_share"] == pytest.approx(0.5)
+    assert line_yield_statistics(np.zeros(4))["relative_se"] is None
+
+
+def test_audit_warns_when_a_rare_electron_carries_the_line_yield():
+    """#201: a statistics-limited yield is flagged and warned about, not refused."""
+    case = _audited_case()
+    even = {"start_eV": 50.0, "stop_eV": 1000.0, "n_electrons": 400}
+    rare = dict(even)
+    E_r = xp.full(400, 500.0)
+    a_width = xp.full(400, np.pi / 0.01)
+    ids = xp.arange(400)
+    _accumulate_edge_truncation(even, E_r, a_width, xp.ones(400), ids)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", LineYieldStatisticsWarning)
+        record = check_line_truncation(case, even)
+    stats = record["line_yield_statistics"]
+    assert stats["relative_se"] < LINE_YIELD_RELATIVE_SE_LIMIT
+    assert not stats["statistics_limited"]
+    weights = xp.asarray(np.r_[1.0e3, np.ones(399)])
+    _accumulate_edge_truncation(rare, E_r, a_width, weights, ids)
+    with pytest.warns(LineYieldStatisticsWarning, match="relative standard error"):
+        record = check_line_truncation(case, rare)
+    stats = record["line_yield_statistics"]
+    assert stats["statistics_limited"]
+    assert stats["max_electron_share"] == pytest.approx(1.0e3 / 1399.0)
+
+
 def test_production_line_collection_retains_resonance_width_and_weight():
     audit = {"start_eV": 50.0, "stop_eV": 2000.0, "collect": []}
     _accumulate_edge_truncation(
-        audit, xp.asarray([500.0, 900.0]), xp.asarray([np.pi, np.pi / 10]),
+        audit,
+        xp.asarray([500.0, 900.0]),
+        xp.asarray([np.pi, np.pi / 10]),
         xp.asarray([2.0, 0.5]),
     )
     energy, width, weight = audit["collect"][0]
@@ -232,12 +283,14 @@ def test_measured_grid_uses_collected_production_weights(monkeypatch):
     from pyrite.montecarlo import runner
 
     policy = resolve_line_grid_policy(
-        start_eV=50.0, stop_eV=100_000.0,
+        start_eV=50.0,
+        stop_eV=100_000.0,
         per_call={"bandwidth": RESONANCE_BANDWIDTH_POLICY},
     ).payload()
     case = {"composition": [("B", 0.5), ("N", 0.5)]}
     collected = (
-        np.array([500.0, 900.0]), np.array([1.0, 100.0]),
+        np.array([500.0, 900.0]),
+        np.array([1.0, 100.0]),
         np.array([100.0, 1.0]),
     )
 
@@ -251,8 +304,12 @@ def test_measured_grid_uses_collected_production_weights(monkeypatch):
         policy, case, {}, np.array([0.0, 0.0, 1.0]), 2, 1.0, None, None
     )
     expected, _ = case_line_stop_eV(
-        case, [ResonancePopulation("production lines", collected[0], collected[2], collected[1])],
-        start_eV=50.0, ceiling_eV=100_000.0, truncation_limit=1e-4, proxy_safety=2.0,
+        case,
+        [ResonancePopulation("production lines", collected[0], collected[2], collected[1])],
+        start_eV=50.0,
+        ceiling_eV=100_000.0,
+        truncation_limit=1e-4,
+        proxy_safety=2.0,
     )
     assert grid[-1] == expected == bandwidth["stop_eV"]
 

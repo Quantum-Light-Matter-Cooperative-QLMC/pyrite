@@ -16,6 +16,7 @@ from ...._backend import REAL, _to_cpu, xp
 from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
 from ..segment_escape import piece_mean_transmission
 from . import _policy
+from ._attribution import record_line_attribution
 from ._bin_quadrature import run_bin_mean_reduction_kernel, sincsq_bin_lineshape
 from ._formation import formation_coefficients, formation_profile
 from ._kernels import (
@@ -716,7 +717,20 @@ def _batched_incoherent_block(st, bt, blk, line_batch):
     E_r_f = E_res.reshape(-1)[gm_idx]
     aw_f = a_width.reshape(-1)[gm_idx]
     w_f = weight.reshape(-1)[gm_idx]
-    _accumulate_edge_truncation(req.truncation_audit, E_r_f, aw_f, w_f)
+    record_line_attribution(
+        req.truncation_audit,
+        st,
+        bt,
+        blk,
+        gm_idx,
+        E_r_f,
+        aw_f,
+        w_f,
+        {"T_abs": T_abs, "A2": A2, "A2_pxr": A2_pxr, "A2_cbs": A2_cbs},
+    )
+    _accumulate_edge_truncation(
+        req.truncation_audit, E_r_f, aw_f, w_f, st.seg_elec_id[blk.sb][gm_idx // bt.N_g]
+    )
     if req.truncation_audit is not None and "collect" in req.truncation_audit:
         return
 

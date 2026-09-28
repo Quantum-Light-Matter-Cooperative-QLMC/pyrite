@@ -431,3 +431,92 @@ contain rare, very heavy far lines: a heavy-tailed line-weight estimator
 not a grid effect. The lower-edge bound also reaches 2e-3, above the 1e-3
 budget, and is ungated. Needs per-electron yield attribution before any
 production conclusion.
+
+## #201 line attribution (2026-09-27, post-#172 rebase)
+
+Branch rebased onto the #172 tip (coupled radiative transport and midpoint
+energy now default; the remote box still falls back to uncoupled EEDL for
+h-BN). Diagnostic `b7e91ba5`: `bandwidth_check attribute` /
+`start-bandwidth --attribute` records the heaviest lines (mass `w pi/a_w`) with
+their factors and the per-electron line mass. No weight or spectrum change.
+
+SLURM 213 (`20260927-183307-2dbea117`): 1 mm 10/100, Ne=8,000, seed 0, local
+resolution, CUDA FP32 then FP64 on identical transport (21.8 M segments,
+43.0 M / 43.6 M lines). Reports: `/tmp/issue201_attribution_ne8000.json`,
+`/tmp/issue201_attribution_ne8000.fp64.json`.
+
+- Line mass per electron 2.589e-6 (FP32) vs 2.589e-6 (FP64); every
+  per-electron and quarter sum agrees to ~1e-6. Not a precision artifact.
+- Two electrons carry 99.6% of the case's line mass: 5025 (65.1%) and 4868
+  (33.4%). Electron quarter sums: 9.8e-5, 5.1e-5, **2.05e-2**, 4.1e-5. All
+  200 heaviest lines come from those two electrons: long straight flights of
+  90-110 consecutive segments on reflections rows 0-3 (|g| = 1.89 A^-1, the
+  (0002)-type row set).
+- The lines are CBS-dominated (|A_CBS|^2 / |A_PXR|^2 median 11 and 68), at
+  5-42 keV, widths 94-200 eV. Detuning is ordinary (3-4.6 A^-2), so the Bragg
+  detuning hypothesis is refuted.
+- Mechanism: `1 - v.n` = 6.5e-3-7.6e-3 against `1/(2 gamma^2)` = 6.3e-3,
+  i.e. the electron travels 15-120 mrad from the detector direction, inside
+  its 1/gamma = 112 mrad radiation cone. Its `v.g` is 0.02-0.14 A^-1 against
+  1.85 for the ordinary 3.6 keV line population. The CBS factor
+  `f_cbs ~ 1/(gamma v.g)` (plus a `1/(v.g)^2` term) and the Doppler-boosted
+  `omega` make each line ~1e2-1e3 heavier than an ordinary line.
+- The amplitude is inside its stated validity: `|U_g| g^2 / (gamma m c^2
+  (v.g)^2)` <= 0.018; angle to the planes 10-72 mrad, above the h-BN
+  Lindhard angle (~3 mrad at 5 MeV), so this is not planar channeling.
+- Consequence: the 10/100 incoherent line yield is a rare-event estimator.
+  Only electrons scattered by ~90 deg into the detector's 1/gamma cone
+  contribute appreciably. From the top 20 electrons the relative standard
+  error of the mean is ~0.73 at Ne=8,000. The 70x jump between Ne=4,000 and
+  8,000 is sampling, not a bug. 80/180 is stable because its geometry has no
+  such population, or has not sampled it.
+
+Decision needed (#201 acceptance: "documented variance policy"): report
+per-electron standard error and gate on it; add a variance-reduction scheme
+(e.g. directional biasing/splitting of electrons scattered toward the
+detector cone); or scope 5 MeV incoherent line yields as statistics-limited.
+Also open: whether these electrons also dominate the measured stop (672 keV
+at Ne=8,000 predates the #172 defaults) and the lower-edge audit.
+
+## Measured-stop attribution and standard-error gate (2026-09-27)
+
+Decision (user): option 1, gate on the per-electron standard error; option 2
+(variance reduction) opened as #203.
+
+`2974a801`: resonance-population audits now sum line mass per line electron
+(both kernel routes) and `check_line_truncation` refuses a case whose relative
+standard error of the mean exceeds `LINE_YIELD_RELATIVE_SE_LIMIT = 0.1`,
+recording `line_yield_statistics` (n, relative SE, largest electron share).
+The attribution diagnostic also ranks lines/electrons by their tail bound above
+the measured stop.
+
+SLURM 215 (`20260927-191234-75a65730`), 1 mm 10/100, seed 0, local
+resolution, FP32 and FP64 identical to shown precision. Reports:
+`/tmp/issue201_stop_attribution.json`, `/tmp/issue201_stop_attribution.fp64.json`.
+
+| Ne | stop eV | max resonance eV | top-1 / top-10 electron mass share | stop tail by electron |
+|---:|---:|---:|---|---|
+| 4,000 | 35,400 | 20,705 | 0.51 / 0.76 | 159: 0.69, 3986: 0.13, 2704: 0.08 |
+| 8,000 | 672,400 | 77,474 | 0.65 / 0.996 | 5025: 0.63, 4868: 0.37, 4073: 0.001 |
+
+The 672 keV stop reproduces under the #172 defaults and is set entirely by the
+two rare detector-cone electrons. No line resonates above 77.5 keV; the edge
+sits ~600 keV higher because their lines are both heavy and wide (small
+`1 - v.n` gives first-zero widths 0.5-9.5 keV), and the `w/(pi^2 D)` tail bound
+decays only as 1/D. Given the sampled population the stop is correct (the bound
+is ~2x the exact far tail), so it is a symptom of the rare-event estimator, not
+a selector bug. Even Ne=4,000 is dominated by one electron (51% of the mass;
+159 is the heaviest electron at Ne=8,000 outside the two cone electrons), so
+the new gate refuses both counts. Likely also the source of the ~2e-3
+lower-edge bound (wide lines at 5-13 keV spill below `start`); not measured.
+
+Next: a stable 5 MeV 10/100 yield needs #203. Remaining #192 items
+(fresh-context validation, `high_energy` opt-in) proceed for cases that pass
+the gate; 5 MeV h-BN 10/100 at 1 mm stays refused until #203.
+
+Revision (user, same day): statistics-limited cases must run, with warnings,
+not be refused. Above the 0.1 relative standard error the truncation record's
+`line_yield_statistics.statistics_limited` is true and
+`LineYieldStatisticsWarning` names the error, electron count and largest
+electron share. The upper-edge truncation gate is unchanged. 5 MeV h-BN
+10/100 at 1 mm therefore runs, flagged, until #203 reduces its variance.

@@ -12,7 +12,7 @@ Prefer the installed CLI: ``pyrite run [PROFILE] -m <material>``.
 from pyrite.materials import MaterialConfigError
 
 try:
-    from pyrite.cli.commands.scan import command
+    from pyrite.cli.commands.scan import _command as command
     from pyrite.console.output import run
 except MaterialConfigError as exc:
     raise SystemExit(str(exc)) from None

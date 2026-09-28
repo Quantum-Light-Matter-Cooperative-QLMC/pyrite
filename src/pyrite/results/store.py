@@ -22,6 +22,7 @@ from .._numerics import (
     validate_bremsstrahlung_model,
     validate_elastic_model,
     validate_inelastic_numerics,
+    validate_radiative_numerics,
 )
 from .._spectral_components import line_spectrum
 from ..detectors import Detector, LegacyEDS
@@ -104,6 +105,10 @@ class Settings:
     bremsstrahlung_model
         ``"auto"`` (default: BremsLib when installed, else EEDL), ``"eedl"`` or
         ``"bremslib"`` continuum source.
+    radiative_model, radiative_cutoff_eV
+        ``"auto"`` (default) couples when BremsLib resolves; ``"uncoupled"``
+        selects post-hoc continuum scoring. The hard-photon cutoff defaults
+        to 1000 eV when coupling runs.
     emission
         ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
     """
@@ -120,13 +125,15 @@ class Settings:
     n_electrons: int = 450  # transport electrons for the lines
     n_electrons_brem: int = 100  # transport electrons for the background
     straggling: bool = False
-    energy_model: Literal["frozen", "midpoint"] = "frozen"
+    energy_model: Literal["frozen", "midpoint"] = "midpoint"
     max_dE_frac: float = 0.0
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
     secondary_threshold_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
     bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
+    radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "auto"
+    radiative_cutoff_eV: float | None = None
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so
@@ -152,6 +159,13 @@ class Settings:
         )
         validate_elastic_model(self.elastic_model)
         validate_bremsstrahlung_model(self.bremsstrahlung_model)
+        validate_radiative_numerics(
+            self.radiative_model,
+            self.radiative_cutoff_eV,
+            self.energy_model,
+            self.straggling,
+            self.bremsstrahlung_model,
+        )
 
     @property
     def coherent_emission(self) -> bool:

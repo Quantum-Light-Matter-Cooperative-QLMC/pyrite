@@ -64,7 +64,7 @@ $S_s$ (keV Å$^{-1}$) is interpolated log-log like the full table; the hard rate
 - $E_{\rm escaped}$ is the kinetic energy at the exit row of every track that leaves the target through any face.
 - $E_{\rm deposited}$ collects the continuous (soft) loss $E_{\rm start}-E_{\rm end}$ of every row, the residual energy of every track that ends at its cutoff, and the kinetic energy of every secondary at or below $T_s$. In the coupled radiative mode the continuous loss also carries the soft radiative share below `radiative_cutoff_eV`.
 - $E_{\rm binding}$ is the inner-shell binding $U_k$ reserved at every explicit vacancy (`binding_reserved`). Vacancies stay bookkeeping-only until #91; see below.
-- $E_{\rm radiated}$ is the energy of hard photons in the coupled `bremslib-soft-hard` mode. With the default uncoupled model, radiation is scored after transport and debits no electron energy.
+- $E_{\rm radiated}$ is the energy of hard photons in the coupled `bremslib-soft-hard` mode. With the uncoupled model, radiation is scored after transport and debits no electron energy.
 
 The identity also holds per primary history. Launched secondary energy appears in no term directly: it is the next generation's initial energy. $E_{\rm binding}$ is not small: with $W_c=50$ eV the L shells of Si are explicit vacancies, and reserved binding is about 12% of the incident energy of a 20 keV beam stopped in Si. A dose tally that omits it undercounts local deposition until #91 relaxes the vacancies; `checks/shell_secondary_transport_observables.py` deposits it at the collision point.
 
