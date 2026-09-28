@@ -60,3 +60,15 @@ def test_catalog_cifs_symlink_cannot_escape_catalog(tmp_path):
 
     with pytest.raises(MaterialConfigError, match="must stay inside cifs/"):
         load_material_catalog(catalog)
+
+
+def test_missing_selected_catalog_fails_without_fallback(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
+    missing = tmp_path / "missing"
+
+    by_option = CliRunner().invoke(command, ["--catalog", str(missing), "profile", "list"])
+    by_env = CliRunner().invoke(command, ["profile", "list"], env={"PYRITE_CATALOG": str(missing)})
+
+    assert by_option.exit_code != 0
+    assert by_env.exit_code != 0
+    assert "standard:" not in by_env.output
