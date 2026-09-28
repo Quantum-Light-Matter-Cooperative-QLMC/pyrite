@@ -86,6 +86,19 @@ def test_config_set_rejects_unsafe_slurm_partition(monkeypatch, tmp_path):
     assert not path.exists()
 
 
+def test_config_help_describes_every_key():
+    for args in (["--help"], ["set", "--help"]):
+        result = invoke(config_command.command, args)
+
+        assert result.exit_code == 0
+        for key in _config.keys():
+            env_name, default, text = _config.describe(key)
+            assert f"  {key} " in result.output
+            assert text in result.output
+            assert f"{env_name}; {default}" in result.output
+        assert all(len(line) <= 80 for line in result.output.splitlines())
+
+
 def test_config_set_workspace_root_normalizes_path(monkeypatch, tmp_path):
     _isolated_store(monkeypatch, tmp_path)
     monkeypatch.chdir(tmp_path)

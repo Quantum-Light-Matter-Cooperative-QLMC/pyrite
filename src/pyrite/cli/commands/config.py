@@ -12,6 +12,20 @@ from .._groups import LazyGroup
 _KEY = click.Choice(_config.keys(), case_sensitive=True)
 
 
+def _keys_epilog() -> str:
+    """Describe every KEY with its environment variable and built-in default."""
+    width = max(map(len, _config.keys()))
+    lines = ["\b", "Keys (environment variable; built-in default):"]
+    for key in _config.keys():
+        env_name, default, text = _config.describe(key)
+        lines.append(f"  {key:<{width}}  {text}")
+        lines.append(f"  {'':<{width}}  {env_name}; {default}")
+    return "\n".join(lines)
+
+
+_KEYS_EPILOG = _keys_epilog()
+
+
 def _validated(key: str, value: str) -> str:
     """Validate VALUE for KEY, returning the spelling that gets stored.
 
@@ -83,17 +97,22 @@ def _validated_code_source(key: str, value: str) -> str:
         "setup": "Detect GPU hardware and persist the selected backend.",
         "completion": "Manage PyRITE shell tab-completion.",
     },
+    epilog=_KEYS_EPILOG,
 )
 def command() -> None:
     """Set and inspect environment-scoped CLI defaults.
 
     Values resolve in one order everywhere: per-call flag, PYRITE_* environment,
-    config store, then built-in default.
+    config store, then built-in default. `pyrite config list` shows each
+    effective value and its source.
+
+    Remote runs need remote.target. The other remote.* keys select the SLURM
+    target profile; their defaults are the NVIDIA lab box.
     """
 
 
-@command.command("set")
-@click.argument("key", type=_KEY)
+@command.command("set", epilog=_KEYS_EPILOG)
+@click.argument("key", type=_KEY, metavar="KEY")
 @click.argument("value")
 def set_command(key: str, value: str) -> None:
     """Persist VALUE for KEY."""
@@ -106,9 +125,12 @@ def set_command(key: str, value: str) -> None:
 
 
 @command.command("get")
-@click.argument("key", type=_KEY)
+@click.argument("key", type=_KEY, metavar="KEY")
 def get_command(key: str) -> None:
-    """Print the effective value for KEY."""
+    """Print the effective value for KEY.
+
+    See `pyrite config --help` for the supported keys.
+    """
     try:
         click.echo(_config.resolve(key).value)
     except _config.ConfigError as exc:

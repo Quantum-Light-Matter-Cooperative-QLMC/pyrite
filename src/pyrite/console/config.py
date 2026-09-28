@@ -43,6 +43,27 @@ _SETTINGS = {
     "xsgen.sbethe_source": ("PYRITE_XSGEN_SBETHE_SOURCE", "../sbethe"),
 }
 
+# One-line help per key, shown by ``pyrite config --help`` / ``config set --help``.
+_DESCRIPTIONS = {
+    "profile.current": "Default catalog scan profile.",
+    "remote.target": "SSH alias of the SLURM head node (required).",
+    "remote.gpu_vendor": "Remote GPU vendor: nvidia or amd.",
+    "remote.partition": "SLURM partition for new remote jobs.",
+    "remote.nodelist": "SLURM node list for new remote jobs, or 'any'.",
+    "remote.gres": "SLURM gres request, e.g. gpu:radeon8060s:1.",
+    "workspace.root": "Workspace directory for checkpoints and outputs.",
+    "catalog.path": "Material catalog directory or file.",
+    "xsgen.bremslib_source": "BremsLib source tree for table generation.",
+    "xsgen.elsepa_source": "ELSEPA source tree for table generation.",
+    "xsgen.sbethe_source": "SBETHE source tree for table generation.",
+}
+# Built-in defaults that read better as a phrase than as their raw value.
+_DEFAULT_LABELS = {
+    "remote.target": "unset",
+    "workspace.root": "current directory",
+    "catalog.path": "bundled catalog",
+}
+
 
 class ConfigError(ValueError):
     """The user configuration store is unreadable or invalid."""
@@ -57,6 +78,12 @@ class ResolvedValue:
 def keys() -> tuple[str, ...]:
     """Return supported context keys in stable display order."""
     return tuple(_SETTINGS)
+
+
+def describe(key: str) -> tuple[str, str, str]:
+    """Return ``(environment variable, built-in default label, one-line help)`` for KEY."""
+    env_name, default = _SETTINGS[key]
+    return env_name, _DEFAULT_LABELS.get(key, default), _DESCRIPTIONS[key]
 
 
 def _store_path_for_read() -> Path:
