@@ -45,7 +45,7 @@ def _resolved(document, name, text):
     )
     if effective is None or "acquisition" not in effective:
         return None
-    catalog = _catalog_io.validated_catalog(_catalog_io._CATALOG_PATH, text, profile=name)
+    catalog = _catalog_io.validated_catalog(_catalog_io.active_catalog_path(), text, profile=name)
     return resolve_profile_observation(catalog, name)
 
 
@@ -327,7 +327,7 @@ def set_command(name, yes, dry_run, **values):
             acquisition=acquisition,
         )
         proposed = tomlkit.dumps(document)
-        _catalog_io.validate(_catalog_io._CATALOG_PATH, proposed)
+        _catalog_io.validate(_catalog_io.active_catalog_path(), proposed)
         observation = _resolved(document, name, proposed)
     except (ValueError, TypeError) as exc:
         raise click.UsageError(str(exc)) from None

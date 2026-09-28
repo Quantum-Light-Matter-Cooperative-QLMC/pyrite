@@ -32,6 +32,7 @@ def test_config_set_get_and_list_effective_values(monkeypatch, tmp_path):
             "profile.current\tsub_100keV\tconfig store\n"
             "remote.target\tbox-a\tconfig store\n"
             "workspace.root\t.\tbuilt-in default\n"
+            f"catalog.path\t{_config.resolve('catalog.path').value}\tbuilt-in default\n"
             # The external-code source trees resolve through the same store
             # and the same precedence, so they list beside everything else.
             "xsgen.bremslib_source\t../BremsLib_v2.0.8\tbuilt-in default\n"

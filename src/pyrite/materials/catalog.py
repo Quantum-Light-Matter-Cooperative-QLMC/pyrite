@@ -11,7 +11,7 @@ from threading import Lock
 from types import MappingProxyType
 from typing import cast
 
-from .._catalog_layout import CatalogLayoutError, Sources, bundled_catalog, catalog_root
+from .._catalog_layout import CatalogLayoutError, Sources, catalog_root, selected_catalog
 from .._catalog_layout import load_raw as _load_raw
 from .._catalog_layout import read_sources as _read_sources
 from ._beam_detector_parse import _parse_beams, _parse_detectors
@@ -50,7 +50,7 @@ def load_material_catalog(
     ----------
     path
         Single-file TOML catalog or catalog directory (one file per object).
-        ``None`` loads the packaged catalog directory.
+        ``None`` loads the selected catalog directory (packaged by default).
     profile
         Profile whose inherited scan grids and artifact references are resolved.
 
@@ -64,7 +64,7 @@ def load_material_catalog(
     MaterialConfigError
         If the file cannot be read, parsed, or validated for ``profile``.
     """
-    source = bundled_catalog() if path is None else Path(path)
+    source = selected_catalog() if path is None else Path(path)
 
     try:
         sources = _read_sources(source)
@@ -118,7 +118,7 @@ def _load_material_catalog_cached(
     profile_artifacts, profile_energy_grid_refs = _load_profile_artifacts(
         source, profiles, profile, errors
     )
-    crystals = _parse_crystals(raw.get("crystals"), errors)
+    crystals = _parse_crystals(raw.get("crystals"), errors, source=source)
     media = _parse_media(raw.get("media"), errors)
     energy_grids = _parse_energy_grids(raw.get("energy_grids", {}), errors)
     resolved_energy_grid_refs: dict[str, str] = {}

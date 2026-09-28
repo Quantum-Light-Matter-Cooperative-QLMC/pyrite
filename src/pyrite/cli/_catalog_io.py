@@ -6,7 +6,8 @@ from pathlib import Path
 
 import tomlkit
 
-from pyrite._catalog_layout import catalog_root, read_text, write_text
+from pyrite._catalog_layout import bundled_catalog, catalog_root, read_text, write_text
+from pyrite.console.config import catalog_path
 from pyrite.energy_grid.apply import _CATALOG_PATH
 from pyrite.materials.catalog import load_material_catalog
 
@@ -17,6 +18,12 @@ RANGES = {
     "azimuth": "tilt_azim_deg",
 }
 DEFAULT_PROFILE = "standard"
+
+
+def active_catalog_path() -> Path:
+    """Selected catalog, retaining the legacy test override for the default."""
+    selected = catalog_path()
+    return _CATALOG_PATH if selected == bundled_catalog().resolve() else selected
 
 
 def range_values(row, key):
@@ -32,7 +39,7 @@ def display(values):
 
 def current_text(path=None):
     """Return the catalog as one TOML text (a directory is assembled)."""
-    return read_text(_CATALOG_PATH if path is None else path)
+    return read_text(active_catalog_path() if path is None else path)
 
 
 def catalog_text(path=None):

@@ -1106,13 +1106,13 @@ def delete_command(name, yes, dry_run, json_output):
         current = _catalog_io.current_text()
         if current != original:
             raise ValueError("material catalog changed after preview; rerun command")
-        _catalog_io.validate(_catalog_io._CATALOG_PATH, proposed)
+        _catalog_io.validate(_catalog_io.active_catalog_path(), proposed)
     except (OSError, ValueError, ParseError) as exc:
         if json_output:
             emit_json_result(cli_json.failure("cxr.profile.delete", {}, str(exc)))
             return 1
         raise CLIError(str(exc)) from None
-    _catalog_io.atomic_write(_catalog_io._CATALOG_PATH, proposed)
+    _catalog_io.atomic_write(_catalog_io.active_catalog_path(), proposed)
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.profile.delete", {"deleted": name}))
         return 0

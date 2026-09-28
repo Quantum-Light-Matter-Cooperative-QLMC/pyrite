@@ -25,6 +25,15 @@ def _validated(key: str, value: str) -> str:
             return validate_remote_target(value)
         except ValueError as exc:
             raise click.BadParameter(str(exc), param_hint="VALUE") from exc
+    if key == "catalog.path":
+        from ...materials.catalog import MaterialConfigError, load_material_catalog
+
+        path = Path(value).expanduser().resolve()
+        try:
+            load_material_catalog(path)
+        except MaterialConfigError as exc:
+            raise click.BadParameter(str(exc), param_hint="VALUE") from exc
+        return str(path)
     if key == "workspace.root":
         return str(Path(value).expanduser().resolve())
     if key.startswith("xsgen."):

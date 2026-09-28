@@ -66,6 +66,26 @@ SYNC_PATHS = [
     "THIRD-PARTY-NOTICES.md",
 ]
 
+
+def remote_catalog_path() -> str | None:
+    """Return the staged catalog path when a non-bundled catalog is selected."""
+    from .._catalog_layout import bundled_catalog, selected_catalog
+
+    source = selected_catalog()
+    if source == bundled_catalog().resolve():
+        return None
+    name = "external-catalog" if source.is_dir() else "external-catalog.toml"
+    return remote_path(name)
+
+
+def remote_runtime_env() -> str:
+    """Environment assignments for direct remote PyRITE invocations."""
+    assignments = [f"PYRITE_HOME={shell_word(remote_dir())}"]
+    catalog = remote_catalog_path()
+    if catalog is not None:
+        assignments.append(f"PYRITE_CATALOG={shell_word(catalog)}")
+    return " ".join(assignments)
+
 # text extensions whose CRLF is normalized to LF before tarring (see _add_to_tar):
 # the laptop is Windows so its working files are CRLF, and shipping those over the
 # box's LF checkout dirties `git status` there even though content is identical.

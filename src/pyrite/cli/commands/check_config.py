@@ -23,7 +23,10 @@ def _run(args: SimpleNamespace) -> None:
     except MaterialConfigError as exc:
         raise SystemExit(str(exc)) from None
 
-    source = str(path) if path is not None else "bundled catalog"
+    from ..._catalog_layout import bundled_catalog, selected_catalog
+
+    selected = selected_catalog() if path is None else path
+    source = "bundled catalog" if path is None and selected == bundled_catalog() else str(selected)
     print(
         f"{_cli_core.paint('valid', 'done')} material catalog: {source} "
         f"({len(catalog.materials)} materials, {len(catalog.crystals)} crystals, "

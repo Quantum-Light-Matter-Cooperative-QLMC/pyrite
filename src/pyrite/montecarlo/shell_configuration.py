@@ -53,7 +53,11 @@ def _nl(label: str) -> str:
 
 
 def _default_path() -> Path:
-    return user_data_dir() / "xsgen/reference-data/sbethe/sdbase/pdatconf.p14"
+    from ..xsgen.sources import fetched_data_dir
+
+    selected = fetched_data_dir("sbethe", "sdbase") / "pdatconf.p14"
+    legacy = user_data_dir() / "xsgen/reference-data/sbethe/sdbase/pdatconf.p14"
+    return selected if selected.is_file() or not legacy.is_file() else legacy
 
 
 def load_atomic_shells(path: str | Path | None = None) -> dict[int, tuple[AtomicShell, ...]]:
