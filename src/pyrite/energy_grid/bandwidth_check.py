@@ -291,6 +291,7 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
             args.material, args.energy, config, seed=args.seed, resolution=args.resolution
         )
         case["_profile_line_grid_stages"] = True
+        case["_min_line_electron_blocks"] = int(args.min_electron_blocks)
         row: dict[str, Any] = {**config, "real": np.dtype(REAL).name}
         started = time.perf_counter()
         try:
@@ -452,6 +453,7 @@ def build_parser() -> argparse.ArgumentParser:
     prod.add_argument("--seed", type=int, default=0)
     prod.add_argument("--resolution", choices=("uniform", "local"), default="uniform")
     prod.add_argument("--json-out", required=True)
+    prod.add_argument("--min-electron-blocks", type=int, default=1)
     cand = commands.add_parser("candidate", help="float32 measured-axis evaluation")
     cand.add_argument("--payload", required=True)
     cand.add_argument("--json-out", required=True)

@@ -720,7 +720,10 @@ def _lines_for_segments(
     if bool(wants_coherent) or not _RESOURCE_POLICY.gpu:
         return once(segs)
     n_segments = int(segs["L_ang"].shape[0])
-    n_blocks = electron_block_count(n_segments, device_headroom_bytes())
+    n_blocks = max(
+        electron_block_count(n_segments, device_headroom_bytes()),
+        int(case.get("_min_line_electron_blocks", 1)),
+    )
     while True:
         saved = snapshot_audit(truncation_audit)
         if case.get("_profile_line_grid_stages"):

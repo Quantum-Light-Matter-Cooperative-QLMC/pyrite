@@ -360,6 +360,7 @@ def remote_bandwidth_commands(args: argparse.Namespace, uv: str) -> list[str]:
                     f"--configs {shlex.quote(args.configs)}",
                     f"--resolution {shlex.quote(args.resolution)}",
                     f"--seed {int(args.seed)} --json-out {report}",
+                    f"--min-electron-blocks {int(args.min_electron_blocks)}",
                 ]
             )
         ]
@@ -574,6 +575,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bandwidth.add_argument(
         "--time-limit-minutes", type=int, default=DEFAULT_PRECISION_TIME_LIMIT_MINUTES
+    )
+    bandwidth.add_argument(
+        "--min-electron-blocks",
+        type=int,
+        default=1,
+        help="production only: split line sums into at least this many electron blocks",
     )
     bandwidth.add_argument(
         "--mem-per-cpu",

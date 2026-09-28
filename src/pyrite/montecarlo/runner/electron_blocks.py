@@ -15,10 +15,10 @@ from ..spectrum.lines._kernels import _SEG_ARRAYS
 
 #: Peak device bytes one segment costs in an incoherent line sum: resident rows
 #: (~86 B at FP32) plus the per-segment setup arrays that the kernel's
-#: ``(n_block, N_g)`` bound does not cover. SLURM 207 (h-BN 5 MeV, 1 mm,
-#: Ne=8,000, ~22-34 M segments) held ~9 GiB live when a further ~0.85 GB
-#: allocation overran an 11.4 GiB pool, i.e. well above 256 B per segment.
-LINE_DEVICE_BYTES_PER_SEGMENT = 512
+#: ``(n_block, N_g)`` bound does not cover. SLURM 209 (h-BN 5 MeV, 1 mm,
+#: 22-86 M segments, 11.4 GiB pool): blocks at ~1,000 B of headroom per
+#: segment fit, blocks at ~500 B overran.
+LINE_DEVICE_BYTES_PER_SEGMENT = 1024
 
 #: Largest block count the OOM retry doubles to before re-raising to the
 #: spectrum phase's own chunk-halving retry.
