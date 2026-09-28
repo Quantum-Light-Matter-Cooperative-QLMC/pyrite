@@ -1101,6 +1101,148 @@ offset_mm = [0.5, 0.0]
     assert catalog.profile_filters["standard"][0]["offset_mm"] == (0.5, 0.0)
 
 
+def test_profile_observation_schema_decodes_and_resolves_without_cli(tmp_path):
+    from pyrite.campaign.observation import resolve_profile_observation
+    from pyrite.detectors import Timepix3
+    from pyrite.materials import load_material_catalog
+
+    text = (
+        _minimal_catalog(
+            material_rows="""
+[materials.mos2]
+display_name = "mos2"
+crystal = "mos2"
+"""
+        )
+        + """
+[profiles.standard.physical_detector]
+distance_mm = 400.0
+polar_deg = 60.0
+shape = [8, 10]
+pitch_mm = [0.055, 0.055]
+
+[profiles.standard.physical_detector.scorer]
+reconstruction = "nearest_tile"
+angular_shape = [3, 5]
+
+[profiles.standard.physical_detector.response]
+kind = "timepix3"
+thickness_um = 500.0
+bias_v = 100.0
+n_mc = 20000
+seed = 7
+
+[profiles.standard.physical_detector.acquisition]
+exposure_s = 2.0
+measured_min_eV = 0.0
+measured_max_eV = 2000.0
+measured_bin_width_eV = 400.0
+hit_threshold_eV = 500.0
+mode = "poisson"
+seed = 19
+"""
+    )
+    catalog = load_material_catalog(_write_catalog(tmp_path, text))
+    observation = resolve_profile_observation(catalog, "standard")
+
+    assert observation is not None
+    assert observation.detector.pixels.shape == (8, 10)
+    assert observation.scorer.angular_shape == (3, 5)
+    assert observation.scorer.reconstruction == "nearest_tile"
+    assert observation.acquisition.measured_edges_eV == (
+        0.0,
+        400.0,
+        800.0,
+        1200.0,
+        1600.0,
+        2000.0,
+    )
+    assert observation.acquisition.mode == "poisson"
+    assert observation.acquisition.seed == 19
+    assert isinstance(observation.detector.response, Timepix3)
+    assert observation.detector.response.seed == 7
+
+
+def test_profile_without_acquisition_does_not_resolve_a_counting_observation(tmp_path):
+    from pyrite.campaign.observation import (
+        physical_detector_from_config,
+        resolve_profile_observation,
+    )
+    from pyrite.materials import load_material_catalog
+
+    text = (
+        _minimal_catalog(
+            material_rows="""
+[materials.mos2]
+display_name = "mos2"
+crystal = "mos2"
+"""
+        )
+        + """
+[profiles.standard.physical_detector]
+distance_mm = 400.0
+"""
+    )
+    catalog = load_material_catalog(_write_catalog(tmp_path, text))
+
+    row = catalog.profile_physical_detectors["standard"]
+    assert physical_detector_from_config(row).response is None
+    assert resolve_profile_observation(catalog, "standard") is None
+
+
+@pytest.mark.parametrize(
+    ("nested", "message"),
+    [
+        (
+            """
+[profiles.standard.physical_detector.scorer]
+reconstruction = "bilinear"
+""",
+            "reconstruction: must be 'nearest_tile'",
+        ),
+        (
+            """
+[profiles.standard.physical_detector.response]
+kind = "ideal"
+n_mc = 10
+""",
+            "ideal response accepts only kind",
+        ),
+        (
+            """
+[profiles.standard.physical_detector.acquisition]
+exposure_s = 1.0
+measured_edges_eV = [0.0, 1000.0]
+measured_min_eV = 0.0
+measured_max_eV = 1000.0
+measured_bin_width_eV = 100.0
+""",
+            "use measured_edges_eV or min/max/bin-width, not both",
+        ),
+    ],
+)
+def test_profile_observation_schema_rejects_ambiguous_fields(tmp_path, nested, message):
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    text = (
+        _minimal_catalog(
+            material_rows="""
+[materials.mos2]
+display_name = "mos2"
+crystal = "mos2"
+"""
+        )
+        + """
+[profiles.standard.physical_detector]
+distance_mm = 400.0
+"""
+        + nested
+    )
+
+    with pytest.raises(MaterialConfigError, match=message):
+        load_material_catalog(_write_catalog(tmp_path, text))
+
+
 def test_profile_longitudinal_policy_decodes_and_reaches_material_sweep(tmp_path, monkeypatch):
     from pyrite.campaign import config
     from pyrite.materials import load_material_catalog
@@ -1972,3 +2114,77 @@ def test_catalog_matches_serialized_physics_for_every_crystal(serialized_catalog
             list(hkl)
             for hkl in crystal_module.dominant_reflections(key, n_families=2, B_ang2=spec.B_ang2)
         ] == physics["dominant_reflections"]
+
+
+def _observation_catalog(tmp_path, acquisition=True):
+    from pyrite.materials import load_material_catalog
+
+    text = (
+        _minimal_catalog(
+            material_rows="""
+[materials.mos2]
+display_name = "mos2"
+crystal = "mos2"
+"""
+        )
+        + """
+[profiles.standard.physical_detector]
+distance_mm = 400.0
+polar_deg = 60.0
+shape = [8, 10]
+pitch_mm = [0.055, 0.055]
+"""
+        + (
+            """
+[profiles.standard.physical_detector.acquisition]
+exposure_s = 2.0
+measured_edges_eV = [0.0, 1000.0, 2000.0]
+"""
+            if acquisition
+            else ""
+        )
+    )
+    return load_material_catalog(_write_catalog(tmp_path, text))
+
+
+def test_counting_observation_profile_sweeps_its_physical_projection(tmp_path, monkeypatch):
+    from pyrite.campaign import config
+    from pyrite.campaign.observation import resolve_profile_observation
+
+    catalog = _observation_catalog(tmp_path)
+    monkeypatch.setattr(config, "_catalog", lambda _profile="standard": catalog)
+    projection = resolve_profile_observation(catalog, "standard").scalar_detector()
+
+    detector = config.material_sweep("mos2").detector
+
+    assert detector.observation_angle_deg == pytest.approx(60.0)
+    assert detector.observation_angle_deg == projection.observation_angle_deg
+    assert detector.polar_acceptance_deg == projection.polar_acceptance_deg
+    assert detector.solid_angle_sr == projection.solid_angle_sr
+
+
+@pytest.mark.parametrize(
+    "override",
+    [{"theta_obs_deg": 90.0}, {"dtheta_obs_deg": 1.0}, {"domega_sr": 0.01}],
+)
+def test_counting_observation_profile_rejects_scalar_detector_overrides(
+    tmp_path, monkeypatch, override
+):
+    from pyrite.campaign import config
+
+    catalog = _observation_catalog(tmp_path)
+    monkeypatch.setattr(config, "_catalog", lambda _profile="standard": catalog)
+
+    with pytest.raises(ValueError, match="counting physical detector"):
+        config.material_sweep("mos2", **override)
+
+
+def test_geometry_only_physical_detector_keeps_the_scalar_detector(tmp_path, monkeypatch):
+    from pyrite.campaign import config
+
+    catalog = _observation_catalog(tmp_path, acquisition=False)
+    monkeypatch.setattr(config, "_catalog", lambda _profile="standard": catalog)
+
+    detector = config.material_sweep("mos2").detector
+
+    assert detector.observation_angle_deg == config.catalog_detector().observation_angle_deg

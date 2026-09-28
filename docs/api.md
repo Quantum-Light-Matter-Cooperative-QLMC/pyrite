@@ -30,6 +30,8 @@ result.provenance["identity_digest"]
 
 For a scalar `Detector`, `Result.spectrum` and `Result.background` are response-free source photon-density arrays per incident electron per eV per sr: they exclude acceptance scaling, source current, quantum efficiency, and measured-energy redistribution. For a `PlanarDetector`, the scalar arrays are instead filter-attenuated, solid-angle-weighted observation averages in the same per-sr units; they still exclude the configured detector response. Their coordinates are `energy_eV` and `background_energy_eV`. `Result.provenance` records the resolved scene, numerics, content identity, backend/device, and library versions. Coherent or `both` emission also exposes `coherent_spectrum`; coherent-only simulation selects that array as `spectrum`. `spectrum` and `coherent_spectrum` are PXR/CBS only; characteristic radiation is the separate `characteristic_spectrum`, and `Result.line_total()` returns their sum (`coherent=True` for the coherent line, `characteristic=False` to omit it). Before issue #123 `spectrum` already included characteristic radiation. The high-level API does not currently accept an external background array, so both `none` and `external` return a zero background on the resolved continuum grid.
 
+For a physical pixel detector, `Acquisition` freezes exposure, explicit half-open measured-energy reporting edges, a post-response hit cut, and expected-versus-seeded-Poisson mode. `Result.acquire()` returns selected-pixel `AcquisitionBatch` records with registered reporting-bin counts and separate underflow, overflow, and below-cut accounting. `Result.acquisition_image()` contracts total or reporting-edge-aligned energy-window images in bounded pixel chunks. Expected counts use exposure, bunch charge, cadence, and the exact elementary charge; optional Poisson realizations are stable under selection and chunk-order changes. `ResolvedObservation` is the profile-lowered detector/scorer/filter/acquisition record. It deliberately projects back to the unchanged scalar `Detector` used by intrinsic transport.
+
 `Sweep` expresses a Cartesian product as ordered paths into a scalar base scene. Paths are checked when the sweep is constructed, including indexed segments:
 
 ```python
@@ -60,8 +62,13 @@ For a `Stack`, paths such as `target.layers[1].thickness_ang` address a particul
    pyrite.PlanarPose
    pyrite.PixelGrid
    pyrite.FilterPlate
+   pyrite.Acquisition
+   pyrite.AcquisitionBatch
+   pyrite.IdealPhotonCounter
    pyrite.PlanarDetector
    pyrite.PixelScorer
+   pyrite.ResolvedObservation
+   pyrite.PixelMetadata
    pyrite.PixelRayMap
    pyrite.SpectralFactors
    pyrite.SpatialResult
@@ -134,6 +141,7 @@ These are the supported low-level simulation entry points. Inputs and outputs us
 
    pyrite.detectors.Detector
    pyrite.detectors.EnergyBins
+   pyrite.detectors.NativeSpectrum
    pyrite.detectors.Timepix3
    pyrite.detectors.EagleXO
    pyrite.detectors.LegacyEDS

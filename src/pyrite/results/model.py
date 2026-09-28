@@ -2,9 +2,10 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import cached_property
 from numbers import Integral
 from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -14,6 +15,10 @@ from ..montecarlo import Case
 
 #: Spatial result components. ``*_total`` adds characteristic radiation.
 COMPONENTS = ("line", "background", "coherent", "characteristic", "line_total", "coherent_total")
+
+if TYPE_CHECKING:
+    from ..instrument import Acquisition, AcquisitionBatch
+    from ..instrument.geometry import PixelRays
 
 
 def _readonly_array(value: object, *, dtype=None) -> np.ndarray:
@@ -87,7 +92,7 @@ class SpectralFactors:
         transmission, and detector response have not been applied.
     mu_by_filter_inv_mm
         Linear attenuation coefficients with shape ``(n_filter, n_energy)`` in
-        inverse mm.
+        inverse mm; ``+inf`` marks an energy at which the filter is opaque.
     """
 
     energy_eV: np.ndarray
@@ -108,11 +113,65 @@ class SpectralFactors:
             raise ValueError("mu_by_filter_inv_mm must have shape (n_filter, n_energy)")
         if not np.all(np.isfinite(intrinsic)):
             raise ValueError("intrinsic_by_tile must contain finite values")
-        if not np.all(np.isfinite(coefficient)) or np.any(coefficient < 0.0):
-            raise ValueError("mu_by_filter_inv_mm must contain finite non-negative values")
+        if np.any(np.isnan(coefficient)) or np.any(coefficient < 0.0):
+            raise ValueError(
+                "mu_by_filter_inv_mm must contain non-negative values (+inf marks an opaque energy)"
+            )
         object.__setattr__(self, "energy_eV", energy)
         object.__setattr__(self, "intrinsic_by_tile", intrinsic)
         object.__setattr__(self, "mu_by_filter_inv_mm", coefficient)
+
+
+@dataclass(frozen=True)
+class PixelMetadata:
+    """Per-pixel geometry and filter factors for a pixel selection.
+
+    Every array's first axis follows ``coordinates``. Lab-frame vectors use
+    the source at the origin with ``+z`` along the beam; polar angle is
+    measured from ``+z`` and azimuth from ``+x`` toward ``+y``. Detector-local
+    positions are the pixel-centre offsets along the pose ``x``/``y`` axes.
+
+    Parameters
+    ----------
+    coordinates
+        ``(n_pixel, 2)`` integer ``(row, column)`` pairs.
+    local_position_mm
+        ``(n_pixel, 2)`` detector-local ``(x, y)`` pixel-centre offsets in mm.
+    center_mm
+        ``(n_pixel, 3)`` lab-frame pixel centres in mm.
+    direction_lab
+        ``(n_pixel, 3)`` unit source-to-pixel-centre directions.
+    polar_deg, azimuth_deg
+        ``(n_pixel,)`` lab polar and azimuth angles of ``direction_lab``.
+    distance_mm
+        ``(n_pixel,)`` source-to-pixel-centre distance in mm.
+    solid_angle_sr
+        ``(n_pixel,)`` scored pixel solid angle in sr.
+    tile_index
+        ``(n_pixel,)`` angular tile whose intrinsic spectrum the pixel uses.
+    tile_direction_lab
+        ``(n_pixel, 3)`` representative tile direction, or ``None`` when the
+        result does not retain tile directions.
+    path_length_mm
+        ``(n_pixel, n_filter)`` filter path lengths in mm, in filter order.
+    """
+
+    coordinates: np.ndarray
+    local_position_mm: np.ndarray
+    center_mm: np.ndarray
+    direction_lab: np.ndarray
+    polar_deg: np.ndarray
+    azimuth_deg: np.ndarray
+    distance_mm: np.ndarray
+    solid_angle_sr: np.ndarray
+    tile_index: np.ndarray
+    tile_direction_lab: np.ndarray | None
+    path_length_mm: np.ndarray
+
+    def __post_init__(self) -> None:
+        for name, value in vars(self).items():
+            if value is not None:
+                object.__setattr__(self, name, _readonly_array(value))
 
 
 @dataclass(frozen=True)
@@ -133,6 +192,9 @@ class SpatialResult:
         Optional characteristic-radiation factors. ``line`` and
         ``coherent_line`` exclude it; the ``"line_total"`` and
         ``"coherent_total"`` components add it.
+    tile_directions_lab
+        Optional representative unit direction per angular tile with shape
+        ``(n_tile, 3)`` in the lab frame; required to persist the result.
     """
 
     ray_map: PixelRayMap
@@ -141,8 +203,17 @@ class SpatialResult:
     detector: PlanarDetector
     coherent_line: SpectralFactors | None = None
     characteristic_line: SpectralFactors | None = None
+    tile_directions_lab: np.ndarray | None = None
 
     def __post_init__(self) -> None:
+        if self.tile_directions_lab is not None:
+            directions = _readonly_array(self.tile_directions_lab, dtype=float)
+            n_tile = int(np.max(self.ray_map.tile_index)) + 1
+            if directions.shape != (n_tile, 3):
+                raise ValueError("tile_directions_lab must have shape (n_tile, 3)")
+            if not np.all(np.isfinite(directions)):
+                raise ValueError("tile_directions_lab must contain finite values")
+            object.__setattr__(self, "tile_directions_lab", directions)
         for name in ("line", "background"):
             factor = getattr(self, name)
             if not isinstance(factor, SpectralFactors):
@@ -165,6 +236,109 @@ class SpatialResult:
             raise ValueError("spectral tile count must match ray_map.tile_index")
         if factor.mu_by_filter_inv_mm.shape[0] != self.ray_map.path_length_mm.shape[2]:
             raise ValueError("spectral filter count must match ray_map.path_length_mm")
+
+    @cached_property
+    def _rays(self) -> PixelRays:
+        from ..instrument.geometry import planar_detector_rays
+
+        rays = planar_detector_rays(self.detector)
+        if rays.shape != self.ray_map.tile_index.shape:
+            raise ValueError("detector pixel grid does not match ray_map")
+        return rays
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        """Detector pixel-grid shape ``(ny, nx)``."""
+        return self.ray_map.tile_index.shape  # type: ignore[return-value]
+
+    def pixel_metadata(self, *, pixels=None, region=None) -> PixelMetadata:
+        """Return geometry and filter factors for selected pixels.
+
+        Geometry is recomputed from ``detector``; it reproduces the stored
+        ``ray_map`` solid angles, so a reopened observation reports the same
+        values that scored it.
+
+        Parameters
+        ----------
+        pixels
+            Iterable of ``(row, column)`` pixel coordinates. Mutually exclusive
+            with ``region``.
+        region
+            ``(row_slice, column_slice)`` selection. Mutually exclusive with
+            ``pixels``.
+        """
+        coordinates = self._coordinates(pixels=pixels, region=region)
+        rows, columns = coordinates.T
+        rays = self._rays
+        pixel_grid = self.detector.pixels
+        ny, nx = self.shape
+        if pixel_grid is None:
+            local = np.zeros((rows.size, 2))
+        else:
+            pitch_y, pitch_x = pixel_grid.pitch_mm
+            local = np.column_stack(
+                ((columns - (nx - 1) / 2.0) * pitch_x, (rows - (ny - 1) / 2.0) * pitch_y)
+            )
+        direction = rays.directions_lab[rows, columns]
+        tile = self.ray_map.tile_index[rows, columns]
+        return PixelMetadata(
+            coordinates=coordinates,
+            local_position_mm=local,
+            center_mm=rays.centers_mm[rows, columns],
+            direction_lab=direction,
+            polar_deg=np.degrees(np.arccos(np.clip(direction[:, 2], -1.0, 1.0))),
+            azimuth_deg=np.degrees(np.arctan2(direction[:, 1], direction[:, 0])),
+            distance_mm=rays.distance_mm[rows, columns],
+            solid_angle_sr=self.ray_map.solid_angle_sr[rows, columns],
+            tile_index=tile,
+            tile_direction_lab=(
+                None if self.tile_directions_lab is None else self.tile_directions_lab[tile]
+            ),
+            path_length_mm=self.ray_map.path_length_mm[rows, columns],
+        )
+
+    def filter_coverage(self) -> np.ndarray:
+        """Return ``(ny, nx, n_filter)`` booleans: the centre ray crosses the filter."""
+        return self.ray_map.path_length_mm > 0.0
+
+    def _energy_node(self, energy_eV: float, component: str) -> int:
+        grid = self._factor(component).energy_eV
+        energy = float(energy_eV)
+        if not np.isfinite(energy):
+            raise ValueError("energy_eV must be finite")
+        if not grid[0] <= energy <= grid[-1]:
+            raise ValueError(
+                f"energy_eV {energy:g} is outside the {component} grid "
+                f"[{grid[0]:g}, {grid[-1]:g}] eV"
+            )
+        return int(np.argmin(np.abs(grid - energy)))
+
+    def energy_node(self, energy_eV: float, *, component: str = "line") -> float:
+        """Return the stored energy node in eV nearest ``energy_eV`` on a component grid.
+
+        Raises
+        ------
+        ValueError
+            If ``energy_eV`` is not finite or lies outside that grid.
+        """
+        return float(self._factor(component).energy_eV[self._energy_node(energy_eV, component)])
+
+    def transmission_image(self, energy_eV: float, *, component: str = "line") -> np.ndarray:
+        """Return ``(ny, nx)`` primary filter transmission at one energy node.
+
+        ``energy_eV`` selects the nearest sample of the component's energy
+        grid (:meth:`energy_node`); attenuation coefficients are stored only
+        at those nodes, so no value is interpolated, and an energy outside the
+        grid is rejected rather than snapped to its end. Uncovered pixels and
+        the no-filter case are 1.
+        """
+        from ..instrument import primary_transmission
+
+        factor = self._factor(component)
+        node = self._energy_node(energy_eV, component)
+        return primary_transmission(
+            self.ray_map.path_length_mm, factor.mu_by_filter_inv_mm[:, node : node + 1]
+        )[..., 0]
 
     def _factor(self, component: str) -> SpectralFactors:
         if component == "line":
@@ -208,6 +382,11 @@ class SpatialResult:
             columns = np.arange(nx)[region[1]]
             yy, xx = np.meshgrid(rows, columns, indexing="ij")
             coordinates = np.column_stack((yy.ravel(), xx.ravel()))
+        elif isinstance(pixels, np.ndarray) and pixels.dtype.kind in "iu":
+            # Integer arrays (the chunked image paths) need no per-element check.
+            if pixels.ndim != 2 or pixels.shape[1] != 2:
+                raise ValueError("pixels must have shape (n_pixel, 2)")
+            coordinates = pixels.astype(np.int64, copy=False)
         else:
             try:
                 raw_coordinates = np.asarray(tuple(pixels), dtype=object)
@@ -388,6 +567,80 @@ class SpatialResult:
             total += np.sum(self._materialize(factor, coordinates), axis=0)
         return total / np.sum(self.ray_map.solid_angle_sr)
 
+    def acquire(
+        self,
+        acquisition: Acquisition,
+        *,
+        rep_rate_hz: float,
+        bunch_charge_pc: float,
+        observation_digest: str,
+        pixels=None,
+        region=None,
+        components: tuple[str, ...] = ("line", "background"),
+    ) -> AcquisitionBatch:
+        """Score selected pixels into common reporting bins and count channels."""
+        from ..instrument import combine_acquisitions, score_acquisition
+
+        resolved_components = tuple(components)
+        if not resolved_components:
+            raise ValueError("components must not be empty")
+        if len(set(resolved_components)) != len(resolved_components):
+            raise ValueError("components must be unique")
+        coordinates = self._coordinates(pixels=pixels, region=region)
+        detector = self.detector.scalar_detector()
+        batches = []
+        for component in resolved_components:
+            factor = self._factor(component)
+            batches.append(
+                score_acquisition(
+                    detector,
+                    factor.energy_eV,
+                    self._materialize(factor, coordinates),
+                    acquisition,
+                    rep_rate_hz=rep_rate_hz,
+                    bunch_charge_pc=bunch_charge_pc,
+                    observation_digest=observation_digest,
+                    coordinates=coordinates,
+                    component=component,
+                )
+            )
+        return combine_acquisitions(batches)
+
+    def acquisition_image(
+        self,
+        *,
+        acquisition: Acquisition,
+        rep_rate_hz: float,
+        bunch_charge_pc: float,
+        observation_digest: str,
+        energy_range_eV: tuple[float, float] | None = None,
+        components: tuple[str, ...] = ("line", "background"),
+        pixel_chunk: int = 1024,
+    ) -> np.ndarray:
+        """Return a total or reporting-window count image in bounded pixel chunks."""
+        chunk = _positive_integer("pixel_chunk", pixel_chunk)
+        ny, nx = self.ray_map.tile_index.shape
+        dtype = np.int64 if acquisition.mode == "poisson" else float
+        image = np.empty(ny * nx, dtype=dtype)
+        flat = np.arange(ny * nx)
+        for start in range(0, flat.size, chunk):
+            chosen = flat[start : start + chunk]
+            coordinates = np.column_stack(np.unravel_index(chosen, (ny, nx)))
+            batch = self.acquire(
+                acquisition,
+                rep_rate_hz=rep_rate_hz,
+                bunch_charge_pc=bunch_charge_pc,
+                observation_digest=observation_digest,
+                pixels=coordinates,
+                components=components,
+            )
+            image[chosen] = (
+                batch.total_counts
+                if energy_range_eV is None
+                else batch.window_counts(energy_range_eV)
+            )
+        return image.reshape(ny, nx)
+
 
 @dataclass(frozen=True)
 class Result:
@@ -475,5 +728,68 @@ class Result:
         }
         return line_spectrum(record, coherent=coherent, characteristic=characteristic)
 
+    def _acquisition_context(self):
+        scene = self.provenance.get("scene")
+        acquisition = getattr(scene, "acquisition", None)
+        beam = getattr(scene, "beam", None)
+        if acquisition is None or beam is None:
+            raise ValueError("result was not produced with an acquisition configuration")
+        if self.spatial is None:
+            raise ValueError("result does not contain spatial factors")
+        digest = self.provenance.get("observation_identity_digest")
+        if not isinstance(digest, str):
+            raise ValueError("result does not contain an observation identity digest")
+        return acquisition, beam, digest, scene
 
-__all__ = ["PixelRayMap", "Result", "SpatialResult", "SpectralFactors"]
+    def acquire(
+        self,
+        *,
+        pixels=None,
+        region=None,
+        components: tuple[str, ...] | None = None,
+    ) -> AcquisitionBatch:
+        """Score selected pixels using this result's frozen acquisition identity."""
+        acquisition, beam, digest, scene = self._acquisition_context()
+        assert self.spatial is not None
+        selected = (
+            (("coherent", "background") if scene.emission == "coherent" else ("line", "background"))
+            if components is None
+            else components
+        )
+        return self.spatial.acquire(
+            acquisition,
+            rep_rate_hz=beam.rep_rate_hz,
+            bunch_charge_pc=beam.bunch_charge_pc,
+            observation_digest=digest,
+            pixels=pixels,
+            region=region,
+            components=selected,
+        )
+
+    def acquisition_image(
+        self,
+        energy_range_eV: tuple[float, float] | None = None,
+        *,
+        components: tuple[str, ...] | None = None,
+        pixel_chunk: int = 1024,
+    ) -> np.ndarray:
+        """Return the configured total or reporting-window detector count image."""
+        acquisition, beam, digest, scene = self._acquisition_context()
+        assert self.spatial is not None
+        selected = (
+            (("coherent", "background") if scene.emission == "coherent" else ("line", "background"))
+            if components is None
+            else components
+        )
+        return self.spatial.acquisition_image(
+            acquisition=acquisition,
+            rep_rate_hz=beam.rep_rate_hz,
+            bunch_charge_pc=beam.bunch_charge_pc,
+            observation_digest=digest,
+            energy_range_eV=energy_range_eV,
+            components=selected,
+            pixel_chunk=pixel_chunk,
+        )
+
+
+__all__ = ["PixelMetadata", "PixelRayMap", "Result", "SpatialResult", "SpectralFactors"]

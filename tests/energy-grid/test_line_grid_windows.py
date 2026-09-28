@@ -33,7 +33,7 @@ from pyrite.campaign.profiles import case_content_key
 from pyrite.campaign.sweep import build_cases
 from pyrite.montecarlo.geometry import tilted_geometry
 from pyrite.montecarlo.runner import line_grid as runner_line_grid
-from pyrite.montecarlo.runner.line_grid import resolve_line_grid
+from pyrite.montecarlo.runner.line_grid import resolve_line_grid, resolve_observation_line_grid
 from pyrite.montecarlo.spectrum import line_seeds
 
 _ENV_NAMES = (
@@ -296,3 +296,68 @@ def test_uniform_automatic_resolution_is_unchanged():
     np.testing.assert_array_equal(
         grid, np.linspace(record["start_eV"], record["stop_eV"], record["num"])
     )
+
+
+# ---- physical-detector observation grid -------------------------------------
+def _rotated(n_hat, degrees):
+    axis = np.cross(n_hat, [0.0, 0.0, 1.0])
+    axis /= np.linalg.norm(axis)
+    angle = np.deg2rad(degrees)
+    return (
+        n_hat * np.cos(angle)
+        + np.cross(axis, n_hat) * np.sin(angle)
+        + axis * np.dot(axis, n_hat) * (1.0 - np.cos(angle))
+    )
+
+
+def _seed_set(record):
+    return {(seed["label"], seed["centre_eV"]) for seed in record["window_plan"]["seeds"]}
+
+
+@pytest.mark.parametrize("windows", [True, None])
+def test_one_observation_direction_reproduces_the_scalar_grid(windows):
+    case, segments, n_hat = _case_and_segments(**({"windows": True} if windows else {}))
+    placeholder = decode_energy_grid(case["E_grid_line"])
+    scalar, scalar_record = resolve_line_grid(case, segments, n_hat, 2, placeholder)
+    observed, record = resolve_observation_line_grid(case, segments, n_hat[None], 2, placeholder)
+
+    np.testing.assert_array_equal(observed, scalar)
+    assert record["cache_key"] != scalar_record["cache_key"]
+    assert record["observation_direction_count"] == 1
+
+
+def test_observation_windows_cover_every_direction():
+    case, segments, n_hat = _case_and_segments(windows=True)
+    placeholder = decode_energy_grid(case["E_grid_line"])
+    other = _rotated(n_hat, 6.0)
+    _, first = resolve_line_grid(case, segments, n_hat, 2, placeholder)
+    _, second = resolve_observation_line_grid(case, segments, other[None], 2, placeholder)
+    grid, joint = resolve_observation_line_grid(
+        case, segments, np.stack([n_hat, other]), 2, placeholder
+    )
+
+    assert _seed_set(first) | _seed_set(second) == _seed_set(joint)
+    assert _seed_set(second) - _seed_set(first)
+    assert joint["feature_width_eV"] == min(first["feature_width_eV"], second["feature_width_eV"])
+    assert np.all(np.diff(grid) > 0.0)
+
+
+def test_uniform_observation_grid_takes_the_finest_direction():
+    case, segments, n_hat = _case_and_segments()
+    placeholder = decode_energy_grid(case["E_grid_line"])
+    others = [_rotated(n_hat, degrees) for degrees in (-8.0, 8.0)]
+    singles = [
+        resolve_observation_line_grid(case, segments, direction[None], 2, placeholder)[1]
+        for direction in others
+    ]
+    _, joint = resolve_observation_line_grid(case, segments, np.stack(others), 2, placeholder)
+
+    assert joint["target_spacing_eV"] == min(single["target_spacing_eV"] for single in singles)
+
+
+def test_observation_grid_keeps_an_explicit_grid():
+    case, segments, n_hat = _case_and_segments()
+    case = {key: value for key, value in case.items() if key != "line_grid_policy"}
+    explicit = np.linspace(100.0, 200.0, 11)
+    grid, record = resolve_observation_line_grid(case, segments, n_hat[None], 2, explicit)
+    assert grid is explicit and record is None

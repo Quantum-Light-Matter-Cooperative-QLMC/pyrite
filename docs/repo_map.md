@@ -31,22 +31,24 @@ Components (a + b denotes a static import cycle):
   p8: energy_grid
   p9: materials
   p10: montecarlo + xsgen
-  p11: perf
-  p12: plots
-  p13: remote
-  p14: results
-  p15: runs
-  p16: validation
+  p11: observations
+  p12: perf
+  p13: plots
+  p14: remote
+  p15: results
+  p16: runs
+  p17: validation
 Edges (importer -> imported):
-  p0 -> p16
+  p0 -> p17
   p0 -> p4
   p0 -> p5
   p0 -> p9
-  p1 -> p12
+  p1 -> p11
   p1 -> p13
   p1 -> p14
   p1 -> p15
   p1 -> p16
+  p1 -> p17
   p1 -> p2
   p1 -> p3
   p1 -> p5
@@ -54,46 +56,52 @@ Edges (importer -> imported):
   p10 -> p5
   p10 -> p6
   p10 -> p9
-  p12 -> p10
-  p12 -> p14
-  p12 -> p6
-  p12 -> p9
-  p13 -> p14
+  p11 -> p10
+  p11 -> p15
+  p11 -> p3
+  p11 -> p5
+  p11 -> p6
+  p13 -> p10
   p13 -> p15
-  p13 -> p16
-  p13 -> p2
-  p13 -> p3
-  p13 -> p5
+  p13 -> p6
   p13 -> p9
-  p14 -> p10
-  p14 -> p6
+  p14 -> p15
+  p14 -> p16
+  p14 -> p17
+  p14 -> p2
+  p14 -> p3
+  p14 -> p5
   p14 -> p9
   p15 -> p10
-  p15 -> p11
-  p15 -> p14
-  p15 -> p2
-  p15 -> p3
-  p15 -> p5
+  p15 -> p6
   p15 -> p9
   p16 -> p10
+  p16 -> p11
+  p16 -> p12
+  p16 -> p15
   p16 -> p2
   p16 -> p3
   p16 -> p5
-  p16 -> p6
   p16 -> p9
+  p17 -> p10
+  p17 -> p2
+  p17 -> p3
+  p17 -> p5
+  p17 -> p6
+  p17 -> p9
   p2 -> p10
-  p2 -> p14
+  p2 -> p15
   p2 -> p6
   p2 -> p9
   p3 -> p10
-  p3 -> p14
+  p3 -> p15
   p3 -> p2
   p3 -> p5
   p3 -> p9
   p4 -> p10
-  p4 -> p11
-  p4 -> p13
-  p4 -> p15
+  p4 -> p12
+  p4 -> p14
+  p4 -> p16
   p4 -> p2
   p4 -> p3
   p4 -> p5
@@ -102,17 +110,17 @@ Edges (importer -> imported):
   p4 -> p9
   p5 -> p9
   p6 -> p9
-  p7 -> p12
-  p7 -> p14
+  p7 -> p13
   p7 -> p15
   p7 -> p16
+  p7 -> p17
   p7 -> p2
   p7 -> p4
   p7 -> p5
   p7 -> p8
   p8 -> p10
-  p8 -> p13
   p8 -> p14
+  p8 -> p15
   p8 -> p2
   p8 -> p3
   p8 -> p6
@@ -128,6 +136,7 @@ Edges (importer -> imported):
 - **`import pyrite`** → `__init__`: lightweight lazy exports for `Beam`, target variants, `Detector`, `Scene`, path-addressed `Sweep`, `Numerics`, `Convergence`, `Analysis`, `Result`, and `simulate`.
 - **`pyrite.simulate(beam, target, detector, ...)`** → `api:simulate`: lower one scalar scene to the typed `Case`, run it without checkpoint I/O, and return response-free source arrays plus resolved provenance in `Result`.
 - **`pyrite profile ...`** → `cli.commands.profile`: manage named campaign defaults and material membership through `set|add|remove`; an absent membership key means all catalog materials.
+- **`pyrite profile physical-detector show|set|reset`** → `cli.commands._physical_detector` (registered on `profile`): the profile's physical pixel detector, scorer, response, and acquisition, with merge/reset primitives in `campaign/profile_edit.py`. An acquisition makes the profile a counting observation whose projection supersedes the scalar detector for sweeps. **`pyrite profile filter add|set|rm|list|show`** → `cli.commands._profile_filters` (registered on `profile`): edits ordered plates and no longer touches the physical detector.
 - **`pyrite material show|set MATERIAL [--profile NAME]`** → `cli.commands.material`: inspect effective ranges and edit per-profile material overrides. `pyrite material blaze MATERIAL ...` routes to the specialized blazed sweep. Hidden compatibility aliases remain under `pyrite sweep`.
 - **`pyrite material validate [catalog]`** → `cli.commands.check_config:_run`: validate bundled offline catalog or explicit complete catalog without starting simulation; hidden alias: `pyrite check-config`.
 - **`pyrite checkpoint ...`** → `cli.commands.checkpoint:command`: grouped local checkpoint shrink, component recompute, archive, restore, list, and merge operations. `checkpoint recompute brem|line -R[=TARGET]` reuses the remote SLURM orchestrators with uniform `--wait` / `--detach`; hidden compatibility paths: `remote rebrem`, `remote reline`.
@@ -141,7 +150,7 @@ Edges (importer -> imported):
 - **`pyrite material energy-grid show|line show|brem show`** and **`pyrite profile energy-grid defaults`** → `energy_grid._command`: inspect resolved detector bins and manage persistent derivation inputs without a root noun.
 - **`pyrite-dev energy-grid add|rm|verify|gc|line set|brem set`** → `energy_grid._command` → immutable `energy-grid-artifacts/<first2>/<sha256>.json` objects plus mutable `profiles.NAME.energy_grid_refs`. `add`/manual setters/rm create replacement objects and repoint only the selected profile; `verify` checks bytes and refs; `gc` reclaims unreachable objects after a 14-day grace window. Hidden D7 hidden user-CLI aliases: `apply` → `add`, `line delete` → `rm`.
 - **`pyrite-dev performance list|analyze|rm`** → `cli.commands.performance`: inspect and reclaim derived compute-performance artifacts. The former top-level `pyrite performance` group is a hidden D7 alias.
-- **Marimo apps**: `src/pyrite/apps/scan_app.py` (sweep runner → checkpoint), `src/pyrite/apps/analysis_app.py` (checkpoint-driven 2D figures, Altair + matplotlib, lazy tabbed layout), `src/pyrite/apps/trace_app.py` (3D trajectory animation + crystal-lattice viewer; runs transport directly from catalog scan grids, no checkpoint needed), `src/pyrite/apps/validation_app.py` (validation-study interface). Shared pieces: `src/pyrite/apps/_design.py` (page chrome), `src/pyrite/apps/_widgets.py` (`MaterialSelect` anywidget). Scan, analysis, and trace apps read per-material grids in `config.py`.
+- **Marimo apps**: `src/pyrite/apps/scan_app.py` (sweep runner → checkpoint), `src/pyrite/apps/analysis_app.py` (checkpoint-driven 2D figures, Altair + matplotlib, lazy tabbed layout), `src/pyrite/apps/trace_app.py` (3D trajectory animation + crystal-lattice viewer; runs transport directly from catalog scan grids, no checkpoint needed), `src/pyrite/apps/validation_app.py` (validation-study interface). Shared pieces: `src/pyrite/apps/_design.py` (page chrome), `src/pyrite/apps/_widgets.py` (`MaterialSelect` anywidget). Scan, analysis, and trace apps read per-material grids in `config.py`. The analysis app's **Pixel detector** tab is wired by `apps/analysis_ui/pixels.py` (observation discovery/loading, controls, image resolution) and rendered by `apps/analysis_ui/views/pixels.py`.
 - **`pyrite app analysis launch [material]`** → `analyze:_cli`: launch or smoke-test the analysis app with explicit or persisted initial material; `pyrite app analysis export` writes static HTML. The implicit launch form is a hidden-behavior compatibility path and warns.
 - **`pyrite app validation launch`** → `check:_cli`: launch the validation app; `pyrite app validation export` writes cached literature-validation figures. The same explicit `launch|export` shape applies to `pyrite app viewer`.
 - **`pyrite remote ...`** → `remote:*`: optional SSH/SLURM resources for lab GPU box. Canonical profile and Zhai reproduction submissions are `pyrite run --remote` and `pyrite run --preset zhai --remote`; hidden warning aliases preserve `remote run`, `remote validate`, and `remote check`. Resource commands remain here, while retired `jobs`, `status`, `logs`, and `stop` paths are hidden aliases of the canonical top-level job lifecycle. `remote pull --preset zhai` retrieves an existing reproduction cache; `remote gc` applies profile-aware checkpoint pruning under remote stem reservations and releases orphaned reservations, replacing the hidden `remote prune` and `remote reap` aliases; `remote rm` deletes remote checkpoints (hidden alias `remote clear`); `check` remains a hidden alias.
@@ -269,7 +278,7 @@ Simulation core: electron transport, segment-sum PXR+CBS and EEDL characteristic
 - `montecarlo/groove.py` — blazed sawtooth entrance-face grooves (escape-path engineering): closed-form entry/escape, `Sweep.groove_spacing_ang` knob.
 - `montecarlo/transverse.py` — transverse phase-space policy on the input side of `BeamSpec`: a Courant-Snyder triplet `(eps_n, beta, alpha)` per plane, resolved per case (normalized emittance is the stored input, geometric is derived as `eps_n / (beta*gamma)`) and sampled into per-electron offsets and slopes. The `y` plane mirrors `x` unless set. Zero first-party imports, so it is the destination `transport/api.py` samples from directly (`resolved_from_mapping`, `sample_transverse`) rather than reaching up into `campaign` (issue #69). See `docs/physics/beam-transport/beam-phase-space.md`. Public: `TransverseDistribution`, `ResolvedTransversePlane`, `ResolvedTransverseDistribution`, `resolve_transverse_distribution`, `sample_transverse`. Deps: NumPy, SciPy constants.
 - `trajectories` — opt-in per-case transport artifacts (#159): `TrajectoryCapture` (picklable, crosses into transport workers), versioned HDF5 writer/reader (`write_trajectory_artifact`, `read_trajectory_artifact`; atomic `.partial` rename, alias hard links, bounded device-array download), deterministic `artifact_relpath`, and `preflight_capture` overwrite/stale checks. `trajectory_export` streams an artifact's segments to VTK XML PolyData (`.vtp`). `runner._transport_case` writes when handed a capture; `run_cases`/`run_sweep` pass it only when set. Deps: `_backend`, `h5py` (lazy).
-- `runner/` — compatibility package for the former flat module. `__init__.py` owns per-case transport/spectrum phases and `_worker_init`; `scheduling.py` owns `run_cases` and runtime-plan selection; `chunking.py` owns spectrum chunk admission, including the larger portable EEDL working-set budget; `pool.py` owns host-memory and worker-pool sizing; `oom.py` owns accelerator OOM tags, release cadence, and pool limits. `timing.py` owns the driver-side `PYRITE_MC_TIMING` phase aggregator and report. `case_tables.py` resolves each transport layer's SBETHE table and opt-in shell-mode catalog key. The backend classifier also recognizes delayed CUDA/ROCm runtime allocation failures. `_spectrum_case` always stores incoherent `spec` and, when requested, `spec_coherent` from the same transport, plus the shared characteristic component as the separate `spec_characteristic` (no array includes another; `_spectral_components` combines them); characteristic emission is evaluated directly on the fine line grid. `_line_pair_for_case` mirrors this for `pyrite reline`. Deps: `_backend`, `transport`, `geometry`, `spectrum`.
+- `runner/` — compatibility package for the former flat module. `__init__.py` owns per-case transport/spectrum phases and `_worker_init`; `scheduling.py` owns `run_cases` and runtime-plan selection; `chunking.py` owns spectrum chunk admission, including the larger portable EEDL working-set budget; `pool.py` owns host-memory and worker-pool sizing; `oom.py` owns accelerator OOM tags, release cadence, and pool limits. `timing.py` owns the driver-side `PYRITE_MC_TIMING` phase aggregator and report. `case_tables.py` resolves each transport layer's SBETHE table and opt-in shell-mode catalog key. `directions.py` evaluates physical-detector observation directions on the same transport as the scalar spectra (`run_case(observation_directions=...)`, `run_cases(observation_directions=...)`, `run_case_directions`) on a line grid that `line_grid.resolve_observation_line_grid` resolves jointly over every direction, separate from the scalar case grid. The backend classifier also recognizes delayed CUDA/ROCm runtime allocation failures. `_spectrum_case` always stores incoherent `spec` and, when requested, `spec_coherent` from the same transport, plus the shared characteristic component as the separate `spec_characteristic` (no array includes another; `_spectral_components` combines them); characteristic emission is evaluated directly on the fine line grid. `_line_pair_for_case` mirrors this for `pyrite reline`. Deps: `_backend`, `transport`, `geometry`, `spectrum`.
 - Deps: `materials.crystal`, `materials.attenuation`, `DATA_DIR`.
 
 ## Campaign, checkpoints & run drivers
@@ -366,6 +375,11 @@ Headless sweep driver: build cases → `run_sweep` → checkpoint; owns `--no-ca
 - Compatibility: `_ProgressTimer` and `_write_progress_record` re-export the neutral `pyrite._progress` implementations.
 - Deps: `_progress`, `config`, `run`, `sweep`.
 
+### `runs/observe.py`
+Library producer for one persisted pixel-detector observation: `produce_observation(scene, numerics, store)` reuses a stored observation without transport when `api.observation_plan(...).find_reusable` matches its true-spatial identity, rescoring only response/acquisition/normalization; otherwise it runs `api.simulate` and stores the result.
+- Public: `produce_observation`, `ObservationRun`.
+- Deps: `api`, `observations`.
+
 ### `runs/blaze.py`
 Headless blazed-crystal (sawtooth entrance face) sweep entry: `pyrite material blaze <material> --energy E [E...] --spacing S [S...] [--polar A [A...]]`. Mirrors `scan.py`'s parse args → build cases → `run_sweep` → checkpoint structure, but forces v1 groove geometry (`theta_obs=90`, `tilt_azim=180`, no substrate/stack/footprint) per (energy, spacing) pair and writes to a dedicated `checkpoints/<material>_blazed/`, never the flat-face `<material>/`. Click wiring is in `cli/commands/blaze.py`; `blaze.command` stays available via a lazy `__getattr__`.
 - Public: `main`, `run`, `command` (lazy).
@@ -383,11 +397,16 @@ Result records, derived line metrics, ranking/selection. Split from single modul
 - `model` — in-memory `Result` plus factorized `SpatialResult`, `PixelRayMap`, and `SpectralFactors`; `Result.characteristic_spectrum` and the `"characteristic"` spatial component preserve the separately auditable EEDL line contribution. Selected pixel spectra and images materialize in bounded chunks and are not checkpoint schema fields.
 - Deps: `montecarlo`, `sweep`.
 
+### `observations/` (package)
+Persisted factorized pixel-detector observations, separate from intrinsic checkpoints at `<workspace>/observations/<stem>/`. `store` owns `ObservationStore` (mutable `index.json` source content key → observation digests; immutable `objects/true/<true_spatial_digest>.h5` factor objects; `objects/obs/<observation_digest>.json` layer-payload records; atomic temp+`os.replace` writes; schema/checksum/digest verification), `StoredObservation` (reopen, count, and `rescore` response/acquisition/normalization over reused true factors), and `observation_from_result`. `plan` owns `PixelSampling` (pixel rays, angular tiles, sample-frame directions, factor assembly from runner directional output) and `ObservationPlan` (one counting observation of one source case: pre-transport `find_reusable`, post-transport `assemble`); `api.simulate`, `runs.observe`, and sweep production all go through it. Never stores a dense pixel-energy cube. Deps: `detectors`, `instrument`, `montecarlo.geometry`, `results.model`, `console.config`.
+- `inventory` — `observation_inventory(stem)` lists a stem's indexed observations as `ObservationEntry` rows (case from record provenance, else the checkpoint `cases.json`, else source key; response, exposure, count mode) reading only `index.json` and records; `ObservationInventory.load` opens one. `ObservationStore.record` is the public small-record reader.
+
 ### `plots/` (package)
 Renderer-neutral data preparation plus backend packages under `mpl/`, `altair/`, and `plotly/`. **Every public and internal package export remains re-exported from `plots`** — `from pyrite.plots import X` unchanged (`tests/plots/test_exports.py` freeze export set). Former flat submodule paths remain compatibility re-exports; first-party callers use the backend-qualified paths. Matplotlib submodule DAG (leaf → driver): `_style → _common → _frames → mpl.sweeps → {mpl.spectra, mpl.detectors, mpl.trajectories} → mpl.interactive`.
 - `_style` — `COLORS`, `_ENERGY_PALETTE`, `energy_color` (per-energy colour map consistent across every figure). Leaf; no sibling deps.
 - `_common` — shared figure plumbing: `_line_brem` (per-record line/brem split scored through `Detector.score`), `_per_tilt_figs` (one-figure-per-tilt loop), `_mode`, `_EFF_CACHE`. Deps: `detectors`, `montecarlo`, `results`.
 - `_frames` — renderer-neutral tidy-data builders (`heatmap_frame`, `metric_vs_frame`, `scan_mode`, `pick_hue`, `_effective_x`/`_ndistinct`, axis/value-label registries `_AXIS_SPECS`/`_axis_disp`/`_value_label`/`_FLUX_GATED`): per-cell/per-point best-record reduction shared by `mpl/sweeps.py` and `altair/sweeps.py`. Leaf-most of sweep-figure modules; no matplotlib/Altair imports. Deps: `_common`, `results`, `pandas`.
+- `_pixel_frames` — pixel-observation frames: `observation_image` (total/window counts, continuum-node transmission, filter coverage) in bounded chunks, `counting_observation` (expected vs Poisson realization, never substituted), `detector_image_frame` (block-reduced display grid <= 128 cells per axis with exact pixel ranges), `pixel_spectrum_frame`, `histogram_frame`, `pixel_metadata_rows`. No plotting imports. Deps: `observations`, `results`, `pandas`.
 - `mpl/spectra` — `plot_by_energy`, `plot_full_spectrum`, `plot_peak_vs_tilt`, `plot_mosaic_comparison`, `plot_best_spectra`, `plot_material_comparison`, `plot_tilt_panel`, `_draw_*` spectral drawers. Deps: `_style`, `_common`, `detectors`, `montecarlo`, `results`.
 - `mpl/sweeps` — `plot_heatmaps`, `facet_metric` (small-multiples over many knobs), `plot_metric_vs`, `plot_scan`; `_HEATMAP_QUANTITIES` / `_METRIC_LABELS` tables + axis helpers. Render from `_frames` tidy DataFrames, not re-derive best-record reduction inline. Deps: `_style`, `_frames`, `results`.
 - `mpl/detectors` — `plot_timepix_efficiency` / `_detected` / `_poisson`, `plot_eaglexo_efficiency` / `_detected` / `_charge` / `_charge_map`. Deps: `_style`, `_common`, `sweeps`, `results`, `detectors` response adapters.
@@ -398,13 +417,14 @@ Renderer-neutral data preparation plus backend packages under `mpl/`, `altair/`,
   - `sweeps` — metric scans + parametric heatmaps: `metric_vs_chart`, `heatmap_chart`, `scan_charts` (auto heatmap-vs-lines, one shared metrics map across quantities). Deps: `_common`, `_frames`, `sweeps`, `results`.
   - `detectors` — Timepix3/Eagle XO spectral views: `timepix_detected_chart`, `eaglexo_detected_chart`, `eaglexo_charge_chart` (+ their `*_frame` builders). Deps: `_common`, `altair.spectra`, `detectors` response adapters.
   - `trajectories` — penetration views: `penetration_survival_chart`, `trajectory_chart` (+ `survival_frame`, `tracks_frame`, `track_segments_frame`); dense datashader raster stay on matplotlib. Deps: `mpl.sweeps`, `mpl.trajectories`.
+  - `pixels` — `detector_image_chart`, `pixel_spectrum_chart`, `histogram_chart` over `_pixel_frames` frames. Deps: `altair._typing`.
 - `plotly/` — Plotly-specific interactive and rendered trajectory views. `trajectories` builds 3D beam/crystal/track figures from shared `mpl.trajectories` geometry; `crystal_lattice` renders unit-cell figures; `render` owns cached animation export over the Plotly trajectory builder; `camera` turns azimuth/elevation/zoom or a named preset into a `scene.camera` dict, so a viewer's chosen view reaches snapshots and renders (marimo drops `scene.camera` relayout events, so a dragged one cannot).
 - Deps: `detectors`, `montecarlo`, `results`.
 
 ## Downstream instrument and detector forward models
 
 ### `instrument/`
-Closed, analytic post-emission photon geometry. `model.py` owns frozen `PlanarPose`, `PixelGrid`, `FilterPlate`, physical `PlanarDetector`, and the narrow `PixelScorer` request; `geometry.py` owns point-source pixel rays, solid-angle weights, coarse angular partitions, and exact finite-box path lengths; `attenuation.py` owns stacked primary-photon transmission. `Scene` owns ordered plates and accepts either the legacy scalar `Detector` or physical `PlanarDetector`; instrument objects never enter the electron-transport navigator. Deps: `detectors.spec`, `materials`.
+Closed, analytic post-emission photon geometry. `model.py` owns frozen `PlanarPose`, `PixelGrid`, `FilterPlate`, physical `PlanarDetector`, and the narrow `PixelScorer` request; `geometry.py` owns point-source pixel rays, solid-angle weights, coarse angular partitions, and exact finite-box path lengths; `attenuation.py` owns stacked per-filter attenuation coefficients and primary-photon transmission. `Scene` owns ordered plates and accepts either the legacy scalar `Detector` or physical `PlanarDetector`; instrument objects never enter the electron-transport navigator. Deps: `detectors.spec`, `materials`.
 
 ### `detectors/`
 Detector configuration, read-time scoring, and detector-adjacent forward models. `spec.py` owns `Detector`, its fine-line/wide-bremsstrahlung `EnergyBins`, the `Timepix3`/`EagleXO`/`LegacyEDS` response adapters, and the deprecated `DetectorSpec` spelling. Stored arrays remain response-free; plots and result tables call `Detector.score`. Deps: `materials.crystal`, `montecarlo` (legacy analytic response only), `DATA_DIR`.

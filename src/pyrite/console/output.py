@@ -312,6 +312,8 @@ COUNT_CSV = _IntCSV("counts")
 # argv relaying (``energy-grid derive``/``submit``); the plain variants return the
 # parsed float list for direct catalog writes (``sweep set``, ``energy-grid defaults``).
 ENERGY_CSV = _CSV("energy", lower=0, lower_open=True)
+#: Detector reporting-bin edges in eV; nonnegative (strict increase is checked by the caller).
+MEASURED_EDGES_CSV = _CSV("measured edges", lower=0)
 ENERGY_CSV_TEXT = _CSV("energy", lower=0, lower_open=True, preserve_text=True)
 THICKNESS_CSV = _CSV("thickness", lower=0, lower_open=True)
 THICKNESS_CSV_TEXT = _CSV("thickness", lower=0, lower_open=True, preserve_text=True)

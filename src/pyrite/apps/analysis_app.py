@@ -35,6 +35,14 @@ with app.setup:
         make_scan_thickness_control,
     )
     from pyrite.apps.analysis_ui.interactive import make_heatmap_widget, make_scan_heatmap_widgets
+    from pyrite.apps.analysis_ui.pixels import (
+        discover_observations,
+        load_selected_observation,
+        make_observation_selector,
+        make_pixel_image_controls,
+        make_pixel_selection_controls,
+        resolve_pixel_image,
+    )
     from pyrite.apps.analysis_ui.views import (
         CASE_BASKET_CAP,
         render_case_comparison,
@@ -42,6 +50,7 @@ with app.setup:
         render_detectors,
         render_dimension_comparison,
         render_energy_comparison,
+        render_pixel_detector,
         render_rankings,
         render_scans,
     )
@@ -313,6 +322,56 @@ def _(context, detector_controls):
         select_results(context.results, **constraints) if constraints else context.results
     )
     return detector_results, detector_values
+
+
+@app.cell
+def _(context):
+    pixel_inventory = discover_observations(context.checkpoint_stem)
+    observation_ui = make_observation_selector(mo, pixel_inventory)
+    return observation_ui, pixel_inventory
+
+
+@app.cell
+def _(observation_ui, pixel_inventory):
+    pixel_state = load_selected_observation(pixel_inventory, observation_ui)
+    pixel_image_controls = (
+        None
+        if pixel_state.observation is None
+        else make_pixel_image_controls(mo, pixel_state.observation)
+    )
+    pixel_selection_controls = (
+        None
+        if pixel_state.observation is None
+        else make_pixel_selection_controls(mo, pixel_state.observation)
+    )
+    return pixel_image_controls, pixel_selection_controls, pixel_state
+
+
+@app.cell
+def _(
+    app_theme,
+    observation_ui,
+    pixel_image_controls,
+    pixel_selection_controls,
+    pixel_state,
+):
+    def pixel_tab():
+        # Resolved only when the tab opens; memoized, so a pixel change reuses the image.
+        return render_pixel_detector(
+            mo,
+            state=pixel_state,
+            selector=observation_ui,
+            image_controls=pixel_image_controls,
+            selection_controls=pixel_selection_controls,
+            resolved=(
+                None
+                if pixel_state.observation is None
+                else resolve_pixel_image(pixel_state.observation, pixel_image_controls.value)
+            ),
+            theme=app_theme,
+        )
+
+    return (pixel_tab,)
 
 
 @app.cell
@@ -652,6 +711,7 @@ def _(
     cross_material_tab,
     detector_tab,
     energy_tab,
+    pixel_tab,
     polar_tab,
     rankings_tab,
     scans_tab,
@@ -688,6 +748,7 @@ def _(
                     ]
                 ),
                 "Instruments": detector_tab,
+                "Pixel detector": pixel_tab,
                 "Compare": cross_material_tab,
             },
             lazy=True,

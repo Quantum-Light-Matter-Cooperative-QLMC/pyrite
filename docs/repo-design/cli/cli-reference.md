@@ -1048,17 +1048,18 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  add          Incrementally add values to profile grids,...
-  create       Create a new profile, cloning defaults...
-  delete       Delete a profile; irreversible.
-  filter       Manage finite FilterPlate objects on a...
-  list         List catalog profiles with membership,...
-  numerics     Inspect and edit result-affecting...
-  remove       Remove values from an existing profile's...
-  rename       Rename profile NAME to NEW_NAME.
-  set          Replace range grids, the beam reference,...
-  show         Show one profile's ranges, beam, detector,...
-  energy-grid  Manage profile-scoped energy-grid derivation inputs.
+  add                Incrementally add values to profile grids,...
+  create             Create a new profile, cloning defaults...
+  delete             Delete a profile; irreversible.
+  filter             Manage finite FilterPlate objects on a...
+  list               List catalog profiles with membership,...
+  numerics           Inspect and edit result-affecting...
+  physical-detector  Manage a profile's physical pixel detector...
+  remove             Remove values from an existing profile's...
+  rename             Rename profile NAME to NEW_NAME.
+  set                Replace range grids, the beam reference,...
+  show               Show one profile's ranges, beam, detector,...
+  energy-grid        Manage profile-scoped energy-grid derivation inputs.
 ```
 
 ## `pyrite profile add`
@@ -1178,18 +1179,19 @@ Usage: pyrite profile filter [OPTIONS] COMMAND [ARGS]...
 
   Manage finite FilterPlate objects on a profile.
 
-  ``add`` validates its plate through the public ``FilterPlate`` dataclass. Supply
-  ``--detector-distance-mm`` (and optionally ``--shape`` or ``--pitch-mm``) to create or
-  replace the profile's physical pixel detector. Filters need that detector when running
-  ``pyrite material simulate``.
+  Plates are validated through the public ``FilterPlate`` dataclass and keep their
+  declared order, which is part of an observation's identity. They need a physical
+  detector, set with 'pyrite profile physical-detector set'. Changing a plate re-
+  evaluates observations on new transport; cached scalar records are kept.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  add   Add one finite filter plate to PROFILE.
+  add   Append one finite filter plate to PROFILE.
   list  List PROFILE's finite filter plates.
   rm    Remove one filter by its name or one-based list index.
+  set   Update one filter, by name or one-based index, in place; order is kept.
   show  Show one PROFILE filter by its name or one-based list index.
 ```
 
@@ -1198,32 +1200,20 @@ Commands:
 ```text
 Usage: pyrite profile filter add [OPTIONS] PROFILE_NAME
 
-  Add one finite filter plate to PROFILE.
+  Append one finite filter plate to PROFILE.
 
 Options:
-  --offset-mm X Y               Local x/y offset in mm.  [default: 0.0, 0.0]
-  --roll-deg FLOAT              Local-roll angle in degrees.  [default: 0.0]
-  --azimuth-deg FLOAT           Observation azimuth in degrees.  [default: 0.0]
-  --polar-deg FLOAT             Observation polar angle in degrees [0, 180].  [default:
-                                90.0]
-  --distance-mm MM              Source-to-plate distance in mm.  [x>0.0; required]
-  --size-mm WIDTH HEIGHT        Plate width and height in mm.  [required]
-  --thickness-mm MM             Plate thickness in mm.  [x>0.0; required]
-  --material KEY                Catalog crystal or medium key.  [required]
-  --name TEXT                   Optional display name; must be unique within the
-                                profile.
-  --pitch-mm Y X                Physical-detector pixel pitch (y, x) in mm.
-  --shape ROWS COLS             Physical-detector pixel shape; defaults to a Timepix3
-                                chip.
-  --detector-offset-mm X Y      Physical-detector local x/y offset in mm.  [default:
-                                0.0, 0.0]
-  --detector-roll-deg FLOAT     Physical-detector local roll in degrees.  [default: 0.0]
-  --detector-azimuth-deg FLOAT  Physical-detector azimuth in degrees.  [default: 0.0]
-  --detector-polar-deg FLOAT    Physical-detector polar angle in degrees [0, 180].
-                                [default: 90.0]
-  --detector-distance-mm MM     Source-to-physical-detector distance in mm.  [x>0.0]
-  --dry-run                     Print proposed TOML diff; write nothing.
-  -h, --help                    Show this message and exit.
+  --offset-mm X Y         Local x/y offset in mm.  [default: 0.0, 0.0]
+  --roll-deg FLOAT        Local-roll angle in degrees.  [default: 0.0]
+  --azimuth-deg FLOAT     Observation azimuth in degrees.  [default: 0.0]
+  --polar-deg FLOAT       Observation polar angle in degrees [0, 180].  [default: 90.0]
+  --distance-mm MM        Source-to-plate distance in mm.  [x>0.0; required]
+  --size-mm WIDTH HEIGHT  Plate width and height in mm.  [required]
+  --thickness-mm MM       Plate thickness in mm.  [x>0.0; required]
+  --material KEY          Catalog crystal or medium key.  [required]
+  --name TEXT             Optional display name; must be unique within the profile.
+  --dry-run               Print proposed TOML diff; write nothing.
+  -h, --help              Show this message and exit.
 ```
 
 ## `pyrite profile filter list`
@@ -1249,6 +1239,27 @@ Usage: pyrite profile filter rm [OPTIONS] PROFILE_NAME IDENTIFIER
 Options:
   --dry-run   Print proposed TOML diff; write nothing.
   -h, --help  Show this message and exit.
+```
+
+## `pyrite profile filter set`
+
+```text
+Usage: pyrite profile filter set [OPTIONS] PROFILE_NAME IDENTIFIER
+
+  Update one filter, by name or one-based index, in place; order is kept.
+
+Options:
+  --name TEXT             New display name; must stay unique within the profile.
+  --material KEY          Catalog crystal or medium key.
+  --thickness-mm MM       Plate thickness in mm.  [x>0.0]
+  --size-mm WIDTH HEIGHT  Plate width and height in mm.
+  --distance-mm MM        Source-to-plate distance in mm.  [x>0.0]
+  --polar-deg FLOAT       Observation polar angle in degrees [0, 180].
+  --azimuth-deg FLOAT     Observation azimuth in degrees.
+  --roll-deg FLOAT        Local-roll angle in degrees.
+  --offset-mm X Y         Local x/y offset in mm.
+  --dry-run               Print proposed TOML diff; write nothing.
+  -h, --help              Show this message and exit.
 ```
 
 ## `pyrite profile filter show`
@@ -1382,6 +1393,114 @@ Usage: pyrite profile numerics show [OPTIONS] NAME
 Options:
   --fidelity [full|survey]        Resolve profile values against this fidelity preset.
                                   [default: full]
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile physical-detector`
+
+```text
+Usage: pyrite profile physical-detector [OPTIONS] COMMAND [ARGS]...
+
+  Manage a profile's physical pixel detector and counting observation.
+
+  The table holds pose and pixel grid, and optionally the angular scorer, the detector
+  response, and the acquisition. With an acquisition the profile is a counting
+  observation: 'pyrite run' stores per-pixel counts beside its checkpoints, and the
+  sweep's scalar observation angle, polar acceptance, and solid angle come from this
+  detector's projection instead of the profile's scalar detector.
+
+  What an edit costs on the next run: pose and pixel grid change the projection and
+  therefore the dataset; the angular shape (and filters) re-evaluate observations on new
+  transport while cached scalar records are kept; response and acquisition only rescore
+  stored observations, with no transport.
+
+  A profile without its own table inherits 'standard's; 'set' gives it a profile-local
+  copy first, so 'standard' never changes.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  reset  Remove NAME's SECTIONS, or its whole physical detector when none are named.
+  set    Create or update NAME's physical detector; only given fields change.
+  show   Show NAME's effective physical detector and derived scalar projection.
+```
+
+## `pyrite profile physical-detector reset`
+
+```text
+Usage: pyrite profile physical-detector reset [OPTIONS] NAME
+                                              [scorer|response|acquisition]...
+
+  Remove NAME's SECTIONS, or its whole physical detector when none are named.
+
+  Removing the acquisition ends the counting observation; stored observations are kept
+  and become reusable again if it is restored.
+
+Options:
+  -y, --yes   Remove without prompting (required when not a TTY).
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile physical-detector set`
+
+```text
+Usage: pyrite profile physical-detector set [OPTIONS] NAME
+
+  Create or update NAME's physical detector; only given fields change.
+
+Options:
+  --distance-mm MM                Source-to-detector distance in mm; required to create.
+  --polar-deg DEG                 Detector-centre polar angle from the beam axis in
+                                  degrees [0, 180].  [0.0<=x<=180.0]
+  --azimuth-deg DEG               Detector-centre azimuth in degrees.
+  --roll-deg DEG                  Detector roll about its normal in degrees.
+  --offset-mm X Y                 Detector-local x/y offset of the centre in mm.
+  --shape ROWS COLS               Pixel counts; a new table defaults to one 256 x 256
+                                  Timepix3 chip.
+  --pitch-mm Y X                  Pixel pitch (y, x) in mm; a new table defaults to
+                                  0.055 0.055.
+  --angular-shape ROWS COLS       Representative directions evaluated per transport
+                                  (nearest-tile); at most --shape.
+  --response [ideal|timepix3]     Detector response: unit-efficiency 'ideal' counter or
+                                  uncalibrated 'timepix3'.
+  --timepix-thickness-um UM       Timepix3 sensor thickness in micrometres.
+  --timepix-bias-v V              Timepix3 sensor bias in volts.
+  --timepix-input-bin-ev EV       Timepix3 response-model incident-energy bin width in
+                                  eV.
+  --timepix-output-bin-ev EV      Timepix3 native measured-energy bin width in eV (not
+                                  the reporting bins).
+  --timepix-samples N             Timepix3 response Monte Carlo photons per input bin.
+  --timepix-seed N                Timepix3 response-matrix seed.
+  --exposure-s S                  Exposure (integration) time in s.
+  --measured-edges-ev EV,...      Explicit half-open reporting-bin edges in eV, strictly
+                                  increasing.
+  --measured-range-ev MIN MAX     Uniform reporting range in eV; use with --measured-
+                                  bin-width-ev.
+  --measured-bin-width-ev EV      Uniform reporting-bin width in eV; output binning, not
+                                  detector resolution.
+  --hit-threshold-ev EV           Post-response measured-energy cut in eV; separate from
+                                  the response's discriminator.
+  --realization [expected|poisson]
+                                  Report expected counts, or a seeded Poisson
+                                  realization.
+  --realization-seed N            Seed of the Poisson realization.
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile physical-detector show`
+
+```text
+Usage: pyrite profile physical-detector show [OPTIONS] NAME
+
+  Show NAME's effective physical detector and derived scalar projection.
+
+Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.

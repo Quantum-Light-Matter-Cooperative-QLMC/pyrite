@@ -105,9 +105,20 @@ def _simulation_scene(document, material, profile_name):
     if physical is None:
         raise ValueError(
             "material simulate requires [profiles.NAME.physical_detector]; "
-            "add one with 'pyrite profile filter add ... --detector-distance-mm MM'"
+            "add one with 'pyrite profile physical-detector set NAME --distance-mm MM'"
         )
-    detector = physical_detector_from_row(physical)
+    from pyrite.campaign.observation import resolve_profile_observation
+
+    observation = resolve_profile_observation(catalog, profile_name)
+    detector = physical_detector_from_row(physical) if observation is None else observation.detector
+    scorer_row = cast("dict[str, Any] | None", physical.get("scorer"))
+    scorer = (
+        observation.scorer
+        if observation is not None
+        else PixelScorer()
+        if scorer_row is None
+        else PixelScorer(angular_shape=tuple(scorer_row["angular_shape"]))
+    )
     detector = replace(
         detector,
         energy_bins=EnergyBins(
@@ -136,7 +147,8 @@ def _simulation_scene(document, material, profile_name):
         target,
         detector,
         filters,
-        PixelScorer(),
+        scorer,
+        None if observation is None else observation.acquisition,
         Numerics(
             n_electrons=n_electrons,
             n_electrons_brem=n_electrons_brem,
@@ -182,6 +194,21 @@ def _simulation_payload(material, profile_name, result):
             "filter_count": int(spatial.ray_map.path_length_mm.shape[2]),
         },
         "observation_identity_digest": result.provenance["observation_identity_digest"],
+        "acquisition": _acquisition_summary(result),
+    }
+
+
+def _acquisition_summary(result):
+    """Total registered counts of a counting observation, or ``None``."""
+    scene = result.provenance["scene"]
+    acquisition = scene.acquisition
+    if acquisition is None:
+        return None
+    return {
+        "mode": acquisition.mode,
+        "exposure_s": acquisition.exposure_s,
+        "measured_edges_eV": list(acquisition.measured_edges_eV),
+        "total_counts": float(result.acquisition_image().sum()),
     }
 
 
@@ -455,8 +482,8 @@ def simulate_command(material, profile_name, output_format, output_file):
     schema = "cxr.material.simulate"
     try:
         _text, document = _catalog_io.catalog_text()
-        beam, target, detector, filters, scorer, numerics, emission = _simulation_scene(
-            document, material, profile_name
+        beam, target, detector, filters, scorer, acquisition, numerics, emission = (
+            _simulation_scene(document, material, profile_name)
         )
         from pyrite.api import simulate
 
@@ -468,6 +495,7 @@ def simulate_command(material, profile_name, output_format, output_file):
             emission=emission,
             filters=filters,
             pixel_scorer=scorer,
+            acquisition=acquisition,
         )
         if output_file is not None:
             _write_simulation_artifact(output_file, result)

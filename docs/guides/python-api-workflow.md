@@ -85,13 +85,70 @@ energy_eV, selected = spatial.spectra(
     component="line",
 )
 line_image = spatial.image((4_000.0, 6_000.0), component="line")
+metadata = spatial.pixel_metadata(pixels=[(128, 64), (128, 192)])
+shadow = spatial.transmission_image(5_000.0, component="background")
 ```
 
 Selected spectra include each pixel's solid angle and therefore have units of photons per incident electron per eV. `component="line"` and `"coherent"` are PXR/CBS only; `"characteristic"` is the atomic-relaxation component, and `"line_total"`/`"coherent_total"` add it to the corresponding line. `Result.spectrum` remains a detector- averaged density per sr. `SpatialResult` stores tile spectra, pixel rays, and attenuation coefficients as separate factors; `spectra` materializes only the selection and `image` works in bounded pixel chunks rather than allocating a full `(row, column, energy)` cube. Pass `measured=True` to either method to apply a configured `PlanarDetector.response` explicitly.
 
+`pixel_metadata` returns, for a selection only, each pixel's detector-local and lab position, unit direction with lab polar/azimuth angles, distance, scored solid angle, angular tile (and its representative direction when retained), and per-filter path length. `filter_coverage()` marks which centre rays cross each plate, and `transmission_image(energy_eV, component=...)` is the primary transmission at the nearest stored node of that component's energy grid (`energy_node` reports it); an energy outside the grid is an error rather than a snap to its end, so use `"background"` for the wide continuum grid. Uncovered pixels are exactly 1.
+
 Pixels use centre rays from the target reference point. The plate is a finite oriented box, so translation, distance, rotation, oblique thickness, edge misses, and side escape affect the shadow. The primary model includes only Beer--Lambert attenuation: no filter scatter, fluorescence, diffraction, or secondary photons. A `PlanarDetector` without `PixelGrid` supports one centre ray and scalar output; partial-coverage scoring requires `PixelScorer` and a physical grid.
 
-`provenance["identity_digest"]` remains the source-case digest. Physical observations additionally carry `observation_identity_digest`, which includes ordered geometry, resolved compositions, angular partition, response, and hashes of the coefficient arrays. Plate display names are not identity.
+`provenance["identity_digest"]` remains the source-case digest. Physical observations additionally carry `observation_identity_digest`, which includes ordered geometry, resolved compositions, angular partition, response, and hashes of the coefficient arrays. Plate display names are not identity. An acquisition-enabled observation instead records independent `true_spatial_digest`, `response_digest`, and `acquisition_digest` layers, then links them through `observation_identity_digest`. Changing exposure or reporting edges therefore leaves the intrinsic and true-spatial identities unchanged; changing only the response leaves true-spatial identity unchanged.
+
+```python
+counting_detector = pr.PlanarDetector.timepix3_chip(
+    pose,
+    response=pr.IdealPhotonCounter(),
+)
+acquisition = pr.Acquisition.uniform(
+    exposure_s=1.0,
+    minimum_eV=0.0,
+    maximum_eV=20_000.0,
+    bin_width_eV=400.0,
+    hit_threshold_eV=500.0,
+)
+configured = pr.simulate(
+    beam,
+    target,
+    counting_detector,
+    pixel_scorer=pr.PixelScorer(angular_shape=(2, 2)),
+    acquisition=acquisition,
+)
+selected = configured.acquire(pixels=[(0, 0), (10, 12)])
+total_image = configured.acquisition_image(pixel_chunk=1024)
+window_image = configured.acquisition_image((4_000.0, 8_000.0), pixel_chunk=1024)
+```
+
+`IdealPhotonCounter` is explicitly unit-efficiency and energy-preserving; it is a mathematical reference response, not calibrated hardware. `selected.expected` contains registered expected counts per reporting bin; `selected.realized` is present only in Poisson mode, and `selected.counts` selects the configured form. Underflow, overflow, and below-cut accounting are separate arrays. `total_counts` sums registered bins; `window_counts` and the image energy range require bounds that match configured reporting edges so an integer realization is never fractionally split. Images process bounded pixel chunks rather than allocating a full pixel-by-energy cube.
+
+### Persist, reopen, and rescore an observation
+
+`pyrite.observations.ObservationStore` keeps observations beside, not inside, intrinsic checkpoints; `pyrite run` writes one per case of a counting-observation profile under `observations/<stem>/`. A true-spatial object stores only factors -- tile map, solid angles, filter paths, representative directions, per-tile spectra, attenuation -- and every response or acquisition over it is a small record, so rescoring never repeats transport:
+
+```python
+import tempfile
+
+from pyrite.observations import ObservationStore, observation_from_result
+
+store = ObservationStore("demo", root=tempfile.mkdtemp())
+stored_digest = store.put(observation_from_result(configured))
+reopened = store.load(stored_digest)
+longer = reopened.rescore(
+    acquisition=pr.Acquisition.uniform(
+        exposure_s=10.0,
+        minimum_eV=0.0,
+        maximum_eV=20_000.0,
+        bin_width_eV=400.0,
+        hit_threshold_eV=500.0,
+    )
+)
+store.put(longer)
+longer_image = longer.acquisition_image(pixel_chunk=1024)
+```
+
+`load` verifies schema, array checksums, and digests and raises `ObservationStoreError` rather than return damaged data. `rescore` accepts a new `acquisition`, `response`, `rep_rate_hz`, or `bunch_charge_pc`; geometry, filters, and angular sampling are fixed by the stored factors and need a new simulation.
 
 ## Apply detector response explicitly
 

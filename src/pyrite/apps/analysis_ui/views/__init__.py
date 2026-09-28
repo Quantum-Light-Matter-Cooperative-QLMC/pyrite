@@ -4,6 +4,7 @@ from .dimension import render_dimension_comparison
 from .energy import render_energy_comparison
 from .materials import render_cross_material
 from .optimize import render_rankings, render_scans
+from .pixels import render_pixel_detector
 
 __all__ = [
     "CASE_BASKET_CAP",
@@ -12,6 +13,7 @@ __all__ = [
     "render_detectors",
     "render_dimension_comparison",
     "render_energy_comparison",
+    "render_pixel_detector",
     "render_rankings",
     "render_scans",
 ]

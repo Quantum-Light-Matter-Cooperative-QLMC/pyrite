@@ -104,7 +104,12 @@ def test_run_case_directions_transports_once_and_stacks_direction_outputs(monkey
         assert payload is case
         assert kwargs["keep_segments_on_device"] is True
         calls["transport"] += 1
-        return {"n_hat": np.array([0.0, 0.0, 1.0]), "segments": object()}
+        return {
+            "n_hat": np.array([0.0, 0.0, 1.0]),
+            "segs": object(),
+            "Ne_lines": 1,
+            "E_grid": np.array([1.0, 2.0]),
+        }
 
     def fake_spectrum(payload, transport):
         assert payload is case
@@ -151,6 +156,72 @@ def test_one_direction_runner_matches_scalar_runner_bit_for_bit() -> None:
         scalar["spec_characteristic"],
     )
     np.testing.assert_array_equal(directional["brem_wide_by_direction"][0], scalar["brem_wide"])
+
+
+def _one_direction_case(name):
+    case = _fake_case(name, 30.0)
+    case["hkl_list"] = [(0, 0, 2)]
+    _, direction = runner.tilted_geometry(
+        case["theta_obs_rad"],
+        np.deg2rad(case["tilt_deg"]),
+        np.deg2rad(case["tilt_azim_deg"]),
+    )
+    tilted = direction + np.array([0.05, 0.02, 0.0])
+    return case, np.stack([direction, tilted / np.linalg.norm(tilted)])
+
+
+def test_run_case_adds_directions_from_the_same_transport_without_changing_scalars():
+    case, directions = _one_direction_case("with-directions")
+
+    plain = runner.run_case(case)
+    combined = runner.run_case(case, observation_directions=directions)
+    separate = runner.run_case_directions(case, directions)
+
+    for key in ("spec", "spec_characteristic", "brem_wide", "E_grid"):
+        np.testing.assert_array_equal(combined[key], plain[key])
+    directional = combined["directional"]
+    for key in ("spec_by_direction", "spec_characteristic_by_direction", "brem_wide_by_direction"):
+        np.testing.assert_array_equal(directional[key], separate[key])
+    np.testing.assert_array_equal(directional["spec_by_direction"][0], plain["spec"])
+    assert "directional" not in plain
+
+
+def test_run_case_transports_once_for_scalar_and_directions(monkeypatch):
+    case, directions = _one_direction_case("single-transport")
+    calls = {"transport": 0}
+    transport = runner._transport_case
+
+    def counting(*args, **kwargs):
+        calls["transport"] += 1
+        return transport(*args, **kwargs)
+
+    monkeypatch.setattr(runner, "_transport_case", counting)
+    runner.run_case(case, observation_directions=directions)
+    assert calls["transport"] == 1
+
+
+@pytest.mark.parametrize("max_workers", [0, 1], ids=["serial", "cpu-pool"])
+def test_run_cases_forwards_per_case_directions(max_workers):
+    case, directions = _one_direction_case("sweep-directions")
+    other = _one_direction_case("sweep-scalar")[0]
+
+    outputs = runner.run_cases(
+        [case, other],
+        max_workers=max_workers,
+        progress=False,
+        engine="cpu",
+        observation_directions=[directions, None],
+    )
+
+    assert outputs[0]["directional"]["spec_by_direction"].shape[0] == 2
+    assert "directional" not in outputs[1]
+    np.testing.assert_array_equal(outputs[0]["spec"], runner.run_case(case)["spec"])
+
+
+def test_run_cases_rejects_misaligned_directions():
+    case, directions = _one_direction_case("misaligned")
+    with pytest.raises(ValueError, match="align"):
+        runner.run_cases([case], progress=False, observation_directions=[directions, None])
 
 
 def test_transport_case_forwards_finite_footprint_to_shared_transport(monkeypatch):

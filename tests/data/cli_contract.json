@@ -91,6 +91,13 @@
         "profile create",
         "profile set"
       ]
+    },
+    {
+      "contract": "A profile's physical detector is set only through `pyrite profile physical-detector set`; `profile filter add` no longer accepts `--detector-distance-mm`, `--detector-*-deg`, `--detector-offset-mm`, `--shape`, or `--pitch-mm`, which replaced the whole table and dropped its scorer, response, and acquisition. They are plain 'no such option' usage errors.",
+      "id": "profile-filter-detector-flags-removed",
+      "paths": [
+        "profile filter add"
+      ]
     }
   ],
   "root": {
@@ -5660,62 +5667,6 @@
                     "help": "Optional display name; must be unique within the profile.",
                     "option_strings": [
                       "--name"
-                    ],
-                    "required": false
-                  },
-                  {
-                    "dest": "detector_pitch_mm",
-                    "help": "Physical-detector pixel pitch (y, x) in mm.",
-                    "option_strings": [
-                      "--pitch-mm"
-                    ],
-                    "required": false
-                  },
-                  {
-                    "dest": "detector_shape",
-                    "help": "Physical-detector pixel shape; defaults to a Timepix3 chip.",
-                    "option_strings": [
-                      "--shape"
-                    ],
-                    "required": false
-                  },
-                  {
-                    "dest": "detector_offset_mm",
-                    "help": "Physical-detector local x/y offset in mm.",
-                    "option_strings": [
-                      "--detector-offset-mm"
-                    ],
-                    "required": false
-                  },
-                  {
-                    "dest": "detector_roll_deg",
-                    "help": "Physical-detector local roll in degrees.",
-                    "option_strings": [
-                      "--detector-roll-deg"
-                    ],
-                    "required": false
-                  },
-                  {
-                    "dest": "detector_azimuth_deg",
-                    "help": "Physical-detector azimuth in degrees.",
-                    "option_strings": [
-                      "--detector-azimuth-deg"
-                    ],
-                    "required": false
-                  },
-                  {
-                    "dest": "detector_polar_deg",
-                    "help": "Physical-detector polar angle in degrees [0, 180].",
-                    "option_strings": [
-                      "--detector-polar-deg"
-                    ],
-                    "required": false
-                  },
-                  {
-                    "dest": "detector_distance_mm",
-                    "help": "Source-to-physical-detector distance in mm.",
-                    "option_strings": [
-                      "--detector-distance-mm"
                     ],
                     "required": false
                   },

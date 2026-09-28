@@ -4,7 +4,17 @@ from importlib import import_module
 from types import ModuleType
 
 from .response import convolve_detector, detector_efficiency
-from .spec import Detector, DetectorResponse, DetectorSpec, EagleXO, EnergyBins, LegacyEDS, Timepix3
+from .spec import (
+    Detector,
+    DetectorResponse,
+    DetectorSpec,
+    EagleXO,
+    EnergyBins,
+    IdealPhotonCounter,
+    LegacyEDS,
+    NativeSpectrum,
+    Timepix3,
+)
 
 __all__ = [
     "Detector",
@@ -12,7 +22,9 @@ __all__ = [
     "DetectorSpec",
     "EagleXO",
     "EnergyBins",
+    "IdealPhotonCounter",
     "LegacyEDS",
+    "NativeSpectrum",
     "Timepix3",
     "convolve_detector",
     "detector_efficiency",

@@ -14,12 +14,7 @@ from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli._deprecations import canonical_option
 from pyrite.cli._groups import LazyGroup
-from pyrite.cli.commands._filter_shared import (
-    filter_cli_options,
-    filter_row,
-    physical_detector_cli_options,
-    physical_detector_row,
-)
+from pyrite.cli.commands import _physical_detector, _profile_filters
 from pyrite.cli.commands._profile_members import (
     add_membership as _add_membership,
 )
@@ -223,15 +218,19 @@ def _emit_show(payload):
                 emit_result(
                     f"  beam.longitudinal.envelope_rms_fs: {longitudinal['envelope_rms_fs']:g}"
                 )
+    physical = payload["physical_detector"]
+    counting = physical is not None and "acquisition" in physical
+    superseded = (
+        " (superseded by the physical detector's projection for sweeps)" if counting else ""
+    )
     if payload["detector_ref"] is not None:
-        emit_result(f"  detector: {payload['detector_ref']} (named reference)")
+        emit_result(f"  detector: {payload['detector_ref']} (named reference){superseded}")
     else:
-        emit_result("  detector:")
+        emit_result(f"  detector:{superseded}")
     for key, label, unit in _ACTIVE_DETECTOR_FIELDS:
         value = payload["detector"][key]
         display = "unspecified" if value is None else f"{value:g} {unit}"
         emit_result(f"    {label}: {display}")
-    physical = payload["physical_detector"]
     if physical is None:
         emit_result("  physical detector: none")
     else:
@@ -247,6 +246,9 @@ def _emit_show(payload):
         ):
             if key in physical:
                 emit_result(f"    {key}: {physical[key]}")
+        sections = [name for name in _profile_edit.PHYSICAL_SECTIONS if name in physical]
+        emit_result(f"    sections: {', '.join(sections) or 'none'}")
+        emit_result(f"    counting observation: {'yes' if counting else 'no'}")
     filters = payload["filters"]
     if not filters:
         emit_result("  filters: none")
@@ -544,142 +546,10 @@ def numerics_reset_command(name, fields, yes, dry_run):
     return _write(document, original, dry_run, f"reset numerics for profile {name}")
 
 
-@command.group("filter")
-def filter_command():
-    """Manage finite FilterPlate objects on a profile.
-
-    ``add`` validates its plate through the public ``FilterPlate`` dataclass.
-    Supply ``--detector-distance-mm`` (and optionally ``--shape`` or
-    ``--pitch-mm``) to create or replace the profile's physical pixel detector.
-    Filters need that detector when running ``pyrite material simulate``.
-    """
+command.add_command(_physical_detector.command)
 
 
-@filter_command.command("add")
-@click.argument("profile_name", shell_complete=_cli_completion.complete_profile)
-@filter_cli_options
-@physical_detector_cli_options
-@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-@click.pass_context
-def filter_add_command(ctx, profile_name, dry_run, **values):
-    """Add one finite filter plate to PROFILE."""
-    try:
-        original, document = _catalog_io.catalog_text()
-        row = filter_row(
-            name=values["name"],
-            material=values["material"],
-            thickness_mm=values["thickness_mm"],
-            size_mm=values["size_mm"],
-            distance_mm=values["distance_mm"],
-            polar_deg=values["polar_deg"],
-            azimuth_deg=values["azimuth_deg"],
-            roll_deg=values["roll_deg"],
-            offset_mm=values["offset_mm"],
-        )
-        values["detector_options_explicit"] = tuple(
-            flag
-            for key, flag in (
-                ("detector_shape", "--shape"),
-                ("detector_pitch_mm", "--pitch-mm"),
-                ("detector_polar_deg", "--detector-polar-deg"),
-                ("detector_azimuth_deg", "--detector-azimuth-deg"),
-                ("detector_roll_deg", "--detector-roll-deg"),
-                ("detector_offset_mm", "--detector-offset-mm"),
-            )
-            if ctx.get_parameter_source(key) is click.core.ParameterSource.COMMANDLINE
-        )
-        detector = physical_detector_row(**values)
-        _profile_edit.add_filter(document, profile_name, row, detector)
-    except (OSError, ValueError, ParseError) as exc:
-        raise CLIError(str(exc)) from None
-    return _write(document, original, dry_run, f"added filter to profile {profile_name}")
-
-
-def _filter_payload(document, profile_name):
-    profile = _profile_edit.existing_profile(document, profile_name)
-    rows = _profile_edit.filter_rows(profile)
-    return {
-        "profile": profile_name,
-        "filters": [
-            {"index": index, **dict(row.unwrap() if hasattr(row, "unwrap") else row)}
-            for index, row in enumerate(rows, start=1)
-        ],
-    }
-
-
-@filter_command.command("list")
-@click.argument("profile_name", shell_complete=_cli_completion.complete_profile)
-@output_option
-def filter_list_command(profile_name, json_output):
-    """List PROFILE's finite filter plates."""
-    try:
-        _text, document = _catalog_io.catalog_text()
-        payload = _filter_payload(document, profile_name)
-    except (OSError, ValueError, ParseError) as exc:
-        if json_output:
-            emit_json_result(cli_json.failure("cxr.profile.filter.list", {}, str(exc)))
-            return 1
-        raise CLIError(str(exc)) from None
-    if json_output:
-        emit_json_result(cli_json.JsonResult("cxr.profile.filter.list", payload))
-        return 0
-    if not payload["filters"]:
-        emit_result(f"{profile_name}: no filters")
-    for row in payload["filters"]:
-        label = row.get("name") or f"#{row['index']}"
-        emit_result(f"{row['index']}: {label} ({row['material']}, {row['thickness_mm']:g} mm)")
-    return 0
-
-
-@filter_command.command("show")
-@click.argument("profile_name", shell_complete=_cli_completion.complete_profile)
-@click.argument("identifier")
-@output_option
-def filter_show_command(profile_name, identifier, json_output):
-    """Show one PROFILE filter by its name or one-based list index."""
-    try:
-        _text, document = _catalog_io.catalog_text()
-        payload = _filter_payload(document, profile_name)
-        row = next(
-            (
-                item
-                for item in payload["filters"]
-                if str(item["index"]) == identifier or item.get("name") == identifier
-            ),
-            None,
-        )
-        if row is None:
-            raise ValueError(f"profile {profile_name!r} has no filter {identifier!r}")
-    except (OSError, ValueError, ParseError) as exc:
-        if json_output:
-            emit_json_result(cli_json.failure("cxr.profile.filter.show", {}, str(exc)))
-            return 1
-        raise CLIError(str(exc)) from None
-    if json_output:
-        emit_json_result(cli_json.JsonResult("cxr.profile.filter.show", row))
-        return 0
-    emit_result(f"{profile_name} filter {row.get('name') or '#' + str(row['index'])}:")
-    for key, value in row.items():
-        if key != "index":
-            emit_result(f"  {key}: {value}")
-    return 0
-
-
-@filter_command.command("rm")
-@click.argument("profile_name", shell_complete=_cli_completion.complete_profile)
-@click.argument("identifier")
-@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def filter_rm_command(profile_name, identifier, dry_run):
-    """Remove one filter by its name or one-based list index."""
-    try:
-        original, document = _catalog_io.catalog_text()
-        removed = _profile_edit.remove_filter(document, profile_name, identifier)
-    except (OSError, ValueError, ParseError) as exc:
-        raise CLIError(str(exc)) from None
-    label = removed.get("name") or identifier
-    return _write(
-        document, original, dry_run, f"removed filter {label} from profile {profile_name}"
-    )
+command.add_command(_profile_filters.command)
 
 
 @command.command("list")

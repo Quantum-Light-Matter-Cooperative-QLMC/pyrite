@@ -222,15 +222,16 @@ def test_analysis_app_discovers_materials_directly_from_catalog() -> None:
     assert "from pyrite.campaign.config import MATERIALS" not in source
 
 
-def test_analysis_app_uses_four_top_level_tabs_and_action_names() -> None:
+def test_analysis_app_uses_top_level_tabs_and_action_names() -> None:
     source = APP.read_text()
 
-    # "Instruments" and "Compare" hold a single view each, so they're bare
-    # top-level tabs rather than nested action-accordion groups.
+    # "Instruments", "Pixel detector", and "Compare" hold a single view each,
+    # so they're bare top-level tabs rather than nested action-accordion groups.
     for group in (
         '"Explore"',
         '"Optimize"',
         '"Instruments"',
+        '"Pixel detector"',
         '"Compare"',
     ):
         assert group in source

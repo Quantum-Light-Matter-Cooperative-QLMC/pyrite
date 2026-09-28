@@ -40,15 +40,24 @@ def catalog_text(path=None):
     return text, tomlkit.parse(text)
 
 
-def validate(path, text):
-    """Load ``text`` as the catalog at ``path`` would, without touching it."""
+def validated_catalog(path, text, *, profile="standard"):
+    """Parse proposed catalog ``text`` beside ``path`` and return the catalog.
+
+    ``profile`` selects whose energy-grid references are resolved, as a run
+    would.
+    """
     fd, temporary = tempfile.mkstemp(dir=catalog_root(path), prefix=".", suffix=".toml.tmp")
     try:
         with os.fdopen(fd, "w") as stream:
             stream.write(text)
-        load_material_catalog(Path(temporary))
+        return load_material_catalog(Path(temporary), profile=profile)
     finally:
         Path(temporary).unlink(missing_ok=True)
+
+
+def validate(path, text):
+    """Load ``text`` as the catalog at ``path`` would, without touching it."""
+    validated_catalog(path, text)
 
 
 def atomic_write(path, text):

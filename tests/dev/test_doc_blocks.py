@@ -106,7 +106,7 @@ def _python_blocks() -> list[FencedBlock]:
 
 def test_python_api_workflow_executes_as_one_accumulating_namespace():
     blocks = _python_blocks()
-    assert len(blocks) == 5
+    assert len(blocks) == 7
 
     namespace: dict[str, object] = {}
     for block in blocks:
@@ -134,6 +134,14 @@ def test_python_api_workflow_executes_as_one_accumulating_namespace():
     # documented axes, independent of Monte Carlo content.
     assert len(namespace["expanded"]) == 9
     assert len(namespace["cases"]) == 9
+
+    reopened = namespace["reopened"]
+    longer = namespace["longer"]
+    assert reopened.digest == namespace["configured"].provenance["observation_identity_digest"]
+    assert longer.identity.true_spatial_digest == reopened.identity.true_spatial_digest
+    np.testing.assert_allclose(
+        namespace["longer_image"], 10.0 * namespace["total_image"], rtol=1e-12
+    )
 
 
 # --- toml block ------------------------------------------------------------

@@ -385,6 +385,14 @@ class TimepixResponse:
         bias_v=None,
     ):
         E = np.asarray(E_grid_eV, dtype=float)
+        if (
+            E.ndim != 1
+            or E.size < 2
+            or not np.all(np.isfinite(E))
+            or np.any(E < 0.0)
+            or np.any(np.diff(E) <= 0.0)
+        ):
+            raise ValueError("TimepixResponse requires a finite increasing energy grid")
         self.E = E  # the fine output grid
         # The detector owns an explicit physical 0 eV boundary, whatever the
         # source mesh starts at: a reflected negative half-bin is clamped up to
@@ -423,12 +431,14 @@ class TimepixResponse:
         # precompute which coarse-input bin each fine bin maps to, so .apply()
         # can re-bin any spectrum with a single bincount (flux-conserving)
         self.idx_in = np.clip(((E - in_edges[0]) / dE_mc).astype(int), 0, self.n_in - 1)
+        self._occupied_input_bins, self._input_starts = np.unique(self.idx_in, return_index=True)
 
         # --- coarse OUTPUT grid --------------------------------------------
         # recorded energy can sit below E_in (charge loss) or above it (ToT
         # noise has ~0.5 keV width), so pad the top by 4*sigma_tot and start at 0
         out_edges = np.arange(0.0, hi + 4.0 * SIGMA_TOT_EV + dE_out, dE_out)
         self.dE_out = dE_out
+        self.out_edges_eV = out_edges
 
         # run the Monte Carlo once; everything below is reused on every .apply()
         resp = _cached_response_matrix(
@@ -446,6 +456,30 @@ class TimepixResponse:
         self.mean_rec = resp["mean_rec"]
         self.fwhm_rec = resp["fwhm_rec"]
         self.sigma_diff_um = resp["sigma_diff_um"]
+
+    def apply_native(self, spec):
+        """Return detected event mass on ``out_edges_eV`` for one spectrum or a batch.
+
+        Validation: detector-timepix
+        """
+        values = np.asarray(spec, dtype=float)
+        if values.ndim == 0 or values.shape[-1] != self.E.size:
+            raise ValueError(
+                f"spec last dimension {values.shape} != response grid {self.E.shape}. "
+                "Build a matching response with timepix_response.get_response(E_grid, ...)."
+            )
+        values = np.nan_to_num(values, nan=0.0, posinf=0.0, neginf=0.0)
+        if np.any(values < 0.0):
+            raise ValueError("native Timepix incident density must be nonnegative")
+        flattened = values.reshape(-1, self.E.size)
+        coarse_input = np.zeros((flattened.shape[0], self.n_in), dtype=float)
+        coarse_input[:, self._occupied_input_bins] = np.add.reduceat(
+            flattened * self.dE_fine,
+            self._input_starts,
+            axis=1,
+        )
+        native = coarse_input @ self.R.T
+        return native.reshape((*values.shape[:-1], self.R.shape[0]))
 
     def apply(self, spec):
         """Detected spectral density on the fine grid, in the SAME flux units per
