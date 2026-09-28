@@ -477,3 +477,39 @@ per-electron standard error and gate on it; add a variance-reduction scheme
 detector cone); or scope 5 MeV incoherent line yields as statistics-limited.
 Also open: whether these electrons also dominate the measured stop (672 keV
 at Ne=8,000 predates the #172 defaults) and the lower-edge audit.
+
+## Measured-stop attribution and standard-error gate (2026-09-27)
+
+Decision (user): option 1, gate on the per-electron standard error; option 2
+(variance reduction) opened as #203.
+
+`2974a801`: resonance-population audits now sum line mass per line electron
+(both kernel routes) and `check_line_truncation` refuses a case whose relative
+standard error of the mean exceeds `LINE_YIELD_RELATIVE_SE_LIMIT = 0.1`,
+recording `line_yield_statistics` (n, relative SE, largest electron share).
+The attribution diagnostic also ranks lines/electrons by their tail bound above
+the measured stop.
+
+SLURM 215 (`20260927-191234-75a65730`), 1 mm 10/100, seed 0, local
+resolution, FP32 and FP64 identical to shown precision. Reports:
+`/tmp/issue201_stop_attribution.json`, `/tmp/issue201_stop_attribution.fp64.json`.
+
+| Ne | stop eV | max resonance eV | top-1 / top-10 electron mass share | stop tail by electron |
+|---:|---:|---:|---|---|
+| 4,000 | 35,400 | 20,705 | 0.51 / 0.76 | 159: 0.69, 3986: 0.13, 2704: 0.08 |
+| 8,000 | 672,400 | 77,474 | 0.65 / 0.996 | 5025: 0.63, 4868: 0.37, 4073: 0.001 |
+
+The 672 keV stop reproduces under the #172 defaults and is set entirely by the
+two rare detector-cone electrons. No line resonates above 77.5 keV; the edge
+sits ~600 keV higher because their lines are both heavy and wide (small
+`1 - v.n` gives first-zero widths 0.5-9.5 keV), and the `w/(pi^2 D)` tail bound
+decays only as 1/D. Given the sampled population the stop is correct (the bound
+is ~2x the exact far tail), so it is a symptom of the rare-event estimator, not
+a selector bug. Even Ne=4,000 is dominated by one electron (51% of the mass;
+159 is the heaviest electron at Ne=8,000 outside the two cone electrons), so
+the new gate refuses both counts. Likely also the source of the ~2e-3
+lower-edge bound (wide lines at 5-13 keV spill below `start`); not measured.
+
+Next: a stable 5 MeV 10/100 yield needs #203. Remaining #192 items
+(fresh-context validation, `high_energy` opt-in) proceed for cases that pass
+the gate; 5 MeV h-BN 10/100 at 1 mm stays refused until #203.
