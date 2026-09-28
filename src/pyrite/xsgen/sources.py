@@ -249,7 +249,9 @@ class ResolvedSource:
             resolved[name] = (
                 local
                 if local.is_dir()
-                else fetched if fetched.is_dir() or not legacy.is_dir() else legacy
+                else fetched
+                if fetched.is_dir() or not legacy.is_dir()
+                else legacy
             )
         return resolved
 

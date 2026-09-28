@@ -86,6 +86,7 @@ def remote_runtime_env() -> str:
         assignments.append(f"PYRITE_CATALOG={shell_word(catalog)}")
     return " ".join(assignments)
 
+
 # text extensions whose CRLF is normalized to LF before tarring (see _add_to_tar):
 # the laptop is Windows so its working files are CRLF, and shipping those over the
 # box's LF checkout dirties `git status` there even though content is identical.

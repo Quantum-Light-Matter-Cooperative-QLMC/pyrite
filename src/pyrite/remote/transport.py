@@ -234,7 +234,9 @@ def _sync_entries() -> list[tuple[str, Path]]:
                 if file.is_symlink() or not file.resolve().is_relative_to(catalog):
                     raise SystemExit(f"selected catalog contains unsafe symlink: {file}")
                 if file.is_file():
-                    entries.append(((Path("external-catalog") / file.relative_to(catalog)).as_posix(), file))
+                    entries.append(
+                        ((Path("external-catalog") / file.relative_to(catalog)).as_posix(), file)
+                    )
         elif catalog.is_file() and not catalog.is_symlink():
             entries.append(("external-catalog.toml", catalog))
         else:

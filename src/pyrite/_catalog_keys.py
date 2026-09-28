@@ -25,7 +25,11 @@ def _section_keys(section: str) -> tuple[str, ...]:
     try:
         from .console.config import resolve
 
-        path = bundled_catalog() if resolve("catalog.path").source == "built-in default" else selected_catalog()
+        path = (
+            bundled_catalog()
+            if resolve("catalog.path").source == "built-in default"
+            else selected_catalog()
+        )
         keys = object_keys(path, section)
     except OSError, tomllib.TOMLDecodeError:
         return ()

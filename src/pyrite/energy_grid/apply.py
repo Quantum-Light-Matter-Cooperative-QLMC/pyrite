@@ -377,7 +377,9 @@ def _profile_row(document, profile: str):
 
 
 def _artifact_store_root(catalog_path: Path | str | None = None) -> Path:
-    return catalog_root(active_catalog_path() if catalog_path is None else catalog_path) / ARTIFACT_DIR
+    return (
+        catalog_root(active_catalog_path() if catalog_path is None else catalog_path) / ARTIFACT_DIR
+    )
 
 
 def _existing_artifact_rows(
