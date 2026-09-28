@@ -63,5 +63,6 @@ def test_scan_module_entry_point_runs_the_scan_command(monkeypatch):
         runpy.run_module("pyrite._entry.scan", run_name="__main__")
 
     assert error.value.code == 23
-    assert seen["command"] is scan_cli.command
+    # The full surface: remote perf jobs pass the hidden performance flags.
+    assert seen["command"] is scan_cli._command
     assert seen["prog_name"] == "pyrite run"

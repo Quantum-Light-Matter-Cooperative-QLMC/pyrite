@@ -361,6 +361,13 @@ def test_scp_remote_path_quotes_hostile_but_valid_posix_path(monkeypatch):
     assert rendered == "qlmc:'/srv/pyrite data/$(touch SENTINEL)'"
 
 
+def test_remote_scan_entry_accepts_the_performance_flags_queue_scripts_pass():
+    from pyrite._entry import scan as entry_scan
+
+    options = {opt for param in entry_scan.command.params for opt in param.opts}
+    assert {"--performance-profile", "--performance-dir", "--perf-interval"} <= options
+
+
 def test_queue_script_has_per_material_scan_calls():
     s = remote._queue_script("20260101-000000", ["mose2", "wse2"], quick=True, workers=8)
     assert 'scan_launcher=("/home/aamador/.local/bin/uv" run --no-sync python)' in s
