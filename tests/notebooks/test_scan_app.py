@@ -63,3 +63,10 @@ def test_geometry_preview_is_lazy() -> None:
     source = APP.read_text()
 
     assert '"Geometry preview": mo.lazy(lambda: geometry_table(cases))' in source
+
+
+def test_initial_material_does_not_require_hopg_in_selected_catalog() -> None:
+    source = APP.read_text()
+
+    assert 'CATALOG.material("hopg")' not in source
+    assert '"hopg" if "hopg" in CATALOG.material_keys' in source
