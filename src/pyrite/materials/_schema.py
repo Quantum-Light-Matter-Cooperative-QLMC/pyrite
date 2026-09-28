@@ -421,6 +421,8 @@ class MaterialCatalog:
         Resolved per-profile beam, scalar-detector, and emission overrides.
     profile_transport_numerics
         Per-profile result-affecting scalar numerical controls.
+    profile_line_grid_policies
+        Per-profile named line-grid bandwidth and resolution policies.
     profile_filters, profile_physical_detectors
         Declarative finite-filter and planar-detector profile data.
     profile_energy_grid_refs, resolved_energy_grid_refs
@@ -464,6 +466,9 @@ class MaterialCatalog:
     #: Explicit scalar result-affecting numerics, keyed by profile. Electron
     #: count grids remain on each resolved :class:`ScanSpec`.
     profile_transport_numerics: Mapping[str, Mapping[str, object]] = MappingProxyType({})
+    #: Explicit ``profiles.NAME.line_grid_policy`` tables (named bandwidth and
+    #: resolution policies), keyed by profile; absent means the automatic policy.
+    profile_line_grid_policies: Mapping[str, Mapping[str, str]] = MappingProxyType({})
     #: Declarative finite filter plates, resolved by the single-scene CLI path.
     #: They intentionally remain plain schema data here: importing instrument
     #: objects would invert the materials -> instrument dependency boundary.
@@ -505,6 +510,11 @@ class MaterialCatalog:
     def profile_numerics(self, name: str) -> Mapping[str, object] | None:
         """Explicit result-affecting transport numerics for ``name``."""
         return self.profile_transport_numerics.get(name)
+
+    def profile_line_grid_policy(self, name: str) -> Mapping[str, str] | None:
+        """Named line-grid policies for ``name``, or ``None`` for the automatic one.
+        Consumed by :func:`config.material_sweep` as ``Sweep.line_grid_policy``."""
+        return self.profile_line_grid_policies.get(name)
 
     def profile_detector(self, name: str) -> Mapping[str, object]:
         """Resolved acceptance fields for ``name``, standard then legacy fallback.

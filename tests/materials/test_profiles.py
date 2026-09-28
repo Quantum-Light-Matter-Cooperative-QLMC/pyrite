@@ -116,9 +116,29 @@ def test_high_energy_profile_range_is_part_of_dataset_identity():
     sweep = material_sweep("hbn", catalog_profile="high_energy")
     identity = named_profile_identity("hbn", catalog_profile="high_energy")
 
-    np.testing.assert_array_equal(sweep.beam.energy_keV, [100.0, 500.0, 1000.0])
+    energies = [100.0, 500.0, 1000.0, 5000.0]
+    np.testing.assert_array_equal(sweep.beam.energy_keV, energies)
     assert identity["catalog_profile"] == "high_energy"
-    assert identity["resolved_parameters"]["sweep"]["energy_keV"] == [100.0, 500.0, 1000.0]
+    assert identity["resolved_parameters"]["sweep"]["energy_keV"] == energies
+    # 5 MeV is h-BN only (#192); the other members keep the shared range.
+    np.testing.assert_array_equal(
+        material_sweep("mos2", catalog_profile="high_energy").beam.energy_keV,
+        [100.0, 500.0, 1000.0],
+    )
+
+
+def test_high_energy_profile_selects_the_measured_line_grid():
+    """#192: the profile's named policies reach every case and its identity."""
+    policy = {"bandwidth": "resonance-population", "resolution": "resonance-local"}
+    sweep = material_sweep("hbn", catalog_profile="high_energy")
+    assert sweep.line_grid_policy == policy
+    identity = named_profile_identity("hbn", catalog_profile="high_energy")
+    assert identity["resolved_parameters"]["sweep"]["line_grid_policy"] == policy
+    case = build_cases(sweep, n_electrons=10, n_electrons_brem=10)[-1]
+    assert case["E0_keV"] == 5000.0
+    assert case["line_grid_policy"]["bandwidth"]["policy"] == "resonance-population"
+    assert case["line_grid_policy"]["resolution"]["policy"] == "resonance-local"
+    assert material_sweep("hbn").line_grid_policy is None
 
 
 def test_hopg_short_keeps_finite_footprint_and_attosecond_bunch():

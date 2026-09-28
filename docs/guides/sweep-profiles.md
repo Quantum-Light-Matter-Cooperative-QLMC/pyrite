@@ -53,6 +53,18 @@ pyrite profile numerics reset standard --yes
 
 Existing `profile create|set --ne-line/--ne-brem`, `--straggling`, `--energy-model`, and `--max-de-frac` spellings remain compatible. Worker, chunk, backend, core, and other execution-only tuning are intentionally absent: they affect runtime, not calculation results or checkpoint identity.
 
+## Line-grid policy
+
+By default each case's line axis spans a closed-form kinematic bandwidth at the measured sinc spacing. At MeV beam energies that axis needs millions of nodes. A profile can instead name measured policies:
+
+```text
+[line_grid_policy]
+bandwidth = "resonance-population"  # stop from the case's own line population
+resolution = "resonance-local"      # fine spacing only where narrow lines resonate
+```
+
+The table applies to every case of the profile and joins its dataset identity. `high_energy` uses it. A measured-bandwidth case records its upper-edge truncation audit and the line yield's per-electron relative standard error in `line_grid_resolved`. When a few electrons carry the yield (relative standard error above 0.1, typical at 5 MeV where rare electrons scatter into the detector's radiation cone), the case still runs, is flagged `statistics_limited`, and raises `LineYieldStatisticsWarning`.
+
 ## Identity and storage
 
 Every profile-aware scan resolves settings and complete `Sweep` first, converts them to JSON-compatible values, and hashes that payload with SHA-256. Component checkpoint `meta.json` stores profile, hash, and exact resolved parameter payload under `dataset_identity`.

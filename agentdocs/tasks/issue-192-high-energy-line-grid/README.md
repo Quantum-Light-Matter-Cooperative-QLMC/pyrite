@@ -520,3 +520,16 @@ not be refused. Above the 0.1 relative standard error the truncation record's
 `LineYieldStatisticsWarning` names the error, electron count and largest
 electron share. The upper-edge truncation gate is unchanged. 5 MeV h-BN
 10/100 at 1 mm therefore runs, flagged, until #203 reduces its variance.
+
+## high_energy opt-in and 5 MeV h-BN (2026-09-28)
+
+After #204 landed (squash `64a4437c`), the branch was reset to main. Profiles
+now accept `[profiles.NAME.line_grid_policy]` (`bandwidth`, `resolution`,
+validated against the known policies); `material_sweep` applies it as
+`Sweep.line_grid_policy`, so it joins the profile's case identity only.
+`high_energy` selects `resonance-population` + `resonance-local` and restores
+5,000 keV for h-BN via `overrides.hbn.energy_keV`; MoS2/MoSe2 keep
+100/500/1000 keV. Statistics-limited cases (e.g. 1 mm 10/100) run with a
+`LineYieldStatisticsWarning`. The earlier note that EagleXO/LegacyEDS refuse
+nonuniform axes is stale: the EagleXO and Timepix responses accept nonuniform
+grids. Not yet run: `pyrite run high_energy -R -m hbn`.
