@@ -1,5 +1,5 @@
-# Courant-Snyder injection, the transverse counterpart of the microbunch beams
-# (gaussian_200fs, microtrain_200fs, compressed_microbunch):
+# Courant-Snyder injection, the transverse counterpart of the longitudinal
+# microbunch beams (e.g. gaussian_200fs):
 # photoinjector-scale numbers at a waist on the crystal entrance face
 # (alpha = 0), with the emittance NORMALIZED so one beam describes the same
 # beam at both 30 and 100 keV. The y-plane is omitted, which mirrors x for a

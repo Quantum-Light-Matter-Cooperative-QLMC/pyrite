@@ -922,8 +922,8 @@ def test_run_material_applies_penetration_watchdog(monkeypatch, tmp_path):
     monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
 
     args = argparse.Namespace(
-        material="mose2",
-        catalog_profile="promising",
+        material="mos2",
+        catalog_profile="standard",
         workers=0,
         quick=True,
         n_families=None,
@@ -1225,15 +1225,15 @@ def test_scan_performance_profile_records_resolved_beam(monkeypatch, tmp_path):
 
 
 def test_scan_forwards_n_families_and_beam_uvw_overrides(monkeypatch, tmp_path):
-    # mose2 auto-selects hkl_list via dominant_reflections (unlike HOPG/h-BN,
+    # mos2 auto-selects hkl_list via dominant_reflections (unlike HOPG/h-BN,
     # which hand-pin it), so n_families=6 must change the resolved reflection
     # count and beam_uvw=(1, 0, 0) must override the material's (0, 0, 2) default.
     import argparse
 
     from pyrite.runs import scan
 
-    default_hkl = crystal_params("mose2", n_families=4)["hkl_list"]
-    override_hkl = crystal_params("mose2", n_families=6)["hkl_list"]
+    default_hkl = crystal_params("mos2", n_families=4)["hkl_list"]
+    override_hkl = crystal_params("mos2", n_families=6)["hkl_list"]
     assert len(override_hkl) != len(default_hkl)
 
     seen = {}
@@ -1243,8 +1243,8 @@ def test_scan_forwards_n_families_and_beam_uvw_overrides(monkeypatch, tmp_path):
 
     monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
     args = argparse.Namespace(
-        material="mose2",
-        catalog_profile="promising",
+        material="mos2",
+        catalog_profile="standard",
         workers=0,
         quick=True,
         n_families=6,

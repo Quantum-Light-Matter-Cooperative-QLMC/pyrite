@@ -47,3 +47,34 @@ def _pin_remote_paths(monkeypatch):
         monkeypatch.setattr(package, "HOST", "remote-host")
         monkeypatch.setattr(package, "REMOTE_DIR", "/path/to/pyrite")
         monkeypatch.setattr(package, "REMOTE_UV", "uv")
+
+
+@pytest.fixture(scope="session")
+def _lab_catalog_dir(tmp_path_factory):
+    """Bundled catalog plus the campaign profiles that live in the lab catalog.
+
+    The bundled catalog keeps only small examples; profiles and beams that moved
+    to a lab catalog are stored under ``tests/data/lab_overlay`` and layered onto
+    a copy of the bundled catalog so their digests stay pinned bit-for-bit.
+    """
+    import shutil
+    from pathlib import Path
+
+    from pyrite import DATA_DIR
+
+    root = tmp_path_factory.mktemp("lab_catalog")
+    shutil.copytree(DATA_DIR / "catalog", root, dirs_exist_ok=True)
+    shutil.copytree(Path(__file__).parent / "data" / "lab_overlay", root, dirs_exist_ok=True)
+    return root
+
+
+@pytest.fixture
+def lab_catalog(_lab_catalog_dir, monkeypatch):
+    """Select the bundled-plus-lab-profiles catalog for one test."""
+    from pyrite import materials
+    from pyrite.materials import load_material_catalog
+
+    catalog = load_material_catalog(_lab_catalog_dir)
+    monkeypatch.setenv("PYRITE_CATALOG", str(_lab_catalog_dir))
+    monkeypatch.setattr(materials, "CATALOG", catalog)
+    return catalog

@@ -795,7 +795,7 @@ def test_gpu_pipeline_workers_degrades_to_serial_under_memory_pressure(monkeypat
 
 
 # ---- in-flight payload budgeting (2026-08-08 remote-host swap incident) -------------
-# Budgeting only the workers let promising/mose2 run 16 workers with 18 cases in
+# Budgeting only the workers let a MoSe2 campaign run 16 workers with 18 cases in
 # flight on a 45 GB box -- 34 host-resident segment payloads, peak tree RSS
 # 50.3 GB, 12.9 GB of swap, ssh unreachable for ~15 min. The driver holds one
 # payload per in-flight case, so they are charged like workers.

@@ -10,7 +10,6 @@ from pyrite.campaign.longitudinal import (
 )
 from pyrite.campaign.profiles import dataset_identity
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
-from pyrite.materials import CATALOG
 from pyrite.montecarlo.transport import C_ANG_PER_FS, _sample_bunch_offsets
 from pyrite.results import Settings
 
@@ -85,7 +84,7 @@ def test_three_campaign_policies_have_16_cases_and_only_longitudinal_differences
         assert compressed["rms_duration_fs"] == pytest.approx(train["microbunch_rms_fs"])
 
 
-def test_bundled_campaign_profiles_resolve_exact_shared_beam_and_case_grid():
+def test_bundled_campaign_profiles_resolve_exact_shared_beam_and_case_grid(lab_catalog):
     def plain(value):
         if isinstance(value, np.ndarray):
             return value.tolist()
@@ -100,7 +99,7 @@ def test_bundled_campaign_profiles_resolve_exact_shared_beam_and_case_grid():
         "hopg_hbn_microtrain_200fs",
         "hopg_hbn_compressed_microbunch",
     )
-    assert all(CATALOG.profile_materials(name) == ("hopg", "hbn") for name in names)
+    assert all(lab_catalog.profile_materials(name) == ("hopg", "hbn") for name in names)
     for name in names:
         beam = material_sweep("hopg", profile=name).beam
         assert beam.transverse_fwhm_x_mm == 0.1

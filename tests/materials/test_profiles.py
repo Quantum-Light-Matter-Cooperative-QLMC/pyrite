@@ -480,7 +480,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     ],
 )
 def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
-    catalog_profile, material, digest
+    lab_catalog, catalog_profile, material, digest
 ):
     """Every shipped profile that carried an inline ``[profiles.NAME.beam]`` block
     now carries ``beam = "NAME"`` instead. The reference resolves to values before
@@ -708,7 +708,7 @@ def test_identity_from_stem_reads_sidecar_when_profile_edited_after_run(tmp_path
     different value, so no candidate recompute matches. But the run-time
     ``dataset_identity`` recorded in the stem's ``meta.json`` sidecar is
     authoritative and still resolves. Mirrors the two on-disk
-    ``hopg_hbn_microtrain_200fs`` stems found that day (two runs a minute apart,
+    named-profile stems found that day (two runs a minute apart,
     profile edited in between, neither recoverable by recompute)."""
     # Identity as recorded at run time. A fabricated digest stands in for "the
     # backing profile was later edited": the stem commits to this run-time

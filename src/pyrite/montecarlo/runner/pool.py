@@ -70,7 +70,7 @@ def _gpu_pipeline_workers(max_workers, n):
 
     The cap covers the ``nw + _PIPELINE_PREFETCH_AHEAD`` in-flight payloads too,
     not just the ``nw`` workers -- ``2 * nw + _PIPELINE_PREFETCH_AHEAD`` slots in
-    total. Budgeting workers alone is what let the 2026-08-08 `promising`/mose2
+    total. Budgeting workers alone is what let the 2026-08-08 MoSe2 campaign
     pipeline arm run 16 workers with 18 cases in flight on a 45 GB box: 34 slots
     at 1536 MiB is 52 GB, and measured peak tree RSS was 50.3 GB with 12.9 GB of
     swap. Clamping an EXPLICIT request warns rather than doing it silently.
