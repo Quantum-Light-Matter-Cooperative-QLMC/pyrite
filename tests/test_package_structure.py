@@ -67,6 +67,7 @@ def test_root_exports_stay_frozen() -> None:
         "PixelScorer",
         "PlanarDetector",
         "PlanarPose",
+        "PixelMetadata",
         "PixelRayMap",
         "Result",
         "ResolvedObservation",

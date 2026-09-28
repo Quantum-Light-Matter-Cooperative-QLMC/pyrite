@@ -68,6 +68,7 @@ For a `Stack`, paths such as `target.layers[1].thickness_ang` address a particul
    pyrite.PlanarDetector
    pyrite.PixelScorer
    pyrite.ResolvedObservation
+   pyrite.PixelMetadata
    pyrite.PixelRayMap
    pyrite.SpectralFactors
    pyrite.SpatialResult

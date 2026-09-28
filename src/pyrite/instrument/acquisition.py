@@ -245,9 +245,12 @@ def score_acquisition(
     if (
         raw_coordinates.ndim != 2
         or raw_coordinates.shape[1:] != (2,)
-        or any(
-            isinstance(value, bool) or not isinstance(value, Integral)
-            for value in raw_coordinates.ravel()
+        or (
+            raw_coordinates.dtype.kind not in "iu"
+            and any(
+                isinstance(value, bool) or not isinstance(value, Integral)
+                for value in raw_coordinates.ravel()
+            )
         )
     ):
         raise ValueError("coordinates must have shape (n_pixel, 2) with integer values")

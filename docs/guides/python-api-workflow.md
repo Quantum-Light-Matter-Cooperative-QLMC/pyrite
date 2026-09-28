@@ -85,9 +85,13 @@ energy_eV, selected = spatial.spectra(
     component="line",
 )
 line_image = spatial.image((4_000.0, 6_000.0), component="line")
+metadata = spatial.pixel_metadata(pixels=[(128, 64), (128, 192)])
+shadow = spatial.transmission_image(5_000.0)
 ```
 
 Selected spectra include each pixel's solid angle and therefore have units of photons per incident electron per eV. `component="line"` and `"coherent"` are PXR/CBS only; `"characteristic"` is the atomic-relaxation component, and `"line_total"`/`"coherent_total"` add it to the corresponding line. `Result.spectrum` remains a detector- averaged density per sr. `SpatialResult` stores tile spectra, pixel rays, and attenuation coefficients as separate factors; `spectra` materializes only the selection and `image` works in bounded pixel chunks rather than allocating a full `(row, column, energy)` cube. Pass `measured=True` to either method to apply a configured `PlanarDetector.response` explicitly.
+
+`pixel_metadata` returns, for a selection only, each pixel's detector-local and lab position, unit direction with lab polar/azimuth angles, distance, scored solid angle, angular tile (and its representative direction when retained), and per-filter path length. `filter_coverage()` marks which centre rays cross each plate, and `transmission_image(energy_eV)` is the primary transmission at the nearest stored energy node; uncovered pixels are exactly 1.
 
 Pixels use centre rays from the target reference point. The plate is a finite oriented box, so translation, distance, rotation, oblique thickness, edge misses, and side escape affect the shadow. The primary model includes only Beer--Lambert attenuation: no filter scatter, fluorescence, diffraction, or secondary photons. A `PlanarDetector` without `PixelGrid` supports one centre ray and scalar output; partial-coverage scoring requires `PixelScorer` and a physical grid.
 

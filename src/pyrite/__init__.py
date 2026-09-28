@@ -56,6 +56,7 @@ _PUBLIC_OBJECTS = {
     "PixelScorer": ("pyrite.instrument", "PixelScorer"),
     "PlanarDetector": ("pyrite.instrument", "PlanarDetector"),
     "PlanarPose": ("pyrite.instrument", "PlanarPose"),
+    "PixelMetadata": ("pyrite.results.model", "PixelMetadata"),
     "PixelRayMap": ("pyrite.results.model", "PixelRayMap"),
     "Result": ("pyrite.results.model", "Result"),
     "ResolvedObservation": ("pyrite.instrument", "ResolvedObservation"),

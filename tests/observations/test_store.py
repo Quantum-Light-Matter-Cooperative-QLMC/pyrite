@@ -293,3 +293,35 @@ def test_rescore_leaves_the_source_observation_unchanged() -> None:
     before = stored.digest
     stored.rescore(acquisition=replace(stored.acquisition, exposure_s=9.0))
     assert stored.digest == before
+
+
+def test_reopened_pixel_metadata_matches_the_scoring_geometry(tmp_path) -> None:
+    from pyrite.instrument.geometry import filter_path_lengths, planar_detector_rays
+
+    result = _simulate()
+    store = ObservationStore("hopg", root=tmp_path)
+    loaded = store.load(store.put(observation_from_result(result)))
+    assert result.spatial is not None
+    region = (slice(None), slice(None))
+
+    metadata = loaded.spatial.pixel_metadata(region=region)
+
+    rays = planar_detector_rays(result.spatial.detector)
+    flat = rays.solid_angle_sr.reshape(-1)
+    # The stored solid angles are the ones the recomputed rays produce.
+    np.testing.assert_allclose(metadata.solid_angle_sr, flat, rtol=1.0e-14)
+    np.testing.assert_allclose(metadata.direction_lab, rays.directions_lab.reshape(-1, 3))
+    np.testing.assert_allclose(np.linalg.norm(metadata.direction_lab, axis=1), 1.0)
+    plate = pr.FilterPlate("silicon", 0.05, (1.5, 10.0), pr.PlanarPose.from_observation(50.0, 60.0))
+    np.testing.assert_allclose(
+        metadata.path_length_mm, filter_path_lengths(rays, (plate,)).reshape(-1, 1)
+    )
+    np.testing.assert_array_equal(
+        metadata.tile_direction_lab,
+        loaded.spatial.tile_directions_lab[metadata.tile_index],
+    )
+    covered = loaded.spatial.filter_coverage()[..., 0]
+    np.testing.assert_array_equal(covered, metadata.path_length_mm[:, 0].reshape(4, 6) > 0.0)
+    transmission = loaded.spatial.transmission_image(2_000.0)
+    np.testing.assert_array_equal(transmission[~covered], 1.0)
+    assert np.all((transmission[covered] > 0.0) & (transmission[covered] < 1.0))
