@@ -32,16 +32,25 @@ __all__ = [
     "DEFAULT_TAIL_WIDTHS",
     "EDGE_SOURCE",
     "KINEMATIC_SOURCE",
+    "ResonancePopulation",
     "SEEDING_REVISION",
     "EdgeBracket",
     "SeedContext",
     "absorption_edge_brackets",
     "absorption_edge_seeds",
+    "LOCAL_SPACING_SOURCE",
+    "case_line_stop_eV",
+    "case_resonance_populations",
     "characteristic_line_seeds",
+    "characteristic_stop_eV",
     "collect_feature_seeds",
     "kinematic_line_seeds",
+    "local_spacing_seeds",
     "register_seed_provider",
+    "resonance_population_stop_eV",
+    "resonance_populations",
     "seed_provider_names",
+    "sincsq_upper_tail_bound",
 ]
 
 KINEMATIC_SOURCE = "pxr-kinematic"
@@ -72,7 +81,8 @@ EDGE_NATIVE_NODES = 3
 #: Bumped whenever the same inputs would seed different windows; it keys the
 #: resolved-grid speed cache so a plan from older seeding is not reused.
 #: 2: in-medium kinematic root; secondary absorption edges.
-SEEDING_REVISION = 2
+#: 3: measured bandwidth and local spacing use production line weights.
+SEEDING_REVISION = 3
 
 #: Kinematic resonances below this are dropped by the line kernels too.
 _MIN_RESONANCE_EV = 10.0
@@ -89,6 +99,303 @@ def _weighted_quantiles(values, weights, probabilities):
     targets = np.asarray(probabilities, dtype=float) * cumulative[-1]
     index = np.searchsorted(cumulative, targets, side="left")
     return ordered[np.minimum(index, ordered.size - 1)]
+
+
+@dataclass(frozen=True, slots=True)
+class ResonancePopulation:
+    """Radiating lines: resonance, line coefficient, and first-zero width.
+
+    ``width_eV`` is the sinc first-zero width ``pi / a_w`` of each line,
+    ``2 pi hbar c / (denominator t_L)``, with the same in-medium denominator
+    as the resonance.
+    """
+
+    label: str
+    energy_eV: np.ndarray
+    weight: np.ndarray
+    width_eV: np.ndarray
+
+
+_POPULATION_BLOCK_SIZE = 1 << 18
+
+
+def _population_blocks(populations: Sequence[ResonancePopulation]):
+    """Yield aligned line-array views in bounded blocks."""
+    for population in populations:
+        size = population.energy_eV.size
+        for start in range(0, size, _POPULATION_BLOCK_SIZE):
+            stop = min(start + _POPULATION_BLOCK_SIZE, size)
+            yield (
+                population.energy_eV[start:stop],
+                population.weight[start:stop],
+                population.width_eV[start:stop],
+            )
+
+
+def resonance_populations(
+    segments,
+    n_hat,
+    *,
+    crystal: str,
+    hkl_list: Iterable[Sequence[int]],
+    beam_uvw=None,
+    surface_hkl=None,
+    azimuth_rad: float = 0.0,
+    recip_miscut_rad=None,
+    mosaic_fwhm_rad=None,
+    mosaic_nodes: int = 1,
+    electron_limit: int | None = None,
+    label_prefix: str = "",
+    composition: Iterable[tuple[str, float]] | None = None,
+    band_eV: tuple[float, float] | None = None,
+) -> list[ResonancePopulation]:
+    """Per-reflection resonance populations of the line segments.
+
+    The resonance, root solver, ``g`` construction, and ``t_L**2`` weight are
+    those documented on :func:`kinematic_line_seeds`, which consumes this;
+    mosaic orientations are pooled into their reflection with the quadrature
+    weight folded into ``weight``.
+
+    Validation: line-window-seeding
+    """
+    energy_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
+    energy = _host(segments[energy_field]).astype(float, copy=False)
+    length = _host(segments["L_ang"]).astype(float, copy=False)
+    direction = _host(segments["v_hat"]).astype(float, copy=False).reshape(-1, 3)
+    if electron_limit is not None:
+        line = _host(segments["elec_id"]) < int(electron_limit)
+        energy, length, direction = energy[line], length[line], direction[line]
+    beta = beta_from_keV(energy)
+    velocity = beta[:, None] * direction
+    v_dot_n = velocity @ np.asarray(n_hat, dtype=float)
+    weight = (length / beta) ** 2
+    usable = np.isfinite(weight) & (weight > 0.0) & np.isfinite(v_dot_n) & (v_dot_n < 1.0)
+    velocity, v_dot_n, weight = velocity[usable], v_dot_n[usable], weight[usable]
+    flight_time = np.sqrt(weight)
+    refractive = None
+    if band_eV is not None:
+        from ...materials.crystal import refractive_index
+        from .lines._kernels import _line_tabulation_grid
+
+        # The kernels' table for an axis spanning band_eV (lines/_setup.py).
+        start, stop = float(band_eV[0]), float(band_eV[1])
+        pad = 0.2 * (stop - start)
+        table_energy = _line_tabulation_grid(
+            CRYSTALS[crystal], list(composition or ()), max(start - pad, 1.0), stop + pad
+        )
+        refractive = (
+            np.asarray(refractive_index(crystal, table_energy).real, dtype=float),
+            table_energy,
+        )
+    if refractive is not None:
+        from .lines._kernels import _in_medium_kinematics
+
+    lattice = CRYSTALS[crystal]["lattice"]
+    rotation = _orientation_R(
+        lattice, beam_uvw, azimuth_rad, recip_miscut_rad, surface_hkl=surface_hkl
+    )
+    orientations = _mosaic_quadrature(mosaic_fwhm_rad, mosaic_nodes) or [(None, 1.0)]
+
+    populations = []
+    for hkl in hkl_list:
+        g_vector, _magnitude = reciprocal_g_vector(hkl, lattice)
+        if rotation is not None:
+            g_vector = rotation @ g_vector
+        energies, weights, widths = [], [], []
+        for mosaic_rotation, mosaic_weight in orientations:
+            g_row = g_vector if mosaic_rotation is None else mosaic_rotation @ g_vector
+            v_dot_g = velocity @ g_row
+            with np.errstate(divide="ignore", invalid="ignore"):
+                if refractive is None:
+                    denominator = 1.0 - v_dot_n
+                else:
+                    denominator, _ = _in_medium_kinematics(v_dot_n, v_dot_g, *refractive)
+                resonance = HBARC_EV_ANG * v_dot_g / denominator
+            radiating = np.isfinite(resonance) & (resonance > _MIN_RESONANCE_EV)
+            energies.append(resonance[radiating])
+            weights.append(weight[radiating] * float(mosaic_weight))
+            widths.append(
+                2.0 * np.pi * HBARC_EV_ANG / (denominator[radiating] * flight_time[radiating])
+            )
+        label = label_prefix + "(" + " ".join(str(int(index)) for index in hkl) + ")"
+        populations.append(
+            ResonancePopulation(
+                label, np.concatenate(energies), np.concatenate(weights), np.concatenate(widths)
+            )
+        )
+    return populations
+
+
+def sincsq_upper_tail_bound(width_eV, distance_eV):
+    """Upper bound on a ``sinc**2`` line's mass fraction beyond ``distance_eV``.
+
+    With ``a_w = pi / width`` the line is ``sinc**2(a_w (E - E_res) / pi)`` and
+    its whole integral is ``pi / a_w = width``. On one side,
+    ``int_D^inf sin**2(a_w x) / (a_w x)**2 dx <= int_D^inf dx / (a_w x)**2
+    = 1 / (a_w**2 D)``, so the fraction is at most
+    ``width / (pi**2 D)``; it is capped at one, and a line whose resonance is on
+    the wrong side (``D <= 0``) counts wholly.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    width = np.asarray(width_eV, dtype=float)
+    distance = np.asarray(distance_eV, dtype=float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        bound = np.where(distance > 0.0, width / (np.pi**2 * distance), 1.0)
+    return np.minimum(bound, 1.0)
+
+
+def resonance_population_stop_eV(
+    populations: Sequence[ResonancePopulation],
+    *,
+    ceiling_eV: float,
+    truncation_limit: float,
+    round_to_eV: float = 100.0,
+) -> tuple[float | None, dict[str, Any]]:
+    """Line-axis ``stop`` from a case's measured resonance population.
+
+    Source equation: each segment ``i`` of each reflection radiates the
+    finite-time line ``W_i sinc**2(a_i (E - E_i) / pi)`` (ledger rows
+    ``finite-time-lineshape``, ``line-energy-dispersion``), whose weight
+    ``W_i`` does not depend on ``E``. Its mass above ``stop`` is at most
+    ``W_i width_i * width_i / (pi**2 (stop - E_i))``
+    (:func:`sincsq_upper_tail_bound`). ``stop`` is the smallest value, rounded up
+    to ``round_to_eV``, whose summed tail bound is at most ``truncation_limit``
+    of the summed line mass. The caller supplies ``W_i`` in ``weight``.
+
+    Assumptions: each line's coefficient is constant in energy, as in the
+    production kernel. The spectrum phase measures the truncated fraction again
+    and the runner refuses a case above its share. ``stop`` never exceeds
+    ``ceiling_eV``, the closed-form
+    bound of ``line-grid-kinematic-bandwidth``; a population that cannot meet
+    the limit below it returns the ceiling.
+
+    Lines resonating above ``stop`` count wholly, so a population may leave its
+    lightest, farthest lines outside the axis within ``truncation_limit``.
+
+    Limiting case: a single straight flight gives
+    ``stop = E_res + width / (pi**2 truncation_limit)``, before rounding.
+
+    Returns ``(stop, summary)``; ``stop`` is ``None`` when nothing radiates.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    limit = float(truncation_limit)
+    if not 0.0 < limit < 1.0:
+        raise ValueError("truncation_limit must lie in (0, 1)")
+    ceiling = float(ceiling_eV)
+    total = 0.0
+    n_lines = 0
+    min_energy = np.inf
+    max_energy = -np.inf
+    for energy_block, weight_block, width_block in _population_blocks(populations):
+        mass = weight_block * width_block
+        keep = np.isfinite(mass) & (mass > 0.0)
+        if not keep.any():
+            continue
+        energies = energy_block[keep]
+        total += float(mass[keep].sum())
+        n_lines += int(keep.sum())
+        min_energy = min(min_energy, float(energies.min()))
+        max_energy = max(max_energy, float(energies.max()))
+    summary: dict[str, Any] = {
+        "truncation_limit": limit,
+        "ceiling_eV": ceiling,
+        "n_lines": n_lines,
+    }
+    if n_lines == 0:
+        summary.update(max_resonance_eV=None, proxy_truncated_fraction=0.0, capped=False)
+        return None, {**summary, "stop_eV": None}
+
+    def lost(stop):
+        numerator = 0.0
+        for energy_block, weight_block, width_block in _population_blocks(populations):
+            mass = weight_block * width_block
+            keep = np.isfinite(mass) & (mass > 0.0)
+            if keep.any():
+                numerator += float(
+                    (
+                        mass[keep]
+                        * sincsq_upper_tail_bound(width_block[keep], stop - energy_block[keep])
+                    ).sum()
+                )
+        return numerator / total
+
+    # Lines above a trial edge count wholly, so the search may start below the
+    # whole population: a rare hard-scattered line spends the share instead of
+    # forcing the axis out to its resonance.
+    low = min_energy
+    stop = ceiling
+    if low < ceiling and lost(ceiling) <= limit:
+        high = ceiling
+        # The tail sum falls monotonically in stop; 60 halvings reach float64
+        # resolution of any band this axis can carry.
+        for _ in range(60):
+            middle = 0.5 * (low + high)
+            if lost(middle) > limit:
+                low = middle
+            else:
+                high = middle
+        stop = min(ceiling, float(np.ceil(high / round_to_eV) * round_to_eV))
+    summary.update(
+        max_resonance_eV=max_energy,
+        proxy_truncated_fraction=lost(stop),
+        capped=stop >= ceiling,
+        stop_eV=stop,
+    )
+    return stop, summary
+
+
+def characteristic_stop_eV(
+    compositions: Iterable[Iterable[tuple[str, float]]],
+    *,
+    truncation_limit: float,
+    relaxation_cutoff_eV: float | None = None,
+) -> tuple[float | None, dict[str, Any]]:
+    """Lowest line-axis ``stop`` that keeps every characteristic line's upper tail.
+
+    Source equation: a characteristic line is a Lorentzian of natural FWHM
+    ``Gamma`` (ledger row ``characteristic-radiation``). Its mass fraction more
+    than ``D`` above the centre is ``1/2 - arctan(2 D / Gamma) / pi``, which is
+    at most ``Gamma / (2 pi D)``. Every emitted line, selected exactly as
+    :func:`characteristic_line_seeds` selects them, therefore loses at most
+    ``truncation_limit`` of its own mass above
+    ``centre + Gamma / (2 pi truncation_limit)``.
+
+    Assumptions: the bound is per line, so it holds for any mixture of line
+    yields; the lower edge is not addressed.
+
+    Limiting case: ``Gamma -> 0`` puts ``stop`` on the highest centre.
+
+    Returns ``(stop, summary)``; ``stop`` is ``None`` when no line is emitted.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from .characteristic import load_characteristic_cross_sections
+
+    limit = float(truncation_limit)
+    if not 0.0 < limit < 1.0:
+        raise ValueError("truncation_limit must lie in (0, 1)")
+    stop, label_at_stop = None, None
+    for composition in compositions:
+        elements = sorted({str(element) for element, _density in composition})
+        tables = {element: load_characteristic_cross_sections(element) for element in elements}
+        cutoff = (
+            max(table.recommended_cutoff_eV for table in tables.values())
+            if relaxation_cutoff_eV is None
+            else float(relaxation_cutoff_eV)
+        )
+        for element, table in tables.items():
+            emitted = np.asarray(table.line_yield_per_vacancy, dtype=float).any(axis=0)
+            for label, centre, fwhm, active in zip(
+                table.line_labels, table.line_energy_eV, table.line_fwhm_eV, emitted, strict=True
+            ):
+                if not active or float(centre) <= cutoff or not float(fwhm) > 0.0:
+                    continue
+                edge = float(centre) + float(fwhm) / (2.0 * np.pi * limit)
+                if stop is None or edge > stop:
+                    stop, label_at_stop = edge, f"{element} {label}"
+    return stop, {"stop_eV": stop, "line": label_at_stop, "truncation_limit": limit}
 
 
 def kinematic_line_seeds(
@@ -173,77 +480,36 @@ def kinematic_line_seeds(
     spacing = width / int(samples_per_feature)
     margin = float(tail_widths) * width
 
-    energy_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
-    energy = _host(segments[energy_field]).astype(float, copy=False)
-    length = _host(segments["L_ang"]).astype(float, copy=False)
-    direction = _host(segments["v_hat"]).astype(float, copy=False).reshape(-1, 3)
-    if electron_limit is not None:
-        line = _host(segments["elec_id"]) < int(electron_limit)
-        energy, length, direction = energy[line], length[line], direction[line]
-    beta = beta_from_keV(energy)
-    velocity = beta[:, None] * direction
-    v_dot_n = velocity @ np.asarray(n_hat, dtype=float)
-    weight = (length / beta) ** 2
-    usable = np.isfinite(weight) & (weight > 0.0) & np.isfinite(v_dot_n) & (v_dot_n < 1.0)
-    velocity, v_dot_n, weight = velocity[usable], v_dot_n[usable], weight[usable]
-    flight_time = np.sqrt(weight)
-    refractive = None
-    if band_eV is not None:
-        from ...materials.crystal import refractive_index
-        from .lines._kernels import _in_medium_kinematics, _line_tabulation_grid
-
-        # The kernels' table for an axis spanning band_eV (lines/_setup.py).
-        start, stop = float(band_eV[0]), float(band_eV[1])
-        pad = 0.2 * (stop - start)
-        table_energy = _line_tabulation_grid(
-            CRYSTALS[crystal], list(composition or ()), max(start - pad, 1.0), stop + pad
-        )
-        refractive = (
-            np.asarray(refractive_index(crystal, table_energy).real, dtype=float),
-            table_energy,
-        )
-
+    populations = resonance_populations(
+        segments,
+        n_hat,
+        crystal=crystal,
+        hkl_list=hkl_list,
+        beam_uvw=beam_uvw,
+        surface_hkl=surface_hkl,
+        azimuth_rad=azimuth_rad,
+        recip_miscut_rad=recip_miscut_rad,
+        mosaic_fwhm_rad=mosaic_fwhm_rad,
+        mosaic_nodes=mosaic_nodes,
+        electron_limit=electron_limit,
+        label_prefix=label_prefix,
+        composition=composition,
+        band_eV=band_eV,
+    )
     # The spacing above resolves the eps-quantile feature, not the narrowest one.
     # Measured over hopg/wse2 at 30-100 keV the two coincide to within 11% -- the
     # longest single flight floors t_L, so the width distribution has no narrow
     # tail -- but that is a property of these cases, not a theorem. Report the
     # narrowest radiating feature so a case where the quantile drifts above it is
     # visible instead of silently under-resolved.
-    narrowest = float("inf")
-
-    lattice = CRYSTALS[crystal]["lattice"]
-    rotation = _orientation_R(
-        lattice, beam_uvw, azimuth_rad, recip_miscut_rad, surface_hkl=surface_hkl
+    narrowest = min(
+        (float(entry.width_eV.min()) for entry in populations if entry.width_eV.size),
+        default=float("inf"),
     )
-    orientations = _mosaic_quadrature(mosaic_fwhm_rad, mosaic_nodes) or [(None, 1.0)]
-
-    populations = []
-    for hkl in hkl_list:
-        g_vector, _magnitude = reciprocal_g_vector(hkl, lattice)
-        if rotation is not None:
-            g_vector = rotation @ g_vector
-        energies, weights = [], []
-        for mosaic_rotation, mosaic_weight in orientations:
-            g_row = g_vector if mosaic_rotation is None else mosaic_rotation @ g_vector
-            v_dot_g = velocity @ g_row
-            with np.errstate(divide="ignore", invalid="ignore"):
-                if refractive is None:
-                    denominator = 1.0 - v_dot_n
-                else:
-                    denominator, _ = _in_medium_kinematics(v_dot_n, v_dot_g, *refractive)
-                resonance = HBARC_EV_ANG * v_dot_g / denominator
-            radiating = np.isfinite(resonance) & (resonance > _MIN_RESONANCE_EV)
-            if radiating.any():
-                widths = 2.0 * np.pi * HBARC_EV_ANG / (denominator * flight_time)
-                narrowest = min(narrowest, float(widths[radiating].min()))
-            energies.append(resonance[radiating])
-            weights.append(weight[radiating] * float(mosaic_weight))
-        label = label_prefix + "(" + " ".join(str(int(index)) for index in hkl) + ")"
-        population_energy = np.concatenate(energies)
-        population_weight = np.concatenate(weights)
-        populations.append(
-            (label, population_energy, population_weight, float(population_weight.sum()))
-        )
+    populations = [
+        (entry.label, entry.energy_eV, entry.weight, float(entry.weight.sum()))
+        for entry in populations
+    ]
 
     if not np.isfinite(narrowest):
         narrowest = float("nan")
@@ -565,6 +831,210 @@ def _kinematic_provider(context: SeedContext):
         seeds.extend(layer_seeds)
         summary[f"layer {layer}"] = layer_summary
     return seeds, summary
+
+
+def case_resonance_populations(
+    case: Mapping[str, Any],
+    segments: Mapping[str, Any],
+    n_hat,
+    *,
+    electron_limit: int | None,
+    band_eV: tuple[float, float],
+) -> list[ResonancePopulation]:
+    """Every radiating layer's resonance populations, read as the kernels read them.
+
+    Per layer exactly as :func:`_kinematic_provider` reads it, with the in-medium
+    root tabulated over ``band_eV``.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from .lines import _segments_in_layer
+
+    compositions = _case_compositions(case)
+    radiators = case.get("layer_radiators")
+    if radiators is None:
+        layers = [(segments, case, compositions[0], "")]
+    else:
+        layers = []
+        for layer, radiator in enumerate(radiators):
+            if radiator is None:
+                continue
+            layer_segments = _segments_in_layer(segments, layer)
+            if layer_segments["L_ang"].size:
+                layers.append((layer_segments, radiator, compositions[layer], f"layer {layer} "))
+    populations: list[ResonancePopulation] = []
+    for layer_segments, radiator, composition, prefix in layers:
+        # Orientation keys fall back to the case, as _lines_for_segments does.
+        populations.extend(
+            resonance_populations(
+                layer_segments,
+                n_hat,
+                crystal=radiator["crystal"],
+                hkl_list=radiator["hkl_list"],
+                beam_uvw=radiator.get("beam_uvw"),
+                surface_hkl=radiator.get("surface_hkl"),
+                azimuth_rad=radiator.get("azimuth_rad", case.get("azimuth_rad", 0.0)),
+                recip_miscut_rad=radiator.get("recip_miscut_rad", case.get("recip_miscut_rad")),
+                mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
+                mosaic_nodes=case.get("mosaic_mc_nodes", 1),
+                electron_limit=electron_limit,
+                label_prefix=prefix,
+                composition=composition,
+                band_eV=(float(band_eV[0]), float(band_eV[1])),
+            )
+        )
+    return populations
+
+
+def case_line_stop_eV(
+    case: Mapping[str, Any],
+    populations: Sequence[ResonancePopulation],
+    *,
+    start_eV: float,
+    ceiling_eV: float,
+    truncation_limit: float,
+    proxy_safety: float,
+    round_to_eV: float = 100.0,
+) -> tuple[float, dict[str, Any]]:
+    """Measured line-axis ``stop`` for one case: PXR/CBS and characteristic lines.
+
+    ``populations`` contain every production line over
+    ``(start_eV, ceiling_eV)``; their edge is chosen at
+    ``truncation_limit / proxy_safety`` (:func:`resonance_population_stop_eV`).
+    Characteristic lines use their exact per-line bound at ``truncation_limit``
+    (:func:`characteristic_stop_eV`). The larger edge wins, rounded up to
+    ``round_to_eV``, never above ``ceiling_eV`` and at least one rounding step
+    above ``start_eV``.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    kinematic_stop, kinematic = resonance_population_stop_eV(
+        populations,
+        ceiling_eV=ceiling_eV,
+        truncation_limit=float(truncation_limit) / float(proxy_safety),
+        round_to_eV=round_to_eV,
+    )
+    characteristic_edge, characteristic = characteristic_stop_eV(
+        _case_compositions(case), truncation_limit=truncation_limit
+    )
+    edges = [value for value in (kinematic_stop, characteristic_edge) if value is not None]
+    stop = max([float(start_eV) + round_to_eV, *edges])
+    stop = min(float(ceiling_eV), float(np.ceil(stop / round_to_eV) * round_to_eV))
+    return stop, {
+        "stop_eV": stop,
+        "truncation_limit": float(truncation_limit),
+        "proxy_safety": float(proxy_safety),
+        "kinematic": kinematic,
+        "characteristic": characteristic,
+    }
+
+
+LOCAL_SPACING_SOURCE = "pxr-local"
+
+
+def local_spacing_seeds(
+    populations: Sequence[ResonancePopulation],
+    *,
+    start_eV: float,
+    stop_eV: float,
+    floor_spacing_eV: float,
+    max_spacing_eV: float,
+    halo_limit: float,
+    bin_eV: float = 100.0,
+) -> tuple[list[FeatureSeed], dict[str, Any]]:
+    """Energy-dependent spacing: fine only where narrow lines resonate.
+
+    Each line narrower than ``max_spacing_eV`` needs nodes no farther apart
+    than its first-zero width ``w`` (``h <= pi / a_w`` integrates its
+    ``sinc**2`` exactly on a uniform grid, ledger row ``line-grid-sinc-convergence``),
+    but only within a halo ``D = w / (pi**2 halo_limit)``: beyond it the line
+    keeps at most ``halo_limit`` of its mass (:func:`sincsq_upper_tail_bound`),
+    which is all a coarser sampling there can misplace. Required spacings are
+    quantised to ``floor_spacing_eV * 2**k``, with ``floor_spacing_eV`` the
+    case's global sinc-Nyquist step, so lines the global rule already lets alias
+    (their weight is inside its aliased-weight budget) are held to that floor
+    rather than refined further. Bins of ``bin_eV`` take the finest level any
+    overlapping halo asks for; runs of equal level become one seed each.
+
+    Assumptions: no weighting beyond the population itself -- every
+    sub-backbone line is resolved within its halo, so this is at least as fine
+    as the uniform step around every line that step resolves. Nonuniform
+    trapezoid error inside a halo is not bounded here; the window ladder
+    measures it.
+
+    Limiting case: one line of width ``w`` gives one window of spacing
+    ``<= w`` spanning ``E_res +- D``, rounded out to bins, on the backbone.
+
+    Returns ``(seeds, summary)``.
+
+    Validation: line-grid-resonance-local-spacing
+    """
+    floor = float(floor_spacing_eV)
+    backbone = float(max_spacing_eV)
+    if not 0.0 < floor:
+        raise ValueError("floor_spacing_eV must be positive")
+    if not 0.0 < float(halo_limit) < 1.0:
+        raise ValueError("halo_limit must lie in (0, 1)")
+    start, stop = float(start_eV), float(stop_eV)
+    levels = [floor * 2.0**k for k in range(64) if floor * 2.0**k < backbone]
+    summary: dict[str, Any] = {
+        "floor_spacing_eV": floor,
+        "max_spacing_eV": backbone,
+        "halo_limit": float(halo_limit),
+        "bin_eV": float(bin_eV),
+        "narrow_lines": 0,
+    }
+    if not levels:
+        return [], {**summary, "windows": 0}
+    n_bins = int(np.ceil((stop - start) / float(bin_eV)))
+    required = np.full(n_bins, len(levels), dtype=np.int64)
+    coverage = np.zeros((len(levels), n_bins + 1), dtype=np.int64)
+    for energy_block, _, width_block in _population_blocks(populations):
+        narrow = np.isfinite(energy_block) & np.isfinite(width_block) & (width_block < backbone)
+        if not narrow.any():
+            continue
+        energy = energy_block[narrow]
+        width = width_block[narrow]
+        summary["narrow_lines"] += int(width.size)
+        level = np.clip(np.floor(np.log2(np.maximum(width, floor) / floor)), 0, len(levels) - 1)
+        halo = width / (np.pi**2 * float(halo_limit))
+        first = np.clip(np.floor((energy - halo - start) / bin_eV), 0, n_bins).astype(np.int64)
+        last = np.clip(np.ceil((energy + halo - start) / bin_eV), 0, n_bins).astype(np.int64)
+        inside = last > first
+        first, last, level = first[inside], last[inside], level[inside].astype(np.int64)
+        for k in range(len(levels)):
+            chosen = level == k
+            if not chosen.any():
+                continue
+            np.add.at(coverage[k], first[chosen], 1)
+            np.add.at(coverage[k], last[chosen], -1)
+    if summary["narrow_lines"] == 0:
+        return [], {**summary, "windows": 0}
+    for k in range(len(levels)):
+        covered = np.cumsum(coverage[k, :-1]) > 0
+        required[covered & (required > k)] = k
+    seeds = []
+    index = 0
+    while index < n_bins:
+        k = int(required[index])
+        run = index
+        while run < n_bins and required[run] == k:
+            run += 1
+        if k < len(levels):
+            lo = start + index * bin_eV
+            hi = min(stop, start + run * bin_eV)
+            seeds.append(
+                FeatureSeed(
+                    source=LOCAL_SPACING_SOURCE,
+                    label=f"{lo:.0f}-{hi:.0f} eV",
+                    centre_eV=lo,
+                    below_eV=0.0,
+                    above_eV=hi - lo,
+                    spacing_eV=levels[k],
+                )
+            )
+        index = run
+    return seeds, {**summary, "windows": len(seeds), "levels_eV": levels}
 
 
 def _case_compositions(case: Mapping[str, Any]) -> list[list[tuple[str, float]]]:

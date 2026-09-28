@@ -20,6 +20,7 @@ from ._formation import (
     formation_window_half_width,
 )
 from ._kernels import (
+    _accumulate_edge_truncation,
     _flight_blocks,
     _in_medium_kinematics,
     _interp_elemental_mu,
@@ -662,6 +663,10 @@ def _accumulate_reflection(
         targets += [(pref * A2_pxr * wm, spec_pxr), (pref * A2_cbs * wm, spec_cbs)]
     a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
     good = xp.isfinite(weight) & (weight > 0)
+    _accumulate_edge_truncation(st.request.truncation_audit, E_r[good], a_width[good], weight[good])
+    if st.request.truncation_audit is not None and "collect" in st.request.truncation_audit:
+        _nsys_pop()
+        return
 
     if st.bin_edges is not None:
         # Bin-mean quadrature (setup refused sinc_cutoff): each row's profile

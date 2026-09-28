@@ -4,13 +4,19 @@ Split out of ``runner/__init__`` to keep that module inside the source-size
 budget; it is runner-internal and has no other consumer.
 """
 
+import sys
 import warnings
+from time import perf_counter
 
 import numpy as np
 
-from ..._backend import REAL
+from ..._backend import BACKEND, REAL, _to_cpu
 from ..._grid_semantics import resolution_num, validate_backend_spacing
 from ..._line_grid_policy import (
+    BANDWIDTH_PROXY_SAFETY,
+    LOCAL_RESOLUTION_POLICY,
+    RESONANCE_BANDWIDTH_POLICY,
+    LineGridToleranceError,
     LineShapePrecisionWarning,
     cached_coordinates,
     coordinate_cache_key,
@@ -21,7 +27,53 @@ from ..._line_grid_policy import (
 )
 from ..._line_windows import build_window_plan, window_plan_from_payload
 from ..spectrum.diagnostics import coherent_fringe_spacing, sinc_feature_spacing
-from ..spectrum.line_seeds import SEEDING_REVISION, SeedContext, collect_feature_seeds
+from ..spectrum.line_seeds import (
+    SEEDING_REVISION,
+    ResonancePopulation,
+    SeedContext,
+    case_line_stop_eV,
+    collect_feature_seeds,
+    local_spacing_seeds,
+)
+
+
+def _resident_mib():
+    """Return current Linux RSS for opt-in line-grid profiling."""
+    try:
+        with open("/proc/self/status", encoding="ascii") as status:
+            for line in status:
+                if line.startswith("VmRSS:"):
+                    return float(line.split()[1]) / 1024.0
+    except OSError:
+        return None
+    return None
+
+
+def _device_mib():
+    """Pool-used and driver-used device MiB for opt-in profiling, if a GPU."""
+    stats = BACKEND.allocator_stats()
+    out = {
+        "device_used_mib": stats.get("used_mib"),
+        "device_reserved_mib": stats.get("reserved_mib"),
+    }
+    runtime = getattr(getattr(getattr(BACKEND, "cp", None), "cuda", None), "runtime", None)
+    if runtime is not None:
+        free, total = runtime.memGetInfo()
+        out["device_driver_used_mib"] = (total - free) / (1 << 20)
+    return out
+
+
+def _profile_stage(profile, **fields):
+    """Record opt-in line-grid stage fields and flush them to stderr.
+
+    Immediate output survives a scheduler time limit that discards the report.
+    Device occupancy is sampled at every stage.
+    """
+    fields.update(_device_mib())
+    profile.update(fields)
+    items = " ".join(f"{name}={value}" for name, value in fields.items())
+    print(f"line-grid profile: {items}", file=sys.stderr, flush=True)
+
 
 # Case fields the automatic line-grid resolution depends on. Transport is a
 # deterministic function of these plus the seed, so they content-address the
@@ -71,6 +123,7 @@ _WINDOW_INPUT_KEYS = (
     "mosaic_mc_nodes",
     "layer_radiators",
 )
+_WEIGHT_INPUT_KEYS = ("B_ang2",)
 
 
 def _cached_grid(cached):
@@ -114,6 +167,121 @@ def _windowed_line_grid(payload, case, segments, n_hat, Ne, feature_width_eV):
     return grid, record
 
 
+def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_layers, groove):
+    """``resonance-population`` axis of this case (#192), under the ceiling cap.
+
+    Uniform at the sinc-Nyquist step, or -- under ``resonance-local`` -- fine
+    only where narrow lines resonate, on a backbone at the maximum spacing.
+    Returns ``(grid, record, bandwidth_record)``.
+    """
+    bandwidth = payload["bandwidth"]
+    resolution = payload["resolution"]
+    profile_enabled = bool(case.get("_profile_line_grid_stages", False))
+    profile = {} if profile_enabled else None
+    if profile_enabled:
+        _profile_stage(profile, rss_before_resolution_mib=_resident_mib())
+    start = float(bandwidth["start_eV"])
+    from . import _lines_for_segments
+
+    ceiling = float(bandwidth["stop_eV"])
+    audit = {"start_eV": start, "stop_eV": ceiling, "collect": []}
+    stage_started = perf_counter() if profile_enabled else 0.0
+    _lines_for_segments(
+        segments,
+        np.array([start, ceiling]),
+        case,
+        n_hat,
+        abs_layers,
+        groove,
+        coherent=False,
+        Ne=Ne,
+        truncation_audit=audit,
+    )
+    chunks = audit["collect"]
+    if profile_enabled:
+        _profile_stage(
+            profile,
+            population_collect_wall_s=perf_counter() - stage_started,
+            population_chunks=len(chunks),
+            population_lines=sum(chunk[0].size for chunk in chunks),
+            rss_after_population_collect_mib=_resident_mib(),
+        )
+    stage_started = perf_counter() if profile_enabled else 0.0
+    populations = [
+        ResonancePopulation("production lines", energy, weight, width)
+        for energy, width, weight in chunks
+    ]
+    if profile_enabled:
+        _profile_stage(
+            profile,
+            population_pack_wall_s=perf_counter() - stage_started,
+            population_data_bytes=sum(
+                array.nbytes
+                for population in populations
+                for array in (population.energy_eV, population.weight, population.width_eV)
+            ),
+            rss_after_population_pack_mib=_resident_mib(),
+        )
+    del audit, chunks
+    stage_started = perf_counter() if profile_enabled else 0.0
+    stop, bandwidth_record = case_line_stop_eV(
+        case,
+        populations,
+        start_eV=start,
+        ceiling_eV=float(bandwidth["stop_eV"]),
+        truncation_limit=float(bandwidth["truncation_limit"]),
+        proxy_safety=BANDWIDTH_PROXY_SAFETY,
+    )
+    if profile_enabled:
+        _profile_stage(
+            profile,
+            stop_search_wall_s=perf_counter() - stage_started,
+            rss_after_stop_search_mib=_resident_mib(),
+        )
+    if resolution["policy"] != LOCAL_RESOLUTION_POLICY:
+        stage_started = perf_counter() if profile_enabled else 0.0
+        grid, record = resolved_coordinates(payload, target_step, dtype=REAL, stop_eV=stop)
+        if profile_enabled:
+            _profile_stage(
+                profile,
+                grid_build_wall_s=perf_counter() - stage_started,
+                rss_after_grid_build_mib=_resident_mib(),
+            )
+            record["line_grid_profile"] = profile
+        return grid, record, bandwidth_record
+    backbone = float(resolution["max_spacing_eV"])
+    stage_started = perf_counter() if profile_enabled else 0.0
+    seeds, summary = local_spacing_seeds(
+        populations,
+        start_eV=start,
+        stop_eV=stop,
+        floor_spacing_eV=min(float(target_step), backbone),
+        max_spacing_eV=backbone,
+        halo_limit=float(resolution["halo_limit"]),
+    )
+    if profile_enabled:
+        _profile_stage(
+            profile,
+            local_spacing_wall_s=perf_counter() - stage_started,
+            local_spacing_seeds=len(seeds),
+            rss_after_local_spacing_mib=_resident_mib(),
+        )
+    stage_started = perf_counter() if profile_enabled else 0.0
+    plan = build_window_plan(start, stop, backbone, seeds)
+    grid, record = windowed_coordinates(payload, plan, dtype=REAL, stop_eV=stop)
+    if profile_enabled:
+        _profile_stage(
+            profile,
+            grid_build_wall_s=perf_counter() - stage_started,
+            rss_after_grid_build_mib=_resident_mib(),
+        )
+    record["feature_width_eV"] = float(target_step)
+    record["local_spacing"] = summary
+    if profile_enabled:
+        record["line_grid_profile"] = profile
+    return grid, record, bandwidth_record
+
+
 def _refuse_coherent_resolution(case, segments, n_hat, Ne):
     """Refuse automatic resolution on the coherent route (issue #117).
 
@@ -148,7 +316,7 @@ def _refuse_coherent_resolution(case, segments, n_hat, Ne):
     )
 
 
-def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
+def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne, abs_layers, groove):
     """Resolve an automatic case-local line grid from this run's trajectories.
 
     Consults the content-addressed cache first, so a repeated case pays the
@@ -159,12 +327,20 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
     hit rebuilds the coordinates from the stored plan; a plan this build would
     not make is treated as a miss.
     """
+    profile_enabled = bool(case.get("_profile_line_grid_stages", False))
+    profile_started = perf_counter() if profile_enabled else 0.0
+    profile_rss_before = _resident_mib() if profile_enabled else None
     _refuse_coherent_resolution(case, segments, n_hat, Ne)
     windowed = payload.get("windows") is not None
-    keys = _RESOLUTION_INPUT_KEYS + (_WINDOW_INPUT_KEYS if windowed else ())
+    measured = payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
+    keys = (
+        _RESOLUTION_INPUT_KEYS
+        + (_WINDOW_INPUT_KEYS if windowed or measured else ())
+        + (_WEIGHT_INPUT_KEYS if measured else ())
+    )
     inputs = {key: case[key] for key in keys if case.get(key, None) is not None}
     inputs["backend_dtype"] = np.dtype(REAL).name
-    if windowed:
+    if windowed or measured:
         inputs["seeding_revision"] = SEEDING_REVISION
     key = coordinate_cache_key(payload, inputs)
     cached = cached_coordinates(key)
@@ -172,17 +348,37 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
         grid = _cached_grid(cached)
         if grid is not None:
             _warn_lineshape_precision(cached)
-            return grid, {**cached, "cache": "hit", "cache_key": key}
+            record = {**cached, "cache": "hit", "cache_key": key}
+            if profile_enabled:
+                record["line_grid_profile"] = {
+                    "cache_hit": True,
+                    "resolution_wall_s": perf_counter() - profile_started,
+                    "rss_before_resolution_mib": profile_rss_before,
+                    "rss_after_resolution_mib": _resident_mib(),
+                }
+            return grid, record
     target_step, aliased_fraction, spacing_segments = sinc_feature_spacing(
         segments,
         n_hat,
         electron_limit=Ne,
         aliased_weight_limit=float(payload["resolution"]["aliased_weight_limit"]),
     )
-    if windowed:
-        grid, record = _windowed_line_grid(payload, case, segments, n_hat, Ne, target_step)
-    else:
-        grid, record = resolved_coordinates(payload, target_step, dtype=REAL)
+    bandwidth_record = None
+    try:
+        if windowed:
+            grid, record = _windowed_line_grid(payload, case, segments, n_hat, Ne, target_step)
+        elif measured:
+            grid, record, bandwidth_record = _measured_line_grid(
+                payload, case, segments, n_hat, Ne, target_step, abs_layers, groove
+            )
+        else:
+            grid, record = resolved_coordinates(payload, target_step, dtype=REAL)
+    except LineGridToleranceError as exc:
+        raise LineGridToleranceError(
+            f"{case['name']} at {case['E0_keV']:g} keV (backend {np.dtype(REAL).name}): {exc}"
+        ) from exc
+    if bandwidth_record is not None:
+        record["measured_bandwidth"] = bandwidth_record
     record.update(
         {
             "aliased_weight_fraction": aliased_fraction,
@@ -193,9 +389,19 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
             "observable_class": record["governing_observable"],
         }
     )
+    line_grid_profile = record.pop("line_grid_profile", None)
     store_coordinates(key, record)
     _warn_lineshape_precision(record)
-    return grid, {**record, "cache": "miss", "cache_key": key}
+    result = {**record, "cache": "miss", "cache_key": key}
+    if profile_enabled:
+        result["line_grid_profile"] = {
+            **(line_grid_profile or {}),
+            "cache_hit": False,
+            "resolution_wall_s": perf_counter() - profile_started,
+            "rss_before_resolution_mib": profile_rss_before,
+            "rss_after_resolution_mib": _resident_mib(),
+        }
+    return grid, result
 
 
 def _warn_lineshape_precision(record):
@@ -204,7 +410,7 @@ def _warn_lineshape_precision(record):
         warnings.warn(message, LineShapePrecisionWarning, stacklevel=3)
 
 
-def resolve_line_grid(case, segments, n_hat, Ne, E_grid):
+def resolve_line_grid(case, segments, n_hat, Ne, E_grid, abs_layers=None, groove=None):
     """Choose this case's line grid once its own trajectories exist.
 
     Three paths, all before the spectrum phase and none of which starts a second
@@ -229,7 +435,9 @@ def resolve_line_grid(case, segments, n_hat, Ne, E_grid):
             "diagnostic derivation and automatic resolution are exclusive"
         )
     if policy_payload is not None:
-        return _resolve_policy_line_grid(policy_payload, case, segments, n_hat, Ne)
+        return _resolve_policy_line_grid(
+            policy_payload, case, segments, n_hat, Ne, abs_layers, groove
+        )
     if diagnostic_grid is None:
         return E_grid, None
     target_step, aliased_fraction, spacing_segments = sinc_feature_spacing(
@@ -263,3 +471,43 @@ def resolve_line_grid(case, segments, n_hat, Ne, E_grid):
         "n_spacing_segments": spacing_segments,
         "observable_class": "intrinsic_source",
     }
+
+
+def line_truncation_audit(case, E_grid):
+    """Empty edge-truncation audit for a ``resonance-population`` case, else ``None``."""
+    payload = case.get("line_grid_policy")
+    if payload is None or payload["bandwidth"]["policy"] != RESONANCE_BANDWIDTH_POLICY:
+        return None
+    grid = np.asarray(E_grid, dtype=float)
+    return {"start_eV": float(grid[0]), "stop_eV": float(grid[-1])}
+
+
+def check_line_truncation(case, audit):
+    """Gate a measured bandwidth on its production-weight truncation (#192).
+
+    The upper-edge fraction is the bandwidth share this policy spends and is
+    refused above ``truncation_limit``. The lower edge is reported only: the
+    ``start`` convention predates this policy and is not its share.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    total = float(_to_cpu(audit.get("line_mass", 0.0)))
+    above = float(_to_cpu(audit.get("mass_above", 0.0)))
+    below = float(_to_cpu(audit.get("mass_below", 0.0)))
+    limit = float(case["line_grid_policy"]["bandwidth"]["truncation_limit"])
+    record = {
+        "start_eV": audit["start_eV"],
+        "stop_eV": audit["stop_eV"],
+        "truncation_limit": limit,
+        "upper_fraction_bound": above / total if total > 0.0 else 0.0,
+        "lower_fraction_bound": below / total if total > 0.0 else 0.0,
+    }
+    if record["upper_fraction_bound"] > limit:
+        raise LineGridToleranceError(
+            f"{case['name']} at {case['E0_keV']:g} keV: the measured line bandwidth "
+            f"[{audit['start_eV']:g}, {audit['stop_eV']:g}] eV may truncate "
+            f"{record['upper_fraction_bound']:.3g} of the line yield above its edge "
+            f"with production weights, above the {limit:g} bandwidth share. Use the "
+            "kinematic-ceiling bandwidth or supply an explicit grid."
+        )
+    return record

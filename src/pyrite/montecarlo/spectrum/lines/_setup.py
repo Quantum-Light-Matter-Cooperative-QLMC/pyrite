@@ -81,6 +81,7 @@ class SpectrumRequest:
     _table_cache: Any = None
     longitudinal_rms_fs: Any = None
     line_quadrature: Any = "node"
+    truncation_audit: Any = None
 
 
 @dataclass

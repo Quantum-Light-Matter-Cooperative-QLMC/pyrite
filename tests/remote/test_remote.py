@@ -901,6 +901,15 @@ def test_slurm_batch_script_requests_the_lab_gpu_profile():
     assert "module purge 2>/dev/null || true" in script
     assert "module load cuda openmpi hdf5 2>/dev/null || true" in script
     assert "echo payload" in script
+    assert "--mem" not in script
+
+
+def test_slurm_batch_script_requests_optional_memory_per_cpu():
+    script = remote._slurm_batch_script(
+        "j", "echo payload", job_name="pyrite-j", mem_per_cpu="4000M"
+    )
+
+    assert "#SBATCH --mem-per-cpu=4000M" in script
 
 
 def test_submit_command_uses_sbatch_parsable_and_records_scheduler_id():

@@ -201,6 +201,28 @@ def test_runner_warns_on_a_binade_window_from_a_cold_and_a_warm_cache(monkeypatc
     assert record["cache"] == "hit"
 
 
+def test_runner_budget_refusal_identifies_case_and_precision():
+    case, segments, n_hat = _case_and_segments()
+    policy = case["line_grid_policy"]
+    case = replace(
+        case,
+        line_grid_policy={
+            **policy,
+            "resolution": {**policy["resolution"], "max_points": 100},
+        },
+    )
+    placeholder = decode_energy_grid(case["E_grid_line"])
+
+    with pytest.raises(LineGridToleranceError) as caught:
+        resolve_line_grid(case, segments, n_hat, 2, placeholder)
+
+    message = str(caught.value)
+    assert case["name"] in message
+    assert "at 77 keV" in message
+    assert f"backend {np.dtype(runner_line_grid.REAL).name}" in message
+    assert "above the 100-point budget" in message
+
+
 def test_windowed_coordinates_refuse_a_plan_for_another_bandwidth():
     plan = build_window_plan(60.0, 16_400.0, 3.0, [_seed(2000.0, 5.0, 0.1)])
     with pytest.raises(ValueError, match="bandwidth"):

@@ -12,6 +12,7 @@ import os
 import sys
 from collections.abc import Mapping
 from contextlib import contextmanager, nullcontext
+from functools import partial
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -132,7 +133,7 @@ from .chunking import (
 from .chunking import (
     _real_itemsize as _real_itemsize,
 )
-from .line_grid import resolve_line_grid
+from .line_grid import check_line_truncation, line_truncation_audit, resolve_line_grid
 
 _RESOURCE_POLICY.n_cpus = _usable_cpus()
 
@@ -177,6 +178,14 @@ def _process_pool_kwargs():
     return {"mp_context": multiprocessing.get_context("spawn")}
 
 
+from .electron_blocks import (
+    MAX_ELECTRON_BLOCKS,
+    device_headroom_bytes,
+    electron_block_count,
+    iter_electron_blocks,
+    restore_audit,
+    snapshot_audit,
+)
 from .oom import (
     _ensure_pool_limit as _ensure_pool_limit,
 )
@@ -641,7 +650,9 @@ def _transport_case(
     # Line resolution needs the transport distribution, so it is chosen after
     # the case's own trajectories exist and before the spectrum phase. No second
     # Monte Carlo job is started for either path; see runner/line_grid.py.
-    E_grid, diagnostic_grid_result = resolve_line_grid(case, segs_all, n_hat, Ne, E_grid)
+    E_grid, diagnostic_grid_result = resolve_line_grid(
+        case, segs_all, n_hat, Ne, E_grid, layers, groove
+    )
 
     tp: dict[str, Any] = dict(
         E_grid=E_grid,
@@ -682,6 +693,73 @@ def _lines_for_segments(
     coherent=None,
     Ne=None,
     table_cache=None,
+    truncation_audit=None,
+):
+    """:func:`_lines_for_segments_once` in electron-aligned device blocks (#192).
+
+    On a GPU, an incoherent sum whose segments exceed the pool headroom runs in
+    disjoint electron blocks whose spectra, audit sums and collected lines add
+    (``iter_electron_blocks``). A block OOM restores the audit and doubles the block
+    count up to ``MAX_ELECTRON_BLOCKS``, then re-raises to the spectrum phase's
+    chunk-halving retry. A case that fits runs as one unchanged call; coherent
+    sums, which may couple electrons, are never split.
+    """
+    once = partial(
+        _lines_for_segments_once,
+        E_grid=E_grid,
+        case=case,
+        n_hat=n_hat,
+        abs_layers=abs_layers,
+        groove=groove,
+        coherent=coherent,
+        Ne=Ne,
+        table_cache=table_cache,
+        truncation_audit=truncation_audit,
+    )
+    wants_coherent = case.get("coherent_emission", False) if coherent is None else coherent
+    if bool(wants_coherent) or not _RESOURCE_POLICY.gpu:
+        return once(segs)
+    n_segments = int(segs["L_ang"].shape[0])
+    n_blocks = max(
+        electron_block_count(n_segments, device_headroom_bytes()),
+        int(case.get("_min_line_electron_blocks", 1)),
+    )
+    while True:
+        saved = snapshot_audit(truncation_audit)
+        if case.get("_profile_line_grid_stages"):
+            print(
+                f"line-grid profile: electron_blocks={n_blocks} segments={n_segments}",
+                file=sys.stderr,
+                flush=True,
+            )
+        try:
+            if n_blocks == 1:
+                return once(segs)
+            spec = None
+            for block in iter_electron_blocks(segs, n_blocks):
+                part = once(block)
+                spec = part if spec is None else spec + part
+            return spec
+        except Exception as error:
+            if not _is_gpu_oom(error) or n_blocks >= MAX_ELECTRON_BLOCKS:
+                raise
+            restore_audit(truncation_audit, saved)
+            BACKEND.release_memory()
+            n_blocks = min(MAX_ELECTRON_BLOCKS, 2 * n_blocks)
+
+
+def _lines_for_segments_once(
+    segs,
+    E_grid,
+    case,
+    n_hat,
+    abs_layers,
+    groove,
+    *,
+    coherent=None,
+    Ne=None,
+    table_cache=None,
+    truncation_audit=None,
 ):
     """Coherent line spectrum on ``E_grid`` from already-transported line
     segments ``segs``. Single slab (``layer_radiators`` absent) radiates from
@@ -698,7 +776,9 @@ def _lines_for_segments(
     transport yields both the incoherent ``spec`` and the ``spec_coherent``.
 
     Line kinematics always run on the crystal's bulk in-medium dispersion
-    ``k = Re n(omega) omega``; there is no vacuum switch."""
+    ``k = Re n(omega) omega``; there is no vacuum switch.
+
+    ``truncation_audit`` is forwarded to every ``mc_spectrum`` call (#192)."""
     radiators = case.get("layer_radiators")
     mosaic_kw = dict(
         mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
@@ -745,6 +825,7 @@ def _lines_for_segments(
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             _table_cache=table_cache,
             line_quadrature=line_quadrature,
+            truncation_audit=truncation_audit,
             **mosaic_kw,
         )
     assert case.get("groove_spacing_ang") is None
@@ -776,6 +857,7 @@ def _lines_for_segments(
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             _table_cache=table_cache,
             line_quadrature=line_quadrature,
+            truncation_audit=truncation_audit,
             **mosaic_kw,
         )
     return spec
@@ -1030,6 +1112,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     want_coherent = bool(case.get("coherent_emission", False))
     spec_coherent = None
     line_table_cache = {}
+    truncation_audit = line_truncation_audit(case, E_grid)
     with _nsys_range("cxr.lines"):
         try:
             spec = _lines_for_segments(
@@ -1042,6 +1125,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 coherent=False,
                 Ne=Ne_lines,
                 table_cache=line_table_cache,
+                truncation_audit=truncation_audit,
             )
 
             if want_coherent:
@@ -1060,6 +1144,10 @@ def _spectrum_case_impl(case, tp, record_timing=False):
             if not _is_gpu_oom(error):
                 raise
             raise _SpectrumPhaseOOM("line", error) from error
+    # Refuse a truncating measured bandwidth before the other components run.
+    truncation_record = (
+        None if truncation_audit is None else check_line_truncation(case, truncation_audit)
+    )
 
     # CHARACTERISTIC: EEDL shell-ionization track-length estimator on the
     # lower-cutoff bremsstrahlung electron population. Atomic relaxation is
@@ -1151,6 +1239,11 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         out["line_grid_diagnostic"] = tp["diagnostic_grid"]
         if case.get("line_grid_policy") is not None:
             out["line_grid_resolved"] = tp["diagnostic_grid"]
+            if truncation_record is not None:
+                out["line_grid_resolved"] = {
+                    **tp["diagnostic_grid"],
+                    "truncation_audit": truncation_record,
+                }
     if spec_coherent is not None:
         out["spec_coherent"] = spec_coherent
     if timed:
