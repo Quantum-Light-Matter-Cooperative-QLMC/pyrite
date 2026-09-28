@@ -46,9 +46,7 @@ def validated_catalog(path, text, *, profile="standard"):
     ``profile`` selects whose energy-grid references are resolved, as a run
     would.
     """
-    fd, temporary = tempfile.mkstemp(
-        dir=catalog_root(path), prefix=".", suffix=".toml.tmp"
-    )
+    fd, temporary = tempfile.mkstemp(dir=catalog_root(path), prefix=".", suffix=".toml.tmp")
     try:
         with os.fdopen(fd, "w") as stream:
             stream.write(text)
