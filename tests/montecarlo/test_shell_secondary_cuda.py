@@ -65,7 +65,10 @@ def _run(key="silicon", *, Ne=64, seed=11, threshold=1000.0, **kw):
 
 
 def _host(result):
-    return {k: (v.get() if hasattr(v, "get") else v) for k, v in result.items()}
+    return {
+        k: (v if isinstance(v, dict) or not hasattr(v, "get") else v.get())
+        for k, v in result.items()
+    }
 
 
 def _first_rows(result):
