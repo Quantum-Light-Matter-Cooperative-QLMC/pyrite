@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 
 from ...console import config as _config
-from ...console.output import CLIError
+from ...console.output import CLIError, emit_diagnostic, emit_result
 from ...remote.config import validate_remote_target, validate_slurm_setting
 from .._groups import LazyGroup
 
@@ -122,6 +122,25 @@ def set_command(key: str, value: str) -> None:
     except _config.ConfigError as exc:
         raise CLIError(str(exc)) from exc
     click.echo(f"{key} = {value}")
+
+
+@command.command("unset")
+@click.argument("key", type=_KEY, metavar="KEY")
+def unset_command(key: str) -> None:
+    """Remove the stored value for KEY.
+
+    KEY then resolves to its PYRITE_* environment variable, if set, or its
+    built-in default. Unsetting a key that is not stored succeeds and changes
+    nothing. See `pyrite config --help` for the supported keys.
+    """
+    try:
+        removed = _config.unset_stored(key)
+        resolved = _config.resolve(key)
+    except _config.ConfigError as exc:
+        raise CLIError(str(exc)) from exc
+    if not removed:
+        emit_diagnostic(f"{key} is not set in the config store")
+    emit_result(f"{key} = {resolved.value} ({resolved.source})")
 
 
 @command.command("get")

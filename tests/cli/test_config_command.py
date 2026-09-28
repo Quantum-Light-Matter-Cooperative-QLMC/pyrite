@@ -56,6 +56,47 @@ def test_config_set_get_and_list_effective_values(monkeypatch, tmp_path):
     assert path.is_file()
 
 
+def test_config_unset_removes_stored_value_and_reports_fallback(monkeypatch, tmp_path):
+    path = _isolated_store(monkeypatch, tmp_path)
+    _config.set_stored("profile.current", "sub_100keV")
+    _config.set_stored("remote.target", "box-a")
+
+    unset_profile = invoke(config_command.command, ["unset", "profile.current"])
+
+    assert_clean_result(unset_profile, stdout="profile.current = standard (built-in default)\n")
+    assert _config.resolve("remote.target").value == "box-a"
+    assert "[profile]" not in path.read_text(encoding="utf-8")
+
+    # A key the environment still sets reports that source as the winner.
+    monkeypatch.setenv("PYRITE_REMOTE_HOST", "box-env")
+    unset_remote = invoke(config_command.command, ["unset", "remote.target"])
+
+    assert_clean_result(unset_remote, stdout="remote.target = box-env (PYRITE_REMOTE_HOST)\n")
+    assert path.read_text(encoding="utf-8").strip() == ""
+
+
+def test_config_unset_of_unstored_key_is_a_noop(monkeypatch, tmp_path):
+    path = _isolated_store(monkeypatch, tmp_path)
+
+    result = invoke(config_command.command, ["unset", "remote.gres"])
+
+    assert_clean_result(
+        result,
+        stdout="remote.gres = gpu:1 (built-in default)\n",
+        stderr="remote.gres is not set in the config store\n",
+    )
+    assert not path.exists()
+
+
+def test_config_unset_rejects_unknown_key(monkeypatch, tmp_path):
+    _isolated_store(monkeypatch, tmp_path)
+
+    result = invoke(config_command.command, ["unset", "remote.nope"])
+
+    assert result.exit_code == 2
+    assert "remote.nope" in result.stderr
+
+
 def test_config_set_slurm_profile_feeds_remote_target(monkeypatch, tmp_path):
     _isolated_store(monkeypatch, tmp_path)
 

@@ -138,25 +138,17 @@ def resolve(key: str, per_call: str | None = None) -> ResolvedValue:
     return ResolvedValue(default, "built-in default")
 
 
-def set_stored(key: str, value: str) -> None:
-    """Atomically persist one supported context value."""
-    if key not in _SETTINGS:
-        raise KeyError(f"unknown config key: {key}")
-    document = tomlkit.document()
+def _load_document() -> tomlkit.TOMLDocument:
     source_path = _store_path_for_read()
-    if source_path.exists():
-        try:
-            document = tomlkit.parse(source_path.read_text(encoding="utf-8"))
-        except (OSError, ParseError) as exc:
-            raise ConfigError(f"cannot read {source_path}: {exc}") from exc
-    section, name = key.split(".", 1)
-    table = document.get(section)
-    if table is None:
-        table = tomlkit.table()
-        document[section] = table
-    elif not isinstance(table, dict):
-        raise ConfigError(f"invalid {CONFIG_PATH}: [{section}] must be a table")
-    table[name] = value
+    if not source_path.exists():
+        return tomlkit.document()
+    try:
+        return tomlkit.parse(source_path.read_text(encoding="utf-8"))
+    except (OSError, ParseError) as exc:
+        raise ConfigError(f"cannot read {source_path}: {exc}") from exc
+
+
+def _write_document(document: tomlkit.TOMLDocument) -> None:
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(dir=CONFIG_PATH.parent, suffix=".toml.tmp")
     try:
@@ -166,6 +158,47 @@ def set_stored(key: str, value: str) -> None:
     except BaseException:
         Path(temporary).unlink(missing_ok=True)
         raise
+
+
+def set_stored(key: str, value: str) -> None:
+    """Atomically persist one supported context value."""
+    if key not in _SETTINGS:
+        raise KeyError(f"unknown config key: {key}")
+    document = _load_document()
+    section, name = key.split(".", 1)
+    table = document.get(section)
+    if table is None:
+        table = tomlkit.table()
+        document[section] = table
+    elif not isinstance(table, dict):
+        raise ConfigError(f"invalid {CONFIG_PATH}: [{section}] must be a table")
+    table[name] = value
+    _write_document(document)
+
+
+def unset_stored(key: str) -> bool:
+    """Atomically remove one stored context value; return whether it was stored.
+
+    An emptied section is dropped with it, so unsetting every key leaves no
+    stale ``[section]`` headers behind. Nothing is written when KEY was not
+    stored.
+    """
+    if key not in _SETTINGS:
+        raise KeyError(f"unknown config key: {key}")
+    document = _load_document()
+    section, name = key.split(".", 1)
+    table = document.get(section)
+    if table is None:
+        return False
+    if not isinstance(table, dict):
+        raise ConfigError(f"invalid {CONFIG_PATH}: [{section}] must be a table")
+    if name not in table:
+        return False
+    del table[name]
+    if not table:
+        del document[section]
+    _write_document(document)
+    return True
 
 
 def workspace_root(explicit: str | PathLike[str] | None = None) -> Path:

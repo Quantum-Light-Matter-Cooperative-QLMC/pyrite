@@ -623,7 +623,11 @@ Usage: pyrite config [OPTIONS] COMMAND [ARGS]...
   Set and inspect environment-scoped CLI defaults.
 
   Values resolve in one order everywhere: per-call flag, PYRITE_* environment, config
-  store, then built-in default.
+  store, then built-in default. `pyrite config list` shows each effective value and its
+  source.
+
+  Remote runs need remote.target. The other remote.* keys select the SLURM target
+  profile; their defaults are the NVIDIA lab box.
 
 Options:
   -h, --help  Show this message and exit.
@@ -632,19 +636,43 @@ Commands:
   get         Print the effective value for KEY.
   list        List effective values and the winning...
   set         Persist VALUE for KEY.
+  unset       Remove the stored value for KEY.
   setup       Detect GPU hardware and persist the selected backend.
   completion  Manage PyRITE shell tab-completion.
+
+  Keys (environment variable; built-in default):
+    profile.current        Default catalog scan profile.
+                           PYRITE_PROFILE; standard
+    remote.target          SSH alias of the SLURM head node (required).
+                           PYRITE_REMOTE_HOST; unset
+    remote.gpu_vendor      Remote GPU vendor: nvidia or amd.
+                           PYRITE_REMOTE_GPU_VENDOR; nvidia
+    remote.partition       SLURM partition for new remote jobs.
+                           PYRITE_REMOTE_PARTITION; gpu
+    remote.nodelist        SLURM node list for new remote jobs, or 'any'.
+                           PYRITE_REMOTE_NODELIST; any
+    remote.gres            SLURM gres request, e.g. gpu:radeon8060s:1.
+                           PYRITE_REMOTE_GRES; gpu:1
+    workspace.root         Workspace directory for checkpoints and outputs.
+                           PYRITE_HOME; current directory
+    catalog.path           Material catalog directory or file.
+                           PYRITE_CATALOG; bundled catalog
+    xsgen.bremslib_source  BremsLib source tree for table generation.
+                           PYRITE_XSGEN_BREMSLIB_SOURCE; ../BremsLib_v2.0.8
+    xsgen.elsepa_source    ELSEPA source tree for table generation.
+                           PYRITE_XSGEN_ELSEPA_SOURCE; ../elsepa-2020
+    xsgen.sbethe_source    SBETHE source tree for table generation.
+                           PYRITE_XSGEN_SBETHE_SOURCE; ../sbethe
 ```
 
 ## `pyrite config get`
 
 ```text
-Usage: pyrite config get [OPTIONS] {profile.current|remote.target|remote.gpu_vendor|remo
-                         te.partition|remote.nodelist|remote.gres|workspace.root|catalog
-                         .path|xsgen.bremslib_source|xsgen.elsepa_source|xsgen.sbethe_so
-                         urce}
+Usage: pyrite config get [OPTIONS] KEY
 
   Print the effective value for KEY.
+
+  See `pyrite config --help` for the supported keys.
 
 Options:
   -h, --help  Show this message and exit.
@@ -664,12 +692,48 @@ Options:
 ## `pyrite config set`
 
 ```text
-Usage: pyrite config set [OPTIONS] {profile.current|remote.target|remote.gpu_vendor|remo
-                         te.partition|remote.nodelist|remote.gres|workspace.root|catalog
-                         .path|xsgen.bremslib_source|xsgen.elsepa_source|xsgen.sbethe_so
-                         urce} VALUE
+Usage: pyrite config set [OPTIONS] KEY VALUE
 
   Persist VALUE for KEY.
+
+Options:
+  -h, --help  Show this message and exit.
+
+  Keys (environment variable; built-in default):
+    profile.current        Default catalog scan profile.
+                           PYRITE_PROFILE; standard
+    remote.target          SSH alias of the SLURM head node (required).
+                           PYRITE_REMOTE_HOST; unset
+    remote.gpu_vendor      Remote GPU vendor: nvidia or amd.
+                           PYRITE_REMOTE_GPU_VENDOR; nvidia
+    remote.partition       SLURM partition for new remote jobs.
+                           PYRITE_REMOTE_PARTITION; gpu
+    remote.nodelist        SLURM node list for new remote jobs, or 'any'.
+                           PYRITE_REMOTE_NODELIST; any
+    remote.gres            SLURM gres request, e.g. gpu:radeon8060s:1.
+                           PYRITE_REMOTE_GRES; gpu:1
+    workspace.root         Workspace directory for checkpoints and outputs.
+                           PYRITE_HOME; current directory
+    catalog.path           Material catalog directory or file.
+                           PYRITE_CATALOG; bundled catalog
+    xsgen.bremslib_source  BremsLib source tree for table generation.
+                           PYRITE_XSGEN_BREMSLIB_SOURCE; ../BremsLib_v2.0.8
+    xsgen.elsepa_source    ELSEPA source tree for table generation.
+                           PYRITE_XSGEN_ELSEPA_SOURCE; ../elsepa-2020
+    xsgen.sbethe_source    SBETHE source tree for table generation.
+                           PYRITE_XSGEN_SBETHE_SOURCE; ../sbethe
+```
+
+## `pyrite config unset`
+
+```text
+Usage: pyrite config unset [OPTIONS] KEY
+
+  Remove the stored value for KEY.
+
+  KEY then resolves to its PYRITE_* environment variable, if set, or its built-in
+  default. Unsetting a key that is not stored succeeds and changes nothing. See `pyrite
+  config --help` for the supported keys.
 
 Options:
   -h, --help  Show this message and exit.
