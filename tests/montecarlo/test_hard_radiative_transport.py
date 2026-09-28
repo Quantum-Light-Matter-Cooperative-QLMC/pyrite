@@ -3,7 +3,8 @@
 Both exact CPU cores run the mode: lockstep, and the per-electron reference
 of the CUDA kernel (whose device half is ``test_hard_radiative_cuda.py``).
 
-Validation: bremslib-radiative-partition, bremslib-radiative-event-spectrum
+Validation: bremslib-radiative-partition, bremslib-radiative-event-spectrum,
+bremslib-coupled-expected-spectrum
 """
 
 from dataclasses import replace
@@ -16,6 +17,7 @@ from pyrite.montecarlo import shell_configuration
 from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
 from pyrite.montecarlo.spectrum.brem_events import (
+    mc_coupled_brem_spectrum,
     mc_hard_brem_event_spectrum,
     mc_soft_brem_spectrum,
 )
@@ -121,6 +123,31 @@ def test_hard_radiative_events_debit_energy_and_close_cpu_flights(core, straggli
             grid,
             **(scoring | {"bremslib_tables": {"C": other_table}}),
         )
+
+
+@pytest.mark.parametrize("core", CPU_CORES)
+def test_expected_value_continuum_matches_the_sampled_photons_on_the_same_tracks(core):
+    """Track length over the full DDCS is the expectation of the analog sum.
+
+    On one set of coupled tracks, the soft bins are the soft scorer's exactly
+    and the hard photons' yield agrees with the expected-value estimate within
+    four standard errors of the ~370 sampled events (seeded, so deterministic).
+    """
+    table = _table(1e6)
+    result = _run(table, core)
+    grid = np.arange(500.0, 60_500.0, 1_000.0)
+    scoring = dict(cutoff_eV=1_000.0, bremslib_tables={"C": table}, composition=[("C", 0.1)])
+    expected = mc_coupled_brem_spectrum(result, grid, **scoring)
+    soft = mc_soft_brem_spectrum(result, grid, **scoring)
+    hard = mc_hard_brem_event_spectrum(result, grid, **scoring)
+
+    assert expected[0] == soft[0] > 0.0
+    events = np.count_nonzero(result["hard_radiative_k_eV"] > 0.0)
+    assert events > 300
+    relative = hard[1:].sum() / expected[1:].sum() - 1.0
+    assert abs(relative) < 4.0 / np.sqrt(events)
+    with pytest.raises(ValueError, match="spectrum cutoff must match"):
+        mc_coupled_brem_spectrum(result, grid, **(scoring | {"cutoff_eV": 2_000.0}))
 
 
 @pytest.mark.parametrize("core", CPU_CORES)

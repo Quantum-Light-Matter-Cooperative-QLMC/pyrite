@@ -214,10 +214,6 @@ def test_refining_a_mesh_does_not_move_the_timepix_input_channels(num):
 @pytest.fixture(scope="module")
 def ladder():
     case = cc.build_ladder_case("hopg", 30.0, 5.0, 95.0, **TINY)
-    # Grid refinement is measured on the smooth track-length continuum; three
-    # coupled electrons sample no hard photons above k_c (issue #172).
-    case.pop("radiative_model", None)
-    case.pop("radiative_cutoff_eV", None)
     return cc.CaseLadder(case, transport_core="lockstep")
 
 

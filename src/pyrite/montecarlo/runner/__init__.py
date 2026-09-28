@@ -1182,7 +1182,6 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 abs_layers,
                 groove=tp.get("groove"),
                 Ne=Ne_brem,
-                event_segments=segs,
             )
         except Exception as error:
             if not _is_gpu_oom(error):

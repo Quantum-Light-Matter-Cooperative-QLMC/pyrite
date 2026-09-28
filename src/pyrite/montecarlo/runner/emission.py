@@ -16,7 +16,6 @@ def _brem_wide_from_segments(
     abs_layers,
     groove=None,
     Ne=None,
-    event_segments=None,
 ):
     """Bremsstrahlung background on ``E_brem`` from already-transported brem
     segments ``segs_b``. EVERY layer radiates with its OWN composition (each
@@ -27,10 +26,9 @@ def _brem_wide_from_segments(
     block; shared with :func:`_brem_for_case` so a brem-only repair regenerates
     the SAME multilayer background as a live sweep.
 
-    A coupled radiative case (``radiative_model``) instead sums soft track
-    length below its cutoff and the hard photons transport sampled; see
-    :func:`_coupled_brem_from_segments`. ``event_segments`` are the host rows
-    for the hard photons (default ``segs_b``), kept at transport precision."""
+    A coupled radiative case (``radiative_model``) scores its coupled tracks
+    with the BremsLib expected-value estimator; see
+    :func:`_coupled_brem_from_segments`."""
     from .. import runner
 
     brem_chunk = runner._admit_chunk(
@@ -49,7 +47,6 @@ def _brem_wide_from_segments(
             n_hat,
             abs_layers,
             Ne=Ne,
-            event_segments=segs_b if event_segments is None else event_segments,
             brem_chunk=brem_chunk,
         )
     # The case records the resolved continuum: BremsLib gets one table set for
@@ -96,21 +93,20 @@ def _brem_wide_from_segments(
     return brem_wide
 
 
-def _coupled_brem_from_segments(
-    segs_b, E_brem, case, n_hat, abs_layers, *, Ne, event_segments, brem_chunk
-):
-    """Coupled-mode continuum: soft BremsLib track length plus hard photon events.
+def _coupled_brem_from_segments(segs_b, E_brem, case, n_hat, abs_layers, *, Ne, brem_chunk):
+    """Coupled-mode continuum: BremsLib track length on the coupled tracks.
 
-    Each layer's soft part radiates with its own composition, like the
-    uncoupled estimator; the hard photons already carry their emitting element
-    and are scored once through the whole stack. Transport stopped every
-    continuum electron at ``E_cut_brem_keV`` (the case requires it not to
-    exceed the line cutoff), so no reclipping is requested.
+    Each layer radiates with its own composition, like the uncoupled
+    estimator, over soft and hard photon energies alike. The sampled hard
+    photons shaped the tracks but are not histogrammed: at production electron
+    counts they leave the continuum above the cutoff almost empty. Transport
+    stopped every continuum electron at ``E_cut_brem_keV`` (the case requires
+    it not to exceed the line cutoff), so no reclipping is requested.
 
-    Validation: bremslib-radiative-event-spectrum
+    Validation: bremslib-coupled-expected-spectrum
     """
     from .. import runner
-    from ..spectrum.brem_events import mc_hard_brem_event_spectrum, mc_soft_brem_spectrum
+    from ..spectrum.brem_events import mc_coupled_brem_spectrum
 
     if case.get("E_cut_brem_keV", 1.0) > case.get("E_cut_lines_keV", 5.0):
         raise ValueError("coupled radiative scoring requires E_cut_brem_keV <= E_cut_lines_keV")
@@ -131,7 +127,7 @@ def _coupled_brem_from_segments(
     for segments, composition in layer_views:
         if segments["L_ang"].size == 0:
             continue
-        brem_wide = brem_wide + mc_soft_brem_spectrum(
+        brem_wide = brem_wide + mc_coupled_brem_spectrum(
             segments,
             E_brem,
             composition=composition,
@@ -142,16 +138,7 @@ def _coupled_brem_from_segments(
             cutoff_eV=cutoff_eV,
             bremslib_tables=tables,
         )
-    return brem_wide + mc_hard_brem_event_spectrum(
-        event_segments,
-        E_brem,
-        composition=case["composition"],
-        n_hat=n_hat,
-        electron_limit=Ne,
-        layers=abs_layers,
-        cutoff_eV=cutoff_eV,
-        bremslib_tables=tables,
-    )
+    return brem_wide
 
 
 def _characteristic_from_segments(

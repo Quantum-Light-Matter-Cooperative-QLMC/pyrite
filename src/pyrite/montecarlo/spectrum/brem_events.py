@@ -1,6 +1,6 @@
-"""Post-transport scoring of explicit hard bremsstrahlung photons.
+"""Post-transport bremsstrahlung scoring of coupled radiative tracks.
 
-Validation: bremslib-radiative-event-spectrum
+Validation: bremslib-coupled-expected-spectrum, bremslib-radiative-event-spectrum
 """
 
 from collections.abc import Mapping
@@ -53,6 +53,39 @@ def _check_transport_partition(segments, cutoff_eV, bremslib_tables):
         raise ValueError("spectrum BremsLib tables must match coupled transport tables")
 
 
+def _uncoupled_view(segments, cutoff_eV, bremslib_tables, kwargs):
+    """Coupled rows as the track-length scorer's input, after partition checks."""
+    _check_transport_partition(segments, cutoff_eV, bremslib_tables)
+    if "cross_section_model" in kwargs:
+        raise ValueError("coupled track-length scoring always uses the BremsLib cross section")
+    if kwargs.get("E_cut_keV") is not None:
+        raise NotImplementedError(
+            "coupled track-length scoring cannot reclip electron tracks at a new cutoff"
+        )
+    view = dict(segments)
+    view.pop("radiative", None)
+    return view
+
+
+def mc_coupled_brem_spectrum(segments, E_grid_eV, *, cutoff_eV, bremslib_tables, **kwargs):
+    """Expected-value continuum on coupled tracks, soft and hard photons alike.
+
+    Scores the full BremsLib DDCS by track length along the coupled electron
+    trajectories. Hard photons change those trajectories (each sampled event
+    removes its energy), but their expected count per path length is the same
+    ``n dσ/dk`` the track-length scorer integrates, so the estimate matches the
+    soft-plus-event sum :func:`mc_soft_brem_spectrum` +
+    :func:`mc_hard_brem_event_spectrum` in expectation without the sparse
+    per-photon histogram above ``cutoff_eV``.
+
+    Validation: bremslib-coupled-expected-spectrum
+    """
+    view = _uncoupled_view(segments, cutoff_eV, bremslib_tables, kwargs)
+    return mc_brem_spectrum(
+        view, E_grid_eV, cross_section_model="bremslib", bremslib_tables=bremslib_tables, **kwargs
+    )
+
+
 def mc_soft_brem_spectrum(segments, E_grid_eV, *, cutoff_eV, bremslib_tables, **kwargs):
     """Track-length bremsstrahlung below the hard-photon cutoff.
 
@@ -65,17 +98,9 @@ def mc_soft_brem_spectrum(segments, E_grid_eV, *, cutoff_eV, bremslib_tables, **
     Validation: bremslib-radiative-event-spectrum
     """
     edges, widths, split = _cutoff_edge(E_grid_eV, cutoff_eV)
-    _check_transport_partition(segments, cutoff_eV, bremslib_tables)
-    if "cross_section_model" in kwargs:
-        raise ValueError("coupled soft scoring always uses the BremsLib cross section")
-    if kwargs.get("E_cut_keV") is not None:
-        raise NotImplementedError(
-            "coupled soft scoring cannot reclip electron tracks at a new cutoff"
-        )
+    uncoupled_view = _uncoupled_view(segments, cutoff_eV, bremslib_tables, kwargs)
     if cutoff_eV <= edges[0]:
         return np.zeros(np.asarray(E_grid_eV).size, dtype=float)
-    uncoupled_view = dict(segments)
-    uncoupled_view.pop("radiative", None)
     full = mc_brem_spectrum(
         uncoupled_view,
         E_grid_eV,

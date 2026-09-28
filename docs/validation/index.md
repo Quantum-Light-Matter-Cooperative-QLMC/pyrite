@@ -86,6 +86,7 @@ radiation-physics/absorption-length
 radiation-physics/brem-source-comparison
 radiation-physics/brem-spectrum
 radiation-physics/bremslib-angular-model
+radiation-physics/bremslib-coupled-expected-spectrum
 radiation-physics/bremslib-radiative-event-spectrum
 radiation-physics/bremslib-radiative-partition
 radiation-physics/cbs-amplitude

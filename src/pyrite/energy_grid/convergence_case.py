@@ -183,9 +183,6 @@ class CaseLadder:
             self.case.get("abs_layers"),
             groove=tp.get("groove"),
             Ne=tp["Ne_brem"],
-            # Coupled hard photons read host rows at transport precision, as
-            # run_case does; the staged copy may be float32 on the GPU.
-            event_segments=self.segments,
         )
         return np.asarray(_to_cpu(brem), dtype=float)
 

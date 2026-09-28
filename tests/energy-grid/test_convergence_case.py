@@ -195,19 +195,3 @@ def test_ladder_grids_nest_only_for_exact_halving():
     assert np.diff(independent[1]).max() <= 5.0
     with pytest.raises(ValueError, match="strictly decreasing"):
         cc.ladder_grids(10.0, 2600.0, (3.0, 6.0))
-
-
-def test_continuum_scores_coupled_hard_photons_from_host_rows(monkeypatch):
-    """Hard photons read transport-precision host rows, not the staged copy (#172)."""
-    segments = {"L_ang": np.ones(3), "r_mid": np.zeros((3, 3))}
-    transport = {"segs": segments, "n_hat": np.array([0.0, 0.0, 1.0]), "Ne_brem": 3}
-    seen = {}
-
-    def fake(_segments, grid, _case, _n_hat, _layers, *, groove=None, Ne=None, event_segments=None):
-        seen["event_segments"] = event_segments
-        return np.zeros(grid.size)
-
-    monkeypatch.setattr(runner, "_brem_wide_from_segments", fake)
-    ladder = cc.CaseLadder({"crystal": "silicon"}, transport=transport)
-    ladder.continuum([1_000.0, 2_000.0])
-    assert seen["event_segments"] is ladder.segments

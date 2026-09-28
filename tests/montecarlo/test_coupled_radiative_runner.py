@@ -22,7 +22,7 @@ from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
-from pyrite.montecarlo.spectrum.brem_events import mc_soft_brem_spectrum
+from pyrite.montecarlo.spectrum.brem_events import mc_coupled_brem_spectrum, mc_soft_brem_spectrum
 from pyrite.montecarlo.transport.events import EVENT_CUTOFF, EVENT_HARD_RADIATIVE
 from pyrite.xsgen.bremslib import tables as bremslib_tables
 from tests.helpers.bremslib import synthetic_bremslib_arrays
@@ -223,6 +223,17 @@ def test_runner_transport_and_scoring_use_the_coupled_mode(synthetic_si_tables, 
         segments, E_brem, case, tp["n_hat"], case.get("abs_layers"), Ne=case["Ne_brem"]
     )
     assert brem.shape == E_brem.shape and np.all(np.isfinite(brem)) and np.any(brem > 0.0)
+    # Production scores the coupled tracks by expected value, not by photon histogram.
+    expected = mc_coupled_brem_spectrum(
+        segments,
+        E_brem,
+        cutoff_eV=1000.0,
+        bremslib_tables=runner._case_bremslib_tables(case),
+        composition=case["composition"],
+        n_hat=tp["n_hat"],
+        electron_limit=case["Ne_brem"],
+    )
+    np.testing.assert_allclose(brem, expected, rtol=1e-12, atol=0.0)
     # The 1 keV cutoff lies below the brem grid, so every on-grid photon is hard.
     soft = mc_soft_brem_spectrum(
         segments,
@@ -255,7 +266,7 @@ def test_uncoupled_case_transport_passes_no_radiative_arguments(monkeypatch):
     assert "radiative_model" not in seen and "bremslib_tables" not in seen
 
 
-def test_layered_stack_scores_soft_per_layer_and_hard_through_the_stack(synthetic_si_tables):
+def test_layered_stack_scores_each_layer_with_its_own_composition(synthetic_si_tables):
     from pyrite.campaign.geometry import Layer, Stack
 
     case = _coupled_case(
