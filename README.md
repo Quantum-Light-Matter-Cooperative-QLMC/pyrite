@@ -178,7 +178,7 @@ Core geometry conventions are documented in the
 
 ## Data and outputs
 
-[`src/pyrite/data/catalog/`](src/pyrite/data/catalog)
+`src/pyrite/data/catalog/`
 is immutable catalog source for crystals, media, scan profiles, materials, and
 stacks, one TOML file per object.
 Phase-specific CIFs live under `src/pyrite/data/cifs/`; production loading is

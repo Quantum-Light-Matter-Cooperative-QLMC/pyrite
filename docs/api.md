@@ -127,8 +127,8 @@ These are the supported low-level simulation entry points. Inputs and outputs us
    pyrite.montecarlo.spectrum.mc_spectrum
    pyrite.montecarlo.spectrum.mc_spectrum_solid_angle
    pyrite.montecarlo.spectrum.mc_brem_spectrum
-   pyrite.montecarlo.detector.detector_efficiency
-   pyrite.montecarlo.detector.convolve_detector
+   pyrite.detectors.response.detector_efficiency
+   pyrite.detectors.response.convolve_detector
    pyrite.montecarlo.runner.run_case
    pyrite.montecarlo.runner.run_cases
 ```

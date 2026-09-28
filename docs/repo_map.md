@@ -1,6 +1,6 @@
 # Repository map
 
-Navigation aid for `src/pyrite/` — importable package. Read before exploring source. For *why* (physics, validation, provenance) see [`README.md`](../README.md) and design notes in [`docs/`](.); backlog in [GitHub Issues](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues). Tracked agent task records and cross-task plans live under `agentdocs/`, never under the public documentation tree. Print current top-level directory inventory: `uv run pyrite-dev repo-map`. Regenerate or check the static dependency region with `uv run pyrite-dev repo-map --write|--check`; `pyrite-dev verify` runs the check and the import-linter contracts from `pyproject.toml`.
+Navigation aid for `src/pyrite/` — importable package. Read before exploring source. For *why* (physics, validation, provenance) see `README.md` and the design notes under `docs/`; backlog in [GitHub Issues](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues). Tracked agent task records and cross-task plans live under `agentdocs/`, never under the public documentation tree. Print current top-level directory inventory: `uv run pyrite-dev repo-map`. Regenerate or check the static dependency region with `uv run pyrite-dev repo-map --write|--check`; `pyrite-dev verify` runs the check and the import-linter contracts from `pyproject.toml`.
 
 ## Workspace ownership
 
