@@ -12,6 +12,7 @@ import os
 import sys
 from collections.abc import Mapping
 from contextlib import contextmanager, nullcontext
+from functools import partial
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -177,6 +178,14 @@ def _process_pool_kwargs():
     return {"mp_context": multiprocessing.get_context("spawn")}
 
 
+from .electron_blocks import (
+    MAX_ELECTRON_BLOCKS,
+    device_headroom_bytes,
+    electron_block_count,
+    iter_electron_blocks,
+    restore_audit,
+    snapshot_audit,
+)
 from .oom import (
     _ensure_pool_limit as _ensure_pool_limit,
 )
@@ -674,6 +683,63 @@ from .emission import (
 
 
 def _lines_for_segments(
+    segs,
+    E_grid,
+    case,
+    n_hat,
+    abs_layers,
+    groove,
+    *,
+    coherent=None,
+    Ne=None,
+    table_cache=None,
+    truncation_audit=None,
+):
+    """:func:`_lines_for_segments_once` in electron-aligned device blocks (#192).
+
+    On a GPU, an incoherent sum whose segments exceed the pool headroom runs in
+    disjoint electron blocks whose spectra, audit sums and collected lines add
+    (``iter_electron_blocks``). A block OOM restores the audit and doubles the block
+    count up to ``MAX_ELECTRON_BLOCKS``, then re-raises to the spectrum phase's
+    chunk-halving retry. A case that fits runs as one unchanged call; coherent
+    sums, which may couple electrons, are never split.
+    """
+    once = partial(
+        _lines_for_segments_once,
+        E_grid=E_grid,
+        case=case,
+        n_hat=n_hat,
+        abs_layers=abs_layers,
+        groove=groove,
+        coherent=coherent,
+        Ne=Ne,
+        table_cache=table_cache,
+        truncation_audit=truncation_audit,
+    )
+    wants_coherent = case.get("coherent_emission", False) if coherent is None else coherent
+    if bool(wants_coherent) or not _RESOURCE_POLICY.gpu:
+        return once(segs)
+    n_segments = int(segs["L_ang"].shape[0])
+    n_blocks = electron_block_count(n_segments, device_headroom_bytes())
+    while True:
+        saved = snapshot_audit(truncation_audit)
+        try:
+            if n_blocks == 1:
+                return once(segs)
+            spec = None
+            for block in iter_electron_blocks(segs, n_blocks):
+                part = once(block)
+                spec = part if spec is None else spec + part
+            return spec
+        except Exception as error:
+            if not _is_gpu_oom(error) or n_blocks >= MAX_ELECTRON_BLOCKS:
+                raise
+            restore_audit(truncation_audit, saved)
+            BACKEND.release_memory()
+            n_blocks = min(MAX_ELECTRON_BLOCKS, 2 * n_blocks)
+
+
+def _lines_for_segments_once(
     segs,
     E_grid,
     case,
