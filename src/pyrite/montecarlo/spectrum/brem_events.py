@@ -18,17 +18,27 @@ from .brem_bremslib import (
     evaluate_bremslib,
     stage_bremslib_table,
 )
-from .lines import _escape_length, _observation_direction
+from .lines import _observation_direction
+from .segment_escape import _escape_paths_at
 
 
 def _cutoff_edge(E_grid_eV, cutoff_eV):
+    """Bin edges, widths and the first hard bin of a soft/hard split.
+
+    A cutoff inside the grid must be a bin edge. One at or below the lowest
+    edge makes every bin hard; one at or above the highest makes every bin soft.
+    """
     edges, widths = node_bin_edges_and_widths(E_grid_eV)
     cutoff = float(cutoff_eV)
     if not np.isfinite(cutoff) or cutoff <= 0.0:
         raise ValueError("hard photon cutoff must be positive and finite")
+    if cutoff <= edges[0]:
+        return edges, widths, 0
+    if cutoff >= edges[-1]:
+        return edges, widths, widths.size
     match = np.flatnonzero(edges == cutoff)
-    if match.size != 1 or match[0] == 0 or match[0] == edges.size - 1:
-        raise ValueError("hard photon cutoff must equal an interior energy-bin edge")
+    if match.size != 1:
+        raise ValueError("hard photon cutoff inside the grid must equal an energy-bin edge")
     return edges, widths, int(match[0])
 
 
@@ -55,8 +65,9 @@ def mc_soft_brem_spectrum(segments, E_grid_eV, *, cutoff_eV, bremslib_tables, **
 
     ``mc_brem_spectrum`` remains the uncoupled compatibility estimator. This
     wrapper is for the soft side of coupled scoring; add its result to
-    :func:`mc_hard_brem_event_spectrum` on the same energy grid. The cutoff
-    must be a bin edge, so no histogram bin straddles the soft/hard boundary.
+    :func:`mc_hard_brem_event_spectrum` on the same energy grid. A cutoff
+    inside the grid must be a bin edge, so no histogram bin straddles the
+    soft/hard boundary; one below the grid leaves no soft bin to score.
 
     Validation: bremslib-radiative-event-spectrum
     """
@@ -68,6 +79,8 @@ def mc_soft_brem_spectrum(segments, E_grid_eV, *, cutoff_eV, bremslib_tables, **
         raise NotImplementedError(
             "coupled soft scoring cannot reclip electron tracks at a new cutoff"
         )
+    if split == 0:
+        return np.zeros(np.asarray(E_grid_eV).size, dtype=float)
     uncoupled_view = dict(segments)
     uncoupled_view.pop("radiative", None)
     full = mc_brem_spectrum(
@@ -94,6 +107,7 @@ def mc_hard_brem_event_spectrum(
     theta_obs_rad=np.deg2rad(119.0),
     n_hat=None,
     electron_limit=None,
+    layers=None,
 ):
     """Bin sampled hard photons, weighting each by its BremsLib angular law.
 
@@ -102,11 +116,19 @@ def mc_hard_brem_event_spectrum(
     electron energy is ``E_end_keV`` and
     emission point is the row endpoint. The event frequency was already
     sampled by transport: this scorer applies only the conditional
-    ``DDCS/SDCS`` angle density and planar-slab escape transmission. It must
-    not multiply by number density, path length, or cross section again.
+    ``DDCS/SDCS`` angle density and escape transmission from the emission
+    point. It must not multiply by number density, path length, or cross
+    section again.
+
+    Escape follows the point-emitter geometry of the track-length scorers: the
+    laterally infinite slab, a finite rectangular footprint
+    (``crystal_width_ang``/``crystal_height_ang``), and, with ``layers``, the
+    summed optical depth of every ``(z_top, z_bot, composition)`` layer the
+    photon crosses. The emitting element is the event's own ``Z``, so a
+    layered stack is scored in one call. Grooved faces are not supported.
 
     Returns photons per incident electron per eV per sr at the energy-grid
-    nodes. Only a single planar slab is supported in this first scorer.
+    nodes.
 
     Validation: bremslib-radiative-event-spectrum
     """
@@ -125,18 +147,17 @@ def mc_hard_brem_event_spectrum(
     ):
         if field not in segments:
             raise ValueError(f"hard-radiative event scoring requires {field}")
-    if segments.get("n_layers", 1) != 1:
-        raise NotImplementedError("hard-radiative event scoring supports one planar slab")
-    if (
-        segments.get("crystal_width_ang") is not None
-        or segments.get("crystal_height_ang") is not None
-    ):
-        raise NotImplementedError(
-            "hard-radiative event scoring does not support a finite footprint"
-        )
-    comp = _normalize_composition(element, n_atoms_per_ang3, composition)
+    if layers is None and segments.get("n_layers", 1) != 1:
+        raise ValueError("layered hard-radiative rows require the absorbing layers")
+    if (segments.get("crystal_width_ang") is None) != (segments.get("crystal_height_ang") is None):
+        raise ValueError("a finite footprint needs both crystal_width_ang and crystal_height_ang")
+    layer_comps = (
+        [_normalize_composition(element, n_atoms_per_ang3, composition)]
+        if layers is None
+        else [layer_comp for _, _, layer_comp in layers]
+    )
     direction = np.asarray(_observation_direction(theta_obs_rad, n_hat), dtype=float)
-    if abs(direction[2]) < 1e-12:
+    if segments.get("crystal_width_ang") is None and abs(direction[2]) < 1e-12:
         raise ValueError("observation direction must cross a slab face")
     kind = np.asarray(BACKEND.to_cpu(segments["event_kind"]))
     n_rows = kind.size
@@ -167,14 +188,21 @@ def mc_hard_brem_event_spectrum(
     length = np.asarray(BACKEND.to_cpu(segments["L_ang"]), dtype=float)[event_indices]
     if np.any(~np.isfinite(k)) or np.any(k < cutoff_eV) or np.any(k > energy) or np.any(Z <= 0):
         raise ValueError("hard-radiative photon energy, cutoff, or atomic number is invalid")
-    endpoint_z = r[:, 2] + 0.5 * length * v[:, 2]
+    endpoint = r + 0.5 * length[:, None] * v
     thickness = float(segments["thickness_ang"])
-    if np.any(endpoint_z < -1e-8) or np.any(endpoint_z > thickness + 1e-8):
+    if np.any(endpoint[:, 2] < -1e-8) or np.any(endpoint[:, 2] > thickness + 1e-8):
         raise ValueError("hard-radiative event endpoint lies outside the slab")
-    path = _escape_length(endpoint_z, thickness, direction[2])
-    mu = np.asarray(BACKEND.to_cpu(_mu_total_inv_ang(comp, k)), dtype=float)
-    mu = np.nan_to_num(mu, nan=0.0, posinf=0.0, neginf=0.0)
-    transmission = np.exp(-path * mu)
+    # Point emitter: per-layer escape path from the event endpoint, as the
+    # track scorers use at their segment ends. Validation: segment-escape-average
+    path = np.asarray(
+        BACKEND.to_cpu(_escape_paths_at(endpoint, direction, segments, layers, None, np)),
+        dtype=float,
+    )
+    tau = np.zeros(k.size, dtype=float)
+    for index, layer_comp in enumerate(layer_comps):
+        mu = np.asarray(BACKEND.to_cpu(_mu_total_inv_ang(layer_comp, k)), dtype=float)
+        tau += path[:, index] * np.nan_to_num(mu, nan=0.0, posinf=0.0, neginf=0.0)
+    transmission = np.exp(-tau)
     tables_by_Z = {table.atomic_number: table for table in bremslib_tables.values()}
     staged_by_Z = {
         atomic_number: stage_bremslib_table(table) for atomic_number, table in tables_by_Z.items()

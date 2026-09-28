@@ -142,3 +142,112 @@ def test_terminal_cutoff_photon_is_still_scored(monkeypatch, table):
         terminal, [10_000.0, 20_000.0, 30_000.0], **kwargs
     )
     np.testing.assert_array_equal(got, expected)
+
+
+def _mu_by_composition(values):
+    def mu(comp, energy):
+        return np.full(np.shape(energy), values[comp[0][0]])
+
+    return mu
+
+
+def _score(segments, table, **kwargs):
+    return brem_events.mc_hard_brem_event_spectrum(
+        segments,
+        [10_000.0, 20_000.0, 30_000.0],
+        cutoff_eV=15_000.0,
+        bremslib_tables={"C": table},
+        n_hat=[0.0, 0.0, 1.0],
+        **kwargs,
+    )
+
+
+def test_hard_event_escape_reduces_to_slab_for_one_layer_and_wide_footprint(monkeypatch, table):
+    comp = [("C", 0.1)]
+    monkeypatch.setattr(brem_events, "_mu_total_inv_ang", _mu_by_composition({"C": 0.0}))
+    unattenuated = _score(_segments(), table, composition=comp)
+    monkeypatch.setattr(brem_events, "_mu_total_inv_ang", _mu_by_composition({"C": 0.01}))
+    slab = _score(_segments(), table, composition=comp)
+    # Endpoint z = 55 Ang, forward exit through z = 100: exp(-0.01 * 45).
+    np.testing.assert_allclose(slab, unattenuated * np.exp(-0.45))
+    np.testing.assert_allclose(
+        _score(_segments(), table, layers=[(0.0, 100.0, comp)]), slab, rtol=1e-12
+    )
+    wide = _segments()
+    wide.update(crystal_width_ang=1e9, crystal_height_ang=1e9)
+    np.testing.assert_allclose(_score(wide, table, composition=comp), slab, rtol=1e-12)
+
+
+def test_hard_event_escape_sums_optical_depth_over_crossed_layers(monkeypatch, table):
+    layers = [(0.0, 80.0, [("C", 0.1)]), (80.0, 100.0, [("Si", 0.05)])]
+    layered = _segments()
+    layered["n_layers"] = 2
+    monkeypatch.setattr(brem_events, "_mu_total_inv_ang", _mu_by_composition({"C": 0.0, "Si": 0.0}))
+    reference = _score(layered, table, layers=layers)
+    monkeypatch.setattr(
+        brem_events, "_mu_total_inv_ang", _mu_by_composition({"C": 0.01, "Si": 0.03})
+    )
+    got = _score(layered, table, layers=layers)
+    # z = 55: 25 Ang of C, then 20 Ang of Si.
+    np.testing.assert_allclose(got, reference * np.exp(-(0.01 * 25.0 + 0.03 * 20.0)))
+    with pytest.raises(ValueError, match="absorbing layers"):
+        _score(layered, table, composition=[("C", 0.1)])
+
+
+def test_hard_event_escape_uses_nearest_footprint_face(monkeypatch, table):
+    monkeypatch.setattr(brem_events, "_mu_total_inv_ang", _mu_by_composition({"C": 0.01}))
+    comp = [("C", 0.1)]
+    direction = np.array([1.0, 0.0, 1.0]) / np.sqrt(2.0)
+    kwargs = dict(composition=comp, n_hat=direction)
+    slab = brem_events.mc_hard_brem_event_spectrum(
+        _segments(),
+        [10_000.0, 20_000.0, 30_000.0],
+        cutoff_eV=15_000.0,
+        bremslib_tables={"C": table},
+        **kwargs,
+    )
+    narrow = _segments()
+    narrow.update(crystal_width_ang=20.0, crystal_height_ang=20.0)
+    got = brem_events.mc_hard_brem_event_spectrum(
+        narrow,
+        [10_000.0, 20_000.0, 30_000.0],
+        cutoff_eV=15_000.0,
+        bremslib_tables={"C": table},
+        **kwargs,
+    )
+    # From x = 0 the +x face at 10 Ang is 10*sqrt(2) away, before z = 100.
+    ratio = np.exp(-0.01 * 10.0 * np.sqrt(2.0)) / np.exp(-0.01 * 45.0 * np.sqrt(2.0))
+    np.testing.assert_allclose(got, slab * ratio)
+
+
+def test_cutoff_below_grid_scores_every_bin_as_hard(monkeypatch, table):
+    monkeypatch.setattr(
+        brem_events, "_mu_total_inv_ang", lambda _comp, energy: np.zeros_like(energy)
+    )
+
+    def unexpected(*_args, **_kwargs):
+        raise AssertionError("no soft bin lies on the grid")
+
+    monkeypatch.setattr(brem_events, "mc_brem_spectrum", unexpected)
+    grid = [30_000.0, 40_000.0, 50_000.0]
+    segments = _segments()
+    segments["hard_radiative_k_eV"][0] = 30_000.0
+    segments["E_end_keV"][0] = 60.0
+    np.testing.assert_array_equal(
+        brem_events.mc_soft_brem_spectrum(
+            {}, grid, cutoff_eV=1_000.0, bremslib_tables={"C": table}
+        ),
+        0.0,
+    )
+    got = brem_events.mc_hard_brem_event_spectrum(
+        segments,
+        grid,
+        cutoff_eV=1_000.0,
+        bremslib_tables={"C": table},
+        element="C",
+        n_atoms_per_ang3=0.1,
+        n_hat=[0.0, 0.0, 1.0],
+    )
+    assert got[0] > 0.0 and np.all(got[1:] == 0.0)
+    above = brem_events._cutoff_edge(grid, 60_000.0)[2]
+    assert above == 3
