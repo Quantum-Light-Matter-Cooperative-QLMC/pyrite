@@ -723,6 +723,12 @@ def _lines_for_segments(
     n_blocks = electron_block_count(n_segments, device_headroom_bytes())
     while True:
         saved = snapshot_audit(truncation_audit)
+        if case.get("_profile_line_grid_stages"):
+            print(
+                f"line-grid profile: electron_blocks={n_blocks} segments={n_segments}",
+                file=sys.stderr,
+                flush=True,
+            )
         try:
             if n_blocks == 1:
                 return once(segs)
