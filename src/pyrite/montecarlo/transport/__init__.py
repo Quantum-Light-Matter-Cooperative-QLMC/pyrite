@@ -142,6 +142,7 @@ from .cores import (
 
 from .events import (
     SegmentEvent,
+    TransportStepLimitError,
     check_segment_event_contract,
     closes_flight,
 )

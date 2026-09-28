@@ -13,6 +13,7 @@ import numpy as np
 from .. import DATA_DIR
 from .._catalog_layout import ARTIFACT_DIR, catalog_root
 from .._energy_grid_artifacts import ArtifactError, load_artifact
+from .._line_grid_policy import BANDWIDTH_POLICIES, RESOLUTION_POLICIES
 from .._numerics import validate_profile_numerics
 from ._beam_detector_parse import (
     _parse_filter_rows,
@@ -436,6 +437,28 @@ def _parse_profile_overrides(raw: object, path: str, errors: _Errors) -> None:
                 _validate_angle_grid(name, grid, f"{material_path}.{name}", errors)
 
 
+#: Allowed values of ``[profiles.NAME.line_grid_policy]`` keys.
+_PROFILE_LINE_GRID_POLICY_VALUES = {
+    "bandwidth": BANDWIDTH_POLICIES,
+    "resolution": RESOLUTION_POLICIES,
+}
+
+
+def _parse_profile_line_grid_policy(raw: object, path: str, errors: _Errors) -> None:
+    """Validate ``[profiles.NAME.line_grid_policy]``: named line-grid policies.
+
+    The table becomes each case's ``Sweep.line_grid_policy``, so it joins the
+    profile's case identity (#192).
+    """
+    table = _table(raw, path, errors)
+    if table is None:
+        return
+    errors.keys(table, path, set(_PROFILE_LINE_GRID_POLICY_VALUES))
+    for key, allowed in _PROFILE_LINE_GRID_POLICY_VALUES.items():
+        if key in table and table[key] not in allowed:
+            errors.add(f"{path}.{key}", f"must be one of {allowed}")
+
+
 def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
     """Parse ``[profiles.*]`` campaign rows.
 
@@ -465,6 +488,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 "filters",
                 "physical_detector",
                 "emission",
+                "line_grid_policy",
                 *_PROFILE_SCALAR_NUMERICS_KEYS,
                 "energy_grid_refs",
             },
@@ -502,6 +526,10 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
             errors.add(f"{path}.{field}", detail)
         if "overrides" in row:
             _parse_profile_overrides(row["overrides"], f"{path}.overrides", errors)
+        if "line_grid_policy" in row:
+            _parse_profile_line_grid_policy(
+                row["line_grid_policy"], f"{path}.line_grid_policy", errors
+            )
         refs = row.get("energy_grid_refs")
         if refs is not None:
             refs_table = _table(refs, f"{path}.energy_grid_refs", errors)

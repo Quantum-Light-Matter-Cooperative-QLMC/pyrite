@@ -520,3 +520,36 @@ not be refused. Above the 0.1 relative standard error the truncation record's
 `LineYieldStatisticsWarning` names the error, electron count and largest
 electron share. The upper-edge truncation gate is unchanged. 5 MeV h-BN
 10/100 at 1 mm therefore runs, flagged, until #203 reduces its variance.
+
+## high_energy opt-in and 5 MeV h-BN (2026-09-28)
+
+After #204 landed (squash `64a4437c`), the branch was reset to main. Profiles
+now accept `[profiles.NAME.line_grid_policy]` (`bandwidth`, `resolution`,
+validated against the known policies); `material_sweep` applies it as
+`Sweep.line_grid_policy`, so it joins the profile's case identity only.
+`high_energy` selects `resonance-population` + `resonance-local` and restores
+5,000 keV for h-BN via `overrides.hbn.energy_keV`; MoS2/MoSe2 keep
+100/500/1000 keV. Statistics-limited cases (e.g. 1 mm 10/100) run with a
+`LineYieldStatisticsWarning`. The earlier note that EagleXO/LegacyEDS refuse
+nonuniform axes is stale: the EagleXO and Timepix responses accept nonuniform
+grids. Not yet run: `pyrite run high_energy -R -m hbn`.
+
+### Remote acceptance: `pyrite run high_energy -R -m hbn` (2026-09-28)
+
+- `high_energy-8`: refused at 32/104 on `hbn 100um 10/140` at 100 keV. The
+  measured stop was capped at the 9.1 keV kinematic ceiling (max resonance
+  4.4 keV) and the tail bound above it was 1.06e-4 > 1e-4. Fixed in
+  `75d7e44f`: at the ceiling the audit warns (`LineGridTruncationWarning`,
+  `capped_at_ceiling`), since the automatic bandwidth drops the same tails.
+- `high_energy-9`: stopped at 89/104 on `TransportStepLimitError`
+  (n_step_limited=177, Ne=300, max_steps=20000). 5 MeV h-BN at 10 mm needs
+  ~23-32k steps per electron (local probe: 1 mm ~2.8k). Fixed in `058f2fa6`:
+  the runner retries at a doubled budget up to 160k; identity-neutral.
+- `high_energy-10`: **104/104 h-BN cases complete** (89 reused, 15 new in
+  165 s). Pulled to `checkpoints/hbn@high_energy-b5d0b092df19/`.
+  `LineYieldStatisticsWarning` fired for 7 cases, all 10 mm (Ne=300):
+  5 MeV 10/140 (RSE 0.155), 10/180 (0.36), 30/140 (0.111), 70/180 (0.24);
+  1 MeV 10/180 (0.375), 30/140 (0.183), 30/180 (0.159).
+- Gap: scan checkpoints do not persist `line_grid_resolved` (only the Python
+  API's provenance does), so `statistics_limited` / `capped_at_ceiling` are
+  visible only as log warnings for scans.

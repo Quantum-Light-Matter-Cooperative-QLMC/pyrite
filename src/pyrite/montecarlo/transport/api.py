@@ -24,6 +24,7 @@ from .cores import (
     _transport_core_ungrooved_perelectron_lut_inelastic,
     exact_ungrooved_core,
 )
+from .events import TransportStepLimitError
 from .hard_inelastic import hard_keys_from_stream_keys, hard_stream_keys, validate_inelastic_args
 from .hard_radiative import validate_radiative_args
 from .kinematics import _sample_bunch_offsets, stream_keys
@@ -1114,10 +1115,7 @@ def simulate_trajectories(
     _nsys_pop()
 
     if n_step_limited:
-        raise RuntimeError(
-            "incomplete electron transport: "
-            f"n_step_limited={n_step_limited}, Ne={Ne}, max_steps={max_steps}"
-        )
+        raise TransportStepLimitError(n_step_limited, Ne, max_steps)
 
     _nsys_push("cxr.transport.output")
     if dev_segs is None:

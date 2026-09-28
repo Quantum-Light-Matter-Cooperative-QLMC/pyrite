@@ -119,6 +119,12 @@ def _catalog(catalog_profile: str = "standard"):
     )
 
 
+def _profile_line_grid_policy(catalog_profile: str) -> dict[str, str] | None:
+    """The profile's named line-grid policies as a ``Sweep.line_grid_policy``."""
+    policy = _catalog(catalog_profile).profile_line_grid_policy(catalog_profile)
+    return None if policy is None else dict(policy)
+
+
 def _material_spec(material: str, catalog_profile: str = "standard") -> MaterialSpec:
     catalog = _catalog(catalog_profile)
     try:
@@ -270,6 +276,7 @@ def material_sweep(
         ),
         n_electrons=scan.n_electrons,
         n_electrons_brem=scan.n_electrons_brem,
+        line_grid_policy=_profile_line_grid_policy(catalog_profile),
     )
     sweep = get_fidelity_preset(fidelity).apply_sweep(sweep)
     numerics = resolve_numerics(

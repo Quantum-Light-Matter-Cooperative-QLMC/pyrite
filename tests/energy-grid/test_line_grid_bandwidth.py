@@ -19,6 +19,7 @@ from pyrite._line_grid_policy import (
     RESONANCE_BANDWIDTH_POLICY,
     RESONANCE_LINE_GRID_POLICY_SCHEMA,
     LineGridToleranceError,
+    LineGridTruncationWarning,
     LineYieldStatisticsWarning,
     resolve_line_grid_policy,
     resolved_coordinates,
@@ -217,6 +218,21 @@ def test_audit_accumulates_and_gates_the_upper_edge():
     record = check_line_truncation(case, narrow)
     assert record["upper_fraction_bound"] <= 1e-4
     assert record["lower_fraction_bound"] > 0.0
+
+
+def test_audit_at_the_kinematic_ceiling_warns_instead_of_refusing():
+    """#192: at 100 keV the measured stop caps at the closed-form ceiling; tails
+    above it are what the automatic bandwidth also drops, so this policy warns."""
+    case = _audited_case()
+    case["line_grid_policy"]["bandwidth"]["stop_eV"] = 1000.0
+    audit = {"start_eV": 50.0, "stop_eV": 1000.0}
+    _accumulate_edge_truncation(
+        audit, xp.asarray([900.0]), xp.asarray([np.pi / 100.0]), xp.asarray([1.0])
+    )
+    with pytest.warns(LineGridTruncationWarning, match="kinematic ceiling"):
+        record = check_line_truncation(case, audit)
+    assert record["capped_at_ceiling"]
+    assert record["upper_fraction_bound"] > 1e-4
 
 
 def test_audit_sums_line_mass_per_electron_when_counted():

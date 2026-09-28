@@ -544,6 +544,37 @@ def test_profile_transport_numerics_are_validated_and_exposed(tmp_path):
         load_material_catalog(path)
 
 
+@pytest.mark.parametrize(
+    ("old", "new", "match"),
+    [
+        ('"resonance-population"', '"coverage-0.95"', "line_grid_policy.bandwidth"),
+        ('"resonance-local"', '"log"', "line_grid_policy.resolution"),
+        ('resolution = "resonance-local"', 'windows = "on"', "line_grid_policy"),
+    ],
+)
+def test_profile_line_grid_policy_is_validated_and_exposed(tmp_path, old, new, match):
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    path = _catalog_with_two_profiles(tmp_path)
+    text = path.read_text().replace(
+        'materials = ["mos2"]\n',
+        'materials = ["mos2"]\n[profiles.narrowed.line_grid_policy]\n'
+        'bandwidth = "resonance-population"\nresolution = "resonance-local"\n',
+    )
+    path.write_text(text)
+    catalog = load_material_catalog(path)
+    assert dict(catalog.profile_line_grid_policy("narrowed")) == {
+        "bandwidth": "resonance-population",
+        "resolution": "resonance-local",
+    }
+    assert catalog.profile_line_grid_policy("standard") is None
+
+    bad = text.replace(old, new)
+    path.write_text(bad)
+    with pytest.raises(MaterialConfigError, match=match.replace(".", r"\.")):
+        load_material_catalog(path)
+
+
 def test_profile_convergence_numerics_are_validated_and_exposed(tmp_path):
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
