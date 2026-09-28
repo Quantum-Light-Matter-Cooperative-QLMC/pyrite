@@ -23,4 +23,6 @@ The two-node collection pass uses the same in-medium roots, line filters, amplit
 
 The coefficient is treated as constant across one sinc line because the kernel evaluates it at $E_i$. The bound covers the upper tail of the incoherent PXR/CBS line model. It does not certify the lower edge, coherent interference, or nonuniform quadrature. For one line below an uncapped edge, the unrounded solution is $S=E_i+w_i/(\pi^2\epsilon/2)$.
 
+The same audit sums $M_i$ per emitting electron and refuses the case when the relative standard error of the mean per-electron line mass exceeds `LINE_YIELD_RELATIVE_SE_LIMIT` (0.1), reporting the largest single-electron share beside it. This is a statistical gate, not part of the bound: at 5 MeV a rare electron scattered into the detector's $1/\gamma$ cone can carry most of a case's line mass (#201), and its wide, heavy lines also drive $S$. The error estimate only describes the sampled electrons, so a run that never sampled such an electron passes with a biased yield.
+
 Focused anchors: `tests/energy-grid/test_line_grid_bandwidth.py` covers the tail inequality, production collection, selector plumbing, ceiling cap, and a two-electron h-BN transport case. Production-size peak memory, remote yield, shape, and detected-count comparisons remain outstanding. Human sign-off pending.

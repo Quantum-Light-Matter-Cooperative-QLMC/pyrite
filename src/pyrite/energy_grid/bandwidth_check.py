@@ -279,6 +279,7 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
         _device_mib,
         check_line_truncation,
         line_truncation_audit,
+        line_yield_statistics,
     )
     from ..montecarlo.runner.oom import _ensure_pool_limit
 
@@ -314,7 +315,7 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
         row["segments_on_device"] = not isinstance(transport["segs"]["L_ang"], np.ndarray)
         print(json.dumps({"stage": "transport", **row}, default=str), flush=True)
         grid = np.asarray(transport["E_grid"], dtype=float)
-        audit = line_truncation_audit(case, grid)
+        audit = line_truncation_audit(case, grid, n_electrons=transport["Ne_lines"])
         started = time.perf_counter()
         try:
             lines = runner._lines_for_segments(
@@ -343,6 +344,8 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
             row["truncation_audit"] = check_line_truncation(case, audit)
         except LineGridToleranceError as error:
             row["refused"] = str(error)
+            if "electron_mass" in audit:
+                row["line_yield_statistics"] = line_yield_statistics(audit["electron_mass"])
         record = transport["diagnostic_grid"]
         density = np.asarray(lines, dtype=float)
         total, centroid = _yield_and_centroid(grid, density)
@@ -394,11 +397,12 @@ def attribute(args: argparse.Namespace) -> dict[str, Any]:
         row["transport_wall_s"] = time.perf_counter() - started
         bandwidth = case["line_grid_policy"]["bandwidth"]
         start, ceiling = float(bandwidth["start_eV"]), float(bandwidth["stop_eV"])
+        measured_stop = float(np.asarray(transport["E_grid"])[-1])
         audit = {
             "start_eV": start,
             "stop_eV": ceiling,
             "collect": [],
-            "attribute": {"top": args.top},
+            "attribute": {"top": args.top, "stop_eV": measured_stop},
         }
         started = time.perf_counter()
         runner._lines_for_segments(
@@ -415,7 +419,9 @@ def attribute(args: argparse.Namespace) -> dict[str, Any]:
         row["attribution_wall_s"] = time.perf_counter() - started
         merged = merge_line_attribution(audit.get("attribution", []), args.top)
         ids, mass = merged["electron_ids"], merged["electron_mass"]
+        tail = merged["electron_tail"]
         total = float(mass.sum())
+        tail_total = float(tail.sum())
         ranked = np.sort(mass)[::-1]
         ne = int(transport["Ne_lines"])
         row.update(
@@ -432,12 +438,22 @@ def attribute(args: argparse.Namespace) -> dict[str, Any]:
                 for q in range(4)
             ],
             heaviest_electrons={int(ids[j]): float(mass[j]) for j in np.argsort(-mass)[:20]},
-            lines={k: v.tolist() for k, v in merged["lines"].items()},
+            measured_stop_eV=measured_stop,
+            measured_bandwidth=transport["diagnostic_grid"].get("measured_bandwidth"),
+            tail_fraction_at_stop=tail_total / total if total else 0.0,
+            tail_by_electron={
+                int(ids[j]): float(tail[j] / tail_total) for j in np.argsort(-tail)[:20]
+            }
+            if tail_total
+            else {},
+            lines_by_mass={k: v.tolist() for k, v in merged["lines_by_mass"].items()},
+            lines_by_tail={k: v.tolist() for k, v in merged["lines_by_tail"].items()},
             device=BACKEND.device.name,
             host_peak_mib=_host_peak_mib(),
         )
         rows.append(row)
-        print(json.dumps({k: v for k, v in row.items() if k != "lines"}, default=str), flush=True)
+        summary = {k: v for k, v in row.items() if not k.startswith("lines")}
+        print(json.dumps(summary, default=str), flush=True)
         del transport, audit
         BACKEND.release_memory()
     report = {"material": args.material, "energy_keV": args.energy, "seed": args.seed, "rows": rows}

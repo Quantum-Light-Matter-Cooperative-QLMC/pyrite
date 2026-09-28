@@ -1109,7 +1109,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     want_coherent = bool(case.get("coherent_emission", False))
     spec_coherent = None
     line_table_cache = {}
-    truncation_audit = line_truncation_audit(case, E_grid)
+    truncation_audit = line_truncation_audit(case, E_grid, n_electrons=Ne_lines)
     with _nsys_range("cxr.lines"):
         try:
             spec = _lines_for_segments(

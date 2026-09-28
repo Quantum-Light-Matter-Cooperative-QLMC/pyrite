@@ -168,18 +168,25 @@ def test_cpu_and_coherent_sums_are_never_split(monkeypatch, small_transport):
 
 
 def test_line_attribution_accounts_for_the_whole_line_mass(small_transport):
-    """#201 diagnostic: per-electron masses sum to the audited line mass and
-    the kept lines are the heaviest; the spectrum is unchanged."""
+    """#201 diagnostic: per-electron masses sum to the audited line mass, the
+    per-electron tails to the audited upper-edge bound, and the kept lines are
+    the heaviest; the spectrum is unchanged."""
     case, tp = small_transport
     grid = np.asarray(tp["E_grid"])
-    audit = {"start_eV": float(grid[0]), "stop_eV": float(grid[-1]), "attribute": {"top": 5}}
+    stop = float(grid[-1])
+    audit = {
+        "start_eV": float(grid[0]),
+        "stop_eV": stop,
+        "attribute": {"top": 5, "stop_eV": stop},
+    }
     spec = np.asarray(_once(case, tp, tp["segs"], audit))
     np.testing.assert_array_equal(spec, np.asarray(_once(case, tp, tp["segs"])))
     merged = merge_line_attribution(audit["attribution"], 5)
-    lines = merged["lines"]
-    total = float(audit["line_mass"])
-    np.testing.assert_allclose(merged["electron_mass"].sum(), total, rtol=1e-9)
+    np.testing.assert_allclose(merged["electron_mass"].sum(), float(audit["line_mass"]), rtol=1e-9)
+    np.testing.assert_allclose(merged["electron_tail"].sum(), float(audit["mass_above"]), rtol=1e-9)
     assert set(merged["electron_ids"]) <= set(range(tp["Ne_lines"]))
-    assert lines["mass"].size == 5 and np.all(np.diff(lines["mass"]) <= 0)
-    np.testing.assert_allclose(lines["mass"], lines["weight"] * lines["width_eV"], rtol=1e-12)
-    assert np.all(lines["A2"] > 0) and np.all(lines["T_abs"] <= 1.0)
+    for rank in ("mass", "tail"):
+        lines = merged[f"lines_by_{rank}"]
+        assert lines[rank].size == 5 and np.all(np.diff(lines[rank]) <= 0)
+        np.testing.assert_allclose(lines["mass"], lines["weight"] * lines["width_eV"], rtol=1e-12)
+        assert np.all(lines["A2"] > 0) and np.all(lines["T_abs"] <= 1.0)

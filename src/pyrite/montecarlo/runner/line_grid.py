@@ -475,13 +475,46 @@ def resolve_line_grid(case, segments, n_hat, Ne, E_grid, abs_layers=None, groove
     }
 
 
-def line_truncation_audit(case, E_grid):
-    """Empty edge-truncation audit for a ``resonance-population`` case, else ``None``."""
+#: Largest relative standard error of the per-electron line mass a measured
+#: bandwidth case may report (#201). A rare electron scattered into the
+#: detector's 1/gamma cone can carry most of a case's line yield.
+LINE_YIELD_RELATIVE_SE_LIMIT = 0.1
+
+
+def line_truncation_audit(case, E_grid, n_electrons=None):
+    """Empty edge-truncation audit for a ``resonance-population`` case, else ``None``.
+
+    With ``n_electrons`` the audit also sums line mass per line electron, so
+    :func:`check_line_truncation` can report the line yield's standard error.
+    """
     payload = case.get("line_grid_policy")
     if payload is None or payload["bandwidth"]["policy"] != RESONANCE_BANDWIDTH_POLICY:
         return None
     grid = np.asarray(E_grid, dtype=float)
-    return {"start_eV": float(grid[0]), "stop_eV": float(grid[-1])}
+    audit = {"start_eV": float(grid[0]), "stop_eV": float(grid[-1])}
+    if n_electrons is not None:
+        audit["n_electrons"] = int(n_electrons)
+    return audit
+
+
+def line_yield_statistics(electron_mass):
+    """Relative standard error of the mean line mass per electron (#201).
+
+    Every line electron is one sample, zero-mass electrons included. The
+    estimate describes the sampled electrons only: a heavy-tailed population
+    whose rare heavy electrons were not sampled reports a small error around a
+    biased mean, so ``max_electron_share`` is reported beside it.
+    """
+    mass = np.asarray(_to_cpu(electron_mass), dtype=float)
+    n = int(mass.size)
+    total = float(mass.sum())
+    if n < 2 or total <= 0.0:
+        return {"n_electrons": n, "relative_se": None, "max_electron_share": None}
+    return {
+        "n_electrons": n,
+        "relative_se": float(mass.std(ddof=1) * np.sqrt(n) / total),
+        "max_electron_share": float(mass.max() / total),
+    }
 
 
 def check_line_truncation(case, audit):
@@ -504,6 +537,18 @@ def check_line_truncation(case, audit):
         "upper_fraction_bound": above / total if total > 0.0 else 0.0,
         "lower_fraction_bound": below / total if total > 0.0 else 0.0,
     }
+    if "electron_mass" in audit:
+        stats = line_yield_statistics(audit["electron_mass"])
+        record["line_yield_statistics"] = stats
+        rse = stats["relative_se"]
+        if rse is not None and rse > LINE_YIELD_RELATIVE_SE_LIMIT:
+            raise LineGridToleranceError(
+                f"{case['name']} at {case['E0_keV']:g} keV: the incoherent line yield "
+                f"has relative standard error {rse:.3g} over {stats['n_electrons']} "
+                f"electrons (one electron carries {stats['max_electron_share']:.3g} of "
+                f"it), above the {LINE_YIELD_RELATIVE_SE_LIMIT:g} limit. Rare electrons "
+                "scattered toward the detector dominate this yield; run more electrons."
+            )
     if record["upper_fraction_bound"] > limit:
         raise LineGridToleranceError(
             f"{case['name']} at {case['E0_keV']:g} keV: the measured line bandwidth "

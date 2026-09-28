@@ -728,7 +728,9 @@ def _batched_incoherent_block(st, bt, blk, line_batch):
         w_f,
         {"T_abs": T_abs, "A2": A2, "A2_pxr": A2_pxr, "A2_cbs": A2_cbs},
     )
-    _accumulate_edge_truncation(req.truncation_audit, E_r_f, aw_f, w_f)
+    _accumulate_edge_truncation(
+        req.truncation_audit, E_r_f, aw_f, w_f, st.seg_elec_id[blk.sb][gm_idx // bt.N_g]
+    )
     if req.truncation_audit is not None and "collect" in req.truncation_audit:
         return
 

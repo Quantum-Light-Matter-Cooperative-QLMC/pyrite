@@ -80,7 +80,7 @@ if hasattr(xp, "fuse"):  # CuPy exposes fuse(); NumPy/dpnp do not -> eager fallb
     _sincsq_lineshape = xp.fuse()(_sincsq_lineshape)
 
 
-def _accumulate_edge_truncation(audit, E_r, a_width, weight):
+def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
     """Add these lines' whole and out-of-axis ``sinc**2`` mass to ``audit``.
 
     ``audit`` carries the axis ``start_eV``/``stop_eV``. A line of weight ``w``
@@ -89,6 +89,10 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight):
     that edge (``line_seeds.sincsq_upper_tail_bound``). Sums stay on the device
     until the runner reads them. ``collect`` instead retains the production
     resonance, width and coefficient for measured grid construction.
+
+    With ``n_electrons`` in the audit, ``electron`` (each line's emitting
+    electron id) also sums the line mass per electron into ``electron_mass``,
+    the sample the runner's line-yield standard error is taken over (#201).
 
     Validation: line-grid-resonance-bandwidth
     """
@@ -109,6 +113,14 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight):
     for distance in (audit["stop_eV"] - E_r, E_r - audit["start_eV"]):
         tail = 1.0 / (xp.pi * a_width * xp.maximum(distance, tiny))
         beyond.append(xp.where(distance > 0.0, xp.minimum(tail, 1.0), 1.0))
+    n_electrons = audit.get("n_electrons")
+    if n_electrons is not None and electron is not None:
+        per_electron = xp.bincount(
+            electron, weights=mass.astype(xp.float64), minlength=int(n_electrons)
+        )
+        if per_electron.size != int(n_electrons):
+            raise ValueError(f"line electron id outside the {n_electrons} line electrons")
+        audit["electron_mass"] = audit.get("electron_mass", 0.0) + per_electron
     for key, value in (
         ("line_mass", mass),
         ("mass_above", mass * beyond[0]),
