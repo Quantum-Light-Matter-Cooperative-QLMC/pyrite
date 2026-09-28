@@ -369,6 +369,82 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
     return report
 
 
+def attribute(args: argparse.Namespace) -> dict[str, Any]:
+    """Heaviest incoherent lines and per-electron line mass (issue #201).
+
+    Transports each configuration as ``production`` does, then evaluates the
+    production line kernel once on the two-node ``[start, ceiling]`` axis with
+    an attribution audit. Reports the ``--top`` lines by mass with the factors
+    that built them, and how the line mass spreads over electrons.
+    """
+    from .._backend import BACKEND, REAL, _to_cpu
+    from ..montecarlo import runner
+    from ..montecarlo.runner.oom import _ensure_pool_limit
+    from ..montecarlo.spectrum.lines._attribution import merge_line_attribution
+
+    _ensure_pool_limit()
+    rows = []
+    for config in parse_configs(args.configs):
+        case = build_case(
+            args.material, args.energy, config, seed=args.seed, resolution=args.resolution
+        )
+        row: dict[str, Any] = {**config, "real": np.dtype(REAL).name}
+        started = time.perf_counter()
+        transport = runner._transport_case(case, keep_segments_on_device=True)
+        row["transport_wall_s"] = time.perf_counter() - started
+        bandwidth = case["line_grid_policy"]["bandwidth"]
+        start, ceiling = float(bandwidth["start_eV"]), float(bandwidth["stop_eV"])
+        audit = {
+            "start_eV": start,
+            "stop_eV": ceiling,
+            "collect": [],
+            "attribute": {"top": args.top},
+        }
+        started = time.perf_counter()
+        runner._lines_for_segments(
+            transport["segs"],
+            np.array([start, ceiling]),
+            case,
+            transport["n_hat"],
+            case.get("abs_layers"),
+            transport.get("groove"),
+            coherent=False,
+            Ne=transport["Ne_lines"],
+            truncation_audit=audit,
+        )
+        row["attribution_wall_s"] = time.perf_counter() - started
+        merged = merge_line_attribution(audit.get("attribution", []), args.top)
+        ids, mass = merged["electron_ids"], merged["electron_mass"]
+        total = float(mass.sum())
+        ranked = np.sort(mass)[::-1]
+        ne = int(transport["Ne_lines"])
+        row.update(
+            n_segments=int(np.asarray(_to_cpu(transport["segs"]["L_ang"])).size),
+            n_lines=int(sum(chunk[0].size for chunk in audit["collect"])),
+            ceiling_eV=ceiling,
+            line_mass=total,
+            line_mass_per_electron=total / max(ne, 1),
+            top_electron_share=[
+                float(ranked[:k].sum() / total) if total else 0.0 for k in (1, 10, 100)
+            ],
+            mass_by_electron_quarter=[
+                float(mass[(ids >= q * ne // 4) & (ids < (q + 1) * ne // 4)].sum())
+                for q in range(4)
+            ],
+            heaviest_electrons={int(ids[j]): float(mass[j]) for j in np.argsort(-mass)[:20]},
+            lines={k: v.tolist() for k, v in merged["lines"].items()},
+            device=BACKEND.device.name,
+            host_peak_mib=_host_peak_mib(),
+        )
+        rows.append(row)
+        print(json.dumps({k: v for k, v in row.items() if k != "lines"}, default=str), flush=True)
+        del transport, audit
+        BACKEND.release_memory()
+    report = {"material": args.material, "energy_keV": args.energy, "seed": args.seed, "rows": rows}
+    Path(args.json_out).write_text(json.dumps(report, indent=2, default=str))
+    return report
+
+
 def candidate(args: argparse.Namespace) -> dict[str, Any]:
     """float32: the measured axis on the pickled segments, against FP64."""
     from .._backend import BACKEND, REAL
@@ -454,6 +530,14 @@ def build_parser() -> argparse.ArgumentParser:
     prod.add_argument("--resolution", choices=("uniform", "local"), default="uniform")
     prod.add_argument("--json-out", required=True)
     prod.add_argument("--min-electron-blocks", type=int, default=1)
+    attr = commands.add_parser("attribute", help="heaviest lines and per-electron line mass")
+    attr.add_argument("--material", default="hbn")
+    attr.add_argument("--energy", type=float, default=5000.0)
+    attr.add_argument("--configs", required=True, help="tilt:azimuth:thickness_ang:ne,...")
+    attr.add_argument("--seed", type=int, default=0)
+    attr.add_argument("--resolution", choices=("uniform", "local"), default="local")
+    attr.add_argument("--top", type=int, default=200)
+    attr.add_argument("--json-out", required=True)
     cand = commands.add_parser("candidate", help="float32 measured-axis evaluation")
     cand.add_argument("--payload", required=True)
     cand.add_argument("--json-out", required=True)
@@ -466,6 +550,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         reference(args)
     elif args.command == "production":
         production(args)
+    elif args.command == "attribute":
+        attribute(args)
     else:
         candidate(args)
     return 0

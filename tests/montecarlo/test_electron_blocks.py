@@ -9,6 +9,7 @@ from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import build_cases
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner import electron_blocks as blocks
+from pyrite.montecarlo.spectrum.lines._attribution import merge_line_attribution
 
 
 def _segments(ids):
@@ -64,6 +65,15 @@ def test_audit_restore_undoes_partial_accumulation():
     blocks.restore_audit(audit, saved)
     assert audit == {"start_eV": 1.0, "line_mass": 2.0, "collect": [("a",)]}
     blocks.restore_audit(None, blocks.snapshot_audit(None))
+
+
+def test_audit_restore_truncates_appended_attribution():
+    audit = {"start_eV": 1.0, "attribute": {"top": 2}}
+    saved = blocks.snapshot_audit(audit)
+    audit.setdefault("attribution", []).append({"mass": 1.0})
+    blocks.restore_audit(audit, saved)
+    assert audit["attribution"] == []
+    assert audit["attribute"] == {"top": 2}
 
 
 @pytest.fixture(scope="module")
@@ -155,3 +165,21 @@ def test_cpu_and_coherent_sums_are_never_split(monkeypatch, small_transport):
         tp["segs"], tp["E_grid"], case, tp["n_hat"], None, None, coherent=True
     )
     assert seen == [tp["segs"], tp["segs"]]
+
+
+def test_line_attribution_accounts_for_the_whole_line_mass(small_transport):
+    """#201 diagnostic: per-electron masses sum to the audited line mass and
+    the kept lines are the heaviest; the spectrum is unchanged."""
+    case, tp = small_transport
+    grid = np.asarray(tp["E_grid"])
+    audit = {"start_eV": float(grid[0]), "stop_eV": float(grid[-1]), "attribute": {"top": 5}}
+    spec = np.asarray(_once(case, tp, tp["segs"], audit))
+    np.testing.assert_array_equal(spec, np.asarray(_once(case, tp, tp["segs"])))
+    merged = merge_line_attribution(audit["attribution"], 5)
+    lines = merged["lines"]
+    total = float(audit["line_mass"])
+    np.testing.assert_allclose(merged["electron_mass"].sum(), total, rtol=1e-9)
+    assert set(merged["electron_ids"]) <= set(range(tp["Ne_lines"]))
+    assert lines["mass"].size == 5 and np.all(np.diff(lines["mass"]) <= 0)
+    np.testing.assert_allclose(lines["mass"], lines["weight"] * lines["width_eV"], rtol=1e-12)
+    assert np.all(lines["A2"] > 0) and np.all(lines["T_abs"] <= 1.0)

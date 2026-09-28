@@ -350,6 +350,31 @@ def remote_bandwidth_commands(args: argparse.Namespace, uv: str) -> list[str]:
     module = "run --no-sync python -m pyrite.energy_grid.bandwidth_check"
     payload = shlex.quote(f"{stem}.segments.pkl")
     report = shlex.quote(args.json_out)
+    if args.attribute:
+        common = [
+            f"--material {shlex.quote(args.material)}",
+            f"--energy {float(args.energy):g}",
+            f"--configs {shlex.quote(args.configs)}",
+            f"--resolution {shlex.quote(args.resolution)}",
+            f"--seed {int(args.seed)} --top {int(args.top)}",
+        ]
+        fp64_report = shlex.quote(f"{stem}.fp64.json")
+        return [
+            " ".join(
+                [
+                    f"env -u PYRITE_FP64 PYRITE_MC_BACKEND=cuda {uv} {module} attribute",
+                    *common,
+                    f"--json-out {report}",
+                ]
+            ),
+            " ".join(
+                [
+                    f"PYRITE_FP64=1 PYRITE_MC_BACKEND=cuda {uv} {module} attribute",
+                    *common,
+                    f"--json-out {fp64_report}",
+                ]
+            ),
+        ]
     if args.production:
         return [
             " ".join(
@@ -462,6 +487,8 @@ def start_bandwidth(args: argparse.Namespace) -> str:
     mem = args.mem_per_cpu
     if mem is not None and (not mem[:-1].isdigit() or mem[-1] not in "KMGTP"):
         raise SystemExit("--mem-per-cpu must be an integer followed by K, M, G, T, or P")
+    if args.attribute and (args.production or args.compare_resolution is not None):
+        raise SystemExit("--attribute runs alone; drop --production/--compare-resolution")
     if args.compare_resolution is not None and args.production:
         raise SystemExit("--compare-resolution requires the FP64 reference job")
     if args.compare_resolution == args.resolution:
@@ -592,6 +619,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="production precision and audit only; no FP64 reference axis",
     )
+    bandwidth.add_argument(
+        "--attribute",
+        action="store_true",
+        help="heaviest lines and per-electron line mass, FP32 then FP64 (#201)",
+    )
+    bandwidth.add_argument("--top", type=int, default=200, help="--attribute: lines kept")
     bandwidth.add_argument("--no-sync", action="store_true")
     bandwidth.add_argument("--dry-run", action="store_true")
     fetch = commands.add_parser("pull", help="copy a remote checkpoint JSON locally")

@@ -83,3 +83,21 @@ def test_bandwidth_job_rejects_malformed_memory_requests(value):
     args = job.build_parser().parse_args(["start-bandwidth", "--mem-per-cpu", value])
     with pytest.raises(SystemExit, match="--mem-per-cpu"):
         job.start_bandwidth(args)
+
+
+def test_bandwidth_attribution_runs_fp32_then_fp64_reports():
+    args = job.build_parser().parse_args(
+        ["start-bandwidth", "--attribute", "--top", "50", "--json-out", "attr.json"]
+    )
+    fp32, fp64 = job.remote_bandwidth_commands(args, "uv")
+    assert fp32.startswith("env -u PYRITE_FP64") and " attribute " in fp32
+    assert fp64.startswith("PYRITE_FP64=1") and " attribute " in fp64
+    assert "--top 50" in fp32 and "--json-out attr.json" in fp32
+    assert "--json-out attr.fp64.json" in fp64
+
+
+@pytest.mark.parametrize("options", [["--production"], ["--compare-resolution", "local"]])
+def test_bandwidth_attribution_runs_alone(options):
+    args = job.build_parser().parse_args(["start-bandwidth", "--attribute", *options])
+    with pytest.raises(SystemExit, match="--attribute"):
+        job.start_bandwidth(args)
