@@ -163,6 +163,26 @@ def track_segments_frame(data):
     vertices) keeps the row count at ~the vertex count, under the Vega-Lite
     5000-row cap. Rows are sorted by ``E`` ascending so the highest-energy segments
     stroke last (on top) -- matching the datashader ``ds.max("E")`` intent."""
+    if "track_id" in data:
+        e1, e2 = _beam_detector_basis(data["beam"], data["detector"])
+        start = np.asarray(data["start_xyz"])
+        end = np.asarray(data["end_xyz"])
+        return (
+            pd.DataFrame(
+                {
+                    "x": start @ e1,
+                    "y": start @ e2,
+                    "x2": end @ e1,
+                    "y2": end @ e2,
+                    "E": data["E"],
+                    "track_id": data["track_id"],
+                    "parent_id": data["parent_id"],
+                    "generation": data["generation"],
+                }
+            )
+            .sort_values("E")
+            .reset_index(drop=True)
+        )
     df = tracks_frame(data)
     v = df[["x", "y", "E", "track"]].to_numpy()
     if len(v) < 2:
@@ -260,6 +280,7 @@ def trajectory_chart(
     E_cut=5.0,
     frame=None,
     width=480,
+    data=None,
 ):
     """Interactive vector view of ONE electron-penetration cross-section in the
     beam-detector plane: energy-coloured per-electron tracks (turbo) with the
@@ -268,7 +289,8 @@ def trajectory_chart(
     marks, not a datashader raster -- see the module docstring). Returns an
     :class:`altair.Chart`, or ``None`` when the cascade is empty."""
     case = _case_of(rec_or_case)
-    data = _trajectory_data(case, Ne, seed)
+    if data is None:
+        data = _trajectory_data(case, Ne, seed)
     seg_df = track_segments_frame(data)
     vacuum_df = vacuum_segments_frame(data)
     if seg_df.empty:
@@ -293,6 +315,16 @@ def trajectory_chart(
             "E:Q",
             title="electron energy (keV)",
             scale=alt.Scale(scheme="turbo", domain=[E_cut, E0]),  # type: ignore[arg-type]
+        ),
+        tooltip=(
+            [
+                alt.Tooltip("track_id:Q", title="track"),
+                alt.Tooltip("parent_id:Q", title="parent"),
+                alt.Tooltip("generation:Q", title="generation"),
+                alt.Tooltip("E:Q", title="energy (keV)", format=".3g"),
+            ]
+            if "track_id" in seg_df
+            else [alt.Tooltip("E:Q", title="energy (keV)", format=".3g")]
         ),
     )
     vacuum = _mark_chart(

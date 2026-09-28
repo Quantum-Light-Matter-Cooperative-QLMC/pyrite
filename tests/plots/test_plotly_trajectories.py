@@ -10,7 +10,57 @@ from pyrite.plots.plotly.trajectories import (
     dataset_t_max,
     frame_reveal_fs,
     track_vertices_3d,
+    trajectory_volume_figure_from_data,
+    visible_trajectory_data,
 )
+
+
+def test_secondary_view_uses_track_identity_and_filters_all_overlays():
+    from pyrite.plots.altair.trajectories import track_segments_frame
+
+    data = {
+        "start_xyz": np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.5], [4.0, 0.0, 0.5]]),
+        "end_xyz": np.array([[0.0, 0.0, 0.5], [0.0, 0.0, 1.0], [4.0, 0.0, 1.0]]),
+        "E": np.array([10.0, 8.0, 2.0]),
+        "t_fs": np.array([0.0, 2.0, 3.0]),
+        "elec_id": np.array([0, 0, 0]),
+        "track_id": np.array([0, 0, 1]),
+        "parent_id": np.array([-1, -1, 0]),
+        "generation": np.array([0, 0, 1]),
+        "thick": 1.0,
+        "u": 1.0,
+        "ulab": "nm",
+        "Ne": 1,
+        "eta": 0.0,
+        "thru": 100.0,
+        "layer_bounds": [],
+        "beam": np.array([0.0, 0.0, 1.0]),
+        "detector": np.array([1.0, 0.0, 0.0]),
+        "ndet": np.array([1.0, 0.0]),
+        "nslab": np.array([0.0, 1.0]),
+        "pts": np.array([[0.0, 0.0], [4.0, 1.0]]),
+        "initial_r_ang": np.array([[0.0, 0.0, 0.0]]),
+        "initial_v_hat": np.array([[0.0, 0.0, 1.0]]),
+        "initial_E_keV": np.array([10.0]),
+        "initial_t0_ang": np.array([0.0]),
+    }
+    case = {"name": "test", "E0_keV": 10.0, "thickness_ang": 1.0}
+    segments = track_segments_frame(data)
+    assert set(segments.track_id) == {0, 1}
+    assert segments.loc[segments.track_id == 1, "parent_id"].iloc[0] == 0
+    figure = trajectory_volume_figure_from_data(case, data)
+    assert {trace.name for trace in figure.data} >= {"electron tracks", "generation 1 tracks"}
+    secondary = next(trace for trace in figure.data if trace.name == "generation 1 tracks")
+    assert secondary.customdata[0][3:5].tolist() == [1.0, 0.0]
+    exit_path = _exit_paths_3d(data, 0.2, cmax=10.0)
+    assert len(exit_path.x) == 6  # both tracks own terminal exit segments
+    only_primary = visible_trajectory_data(data, max_generation=0)
+    assert set(track_segments_frame(only_primary).track_id) == {0}
+    assert len(_exit_paths_3d(only_primary, 0.2, cmax=10.0).x) == 3
+    assert len(visible_trajectory_data(data, min_energy_keV=5.0)["E"]) == 2
+    empty = visible_trajectory_data(data, min_energy_keV=20.0)
+    assert not len(empty["E"])
+    trajectory_volume_figure_from_data(case, empty).to_json()
 
 
 def test_track_vertices_3d_separates_every_physical_segment():

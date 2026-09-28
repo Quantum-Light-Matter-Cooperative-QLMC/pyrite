@@ -22,6 +22,7 @@ from ..montecarlo import (
     simulate_trajectories,
     tilted_geometry,
 )
+from ..montecarlo.runner.case_tables import _case_inelastic_kwargs, _case_stopping_tables
 from ..results import records, records_for_cases, selection_score
 from ._common import (
     _beam_detector_basis,
@@ -361,6 +362,15 @@ def _trajectory_data(
         # groove=None (the default for every ungrooved case) is bit-for-bit the
         # legacy flat-face entry.
         groove=_groove_spec(case),
+        **(
+            dict(
+                energy_model=case.get("energy_model", "midpoint"),
+                stopping_tables=_case_stopping_tables(case),
+                **_case_inelastic_kwargs(case),
+            )
+            if case.get("inelastic_model") is not None
+            else {}
+        ),
     )
     e1, e2 = _beam_detector_basis(beam, n_hat)
     L, v, r = segs["L_ang"], segs["v_hat"], segs["r_mid"]
@@ -372,11 +382,14 @@ def _trajectory_data(
     # consecutive starts share an endpoint, so they trace the real zig-zag path --
     # then break with NaN between electrons. This is what makes the tracks read as
     # paths (the old per-segment LineCollection got faint at the cool, slow tail).
-    order = np.lexsort((segs["t_ang"], segs["elec_id"]))
+    track_id = np.asarray(segs.get("track_id", segs["elec_id"]), dtype=np.int64)
+    parent_id = np.asarray(segs.get("parent_id", np.full(len(track_id), -1)), dtype=np.int64)
+    generation = np.asarray(segs.get("generation", np.zeros(len(track_id))), dtype=np.int64)
+    order = np.lexsort((segs["t_ang"], track_id))
     sx = (start @ e1)[order] / u
     sy = (start @ e2)[order] / u
     sE = segs["E_keV"][order]
-    brk = np.flatnonzero(np.diff(segs["elec_id"][order]) != 0) + 1
+    brk = np.flatnonzero(np.diff(track_id[order]) != 0) + 1
     px = np.insert(sx, brk, np.nan)
     py = np.insert(sy, brk, np.nan)
     pE = np.insert(sE, brk, np.nan)
@@ -397,6 +410,9 @@ def _trajectory_data(
         z_u=(r[:, 2] + 0.5 * L * v[:, 2])
         / u,  # depth of segment ENDPOINT; transmitted electrons reach thick exactly
         elec_id=segs["elec_id"],  # emitting electron index, per segment
+        track_id=track_id,
+        parent_id=parent_id,
+        generation=generation,
         L=segs["L_ang"],
         initial_r_ang=np.asarray(segs["initial_r_ang"], dtype=float),
         initial_v_hat=np.asarray(segs["initial_v_hat"], dtype=float),

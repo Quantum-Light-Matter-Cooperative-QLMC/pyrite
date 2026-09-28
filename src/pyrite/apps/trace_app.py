@@ -59,6 +59,7 @@ def _():
         VOLUME_CAMERA_ANGLES,
         trajectory_volume_data,
         trajectory_volume_figure_from_data,
+        visible_trajectory_data,
     )
 
     return (
@@ -91,6 +92,7 @@ def _():
         trajectory_sweep,
         trajectory_volume_data,
         trajectory_volume_figure_from_data,
+        visible_trajectory_data,
     )
 
 
@@ -375,9 +377,23 @@ def _(mo):
     penetration_groove_ui = mo.ui.number(
         value=0.0, start=0.0, step=1000.0, label="Groove spacing (Å, 0 = off)"
     )
+    penetration_secondaries_ui = mo.ui.switch(value=False, label="generate secondaries")
+    penetration_secondary_threshold_ui = mo.ui.number(
+        value=1000.0, start=50.0, step=100.0, label="secondary threshold (eV)"
+    )
+    penetration_max_generation_ui = mo.ui.number(
+        value=64, start=0, step=1, label="show through generation"
+    )
+    penetration_min_energy_ui = mo.ui.number(
+        value=0.0, start=0.0, step=0.5, label="minimum shown energy (keV)"
+    )
     return (
         penetration_beam_fwhm_ui,
         penetration_groove_ui,
+        penetration_secondaries_ui,
+        penetration_secondary_threshold_ui,
+        penetration_max_generation_ui,
+        penetration_min_energy_ui,
         penetration_ne_ui,
         penetration_regen_ui,
     )
@@ -474,6 +490,10 @@ def _(
     penetration_energy_source_ui,
     penetration_groove_ui,
     penetration_ne_ui,
+    penetration_secondaries_ui,
+    penetration_secondary_threshold_ui,
+    penetration_max_generation_ui,
+    penetration_min_energy_ui,
     penetration_realistic_ui,
     penetration_regen_ui,
     penetration_render_button_ui,
@@ -495,6 +515,7 @@ def _(
     trajectory_sweep,
     trajectory_volume_data,
     trajectory_volume_figure_from_data,
+    visible_trajectory_data,
     resolved_theme,
     theme_ui,
 ):
@@ -505,7 +526,8 @@ def _(
         _md = mo.md(
             "An interactive 3D electron track cutaway and a surviving-electron fraction vs depth, at the polar tilt and "
             "azimuth selected in this tab. The translucent crystal's lateral extent is fitted to the tracks; depth "
-            "and layer interfaces retain true scale. "
+            "and layer interfaces retain true scale. Enable secondaries to generate shell collision tracks; "
+            "track hover shows each parent and generation. The generation and energy controls filter both views. "
         )
         # Blazed grooves: valid only at azimuth 180 deg with 0 < polar tilt < 90.
         # Only feed the knob to trajectory_sweep when the selected azimuth admits
@@ -513,10 +535,14 @@ def _(
         # Sweep still validate (tilt, substrate/stack, footprint) and raise -- a
         # substrate material or tilt=0 falls back to ungrooved with the reason.
         _groove_req = float(penetration_groove_ui.value or 0.0)
+        if penetration_secondaries_ui.value and _groove_req > 0:
+            _groove_req = 0.0  # shell transport does not support grooved geometry
+            _groove_note = mo.md("*Grooves are disabled while generating secondaries.*")
+        else:
+            _groove_note = None
         _groove_spacing = (
             _groove_req if (_groove_req > 0.0 and penetration_azim_deg == 180.0) else None
         )
-        _groove_note = None
         if _groove_req > 0.0 and _groove_spacing is None:
             _groove_note = mo.md(
                 f"*Grooves need azimuth = 180 deg (selected {penetration_azim_deg:g} deg); "
@@ -548,6 +574,14 @@ def _(
         # The sweep has one selected energy and tilt; keep the nearest-case guard
         # in case a future sweep adds a surrounding grid.
         _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
+        if penetration_secondaries_ui.value:
+            _nc = dict(
+                _nc,
+                energy_model="midpoint",
+                inelastic_model="shell-soft-hard",
+                inelastic_cutoff_eV=50.0,
+                secondary_threshold_eV=float(penetration_secondary_threshold_ui.value),
+            )
 
         # Survival-chart cache: penetration_survival_chart runs its OWN fresh
         # Ne=500-electron transport, so without caching it would redo that work
@@ -589,6 +623,10 @@ def _(
             _seed,
             _realistic,
             _beam_fwhm,
+            bool(penetration_secondaries_ui.value),
+            float(penetration_secondary_threshold_ui.value)
+            if penetration_secondaries_ui.value
+            else None,
         )
         _cached = get_penetration_data()
         if _cached is not None and _cached[0] == _data_key:
@@ -606,8 +644,13 @@ def _(
         # Plotly frame animation was intentionally removed; the static figure remains.
         # workstream 2. Smooth playback now comes from the Render button below,
         # which prerenders a fixed-camera video via render_reveal_animation.
+        _max_generation = int(penetration_max_generation_ui.value)
+        _min_energy = float(penetration_min_energy_ui.value)
+        _view_data = visible_trajectory_data(
+            _data, max_generation=_max_generation, min_energy_keV=_min_energy
+        )
         _volume = trajectory_volume_figure_from_data(
-            _nc, _data, realistic=_realistic, beam_fwhm_mm=_beam_fwhm, reveal_until_fs=None
+            _nc, _view_data, realistic=_realistic, beam_fwhm_mm=_beam_fwhm, reveal_until_fs=None
         )
         # Full-row plot now that the 2D cross-section moved down beside the
         # survival chart; widened past Plotly's 700 default now the colorbar
@@ -673,7 +716,7 @@ def _(
         _n_frames = int(penetration_render_frames_ui.value)
         _render_key = render_cache_key(
             _nc["name"],
-            _data_key[1:5],
+            (*_data_key[1:5], *_data_key[9:], _max_generation, _min_energy),
             _Ne,
             _seed,
             _realistic,
@@ -748,8 +791,12 @@ def _(
         # Built eagerly (cheap at Ne=40); no longer behind a lazy accordion.
         # Sits beside the survival chart now, not the 3D plot, so back to its
         # own 480 default width.
-        _cross_section_chart = apply_altair_theme(trajectory_chart(_nc, Ne=40, width=420), _theme)
-        _cross_section_block = _cross_section_chart
+        _cross_section_chart = trajectory_chart(_nc, data=_view_data, width=420)
+        _cross_section_block = (
+            apply_altair_theme(_cross_section_chart, _theme)
+            if _cross_section_chart is not None
+            else mo.md("*No tracks pass the display filters.*")
+        )
 
         _bottom_cols = [p for p in (_cross_section_block, _survival) if p is not None]
         _bottom_row = (
@@ -862,6 +909,20 @@ def _(
                         wrap=True,
                     ),
                     *((_groove_note,) if _groove_note is not None else ()),
+                    mo.hstack(
+                        [
+                            penetration_secondaries_ui,
+                            dim_unless(
+                                penetration_secondary_threshold_ui, penetration_secondaries_ui.value
+                            ),
+                            penetration_max_generation_ui,
+                            penetration_min_energy_ui,
+                        ],
+                        justify="start",
+                        align="center",
+                        gap=1,
+                        wrap=True,
+                    ),
                     mo.hstack([penetration_regen_ui], justify="end", wrap=True),
                 ]
             ),
@@ -1094,10 +1155,13 @@ def _(
     penetration_camera,
     penetration_render_button_ui,
     penetration_render_frames_ui,
+    penetration_max_generation_ui,
+    penetration_min_energy_ui,
     prune_render_cache,
     render_cache_key,
     render_reveal_animation,
     set_penetration_render_status,
+    visible_trajectory_data,
 ):
     # EAGER render cell -- must live outside the lazy tab body. marimo resets
     # run_button.value to False as soon as the click-triggered update
@@ -1117,10 +1181,12 @@ def _(
     _data_key, _data, _nc = _cached
     _n_frames = int(penetration_render_frames_ui.value)
     # Same key recipe as the tab body: _data_key is (name, E0, tilt, azim,
-    # groove, Ne, seed, realistic, beam_fwhm).
+    # groove, Ne, seed, realistic, beam_fwhm, secondary mode, threshold).
+    _max_generation = int(penetration_max_generation_ui.value)
+    _min_energy = float(penetration_min_energy_ui.value)
     _render_key = render_cache_key(
         _data_key[0],
-        _data_key[1:5],
+        (*_data_key[1:5], *_data_key[9:], _max_generation, _min_energy),
         _data_key[5],
         _data_key[6],
         _data_key[7],
@@ -1146,7 +1212,9 @@ def _(
 
                 render_reveal_animation(
                     _nc,
-                    _data,
+                    visible_trajectory_data(
+                        _data, max_generation=_max_generation, min_energy_keV=_min_energy
+                    ),
                     _render_path,
                     realistic=_data_key[7],
                     beam_fwhm_mm=_data_key[8],
