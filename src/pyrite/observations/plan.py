@@ -261,6 +261,8 @@ class SweepObservation:
         Profile emission policy.
     provenance_fn
         ``case -> mapping`` of JSON-compatible software/model provenance.
+        :meth:`provenance` adds the case's ``name`` and ``E0_keV`` so a stored
+        observation can be named without the checkpoint's case manifest.
     """
 
     observation: ResolvedObservation
@@ -273,6 +275,16 @@ class SweepObservation:
     def sampling(self) -> PixelSampling:
         """Pixel sampling shared by every case of the sweep."""
         return PixelSampling.of(self.observation.detector, self.observation.scorer.angular_shape)
+
+    def provenance(self, case: Mapping[str, Any]) -> dict[str, Any]:
+        """Record provenance of one case's observation, including the case name.
+
+        Provenance is not identity: the case label never enters a digest.
+        """
+        return {
+            **self.provenance_fn(case),
+            "case": {"name": str(case["name"]), "E0_keV": float(case["E0_keV"])},
+        }
 
     def plan(self, case: Mapping[str, Any]) -> ObservationPlan:
         """Plan this observation for one sweep case."""

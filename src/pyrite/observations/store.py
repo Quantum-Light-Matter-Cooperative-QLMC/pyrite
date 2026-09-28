@@ -507,6 +507,16 @@ class ObservationStore:
 
     # -- public -------------------------------------------------------------
 
+    def record(self, observation_digest: str) -> Mapping[str, Any]:
+        """Return one observation's small JSON record without opening its factors.
+
+        Raises
+        ------
+        ObservationStoreError
+            If the record is missing, unreadable, or of an unknown schema.
+        """
+        return self._read_record(observation_digest)
+
     def put(self, observation: StoredObservation) -> str:
         """Persist ``observation`` idempotently and index it; return its digest.
 

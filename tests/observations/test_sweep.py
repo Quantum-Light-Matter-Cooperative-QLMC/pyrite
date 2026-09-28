@@ -250,3 +250,7 @@ def test_scan_places_the_observation_store_beside_the_checkpoint_root(
     assert built.store.path == (tmp_path / "observations" / "hopg-abc").resolve()
     assert built.emission == "both"
     assert built.provenance_fn(CASES[0])["backend"]
+    assert built.provenance(CASES[0])["case"] == {
+        "name": CASES[0]["name"],
+        "E0_keV": float(CASES[0]["E0_keV"]),
+    }

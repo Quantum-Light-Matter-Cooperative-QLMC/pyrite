@@ -365,10 +365,11 @@ proposals, not validated acceptance criteria.
   the observation store and producers (item 4), and the profile/CLI surface
   plus `pyrite run` production (item 7); see "Observation store progress" and
   "Sweep production and CLI progress" (both 2026-09-26).
-- Next: complete pixel metadata/selection APIs (item 5) and the analysis
-  workflow (item 6) over `ObservationStore`; then remote transfer and
-  lifecycle (item 8). Workers consume the vertical backend rather than
-  inventing parallel representations.
+- Completed 2026-09-27: bounded result APIs (item 5) and the analysis
+  workflow (item 6); see "Bounded APIs and analysis workflow progress".
+- Next: remote transfer and lifecycle (item 8), then validation and
+  performance closure (item 9). Workers consume the vertical backend rather
+  than inventing parallel representations.
 
 ## Decisions and open questions
 
@@ -844,6 +845,53 @@ Not done in this slice: remote transfer and GC/reachability (item 8).
   union and the zero-energy opaque branch of `positioned-filter-attenuation`
   (ledger row notes it postdates the 2026-09-13 re-derivation).
 
+## Bounded APIs and analysis workflow progress (2026-09-27)
+
+- Rebased onto `main` (#172/#192/#198/#201). The observation line grid now
+  also covers `main`'s measured `resonance-population` policy: each direction
+  measures its own line population and stop edge, the grid ends at the widest
+  edge, and `resonance-local` refines the union of per-direction local seeds;
+  one direction reproduces the scalar axis exactly (regression in
+  `tests/energy-grid/test_line_grid_local_spacing.py`). Profile filter CLI
+  moved to the directory catalog path.
+- Item 5: `SpatialResult.pixel_metadata` (local/lab position, direction,
+  polar/azimuth, distance, solid angle, tile and tile direction, filter paths;
+  recomputed from the persisted detector and checked against stored factors
+  after reopen), `filter_coverage`, `energy_node`, and `transmission_image`
+  (stored nodes only; out-of-grid energies are refused, not snapped). A
+  512 by 512 regression bounds peak traced memory for total/window count
+  images, a true window image, selected spectra, and metadata below one eighth
+  of a single pixel-energy cube. Integer coordinate arrays skip the per-element
+  type walk (about a third of chunked image time).
+- Item 6: `observations.observation_inventory` lists a stem's observations by
+  case from record provenance (sweeps now record `case: {name, E0_keV}`; not
+  identity), falling back to `cases.json` (written only with the shared cache)
+  and then the source key. `plots/_pixel_frames` and `plots/altair/pixels`
+  hold reusable image/spectrum/histogram frames and charts;
+  `apps/analysis_ui/pixels.py` and `views/pixels.py` back a thin
+  **Pixel detector** tab. Views: total/window counts, continuum-node
+  transmission, coverage; expected vs labelled Poisson realization (a
+  Poisson acquisition may also be viewed as expectation via read-time
+  rescoring; never substituted); block-reduced display (<= 128 cells per
+  axis) with exact pixel-range tooltips; row/column selection with metadata,
+  true spectra, and measured histogram plus underflow/overflow/below-cut.
+  Missing checkpoint/store, unreadable records, inverted windows, and
+  all-zero images render explanations.
+- Static export renders the default centre-pixel selection only (tabs are
+  lazy, so export executes the pixel cells but draws the first tab). Pixel
+  selection is by row/column inputs; click-to-select on the image is not
+  implemented.
+- Real smoke (isolated profile, 16 by 16, 2 by 2 tiles, Timepix3, 7
+  electrons, half-covering 50 um Si plate, CPU backend): `pyrite run`
+  produced the observation; inventory, all four images, render, and headless
+  `marimo export` succeeded. Found and fixed: transmission on the line grid
+  silently snapped 6 keV to its 3.7 keV end; `observations/` was not
+  gitignored; the inventory needed `cases.json`, absent under `--no-cache`.
+  First Timepix3 image per process takes about 20 s (response-matrix build).
+- Physics review still owed (not self-adjudicated): observation line-grid
+  union including the new measured-bandwidth union, and the zero-energy
+  opaque filter branch.
+
 ## Staleness audit (2026-09-26)
 
 Checked against the branch after rebase onto `main`:
@@ -868,9 +916,10 @@ Checked against the branch after rebase onto `main`:
   limitation no longer blocks native reporting bins (`native_score`, including
   nonuniform true grids after the #100/#114 rebase).
 - Still accurate: `run_case_directions` performs one transport, then loops
-  directions; `SpatialResult.spectra(measured=True)` loops per pixel;
-  `AnalysisContext` loads one intrinsic checkpoint and has no observation
-  inventory.
+  directions; `SpatialResult.spectra(measured=True)` loops per pixel (the
+  native measured path is `acquire`). Superseded 2026-09-27: the analysis app
+  discovers observations through `observation_inventory` beside, not inside,
+  `AnalysisContext`.
 - Superseded: Slice 1 text saying "Slice 2 must not generalize `PixelScorer`"
   and "human review must choose the tolerance" is closed by the 2026-08-23
   `nearest_tile` decision under "Decisions and open questions".

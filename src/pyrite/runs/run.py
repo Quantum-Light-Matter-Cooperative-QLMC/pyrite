@@ -543,7 +543,7 @@ def run_sweep(
         plan = observation_plans.get(key)
         if plan is not None and directional is not None:
             assert observation is not None
-            observation.store.put(plan.assemble(directional, observation.provenance_fn(case)))
+            observation.store.put(plan.assemble(directional, observation.provenance(case)))
             del observation_plans[key]
         if key in observation_only:
             # The scalar record was already cached; this run owed only the

@@ -301,20 +301,41 @@ class SpatialResult:
         """Return ``(ny, nx, n_filter)`` booleans: the centre ray crosses the filter."""
         return self.ray_map.path_length_mm > 0.0
 
+    def _energy_node(self, energy_eV: float, component: str) -> int:
+        grid = self._factor(component).energy_eV
+        energy = float(energy_eV)
+        if not np.isfinite(energy):
+            raise ValueError("energy_eV must be finite")
+        if not grid[0] <= energy <= grid[-1]:
+            raise ValueError(
+                f"energy_eV {energy:g} is outside the {component} grid "
+                f"[{grid[0]:g}, {grid[-1]:g}] eV"
+            )
+        return int(np.argmin(np.abs(grid - energy)))
+
+    def energy_node(self, energy_eV: float, *, component: str = "line") -> float:
+        """Return the stored energy node in eV nearest ``energy_eV`` on a component grid.
+
+        Raises
+        ------
+        ValueError
+            If ``energy_eV`` is not finite or lies outside that grid.
+        """
+        return float(self._factor(component).energy_eV[self._energy_node(energy_eV, component)])
+
     def transmission_image(self, energy_eV: float, *, component: str = "line") -> np.ndarray:
         """Return ``(ny, nx)`` primary filter transmission at one energy node.
 
         ``energy_eV`` selects the nearest sample of the component's energy
-        grid; attenuation coefficients are stored only at those nodes, so no
-        value is interpolated. Uncovered pixels and the no-filter case are 1.
+        grid (:meth:`energy_node`); attenuation coefficients are stored only
+        at those nodes, so no value is interpolated, and an energy outside the
+        grid is rejected rather than snapped to its end. Uncovered pixels and
+        the no-filter case are 1.
         """
         from ..instrument import primary_transmission
 
         factor = self._factor(component)
-        energy = float(energy_eV)
-        if not np.isfinite(energy):
-            raise ValueError("energy_eV must be finite")
-        node = int(np.argmin(np.abs(factor.energy_eV - energy)))
+        node = self._energy_node(energy_eV, component)
         return primary_transmission(
             self.ray_map.path_length_mm, factor.mu_by_filter_inv_mm[:, node : node + 1]
         )[..., 0]

@@ -9,6 +9,7 @@ pixel sampling, factor assembly, and layered identity are built for every
 producer.
 """
 
+from .inventory import ObservationEntry, ObservationInventory, observation_inventory
 from .plan import ObservationPlan, PixelSampling, SweepObservation
 from .store import (
     ObservationStore,
@@ -19,6 +20,8 @@ from .store import (
 )
 
 __all__ = [
+    "ObservationEntry",
+    "ObservationInventory",
     "ObservationPlan",
     "ObservationStore",
     "ObservationStoreError",
@@ -27,4 +30,5 @@ __all__ = [
     "PixelSampling",
     "SweepObservation",
     "observation_from_result",
+    "observation_inventory",
 ]

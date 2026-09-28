@@ -36,6 +36,19 @@ In memory, every record keeps `spec`, `spec_coherent`, `spec_characteristic`, an
 
 Legacy `.pkl` component paths and plain, gzip, and zstd monoliths remain readable and migrate to HDF5 on the next normal save. Artifacts written before the separate-component contract stored `spec`/`spec_coherent` as totals including `spec_characteristic`; they are separated once on load. Use the [result schema](../repo-design/storage/result-schema.md) for independent inspection.
 
+## Pixel-detector observations
+
+A profile whose physical detector has an acquisition (`pyrite profile physical-detector set`) also stores one counting observation per case in `observations/<stem>/`, the sibling of `checkpoints/<stem>/`. Observations hold factorized per-tile spectra, pixel solid angles, and filter paths rather than a pixel-by-energy cube, so reopening one never reruns transport. The [Python workflow](python-api-workflow.md#persist-reopen-and-rescore-an-observation) covers `ObservationStore` and rescoring; `pyrite.observations.observation_inventory(stem)` lists a stem's stored observations by case without opening their factors.
+
+The analysis app's **Pixel detector** tab reads the loaded dataset's observations:
+
+- choose an observation, then an image: registered **total counts**, counts in an **energy window** bounded by configured reporting edges, primary **filter transmission** at a stored continuum-grid energy, or **filter coverage** (plates crossed by each pixel's centre ray);
+- **Counts** shows deterministic expectations by default. A Poisson acquisition also offers its seeded realization, labelled as such; neither is ever substituted for the other;
+- the image is drawn at full resolution up to 128 by 128 pixels, and larger grids draw summed (counts), averaged (transmission), or maximum (coverage) display cells whose tooltips give their pixel ranges;
+- **row** and **column** select one pixel for its geometry (local and lab position, direction, polar/azimuth, solid angle, angular tile, filter paths), its true accepted spectra before response, and its measured reporting-bin histogram with underflow, overflow, and below-cut accounting.
+
+Timepix3 counts are clustered photon events attributed to the incident-ray pixel; raw neighbouring-pixel triggers are not modelled. The first Timepix3 image in a session builds the response matrix and can take tens of seconds. Static HTML export renders the default centre-pixel selection only; interactive pixel selection needs a running app. Observations produced with `pyrite run --remote` stay on the remote host until remote transfer is implemented.
+
 ## Save electron trajectories
 
 Checkpoints keep spectra, not the electron histories behind them. To keep the complete transport result of a run for later analysis, opt in per run:

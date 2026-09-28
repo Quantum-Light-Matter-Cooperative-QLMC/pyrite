@@ -225,8 +225,12 @@ def test_filter_coverage_and_transmission_image_use_stored_nodes() -> None:
     np.testing.assert_array_equal(spatial.filter_coverage(), [[[False], [True]]])
     # mu = ln 2 / mm over a 1 mm path halves the covered pixel; 2.4 eV snaps to 2 eV.
     np.testing.assert_allclose(spatial.transmission_image(2.4), [[1.0, 0.5]], rtol=1.0e-15)
+    assert spatial.energy_node(2.4) == 2.0
     with pytest.raises(ValueError, match="finite"):
         spatial.transmission_image(float("nan"))
+    # An energy past the grid is refused, not silently snapped to its last node.
+    with pytest.raises(ValueError, match=r"outside the line grid \[1, 3\]"):
+        spatial.transmission_image(3.5)
 
 
 def test_512_square_detector_images_and_selections_stay_bounded() -> None:
