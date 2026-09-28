@@ -46,16 +46,58 @@ def test_auto_falls_back_to_cpu(monkeypatch):
     assert backend.fallback_reason == "accelerator_unavailable: missing; missing"
 
 
-def test_explicit_fp64_incompatible_backend_errors(monkeypatch):
+def _stub_sycl(supports_fp64: bool) -> _backend.ArrayBackend:
     backend = _backend.NumPyBackend()
     backend.name = "sycl"
     backend.vendor = "intel"
-    backend.device = _backend.DeviceInfo("sycl", "intel", "Arc", 4 * GIB, False)
-    monkeypatch.setattr(_backend, "_load_sycl", lambda: backend)
-    monkeypatch.setenv("PYRITE_FP64", "1")
+    backend.device = _backend.DeviceInfo("sycl", "intel", "Arc", 4 * GIB, supports_fp64)
+    return backend
 
-    with pytest.raises(_backend.BackendUnavailableError, match="lacks fp64"):
+
+@pytest.mark.parametrize("fp64_env", [None, "1"])
+def test_explicit_fp64_incompatible_backend_errors(monkeypatch, fp64_env):
+    monkeypatch.setattr(_backend, "_load_sycl", lambda: _stub_sycl(False))
+    if fp64_env is None:
+        monkeypatch.delenv("PYRITE_FP64", raising=False)
+    else:
+        monkeypatch.setenv("PYRITE_FP64", fp64_env)
+
+    with pytest.raises(_backend.BackendUnavailableError, match="lacks fp64") as error:
         _backend.select_backend("sycl")
+    assert "'Arc'" in str(error.value) and "PYRITE_MC_BACKEND=cpu" in str(error.value)
+
+
+@pytest.mark.parametrize("fp64_env", [None, "1"])
+def test_auto_falls_back_when_sycl_lacks_fp64(monkeypatch, caplog, fp64_env):
+    def unavailable(expected=None):
+        raise _backend.BackendUnavailableError("missing")
+
+    monkeypatch.setattr(_backend, "_load_cupy", unavailable)
+    monkeypatch.setattr(_backend, "_load_sycl", lambda: _stub_sycl(False))
+    if fp64_env is None:
+        monkeypatch.delenv("PYRITE_FP64", raising=False)
+    else:
+        monkeypatch.setenv("PYRITE_FP64", fp64_env)
+
+    with caplog.at_level("WARNING", logger=_backend.logger.name):
+        result = _backend.select_backend("auto")
+
+    assert result.name == "cpu"
+    assert result.fallback_reason == "unsupported_fp64: Arc"
+    assert [r.getMessage() for r in caplog.records if "lacks native fp64" in r.getMessage()]
+
+
+@pytest.mark.parametrize("requested", ["auto", "sycl"])
+def test_fp64_capable_sycl_is_selected(monkeypatch, requested):
+    def unavailable(expected=None):
+        raise _backend.BackendUnavailableError("missing")
+
+    stub = _stub_sycl(True)
+    monkeypatch.setattr(_backend, "_load_cupy", unavailable)
+    monkeypatch.setattr(_backend, "_load_sycl", lambda: stub)
+    monkeypatch.delenv("PYRITE_FP64", raising=False)
+
+    assert _backend.select_backend(requested) is stub
 
 
 def test_sycl_contract_pins_creation_queue_and_round_trips():
@@ -481,7 +523,11 @@ def test_intel_machine_selects_sycl_backend() -> None:
         import pyrite.campaign.config
         from pyrite._backend import BACKEND
 
-        assert BACKEND.name == "sycl", (
+        # An fp64-less Intel GPU is found but refused (issue #210).
+        fp64_refused = BACKEND.name == "cpu" and str(BACKEND.fallback_reason).startswith(
+            "unsupported_fp64: "
+        )
+        assert BACKEND.name == "sycl" or fp64_refused, (
             f"Expected SYCL backend, got {BACKEND.name!r}. "
             f"Fallback reason: {BACKEND.fallback_reason!r}"
         )
