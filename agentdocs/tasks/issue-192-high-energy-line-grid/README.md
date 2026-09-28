@@ -364,3 +364,33 @@ each node sums only lines within K first-zero widths; truncated tail
 <= 2/(pi**2 K) of each line, K ~ 2e3 for 1e-4) with a derivation, ledger row,
 and CPU/GPU kernel; or cap production Ne for 1 mm cases. No production rerun
 until one is chosen.
+
+## Ne=4,000 production at 1 mm (2026-09-27)
+
+Job `20260927-171749-f5dfb3c9` / SLURM 205: `--production --resolution local`,
+FP32 CUDA (RTX 5080, 16 GB), seed 0, `--mem-per-cpu 3000M` (24,000 MB of the
+40,960 MB WSL node, leaving ~17 GB for OS/Windows). Completed in ~2 minutes.
+Report pulled to `/tmp/issue192_production_ne4000_20260927.json`.
+
+| tilt/azim | segments | lines | collect s | stop search s | stop eV | nodes | transport s | line eval s | device peak MiB | host peak MiB | audit upper / lower |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 10/100 | 10,913,900 | 21,501,794 | 22.9 | 5.4 | 35,400 | 56,695 | 33.2 | 3.2 | 8,977 | 1,819 | 5.0e-5 / 2.3e-4 |
+| 80/180 | 17,021,822 | 12,947,423 | 1.4 | 3.0 | 798,100 | 304,159 | 13.4 | 42.1 | 13,230 | 2,756 | 2.9e-5 / 4.7e-4 |
+
+Correction to the CPU-profile conclusion above: on CUDA, the dense
+lines x nodes reduction is not the bottleneck at this scale (1.2e12 and 3.9e12
+pair evaluations in 3.2 s and 42 s). Selector host memory is also small (~0.5 GB
+added). The collect time for the first case includes one-time CUDA JIT/table
+warm-up. Device memory instead scales with transported segments: ~0.78 GiB per
+million (9.0 GB at 10.9 M, 13.2 GB at 17.0 M). Ne=20,000 at 1 mm implies
+~55-85 M segments, ~43-66 GB of device memory on a 16 GB card. That is the
+likely failure mode of SLURM 189/204. Hypothesis, not yet verified: under WSL
+the Windows driver's CUDA sysmem fallback can spill VRAM into shared Windows
+RAM outside the SLURM cgroup, which would explain both the stall and the
+host-wide unresponsiveness. Next measurement: which transport/spectrum arrays
+hold per-segment device memory, and whether segments can be streamed to the
+device in bounded blocks.
+
+The 80/180 stop is 798 keV (rare Doppler-boosted forward lines); local spacing
+keeps it at 304k nodes. The lower-edge bound (2.3e-4, 4.7e-4) exceeds 1e-4
+and is not gated; it matches the earlier lower-edge finding.
