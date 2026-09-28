@@ -113,18 +113,12 @@ def test_dataset_identity_dispatches_through_recorded_v1():
 
 
 def test_high_energy_profile_range_is_part_of_dataset_identity():
-    sweep = material_sweep("tise2", catalog_profile="high_energy")
-    identity = named_profile_identity("tise2", catalog_profile="high_energy")
+    sweep = material_sweep("hbn", catalog_profile="high_energy")
+    identity = named_profile_identity("hbn", catalog_profile="high_energy")
 
-    np.testing.assert_array_equal(sweep.beam.energy_keV, [100.0, 150.0, 200.0, 250.0, 300.0])
+    np.testing.assert_array_equal(sweep.beam.energy_keV, [100.0, 500.0, 1000.0])
     assert identity["catalog_profile"] == "high_energy"
-    assert identity["resolved_parameters"]["sweep"]["energy_keV"] == [
-        100.0,
-        150.0,
-        200.0,
-        250.0,
-        300.0,
-    ]
+    assert identity["resolved_parameters"]["sweep"]["energy_keV"] == [100.0, 500.0, 1000.0]
 
 
 def test_hopg_short_keeps_finite_footprint_and_attosecond_bunch():
