@@ -91,6 +91,7 @@ __all__ = [
     "WINDOW_POLICY",
     "LineGridPolicy",
     "LineShapePrecisionWarning",
+    "LineYieldStatisticsWarning",
     "cached_coordinates",
     "coordinate_cache_key",
     "environment_overrides_present",
@@ -291,6 +292,10 @@ class LineGridToleranceError(ValueError):
 
 class LineShapePrecisionWarning(UserWarning):
     """A float32 line window reaches the binade where lineshape exceeds its share."""
+
+
+class LineYieldStatisticsWarning(UserWarning):
+    """A few electrons carry a measured-bandwidth case's incoherent line yield."""
 
 
 #: Lower edge of the ``[2**14, 2**15)`` eV float32 binade. Measured on identical

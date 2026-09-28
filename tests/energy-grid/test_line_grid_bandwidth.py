@@ -5,6 +5,7 @@ refusals, case construction where the ceiling alone overflows the budget, and
 the production-weight truncation audit.
 """
 
+import warnings
 from dataclasses import replace
 
 import numpy as np
@@ -18,6 +19,7 @@ from pyrite._line_grid_policy import (
     RESONANCE_BANDWIDTH_POLICY,
     RESONANCE_LINE_GRID_POLICY_SCHEMA,
     LineGridToleranceError,
+    LineYieldStatisticsWarning,
     resolve_line_grid_policy,
     resolved_coordinates,
 )
@@ -238,8 +240,8 @@ def test_line_yield_statistics_is_the_relative_standard_error_of_the_mean():
     assert line_yield_statistics(np.zeros(4))["relative_se"] is None
 
 
-def test_audit_refuses_a_line_yield_carried_by_a_rare_electron():
-    """#201: one of many electrons carrying the yield is refused, not reported."""
+def test_audit_warns_when_a_rare_electron_carries_the_line_yield():
+    """#201: a statistics-limited yield is flagged and warned about, not refused."""
     case = _audited_case()
     even = {"start_eV": 50.0, "stop_eV": 1000.0, "n_electrons": 400}
     rare = dict(even)
@@ -247,12 +249,19 @@ def test_audit_refuses_a_line_yield_carried_by_a_rare_electron():
     a_width = xp.full(400, np.pi / 0.01)
     ids = xp.arange(400)
     _accumulate_edge_truncation(even, E_r, a_width, xp.ones(400), ids)
-    record = check_line_truncation(case, even)
-    assert record["line_yield_statistics"]["relative_se"] < LINE_YIELD_RELATIVE_SE_LIMIT
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", LineYieldStatisticsWarning)
+        record = check_line_truncation(case, even)
+    stats = record["line_yield_statistics"]
+    assert stats["relative_se"] < LINE_YIELD_RELATIVE_SE_LIMIT
+    assert not stats["statistics_limited"]
     weights = xp.asarray(np.r_[1.0e3, np.ones(399)])
     _accumulate_edge_truncation(rare, E_r, a_width, weights, ids)
-    with pytest.raises(LineGridToleranceError, match="relative standard error"):
-        check_line_truncation(case, rare)
+    with pytest.warns(LineYieldStatisticsWarning, match="relative standard error"):
+        record = check_line_truncation(case, rare)
+    stats = record["line_yield_statistics"]
+    assert stats["statistics_limited"]
+    assert stats["max_electron_share"] == pytest.approx(1.0e3 / 1399.0)
 
 
 def test_production_line_collection_retains_resonance_width_and_weight():

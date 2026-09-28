@@ -18,6 +18,7 @@ from ..._line_grid_policy import (
     RESONANCE_BANDWIDTH_POLICY,
     LineGridToleranceError,
     LineShapePrecisionWarning,
+    LineYieldStatisticsWarning,
     cached_coordinates,
     coordinate_cache_key,
     lineshape_precision_warning,
@@ -475,9 +476,10 @@ def resolve_line_grid(case, segments, n_hat, Ne, E_grid, abs_layers=None, groove
     }
 
 
-#: Largest relative standard error of the per-electron line mass a measured
-#: bandwidth case may report (#201). A rare electron scattered into the
-#: detector's 1/gamma cone can carry most of a case's line yield.
+#: Relative standard error of the per-electron line mass above which a
+#: measured bandwidth case is flagged ``statistics_limited`` and warned about
+#: (#201). A rare electron scattered into the detector's 1/gamma cone can carry
+#: most of a case's line yield; the case still runs.
 LINE_YIELD_RELATIVE_SE_LIMIT = 0.1
 
 
@@ -522,7 +524,9 @@ def check_line_truncation(case, audit):
 
     The upper-edge fraction is the bandwidth share this policy spends and is
     refused above ``truncation_limit``. The lower edge is reported only: the
-    ``start`` convention predates this policy and is not its share.
+    ``start`` convention predates this policy and is not its share. With
+    per-electron sums, the line yield's standard error is recorded and a
+    statistics-limited case is warned about, not refused (#201).
 
     Validation: line-grid-resonance-bandwidth
     """
@@ -541,13 +545,18 @@ def check_line_truncation(case, audit):
         stats = line_yield_statistics(audit["electron_mass"])
         record["line_yield_statistics"] = stats
         rse = stats["relative_se"]
-        if rse is not None and rse > LINE_YIELD_RELATIVE_SE_LIMIT:
-            raise LineGridToleranceError(
+        limited = rse is not None and rse > LINE_YIELD_RELATIVE_SE_LIMIT
+        stats["statistics_limited"] = limited
+        if limited:
+            warnings.warn(
                 f"{case['name']} at {case['E0_keV']:g} keV: the incoherent line yield "
                 f"has relative standard error {rse:.3g} over {stats['n_electrons']} "
                 f"electrons (one electron carries {stats['max_electron_share']:.3g} of "
-                f"it), above the {LINE_YIELD_RELATIVE_SE_LIMIT:g} limit. Rare electrons "
-                "scattered toward the detector dominate this yield; run more electrons."
+                f"it), above {LINE_YIELD_RELATIVE_SE_LIMIT:g}. Rare electrons scattered "
+                "toward the detector dominate this yield and its measured bandwidth; "
+                "treat the line yield as statistics-limited or run more electrons.",
+                LineYieldStatisticsWarning,
+                stacklevel=2,
             )
     if record["upper_fraction_bound"] > limit:
         raise LineGridToleranceError(

@@ -513,3 +513,10 @@ lower-edge bound (wide lines at 5-13 keV spill below `start`); not measured.
 Next: a stable 5 MeV 10/100 yield needs #203. Remaining #192 items
 (fresh-context validation, `high_energy` opt-in) proceed for cases that pass
 the gate; 5 MeV h-BN 10/100 at 1 mm stays refused until #203.
+
+Revision (user, same day): statistics-limited cases must run, with warnings,
+not be refused. Above the 0.1 relative standard error the truncation record's
+`line_yield_statistics.statistics_limited` is true and
+`LineYieldStatisticsWarning` names the error, electron count and largest
+electron share. The upper-edge truncation gate is unchanged. 5 MeV h-BN
+10/100 at 1 mm therefore runs, flagged, until #203 reduces its variance.
