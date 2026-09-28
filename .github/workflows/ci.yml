@@ -22,7 +22,12 @@ jobs:
         run: uv sync --all-groups --locked
 
       - name: Test ${{ matrix.suite }} suite
-        run: uv run pyrite-dev test-suite ${{ matrix.suite }}
+        run: |
+          if [ "${{ matrix.suite }}" = core ]; then
+            uv run pyrite-dev test-suite core -n 2 --dist loadfile --durations=30 --durations-min=0.5
+          else
+            uv run pyrite-dev test-suite "${{ matrix.suite }}"
+          fi
 
   full:
     runs-on: ubuntu-latest
@@ -33,5 +38,5 @@ jobs:
           python-version: "3.14"
       - run: uv sync --all-groups --locked
 
-      - name: Verify
-        run: uv run pyrite-dev verify
+      - name: Verify non-test gates
+        run: uv run pyrite-dev verify --skip-tests

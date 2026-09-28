@@ -19,6 +19,7 @@ uv sync --no-dev --locked
 
 # Stable domain partitions. Together these contain every tests/test_*.py once.
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite core
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite core -n 2 --dist loadfile --durations=30 --durations-min=0.5
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite cli
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite apps
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite packaging
@@ -36,6 +37,7 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev precommit
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite integration
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify --skip-tests
 
 # Clean wheel and editable-install compatibility check.
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev package-smoke
@@ -43,7 +45,7 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev package-smoke
 
 Use the project runner rather than bare `pytest` or an environment-specific Python path. If the project environment is not writable, add `UV_PROJECT_ENVIRONMENT=/tmp/pyrite-venv` instead of switching interpreters.
 
-Suite ownership uses deterministic filename rules in `pyrite._dev`. A regression test requires the four domain suites to cover every test module exactly once, so a new test cannot silently disappear from focused coverage. The integration suite intentionally overlaps domain suites; it exercises public imports/data, exports, CLI contract, remote, sweep/run, and a headless app path. `pyrite-dev docs` performs the clean offline warnings-as-errors Sphinx build; `verify` includes that documentation gate along with skills, imports, generated repository structure, lint, types, and tests.
+Suite ownership uses deterministic filename rules in `pyrite._dev`. A regression test requires the four domain suites to cover every test module exactly once, so a new test cannot silently disappear from focused coverage. The integration suite intentionally overlaps domain suites; it exercises public imports/data, exports, CLI contract, remote, sweep/run, and a headless app path. `pyrite-dev docs` performs the clean offline warnings-as-errors Sphinx build; `verify` includes that documentation gate along with skills, imports, generated repository structure, lint, types, and tests. CI runs the four domain suites once each (core with two file-grouped workers and slow-test timings) and uses `verify --skip-tests` for the remaining checks; local `verify` still runs everything.
 
 ## Coverage
 

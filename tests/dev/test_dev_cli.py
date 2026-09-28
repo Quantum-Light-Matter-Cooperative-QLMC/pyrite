@@ -253,6 +253,49 @@ def test_verify_runs_checks_in_required_order(dev_module, monkeypatch) -> None:
     ]
 
 
+def test_verify_skip_tests_runs_every_other_check(dev_module, monkeypatch) -> None:
+    calls = []
+    for name in (
+        "cmd_check_skills",
+        "cmd_imports",
+        "cmd_repo_map",
+        "cmd_docs",
+        "cmd_lint",
+        "cmd_typecheck",
+        "cmd_test",
+    ):
+        monkeypatch.setattr(dev_module, name, lambda _args, name=name: calls.append(name))
+
+    dev_module.main(["verify", "--skip-tests"])
+
+    assert calls == [
+        "cmd_check_skills",
+        "cmd_imports",
+        "cmd_repo_map",
+        "cmd_docs",
+        "cmd_lint",
+        "cmd_typecheck",
+    ]
+
+
+def test_verify_skip_tests_rejects_pytest_arguments(dev_module, monkeypatch) -> None:
+    monkeypatch.setattr(dev_module, "cmd_verify", lambda _args: pytest.fail("verify ran"))
+
+    with pytest.raises(SystemExit, match="2"):
+        dev_module.main(["verify", "--skip-tests", "-k", "example"])
+
+
+def test_verify_help_exposes_skip_tests_without_running_checks(
+    dev_module, monkeypatch, capsys
+) -> None:
+    monkeypatch.setattr(dev_module, "cmd_verify", lambda _args: pytest.fail("verify ran"))
+
+    with pytest.raises(SystemExit, match="0"):
+        dev_module.main(["verify", "--help"])
+
+    assert "--skip-tests" in capsys.readouterr().out
+
+
 def test_smoke_forwards_material_and_output_directory(dev_module, monkeypatch) -> None:
     from pyrite.devtools import smoke
 
