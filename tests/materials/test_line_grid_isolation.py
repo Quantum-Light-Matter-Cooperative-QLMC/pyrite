@@ -50,7 +50,7 @@ def _install_hopg_artifact(catalog_path):
     )
     stored = artifacts.write_artifact(catalog_path.parent / "energy-grid-artifacts", identity)
     document = tomlkit.parse(catalog_path.read_text())
-    for profile in ("standard", "hopg_hbn", "hopg_hbn_straggling", "hopg_short"):
+    for profile in ("standard", "hopg_hbn", "hopg_short"):
         document["profiles"][profile]["energy_grid_refs"] = {"hopg": stored.digest}
     catalog_path.write_text(tomlkit.dumps(document))
     return stored
@@ -100,7 +100,7 @@ def test_changing_hopg_legacy_rows_only_changes_hopg(catalog_path, monkeypatch):
 def test_regenerating_hopg_artifact_isolated_across_materials_and_profiles(catalog_path, tmp_path):
     stored = _install_hopg_artifact(catalog_path)
     document = tomlkit.parse(catalog_path.read_text())
-    profiles = ("standard", "hopg_hbn", "hopg_hbn_straggling", "hopg_short")
+    profiles = ("standard", "hopg_hbn", "hopg_short")
     before = {profile: load_material_catalog(catalog_path, profile=profile) for profile in profiles}
     original_refs = {
         profile: dict(document["profiles"][profile]["energy_grid_refs"]) for profile in profiles

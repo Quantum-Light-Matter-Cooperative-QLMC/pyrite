@@ -145,7 +145,7 @@ def test_profile_menu_lists_standard_and_sidecar_resolved_variant(tmp_path):
         tmp_path,
         "hbn--full-6a7c899190fc",
         material="hbn",
-        catalog_profile="hopg_hbn_microtrain_200fs",
+        catalog_profile="hopg_hbn",
     )
 
     menu = analyze.profile_menu("hbn", tmp_path)
@@ -154,7 +154,7 @@ def test_profile_menu_lists_standard_and_sidecar_resolved_variant(tmp_path):
         {"value": "hbn", "label": "Standard", "disabled": False},
         {
             "value": "hbn--full-6a7c899190fc",
-            "label": "hopg_hbn_microtrain_200fs (abcdef)",
+            "label": "hopg_hbn (abcdef)",
             "disabled": False,
         },
     )

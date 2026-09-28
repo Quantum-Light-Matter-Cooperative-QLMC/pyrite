@@ -88,7 +88,7 @@ bunch_charge_pc = 1.0
 kind = "gaussian"
 envelope_rms_fs = 200.0
 
-[profiles.hopg_hbn_gaussian_200fs]
+[profiles.my_scan]
 beam = "gaussian_200fs"
 
 [detectors.eds]
@@ -152,7 +152,7 @@ What an edit costs on the next run: pose and pixel grid change the projection an
 
 `pyrite material simulate MATERIAL --profile NAME` runs one in-memory scene on the physical detector, using the profile's scorer and, when present, its acquisition. It requires singleton thickness, energy, polar, and azimuth grids, prints a compact line/background and pixel-grid summary (`-o json` is the stable envelope and adds total counts for a counting observation; `-o wide` is one tab-separated line), writes the complete factorized spatial arrays with `--output-file PATH.npz`, and never creates a checkpoint or observation store.
 
-The bundled `emittance_demo` beam is the worked example: a Courant-Snyder waist (`alpha_twiss_x = 0`) on the crystal entrance face at 0.1 mm·mrad normalized emittance and a 0.05 m beta function, plus a 0.1% energy spread, run by `hopg_emittance_demo` over hopg at 30 and 100 keV. Because the stored emittance is normalized, that one beam is the same physical beam at both energies -- 0.12 mm and 2.4 mrad RMS at 30 keV, shrinking as `1/sqrt(beta*gamma)` at 100 keV. A `transverse` table clears the spot FWHM that a beam otherwise defaults to; the two spellings are mutually exclusive, and specifying both is an error rather than a precedence rule. The `compressed_microbunch` beam, run by `hopg_hbn_compressed_microbunch`, is the longitudinal counterpart.
+The bundled `emittance_demo` beam is the worked example: a Courant-Snyder waist (`alpha_twiss_x = 0`) on the crystal entrance face at 0.1 mm·mrad normalized emittance and a 0.05 m beta function, plus a 0.1% energy spread, run by `hopg_emittance_demo` over hopg at 30 and 100 keV. Because the stored emittance is normalized, that one beam is the same physical beam at both energies -- 0.12 mm and 2.4 mrad RMS at 30 keV, shrinking as `1/sqrt(beta*gamma)` at 100 keV. A `transverse` table clears the spot FWHM that a beam otherwise defaults to; the two spellings are mutually exclusive, and specifying both is an error rather than a precedence rule. The beam's `longitudinal` table is the longitudinal counterpart; lab campaigns that scan microbunch structure keep those beams in their external catalog.
 
 Archive and restore copy the complete component directory, including identity metadata. Archive merge rejects two identity-bearing datasets whose resolved parameter hashes differ. Legacy checkpoints without identity remain readable and merge-compatible; their provenance cannot be reconstructed retroactively.
 
