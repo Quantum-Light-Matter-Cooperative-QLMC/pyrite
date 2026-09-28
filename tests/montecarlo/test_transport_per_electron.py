@@ -464,6 +464,8 @@ def test_cuda_cutoff_crossing_truncates_the_terminal_flight():
         seed=4,
         max_steps=20,
         transport_core="cuda",
+        # The endpoint oracle below is the frozen left-endpoint rule.
+        energy_model="frozen",
     )
 
     terminal_start = out["E_keV"][-1]
