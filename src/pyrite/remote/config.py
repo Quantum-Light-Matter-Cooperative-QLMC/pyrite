@@ -106,6 +106,11 @@ def remote_host() -> str:
                 "remote target is not configured; set remote.target with "
                 "`pyrite config set remote.target HOST` or set PYRITE_REMOTE_HOST"
             )
+        if not resolved.value:
+            raise SystemExit(
+                "remote target is not configured; set remote.target with "
+                "`pyrite config set remote.target HOST` or set PYRITE_REMOTE_HOST"
+            )
         return validate_remote_target(resolved.value)
     except (ValueError, cli_config.ConfigError) as exc:
         raise SystemExit(f"invalid PYRITE_REMOTE_HOST: {exc}") from exc

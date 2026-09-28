@@ -8,8 +8,11 @@
 #SBATCH --mem=16G
 #SBATCH --time=02:00:00
 #SBATCH --output=benchmark_cpu_%j.log
+#SBATCH --output=benchmark_cpu_%j.log
 
 set -euo pipefail
+ROOT="${PYRITE_BENCH_ROOT:-$PWD}"
+cd "$ROOT/pyrite"
 ROOT="${PYRITE_BENCH_ROOT:-$PWD}"
 cd "$ROOT/pyrite"
 export PYRITE_MC_BACKEND=cpu

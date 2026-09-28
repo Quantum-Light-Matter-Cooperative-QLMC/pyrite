@@ -107,10 +107,8 @@ def test_penetration_view_uses_static_volume_figure_as_primary_track_plot() -> N
         assert arg in source
     # The 2D cross-section renders eagerly beside the survival chart (no lazy
     # accordion wrapper -- see the rail-free declutter).
-    assert (
-        "_cross_section_chart = apply_altair_theme("
-        "trajectory_chart(_nc, Ne=40, width=420), _theme)" in source
-    )
+    assert "trajectory_chart(_nc, data=_view_data, width=420)" in source
+    assert "visible_trajectory_data(" in source
     assert "lateral extent is fitted to the tracks" in source
 
 

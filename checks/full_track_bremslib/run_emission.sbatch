@@ -9,7 +9,9 @@
 #SBATCH --mem=24G
 #SBATCH --time=03:00:00
 #SBATCH --output=pyrite_emission_%j.log
+#SBATCH --output=pyrite_emission_%j.log
 set -euo pipefail
+ROOT="${PYRITE_BENCH_ROOT:?set PYRITE_BENCH_ROOT to the staged benchmark directory}"
 ROOT="${PYRITE_BENCH_ROOT:?set PYRITE_BENCH_ROOT to the staged benchmark directory}"
 cd "$ROOT/pyrite-fa20e0dd"
 export PYRITE_MC_BACKEND=cpu PYRITE_BENCH_CORE=per-electron PYRITE_BENCH_NE=100000

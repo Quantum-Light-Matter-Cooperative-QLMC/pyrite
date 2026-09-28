@@ -108,7 +108,7 @@ def track_vertices_3d(data, *, t_fs=None, reveal_until_fs=None):
     return xyz, colors, ids
 
 
-def _tracks_trace(case, data, unit, *, R=_IDENTITY_R, reveal_until_fs=None):
+def _tracks_trace(case, data, unit, *, R=_IDENTITY_R, reveal_until_fs=None, generation=0):
     """Electron-track ``Scatter3d`` at one reveal cutoff (see
     :func:`track_vertices_3d`). Shared by the full-reveal figure
     (:func:`trajectory_volume_figure_from_data`) and by every animation frame
@@ -123,9 +123,17 @@ def _tracks_trace(case, data, unit, *, R=_IDENTITY_R, reveal_until_fs=None):
     xyz, energy, elec_id = track_vertices_3d(
         data, t_fs=data["t_fs"], reveal_until_fs=reveal_until_fs
     )
+    track_data = dict(data, elec_id=data.get("track_id", data["elec_id"]))
+    _, _, track_id = track_vertices_3d(
+        track_data, t_fs=data["t_fs"], reveal_until_fs=reveal_until_fs
+    )
+    parent_data = dict(data, elec_id=data.get("parent_id", np.full(len(data["E"]), -1)))
+    _, _, parent_id = track_vertices_3d(
+        parent_data, t_fs=data["t_fs"], reveal_until_fs=reveal_until_fs
+    )
     depth = xyz[:, 2]
     xyz = _rotate(xyz, R)
-    custom = np.column_stack((energy, elec_id, depth))
+    custom = np.column_stack((energy, elec_id, depth, track_id, parent_id))
     return go.Scatter3d(
         x=xyz[:, 0],
         y=xyz[:, 1],
@@ -136,7 +144,8 @@ def _tracks_trace(case, data, unit, *, R=_IDENTITY_R, reveal_until_fs=None):
             "colorscale": "Turbo",
             "cmin": 0.0,
             "cmax": float(case["E0_keV"]),
-            "width": 4,
+            "width": 4 if generation == 0 else 2,
+            "showscale": generation == 0,
             "colorbar": {
                 "title": {"text": "electron<br>energy (keV)"},
                 "thickness": 14,
@@ -145,13 +154,45 @@ def _tracks_trace(case, data, unit, *, R=_IDENTITY_R, reveal_until_fs=None):
             },
         },
         customdata=custom,
+        opacity=1.0 if generation == 0 else 0.65,
         hovertemplate=(
             "electron %{customdata[1]:.0f}<br>"
+            "track %{customdata[3]:.0f}<br>"
+            "parent %{customdata[4]:.0f}<br>"
+            f"generation {generation}<br>"
             "energy %{customdata[0]:.3g} keV<br>"
             f"depth %{{customdata[2]:.4g}} {unit}<extra></extra>"
         ),
-        name="electron tracks",
+        name="electron tracks" if generation == 0 else f"generation {generation} tracks",
     )
+
+
+_SEGMENT_FIELDS = (
+    "E",
+    "t_fs",
+    "z_u",
+    "elec_id",
+    "track_id",
+    "parent_id",
+    "generation",
+    "L",
+    "start_xyz",
+    "end_xyz",
+)
+
+
+def visible_trajectory_data(data, *, max_generation=None, min_energy_keV=0.0):
+    """Select captured segments for all viewer overlays, retaining beam metadata."""
+    energy = np.asarray(data["E"])
+    generation = np.asarray(data.get("generation", np.zeros(len(energy))))
+    keep = energy >= min_energy_keV
+    if max_generation is not None:
+        keep &= generation <= max_generation
+    visible = dict(data)
+    for key in _SEGMENT_FIELDS:
+        if key in data:
+            visible[key] = np.asarray(data[key])[keep]
+    return visible
 
 
 def vacuum_legs_trace(
@@ -560,7 +601,7 @@ def _exit_paths_3d(
     regardless of ``R``; ``R`` (default identity) only rotates the final
     plotted points into the lab frame.
     """
-    elec_id = np.asarray(data["elec_id"])
+    elec_id = np.asarray(data.get("track_id", data["elec_id"]))
     start = np.asarray(data["start_xyz"], dtype=float)
     end = np.asarray(data["end_xyz"], dtype=float)
     energy = np.asarray(data["E"], dtype=float)
@@ -731,7 +772,14 @@ def trajectory_volume_figure(
 
 
 def trajectory_volume_figure_from_data(
-    rec_or_case, data, *, realistic=False, beam_fwhm_mm=None, reveal_until_fs=None
+    rec_or_case,
+    data,
+    *,
+    realistic=False,
+    beam_fwhm_mm=None,
+    reveal_until_fs=None,
+    max_generation=None,
+    min_energy_keV=0.0,
 ):
     """Assemble the 3D cutaway figure from an ALREADY-transported ``data`` dict
     (see :func:`trajectory_volume_data`) plus a playback reveal cutoff.
@@ -744,11 +792,30 @@ def trajectory_volume_figure_from_data(
     drawn crystal footprint and beam-spot outline, not transport.
     """
     case = _case_of(rec_or_case)
+    data = visible_trajectory_data(
+        data, max_generation=max_generation, min_energy_keV=min_energy_keV
+    )
     R = _case_R(case)
     lox, hix, loy, hiy, thick, unit, span = _display_extent(case, data, realistic=realistic)
-    tracks = _tracks_trace(case, data, unit, R=R, reveal_until_fs=reveal_until_fs)
-
-    fig = go.Figure([_crystal_mesh(lox, hix, loy, hiy, thick, R=R), tracks])
+    generations = np.asarray(data.get("generation", np.zeros(len(data["E"]), dtype=int)))
+    track_traces = []
+    for value in np.unique(generations):
+        rows = generations == value
+        generation_data = dict(data)
+        for key in _SEGMENT_FIELDS:
+            if key in data:
+                generation_data[key] = np.asarray(data[key])[rows]
+        track_traces.append(
+            _tracks_trace(
+                case,
+                generation_data,
+                unit,
+                R=R,
+                reveal_until_fs=reveal_until_fs,
+                generation=int(value),
+            )
+        )
+    fig = go.Figure([_crystal_mesh(lox, hix, loy, hiy, thick, R=R), *track_traces])
     if len(data.get("vacuum_start_xyz", ())):
         fig.add_trace(
             vacuum_legs_trace(
