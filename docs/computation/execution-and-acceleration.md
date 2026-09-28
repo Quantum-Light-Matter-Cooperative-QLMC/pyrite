@@ -29,7 +29,9 @@ The CUDA transport core requires a CUDA array backend for its `cupyx.jit` kernel
 
 `auto` probes in a fixed order — CuPy for CUDA or ROCm, then Intel SYCL through `dpnp`, then NumPy — and takes the first that yields a usable device. The probe is recorded: a backend that fell back to NumPy carries a `fallback_reason` string naming why, which appears in the runtime plan.
 
-An explicit accelerator request raises if it cannot be satisfied. Asking for `PYRITE_MC_BACKEND=cuda` on a machine with a ROCm CuPy build raises rather than running somewhere else, and naming a backend whose device lacks `float64` support while `PYRITE_FP64=1` is set raises for the same reason. Only `auto` is permitted to substitute, and only with a logged warning.
+An explicit accelerator request raises if it cannot be satisfied. Asking for `PYRITE_MC_BACKEND=cuda` on a machine with a ROCm CuPy build raises rather than running somewhere else, and naming a backend whose device lacks native `float64` support raises for the same reason, whatever `PYRITE_FP64` says. Only `auto` is permitted to substitute, and only with a logged warning; such a device falls back to NumPy with `fallback_reason` `unsupported_fp64: <device>`.
+
+A device without native `float64` is refused even though `REAL` would be `float32`: some spectrum reductions still accumulate in `float64` on the device, and such a queue fails mid-run instead of at selection. Intel Arc (DG2) and integrated Intel GPUs fall in this class, so on them the SYCL backend is currently unavailable; on-device support is tracked in issue #224.
 
 Selection happens once at import and applies to the whole process: the module-level `xp`, `REAL`, and `_GPU` bindings are read by every kernel, so a mid-run switch would leave arrays from two backends in the same reduction. A different backend requires a separate process. Worker pools select their backend this way (see [memory, chunking, and scheduling](memory-and-scheduling.md)).
 
@@ -200,7 +202,7 @@ The following unsupported combinations and invalid inputs raise errors:
 * **Flight-grouped incoherent CXR on a non-NumPy backend.** The segmented complex accumulation has no device equivalent, so substepped rows raise. The fallback would be the row-incoherent sum, which is a different physical claim.
 * **Layered or component-resolved substepped grouping.** The per-layer refractive decrement along the escape path is not modelled, so these raise too.
 * **Device residency on a non-CUDA core.** Only CUDA transport produces resident segment arrays.
-* **An explicit accelerator backend that is unavailable, or lacks `float64` under `PYRITE_FP64=1`.** Raises; only `auto` may substitute.
+* **An explicit accelerator backend that is unavailable, or whose device lacks native `float64`.** Raises; only `auto` may substitute.
 * **A transport lookup table with a non-positive elastic rate.** Raises at build time rather than producing an infinite mean free path at run time.
 
 Device out-of-memory handling can replay transport with downloaded segments. Counter-addressed streams preserve the result during that fallback.

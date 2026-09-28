@@ -40,7 +40,7 @@ change scheduling, memory, or profiling only.
 | `PYRITE_PROFILE` | Campaign-profile name; unset resolves to `standard`. Empty is invalid. | Command option > environment > config store > default; `console.config`. | selects configuration |
 | `PYRITE_REMOTE_HOST` | SSH-config host alias; unset means remote commands require configuration. | Command option > environment > config store; `console.config`, `remote.config`. | remote destination |
 | `PYRITE_HOME` | Workspace-root path; unset resolves to the current directory. | Explicit workspace/checkpoint path > environment > config store > cwd; `console.config`. | checkpoint/artifact location |
-| `PYRITE_MC_BACKEND` | `auto`, `cpu`, `cuda`, `rocm`, or `sycl`; unset is `auto`. An explicit unavailable accelerator fails. | Process-wide backend selection; `_backend`. | **numerics**, resources |
+| `PYRITE_MC_BACKEND` | `auto`, `cpu`, `cuda`, `rocm`, or `sycl`; unset is `auto`. An explicit unavailable accelerator, or one whose device lacks native fp64, fails; `auto` falls back to CPU. | Process-wide backend selection; `_backend`. | **numerics**, resources |
 | `PYRITE_MC_SYCL_DEVICE` | A dpctl SYCL device selector; unset chooses the first usable GPU. | Used only when the SYCL backend resolves; `_backend`. | hardware choice |
 | `PYRITE_FP64` | Set to `1` for float64 accelerator calculations; any other or unset value retains the normal CPU float64/GPU float32 behavior. | Process-wide; `_backend`. | **numerics**, resources |
 | `PYRITE_MC_TRANSPORT_CORE` | `lockstep`, `per-electron`, `cuda`, or `auto`; unset leaves the requested/automatic core selection in force. | Process-wide transport pin; `montecarlo.transport.batching`. | **numerics**, resources |

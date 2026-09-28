@@ -334,13 +334,22 @@ def select_backend(requested: str | None = None) -> ArrayBackend:
                 logger.debug("accelerator probe skipped: %s", error)
         if backend is None:
             return NumPyBackend(fallback_reason="accelerator_unavailable: " + "; ".join(failures))
-    if env_value("PYRITE_FP64") == "1" and not backend.device.supports_fp64:
+    # Device kernels still accumulate some sums in float64 even when REAL is
+    # float32, so a device without native fp64 fails mid-run. Refuse it before
+    # any kernel launch until those sites move off device (issue #224).
+    if not backend.device.supports_fp64:
         if requested == "auto":
-            logger.warning("%s lacks fp64; PYRITE_FP64=1 selects CPU NumPy", backend.device.name)
+            logger.warning(
+                "%s device %r lacks native fp64, which PyRITE device kernels require; "
+                "using CPU NumPy",
+                backend.name,
+                backend.device.name,
+            )
             return NumPyBackend(fallback_reason=f"unsupported_fp64: {backend.device.name}")
         raise BackendUnavailableError(
-            f"PYRITE_MC_BACKEND={backend.name} device {backend.device.name!r} lacks fp64; "
-            "unset PYRITE_FP64 or select PYRITE_MC_BACKEND=cpu"
+            f"PYRITE_MC_BACKEND={backend.name} device {backend.device.name!r} lacks fp64 "
+            "(no native float64 support), which PyRITE device kernels require; "
+            "select PYRITE_MC_BACKEND=cpu, or auto to fall back to CPU"
         )
     return backend
 

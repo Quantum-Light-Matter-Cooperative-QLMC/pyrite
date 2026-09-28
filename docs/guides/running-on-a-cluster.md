@@ -84,7 +84,7 @@ Then run `pyrite app analysis launch <material>` (the `src/pyrite/apps/analysis_
 
 - **`__main__` guard:** `pyrite run` (and the `python -m pyrite._entry.scan` shim) are properly guarded, so the `spawn` / `forkserver` transport workers are safe. Don't wrap the sweep in an unguarded `python -c "…"`.
 - **`--quick`** runs a tiny smoke grid into the `<material>_quick/` component directory — use it to validate your sbatch script cheaply before submitting the full sweep.
-- **fp64:** set `PYRITE_FP64=1` for double-precision reference runs (the GPU path defaults to fp32). Devices without fp64 error when selected explicitly; automatic selection routes the reference run to CPU.
+- **fp64:** set `PYRITE_FP64=1` for double-precision reference runs (the GPU path defaults to fp32). Devices without native fp64 (e.g. Intel Arc/integrated GPUs) are refused regardless of `PYRITE_FP64`: explicit selection errors and automatic selection runs on CPU.
 - **small devices:** `PYRITE_MC_RESOURCE_POLICY=auto` selects `conservative` below 8 GiB and admits chunks before allocation. Use `balanced` or `throughput` only after measuring headroom on the target node.
 
 ## Lab-box remote helper
