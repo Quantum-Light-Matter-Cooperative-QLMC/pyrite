@@ -17,6 +17,7 @@ from ..._line_grid_policy import (
     LOCAL_RESOLUTION_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
     LineGridToleranceError,
+    LineGridTruncationWarning,
     LineShapePrecisionWarning,
     LineYieldStatisticsWarning,
     cached_coordinates,
@@ -524,7 +525,9 @@ def check_line_truncation(case, audit):
 
     The upper-edge fraction is the bandwidth share this policy spends and is
     refused above ``truncation_limit``. The lower edge is reported only: the
-    ``start`` convention predates this policy and is not its share. With
+    ``start`` convention predates this policy and is not its share. An axis
+    already at the closed-form ceiling is warned about instead: the policy cut
+    nothing the automatic bandwidth keeps. With
     per-electron sums, the line yield's standard error is recorded and a
     statistics-limited case is warned about, not refused (#201).
 
@@ -558,7 +561,21 @@ def check_line_truncation(case, audit):
                 LineYieldStatisticsWarning,
                 stacklevel=2,
             )
-    if record["upper_fraction_bound"] > limit:
+    ceiling = float(case["line_grid_policy"]["bandwidth"]["stop_eV"])
+    record["capped_at_ceiling"] = float(audit["stop_eV"]) >= ceiling
+    if record["upper_fraction_bound"] > limit and record["capped_at_ceiling"]:
+        # The axis already reaches the closed-form kinematic ceiling that the
+        # automatic policy uses unaudited; no line resonates above it, so only
+        # sinc**2 tails cross the edge and this policy cut nothing.
+        warnings.warn(
+            f"{case['name']} at {case['E0_keV']:g} keV: the line axis reaches the "
+            f"kinematic ceiling {ceiling:g} eV, yet line tails above it may hold "
+            f"{record['upper_fraction_bound']:.3g} of the line yield (bound), above "
+            f"the {limit:g} share. The automatic bandwidth truncates the same tails.",
+            LineGridTruncationWarning,
+            stacklevel=2,
+        )
+    elif record["upper_fraction_bound"] > limit:
         raise LineGridToleranceError(
             f"{case['name']} at {case['E0_keV']:g} keV: the measured line bandwidth "
             f"[{audit['start_eV']:g}, {audit['stop_eV']:g}] eV may truncate "

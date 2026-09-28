@@ -91,6 +91,7 @@ __all__ = [
     "WINDOW_POLICY",
     "LineGridPolicy",
     "LineShapePrecisionWarning",
+    "LineGridTruncationWarning",
     "LineYieldStatisticsWarning",
     "cached_coordinates",
     "coordinate_cache_key",
@@ -292,6 +293,10 @@ class LineGridToleranceError(ValueError):
 
 class LineShapePrecisionWarning(UserWarning):
     """A float32 line window reaches the binade where lineshape exceeds its share."""
+
+
+class LineGridTruncationWarning(UserWarning):
+    """A measured line axis at the kinematic ceiling still leaves tail mass above it."""
 
 
 class LineYieldStatisticsWarning(UserWarning):
