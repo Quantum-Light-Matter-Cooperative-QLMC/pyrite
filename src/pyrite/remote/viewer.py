@@ -142,9 +142,13 @@ def _status_remote_command(job_assign, detail):
         '{ cat "$D/meta" 2>/dev/null; } | emit META; '
         '{ cat "$D/state" 2>/dev/null; } | emit STATE; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
+        # Rank the job within the partition its own run.sh requested, so a job
+        # submitted to another target profile is not ranked against this one.
+        'PART=$(sed -n "s/^#SBATCH --partition=//p" "$D/run.sh" 2>/dev/null | head -1); '
+        f'[ -n "$PART" ] || PART={config.shell_word(config.slurm_partition())}; '
         "QUEUE_RAW=; "
         "case \"$SID\" in ''|*[!0-9]*) ;; *) "
-        f"QUEUE_RAW=$(squeue -h --partition={config.shell_word(config.SLURM_PARTITION)} "
+        'QUEUE_RAW=$(squeue -h --partition="$PART" '
         "--states=PENDING,RUNNING --sort=-p,i "
         "-o 'job_id=%i|state=%T|name=%j|partition=%P|elapsed=%M|left=%L|"
         "nodes=%D|reason=%R|priority=%Q|user=%u' 2>&1); "
@@ -159,8 +163,7 @@ def _status_remote_command(job_assign, detail):
         'else printf "job_id=%s|state=NOT_QUEUED\\n" "$SID"; fi ;; esac; '
         "} | emit SQUEUE || exit $?; "
         "{ "
-        f"printf 'cohort_partition={config.SLURM_PARTITION}|"
-        "order=priority_desc_job_id_asc\\n'; "
+        "printf 'cohort_partition=%s|order=priority_desc_job_id_asc\\n' \"$PART\"; "
         'if [ -n "${QUEUE_RAW+x}" ]; then printf "%s\\n" "$QUEUE_RAW"; fi; '
         "} | emit QUEUE; " + progress + performance + resources + log
     )

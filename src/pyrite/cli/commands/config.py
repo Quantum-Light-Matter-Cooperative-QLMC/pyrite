@@ -6,7 +6,7 @@ import click
 
 from ...console import config as _config
 from ...console.output import CLIError
-from ...remote.config import validate_remote_target
+from ...remote.config import validate_remote_target, validate_slurm_setting
 from .._groups import LazyGroup
 
 _KEY = click.Choice(_config.keys(), case_sensitive=True)
@@ -23,6 +23,11 @@ def _validated(key: str, value: str) -> str:
     if key == "remote.target":
         try:
             return validate_remote_target(value)
+        except ValueError as exc:
+            raise click.BadParameter(str(exc), param_hint="VALUE") from exc
+    if key in ("remote.gpu_vendor", "remote.partition", "remote.nodelist", "remote.gres"):
+        try:
+            return validate_slurm_setting(key, value)
         except ValueError as exc:
             raise click.BadParameter(str(exc), param_hint="VALUE") from exc
     if key == "catalog.path":

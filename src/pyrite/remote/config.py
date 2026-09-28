@@ -18,8 +18,13 @@ HOST: str | None = None
 # path, and the defaults work on any box without configuration.
 REMOTE_DIR = env_value("PYRITE_REMOTE_DIR", "~/pyrite")
 REMOTE_UV = env_value("PYRITE_REMOTE_UV", "~/.local/bin/uv")
-REMOTE_GPU_VENDOR = env_value("PYRITE_REMOTE_GPU_VENDOR", "nvidia")
-SLURM_PARTITION = "gpu"
+# SLURM target profile overrides, same compatibility role as ``HOST``: ``None``
+# resolves ``remote.gpu_vendor`` / ``remote.partition`` / ``remote.nodelist`` /
+# ``remote.gres`` through the shared config precedence (see ``console.config``).
+REMOTE_GPU_VENDOR: str | None = None
+SLURM_PARTITION: str | None = None
+SLURM_NODELIST: str | None = None
+SLURM_GRES: str | None = None
 SLURM_GPUS = 1
 SLURM_CPUS_PER_MATERIAL = 8
 SLURM_TIME = "UNLIMITED"
@@ -212,15 +217,72 @@ def remote_uv() -> str:
     return value
 
 
-def remote_gpu_vendor() -> str:
-    """Return validated remote accelerator vendor capability selector."""
+_SLURM_SETTINGS = {
+    # key: (environment name, value pattern, what a valid value looks like)
+    "remote.gpu_vendor": (
+        "PYRITE_REMOTE_GPU_VENDOR",
+        re.compile(r"nvidia|amd|intel"),
+        "nvidia, amd, or intel",
+    ),
+    "remote.partition": (
+        "PYRITE_REMOTE_PARTITION",
+        re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*"),
+        "a SLURM partition name such as gpu-amd",
+    ),
+    "remote.nodelist": (
+        "PYRITE_REMOTE_NODELIST",
+        re.compile(r"[A-Za-z0-9][A-Za-z0-9._,\[\]-]*"),
+        "a SLURM node list such as qlmc-ace or node[01-02], or 'any'",
+    ),
+    "remote.gres": (
+        "PYRITE_REMOTE_GRES",
+        re.compile(r"[A-Za-z0-9][A-Za-z0-9._:,-]*"),
+        "a SLURM gres string such as gpu:1 or gpu:radeon8060s:1",
+    ),
+}
+# ``remote.nodelist`` value meaning "let SLURM pick any node in the partition".
+NODELIST_ANY = "any"
 
-    value = str(REMOTE_GPU_VENDOR).strip().lower()
-    if value not in {"nvidia", "amd", "intel"}:
-        raise SystemExit(
-            f"invalid PYRITE_REMOTE_GPU_VENDOR={REMOTE_GPU_VENDOR!r}: expected nvidia, amd, or intel"
-        )
+
+def validate_slurm_setting(key: str, value: str) -> str:
+    """Validate one SLURM profile value; accepted values are safe unquoted in ``#SBATCH``."""
+    _env_name, pattern, expected = _SLURM_SETTINGS[key]
+    if key == "remote.gpu_vendor":
+        value = value.strip().lower()
+    if pattern.fullmatch(value) is None:
+        raise ValueError(f"expected {expected}")
     return value
+
+
+def _slurm_setting(key: str, override: str | None) -> str:
+    from ..console import config as cli_config
+
+    env_name = _SLURM_SETTINGS[key][0]
+    try:
+        value = validate_slurm_setting(key, cli_config.resolve(key, override).value)
+    except (ValueError, cli_config.ConfigError) as exc:
+        raise SystemExit(f"invalid {key} ({env_name}): {exc}") from exc
+    return "" if key == "remote.nodelist" and value == NODELIST_ANY else value
+
+
+def remote_gpu_vendor() -> str:
+    """Return validated remote accelerator vendor (``remote.gpu_vendor``)."""
+    return _slurm_setting("remote.gpu_vendor", REMOTE_GPU_VENDOR)
+
+
+def slurm_partition() -> str:
+    """Return validated SLURM partition for new jobs (``remote.partition``)."""
+    return _slurm_setting("remote.partition", SLURM_PARTITION)
+
+
+def slurm_nodelist() -> str | None:
+    """Return validated SLURM node selection (``remote.nodelist``), or None for any node."""
+    return _slurm_setting("remote.nodelist", SLURM_NODELIST) or None
+
+
+def slurm_gres() -> str:
+    """Return validated SLURM generic-resource request (``remote.gres``)."""
+    return _slurm_setting("remote.gres", SLURM_GRES)
 
 
 def remote_path(*parts: str) -> str:

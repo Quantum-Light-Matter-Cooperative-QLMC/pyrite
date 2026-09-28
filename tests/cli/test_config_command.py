@@ -11,6 +11,15 @@ def _isolated_store(monkeypatch, tmp_path):
     monkeypatch.delenv("PYRITE_PROFILE", raising=False)
     monkeypatch.delenv("PYRITE_REMOTE_HOST", raising=False)
     monkeypatch.setattr(remote_config, "HOST", None)
+    for name in (
+        "PYRITE_REMOTE_GPU_VENDOR",
+        "PYRITE_REMOTE_PARTITION",
+        "PYRITE_REMOTE_NODELIST",
+        "PYRITE_REMOTE_GRES",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    for attribute in ("REMOTE_GPU_VENDOR", "SLURM_PARTITION", "SLURM_NODELIST", "SLURM_GRES"):
+        monkeypatch.setattr(remote_config, attribute, None)
     return path
 
 
@@ -31,6 +40,10 @@ def test_config_set_get_and_list_effective_values(monkeypatch, tmp_path):
             "KEY\tVALUE\tSOURCE\n"
             "profile.current\tsub_100keV\tconfig store\n"
             "remote.target\tbox-a\tconfig store\n"
+            "remote.gpu_vendor\tnvidia\tbuilt-in default\n"
+            "remote.partition\tgpu\tbuilt-in default\n"
+            "remote.nodelist\tany\tbuilt-in default\n"
+            "remote.gres\tgpu:1\tbuilt-in default\n"
             "workspace.root\t.\tbuilt-in default\n"
             f"catalog.path\t{_config.resolve('catalog.path').value}\tbuilt-in default\n"
             # The external-code source trees resolve through the same store
@@ -41,6 +54,36 @@ def test_config_set_get_and_list_effective_values(monkeypatch, tmp_path):
         ),
     )
     assert path.is_file()
+
+
+def test_config_set_slurm_profile_feeds_remote_target(monkeypatch, tmp_path):
+    _isolated_store(monkeypatch, tmp_path)
+
+    for key, value in (
+        ("remote.gpu_vendor", "AMD"),
+        ("remote.partition", "gpu-amd"),
+        ("remote.nodelist", "qlmc-ace"),
+        ("remote.gres", "gpu:radeon8060s:1"),
+    ):
+        assert invoke(config_command.command, ["set", key, value]).exit_code == 0
+
+    assert remote_config.remote_gpu_vendor() == "amd"
+    assert remote_config.slurm_partition() == "gpu-amd"
+    assert remote_config.slurm_nodelist() == "qlmc-ace"
+    assert remote_config.slurm_gres() == "gpu:radeon8060s:1"
+
+    assert invoke(config_command.command, ["set", "remote.nodelist", "any"]).exit_code == 0
+    assert remote_config.slurm_nodelist() is None
+
+
+def test_config_set_rejects_unsafe_slurm_partition(monkeypatch, tmp_path):
+    path = _isolated_store(monkeypatch, tmp_path)
+
+    result = invoke(config_command.command, ["set", "remote.partition", "gpu --x"])
+
+    assert result.exit_code == 2
+    assert "SLURM partition name" in result.output
+    assert not path.exists()
 
 
 def test_config_set_workspace_root_normalizes_path(monkeypatch, tmp_path):

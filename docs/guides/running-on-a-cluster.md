@@ -89,7 +89,20 @@ Then run `pyrite app analysis launch <material>` (the `src/pyrite/apps/analysis_
 
 ## Lab-box remote helper
 
-`pyrite remote` syncs the current working tree to the configured lab host and submits every CXR compute run through SLURM. Its fixed lab allocation requests the `gpu` partition, one node, one task, and one GPU (`--gres=gpu:1`). Default `--chunk-minutes 10` runs one material at a time in bounded, self-resubmitting slices. `--chunk-minutes 0` selects a monolithic `UNLIMITED` allocation; only that mode accepts `--parallel-materials`, defaults to one material, and caps concurrency at four. This helper remains an NVIDIA lab-box path: its generated batch job starts with `module purge`, then loads `cuda`, `openmpi`, and `hdf5`; it uses the synced project's configured `uv` environment, not the WarpX-specific `warpx-user` Conda environment. `PYRITE_REMOTE_GPU_VENDOR` defaults to `nvidia`; setting `amd` or `intel` fails before batch-script generation until those lab-box module/profiler paths are validated, so NVIDIA commands are never emitted for another vendor.
+`pyrite remote` syncs the current working tree to the configured lab host and submits every CXR compute run through SLURM. Each allocation requests one node, one task, and the configured SLURM target profile: `remote.partition` (default `gpu`), optional `remote.nodelist` (default `any`, no `--nodelist`), and `remote.gres` (default `gpu:1`). Default `--chunk-minutes 10` runs one material at a time in bounded, self-resubmitting slices. `--chunk-minutes 0` selects a monolithic `UNLIMITED` allocation; only that mode accepts `--parallel-materials`, defaults to one material, and caps concurrency at four. It uses the synced project's configured `uv` environment, not the WarpX-specific `warpx-user` Conda environment. `remote.gpu_vendor` (`PYRITE_REMOTE_GPU_VENDOR`, default `nvidia`) selects the job prelude. NVIDIA jobs start with `module purge`, then load `cuda`, `openmpi`, and `hdf5`. AMD jobs load no modules. They sync into their own `.venv-amd` with `CUPY_INSTALL_USE_HIP=1 uv sync --extra amd`, which builds CuPy against the node's ROCm toolchain (`ROCM_HOME`, default `/opt/rocm`). They also pin `PYRITE_MC_BACKEND=rocm`, so a missing HIP stack fails the job instead of falling back to CPU, and they log `rocminfo` gfx and `rocm-smi` output in the job-log header. `--nsys` needs an NVIDIA target. `intel` still fails before batch-script generation. Every compute node must see the head node's `PYRITE_REMOTE_DIR` at the same path on a shared filesystem: the batch script, job bookkeeping (`jobs/<id>/`), reservations, progress, and checkpoints all live there, and `job status`, `job logs`, and `remote pull` read them from the head node. `job status` ranks each job within the partition its own `run.sh` requested.
+
+For example, to target the AMD node `qlmc-ace` behind the `qlmc` head node:
+
+```bash
+pyrite config set remote.target qlmc
+pyrite config set remote.gpu_vendor amd
+pyrite config set remote.partition gpu-amd
+pyrite config set remote.nodelist qlmc-ace
+pyrite config set remote.gres gpu:radeon8060s:1
+pyrite run --quick -m hopg --remote --dry-run
+```
+
+Switch back with `remote.gpu_vendor nvidia`, `remote.partition gpu`, `remote.nodelist any`, and `remote.gres gpu:1`, or override one command with the matching `PYRITE_REMOTE_*` variables.
 
 Remote configuration. There is no built-in host: set the SSH-config alias with `pyrite config set remote.target HOST` (or `PYRITE_REMOTE_HOST`, or `-R HOST` per command). The checkout directory and `uv` executable on that host default to `~/pyrite` and `~/.local/bin/uv`; `sync` creates the checkout directory if it is missing. A leading `~` is resolved to the remote login home with one cached, non-interactive `ssh` call per process, so everything downstream (scripts, `scp` paths) sees an absolute path; if that call fails the command stops and asks for absolute paths. Override with `PYRITE_REMOTE_DIR` and `PYRITE_REMOTE_UV` (absolute POSIX paths, `~/...` paths, or for `uv` a bare executable name on the remote non-interactive `PATH`). The precedence table is in [configuration resolution](../repo-design/configuration-resolution.md).
 

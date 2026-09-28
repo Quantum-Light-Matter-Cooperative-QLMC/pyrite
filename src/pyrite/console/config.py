@@ -32,6 +32,10 @@ CONFIG_PATH = state_dir() / "config.toml"
 _SETTINGS = {
     "profile.current": ("PYRITE_PROFILE", "standard"),
     "remote.target": ("PYRITE_REMOTE_HOST", ""),
+    "remote.gpu_vendor": ("PYRITE_REMOTE_GPU_VENDOR", "nvidia"),
+    "remote.partition": ("PYRITE_REMOTE_PARTITION", "gpu"),
+    "remote.nodelist": ("PYRITE_REMOTE_NODELIST", "any"),
+    "remote.gres": ("PYRITE_REMOTE_GRES", "gpu:1"),
     "workspace.root": ("PYRITE_HOME", "."),
     "catalog.path": ("PYRITE_CATALOG", str(data_dir() / "catalog")),
     "xsgen.bremslib_source": ("PYRITE_XSGEN_BREMSLIB_SOURCE", "../BremsLib_v2.0.8"),

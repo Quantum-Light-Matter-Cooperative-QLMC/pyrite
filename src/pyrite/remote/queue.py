@@ -139,6 +139,8 @@ def start_queue(
         raise SystemExit("nsys requires one material process per GPU")
     if nsys and len(materials) != 1:
         raise SystemExit("nsys requires exactly one material")
+    if nsys and config.remote_gpu_vendor() != "nvidia":
+        raise SystemExit("nsys requires an NVIDIA target (remote.gpu_vendor=nvidia)")
     if (cpu or cpu_only) and chunked:
         raise SystemExit("CPU profiling requires a monolithic allocation")
     if chunked and parallel_materials is not None:

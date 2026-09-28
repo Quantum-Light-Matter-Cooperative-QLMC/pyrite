@@ -467,7 +467,7 @@ One module per `pyrite` subcommand group, holding only the Click layer. `scan`/`
 Terminal presentation primitives shared by the CLI and the domain packages, and the layer everything else may depend on without depending on `cli/`. It imports `paths`, `_env` and `_catalog_keys` and nothing else first-party.
 - `output.py` — colour, Click parameter types, destructive-action confirmation, result/diagnostic emission, JSON envelopes, and `run()`, which preserves the pyrite exit contract around Click.
 - `json.py` — stable JSON payload adapters for automation.
-- `config.py` — the persistent context store (`profile.current`, `remote.target`, `workspace.root`, `catalog.path`), its per-call > `PYRITE_*` > store > built-in precedence resolver, and workspace/catalog path helpers.
+- `config.py` — the persistent context store (`profile.current`, `remote.*` target and SLURM profile, `workspace.root`, `catalog.path`, `xsgen.*`), its per-call > `PYRITE_*` > store > built-in precedence resolver, and workspace/catalog path helpers.
 - `dashboard/` — below.
 
 `checkpoints`, `runs` and `remote` all emit results and render progress while they work. Sourcing that from `cli/` is what put `cli` in a bidirectional pair with each of them; the `domain-packages-stay-below-cli` and `console-stays-below-every-driver` contracts hold the split.

@@ -19,6 +19,10 @@ Each context value resolves independently in this order:
 |---|---|---|
 | `profile.current` | `PYRITE_PROFILE` | `standard` |
 | `remote.target` | `PYRITE_REMOTE_HOST` | unset; configure an SSH host alias to use remote commands |
+| `remote.gpu_vendor` | `PYRITE_REMOTE_GPU_VENDOR` | `nvidia` |
+| `remote.partition` | `PYRITE_REMOTE_PARTITION` | `gpu` |
+| `remote.nodelist` | `PYRITE_REMOTE_NODELIST` | `any` (no `--nodelist`) |
+| `remote.gres` | `PYRITE_REMOTE_GRES` | `gpu:1` |
 | `workspace.root` | `PYRITE_HOME` | current directory |
 
 `pyrite config list` shows both effective values and their sources. `config set` writes atomically to Click's platform-specific user configuration directory.
@@ -69,7 +73,10 @@ output.
 |---|---|---|---|
 | `PYRITE_REMOTE_DIR` | Absolute POSIX path to the remote checkout, or `~/...` (expanded to the remote login home over one cached ssh call); unset is `~/pyrite`. | `remote.config` | remote destination |
 | `PYRITE_REMOTE_UV` | Executable name, absolute POSIX path, or `~/...` path for `uv` on the remote host; unset is `~/.local/bin/uv`. | `remote.config` | remote execution |
-| `PYRITE_REMOTE_GPU_VENDOR` | `nvidia`, `amd`, or `intel`; unset is `nvidia`. Non-NVIDIA values fail before unsupported batch-script generation. | `remote.config` | remote resources |
+| `PYRITE_REMOTE_GPU_VENDOR` | `nvidia`, `amd`, or `intel`; unset is `nvidia`. Selects the batch-script prelude and `uv sync --extra`; `intel` fails before batch-script generation. | Environment > config store (`remote.gpu_vendor`); `console.config`, `remote.config`. | remote resources |
+| `PYRITE_REMOTE_PARTITION` | SLURM partition name for new jobs; unset is `gpu`. | Environment > config store (`remote.partition`); `console.config`, `remote.config`. | remote resources |
+| `PYRITE_REMOTE_NODELIST` | SLURM node list for `#SBATCH --nodelist`, or `any`; unset is `any`. | Environment > config store (`remote.nodelist`); `console.config`, `remote.config`. | remote resources |
+| `PYRITE_REMOTE_GRES` | SLURM gres string for `#SBATCH --gres`, such as `gpu:radeon8060s:1`; unset is `gpu:1`. | Environment > config store (`remote.gres`); `console.config`, `remote.config`. | remote resources |
 | `PYRITE_XSGEN_BREMSLIB_SOURCE` | Directory containing the BremsLib source tree; unset is `../BremsLib_v2.0.8`. | `console.config`, `xsgen.sources` | external data/tooling |
 | `PYRITE_XSGEN_ELSEPA_SOURCE` | Directory containing the ELSEPA source tree; unset is `../elsepa-2020`. | `console.config`, `xsgen.sources` | external data/tooling |
 | `PYRITE_XSGEN_SBETHE_SOURCE` | Directory containing the SBETHE source tree; unset is `../sbethe`. | `console.config`, `xsgen.sources` | external data/tooling |

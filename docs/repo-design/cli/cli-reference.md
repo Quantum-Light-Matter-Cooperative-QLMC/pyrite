@@ -639,7 +639,8 @@ Commands:
 ## `pyrite config get`
 
 ```text
-Usage: pyrite config get [OPTIONS] {profile.current|remote.target|workspace.root|catalog
+Usage: pyrite config get [OPTIONS] {profile.current|remote.target|remote.gpu_vendor|remo
+                         te.partition|remote.nodelist|remote.gres|workspace.root|catalog
                          .path|xsgen.bremslib_source|xsgen.elsepa_source|xsgen.sbethe_so
                          urce}
 
@@ -663,7 +664,8 @@ Options:
 ## `pyrite config set`
 
 ```text
-Usage: pyrite config set [OPTIONS] {profile.current|remote.target|workspace.root|catalog
+Usage: pyrite config set [OPTIONS] {profile.current|remote.target|remote.gpu_vendor|remo
+                         te.partition|remote.nodelist|remote.gres|workspace.root|catalog
                          .path|xsgen.bremslib_source|xsgen.elsepa_source|xsgen.sbethe_so
                          urce} VALUE
 
