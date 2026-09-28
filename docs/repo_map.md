@@ -328,7 +328,7 @@ Pure diagnostics over sampled initial phase-space arrays: per-plane RMS size, ge
 
 ### `campaign/config.py`
 Default settings/sweep builders shared by CLI and both notebooks; per-material scan grids project from immutable `materials.CATALOG`.
-- Public: `default_settings`, `material_grid`, `material_sweep`, `trajectory_sweep`, `catalog_detector`; `MATERIALS` ordered tuple. `catalog_detector` applies the catalog's acceptance mapping onto `DEFAULT_CATALOG_DETECTOR` (Timepix3 at 90 deg); the default response lives here rather than in the catalog. The catalog speaks the flat geometry vocabulary, so both builders project their scan grid through `target_from_flat` and hand `Sweep` a built `target`. Catalog energy-grid artifacts resolve into the built detector's `EnergyBins` at this boundary.
+- Public: `default_settings`, `material_grid`, `material_sweep`, `trajectory_sweep`, `catalog_detector`; `MATERIALS` ordered tuple. `catalog_detector` applies the catalog's acceptance mapping onto `DEFAULT_CATALOG_DETECTOR` (response-free scalar geometry at 90 deg). The catalog speaks the flat geometry vocabulary, so both builders project their scan grid through `target_from_flat` and hand `Sweep` a built `target`. Catalog energy-grid artifacts resolve into the built detector's `EnergyBins` at this boundary.
 - Deps: `materials` (`CATALOG`, `MaterialSpec`), `results` (`Settings`), `profiles` (`get_fidelity_preset`), `sweep` (`Sweep`), `geometry` (`target_from_flat`), `detectors` (`Detector`, `EnergyBins`).
 
 ### `campaign/profiles.py`
