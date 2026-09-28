@@ -1,6 +1,6 @@
 # Issue 49 slice: named detector CLI objects
 
-Issue: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/49
+Issue: #49
 
 Work branch: `49-custom-detector-tooling`
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Submit and manage courteous sliced line-grid-bound diagnostics on qlmc.
+"""Submit and manage courteous sliced line-grid-bound diagnostics on remote-host.
 
 This job uses pyrite.remote's existing staging, SLURM wrapper, state, attach,
 and stop-sentinel contracts without pretending the diagnostic is a material

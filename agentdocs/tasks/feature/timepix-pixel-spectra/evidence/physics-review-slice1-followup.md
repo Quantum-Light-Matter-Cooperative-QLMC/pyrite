@@ -3,7 +3,7 @@
 Reviewer role: independent physics review under `.claude/skills/physics-review/SKILL.md`.
 Scope: the two follow-up oracle passes recorded in the task `README.md`
 ("Broken-mirror-symmetry pass" and "Near-normal polar-angle pass",
-2026-08-21, `qlmc` box) and their raw evidence
+2026-08-21, `remote-host` box) and their raw evidence
 (`evidence/oracle-report.broken-symmetry.json`,
 `evidence/oracle-report.near-normal.json`), reviewed against the actual
 `mc_spectrum` implementation

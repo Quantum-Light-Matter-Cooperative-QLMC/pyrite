@@ -1,7 +1,7 @@
 # 65 — Decompose `mc_spectrum` into testable phases
 
-Issue: [#65](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/65)
-(parent [#64](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/64)).
+Issue: [#65](#65)
+(parent [#64](#64)).
 Branch: `65-decompose-mc-spectrum-into-testable-phases`.
 
 Pure restructuring of `src/pyrite/montecarlo/spectrum/lines.py`. No physics
@@ -114,7 +114,7 @@ could not previously be its own function.
 
 The CUDA streaming and fused-reduction paths are unreachable on the NumPy
 backend, so no CPU golden touches them. They were checked directly on the lab
-box (`qlmc`, RTX 5080, CuPy 14.2.0, `PYRITE_MC_BACKEND=cuda`, `REAL=float32`)
+box (`remote-host`, RTX 5080, CuPy 14.2.0, `PYRITE_MC_BACKEND=cuda`, `REAL=float32`)
 by running the same 12-configuration matrix against two synced trees --
 `main@2aed7009` and this branch -- under `srun -p gpu`, importing each revision
 via `PYTHONPATH` with an asserted `pyrite.__file__`.

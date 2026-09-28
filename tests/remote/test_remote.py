@@ -11,6 +11,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 from types import SimpleNamespace
 
@@ -227,6 +228,73 @@ def test_remote_dir_rejects_nonabsolute_and_control_values(monkeypatch, value):
         remote._queue_script("j", ["hopg"], quick=False, workers=None)
 
 
+def test_remote_defaults_are_home_relative_and_functional(monkeypatch):
+    """Unconfigured defaults must be usable on any box: resolved against the remote $HOME."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PYRITE_REMOTE_")}
+    out = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from pyrite.remote import config; print(config.REMOTE_DIR, config.REMOTE_UV)",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    ).stdout.split()
+
+    assert out == ["~/pyrite", "~/.local/bin/uv"]
+
+
+def test_remote_home_expansion_resolves_tilde_over_one_cached_ssh_call(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="/home/lab\n", stderr="")
+
+    config._remote_home.cache_clear()
+    monkeypatch.setattr(config, "HOST", "box")
+    monkeypatch.setattr(config.subprocess, "run", fake_run)
+    monkeypatch.setattr(config, "REMOTE_DIR", "~/pyrite")
+    monkeypatch.setattr(config, "REMOTE_UV", "~/.local/bin/uv")
+    try:
+        assert config.remote_dir() == "/home/lab/pyrite"
+        assert config.remote_uv() == "/home/lab/.local/bin/uv"
+        assert config.remote_path("jobs") == "/home/lab/pyrite/jobs"
+    finally:
+        config._remote_home.cache_clear()
+
+    assert len(calls) == 1
+    assert calls[0][:4] == ["ssh", "-n", "-o", "BatchMode=yes"]
+    assert calls[0][4] == "box"
+
+
+def test_remote_home_expansion_leaves_absolute_values_without_ssh(monkeypatch):
+    monkeypatch.setattr(config, "REMOTE_DIR", "/srv/pyrite")
+    monkeypatch.setattr(config, "REMOTE_UV", "uv")
+
+    # The autouse ssh guard would raise if either call reached ssh.
+    assert config.remote_dir() == "/srv/pyrite"
+    assert config.remote_uv() == "uv"
+
+
+@pytest.mark.parametrize("stdout, returncode", [("", 0), ("relative\n", 0), ("/home/lab\n", 255)])
+def test_remote_home_expansion_fails_closed_when_home_unresolvable(monkeypatch, stdout, returncode):
+    def fake_run(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, returncode, stdout=stdout, stderr="")
+
+    config._remote_home.cache_clear()
+    monkeypatch.setattr(config, "HOST", "box")
+    monkeypatch.setattr(config.subprocess, "run", fake_run)
+    monkeypatch.setattr(config, "REMOTE_DIR", "~/pyrite")
+    try:
+        with pytest.raises(SystemExit, match="cannot resolve '~'"):
+            config.remote_dir()
+    finally:
+        config._remote_home.cache_clear()
+
+
 @pytest.mark.parametrize(
     "build",
     [
@@ -353,12 +421,12 @@ def test_sbatch_rejects_remote_dir_unsupported_by_directives(monkeypatch, value)
 
 
 def test_scp_remote_path_quotes_hostile_but_valid_posix_path(monkeypatch):
-    monkeypatch.setattr(config, "HOST", "qlmc")
+    monkeypatch.setattr(config, "HOST", "remote-host")
     path = "/srv/pyrite data/$(touch SENTINEL)"
 
     rendered = config.scp_remote_path(path)
 
-    assert rendered == "qlmc:'/srv/pyrite data/$(touch SENTINEL)'"
+    assert rendered == "remote-host:'/srv/pyrite data/$(touch SENTINEL)'"
 
 
 def test_remote_scan_entry_accepts_the_performance_flags_queue_scripts_pass():
@@ -370,7 +438,7 @@ def test_remote_scan_entry_accepts_the_performance_flags_queue_scripts_pass():
 
 def test_queue_script_has_per_material_scan_calls():
     s = remote._queue_script("20260101-000000", ["mose2", "wse2"], quick=True, workers=8)
-    assert 'scan_launcher=("/home/aamador/.local/bin/uv" run --no-sync python)' in s
+    assert 'scan_launcher=("uv" run --no-sync python)' in s
     assert '"${scan_launcher[@]}" -u -m pyrite._entry.scan' in s
     assert "--quick" in s and "--workers 8" in s
     assert "mose2" in s and "wse2" in s
@@ -472,7 +540,7 @@ def test_queue_script_wraps_single_profile_session_with_nsys():
     assert 'if [ -n "${PYRITE_MC_NSYS_PYSTACK:-}" ]; then' in script
     assert "--python-backtrace=cuda" in script
     assert '--output="$trace_base"' in script
-    assert 'scan_launcher=("/home/aamador/dev/pyrite/.venv/bin/python")' in script
+    assert 'scan_launcher=("/path/to/pyrite/.venv/bin/python")' in script
     assert '--checkpoint-dir "$JOBDIR/performance-checkpoints/$m/$repetition"' in script
     assert "nsys stats" in script
     assert "--report cuda_api_sum,cuda_gpu_kern_sum,cuda_kern_exec_sum,nvtx_sum" in script
@@ -2695,13 +2763,13 @@ def test_logs_identify_resolved_job_and_host(monkeypatch, capsys):
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda command: commands.append(command) or "LOG j · qlmc\n\nline\n",
+        lambda command: commands.append(command) or "LOG j · remote-host\n\nline\n",
     )
 
     remote.tail_logs("j")
 
-    assert capsys.readouterr().out == "LOG j · qlmc\n\nline\n"
-    assert 'printf "LOG %s · qlmc' in commands[0]
+    assert capsys.readouterr().out == "LOG j · remote-host\n\nline\n"
+    assert 'printf "LOG %s · remote-host' in commands[0]
 
 
 def test_attach_returns_false_when_the_viewer_is_interrupted(monkeypatch, capsys):
@@ -6110,7 +6178,7 @@ def test_submitted_job_meta_carries_the_synced_code_stamp(monkeypatch, tmp_path,
     monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
     (tmp_path / config.SYNC_STAMP_NAME).write_text(
         "code_digest: abc123\ncode_revision: feedface\ncode_dirty: False\n"
-        "code_synced_at: 2026-09-19T14:14:00+00:00\ncode_source: laptop:/home/a/dev/pyrite\n"
+        "code_synced_at: 2026-09-19T14:14:00+00:00\ncode_source: laptop:/home/user/dev/pyrite\n"
     )
     jobdir = tmp_path / "jobs" / "j"
     jobdir.parent.mkdir(parents=True)

@@ -27,7 +27,7 @@ The public API — `cromer_mann_f0`, `henke_dispersion`, `atomic_form_factor`, `
 
 The CXRO `.nff` CSVs in `data/atomic_scattering_factors/` are now **legacy / unused by the code** (kept for provenance and any future A/B against Henke).
 
-**Why a library:** the "adding an element" chore in [CLAUDE.md](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/CLAUDE.md) touched ~8 non-colocated registries, ~4 of them atomic data. The swap eliminates the two worst (typing Cromer–Mann coefficients, downloading a CXRO `.nff` per element) — a new element is now free for f0/f′/f″/Z. **The cost:** xraydb is Chantler, not Henke, so numbers shift a few percent and the validation anchors had to be re-run (they held — see below).
+**Why a library:** the "adding an element" chore in [CLAUDE.md](../../../CLAUDE.md) touched ~8 non-colocated registries, ~4 of them atomic data. The swap eliminates the two worst (typing Cromer–Mann coefficients, downloading a CXRO `.nff` per element) — a new element is now free for f0/f′/f″/Z. **The cost:** xraydb is Chantler, not Henke, so numbers shift a few percent and the validation anchors had to be re-run (they held — see below).
 
 ---
 

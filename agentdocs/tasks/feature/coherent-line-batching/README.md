@@ -18,7 +18,7 @@ the legacy per-hkl `_accumulate` loop (`src/cxr_mc/montecarlo/spectrum.py`,
 launch storm that starved the GPU" — therefore never runs for coherent
 profiles, which is the entire `hopg_coherent` workload.
 
-## Evidence (ALEX-DESKTOP: 24 cores, 23.4 GB RAM, RTX 3060 Ti 8 GB)
+## Evidence (local-workstation: 24 cores, 23.4 GB RAM, RTX 3060 Ti 8 GB)
 
 Workload `hopg_coherent` / `hopg`, Ne=10000, 864 line bins, 4 reflections.
 cProfile over 89 distinct cases, cold, 16.1 s of GPU-phase wall:

@@ -16,7 +16,7 @@ def _mem_worker_cap(per_worker_mb=None):
 
     ``min(MemAvailable, 0.9 * MemTotal) // per_worker_mb``. Binds BOTH worker
     pools (full-case CPU pool and GPU-pipeline transport pool) so neither can
-    oversubscribe host RAM and re-create the 2026-07-18 qlmc OOM, where the
+    oversubscribe host RAM and re-create the 2026-07-18 remote-host OOM, where the
     kernel killed one worker and ``BrokenProcessPool`` lost the whole run. The
     two pools pass different budgets: ``_WORKER_MEM_MB`` for full-case workers
     (transport + spectrum state), ``_RESOURCE_POLICY.pipeline_worker_mem_mb`` for the much
@@ -119,7 +119,7 @@ def _cpu_pool_workers(max_workers, n):
 
     Each full-case worker holds transport AND spectrum state (unlike the GPU
     pipeline's transport-only workers): ~5.5 GB anon-rss measured per worker at
-    200 keV on qlmc, where the uncapped ncpu*3//4 = 24-worker pool OOM'd the
+    200 keV on remote-host, where the uncapped ncpu*3//4 = 24-worker pool OOM'd the
     45 GiB box (2026-07-18: kernel killed one worker, BrokenProcessPool lost
     the whole run after swap-thrash had already crawled it).
 

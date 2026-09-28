@@ -1,6 +1,6 @@
 # Issue #100: nonuniform photon continua
 
-Issue: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/100
+Issue: #100
 Branch: `issue-100-nonuniform-photon-continua`
 
 Status: nine slices implemented and checkpointed on this branch; issue stays

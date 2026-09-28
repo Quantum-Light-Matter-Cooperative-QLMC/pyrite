@@ -6,7 +6,7 @@ Use these recipes to configure a run without editing checkpoint data. Commands s
 
 ```bash
 pyrite config set profile.current standard
-pyrite config set remote.target qlmc
+pyrite config set remote.target my-cluster
 pyrite config set workspace.root /path/to/pyrite-workspace
 pyrite config list
 ```

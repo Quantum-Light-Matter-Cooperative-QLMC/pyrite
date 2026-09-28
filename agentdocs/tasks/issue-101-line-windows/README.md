@@ -18,7 +18,7 @@ GitHub issue: #101. Branch: `issue-101-line-windows`.
 
 ## Campaign record
 
-Window-refinement campaign, 2026-09-16, remote box `qlmc`:
+Window-refinement campaign, 2026-09-16, remote box `remote-host`:
 
 - Job `20260916-191238-87ccd502` (SLURM 1756) — **failed**. hopg 300 keV at 32
   samples per feature asks 1 260 300 bins; an 11.14 GiB device budget cannot

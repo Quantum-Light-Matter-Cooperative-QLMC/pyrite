@@ -3,7 +3,7 @@
 Written 2026-08-09 against `main` (`c0114c4`), when Rounds 1-4 were fully
 merged and nothing was in-flight. Round 5 then closed W1, W2, and W3 item 1.
 
-**Completed 2026-08-14.** The authorized `qlmc` run closed the outstanding
+**Completed 2026-08-14.** The authorized `remote-host` run closed the outstanding
 primary-only Nsight acceptance check and the remaining W4 attribution. At
 production `hopg_hbn` scale the pipeline was not
 transport-starved; spectrum dispatch/synchronization dominated instead. The
@@ -40,7 +40,7 @@ Two things that need a human, neither invented by this round:
   `src/cxr_mc/sweep.py:61,567`, self-labelled "(placeholder)". Reported, not
   fixed.
 
-Open questions 1-3 below are answered (`ALEX-DESKTOP` is a local desktop, not an
+Open questions 1-3 below are answered (`local-workstation` is a local desktop, not an
 ssh target; do not flip the prologue; port the flags). Question 4's remote-gated
 levers are still open.
 
@@ -59,7 +59,7 @@ no material-specific slow path; OOM retry, chunk resizing, checkpoint I/O and
 document-as-expected, no default change. Round 4 then made the CUDA transport
 core the default above 1000 electrons with `Validation: gpu-transport-core` and
 a ledger row, measured at 1.55x case-loop and 12.7 GB -> 0.76 GB host RSS on
-`qlmc`. Two of Part B's four follow-ups are done:
+`remote-host`. Two of Part B's four follow-ups are done:
 `docs/performance-profile-analysis.md` was corrected (`0da9e44`) and the fill
 transient is documented there.
 
@@ -109,7 +109,7 @@ tense, not misleading about current state).
 
 State: `spectrum.py:39` `_USE_JIT_LINE_PROLOGUE = False`, gating a 347-line
 `line_prologue_jit_kernel.py` that nothing else reaches. Zero tests reference
-the flag or the module. The numerics were verified comprehensively on `qlmc`
+the flag or the module. The numerics were verified comprehensively on `remote-host`
 (exact keep-mask agreement over 17.2 M pairs, bit-for-bit `E_r`/`aw`,
 significant-bin error ~170x inside the repo's own accepted cross-path bound,
 bitwise run-to-run determinism) — the numerics are *not* the blocker. `w` is
@@ -119,7 +119,7 @@ the eager gather kernel blocks FMA contraction with explicit
 do not.
 
 What actually blocks a flip is value, not correctness: the win is 4.2-8.9% of
-the *line phase*, and the line phase is ~1-3% of case wall time on `qlmc` where
+the *line phase*, and the line phase is ~1-3% of case wall time on `remote-host` where
 transport is 2.4-3.4x the whole GPU phase. Round 4's transport work has since
 moved the bottleneck again.
 
@@ -147,17 +147,17 @@ claim on a path that already owes four (W1), and the branch has been off since
 Round 3 with nothing depending on it.
 
 Gate correction (answered 2026-08-09): the original checklist required the
-interleaved A/B on **both** `qlmc` and `ALEX-DESKTOP`. `ALEX-DESKTOP` is not an
+interleaved A/B on **both** `remote-host` and `local-workstation`. `local-workstation` is not an
 ssh target and never will be — it is the user's home desktop (RTX 3060 Ti), so
 its arm runs **locally, when working at that machine**, not through
 `cxr remote`. It is not absent from the gate, just not remotely reachable; an
-agent on `qlmc` cannot close that arm and should not treat its absence as a
+agent on `remote-host` cannot close that arm and should not treat its absence as a
 blocker.
 
 ## W3. The `--cpu` / `--cpu-only` profiler — completed
 
 **Completed 2026-08-14.** The flags were ported to the supported remote run
-surface, and the authorized `qlmc` job exercised the profiler. Nsight job
+surface, and the authorized `remote-host` job exercised the profiler. Nsight job
 `hopg_hbn-8` / SLURM `1640` ran only the primary scan when invoked with
 `--nsys`, satisfying the remaining acceptance check without starting the CPU
 phase.
@@ -177,16 +177,16 @@ Skills: `cli-ui-ux`, `remote-gpu-jobs`, `regression-testing`.
 
 ## W4. Deferred performance levers
 
-All measured, all deliberately not taken. Sizes are from Round 4 on `qlmc`
+All measured, all deliberately not taken. Sizes are from Round 4 on `remote-host`
 (RTX 5080); the durable list is the round doc's "Still open".
 
 | lever | size | why deferred | needs GPU |
 | --- | --- | --- | --- |
-| NVTX ranges in `transport.py` | diagnostic only | **Done and exercised.** The ranges separated hidden transport work from the spectrum bottleneck in the `qlmc` production trace | yes to use |
+| NVTX ranges in `transport.py` | diagnostic only | **Done and exercised.** The ranges separated hidden transport work from the spectrum bottleneck in the `remote-host` production trace | yes to use |
 | Host-side remainder of the transport driver (scratch alloc, mask construction, output assembly) | **Closed 2026-08-14.** At `hopg_hbn` scale transport was 17.70 s cumulative across four workers (~4.4 s wall, hidden), and driver transport wait was 1.45 s | not the production bottleneck; no transport change | yes |
 | Spectrum boolean-mask compaction | `cxr.lines` was 20.86 ms/case; 46 blocking scalar readbacks and 471 launches per case | **Done 2026-08-14.** Resolve the survivor index once and reuse it across segment arrays: 19 readbacks and 366 launches per case, byte-identical selected rows | yes |
 | Compact resident segments to `REAL` at the join | ~halves 509 MB held / 1176 MB peak pool | **Not justified for throughput by the local trace:** `.join` was 2.3% / 0.5% of transport-core wall for hopg / MoSe2. Memory-only motivation remains, with the documented dtype/API cost | yes |
-| `gpu-pipeline` memory sizing | pipeline arm drove `qlmc` to 50.3 GB RSS + 12.9 GB swap on a 45 GB box | **Confirmed 2026-08-14.** `--cpus-per-task=8` and `SLURM_CPUS_PER_MATERIAL=8` resolved to four workers even though process affinity exposed all 32 cores. Feed wait was 1.1%; more workers would not improve this workload | confirmed |
+| `gpu-pipeline` memory sizing | pipeline arm drove `remote-host` to 50.3 GB RSS + 12.9 GB swap on a 45 GB box | **Confirmed 2026-08-14.** `--cpus-per-task=8` and `SLURM_CPUS_PER_MATERIAL=8` resolved to four workers even though process affinity exposed all 32 cores. Feed wait was 1.1%; more workers would not improve this workload | confirmed |
 | `numba.prange` over the per-electron core | starts from a 0.27-1.05x deficit vs lockstep | needs more than two cores just to break even | no |
 | Grooved transport on the CUDA core | grooved runs stay on lockstep | scope | yes |
 
@@ -218,19 +218,19 @@ workload for confirming it — the model predicts 4 workers and 6 in flight on a
 
 ## Open questions for the user
 
-1. ~~Is `ALEX-DESKTOP` still a target box?~~ **Answered:** it is the user's home
-   desktop, not an ssh target. Its arm is run locally from that machine; `qlmc`
+1. ~~Is `local-workstation` still a target box?~~ **Answered:** it is the user's home
+   desktop, not an ssh target. Its arm is run locally from that machine; `remote-host`
    is the only remote box.
 2. ~~`_USE_JIT_LINE_PROLOGUE`: delete, flip, or leave?~~ **Closed 2026-08-09:
    deleted.** Flag and module removed; see W2 above.
 3. ~~Do `--cpu`/`--cpu-only` move to `cxr run -R`?~~ **Answered: yes**, and they
-   have. The authorized primary-only Nsight check ran on `qlmc`; the two CPU
+   have. The authorized primary-only Nsight check ran on `remote-host`; the two CPU
    arms retain their earlier unit/script coverage.
-4. ~~Is any of W4 wanted now?~~ **Closed 2026-08-14:** the authorized `qlmc`
+4. ~~Is any of W4 wanted now?~~ **Closed 2026-08-14:** the authorized `remote-host`
    trace found and removed the material spectrum synchronization bottleneck.
    The other measured levers remain unjustified or out of scope.
 
-## Final `qlmc` evidence (2026-08-14)
+## Final `remote-host` evidence (2026-08-14)
 
 Production job `hopg_hbn-7` / SLURM `1639` ran 5,508 cases at `Ne=450` in
 184--187 s (~33.4 ms/case). Terminal attribution was spectrum 132.07 s (70.5%),
@@ -335,7 +335,7 @@ dispatch-heavy case because transport is short; the absolute table preparation
 removal remains valid at higher energy, but its percentage throughput gain is
 not generalized beyond this measured workload.
 
-## Local ALEX-DESKTOP evidence (2026-08-10)
+## Local local-workstation evidence (2026-08-10)
 
 The first W4 gate is now exercised on the user's home desktop: Ryzen 9 5900X,
 22.9 GiB RAM, RTX 3060 Ti 8 GiB, NVIDIA driver 610.43.02 / CUDA runtime 13.2,

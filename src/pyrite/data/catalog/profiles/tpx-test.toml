@@ -1,0 +1,29 @@
+detector = "default"
+materials = ["hopg"]
+thickness_ang = {values = [10000000.0]}
+energy_keV = {values = [30.0]}
+tilt_deg = {values = [30.0]}
+tilt_azim_deg = {values = [180.0]}
+E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
+n_electrons = {values = [300]}
+n_electrons_brem = {values = [300]}
+
+[physical_detector]
+distance_mm = 100.0
+polar_deg = 90.0
+shape = [256, 256]
+pitch_mm = [0.055, 0.055]
+
+[physical_detector.scorer]
+reconstruction = "nearest_tile"
+angular_shape = [5, 5]
+
+[physical_detector.response]
+kind = "timepix3"
+
+[physical_detector.acquisition]
+exposure_s = 1.0
+measured_min_eV = 0.0
+measured_max_eV = 20000.0
+measured_bin_width_eV = 400.0
+hit_threshold_eV = 500.0

@@ -992,7 +992,7 @@ Interactions that need explicit design rather than incremental patching:
       clock point with paired seed replicas; the fixed-path Jensen shift is
       13.607 +/- 2.401 rad and falls inside the 9.8--19 rad target, leaving zero
       interval residual.** Harness checkpoint: `f30df0a0`. Final remote run:
-      qlmc SLURM `1673`, 600 electrons x 8 independent seeds x straggling
+      remote-host SLURM `1673`, 600 electrons x 8 independent seeds x straggling
       off/on, CPU lockstep backend on a GPU-node allocation, 6.56 s measured
       runtime. The committed harness is
       `checks/energy_loss_straggling_observables.py`; its JSON report names the
@@ -1096,7 +1096,7 @@ Interactions that need explicit design rather than incremental patching:
       units, limits, signs/conventions, Poisson additivity, tail termination,
       generator/covariance semantics, and the tie convention; ledger status is
       `rederived`. Focused sampler tests: 135 passed. All five CUDA hardware
-      tests pass on `qlmc` (RTX 5080, driver 610.47, CuPy 14.1.1).
+      tests pass on `remote-host` (RTX 5080, driver 610.47, CuPy 14.1.1).
 
 ## Decisions and open questions
 
@@ -1114,7 +1114,7 @@ Interactions that need explicit design rather than incremental patching:
   Slice L replaces the approximate count branch, pins the full state-dependent
   generator remainder, and retains geometry-wins equality as an explicit
   convention. Fresh-context re-validation moved the row to `rederived`; all
-  five CUDA hardware tests subsequently passed on `qlmc`.
+  five CUDA hardware tests subsequently passed on `remote-host`.
 
 - **Dependency noted 2026-08-20 (supervisor):** ELSEPA elastic-scattering data
   is being set up under `feature/reference-elastic-scattering-data`. Flight
@@ -1295,7 +1295,7 @@ No implementation or validation gate remains; human `signed-off` is separate.
   failure was the restricted-sandbox forkserver socket, and its exact test
   passed with escalation. Generated ledger checks, 44 docs/dev tests, and the
   strict docs build then passed.
-- `qlmc` CUDA hardware suite: 5 passed on NVIDIA GeForce RTX 5080, driver
+- `remote-host` CUDA hardware suite: 5 passed on NVIDIA GeForce RTX 5080, driver
   610.47, CuPy 14.1.1. No numerical golden moved.
 
 ## Delegation slices and required skills

@@ -18,7 +18,7 @@ Each context value resolves independently in this order:
 | key | environment | built-in |
 |---|---|---|
 | `profile.current` | `PYRITE_PROFILE` | `standard` |
-| `remote.target` | `PYRITE_REMOTE_HOST` | `qlmc` |
+| `remote.target` | `PYRITE_REMOTE_HOST` | unset; configure an SSH host alias to use remote commands |
 | `workspace.root` | `PYRITE_HOME` | current directory |
 
 `pyrite config list` shows both effective values and their sources. `config set` writes atomically to Click's platform-specific user configuration directory.
@@ -38,7 +38,7 @@ change scheduling, memory, or profiling only.
 | variable | purpose, values, and default | precedence / owner | effect |
 |---|---|---|---|
 | `PYRITE_PROFILE` | Campaign-profile name; unset resolves to `standard`. Empty is invalid. | Command option > environment > config store > default; `console.config`. | selects configuration |
-| `PYRITE_REMOTE_HOST` | SSH-config host alias; unset resolves to `qlmc`. | Command option > environment > config store > default; `console.config`, `remote.config`. | remote destination |
+| `PYRITE_REMOTE_HOST` | SSH-config host alias; unset means remote commands require configuration. | Command option > environment > config store; `console.config`, `remote.config`. | remote destination |
 | `PYRITE_HOME` | Workspace-root path; unset resolves to the current directory. | Explicit workspace/checkpoint path > environment > config store > cwd; `console.config`. | checkpoint/artifact location |
 | `PYRITE_MC_BACKEND` | `auto`, `cpu`, `cuda`, `rocm`, or `sycl`; unset is `auto`. An explicit unavailable accelerator fails. | Process-wide backend selection; `_backend`. | **numerics**, resources |
 | `PYRITE_MC_SYCL_DEVICE` | A dpctl SYCL device selector; unset chooses the first usable GPU. | Used only when the SYCL backend resolves; `_backend`. | hardware choice |
@@ -67,8 +67,8 @@ output.
 
 | variable | purpose, values, and default | owner | effect |
 |---|---|---|---|
-| `PYRITE_REMOTE_DIR` | Absolute POSIX path to the remote checkout; unset is `/home/aamador/dev/pyrite`. | `remote.config` | remote destination |
-| `PYRITE_REMOTE_UV` | Executable name or absolute POSIX path for `uv` on the remote host; unset is `/home/aamador/.local/bin/uv`. | `remote.config` | remote execution |
+| `PYRITE_REMOTE_DIR` | Absolute POSIX path to the remote checkout, or `~/...` (expanded to the remote login home over one cached ssh call); unset is `~/pyrite`. | `remote.config` | remote destination |
+| `PYRITE_REMOTE_UV` | Executable name, absolute POSIX path, or `~/...` path for `uv` on the remote host; unset is `~/.local/bin/uv`. | `remote.config` | remote execution |
 | `PYRITE_REMOTE_GPU_VENDOR` | `nvidia`, `amd`, or `intel`; unset is `nvidia`. Non-NVIDIA values fail before unsupported batch-script generation. | `remote.config` | remote resources |
 | `PYRITE_XSGEN_BREMSLIB_SOURCE` | Directory containing the BremsLib source tree; unset is `../BremsLib_v2.0.8`. | `console.config`, `xsgen.sources` | external data/tooling |
 | `PYRITE_XSGEN_ELSEPA_SOURCE` | Directory containing the ELSEPA source tree; unset is `../elsepa-2020`. | `console.config`, `xsgen.sources` | external data/tooling |

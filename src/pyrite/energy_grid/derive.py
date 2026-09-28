@@ -90,7 +90,7 @@ REFINE_NE = 2000
 TOP_K = 3
 CASE_BATCH_SIZE = 10
 # Refine cases are spectrum-dominated and ran for about nine minutes each on
-# qlmc at 250 keV.  Keep them individually checkpointable so the 10-minute
+# remote-host at 250 keV.  Keep them individually checkpointable so the 10-minute
 # soft slice budget can hand off well before the 30-minute SLURM backstop.
 REFINE_BATCH_SIZE = 1
 # At the 30 keV diagnostic ceiling, spectrum work dominates and the GPU path is

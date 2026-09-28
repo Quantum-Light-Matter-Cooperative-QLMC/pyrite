@@ -1,6 +1,6 @@
 # Issue 57 slice: analytic inter-electron decoherence for the coherent path
 
-Issue: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/57
+Issue: #57
 
 Work branch: `57-settable-coherent-bunch-length`
 

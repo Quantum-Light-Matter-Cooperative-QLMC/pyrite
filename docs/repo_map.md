@@ -1,6 +1,6 @@
 # Repository map
 
-Navigation aid for `src/pyrite/` — importable package. Read before exploring source. For *why* (physics, validation, provenance) see [`README.md`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/README.md) and design notes in [`docs/`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/tree/main/docs); backlog in [GitHub Issues](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues). Tracked agent task records and cross-task plans live under `agentdocs/`, never under the public documentation tree. Print current top-level directory inventory: `uv run pyrite-dev repo-map`. Regenerate or check the static dependency region with `uv run pyrite-dev repo-map --write|--check`; `pyrite-dev verify` runs the check and the import-linter contracts from `pyproject.toml`.
+Navigation aid for `src/pyrite/` — importable package. Read before exploring source. For *why* (physics, validation, provenance) see [`README.md`](../README.md) and design notes in [`docs/`](.); backlog in [GitHub Issues](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues). Tracked agent task records and cross-task plans live under `agentdocs/`, never under the public documentation tree. Print current top-level directory inventory: `uv run pyrite-dev repo-map`. Regenerate or check the static dependency region with `uv run pyrite-dev repo-map --write|--check`; `pyrite-dev verify` runs the check and the import-linter contracts from `pyproject.toml`.
 
 ## Workspace ownership
 
@@ -557,7 +557,7 @@ Canonical maintained Zhai detector geometry and cache-schema provenance shared b
 - Public: `command`; internal `_run`.
 
 ### `remote/`
-Optional SSH/SLURM orchestration for configured lab box: sync, bounded and chunked submissions, progress/status/log viewers, checkpoint pulls, safe stop and clear, remote validation jobs.
+Optional SSH/SLURM orchestration for a configured remote host: sync, bounded and chunked submissions, progress/status/log viewers, checkpoint pulls, safe stop and clear, remote validation jobs.
 - Public CLI: `add_subparser`, `main`.
 - The public package contains the former facade and implementation modules (acyclic: `config` ◄ `transport` ◄ `scripts` ◄ `state` ◄ `lifecycle`/`viewer`; the Click wiring lives in `cli/commands/remote.py` and the frame rendering in `console/dashboard/`):
   - `config.py` — env-driven hosts/paths/SLURM constants.

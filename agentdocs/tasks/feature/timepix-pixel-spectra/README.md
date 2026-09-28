@@ -463,7 +463,7 @@ Open for their later owning slices:
   with the dataset-level table set, so a `produce_observation` result and a
   sweep result for the same physics may be indexed under different source
   keys. Unifying the two marker sets is a separate identity change, tracked in
-  [#191](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/191).
+  [#191](#191).
 
 The human semantics gate for the domain/native-response/acquisition slice is
 closed.
@@ -571,7 +571,7 @@ These numbers are noisy at smoke statistics and only span one geometry
 a physics reviewer can set a real tolerance bar or confirm/reject nearest-tile
 sufficiency.
 
-### High-statistics pass (2026-08-21, `qlmc` box)
+### High-statistics pass (2026-08-21, `remote-host` box)
 
 Ran on the configured remote GPU host (`pyrite remote sync`, then direct SSH
 execution of a 20x-electron/10x-Timepix-MC copy of the harness — this is a
@@ -649,7 +649,7 @@ requirement, measured-bin bounds, CLI command tree, observation-artifact
 lifecycle location) — those remain owned by their respective later slices
 (2-8) and are not blocking the oracle harness itself.
 
-### Broken-mirror-symmetry pass (2026-08-21, `qlmc` box)
+### Broken-mirror-symmetry pass (2026-08-21, `remote-host` box)
 
 Highest-priority follow-up from the independent review: same scene, but
 `Slab(tilt_azim_deg=45.0)` instead of `0.0`, so beam/`g`/detector are no
@@ -692,7 +692,7 @@ be assumed. Still needed per the review's original sequencing: a near-normal
 polar-angle case and a different target/energy case, to separate "breaks
 because symmetry broke" from "breaks because of this specific 45° choice."
 
-### Near-normal polar-angle pass (2026-08-21, `qlmc` box)
+### Near-normal polar-angle pass (2026-08-21, `remote-host` box)
 
 Second review-recommended follow-up: same scene as the original
 (`tilt_azim_deg=0`, symmetric, isolating the polar-coefficient-scaling
@@ -764,7 +764,7 @@ near-pole-but-not-`g`-aligned geometry before Slice 1 evidence can be
 re-reviewed. Human sign-off on the reconstruction tolerance/default remains
 open; Slice 2 must not generalize `PixelScorer` first.
 
-### Repaired multi-geometry pass (2026-08-23, `qlmc` box)
+### Repaired multi-geometry pass (2026-08-23, `remote-host` box)
 
 Completed the required four-geometry pass on the configured remote RTX 5080
 with CUDA: 4,000 line electrons, 2,000 bremsstrahlung electrons, 200,000

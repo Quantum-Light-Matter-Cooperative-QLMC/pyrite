@@ -1,4 +1,4 @@
-materials = ["hbn", "mose2", "mos2"]
+materials = ["hbn", "hopg", "mose2"]
 thickness_ang = {values = [10000.0, 1000000.0, 10000000.0, 100000000.0]}
 energy_keV = {values = [100.0, 500.0, 1000.0]}
 tilt_deg = {values = [10.0, 30.0, 50.0, 70.0]}

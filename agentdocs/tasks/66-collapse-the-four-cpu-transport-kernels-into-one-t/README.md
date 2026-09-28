@@ -1,6 +1,6 @@
 # Issue #66 — collapse the four CPU transport kernels into one templated body
 
-Issue: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/66
+Issue: #66
 Branch: `66-collapse-the-four-cpu-transport-kernels-into-one-t` (issue body names
 `66-collapse-transport-kernels`; the actual linked branch is this one).
 Worktree: `wt/pyrite/66-collapse-the-four-cpu-transport-kernels-into-one-t`.

@@ -659,7 +659,7 @@ def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
 
 
 # ---- _cpu_pool_workers memory-aware sizing (2026-07-18 OOM fix) -------------
-# The uncapped ncpu*3//4 = 24-worker pool OOM'd qlmc (45 GiB box, ~5.5 GB
+# The uncapped ncpu*3//4 = 24-worker pool OOM'd remote-host (45 GiB box, ~5.5 GB
 # anon-rss per full-case worker at 200 keV): the kernel killed one worker and
 # BrokenProcessPool lost the whole run. These tests pin the host probes so the
 # sizing is deterministic on any machine.
@@ -681,7 +681,7 @@ def _patch_host(
     budget_mb=6_144,
     pipeline_budget_mb=1_536,
 ):
-    """Fake a host for _cpu_pool_workers; defaults reproduce qlmc's shape."""
+    """Fake a host for _cpu_pool_workers; defaults reproduce remote-host's shape."""
     from pyrite.montecarlo import runner
 
     monkeypatch.setattr(runner._RESOURCE_POLICY, "n_cpus", ncpus)
@@ -692,8 +692,8 @@ def _patch_host(
     return runner
 
 
-def test_cpu_pool_workers_autosize_is_memory_bound_on_qlmc_shape(monkeypatch):
-    """qlmc regression: 32 cores asks for 24 workers, RAM only carries 7."""
+def test_cpu_pool_workers_autosize_is_memory_bound_on_remote_host_shape(monkeypatch):
+    """remote-host regression: 32 cores asks for 24 workers, RAM only carries 7."""
     runner = _patch_host(monkeypatch)
     # 44_900 // 6_144 = 7
     assert runner._cpu_pool_workers(None, 980) == 7
@@ -744,7 +744,7 @@ def test_run_cases_cpu_pool_receives_the_capped_worker_count(monkeypatch):
 
 # ---- _gpu_pipeline_workers memory-aware sizing -------------------------------
 # The GPU-pipeline transport pool spawns full worker processes just like the CPU
-# pool, but originally sized them as ncpu//2 with no RAM cap. On qlmc that OOM'd
+# pool, but originally sized them as ncpu//2 with no RAM cap. On remote-host that OOM'd
 # a worker at pool startup and the first submit raised BrokenProcessPool, losing
 # the whole hopg scan (exit 1). The cap now binds this path too.
 
@@ -794,7 +794,7 @@ def test_gpu_pipeline_workers_degrades_to_serial_under_memory_pressure(monkeypat
     assert runner._gpu_pipeline_workers(None, 980) < 2
 
 
-# ---- in-flight payload budgeting (2026-08-08 qlmc swap incident) -------------
+# ---- in-flight payload budgeting (2026-08-08 remote-host swap incident) -------------
 # Budgeting only the workers let promising/mose2 run 16 workers with 18 cases in
 # flight on a 45 GB box -- 34 host-resident segment payloads, peak tree RSS
 # 50.3 GB, 12.9 GB of swap, ssh unreachable for ~15 min. The driver holds one

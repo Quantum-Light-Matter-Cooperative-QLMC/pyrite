@@ -187,9 +187,9 @@ def test_sweep_guard_blocks_local_scan(sweep_guard_module, command: str) -> None
     "command",
     [
         "uv run pyrite run standard -m hopg --remote",
-        "uv run pyrite run standard -m hopg --remote=qlmc",
+        "uv run pyrite run standard -m hopg --remote=remote-host",
         "uv run pyrite run standard -m hopg -R",
-        "uv run pyrite run standard -m hopg -Rqlmc",
+        "uv run pyrite run standard -m hopg -Rremote-host",
         "uv run pyrite remote run standard -m hopg",
         "uv run pyrite run --help",
         "echo 'uv run pyrite run standard -m hopg'",

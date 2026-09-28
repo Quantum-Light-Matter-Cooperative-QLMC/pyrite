@@ -81,7 +81,7 @@ instead of a mock:
       density, thickness, `E_cut_keV`, `max_steps`, and beam geometry that
       deterministically (`seed=9`) reproduces the event sequence the original
       mock forced. A scratch probe
-      (`/home/alexa/dev/cxr-mc/tests/montecarlo/test_groove.py`-adjacent, see prior
+      (`${HOME}/dev/cxr-mc/tests/montecarlo/test_groove.py`-adjacent, see prior
       session's `probe_groove.py`) showed the existing `_one_electron_transport`
       default kwargs (straight-vertical beam, shallow spec) pass through with
       zero groove interaction — non-default geometry/kwargs are needed per

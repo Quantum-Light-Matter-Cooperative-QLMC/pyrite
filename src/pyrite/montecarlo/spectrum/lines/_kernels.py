@@ -697,7 +697,7 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     # stalled queue per segment array per call. Resolving the mask to an index
     # once pays that readback a single time and then gathers with a known output
     # size. Same survivors in the same order, so the selection is bit-for-bit
-    # what the mask produced. Measured on qlmc (RTX 5080, hopg Ne=450, 3 cases
+    # what the mask produced. Measured on remote-host (RTX 5080, hopg Ne=450, 3 cases
     # after warmup): this line alone was 6.89 ms/case -- the single largest cost
     # in the spectrum phase -- and the phase went 23.9 -> 17.8 ms/case, with
     # blocking device->host syncs 46 -> 19 per case and kernel launches 471 ->

@@ -1,6 +1,6 @@
 # Issue #153: sweep-level spelling for nonuniform photon continua
 
-Issue: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/153
+Issue: #153
 Branch: `issue-153-nonuniform-grid-spelling`
 
 Carried forward from #100 (closed by #149), "Remaining on #100" in

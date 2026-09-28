@@ -1,10 +1,10 @@
 # Issue #124: per-material line grids
 
-Issue: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/124
+Issue: #124
 Branch: `issue-124-per-material-line-grids`
 
 Status: approved and implemented locally; awaiting integration.
-Worktree: `/home/alex/dev/pyrite/.worktrees/issue-124`.
+Worktree: `${HOME}/dev/pyrite/.worktrees/issue-124`.
 
 ## Approved decision
 

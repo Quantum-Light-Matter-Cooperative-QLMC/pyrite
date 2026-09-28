@@ -58,6 +58,18 @@ batching; batch 0 of the current driver uses the same seed. The Slurm script
 1 keV and 3,000 at each higher cutoff. It requires a staged checkout and uv
 environment on the remote CPU node. The exact JSON summaries and compressed CPU log are
 in `results/`; table keys and digests are in each JSON record.
+
+All four `.sbatch` scripts are site-neutral. Submit them from the staging
+directory (`sbatch` with no path assumptions beyond the following):
+
+- `PYRITE_BENCH_ROOT`: staging directory holding the pinned `pyrite/` checkout
+  (`pyrite-fa20e0dd/` for `run_emission.sbatch`) and `test_benchmark.py`. It
+  defaults to the submission directory; `run_emission.sbatch` requires it.
+- `PYRITE_REMOTE_UV`: `uv` executable, default `$HOME/.local/bin/uv`. Use an
+  absolute path; a literal `~` is not expanded here.
+- Slurm logs (`--output`) are written to the submission directory. The scripts
+  pin no node; add `sbatch -w NODE` (and `-p PARTITION` if your site does not
+  use `cpu`) to target specific hardware.
 The driver checks the segment event contract and calculates the vector recoil
 residual for every hard photon. The target takes the residual momentum with
 negligible recoil energy, as in the ledgered convention. All six reruns pass

@@ -43,7 +43,7 @@ release archive is hosted (F15).
 
 The vendored ELSEPA/SBETHE sources and a local BremsLib checkout are available:
 
-- `src/pyrite/data/xsgen/{elsepa,sbethe}` and `/home/alex/dev/BremsLib_v2.0.8`
+- `src/pyrite/data/xsgen/{elsepa,sbethe}` and `${HOME}/dev/BremsLib_v2.0.8`
   (the BremsLib anchors need no compiler, only the library; point at it with
   `PYRITE_XSGEN_BREMSLIB_SOURCE` when running from this worktree, whose parent
   is `/tmp`)
@@ -425,7 +425,7 @@ credentials. Until a public location is chosen (a Zenodo or Mendeley
 deposit is the natural fit for a CC BY adaptation), `fetch bremslib` without
 `--archive` fails naming the `--archive` route. The pinned archive is
 `build/xsgen-release/bremslib-tables.zip` in this worktree (gitignored),
-with a durable copy at `/home/alex/dev/bremslib-tables.zip` (digest verified);
+with a durable copy at `${HOME}/dev/bremslib-tables.zip` (digest verified);
 upload that exact file, or rebuild with `--url ... --pin` and commit the new
 index -- manifests carry a timestamp, so a rebuild changes the digest.
 

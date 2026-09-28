@@ -8,7 +8,7 @@ Chunked remote sweeps can spend more wall time decoding and rewriting checkpoint
 than computing cases, while the dashboard presents the interval as a running or
 apparently hung simulation.
 
-Observed on `qlmc` (RTX 5080), profile `hopg_hbn`, 2026-08-14:
+Observed on `remote-host` (RTX 5080), profile `hopg_hbn`, 2026-08-14:
 
 - HOPG computed 5,508 cases in 276 s, then serialized `brem.pkl` (540 MB) for
   about 95 s and `line.pkl` (530 MB) for about 92 s: roughly 187 s of finalization.
@@ -176,7 +176,7 @@ incremental accumulator (about 213x for manifest construction). The focused
 regression asserts that a complete sharded sweep performs one full manifest scan,
 at final consolidation, instead of one per config plus consolidation.
 
-Real `qlmc` confirmation used the same full, uncached 5,508-case hopg workload,
+Real `remote-host` confirmation used the same full, uncached 5,508-case hopg workload,
 parameter digest `4135cde714d5`, RTX 5080 backend, and performance sampler. Job
 `hopg_hbn-12` / SLURM `1644` is the pre-change baseline; `hopg_hbn-15` / SLURM
 `1647` is the candidate:

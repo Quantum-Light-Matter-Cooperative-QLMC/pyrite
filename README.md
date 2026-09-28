@@ -25,7 +25,7 @@ effects in crystals below 100 MeV is under active investigation.
 Requires Python ≥3.14 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
+git clone <repository-url> pyrite
 cd pyrite
 uv sync
 uv run pyrite tables fetch elsepa   # elastic cross sections the default transport reads
@@ -178,7 +178,7 @@ Core geometry conventions are documented in the
 
 ## Data and outputs
 
-[`src/pyrite/data/catalog/`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/tree/main/src/pyrite/data/catalog)
+[`src/pyrite/data/catalog/`](src/pyrite/data/catalog)
 is immutable catalog source for crystals, media, scan profiles, materials, and
 stacks, one TOML file per object.
 Phase-specific CIFs live under `src/pyrite/data/cifs/`; production loading is

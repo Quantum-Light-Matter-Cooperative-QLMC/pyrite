@@ -2,7 +2,9 @@
 
 import re
 import shlex
+import subprocess
 from contextlib import contextmanager
+from functools import cache
 from pathlib import Path, PurePosixPath
 
 from .._env import env_value
@@ -11,8 +13,11 @@ from .._env import env_value
 # module global. Normal resolution is dynamic so environment and store changes
 # made before an invocation are observed.
 HOST: str | None = None
-REMOTE_DIR = env_value("PYRITE_REMOTE_DIR", "/home/aamador/dev/pyrite")
-REMOTE_UV = env_value("PYRITE_REMOTE_UV", "/home/aamador/.local/bin/uv")
+# A leading ``~/`` is the remote login home, resolved once per host over ssh (see
+# ``_expand_remote_home``): every downstream script and scp path sees an absolute
+# path, and the defaults work on any box without configuration.
+REMOTE_DIR = env_value("PYRITE_REMOTE_DIR", "~/pyrite")
+REMOTE_UV = env_value("PYRITE_REMOTE_UV", "~/.local/bin/uv")
 REMOTE_GPU_VENDOR = env_value("PYRITE_REMOTE_GPU_VENDOR", "nvidia")
 SLURM_PARTITION = "gpu"
 SLURM_GPUS = 1
@@ -96,6 +101,11 @@ def remote_host() -> str:
 
     try:
         resolved = cli_config.resolve("remote.target", HOST)
+        if not resolved.value:
+            raise SystemExit(
+                "remote target is not configured; set remote.target with "
+                "`pyrite config set remote.target HOST` or set PYRITE_REMOTE_HOST"
+            )
         return validate_remote_target(resolved.value)
     except (ValueError, cli_config.ConfigError) as exc:
         raise SystemExit(f"invalid PYRITE_REMOTE_HOST: {exc}") from exc
@@ -117,28 +127,60 @@ def override_remote_host(value: str | None):
         HOST = previous
 
 
+@cache
+def _remote_home(host: str) -> str:
+    """Return the absolute login home of ``host`` (one ssh round trip, cached)."""
+    try:
+        result = subprocess.run(
+            ["ssh", "-n", "-o", "BatchMode=yes", host, 'printf %s "$HOME"'],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise SystemExit(f"cannot resolve '~' on remote host {host!r}: {exc}") from exc
+    home = result.stdout.strip()
+    if result.returncode != 0 or not PurePosixPath(home).is_absolute():
+        raise SystemExit(
+            f"cannot resolve '~' on remote host {host!r} (ssh exit {result.returncode}); "
+            "set PYRITE_REMOTE_DIR / PYRITE_REMOTE_UV to absolute paths"
+        )
+    _reject_controls("remote $HOME", home)
+    return home
+
+
+def _expand_remote_home(value: str) -> str:
+    """Replace a leading ``~`` or ``~/`` with the remote login home."""
+    if value != "~" and not value.startswith("~/"):
+        return value
+    return _remote_home(remote_host()).rstrip("/") + value[1:]
+
+
 def remote_dir() -> str:
-    """Return validated absolute POSIX checkout path."""
+    """Return validated absolute POSIX checkout path (``~/`` expanded remotely)."""
     value = REMOTE_DIR
     if not isinstance(value, str):
         raise SystemExit(f"invalid PYRITE_REMOTE_DIR={value!r}: expected absolute POSIX path")
     _reject_controls("PYRITE_REMOTE_DIR", value)
+    value = _expand_remote_home(value)
     if not value or not PurePosixPath(value).is_absolute():
         raise SystemExit(
             f"invalid PYRITE_REMOTE_DIR={value!r}: expected absolute POSIX path "
-            "(for example /home/user/dev/pyrite)"
+            "or ~/... (for example ~/pyrite)"
         )
     return value
 
 
 def remote_uv() -> str:
-    """Return validated executable name or absolute POSIX executable path."""
+    """Return validated executable name or absolute POSIX path (``~/`` expanded remotely)."""
     value = REMOTE_UV
     if not isinstance(value, str):
         raise SystemExit(
             f"invalid PYRITE_REMOTE_UV={value!r}: expected executable name or absolute POSIX path"
         )
     _reject_controls("PYRITE_REMOTE_UV", value)
+    value = _expand_remote_home(value)
     if not value or (
         _ABS_EXECUTABLE_RE.fullmatch(value) is None and _EXECUTABLE_RE.fullmatch(value) is None
     ):

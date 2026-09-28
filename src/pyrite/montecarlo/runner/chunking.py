@@ -121,7 +121,7 @@ def _adaptive_chunk(nbins, *, intermediates=3):
     intermediates in the mc_spectrum / mc_brem_spectrum chunk loops fit in
     the policy spectrum budget.
 
-    Replaces the fixed defaults after the 2026-07-18 qlmc OOMs: widening the
+    Replaces the fixed defaults after the 2026-07-18 remote-host OOMs: widening the
     line grid to 30000 eV grew nbins ~3x and silently tripled the per-matmul
     transient (the fixed chunk had been tuned on the old narrow grid). Holding
     the byte product constant instead means the chunk shrinks as the grid

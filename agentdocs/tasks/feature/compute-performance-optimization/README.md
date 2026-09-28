@@ -187,7 +187,7 @@ Scope is `cxr remote run`; no local-run flag is added by this slice.
 Part B 4/4 closed.** Headline outcomes:
 
 - `_USE_JIT_LINE_PROLOGUE` **stays `False`** — not because the numerics
-  failed (they passed comfortably) but because item 4's `ALEX-DESKTOP` arm is
+  failed (they passed comfortably) but because item 4's `local-workstation` arm is
   unreachable, the measured win is ~1-3% of case wall time, and the line path
   already carries four unledgered `Validation:` markers.
 - Round 3's fixed-order prologue is **not bit-for-bit** — confirmed by
@@ -198,10 +198,10 @@ Part B 4/4 closed.** Headline outcomes:
   compute-bound transport, scaling linearly in `n_seg`. Decision is
   document-as-expected; no chunk or worker default changes.
 - Transport/GPU balance has **flipped since Round 2** — transport is now
-  2.4-3.4x the GPU phase on `qlmc` (RTX 5080) vs ~0.98x on `ALEX-DESKTOP`
+  2.4-3.4x the GPU phase on `remote-host` (RTX 5080) vs ~0.98x on `local-workstation`
   (3060 Ti). Round 2's "two transport workers hide transport" no longer holds.
 
-All measurements below are on `qlmc` unless stated. Harness scripts were run
+All measurements below are on `remote-host` unless stated. Harness scripts were run
 from the remote scratch tree and removed afterwards; the box was returned to
 its original catalog (the temporary `stall_repro` profile was deleted).
 
@@ -209,7 +209,7 @@ Two parts of the same Active TODO item. Editing/dispatch
 environment for this slice is an Intel-dGPU laptop with no CUDA device and no
 locally-visible SYCL device — Part A's CUDA compile/compare/golden/A-B-timing
 work is not runnable here at all and must go through `cxr remote` on
-`qlmc`/`ALEX-DESKTOP` per `AGENTS.md`; only the non-NVIDIA-fallback spot check
+`remote-host`/`local-workstation` per `AGENTS.md`; only the non-NVIDIA-fallback spot check
 below is local.
 
 ### A. Required GPU verification (gates enabling Round 3)
@@ -223,7 +223,7 @@ while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
 "Required GPU verification" list is the checklist:
 
 - [x] Compile each JIT specialization on the minimum and current supported
-      CuPy versions. **PASS** (2026-08-08, `qlmc` = DESKTOP-QNIHO3D, RTX 5080
+      CuPy versions. **PASS** (2026-08-08, remote host, RTX 5080
       16 GiB, driver 610.47, SM 12.0, Python 3.14.6, CUDA runtime 13.2,
       NVRTC 13.3, NumPy 2.4.6, Numba 0.65.1). *Minimum and current supported
       CuPy are the same version*: `pyproject.toml` pins the NVIDIA extra to
@@ -303,7 +303,7 @@ while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
       reduction input is only ~2x the compacted eager input, not the
       order-of-magnitude blowup a low keep fraction would have caused.
 
-      Suite half of this item: `cxr-dev test-suite core` on `qlmc` (GPU
+      Suite half of this item: `cxr-dev test-suite core` on `remote-host` (GPU
       backend live, so the flag is actually reached) gives **identical results
       with the flag off and on — 1075 passed, 3 failed, 42 skipped in both
       arms, the same 3 tests**. The prologue changes zero test outcomes. Those
@@ -316,17 +316,17 @@ while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
       comparison lacks its checked-in inputs. Verified: the same three test
       files pass locally (76 passed) where those paths exist. Note the test
       tree itself is not synced by `cxr remote sync` either and had to be
-      copied to `qlmc` separately to run this at all.
+      copied to `remote-host` separately to run this at all.
 - [~] Re-run the interleaved burn-in A/B harness at `Ne=450`, 2000, and 10000
-      on both `ALEX-DESKTOP` and `qlmc`. **PARTIAL: `qlmc` done; `ALEX-DESKTOP`
+      on both `local-workstation` and `remote-host`. **PARTIAL: `remote-host` done; `local-workstation`
       is not remotely runnable by design.** It is the user's home desktop (24
       cores / 23.4 GiB / RTX 3060 Ti), not an ssh target — absent from
-      `~/.ssh/config` (which defines only `qlmc`) and from `known_hosts`, and
+      `~/.ssh/config` (which defines only `remote-host`) and from `known_hosts`, and
       this editing box is not it (16 cores / 30 GiB / no NVIDIA driver). Its arm
       is run **locally, while working at that machine** (confirmed 2026-08-09);
-      an agent on `qlmc` cannot close it and should not treat it as a blocker.
+      an agent on `remote-host` cannot close it and should not treat it as a blocker.
 
-      `qlmc` arm (2026-08-08), Round 2 method reproduced exactly: transport
+      `remote-host` arm (2026-08-08), Round 2 method reproduced exactly: transport
       once, 4 s GPU burn-in, explicit `Device().synchronize()` around each
       timed call, 7 reps, 3 rounds with the arms interleaved across separate
       processes. Workload: `mos2`, standard catalog profile, 30 keV,
@@ -345,7 +345,7 @@ while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
       projected 0.83 s -> 0.25-0.30 s at `Ne=2000` from the measured phase
       split; the delivered figure is ~6% at that `Ne`. Two reasons, both
       measured here rather than assumed:
-      - Round 2's extrapolation was taken on `ALEX-DESKTOP` (RTX 3060 Ti) with
+      - Round 2's extrapolation was taken on `local-workstation` (RTX 3060 Ti) with
         `N_g = 110`. On an RTX 5080 with `N_g = 66` the eager prologue is a
         much smaller share of a much faster GPU phase, so removing it wins
         less.
@@ -360,7 +360,7 @@ while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
       consistent with the ~1e-7 drift recorded above.
 - [x] Re-measure transport/GPU overlap before touching process counts or
       starting a `prange`/CUDA transport project. **PASS — and the balance has
-      flipped since Round 2.** Single-process phase wall times on `qlmc`
+      flipped since Round 2.** Single-process phase wall times on `remote-host`
       (transport once, then min-of-3 timed GPU calls on the same segments;
       same workload definition as item 4):
 
@@ -380,16 +380,16 @@ while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
       | hopg | 20000 | 2,290,190 | 0.510 | 0.0441 | 0.0415 | 0.0856 | **5.96** | 0.223 |
 
       Round 2 measured single-core transport at **≈0.98x** the whole GPU phase
-      on `ALEX-DESKTOP` (RTX 3060 Ti) and concluded that "the `gpu-pipeline`
+      on `local-workstation` (RTX 3060 Ti) and concluded that "the `gpu-pipeline`
       engine hides transport completely at two or more transport workers".
-      **That conclusion no longer holds on `qlmc`.** On an RTX 5080 the GPU
+      **That conclusion no longer holds on `remote-host`.** On an RTX 5080 the GPU
       phase shrank while single-core transport did not, so transport is now
       **2.4-3.4x** the GPU phase for the TMDs and **6-12x** for hopg. Even
       after scaling the line phase by `110/66` to match Round 2's `N_g`, the
       mose2 `Ne=20000` ratio is still `3.153 / 1.857 = 1.70`.
 
       Implication for the pending decisions this item was meant to gate:
-      keeping the GPU fed on `qlmc` needs roughly **3-4 concurrent transport
+      keeping the GPU fed on `remote-host` needs roughly **3-4 concurrent transport
       workers for TMDs and 6-12 for light materials**, not the two Round 2
       implied. Conversely, further optimization of the *line* phase has
       limited end-to-end value on this box — which is the main reason the
@@ -413,12 +413,12 @@ while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
       independent reasons, in order of weight:
 
       1. **The checklist is not clean: item 4 is only half done.** It requires
-         the interleaved A/B on *both* `ALEX-DESKTOP` and `qlmc`.
-         `ALEX-DESKTOP` is unreachable from this environment, so the second
+         the interleaved A/B on *both* `local-workstation` and `remote-host`.
+         `local-workstation` is unreachable from this environment, so the second
          arm does not exist. The gate says flip only if everything passes.
       2. **The measured benefit does not justify the cost.** The prologue wins
          4.2-8.9% of the *line phase*. Item 5 measured transport at 2.4-3.4x
-         the whole GPU phase on `qlmc`, so that is roughly **1-3% of case
+         the whole GPU phase on `remote-host`, so that is roughly **1-3% of case
          wall time** — and the 6-case steady-state run above spent 30-34% of
          its time waiting on transport, not on lines. Against that, flipping
          permanently accepts a non-bit-for-bit change to `w` (max 7.97e-6
@@ -476,7 +476,7 @@ compute or memory-pressure problem — but unconfirmed.
 
 - [x] Reproduce with `cxr remote run` at matched `--ne-line=20_000` on
       `MoSe2`, `--perf` telemetry on, per `docs/performance-profile-analysis.md`.
-      **REPRODUCED (2026-08-08, `qlmc`).**
+      **REPRODUCED (2026-08-08, `remote-host`).**
 
       Two CLI corrections found while setting this up, both of which make the
       checklist text as written unrunnable:
@@ -490,7 +490,7 @@ compute or memory-pressure problem — but unconfirmed.
         profile's `n_electrons` grid. So "running with `--ne-line=20_000`"
         means the profile's electron count was changed and then run.
 
-      Reproduction used a scratch profile created **on `qlmc` only** (so the
+      Reproduction used a scratch profile created **on `remote-host` only** (so the
       git worktree keeps a clean `data/materials.toml`):
       `cxr profile create stall_repro --from promising_low_ne` then
       `cxr profile set stall_repro --thickness 50000 --energy 30 --polar 45
@@ -721,7 +721,7 @@ moves. Not done, and the default was not moved.
 Open — needs a GPU session, in this order:
 
 - [x] Compile each specialization on min and current pinned CuPy. **Done
-      2026-08-08** on qlmc (RTX 5080, driver 610.47, CuPy 14.1.1 — the
+      2026-08-08** on remote-host (RTX 5080, driver 610.47, CuPy 14.1.1 — the
       `cupy-cuda13x` floor and the current pin are the same version, so one run
       covers both). One real defect found and fixed: `e = e_start + i` mixed the
       int32 launcher scalar with the uint32 `blockIdx`/`threadIdx` product, and
@@ -732,13 +732,13 @@ Open — needs a GPU session, in this order:
       `xp.abs`/`xp.log10` on device scalars, int16 narrowing on store, and
       zero-size `internal_bounds` passed as an argument all transpile.
 - [x] Run the 10 CUDA-gated tests. **Done 2026-08-08**: 37 passed in 54.81s on
-      qlmc, all 10 CUDA tests included — determinism, launch-geometry
+      remote-host, all 10 CUDA tests included — determinism, launch-geometry
       independence at nthreads 32/128/512, capacity replay at cap 4/256/4096,
       first-step agreement with the CPU reference at `rtol=1e-12`, and aggregate
       agreement. The two slow tests are CPU-side: the 8-seed lockstep comparison
       (31.15s) and the CUDA-vs-CPU aggregate (14.61s).
 - [x] `Ne` sweep of transport wall time, GPU core vs CPU core. **Done
-      2026-08-08** on qlmc (RTX 5080, CuPy 14.1.1, NumPy 2.4.6, numba 0.65.1,
+      2026-08-08** on remote-host (RTX 5080, CuPy 14.1.1, NumPy 2.4.6, numba 0.65.1,
       Python 3.14.6). Workload: 30 keV into a 1e6 Ang stopping slab, catalog
       compositions from `build_cases(material_sweep(m))[0]`, `E_cut=5 keV`,
       seed 1, 3 repeats, medians below, compile excluded by a warm-up call.
@@ -828,7 +828,7 @@ Open — needs a GPU session, in this order:
       headroom of the true maximum with and without a probe. 44 pass on the GPU
       box, 1113 in the core suite.
 - [x] Warp divergence and occupancy. **Done 2026-08-08.** `ncu` is unusable on
-      qlmc — GPU performance counters are admin-only (`ERR_NVGPUCTRPERM`) and
+      remote-host — GPU performance counters are admin-only (`ERR_NVGPUCTRPERM`) and
       sudo needs a password; enabling them is a driver-param change on a shared
       box and was not attempted. Both quantities were obtained without counters.
 
@@ -1028,12 +1028,12 @@ Open — needs a GPU session, in this order:
       `transport_only` not asking for it. Full local suite green, lint and
       typecheck clean.
 
-- [x] **Measure the flip on `qlmc`.** **Done 2026-08-08.** Both arms run the
+- [x] **Measure the flip on `remote-host`.** **Done 2026-08-08.** Both arms run the
       same `cxr run` and differ only in `CXR_MC_TRANSPORT_CORE` (unset vs
       `lockstep`), fresh checkpoint dir per arm, one warm-up rep then three
       interleaved reps. Full tables in
       `docs/compute-performance-optimization.md` ("Verification: whole-sweep A/B
-      on qlmc").
+      on remote-host").
 
       `coh_test`/hopg, 72 cases, Ne=20000: **12.03 s vs 18.70 s** case loop
       (1.55x), 13.88 vs 20.48 s wall, **11.8 vs 53.2 CPU core-seconds**, GPU
@@ -1051,7 +1051,7 @@ Open — needs a GPU session, in this order:
       No MoSe2 *pipeline* counterpart. I started one for completeness and
       **stopped it**: 319 of 432 cases in 5212 s, decelerating 21 → 34 → 71
       s/case (device arm: 1154 s for all 432), peak tree RSS **50.3 GB** and
-      swap **12.9 GB** on a 45 GB box, load average 49–76, `qlmc` unreachable
+      swap **12.9 GB** on a 45 GB box, load average 49–76, `remote-host` unreachable
       over ssh for ~15 min. `SIGTERM`ed at case 319 — it is a shared box and
       this was my optional extra, not the requested measurement. Not rerun.
 

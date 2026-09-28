@@ -2,7 +2,7 @@
 
 Date: 2026-08-23  
 Harness checkpoint: `33a463b5`  
-Remote: configured `qlmc` host, NVIDIA GeForce RTX 5080, CUDA backend
+Remote: configured `remote-host` host, NVIDIA GeForce RTX 5080, CUDA backend
 
 This is decision evidence for issue #23, not a validation anchor or human
 sign-off. It establishes no acceptance threshold.

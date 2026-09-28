@@ -57,7 +57,7 @@ def test_remote_probe_checks_configured_host(monkeypatch):
 _ZHAI_JOB_BANNER = (
     "\nJOB 20260816-084051-40a80198 · SUBMITTED\n"
     "  SLURM     1665\n"
-    "  Host      qlmc\n"
+    "  Host      remote-host\n"
     "  Workload  Zhai reproduction\n"
     "  Monitor   pyrite job attach 20260816-084051-40a80198\n"
     "  Status    pyrite job status 20260816-084051-40a80198 -vv\n"

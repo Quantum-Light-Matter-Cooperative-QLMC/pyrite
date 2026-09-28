@@ -19,7 +19,7 @@ Three corrections were made during implementation:
 
 ## Round 1 (2026-07-31)
 
-Work on `feature/compute-performance-optimization`. Numbers are from `nsys` profiles on the lab box (`qlmc`, RTX-class single GPU) over the `hopg` test profile (189 cases) unless noted; see `performance-profiles/hopg_test-*/`.
+Work on `feature/compute-performance-optimization`. Numbers are from `nsys` profiles on the lab box (`remote-host`, RTX-class single GPU) over the `hopg` test profile (189 cases) unless noted; see `performance-profiles/hopg_test-*/`.
 
 ### Method
 
@@ -78,7 +78,7 @@ Answer: (a) yes, ~3× on the line phase, but the target has moved — the rawker
 
 ### Environment and workload
 
-Local box `ALEX-DESKTOP` (not `qlmc`): RTX 3060 Ti 8 GiB, driver 610.47, 24 cores, 22 GiB RAM, `nsys` 2026.4.1. Single case from the `compute_test` catalog profile, `mos2`, `MoS2 1mm pol=45 az=120 footprint=5x5mm`: 22 reflections × 5 mosaic-MC nodes (`N_g = 110`), 1018 line bins, 4001 brem bins, incoherent path, `REAL = float32`, no layers, finite 5×5 mm footprint.
+Local box `local-workstation` (not `remote-host`): RTX 3060 Ti 8 GiB, driver 610.47, 24 cores, 22 GiB RAM, `nsys` 2026.4.1. Single case from the `compute_test` catalog profile, `mos2`, `MoS2 1mm pol=45 az=120 footprint=5x5mm`: 22 reflections × 5 mosaic-MC nodes (`N_g = 110`), 1018 line bins, 4001 brem bins, incoherent path, `REAL = float32`, no layers, finite 5×5 mm footprint.
 
 Method: `_transport_case` once, then repeated `_lines_for_segments` / `_brem_wide_from_segments` on the same segments with explicit `Device().synchronize()` around each call. **The 3060 Ti idles at 210 MHz SM and takes seconds to reach boost**, which alone produced ±25% spread; every timing below is preceded by a 4 s GPU burn-in, reported as min and median of 7–9 reps, with A/B arms interleaved across separate processes.
 
@@ -170,7 +170,7 @@ No new tooling was added. The harness is `_transport_case` once followed by repe
 
 ### Scope limits
 
-Measured on one material, one geometry, one GPU, and the incoherent line path only — the coherent path was under concurrent work and deliberately left out. The prologue result is shared code and should generalize; the −25% and ≈3× figures are for this workload and should be re-measured on `qlmc` before being quoted as production numbers.
+Measured on one material, one geometry, one GPU, and the incoherent line path only — the coherent path was under concurrent work and deliberately left out. The prologue result is shared code and should generalize; the −25% and ≈3× figures are for this workload and should be re-measured on `remote-host` before being quoted as production numbers.
 
 ## Round 3: fused line prologue implementation (2026-08-06)
 
@@ -212,7 +212,7 @@ Before enabling this in a release branch:
 1. Compile each JIT specialization on the minimum and current supported CuPy versions.
 2. Compare the prologue's `E_r`, `aw`, and nonzero `w` against the eager path on one-block synthetic inputs, edge-bracketing inputs, and full MoS2 cases.
 3. Run the line golden suite and repeated-run determinism checks. Record max absolute error, max error/peak, significant-bin relative error, and integral drift.
-4. Re-run the interleaved burn-in A/B harness at `Ne=450`, 2000, and 10000 on both ALEX-DESKTOP and `qlmc`. Capture line wall time, kernel count, survivor fraction, and fixed-order zero-slot overhead.
+4. Re-run the interleaved burn-in A/B harness at `Ne=450`, 2000, and 10000 on both local-workstation and `remote-host`. Capture line wall time, kernel count, survivor fraction, and fixed-order zero-slot overhead.
 5. Re-measure transport/GPU overlap before changing process counts or starting a `prange`/CUDA transport project.
 
 ## Round 4: GPU transport (2026-08-08)
@@ -237,9 +237,9 @@ A device-transported run **gives up the `gpu-pipeline` engine**, and this is the
 
 The cost is that this **changes numerical output**: per-electron streams are a different realization of the same distribution, and CUDA's libm differs from the host's by a few ulp on a chaotic trajectory. It is ledgered as `Validation: gpu-transport-core` (`filtered`) on aggregate agreement across seeds, first-step agreement at `rtol=1e-12`, bitwise repeat-run determinism, and invariance to batch size, launch geometry, and capacity replay. Any pinned spectrum taken above the threshold on a CUDA box has to be regenerated; `PYRITE_MC_TRANSPORT_CORE=lockstep` restores the old core process-wide.
 
-### Verification: whole-sweep A/B on qlmc (2026-08-08)
+### Verification: whole-sweep A/B on remote-host (2026-08-08)
 
-Everything above is a per-case or per-phase measurement. This is the flip itself, end to end, on `qlmc` (RTX 5080 16 GB, 32 logical cores, 45 GB RAM, idle box, no SLURM allocation so the pipeline arm gets every core it asks for). Both arms run the same `pyrite run` invocation and differ only in `PYRITE_MC_TRANSPORT_CORE`: unset (so `auto` resolves to the CUDA core, serial in the driver, segments resident) against `lockstep` (the historical `gpu-pipeline` arm, 16 transport workers). Fresh checkpoint directory per arm — `pyrite-dev perf` already bypasses the shared cache, but a resumed arm would otherwise measure nothing. One warm-up rep per arm, then three interleaved reps.
+Everything above is a per-case or per-phase measurement. This is the flip itself, end to end, on `remote-host` (RTX 5080 16 GB, 32 logical cores, 45 GB RAM, idle box, no SLURM allocation so the pipeline arm gets every core it asks for). Both arms run the same `pyrite run` invocation and differ only in `PYRITE_MC_TRANSPORT_CORE`: unset (so `auto` resolves to the CUDA core, serial in the driver, segments resident) against `lockstep` (the historical `gpu-pipeline` arm, 16 transport workers). Fresh checkpoint directory per arm — `pyrite-dev perf` already bypasses the shared cache, but a resumed arm would otherwise measure nothing. One warm-up rep per arm, then three interleaved reps.
 
 `coh_test` / hopg, 72 cases, `Ne=20000`, `Ne_brem=150`:
 
@@ -274,7 +274,7 @@ That control also caught a defect in the pin: `_worker_init` overwrote `PYRITE_M
 ### Still open
 
 - NVTX ranges in `transport.py`. **Done in Round 5**; the rest of this list is unchanged and Round 5 turns it into a sequenced plan.
-- **The `gpu-pipeline` engine's memory sizing.** Running `promising`/mose2 on the pipeline arm drove `qlmc`'s 45 GB to 46.8 GB of tree RSS and 8 GB of swap. That arm was left running to get a pipeline-vs-device total for MoSe2 and **never produced one — I stopped it**. It reached 319 of 432 cases in 5212 s while decelerating hard (21 s/case at case 282, 34 s/case by 298, 71 s/case by 319, against the device arm's 1154 s for all 432), driving peak tree RSS to **50.3 GB and swap to 12.9 GB on a 45 GB box**, load average 49–76, and leaving the machine unreachable over ssh for ~15 minutes. It was `SIGTERM`ed at case 319 rather than allowed to finish: it is a shared box. Treat those numbers as evidence about memory behavior, not as a timing — the measured MoSe2 figures elsewhere in this document are the device arm's.
+- **The `gpu-pipeline` engine's memory sizing.** Running `promising`/mose2 on the pipeline arm drove `remote-host`'s 45 GB to 46.8 GB of tree RSS and 8 GB of swap. That arm was left running to get a pipeline-vs-device total for MoSe2 and **never produced one — I stopped it**. It reached 319 of 432 cases in 5212 s while decelerating hard (21 s/case at case 282, 34 s/case by 298, 71 s/case by 319, against the device arm's 1154 s for all 432), driving peak tree RSS to **50.3 GB and swap to 12.9 GB on a 45 GB box**, load average 49–76, and leaving the machine unreachable over ssh for ~15 minutes. It was `SIGTERM`ed at case 319 rather than allowed to finish: it is a shared box. Treat those numbers as evidence about memory behavior, not as a timing — the measured MoSe2 figures elsewhere in this document are the device arm's.
 
 The partial run does carry one clean result. At MoSe2 scale the pipeline is genuinely **feed-starved**, which at hopg scale it was not: `gpu_feed_wait_fraction` runs a median of **0.569** (max 0.671) against hopg's 0.103–0.110. So the two materials fail the pipeline for different reasons — hopg by payload overhead at 11% feed-wait, MoSe2 by a transport pool that cannot keep 16 workers ahead of the card once `n_seg` triples. It also holds *more* device memory than the resident arm it was supposed to undercut: peak VRAM **9405 MiB vs 6873**, with 18 cases in flight throughout and 0 OOM retries. `_gpu_pipeline_workers` budgeted *workers* (`_PIPELINE_WORKER_MEM_MB`) but nothing budgeted the 18 cases in flight, each holding a host-side segment payload, and the worker count came from `os.cpu_count()` — which ignores a SLURM cgroup, so a `--cpus-per-task=8` allocation on this box still spawned 16. The flip routes the heavy runs away from this path rather than fixing it; anything still using the pipeline (no GPU, `Ne ≤ 1000`, grooved) was still exposed. **Both defects fixed in Round 5** — see that round below.
 - The host-side remainder of a transport call — scratch allocation, mask construction, output assembly — is now 38% of hopg's wall and 52% of MoSe2's. The kernel is no longer the bottleneck; the driver around it is.
@@ -294,7 +294,7 @@ Instrumentation, bookkeeping, and a plan. No kernel or numerical change: nothing
 
 ### Is the gated line prologue still worth anything? (`_USE_JIT_LINE_PROLOGUE`)
 
-Re-derived rather than re-measured — **arithmetic on recorded numbers, not a new measurement**, because it needs a CUDA box. Round 3 measured the prologue at **4.2–8.9% of the line phase** (`Ne` 450 → 10000, mos2, `N_g = 66`, `qlmc`).
+Re-derived rather than re-measured — **arithmetic on recorded numbers, not a new measurement**, because it needs a CUDA box. Round 3 measured the prologue at **4.2–8.9% of the line phase** (`Ne` 450 → 10000, mos2, `N_g = 66`, `remote-host`).
 
 Before Round 4, the single-process split at `Ne=10000` was transport 1.273 s, lines 0.3356 s, brem 0.1564 s — a 1.765 s case in which the line phase is **19.0%** and the prologue's best case is worth **1.7% of case wall**. Round 4's whole-case measurement (hopg, `Ne=16000`) is 0.265 s → 0.104 s with transport −73% and spectrum −43%. Applying those factors to the mos2 split gives transport 0.344 s, lines 0.191 s, brem 0.089 s: the line phase's share of the case **roughly doubles, 19.0% → 30.6%**.
 
@@ -317,7 +317,7 @@ Sequenced, because two of them are gated on the first:
 
 The missing MoSe2 pipeline arm stays deferred until (3) is confirmed on hardware, and should be rerun only with an explicit memory cap on a box that is not shared.
 
-#### Local ALEX-DESKTOP NVTX result (2026-08-10)
+#### Local workstation NVTX result (2026-08-10)
 
 The first gate was exercised locally on the RTX 3060 Ti desktop with Nsight Systems 2026.4.1. Matched warmed cases used `Ne=8000`, `Ne_brem=150`, seed 75001, 30 keV, 1e4 A, 45 degree polar tilt, 140 degree azimuth, the `promising_low_ne` grids, CUDA transport, resident segments, and `REAL=float32`. Hopg produced 373,949 segments and MoSe2 3,495,865.
 

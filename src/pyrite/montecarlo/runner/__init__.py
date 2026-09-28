@@ -92,7 +92,7 @@ def _usable_cpus():
     ``os.cpu_count()`` reports the MACHINE, not the allocation: inside a SLURM
     ``--cpus-per-task=8`` cgroup on a 32-core box it still returns 32, so the
     GPU pipeline sized a 16-worker pool into an 8-CPU allocation and helped
-    drive qlmc into swap (2026-08-08; see docs/repo-design/compute/compute-performance-optimization.md
+    drive remote-host into swap (2026-08-08; see docs/repo-design/compute/compute-performance-optimization.md
     "Still open"). Take the tightest of the machine count, the affinity mask,
     ``SLURM_CPUS_PER_TASK``, and the cgroup quota. Read once at import, like the
     rest of the host probe; workers inherit the value on spawn."""
@@ -1123,7 +1123,7 @@ def _worker_init(force_cpu=False):
     naming a CPU core is a deliberate choice that a worker can honor, and
     overwriting it made the pin a no-op for every pooled run: a sweep pinned to
     "per-electron" silently transported on lockstep instead, which a 2026-08-08
-    qlmc A/B caught only because the two arms came out bit-identical.
+    remote-host A/B caught only because the two arms came out bit-identical.
 
     force_cpu: when True (the engine="cpu" full-case pool), rebind THIS
     worker process's copy of runner._RESOURCE_POLICY.gpu and spectrum.xp/REAL to their CPU

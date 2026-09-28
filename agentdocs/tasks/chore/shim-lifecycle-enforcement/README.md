@@ -1,7 +1,7 @@
 # chore/shim-lifecycle-enforcement
 
-Issue: [#68](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/68)
-Worktree: `/home/alex/dev/wt/pyrite/shim-lifecycle-enforcement`
+Issue: [#68](#68)
+Worktree: `${HOME}/dev/wt/pyrite/shim-lifecycle-enforcement`
 
 ## Problem
 

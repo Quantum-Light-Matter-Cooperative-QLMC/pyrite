@@ -539,7 +539,7 @@ def test_click_rm_expected_failure_uses_stderr(monkeypatch):
 
 def test_pull_combined_quotes_remote_scp_path(monkeypatch):
     calls = []
-    monkeypatch.setattr(energy_grid.remote.config, "HOST", "qlmc")
+    monkeypatch.setattr(energy_grid.remote.config, "HOST", "remote-host")
     monkeypatch.setattr(energy_grid.remote.config, "REMOTE_DIR", "/srv/pyrite data")
     monkeypatch.setattr(energy_grid.remote, "_run", lambda command: calls.append(command))
 
@@ -547,7 +547,11 @@ def test_pull_combined_quotes_remote_scp_path(monkeypatch):
 
     assert local == "/tmp/pull-dest/bounds-result.json"
     assert calls == [
-        ["scp", "qlmc:'/srv/pyrite data/bounds-result.json'", "/tmp/pull-dest/bounds-result.json"]
+        [
+            "scp",
+            "remote-host:'/srv/pyrite data/bounds-result.json'",
+            "/tmp/pull-dest/bounds-result.json",
+        ]
     ]
 
 

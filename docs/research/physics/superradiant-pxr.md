@@ -6,7 +6,7 @@
 
 The target is the externally microbunched, relativistic PXR source studied by {cite:t}`feranchuk2022`. A bunch prepared by an XFEL enters a crystal, and its density modulation resonates with PXR emission. The paper studies extremely asymmetric diffraction with electrons traveling near the crystal surface and photons exiting at a large angle to the beam. It does not establish a general relativistic CBS model or demonstrate self-bunching inside PyRITE's target.
 
-The published 2022 PDF was inspected from `/home/alexa/dev/PhysRevAccelBeams.25.120702.pdf`; the Zotero parent record is `IJNJA3GU`. The portable reference is the DOI in the shared bibliography. The local PDF is not a repository dependency. Source equation references in the [companion PXR/CBS assessment](relativistic-pxr-cbs.md) refer to the inspected published text; the arXiv version is not assumed numerically identical.
+The published 2022 PDF was inspected from a local copy of the published PDF; the Zotero parent record is `IJNJA3GU`. The portable reference is the DOI in the shared bibliography. The local PDF is not a repository dependency. Source equation references in the [companion PXR/CBS assessment](relativistic-pxr-cbs.md) refer to the inspected published text; the arXiv version is not assumed numerically identical.
 
 ## Existing foundations
 

@@ -122,7 +122,7 @@ def test_high_energy_profile_range_is_part_of_dataset_identity():
     assert identity["resolved_parameters"]["sweep"]["energy_keV"] == energies
     # 5 MeV is h-BN only (#192); the other members keep the shared range.
     np.testing.assert_array_equal(
-        material_sweep("mos2", catalog_profile="high_energy").beam.energy_keV,
+        material_sweep("mose2", catalog_profile="high_energy").beam.energy_keV,
         [100.0, 500.0, 1000.0],
     )
 

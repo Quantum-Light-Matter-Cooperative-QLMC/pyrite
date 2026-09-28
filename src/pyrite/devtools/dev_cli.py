@@ -758,7 +758,9 @@ def main(argv: list[str] | None = None, *, prog_name: str = "pyrite-dev") -> Non
         if skip_tests:
             rest = rest[1:]
             if rest:
-                build_parser(prog_name).error("verify --skip-tests does not accept pytest arguments")
+                build_parser(prog_name).error(
+                    "verify --skip-tests does not accept pytest arguments"
+                )
         numba = bool(rest) and rest[0] == "--numba"
         pytest_args = rest[1:] if numba else rest
         func(

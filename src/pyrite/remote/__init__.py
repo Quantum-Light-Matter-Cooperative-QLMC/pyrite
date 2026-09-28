@@ -1,17 +1,13 @@
-"""``pyrite remote`` -- schedule heavy CXR scans on the lab GPU box, keep data-vis local.
+"""``pyrite remote`` -- schedule heavy CXR scans on a configured remote host.
 
-The split this enables: the laptop holds the project and does all interactive
-analysis and static-HTML export, while
-the lab box (an RTX 5080, ssh host 'qlmc') only does the GPU-heavy Monte-Carlo
-sweep. Every compute-producing subcommand ships the current code up, submits a
-one-GPU SLURM batch script there (see :mod:`pyrite.runs.scan`), and pulls results into
-./checkpoints
--- so you never hand-ssh in or copy files, and the lab box needs no visualization
-toolchain.
+The local machine handles interactive analysis and static-HTML export, while
+the remote host handles GPU-heavy Monte Carlo sweeps. Compute-producing
+subcommands can sync the current code, submit a SLURM batch script (see
+:mod:`pyrite.runs.scan`), and pull results into ``./checkpoints``.
 
-Optional, dev-only tool: it is only useful if you have an ssh host configured
-(default 'qlmc', override via PYRITE_REMOTE_HOST) to run sweeps on. Every other
-``pyrite`` command works without it.
+Optional, dev-only tool. Configure an SSH host alias with
+``pyrite config set remote.target HOST`` or ``PYRITE_REMOTE_HOST`` before using
+remote commands. Other ``pyrite`` commands work without this configuration.
 
 Run, wait for SLURM, then pull:
 
@@ -52,9 +48,10 @@ time with `attach`/`status`/`logs`, then `pull` once state is `done`.
 
 Then locally: run ``pyrite app analysis <material>`` or ``pyrite app analysis export [stem]``.
 
-Transport is ssh/scp only (uses the 'qlmc' host in ~/.ssh/config, cloudflared
-ProxyCommand and all) -- no rsync dependency, so it works from Windows Git Bash.
-Override the box via env: PYRITE_REMOTE_HOST / PYRITE_REMOTE_DIR / PYRITE_REMOTE_UV.
+Transport uses ssh/scp and the configured SSH options; it has no rsync
+dependency. The remote checkout and ``uv`` default to ``~/pyrite`` and
+``~/.local/bin/uv`` (``~`` is the remote login home); set ``PYRITE_REMOTE_DIR``
+and ``PYRITE_REMOTE_UV`` when they differ.
 """
 
 # ---------------------------------------------------------------------------
@@ -85,7 +82,7 @@ from . import (
 # --- from config ------------------------------------------------------
 # Compatibility snapshot only; subsystem calls resolve the effective host
 # dynamically through ``config.remote_host()``.
-HOST = env_value("PYRITE_REMOTE_HOST", "qlmc")
+HOST = env_value("PYRITE_REMOTE_HOST")
 REMOTE_DIR = config.REMOTE_DIR
 REMOTE_UV = config.REMOTE_UV
 SLURM_PARTITION = config.SLURM_PARTITION

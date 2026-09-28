@@ -1,8 +1,8 @@
 # Issue #123: derive line coverage measures the PXR/CBS channel
 
-Issue: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/123
+Issue: #123
 Branch: `issue-123-derive-line-coverage-channel`
-Worktree: `/home/alex/dev/wt/pyrite/issue-123-derive-line-coverage-channel`
+Worktree: `${HOME}/dev/wt/pyrite/issue-123-derive-line-coverage-channel`
 
 Base: stacked on `issue-101-line-windows` at `4da0a8ea`. Land after #101, or
 rebase onto `main` once #101 merges.

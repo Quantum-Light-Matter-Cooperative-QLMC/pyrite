@@ -31,7 +31,7 @@ CONFIG_PATH = state_dir() / "config.toml"
 # that does not exist is not an error here -- only using it is.
 _SETTINGS = {
     "profile.current": ("PYRITE_PROFILE", "standard"),
-    "remote.target": ("PYRITE_REMOTE_HOST", "qlmc"),
+    "remote.target": ("PYRITE_REMOTE_HOST", ""),
     "workspace.root": ("PYRITE_HOME", "."),
     "xsgen.bremslib_source": ("PYRITE_XSGEN_BREMSLIB_SOURCE", "../BremsLib_v2.0.8"),
     "xsgen.elsepa_source": ("PYRITE_XSGEN_ELSEPA_SOURCE", "../elsepa-2020"),
