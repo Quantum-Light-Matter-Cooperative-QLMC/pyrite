@@ -38,6 +38,7 @@ def _():
     from pyrite.campaign.beam_metrics import initial_state_metrics
     from pyrite.campaign.config import default_settings, trajectory_sweep
     from pyrite.materials import CATALOG
+    from pyrite.montecarlo.transport.shell_oscillators import load_conduction_bands
     from pyrite.plots.altair.trajectories import (
         penetration_survival_chart,
         trajectory_chart,
@@ -77,6 +78,7 @@ def _():
         default_settings,
         fmt_thickness,
         initial_state_metrics,
+        load_conduction_bands,
         mo,
         np,
         page_title,
@@ -473,6 +475,7 @@ def _(
     get_penetration_render_status,
     get_penetration_survival,
     initial_state_metrics,
+    load_conduction_bands,
     mo,
     np,
     penetration_azim_deg,
@@ -576,10 +579,11 @@ def _(
         _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
         _secondary_note = None
         if penetration_secondaries_ui.value:
-            if _nc["crystal"] not in {"silicon", "sio2", "mos2"}:
+            _shell_keys = load_conduction_bands()
+            if _nc["crystal"] not in _shell_keys:
                 _secondary_note = mo.md(
                     "*Shell secondaries are unavailable for this material; supported materials "
-                    "are silicon, SiO₂, and MoS₂.*"
+                    f"are {', '.join(sorted(_shell_keys))}.*"
                 )
             else:
                 _nc = dict(
