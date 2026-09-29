@@ -202,7 +202,7 @@ def test_run_warns_when_profile_falls_back_to_builtin_standard(monkeypatch, tmp_
     assert result.exit_code == 0
     assert seen["catalog_profile"] == "standard"
     assert result.stderr.startswith("warning: this run names no profile; using the 'standard'")
-    assert "will be an error in 0.5.0" in result.stderr
+    assert "will be an error in 0.6.0" in result.stderr
     assert "pyrite config set profile.current NAME" in result.stderr
 
 

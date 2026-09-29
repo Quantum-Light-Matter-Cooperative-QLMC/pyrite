@@ -341,7 +341,7 @@ class ImplicitDefault:
 
 
 def _implicit(
-    key: str, fallback: str, replacement: str, *, since: str = "0.3.0", note: str = ""
+    key: str, fallback: str, replacement: str, *, since: str = "0.4.0", note: str = ""
 ) -> ImplicitDefault:
     return ImplicitDefault(key, fallback, replacement, since, _window(since), note)
 
