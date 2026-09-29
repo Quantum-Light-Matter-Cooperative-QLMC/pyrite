@@ -60,8 +60,12 @@ import sys
 from pathlib import Path
 
 import pyrite._catalog_layout as layout
+from pyrite.console import config
 
 invalid = Path(sys.argv[1])
+# The subprocess does not inherit the conftest store isolation; a developer's
+# ``catalog.path`` would otherwise bypass the patched bundled catalog.
+config.CONFIG_PATH = invalid.parent / "absent-store" / "config.toml"
 layout.bundled_catalog = lambda: invalid
 from pyrite import cli
 cli.main(["material", "validate"])

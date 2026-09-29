@@ -98,7 +98,9 @@ def _(mo, page_title, style_sheet, theme_switch):
 def _(CATALOG, mo):
     material_options = {CATALOG.material(key).label: key for key in CATALOG.material_keys}
     # A selected external catalog need not define hopg; start on its first material.
-    _initial = "hopg" if "hopg" in CATALOG.material_keys else next(iter(CATALOG.material_keys), None)
+    _initial = (
+        "hopg" if "hopg" in CATALOG.material_keys else next(iter(CATALOG.material_keys), None)
+    )
     material_ui = mo.ui.dropdown(
         material_options,
         value=None if _initial is None else CATALOG.material(_initial).label,

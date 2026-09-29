@@ -5,7 +5,7 @@
 
 import marimo
 
-__generated_with = "0.24.0"
+__generated_with = "0.25.0"
 app = marimo.App(width="full")
 
 with app.setup:
@@ -95,7 +95,7 @@ def _():
                     mo,
                     "Spectral Analysis",
                     "Explore spectra, optimize geometry, inspect instrument response, and compare materials.",
-                    eyebrow="PyRITE - a Python toolkit for Radiation from Interaction and Transport of Electrons",
+                    eyebrow="PyRITE",
                 ),
                 theme_ui,
             ],

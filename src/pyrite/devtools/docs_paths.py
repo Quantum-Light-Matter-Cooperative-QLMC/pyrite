@@ -12,6 +12,7 @@ _SKIP_PARTS = frozenset(
         ".remember",
         ".serena",
         ".venv",
+        ".worktrees",
         "_autosummary",
         "_build",
         "__pycache__",
