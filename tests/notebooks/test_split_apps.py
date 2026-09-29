@@ -5,8 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from pyrite.apps.analysis_ui.data import resolve_checkpoint_stem
-
 APPS = Path(__file__).parents[2] / "src" / "pyrite" / "apps"
 PIXEL_APP = APPS / "pixel_app.py"
 COMPARE_APP = APPS / "compare_app.py"
@@ -66,14 +64,17 @@ def test_each_app_owns_a_checkpoint_picker_seeded_from_the_launcher(app: Path) -
     source = app.read_text()
 
     assert "initial_material(mo.cli_args(), get_default_material())" in source
-    for label in ('label="Material"', 'label="Face"', 'label="Profile"'):
-        assert label in source
+    assert 'label="Material"' in source
+    # One Checkpoint dropdown (issue #236) replaces the Face and Profile pickers.
+    assert "make_checkpoint_picker(" in source
+    for label in ('label="Face"', 'label="Profile"'):
+        assert label not in source
 
 
 def test_pixel_app_discovers_observations_without_loading_the_checkpoint() -> None:
     source = PIXEL_APP.read_text()
 
-    assert "selected_checkpoint_stem(material_ui, face_ui, profile_ui)" in source
+    assert "selected_checkpoint_stem(checkpoint_ui)" in source
     assert "discover_observations(observation_stem)" in source
     assert "load_context" not in source
     assert "from pyrite.apps.analysis_ui.views.pixels import render_pixel_detector" in source
@@ -89,19 +90,3 @@ def test_compare_app_holds_the_case_basket_and_cross_material_views() -> None:
     assert "MATERIAL_LABELS" not in source
     for tab in ('"Compare any cases"', '"Compare materials"'):
         assert tab in source
-
-
-@pytest.mark.parametrize(
-    ("material", "face", "profile", "expected"),
-    [
-        ("hopg", "flat", None, "hopg"),
-        ("hopg", "flat", "hopg", "hopg"),
-        ("hopg", "flat", "hopg@tpx-test-abc", "hopg@tpx-test-abc"),
-        (None, None, None, None),
-        ("hopg", None, None, None),
-    ],
-)
-def test_resolve_checkpoint_stem_matches_load_context_precedence(
-    material, face, profile, expected
-) -> None:
-    assert resolve_checkpoint_stem(material, face, profile) == expected

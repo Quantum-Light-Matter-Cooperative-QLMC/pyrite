@@ -7,14 +7,16 @@ does not pull them into the analysis app.
 """
 
 from .detectors import render_detectors
-from .dimension import render_dimension_comparison
-from .energy import render_energy_comparison
-from .optimize import render_rankings, render_scans
+from .map import render_map, render_map_trends, render_rankings
+from .sidebar import render_sidebar
+from .spectra import SPECTRA_SPECS, render_spectra
 
 __all__ = [
+    "SPECTRA_SPECS",
     "render_detectors",
-    "render_dimension_comparison",
-    "render_energy_comparison",
+    "render_map",
+    "render_map_trends",
     "render_rankings",
-    "render_scans",
+    "render_sidebar",
+    "render_spectra",
 ]

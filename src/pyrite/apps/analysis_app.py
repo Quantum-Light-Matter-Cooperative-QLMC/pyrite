@@ -21,37 +21,39 @@ with app.setup:
     )
     from pyrite.apps._widgets import MaterialSelect
     from pyrite.apps.analysis_ui import (
-        DimensionComparisonSpec,
         load_context,
+        make_checkpoint_picker,
         resolve_axis_pair,
         select_emission,
+        slice_results,
     )
     from pyrite.apps.analysis_ui.controls import (
-        make_detector_controls,
-        make_dimension_controls,
-        make_energy_controls,
-        make_heatmap_energy_control,
-        make_scan_thickness_control,
+        make_component_controls,
+        make_detector_axes,
+        make_detector_choice,
+        make_map_quantity_control,
+        make_slice_controls,
+        make_spectra_axes,
+        make_vary_control,
+        make_varying_control,
     )
-    from pyrite.apps.analysis_ui.interactive import make_heatmap_widget, make_scan_heatmap_widgets
-    from pyrite.apps.analysis_ui.navigation import EXPLORE, INSTRUMENTS, OPTIMIZE, make_view_nav
+    from pyrite.apps.analysis_ui.interactive import is_heatmap_sweep, make_map_widget
+    from pyrite.apps.analysis_ui.navigation import DETECTORS, MAP, SPECTRA, make_view_nav
     from pyrite.apps.analysis_ui.views import (
+        SPECTRA_SPECS,
         render_detectors,
-        render_dimension_comparison,
-        render_energy_comparison,
-        render_rankings,
-        render_scans,
+        render_map,
+        render_map_trends,
+        render_sidebar,
+        render_spectra,
     )
     from pyrite.apps.analyze import (
         emission_menu,
-        face_menu,
         get_default_material,
         initial_material,
         material_menu,
-        profile_menu,
         select_initial_material,
     )
-    from pyrite.results import select_results, select_thickness
     from pyrite.runs.run import DEFAULT_CHECKPOINT_DIR
 
     try:
@@ -72,7 +74,7 @@ def _():
                 page_title(
                     mo,
                     "Spectral Analysis",
-                    "Explore spectra, optimize geometry, and inspect instrument response.",
+                    "Compare spectra, map geometry scans, and inspect detector response.",
                     eyebrow="PyRITE",
                 ),
                 theme_ui,
@@ -121,39 +123,13 @@ def _():
 
 @app.cell
 def _(material_ui):
-    _material = material_ui.value["value"]
-    _options = face_menu(_material, DEFAULT_CHECKPOINT_DIR) if _material else ()
-    _initial_selection = select_initial_material(None, _options)
-    face_ui = mo.ui.anywidget(
-        MaterialSelect(
-            options=list(_options),
-            value=_initial_selection,
-            label="Face",
-            disabled=_initial_selection is None,
-        )
-    )
-    return (face_ui,)
+    checkpoint_ui = make_checkpoint_picker(mo, material_ui.value["value"], DEFAULT_CHECKPOINT_DIR)
+    return (checkpoint_ui,)
 
 
 @app.cell
-def _(material_ui):
-    _material = material_ui.value["value"]
-    _options = profile_menu(_material, DEFAULT_CHECKPOINT_DIR) if _material else ()
-    _initial_selection = select_initial_material(None, _options)
-    profile_ui = mo.ui.anywidget(
-        MaterialSelect(
-            options=list(_options),
-            value=_initial_selection,
-            label="Profile",
-            disabled=_initial_selection is None,
-        )
-    )
-    return (profile_ui,)
-
-
-@app.cell
-def _(face_ui, material_ui, profile_ui):
-    base_context = load_context(material_ui, face_ui, profile_ui)
+def _(checkpoint_ui, material_ui):
+    base_context = load_context(material_ui, checkpoint_ui, DEFAULT_CHECKPOINT_DIR)
     return (base_context,)
 
 
@@ -178,24 +154,49 @@ def _(base_context, emission_ui):
     return (context,)
 
 
+@app.cell
+def _(base_context):
+    # Built from the checkpoint, not the emission view, so toggling emission
+    # keeps the slice. One name per dropdown: a view reruns only when a
+    # dimension it reads changes.
+    slice_controls = make_slice_controls(mo, base_context.checkpoint_results)
+    energy_ui = slice_controls["energy"]
+    tilt_ui = slice_controls["tilt"]
+    azimuth_ui = slice_controls["azimuth"]
+    thickness_ui = slice_controls["thickness"]
+    return azimuth_ui, energy_ui, slice_controls, thickness_ui, tilt_ui
+
+
 @app.cell(hide_code=True)
-def _(context, emission_ui, face_ui, material_ui, profile_ui):
-    parts = [
-        mo.hstack(
-            [material_ui, face_ui, profile_ui, emission_ui],
-            wrap=True,
+def _(base_context, checkpoint_ui, emission_ui, material_ui, slice_controls):
+    render_sidebar(
+        mo,
+        material_ui=material_ui,
+        checkpoint_ui=checkpoint_ui,
+        emission_ui=emission_ui,
+        slice_controls=slice_controls,
+        results=base_context.checkpoint_results,
+    )
+    return
+
+
+@app.cell
+def _(context):
+    no_data_notice = None
+    if not context.has_data and context.notice is not None and context.load_error is None:
+        # The material has checkpoints but no standard flat one: ask, never guess.
+        no_data_notice = mo.callout(
+            mo.md(f"**No checkpoint selected.** {context.notice}"), kind="info"
         )
-    ]
-    if context.selected_profile not in (None, context.selected_material):
-        parts.append(
-            mo.md(
-                "*This profile selects a checkpoint directly; the face selector does not "
-                "change the loaded checkpoint.*"
-            )
+    elif not context.has_data:
+        detail = (
+            context.load_error or "Run `pyrite run standard -m <material>` to create a checkpoint."
         )
-    if context.load_error is not None:
-        parts.append(mo.callout(mo.md(context.load_error), kind="warn"))
-    mo.vstack(parts)
+        no_data_notice = mo.callout(
+            mo.md(f"**No checkpoint data available.** {detail}"),
+            kind="info",
+        )
+    no_data_notice
     return
 
 
@@ -208,305 +209,157 @@ def _():
 
 
 @app.cell
-def _(context, view_nav):
-    mo.stop(view_nav.value != EXPLORE)
-    energy_controls = make_energy_controls(mo, context.results)
-    return (energy_controls,)
+def _():
+    # No dependencies: view-local choices survive view and checkpoint changes.
+    vary_ui = make_vary_control(mo)
+    spectrum_components_ui = make_component_controls(mo)
+    map_quantity_ui = make_map_quantity_control(mo)
+    detector_ui = make_detector_choice(mo)
+    return detector_ui, map_quantity_ui, spectrum_components_ui, vary_ui
 
 
 @app.cell
-def _(context, energy_controls):
-    energy_values = energy_controls.value
-    pinned_results = (
-        select_thickness(context.results, energy_values["thickness"])
-        if energy_values["thickness"] is not None
-        else context.results
-    )
-    return energy_values, pinned_results
+def _(base_context, view_nav):
+    mo.stop(view_nav.value != SPECTRA)
+    spectra_axes_controls = make_spectra_axes(mo, base_context.checkpoint_results)
+    return (spectra_axes_controls,)
 
 
 @app.cell
-def _(pinned_results):
-    heatmap_energy_ui = make_heatmap_energy_control(mo, pinned_results)
-    return (heatmap_energy_ui,)
-
-
-@app.cell
-def _(app_theme, context, heatmap_energy_ui, pinned_results):
-    heatmap_widget = make_heatmap_widget(
+def _(base_context, vary_ui, view_nav):
+    mo.stop(view_nav.value != SPECTRA)
+    spectra_varying_ui = make_varying_control(
         mo,
-        alt,
-        pinned_results,
-        context.settings,
-        energy=heatmap_energy_ui.value,
-        theme=app_theme,
+        base_context.checkpoint_results,
+        varying_key=vary_ui.value,
+        unit=SPECTRA_SPECS[vary_ui.value].unit,
     )
-    return (heatmap_widget,)
-
-
-@app.cell
-def _(context, view_nav):
-    mo.stop(view_nav.value != EXPLORE)
-    polar_controls = make_dimension_controls(mo, context.results, varying_key="tilt_deg")
-    azimuth_controls = make_dimension_controls(
-        mo,
-        context.results,
-        varying_key="tilt_azim_deg",
-    )
-    return azimuth_controls, polar_controls
-
-
-@app.cell
-def _(context, view_nav):
-    mo.stop(view_nav.value != OPTIMIZE)
-    scan_thickness_ui = make_scan_thickness_control(mo, context.results)
-    return (scan_thickness_ui,)
-
-
-@app.cell
-def _(context, scan_thickness_ui):
-    scan_results = (
-        select_results(context.results, thickness_ang=scan_thickness_ui.value)
-        if scan_thickness_ui.value is not None
-        else context.results
-    )
-    return (scan_results,)
-
-
-@app.cell
-def _(scan_results):
-    scan_heatmap_energy_ui = make_heatmap_energy_control(mo, scan_results)
-    return (scan_heatmap_energy_ui,)
-
-
-@app.cell
-def _(app_theme, context, scan_heatmap_energy_ui, scan_results):
-    scan_heatmap_widgets = make_scan_heatmap_widgets(
-        mo,
-        alt,
-        scan_results,
-        context.settings,
-        context.cases,
-        energy=scan_heatmap_energy_ui.value,
-        theme=app_theme,
-    )
-    return (scan_heatmap_widgets,)
-
-
-@app.cell
-def _(context, view_nav):
-    mo.stop(view_nav.value != INSTRUMENTS)
-    detector_controls = make_detector_controls(mo, context.results)
-    return (detector_controls,)
-
-
-@app.cell
-def _(context, detector_controls):
-    detector_values = detector_controls.value
-    constraints = {
-        "thickness_ang": detector_values["thickness"],
-        "tilt_azim_deg": detector_values["azimuth"],
-    }
-    constraints = {key: value for key, value in constraints.items() if value is not None}
-    detector_results = (
-        select_results(context.results, **constraints) if constraints else context.results
-    )
-    return detector_results, detector_values
+    return (spectra_varying_ui,)
 
 
 @app.cell
 def _(
     app_theme,
+    azimuth_ui,
     context,
-    energy_controls,
-    energy_values,
-    heatmap_energy_ui,
-    heatmap_widget,
-    pinned_results,
+    energy_ui,
+    spectra_axes_controls,
+    spectra_varying_ui,
+    spectrum_components_ui,
+    thickness_ui,
+    tilt_ui,
+    vary_ui,
+    view_nav,
 ):
-    _axes = resolve_axis_pair(energy_values["axes"])
-    heatmap_selection = None if heatmap_widget is None else heatmap_widget.value
-
-    def energy_tab():
-        return render_energy_comparison(
-            mo,
-            context=context,
-            pinned_results=pinned_results,
-            controls=energy_controls,
-            values=energy_values,
-            axes=_axes,
-            heatmap_energy_ui=heatmap_energy_ui,
-            heatmap_widget=heatmap_widget,
-            heatmap_selection=heatmap_selection,
-            theme=app_theme,
-        )
-
-    return (energy_tab,)
-
-
-@app.cell
-def _(app_theme, context, polar_controls):
-    _values = polar_controls.value
-    _axes = resolve_axis_pair(_values["axes"])
-    _specification = DimensionComparisonSpec(
-        varying_key="tilt_deg",
-        varying_label="polar tilt",
-        varying_plural="polar angles",
-        pinned_angle_key="tilt_azim_deg",
-        pinned_angle_label="azimuth",
-        description=(
-            "Coherent CXR line spectra at pinned beam energy, azimuth, and thickness. "
-            "Polar tilt varies across selected curves."
-        ),
-    )
-
-    def polar_tab():
-        return render_dimension_comparison(
-            mo,
-            context=context,
-            controls=polar_controls,
-            values=_values,
-            axes=_axes,
-            spec=_specification,
-            theme=app_theme,
-        )
-
-    return (polar_tab,)
-
-
-@app.cell
-def _(app_theme, azimuth_controls, context):
-    _values = azimuth_controls.value
-    _axes = resolve_axis_pair(_values["axes"])
-    _specification = DimensionComparisonSpec(
-        varying_key="tilt_azim_deg",
-        varying_label="azimuth",
-        varying_plural="azimuths",
-        pinned_angle_key="tilt_deg",
-        pinned_angle_label="polar tilt",
-        description=(
-            "Coherent CXR line spectra at pinned beam energy, polar tilt, and thickness. "
-            "Azimuth varies across selected curves."
-        ),
-    )
-
-    def azimuth_tab():
-        return render_dimension_comparison(
-            mo,
-            context=context,
-            controls=azimuth_controls,
-            values=_values,
-            axes=_axes,
-            spec=_specification,
-            theme=app_theme,
-        )
-
-    return (azimuth_tab,)
-
-
-@app.cell
-def _(
-    app_theme,
-    context,
-    scan_heatmap_energy_ui,
-    scan_heatmap_widgets,
-    scan_results,
-    scan_thickness_ui,
-):
-    selections = {
-        key: None if widget is None else widget.value
-        for key, widget in scan_heatmap_widgets.items()
-    }
-
-    def scans_tab():
-        return render_scans(
-            mo,
-            context=context,
-            scan_results=scan_results,
-            thickness_ui=scan_thickness_ui,
-            heatmap_energy_ui=scan_heatmap_energy_ui,
-            heatmap_widgets=scan_heatmap_widgets,
-            heatmap_selections=selections,
-            theme=app_theme,
-        )
-
-    def rankings_tab():
-        return render_rankings(mo, context=context)
-
-    return rankings_tab, scans_tab
-
-
-@app.cell
-def _(
-    app_theme,
-    context,
-    detector_controls,
-    detector_results,
-    detector_values,
-):
-    _axes = resolve_axis_pair(detector_values["axes"], include_y_domain=True)
-
-    def detector_tab():
-        return render_detectors(
-            mo,
-            context=context,
-            detector_results=detector_results,
-            controls=detector_controls,
-            values=detector_values,
-            axes=_axes,
-            theme=app_theme,
-        )
-
-    return (detector_tab,)
-
-
-@app.cell
-def _(context):
-    if not context.has_data:
-        detail = (
-            context.load_error or "Run `pyrite run standard -m <material>` to create a checkpoint."
-        )
-        no_data_notice = mo.callout(
-            mo.md(f"**No checkpoint data available.** {detail}"),
-            kind="info",
-        )
-    else:
-        no_data_notice = None
-    no_data_notice
-    return
-
-
-@app.cell
-def _(azimuth_tab, context, energy_tab, polar_tab, view_nav):
-    mo.stop(not context.has_data or view_nav.value != EXPLORE)
-    mo.accordion(
-        {
-            "Compare beam energies": energy_tab,
-            "Compare polar angles": polar_tab,
-            "Compare azimuths": azimuth_tab,
+    mo.stop(not context.has_data or view_nav.value != SPECTRA)
+    render_spectra(
+        mo,
+        context=context,
+        slice_values={
+            "energy": energy_ui.value,
+            "tilt": tilt_ui.value,
+            "azimuth": azimuth_ui.value,
+            "thickness": thickness_ui.value,
         },
-        lazy=True,
-        multiple=True,
+        spec=SPECTRA_SPECS[vary_ui.value],
+        vary_ui=vary_ui,
+        varying_ui=spectra_varying_ui,
+        components=spectrum_components_ui,
+        axes_controls=spectra_axes_controls,
+        axes=resolve_axis_pair(spectra_axes_controls.value),
+        theme=app_theme,
     )
     return
 
 
 @app.cell
-def _(context, rankings_tab, scans_tab, view_nav):
-    mo.stop(not context.has_data or view_nav.value != OPTIMIZE)
-    mo.vstack(
-        [
-            scans_tab(),
-            mo.accordion({"Rank geometries": rankings_tab}, lazy=True, multiple=True),
-        ]
+def _(app_theme, context, energy_ui, map_quantity_ui, thickness_ui, view_nav):
+    mo.stop(not context.has_data or view_nav.value != MAP)
+    map_results = slice_results(context.results, thickness=thickness_ui.value)
+    heatmap_mode = is_heatmap_sweep(map_results)
+    map_widget = (
+        make_map_widget(
+            mo,
+            alt,
+            map_results,
+            context.settings,
+            context.cases,
+            quantity=map_quantity_ui.value,
+            energy=energy_ui.value,
+            theme=app_theme,
+        )
+        if heatmap_mode
+        else None
+    )
+    return heatmap_mode, map_results, map_widget
+
+
+@app.cell
+def _(app_theme, context, map_results, view_nav):
+    mo.stop(view_nav.value != MAP)
+    map_trends = render_map_trends(mo, context=context, map_results=map_results, theme=app_theme)
+    return (map_trends,)
+
+
+@app.cell
+def _(
+    app_theme,
+    context,
+    energy_ui,
+    heatmap_mode,
+    map_quantity_ui,
+    map_results,
+    map_trends,
+    map_widget,
+    view_nav,
+):
+    mo.stop(view_nav.value != MAP)
+    render_map(
+        mo,
+        context=context,
+        map_results=map_results,
+        heatmap_mode=heatmap_mode,
+        quantity_ui=map_quantity_ui,
+        map_widget=map_widget,
+        selection=None if map_widget is None else map_widget.value,
+        energy=energy_ui.value,
+        trends=map_trends,
+        theme=app_theme,
     )
     return
 
 
 @app.cell
-def _(context, detector_tab, view_nav):
-    mo.stop(not context.has_data or view_nav.value != INSTRUMENTS)
-    detector_tab()
+def _(base_context, view_nav):
+    mo.stop(view_nav.value != DETECTORS)
+    detector_axes_controls = make_detector_axes(mo, base_context.checkpoint_results)
+    return (detector_axes_controls,)
+
+
+@app.cell
+def _(
+    app_theme,
+    azimuth_ui,
+    context,
+    detector_axes_controls,
+    detector_ui,
+    thickness_ui,
+    tilt_ui,
+    view_nav,
+):
+    mo.stop(not context.has_data or view_nav.value != DETECTORS)
+    render_detectors(
+        mo,
+        context=context,
+        detector_results=slice_results(
+            context.results, azimuth=azimuth_ui.value, thickness=thickness_ui.value
+        ),
+        detector_ui=detector_ui,
+        tilt=tilt_ui.value,
+        axes_controls=detector_axes_controls,
+        axes=resolve_axis_pair(detector_axes_controls.value, include_y_domain=True),
+        theme=app_theme,
+    )
     return
 
 

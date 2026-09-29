@@ -28,13 +28,13 @@ class AnalysisContext:
 
     selected_material: str | None
     selected_face: str | None
-    selected_profile: str | None
     checkpoint_stem: str | None
     settings: Any
     checkpoint_results: Any
     results: Any
     cases: Any
     load_error: str | None = None
+    notice: str | None = None
     emission: str = "incoherent"
 
     @property
@@ -69,9 +69,16 @@ class AnalysisContext:
 
 @dataclass(frozen=True)
 class DimensionComparisonSpec:
+    """One Spectra-view "Vary" choice.
+
+    ``varying_key`` is the case field that varies across curves; ``pinned``
+    names the sidebar slice dimensions (``energy``/``tilt``/``azimuth``) held
+    fixed. Thickness is always pinned.
+    """
+
     varying_key: str
     varying_label: str
     varying_plural: str
-    pinned_angle_key: str
-    pinned_angle_label: str
+    unit: str
+    pinned: tuple[str, ...]
     description: str

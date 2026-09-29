@@ -20,7 +20,12 @@ with app.setup:
         theme_switch,
     )
     from pyrite.apps._widgets import MaterialSelect
-    from pyrite.apps.analysis_ui import load_context, resolve_axis_pair, select_emission
+    from pyrite.apps.analysis_ui import (
+        load_context,
+        make_checkpoint_picker,
+        resolve_axis_pair,
+        select_emission,
+    )
     from pyrite.apps.analysis_ui.controls import make_case_axes
     from pyrite.apps.analysis_ui.views.cases import CASE_BASKET_CAP, render_case_comparison
     from pyrite.apps.analysis_ui.views.materials import render_cross_material
@@ -28,11 +33,9 @@ with app.setup:
         analysis_checkpoint_manifest,
         comparison_stem,
         emission_menu,
-        face_menu,
         get_default_material,
         initial_material,
         material_menu,
-        profile_menu,
         select_initial_material,
     )
     from pyrite.campaign.config import default_settings
@@ -108,39 +111,13 @@ def _():
 
 @app.cell
 def _(material_ui):
-    _material = material_ui.value["value"]
-    _options = face_menu(_material, DEFAULT_CHECKPOINT_DIR) if _material else ()
-    _initial_selection = select_initial_material(None, _options)
-    face_ui = mo.ui.anywidget(
-        MaterialSelect(
-            options=list(_options),
-            value=_initial_selection,
-            label="Face",
-            disabled=_initial_selection is None,
-        )
-    )
-    return (face_ui,)
+    checkpoint_ui = make_checkpoint_picker(mo, material_ui.value["value"], DEFAULT_CHECKPOINT_DIR)
+    return (checkpoint_ui,)
 
 
 @app.cell
-def _(material_ui):
-    _material = material_ui.value["value"]
-    _options = profile_menu(_material, DEFAULT_CHECKPOINT_DIR) if _material else ()
-    _initial_selection = select_initial_material(None, _options)
-    profile_ui = mo.ui.anywidget(
-        MaterialSelect(
-            options=list(_options),
-            value=_initial_selection,
-            label="Profile",
-            disabled=_initial_selection is None,
-        )
-    )
-    return (profile_ui,)
-
-
-@app.cell
-def _(face_ui, material_ui, profile_ui):
-    base_context = load_context(material_ui, face_ui, profile_ui)
+def _(checkpoint_ui, material_ui):
+    base_context = load_context(material_ui, checkpoint_ui, DEFAULT_CHECKPOINT_DIR)
     return (base_context,)
 
 
@@ -276,28 +253,22 @@ def _(
     case_picker_ui,
     case_remove_select_ui,
     case_remove_ui,
+    checkpoint_ui,
     context,
     emission_ui,
-    face_ui,
     get_case_basket,
     material_ui,
-    profile_ui,
 ):
     basket = get_case_basket()
     _values = case_controls.value
     _axes = resolve_axis_pair(_values["axes"])
 
     def case_tab():
-        parts = [mo.hstack([material_ui, face_ui, profile_ui, emission_ui], wrap=True)]
-        if context.selected_profile not in (None, context.selected_material):
-            parts.append(
-                mo.md(
-                    "*This profile selects a checkpoint directly; the face selector does not "
-                    "change the loaded checkpoint.*"
-                )
-            )
+        parts = [mo.hstack([material_ui, checkpoint_ui, emission_ui], wrap=True)]
         if context.load_error is not None:
             parts.append(mo.callout(mo.md(context.load_error), kind="warn"))
+        elif context.notice is not None:
+            parts.append(mo.callout(mo.md(context.notice), kind="info"))
         parts.append(
             render_case_comparison(
                 mo,
