@@ -2547,8 +2547,8 @@ def test_job_status_double_verbose_renders_case_progress(monkeypatch, capsys):
     assert "Host memory" in output and "8.0/16.0 GiB" in output
     assert "GPU" in output and "80.0%" in output
     assert "GPU VRAM" in output and "12000/24000 MiB" in output
-    assert "COUPLING PROVENANCE" in output
-    assert "1 stored spectra; 2 cases recomputed χ_g/U_g" in output
+    assert "COUPLING PROVENANCE" not in output
+    assert "χ_g/U_g" not in output
     assert '{"material"' not in output
     assert "last log line" in output
     assert '"$D"/progress/*.json' in commands[0]
