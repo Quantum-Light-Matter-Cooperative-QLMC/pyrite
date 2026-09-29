@@ -699,6 +699,9 @@ def format_job_status(sections, detail):
     rows = [
         ("State", display_state),
     ]
+    timeout_event = sanitize_terminal(sections.get("TIMEOUT", "")).strip()
+    if timeout_event:
+        rows.append(("Last timeout", timeout_event))
     if cpu_phase and state_text != display_state:
         rows.append(("Phase", state_text))
     queue_context = (

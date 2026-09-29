@@ -376,6 +376,58 @@ while [ "$attempt" -lt {_SBATCH_RETRY_ATTEMPTS} ]; do
 done"""
 
 
+def _chunked_timeout_setup() -> str:
+    """Only SLURM's chunked prelimit USR1 can authorize a resumable 143."""
+    return """timeout_warned=0
+child_pid=
+trap 'timeout_warned=1; [ -z "$child_pid" ] || kill -TERM "$child_pid" 2>/dev/null || true' USR1
+progress_count() {
+  python3 - "$JOBDIR/progress" <<'PY'
+import glob
+import json
+import sys
+
+count = 0
+for path in glob.glob(sys.argv[1] + "/*.json"):
+    try:
+        with open(path, encoding="utf-8") as record_file:
+            record = json.load(record_file)
+        count += int(record.get("cached_cases", 0)) + int(record.get("completed_new_cases", 0))
+    except (OSError, ValueError, TypeError, AttributeError):
+        # Legacy or interrupted records cannot prove checkpoint progress.
+        continue
+print(count)
+PY
+}
+slice_progress_before=$(progress_count) || exit 1
+"""
+
+
+def _chunked_run_wait() -> str:
+    """Read the child result even when USR1 interrupts bash's wait."""
+    return """  child_pid=$!
+  wait "$child_pid" 2>/dev/null || true
+  [ -f "$JOBDIR/.child_rc" ] || wait "$child_pid" 2>/dev/null || true
+  rc=$(cat "$JOBDIR/.child_rc") || exit 1
+  child_pid=
+"""
+
+
+def _chunked_timeout_result() -> str:
+    return """  elif [ "$rc" -eq 143 ] && [ "$timeout_warned" -eq 1 ]; then
+    progress_after=$(progress_count) || exit 1
+    if [ "$progress_after" -gt "$progress_before" ]; then
+      echo "resumable timeout: $m [$n/$total] $(date -Is)" | tee -a "$JOBDIR/timeouts" >> "$JOBDIR/log"
+      echo "resumable timeout at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
+      break
+    fi
+    echo "WARNING: slice timed out without checkpoint progress for $m; will not retry" >> "$JOBDIR/log"
+    echo "failed: $m" >> "$JOBDIR/log"
+    echo "FAILED (slice timeout without progress) $(date -Is)" > "$JOBDIR/state"
+    exit 1
+"""
+
+
 def _chunked_queue_tail() -> str:
     """Common resubmit-or-finish tail shared by every self-resubmitting chunked
     queue script (scan/rebrem/reline chunked variants).
@@ -387,7 +439,16 @@ def _chunked_queue_tail() -> str:
     id to ``$JOBDIR/meta``. Assumes the caller's shell scope already defines
     ``mats``, ``total``, and ``JOBDIR``.
     """
-    return f"""unresolved=0
+    return f"""slice_progress_after=$(progress_count) || exit 1
+if [ "$slice_progress_after" -gt "$slice_progress_before" ]; then
+  stalled=0
+  echo 0 > "$JOBDIR/.no_progress_slices"
+else
+  stalled=$(cat "$JOBDIR/.no_progress_slices" 2>/dev/null || echo 0)
+  stalled=$((stalled + 1))
+  echo "$stalled" > "$JOBDIR/.no_progress_slices"
+fi
+unresolved=0
 failures=0
 for m in "${{mats[@]}}"; do
   grep -qx "failed: $m" "$JOBDIR/log" 2>/dev/null && {{ failures=$((failures + 1)); continue; }}
@@ -403,6 +464,10 @@ if [ "$unresolved" -eq 0 ]; then
   exit 0
 fi
 [ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
+if [ "$stalled" -ge 3 ]; then
+  echo "FAILED (3 slices without checkpoint progress) $(date -Is)" > "$JOBDIR/state"
+  exit 1
+fi
 k=$(grep -c "^slurm_job_id: " "$JOBDIR/meta" 2>/dev/null)
 echo "queued slice $((k + 1)) $(date -Is)" > "$JOBDIR/state"
 {_sbatch_retry_block("sbatch --parsable --nice=10000", '"$JOBDIR/run.sh"')}
@@ -476,6 +541,7 @@ mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
 {runtime_exports.lstrip()}
+{_chunked_timeout_setup()}
 slice_start=$(date +%s)
 n=0
 for m in "${{mats[@]}}"; do
@@ -487,12 +553,24 @@ for m in "${{mats[@]}}"; do
   [ "$remaining" -gt 0 ] || break
   remaining_min=$(awk "BEGIN {{ printf \\"%.2f\\", $remaining / 60 }}")
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
+  progress_before=$(progress_count) || exit 1
+  timeout_warned=0
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
-  {config.shell_remote_uv()} run --no-sync python -u -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags} --max-minutes "$remaining_min" \
-    --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1 || rc=$?
+  rm -f "$JOBDIR/.child_rc"
+  (
+    uv_pid=
+    trap '[ -z "$uv_pid" ] || {{ kill -TERM "$uv_pid" 2>/dev/null || true; wait "$uv_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
+    {config.shell_remote_uv()} run --no-sync python -u -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags} --max-minutes "$remaining_min" \
+      --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1 &
+    uv_pid=$!
+    wait "$uv_pid"
+    echo "$?" > "$JOBDIR/.child_rc"
+  ) &
+{_chunked_run_wait()}
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
+{_chunked_timeout_result()}
   elif [ "$rc" -ne 75 ]; then
     echo "WARNING: scan failed for $m (exit $rc); will not retry" >> "$JOBDIR/log"
     echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
@@ -636,6 +714,7 @@ echo "started: $(date -Is)" >> "$JOBDIR/meta"
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
+{_chunked_timeout_setup()}
 slice_start=$(date +%s)
 n=0
 for m in "${{mats[@]}}"; do
@@ -647,12 +726,24 @@ for m in "${{mats[@]}}"; do
   [ "$remaining" -gt 0 ] || break
   remaining_min=$(awk "BEGIN {{ printf \\"%.2f\\", $remaining / 60 }}")
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
+  progress_before=$(progress_count) || exit 1
+  timeout_warned=0
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
-  {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute brem "$m"{flags} --max-minutes "$remaining_min" \
-    --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 || rc=$?
+  rm -f "$JOBDIR/.child_rc"
+  (
+    uv_pid=
+    trap '[ -z "$uv_pid" ] || {{ kill -TERM "$uv_pid" 2>/dev/null || true; wait "$uv_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
+    {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute brem "$m"{flags} --max-minutes "$remaining_min" \
+      --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 &
+    uv_pid=$!
+    wait "$uv_pid"
+    echo "$?" > "$JOBDIR/.child_rc"
+  ) &
+{_chunked_run_wait()}
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
+{_chunked_timeout_result()}
   elif [ "$rc" -ne 75 ]; then
     echo "WARNING: rebrem failed for $m (exit $rc); will not retry" >> "$JOBDIR/log"
     echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
@@ -799,6 +890,7 @@ echo "started: $(date -Is)" >> "$JOBDIR/meta"
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
+{_chunked_timeout_setup()}
 slice_start=$(date +%s)
 n=0
 for m in "${{mats[@]}}"; do
@@ -810,12 +902,24 @@ for m in "${{mats[@]}}"; do
   [ "$remaining" -gt 0 ] || break
   remaining_min=$(awk "BEGIN {{ printf \\"%.2f\\", $remaining / 60 }}")
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
+  progress_before=$(progress_count) || exit 1
+  timeout_warned=0
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
-  {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute line "$m"{flags} --max-minutes "$remaining_min" \
-    --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 || rc=$?
+  rm -f "$JOBDIR/.child_rc"
+  (
+    uv_pid=
+    trap '[ -z "$uv_pid" ] || {{ kill -TERM "$uv_pid" 2>/dev/null || true; wait "$uv_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
+    {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute line "$m"{flags} --max-minutes "$remaining_min" \
+      --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 &
+    uv_pid=$!
+    wait "$uv_pid"
+    echo "$?" > "$JOBDIR/.child_rc"
+  ) &
+{_chunked_run_wait()}
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
+{_chunked_timeout_result()}
   elif [ "$rc" -ne 75 ]; then
     echo "WARNING: scan failed for $m (exit $rc); will not retry" >> "$JOBDIR/log"
     echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"

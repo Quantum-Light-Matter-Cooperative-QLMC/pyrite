@@ -136,6 +136,7 @@ def _slurm_batch_script(
     time_limit: str = config.SLURM_TIME,
     cpus_per_task: int = config.SLURM_CPUS_PER_MATERIAL,
     mem_per_cpu: str | None = None,
+    chunked: bool = False,
 ) -> str:
     """Wrap a CXR queue payload in the configured one-GPU SLURM target profile.
 
@@ -152,6 +153,8 @@ def _slurm_batch_script(
     partition = config.slurm_partition()
     nodelist = config.slurm_nodelist()
     nodelist_line = f"#SBATCH --nodelist={nodelist}\n" if nodelist else ""
+    signal_grace = max(10, min(120, int(time_limit) * 30)) if chunked else 0
+    signal_line = f"#SBATCH --signal=B:USR1@{signal_grace}\n" if chunked else ""
     reservation_stems = reservation_stems or []
     transport._check_shell_tokens([jobid, *reservation_stems])
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
@@ -179,7 +182,7 @@ def _slurm_batch_script(
 {f"#SBATCH --mem-per-cpu={mem_per_cpu}" if mem_per_cpu else ""}
 #SBATCH --gres={config.slurm_gres()}
 #SBATCH --time={time_limit}
-#SBATCH --output={sbatch_jobdir}/slurm-%j.out
+{signal_line}#SBATCH --output={sbatch_jobdir}/slurm-%j.out
 #SBATCH --error={sbatch_jobdir}/slurm-%j.err
 
 set -u

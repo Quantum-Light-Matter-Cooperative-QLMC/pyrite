@@ -4660,6 +4660,135 @@ def test_chunked_script_marks_hard_failure_and_never_retries(monkeypatch, tmp_pa
     assert (jobdir / "state").read_text().startswith("done with 1 warning(s)")
 
 
+@pytest.mark.parametrize(
+    "builder",
+    [
+        lambda: scripts._chunked_queue_script("j", ["hopg"], False, None, 10),
+        lambda: scripts._rebrem_chunked_queue_script("j", ["hopg"], None, None, False, 10),
+        lambda: scripts._reline_chunked_queue_script("j", ["hopg"], None, None, False, 10),
+    ],
+    ids=["scan", "rebrem", "reline"],
+)
+@pytest.mark.parametrize(
+    ("rc", "prelimit", "progress", "resumes"),
+    [
+        (143, True, True, True),
+        (143, False, True, False),
+        (143, True, False, False),
+        (7, False, True, False),
+    ],
+)
+def test_chunked_prelimit_signal_resumes_only_143_with_checkpoint_progress(
+    monkeypatch, tmp_path, builder, rc, prelimit, progress, resumes
+):
+    bash = _bash_or_skip(tmp_path)
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.mkdir(parents=True)
+    (jobdir / "meta").write_text("slurm_job_id: 100\n")
+    if not progress:
+        (jobdir / "progress").mkdir()
+        (jobdir / "progress" / "hopg.json").write_text("{")
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = sync ]; then exit 0; fi\n'
+        + (
+            f"printf '%s\\n' '{{\"cached_cases\":0,\"completed_new_cases\":1}}' > '{jobdir}/progress/hopg.json'\n"
+            if progress
+            else ""
+        )
+        + ('kill -USR1 "$(ps -o ppid= -p "$PPID")"\n' if prelimit else "")
+        + f"exit {rc}\n"
+    )
+    fake_uv.chmod(0o755)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    marker = tmp_path / "sbatch_called"
+    (bin_dir / "sbatch").write_text(f"#!/bin/sh\ntouch '{marker}'\necho 4242\n")
+    (bin_dir / "sbatch").chmod(0o755)
+    monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "REMOTE_UV", str(fake_uv))
+    result = subprocess.run(
+        [bash, "-c", builder()],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert marker.exists() is resumes, (result.stderr, (jobdir / "log").read_text())
+    log = (jobdir / "log").read_text()
+    if resumes:
+        assert result.returncode == 0
+        assert "resumable timeout: hopg" in log
+        assert "failed: hopg" not in log
+        assert (jobdir / "state").read_text().startswith("queued slice 2")
+        assert (jobdir / "timeouts").read_text().startswith("resumable timeout: hopg")
+    elif rc == 143 and prelimit:
+        assert result.returncode != 0
+        assert (jobdir / "state").read_text().startswith("FAILED (slice timeout without progress)")
+    else:
+        assert "failed: hopg" in log
+
+
+def test_chunked_no_progress_slices_stop_after_three(monkeypatch, tmp_path):
+    bash = _bash_or_skip(tmp_path)
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.mkdir(parents=True)
+    (jobdir / "meta").write_text("slurm_job_id: 100\n")
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text('#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\nexit 75\n')
+    fake_uv.chmod(0o755)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    marker = tmp_path / "submissions"
+    (bin_dir / "sbatch").write_text(f"#!/bin/sh\necho called >> '{marker}'\necho 4242\n")
+    (bin_dir / "sbatch").chmod(0o755)
+    monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "REMOTE_UV", str(fake_uv))
+    script = scripts._chunked_queue_script("j", ["hopg"], False, None, 10)
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    results = [
+        subprocess.run([bash, "-c", script], capture_output=True, text=True, env=env)
+        for _ in range(3)
+    ]
+    assert [result.returncode for result in results] == [0, 0, 1]
+    assert len(marker.read_text().splitlines()) == 2
+    assert (jobdir / "state").read_text().startswith("FAILED (3 slices without checkpoint progress)")
+
+
+def test_job_status_displays_resumable_timeout_event():
+    output = dashboard_render.format_job_status(
+        {
+            "JOB": "j",
+            "META": "job: j\nkind: scan\nmaterials: hopg\nslurm_job_id: 4242",
+            "STATE": "queued slice 2 now",
+            "SQUEUE": "job_id=4242|state=PENDING",
+            "TIMEOUT": "resumable timeout: hopg [1/1] 2026-09-29T12:00:00Z",
+        },
+        detail=0,
+    )
+    assert "Last timeout" in output
+    assert "resumable timeout: hopg [1/1]" in output
+
+
+@pytest.mark.parametrize(
+    ("state_text", "exit_code"),
+    [("queued slice 2", 0), ("FAILED (3 slices without checkpoint progress)", 1)],
+)
+def test_batch_exit_trap_preserves_chunk_handoff_and_failure(monkeypatch, tmp_path, state_text, exit_code):
+    bash = _bash_or_skip(tmp_path)
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.mkdir(parents=True)
+    monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
+    payload = f'echo "{state_text}" > "$JOBDIR/state"\nexit {exit_code}'
+    script = scripts._slurm_batch_script(
+        "j", payload, job_name="pyrite-j", time_limit="30", chunked=True
+    )
+    assert "#SBATCH --signal=B:USR1@120" in script
+    result = subprocess.run([bash, "-c", script], capture_output=True, text=True)
+    assert result.returncode == exit_code
+    assert (jobdir / "state").read_text().strip() == state_text
+
+
 def test_clear_fails_closed_when_squeue_cannot_be_queried(monkeypatch, tmp_path):
     """A scheduler outage cannot be mistaken for an absent job before deletion."""
     bash = _bash_or_skip(tmp_path)
