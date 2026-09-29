@@ -22,13 +22,23 @@ Launch the checkpoint-driven analysis app for a material:
 uv run pyrite app analysis launch hopg
 ```
 
+The sidebar holds the **Material** and **Checkpoint** pickers, the **Emission** choice, and one shared slice: beam energy, polar tilt, azimuth, and crystal thickness. The Checkpoint menu lists every dataset for the material with its face, for example `standard · flat`, `standard · blazed`, or `high_energy (a7b2ce) · flat`. It opens on the standard flat run; when a material has none, it opens on **choose a checkpoint** and loads nothing until you pick one.
+
+The app has three views, and each reads the sidebar slice:
+
+- **Spectra** overlays narrowband and broadband spectra. **Vary** picks the dimension that changes across curves (beam energy, polar tilt, or azimuth); the other slice values stay pinned.
+- **Map** draws one azimuth × polar-tilt heatmap at the slice's beam energy and thickness. Pick the plotted **quantity**, click a cell to plot its spectrum, and read the line/coherent-flux trends and the top-20 geometry ranking below it. A checkpoint without a 2-D angular sweep shows 1-D scan plots instead.
+- **Detectors** shows the Eagle XO or Timepix3 response at the slice's polar tilt, azimuth, and thickness, with beam energy varying across curves.
+
+A pinned thickness the beam never reached at a low beam energy falls back to that energy's thickest computed slab, and the view says so. The matplotlib efficiency, charge-map, and best-spectra figures are no longer in the app; call them from `pyrite.plots`.
+
 To compare hand-picked cases across datasets (the case basket) or the best lines of every material with a checkpoint, launch the compare app:
 
 ```bash
 uv run pyrite app compare launch hopg
 ```
 
-Its picker selects the dataset cases are added from; the basket persists while you switch material, face, or profile. The cross-material view ignores that picker and reads every catalog material's checkpoint.
+Its Material and Checkpoint pickers select the dataset cases are added from; the basket persists while you switch either. The cross-material view ignores that picker and reads every catalog material's checkpoint.
 
 For non-interactive use, inspect `pyrite app analysis export --help`; `pyrite app pixels export` and `pyrite app compare export` render the other two apps the same way. The generated [CLI reference](../repo-design/cli/cli-reference.md) is authoritative for accepted arguments and output formats.
 
@@ -48,7 +58,7 @@ Legacy `.pkl` component paths and plain, gzip, and zstd monoliths remain readabl
 
 A profile whose physical detector has an acquisition (`pyrite profile physical-detector set`) also stores one counting observation per case in `observations/<stem>/`, the sibling of `checkpoints/<stem>/`. Observations hold factorized per-tile spectra, pixel solid angles, and filter paths rather than a pixel-by-energy cube, so reopening one never reruns transport. The [Python workflow](python-api-workflow.md#persist-reopen-and-rescore-an-observation) covers `ObservationStore` and rescoring; `pyrite.observations.observation_inventory(stem)` lists a stem's stored observations by case without opening their factors.
 
-The pixel app reads one dataset's observations without loading its checkpoint. Pick the material, face, and profile that name the dataset:
+The pixel app reads one dataset's observations without loading its checkpoint. Pick the material and checkpoint that name the dataset:
 
 ```bash
 uv run pyrite app pixels launch hopg

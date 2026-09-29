@@ -20,7 +20,8 @@ with app.setup:
         theme_switch,
     )
     from pyrite.apps._widgets import MaterialSelect
-    from pyrite.apps.analysis_ui import selected_checkpoint_stem
+    from pyrite.apps.analysis_ui import make_checkpoint_picker, selected_checkpoint_stem
+    from pyrite.apps.analysis_ui.pickers import checkpoint_notice
     from pyrite.apps.analysis_ui.pixels import (
         discover_observations,
         load_selected_observation,
@@ -31,11 +32,9 @@ with app.setup:
     )
     from pyrite.apps.analysis_ui.views.pixels import render_pixel_detector
     from pyrite.apps.analyze import (
-        face_menu,
         get_default_material,
         initial_material,
         material_menu,
-        profile_menu,
         select_initial_material,
     )
     from pyrite.runs.run import DEFAULT_CHECKPOINT_DIR
@@ -108,50 +107,28 @@ def _():
 
 @app.cell
 def _(material_ui):
-    _material = material_ui.value["value"]
-    _options = face_menu(_material, DEFAULT_CHECKPOINT_DIR) if _material else ()
-    _initial_selection = select_initial_material(None, _options)
-    face_ui = mo.ui.anywidget(
-        MaterialSelect(
-            options=list(_options),
-            value=_initial_selection,
-            label="Face",
-            disabled=_initial_selection is None,
-        )
-    )
-    return (face_ui,)
+    checkpoint_ui = make_checkpoint_picker(mo, material_ui.value["value"], DEFAULT_CHECKPOINT_DIR)
+    return (checkpoint_ui,)
 
 
 @app.cell
-def _(material_ui):
-    _material = material_ui.value["value"]
-    _options = profile_menu(_material, DEFAULT_CHECKPOINT_DIR) if _material else ()
-    _initial_selection = select_initial_material(None, _options)
-    profile_ui = mo.ui.anywidget(
-        MaterialSelect(
-            options=list(_options),
-            value=_initial_selection,
-            label="Profile",
-            disabled=_initial_selection is None,
-        )
-    )
-    return (profile_ui,)
-
-
-@app.cell
-def _(face_ui, material_ui, profile_ui):
+def _(checkpoint_ui):
     # Observations are discovered per checkpoint stem; the checkpoint itself is never loaded.
-    observation_stem = selected_checkpoint_stem(material_ui, face_ui, profile_ui)
+    observation_stem = selected_checkpoint_stem(checkpoint_ui)
     pixel_inventory = discover_observations(observation_stem)
     observation_ui = make_observation_selector(mo, pixel_inventory)
     return observation_stem, observation_ui, pixel_inventory
 
 
 @app.cell(hide_code=True)
-def _(observation_stem, face_ui, material_ui, profile_ui):
-    _parts = [mo.hstack([material_ui, face_ui, profile_ui], wrap=True)]
+def _(checkpoint_ui, material_ui, observation_stem):
+    _parts = [mo.hstack([material_ui, checkpoint_ui], wrap=True)]
     if observation_stem is not None:
         _parts.append(mo.md(f"*Observations for checkpoint stem `{observation_stem}`.*"))
+    else:
+        _notice = checkpoint_notice(material_ui.value["value"], None, DEFAULT_CHECKPOINT_DIR)
+        if _notice is not None:
+            _parts.append(mo.callout(mo.md(_notice), kind="info"))
     mo.vstack(_parts)
     return
 

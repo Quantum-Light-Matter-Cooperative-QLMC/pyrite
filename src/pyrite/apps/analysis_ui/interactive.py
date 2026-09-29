@@ -1,17 +1,32 @@
 from pyrite.apps._design import apply_altair_theme
 from pyrite.plots.altair.sweeps import heatmap_select_chart
-from pyrite.plots.mpl.sweeps import _HEATMAP_QUANTITIES as HEATMAP_QUANTITIES
 from pyrite.results import records
 
+from .controls import MAP_QUANTITIES
 
-def make_heatmap_widget(mo, alt, results, settings, *, energy, theme):
+
+def is_heatmap_sweep(results) -> bool:
+    """A Map heatmap needs an azimuth × polar-tilt sweep (at least 4 × 4)."""
+    tilts = {record["case"]["tilt_deg"] for record in records(results)}
+    azimuths = {record["case"]["tilt_azim_deg"] for record in records(results)}
+    return len(tilts) >= 4 and len(azimuths) >= 4
+
+
+def make_map_widget(mo, alt, results, settings, cases, *, quantity, energy, theme):
+    """One click-selectable heatmap of ``quantity`` at beam ``energy``, or ``None``."""
     if not records(results):
         return None
+    specification = next(
+        (entry for entry in MAP_QUANTITIES if entry[0] == quantity), MAP_QUANTITIES[0]
+    )
     chart = heatmap_select_chart(
         results,
         settings,
+        quantity=specification,
         panel_value=energy,
+        cases=cases,
         line_metric="prominence",
+        color_domain=(0.0, 1.0) if specification[0] == "hit_frac" else None,
     )
     if chart is None:
         return None
@@ -22,33 +37,3 @@ def make_heatmap_widget(mo, alt, results, settings, *, energy, theme):
             chart_selection=False,
             legend_selection=False,
         )
-
-
-def make_scan_heatmap_widgets(mo, alt, results, settings, cases, *, energy, theme):
-    specifications = list(HEATMAP_QUANTITIES) + [
-        ("hit_frac", "electron footprint-hit fraction", "magma")
-    ]
-    widgets = {}
-    if not records(results):
-        return {key: None for key, _label, _color_map in specifications}
-    with alt.data_transformers.enable("default"):
-        for key, label, color_map in specifications:
-            chart = heatmap_select_chart(
-                results,
-                settings,
-                quantity=(key, label, color_map),
-                panel_value=energy,
-                cases=cases,
-                line_metric="prominence",
-                color_domain=(0.0, 1.0) if key == "hit_frac" else None,
-            )
-            widgets[key] = (
-                mo.ui.altair_chart(
-                    apply_altair_theme(chart, theme),
-                    chart_selection=False,
-                    legend_selection=False,
-                )
-                if chart is not None
-                else None
-            )
-    return widgets

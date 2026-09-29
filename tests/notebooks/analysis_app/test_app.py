@@ -28,7 +28,6 @@ def test_blazed_face_title_preserves_altair_typography() -> None:
     context = AnalysisContext(
         selected_material="hopg",
         selected_face="blazed",
-        selected_profile=None,
         checkpoint_stem=None,
         settings=None,
         checkpoint_results=None,
@@ -81,29 +80,22 @@ def test_in_progress_checkpoint_uses_analysis_safe_reads() -> None:
 
     assert "load_context" in source
     assert "load_analysis_checkpoint" in data_source
-    assert "loaded = load_analysis_checkpoint(stem)" in data_source
+    assert "loaded = load_analysis_checkpoint(stem, root)" in data_source
     assert "load_error" in data_source
 
 
 def test_characteristic_checkbox_matches_spectrum_component_controls() -> None:
     source = APP.read_text()
     controls_source = CONTROLS.read_text()
-    view_sources = [
-        (VIEWS / name).read_text() for name in ("energy.py", "dimension.py", "cases.py")
-    ]
+    view_sources = [(VIEWS / name).read_text() for name in ("spectra.py", "cases.py")]
 
-    assert controls_source.count('"characteristic": mo.ui.checkbox(') == 3
-    assert controls_source.count('label="show characteristic radiation"') == 3
-    assert (
-        controls_source.count('value=False,\n                label="show characteristic radiation"')
-        == 3
-    )
+    # One Spectra component toggle set plus the compare app's case axes.
+    assert controls_source.count('"characteristic": mo.ui.checkbox(') == 2
+    assert controls_source.count('label="show characteristic radiation"') == 2
     assert "characteristic_ui" not in source
-    assert all('controls["characteristic"]' in view_source for view_source in view_sources)
-    assert all(
-        'include_characteristic=values["characteristic"]' in view_source
-        for view_source in view_sources
-    )
+    assert 'components["characteristic"]' in view_sources[0]
+    assert 'include_characteristic=component_values["characteristic"]' in view_sources[0]
+    assert 'controls["characteristic"]' in view_sources[1]
 
 
 def test_thickness_controls_and_context_use_shared_human_units() -> None:
@@ -115,7 +107,7 @@ def test_thickness_controls_and_context_use_shared_human_units() -> None:
     common_view_source = (APP.parent / "analysis_ui" / "views" / "common.py").read_text()
 
     assert "fmt_thickness" not in source
-    assert controls_source.count("fmt_thickness(") + common_view_source.count("fmt_thickness(") >= 4
+    assert controls_source.count("fmt_thickness(") + common_view_source.count("fmt_thickness(") >= 3
 
 
 def test_all_ui_values_are_read_downstream_of_creation() -> None:
@@ -177,9 +169,10 @@ def test_material_and_face_select_labels_render_bold() -> None:
     assert 'const labelText = document.createElement("strong");' in widget_source
     assert 'labelText.textContent = model.get("label");' in widget_source
     assert 'label="Material"' in source
-    assert 'label="Face"' in source
     assert 'label="**Material**"' not in source
-    assert 'label="**Face**"' not in source
+    assert 'label="Face"' not in source
+    assert 'label="Profile"' not in source
+    assert "make_checkpoint_picker(" in source
 
 
 def test_material_menu_cell_owns_checkpoint_directory_dependency() -> None:
@@ -221,20 +214,68 @@ def test_analysis_app_uses_no_legacy_material_registries() -> None:
     assert "from pyrite.campaign.config import MATERIALS" not in source
 
 
-def test_analysis_app_uses_top_level_tabs_and_action_names() -> None:
-    source = APP.read_text() + (APP.parent / "analysis_ui" / "navigation.py").read_text()
+def test_analysis_app_has_three_views_and_no_accordions() -> None:
+    # Issue #236: Spectra / Map / Detectors, no accordion anywhere except the
+    # single collapsible axes panel (replaced by chart zoom in #237).
+    navigation = (APP.parent / "analysis_ui" / "navigation.py").read_text()
+    for view in ('"Spectra"', '"Map"', '"Detectors"'):
+        assert view in navigation
+    assert "VIEW_NAMES = (SPECTRA, MAP, DETECTORS)" in navigation
+    assert "mo.accordion" not in APP.read_text()
+    for view_module in ("spectra.py", "map.py", "detectors.py", "sidebar.py"):
+        assert "mo.accordion" not in (VIEWS / view_module).read_text()
+    assert CONTROLS.read_text().count("mo.accordion") == 1  # axes_panel only
 
-    # "Instruments" holds a single view, so it's a bare top-level tab rather
-    # than a nested action-accordion group.
-    for group in ('"Explore"', '"Optimize"', '"Instruments"'):
-        assert group in source
-    for action in (
-        "Compare beam energies",
-        "Compare polar angles",
-        "Compare azimuths",
-        "Rank geometries",
+
+def test_matplotlib_panes_are_gone_from_the_analysis_views() -> None:
+    for view_module in ("spectra.py", "map.py", "detectors.py"):
+        source = (VIEWS / view_module).read_text()
+        for dropped in (
+            "plot_best_spectra",
+            "plot_eaglexo_efficiency",
+            "plot_eaglexo_charge_map",
+            "plot_timepix_efficiency",
+        ):
+            assert dropped not in source
+
+
+def test_face_selector_note_is_gone() -> None:
+    for app in ("analysis_app.py", "compare_app.py", "pixel_app.py"):
+        assert "the face selector does not" not in (APP.parent / app).read_text()
+
+
+def test_slice_controls_live_in_the_sidebar_outside_every_view() -> None:
+    tree = ast.parse(APP.read_text())
+    cells = [cell for cell in tree.body if isinstance(cell, ast.FunctionDef)]
+    slice_cell = next(cell for cell in cells if "make_slice_controls(" in ast.unparse(cell))
+    sidebar_cell = next(cell for cell in cells if "render_sidebar(" in ast.unparse(cell))
+
+    # Not gated on the view and not rebuilt on emission changes.
+    assert _stop_guards(slice_cell) == set()
+    assert {arg.arg for arg in slice_cell.args.args} == {"base_context"}
+    assert "view_nav" not in {arg.arg for arg in sidebar_cell.args.args}
+    sidebar_source = (VIEWS / "sidebar.py").read_text()
+    assert "mo.sidebar(" in sidebar_source
+    # Each view reads the shared slice dropdowns rather than building its own.
+    for name in ("energy_ui", "tilt_ui", "azimuth_ui", "thickness_ui"):
+        readers = [cell for cell in cells if f"{name}.value" in ast.unparse(cell)]
+        assert readers, name
+
+
+def test_view_local_choices_are_dependency_free() -> None:
+    tree = ast.parse(APP.read_text())
+    cell = next(
+        cell
+        for cell in tree.body
+        if isinstance(cell, ast.FunctionDef) and "make_vary_control(mo)" in ast.unparse(cell)
+    )
+    assert not cell.args.args
+    for builder in (
+        "make_component_controls(mo)",
+        "make_map_quantity_control(mo)",
+        "make_detector_choice(mo)",
     ):
-        assert action in source
+        assert builder in ast.unparse(cell)
 
 
 def test_pixel_case_and_cross_material_views_live_in_their_own_apps() -> None:
@@ -379,18 +420,24 @@ def test_heavy_view_builders_are_gated_on_the_selected_view() -> None:
             continue
         source = ast.unparse(cell)
         for builder in (
-            "make_energy_controls",
-            "make_dimension_controls",
-            "make_scan_thickness_control",
-            "make_detector_controls",
+            "make_spectra_axes",
+            "make_varying_control",
+            "render_spectra",
+            "make_map_widget",
+            "render_map_trends",
+            "render_map(",
+            "make_detector_axes",
+            "render_detectors",
         ):
             if builder in source:
                 guards[builder] = _stop_guards(cell)
 
-    assert guards["make_energy_controls"] == {"EXPLORE"}
-    assert guards["make_dimension_controls"] == {"EXPLORE"}
-    assert guards["make_scan_thickness_control"] == {"OPTIMIZE"}
-    assert guards["make_detector_controls"] == {"INSTRUMENTS"}
+    for builder in ("make_spectra_axes", "make_varying_control", "render_spectra"):
+        assert guards[builder] == {"SPECTRA"}, builder
+    for builder in ("make_map_widget", "render_map_trends", "render_map("):
+        assert guards[builder] == {"MAP"}, builder
+    for builder in ("make_detector_axes", "render_detectors"):
+        assert guards[builder] == {"DETECTORS"}, builder
 
 
 def test_view_nav_is_dependency_free_so_selection_survives_context_changes() -> None:
