@@ -8,6 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from pyrite import DATA_DIR
 from pyrite.energy_grid import golden
 
 
@@ -39,6 +40,25 @@ def test_build_reproduces_checked_in_golden():
     rebuilt = golden.build_golden()
     if not _approx_equal(rebuilt, checked_in):
         assert rebuilt == checked_in  # not close either -> real drift, get the rich diff
+
+
+def test_build_ignores_the_developers_selected_catalog(tmp_path, monkeypatch):
+    """The golden pins the packaged catalog; a user workspace catalog must not leak in."""
+    selected = tmp_path / "catalog"
+    shutil.copytree(DATA_DIR / "catalog", selected)
+    standard = selected / "profiles" / "standard.toml"
+    standard.write_text(
+        standard.read_text().replace(
+            "energy_keV = { values = [30.0, 40.0, 50.0, 60.0, 100.0, 150.0, 200.0, 250.0, 300.0] }",
+            "energy_keV = { values = [30.0] }",
+        )
+    )
+    monkeypatch.setenv("PYRITE_CATALOG", str(selected))
+
+    checked_in = json.loads(golden.GOLDEN_PATH.read_text())
+    rebuilt = golden.build_golden()
+    hopg_energies = rebuilt["materials"]["hopg"]["scan"]["energy_keV"]
+    assert hopg_energies == checked_in["materials"]["hopg"]["scan"]["energy_keV"]
 
 
 def test_check_flags_drift(tmp_path, monkeypatch):

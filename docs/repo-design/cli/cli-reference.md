@@ -1316,8 +1316,9 @@ Usage: pyrite profile create [OPTIONS] NAME
 
   Create a profile from packaged sweep defaults, or explicitly clone --from.
 
-  Range options replace individual grids. ``--material`` replaces membership. An
-  explicit --from clones instrument and physics sections, plus ranges and membership;
+  Range options replace individual grids. ``--material`` replaces membership. Without
+  --from, packaged standard per-material overrides are copied only for member materials.
+  An explicit --from clones instrument and physics sections, plus ranges and membership;
   per-material overrides are not cloned. Beam phase space and detector geometry are set
   only through named objects: build them with ``pyrite beam create`` / ``pyrite detector
   create`` and attach them here with --beam NAME / --detector NAME.

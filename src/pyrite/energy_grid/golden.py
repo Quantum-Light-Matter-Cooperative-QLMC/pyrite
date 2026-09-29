@@ -1,10 +1,12 @@
 """Independent regeneration of tests/data/material_catalog_golden.json.
 
 `pyrite-dev regen-golden` rebuilds the serialized catalog snapshot the
-material-catalog golden test asserts against. It re-loads the catalog from
-disk via ``load_material_catalog`` (NOT the process-global ``CATALOG`` singleton)
-so the regenerated golden always reflects on-disk state after a
-``pyrite energy-grid apply``. Crystal physics fingerprints come from the low-level
+material-catalog golden test asserts against. It re-loads the *packaged*
+catalog from disk via ``load_material_catalog(bundled_catalog())`` (NOT the
+process-global ``CATALOG`` singleton, and NOT the developer's selected catalog:
+a ``catalog.path`` / ``PYRITE_CATALOG`` user workspace would otherwise be
+serialized into the golden) so the regenerated golden always reflects the
+source tree's on-disk state. Crystal physics fingerprints come from the low-level
 ``pyrite.materials.crystal`` module (the same functions the golden test treats as
 ground truth), never from the packaged singleton.
 
@@ -192,8 +194,8 @@ def _special_grids(catalog) -> dict:
 
 
 def build_golden() -> dict:
-    """Serialize the on-disk material catalog into the golden snapshot structure."""
-    catalog = load_material_catalog()
+    """Serialize the on-disk packaged catalog into the golden snapshot structure."""
+    catalog = load_material_catalog(bundled_catalog())
     return {
         "provenance": dict(_PROVENANCE),
         "crystal_keys": list(catalog.crystals),

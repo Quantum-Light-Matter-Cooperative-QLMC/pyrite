@@ -140,12 +140,7 @@ def test_merge_refuses_a_line_row_it_cannot_respell(nonuniform_catalog):
         }
     }
     with pytest.raises(ValueError, match=r"line row @ 30 keV is a values grid"):
-        apply.apply_bounds(NONUNIFORM_TOML, combined, provenance_mod=_NoManual())
-
-
-class _NoManual:
-    def is_manual_brem(self, *args, **kwargs):
-        return False
+        apply.apply_bounds(NONUNIFORM_TOML, combined)
 
 
 # --- write side -------------------------------------------------------------

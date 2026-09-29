@@ -4,119 +4,19 @@ thickness_ang = { values = [1000.0, 5000.0, 10000.0, 40000.0, 100000.0, 200000.0
 energy_keV = { values = [30.0, 40.0, 50.0, 60.0, 100.0, 150.0, 200.0, 250.0, 300.0] }
 tilt_deg = { values = [5.0, 15.0, 30.0, 45.0, 60.0, 75.0, 85.0] }
 tilt_azim_deg = { values = [95.0, 105.0, 120.0, 135.0, 150.0, 165.0, 180.0] }
-# A brem grid's `start` is a *lower bound the profile asks for*, not the band
-# it gets: the photon-continuum floor belongs to the medium, not to the profile
-# that declared the band, so it is resolved per material in
-# campaign/sweep.py::build_cases (energy_grid/floor.py::
-# floored_lattice_start_eV) and a declared `start` below it is raised there.
-# `0.0` therefore reads as "no bound beyond the medium's own", which is what a
-# profile-level default -- naming no medium -- can honestly say. The
-# per-material overrides below carry each medium's own resolved value, which is
-# what `pyrite material energy-grid derive` writes; a stored per-profile value
-# must never *differ* per profile for the same material, or two profiles stop
-# sharing the cases they are supposed to share
-# (tests/materials/test_profiles.py::
+# At full fidelity a uniform brem grid contributes only its `step` to a case
+# (the deprecated survey preset also crops it). Its `start` is a
+# lower bound the profile asks for: the photon-continuum floor belongs to the
+# medium, so campaign/sweep.py::build_cases raises it per material
+# (energy_grid/floor.py::floored_lattice_start_eV). Its `stop` is replaced per
+# case by E0 + step, so the grid always reaches the beam energy. No per-material
+# uniform override is needed; only a nonuniform (e.g. geometric) grid is a real
+# per-material limit (tests/materials/test_profiles.py::
 # test_case_content_key_matches_across_profiles_for_shared_cases).
 E_grid_brem = { arange = { start = 0.0, stop = 30000.0, step = 25.0 } }
 
-[overrides.hopg]
-E_grid_brem = { arange = { start = 50.0, stop = 40000.0, step = 25.0 } }
-
-[overrides.hbn]
-E_grid_brem = { arange = { start = 50.0, stop = 40500.0, step = 25.0 } }
-
-[overrides.diamond]
-E_grid_brem = { arange = { start = 50.0, stop = 140700.0, step = 25.0 } }
-
-[overrides.mose2]
-E_grid_brem = { arange = { start = 75.0, stop = 42400.0, step = 25.0 } }
-
-[overrides.wse2]
-E_grid_brem = { arange = { start = 75.0, stop = 262400.0, step = 25.0 } }
-
-[overrides.nbs2]
-E_grid_brem = { arange = { start = 50.0, stop = 43300.0, step = 25.0 } }
-
-[overrides.nbse2]
-E_grid_brem = { arange = { start = 50.0, stop = 49700.0, step = 25.0 } }
-
-[overrides.mote2]
-E_grid_brem = { arange = { start = 75.0, stop = 43400.0, step = 25.0 } }
-
 [overrides.mote2_product]
 thickness_layers = { values = [3, 4, 5, 6] }
-
-[overrides.ptse2]
-E_grid_brem = { arange = { start = 75.0, stop = 44700.0, step = 25.0 } }
-
-[overrides.pts2]
-E_grid_brem = { arange = { start = 75.0, stop = 38600.0, step = 25.0 } }
-
-[overrides.pds2]
-E_grid_brem = { arange = { start = 50.0, stop = 37800.0, step = 25.0 } }
-
-[overrides.pdte2]
-E_grid_brem = { arange = { start = 75.0, stop = 55200.0, step = 25.0 } }
-
-[overrides.ptbi2]
-E_grid_brem = { arange = { start = 75.0, stop = 40300.0, step = 25.0 } }
-
-[overrides.ptte2]
-E_grid_brem = { arange = { start = 75.0, stop = 39400.0, step = 25.0 } }
-
-[overrides.pdse2]
-E_grid_brem = { arange = { start = 50.0, stop = 46000.0, step = 25.0 } }
-
-[overrides.hfs2]
-E_grid_brem = { arange = { start = 50.0, stop = 38300.0, step = 25.0 } }
-
-[overrides.hfte2]
-E_grid_brem = { arange = { start = 50.0, stop = 55700.0, step = 25.0 } }
-
-[overrides.nbte2]
-E_grid_brem = { arange = { start = 75.0, stop = 49000.0, step = 25.0 } }
-
-[overrides.vse2]
-E_grid_brem = { arange = { start = 50.0, stop = 55300.0, step = 25.0 } }
-
-[overrides.gese]
-E_grid_brem = { arange = { start = 50.0, stop = 51500.0, step = 25.0 } }
-
-[overrides.gese2]
-E_grid_brem = { arange = { start = 50.0, stop = 54900.0, step = 25.0 } }
-
-[overrides.res2]
-E_grid_brem = { arange = { start = 50.0, stop = 38100.0, step = 25.0 } }
-
-[overrides.2h_tas2]
-E_grid_brem = { arange = { start = 75.0, stop = 39000.0, step = 25.0 } }
-
-[overrides.2h_tase2]
-E_grid_brem = { arange = { start = 75.0, stop = 39000.0, step = 25.0 } }
-
-[overrides.tate2]
-E_grid_brem = { arange = { start = 75.0, stop = 48800.0, step = 25.0 } }
-
-[overrides.fete]
-E_grid_brem = { arange = { start = 50.0, stop = 54300.0, step = 25.0 } }
-
-[overrides.wte2]
-E_grid_brem = { arange = { start = 75.0, stop = 52800.0, step = 25.0 } }
-
-[overrides.zrte3]
-E_grid_brem = { arange = { start = 50.0, stop = 54800.0, step = 25.0 } }
-
-[overrides.hfse2]
-E_grid_brem = { arange = { start = 75.0, stop = 43400.0, step = 25.0 } }
-
-[overrides.zrse2]
-E_grid_brem = { arange = { start = 50.0, stop = 43300.0, step = 25.0 } }
-
-[overrides.black_phosphorus]
-E_grid_brem = { arange = { start = 50.0, stop = 44300.0, step = 25.0 } }
-
-[overrides.mos2]
-E_grid_brem = { arange = { start = 50.0, stop = 45500.0, step = 25.0 } }
 
 [overrides.mos2-on-sapphire]
 thickness_layers = 3

@@ -46,9 +46,15 @@ pyrite profile numerics reset standard --yes
 
 Existing `profile create|set --ne-line/--ne-brem`, `--straggling`, `--energy-model`, and `--max-de-frac` spellings remain compatible. Worker, chunk, backend, core, and other execution-only tuning are intentionally absent: they affect runtime, not calculation results or checkpoint identity.
 
-`pyrite profile create NAME` starts from the packaged `standard` sweep's ranges, inline bremsstrahlung grid, per-material overrides, and membership. It uses only materials present in the selected catalog. It does not copy the selected catalog's mutable `standard` profile or attach a beam, scalar detector, physical detector, filters, emission policy, or transport numerics. Absent emission resolves to incoherent and absent straggling resolves to off. `pyrite profile show NAME` marks code defaults with `(default)` and shows an absent detector as `none`.
+`pyrite profile create NAME` starts from the packaged `standard` sweep's ranges, inline bremsstrahlung grid, and membership. It uses only materials present in the selected catalog. Packaged per-material overrides, such as stack layer counts, are copied only for the new profile's member materials. A non-member resolves against `standard`, so its row would never be read. It does not copy the selected catalog's mutable `standard` profile or attach a beam, scalar detector, physical detector, filters, emission policy, or transport numerics. Absent emission resolves to incoherent and absent straggling resolves to off. `pyrite profile show NAME` marks code defaults with `(default)` and shows an absent detector as `none`.
 
 `pyrite profile create NAME --from SOURCE` explicitly clones SOURCE's ranges, membership, beam, scalar and physical detectors, filters, emission, and transport numerics. Its output lists any inherited instrument and physics sections. Per-material overrides remain local to SOURCE and are not cloned. Review the cloned profile before running it, especially if SOURCE is a modified `standard`.
+
+## Bremsstrahlung grid
+
+A profile's `E_grid_brem` sets the continuum grid for every case. For a uniform `arange` grid only `step` takes effect at full fidelity. Each case raises `start` to the medium's photon-continuum floor, snapped onto the `step` lattice, and replaces `stop` with the beam energy plus one step. A per-material uniform override therefore changes only the step. A nonuniform grid, such as the geometric continuum from `pyrite-dev energy-grid brem set --spacing geometric`, is used as stored and is a real per-material limit.
+
+Earlier releases stored a derived uniform `E_grid_brem` override for each material in the packaged profiles and copied them into new profiles. Those rows are gone. Case grids and case content keys are unchanged. The dataset identity hashes the declared sweep grid, though, so affected materials get a new `parameter_sha256`. Resuming an older checkpoint for one of them reports `checkpoint dataset identity mismatch`: archive it and rerun. Uniform `E_grid_brem` rows in existing user profiles under `~/.pyrite/catalog/profiles/` are harmless. Deleting them has the same identity effect.
 
 ## Line-grid policy
 

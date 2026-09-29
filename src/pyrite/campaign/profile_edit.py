@@ -39,8 +39,12 @@ _CREATION_KEYS = (*RANGES.values(), "E_grid_brem", "materials")
 
 
 def creation_template(document):
-    """Build a new profile from the immutable packaged standard sweep data."""
-    packaged = tomlkit.parse((DATA_DIR / "catalog" / "profiles" / "standard.toml").read_text())
+    """Build a new profile from the immutable packaged standard sweep data.
+
+    Override rows are not copied here; :func:`create_profile` adds them once
+    membership is final (:func:`member_overrides`).
+    """
+    packaged = _packaged_standard()
     target = tomlkit.table()
     for key in _CREATION_KEYS:
         if key == "materials":
@@ -50,17 +54,39 @@ def creation_template(document):
                 target[key] = selected
         else:
             target[key] = clone_grid(packaged[key])
+    return target
+
+
+def _packaged_standard():
+    return tomlkit.parse((DATA_DIR / "catalog" / "profiles" / "standard.toml").read_text())
+
+
+def _uniform_grid(value) -> bool:
+    return isinstance(value, dict) and "arange" in value
+
+
+def member_overrides(document, members):
+    """Packaged ``standard`` override rows a new profile can actually read.
+
+    Only rows for MEMBERS are copied: a non-member resolves against
+    ``standard`` itself (``materials/_parse.py``), so its row would be dead.
+    A uniform ``E_grid_brem`` row is dropped too: the case grid replaces its
+    start with the medium floor and its stop with E0, so only ``step`` would
+    survive, and the profile-level default already carries that (issue #256).
+    """
+    known = material_rows(document)
     overrides = tomlkit.table()
-    for material, row in packaged["overrides"].items():
-        if material not in material_rows(document):
+    for material, row in _packaged_standard().get("overrides", {}).items():
+        if material not in known or (members is not None and material not in members):
             continue
         entry = tomlkit.table()
         for key, value in row.items():
+            if key == "E_grid_brem" and _uniform_grid(value):
+                continue
             entry[key] = clone_grid(value)
-        overrides[material] = entry
-    if overrides:
-        target["overrides"] = overrides
-    return target
+        if entry:
+            overrides[material] = entry
+    return overrides
 
 
 def catalog_key(label):
@@ -686,6 +712,11 @@ def create_profile(
     _apply_transport_updates(target, transport_updates)
     if materials is not None:
         target["materials"] = validate_materials(document, csv_materials(materials))
+    if source_name is None:
+        members = target.get("materials")
+        overrides = member_overrides(document, None if members is None else set(members))
+        if overrides:
+            target["overrides"] = overrides
     profiles[name] = target
 
 

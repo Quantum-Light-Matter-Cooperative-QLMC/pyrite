@@ -1,13 +1,16 @@
 """Named profile, provenance, and variant-storage regression contracts."""
 
 import json
+import tomllib
 from dataclasses import replace
 from unittest import mock
 
 import numpy as np
 import pytest
+import tomlkit
 
-from pyrite.campaign import profiles
+from pyrite import DATA_DIR
+from pyrite.campaign import profile_edit, profiles
 from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.profiles import (
     FIDELITY_NAMES,
@@ -25,6 +28,8 @@ from pyrite.campaign.profiles import (
 from pyrite.campaign.sweep import build_cases, target_flat_fields
 from pyrite.checkpoints import _checkpoint_store
 from pyrite.detectors import Detector, EnergyBins, Timepix3
+from pyrite.energy_grid.floor import floored_lattice_start_eV
+from pyrite.materials import CATALOG
 from pyrite.montecarlo.spectrum import (
     BREMSSTRAHLUNG_MODEL,
     CHARACTERISTIC_MODEL,
@@ -106,7 +111,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "81c10d3b49f4272f265d509cba3299c35d90ab86b73a7da6935589d520556fbd"
+        "84c8b00abd6282598a6429c03c0c5dc82d1a5088b13a92245d2e6db7c8deee52"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -431,7 +436,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "81c10d3b49f4272f265d509cba3299c35d90ab86b73a7da6935589d520556fbd"
+        "84c8b00abd6282598a6429c03c0c5dc82d1a5088b13a92245d2e6db7c8deee52"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -649,10 +654,11 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # for issue #91's L-shell Coster--Kronig relaxation marker, and again for
     # issue #89's default ELSEPA elastic model, and again for the BremsLib
     # default continuum of issue #86, and again for issue #181's line-escape
-    # marker, and again for issue #91's EADL relaxation cascade) must stay
-    # bit-for-bit.
+    # marker, and again for issue #91's EADL relaxation cascade, and again for
+    # issue #256's dropped uniform E_grid_brem override, which the sweep-level
+    # payload hashes although no case grid changed) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "81c10d3b49f4272f265d509cba3299c35d90ab86b73a7da6935589d520556fbd"
+        "84c8b00abd6282598a6429c03c0c5dc82d1a5088b13a92245d2e6db7c8deee52"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -663,9 +669,11 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # Artifact-backed materials (hopg, hbn) did not: their stored 0.0 is a
     # bandwidth request the resolver raises, so it was left alone. Re-minted
     # again for issue #89's default ELSEPA elastic model, and for issue #181's
-    # line-escape marker.
+    # line-escape marker. Re-minted again for issue #256: the per-material
+    # uniform override was dropped, so the hashed sweep grid is the profile
+    # default (the resolved case grids are unchanged).
     assert survey_incoherent["parameter_sha256"] == (
-        "ecbcb1e9f4898a59c880e065efb4c1517469a7f67164382313c31f2a78248646"
+        "b4671ad59302fd4268453fd85b11197df25ec65e4794cba485ca091a819e98e2"
     )
 
 
@@ -857,3 +865,62 @@ def test_default_elsepa_model_forks_identity_and_case_payload_from_mott():
     assert profiles.case_content_key(default_case) != profiles.case_content_key(mott_case)
     with pytest.raises(ValueError, match="elastic_model"):
         build_cases(sweep, 4, 4, elastic_model="nope")
+
+
+_PACKAGED_PROFILES = sorted(
+    path.stem for path in (DATA_DIR / "catalog" / "profiles").glob("*.toml")
+)
+
+
+@pytest.mark.parametrize("catalog_profile", _PACKAGED_PROFILES)
+def test_uniform_case_brem_grid_is_medium_floor_to_e0_at_25_ev(catalog_profile):
+    """Issue #256: per-material uniform ``E_grid_brem`` overrides were dropped
+    because a case grid keeps only their step -- start is the medium floor and
+    stop is E0 + step. Pin the case grid every packaged profile resolved while
+    those overrides still existed (all at 25 eV), so removing them cannot
+    silently change a step, start, or stop."""
+    for material in CATALOG.material_keys:
+        sweep = material_sweep(
+            material,
+            catalog_profile=catalog_profile,
+            thickness_ang=1e4,
+            tilt_deg=45.0,
+            tilt_azim_deg=135.0,
+        )
+        start = floored_lattice_start_eV(sweep.material, 25.0)
+        for case in build_cases(sweep, n_electrons=300, n_electrons_brem=150):
+            assert case["E_grid_brem"] == (start, case["E0_keV"] * 1e3 + 25.0, 25.0), (
+                catalog_profile,
+                material,
+            )
+
+
+@pytest.mark.parametrize("catalog_profile", _PACKAGED_PROFILES)
+def test_packaged_profiles_store_no_uniform_per_material_brem_override(catalog_profile):
+    raw = tomllib.loads((DATA_DIR / "catalog" / "profiles" / f"{catalog_profile}.toml").read_text())
+    for material, row in raw.get("overrides", {}).items():
+        assert "arange" not in row.get("E_grid_brem", {}), material
+
+
+def test_member_overrides_copies_only_member_rows_without_uniform_brem():
+    document = {
+        "materials": {"sapphire": {}, "mote2_product": {}, "hopg": {}},
+    }
+    packaged = (
+        "[overrides.sapphire]\nthickness_ang = 5000000.0\n"
+        "[overrides.mote2_product]\nthickness_layers = 3\n"
+        "E_grid_brem = { arange = { start = 75.0, stop = 43400.0, step = 25.0 } }\n"
+        "[overrides.hopg]\n"
+        "E_grid_brem = { arange = { start = 50.0, stop = 40000.0, step = 25.0 } }\n"
+    )
+    with mock.patch.object(
+        profile_edit, "_packaged_standard", return_value=tomlkit.parse(packaged)
+    ):
+        members = profile_edit.member_overrides(document, {"mote2_product", "hopg"})
+        implicit = profile_edit.member_overrides(document, None)
+
+    assert members.unwrap() == {"mote2_product": {"thickness_layers": 3}}
+    assert implicit.unwrap() == {
+        "sapphire": {"thickness_ang": 5000000.0},
+        "mote2_product": {"thickness_layers": 3},
+    }
