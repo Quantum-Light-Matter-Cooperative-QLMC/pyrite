@@ -5,7 +5,8 @@ object-header metadata and roughly 125 us per leaf. A component store is not a
 tree of unrelated leaves, though: it is ``{configuration: {E0_keV: record}}``
 with one record key set, so it encodes columnar. Version 2 detects that shape
 and writes a *record table* -- one dataset per flattened record column, plus a
-key column per nesting level -- and falls back to an attribute-packed typed tree
+key column per nesting level -- and a flat list of such records the same way
+as a *record list*. It falls back to an attribute-packed typed tree
 for payloads that are not record sets (CAS runner blobs, analysis caches).
 
 Arrays inside a record table are stored once in a per-artifact content-addressed
@@ -217,19 +218,36 @@ def _table_rows(obj: Mapping) -> tuple[int, list[tuple[tuple, Mapping]]] | None:
     if levels < 1:
         return None
     rows = [(path, node) for path, node in layer]
-    if len(rows) < MIN_TABLE_ROWS:
+    if not _dense_records([record for _, record in rows]):
         return None
+    return levels, rows
+
+
+def _dense_records(records: list[Mapping]) -> bool:
+    """Whether ``records`` are enough, and share enough keys, to encode as columns.
+
+    Shared by record tables and record lists: at least :data:`MIN_TABLE_ROWS`
+    rows, a non-empty key union, and at least :data:`MIN_KEY_DENSITY` of that
+    union carried by the average record.
+    """
+    if len(records) < MIN_TABLE_ROWS:
+        return False
     union: dict[tuple[str, Any], None] = {}
     filled = 0
-    for _, record in rows:
+    for record in records:
         for key in record:
             union.setdefault(_key_id(key), None)
             filled += 1
     if not union:
-        return None
-    if filled < MIN_KEY_DENSITY * len(rows) * len(union):
-        return None
-    return levels, rows
+        return False
+    return filled >= MIN_KEY_DENSITY * len(records) * len(union)
+
+
+def _is_record_list(value: list | tuple) -> bool:
+    """Whether a sequence is a flat list of records (non-empty mappings) to encode columnar."""
+    return all(isinstance(item, Mapping) and item for item in value) and _dense_records(
+        cast(list[Mapping], list(value))
+    )
 
 
 # --------------------------------------------------------------------------
@@ -323,6 +341,15 @@ class _Writer:
                 node.attrs["container"] = container
                 node.attrs["tag"] = tag
                 return
+        if _is_record_list(value):
+            # A flat sequence of uniform records (e.g. a cross-material
+            # comparison cache) encodes like a record table without key
+            # columns: one group per column instead of one group per record.
+            group = parent.create_group(name)
+            group.attrs["kind"] = "record-list"
+            group.attrs["container"] = container
+            self._write_column_set(group.create_group("records"), list(value))
+            return
         group = parent.create_group(name)
         group.attrs["kind"] = container
         self._write_entries(group, [f"{i:08d}" for i in range(len(value))], list(value))
@@ -578,6 +605,9 @@ class _Reader:
         kind = node.attrs["kind"]
         if kind == "record-table":
             return self._read_table(cast(h5py.Group, node))
+        if kind == "record-list":
+            records = self._read_column_set(cast(h5py.Group, node)["records"])
+            return tuple(records) if node.attrs["container"] == "tuple" else records
         if kind == "mapping":
             group = cast(h5py.Group, node)
             if node.attrs["keys_inline"]:

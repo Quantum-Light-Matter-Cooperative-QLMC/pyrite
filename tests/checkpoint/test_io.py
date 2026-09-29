@@ -249,17 +249,128 @@ def test_load_reads_gzip_pickle(tmp_path):
 
 def test_dump_load_roundtrips_a_long_uniform_list_payload(tmp_path):
     """A cross-material comparison cache is a flat list of thousands of record
-    dicts, not a `{config: {E0: record}}` mapping, so it takes the generic
-    typed-tree path rather than the record-table encoder. That path used to
-    pack each entry's kind tag into one `kinds` *attribute*; past a few
-    thousand entries the attribute's encoded size exceeds HDF5's ~64 KiB
-    object-header message ceiling and raises ``OSError: Unable to
-    synchronously create attribute (object header message is too large)``."""
+    dicts, not a `{config: {E0: record}}` mapping. It now encodes as a columnar
+    ``record-list`` node; it used to take the per-element typed tree, which
+    packed each entry's kind tag into one `kinds` *attribute* -- past a few
+    thousand entries that attribute exceeds HDF5's ~64 KiB object-header
+    message ceiling (``OSError: ... object header message is too large``) --
+    and cost one HDF5 group per record (~14 MB, ~2 s dump for 6000 records).
+    The size keeps guarding both regressions."""
     path = tmp_path / "comparison.pkl"
     payload = [{"E0_keV": float(i), "line_eV": i * 1.5, "quality": 0.5} for i in range(6000)]
     ckio.dump(payload, str(path))
     loaded = ckio.load(str(path))
     assert loaded == payload
+    with h5py.File(path, "r") as h5:
+        assert h5["value"].attrs["kind"] == "record-list"
+        assert "00000000" not in h5["value"]
+    assert path.stat().st_size < 1_000_000
+
+
+def _assert_identical(actual, expected):
+    """Equality plus exact container/scalar types and mapping key order."""
+    assert type(actual) is type(expected), (actual, expected)
+    if isinstance(expected, dict):
+        assert list(actual) == list(expected)
+        for key in expected:
+            assert type(next(k for k in actual if k == key)) is type(key)
+            _assert_identical(actual[key], expected[key])
+    elif isinstance(expected, (list, tuple)):
+        assert len(actual) == len(expected)
+        for a, e in zip(actual, expected, strict=True):
+            _assert_identical(a, e)
+    elif isinstance(expected, np.ndarray):
+        assert actual.dtype == expected.dtype
+        assert np.array_equal(actual, expected)
+    elif isinstance(expected, float) and expected != expected:
+        assert actual != actual
+    else:
+        assert actual == expected
+
+
+def _value_kind(path):
+    with h5py.File(path, "r") as h5:
+        return h5["value"].attrs["kind"]
+
+
+def test_record_list_roundtrips_types_order_optional_keys_and_container(tmp_path):
+    records = [
+        {"a": 1, "b": 1.5, "c": True, "d": "x", "e": None, "f": np.float64(2.0)},
+        {"b": 2.5, "a": 2, "c": False, "d": "yy", "e": None, "f": np.float64(3.0)},
+        {"a": 3, "b": 3.5, "c": True, "d": "", "f": np.float64(4.0), "opt": np.int32(7)},
+        {"a": 4, "b": None, "c": False, "d": "z", "e": 1, "f": 5.0},
+        {"a": 5, "b": 5.5, "c": True, "d": "w", "e": "s", "f": np.float32(6.0)},
+    ]
+    for container in (list, tuple):
+        path = tmp_path / f"records_{container.__name__}.pkl"
+        payload = container(dict(record) for record in records)
+        ckio.dump(payload, str(path))
+        assert _value_kind(path) == "record-list"
+        _assert_identical(ckio.load(str(path)), payload)
+
+
+def test_record_list_roundtrips_nested_values_and_nested_record_lists(tmp_path):
+    inner = [{"x": float(i), "tag": f"t{i}"} for i in range(4)]
+    payload = {
+        "runs": [
+            {
+                "spec": np.arange(3.0) + i,
+                "meta": {"crystal": "hopg", "order": i},
+                "lines": list(inner),
+                "shape": (1, 2, i),
+                "raw": b"\x00\x01",
+            }
+            for i in range(5)
+        ],
+        "nested": [list(inner), tuple(inner)],
+    }
+    path = tmp_path / "nested.pkl"
+    ckio.dump(payload, str(path))
+    with h5py.File(path, "r") as h5:
+        assert h5["value/runs"].attrs["kind"] == "record-list"
+        assert h5["value/nested"].attrs["kind"] == "list"
+        assert h5["value/nested/00000000"].attrs["kind"] == "record-list"
+        assert h5["value/nested/00000001"].attrs["container"] == "tuple"
+    _assert_identical(ckio.load(str(path)), payload)
+
+
+def test_short_mixed_sparse_or_non_mapping_lists_keep_typed_tree(tmp_path):
+    cases = {
+        "short": [{"a": 1.0}, {"a": 2.0}, {"a": 3.0}],
+        "mixed": [{"a": 1.0}, {"a": 2.0}, {"a": 3.0}, 4.0],
+        "empty_record": [{"a": 1.0}, {"a": 2.0}, {"a": 3.0}, {}],
+        "sparse": [{"a": 1}, {"b": 2}, {"c": 3}, {"d": 4}],
+        "strings": ["a", "b", "c", "d"],
+        "lists": [[1.0], [2.0, 3.0], [4.0], ["x"]],
+    }
+    for name, payload in cases.items():
+        for container in (list, tuple):
+            path = tmp_path / f"{name}_{container.__name__}.pkl"
+            value = container(payload)
+            ckio.dump(value, str(path))
+            assert _value_kind(path) == container.__name__, name
+            _assert_identical(ckio.load(str(path)), value)
+
+
+def test_load_reads_legacy_typed_tree_record_list(tmp_path, monkeypatch):
+    """v2 files written before ``record-list`` existed store a list of records
+    as a ``list`` group with one ``mapping`` child per record; they must still
+    load. Generate that layout with the writer's record-list path disabled."""
+    from pyrite.checkpoints import _result_v2
+
+    path = tmp_path / "legacy_records.pkl"
+    payload = [
+        {"E0_keV": float(i), "line_eV": i * 1.5, "quality": np.float64(0.5), "note": None}
+        for i in range(6)
+    ]
+    with monkeypatch.context() as patch:
+        patch.setattr(_result_v2, "_is_record_list", lambda value: False)
+        ckio.dump(payload, str(path))
+    with h5py.File(path, "r") as h5:
+        assert h5["value"].attrs["kind"] == "list"
+        assert h5["value/00000000"].attrs["kind"] == "mapping"
+        assert h5.attrs["schema_version"] == 2
+    _assert_identical(ckio.load(str(path)), payload)
 
 
 def test_load_reads_legacy_attribute_packed_kinds(tmp_path):
