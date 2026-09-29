@@ -70,6 +70,15 @@
     background: var(--pyrite-bg, ${DARK_BG});
     color: var(--pyrite-text, ${DARK_TEXT});
   }
+  body:has(.pyrite-shell) .markdown.prose {
+    --tw-prose-body: var(--pyrite-text);
+    --tw-prose-headings: var(--pyrite-text);
+    --tw-prose-links: var(--pyrite-focus);
+    --tw-prose-bold: var(--pyrite-text);
+    --tw-prose-quotes: var(--pyrite-text);
+    --tw-prose-code: var(--pyrite-text);
+    color: var(--pyrite-text);
+  }
   body:has(.pyrite-shell) :is(button, input, select, [tabindex]):focus-visible {
     outline: ${FOCUS_WIDTH} solid var(--pyrite-focus, ${DARK_FOCUS});
     outline-offset: ${FOCUS_OFFSET};

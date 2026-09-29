@@ -103,7 +103,8 @@ def notebook_css() -> str:
 
 
 def style_sheet(mo):
-    return mo.Html(notebook_css())
+    # The style tag applies globally; hide its otherwise empty layout item.
+    return mo.Html(notebook_css()).style({"display": "none"})
 
 
 def theme_switch(mo):

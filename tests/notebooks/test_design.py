@@ -49,10 +49,19 @@ def test_notebook_css_resource_preserves_pre_extraction_rendering() -> None:
     assert "${DARK_BG}" in template
     assert "${LIGHT_TEXT}" in template
     assert "${" not in css
-    assert len(css.splitlines()) == 252
+    assert len(css.splitlines()) == 261
     assert sha256(css.encode()).hexdigest() == (
-        "88705675fefcf6a02d00f9039716f63325a7384cc7cc2c08c4977211820f0e49"
+        "a74bbb0eb2336ee656f951de6b9bf6a8d2f2a6a0f460470600c2f16ebabd4ab4"
     )
+
+
+def test_shared_style_has_no_blank_layout_item_and_styles_markdown() -> None:
+    html = _design.style_sheet(mo)._repr_html_()
+    css = _design.notebook_css()
+
+    assert html.startswith("<div style='display:none'><style>")
+    assert "--tw-prose-body: var(--pyrite-text)" in css
+    assert "--tw-prose-code: var(--pyrite-text)" in css
 
 
 def test_marimo_starts_in_pyrite_default_light_theme() -> None:
