@@ -256,6 +256,7 @@ def test_domain_suites_partition_every_test_module_once(dev_module) -> None:
 
 def test_test_suite_forwards_stable_paths_and_pytest_arguments(dev_module, monkeypatch) -> None:
     calls = []
+    monkeypatch.setenv("PYRITE_TEST_WORKERS", "1")
     monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
 
     args = dev_module.build_parser().parse_args(["test-suite", "integration", "-k", "export"])
@@ -265,11 +266,37 @@ def test_test_suite_forwards_stable_paths_and_pytest_arguments(dev_module, monke
         (
             "-m",
             "pytest",
-            *[f"tests/{name}" for name in dev_module.INTEGRATION_TESTS],
             "-k",
             "export",
+            *[f"tests/{name}" for name in dev_module.INTEGRATION_TESTS],
         )
     ]
+
+
+@pytest.mark.parametrize("suite", ["core", "cli", "apps", "packaging", "integration"])
+def test_test_suite_uses_memory_bounded_workers(dev_module, monkeypatch, suite) -> None:
+    calls = []
+    monkeypatch.setenv("PYRITE_TEST_WORKERS", "3")
+    monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
+
+    dev_module.cmd_test_suite(Namespace(suite=suite, pytest_args=[]))
+
+    paths = [
+        str(path.relative_to(dev_module.ROOT)) for path in dev_module.test_files_for_suite(suite)
+    ]
+    assert calls == [("-m", "pytest", "-n", "3", "--dist", "worksteal", *paths)]
+
+
+@pytest.mark.parametrize("pytest_args", [["-n", "2"], ["-p", "no:xdist"]])
+def test_test_suite_respects_explicit_worker_choice(dev_module, monkeypatch, pytest_args) -> None:
+    calls = []
+    monkeypatch.setenv("PYRITE_TEST_WORKERS", "3")
+    monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
+
+    dev_module.cmd_test_suite(Namespace(suite="integration", pytest_args=pytest_args))
+
+    paths = [f"tests/{name}" for name in dev_module.INTEGRATION_TESTS]
+    assert calls == [("-m", "pytest", *pytest_args, *paths)]
 
 
 def test_verify_runs_checks_in_required_order(dev_module, monkeypatch) -> None:

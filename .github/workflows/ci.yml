@@ -24,7 +24,7 @@ jobs:
       - name: Test ${{ matrix.suite }} suite
         run: |
           if [ "${{ matrix.suite }}" = core ]; then
-            uv run pyrite-dev test-suite core -n 2 --dist loadfile --durations=30 --durations-min=0.5
+            uv run pyrite-dev test-suite core --durations=30 --durations-min=0.5
           else
             uv run pyrite-dev test-suite "${{ matrix.suite }}"
           fi

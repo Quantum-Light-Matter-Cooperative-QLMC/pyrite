@@ -22,6 +22,7 @@ Commands:
                runs without test paths use memory-bounded xdist workers,
                PYRITE_TEST_WORKERS=N overrides, 1 = serial)
     test-suite run one stable core/CLI/app/packaging/integration test suite
+               with the same memory-bounded xdist worker default as test
     package-smoke build and install clean wheel/editable environments
     smoke      exercise checkpoint loading and plotting
     perf       measure MC sweeps with compute-performance telemetry
@@ -279,7 +280,7 @@ MAX_TEST_WORKERS = 6
 
 
 def default_test_workers() -> int:
-    """xdist worker count for a full-suite run: ``PYRITE_TEST_WORKERS`` or a
+    """xdist worker count for an untargeted run: ``PYRITE_TEST_WORKERS`` or a
     CPU- and available-memory-bounded default (1 means serial)."""
     override = os.environ.get("PYRITE_TEST_WORKERS")
     if override:
@@ -298,10 +299,11 @@ def _selects_test_paths(pytest_args: list[str]) -> bool:
 
 
 def parallel_pytest_args(pytest_args: list[str]) -> list[str]:
-    """Prepend xdist workers to a full-suite run.
+    """Prepend xdist workers unless the caller supplies a targeted selection.
 
-    Runs that name test paths, or already choose ``-n``/``--numprocesses`` or
-    disable xdist, are forwarded unchanged.
+    Call with forwarded arguments only; ``test-suite`` adds its owned paths
+    afterwards. Runs that name test paths, choose ``-n``/``--numprocesses``,
+    or disable xdist are forwarded unchanged.
     """
     explicit = any(
         arg in {"-n", "--numprocesses", "no:xdist"}
@@ -315,7 +317,7 @@ def parallel_pytest_args(pytest_args: list[str]) -> list[str]:
     if workers < 2:
         return pytest_args
     print(
-        f"pyrite-dev test: {workers} xdist workers (PYRITE_TEST_WORKERS=1 for serial)",
+        f"pyrite-dev: {workers} xdist workers (PYRITE_TEST_WORKERS=1 for serial)",
         file=sys.stderr,
     )
     return ["-n", str(workers), "--dist", "worksteal", *pytest_args]
@@ -362,7 +364,8 @@ def test_files_for_suite(name: str, root: Path = ROOT) -> list[Path]:
 
 def cmd_test_suite(args: argparse.Namespace) -> None:
     paths = [str(path.relative_to(ROOT)) for path in test_files_for_suite(args.suite)]
-    run("-m", "pytest", *paths, *getattr(args, "pytest_args", []))
+    pytest_args = parallel_pytest_args(getattr(args, "pytest_args", []))
+    run("-m", "pytest", *pytest_args, *paths)
 
 
 def cmd_smoke(args: argparse.Namespace) -> None:
