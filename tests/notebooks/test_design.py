@@ -90,6 +90,9 @@ def test_theme_switch_updates_marimo_shadow_dom_controls() -> None:
     assert '.querySelectorAll(".marimo > .contents")' in source
     assert 'classList.remove("light", "dark")' in source
     assert "classList.add(resolved)" in source
+    assert 'style[data-pyrite-select-theme]' in source
+    assert '[data-slot="select-trigger"]' in source
+    assert 'background-color: var(--pyrite-surface) !important' in source
 
 
 def test_altair_light_theme_overrides_axis_and_embedded_title_colors() -> None:

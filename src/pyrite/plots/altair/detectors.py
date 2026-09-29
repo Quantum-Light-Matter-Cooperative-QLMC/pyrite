@@ -24,10 +24,8 @@ Eagle XO recorded-charge density. The static efficiency curves
 (``plot_timepix_efficiency`` / ``plot_eaglexo_efficiency``) and the geometry
 heatmap (``plot_eaglexo_charge_map``) stay on matplotlib for now.
 
-See :mod:`pyrite.plots.altair.spectra` for the Vega-Lite 5000-row cap note: a
-dense detector overlay (fine line grid + wide brem x several beam energies) can
-exceed it; enable ``altair.data_transformers.enable("vegafusion")`` or
-``altair.data_transformers.disable_max_rows()`` once at the top of a notebook.
+Dense detector overlays are peak-preserving sampled to at most 5000 rows per
+chart. The frame functions still return full-resolution response data.
 """
 
 import altair as alt
@@ -50,8 +48,8 @@ from .._common import (
     _tpx_detected,
 )
 from ._typing import _mark_chart
-from .spectra import _scale as _axis_scale
 from .spectra import (
+    _peak_preserving_indices,
     _spectrum_axis,
     _spectrum_legend,
     _spectrum_title,
@@ -59,6 +57,7 @@ from .spectra import (
     _validate_band,
     _windowed_frame,
 )
+from .spectra import _scale as _axis_scale
 
 # incident-vs-detected long form (Timepix + Eagle photon density)
 _DET_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "kind", "band"]
@@ -68,6 +67,40 @@ _NA_PER_UA = 1000.0
 _INTENSITY_TITLE = "Phs/s/eV/uA"
 # Eagle recorded-charge density long form
 _CHARGE_COLUMNS = ["energy_eV", "charge_density", "E0_keV", "azimuth_deg", "band"]
+_CHART_MAX_ROWS = 5000
+
+
+def _chart_frame(df, *, value_column, max_rows=_CHART_MAX_ROWS):
+    """Bound serialized detector data while retaining peaks on each curve.
+
+    Incident and detected rows share sampled energies, so their overlays stay
+    aligned. Normalize each kind before selecting peaks: the weaker detected
+    response must not lose its narrow features to the incident curve.
+    """
+    if len(df) <= max_rows:
+        return df
+    group_columns = ["E0_keV", "azimuth_deg", "band"]
+    groups = list(df.groupby(group_columns, sort=False, dropna=False))
+    kinds_per_group = 2 if "kind" in df else 1
+    points_per_group = max(2, max_rows // (len(groups) * kinds_per_group))
+    sampled = []
+    for _, group in groups:
+        if "kind" in group:
+            curves = [part.sort_values("energy_eV") for _, part in group.groupby("kind", sort=False)]
+            energy = curves[0]["energy_eV"].to_numpy()
+            if any(not np.array_equal(curve["energy_eV"].to_numpy(), energy) for curve in curves[1:]):
+                raise ValueError("detector curves must share one energy grid")
+            normalized = [
+                np.abs(curve[value_column].to_numpy()) / max(np.nanmax(np.abs(curve[value_column])), 1e-300)
+                for curve in curves
+            ]
+            basis = np.maximum.reduce(normalized)
+        else:
+            curves = [group.sort_values("energy_eV")]
+            basis = np.abs(curves[0][value_column].to_numpy())
+        indices = _peak_preserving_indices(basis, points_per_group)
+        sampled.extend(curve.iloc[indices] for curve in curves)
+    return pd.concat(sampled, ignore_index=True)
 
 
 def _collapsed(recs, *, collapse_azimuth):
@@ -270,6 +303,7 @@ def timepix_detected_chart(
     )
     if df.empty:
         return None
+    df = _chart_frame(df, value_column="intensity")
     incident, detected = _detected_layers(
         df,
         x_scale=_detector_x_scale(x_type, x_domain),
@@ -374,6 +408,7 @@ def eaglexo_detected_chart(
     )
     if df.empty:
         return None
+    df = _chart_frame(df, value_column="intensity")
     xsc = _detector_x_scale(x_type, x_domain)
     ysc = _y_scale(df, "intensity", y_type, x_domain, y_domain)
     incident, detected = _detected_layers(df, x_scale=xsc, y_scale=ysc)
@@ -492,6 +527,7 @@ def eaglexo_charge_chart(
     )
     if df.empty:
         return None
+    df = _chart_frame(df, value_column="charge_density")
     base = alt.Chart(df).encode(
         x=alt.X(
             "energy_eV:Q",

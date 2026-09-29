@@ -101,6 +101,27 @@ class ThemeSelect(AnyWidget):
           wrapper.classList.remove("light", "dark");
           wrapper.classList.add(resolved);
         }
+        // Sidebar slice dropdowns are rendered inside marimo shadow roots.
+        // Their light trigger background can survive a runtime theme switch,
+        // leaving light text on white even when the wrapper is dark.
+        if (!shadow.querySelector("style[data-pyrite-select-theme]")) {
+          const style = document.createElement("style");
+          style.dataset.pyriteSelectTheme = "";
+          style.textContent = `
+            :is([role="combobox"], [data-slot="select-trigger"], button[aria-haspopup="listbox"], select) {
+              background-color: var(--pyrite-surface) !important;
+              color: var(--pyrite-text) !important;
+              border-color: var(--pyrite-rule) !important;
+              opacity: 1 !important;
+            }
+            :is([role="combobox"], [data-slot="select-trigger"], button[aria-haspopup="listbox"], select):disabled,
+            :is([role="combobox"], [data-slot="select-trigger"], button[aria-haspopup="listbox"], select)[data-disabled] {
+              color: var(--pyrite-muted) !important;
+              opacity: 1 !important;
+            }
+          `;
+          shadow.appendChild(style);
+        }
       }
     }
 

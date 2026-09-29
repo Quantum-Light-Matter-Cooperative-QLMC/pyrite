@@ -11,10 +11,12 @@ from types import SimpleNamespace
 
 import altair as alt
 import numpy as np
+import pandas as pd
 
 from pyrite.detectors import Timepix3
 from pyrite.plots.altair.detectors import (
     _NA_PER_UA,
+    _chart_frame,
     eaglexo_charge_chart,
     eaglexo_charge_frame,
     eaglexo_detected_chart,
@@ -68,6 +70,42 @@ def _dataset(spec):
     if name is None:
         name = spec["layer"][0]["data"]["name"]
     return spec["datasets"][name]
+
+
+def test_detector_chart_sampling_bounds_payload_and_keeps_both_peaks():
+    energy = np.arange(20000, dtype=float)
+    incident = np.ones(energy.size)
+    detected = np.ones(energy.size) * 0.01
+    incident[4321] = 100.0
+    detected[15678] = 5.0
+    frame = pd.concat(
+        [
+            pd.DataFrame(
+                {
+                    "energy_eV": energy,
+                    "intensity": intensity,
+                    "E0_keV": 30.0,
+                    "azimuth_deg": 0.0,
+                    "kind": kind,
+                    "band": "line",
+                }
+            )
+            for kind, intensity in (("incident", incident), ("detected", detected))
+        ],
+        ignore_index=True,
+    )
+    sampled = _chart_frame(frame, value_column="intensity")
+    assert len(sampled) == 5000
+    curves = {kind: part for kind, part in sampled.groupby("kind")}
+    assert set(curves["incident"]["energy_eV"]) == set(curves["detected"]["energy_eV"])
+    assert 4321.0 in set(curves["incident"]["energy_eV"])
+    assert 15678.0 in set(curves["detected"]["energy_eV"])
+
+
+def test_dense_eagle_chart_serializes_with_bounded_rows():
+    store = {"HOPG bulk": {30.0: _record(30.0, -20.0, 0.0, n=8651)}}
+    chart = eaglexo_detected_chart(store, _settings(), show_qe=False)
+    assert len(_dataset(chart.to_dict())) == 5000
 
 
 # ---- Timepix3 ----------------------------------------------------------------
