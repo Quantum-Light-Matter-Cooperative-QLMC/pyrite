@@ -379,9 +379,7 @@ def test_run_chunk_minutes_requires_remote(monkeypatch):
     monkeypatch.setattr(remote_cli, "_cli_start", fail_submission)
 
     local = invoke(scan.command, ["standard", "-m", "hopg", "--chunk-minutes", "30"])
-    negative = invoke(
-        scan.command, ["standard", "-m", "hopg", "--remote", "--chunk-minutes", "-1"]
-    )
+    negative = invoke(scan.command, ["standard", "-m", "hopg", "--remote", "--chunk-minutes", "-1"])
 
     assert local.exit_code == 2
     assert "--chunk-minutes requires -R/--remote" in local.stderr

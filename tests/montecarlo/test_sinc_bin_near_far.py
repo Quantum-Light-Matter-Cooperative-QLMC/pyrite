@@ -23,7 +23,9 @@ def test_tree_matches_hybrid_on_irregular_bins_and_clustered_lines(seed):
     assert np.all(np.isfinite(tree))
     assert np.all(tree >= 0.0)
     np.testing.assert_allclose(tree, baseline, rtol=2e-6, atol=1e-9)
-    np.testing.assert_allclose(np.dot(tree, np.diff(edges)), np.dot(baseline, np.diff(edges)), rtol=2e-7)
+    np.testing.assert_allclose(
+        np.dot(tree, np.diff(edges)), np.dot(baseline, np.diff(edges)), rtol=2e-7
+    )
 
 
 def test_tree_handles_edge_at_resonance_and_overlapping_near_windows():
@@ -59,7 +61,11 @@ def test_tree_does_not_accept_a_float32_near_pair_at_the_64_width_boundary(side)
     a = np.full(33, 3.0, dtype=np.float32)
     w = np.ones(33, dtype=np.float32)
     boundary = 8000.0 + side * (64.0 * np.pi / 3.0 + 1e-9)
-    edges = np.array([boundary, boundary + 0.001]) if side > 0 else np.array([boundary - 0.001, boundary])
+    edges = (
+        np.array([boundary, boundary + 0.001])
+        if side > 0
+        else np.array([boundary - 0.001, boundary])
+    )
     baseline = np.sum(w[:, None] * _host_bin_mean(a, e, edges, 1.0 / np.diff(edges), 64.0), axis=0)
     tree = reduce_host(e, a, w, edges)
     np.testing.assert_allclose(tree, baseline, rtol=1e-8, atol=1e-14)

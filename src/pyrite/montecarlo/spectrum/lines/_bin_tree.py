@@ -74,7 +74,9 @@ def build_line_tree(E_r, aw, w, *, exact_widths=BIN_MEAN_EXACT_WIDTHS):
     half[leaves] = (high[leaves] - low[leaves]) * 0.5
     radius[leaves] = np.maximum.reduceat(near_radius, starts)
     group = np.arange(len(e)) // _LEAF_SIZE
-    u = (e.astype(np.float64) - center[leaves[group]]) / np.where(half[leaves[group]] != 0, half[leaves[group]], 1.0)
+    u = (e.astype(np.float64) - center[leaves[group]]) / np.where(
+        half[leaves[group]] != 0, half[leaves[group]], 1.0
+    )
     term = coeff.copy()
     for k in range(_ORDER + 1):
         moments[leaves, k] = np.add.reduceat(term, starts)
@@ -260,12 +262,21 @@ def run_tree_reduction(E_r, aw, w, edges, inv_width, *, out, exact_widths=BIN_ME
         ((n_bins + 127) // 128,),
         (128,),
         (
-            cupy.asarray(e), cupy.asarray(a), cupy.asarray(wt),
-            cupy.asarray(first), cupy.asarray(last),
-            cupy.asarray(center), cupy.asarray(half), cupy.asarray(radius),
-            cupy.asarray(moments), cupy.ascontiguousarray(edges, dtype=cupy.float64),
-            cupy.ascontiguousarray(inv_width, dtype=cupy.float64), per_bin,
-            np.int32(n_bins), np.int32(len(first)), np.int32(len(first) // 2),
+            cupy.asarray(e),
+            cupy.asarray(a),
+            cupy.asarray(wt),
+            cupy.asarray(first),
+            cupy.asarray(last),
+            cupy.asarray(center),
+            cupy.asarray(half),
+            cupy.asarray(radius),
+            cupy.asarray(moments),
+            cupy.ascontiguousarray(edges, dtype=cupy.float64),
+            cupy.ascontiguousarray(inv_width, dtype=cupy.float64),
+            per_bin,
+            np.int32(n_bins),
+            np.int32(len(first)),
+            np.int32(len(first) // 2),
             np.float32(exact_widths),
         ),
     )

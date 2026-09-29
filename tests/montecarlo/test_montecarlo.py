@@ -886,9 +886,7 @@ def test_gpu_pipeline_deadline_completes_at_most_one_case_after_expiry(monkeypat
     assert clock["seconds"] == 20
 
     started.clear()
-    results = runner.run_cases(
-        cases, progress=False, should_stop=lambda: clock["seconds"] >= 15
-    )
+    results = runner.run_cases(cases, progress=False, should_stop=lambda: clock["seconds"] >= 15)
     assert started == []
     assert all(result is None for result in results)
 

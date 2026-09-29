@@ -621,7 +621,14 @@ def sincsq_bin_lineshape(
 
 
 def run_bin_mean_reduction_kernel(
-    E_r, aw, w, edges, inv_width, *, out, exact_widths: float | None = BIN_MEAN_EXACT_WIDTHS,
+    E_r,
+    aw,
+    w,
+    edges,
+    inv_width,
+    *,
+    out,
+    exact_widths: float | None = BIN_MEAN_EXACT_WIDTHS,
     method: str = "auto",
 ):
     """Fused CUDA bin-mean line reduction: ``out[k] += sum_l w_l * mean_k(line l)``.

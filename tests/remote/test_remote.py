@@ -4781,7 +4781,9 @@ def test_chunked_no_progress_slices_stop_after_three(monkeypatch, tmp_path):
     ]
     assert [result.returncode for result in results] == [0, 0, 1]
     assert len(marker.read_text().splitlines()) == 2
-    assert (jobdir / "state").read_text().startswith("FAILED (3 slices without checkpoint progress)")
+    assert (
+        (jobdir / "state").read_text().startswith("FAILED (3 slices without checkpoint progress)")
+    )
 
 
 def test_job_status_displays_resumable_timeout_event():
@@ -4803,7 +4805,9 @@ def test_job_status_displays_resumable_timeout_event():
     ("state_text", "exit_code"),
     [("queued slice 2", 0), ("FAILED (3 slices without checkpoint progress)", 1)],
 )
-def test_batch_exit_trap_preserves_chunk_handoff_and_failure(monkeypatch, tmp_path, state_text, exit_code):
+def test_batch_exit_trap_preserves_chunk_handoff_and_failure(
+    monkeypatch, tmp_path, state_text, exit_code
+):
     bash = _bash_or_skip(tmp_path)
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
