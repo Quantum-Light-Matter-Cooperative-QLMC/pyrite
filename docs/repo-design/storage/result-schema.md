@@ -40,6 +40,8 @@ A component store has the shape `{configuration: {E0_keV: record}}` — many row
 
 A mapping becomes a `record-table` when peeling nested mapping levels reaches a uniform record layer of at least `MIN_TABLE_ROWS` (4) rows whose keys overlap by at least `MIN_KEY_DENSITY` (0.5) of the key union. Anything else — CAS runner blobs, analysis caches, small payloads — stays a typed tree.
 
+A flat list or tuple of records — a cross-material comparison cache holds thousands of `{"E0_keV": …, "line_eV": …, "quality": …}` dicts — becomes a `record-list` under the same rule: at least `MIN_TABLE_ROWS` elements, every element a non-empty mapping, and key density at least `MIN_KEY_DENSITY`. It is a record table without key columns: the group carries `container` (`list` or `tuple`) and one `records` column set. Short, sparse, mixed, or non-mapping sequences stay a typed-tree `list`/`tuple`. A 6000-record comparison cache went from about 14 MB and seconds per dump or load as one group per record to about 0.2 MB and tens of milliseconds.
+
 | Object | Contents |
 | --- | --- |
 | `keys/00`, `keys/01`, … | one column per nesting level above the record layer |
@@ -77,6 +79,7 @@ Payloads that are not record sets, and the record table's own `tree-pool` entrie
 | `list`, `tuple` | group | entries named `00000000`, … |
 | `packed-sequence` | dataset | a uniform-tag numeric sequence as one array |
 | `record-table` | group | see [Record tables](#record-tables) |
+| `record-list` | group | a uniform list/tuple of records: `container` attribute plus a `records` column set; see [Record tables](#record-tables) |
 | `array` | dataset | native NumPy numeric/boolean/byte array with exact shape and dtype |
 | `unicode-array` | dataset | variable-width UTF-8 values plus `numpy_dtype` attribute |
 | `scalar` | group | `tag` plus a `v` attribute; `null` carries no value |
@@ -114,6 +117,8 @@ CAS runner mappings add `n_segments` (integer count), `crystal` (catalog key), `
 ## Compatibility and writes
 
 Readers sniff the HDF5 eight-byte signature and then the container's `schema_version`, so version 1 and version 2 artifacts load side by side with no migration step and no flag day. If the signature is absent, readers permanently fall back to the previous zstd-compressed pickle, gzip-compressed pickle, and plain pickle readers; a zstd frame is disambiguated by the signature of what it decodes to. Loading does not rewrite. The next normal store save writes version 2 through the existing same-filesystem temporary file and `os.replace`.
+
+`record-list` is an additive node kind within version 2, not a schema bump. Version 2 files written before it, which store a record list as a `list`/`tuple` group with one `mapping` child per record, still load unchanged. An older reader meeting `record-list` fails loudly with `unsupported result node kind`, the same failure a version bump would give, without rejecting files that do not use it.
 
 `compresslevel` keeps its historical 1–22 interface for CLI compatibility but no longer affects a stored artifact. It selects the transfer frame's strength.
 
