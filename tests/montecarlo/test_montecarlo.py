@@ -848,6 +848,51 @@ def test_run_cases_pipeline_holds_no_more_than_the_budgeted_prefetch(monkeypatch
     assert max(event["in_flight_case_count"] for event in activity) == 1
 
 
+def test_gpu_pipeline_deadline_completes_at_most_one_case_after_expiry(monkeypatch):
+    from pyrite.montecarlo import runner
+
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(scheduling, "_gpu_pipeline_workers", lambda *_args: 2)
+    monkeypatch.setattr(scheduling, "_gpu_pipeline_prefetch", lambda *_args: 4)
+    monkeypatch.setattr(scheduling, "_ensure_pool_limit", lambda: None)
+    monkeypatch.setattr(scheduling, "_process_pool_kwargs", lambda: {})
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
+
+    clock = {"seconds": 0}
+    started = []
+
+    def transport(case):
+        started.append(case["name"])
+        return {"name": case["name"]}
+
+    def spectrum(_case, payload, **_kwargs):
+        clock["seconds"] += 10
+        return payload
+
+    monkeypatch.setattr(scheduling, "_transport_case", transport)
+    monkeypatch.setattr(scheduling, "_spectrum_case_retry", spectrum)
+    cases = [{"name": f"c{i}", "Ne": 10} for i in range(6)]
+    activity = []
+    results = runner.run_cases(
+        cases,
+        progress=False,
+        should_stop=lambda: clock["seconds"] >= 15,
+        on_activity=activity.append,
+    )
+
+    assert started == ["c0", "c1"]
+    assert [r["name"] if r else None for r in results] == ["c0", "c1", None, None, None, None]
+    assert max(event["in_flight_case_count"] for event in activity) == 1
+    assert clock["seconds"] == 20
+
+    started.clear()
+    results = runner.run_cases(
+        cases, progress=False, should_stop=lambda: clock["seconds"] >= 15
+    )
+    assert started == []
+    assert all(result is None for result in results)
+
+
 # ---- _usable_cpus: the allocation, not the machine ---------------------------
 # os.cpu_count() reports the box. Under the lab's --cpus-per-task=8 SLURM
 # allocation on a 32-core node it still returned 32, so the pipeline sized a

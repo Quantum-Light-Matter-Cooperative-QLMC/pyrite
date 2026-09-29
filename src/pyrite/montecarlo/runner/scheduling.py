@@ -448,7 +448,11 @@ def run_cases(
         _single_thread_blas()
         from concurrent.futures import ProcessPoolExecutor
 
-        prefetch = _gpu_pipeline_prefetch(nw, n)  # keep the transport pool ahead
+        # A bounded scan must not leave speculative transports running when its
+        # deadline passes. Keep one case in flight and checkpoint it before exit.
+        prefetch = 1 if should_stop is not None else _gpu_pipeline_prefetch(nw, n)
+        if should_stop is not None and should_stop():
+            return results
         with ProcessPoolExecutor(
             max_workers=nw,
             initializer=_worker_init,
@@ -511,7 +515,7 @@ def run_cases(
                     ready.wait()
 
                 j = i + prefetch
-                if j < n and not stopped:
+                if j < n and not stopped and should_stop is None:
                     inflight[j] = _submit_transport(j)
                 _activity(
                     "spectrum",
@@ -578,6 +582,10 @@ def run_cases(
                     callback(i, cases[i], out)
                 if not keep_results:
                     results[i] = None
+                if should_stop is not None:
+                    stopped = should_stop()
+                    if not stopped and j < n:
+                        inflight[j] = _submit_transport(j)
         _activity("idle", in_flight_case_count=0, transport_prefetch_count=prefetch)
         if _TIMING and timing is not None:
             timing.report("GPU-pipeline", nw=nw)
