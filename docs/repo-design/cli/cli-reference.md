@@ -199,6 +199,8 @@ Options:
 
 Commands:
   analysis    Launch or export the analysis app.
+  pixels      Launch or export the pixel-detector observation app.
+  compare     Launch or export the case and cross-material comparison app.
   viewer      Launch or export the 3D trajectory viewer.
   validation  Launch or export cached validation figures.
 ```
@@ -253,6 +255,115 @@ Options:
   --tunnel            Bind fixed port for SSH tunneling.
   --no-token          Disable marimo auth token.
   -h, --help          Show this message and exit.
+```
+
+## `pyrite app pixels`
+
+```text
+Usage: pyrite app pixels [OPTIONS] COMMAND [ARGS]...
+
+  Launch the interactive pixel-detector observation app with marimo run or edit.
+
+  MATERIAL starts the checkpoint picker for this run. Without it, the picker starts on
+  the analysis app's saved default material, else hopg; this command never changes that
+  default.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  export  Render the pixel-detector observation app as static HTML without starting...
+  launch  Launch the interactive pixel-detector observation app with marimo run or...
+```
+
+## `pyrite app pixels export`
+
+```text
+Usage: pyrite app pixels export [OPTIONS] [MATERIAL]
+
+  Render the pixel-detector observation app as static HTML without starting marimo.
+
+  Writes results/<stem>.html; the stem defaults to pyrite_pixels_<material>.
+
+Options:
+  --stem TEXT  Output stem under results/ (without .html).
+  -h, --help   Show this message and exit.
+```
+
+## `pyrite app pixels launch`
+
+```text
+Usage: pyrite app pixels launch [OPTIONS] [MATERIAL]
+
+  Launch the interactive pixel-detector observation app with marimo run or edit.
+
+  MATERIAL starts the checkpoint picker for this run. Without it, the picker starts on
+  the analysis app's saved default material, else hopg; this command never changes that
+  default.
+
+Options:
+  --watch     Reload app when source files change.
+  --smoke     Execute app once headlessly and exit.
+  --edit      Use `marimo edit` instead of `marimo run`.
+  --acp       Start local Claude and Codex ACP bridges.
+  --tunnel    Bind fixed port for SSH tunneling.
+  --no-token  Disable marimo auth token.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite app compare`
+
+```text
+Usage: pyrite app compare [OPTIONS] COMMAND [ARGS]...
+
+  Launch the interactive case and cross-material comparison app with marimo run or edit.
+
+  MATERIAL starts the checkpoint picker for this run. Without it, the picker starts on
+  the analysis app's saved default material, else hopg; this command never changes that
+  default.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  export  Render the case and cross-material comparison app as static HTML without...
+  launch  Launch the interactive case and cross-material comparison app with marimo...
+```
+
+## `pyrite app compare export`
+
+```text
+Usage: pyrite app compare export [OPTIONS] [MATERIAL]
+
+  Render the case and cross-material comparison app as static HTML without starting
+  marimo.
+
+  Writes results/<stem>.html; the stem defaults to pyrite_compare_<material>.
+
+Options:
+  --stem TEXT  Output stem under results/ (without .html).
+  -h, --help   Show this message and exit.
+```
+
+## `pyrite app compare launch`
+
+```text
+Usage: pyrite app compare launch [OPTIONS] [MATERIAL]
+
+  Launch the interactive case and cross-material comparison app with marimo run or edit.
+
+  MATERIAL starts the checkpoint picker for this run. Without it, the picker starts on
+  the analysis app's saved default material, else hopg; this command never changes that
+  default.
+
+Options:
+  --watch     Reload app when source files change.
+  --smoke     Execute app once headlessly and exit.
+  --edit      Use `marimo edit` instead of `marimo run`.
+  --acp       Start local Claude and Codex ACP bridges.
+  --tunnel    Bind fixed port for SSH tunneling.
+  --no-token  Disable marimo auth token.
+  -h, --help  Show this message and exit.
 ```
 
 ## `pyrite app viewer`

@@ -81,6 +81,10 @@ uv run pyrite run standard -m hopg --quick
 # Analyze existing checkpoint.
 uv run pyrite app analysis launch hopg
 
+# Stored pixel-detector observations; case basket and cross-material comparison.
+uv run pyrite app pixels launch hopg
+uv run pyrite app compare launch hopg
+
 # Interactive transport/lattice viewer; no checkpoint required.
 uv run pyrite app viewer launch hopg
 

@@ -5,7 +5,9 @@ launchers (:mod:`pyrite.cli.commands.app_analysis`,
 :mod:`pyrite.cli.commands.app_viewer`) write it from ``-d/--save-default`` and
 read it back to resolve a no-argument launch, while the notebooks
 (``analysis_app.py``, ``trace_app.py``, via :mod:`pyrite.apps.analyze` and
-:mod:`pyrite.apps.viewer`) read it to seed their dropdown.
+:mod:`pyrite.apps.viewer`) read it to seed their dropdown. The pixel and compare
+launchers (:mod:`pyrite.cli.commands.app_views`) read the analysis default but
+never write it.
 
 Keeping it here rather than in ``apps/`` is what lets ``cli`` stop importing
 ``apps``; that was the last edge holding ``apps`` inside the driver import

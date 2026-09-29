@@ -81,6 +81,7 @@ TEST_SUITE_PATTERNS = {
         "plots/test_plotly_trajectories.py",
         "plots/test_render_*.py",
         "notebooks/test_scan_app.py",
+        "notebooks/test_split_apps.py",
         "notebooks/test_trace_app.py",
         "plots/test_trajectories.py",
         "materials/test_validation_background.py",

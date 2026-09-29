@@ -22,7 +22,15 @@ Launch the checkpoint-driven analysis app for a material:
 uv run pyrite app analysis launch hopg
 ```
 
-For non-interactive use, inspect `pyrite app analysis export --help`. The generated [CLI reference](../repo-design/cli/cli-reference.md) is authoritative for accepted arguments and output formats.
+To compare hand-picked cases across datasets (the case basket) or the best lines of every material with a checkpoint, launch the compare app:
+
+```bash
+uv run pyrite app compare launch hopg
+```
+
+Its picker selects the dataset cases are added from; the basket persists while you switch material, face, or profile. The cross-material view ignores that picker and reads every catalog material's checkpoint.
+
+For non-interactive use, inspect `pyrite app analysis export --help`; `pyrite app pixels export` and `pyrite app compare export` render the other two apps the same way. The generated [CLI reference](../repo-design/cli/cli-reference.md) is authoritative for accepted arguments and output formats.
 
 Current full checkpoints contain three versioned HDF5 components:
 
@@ -40,7 +48,13 @@ Legacy `.pkl` component paths and plain, gzip, and zstd monoliths remain readabl
 
 A profile whose physical detector has an acquisition (`pyrite profile physical-detector set`) also stores one counting observation per case in `observations/<stem>/`, the sibling of `checkpoints/<stem>/`. Observations hold factorized per-tile spectra, pixel solid angles, and filter paths rather than a pixel-by-energy cube, so reopening one never reruns transport. The [Python workflow](python-api-workflow.md#persist-reopen-and-rescore-an-observation) covers `ObservationStore` and rescoring; `pyrite.observations.observation_inventory(stem)` lists a stem's stored observations by case without opening their factors.
 
-The analysis app's **Pixel detector** tab reads the loaded dataset's observations:
+The pixel app reads one dataset's observations without loading its checkpoint. Pick the material, face, and profile that name the dataset:
+
+```bash
+uv run pyrite app pixels launch hopg
+```
+
+In the app:
 
 - choose an observation, then an image: registered **total counts**, counts in an **energy window** bounded by configured reporting edges, primary **filter transmission** at a stored continuum-grid energy, or **filter coverage** (plates crossed by each pixel's centre ray);
 - **Counts** shows deterministic expectations by default. A Poisson acquisition also offers its seeded realization, labelled as such; neither is ever substituted for the other;

@@ -214,10 +214,9 @@ def test_material_menu_cell_owns_checkpoint_directory_dependency() -> None:
         )
 
 
-def test_analysis_app_discovers_materials_directly_from_catalog() -> None:
+def test_analysis_app_uses_no_legacy_material_registries() -> None:
     source = APP.read_text()
 
-    assert "from pyrite.materials import CATALOG" in source
     assert "MATERIAL_LABELS" not in source
     assert "from pyrite.campaign.config import MATERIALS" not in source
 
@@ -225,15 +224,9 @@ def test_analysis_app_discovers_materials_directly_from_catalog() -> None:
 def test_analysis_app_uses_top_level_tabs_and_action_names() -> None:
     source = APP.read_text()
 
-    # "Instruments", "Pixel detector", and "Compare" hold a single view each,
-    # so they're bare top-level tabs rather than nested action-accordion groups.
-    for group in (
-        '"Explore"',
-        '"Optimize"',
-        '"Instruments"',
-        '"Pixel detector"',
-        '"Compare"',
-    ):
+    # "Instruments" holds a single view, so it's a bare top-level tab rather
+    # than a nested action-accordion group.
+    for group in ('"Explore"', '"Optimize"', '"Instruments"'):
         assert group in source
     for action in (
         "Compare beam energies",
@@ -242,6 +235,28 @@ def test_analysis_app_uses_top_level_tabs_and_action_names() -> None:
         "Rank geometries",
     ):
         assert action in source
+
+
+def test_pixel_case_and_cross_material_views_live_in_their_own_apps() -> None:
+    # Issue #235: the pixel detector moved to pixel_app.py; the case basket and
+    # cross-material comparison moved to compare_app.py.
+    source = APP.read_text()
+
+    for moved in (
+        "analysis_ui.pixels",
+        "render_pixel_detector",
+        "render_case_comparison",
+        "render_cross_material",
+        "CASE_BASKET_CAP",
+        "make_case_axes",
+        "case_basket",
+        '"Pixel detector"',
+        '"Compare any cases"',
+    ):
+        assert moved not in source
+    views_package = (VIEWS / "__init__.py").read_text()
+    for module in (".pixels", ".cases", ".materials"):
+        assert f"from {module} import" not in views_package
 
 
 def test_no_lazy_view_uses_a_context_rail() -> None:

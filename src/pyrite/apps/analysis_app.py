@@ -27,7 +27,6 @@ with app.setup:
         select_emission,
     )
     from pyrite.apps.analysis_ui.controls import (
-        make_case_axes,
         make_detector_controls,
         make_dimension_controls,
         make_energy_controls,
@@ -35,28 +34,14 @@ with app.setup:
         make_scan_thickness_control,
     )
     from pyrite.apps.analysis_ui.interactive import make_heatmap_widget, make_scan_heatmap_widgets
-    from pyrite.apps.analysis_ui.pixels import (
-        discover_observations,
-        load_selected_observation,
-        make_observation_selector,
-        make_pixel_image_controls,
-        make_pixel_selection_controls,
-        resolve_pixel_image,
-    )
     from pyrite.apps.analysis_ui.views import (
-        CASE_BASKET_CAP,
-        render_case_comparison,
-        render_cross_material,
         render_detectors,
         render_dimension_comparison,
         render_energy_comparison,
-        render_pixel_detector,
         render_rankings,
         render_scans,
     )
     from pyrite.apps.analyze import (
-        analysis_checkpoint_manifest,
-        comparison_stem,
         emission_menu,
         face_menu,
         get_default_material,
@@ -65,15 +50,7 @@ with app.setup:
         profile_menu,
         select_initial_material,
     )
-    from pyrite.materials import CATALOG
-    from pyrite.results import (
-        case_label,
-        case_table_rows,
-        select_results,
-        select_thickness,
-        slim_case_record,
-        sweep_values,
-    )
+    from pyrite.results import select_results, select_thickness
     from pyrite.runs.run import DEFAULT_CHECKPOINT_DIR
 
     try:
@@ -94,7 +71,7 @@ def _():
                 page_title(
                     mo,
                     "Spectral Analysis",
-                    "Explore spectra, optimize geometry, inspect instrument response, and compare materials.",
+                    "Explore spectra, optimize geometry, and inspect instrument response.",
                     eyebrow="PyRITE",
                 ),
                 theme_ui,
@@ -325,183 +302,6 @@ def _(context, detector_controls):
 
 
 @app.cell
-def _(context):
-    pixel_inventory = discover_observations(context.checkpoint_stem)
-    observation_ui = make_observation_selector(mo, pixel_inventory)
-    return observation_ui, pixel_inventory
-
-
-@app.cell
-def _(observation_ui, pixel_inventory):
-    pixel_state = load_selected_observation(pixel_inventory, observation_ui)
-    pixel_image_controls = (
-        None
-        if pixel_state.observation is None
-        else make_pixel_image_controls(mo, pixel_state.observation)
-    )
-    pixel_selection_controls = (
-        None
-        if pixel_state.observation is None
-        else make_pixel_selection_controls(mo, pixel_state.observation)
-    )
-    return pixel_image_controls, pixel_selection_controls, pixel_state
-
-
-@app.cell
-def _(
-    app_theme,
-    observation_ui,
-    pixel_image_controls,
-    pixel_selection_controls,
-    pixel_state,
-):
-    def pixel_tab():
-        # Resolved only when the tab opens; memoized, so a pixel change reuses the image.
-        return render_pixel_detector(
-            mo,
-            state=pixel_state,
-            selector=observation_ui,
-            image_controls=pixel_image_controls,
-            selection_controls=pixel_selection_controls,
-            resolved=(
-                None
-                if pixel_state.observation is None
-                else resolve_pixel_image(pixel_state.observation, pixel_image_controls.value)
-            ),
-            theme=app_theme,
-        )
-
-    return (pixel_tab,)
-
-
-@app.cell
-def _():
-    get_case_basket, set_case_basket = mo.state([])
-    return get_case_basket, set_case_basket
-
-
-@app.cell
-def _(context):
-    case_picker_ui = mo.ui.table(
-        case_table_rows(context.results),
-        selection="multi",
-        label="cases in this checkpoint",
-    )
-    return (case_picker_ui,)
-
-
-@app.cell
-def _(case_picker_ui, context, set_case_basket):
-    def add_selected(click_count):
-        selected = case_picker_ui.value
-        if selected:
-            varying = set(sweep_values(context.results))
-            additions = []
-            for row in selected:
-                record = context.results[row["name"]][row["E0_keV"]]
-                label = case_label(
-                    record["case"],
-                    material_label=context.selected_material,
-                    face=context.selected_face,
-                    varying=varying,
-                )
-                additions.append(
-                    slim_case_record(
-                        record,
-                        material=context.selected_material,
-                        label=label,
-                        face=context.selected_face,
-                    )
-                )
-
-            def update(old):
-                merged = list(old)
-                for entry in additions:
-                    key = (
-                        entry["case"].get("material"),
-                        entry["case"].get("face"),
-                        entry["case"].get("label"),
-                    )
-                    merged = [
-                        existing
-                        for existing in merged
-                        if (
-                            existing["case"].get("material"),
-                            existing["case"].get("face"),
-                            existing["case"].get("label"),
-                        )
-                        != key
-                    ]
-                    merged.append(entry)
-                return merged[-CASE_BASKET_CAP:]
-
-            set_case_basket(update)
-        return click_count + 1
-
-    case_add_ui = mo.ui.button(value=0, on_click=add_selected, label="Add selected cases")
-    return (case_add_ui,)
-
-
-@app.cell
-def _(get_case_basket):
-    _options = {
-        f"{index}: {entry['case']['label']}": index for index, entry in enumerate(get_case_basket())
-    }
-    case_remove_select_ui = mo.ui.multiselect(_options, label="remove from basket")
-    return (case_remove_select_ui,)
-
-
-@app.cell
-def _(case_remove_select_ui, set_case_basket):
-    def remove_selected(click_count):
-        indexes = set(case_remove_select_ui.value)
-        if indexes:
-            set_case_basket(
-                lambda old: [entry for index, entry in enumerate(old) if index not in indexes]
-            )
-        return click_count + 1
-
-    def clear_basket(click_count):
-        set_case_basket(lambda _old: [])
-        return click_count + 1
-
-    case_remove_ui = mo.ui.button(value=0, on_click=remove_selected, label="Remove selected")
-    case_clear_ui = mo.ui.button(value=0, on_click=clear_basket, label="Clear basket")
-    return case_clear_ui, case_remove_ui
-
-
-@app.cell
-def _(get_case_basket):
-    case_controls = make_case_axes(mo, get_case_basket())
-    return (case_controls,)
-
-
-@app.cell
-def _():
-    energies = set()
-    for material_key in CATALOG.material_keys:
-        manifest = analysis_checkpoint_manifest(material_key)
-        if manifest:
-            energies.update(manifest["energies_keV"])
-    cross_material_energy_options = {f"{energy:g} keV": energy for energy in sorted(energies)} or {
-        "— no data —": None
-    }
-    compare_all_energies_ui = mo.ui.checkbox(value=True, label="Compare all beam energies")
-    return compare_all_energies_ui, cross_material_energy_options
-
-
-@app.cell
-def _(compare_all_energies_ui, cross_material_energy_options):
-    cross_material_energy_ui = mo.ui.dropdown(
-        cross_material_energy_options,
-        value=next(iter(cross_material_energy_options)),
-        label="beam energy",
-        disabled=compare_all_energies_ui.value,
-    )
-    return (cross_material_energy_ui,)
-
-
-@app.cell
 def _(
     app_theme,
     context,
@@ -594,41 +394,6 @@ def _(app_theme, azimuth_controls, context):
 @app.cell
 def _(
     app_theme,
-    case_add_ui,
-    case_clear_ui,
-    case_controls,
-    case_picker_ui,
-    case_remove_select_ui,
-    case_remove_ui,
-    context,
-    get_case_basket,
-):
-    basket = get_case_basket()
-    _values = case_controls.value
-    _axes = resolve_axis_pair(_values["axes"])
-
-    def case_tab():
-        return render_case_comparison(
-            mo,
-            basket=basket,
-            picker=case_picker_ui,
-            add_button=case_add_ui,
-            remove_selector=case_remove_select_ui,
-            remove_button=case_remove_ui,
-            clear_button=case_clear_ui,
-            controls=case_controls,
-            values=_values,
-            axes=_axes,
-            settings=context.settings,
-            theme=app_theme,
-        )
-
-    return (case_tab,)
-
-
-@app.cell
-def _(
-    app_theme,
     context,
     scan_heatmap_energy_ui,
     scan_heatmap_widgets,
@@ -683,35 +448,11 @@ def _(
 
 
 @app.cell
-def _(app_theme, compare_all_energies_ui, context, cross_material_energy_ui):
-    compare_all = compare_all_energies_ui.value
-    energy = cross_material_energy_ui.value
-
-    def cross_material_tab():
-        return render_cross_material(
-            mo,
-            settings=context.settings,
-            analysis_checkpoint_manifest=analysis_checkpoint_manifest,
-            comparison_stem=lambda material: comparison_stem(material, DEFAULT_CHECKPOINT_DIR),
-            compare_all_ui=compare_all_energies_ui,
-            energy_ui=cross_material_energy_ui,
-            compare_all=compare_all,
-            energy=energy,
-            theme=app_theme,
-        )
-
-    return (cross_material_tab,)
-
-
-@app.cell
 def _(
     azimuth_tab,
-    case_tab,
     context,
-    cross_material_tab,
     detector_tab,
     energy_tab,
-    pixel_tab,
     polar_tab,
     rankings_tab,
     scans_tab,
@@ -732,7 +473,6 @@ def _(
                         "Compare beam energies": energy_tab,
                         "Compare polar angles": polar_tab,
                         "Compare azimuths": azimuth_tab,
-                        "Compare any cases": case_tab,
                     },
                     lazy=True,
                     multiple=True,
@@ -748,8 +488,6 @@ def _(
                     ]
                 ),
                 "Instruments": detector_tab,
-                "Pixel detector": pixel_tab,
-                "Compare": cross_material_tab,
             },
             lazy=True,
         )
@@ -760,6 +498,10 @@ def _(
             mo.md(
                 "*3D trajectory and crystal-structure views live in `trace_app.py` "
                 "(`marimo run src/pyrite/apps/trace_app.py`).*"
+            ),
+            mo.md(
+                "*Pixel-detector observations: `pyrite app pixels launch`. Case baskets and "
+                "cross-material comparison: `pyrite app compare launch`.*"
             ),
         ]
     )
