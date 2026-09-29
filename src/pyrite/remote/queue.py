@@ -219,6 +219,7 @@ def start_queue(
         reservation_stems=stems,
         time_limit=time_limit,
         cpus_per_task=cpus_per_task,
+        chunked=chunked,
     )
     upload = scripts._write_job_script_command(
         jobdir,

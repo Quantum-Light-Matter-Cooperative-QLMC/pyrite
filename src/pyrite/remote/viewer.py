@@ -141,6 +141,7 @@ def _status_remote_command(job_assign, detail):
         '{ printf "%s\\n" "$JOB"; } | emit JOB; '
         '{ cat "$D/meta" 2>/dev/null; } | emit META; '
         '{ cat "$D/state" 2>/dev/null; } | emit STATE; '
+        '{ tail -1 "$D/timeouts" 2>/dev/null; } | emit TIMEOUT; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
         # Rank the job within the partition its own run.sh requested, so a job
         # submitted to another target profile is not ranked against this one.

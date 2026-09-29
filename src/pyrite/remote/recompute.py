@@ -68,6 +68,7 @@ def start_rebrem_queue(
         job_name=f"pyrite-rebrem-{jobid}",
         reservation_stems=stems,
         time_limit=time_limit,
+        chunked=chunked,
     )
     upload = scripts._write_job_script_command(
         jobdir,
@@ -190,6 +191,7 @@ def start_reline_queue(
         job_name=f"pyrite-reline-{jobid}",
         reservation_stems=stems,
         time_limit=time_limit,
+        chunked=chunked,
     )
     upload = scripts._write_job_script_command(
         jobdir,
