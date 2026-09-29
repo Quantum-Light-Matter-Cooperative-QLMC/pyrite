@@ -60,7 +60,12 @@ def _referencing_profiles(document, name):
     return sorted(
         profile_name
         for profile_name, row in _catalog_io.profile_rows(document).items()
-        if isinstance(row, dict) and row.get("detector") == name
+        if isinstance(row, dict)
+        and (
+            row.get("detector") == name
+            or isinstance(row.get("detectors"), dict)
+            and name in row["detectors"].values()
+        )
     )
 
 
@@ -100,6 +105,21 @@ def _emit_show(payload):
     for key, label, unit in _DISPLAY_FIELDS:
         if key in payload:
             emit_result(f"  {label}: {payload[key]:g} {unit}")
+    if "distance_mm" in payload:
+        for key in (
+            "distance_mm",
+            "polar_deg",
+            "azimuth_deg",
+            "roll_deg",
+            "offset_mm",
+            "shape",
+            "pitch_mm",
+            "scorer",
+            "response",
+            "acquisition",
+        ):
+            if key in payload:
+                emit_result(f"  {key}: {payload[key]}")
 
 
 @click.group(name="detector", no_args_is_help=True)
@@ -261,7 +281,14 @@ def rename_command(name, new_name, dry_run):
         del detectors[name]
         detectors[new_name] = target
         for profile_name in _referencing_profiles(document, name):
-            _catalog_io.profile_rows(document)[profile_name]["detector"] = new_name
+            profile = _catalog_io.profile_rows(document)[profile_name]
+            if profile.get("detector") == name:
+                profile["detector"] = new_name
+            collection = profile.get("detectors")
+            if isinstance(collection, dict):
+                for detector_id, reference in collection.items():
+                    if reference == name:
+                        collection[detector_id] = new_name
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     return _write(document, original, dry_run, f"renamed detector {name} to {new_name}")

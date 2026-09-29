@@ -219,40 +219,39 @@ def _emit_show(payload):
                 emit_result(
                     f"  beam.longitudinal.envelope_rms_fs: {longitudinal['envelope_rms_fs']:g}"
                 )
-    physical = payload["physical_detector"]
-    counting = physical is not None and "acquisition" in physical
-    superseded = (
-        " (superseded by the physical detector's projection for sweeps)" if counting else ""
-    )
-    if payload["detector_ref"] is not None:
-        emit_result(f"  detector: {payload['detector_ref']} (named reference){superseded}")
-    elif not payload["detector_present"]:
-        emit_result(f"  detector: none{superseded}")
-    else:
-        emit_result(f"  detector:{superseded}")
-    if payload["detector_present"]:
+    emit_result("  detectors:")
+    for detector_id, detector_entry in payload["detectors"].items():
+        reference = detector_entry["reference"]
+        suffix = f" (reference: {reference})" if reference else ""
+        emit_result(f"    {detector_id}: {detector_entry['kind']}{suffix}")
+        settings = detector_entry["settings"]
         for key, label, unit in _ACTIVE_DETECTOR_FIELDS:
-            value = payload["detector"][key]
+            value = detector_entry["acceptance"][key]
             display = "unspecified" if value is None else f"{value:g} {unit}"
-            emit_result(f"    {label}: {display}")
-    if physical is None:
-        emit_result("  physical detector: none")
-    else:
-        emit_result("  physical detector:")
-        for key in (
-            "distance_mm",
-            "polar_deg",
-            "azimuth_deg",
-            "roll_deg",
-            "offset_mm",
-            "shape",
-            "pitch_mm",
-        ):
-            if key in physical:
-                emit_result(f"    {key}: {physical[key]}")
-        sections = [name for name in _profile_edit.PHYSICAL_SECTIONS if name in physical]
-        emit_result(f"    sections: {', '.join(sections) or 'none'}")
-        emit_result(f"    counting observation: {'yes' if counting else 'no'}")
+            emit_result(f"      {label}: {display}")
+        if detector_entry["kind"] == "pixel":
+            defaults = {
+                "polar_deg": 90.0,
+                "azimuth_deg": 0.0,
+                "roll_deg": 0.0,
+                "offset_mm": (0.0, 0.0),
+                "shape": (256, 256),
+                "pitch_mm": (0.055, 0.055),
+            }
+            for key in (
+                "distance_mm",
+                "polar_deg",
+                "azimuth_deg",
+                "roll_deg",
+                "offset_mm",
+                "shape",
+                "pitch_mm",
+                "scorer",
+                "response",
+                "acquisition",
+            ):
+                if key in settings or key in defaults:
+                    emit_result(f"      {key}: {settings.get(key, defaults.get(key))}")
     filters = payload["filters"]
     if not filters:
         emit_result("  filters: none")

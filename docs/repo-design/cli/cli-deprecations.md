@@ -27,5 +27,5 @@ A run that leaves one of these unnamed still resolves the fallback, warns on std
 | Unnamed | Current fallback | Name it explicitly | Deprecated in | Remove in | Note |
 | --- | --- | --- | --- | --- | --- |
 | beam | the built-in example beam (5 kHz, 1 pC, as bundled `default`) | set the profile's `beam` with 'pyrite profile set NAME --beam BEAM' | 0.4.0 | 0.6.0 | Profiles in a user-selected catalog; bundled example profiles are exempt. |
-| detector | the code-default scalar detector (90-degree example geometry) | set the profile's `detector` with 'pyrite profile set NAME --detector DETECTOR' | 0.4.0 | 0.6.0 | Profiles in a user-selected catalog; bundled example profiles are exempt. |
+| detector | the code-default scalar detector (90-degree example geometry) | declare `[profiles.NAME.detectors.ID]` or set the legacy `detector` reference | 0.4.0 | 0.6.0 | Profiles in a user-selected catalog; bundled example profiles are exempt. |
 | profile | the `standard` profile | pass PROFILE, set PYRITE_PROFILE, or run 'pyrite config set profile.current NAME' | 0.4.0 | 0.6.0 | `pyrite run` and `pyrite remote start`; `standard` stays a named profile. |

@@ -118,7 +118,9 @@ The reference resolves to *values* before hashing, and `label` is stripped, so `
 
 The older inline `[profiles.<name>.beam]` table still decodes and means exactly the same thing, but nothing writes it any more and all bundled profiles have been converted. A profile carrying both spellings fails to load. The nine `pyrite profile create` / `pyrite profile set` flags that used to write that block have been removed; `--beam NAME` is the only way `pyrite profile` touches beam phase space.
 
-Detector geometry uses the same named-object pattern shown above. Use `pyrite detector list|show|create|set|rename|delete` to manage these objects and `pyrite profile set <profile> --detector NAME` to attach one. Rename updates every reference; delete names and refuses surviving referents. The name and label never enter checkpoint identity, but resolved geometry does. The older inline `[profiles.<name>.detector]` table still decodes and means exactly the same thing, but nothing writes it any more. The three `pyrite profile create` / `pyrite profile set` flags that used to write that block have been removed; `--detector NAME` is the only way `pyrite profile` touches detector geometry. Response models and detector energy bins are runtime objects and are not serialized here. Named and inline geometry leave the scalar detector response-free; configure a physical counting observation or supply an explicit runtime response to model measured detector effects.
+Detector geometry can be declared in `[profiles.NAME.detectors.ID]` tables. Each ID is a lowercase letter followed by lowercase letters, digits, `_`, or `-`. A table may contain scalar acceptance (`observation_angle_deg`, `polar_acceptance_deg`, `solid_angle_sr`) or pixel geometry (`distance_mm`, pose, grid, and optional `scorer`, `response`, and `acquisition`). Pixel acceptance is derived from its geometry; scalar acceptance fields cannot be mixed into the same pixel table. A reference to a named `[detectors.NAME]` object can be written under `[profiles.NAME.detectors]` as `ID = "NAME"`; named objects can also contain pixel geometry. `pyrite profile show NAME` lists every ID and its resolved acceptance.
+
+`pyrite detector list|show|create|set|rename|delete` still manages named scalar objects, and `pyrite profile set NAME --detector REF` still writes the legacy single-detector reference. Use catalog TOML for a collection or a named pixel object. The legacy `detector` and `physical_detector` profile entries remain loadable, but a profile cannot combine either with a `detectors` collection.
 
 ### Bundled examples and implicit defaults
 
@@ -137,11 +139,36 @@ A beam table -- named or inline -- decodes into `BeamSpec`. The nested `longitud
 
 Both sub-tables join `parameter_sha256` only when they diverge from the inert defaults, so a profile that never sets them hashes exactly as it did before the keys existed and resumes into its existing checkpoints.
 
-## Physical detector, filters, and counting observations
+## Detector collections, filters, and counting observations
 
-A `[profiles.NAME.physical_detector]` table places one planar pixel detector: pose (`distance_mm`, `polar_deg`, `azimuth_deg`, `roll_deg`, `offset_mm`) and pixel grid (`shape`, `pitch_mm`; omitted, one 256 by 256 Timepix3-style chip at 0.055 mm). Optional nested tables add the angular `scorer` (`angular_shape`, nearest-tile reconstruction), the detector `response` (`ideal` or uncalibrated `timepix3`), and an `acquisition` (exposure, reporting-bin edges, post-response hit threshold, expected or seeded Poisson counts). A profile without its own table has no physical detector.
+A profile can mix scalar and pixel detectors. For example:
 
-Edit it with `pyrite profile physical-detector show|set|reset`; creating one requires `--distance-mm`. Each `[[profiles.NAME.filters]]` table is one `FilterPlate`, edited in declared order with `pyrite profile filter add|set|rm|list|show`. For example:
+```toml
+[profiles.survey.detectors.eds]
+observation_angle_deg = 70.0
+polar_acceptance_deg = 10.0
+solid_angle_sr = 0.05
+
+[profiles.survey.detectors.camera]
+distance_mm = 400.0
+polar_deg = 110.0
+shape = [256, 256]
+pitch_mm = [0.055, 0.055]
+
+[profiles.survey.detectors.camera.response]
+kind = "ideal"
+
+[profiles.survey.detectors.camera.acquisition]
+exposure_s = 1.0
+measured_min_eV = 0.0
+measured_max_eV = 20000.0
+measured_bin_width_eV = 400.0
+hit_threshold_eV = 500.0
+```
+
+The pixel pose uses `distance_mm`, `polar_deg`, `azimuth_deg`, `roll_deg`, and `offset_mm`; the grid uses `shape` and `pitch_mm` (default 256 by 256 at 0.055 mm). Optional `scorer`, `response`, and `acquisition` belong to that detector ID. An acquisition produces a factorized counting observation. Profile filters remain shared across the collection.
+
+The older `[profiles.NAME.physical_detector]` table remains editable with `pyrite profile physical-detector show|set|reset`; creating one requires `--distance-mm`. Each `[[profiles.NAME.filters]]` table is one `FilterPlate`, edited in declared order with `pyrite profile filter add|set|rm|list|show`.
 
 ```bash
 pyrite profile physical-detector set filter_demo --distance-mm 400 --polar-deg 60 \
@@ -152,14 +179,13 @@ pyrite profile physical-detector set filter_demo --exposure-s 1 \
   --measured-range-ev 0 20000 --measured-bin-width-ev 400 --hit-threshold-ev 500
 ```
 
-With an acquisition the profile is a **counting observation**, and two things change for `pyrite run`:
+One `pyrite run` invocation executes every detector ID for each selected material. Each detector gets a distinct checkpoint stem containing its ID and parameter digest. With an acquisition, that detector also writes a factorized observation under `observations/<stem>/`, beside its checkpoint. The scalar acceptance used for a pixel detector's source case comes from its geometry, including when there is no acquisition. `profile show` prints that derived acceptance.
 
-- The sweep's scalar observation angle, polar acceptance, and solid angle come from the physical detector's projection, so the intrinsic checkpoint and the observation describe the same transport. Scalar detector overrides on such a profile are rejected, and `pyrite profile show` marks the scalar detector as superseded.
-- Every case also stores a factorized observation under `observations/<stem>/`, beside the `checkpoints/` root, evaluated on the same transport as the scalar record (see [Python API workflow](python-api-workflow.md) for reading one back).
+Legacy `detector` becomes ID `default`; legacy `physical_detector` becomes ID `physical`. If both are present, a run now executes both, and each gets a new ID-qualified checkpoint stem. A profile with neither retains one implicit scalar `default` detector. A profile with only one legacy detector keeps its existing checkpoint identity where its resolved geometry is unchanged.
 
 What an edit costs on the next run: pose and pixel grid change the projection and therefore the dataset; angular shape and filters re-evaluate observations on new transport while cached scalar records are kept; response, acquisition, and beam normalization only rescore stored observations, with no transport. Remote transfer and garbage collection of observation stores are not implemented yet.
 
-`pyrite material simulate MATERIAL --profile NAME` runs one in-memory scene on the physical detector, using the profile's scorer and, when present, its acquisition. It requires singleton thickness, energy, polar, and azimuth grids, prints a compact line/background and pixel-grid summary (`-o json` is the stable envelope and adds total counts for a counting observation; `-o wide` is one tab-separated line), writes the complete factorized spatial arrays with `--output-file PATH.npz`, and never creates a checkpoint or observation store.
+`pyrite material simulate MATERIAL --profile NAME` runs one in-memory scene on a pixel detector, using its scorer and, when present, its acquisition. It selects the sole pixel detector automatically; use `--detector ID` when several are present. It requires singleton thickness, energy, polar, and azimuth grids, prints a compact line/background and pixel-grid summary (`-o json` is the stable envelope and adds total counts for a counting observation; `-o wide` is one tab-separated line), writes the complete factorized spatial arrays with `--output-file PATH.npz`, and never creates a checkpoint or observation store.
 
 The bundled `emittance_demo` beam is the worked example: a Courant-Snyder waist (`alpha_twiss_x = 0`) on the crystal entrance face at 0.1 mm·mrad normalized emittance and a 0.05 m beta function, plus a 0.1% energy spread, run by `hopg_emittance_demo` over hopg at 30 and 100 keV. Because the stored emittance is normalized, that one beam is the same physical beam at both energies -- 0.12 mm and 2.4 mrad RMS at 30 keV, shrinking as `1/sqrt(beta*gamma)` at 100 keV. A `transverse` table clears the spot FWHM that a beam otherwise defaults to; the two spellings are mutually exclusive, and specifying both is an error rather than a precedence rule. The beam's `longitudinal` table is the longitudinal counterpart; lab campaigns that scan microbunch structure keep those beams in their external catalog.
 

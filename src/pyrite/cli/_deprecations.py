@@ -440,7 +440,7 @@ IMPLICIT_DEFAULTS: dict[str, ImplicitDefault] = {
     "detector": _implicit(
         "detector",
         "the code-default scalar detector (90-degree example geometry)",
-        "set the profile's `detector` with 'pyrite profile set NAME --detector DETECTOR'",
+        "declare `[profiles.NAME.detectors.ID]` or set the legacy `detector` reference",
         note="Profiles in a user-selected catalog; bundled example profiles are exempt.",
     ),
 }

@@ -815,8 +815,34 @@ def _stem_label(identity: Mapping[str, Any]) -> str:
     return str(identity["fidelity"])
 
 
+def detector_variant(
+    catalog_profile: str, detector_id: str | None = None, *, quick: bool = False
+) -> str | None:
+    """Identity variant for a named detector without changing single legacy stems."""
+    from ..materials import CATALOG, load_material_catalog
+
+    catalog = (
+        CATALOG if catalog_profile == "standard" else load_material_catalog(profile=catalog_profile)
+    )
+    detectors = catalog.profile_detector_set(catalog_profile)
+    if detector_id is None:
+        detector_id = next(iter(detectors))
+    named = len(detectors) > 1 or (
+        catalog_profile not in catalog.profile_detectors
+        and catalog_profile not in catalog.profile_physical_detectors
+        and bool(detectors[detector_id])
+    )
+    if named:
+        return f"{'quick-' if quick else ''}detector-{detector_id}"
+    return "quick" if quick else None
+
+
 def named_profile_identity(
-    material: str, fidelity: str = "full", *, catalog_profile: str = "standard"
+    material: str,
+    fidelity: str = "full",
+    *,
+    catalog_profile: str = "standard",
+    detector_id: str | None = None,
 ) -> dict[str, Any]:
     """Resolve identity for an unmodified named material/fidelity pair."""
     # Local import avoids config -> profiles -> config import cycle.
@@ -826,23 +852,44 @@ def named_profile_identity(
         material,
         fidelity,
         default_settings(fidelity),
-        material_sweep(material, fidelity=fidelity, catalog_profile=catalog_profile),
+        material_sweep(
+            material,
+            fidelity=fidelity,
+            catalog_profile=catalog_profile,
+            detector_id=detector_id,
+        ),
         catalog_profile=catalog_profile,
+        variant=detector_variant(catalog_profile, detector_id),
     )
 
 
 def named_profile_stem(
-    material: str, fidelity: str = "full", *, catalog_profile: str = "standard"
+    material: str,
+    fidelity: str = "full",
+    *,
+    catalog_profile: str = "standard",
+    detector_id: str | None = None,
 ) -> str:
     """Checkpoint stem for an unmodified named material/profile pair."""
     return variant_stem(
-        named_profile_identity(material, fidelity, catalog_profile=catalog_profile),
-        canonical_full=fidelity == "full" and catalog_profile == "standard",
+        named_profile_identity(
+            material, fidelity, catalog_profile=catalog_profile, detector_id=detector_id
+        ),
+        canonical_full=(
+            fidelity == "full"
+            and catalog_profile == "standard"
+            and detector_variant(catalog_profile, detector_id) is None
+        ),
     )
 
 
 def high_energy_floor_identity(
-    material: str, floor_kev: float, fidelity: str = "full", *, catalog_profile: str = "standard"
+    material: str,
+    floor_kev: float,
+    fidelity: str = "full",
+    *,
+    catalog_profile: str = "standard",
+    detector_id: str | None = None,
 ) -> dict[str, Any]:
     """Resolve identity for a material/profile pair with its energy_keV grid
     floored at ``floor_kev`` for compatibility with legacy remote job records.
@@ -851,7 +898,9 @@ def high_energy_floor_identity(
     # Local import avoids config -> profiles -> config import cycle.
     from .config import default_settings, material_sweep
 
-    sweep = material_sweep(material, fidelity=fidelity, catalog_profile=catalog_profile)
+    sweep = material_sweep(
+        material, fidelity=fidelity, catalog_profile=catalog_profile, detector_id=detector_id
+    )
     energies = np.asarray(sweep.beam.energy_keV, dtype=float)
     kept = energies[energies >= floor_kev]
     if kept.size == 0:
@@ -861,16 +910,32 @@ def high_energy_floor_identity(
         )
     sweep = replace(sweep, beam=beam_replace(sweep.beam, energy_keV=kept))
     return dataset_identity(
-        material, fidelity, default_settings(fidelity), sweep, catalog_profile=catalog_profile
+        material,
+        fidelity,
+        default_settings(fidelity),
+        sweep,
+        catalog_profile=catalog_profile,
+        variant=detector_variant(catalog_profile, detector_id),
     )
 
 
 def high_energy_floor_stem(
-    material: str, floor_kev: float, fidelity: str = "full", *, catalog_profile: str = "standard"
+    material: str,
+    floor_kev: float,
+    fidelity: str = "full",
+    *,
+    catalog_profile: str = "standard",
+    detector_id: str | None = None,
 ) -> str:
     """Checkpoint stem for a high-energy-floored material/profile pair."""
     return variant_stem(
-        high_energy_floor_identity(material, floor_kev, fidelity, catalog_profile=catalog_profile),
+        high_energy_floor_identity(
+            material,
+            floor_kev,
+            fidelity,
+            catalog_profile=catalog_profile,
+            detector_id=detector_id,
+        ),
         canonical_full=False,
     )
 

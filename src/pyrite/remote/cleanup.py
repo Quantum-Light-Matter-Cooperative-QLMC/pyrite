@@ -146,9 +146,9 @@ def _profile_checkpoint_stems(catalog_profile, *, current_stems=()):
     """Return exact remote stems owned by a named catalog profile.
 
     Current predicted stems remain candidates even before they have a manifest.
-    Older identity generations are accepted only when their remote manifest
-    confirms profile ownership; a readable ``@`` label alone is not deletion
-    authority because explicit variants share the same stem namespace.
+    Identity-qualified stems are accepted only when their remote manifest
+    confirms profile ownership. Detector IDs may replace the profile in the
+    readable ``@`` label, which is never deletion authority by itself.
     """
     from ..campaign.profiles import _VARIANT_STEM_RE
 
@@ -156,7 +156,7 @@ def _profile_checkpoint_stems(catalog_profile, *, current_stems=()):
     names = transport._ssh_capture(scripts._list_checkpoint_dirs_command()).split()
     for name in names:
         match = _VARIANT_STEM_RE.fullmatch(name)
-        if match is None or match["label"] != catalog_profile:
+        if match is None:
             continue
         remote_meta = pulling._remote_meta_json(name)
         if remote_meta is None:

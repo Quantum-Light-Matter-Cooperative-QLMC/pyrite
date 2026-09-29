@@ -56,7 +56,7 @@ Legacy `.pkl` component paths and plain, gzip, and zstd monoliths remain readabl
 
 ## Pixel-detector observations
 
-A profile whose physical detector has an acquisition (`pyrite profile physical-detector set`) also stores one counting observation per case in `observations/<stem>/`, the sibling of `checkpoints/<stem>/`. Observations hold factorized per-tile spectra, pixel solid angles, and filter paths rather than a pixel-by-energy cube, so reopening one never reruns transport. The [Python workflow](python-api-workflow.md#persist-reopen-and-rescore-an-observation) covers `ObservationStore` and rescoring; `pyrite.observations.observation_inventory(stem)` lists a stem's stored observations by case without opening their factors.
+A profile detector with an acquisition also stores one counting observation per case in `observations/<stem>/`, the sibling of that detector's `checkpoints/<stem>/`. A profile with several detectors has a separate ID-qualified stem for each. Observations hold factorized per-tile spectra, pixel solid angles, and filter paths rather than a pixel-by-energy cube, so reopening one never reruns transport. The [Python workflow](python-api-workflow.md#persist-reopen-and-rescore-an-observation) covers `ObservationStore` and rescoring; `pyrite.observations.observation_inventory(stem)` lists a stem's stored observations by case without opening their factors.
 
 The pixel app reads one dataset's observations without loading its checkpoint. Pick the material and checkpoint that name the dataset:
 

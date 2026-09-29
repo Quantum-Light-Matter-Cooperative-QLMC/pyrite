@@ -476,6 +476,9 @@ class MaterialCatalog:
     profile_filters: Mapping[str, tuple[Mapping[str, object], ...]] = MappingProxyType({})
     #: Declarative planar-pixel detector geometry for ``material simulate``.
     profile_physical_detectors: Mapping[str, Mapping[str, object]] = MappingProxyType({})
+    #: Named per-profile detector collection rows. Each mapping value combines
+    #: optional scalar acceptance and optional pixelated geometry settings.
+    profile_detector_sets: Mapping[str, Mapping[str, Mapping[str, object]]] = MappingProxyType({})
     #: Explicit immutable energy-grid artifact refs, keyed first by profile and
     #: then material. Legacy ``[energy_grids.*]`` fallback rows are deliberately
     #: absent: callers can distinguish migrated refs from compatibility input.
@@ -524,6 +527,22 @@ class MaterialCatalog:
         detector with :func:`config.catalog_detector`.
         """
         return self.profile_detectors.get(name, _DEFAULT_PROFILE_DETECTOR_SPEC)
+
+    def profile_detector_set(self, name: str) -> Mapping[str, Mapping[str, object]]:
+        """Return named detectors, including legacy and implicit defaults."""
+        if name not in self.profile_names:
+            raise KeyError(f"unknown profile {name!r}; have {list(self.profile_names)}")
+        declared = self.profile_detector_sets.get(name)
+        if declared is not None:
+            return declared
+        legacy: dict[str, Mapping[str, object]] = {}
+        if name in self.profile_physical_detectors:
+            legacy["physical"] = self.profile_physical_detectors[name]
+        if name in self.profile_detectors:
+            legacy["default"] = self.profile_detectors[name]
+        if not legacy:
+            legacy["default"] = MappingProxyType({})
+        return MappingProxyType(legacy)
 
     def profile_materials(self, name: str) -> tuple[str, ...] | None:
         """Explicit ``profiles.NAME.materials`` membership, or ``None`` when the

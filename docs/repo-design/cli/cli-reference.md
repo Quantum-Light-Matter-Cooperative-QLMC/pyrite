@@ -1900,7 +1900,7 @@ Options:
 Commands:
   set          Set or reset MATERIAL overrides without...
   show         Show MATERIAL's effective ranges and...
-  simulate     Simulate one material/profile scene on its...
+  simulate     Simulate one material/profile scene on a...
   blaze        Run a grooved-crystal sweep and write a checkpoint.
   energy-grid  Derive and inspect detector energy-grid inputs.
   validate     Validate a material catalog without starting simulation.
@@ -1958,7 +1958,7 @@ Options:
 ```text
 Usage: pyrite material simulate [OPTIONS] MATERIAL
 
-  Simulate one material/profile scene on its physical detector.
+  Simulate one material/profile scene on a selected pixel detector.
 
   This is intentionally filesystem-free except for an explicit --output-file: it calls
   the public single-scene API and does not create a sweep or checkpoint.
@@ -1966,6 +1966,8 @@ Usage: pyrite material simulate [OPTIONS] MATERIAL
 Options:
   --profile TEXT                  Resolve one scene from profile NAME.  [default:
                                   standard]
+  --detector TEXT                 Pixel detector ID; required when the profile has
+                                  several.
   -o, --output [table|json|wide]  Output format; json is the stable automation contract.
                                   [default: table]
   --output-file FILE              Write full factorized spatial arrays as a new
