@@ -30,7 +30,7 @@ from ._kernels import (
     _log_interp_fraction,
     _matvec3,
     _polarization_pair,
-    _reflection_tabulation,
+    _reflection_tables,
     _rowdot3,
     _sincsq_lineshape,
 )
@@ -753,7 +753,9 @@ def _accumulate_per_hkl(st):
     # identical with only float-rounding-level movement.
     _nsys_push("cxr.lines.tab")
     g_rows, es_rows, ep_rows, wm_rows, hkl_of_row = [], [], [], [], []
-    cr_rows, ci_rows, ur_rows, ui_rows = [], [], [], []
+    CHI_RE, CHI_IM, U_RE, U_IM = _reflection_tables(  # (N_hkl, N_tab)
+        crystal, hkl_list, E_tab, B_ang2, use_henke
+    )
     orients = ((None, 1.0),) if mosaic_quad is None else mosaic_quad
     for i_hkl, hkl in enumerate(hkl_list):
         # reciprocal vector in the sample frame: construction frame by default
@@ -761,11 +763,6 @@ def _accumulate_per_hkl(st):
         g_vec, _g = reciprocal_g_vector(hkl, info["lattice"])
         if R_orient is not None:
             g_vec = R_orient @ g_vec
-        chi_tab, u_tab = _reflection_tabulation(crystal, hkl, E_tab, B_ang2, use_henke)
-        cr_rows.append(chi_tab.real)
-        ci_rows.append(chi_tab.imag)
-        ur_rows.append(u_tab.real)
-        ui_rows.append(u_tab.imag)
         for R_m, wm in orients:  # None -> perfect crystal, one orientation, weight 1
             gd = g_vec if R_m is None else R_m @ g_vec
             e_s, e_p = _polarization_pair(n_hat, gd)
@@ -777,10 +774,6 @@ def _accumulate_per_hkl(st):
     G = xp.asarray(np.array(g_rows), dtype=REAL)  # (N_g, 3)
     ES = xp.asarray(np.array(es_rows), dtype=REAL)
     EP = xp.asarray(np.array(ep_rows), dtype=REAL)
-    CHI_RE = xp.asarray(np.array(cr_rows), dtype=REAL)  # (N_hkl, N_tab)
-    CHI_IM = xp.asarray(np.array(ci_rows), dtype=REAL)
-    U_RE = xp.asarray(np.array(ur_rows), dtype=REAL)
-    U_IM = xp.asarray(np.array(ui_rows), dtype=REAL)
     G2 = _rowdot3(G, G)
     N_DOT_G = _matvec3(G, n_hat_d)
     G_DOT_ES = _rowdot3(G, ES)

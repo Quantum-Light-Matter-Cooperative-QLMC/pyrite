@@ -428,6 +428,91 @@ def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     return result
 
 
+def reflection_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_henke=False, xp=np):
+    """Tabulate :func:`chi_g` and ``U_g/m_e`` for several reflections at once.
+
+    Both couplings are linear in the per-atom form factor
+    ``F_i(g, E) = f0_i(g) + f'_i(E) + i f''_i(E)`` (or ``f0_i(g)`` alone when
+    no anomalous correction applies), and ``f'``/``f''`` depend only on the
+    element and energy. Grouping the basis by element,
+
+        S(g, E)   = DWF(g) [c_g + sum_el P_el(g) (f'_el(E) + i f''_el(E))]
+        acc(g, E) = DWF(g)/g**2 [a_g - sum_el P_el(g) f'_el(E)]
+
+    with ``P_el(g) = sum_{i in el} exp(i 2 pi hkl.R_i)``,
+    ``c_g = sum_el P_el f0_el(g)`` and ``a_g = sum_el P_el (Z_el - f0_el(g))``.
+    Then ``chi_g = -r_e lambda**2 S / (pi V_cell)`` and
+    ``U_g/m_e = 4 pi e**2 acc / (V_cell m_e c**2)``, exactly as
+    :func:`chi_g`/:func:`U_g`. The anomalous tables are read once per element
+    for every reflection, and the per-energy arithmetic runs on ``xp`` (CuPy on
+    a GPU), in float64. Only summation order differs from the per-atom
+    functions, so results agree to float64 rounding; NaN outside the
+    Chantler range propagates the same way.
+
+    Parameters
+    ----------
+    crystal
+        Catalog crystal key.
+    hkl_list
+        Sequence of three Miller indices per reflection.
+    photon_E_eV
+        One-dimensional photon energies in eV.
+    B_ang2
+        Isotropic Debye--Waller ``B`` factor in square angstroms.
+    use_henke
+        Include anomalous corrections for every element (edge-prone elements
+        always carry them).
+    xp
+        Array module for the energy arithmetic.
+
+    Returns
+    -------
+    chi_re, chi_im, u_re, u_im
+        ``(N_hkl, N_E)`` float64 ``xp`` arrays: dimensionless ``chi_g`` and
+        dimensionless ``U_g/m_e``.
+
+    Validation: line-reflection-coupling-tables
+    """
+    info = CRYSTALS[crystal]
+    basis = info["basis"]
+    E_host = np.asarray(photon_E_eV, dtype=np.float64)
+    E = xp.asarray(E_host)
+    dispersive = {}
+    for el, _R in basis:
+        if el not in dispersive and (use_henke or el in _EDGE_PRONE):
+            fp, fpp = henke_dispersion(el, E_host)
+            dispersive[el] = (xp.asarray(fp), xp.asarray(fpp))
+    chi_scale = -R_E_ANG * (HC_EV_ANG / E) ** 2 / (np.pi * info["V_cell"])
+    u_scale = 4.0 * np.pi * E2_EV_ANG / info["V_cell"] / M_E_EV
+    rows = ([], [], [], [])
+    for hkl in hkl_list:
+        hkl = np.asarray(hkl, dtype=float)
+        _, g = reciprocal_g_vector(hkl, info["lattice"])
+        dwf = debye_waller(g, B_ang2)
+        weights = {}
+        for el, R in basis:
+            weights[el] = weights.get(el, 0.0) + np.exp(1j * 2.0 * np.pi * np.dot(hkl, R))
+        c = sum(w * cromer_mann_f0(el, g) for el, w in weights.items())
+        a = sum(w * (Z_TABLE[el] - cromer_mann_f0(el, g)) for el, w in weights.items())
+        s_re = xp.full(E.shape, float(np.real(c)))
+        s_im = xp.full(E.shape, float(np.imag(c)))
+        acc_re = xp.full(E.shape, float(np.real(a)))
+        acc_im = xp.full(E.shape, float(np.imag(a)))
+        for el, w in weights.items():
+            if el not in dispersive:
+                continue
+            fp, fpp = dispersive[el]
+            s_re += w.real * fp - w.imag * fpp
+            s_im += w.imag * fp + w.real * fpp
+            acc_re -= w.real * fp
+            acc_im -= w.imag * fp
+        rows[0].append(chi_scale * (dwf * s_re))
+        rows[1].append(chi_scale * (dwf * s_im))
+        rows[2].append(u_scale * (dwf / g**2) * acc_re)
+        rows[3].append(u_scale * (dwf / g**2) * acc_im)
+    return tuple(xp.stack(row) for row in rows)
+
+
 # ---- absorption length ------------------------------------------------------
 def absorption_length_ang(element, photon_E_eV, number_density_per_ang3):
     """

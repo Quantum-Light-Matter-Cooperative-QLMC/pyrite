@@ -4,11 +4,14 @@ import numpy as np
 import pytest
 
 from pyrite.materials.attenuation import _mu_total_inv_ang
-from pyrite.materials.crystal import CRYSTALS
+from pyrite.materials.crystal import CRYSTALS, reflection_coupling_tables, refractive_index
 from pyrite.montecarlo.spectrum.lines import (
     _elemental_log_mu_table,
     _interp_elemental_mu,
+    _interp_gather1d,
+    _interp_gather2d,
     _interp_index,
+    _line_table_nan_ceiling,
     _line_tabulation_grid,
     _log_interp_fraction,
 )
@@ -114,3 +117,73 @@ def test_explicit_absorber_contributes_native_nodes_and_clamps_endpoints():
 
     np.testing.assert_array_equal(got, expected_endpoints)
     np.testing.assert_array_equal(np.exp(-np.zeros_like(got) * got), np.ones_like(got))
+
+
+def _line_tables(crystal, composition, grid):
+    couplings = reflection_coupling_tables(crystal, [(0, 0, 2), (0, 0, 4)], grid, 0.0, True)
+    n_re = np.asarray(refractive_index(crystal, grid, True).real)
+    return couplings, n_re, _elemental_log_mu_table(composition, grid)
+
+
+def _interpolate(grid, tables, query):
+    couplings, n_re, log_mu = tables
+    q = query[:, None]
+    idx, frac, below, above = _interp_index(q, grid)
+    rows = np.arange(couplings[0].shape[0])
+    idx2 = np.broadcast_to(idx, (query.size, rows.size))
+    frac2 = np.broadcast_to(frac, idx2.shape)
+    below2 = np.broadcast_to(below, idx2.shape)
+    above2 = np.broadcast_to(above, idx2.shape)
+    gathered = [_interp_gather2d(idx2, frac2, below2, above2, t, rows) for t in couplings]
+    gathered.append(_interp_gather1d(idx, frac, below, above, n_re))
+    log_frac = _log_interp_fraction(q, grid, idx)
+    gathered.append(_interp_elemental_mu(idx, log_frac, below, above, log_mu))
+    return gathered
+
+
+@pytest.mark.parametrize(
+    "composition",
+    [None, [("Si", 0.05)]],
+    ids=["basis-absorbers", "explicit-si-absorber"],
+)
+def test_nan_ceiling_cut_leaves_every_interpolated_table_unchanged(composition):
+    """Validation: line-tabulation-nan-ceiling"""
+    crystal = "hopg"
+    composition = composition or _composition(crystal)
+    info = CRYSTALS[crystal]
+    lo, hi = 700_000.0, 1_150_000.0
+    ceiling = _line_table_nan_ceiling(info, composition, True)
+    assert lo < ceiling < hi
+
+    full = _line_tabulation_grid(info, composition, lo, hi)
+    cut = _line_tabulation_grid(info, composition, lo, ceiling)
+    assert cut.size < full.size
+    np.testing.assert_array_equal(cut[cut < ceiling], full[full < ceiling])
+
+    full_tables = _line_tables(crystal, composition, full)
+    # The ceiling claim itself: every table is NaN at every node at or above it.
+    beyond = full >= ceiling
+    couplings, n_re, log_mu = full_tables
+    for table in (*couplings, n_re[None, :], log_mu):
+        assert np.all(np.isnan(table[:, beyond]))
+        assert np.any(np.isfinite(table[:, ~beyond]))
+
+    rng = np.random.default_rng(248)
+    query = np.concatenate(
+        [
+            rng.uniform(lo - 50.0, hi + 50.0, 4000),
+            full[(full > ceiling - 5.0) & (full < ceiling + 5.0)],
+            cut[-3:],
+            [lo - 1.0, ceiling, hi + 1.0],
+        ]
+    )
+    got = _interpolate(cut, _line_tables(crystal, composition, cut), query)
+    want = _interpolate(full, full_tables, query)
+    for g, w in zip(got, want, strict=True):
+        np.testing.assert_array_equal(g, w)
+
+
+def test_nan_ceiling_is_inactive_without_anomalous_refraction():
+    """Validation: line-tabulation-nan-ceiling"""
+    info = CRYSTALS["hopg"]
+    assert _line_table_nan_ceiling(info, _composition("hopg"), False) == np.inf

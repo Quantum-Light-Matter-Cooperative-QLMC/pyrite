@@ -15,6 +15,7 @@ from pyrite.materials.crystal import (
     dominant_reflections,
     optical_constants,
     reciprocal_g_vector,
+    reflection_coupling_tables,
     refractive_index,
     structure_factor,
 )
@@ -723,3 +724,33 @@ def test_packaged_p1_cifs_match_catalog_crystal_info():
             rtol=0.0,
             atol=1e-12,
         )
+
+
+@pytest.mark.parametrize(
+    ("crystal", "hkl_list", "B_ang2", "use_henke"),
+    [
+        ("hopg", [(0, 0, 2), (0, 0, -2), (0, 0, 4), (1, 0, 1)], 0.0, True),
+        ("hbn", [(0, 0, 2), (1, 0, 0), (1, 0, 1)], 0.4, True),
+        ("hbn", [(0, 0, 2), (1, 0, 1)], 0.4, False),
+        ("mose2", [(0, 0, 2), (1, 0, 3), (1, 1, 0)], 0.6, False),
+    ],
+)
+def test_reflection_coupling_tables_match_per_atom_couplings(crystal, hkl_list, B_ang2, use_henke):
+    # Includes energies below and above the Chantler table, where the per-atom
+    # functions return NaN for anomalous elements; the tables must match there too.
+    E = np.concatenate([[0.5, 5.0], np.geomspace(30.0, 9.0e5, 4001), [2.0e6]])
+    chi_re, chi_im, u_re, u_im = reflection_coupling_tables(crystal, hkl_list, E, B_ang2, use_henke)
+    assert chi_re.shape == (len(hkl_list), E.size)
+    for row, hkl in enumerate(hkl_list):
+        chi = np.asarray(chi_g(crystal, hkl, E, B_ang2, use_henke))
+        u = np.asarray(U_g(crystal, hkl, E, B_ang2, use_henke)) / crystal_module.M_E_EV
+        for re_tab, im_tab, want in ((chi_re, chi_im, chi), (u_re, u_im, u)):
+            got = re_tab[row] + 1j * im_tab[row]
+            np.testing.assert_array_equal(np.isnan(got), np.isnan(want))
+            finite = np.isfinite(want)
+            # Compare complex values so components that cancel to rounding
+            # (Im on centric phases, or a structure factor crossing zero
+            # between edges) are judged against the coupling's own scale.
+            err = np.abs(got[finite] - want[finite])
+            tol = 1e-12 * np.abs(want[finite]) + 1e-12 * np.max(np.abs(want[finite]))
+            np.testing.assert_array_less(err, tol)

@@ -33,7 +33,7 @@ from ._kernels import (
     _log_interp_fraction,
     _matvec3,
     _polarization_pair,
-    _reflection_tabulation,
+    _reflection_tables,
     _rowdot3,
     _segment_escape_distance,
     _sincsq_lineshape,
@@ -75,6 +75,7 @@ class _BatchedTables:
     CHI_IM: Any
     U_RE: Any
     U_IM: Any
+    ROW_TABLE: Any
     G2: Any
     N_DOT_G: Any
     G_DOT_ES: Any
@@ -196,7 +197,7 @@ def _batched_reflection_tables(st):
     """Build -- or reuse from the pair-local cache -- the batched route's
     (reflection, crystallite orientation) rows and their chi/U tabulations.
 
-    Returns the 13-tuple the caller unpacks. The cache key is an explicit
+    Returns the 14-tuple the caller unpacks. The cache key is an explicit
     tuple rather than a hash of the request: it keys on the identity of the
     energy grid, which no value hash reproduces.
     """
@@ -246,14 +247,17 @@ def _batched_reflection_tables(st):
     tables = None if _table_cache is None else _table_cache.get(table_key)
     if tables is None:
         _nsys_push("cxr.lines.tab")
-        g_rows, es_rows, ep_rows, wm_rows = [], [], [], []
-        cr_rows, ci_rows, ur_rows, ui_rows = [], [], [], []
+        g_rows, es_rows, ep_rows, wm_rows, table_rows = [], [], [], [], []
+        # One coupling row per reflection; its mosaic orientations index it
+        # through ROW_TABLE rather than carrying (N_g, N_tab) copies.
+        CHI_RE, CHI_IM, U_RE, U_IM = _reflection_tables(  # (N_hkl, N_tab)
+            crystal, hkl_list, E_tab, B_ang2, use_henke
+        )
         orients = ((None, 1.0),) if mosaic_quad is None else mosaic_quad
-        for hkl in hkl_list:
+        for i_hkl, hkl in enumerate(hkl_list):
             g_vec, _g = reciprocal_g_vector(hkl, info["lattice"])
             if R_orient is not None:
                 g_vec = R_orient @ g_vec
-            chi_tab, u_tab = _reflection_tabulation(crystal, hkl, E_tab, B_ang2, use_henke)
             for R_m, wm in orients:
                 gd = g_vec if R_m is None else R_m @ g_vec
                 e_s, e_p = _polarization_pair(n_hat, gd)
@@ -261,18 +265,12 @@ def _batched_reflection_tables(st):
                 es_rows.append(e_s)
                 ep_rows.append(e_p)
                 wm_rows.append(wm)
-                cr_rows.append(chi_tab.real)
-                ci_rows.append(chi_tab.imag)
-                ur_rows.append(u_tab.real)
-                ui_rows.append(u_tab.imag)
+                table_rows.append(i_hkl)
         G = xp.asarray(np.array(g_rows), dtype=REAL)  # (N_g, 3)
         ES = xp.asarray(np.array(es_rows), dtype=REAL)
         EP = xp.asarray(np.array(ep_rows), dtype=REAL)
         WM = xp.asarray(np.array(wm_rows), dtype=REAL)[None, :]  # (1, N_g)
-        CHI_RE = xp.asarray(np.array(cr_rows), dtype=REAL)  # (N_g, N_tab)
-        CHI_IM = xp.asarray(np.array(ci_rows), dtype=REAL)
-        U_RE = xp.asarray(np.array(ur_rows), dtype=REAL)
-        U_IM = xp.asarray(np.array(ui_rows), dtype=REAL)
+        ROW_TABLE = xp.asarray(np.array(table_rows, dtype=np.int32))  # (N_g,)
         G2 = _rowdot3(G, G)
         N_DOT_G = _matvec3(G, n_hat_d)
         G_DOT_ES = _rowdot3(G, ES)
@@ -286,6 +284,7 @@ def _batched_reflection_tables(st):
             CHI_IM,
             U_RE,
             U_IM,
+            ROW_TABLE,
             G2,
             N_DOT_G,
             G_DOT_ES,
@@ -332,6 +331,7 @@ def _batched_tables(st):
         CHI_IM,
         U_RE,
         U_IM,
+        ROW_TABLE,
         G2,
         N_DOT_G,
         G_DOT_ES,
@@ -384,6 +384,7 @@ def _batched_tables(st):
         CHI_IM=CHI_IM,
         U_RE=U_RE,
         U_IM=U_IM,
+        ROW_TABLE=ROW_TABLE,
         G2=G2,
         N_DOT_G=N_DOT_G,
         G_DOT_ES=G_DOT_ES,
@@ -471,6 +472,7 @@ def _batched_block(st, bt, sb):
         U_RE,
         U_IM,
         log_mu_tab_g,
+        bt.ROW_TABLE,
     )
     return _BatchedBlock(
         sb=sb,
@@ -1146,6 +1148,7 @@ def _accumulate_batched(st):
                 n_re_tab=n_re_tab_g,
                 L_start=_coh_L_start[sel],
                 L_end=_coh_L_end[sel],
+                table_row=bt.ROW_TABLE,
                 config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
             )
             # Formation mode appends the pair-layout attenuation constants
