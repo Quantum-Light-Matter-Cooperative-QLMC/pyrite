@@ -20,6 +20,7 @@ import click
 import pytest
 
 from pyrite import cli
+from pyrite.remote import config as remote_config
 from pyrite.remote import scripts
 
 #: Modules whose job is to build shell for the box.
@@ -53,11 +54,18 @@ def _source_invocations() -> set[tuple[str, ...]]:
 
 
 def _generated_invocations() -> set[tuple[str, ...]]:
-    """Invocations whose verb is interpolated, so only the built script shows it."""
-    built = (
-        scripts._prune_checkpoint_stems_command("j", ["hopg"], catalog_profile="standard"),
-        scripts._prune_checkpoint_stems_command("j", ["hopg"], all_profiles=True, yes=True),
-    )
+    """Invocations whose verb is interpolated, so only the built script shows it.
+
+    Runs at collection, before the autouse remote pins: pin an absolute remote
+    checkout and uv here so building never resolves a host or ssh-expands ``~``.
+    """
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(remote_config, "REMOTE_DIR", "/path/to/pyrite")
+        patch.setattr(remote_config, "REMOTE_UV", "uv")
+        built = (
+            scripts._prune_checkpoint_stems_command("j", ["hopg"], catalog_profile="standard"),
+            scripts._prune_checkpoint_stems_command("j", ["hopg"], all_profiles=True, yes=True),
+        )
     found: set[tuple[str, ...]] = set()
     for command in built:
         found |= _invocations(command)

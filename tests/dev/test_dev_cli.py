@@ -385,3 +385,35 @@ def test_cli_doc_parsers_accept_explicit_write_mode(dev_module, command: str) ->
 
     assert args.write is True
     assert args.check is False
+
+
+def _fake_checkout(path):
+    (path / "src" / "pyrite").mkdir(parents=True)
+    (path / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
+    return path
+
+
+def test_repo_root_follows_the_invoking_worktree_not_pyrite_home(monkeypatch, tmp_path) -> None:
+    from pyrite.devtools import repo_root
+
+    main = _fake_checkout(tmp_path / "main")
+    worktree = _fake_checkout(main / ".worktrees" / "issue-1-task")
+    (worktree / "tests").mkdir()
+    monkeypatch.setenv("PYRITE_HOME", str(main))
+    monkeypatch.chdir(worktree / "tests")
+
+    assert repo_root() == worktree.resolve()
+
+
+def test_repo_root_outside_a_checkout_uses_this_source_tree(tmp_path) -> None:
+    from pathlib import Path
+
+    from pyrite.devtools import repo_root
+
+    assert repo_root(tmp_path) == Path(dev_cli.__file__).resolve().parents[3]
+
+
+def test_dev_cli_root_is_the_checkout_holding_its_tests() -> None:
+    from pathlib import Path
+
+    assert dev_cli.ROOT == Path(__file__).resolve().parents[2]

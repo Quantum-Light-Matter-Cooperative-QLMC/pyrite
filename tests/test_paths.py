@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from pathlib import Path
 
 from pyrite import DATA_DIR
@@ -41,7 +43,12 @@ def test_workspace_root_uses_store_then_cwd(monkeypatch, tmp_path):
 
 
 def test_state_dir_matches_config_store_parent():
-    assert state_dir() == _config.CONFIG_PATH.parent
+    # conftest redirects CONFIG_PATH in-process; read the shipped default fresh.
+    probe = "from pyrite.console.config import CONFIG_PATH; print(CONFIG_PATH.parent)"
+    parent = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    assert Path(parent) == state_dir()
     assert state_dir().name == "pyrite"
 
 
