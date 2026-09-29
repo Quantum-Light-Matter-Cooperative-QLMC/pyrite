@@ -39,29 +39,6 @@ def render_case_comparison(
 
     cases = [(entry, entry["case"]["label"]) for entry in basket]
     components = set(values["components"])
-    narrow = multi_case_spectrum_chart(
-        cases,
-        settings,
-        include_brem="Bremsstrahlung" in components,
-        include_line="Line" in components,
-        include_characteristic="Characteristic" in components,
-        x_type=axes.narrow.x_type,
-        y_type=axes.narrow.y_type,
-        band="narrow",
-    )
-    broad = multi_case_spectrum_chart(
-        cases,
-        settings,
-        include_brem="Bremsstrahlung" in components,
-        include_line="Line" in components,
-        include_characteristic="Characteristic" in components,
-        x_type=axes.broad.x_type,
-        y_type=axes.broad.y_type,
-        band="broad",
-    )
-    narrow = themed_chart(narrow, theme)
-    broad = themed_chart(broad, theme)
-
     rows = [
         {"label": entry["case"]["label"], "material": entry["case"]["material"]} for entry in basket
     ]
@@ -78,6 +55,34 @@ def render_case_comparison(
             axes_panel(mo, controls["axes"]),
         ]
     )
+    if not components:
+        parts.append(mo.md("*Select at least one component above to plot.*"))
+        return mo.vstack(parts)
+
+    narrow = multi_case_spectrum_chart(
+        cases,
+        settings,
+        include_brem="Bremsstrahlung" in components,
+        include_line="Line" in components,
+        include_characteristic="Characteristic" in components,
+        sum_components=True,
+        x_type=axes.narrow.x_type,
+        y_type=axes.narrow.y_type,
+        band="narrow",
+    )
+    broad = multi_case_spectrum_chart(
+        cases,
+        settings,
+        include_brem="Bremsstrahlung" in components,
+        include_line="Line" in components,
+        include_characteristic="Characteristic" in components,
+        sum_components=True,
+        x_type=axes.broad.x_type,
+        y_type=axes.broad.y_type,
+        band="broad",
+    )
+    narrow = themed_chart(narrow, theme)
+    broad = themed_chart(broad, theme)
     parts.extend(
         [
             mo.md("**Narrowband**"),

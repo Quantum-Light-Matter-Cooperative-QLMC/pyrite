@@ -377,8 +377,8 @@ def test_compact_controls_render_with_marimo() -> None:
 
     axes = make_spectrum_axes(mo)
     assert axes_panel(mo, axes) is not None
-    assert make_component_controls(mo).value == ["Bremsstrahlung"]
-    assert make_case_axes(mo).value["components"] == ["Bremsstrahlung"]
+    assert make_component_controls(mo).value == ["Line", "Bremsstrahlung"]
+    assert make_case_axes(mo).value["components"] == ["Line", "Bremsstrahlung"]
 
 
 def _stop_guards(cell: ast.FunctionDef) -> set[str]:

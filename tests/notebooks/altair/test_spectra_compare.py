@@ -175,6 +175,114 @@ def test_compare_chart_none_on_empty():
     assert compare_spectrum_chart({}, _settings(), hue="E0_keV") is None
 
 
+def test_selected_components_do_not_expand_dense_chart_payload():
+    """Selecting Line changes the total without adding a serialized trace."""
+    store = {"HOPG bulk": {30.0: _record(30.0, 20.0, 0.0, n=8651)}}
+    baseline = compare_spectrum_chart(
+        store,
+        _settings(),
+        hue="E0_keV",
+        include_brem=True,
+        include_line=False,
+        include_characteristic=False,
+        sum_components=True,
+    )
+    with_line = compare_spectrum_chart(
+        store,
+        _settings(),
+        hue="E0_keV",
+        include_brem=True,
+        include_line=True,
+        include_characteristic=False,
+        sum_components=True,
+    )
+
+    for chart in (baseline, with_line):
+        spec = chart.to_dict()
+        rows = spec["datasets"][spec["data"]["name"]]
+        assert len(rows) == 5000
+        assert len(spec["layer"]) == 1
+        assert "line" not in rows[0] and "brem" not in rows[0]
+
+
+def test_selected_components_make_one_additive_spectrum():
+    record = _record(30.0, 20.0, 0.0, n=80)
+    record["spec_characteristic"] = np.full(80, 0.4)
+    store = {"HOPG bulk": {30.0: record}}
+
+    def total(*, brem: bool, line: bool, characteristic: bool):
+        chart = compare_spectrum_chart(
+            store,
+            _settings(),
+            hue="E0_keV",
+            include_brem=brem,
+            include_line=line,
+            include_characteristic=characteristic,
+            sum_components=True,
+        )
+        spec = chart.to_dict()
+        assert len(spec["layer"]) == 1
+        rows = spec["datasets"][spec["data"]["name"]]
+        return np.array([row["total"] for row in rows])
+
+    brem = total(brem=True, line=False, characteristic=False)
+    line = total(brem=False, line=True, characteristic=False)
+    characteristic = total(brem=False, line=False, characteristic=True)
+    combined = total(brem=True, line=True, characteristic=True)
+
+    assert np.max(characteristic) > 0
+    np.testing.assert_allclose(combined, brem + line + characteristic)
+
+
+def test_case_basket_selected_components_have_one_layer():
+    record = _record(30.0, 20.0, 0.0, n=80)
+    chart = multi_case_spectrum_chart(
+        [(record, "HOPG")],
+        _settings(),
+        include_brem=True,
+        include_line=True,
+        include_characteristic=False,
+        sum_components=True,
+    )
+    assert len(chart.to_dict()["layer"]) == 1
+
+
+def test_both_emissions_sum_the_same_selected_components():
+    record = _record(30.0, 20.0, 0.0, n=80)
+    record["spec_coherent"] = record["spec"] * 2.0
+    record["spec_characteristic"] = np.full(80, 0.4)
+    store = {"HOPG bulk": {30.0: record}}
+
+    both = compare_spectrum_chart(
+        store,
+        _settings(),
+        hue="E0_keV",
+        include_brem=True,
+        include_line=True,
+        include_characteristic=True,
+        include_coherent=True,
+        sum_components=True,
+    ).to_dict()
+    line = compare_spectrum_chart(
+        store,
+        _settings(),
+        hue="E0_keV",
+        include_brem=False,
+        include_line=True,
+        include_characteristic=False,
+        sum_components=True,
+    ).to_dict()
+    both_rows = both["datasets"][both["data"]["name"]]
+    line_rows = line["datasets"][line["data"]["name"]]
+
+    assert len(both["layer"]) == 2
+    np.testing.assert_allclose(
+        [row["coherent"] - row["total"] for row in both_rows],
+        [row["total"] for row in line_rows],
+        atol=1e-12,
+    )
+
+
 def test_compare_chart_single_hue_value_still_renders_one_line():
     chart = compare_spectrum_chart(_store_single_tilt(), _settings(), hue="tilt_deg")
     spec = chart.to_dict()

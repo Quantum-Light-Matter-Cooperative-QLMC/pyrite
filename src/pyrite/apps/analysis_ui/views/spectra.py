@@ -101,6 +101,9 @@ def render_spectra(
     available = sweep_values(results).get(spec.varying_key, []) if records(results) else []
     if len(available) <= 1:
         parts.append(mo.md(f"*Only one {spec.varying_label} in this checkpoint.*"))
+    if not component_values:
+        parts.append(mo.md("*Select at least one component above to plot.*"))
+        return mo.vstack(parts)
     varying_values = list(varying_ui.value or [])
     if not varying_values:
         parts.append(mo.md(f"*Select at least one {spec.varying_label} above to plot.*"))
@@ -121,6 +124,8 @@ def render_spectra(
             include_line="Line" in component_values,
             include_characteristic="Characteristic" in component_values,
             include_coherent=context.show_both_emissions,
+            sum_components=True,
+            max_points=2500 if context.show_both_emissions else 5000,
             x_type=band_axes.x_type,
             y_type=band_axes.y_type,
             band=band,

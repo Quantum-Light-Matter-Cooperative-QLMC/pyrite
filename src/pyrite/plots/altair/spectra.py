@@ -226,6 +226,18 @@ def _characteristic_view(record, *, include_characteristic):
     return {key: value for key, value in record.items() if key != "spec_characteristic"}
 
 
+def _selected_line_record(record, line_source, *, include_line, include_characteristic):
+    """Score selected line-grid terms without adding characteristic twice."""
+    selected = np.zeros_like(np.asarray(line_source, dtype=float))
+    if include_line:
+        selected += np.asarray(line_source, dtype=float)
+    if include_characteristic and record.get("spec_characteristic") is not None:
+        selected += np.asarray(record["spec_characteristic"], dtype=float)
+    scored_record = {**record, "spec": selected}
+    scored_record.pop("spec_characteristic", None)
+    return scored_record
+
+
 def _record_frame(
     r,
     settings,
@@ -234,18 +246,27 @@ def _record_frame(
     include_line=False,
     include_characteristic=True,
     include_coherent=False,
+    sum_components=False,
     meta,
 ):
-    r = _characteristic_view(r, include_characteristic=include_characteristic)
+    if sum_components:
+        scored_record = _selected_line_record(
+            r,
+            r["spec"],
+            include_line=include_line,
+            include_characteristic=include_characteristic,
+        )
+    else:
+        scored_record = _characteristic_view(r, include_characteristic=include_characteristic)
     E = np.asarray(r["E_grid"], dtype=float)
     scale = r["scale"] * _NA_PER_UA
-    line_det, brem_det = _line_brem(r, settings, convolve=False)
+    line_det, brem_det = _line_brem(scored_record, settings, convolve=False)
     line_det = np.asarray(line_det, dtype=float)
     brem_det = np.asarray(brem_det, dtype=float)
 
     total_E = E
     total = (line_det + brem_det) if include_brem else line_det
-    line_basis = line_det
+    line_basis = total if sum_components else line_det
     line_grid = np.ones(E.shape, dtype=bool)
     brem_E = E
     brem = brem_det
@@ -281,7 +302,7 @@ def _record_frame(
             }
         )
     ]
-    if include_brem:
+    if include_brem and not sum_components:
         frames.append(
             pd.DataFrame(
                 {
@@ -294,7 +315,7 @@ def _record_frame(
                 }
             )
         )
-    if include_line:
+    if include_line and not sum_components:
         frames.append(
             pd.DataFrame(
                 {
@@ -308,16 +329,26 @@ def _record_frame(
             )
         )
     if include_coherent and r.get("spec_coherent") is not None:
-        coherent_line, _ = _line_brem({**r, "spec": r["spec_coherent"]}, settings, convolve=False)
+        if sum_components:
+            coherent_record = _selected_line_record(
+                r,
+                r["spec_coherent"],
+                include_line=include_line,
+                include_characteristic=include_characteristic,
+            )
+        else:
+            coherent_record = {**scored_record, "spec": r["spec_coherent"]}
+        coherent_line, _ = _line_brem(coherent_record, settings, convolve=False)
         coherent_line = np.asarray(coherent_line, dtype=float)
-        # `total_E`'s tail (past the line grid) is brem-only; the coherent overlay
-        # has no signal there, so it zero-pads to share the SAME energy coordinates
-        # as `total`/`line` -- required by `_decimate_frame`'s per-trace grid check.
+        # The coherent curve shares the total's grid. Its wide tail contains
+        # brem in summed mode and zeros in decomposition mode.
         tail_len = total_E.size - E.size
+        coherent_total = coherent_line + brem_det if sum_components and include_brem else coherent_line
+        coherent_tail = (
+            brem_tail if tail_len and sum_components and include_brem else np.zeros(tail_len)
+        )
         coherent_basis = (
-            np.concatenate([coherent_line, np.zeros(tail_len, dtype=float)])
-            if tail_len > 0
-            else coherent_line
+            np.concatenate([coherent_total, coherent_tail]) if tail_len > 0 else coherent_total
         )
         frames.append(
             pd.DataFrame(
@@ -607,6 +638,7 @@ def _compare_frame(
     include_line=False,
     include_characteristic=True,
     include_coherent=False,
+    sum_components=False,
     band="narrow",
     max_points=None,
 ):
@@ -643,6 +675,7 @@ def _compare_frame(
                 include_line=include_line,
                 include_characteristic=include_characteristic,
                 include_coherent=include_coherent,
+                sum_components=sum_components,
                 meta=row_meta,
             )
         )
@@ -661,6 +694,7 @@ def compare_spectrum_chart(
     include_line=False,
     include_characteristic=True,
     include_coherent=False,
+    sum_components=False,
     x_domain=None,
     x_type="linear",
     y_type="linear",
@@ -673,8 +707,9 @@ def compare_spectrum_chart(
     VALUE of ``hue`` (one of ``"E0_keV"``, ``"tilt_deg"``, ``"tilt_azim_deg"``),
     for whatever ``results`` the caller already sliced down. Same physics/units
     as ``spectrum_chart``; ``band``, ``x_type``, and ``max_points`` match that
-    function. Returns an :class:`altair.Chart`, or ``None`` when there are no
-    records.
+    function. With ``sum_components=True``, component flags select terms in one
+    total curve; the default retains separate decomposition overlays. Returns
+    an :class:`altair.Chart`, or ``None`` when there are no records.
     """
     if hue not in _COMPARE_HUE_FIELDS:
         raise ValueError(f"hue must be one of {sorted(_COMPARE_HUE_FIELDS)}, got {hue!r}")
@@ -689,6 +724,7 @@ def compare_spectrum_chart(
         include_line=include_line,
         include_characteristic=include_characteristic,
         include_coherent=include_coherent,
+        sum_components=sum_components,
         band=band,
         max_points=max_points,
     )
@@ -707,8 +743,10 @@ def compare_spectrum_chart(
     hue_title = _COMPARE_HUE_FIELDS[hue]
 
     compact = _compact_component_frame(df)
+    show_brem_layer = include_brem and not sum_components
+    show_line_layer = include_line and not sum_components
     base = _fold_components(
-        alt.Chart(compact), include_brem, include_line, include_coherent
+        alt.Chart(compact), show_brem_layer, show_line_layer, include_coherent
     ).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()),
         y=alt.Y(
@@ -720,7 +758,7 @@ def compare_spectrum_chart(
         color=alt.Color(f"{hue}:N", title=hue_title, legend=_spectrum_legend()),
         tooltip=[f"{hue}:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
-    layers = _component_layers(base, include_brem, include_line, include_coherent)
+    layers = _component_layers(base, show_brem_layer, show_line_layer, include_coherent)
     return _style_chart(
         alt.layer(*layers)
         .properties(width=width, height=height, title=_spectrum_title(title))
@@ -736,6 +774,7 @@ def _multi_case_frame(
     include_line=False,
     include_characteristic=True,
     include_coherent=False,
+    sum_components=False,
     band="narrow",
     max_points=None,
 ):
@@ -756,6 +795,7 @@ def _multi_case_frame(
                 include_line=include_line,
                 include_characteristic=include_characteristic,
                 include_coherent=include_coherent,
+                sum_components=sum_components,
                 meta={"label": str(label)},
             )
         )
@@ -773,6 +813,7 @@ def multi_case_spectrum_chart(
     include_line=False,
     include_characteristic=True,
     include_coherent=False,
+    sum_components=False,
     x_domain=None,
     x_type="linear",
     y_type="linear",
@@ -789,7 +830,8 @@ def multi_case_spectrum_chart(
     :func:`pyrite.results.selection.case_label`), so two basket entries that
     happen to share every case field both survive. ``include_brem``,
     ``x_domain``, ``x_type``/``y_type``, ``band``, and ``max_points`` match
-    :func:`compare_spectrum_chart`. Returns ``None`` when ``cases`` is empty.
+    :func:`compare_spectrum_chart`. ``sum_components=True`` selects terms in
+    one total curve. Returns ``None`` when ``cases`` is empty.
     """
     if not cases:
         return None
@@ -800,6 +842,7 @@ def multi_case_spectrum_chart(
         include_line=include_line,
         include_characteristic=include_characteristic,
         include_coherent=include_coherent,
+        sum_components=sum_components,
         band=band,
         max_points=max_points,
     )
@@ -816,8 +859,10 @@ def multi_case_spectrum_chart(
     )
 
     compact = _compact_component_frame(df)
+    show_brem_layer = include_brem and not sum_components
+    show_line_layer = include_line and not sum_components
     base = _fold_components(
-        alt.Chart(compact), include_brem, include_line, include_coherent
+        alt.Chart(compact), show_brem_layer, show_line_layer, include_coherent
     ).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()),
         y=alt.Y(
@@ -829,7 +874,7 @@ def multi_case_spectrum_chart(
         color=alt.Color("label:N", title="case", legend=_spectrum_legend()),
         tooltip=["label:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
-    layers = _component_layers(base, include_brem, include_line, include_coherent)
+    layers = _component_layers(base, show_brem_layer, show_line_layer, include_coherent)
     return _style_chart(
         alt.layer(*layers)
         .properties(width=width, height=height, title=_spectrum_title("Case comparison"))
