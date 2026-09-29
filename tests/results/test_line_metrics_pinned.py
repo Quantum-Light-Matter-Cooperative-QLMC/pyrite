@@ -439,3 +439,34 @@ def test_pinned_line_outputs(name, metric):
     # repr comparison: exact floats, and NaN == NaN
     assert repr(metrics) == repr(e_metrics)
     assert metrics["line_quality"] == quality
+
+
+def test_top_geometries_shares_line_metrics_cache(monkeypatch):
+    from pyrite.results import metrics as _metrics
+    from pyrite.results import top_geometries
+
+    store = {}
+    for i, amp in enumerate((1.0, 2.0, 3.0)):
+        rec = _record(_gauss(2500.0 + 100.0 * i, 25.0, amp), i)
+        rec["case"] = {
+            "name": f"m{i}",
+            "E0_keV": 30.0,
+            "tilt_deg": 10.0 * i,
+            "tilt_azim_deg": 0.0,
+            "thickness_ang": 1.0e4,
+        }
+        store.setdefault(f"m{i}", {})[30.0] = rec
+    _metrics._LINE_METRICS_CACHE.clear()
+    real = _metrics.line_metrics
+    calls = {"n": 0}
+
+    def counting(*a, **k):
+        calls["n"] += 1
+        return real(*a, **k)
+
+    monkeypatch.setattr(_metrics, "line_metrics", counting)
+    first = top_geometries(store, Settings())
+    second = top_geometries(store, Settings())
+    assert calls["n"] == 3
+    assert first.equals(second)
+    _metrics._LINE_METRICS_CACHE.clear()

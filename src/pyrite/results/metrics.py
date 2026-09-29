@@ -24,8 +24,41 @@ def _find_peaks_props(spec, rel_prominence):
     smax = float(spec.max()) if spec.size else 0.0
     if smax <= 0:
         return np.array([], dtype=int), {}, smax
-    peaks, props = find_peaks(spec, prominence=rel_prominence * smax, width=0)
+    floor = rel_prominence * smax
+    if float(spec.min()) >= 0.0:
+        # Exact pre-filter: for a non-negative spectrum prominence <= peak height,
+        # and scipy applies the height condition before the (expensive)
+        # prominence/width passes, so peaks that fail it could never clear the
+        # prominence floor anyway.
+        peaks, props = find_peaks(spec, height=floor, prominence=floor, width=0)
+    else:
+        peaks, props = find_peaks(spec, prominence=floor, width=0)
     return peaks, props, smax
+
+
+def _select_index(spec, peaks, props, smax, metric):
+    """Dominant-line index from one :func:`_find_peaks_props` pass."""
+    if smax <= 0 or metric == "max" or peaks.size == 0:
+        return int(np.argmax(spec))
+    if metric == "prominence":
+        score = props["prominences"]
+    else:  # "sharpness"
+        score = props["prominences"] / np.maximum(props["widths"], 1.0)
+    return int(peaks[int(np.argmax(score))])
+
+
+def _quality_from_peaks(size, peaks, props, smax, rel_width_max):
+    """Line-definition score in [0, 1] from one :func:`_find_peaks_props` pass."""
+    if peaks.size == 0:
+        return 0.0
+    proms = props["prominences"]
+    k = int(np.argmax(proms))
+    top = float(proms[k])
+    dominance = top / float(proms.sum())
+    contrast = top / smax
+    relwidth = float(props["widths"][k]) / size
+    narrowness = float(np.clip(1.0 - relwidth / rel_width_max, 0.0, 1.0))
+    return float(dominance * contrast * narrowness)
 
 
 def line_index(spec, rel_prominence=0.03, metric="sharpness"):
@@ -52,13 +85,7 @@ def line_index(spec, rel_prominence=0.03, metric="sharpness"):
     if spec.size == 0:
         return 0
     peaks, props, smax = _find_peaks_props(spec, rel_prominence)
-    if smax <= 0 or metric == "max" or peaks.size == 0:
-        return int(np.argmax(spec))
-    if metric == "prominence":
-        score = props["prominences"]
-    else:  # "sharpness"
-        score = props["prominences"] / np.maximum(props["widths"], 1.0)
-    return int(peaks[int(np.argmax(score))])
+    return _select_index(spec, peaks, props, smax, metric)
 
 
 def line_quality(spec, rel_prominence=0.03, rel_width_max=0.10):
@@ -85,16 +112,48 @@ def line_quality(spec, rel_prominence=0.03, rel_width_max=0.10):
     spectrum). rel_width_max is the broadness cutoff as a fraction of the grid
     (0.10 -> a line spanning >10% of the energy window scores 0 on narrowness)."""
     peaks, props, smax = _find_peaks_props(spec, rel_prominence)
-    if peaks.size == 0:
-        return 0.0
-    proms = props["prominences"]
-    k = int(np.argmax(proms))
-    top = float(proms[k])
-    dominance = top / float(proms.sum())
-    contrast = top / smax
-    relwidth = float(props["widths"][k]) / np.asarray(spec).size
-    narrowness = float(np.clip(1.0 - relwidth / rel_width_max, 0.0, 1.0))
-    return float(dominance * contrast * narrowness)
+    return _quality_from_peaks(np.asarray(spec).size, peaks, props, smax, rel_width_max)
+
+
+# Cross-call cache for the (expensive, per-record scipy peak-finding)
+# `line_metrics` result -- `plots._common._metrics_map` already dedupes within one call via
+# `id(rec)`, but every fresh call (e.g. a marimo tab re-rendering because an
+# unrelated widget elsewhere changed) redid the whole O(records) pass from
+# scratch. Measured on the densest checkpoint (mose2, 3720 records): this pass
+# is why `heatmap_select_chart`/`scan_charts` cost ~0.9-1.1s per call.
+#
+# Keyed on CONTENT (the record's (name, E0_keV) pair), not `id(r)`/`id(settings)`:
+# an identity key would be unsafe for a process-lifetime cache, since CPython
+# reuses a freed object's address for the next allocation -- two unrelated
+# records built at different times could collide on `id()` alone and silently
+# return each other's metrics. `(case["name"], case["E0_keV"])` is already the
+# results store's own primary key (`results[name][E0] = record`, see
+# `results.store.store_result`), so it's guaranteed unique per record and --
+# unlike the rest of `case` (which can carry unhashable `composition`/
+# `hkl_list`/`abs_layers` entries) is always a plain hashable (str, float)
+# pair. Derived source current is the only record/settings value
+# `line_metrics` reads today -- extend this key if that grows.
+_LINE_METRICS_CACHE = {}
+_LINE_METRICS_CACHE_MAX = 100_000
+
+
+def _cached_line_metrics(r, settings, rel_prominence, line_metric):
+    case = r["case"]
+    key = (
+        case["name"],
+        case["E0_keV"],
+        beam_current_na(r, settings),
+        rel_prominence,
+        line_metric,
+    )
+    cached = _LINE_METRICS_CACHE.get(key)
+    if cached is not None:
+        return cached
+    value = line_metrics(r, settings, rel_prominence, metric=line_metric)
+    if len(_LINE_METRICS_CACHE) >= _LINE_METRICS_CACHE_MAX:
+        _LINE_METRICS_CACHE.clear()
+    _LINE_METRICS_CACHE[key] = value
+    return value
 
 
 def _sample_energy(E: np.ndarray, sample_position: float) -> float:
@@ -181,7 +240,12 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
     brem = np.asarray(r["brem"], dtype=float)
     cur, sc = beam_current_na(r, settings), r["scale"]
     smax = float(spec.max()) if spec.size else 0.0
-    idx = line_index(spec, rel_prominence, metric)
+    if spec.size:
+        peaks, props, _ = _find_peaks_props(spec, rel_prominence)
+        idx = _select_index(spec, peaks, props, smax, metric)
+        quality = _quality_from_peaks(spec.size, peaks, props, smax, 0.10)
+    else:
+        idx, quality = 0, 0.0
     try:
         # a zero-prominence/zero-width peak (argmax fallback, single-sample spike)
         # is expected at ill-defined geometries -- line_quality already gates those,
@@ -224,7 +288,7 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
         "total_flux": total_int * sc * cur,
         "coherent_brem_ratio": (coh_int / brem_int) if brem_int > 0 else float("nan"),
         "line_brem_ratio": (line_int / brem_line_int) if brem_line_int > 0 else float("nan"),
-        "line_quality": line_quality(spec, rel_prominence),
+        "line_quality": quality,
         # geometry diagnostic (not spectrum-derived): finite-crystal footprint-hit
         # fraction carried straight from the record. NaN on pre-feature checkpoints.
         "hit_frac": float(r.get("hit_frac", float("nan"))),
