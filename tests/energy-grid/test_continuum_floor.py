@@ -345,8 +345,9 @@ def test_artifact_resolved_brem_grids_start_inside_the_modelled_band():
         assert float(brem["start"]) == floored_lattice_start_eV(material, float(brem["step"]))
 
 
-def test_derived_brem_row_is_written_at_the_medium_floor_not_zero():
-    """``apply_bounds`` is where a derived grid's first node is decided."""
+def test_derived_brem_band_is_not_written_as_a_uniform_override():
+    """Issue #256: the case grid floors ``start`` per medium and extends
+    ``stop`` to E0, so ``apply_bounds`` leaves the derived band as a diagnostic."""
     text = read_text(_CATALOG_PATH)
     combined = {
         "hopg": {
@@ -357,10 +358,9 @@ def test_derived_brem_row_is_written_at_the_medium_floor_not_zero():
 
     updated, skipped = apply_bounds(text, combined, force=True)
 
-    row = tomllib.loads(updated)["profiles"]["standard"]["overrides"]["hopg"]["E_grid_brem"]
+    overrides = tomllib.loads(updated)["profiles"]["standard"].get("overrides", {})
     assert skipped == []
-    assert row["arange"]["start"] == floored_lattice_start_eV("hopg", 25.0)
-    assert row["arange"]["start"] > 0.0
+    assert "E_grid_brem" not in overrides.get("hopg", {})
 
 
 def test_diagnostic_band_and_installed_grid_agree_on_where_the_band_starts():

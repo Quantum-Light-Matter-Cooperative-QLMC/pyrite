@@ -7,13 +7,8 @@ from pyrite.energy_grid import apply
 from tests.helpers.energy_grid_catalog import BASE_TOML, COMBINED
 
 
-class _NoManual:
-    def is_manual_brem(self, *a):
-        return False
-
-
 def test_apply_rewrites_only_owned_blocks_and_reparses():
-    new_text, skipped = apply.apply_bounds(BASE_TOML, COMBINED, provenance_mod=_NoManual())
+    new_text, skipped = apply.apply_bounds(BASE_TOML, COMBINED)
     assert skipped == []
     assert "stop = 2700.0, num = 897" in new_text
     assert 'display_name = "HOPG"' in new_text  # untouched line preserved
@@ -28,13 +23,11 @@ def test_apply_skips_manual_line_unless_forced():
         'num = 864, endpoint = true } }, source = "manual" }',
     )
 
-    new_text, skipped = apply.apply_bounds(manual_toml, COMBINED, provenance_mod=_NoManual())
+    new_text, skipped = apply.apply_bounds(manual_toml, COMBINED)
     assert "hopg:30" in skipped
     assert "stop = 2600.0, num = 864" in new_text  # original 30 keV row kept
 
-    forced, skipped2 = apply.apply_bounds(
-        manual_toml, COMBINED, force=True, provenance_mod=_NoManual()
-    )
+    forced, skipped2 = apply.apply_bounds(manual_toml, COMBINED, force=True)
     assert skipped2 == []
     assert "stop = 2700.0, num = 897" in forced
 
@@ -66,14 +59,13 @@ COMBINED_NO_GRID = {
 }
 
 
-def test_apply_inserts_new_line_and_brem_blocks_when_absent():
-    new_text, skipped = apply.apply_bounds(
-        BASE_TOML_NO_GRID, COMBINED_NO_GRID, provenance_mod=_NoManual()
-    )
+def test_apply_inserts_new_line_block_and_leaves_brem_unstored():
+    new_text, skipped = apply.apply_bounds(BASE_TOML_NO_GRID, COMBINED_NO_GRID)
     assert skipped == []
     assert "stop = 2800.0, num = 930" in new_text
     assert "[energy_grids.hfs2]" in new_text
-    assert "stop = 140000.0, step = 25.0" in new_text
+    # The derived brem band is a diagnostic; no uniform override is written.
+    assert "E_grid_brem" not in new_text
     assert 'display_name = "HfS2"' in new_text  # untouched line preserved
     assert 'display_name = "HOPG"' in new_text  # neighboring section untouched
     tomllib.loads(new_text)  # still valid TOML
@@ -83,7 +75,7 @@ def test_new_material_rows_are_not_seeded_from_shared_grid(tmp_path, monkeypatch
     shared = BASE_TOML_NO_GRID.replace("energy_grids.hopg", "energy_grids.standard")
     # A shared manual row must neither block nor seed a different material.
     shared = shared.replace('source = "derived"', 'source = "manual"')
-    new_text, skipped = apply.apply_bounds(shared, COMBINED_NO_GRID, provenance_mod=_NoManual())
+    new_text, skipped = apply.apply_bounds(shared, COMBINED_NO_GRID)
     assert skipped == []
     rows = tomllib.loads(new_text)["energy_grids"]["hfs2"]["line_by_energy"]
     assert len(rows) == 1

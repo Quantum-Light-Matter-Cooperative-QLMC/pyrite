@@ -7,6 +7,3 @@ beam = "1_atto"
 materials = ["hopg"]
 emission = "both"
 n_electrons = {values = [20000]}
-
-[overrides.hopg]
-E_grid_brem = {arange = {start = 50.0, stop = 24900.0, step = 25.0}}

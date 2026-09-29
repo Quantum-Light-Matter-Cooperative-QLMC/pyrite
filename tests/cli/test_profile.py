@@ -444,7 +444,8 @@ polar_deg = 90.0
     fresh = tomlkit.parse(catalog.read_text())["profiles"]["fresh"]
     assert fresh["energy_keV"]["values"][0] == 30.0
     assert fresh["E_grid_brem"]["arange"]["step"] == 25.0
-    assert "hopg" in fresh["overrides"]
+    # Packaged standard carries no uniform brem override for hopg (issue #256).
+    assert "overrides" not in fresh
     assert list(fresh["materials"]) == ["hopg"]
     for key in ("detector", "physical_detector", "filters", "emission", "straggling"):
         assert key not in fresh

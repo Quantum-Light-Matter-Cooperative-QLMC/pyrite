@@ -1,11 +1,13 @@
 """Surgical write-back of derived line-grid bounds into the material catalog.
 
-Owns three regions and edits only those via tomlkit (format-preserving TOML),
+Owns two regions and edits only those via tomlkit (format-preserving TOML),
 leaving everything else untouched: the shared per-material derived-grid store
 (``[energy_grids.<material>].line_by_energy``, decision 3,
-docs/adr/0005-energy-grid-schema-decisions.md), per-material ``E_grid_brem``
-(``[profiles.standard.overrides.<material>]``), and ``[profiles.standard]
-energy_keV``. Each line-grid row carries its own ``source``
+docs/adr/0005-energy-grid-schema-decisions.md) and ``[profiles.standard]
+energy_keV``. The derived bremsstrahlung band is reported, not stored: a uniform
+case grid resolves its start per medium and its stop per beam energy. Only an
+explicit nonuniform grid (:func:`set_brem_geometric`) writes a per-material
+``E_grid_brem`` override. Each line-grid row carries its own ``source``
 ("derived"/"manual") provenance inline; ``pyrite.energy_grid.provenance``
 remains the sidecar for optional notes and for bremsstrahlung's separate
 manual/derived tracking (brem bounds aren't governed by decision 3).
@@ -261,21 +263,6 @@ def _material_override_table(document, material: str, profile: str = "standard")
     return target
 
 
-def _merge_brem(document, material: str, brem, force: bool, provenance_mod) -> list[str]:
-    if not force and provenance_mod.is_manual_brem(material):
-        return [f"{material}:brem"]
-    target = _material_override_table(document, material)
-    step = float(brem["step_eV"])
-    arange = tomlkit.inline_table()
-    arange["start"] = _brem_start_eV(material, step)
-    arange["stop"] = float(brem["stop_eV"])
-    arange["step"] = step
-    item = tomlkit.inline_table()
-    item["arange"] = arange
-    target["E_grid_brem"] = item
-    return []
-
-
 def _insert_energies(document, energies) -> None:
     standard = document["profiles"]["standard"]
     energy_item = standard.get("energy_keV")
@@ -286,7 +273,7 @@ def _insert_energies(document, energies) -> None:
     energy_item["values"] = union
 
 
-def apply_bounds(toml_text, combined, *, force=False, provenance_mod=_provenance):
+def apply_bounds(toml_text, combined, *, force=False):
     combined = _validated_combined(combined)
     document = tomlkit.parse(toml_text)
     skipped = []
@@ -295,7 +282,10 @@ def apply_bounds(toml_text, combined, *, force=False, provenance_mod=_provenance
         rows = entry["line_rows"]
         all_energies.update(float(r["energy_keV"]) for r in rows)
         skipped.extend(_merge_line_rows(document, material, rows, force, "derived"))
-        skipped.extend(_merge_brem(document, material, entry["brem"], force, provenance_mod))
+        # The derived brem band stays in ``combined`` as a diagnostic only: a
+        # case's uniform grid takes its start from the medium floor and its stop
+        # from E0 (``campaign/sweep.py::build_cases``), so a stored per-material
+        # uniform override would change nothing but bookkeeping (issue #256).
     _insert_energies(document, all_energies)
     return tomlkit.dumps(document), skipped
 
