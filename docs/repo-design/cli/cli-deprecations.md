@@ -12,7 +12,13 @@ No command spelling is currently deprecated. Every spelling the CLI accepts is c
 
 ## Options
 
-No option spelling is currently deprecated. Every option the CLI accepts is canonical; anything else exits as a usage error.
+| Command | Deprecated option | Replacement | Deprecated in | Remove in | Note |
+| --- | --- | --- | --- | --- | --- |
+| `pyrite checkpoint recompute brem` | `--fidelity` | omit it; recompute reads fidelity from checkpoint metadata | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
+| `pyrite checkpoint recompute line` | `--fidelity` | omit it; recompute reads fidelity from checkpoint metadata | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
+| `pyrite profile numerics show` | `--fidelity` | omit it; numerics resolve against full | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
+| `pyrite-dev perf` | `--fidelity` | omit it for full; for reduced runs use --quick or a user-defined catalog profile | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
+| `pyrite run` | `--fidelity` | omit it for full; for reduced runs use --quick or a user-defined catalog profile | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
 
 ## Implicit defaults
 

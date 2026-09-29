@@ -12,6 +12,7 @@ from ...console import output as _cli_core
 from ...runs import scan as _scan
 from .. import _completion as _cli_completion
 from .. import _implicit_defaults
+from .._deprecations import DeprecatedOption
 from .._options import remote_option
 
 _PERFORMANCE_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
@@ -332,7 +333,7 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     help="Absolute screen-coordinate tolerance in meters [default: 1e-9].",
 )
 @click.pass_context
-@_cli_core.fidelity_option()
+@_cli_core.fidelity_option(cls=DeprecatedOption)
 @_cli_core.output_option
 def _command(
     ctx,
@@ -770,3 +771,6 @@ performance_command = _derived_command(
         "Runs omit shared-cache reads and writes unless --recompute is explicit."
     ),
 )
+# `pyrite-dev perf` runs this command as its own program root, so deprecation
+# lookups need the prefix the relocated root cannot infer.
+performance_command.deprecation_prefix = "pyrite-dev perf"  # type: ignore[attr-defined]

@@ -3,6 +3,7 @@
 import shlex
 import uuid
 
+from .._env import GENERATED_INVOCATION_ENV
 from . import _queue_scripts, config, transport
 
 datetime = _queue_scripts.datetime
@@ -185,6 +186,8 @@ set -u
 {_VENDOR_PRELUDES[vendor]()}
 
 export PYRITE_HOME={config.shell_word(config.remote_dir())}
+# argv below is generated; deprecated options it carries were warned locally.
+export {GENERATED_INVOCATION_ENV}=1
 {catalog_export}
 JOBDIR={config.shell_word(jobdir)}
 JOBID={config.shell_word(jobid)}

@@ -77,8 +77,14 @@ def build_deprecations() -> str:
                 if entry.command.startswith("pyrite-dev ")
                 else f"pyrite {entry.command}"
             )
+            # A renamed spelling's replacement is a flag; a retired option's is prose.
+            replacement = (
+                f"`{entry.replacement}`"
+                if entry.replacement.startswith(("-", "pyrite"))
+                else entry.replacement
+            )
             lines.append(
-                f"| `{command}` | `{entry.flag}` | `{entry.replacement}` "
+                f"| `{command}` | `{entry.flag}` | {replacement} "
                 f"| {entry.deprecated_in} | {entry.remove_in} | {entry.note} |"
             )
     else:

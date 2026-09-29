@@ -42,7 +42,7 @@ from typing import Any
 import click
 
 from .._catalog_keys import material_keys
-from .._env import set_canonical_env
+from .._env import GENERATED_INVOCATION_ENV, set_canonical_env
 from .._progress import _ProgressTimer, _write_progress_record
 from ..console import dashboard as _dashboard
 from ..console import json as cli_json
@@ -275,6 +275,8 @@ def _reexec_under_nsys(**kwargs):
     argv, trace_base = _nsys_reexec_command(**kwargs)
     trace_base.parent.mkdir(parents=True, exist_ok=True)
     set_canonical_env("PYRITE_MC_NSYS", "1")
+    # The parent already warned about any deprecated option it forwards.
+    set_canonical_env(GENERATED_INVOCATION_ENV, "1")
     os.execvp(argv[0], argv)
 
 

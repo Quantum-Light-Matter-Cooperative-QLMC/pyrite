@@ -176,8 +176,9 @@ Options:
   --gdf-screen-tolerance-m NUMBER
                                   Absolute screen-coordinate tolerance in meters
                                   [default: 1e-9].
-  --fidelity [full|survey]        Named settings/grid-reduction policy. survey is
-                                  provisional and reduced.  [default: full]
+  --fidelity [full|survey]        Deprecated (removal in 0.6.0; issue #215). Named
+                                  settings/grid-reduction policy; survey is retired.
+                                  [default: full]
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
@@ -429,8 +430,9 @@ Usage: pyrite checkpoint recompute brem [OPTIONS] [MATERIALS]...
 
 Options:
   -a, --all                       Recompute every checkpoint.
-  --fidelity [full|survey]        Override dataset fidelity; defaults to checkpoint
-                                  metadata or full for legacy data.
+  --fidelity [full|survey]        Deprecated (removal in 0.6.0; issue #215). Override
+                                  dataset fidelity; defaults to checkpoint metadata or
+                                  full for legacy data.
   --profile NAME                  Catalog profile for legacy data; otherwise must match
                                   checkpoint metadata.
   --ne-brem N                     Bremsstrahlung electron count; overrides profile
@@ -471,8 +473,9 @@ Usage: pyrite checkpoint recompute line [OPTIONS] [MATERIALS]...
 
 Options:
   -a, --all                       Recompute every checkpoint.
-  --fidelity [full|survey]        Override dataset fidelity; defaults to checkpoint
-                                  metadata or full for legacy data.
+  --fidelity [full|survey]        Deprecated (removal in 0.6.0; issue #215). Override
+                                  dataset fidelity; defaults to checkpoint metadata or
+                                  full for legacy data.
   --profile NAME                  Catalog profile for legacy data; otherwise must match
                                   checkpoint metadata.
   --line-ne N                     Line-spectrum electron count; overrides profile
@@ -1463,7 +1466,8 @@ Usage: pyrite profile numerics show [OPTIONS] NAME
   Show explicit and effective PROFILE numerics with value sources.
 
 Options:
-  --fidelity [full|survey]        Resolve profile values against this fidelity preset.
+  --fidelity [full|survey]        Deprecated (removal in 0.6.0; issue #215). Resolve
+                                  profile values against this fidelity preset.
                                   [default: full]
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]

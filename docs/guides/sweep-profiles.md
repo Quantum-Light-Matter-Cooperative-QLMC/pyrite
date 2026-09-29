@@ -1,29 +1,22 @@
 # Sweep fidelity and dataset identity
 
-`pyrite run` accepts two named, independently resolved fidelity policies:
+`pyrite run` resolves every sweep at `full` fidelity: automatic case-local line grids, 300 line electrons, 150 bremsstrahlung electrons, and complete configured reflection sets.
 
-- `full` preserves production behavior: automatic case-local line grids, 300 line electrons, 150 bremsstrahlung electrons, and complete configured reflection sets.
-- `survey` is provisional. It uses 60/30 electrons, at most two beam energies, three thicknesses, five polar tilts, two azimuths, two reflection families (at most four resolved reflections), and any explicit photon grids cropped to their central 70% then sampled at one-quarter density. Automatic line grids remain case-local under either fidelity.
+`--fidelity {full,survey}` is deprecated in 0.4.0 and will be removed in 0.6.0 (see [CLI deprecations](../repo-design/cli/cli-deprecations.md)). During the window it still works and warns once on stderr. `--fidelity full` is the default and can simply be omitted. The provisional `survey` preset (60/30 electrons, at most two beam energies, three thicknesses, five polar tilts, two azimuths, two reflection families with at most four resolved reflections, and explicit photon grids cropped to their central 70% then sampled at one-quarter density) is retired with no built-in replacement. Use `--quick` for a smoke test, or a user-defined catalog profile with explicit electron counts and narrower grids for a reduced campaign (see the [configuration cookbook](configuration-cookbook.md)).
 
-Run a survey with:
-
-```bash
-pyrite run standard -m mose2 --fidelity survey
-```
-
-`--profile full|survey` is not a compatibility spelling: `profile` is reserved for catalog `[profiles.*]` campaigns. Fidelity (`--fidelity`) selects the grid-reduction policy; catalog profiles select scan-parameter ranges. See [ADR-0005](../adr/0005-energy-grid-schema-decisions.md) for the decision record.
+Existing `--survey` checkpoints keep their identity: they remain readable, and `pyrite remote pull MATERIAL@PROFILE --hash PREFIX` selects one when several variants share a profile. Full-fidelity stems and digests are unchanged. `profile` names catalog `[profiles.*]` campaigns only; see [ADR-0005](../adr/0005-energy-grid-schema-decisions.md) for the decision record.
 
 The supported high-level Python API has no fidelity shorthand. Construct a `Scene`, `Sweep`, and `Numerics` explicitly as described in the [Python API workflow](python-api-workflow.md). The internal `pyrite.campaign.config.default_settings` and `material_sweep` helpers remain campaign compatibility surfaces rather than the supported library entry point.
 
-`pyrite material energy-grid derive`, locally or with `--remote`, is an optional optimization upstream of this choice: it measures line and bremsstrahlung bounds without a fidelity setting and installs those bounds for `--profile NAME` (or the configured current profile). Survey fidelity reduces an installed explicit grid together with other sweep axes; otherwise both fidelities use automatic line-grid resolution.
+`pyrite material energy-grid derive`, locally or with `--remote`, is an optional optimization upstream of this choice: it measures line and bremsstrahlung bounds without a fidelity setting and installs those bounds for `--profile NAME` (or the configured current profile). Without installed bounds, runs use automatic line-grid resolution.
 
 ## Calculation numerics
 
 Use the nested profile workflow to inspect every result-affecting calculation control and the source of its effective value:
 
 ```bash
-pyrite profile numerics show standard --fidelity full
-pyrite profile numerics show standard --fidelity survey -o json
+pyrite profile numerics show standard
+pyrite profile numerics show standard -o json
 ```
 
 The output groups sampling counts, reflection/mosaic convergence, and transport integration controls. Each field reports its explicit profile value, effective value, and source (`profile`, `fidelity`, or `built-in`). Resolution follows:
