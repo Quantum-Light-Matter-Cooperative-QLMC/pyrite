@@ -27,8 +27,8 @@ from pyrite.console import output as _cli_core
 from pyrite.console.dashboard import poll as dashboard_poll
 from pyrite.console.dashboard import render as dashboard_render
 from pyrite.console.dashboard import state as dashboard_state
-from pyrite.remote import cleanup as lifecycle_cleanup
 from pyrite.remote import (  # noqa: F401
+    _queue_scripts,
     config,
     lifecycle,
     scripts,
@@ -36,6 +36,7 @@ from pyrite.remote import (  # noqa: F401
     transport,
     viewer,
 )
+from pyrite.remote import cleanup as lifecycle_cleanup
 from pyrite.remote import jobs as lifecycle_jobs
 from pyrite.remote import performance as lifecycle_performance
 from pyrite.remote import queue as lifecycle_queue
@@ -4586,6 +4587,8 @@ def test_chunked_script_fails_closed_when_resubmission_fails(monkeypatch, tmp_pa
     (bin_dir / "sbatch").chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
     monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
+    # Every retry fails the same way; skip the production backoff between them.
+    monkeypatch.setattr(_queue_scripts, "_SBATCH_RETRY_SECONDS", 0)
     script = remote._chunked_queue_script(
         "j", ["hopg"], quick=False, workers=None, chunk_minutes=10.0
     )

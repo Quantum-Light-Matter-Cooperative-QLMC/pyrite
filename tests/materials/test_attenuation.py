@@ -128,6 +128,31 @@ def test_total_attenuation_agrees_with_independent_elam_total(
     assert mine_inv_cm == pytest.approx(reference_inv_cm, rel=0.06)
 
 
+@pytest.mark.parametrize("element", ["B", "N", "S", "Mo", "Au"])
+@pytest.mark.parametrize("kind", ["coh", "incoh"])
+def test_vectorized_elam_spline_matches_xraydb_bitwise(element, kind) -> None:
+    """The searchsorted Elam spline reproduces ``xraydb.mu_elam`` exactly.
+
+    The grid mixes off-knot points with every exact table knot, where xraydb's
+    strict brackets straddle the knot rather than landing on it.
+    """
+    xraydb = pytest.importorskip("xraydb")
+    from pyrite.materials.atomic import (
+        ELAM_E_MAX_EV,
+        ELAM_E_MIN_EV,
+        _elam_scattering_table,
+        _mu_elam_scattering,
+    )
+
+    knots_eV = np.exp(_elam_scattering_table(element, kind)[0])
+    energy_eV = np.concatenate([np.geomspace(ELAM_E_MIN_EV, ELAM_E_MAX_EV, 997), knots_eV])
+    energy_eV = np.clip(energy_eV, ELAM_E_MIN_EV, ELAM_E_MAX_EV)
+
+    np.testing.assert_array_equal(
+        _mu_elam_scattering(element, energy_eV, kind), xraydb.mu_elam(element, energy_eV, kind)
+    )
+
+
 def test_incoherent_term_approaches_klein_nishina_at_500_keV() -> None:
     """Free-electron limit, computed from CODATA rather than any table.
 

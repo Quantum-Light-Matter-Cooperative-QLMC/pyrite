@@ -126,6 +126,9 @@ addopts = [
     "-q",
     "--import-mode=importlib"
 ]
+# A full run writes ~1 GB under the basetemp, and /tmp is often a quota'd
+# tmpfs (RAM): keep only failed tests' directories for post-mortem.
+tmp_path_retention_policy = "failed"
 markers = [
     "online: test fetches from an external structure database (COD/MP); skipped unless PYRITE_ONLINE_TESTS=1",
     "oracle: test requires the pinned optional independent-validation backend",
