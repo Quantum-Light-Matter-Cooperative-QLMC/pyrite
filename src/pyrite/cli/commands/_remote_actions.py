@@ -89,14 +89,6 @@ def _ensure_utf8_stdio():
 
 
 # ---- CLI wiring ----------------------------------------------------------------
-def _dispatch(handler):
-    def _run_cli(args):
-        _ensure_utf8_stdio()
-        return handler(args)
-
-    return _run_cli
-
-
 def _performance_profile_name(ctx, param, value):
     if value is None:
         return None
@@ -513,10 +505,6 @@ def _cli_performance_prune(*, profiles, all_profiles, yes):
         all_profiles=all_profiles,
         yes=yes,
     )
-
-
-def _cli_stop(*, materials, all_, yes, catalog_profile):
-    lifecycle.stop_jobs(materials, all_, yes=yes, profile=catalog_profile)
 
 
 def _cli_reap(*, min_age_minutes, yes):

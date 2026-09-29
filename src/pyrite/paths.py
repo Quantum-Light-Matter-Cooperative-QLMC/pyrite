@@ -28,11 +28,6 @@ def state_dir() -> Path:
     return Path(click.get_app_dir("pyrite"))
 
 
-def state_path_for_read(name: str) -> Path:
-    """Return one path in the canonical mutable-state directory."""
-    return state_dir() / name
-
-
 def cache_dir() -> Path:
     """Return the canonical platform-specific user cache directory."""
     return Path(user_cache_path("pyrite", appauthor=False))

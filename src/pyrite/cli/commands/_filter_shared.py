@@ -1,25 +1,13 @@
 """Filter CLI parsing and filter/physical-detector TOML resolution."""
 
 from collections.abc import Mapping
-from typing import Any, NotRequired, TypedDict, cast
+from typing import Any, cast
 
 import click
 import tomlkit
 
 from pyrite.campaign.observation import filter_from_config, physical_detector_from_config
 from pyrite.instrument import FilterPlate, PlanarDetector
-
-
-class _FilterRow(TypedDict):
-    material: str
-    thickness_mm: float
-    size_mm: tuple[float, float]
-    distance_mm: float
-    polar_deg: float
-    azimuth_deg: NotRequired[float]
-    roll_deg: NotRequired[float]
-    offset_mm: NotRequired[tuple[float, float]]
-    name: NotRequired[str]
 
 
 def filter_cli_options(function):
