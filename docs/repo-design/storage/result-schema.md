@@ -110,6 +110,7 @@ Component stores have the logical shape `{configuration: {E0_keV: record}}`. CAS
 | `hit_frac` | `float64` | scalar | finite-footprint hit fraction; `NaN` for old records |
 | `scale` | `float64` | scalar | conversion from per-e/sr to per-s/nA |
 | `source_current_na` | `float64` | scalar | reporting source current, nA |
+| `line_grid_resolved` | mapping | — | resolved automatic line grid: policy, spacing, measured bandwidth and, for `resonance-population` cases, `truncation_audit` (`capped_at_ceiling`, `line_yield_statistics.statistics_limited`); key absent for fixed grids and records written before #192 |
 | `case` | mapping | — | version-1 resolved simulation case |
 
 CAS runner mappings add `n_segments` (integer count), `crystal` (catalog key), `E0_keV` (incident electron energy in keV), and optional underscore-prefixed timing/backend diagnostics. Diagnostics are metadata, not scientific arrays.

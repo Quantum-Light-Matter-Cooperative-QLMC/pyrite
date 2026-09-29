@@ -6,6 +6,7 @@ so these tests are the device-side accuracy gate. Whole-route agreement runs
 under ``PYRITE_TEST_BACKEND=cuda`` through ``test_sinc_bin_integration.py``.
 
 Validation: sinc-bin-integration
+Validation: sinc-bin-far-envelope
 """
 
 import numpy as np
@@ -50,6 +51,7 @@ def test_matrix_kernel_matches_the_host_evaluator_in_fp64():
         cp.asarray(edges),
         cp.asarray(inv_width),
         np.int64(inv_width.size),
+        np.float64(np.inf),
         out,
     )
     # A bin mean is (pi / a) * inv_width * (R_hi - R_lo): each evaluator's tail R
@@ -71,6 +73,7 @@ def test_matrix_kernel_float32_is_the_cast_fp64_mean():
         cp.asarray(edges),
         cp.asarray(inv_width),
         np.int64(inv_width.size),
+        np.float64(np.inf),
         out,
     )
     np.testing.assert_allclose(cp.asnumpy(out), host, rtol=4 * np.finfo(np.float32).eps, atol=1e-12)
@@ -90,6 +93,7 @@ def test_fused_reduction_matches_the_weighted_host_sum():
         cp.asarray(edges),
         cp.asarray(inv_width),
         out=out,
+        exact_widths=None,
     )
     np.testing.assert_allclose(cp.asnumpy(out), host, rtol=1e-9, atol=1e-10)
     # accumulates, like the node-sampling kernel
@@ -100,6 +104,7 @@ def test_fused_reduction_matches_the_weighted_host_sum():
         cp.asarray(edges),
         cp.asarray(inv_width),
         out=out,
+        exact_widths=None,
     )
     np.testing.assert_allclose(cp.asnumpy(out), 2.0 * host, rtol=1e-9, atol=2e-10)
 
@@ -116,20 +121,63 @@ def test_device_mass_identity_on_a_float32_spectrum():
         cp.asarray(edges),
         cp.asarray(inv_width),
         out=spec,
+        exact_widths=None,
     )
     captured, _ = bq.sincsq_window_mass(a_width, E_res, edges)
     total = float(np.sum(cp.asnumpy(spec).astype(np.float64) / inv_width))
     assert total == pytest.approx(float(captured.sum()), rel=1e-6)
 
 
-@pytest.mark.parametrize("scratch", [1, 1 << 24])
-def test_fused_reduction_is_independent_of_its_line_blocks(monkeypatch, scratch):
-    """``scratch=1`` forces one line block per bin; the default splits lines."""
+@pytest.mark.parametrize("threads", [32, 256])
+def test_fused_reduction_is_independent_of_its_thread_count(monkeypatch, threads):
+    """Lines stride across a bin's threads; the sum must not depend on how many."""
     a_width, E_res = (v.astype(np.float32) for v in _lines())
     weight = np.ones_like(a_width)
     edges, inv_width = _axis()
     host = weight.astype(np.float64) @ bq._host_bin_mean(a_width, E_res, edges, inv_width)
-    monkeypatch.setattr(bq, "_REDUCE_SCRATCH_ELEMENTS", scratch * inv_width.size)
+    monkeypatch.setattr(bq, "_REDUCE_THREADS", threads)
+    out = cp.zeros(inv_width.size, dtype=cp.float64)
+    bq.run_bin_mean_reduction_kernel(
+        cp.asarray(E_res),
+        cp.asarray(a_width),
+        cp.asarray(weight),
+        cp.asarray(edges),
+        cp.asarray(inv_width),
+        out=out,
+        exact_widths=None,
+    )
+    np.testing.assert_allclose(cp.asnumpy(out), host, rtol=1e-9, atol=1e-10)
+
+
+def test_hybrid_matrix_kernel_matches_the_host_hybrid():
+    """Far-field envelope bins agree to float32 rounding; near bins stay FP64-exact."""
+    a_width, E_res = _lines()
+    edges, inv_width = _axis()
+    host = bq._host_bin_mean(
+        a_width, E_res, edges, inv_width, exact_widths=bq.BIN_MEAN_EXACT_WIDTHS
+    )
+    out = cp.empty(host.shape, dtype=cp.float64)
+    bq._bin_mean_kernel()(
+        cp.asarray(a_width),
+        cp.asarray(E_res),
+        cp.asarray(edges),
+        cp.asarray(inv_width),
+        np.int64(inv_width.size),
+        np.float64(bq.BIN_MEAN_EXACT_WIDTHS),
+        out,
+    )
+    scale = (np.pi / a_width)[:, None] * inv_width[None, :]
+    difference = np.abs(cp.asnumpy(out) - host)
+    assert np.all(difference <= 4 * np.finfo(np.float32).eps * np.abs(host) + 1e-14 * scale)
+
+
+def test_hybrid_reduction_matches_the_host_hybrid_and_keeps_the_mass():
+    a_width, E_res = (v.astype(np.float32) for v in _lines())
+    weight = np.ones_like(a_width)
+    edges, inv_width = _axis()
+    host = weight.astype(np.float64) @ bq._host_bin_mean(
+        a_width, E_res, edges, inv_width, exact_widths=bq.BIN_MEAN_EXACT_WIDTHS
+    )
     out = cp.zeros(inv_width.size, dtype=cp.float64)
     bq.run_bin_mean_reduction_kernel(
         cp.asarray(E_res),
@@ -139,4 +187,8 @@ def test_fused_reduction_is_independent_of_its_line_blocks(monkeypatch, scratch)
         cp.asarray(inv_width),
         out=out,
     )
-    np.testing.assert_allclose(cp.asnumpy(out), host, rtol=1e-9, atol=1e-10)
+    np.testing.assert_allclose(cp.asnumpy(out), host, rtol=1e-6, atol=1e-10)
+    captured, _ = bq.sincsq_window_mass(a_width, E_res, edges)
+    total = float(np.sum(cp.asnumpy(out) / inv_width))
+    bound = 3.0 / (2.0 * np.pi**3 * bq.BIN_MEAN_EXACT_WIDTHS**2)
+    assert abs(total / float(captured.sum()) - 1.0) <= bound

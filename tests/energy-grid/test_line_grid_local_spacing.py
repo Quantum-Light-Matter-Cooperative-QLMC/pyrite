@@ -50,26 +50,38 @@ def _halo_extent(width):
     return width / (np.pi**2 * _HALO)
 
 
-def test_isolated_narrow_line_gets_one_halo_window():
+def test_isolated_narrow_line_gets_a_halo_and_a_core():
     seeds, summary = _seeds([7000.0], [2.0])
-    assert len(seeds) == 1 == summary["windows"]
-    assert summary["narrow_lines"] == 1
-    seed = seeds[0]
-    assert seed.source == LOCAL_SPACING_SOURCE
+    assert len(seeds) == 3 == summary["windows"]
+    assert summary["narrow_lines"] == 1 == summary["cored_lines"]
+    assert {seed.source for seed in seeds} == {LOCAL_SPACING_SOURCE}
     # 100 eV bins round the halo E_res +- w / (pi**2 halo_limit) outward.
     lo = 50.0 + 100.0 * np.floor((7000.0 - _halo_extent(2.0) - 50.0) / 100.0)
     hi = 50.0 + 100.0 * np.ceil((7000.0 + _halo_extent(2.0) - 50.0) / 100.0)
-    assert seed.centre_eV == lo
-    assert seed.below_eV == 0.0
-    assert seed.above_eV == pytest.approx(hi - lo)
-    # No coarser than the line's first-zero width.
-    assert seed.spacing_eV == 2.0
+    assert seeds[0].centre_eV == lo
+    assert seeds[-1].centre_eV + seeds[-1].above_eV == pytest.approx(hi)
+    assert all(seed.below_eV == 0.0 for seed in seeds)
+    # Halo no coarser than w; the core bin (E_res +- 10 w) no coarser than w / 2.
+    assert [seed.spacing_eV for seed in seeds] == [2.0, 1.0, 2.0]
+    core = seeds[1]
+    assert core.centre_eV <= 7000.0 - 20.0 and core.centre_eV + core.above_eV >= 7000.0 + 20.0
 
 
-def test_lines_as_wide_as_the_backbone_seed_nothing():
+def test_lines_as_wide_as_the_backbone_get_only_a_core():
+    """#192 verification: a spacing join inside a wide line's core costs up to
+    ~1e-2 of its mass, so lines below twice the backbone get an h <= w/2 core."""
     seeds, summary = _seeds([7000.0, 9000.0], [3.0, 10.0])
-    assert seeds == []
     assert summary["narrow_lines"] == 0
+    assert summary["cored_lines"] == 1
+    assert [(seed.centre_eV, seed.above_eV, seed.spacing_eV) for seed in seeds] == [
+        (6950.0, 100.0, 1.0)
+    ]
+
+
+def test_lines_twice_the_backbone_seed_nothing():
+    seeds, summary = _seeds([9000.0], [6.0])
+    assert seeds == []
+    assert summary["cored_lines"] == 0
     assert summary["windows"] == 0
 
 
@@ -126,6 +138,7 @@ def _local_policy(**per_call):
         per_call={
             "bandwidth": RESONANCE_BANDWIDTH_POLICY,
             "resolution": LOCAL_RESOLUTION_POLICY,
+            "quadrature": "bin-mean",
             **per_call,
         },
     ).payload()
@@ -144,6 +157,11 @@ def test_local_resolution_needs_the_measured_bandwidth():
         resolve_line_grid_policy(
             start_eV=50.0, stop_eV=1000.0, per_call={"resolution": LOCAL_RESOLUTION_POLICY}
         )
+
+
+def test_local_resolution_needs_bin_mean_quadrature():
+    with pytest.raises(ValueError, match="needs bin-mean quadrature"):
+        _local_policy(quadrature="node")
 
 
 def _collecting_lines(monkeypatch, energy, width, weight):
@@ -178,7 +196,8 @@ def test_measured_local_grid_refines_only_around_narrow_lines(monkeypatch):
     assert grid[0] == 50.0
     assert grid[-1] == stop >= 7100.0
     steps = np.diff(grid)
-    assert steps.min() == pytest.approx(1.0)  # the line's first-zero width
+    assert steps.min() == pytest.approx(0.5)  # half the line's first-zero width (core)
+    assert np.all(steps[np.abs(grid[:-1] - 5000.0) <= 10.0] <= 0.5 + 1e-9)
     assert steps.max() == pytest.approx(3.0)  # the backbone
     fine_nodes = grid[:-1][steps < 3.0 - 1e-9]
     assert fine_nodes.size
@@ -257,3 +276,83 @@ def test_block_streaming_matches_one_block(monkeypatch):
     )
     assert stop == expected_stop[0]
     assert summary == pytest.approx(expected_stop[1])
+
+
+def _join_population(width, offset, seed=7):
+    """A concentrated population ``offset`` eV above the join a narrow-line
+    window lays at 20 000 eV -- the fresh-context verifier's adversarial case."""
+    rng = np.random.default_rng(seed)
+    energy = np.r_[20_000.0 + offset + rng.normal(0.0, 3.0, 400), np.full(10, 19_550.0)]
+    width = np.r_[np.full(400, width) * np.exp(rng.normal(0.0, 0.01, 400)), np.full(10, 0.4)]
+    weight = rng.uniform(0.0, 1.0, energy.size)
+    return energy, width, weight
+
+
+def _local_axis(energy, width, weight, **core):
+    from pyrite._line_windows import build_window_plan
+
+    seeds, _ = local_spacing_seeds(
+        [ResonancePopulation("t", energy, weight, width)],
+        start_eV=100.0,
+        stop_eV=60_000.0,
+        floor_spacing_eV=0.25,
+        max_spacing_eV=3.0,
+        halo_limit=_HALO,
+        **core,
+    )
+    return build_window_plan(100.0, 60_000.0, 3.0, seeds).coordinates()
+
+
+def _yield_error(energy, width, weight, *, bin_mean, **core):
+    from pyrite.montecarlo.spectrum.lines._bin_quadrature import bin_axis, sincsq_bin_lineshape
+
+    grid = _local_axis(energy, width, weight, **core)
+    edges, inv_width = bin_axis(grid)
+    edges = np.asarray(edges)
+    widths = np.diff(edges)
+    if bin_mean:
+        shape = np.asarray(sincsq_bin_lineshape(np.pi / width, energy, edges, inv_width))
+    else:
+        shape = np.sinc((grid[None, :] - energy[:, None]) / width[:, None]) ** 2
+    return float(np.sum(weight[:, None] * shape * widths) / np.sum(weight * width) - 1.0)
+
+
+def test_core_reduces_but_does_not_bound_node_error_near_a_join():
+    """w ~ 3.1 eV, 3 eV below a join: node quadrature loses 6.3e-3 without the
+    core and 1.1e-3 with it -- still over budget, hence bin-mean is required."""
+    population = _join_population(3.1, -3.0)
+    without = _yield_error(*population, bin_mean=False, core_fraction=1e9)
+    cored = _yield_error(*population, bin_mean=False)
+    assert abs(without) > 3e-3
+    assert abs(cored) < abs(without) / 4
+    assert abs(_yield_error(*population, bin_mean=True)) < 1e-4
+
+
+def test_narrow_line_halos_survive_without_cores():
+    """No cored lines (core_fraction > 1) must not drop the narrow lines' halos."""
+    energy, width, weight = np.array([20_000.0]), np.array([1.0]), np.array([1.0])
+    seeds, summary = local_spacing_seeds(
+        [ResonancePopulation("t", energy, weight, width)],
+        start_eV=100.0,
+        stop_eV=60_000.0,
+        floor_spacing_eV=0.25,
+        max_spacing_eV=3.0,
+        halo_limit=_HALO,
+        core_fraction=1e9,
+    )
+    assert summary["cored_lines"] == 0 and summary["narrow_lines"] == 1
+    assert seeds and max(seed.spacing_eV for seed in seeds) <= 1.0
+
+
+@pytest.mark.parametrize("core", [{"core_fraction": 0.0}, {"core_widths": -1.0}])
+def test_core_parameters_must_be_positive(core):
+    with pytest.raises(ValueError, match="must be positive"):
+        _local_axis(np.array([20_000.0]), np.array([1.0]), np.array([1.0]), **core)
+
+
+def test_bin_mean_yield_is_exact_across_joins_in_wide_line_cores():
+    """w = 8 eV straddling a join: node quadrature loses ~1e-2, bin-mean keeps the
+    yield to the band-edge tail truncation (high_energy selects bin-mean)."""
+    population = _join_population(8.0, -3.0)
+    assert abs(_yield_error(*population, bin_mean=False)) > 1e-3
+    assert abs(_yield_error(*population, bin_mean=True)) < 1e-4

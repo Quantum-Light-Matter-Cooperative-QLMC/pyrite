@@ -129,7 +129,11 @@ def test_high_energy_profile_range_is_part_of_dataset_identity():
 
 def test_high_energy_profile_selects_the_measured_line_grid():
     """#192: the profile's named policies reach every case and its identity."""
-    policy = {"bandwidth": "resonance-population", "resolution": "resonance-local"}
+    policy = {
+        "bandwidth": "resonance-population",
+        "resolution": "resonance-local",
+        "quadrature": "bin-mean",
+    }
     sweep = material_sweep("hbn", catalog_profile="high_energy")
     assert sweep.line_grid_policy == policy
     identity = named_profile_identity("hbn", catalog_profile="high_energy")
@@ -138,6 +142,7 @@ def test_high_energy_profile_selects_the_measured_line_grid():
     assert case["E0_keV"] == 5000.0
     assert case["line_grid_policy"]["bandwidth"]["policy"] == "resonance-population"
     assert case["line_grid_policy"]["resolution"]["policy"] == "resonance-local"
+    assert case["line_grid_policy"]["quadrature"] == "bin-mean"
     assert material_sweep("hbn").line_grid_policy is None
 
 

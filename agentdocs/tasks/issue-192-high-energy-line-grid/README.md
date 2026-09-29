@@ -553,3 +553,105 @@ grids. Not yet run: `pyrite run high_energy -R -m hbn`.
 - Gap: scan checkpoints do not persist `line_grid_resolved` (only the Python
   API's provenance does), so `statistics_limited` / `capped_at_ceiling` are
   visible only as log warnings for scans.
+
+## Re-check follow-up (2026-09-28)
+
+Second fresh-context verification of `line-grid-resonance-local-spacing`
+(appended to its page) returned `discrepancy` on wording and cited evidence,
+not geometry. Addressed (uncommitted at time of writing):
+
+- `resolve_line_grid_policy` refuses `resonance-local` unless `quadrature =
+  "bin-mean"`; `bandwidth_check --resolution local` selects bin-mean.
+- `local_spacing_seeds` no longer drops narrow-line halos when no line is
+  cored (`core_fraction > 1`); regression added.
+- The core regression now discriminates (w ~ 3.1 eV, 3 eV below a join:
+  node 6.3e-3 without core, ~1.1e-3 with; bin-mean < 1e-4).
+- Ledger claim/Notes, derivation page, and budget page: core spacing is
+  `max(w/2, floor)` and does not exclude fine-fine joins; node caveat covers
+  cored lines; no shape bound is claimed; core parameters are absent from the
+  policy payload (identity does not record them).
+
+Still open: identical-trajectory line-shape and detected-count comparison;
+fresh-context re-verify
+of the revised wording; human sign-off.
+
+## Scan checkpoints keep `line_grid_resolved` (2026-09-28)
+
+`store_result` now copies `line_grid_resolved` into the scan record, and the
+legacy CAS-seed whitelist keeps it, so `statistics_limited` /
+`capped_at_ceiling` persist in `line.h5` and survive cross-profile CAS replay
+(fresh CAS blobs already held the full runner output). Regression:
+`tests/scan/test_run.py::test_scan_checkpoint_persists_resolved_line_grid`.
+Real CPU smoke (h-BN 100 keV, 1 um, 10/140, Ne=20, local resolution): both
+warnings fired and both flags reloaded from the checkpoint; ~2.4 kB/record.
+Existing profile checkpoints (e.g. `hbn@high_energy-b5d0b092df19`) predate
+this: resume reads their own records, not the CAS, so those records gain the
+field only when recomputed (or replayed into a new stem from a CAS blob that
+already holds it).
+
+## Second re-check and shape/count comparison (2026-09-28)
+
+Fresh-context second re-check of `line-grid-resonance-local-spacing`
+(appended to its page): **`rederived`** as worded; suggested status
+`unverified` -> `rederived` (human applies). Follow-ups in `a1c90dd0`:
+`Case` refuses a `resonance-local` policy without `line_quadrature =
+"bin-mean"` before transport (hand-built / pre-`b01bc2f2` payloads); core
+parameters validated; stale trapezoid wording and the `0f78fef1` citation
+fixed.
+
+`bandwidth_check reference` now reports, per measured and
+`--compare-resolution` axis against the full-ceiling reference on identical
+segments (`shape_and_counts`): 100 eV intrinsic bin-mass L1 / worst bin,
+dominant-line FWHM, EagleXO counts (full axis), and Timepix3 detected events
+over `[start, 60 keV]` through one response matrix on overlap-split channel
+masses (grid term only). Timepix3 `native_score` (`apply_native`, #219) assigns each node's
+whole cell to the channel holding the node; that axis-dependent term is
+reported separately (`node_rebin_counts_rel`). Local smoke (h-BN 100 keV,
+1 um 10/140, Ne=20, FP64 CPU): grid term local/uniform -3.5e-6 / -6.9e-6
+counts, L1 5.6e-6 / 1.0e-5; node-rebin term 1.5e-4 / 3.8e-4 (above the 2e-4
+interpolation share -- a detector-resampling finding, not a line-grid one).
+
+Remote: SLURM 238 (`20260928-093552-b5a224ce`), 5 MeV h-BN, seed 0, local vs
+uniform vs full ceiling: 1 um 10/100 and 80/180 at Ne=2,000; 1 mm 10/100 and
+80/180 at Ne=200.
+
+### SLURM 238 / 239 results (2026-09-28)
+
+SLURM 238 stalled: prominence peak-finding is quadratic (~minutes per call
+at 1.4 M nodes); cancelled after config 1. Fixed in `afc03171` (O(n) FWHM,
+cell-snapped intrinsic bins). SLURM 239 (`20260928-103350-a05c09b2`)
+completed all four configs in ~25 min. Report: `/tmp/issue192_shape_counts_20260928b.json`.
+
+| case (5 MeV h-BN, seed 0) | nodes local / uniform / ceiling | line yield local | EagleXO counts local | Timepix3 counts local / uniform | Timepix3 detected L1 local / uniform | dominant FWHM local / uniform (ref) | FP32 yield | line eval s local / ref |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 um 10/100, Ne 2,000 | 8,744 / 10,736 / 1,415,387 | 2.4e-5 | -6.6e-7 | 1.7e-4 / 8.2e-5 | 1.7e-3 / 8.5e-4 | -15.8% / -4.3% (3.05 eV) | 1.4e-7 | 0.5 / 26 |
+| 1 um 80/180, Ne 2,000 | 9,631 / 25,433 / 5,436,172 | 2.2e-5 | -1.5e-6 | 6.6e-6 / 1.1e-6 | 1.4e-5 / 1.4e-6 | -4.6% / +0.3% (2.52 eV) | -1.4e-6 | 0.6 / 31 |
+| 1 mm 10/100, Ne 200 | 70,080 / 362,923 / 5,899,830 | -3.2e-5 | 1.4e-6 | -5.0e-7 / -6.4e-10 | 1.2e-5 / 6.3e-8 | +0.7% / +0.4% (1.92 eV) | -1.0e-6 | 60 / 191 |
+| 1 mm 80/180, Ne 200 | 31,308 / 53,140 / 6,371,941 | 1.9e-5 | -4.5e-7 | 5.0e-7 / 3.1e-7 | 9.2e-7 / 4.0e-7 | -2.4% / -1.5% (0.87 eV) | -3.3e-6 | 40 / 245 |
+
+Line yield differences are the measured-stop truncation (true fraction above the stop 1.9-2.4e-5; the 1 mm 10/100 local value includes -3.2e-5 from the 106 keV stop). Detected counts agree to <=1.7e-4 (Timepix3, grid term) and <=1.5e-6 (EagleXO) -- inside the 2e-4 interpolation share. The Timepix3 detected-shape L1 is <=6e-5 except 1 um 10/100 (1.7e-3, uniform 8.5e-4): there 3 eV lines on a 1.2 eV reference have a 0.35 sub-cell split bound at 100 eV, so part of it is sub-cell ambiguity in the 50 eV channel split, not grid error. The dominant-line FWHM is the one real shape limitation: bin-mean averaging at h ~ w/2 widens a 3 eV line by up to 16% (uniform axis 4%). The detector resolution is far coarser, so detected shape is unaffected, but an intrinsic FWHM finer than a few eV is not preserved by `resonance-local`. FP32 matches FP64 to <=3.3e-6 in yield. Peak host / device memory is 3.2 / 6.0 GiB. Separately, Timepix3 native-bin scoring (`apply_native`, used by physical-detector acquisition; `apply` already splits by overlap) assigns cells to channels by node and moves detected counts by up to 1.8e-3 depending on the axis (`node_rebin_counts_rel`) -- a detector-resampling term above its 2e-4 share, independent of this policy (#219).
+
+## Hybrid bin-mean and the completed h-BN scan (2026-09-28)
+
+`high_energy-12`/`-13`/`-14` died on SLURM TIMEOUT (#220-#222): `bin-mean`
+evaluated an FP64 sine integral per (line, bin) pair, ~40x slower than node
+sampling on the RTX 5080 (5 MeV 10 mm cases took over an hour). New
+`sinc-bin-far-envelope` (rederived after one fixed discrepancy): exact bin
+mean within 64 widths, float32 envelope mean `1/(2 pi^2 x_lo x_hi)` beyond,
+yield change <= 1.2e-5; coalesced reduction with deterministic near-pair
+compaction. RTX 5080, 50k lines x 240k bins: exact 1.2e9, hybrid 1.9e10,
+node 1.1e11 pairs/s; CUDA tests 8/8 at `3913f3fc`. Commits `42d360f2`,
+`e8554873`, `1a8434e9`, `c5bb3f1e`, `0a3a8e3f`, `3913f3fc`.
+
+`high_energy-15` (SLURM 251, 30-min slices via `start_command`, #220)
+completed h-BN 104/104 at 17:41, no timeout; the case that had stalled
+(5 MeV 10 mm 10/180) took ~20 min. Pulled to
+`checkpoints/hbn@high_energy-18d155e86c96/` (43 MB slimmed). 37 of 104
+records carry `line_grid_resolved` (those computed after `5d01f415`; the
+100 keV cases and older ones do not): 15 `statistics_limited`, 0
+`capped_at_ceiling`. The 67 older records were computed with the all-exact
+bin mean (identity unchanged; within 1.2e-5).
+
+Open: backfill/recompute of the 67 records lacking `line_grid_resolved`;
+MoS2/MoSe2 members of `high_energy` not rerun; #203 variance reduction for
+statistics-limited 5 MeV cases; #219-#222.
