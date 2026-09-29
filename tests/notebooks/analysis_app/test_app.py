@@ -6,7 +6,12 @@ from pathlib import Path
 import altair as alt
 
 from pyrite.apps.analysis_ui.axes import resolve_axis_spec
-from pyrite.apps.analysis_ui.controls import _grid_limits, make_spectrum_axes
+from pyrite.apps.analysis_ui.controls import (
+    axes_panel,
+    make_case_axes,
+    make_component_controls,
+    make_spectrum_axes,
+)
 from pyrite.apps.analysis_ui.models import AnalysisContext
 
 APP = Path(__file__).parents[3] / "src" / "pyrite" / "apps" / "analysis_app.py"
@@ -84,18 +89,16 @@ def test_in_progress_checkpoint_uses_analysis_safe_reads() -> None:
     assert "load_error" in data_source
 
 
-def test_characteristic_checkbox_matches_spectrum_component_controls() -> None:
+def test_component_multiselect_matches_spectrum_views() -> None:
     source = APP.read_text()
     controls_source = CONTROLS.read_text()
     view_sources = [(VIEWS / name).read_text() for name in ("spectra.py", "cases.py")]
 
-    # One Spectra component toggle set plus the compare app's case axes.
-    assert controls_source.count('"characteristic": mo.ui.checkbox(') == 2
-    assert controls_source.count('label="show characteristic radiation"') == 2
+    assert controls_source.count('label="Components"') == 1
+    assert '"components": make_component_controls(mo)' in controls_source
     assert "characteristic_ui" not in source
-    assert 'components["characteristic"]' in view_sources[0]
-    assert 'include_characteristic=component_values["characteristic"]' in view_sources[0]
-    assert 'controls["characteristic"]' in view_sources[1]
+    assert 'include_characteristic="Characteristic" in component_values' in view_sources[0]
+    assert 'include_characteristic="Characteristic" in components' in view_sources[1]
 
 
 def test_thickness_controls_and_context_use_shared_human_units() -> None:
@@ -215,8 +218,8 @@ def test_analysis_app_uses_no_legacy_material_registries() -> None:
 
 
 def test_analysis_app_has_three_views_and_no_accordions() -> None:
-    # Issue #236: Spectra / Map / Detectors, no accordion anywhere except the
-    # single collapsible axes panel (replaced by chart zoom in #237).
+    # Issue #236: Spectra / Map / Detectors. Scale toggles and chart zoom
+    # replace the axes accordion.
     navigation = (APP.parent / "analysis_ui" / "navigation.py").read_text()
     for view in ('"Spectra"', '"Map"', '"Detectors"'):
         assert view in navigation
@@ -224,7 +227,7 @@ def test_analysis_app_has_three_views_and_no_accordions() -> None:
     assert "mo.accordion" not in APP.read_text()
     for view_module in ("spectra.py", "map.py", "detectors.py", "sidebar.py"):
         assert "mo.accordion" not in (VIEWS / view_module).read_text()
-    assert CONTROLS.read_text().count("mo.accordion") == 1  # axes_panel only
+    assert "mo.accordion" not in CONTROLS.read_text()
 
 
 def test_matplotlib_panes_are_gone_from_the_analysis_views() -> None:
@@ -333,38 +336,23 @@ def test_analysis_app_has_no_mojibake() -> None:
     assert "INTRINSIC" not in source
 
 
-def test_auto_domain_controls_replace_zero_sentinel_copy() -> None:
-    # The per-axis *_auto_ui widgets were consolidated into a single
-    # make_axis_controls("Auto {prefix} domain") switch factory shared across
-    # narrow/broad/polar/azimuth/detector axes.
+def test_chart_zoom_replaces_manual_domain_controls() -> None:
     source = APP.read_text()
     controls_source = (APP.parent / "analysis_ui" / "controls.py").read_text()
     axes_source = (APP.parent / "analysis_ui" / "axes.py").read_text()
+    spectra_source = (APP.parent.parent / "plots" / "altair" / "spectra.py").read_text()
 
-    assert "0 = auto" not in source
-    assert "0 = auto" not in controls_source
-    assert 'mo.ui.switch(value=auto, label=f"Auto {prefix} domain")' in controls_source
-    assert "if auto:" in axes_source
-    assert "return None" in axes_source
-
-
-def test_grid_limits_use_full_line_and_brem_arrays() -> None:
-    source = [
-        {"E_grid": [40.0, 5000.0], "E_grid_brem": [20.0, 150000.0]},
-        {"E_grid": [30.0, 6000.0], "E_grid_brem": [10.0, 200000.0]},
-    ]
-    assert _grid_limits(source, "E_grid") == (30.0, 6000.0)
-    assert _grid_limits(source, "E_grid_brem") == (10.0, 200000.0)
+    assert "mo.ui.text(" not in controls_source
+    assert '"auto"' not in controls_source
+    assert "manual limits" not in axes_source
+    assert "include_y_domain" not in source
+    assert ".interactive(bind_y=False)" in spectra_source
 
 
-def test_axis_defaults_use_grid_endpoints_and_log_floor() -> None:
+def test_axis_controls_have_four_scale_toggles_and_no_domains() -> None:
     class FakeUI:
         @staticmethod
         def switch(*, value, label):
-            return value
-
-        @staticmethod
-        def text(*, value, label):
             return value
 
         @staticmethod
@@ -376,26 +364,21 @@ def test_axis_defaults_use_grid_endpoints_and_log_floor() -> None:
 
     axes = make_spectrum_axes(
         FakeMo(),
-        narrow_auto=False,
-        narrow_xmin=30.0,
-        narrow_xmax=6000.0,
-        broad_auto=False,
-        broad_xmin=10.0,
-        broad_xmax=200000.0,
         broad_xlog=True,
     )
-    assert (axes["narrow"]["xmin"], axes["narrow"]["xmax"]) == ("30", "6000")
-    assert (axes["broad"]["xmin"], axes["broad"]["xmax"]) == ("10", "200000")
-    assert resolve_axis_spec(axes["broad"]).x_domain == (10.0, 200000.0)
-    detector_axis = {**axes["broad"], "ymin": "0", "ymax": "0"}
-    assert resolve_axis_spec(detector_axis, include_y_domain=True).warnings == ()
+    assert set(axes) == {"narrow", "broad"}
+    assert all(set(band) == {"xlog", "ylog"} for band in axes.values())
+    assert resolve_axis_spec(axes["broad"]).x_type == "log"
+    assert resolve_axis_spec(axes["narrow"]).y_type == "linear"
 
 
-def test_manual_axis_accepts_incomplete_and_invalid_text() -> None:
-    base = {"auto": False, "xmin": "20", "xmax": "1,000", "xlog": True}
-    assert resolve_axis_spec(base).x_domain == (20.0, 1000.0)
-    for xmax in ("", "0", "not a number"):
-        assert resolve_axis_spec({**base, "xmax": xmax}).x_domain is None
+def test_compact_controls_render_with_marimo() -> None:
+    import marimo as mo
+
+    axes = make_spectrum_axes(mo)
+    assert axes_panel(mo, axes) is not None
+    assert make_component_controls(mo).value == ["Bremsstrahlung"]
+    assert make_case_axes(mo).value["components"] == ["Bremsstrahlung"]
 
 
 def _stop_guards(cell: ast.FunctionDef) -> set[str]:

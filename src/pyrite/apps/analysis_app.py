@@ -219,9 +219,9 @@ def _():
 
 
 @app.cell
-def _(base_context, view_nav):
+def _(view_nav):
     mo.stop(view_nav.value != SPECTRA)
-    spectra_axes_controls = make_spectra_axes(mo, base_context.checkpoint_results)
+    spectra_axes_controls = make_spectra_axes(mo)
     return (spectra_axes_controls,)
 
 
@@ -330,9 +330,9 @@ def _(
 
 
 @app.cell
-def _(base_context, view_nav):
+def _(view_nav):
     mo.stop(view_nav.value != DETECTORS)
-    detector_axes_controls = make_detector_axes(mo, base_context.checkpoint_results)
+    detector_axes_controls = make_detector_axes(mo)
     return (detector_axes_controls,)
 
 
@@ -357,7 +357,7 @@ def _(
         detector_ui=detector_ui,
         tilt=tilt_ui.value,
         axes_controls=detector_axes_controls,
-        axes=resolve_axis_pair(detector_axes_controls.value, include_y_domain=True),
+        axes=resolve_axis_pair(detector_axes_controls.value),
         theme=app_theme,
     )
     return

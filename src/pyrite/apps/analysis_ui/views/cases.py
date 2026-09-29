@@ -1,7 +1,7 @@
 from pyrite.plots.altair.spectra import multi_case_spectrum_chart
 
 from ..controls import axes_panel
-from .common import axis_warning_block, themed_chart
+from .common import themed_chart
 
 CASE_BASKET_CAP = 12
 
@@ -38,13 +38,13 @@ def render_case_comparison(
         return mo.vstack([picker_block, mo.md("*Add 2+ cases from the picker above to compare.*")])
 
     cases = [(entry, entry["case"]["label"]) for entry in basket]
+    components = set(values["components"])
     narrow = multi_case_spectrum_chart(
         cases,
         settings,
-        include_brem=values["brem"],
-        include_line=values["line"],
-        include_characteristic=values["characteristic"],
-        x_domain=axes.narrow.x_domain,
+        include_brem="Bremsstrahlung" in components,
+        include_line="Line" in components,
+        include_characteristic="Characteristic" in components,
         x_type=axes.narrow.x_type,
         y_type=axes.narrow.y_type,
         band="narrow",
@@ -52,10 +52,9 @@ def render_case_comparison(
     broad = multi_case_spectrum_chart(
         cases,
         settings,
-        include_brem=values["brem"],
-        include_line=values["line"],
-        include_characteristic=values["characteristic"],
-        x_domain=axes.broad.x_domain,
+        include_brem="Bremsstrahlung" in components,
+        include_line="Line" in components,
+        include_characteristic="Characteristic" in components,
         x_type=axes.broad.x_type,
         y_type=axes.broad.y_type,
         band="broad",
@@ -75,16 +74,10 @@ def render_case_comparison(
         [
             mo.md("**Basket contents**"),
             mo.ui.table(rows, selection=None),
-            mo.hstack(
-                [controls["line"], controls["brem"], controls["characteristic"]],
-                wrap=True,
-            ),
+            controls["components"],
             axes_panel(mo, controls["axes"]),
         ]
     )
-    warning = axis_warning_block(mo, axes)
-    if warning is not None:
-        parts.append(warning)
     parts.extend(
         [
             mo.md("**Narrowband**"),

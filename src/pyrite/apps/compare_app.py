@@ -239,8 +239,8 @@ def _(case_remove_select_ui, set_case_basket):
 
 
 @app.cell
-def _(get_case_basket):
-    case_controls = make_case_axes(mo, get_case_basket())
+def _():
+    case_controls = make_case_axes(mo)
     return (case_controls,)
 
 

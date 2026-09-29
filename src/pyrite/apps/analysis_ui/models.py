@@ -2,18 +2,12 @@ from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 ScaleType = Literal["linear", "log"]
-Domain = tuple[float, float] | None
-
-
 @dataclass(frozen=True)
 class AxisSpec:
-    """Validated axis configuration passed to plotting functions."""
+    """Scale configuration passed to plotting functions."""
 
-    x_domain: Domain
-    y_domain: Domain
     x_type: ScaleType
     y_type: ScaleType
-    warnings: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

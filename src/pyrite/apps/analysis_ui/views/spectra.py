@@ -7,7 +7,7 @@ from pyrite.results import records, select_results, sweep_values
 from ..controls import axes_panel
 from ..data import slice_results
 from ..models import DimensionComparisonSpec
-from .common import axis_warning_block, themed_chart
+from .common import themed_chart
 
 SPECTRA_SPECS = {
     "E0_keV": DimensionComparisonSpec(
@@ -88,21 +88,15 @@ def render_spectra(
     axes,
     theme,
 ):
-    """The Spectra view: vary radio, curve picker, component toggles, two bands."""
+    """The Spectra view: vary radio, curve picker, components, two bands."""
     results = context.results
-    component_values = components.value
+    component_values = set(components.value)
     parts = [
-        mo.hstack([vary_ui, varying_ui], wrap=True, align="end"),
+        mo.hstack([vary_ui, varying_ui], align="end", widths=[1, 1]),
         mo.md(spec.description),
-        mo.hstack(
-            [components["line"], components["brem"], components["characteristic"]],
-            wrap=True,
-        ),
+        components,
         axes_panel(mo, axes_controls),
     ]
-    warning = axis_warning_block(mo, axes)
-    if warning is not None:
-        parts.append(warning)
 
     available = sweep_values(results).get(spec.varying_key, []) if records(results) else []
     if len(available) <= 1:
@@ -123,11 +117,10 @@ def render_spectra(
             selected,
             context.settings,
             hue=spec.varying_key,
-            include_brem=component_values["brem"],
-            include_line=component_values["line"],
-            include_characteristic=component_values["characteristic"],
+            include_brem="Bremsstrahlung" in component_values,
+            include_line="Line" in component_values,
+            include_characteristic="Characteristic" in component_values,
             include_coherent=context.show_both_emissions,
-            x_domain=band_axes.x_domain,
             x_type=band_axes.x_type,
             y_type=band_axes.y_type,
             band=band,

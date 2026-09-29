@@ -565,7 +565,7 @@ def spectrum_chart(
     return _style_chart(
         alt.layer(*layers)
         .properties(width=width, height=height, title=_spectrum_title(title))
-        .interactive()
+        .interactive(bind_y=False)
     )
 
 
@@ -724,7 +724,7 @@ def compare_spectrum_chart(
     return _style_chart(
         alt.layer(*layers)
         .properties(width=width, height=height, title=_spectrum_title(title))
-        .interactive()
+        .interactive(bind_y=False)
     )
 
 
@@ -833,7 +833,7 @@ def multi_case_spectrum_chart(
     return _style_chart(
         alt.layer(*layers)
         .properties(width=width, height=height, title=_spectrum_title("Case comparison"))
-        .interactive()
+        .interactive(bind_y=False)
     )
 
 
@@ -928,4 +928,4 @@ def material_comparison_chart(
             f"Dropped from cross-material comparison (select={select!r}{quality_scope}): "
             f"{_comparison_drop_message(dropped)}"
         )
-    return _style_chart(chart.interactive())
+    return _style_chart(chart.interactive(bind_y=False))

@@ -8,7 +8,7 @@ from pyrite.plots.altair.detectors import (
 )
 
 from ..controls import axes_panel
-from .common import axis_warning_block, themed_chart
+from .common import themed_chart
 
 DETECTOR_CHARTS = {
     "eaglexo": (
@@ -47,11 +47,8 @@ def render_detectors(
             f"{description} Beam energy varies across curves; polar tilt, azimuth, and "
             "thickness come from the sidebar."
         ),
-        axes_panel(mo, axes_controls, include_y_domain=True),
+        axes_panel(mo, axes_controls),
     ]
-    warning = axis_warning_block(mo, axes)
-    if warning is not None:
-        parts.append(warning)
 
     charts = []
     for chart_function in chart_functions:
@@ -61,8 +58,6 @@ def render_detectors(
                 detector_results,
                 context.settings,
                 tilt_deg=tilt,
-                x_domain=band_axes.x_domain,
-                y_domain=band_axes.y_domain,
                 x_type=band_axes.x_type,
                 y_type=band_axes.y_type,
                 band=band,
