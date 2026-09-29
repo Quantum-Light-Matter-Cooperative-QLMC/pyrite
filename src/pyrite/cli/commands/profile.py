@@ -226,12 +226,15 @@ def _emit_show(payload):
     )
     if payload["detector_ref"] is not None:
         emit_result(f"  detector: {payload['detector_ref']} (named reference){superseded}")
+    elif not payload["detector_present"]:
+        emit_result(f"  detector: none{superseded}")
     else:
         emit_result(f"  detector:{superseded}")
-    for key, label, unit in _ACTIVE_DETECTOR_FIELDS:
-        value = payload["detector"][key]
-        display = "unspecified" if value is None else f"{value:g} {unit}"
-        emit_result(f"    {label}: {display}")
+    if payload["detector_present"]:
+        for key, label, unit in _ACTIVE_DETECTOR_FIELDS:
+            value = payload["detector"][key]
+            display = "unspecified" if value is None else f"{value:g} {unit}"
+            emit_result(f"    {label}: {display}")
     if physical is None:
         emit_result("  physical detector: none")
     else:
@@ -263,9 +266,14 @@ def _emit_show(payload):
             )
     emit_result(f"  emission: {payload['emission'] or 'incoherent (default)'}")
     numerics = payload["transport_numerics"]
-    emit_result(f"  straggling: {numerics.get('straggling', False)}")
-    emit_result(f"  energy model: {numerics.get('energy_model', 'midpoint')}")
-    emit_result(f"  max dE fraction: {numerics.get('max_dE_frac', 0.0):g}")
+    for key, label, default in (
+        ("straggling", "straggling", False),
+        ("energy_model", "energy model", "midpoint"),
+        ("max_dE_frac", "max dE fraction", 0.0),
+    ):
+        value = numerics.get(key, default)
+        display = f"{value:g}" if key == "max_dE_frac" else str(value)
+        emit_result(f"  {label}: {display}{' (default)' if key not in numerics else ''}")
     if "inelastic_model" in numerics:
         emit_result(
             f"  inelastic model: {numerics['inelastic_model']}"
@@ -284,7 +292,7 @@ def _emit_show(payload):
         emit_result(f"  {material}: overrides {', '.join(labels)}")
     refs = payload["energy_grid_refs"]
     if not refs:
-        emit_result("  energy grids: legacy catalog tables (no artifact refs)")
+        emit_result("  energy grids: inline (E_grid_brem + material overrides)")
     else:
         emit_result("  energy grids:")
         for material, digest in refs.items():
@@ -622,7 +630,7 @@ def show_command(name, json_output):
     "source",
     metavar="SOURCE",
     shell_complete=_cli_completion.complete_profile,
-    help="Clone ranges, beam, detector, and material membership from SOURCE; defaults to standard.",
+    help="Explicitly clone SOURCE, including beam, detector, filters, emission, and transport numerics; material overrides stay local.",
 )
 @_range_cli_options
 @_ne_cli_options
@@ -666,10 +674,11 @@ def create_command(
     detector_name,
     dry_run,
 ):
-    """Create a new profile, cloning defaults from --from (standard).
+    """Create a profile from packaged sweep defaults, or explicitly clone --from.
 
-    Range options replace individual cloned grids. Material membership is cloned
-    and ``--material`` replaces it. Per-material overrides are not cloned. Beam
+    Range options replace individual grids. ``--material`` replaces membership.
+    An explicit --from clones instrument and physics sections, plus ranges and
+    membership; per-material overrides are not cloned. Beam
     phase space and detector geometry are set only through named objects: build
     them with ``pyrite beam create`` / ``pyrite detector create`` and attach them
     here with --beam NAME / --detector NAME.
@@ -685,9 +694,25 @@ def create_command(
         )
         if value is not None
     }
-    source_name = source or "standard"
+    source_name = source
     try:
         original, document = _catalog_io.catalog_text()
+        inherited = []
+        if source is not None:
+            source_row = _profile_edit.profile_rows(document).get(source, {})
+            inherited = [
+                label
+                for key, label in (
+                    ("beam", "beam"),
+                    ("detector", "detector"),
+                    ("physical_detector", "physical detector"),
+                    ("filters", "filters"),
+                    ("emission", "emission"),
+                )
+                if key in source_row
+            ]
+            if any(key in source_row for key in _profile_edit.TRANSPORT_KEYS):
+                inherited.append("transport numerics")
         _profile_edit.create_profile(
             document,
             name,
@@ -700,7 +725,12 @@ def create_command(
         )
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
-    return _write(document, original, dry_run, f"created profile {name}")
+    message = f"created profile {name}"
+    if source is not None:
+        message += f" from {source}"
+        if inherited:
+            message += f" (inherited: {', '.join(inherited)})"
+    return _write(document, original, dry_run, message)
 
 
 @command.command("set")

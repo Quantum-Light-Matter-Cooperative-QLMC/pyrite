@@ -1,5 +1,7 @@
 import json
 
+import tomlkit
+
 from pyrite import _energy_grid_artifacts as artifacts
 from pyrite.cli import _catalog_io
 from pyrite.cli import command as root_command
@@ -166,10 +168,10 @@ def test_list_and_show_expose_energy_grid_refs(tmp_path, monkeypatch):
     assert_clean_result(shown)
     assert f"    hopg -> {stored.digest}" in shown.stdout
 
-    # A profile with no refs still resolves through the legacy catalog tables.
+    # A profile with no refs uses inline catalog grids.
     legacy = invoke(profile.command, ["show", "standard"])
     assert_clean_result(legacy)
-    assert "energy grids: legacy catalog tables (no artifact refs)" in legacy.stdout
+    assert "energy grids: inline (E_grid_brem + material overrides)" in legacy.stdout
 
     machine = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
     assert_clean_result(machine)
@@ -190,9 +192,12 @@ def test_show_and_bare_name_alias(tmp_path, monkeypatch):
     assert "[sub_100keV]" in shown.stdout
     assert "energy: [30, 50]" in shown.stdout
     assert "materials: hopg" in shown.stdout
-    assert "observation angle: 90 deg" in shown.stdout
-    assert "polar acceptance (full span): unspecified" in shown.stdout
-    assert "solid angle: unspecified" in shown.stdout
+    assert "  detector: none\n" in shown.stdout
+    assert "physical detector: none" in shown.stdout
+    assert "emission: incoherent (default)" in shown.stdout
+    assert "straggling: False (default)" in shown.stdout
+    assert "energy model: midpoint (default)" in shown.stdout
+    assert "max dE fraction: 0 (default)" in shown.stdout
 
     aliased = invoke(profile.command, ["sub_100keV"])
     assert_clean_result(aliased)
@@ -369,7 +374,9 @@ def test_show_unknown_profile_suggests_and_points_to_create(tmp_path, monkeypatc
     assert "pyrite profile create sub_100kv" in result.stderr
 
 
-def test_show_inherits_standard_detector_when_profile_block_is_absent(tmp_path, monkeypatch):
+def test_show_does_not_inherit_standard_detector_when_profile_block_is_absent(
+    tmp_path, monkeypatch
+):
     _catalog(
         tmp_path,
         monkeypatch,
@@ -384,9 +391,9 @@ def test_show_inherits_standard_detector_when_profile_block_is_absent(tmp_path, 
 
     assert_clean_result(shown)
     assert json.loads(shown.stdout)["payload"]["detector"] == {
-        "observation_angle_deg": 91.0,
-        "polar_acceptance_deg": 16.6,
-        "solid_angle_sr": 0.066,
+        "observation_angle_deg": 90.0,
+        "polar_acceptance_deg": None,
+        "solid_angle_sr": None,
     }
 
 
@@ -397,7 +404,7 @@ def test_create_clones_source_and_applies_range_overrides(tmp_path, monkeypatch)
         profile.command, ["create", "sub_200keV", "--from", "sub_100keV", "--energy", "150,200"]
     )
 
-    assert_clean_result(result, stdout="created profile sub_200keV\n")
+    assert_clean_result(result, stdout="created profile sub_200keV from sub_100keV\n")
     text = catalog.read_text()
     assert "[profiles.sub_200keV]" in text
     assert "energy_keV = {values = [150.0, 200.0]}" in text
@@ -407,6 +414,55 @@ def test_create_clones_source_and_applies_range_overrides(tmp_path, monkeypatch)
     assert 'materials = ["hopg"]' in section
 
 
+def test_create_uses_packaged_template_and_explicit_clone_lists_inherited_sections(
+    tmp_path, monkeypatch
+):
+    source = _CATALOG.replace(
+        "[profiles.standard]\n",
+        '[profiles.standard]\ndetector = "default"\nemission = "coherent"\nstraggling = true\n',
+    )
+    source = source.replace(
+        "energy_keV = { values = [30.0, 60.0] }", "energy_keV = { values = [999.0] }", 1
+    )
+    source += """
+[profiles.standard.physical_detector]
+distance_mm = 400.0
+polar_deg = 60.0
+shape = [2, 3]
+
+[[profiles.standard.filters]]
+material = "silicon"
+thickness_mm = 0.1
+size_mm = [7.04, 14.08]
+distance_mm = 200.0
+polar_deg = 90.0
+"""
+    catalog = _catalog(tmp_path, monkeypatch, source)
+
+    created = invoke(profile.command, ["create", "fresh"])
+    assert_clean_result(created, stdout="created profile fresh\n")
+    fresh = tomlkit.parse(catalog.read_text())["profiles"]["fresh"]
+    assert fresh["energy_keV"]["values"][0] == 30.0
+    assert fresh["E_grid_brem"]["arange"]["step"] == 25.0
+    assert "hopg" in fresh["overrides"]
+    assert list(fresh["materials"]) == ["hopg"]
+    for key in ("detector", "physical_detector", "filters", "emission", "straggling"):
+        assert key not in fresh
+
+    cloned = invoke(profile.command, ["create", "clone", "--from", "standard"])
+    assert_clean_result(
+        cloned,
+        stdout=(
+            "created profile clone from standard (inherited: detector, physical detector, "
+            "filters, emission, transport numerics)\n"
+        ),
+    )
+    clone = tomlkit.parse(catalog.read_text())["profiles"]["clone"]
+    for key in ("detector", "physical_detector", "filters", "emission", "straggling"):
+        assert key in clone
+    assert "overrides" not in clone
+
+
 def test_create_clones_energy_grid_refs_without_copying_artifact_bytes(tmp_path, monkeypatch):
     stored = _artifact(tmp_path)
     catalog = _catalog(tmp_path, monkeypatch, _artifact_ref_catalog(stored.digest))
@@ -414,7 +470,7 @@ def test_create_clones_energy_grid_refs_without_copying_artifact_bytes(tmp_path,
 
     result = invoke(profile.command, ["create", "clone", "--from", "sub_100keV"])
 
-    assert_clean_result(result, stdout="created profile clone\n")
+    assert_clean_result(result, stdout="created profile clone from sub_100keV\n")
     text = catalog.read_text()
     section = text.split("[profiles.clone]", 1)[1].split("\n[", 1)[0]
     assert f'energy_grid_refs={{hopg="{stored.digest}"}}' in section.replace(" ", "")

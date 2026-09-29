@@ -976,7 +976,7 @@ def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
     assert replace(explicit.detector, energy_bins=EnergyBins()) == Detector(100.0, 8.0, 0.01)
 
 
-def test_profile_detector_omission_inherits_standard_then_legacy_fallback(tmp_path, monkeypatch):
+def test_profile_detector_omission_uses_code_default(tmp_path, monkeypatch):
     from pyrite.campaign import config
     from pyrite.detectors import Detector
     from pyrite.materials import load_material_catalog
@@ -1006,10 +1006,10 @@ crystal = "mos2"
         _catalog_with_two_profiles(tmp_path).read_text()
         + "\n[profiles.standard.detector]\nobservation_angle_deg = 91.0\n"
     )
-    inherited = load_material_catalog(_write_catalog(tmp_path, text), profile="narrowed")
-    assert dict(inherited.profile_detector("narrowed")) == {"observation_angle_deg": 91.0}
-    monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": inherited)
-    assert config.catalog_detector("narrowed") == Detector(91.0)
+    catalog = load_material_catalog(_write_catalog(tmp_path, text), profile="narrowed")
+    assert dict(catalog.profile_detector("narrowed")) == {}
+    monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": catalog)
+    assert config.catalog_detector("narrowed") == Detector()
 
 
 def test_profile_detector_rejects_bad_fields_with_catalog_path(tmp_path):
@@ -1169,6 +1169,29 @@ seed = 19
     assert observation.acquisition.seed == 19
     assert isinstance(observation.detector.response, Timepix3)
     assert observation.detector.response.seed == 7
+
+
+def test_counting_observation_does_not_inherit_standard_detector(tmp_path):
+    from pyrite.campaign.observation import resolve_profile_observation
+    from pyrite.materials import load_material_catalog
+
+    text = (
+        _catalog_with_two_profiles(tmp_path).read_text()
+        + """
+[profiles.standard.physical_detector]
+distance_mm = 400.0
+polar_deg = 60.0
+
+[profiles.standard.physical_detector.acquisition]
+exposure_s = 1.0
+measured_min_eV = 0.0
+measured_max_eV = 2000.0
+measured_bin_width_eV = 400.0
+"""
+    )
+    catalog = load_material_catalog(_write_catalog(tmp_path, text), profile="narrowed")
+    assert resolve_profile_observation(catalog, "standard") is not None
+    assert resolve_profile_observation(catalog, "narrowed") is None
 
 
 def test_profile_without_acquisition_does_not_resolve_a_counting_observation(tmp_path):

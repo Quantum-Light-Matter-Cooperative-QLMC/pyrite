@@ -9,6 +9,7 @@ import difflib
 
 import tomlkit
 
+from pyrite import DATA_DIR
 from pyrite._numerics import (
     PROFILE_NUMERICS_KEYS,
     SAMPLING_KEYS,
@@ -34,6 +35,32 @@ _EMISSION_DECODE = {
     "coherent": frozenset({"coherent"}),
     "both": frozenset({"incoherent", "coherent"}),
 }
+_CREATION_KEYS = (*RANGES.values(), "E_grid_brem", "materials")
+
+
+def creation_template(document):
+    """Build a new profile from the immutable packaged standard sweep data."""
+    packaged = tomlkit.parse((DATA_DIR / "catalog" / "profiles" / "standard.toml").read_text())
+    target = tomlkit.table()
+    for key in _CREATION_KEYS:
+        if key == "materials":
+            # External catalogs may contain a smaller or different material set.
+            selected = [name for name in packaged[key] if name in material_rows(document)]
+            if selected:
+                target[key] = selected
+        else:
+            target[key] = clone_grid(packaged[key])
+    overrides = tomlkit.table()
+    for material, row in packaged["overrides"].items():
+        if material not in material_rows(document):
+            continue
+        entry = tomlkit.table()
+        for key, value in row.items():
+            entry[key] = clone_grid(value)
+        overrides[material] = entry
+    if overrides:
+        target["overrides"] = overrides
+    return target
 
 
 def catalog_key(label):
@@ -166,12 +193,9 @@ def filter_rows(profile):
     return filters
 
 
-def physical_detector_row(profile, profiles):
-    """Return the selected physical detector, inheriting ``standard``."""
+def physical_detector_row(profile):
+    """Return only the profile's own physical detector."""
     physical = profile.get("physical_detector")
-    if physical is None and profile is not profiles.get("standard"):
-        standard = profiles.get("standard", {})
-        physical = standard.get("physical_detector") if isinstance(standard, dict) else None
     if physical is not None and not isinstance(physical, dict):
         raise ValueError("profile physical_detector must be a table")
     return physical
@@ -179,7 +203,6 @@ def physical_detector_row(profile, profiles):
 
 def profile_payload(document, name):
     profile = existing_profile(document, name)
-    profiles = profile_rows(document)
     overrides = profile_overrides(profile)
     materials = profile.get("materials")
     range_keys = [*RANGES.items(), *EXTRA_RANGES.items()]
@@ -187,9 +210,7 @@ def profile_payload(document, name):
     beam_ref = str(beam) if isinstance(beam, str) else None
     beam_payload = beam.unwrap() if beam_ref is None and hasattr(beam, "unwrap") else None
     raw_detector = profile.get("detector")
-    if raw_detector is None:
-        standard = profiles.get("standard", {})
-        raw_detector = standard.get("detector") if isinstance(standard, dict) else None
+    detector_present = raw_detector is not None
     detector_ref = str(raw_detector) if isinstance(raw_detector, str) else None
     if detector_ref is not None:
         named = detector_rows(document).get(detector_ref)
@@ -205,7 +226,7 @@ def profile_payload(document, name):
     filters = [
         dict(row.unwrap() if hasattr(row, "unwrap") else row) for row in filter_rows(profile)
     ]
-    physical = physical_detector_row(profile, profiles)
+    physical = physical_detector_row(profile)
     return {
         "name": name,
         "ranges": [
@@ -217,6 +238,7 @@ def profile_payload(document, name):
         "beam": beam_payload,
         "beam_ref": beam_ref,
         "detector_ref": detector_ref,
+        "detector_present": detector_present,
         "detector": {key: getattr(detector, key) for key, _label, _unit in ACTIVE_DETECTOR_FIELDS},
         "filters": filters,
         "physical_detector": (
@@ -324,28 +346,20 @@ def set_physical_detector(
 ):
     """Merge updates into ``name``'s physical detector.
 
-    Returns ``"created"`` for a new table, ``"copied"`` when the profile first
-    received a local copy of ``standard``'s, else ``"updated"``.
-
-    A profile inheriting ``standard``'s detector first receives a profile-local
-    copy, so editing it never changes ``standard``. ``response`` with a new
-    ``kind`` replaces that section (parameters of another kind never leak into
-    it); without one, parameters merge into the existing Timepix3 response. An
+    ``response`` with a new ``kind`` replaces that section (parameters of
+    another kind never leak into it); without one, parameters merge into the
+    existing Timepix3 response. An
     acquisition axis (explicit edges, or min/max/bin width) replaces the other
     spelling, and ``mode = "expected"`` drops any realization seed.
     """
     profile = existing_profile(document, name)
     table = own_physical_detector(profile)
-    status = "updated"
     if table is None:
-        inherited = physical_detector_row(profile, profile_rows(document))
-        status = "created" if inherited is None else "copied"
-        if inherited is None and "distance_mm" not in geometry:
+        if "distance_mm" not in geometry:
             raise ValueError(
                 f"profile {name!r} has no physical detector; creating one requires --distance-mm"
             )
-        plain = {} if inherited is None else inherited.unwrap()
-        table = _toml_value(plain)
+        table = _toml_value({})
         profile["physical_detector"] = table
     for key, value in geometry.items():
         table[key] = _toml_value(value)
@@ -374,7 +388,6 @@ def set_physical_detector(
             section.pop("seed", None)
         for key, value in acquisition.items():
             section[key] = _toml_value(value)
-    return status
 
 
 def reset_physical_detector(document, name, sections=()):
@@ -382,11 +395,6 @@ def reset_physical_detector(document, name, sections=()):
     profile = existing_profile(document, name)
     table = own_physical_detector(profile)
     if table is None:
-        if physical_detector_row(profile, profile_rows(document)) is not None:
-            raise ValueError(
-                f"profile {name!r} inherits the standard physical detector; reset 'standard' "
-                f"or give {name!r} its own with 'pyrite profile physical-detector set'"
-            )
         raise ValueError(f"profile {name!r} has no physical detector")
     if not sections:
         profile.pop("physical_detector")
@@ -608,12 +616,13 @@ def create_profile(
         unknown_beam(document, beam_name)
     if detector_name is not None and detector_name not in detector_rows(document):
         unknown_detector(document, detector_name)
-    if source_name not in profiles:
+    if source_name is not None and source_name not in profiles:
         raise ValueError(f"unknown source profile: {source_name}")
-    target = tomlkit.table()
-    for key, value in profiles[source_name].items():
-        if key != "overrides":
-            target[key] = clone_grid(value)
+    target = creation_template(document) if source_name is None else tomlkit.table()
+    if source_name is not None:
+        for key, value in profiles[source_name].items():
+            if key != "overrides":
+                target[key] = clone_grid(value)
     for label, values in updates.items():
         target[catalog_key(label)] = values_item(values)
     if beam_name is not None:

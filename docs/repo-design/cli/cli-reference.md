@@ -1254,7 +1254,7 @@ Options:
 
 Commands:
   add                Incrementally add values to profile grids,...
-  create             Create a new profile, cloning defaults...
+  create             Create a profile from packaged sweep...
   delete             Delete a profile; irreversible.
   filter             Manage finite FilterPlate objects on a...
   list               List catalog profiles with membership,...
@@ -1314,17 +1314,18 @@ Options:
 ```text
 Usage: pyrite profile create [OPTIONS] NAME
 
-  Create a new profile, cloning defaults from --from (standard).
+  Create a profile from packaged sweep defaults, or explicitly clone --from.
 
-  Range options replace individual cloned grids. Material membership is cloned and
-  ``--material`` replaces it. Per-material overrides are not cloned. Beam phase space
-  and detector geometry are set only through named objects: build them with ``pyrite
-  beam create`` / ``pyrite detector create`` and attach them here with --beam NAME /
-  --detector NAME.
+  Range options replace individual grids. ``--material`` replaces membership. An
+  explicit --from clones instrument and physics sections, plus ranges and membership;
+  per-material overrides are not cloned. Beam phase space and detector geometry are set
+  only through named objects: build them with ``pyrite beam create`` / ``pyrite detector
+  create`` and attach them here with --beam NAME / --detector NAME.
 
 Options:
-  --from SOURCE                   Clone ranges, beam, detector, and material membership
-                                  from SOURCE; defaults to standard.
+  --from SOURCE                   Explicitly clone SOURCE, including beam, detector,
+                                  filters, emission, and transport numerics; material
+                                  overrides stay local.
   --thickness ANGSTROM,... | START:STOP:STEP
                                   Crystal thicknesses in angstrom. Comma-separated,
                                   mixable with start:stop:step ranges; repeat to
@@ -1622,8 +1623,8 @@ Usage: pyrite profile physical-detector [OPTIONS] COMMAND [ARGS]...
   transport while cached scalar records are kept; response and acquisition only rescore
   stored observations, with no transport.
 
-  A profile without its own table inherits 'standard's; 'set' gives it a profile-local
-  copy first, so 'standard' never changes.
+  A profile without its own table has no physical detector. Creating one requires
+  --distance-mm.
 
 Options:
   -h, --help  Show this message and exit.

@@ -518,14 +518,12 @@ class MaterialCatalog:
         return self.profile_line_grid_policies.get(name)
 
     def profile_detector(self, name: str) -> Mapping[str, object]:
-        """Resolved acceptance fields for ``name``, standard then legacy fallback.
+        """Acceptance fields belonging to ``name``, or code defaults.
 
         An empty mapping means "every detector default stands". Build the
         detector with :func:`config.catalog_detector`.
         """
-        return self.profile_detectors.get(
-            name, self.profile_detectors.get("standard", _DEFAULT_PROFILE_DETECTOR_SPEC)
-        )
+        return self.profile_detectors.get(name, _DEFAULT_PROFILE_DETECTOR_SPEC)
 
     def profile_materials(self, name: str) -> tuple[str, ...] | None:
         """Explicit ``profiles.NAME.materials`` membership, or ``None`` when the

@@ -40,9 +40,7 @@ def _resolved(document, name, text):
     """
     from pyrite.campaign.observation import resolve_profile_observation
 
-    effective = _profile_edit.physical_detector_row(
-        _profile_edit.existing_profile(document, name), _profile_edit.profile_rows(document)
-    )
+    effective = _profile_edit.physical_detector_row(_profile_edit.existing_profile(document, name))
     if effective is None or "acquisition" not in effective:
         return None
     catalog = _catalog_io.validated_catalog(_catalog_io.active_catalog_path(), text, profile=name)
@@ -61,11 +59,11 @@ def _projection(observation):
 def _payload(document, text, name):
     profile = _profile_edit.existing_profile(document, name)
     own = _profile_edit.own_physical_detector(profile)
-    effective = _profile_edit.physical_detector_row(profile, _profile_edit.profile_rows(document))
+    effective = _profile_edit.physical_detector_row(profile)
     observation = _resolved(document, name, text)
     return {
         "profile": name,
-        "source": None if effective is None else "profile" if own is not None else "standard",
+        "source": "profile" if own is not None else None,
         "physical_detector": None if effective is None else _plain(effective),
         "counting_observation": observation is not None,
         "measured_edges_eV": (
@@ -92,8 +90,8 @@ def command():
     are kept; response and acquisition only rescore stored observations,
     with no transport.
 
-    A profile without its own table inherits 'standard's; 'set' gives it a
-    profile-local copy first, so 'standard' never changes.
+    A profile without its own table has no physical detector. Creating one
+    requires --distance-mm.
     """
 
 
@@ -117,8 +115,7 @@ def show_command(name, json_output):
     if row is None:
         emit_result(f"{name}: no physical detector")
         return 0
-    source = "own" if payload["source"] == "profile" else "inherited from standard"
-    emit_result(f"{name} physical detector ({source}):")
+    emit_result(f"{name} physical detector (own):")
     for key in ("distance_mm", "polar_deg", "azimuth_deg", "roll_deg", "offset_mm"):
         if key in row:
             emit_result(f"  {key}: {row[key]}")
@@ -318,7 +315,7 @@ def set_command(name, yes, dry_run, **values):
     except (OSError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     try:
-        status = _profile_edit.set_physical_detector(
+        _profile_edit.set_physical_detector(
             document,
             name,
             geometry=geometry,
@@ -332,8 +329,6 @@ def set_command(name, yes, dry_run, **values):
     except (ValueError, TypeError) as exc:
         raise click.UsageError(str(exc)) from None
     confirm_standard(name, "set the physical detector on", yes, dry_run)
-    if status == "copied":
-        click.echo(f"note: {name} now has its own copy of standard's physical detector", err=True)
     if observation is not None:
         projection = _projection(observation)
         click.echo(

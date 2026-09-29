@@ -46,6 +46,10 @@ pyrite profile numerics reset standard --yes
 
 Existing `profile create|set --ne-line/--ne-brem`, `--straggling`, `--energy-model`, and `--max-de-frac` spellings remain compatible. Worker, chunk, backend, core, and other execution-only tuning are intentionally absent: they affect runtime, not calculation results or checkpoint identity.
 
+`pyrite profile create NAME` starts from the packaged `standard` sweep's ranges, inline bremsstrahlung grid, per-material overrides, and membership. It uses only materials present in the selected catalog. It does not copy the selected catalog's mutable `standard` profile or attach a beam, scalar detector, physical detector, filters, emission policy, or transport numerics. Absent emission resolves to incoherent and absent straggling resolves to off. `pyrite profile show NAME` marks code defaults with `(default)` and shows an absent detector as `none`.
+
+`pyrite profile create NAME --from SOURCE` explicitly clones SOURCE's ranges, membership, beam, scalar and physical detectors, filters, emission, and transport numerics. Its output lists any inherited instrument and physics sections. Per-material overrides remain local to SOURCE and are not cloned. Review the cloned profile before running it, especially if SOURCE is a modified `standard`.
+
 ## Line-grid policy
 
 By default each case's line axis spans a closed-form kinematic bandwidth at the measured sinc spacing. That bandwidth is capped at the beam's kinetic energy and at the end of the atomic data (about 800 keV for most elements), above which no line can emit in this model. At MeV beam energies that axis needs millions of nodes. A profile can instead name measured policies:
@@ -121,7 +125,9 @@ Detector geometry uses the same named-object pattern shown above. Use `pyrite de
 The bundled `default` beam (200 fs, 5 kHz, 1 pC) and `default` detector (90 degrees) are examples, not a description of your beamline or detector, and the bundled `standard` profile is a 128-line example sweep. PyRITE still falls back to them when nothing names a choice, and warns on stderr:
 
 - `pyrite run` and `pyrite remote start` without `PROFILE`, `PYRITE_PROFILE`, or a saved `profile.current` run `standard` and warn. Select a profile with `pyrite run NAME` or keep one with `pyrite config set profile.current NAME`.
-- A run from a user-selected catalog (see [External catalogs](external-catalog.md)) whose profile names no `beam` uses the built-in example beam and warns; one that names no `detector` inherits `standard`'s and warns. Attach your own with `pyrite profile set NAME --beam BEAM --detector DETECTOR`. Profiles run from the bundled catalog are examples themselves and do not warn.
+- A run from a user-selected catalog (see [External catalogs](external-catalog.md)) whose profile names no `beam` uses the built-in example beam and warns; one that names no `detector` uses the code-default scalar detector and warns. Attach your own with `pyrite profile set NAME --beam BEAM --detector DETECTOR`. Profiles run from the bundled catalog are examples themselves and do not warn.
+
+Profiles created before this change that omitted `detector` or `physical_detector` should be reviewed. They now resolve the code-default scalar detector and no physical detector. If a run previously inherited modified geometry from `standard`, its resolved `parameter_sha256` changes, so it gets a distinct checkpoint; an inherited counting observation no longer runs. Attach the intended detector explicitly to retain that geometry. The `standard` profile itself and profiles with explicit geometry keep their resolved identities.
 
 The [deprecation schedule](../repo-design/cli/cli-deprecations.md#implicit-defaults) gives the release from which each fallback becomes an error. Only the fallback changes: `standard` keeps its name and contents, and its checkpoints keep their stems.
 
@@ -133,9 +139,9 @@ Both sub-tables join `parameter_sha256` only when they diverge from the inert de
 
 ## Physical detector, filters, and counting observations
 
-A `[profiles.NAME.physical_detector]` table places one planar pixel detector: pose (`distance_mm`, `polar_deg`, `azimuth_deg`, `roll_deg`, `offset_mm`) and pixel grid (`shape`, `pitch_mm`; omitted, one 256 by 256 Timepix3-style chip at 0.055 mm). Optional nested tables add the angular `scorer` (`angular_shape`, nearest-tile reconstruction), the detector `response` (`ideal` or uncalibrated `timepix3`), and an `acquisition` (exposure, reporting-bin edges, post-response hit threshold, expected or seeded Poisson counts). A profile without its own table inherits `standard`'s.
+A `[profiles.NAME.physical_detector]` table places one planar pixel detector: pose (`distance_mm`, `polar_deg`, `azimuth_deg`, `roll_deg`, `offset_mm`) and pixel grid (`shape`, `pitch_mm`; omitted, one 256 by 256 Timepix3-style chip at 0.055 mm). Optional nested tables add the angular `scorer` (`angular_shape`, nearest-tile reconstruction), the detector `response` (`ideal` or uncalibrated `timepix3`), and an `acquisition` (exposure, reporting-bin edges, post-response hit threshold, expected or seeded Poisson counts). A profile without its own table has no physical detector.
 
-Edit it with `pyrite profile physical-detector show|set|reset`; `set` changes only the fields given and gives an inheriting profile its own copy first, so `standard` never changes. Each `[[profiles.NAME.filters]]` table is one `FilterPlate`, edited in declared order with `pyrite profile filter add|set|rm|list|show`. For example:
+Edit it with `pyrite profile physical-detector show|set|reset`; creating one requires `--distance-mm`. Each `[[profiles.NAME.filters]]` table is one `FilterPlate`, edited in declared order with `pyrite profile filter add|set|rm|list|show`. For example:
 
 ```bash
 pyrite profile physical-detector set filter_demo --distance-mm 400 --polar-deg 60 \

@@ -81,15 +81,11 @@ def resolve_profile_observation(
 
     A geometry-only ``physical_detector`` remains the existing material-smoke
     configuration and does not silently acquire exposure/counting semantics.
-    The selected profile inherits standard physical geometry exactly as the
-    existing scalar material path does; ordered filters remain profile-local.
+    Physical geometry and ordered filters belong to the selected profile.
     """
     if profile_name not in catalog.profile_names:
         raise KeyError(f"unknown profile {profile_name!r}; have {list(catalog.profile_names)}")
-    row = catalog.profile_physical_detectors.get(
-        profile_name,
-        catalog.profile_physical_detectors.get("standard"),
-    )
+    row = catalog.profile_physical_detectors.get(profile_name)
     if row is None or "acquisition" not in row:
         return None
     detector = physical_detector_from_config(row, energy_bins=energy_bins)

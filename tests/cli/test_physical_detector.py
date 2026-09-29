@@ -198,18 +198,23 @@ def test_angular_shape_cannot_exceed_the_pixel_grid(catalog) -> None:
     assert catalog.read_text() == before
 
 
-def test_set_on_an_inheriting_profile_copies_standard_first(catalog) -> None:
+def test_set_on_profile_without_detector_requires_geometry(catalog) -> None:
     _create("standard", *ACQUIRE)
-    assert _show("high_energy")["source"] == "standard"
+    assert _show("high_energy")["source"] is None
 
     result = invoke(profile.command, [*SET, "high_energy", "--polar-deg", "45"])
 
-    assert result.exit_code == 0
-    assert "note: high_energy now has its own copy of standard's physical detector" in result.stderr
+    assert result.exit_code == 2
+    assert "creating one requires --distance-mm" in result.stderr
+    created = invoke(
+        profile.command,
+        [*SET, "high_energy", "--distance-mm", "300", "--polar-deg", "45"],
+    )
+    assert_clean_result(created, stdout="updated physical detector for profile high_energy\n")
     local = _show("high_energy")
     assert local["source"] == "profile"
     assert local["physical_detector"]["polar_deg"] == 45.0
-    assert local["physical_detector"]["acquisition"]["exposure_s"] == 2.0
+    assert "acquisition" not in local["physical_detector"]
     assert _show()["physical_detector"]["polar_deg"] == 60.0
 
 
@@ -247,8 +252,8 @@ def test_reset_sections_then_the_whole_detector(catalog) -> None:
     assert _show()["physical_detector"] is None
 
 
-def test_reset_refuses_an_inherited_detector(catalog) -> None:
+def test_reset_refuses_a_profile_without_detector(catalog) -> None:
     _create()
     result = invoke(profile.command, ["physical-detector", "reset", "high_energy", "-y"])
     assert result.exit_code == 2
-    assert "inherits the standard physical detector" in result.stderr
+    assert "has no physical detector" in result.stderr
