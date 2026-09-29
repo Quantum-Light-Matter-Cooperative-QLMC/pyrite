@@ -1,5 +1,6 @@
-import math
 from collections.abc import Sequence
+
+import numpy as np
 
 from pyrite._formatting import fmt_thickness
 from pyrite.results import records, sweep_values, thicknesses_by_energy
@@ -25,13 +26,28 @@ def _spread_default(values: Sequence[float], count: int = 4) -> list[float]:
 
 def _grid_limits(source, key: str) -> tuple[float, float]:
     """Positive lower and full upper endpoint of the selected photon grid."""
-    values = [
-        float(energy)
-        for record in source
-        for energy in (record.get(key) if record.get(key) is not None else record.get("E_grid", ()))
-        if math.isfinite(float(energy)) and float(energy) > 0
-    ]
-    return (min(values), max(values)) if values else (1.0, 1.0)
+    values = []
+    for record in source:
+        # Get the array from the key, falling back to E_grid if key is None or missing
+        array = record.get(key) if record.get(key) is not None else record.get("E_grid", ())
+        # Check if array is not empty (works for lists, tuples, and numpy arrays)
+        try:
+            if len(array) > 0:  # Only process non-empty arrays
+                # Convert to numpy array with float dtype
+                arr = np.asarray(array, dtype=float)
+                # Create mask for finite and positive values
+                mask = np.isfinite(arr) & (arr > 0)
+                filtered = arr[mask]
+                if len(filtered) > 0:
+                    values.append(filtered)
+        except TypeError:
+            # Skip if array doesn't have len (shouldn't happen with dict.get)
+            pass
+
+    if values:
+        combined = np.concatenate(values)
+        return (float(np.min(combined)), float(np.max(combined)))
+    return (1.0, 1.0)
 
 
 def make_axis_controls(
