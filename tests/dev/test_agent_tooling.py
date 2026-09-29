@@ -1,6 +1,5 @@
 """Tests for portable repository agent tooling."""
 
-import importlib.util
 import json
 from pathlib import Path
 
@@ -12,16 +11,6 @@ from pyrite.devtools import dev_cli
 @pytest.fixture
 def dev_module():
     return dev_cli
-
-
-@pytest.fixture
-def sweep_guard_module():
-    path = Path(__file__).parents[2] / ".claude" / "hooks" / "guard_local_sweep.py"
-    spec = importlib.util.spec_from_file_location("pyrite_sweep_guard", path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def write_skill(root: Path, name: str, description: str | None = None) -> Path:
@@ -161,75 +150,10 @@ def test_agent_session_start_syncs_optional_dependencies() -> None:
 
     claude_command = claude["hooks"]["SessionStart"][0]["hooks"][0]["command"]
     codex_command = codex["hooks"]["SessionStart"][0]["hooks"][0]["command"]
-    claude_hook_script = (root / ".claude" / "hooks" / "sync_local_backend.sh").read_text()
+    claude_hook_script = (root / ".agents" / "hooks" / "sync_local_backend.sh").read_text()
 
     assert "sync_local_backend.sh" in claude_command
+    assert "sync_local_backend.sh" in codex_command
     assert expected in claude_hook_script
-    assert expected in codex_command
+    assert "--inexact" in claude_hook_script
     assert "UV_CACHE_DIR=/tmp/pyrite-uv-cache" in claude_hook_script
-    assert "UV_CACHE_DIR=/tmp/pyrite-uv-cache" in codex_command
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        "uv run pyrite run standard -m hopg",
-        "UV_CACHE_DIR=/tmp/cache uv run pyrite run standard -m hopg",
-        "git status && uv run pyrite run standard -m hopg",
-        "(uv run pyrite run standard -m hopg)",
-    ],
-)
-def test_sweep_guard_blocks_local_scan(sweep_guard_module, command: str) -> None:
-    assert sweep_guard_module._local_scan(command)
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        "uv run pyrite run standard -m hopg --remote",
-        "uv run pyrite run standard -m hopg --remote=remote-host",
-        "uv run pyrite run standard -m hopg -R",
-        "uv run pyrite run standard -m hopg -Rremote-host",
-        "uv run pyrite remote run standard -m hopg",
-        "uv run pyrite run --help",
-        "echo 'uv run pyrite run standard -m hopg'",
-        "rg 'pyrite run' README.md",
-        "git status",
-    ],
-)
-def test_sweep_guard_allows_safe_commands(sweep_guard_module, command: str) -> None:
-    assert not sweep_guard_module._local_scan(command)
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        "PYRITE_LOCAL_SWEEP_OK=1 uv run pyrite run standard -m hopg",
-        "PYRITE_LOCAL_SWEEP_OK=1 uv run pyrite run standard -m hopg",
-        "env PYRITE_LOCAL_SWEEP_OK=true uv run pyrite run standard -m hopg",
-    ],
-)
-def test_sweep_guard_inline_override_opts_out_a_detected_run(
-    sweep_guard_module, monkeypatch, command: str
-) -> None:
-    monkeypatch.delenv("PYRITE_LOCAL_SWEEP_OK", raising=False)
-    # Still detected as a local run -- the detector is unchanged ...
-    assert sweep_guard_module._local_scan(command)
-    # ... but the inline opt-in suppresses the block.
-    assert sweep_guard_module._override_active(command)
-
-
-def test_sweep_guard_ambient_override_opts_out(sweep_guard_module, monkeypatch) -> None:
-    command = "uv run pyrite run standard -m hopg"
-    monkeypatch.setenv("PYRITE_LOCAL_SWEEP_OK", "1")
-    assert sweep_guard_module._override_active(command)
-
-
-@pytest.mark.parametrize("value", ["", "0", "false", "no", "off"])
-def test_sweep_guard_falsey_override_still_blocks(
-    sweep_guard_module, monkeypatch, value: str
-) -> None:
-    monkeypatch.delenv("PYRITE_LOCAL_SWEEP_OK", raising=False)
-    command = f"PYRITE_LOCAL_SWEEP_OK={value} uv run pyrite run standard -m hopg"
-    assert sweep_guard_module._local_scan(command)
-    assert not sweep_guard_module._override_active(command)

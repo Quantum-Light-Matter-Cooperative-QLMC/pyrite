@@ -13,7 +13,7 @@ import pytest
 from pyrite.energy_grid import convergence_job as job
 
 REMOTE = SimpleNamespace(shell_word=shlex.quote, shell_remote_dir=lambda: "/box/pyrite")
-SYNC = "uv sync --package pyrite-xray --no-dev --extra nvidia  # SYNC-MARKER"
+SYNC = "uv sync --package pyrite-xray --no-default-groups --extra nvidia  # SYNC-MARKER"
 
 
 def _args(**overrides):

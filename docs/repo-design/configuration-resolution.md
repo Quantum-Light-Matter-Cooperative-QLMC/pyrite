@@ -136,11 +136,10 @@ configuration.
 
 `_PYRITE_COMPLETE` is Click's completion protocol variable, not a PyRITE-defined
 runtime setting. `PYRITE_PI` is a constant inside generated kernel source, not
-an environment read. `PYRITE_LOCAL_SWEEP_OK` appears only in agent-tooling tests
-and is not read by the PyRITE package. Standard/external variables such as
-`NO_COLOR`, `TERM`, `SLURM_*`, `NUMBA_DISABLE_JIT`, `MPLBACKEND`,
-`MPLCONFIGDIR`, `PATH`, `MP_API_KEY`, `UV_CACHE_DIR`, and
-`UV_PROJECT_ENVIRONMENT` belong to their owning tools or execution environment.
+an environment read. Standard/external variables such as `NO_COLOR`, `TERM`,
+`SLURM_*`, `NUMBA_DISABLE_JIT`, `MPLBACKEND`, `MPLCONFIGDIR`, `PATH`,
+`MP_API_KEY`, `UV_CACHE_DIR`, and `UV_PROJECT_ENVIRONMENT` belong to their
+owning tools or execution environment.
 
 ## Catalog-profile resolution
 

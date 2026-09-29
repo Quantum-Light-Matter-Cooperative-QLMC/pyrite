@@ -462,6 +462,10 @@ indent-style = "space"
 
 [tool.uv]
 cache-dir = "/tmp/pyrite-uv-cache"
+# Every `uv run`/`uv sync` (including a fresh worktree's first `uv run`) gets
+# all contributor groups; tests import notebook-group packages such as plotly.
+# Runtime-only installs pass `--no-default-groups`.
+default-groups = "all"
 conflicts = [
     [
         { extra = "nvidia" },

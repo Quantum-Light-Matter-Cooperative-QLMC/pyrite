@@ -180,8 +180,8 @@ def _print_extra_instructions(backend: str) -> None:
         return
     click.echo(
         f"writing .env alone does not install the accelerator package; run "
-        f"`{install_cmd}` (a new Claude Code session does this automatically via "
-        "`.claude/hooks/sync_local_backend.sh`)."
+        f"`{install_cmd}` (a new Claude Code or Codex session does this "
+        "automatically via `.agents/hooks/sync_local_backend.sh`)."
     )
 
 

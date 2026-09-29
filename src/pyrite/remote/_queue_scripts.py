@@ -91,7 +91,7 @@ def _uv_sync_block(once: bool = False) -> str:
     build_env = "CUPY_INSTALL_USE_HIP=1 " if vendor == "amd" else ""
     sync = f"""uv_sync_start_ns=$(date +%s%N)
 uv_sync_rc=0
-{build_env}{config.shell_remote_uv()} sync --package pyrite-xray --no-dev --extra {vendor} >> "$JOBDIR/log" 2>&1 || uv_sync_rc=$?
+{build_env}{config.shell_remote_uv()} sync --package pyrite-xray --no-default-groups --extra {vendor} >> "$JOBDIR/log" 2>&1 || uv_sync_rc=$?
 uv_sync_elapsed_ms=$((($(date +%s%N) - uv_sync_start_ns) / 1000000))
 printf 'timing: uv sync %d.%03d s\\n' \
   "$((uv_sync_elapsed_ms / 1000))" "$((uv_sync_elapsed_ms % 1000))" >> "$JOBDIR/log"

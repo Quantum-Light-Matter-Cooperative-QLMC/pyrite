@@ -9,6 +9,16 @@
   "hooks": {
     "SessionStart": [
       {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.agents/hooks/sync_local_backend.sh\"",
+            "timeout": 300
+          }
+        ]
+      },
+      {
         "matcher": "",
         "hooks": [
           {

@@ -18,8 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"$(git rev-parse --show-toplevel)\" && UV_CACHE_DIR=/tmp/pyrite-uv-cache uv sync --all-groups",
-            "timeout": 600,
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && bash .agents/hooks/sync_local_backend.sh",
+            "timeout": 300,
             "statusMessage": "Syncing project dependencies"
           },
           {

@@ -11,11 +11,12 @@ Splitting that namespace between wheels would make installation order decide whi
 ## Commands
 
 ```bash
-# Normal contributor setup: root package and contributor tools.
+# Normal contributor setup: root package and every dependency group
+# (`tool.uv.default-groups = "all"`; `uv run` syncs the same set).
 uv sync --locked
 
 # Runtime-only environment, used by remote installations.
-uv sync --no-dev --locked
+uv sync --no-default-groups --locked
 
 # Stable domain partitions. Together these contain every tests/test_*.py once.
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite core
