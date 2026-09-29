@@ -388,11 +388,6 @@ class LineGridPolicy:
             payload["resolution"] = {**payload["resolution"], "halo_limit": self.halo_limit}
         return payload
 
-    @property
-    def strictest_rtol(self) -> float:
-        """The governing tolerance: the tightest across observable classes."""
-        return min(value for _, value in self.rtol)
-
 
 def _float_env(name: str, *, minimum: float, maximum: float | None = None) -> float | None:
     raw = env_value(name)

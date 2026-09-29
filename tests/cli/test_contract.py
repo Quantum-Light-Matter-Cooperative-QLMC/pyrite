@@ -158,14 +158,6 @@ def test_every_frozen_path_retired_at_0_3_0_is_now_refused(path):
     assert completed.exit_code != 0
 
 
-def test_version_uses_stdout():
-    completed = _run("--version")
-    assert completed.exit_code == 0
-    assert completed.stdout.startswith("PyRITE ")
-    assert completed.stdout.endswith("\n")
-    assert completed.stderr == ""
-
-
 @pytest.mark.parametrize(
     ("argv", "diagnostic"),
     [

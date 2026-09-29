@@ -96,12 +96,6 @@ def hard_keys_from_stream_keys(keys):
 
 
 @njit(cache=True)
-def _hard_uniform(key, counter):
-    """One hard-stream uniform in ``[0, 1)`` and the advanced counter."""
-    return _stream_uniform_scalar(key, counter), counter + _SM64_ONE
-
-
-@njit(cache=True)
 def _log_grid_frac(log_grid, n, log_e):
     """Lower node and fraction of ``log_e`` on a sorted, possibly uneven grid.
 

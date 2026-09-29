@@ -291,10 +291,6 @@ def _emit_show(payload):
             emit_result(f"    {material} -> {digest}")
 
 
-def _detector_table(profile):
-    return _profile_edit.detector_table(profile)
-
-
 class _ProfileGroup(LazyGroup):
     """``pyrite profile NAME`` aliases ``pyrite profile show NAME``."""
 

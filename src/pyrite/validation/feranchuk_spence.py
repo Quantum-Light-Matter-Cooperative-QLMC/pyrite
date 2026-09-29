@@ -1046,33 +1046,6 @@ def bremsstrahlung_background(photon_E_eV, Z, number_density_per_ang3, L_z_ang, 
     )
 
 
-# ---- CXR / bremsstrahlung-background ratio (Eq. 18) ------------------------
-
-
-def cxr_to_bremsstrahlung(photon_E_eV, number_density_per_ang3, beta, Z_avg, dE_over_E):
-    """
-
-    eta = [dN/dn]_CXR / [dN/dn]_BS, Feranchuk-Spence Eq. (18):
-
-        eta ~ (rho / omega_n^3) * (6 pi^2 v0 / ln(137/Z^{1/3})) * (omega_n/dE)
-
-    rho = number density [1/Angstrom^3], omega_n in [1/Angstrom] (= omega/c).
-
-    The coherency factor xi_n = rho / omega_n^3 (Eq. 19) is the key scaling.
-
-    Higher detector resolution (smaller dE/E) -> larger eta.
-
-    """
-
-    omega_per_ang = photon_E_eV / HC_EV_ANG * 2.0 * np.pi  # omega/c [1/Angstrom]
-
-    xi_n = number_density_per_ang3 / omega_per_ang**3  # Eq.(19)
-
-    eta = xi_n * (6.0 * np.pi**2 * beta / np.log(137.0 / Z_avg ** (1.0 / 3.0))) / dE_over_E
-
-    return eta, xi_n
-
-
 if __name__ == "__main__":
     beta = beta_from_Ee(30e3)
 
