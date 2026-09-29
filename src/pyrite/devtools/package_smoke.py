@@ -9,9 +9,9 @@ import tomllib
 import zipfile
 from pathlib import Path
 
-from pyrite.console.config import workspace_root
+from pyrite.devtools import repo_root
 
-ROOT = workspace_root()
+ROOT = repo_root()
 EXPECTED_EXTRAS = {"amd", "external-db", "intel", "nvidia"}
 PROJECT_DOCUMENT = tomllib.loads((ROOT / "pyproject.toml").read_text())
 PROJECT_VERSION = PROJECT_DOCUMENT["project"]["version"]

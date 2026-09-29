@@ -6,6 +6,8 @@ Harmless when pyarrow is absent (the altair tests skip without it)."""
 
 import os
 import sys
+import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -18,11 +20,33 @@ import pytest
 # hardware-gated tests scrub this pin from subprocesses they spawn.
 _TEST_BACKEND = os.environ.get("PYRITE_TEST_BACKEND") or "cpu"
 os.environ["PYRITE_MC_BACKEND"] = _TEST_BACKEND
+# A developer's PYRITE_HOME names their user workspace; tests must neither
+# depend on it nor write generated tables into it. Drop it before any module
+# resolves import-time workspace defaults; tests that exercise it set their own.
+os.environ.pop("PYRITE_HOME", None)
 
 try:
     import pyarrow  # noqa: F401
 except ImportError:
     pass
+
+# Likewise the developer's config store (``workspace.root``, ``catalog.path``,
+# ...): point it at an absent file before any module resolves import-time
+# defaults. ``_isolate_config_store`` then gives each test its own empty store.
+from pyrite.console import config as _config  # noqa: E402
+
+_config.CONFIG_PATH = Path(tempfile.gettempdir()) / "pyrite-tests-absent-store" / "config.toml"
+
+
+@pytest.fixture(autouse=True)
+def _isolate_config_store(monkeypatch, tmp_path):
+    """Give every test an empty config store.
+
+    The developer's store may set ``workspace.root`` (redirecting generated
+    xsgen tables into a checkout) or other keys that CI never sees. Tests that
+    exercise the store point ``CONFIG_PATH`` at their own file.
+    """
+    monkeypatch.setattr(_config, "CONFIG_PATH", tmp_path / "pyrite-config" / "config.toml")
 
 
 @pytest.fixture(autouse=True)
