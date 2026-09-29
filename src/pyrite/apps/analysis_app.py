@@ -34,6 +34,7 @@ with app.setup:
         make_scan_thickness_control,
     )
     from pyrite.apps.analysis_ui.interactive import make_heatmap_widget, make_scan_heatmap_widgets
+    from pyrite.apps.analysis_ui.navigation import EXPLORE, INSTRUMENTS, OPTIMIZE, make_view_nav
     from pyrite.apps.analysis_ui.views import (
         render_detectors,
         render_dimension_comparison,
@@ -199,7 +200,16 @@ def _(context, emission_ui, face_ui, material_ui, profile_ui):
 
 
 @app.cell
-def _(context):
+def _():
+    # No dependencies: the selected view survives material/emission changes.
+    view_nav = make_view_nav(mo)
+    view_nav
+    return (view_nav,)
+
+
+@app.cell
+def _(context, view_nav):
+    mo.stop(view_nav.value != EXPLORE)
     energy_controls = make_energy_controls(mo, context.results)
     return (energy_controls,)
 
@@ -235,7 +245,8 @@ def _(app_theme, context, heatmap_energy_ui, pinned_results):
 
 
 @app.cell
-def _(context):
+def _(context, view_nav):
+    mo.stop(view_nav.value != EXPLORE)
     polar_controls = make_dimension_controls(mo, context.results, varying_key="tilt_deg")
     azimuth_controls = make_dimension_controls(
         mo,
@@ -246,7 +257,8 @@ def _(context):
 
 
 @app.cell
-def _(context):
+def _(context, view_nav):
+    mo.stop(view_nav.value != OPTIMIZE)
     scan_thickness_ui = make_scan_thickness_control(mo, context.results)
     return (scan_thickness_ui,)
 
@@ -282,7 +294,8 @@ def _(app_theme, context, scan_heatmap_energy_ui, scan_results):
 
 
 @app.cell
-def _(context):
+def _(context, view_nav):
+    mo.stop(view_nav.value != INSTRUMENTS)
     detector_controls = make_detector_controls(mo, context.results)
     return (detector_controls,)
 
@@ -448,57 +461,64 @@ def _(
 
 
 @app.cell
-def _(
-    azimuth_tab,
-    context,
-    detector_tab,
-    energy_tab,
-    polar_tab,
-    rankings_tab,
-    scans_tab,
-):
+def _(context):
     if not context.has_data:
         detail = (
             context.load_error or "Run `pyrite run standard -m <material>` to create a checkpoint."
         )
-        view = mo.callout(
+        no_data_notice = mo.callout(
             mo.md(f"**No checkpoint data available.** {detail}"),
             kind="info",
         )
     else:
-        view = mo.ui.tabs(
-            {
-                "Explore": lambda: mo.accordion(
-                    {
-                        "Compare beam energies": energy_tab,
-                        "Compare polar angles": polar_tab,
-                        "Compare azimuths": azimuth_tab,
-                    },
-                    lazy=True,
-                    multiple=True,
-                ),
-                "Optimize": lambda: mo.vstack(
-                    [
-                        scans_tab(),
-                        mo.accordion(
-                            {"Rank geometries": rankings_tab},
-                            lazy=True,
-                            multiple=True,
-                        ),
-                    ]
-                ),
-                "Instruments": detector_tab,
-            },
-            lazy=True,
-        )
+        no_data_notice = None
+    no_data_notice
+    return
 
+
+@app.cell
+def _(azimuth_tab, context, energy_tab, polar_tab, view_nav):
+    mo.stop(not context.has_data or view_nav.value != EXPLORE)
+    mo.accordion(
+        {
+            "Compare beam energies": energy_tab,
+            "Compare polar angles": polar_tab,
+            "Compare azimuths": azimuth_tab,
+        },
+        lazy=True,
+        multiple=True,
+    )
+    return
+
+
+@app.cell
+def _(context, rankings_tab, scans_tab, view_nav):
+    mo.stop(not context.has_data or view_nav.value != OPTIMIZE)
     mo.vstack(
         [
-            view,
-            mo.md(
-                "*3D trajectory and crystal-structure views live in `trace_app.py` "
-                "(`marimo run src/pyrite/apps/trace_app.py`).*"
-            ),
+            scans_tab(),
+            mo.accordion({"Rank geometries": rankings_tab}, lazy=True, multiple=True),
+        ]
+    )
+    return
+
+
+@app.cell
+def _(context, detector_tab, view_nav):
+    mo.stop(not context.has_data or view_nav.value != INSTRUMENTS)
+    detector_tab()
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    note = (
+        "*3D trajectory and crystal-structure views live in `trace_app.py` "
+        "(`marimo run src/pyrite/apps/trace_app.py`).*"
+    )
+    mo.vstack(
+        [
+            mo.md(note),
             mo.md(
                 "*Pixel-detector observations: `pyrite app pixels launch`. Case baskets and "
                 "cross-material comparison: `pyrite app compare launch`.*"

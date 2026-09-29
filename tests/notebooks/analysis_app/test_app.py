@@ -222,7 +222,7 @@ def test_analysis_app_uses_no_legacy_material_registries() -> None:
 
 
 def test_analysis_app_uses_top_level_tabs_and_action_names() -> None:
-    source = APP.read_text()
+    source = APP.read_text() + (APP.parent / "analysis_ui" / "navigation.py").read_text()
 
     # "Instruments" holds a single view, so it's a bare top-level tab rather
     # than a nested action-accordion group.
@@ -355,3 +355,49 @@ def test_manual_axis_accepts_incomplete_and_invalid_text() -> None:
     assert resolve_axis_spec(base).x_domain == (20.0, 1000.0)
     for xmax in ("", "0", "not a number"):
         assert resolve_axis_spec({**base, "xmax": xmax}).x_domain is None
+
+
+def _stop_guards(cell: ast.FunctionDef) -> set[str]:
+    """View constants named in ``mo.stop(view_nav.value != VIEW)`` calls of a cell."""
+    found: set[str] = set()
+    for node in ast.walk(cell):
+        if isinstance(node, ast.Call) and _attribute_path(node.func) == ("mo", "stop"):
+            found.update(
+                sub.id
+                for sub in ast.walk(node.args[0])
+                if isinstance(sub, ast.Name) and sub.id.isupper()
+            )
+    return found
+
+
+def test_heavy_view_builders_are_gated_on_the_selected_view() -> None:
+    # Only the visible view may build controls/widgets (issue #234).
+    tree = ast.parse(APP.read_text())
+    guards: dict[str, set[str]] = {}
+    for cell in tree.body:
+        if not isinstance(cell, ast.FunctionDef):
+            continue
+        source = ast.unparse(cell)
+        for builder in (
+            "make_energy_controls",
+            "make_dimension_controls",
+            "make_scan_thickness_control",
+            "make_detector_controls",
+        ):
+            if builder in source:
+                guards[builder] = _stop_guards(cell)
+
+    assert guards["make_energy_controls"] == {"EXPLORE"}
+    assert guards["make_dimension_controls"] == {"EXPLORE"}
+    assert guards["make_scan_thickness_control"] == {"OPTIMIZE"}
+    assert guards["make_detector_controls"] == {"INSTRUMENTS"}
+
+
+def test_view_nav_is_dependency_free_so_selection_survives_context_changes() -> None:
+    tree = ast.parse(APP.read_text())
+    nav_cell = next(
+        cell
+        for cell in tree.body
+        if isinstance(cell, ast.FunctionDef) and "make_view_nav(mo)" in ast.unparse(cell)
+    )
+    assert not nav_cell.args.args
