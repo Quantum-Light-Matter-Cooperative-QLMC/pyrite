@@ -122,6 +122,15 @@ The older inline `[profiles.<name>.beam]` table still decodes and means exactly 
 
 Detector geometry uses the same named-object pattern shown above. Use `pyrite detector list|show|create|set|rename|delete` to manage these objects and `pyrite profile set <profile> --detector NAME` to attach one. Rename updates every reference; delete names and refuses surviving referents. The name and label never enter checkpoint identity, but resolved geometry does. The older inline `[profiles.<name>.detector]` table still decodes and means exactly the same thing, but nothing writes it any more. The three `pyrite profile create` / `pyrite profile set` flags that used to write that block have been removed; `--detector NAME` is the only way `pyrite profile` touches detector geometry. Response models and detector energy bins are runtime objects and are not serialized here. Named and inline geometry leave the scalar detector response-free; configure a physical counting observation or supply an explicit runtime response to model measured detector effects.
 
+### Bundled examples and implicit defaults
+
+The bundled `default` beam (200 fs, 5 kHz, 1 pC) and `default` detector (90 degrees) are examples, not a description of your beamline or detector, and the bundled `standard` profile is a 128-line example sweep. PyRITE still falls back to them when nothing names a choice, and warns on stderr:
+
+- `pyrite run` and `pyrite remote start` without `PROFILE`, `PYRITE_PROFILE`, or a saved `profile.current` run `standard` and warn. Select a profile with `pyrite run NAME` or keep one with `pyrite config set profile.current NAME`.
+- A run from a user-selected catalog (see [External catalogs](external-catalog.md)) whose profile names no `beam` uses the built-in example beam and warns; one that names no `detector` inherits `standard`'s and warns. Attach your own with `pyrite profile set NAME --beam BEAM --detector DETECTOR`. Profiles run from the bundled catalog are examples themselves and do not warn.
+
+The [deprecation schedule](../repo-design/cli/cli-deprecations.md#implicit-defaults) gives the release from which each fallback becomes an error. Only the fallback changes: `standard` keeps its name and contents, and its checkpoints keep their stems.
+
 ## Beam block
 
 A beam table -- named or inline -- decodes into `BeamSpec`. The nested `longitudinal` and `transverse` sub-tables carry the bunch and phase-space policies; `docs/physics/beam-transport/beam-phase-space.md` is the reference for every key, its units, and the mutual exclusions between them. `pyrite beam create` / `pyrite beam set` write the same keys from `--emittance`, `--twiss-beta`, `--twiss-alpha`, `--energy-spread`, and the legacy `--transverse-fwhm-mm`. They are the only CLI surface that writes them: `pyrite profile` has no inline beam flags.

@@ -538,7 +538,8 @@ _start_transfer_options = _option_group(
         "Use --headless to return after submission. Use --no-pull to track "
         "through completion without automatically pulling checkpoints.\n\n"
         "PROFILE selects the catalog campaign and its material membership; when "
-        "omitted it uses the current configured profile (standard built-in). Use "
+        "omitted it uses the current configured profile (standard built-in; the "
+        "built-in fallback warns and is deprecated). Use "
         "-m/--material to run one member only. Profiles without an explicit "
         "membership run every catalog material.\n\n"
         "A profile run names the job after PROFILE (NAME, then "
@@ -554,14 +555,18 @@ _start_transfer_options = _option_group(
 def start_command(**params):
     from ...console import config as cli_config
     from ...runs.scan import resolve_profile_materials
+    from .. import _implicit_defaults
 
     flags = _StartFlags(**params)
     try:
-        catalog_profile = cli_config.resolve("profile.current", flags.catalog_profile).value
+        resolved_profile = cli_config.resolve("profile.current", flags.catalog_profile)
     except cli_config.ConfigError as exc:
         raise CLIError(str(exc)) from exc
+    catalog_profile = resolved_profile.value
 
     materials = resolve_profile_materials(catalog_profile, flags.material)
+    _implicit_defaults.warn_implicit_profile(resolved_profile)
+    _implicit_defaults.warn_implicit_instrument(catalog_profile)
     plan = _plan_start(flags, catalog_profile)
     return _invoke_action(
         _cli_start,

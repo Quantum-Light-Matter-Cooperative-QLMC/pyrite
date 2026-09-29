@@ -1,2 +1,2 @@
-label = "Standard 90 degree detector geometry"
+label = "Example 90 degree geometry, not your detector"
 observation_angle_deg = 90.0

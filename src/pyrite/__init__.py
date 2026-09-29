@@ -16,7 +16,7 @@ from typing import Any
 from ._env import env_value
 from .paths import data_dir
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 # Packaged data (catalog/, cifs/, mott_transport_cross_sections/,
 # eaglexo_qe.csv, legacy atomic_scattering_factors/). Resolved relative to this

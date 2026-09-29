@@ -1,3 +1,4 @@
+label = "Example beam, not your hardware: 200 fs, 5 kHz, 1 pC"
 rep_rate_hz = 5000.0
 bunch_charge_pc = 1.0
 
