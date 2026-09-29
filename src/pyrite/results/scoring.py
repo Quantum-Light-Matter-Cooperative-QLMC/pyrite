@@ -11,7 +11,7 @@ here (:func:`top_geometries` / :func:`show_top`).
 import numpy as np
 import pandas as pd
 
-from .metrics import line_metrics
+from .metrics import _cached_line_metrics
 from .selection import records
 
 # ---- "best geometry" selection -----------------------------------------------
@@ -81,7 +81,7 @@ def top_geometries(
         return pd.DataFrame()
     scored = []
     for r in recs:
-        m = line_metrics(r, settings, rel_prominence, metric=line_metric)
+        m = _cached_line_metrics(r, settings, rel_prominence, line_metric)
         scored.append((selection_score(m, select), r, m))
     scored.sort(key=lambda t: -t[0])
     rows = []

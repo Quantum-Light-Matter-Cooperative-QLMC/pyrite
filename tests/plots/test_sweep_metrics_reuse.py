@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 
 import pyrite.plots._common as _common
+import pyrite.results.metrics as _metrics
 from pyrite.plots.altair.sweeps import scan_charts
 from pyrite.plots.mpl.sweeps import plot_heatmaps, plot_scan
 
@@ -67,21 +68,21 @@ def _store():
 
 @pytest.fixture
 def line_metrics_calls(monkeypatch):
-    """Count every per-record line_metrics computation (_metrics_map resolves
-    the name from plots._common at call time). Clears `_LINE_METRICS_CACHE`
+    """Count every per-record line_metrics computation (the shared cache in
+    results.metrics resolves the name at call time). Clears `_LINE_METRICS_CACHE`
     first: it persists across calls (and so across tests, within one process)
     by design -- every test here uses the same deterministic `_store()` +
     default rel_prominence/line_metric, so without a reset the second test
     onward would cache-hit the first test's entries and see zero calls."""
     _common._LINE_METRICS_CACHE.clear()
-    real = _common.line_metrics
+    real = _metrics.line_metrics
     calls = {"n": 0}
 
     def counting(*args, **kwargs):
         calls["n"] += 1
         return real(*args, **kwargs)
 
-    monkeypatch.setattr(_common, "line_metrics", counting)
+    monkeypatch.setattr(_metrics, "line_metrics", counting)
     return calls
 
 

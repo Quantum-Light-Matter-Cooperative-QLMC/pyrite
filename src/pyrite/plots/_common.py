@@ -14,11 +14,8 @@ from ..detectors import Detector, EagleXO, LegacyEDS, Timepix3
 from ..detectors import eaglexo_response as eag
 from ..detectors import timepix_response as tpx
 from ..montecarlo.groove import surface_depth_ang
-from ..results import (
-    beam_current_na,
-    detected_background,
-    line_metrics,
-)
+from ..results import detected_background
+from ..results.metrics import _LINE_METRICS_CACHE, _cached_line_metrics  # noqa: F401
 
 # cache of the (expensive) Timepix efficiency-curve response, keyed by hardware +
 # MC settings, so re-running the detector cell with unchanged settings doesn't
@@ -66,47 +63,6 @@ def _case_title(case, tail="", *, latex=True, e0_keV=None, tilt_fmt="0.1f"):
     e0 = f", {e0_keV:g} keV" if e0_keV is not None else ""
     head = f"{mat}, {thick:.1f} um{e0}, theta_tilt={tilt} deg"
     return f"{head} -- {tail}" if tail else head
-
-
-# Cross-call cache for the (expensive, per-record scipy peak-finding)
-# `line_metrics` result -- `_metrics_map` already dedupes within one call via
-# `id(rec)`, but every fresh call (e.g. a marimo tab re-rendering because an
-# unrelated widget elsewhere changed) redid the whole O(records) pass from
-# scratch. Measured on the densest checkpoint (mose2, 3720 records): this pass
-# is why `heatmap_select_chart`/`scan_charts` cost ~0.9-1.1s per call.
-#
-# Keyed on CONTENT (the record's (name, E0_keV) pair), not `id(r)`/`id(settings)`:
-# an identity key would be unsafe for a process-lifetime cache, since CPython
-# reuses a freed object's address for the next allocation -- two unrelated
-# records built at different times could collide on `id()` alone and silently
-# return each other's metrics. `(case["name"], case["E0_keV"])` is already the
-# results store's own primary key (`results[name][E0] = record`, see
-# `results.store.store_result`), so it's guaranteed unique per record and --
-# unlike the rest of `case` (which can carry unhashable `composition`/
-# `hkl_list`/`abs_layers` entries) is always a plain hashable (str, float)
-# pair. Derived source current is the only record/settings value
-# `line_metrics` reads today -- extend this key if that grows.
-_LINE_METRICS_CACHE = {}
-_LINE_METRICS_CACHE_MAX = 100_000
-
-
-def _cached_line_metrics(r, settings, rel_prominence, line_metric):
-    case = r["case"]
-    key = (
-        case["name"],
-        case["E0_keV"],
-        beam_current_na(r, settings),
-        rel_prominence,
-        line_metric,
-    )
-    cached = _LINE_METRICS_CACHE.get(key)
-    if cached is not None:
-        return cached
-    value = line_metrics(r, settings, rel_prominence, metric=line_metric)
-    if len(_LINE_METRICS_CACHE) >= _LINE_METRICS_CACHE_MAX:
-        _LINE_METRICS_CACHE.clear()
-    _LINE_METRICS_CACHE[key] = value
-    return value
 
 
 def _metrics_map(recs, settings, rel_prominence, line_metric):
