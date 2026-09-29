@@ -12,7 +12,7 @@ from pyrite.campaign import profile_edit as _profile_edit
 from pyrite.campaign.profiles import FIDELITY_NAMES, resolve_numerics
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
-from pyrite.cli._deprecations import canonical_option
+from pyrite.cli._deprecations import DeprecatedOption, canonical_option
 from pyrite.cli._groups import LazyGroup
 from pyrite.cli.commands import _physical_detector, _profile_filters
 from pyrite.cli.commands._profile_members import (
@@ -34,6 +34,7 @@ from pyrite.console.output import (
     AZIMUTH_CSV_RANGE,
     COUNT_CSV,
     ENERGY_CSV_RANGE,
+    FIDELITY_DEPRECATED_HELP,
     THICKNESS_CSV_RANGE,
     TILT_CSV_RANGE,
     CLIError,
@@ -347,10 +348,11 @@ def numerics_command():
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @click.option(
     "--fidelity",
+    cls=DeprecatedOption,
     type=click.Choice(FIDELITY_NAMES),
     default="full",
     show_default=True,
-    help="Resolve profile values against this fidelity preset.",
+    help=f"{FIDELITY_DEPRECATED_HELP} Resolve profile values against this fidelity preset.",
 )
 @output_option
 def numerics_show_command(name, fidelity, json_output):

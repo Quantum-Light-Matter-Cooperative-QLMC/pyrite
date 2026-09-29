@@ -14,7 +14,7 @@ pyrite config list
 For a temporary override, use a command option or environment variable. It wins over the persistent store and does not mutate it:
 
 ```bash
-PYRITE_PROFILE=sub_100keV pyrite run -m hopg --fidelity survey
+PYRITE_PROFILE=sub_100keV pyrite run -m hopg --quick
 PYRITE_HOME=/scratch/my-run pyrite checkpoint list  # archive shelf in that workspace
 ```
 
@@ -67,7 +67,7 @@ pyrite-dev energy-grid add PATH_FROM_DERIVE --profile my-survey --material hopg
 pyrite-dev energy-grid verify
 ```
 
-Derivation can be remote for heavy work. The stored artifact contains full bounds; `--fidelity survey` reduces them later at run resolution.
+Derivation can be remote for heavy work. The stored artifact contains full bounds; do not paste reduced bounds into the catalog.
 
 ## Diagnose precedence
 

@@ -19,6 +19,7 @@ from ...checkpoints import recompute as _recompute
 from ...console import json as cli_json
 from ...console import output as _cli_core
 from .. import _completion as _cli_completion
+from .._deprecations import DeprecatedOption
 from .._options import remote_option
 
 
@@ -194,9 +195,13 @@ def _reject_remote_local_options(ctx: click.Context, json_output: bool) -> None:
 @click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
 @click.option(
     "--fidelity",
+    cls=DeprecatedOption,
     type=_cli_core.FIDELITY_CHOICES,
     default=None,
-    help="Override dataset fidelity; defaults to checkpoint metadata or full for legacy data.",
+    help=(
+        f"{_cli_core.FIDELITY_DEPRECATED_HELP} Override dataset fidelity; defaults to "
+        "checkpoint metadata or full for legacy data."
+    ),
 )
 @click.option(
     "--profile",
@@ -433,9 +438,13 @@ def _line_cli_json(args):
 @click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
 @click.option(
     "--fidelity",
+    cls=DeprecatedOption,
     type=_cli_core.FIDELITY_CHOICES,
     default=None,
-    help="Override dataset fidelity; defaults to checkpoint metadata or full for legacy data.",
+    help=(
+        f"{_cli_core.FIDELITY_DEPRECATED_HELP} Override dataset fidelity; defaults to "
+        "checkpoint metadata or full for legacy data."
+    ),
 )
 @click.option(
     "--profile",

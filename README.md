@@ -75,8 +75,8 @@ backend, precision, transport-core, and memory-policy controls.
 Use `pyrite run` for resumable profile campaigns that write checkpoints:
 
 ```bash
-# Small survey run; writes component checkpoints.
-uv run pyrite run standard -m hopg --fidelity survey
+# Small smoke-test run; writes component checkpoints.
+uv run pyrite run standard -m hopg --quick
 
 # Analyze existing checkpoint.
 uv run pyrite app analysis launch hopg

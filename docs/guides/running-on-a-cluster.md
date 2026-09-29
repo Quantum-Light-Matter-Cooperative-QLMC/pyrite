@@ -1,6 +1,6 @@
 # Running on a cluster (SLURM)
 
-`pyrite run [PROFILE] -m MATERIAL` is the headless entry point for one profile member. Canonical full runs write `checkpoints/<material>/{line,brem,characteristic}.h5`; survey and overridden runs use identity-qualified directories. This makes the command a clean fit for any batch scheduler without the optional lab-box helper below. Install once, submit one job per material, then pull checkpoints back for local analysis or static-HTML export. See [Sweep fidelity and dataset identity](sweep-profiles.md) for the complete naming contract.
+`pyrite run [PROFILE] -m MATERIAL` is the headless entry point for one profile member. Canonical full runs write `checkpoints/<material>/{line,brem,characteristic}.h5`; overridden runs (and existing `--survey` datasets) use identity-qualified directories. This makes the command a clean fit for any batch scheduler without the optional lab-box helper below. Install once, submit one job per material, then pull checkpoints back for local analysis or static-HTML export. See [Sweep fidelity and dataset identity](sweep-profiles.md) for the complete naming contract.
 
 > The scripts below are **templates** — partition names, the CUDA module, account
 > strings, and resource limits are site-specific. Adapt them to your cluster.
@@ -41,7 +41,6 @@ cd "$SLURM_SUBMIT_DIR"
 
 MATERIAL="${1:?usage: sbatch run_pyrite.sh <material>}"
 uv run pyrite run standard -m "$MATERIAL"
-uv run pyrite run standard -m "$MATERIAL" --fidelity survey
 ```
 
 On an accelerator node one main-process device context handles spectrum/bremsstrahlung while a process pool prepares CPU electron transport, so `--cpus-per-task` supplies those transport workers. For a **CPU-only** partition, drop `--gres` and the CUDA module; `run_cases` uses a full-case worker pool capped by both core count and available memory. Pass `--workers $SLURM_CPUS_PER_TASK` to request the allocation's CPU count; the memory cap still applies. The two pools carry different per-worker RAM budgets: `PYRITE_MC_WORKER_MEM_MB` (default 6144) for full-case CPU workers, `PYRITE_MC_PIPELINE_WORKER_MEM_MB` (default 1536) for the transport-only workers behind a GPU. A pinned `--workers` clamped by either budget now warns.

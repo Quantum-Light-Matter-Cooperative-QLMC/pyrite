@@ -28,12 +28,12 @@ uv run pyrite config list
 
 Use the generated [CLI reference](../repo-design/cli/cli-reference.md) when a command's complete option and output contract matters. The [sweep-profile guide](sweep-profiles.md) explains profiles, fidelity, dataset identity, and named beams.
 
-## Run a small survey
+## Run a small smoke test
 
-Start with one material and survey fidelity rather than a production sweep:
+Start with one material on the tiny `--quick` grid rather than a production sweep:
 
 ```bash
-uv run pyrite run standard -m hopg --fidelity survey
+uv run pyrite run standard -m hopg --quick
 ```
 
 Bundled profiles resolve a conservative case-local line grid automatically; no derivation step is required. Full sweeps are heavy; use the [cluster guide](running-on-a-cluster.md) for GPU or SLURM work.

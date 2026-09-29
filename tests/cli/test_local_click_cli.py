@@ -4,6 +4,8 @@ import sys
 import pytest
 
 from pyrite.checkpoints import _checkpoint_io, slim
+from pyrite.cli import command as root_command
+from pyrite.cli._deprecations import option_message
 from pyrite.cli.commands import app_analysis as analyze
 from pyrite.cli.commands import app_validation as check
 from pyrite.cli.commands import app_viewer as viewer
@@ -152,8 +154,8 @@ def test_perf_cache_flag_precedence(monkeypatch, extra, expected):
 
 def test_run_fidelity_dispatch_and_quick_conflict(monkeypatch):
     seen = _capture(monkeypatch, scan, "run")
-    result = invoke(scan_cli.command, ["standard", "-m", "hopg", "--fidelity", "survey"])
-    assert_clean_result(result)
+    result = invoke(root_command, ["run", "standard", "-m", "hopg", "--fidelity", "survey"])
+    assert_clean_result(result, stderr=option_message("run", "--fidelity") + "\n")
     assert seen["fidelity"] == "survey"
 
     conflict = invoke(

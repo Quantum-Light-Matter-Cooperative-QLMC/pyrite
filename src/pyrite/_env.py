@@ -3,6 +3,12 @@
 import os
 from typing import overload
 
+#: Set by PyRITE on argv it generates itself (remote job scripts, the local
+#: ``--nsys`` re-exec). A deprecated CLI option carried there repeats a choice the
+#: user was already warned about -- or a default PyRITE filled in -- so the child
+#: stays quiet rather than warning a second time into a job log.
+GENERATED_INVOCATION_ENV = "PYRITE_GENERATED_INVOCATION"
+
 
 @overload
 def env_value(name: str, default: str) -> str: ...

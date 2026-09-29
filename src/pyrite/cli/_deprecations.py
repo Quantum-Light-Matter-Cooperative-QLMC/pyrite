@@ -13,8 +13,8 @@ without a row and a row cannot outlive the alias it describes, and
 `tests/test_deprecation_schedule.py` holds every row to the shipping
 `__version__` so a removal target cannot pass unnoticed again.
 
-Both registries are empty at 0.3.0: the 0.1.0 cohort reached its target and was
-removed. What remains here is the substrate, not leftovers.
+The 0.1.0 cohort reached its target and was removed at 0.3.0; the only option rows
+now are the 0.4.0 `--fidelity` deprecations (issue #215).
 """
 
 import re
@@ -23,6 +23,8 @@ from dataclasses import dataclass
 
 import click
 from click.core import ParameterSource
+
+from .._env import GENERATED_INVOCATION_ENV, env_value
 
 SUPPORT_WINDOW_MINORS = 2
 
@@ -200,15 +202,50 @@ def _flag(
 # attached with `--beam NAME` / `--detector NAME`, so the old spellings are plain
 # "no such option" usage errors with no registry row.
 
-#: Keyed by ``(command path, retired flag)``. `tests/cli/test_deprecations.py`
+_FIDELITY_RUN = "omit it for full; for reduced runs use --quick or a user-defined catalog profile"
+_FIDELITY_RECOMPUTE = "omit it; recompute reads fidelity from checkpoint metadata"
+_FIDELITY_NOTE = (
+    "`survey` is retired with no built-in replacement (issue #215); existing "
+    "`--survey` checkpoints stay readable and pullable."
+)
+
+#: Keyed by ``(command path, deprecated flag)``. `tests/cli/test_deprecations.py`
 #: holds this registry to the live command tree in both directions, exactly as
-#: it does for `DEPRECATIONS`.
+#: it does for `DEPRECATIONS`: every `RetiredOption` and `DeprecatedOption` needs
+#: a row, and every row needs one of them.
 #:
-#: Empty as of 0.3.0: the D5 spellings were deprecated in 0.1.0, and a
-#: two-minor window closes at 0.3.0. `RetiredOption` and `canonical_option`
-#: below stay -- they are the substrate ADR-0002 requires for the next rename,
-#: not leftovers from this one.
-DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {}
+#: The D5 spellings (deprecated in 0.1.0) were removed at 0.3.0; `RetiredOption`
+#: and `canonical_option` below stay as the substrate ADR-0002 requires for the
+#: next rename. `--fidelity` is a whole option being retired rather than a
+#: spelling being renamed, so it rides `DeprecatedOption` instead.
+DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
+    row.key: row
+    for row in (
+        _flag("run", "--fidelity", _FIDELITY_RUN, since="0.4.0", note=_FIDELITY_NOTE),
+        _flag("pyrite-dev perf", "--fidelity", _FIDELITY_RUN, since="0.4.0", note=_FIDELITY_NOTE),
+        _flag(
+            "checkpoint recompute brem",
+            "--fidelity",
+            _FIDELITY_RECOMPUTE,
+            since="0.4.0",
+            note=_FIDELITY_NOTE,
+        ),
+        _flag(
+            "checkpoint recompute line",
+            "--fidelity",
+            _FIDELITY_RECOMPUTE,
+            since="0.4.0",
+            note=_FIDELITY_NOTE,
+        ),
+        _flag(
+            "profile numerics show",
+            "--fidelity",
+            "omit it; numerics resolve against full",
+            since="0.4.0",
+            note=_FIDELITY_NOTE,
+        ),
+    )
+}
 
 
 def flag_message(command: str, flag: str, replacement: str) -> str:
@@ -271,6 +308,46 @@ class RetiredOption(click.Option):
         warn_flag(ctx, self.retired_flag, self.replacement)
         ctx.params[self.canonical_dest] = value
         return None
+
+
+def option_message(command: str, flag: str) -> str:
+    """Render the stderr warning for a deprecated option with no renamed spelling."""
+    entry = DEPRECATED_FLAGS.get((command, flag))
+    if entry is None:
+        return f"warning: '{flag}' is deprecated"
+    return (
+        f"warning: '{entry.flag}' is deprecated and will be removed in "
+        f"{entry.remove_in}; {entry.replacement}"
+    )
+
+
+class DeprecatedOption(click.Option):
+    """Visible option whose whole flag is being retired, not renamed.
+
+    The value still flows unchanged through the support window; giving the flag
+    on the command line warns once on stderr from the `DEPRECATED_FLAGS` row
+    for the invoking command. Defaults and environment-supplied values stay
+    silent, as does argv PyRITE generated itself (`GENERATED_INVOCATION_ENV`).
+    """
+
+    def __init__(self, param_decls: Sequence[str], **kwargs):
+        self.deprecated_flag = max((decl for decl in param_decls if decl.startswith("--")), key=len)
+        super().__init__(param_decls, callback=self._warn, **kwargs)
+
+    def _warn(self, ctx: click.Context, param: click.Parameter, value):
+        assert self.name is not None
+        if (
+            ctx.get_parameter_source(self.name) is ParameterSource.COMMANDLINE
+            and not env_value(GENERATED_INVOCATION_ENV)
+            and not ctx.meta.get(_option_warned_key(self.deprecated_flag))
+        ):
+            ctx.meta[_option_warned_key(self.deprecated_flag)] = True
+            click.echo(option_message(invocation_path(ctx), self.deprecated_flag), err=True)
+        return value
+
+
+def _option_warned_key(flag: str) -> str:
+    return f"pyrite.deprecated_option_warned:{flag}"
 
 
 #: Keyword arguments that describe the *value* of an option, and so have to

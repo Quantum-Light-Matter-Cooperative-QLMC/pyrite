@@ -4,16 +4,20 @@ import click
 import pytest
 
 from pyrite import _dev
+from pyrite._env import GENERATED_INVOCATION_ENV
 from pyrite.cli import command
 from pyrite.cli._deprecations import (
     DEPRECATED_FLAGS,
     DEPRECATIONS,
     SUPPORT_WINDOW_MINORS,
+    DeprecatedOption,
     RetiredOption,
     _window,
     canonical_option,
     message,
+    option_message,
 )
+from pyrite.cli.commands.scan import performance_command as perf_command
 from pyrite.devtools.cli_commands import energy_grid_command, performance_command
 from pyrite.devtools.cli_deprecations import build_deprecations
 from tests.helpers.cli import invoke
@@ -98,7 +102,7 @@ def test_every_hidden_command_is_covered_by_deprecations() -> None:
 
 def test_retired_flag_registry_matches_live_command_tree() -> None:
     root_ctx = click.Context(command, info_name="pyrite")
-    live: dict[tuple[str, str], RetiredOption] = {}
+    live: dict[tuple[str, str], RetiredOption | DeprecatedOption] = {}
 
     trees = [
         _walk_commands(command, root_ctx),
@@ -112,17 +116,23 @@ def test_retired_flag_registry_matches_live_command_tree() -> None:
             click.Context(performance_command, info_name="performance"),
             ("pyrite-dev", "performance"),
         ),
+        [(("pyrite-dev", "perf"), perf_command, click.Context(perf_command))],
     ]
     for path, child, _child_ctx in (item for tree in trees for item in tree):
         for param in child.params:
             if isinstance(param, RetiredOption):
                 key = (" ".join(path), param.retired_flag)
-                assert key not in live, f"duplicate retired flag: {key!r}"
-                live[key] = param
+            elif isinstance(param, DeprecatedOption):
+                key = (" ".join(path), param.deprecated_flag)
+            else:
+                continue
+            assert key not in live, f"duplicate deprecated flag: {key!r}"
+            live[key] = param
 
     assert live.keys() == DEPRECATED_FLAGS.keys()
     for key, param in live.items():
-        assert param.replacement == DEPRECATED_FLAGS[key].replacement
+        if isinstance(param, RetiredOption):
+            assert param.replacement == DEPRECATED_FLAGS[key].replacement
 
 
 def _replacement_command_path(replacement: str) -> tuple[str, str]:
@@ -278,7 +288,73 @@ def test_generated_deprecation_docs_are_current() -> None:
         command_name = (
             entry.command if entry.command.startswith("pyrite-dev ") else f"pyrite {entry.command}"
         )
+        replacement = (
+            f"`{entry.replacement}`"
+            if entry.replacement.startswith(("-", "pyrite"))
+            else entry.replacement
+        )
         assert (
-            f"| `{command_name}` | `{entry.flag}` | `{entry.replacement}` "
+            f"| `{command_name}` | `{entry.flag}` | {replacement} "
             f"| {entry.deprecated_in} | {entry.remove_in} | {entry.note} |"
         ) in actual
+
+
+@click.command()
+@click.option("--fidelity", cls=DeprecatedOption, type=click.Choice(("full", "survey")))
+@click.option("--quick", is_flag=True)
+def _deprecated_option_command(fidelity: str | None, quick: bool) -> None:
+    click.echo(f"fidelity={fidelity}")
+
+
+def test_deprecated_option_is_silent_when_omitted() -> None:
+    result = invoke(_deprecated_option_command, ["--quick"])
+
+    assert result.exit_code == 0
+    assert result.stdout == "fidelity=None\n"
+    assert result.stderr == ""
+
+
+@pytest.mark.parametrize("value", ["full", "survey"])
+def test_deprecated_option_warns_once_and_value_flows(value: str) -> None:
+    result = invoke(_deprecated_option_command, ["--fidelity", value, "--fidelity", value])
+
+    assert result.exit_code == 0
+    assert result.stdout == f"fidelity={value}\n"
+    assert result.stderr.splitlines() == ["warning: '--fidelity' is deprecated"]
+
+
+def test_deprecated_option_is_silent_in_generated_invocations(monkeypatch) -> None:
+    monkeypatch.setenv(GENERATED_INVOCATION_ENV, "1")
+
+    result = invoke(_deprecated_option_command, ["--fidelity", "survey"])
+
+    assert result.exit_code == 0
+    assert result.stdout == "fidelity=survey\n"
+    assert result.stderr == ""
+
+
+def test_deprecated_option_help_does_not_warn() -> None:
+    result = invoke(_deprecated_option_command, ["--help"])
+
+    assert result.exit_code == 0
+    assert "--fidelity" in result.stdout
+    assert result.stderr == ""
+
+
+def test_fidelity_rows_name_the_removal_release() -> None:
+    assert option_message("checkpoint recompute brem", "--fidelity") == (
+        "warning: '--fidelity' is deprecated and will be removed in 0.6.0; "
+        "omit it; recompute reads fidelity from checkpoint metadata"
+    )
+    for key, entry in DEPRECATED_FLAGS.items():
+        if key[1] == "--fidelity":
+            assert (entry.deprecated_in, entry.remove_in) == ("0.4.0", "0.6.0")
+
+
+def test_profile_numerics_show_warns_once_with_registry_message() -> None:
+    result = invoke(command, ["profile", "numerics", "show", "standard", "--fidelity", "full"])
+
+    assert result.exit_code == 0, result.output
+    warnings = [line for line in result.stderr.splitlines() if "is deprecated" in line]
+    assert warnings == [option_message("profile numerics show", "--fidelity")]
+    assert "fidelity=full" in result.stdout
