@@ -14,6 +14,6 @@ Never run heavy sweep locally; WSL multiprocessing can OOM/crash.
 4. Pull results with `pyrite remote pull <profiles-or-stems...>`.
 5. Cancel with `pyrite job stop <job-id>`; later submission resumes checkpoints.
 
-Default ~10-minute SLURM chunks (`--chunk-minutes`) provide scheduler yield
-points and checkpoint resume. `--chunk-minutes 0` monopolizes one allocation;
+Default ~10-minute SLURM chunks provide scheduler yield points and checkpoint
+resume; override with `pyrite run ... --remote --chunk-minutes N` (remote only). `--chunk-minutes 0` monopolizes one allocation;
 use only with confirmed box availability.

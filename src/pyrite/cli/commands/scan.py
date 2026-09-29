@@ -274,6 +274,16 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
 @click.option("--wait", is_flag=True, help="Wait for remote completion and pull results.")
 @click.option("--detach", is_flag=True, help="Return after remote submission.")
 @click.option(
+    "--chunk-minutes",
+    type=_cli_core.NONNEGATIVE_FLOAT,
+    default=None,
+    metavar="MINUTES",
+    help=(
+        "With -R/--remote, self-resubmitting SLURM slice length; defaults to 10, "
+        "or 0 (one unchunked allocation) for profiling captures."
+    ),
+)
+@click.option(
     "--source",
     type=click.Choice(("analytic", "gpt_gdf")),
     default=None,
@@ -374,6 +384,7 @@ def _command(
     remote_target,
     wait,
     detach,
+    chunk_minutes,
     source,
     gdf_shape_only,
     gdf_path,
@@ -422,6 +433,8 @@ def _command(
         raise click.UsageError("--no-sync/--dry-run require -R/--remote")
     if remote_target is None and (cpu or cpu_only):
         raise click.UsageError("--cpu/--cpu-only require -R/--remote")
+    if remote_target is None and chunk_minutes is not None:
+        raise click.UsageError("--chunk-minutes requires -R/--remote")
     if no_cache and recompute:
         raise click.UsageError("--no-cache and --recompute are mutually exclusive")
     if overwrite_trajectories and trajectories is None:
@@ -459,6 +472,7 @@ def _command(
             "nsys": "--nsys",
             "cpu": "--cpu",
             "cpu_only": "--cpu-only",
+            "chunk_minutes": "--chunk-minutes",
             "no_cache": "--no-cache",
             "recompute": "--recompute",
             "trajectories": "--trajectories",
@@ -549,6 +563,7 @@ def _command(
                 dry_run=dry_run,
                 headless=detach,
                 no_pull=False,
+                chunk_minutes=chunk_minutes,
             )
     if resolved_profile is not None:
         _implicit_defaults.warn_implicit_instrument(catalog_profile)

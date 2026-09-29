@@ -354,3 +354,36 @@ def test_recompute_locality_controls_are_rejected_when_incompatible():
     assert "local-only option(s): --checkpoint-dir" in remote_local_option.stderr
     assert remote_json.exit_code == 2
     assert "does not yet support --output json" in remote_json.stderr
+
+
+def test_run_remote_chunk_minutes_forwards_value_and_default(monkeypatch):
+    seen = []
+    monkeypatch.setattr(remote_cli, "_cli_start", lambda **kwargs: seen.append(kwargs))
+
+    explicit = invoke(
+        scan.command,
+        ["standard", "-m", "hopg", "--remote", "--chunk-minutes", "30", "--detach"],
+    )
+    default = invoke(scan.command, ["standard", "-m", "hopg", "--remote", "--detach"])
+
+    assert_clean_result(explicit)
+    assert_clean_result(default)
+    assert seen[0]["chunk_minutes"] == 30.0
+    assert seen[1]["chunk_minutes"] == 10.0
+
+
+def test_run_chunk_minutes_requires_remote(monkeypatch):
+    def fail_submission(**_kwargs):
+        raise AssertionError("local --chunk-minutes must not submit")
+
+    monkeypatch.setattr(remote_cli, "_cli_start", fail_submission)
+
+    local = invoke(scan.command, ["standard", "-m", "hopg", "--chunk-minutes", "30"])
+    negative = invoke(
+        scan.command, ["standard", "-m", "hopg", "--remote", "--chunk-minutes", "-1"]
+    )
+
+    assert local.exit_code == 2
+    assert "--chunk-minutes requires -R/--remote" in local.stderr
+    assert negative.exit_code == 2
+    assert "--chunk-minutes" in negative.stderr
