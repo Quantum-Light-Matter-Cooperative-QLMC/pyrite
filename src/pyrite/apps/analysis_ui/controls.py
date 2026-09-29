@@ -1,5 +1,6 @@
-import math
 from collections.abc import Sequence
+
+import numpy as np
 
 from pyrite._formatting import fmt_thickness
 from pyrite.results import records, sweep_values, thicknesses_by_energy
@@ -25,13 +26,15 @@ def _spread_default(values: Sequence[float], count: int = 4) -> list[float]:
 
 def _grid_limits(source, key: str) -> tuple[float, float]:
     """Positive lower and full upper endpoint of the selected photon grid."""
-    values = [
-        float(energy)
-        for record in source
-        for energy in (record.get(key) if record.get(key) is not None else record.get("E_grid", ()))
-        if math.isfinite(float(energy)) and float(energy) > 0
-    ]
-    return (min(values), max(values)) if values else (1.0, 1.0)
+    lows, highs = [], []
+    for record in source:
+        grid = record.get(key) if record.get(key) is not None else record.get("E_grid", ())
+        energies = np.asarray(grid, dtype=float).ravel()
+        energies = energies[np.isfinite(energies) & (energies > 0)]
+        if energies.size:
+            lows.append(energies.min())
+            highs.append(energies.max())
+    return (float(min(lows)), float(max(highs))) if lows else (1.0, 1.0)
 
 
 def make_axis_controls(
