@@ -14,6 +14,7 @@ import pytest
 
 from pyrite.montecarlo.spectrum.characteristic import _energy_bin_edges_and_widths
 from pyrite.montecarlo.spectrum.lines import _bin_quadrature as bq
+from pyrite.montecarlo.spectrum.lines._bin_tree import reduce_host
 
 cp = pytest.importorskip("cupy")
 
@@ -23,6 +24,23 @@ except Exception:  # pragma: no cover - depends on CUDA runtime presence
     _NDEV = 0
 
 pytestmark = pytest.mark.skipif(_NDEV < 1, reason="CUDA device required")
+
+
+def test_near_far_tree_matches_host_and_all_pairs_on_irregular_bins():
+    rng = np.random.default_rng(248)
+    edges = np.r_[np.linspace(900.0, 1000.0, 301), np.linspace(1000.2, 1300.0, 320)]
+    inv_width = 1.0 / np.diff(edges)
+    e = np.r_[rng.uniform(850, 1350, 350), np.full(50, 1000.2)].astype(np.float32)
+    a = (np.pi / rng.uniform(0.02, 5.0, len(e))).astype(np.float32)
+    w = rng.uniform(0.01, 1.0, len(e)).astype(np.float32)
+    tree = cp.zeros(len(inv_width), dtype=cp.float64)
+    pairs = cp.zeros_like(tree)
+    args = (cp.asarray(e), cp.asarray(a), cp.asarray(w), cp.asarray(edges), cp.asarray(inv_width))
+    bq.run_bin_mean_reduction_kernel(*args, out=tree, method="tree")
+    bq.run_bin_mean_reduction_kernel(*args, out=pairs, method="pairs")
+    host = reduce_host(e, a, w, edges)
+    np.testing.assert_allclose(cp.asnumpy(tree), host, rtol=2e-6, atol=1e-9)
+    np.testing.assert_allclose(cp.asnumpy(tree), cp.asnumpy(pairs), rtol=2e-6, atol=1e-9)
 
 
 def _lines(count=400, seed=11):

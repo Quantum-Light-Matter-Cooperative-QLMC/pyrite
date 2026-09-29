@@ -172,6 +172,17 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** Required: envelope bin-mean closed form and its product (cancellation-free) form; the per-side oscillatory bound and its factor 3/2; telescoping over contiguous far bins; that only bins with both edges beyond $K$ on one side use the envelope; host/device agreement; $K\to\infty$ recovers the exact route; identical-trajectory yield and shape against exact bin-mean on production cases
 - **Anchor:** `tests/montecarlo/test_sinc_bin_integration.py`, `tests/montecarlo/test_sinc_bin_integration_cuda.py`
 - **Notes:** Introduced for #192: the FP64 sine integral at every (line, bin) pair made 5 MeV `high_energy` h-BN cases ~40x slower than node sampling on the consumer lab GPU. Bin-mean case identity is unchanged (the change is within the stated tolerance); checkpoints written with the all-exact mean remain valid to $1.2\times10^{-5}$ in yield. Fresh-context verification (2026-09-28) returned `discrepancy`: the FP64 resonance was rounded to float32 before the offset was formed, which broke the bound for $E_{\rm res}/w \gtrsim 2^{23}$ on the FP64 host/matrix routes. Fixed by the resonance head/remainder split, pinned by two MeV regressions; the re-check (same day) rederived it. Human sign-off pending. [derivation](radiation-physics/sinc-bin-far-envelope.md)
+
+## `sinc-bin-near-far`
+
+- **Claim:** the large CUDA bin-mean reduction groups strictly far line intervals into a sorted tree. For $c_l=w_l/(2a_l^2)$, a far pair contributes $c_l/[(L-E_l)(H-E_l)]$ to bin $[L,H]$. A ten-moment expansion with node opening ratio at most $0.2$ has relative far-sum truncation below $4.6\times10^{-7}$ and per-line integrated-yield allowance below $7.3\times10^{-10}$ at $K=64$, in addition to the `sinc-bin-far-envelope` allowance. Leaves preserve the #192 near/far classification and exact near mean.
+- **Code:** `montecarlo/spectrum/lines/_bin_tree.py::build_line_tree`, `::run_tree_reduction`, `::reduce_host`; `montecarlo/spectrum/lines/_bin_quadrature.py::run_bin_mean_reduction_kernel`
+- **Source:** partial-fraction integral of the far envelope; geometric expansion of $1/[(L-E_l)(H-E_l)]$ about a node center, with a positive-weight remainder bound
+- **Status:** rederived
+- **Checks:** Re-derived in fresh context: units, positivity, $K\to\infty$ and single-line limits, edge-pole exclusion, guarded #192 near classification. Host regressions cover nonuniform/overlapping-near cases. Pending: device regression, host/device agreement, matched 5 MeV h-BN accuracy and timing.
+- **Anchor:** `tests/montecarlo/test_sinc_bin_near_far.py`, `tests/montecarlo/test_sinc_bin_integration_cuda.py`
+- **Notes:** Issue #248. A fresh-context verifier rederived the equation, units, positivity, limits, and guarded float32 near boundary at `bb5d80a8` (2026-09-28). The first pass at `5f4cd571` found an unguarded 64-width boundary mismatch, fixed by the radius guard and pinned on both sides. Small CUDA cases retain the #192 all-pairs reduction; host line-shape assembly is unchanged. RTX 5080 production-case accuracy and timing are pending. Human sign-off pending. [derivation and verification](radiation-physics/sinc-bin-near-far.md)
+
 ## `pxr-amplitude`
 
 - **Claim:** `χ_g` PXR susceptibility amplitude

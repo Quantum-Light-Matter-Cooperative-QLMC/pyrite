@@ -621,7 +621,8 @@ def sincsq_bin_lineshape(
 
 
 def run_bin_mean_reduction_kernel(
-    E_r, aw, w, edges, inv_width, *, out, exact_widths: float | None = BIN_MEAN_EXACT_WIDTHS
+    E_r, aw, w, edges, inv_width, *, out, exact_widths: float | None = BIN_MEAN_EXACT_WIDTHS,
+    method: str = "auto",
 ):
     """Fused CUDA bin-mean line reduction: ``out[k] += sum_l w_l * mean_k(line l)``.
 
@@ -633,6 +634,7 @@ def run_bin_mean_reduction_kernel(
 
     Validation: sinc-bin-integration
     Validation: sinc-bin-far-envelope
+    Validation: sinc-bin-near-far
     """
     import cupy
 
@@ -640,6 +642,17 @@ def run_bin_mean_reduction_kernel(
     n_lines = int(E_r.size)
     if n_bins == 0 or n_lines == 0:
         return out
+    if method not in ("auto", "pairs", "tree"):
+        raise ValueError("method must be 'auto', 'pairs', or 'tree'")
+    # The host tree setup is O(lines) (~0.09 s for 400k synthetic lines on
+    # the development CPU). The #192 all-pairs kernel measured ~19B pairs/s
+    # on the lab GPU; use a conservative crossover until matched case timing
+    # establishes a better one. An infinite exact window has no far nodes.
+    use_tree = method == "tree" or (method == "auto" and n_bins * n_lines >= 5_000_000_000)
+    if use_tree and exact_widths is not None:
+        from ._bin_tree import run_tree_reduction
+
+        return run_tree_reduction(E_r, aw, w, edges, inv_width, out=out, exact_widths=exact_widths)
     per_bin = cupy.empty(n_bins, dtype=cupy.float64)
     threads = int(_REDUCE_THREADS)
     _bin_reduce_kernel()(
