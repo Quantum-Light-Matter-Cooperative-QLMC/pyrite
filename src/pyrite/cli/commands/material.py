@@ -53,7 +53,7 @@ def _one(values, label):
     return float(values.item())
 
 
-def _simulation_scene(document, material, profile_name):
+def _simulation_scene(document, material, profile_name, detector_id=None):
     """Resolve one profile case without constructing a Sweep or checkpoint."""
     from pyrite.campaign.longitudinal import LongitudinalDistribution
     from pyrite.campaign.model import Beam, Numerics
@@ -99,15 +99,24 @@ def _simulation_scene(document, material, profile_name):
         substrate=spec.substrate,
         stack=spec.stack or None,
     )
-    physical = catalog.profile_physical_detectors.get(profile_name)
-    if physical is None:
+    detectors = catalog.profile_detector_set(profile_name)
+    pixel_ids = [name for name, row in detectors.items() if "distance_mm" in row]
+    if detector_id is None and len(pixel_ids) == 1:
+        detector_id = pixel_ids[0]
+    if detector_id is None:
         raise ValueError(
-            "material simulate requires [profiles.NAME.physical_detector]; "
-            "add one with 'pyrite profile physical-detector set NAME --distance-mm MM'"
+            "material simulate requires one pixel detector or --detector ID; "
+            f"available pixel detectors: {', '.join(pixel_ids) or 'none'}"
         )
+    if detector_id not in pixel_ids:
+        raise ValueError(
+            f"detector {detector_id!r} is not a pixel detector in profile {profile_name!r}; "
+            f"available: {', '.join(pixel_ids) or 'none'}"
+        )
+    physical = detectors[detector_id]
     from pyrite.campaign.observation import resolve_profile_observation
 
-    observation = resolve_profile_observation(catalog, profile_name)
+    observation = resolve_profile_observation(catalog, profile_name, detector_id=detector_id)
     detector = physical_detector_from_row(physical) if observation is None else observation.detector
     scorer_row = cast("dict[str, Any] | None", physical.get("scorer"))
     scorer = (
@@ -170,6 +179,7 @@ def _simulation_scene(document, material, profile_name):
             radiative_cutoff_eV=cast(float | None, transport.get("radiative_cutoff_eV")),
         ),
         catalog.profile_emission(profile_name) or "incoherent",
+        detector_id,
     )
 
 
@@ -457,6 +467,9 @@ def command():
     help="Resolve one scene from profile NAME.",
 )
 @click.option(
+    "--detector", "detector_id", help="Pixel detector ID; required when the profile has several."
+)
+@click.option(
     "-o",
     "--output",
     "output_format",
@@ -471,8 +484,8 @@ def command():
     type=click.Path(path_type=Path, dir_okay=False, writable=True),
     help="Write full factorized spatial arrays as a new compressed .npz file.",
 )
-def simulate_command(material, profile_name, output_format, output_file):
-    """Simulate one material/profile scene on its physical detector.
+def simulate_command(material, profile_name, detector_id, output_format, output_file):
+    """Simulate one material/profile scene on a selected pixel detector.
 
     This is intentionally filesystem-free except for an explicit --output-file:
     it calls the public single-scene API and does not create a sweep or checkpoint.
@@ -480,8 +493,8 @@ def simulate_command(material, profile_name, output_format, output_file):
     schema = "cxr.material.simulate"
     try:
         _text, document = _catalog_io.catalog_text()
-        beam, target, detector, filters, scorer, acquisition, numerics, emission = (
-            _simulation_scene(document, material, profile_name)
+        beam, target, detector, filters, scorer, acquisition, numerics, emission, selected_id = (
+            _simulation_scene(document, material, profile_name, detector_id)
         )
         from pyrite.api import simulate
 
@@ -498,6 +511,7 @@ def simulate_command(material, profile_name, output_format, output_file):
         if output_file is not None:
             _write_simulation_artifact(output_file, result)
         payload = _simulation_payload(material, profile_name, result)
+        payload["detector_id"] = selected_id
         if output_file is not None:
             payload["output_file"] = str(output_file)
     except (OSError, ValueError, ParseError) as exc:
@@ -510,13 +524,14 @@ def simulate_command(material, profile_name, output_format, output_file):
         return 0
     if output_format == "wide":
         emit_result(
-            f"material={material}\tprofile={profile_name}\tline_samples={len(result.energy_eV)}\t"
+            f"material={material}\tprofile={profile_name}\tdetector={selected_id}\t"
+            f"line_samples={len(result.energy_eV)}\t"
             f"background_samples={len(result.background_energy_eV)}\t"
             f"pixel_shape={tuple(payload['pixel_grid']['shape'])}\t"
             f"filters={payload['pixel_grid']['filter_count']}"
         )
     else:
-        emit_result(f"{material}: profile {profile_name}")
+        emit_result(f"{material}: profile {profile_name}, detector {selected_id}")
         emit_result("  component  samples  energy range (eV)")
         emit_result(
             f"  line       {len(result.energy_eV):7d}  {result.energy_eV[0]:g} .. {result.energy_eV[-1]:g}"

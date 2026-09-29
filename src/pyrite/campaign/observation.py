@@ -76,6 +76,7 @@ def resolve_profile_observation(
     profile_name: str,
     *,
     energy_bins: EnergyBins | None = None,
+    detector_id: str | None = None,
 ) -> ResolvedObservation | None:
     """Resolve a complete counting observation, or ``None`` for legacy profiles.
 
@@ -85,7 +86,15 @@ def resolve_profile_observation(
     """
     if profile_name not in catalog.profile_names:
         raise KeyError(f"unknown profile {profile_name!r}; have {list(catalog.profile_names)}")
-    row = catalog.profile_physical_detectors.get(profile_name)
+    detectors = catalog.profile_detector_set(profile_name)
+    if detector_id is None:
+        detector_id = next(iter(detectors))
+    try:
+        row = detectors[detector_id]
+    except KeyError:
+        raise ValueError(
+            f"unknown detector {detector_id!r} in profile {profile_name!r}; have {list(detectors)}"
+        ) from None
     if row is None or "acquisition" not in row:
         return None
     detector = physical_detector_from_config(row, energy_bins=energy_bins)

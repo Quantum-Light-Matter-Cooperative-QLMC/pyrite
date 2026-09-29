@@ -227,6 +227,59 @@ def profile_payload(document, name):
         dict(row.unwrap() if hasattr(row, "unwrap") else row) for row in filter_rows(profile)
     ]
     physical = physical_detector_row(profile)
+    declared_detectors = profile.get("detectors")
+    if declared_detectors is not None:
+        detector_items = declared_detectors.items()
+    else:
+        detector_items = []
+        if physical is not None:
+            detector_items.append(("physical", physical))
+        if detector_present:
+            detector_items.append(("default", profile["detector"]))
+        if not detector_items:
+            detector_items.append(("default", {}))
+    detector_collection = {}
+    for detector_id, entry in detector_items:
+        reference = str(entry) if isinstance(entry, str) else None
+        if reference is not None:
+            entry = detector_rows(document).get(reference)
+            if entry is None:
+                unknown_detector(document, reference)
+        values = dict(entry.unwrap() if hasattr(entry, "unwrap") else entry)
+        if "distance_mm" in values:
+            from .observation import physical_detector_from_config
+
+            geometry = {
+                key: value
+                for key, value in values.items()
+                if key
+                in {
+                    "distance_mm",
+                    "polar_deg",
+                    "azimuth_deg",
+                    "roll_deg",
+                    "offset_mm",
+                    "shape",
+                    "pitch_mm",
+                }
+            }
+            projection = physical_detector_from_config(geometry).scalar_detector()
+            detector_collection[detector_id] = {
+                "kind": "pixel",
+                "reference": reference,
+                "settings": values,
+                "acceptance": {key: getattr(projection, key) for key in active_detector_keys},
+            }
+        else:
+            resolved = Detector(
+                **{key: value for key, value in values.items() if key in active_detector_keys}
+            )
+            detector_collection[detector_id] = {
+                "kind": "scalar",
+                "reference": reference,
+                "settings": {key: getattr(resolved, key) for key in active_detector_keys},
+                "acceptance": {key: getattr(resolved, key) for key in active_detector_keys},
+            }
     return {
         "name": name,
         "ranges": [
@@ -240,6 +293,7 @@ def profile_payload(document, name):
         "detector_ref": detector_ref,
         "detector_present": detector_present,
         "detector": {key: getattr(detector, key) for key, _label, _unit in ACTIVE_DETECTOR_FIELDS},
+        "detectors": detector_collection,
         "filters": filters,
         "physical_detector": (
             None

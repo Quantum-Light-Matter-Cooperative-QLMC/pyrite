@@ -16,6 +16,7 @@ from .._energy_grid_artifacts import ArtifactError, load_artifact
 from .._line_grid_policy import BANDWIDTH_POLICIES, LINE_QUADRATURES, RESOLUTION_POLICIES
 from .._numerics import validate_profile_numerics
 from ._beam_detector_parse import (
+    _parse_detector_entry,
     _parse_filter_rows,
     _parse_physical_detector,
     _parse_profile_beam,
@@ -492,6 +493,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 "overrides",
                 "beam",
                 "detector",
+                "detectors",
                 "filters",
                 "physical_detector",
                 "emission",
@@ -596,6 +598,35 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 row_out["physical_detector"] = physical_detector
             else:
                 del row_out["physical_detector"]
+        if "detectors" in row_out:
+            detector_table = _table(row_out["detectors"], f"{path}.detectors", errors)
+            if detector_table is not None:
+                if "detector" in row or "physical_detector" in row:
+                    errors.add(
+                        f"{path}.detectors",
+                        "cannot be combined with legacy detector or physical_detector",
+                    )
+                parsed_detectors: dict[str, Mapping[str, object] | str] = {}
+                for detector_name, detector_raw in detector_table.items():
+                    detector_path = f"{path}.detectors.{detector_name}"
+                    if re.fullmatch(r"[a-z][a-z0-9_-]*", detector_name) is None:
+                        errors.add(
+                            detector_path,
+                            "ID must start with a lowercase letter and contain only "
+                            "lowercase letters, digits, '_' or '-'",
+                        )
+                    if isinstance(detector_raw, str):
+                        if detector_raw:
+                            parsed_detectors[detector_name] = detector_raw
+                        else:
+                            errors.add(detector_path, "must be a nonempty detector reference")
+                        continue
+                    detector = _parse_detector_entry(detector_raw, detector_path, errors)
+                    if detector is not None:
+                        parsed_detectors[detector_name] = detector
+                if not parsed_detectors:
+                    errors.add(f"{path}.detectors", "must contain at least one detector")
+                row_out["detectors"] = MappingProxyType(parsed_detectors)
         out[key] = row_out
     return out
 

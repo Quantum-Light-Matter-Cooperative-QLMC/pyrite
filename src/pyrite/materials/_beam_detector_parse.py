@@ -722,6 +722,27 @@ def _parse_physical_detector(
     return MappingProxyType(cleaned)
 
 
+def _parse_detector_entry(raw: object, path: str, errors: _Errors) -> Mapping[str, object] | None:
+    """Validate one scalar or pixelated detector in a named collection."""
+    row = _table(raw, path, errors)
+    if row is None:
+        return None
+    pixel_keys = set(_PHYSICAL_DETECTOR_KEYS)
+    scalar_keys = set(_DETECTOR_KEYS | _DEPRECATED_DETECTOR_KEYS)
+    errors.keys(row, path, pixel_keys | scalar_keys)
+    has_pixel = bool(row.keys() & (pixel_keys - {"distance_mm"}))
+    has_scalar = bool(row.keys() & (scalar_keys - {"distance_mm"}))
+    if has_pixel and has_scalar:
+        errors.add(path, "pixel detector acceptance is derived from its geometry")
+        return None
+    if has_scalar:
+        return _parse_profile_detector(row, path, errors)
+    if has_pixel or "distance_mm" in row:
+        return _parse_physical_detector(row, path, errors)
+    errors.add(path, "must define scalar acceptance or pixel geometry")
+    return None
+
+
 def _parse_detectors(
     raw: object, errors: _Errors
 ) -> tuple[dict[str, Mapping[str, object]], dict[str, str]]:
@@ -751,7 +772,7 @@ def _parse_detectors(
         if not fields:
             errors.add(path, "must define at least one detector geometry field")
             continue
-        detector = _parse_profile_detector(fields, path, errors)
+        detector = _parse_detector_entry(fields, path, errors)
         if detector is not None:
             detectors[key] = detector
     return detectors, labels

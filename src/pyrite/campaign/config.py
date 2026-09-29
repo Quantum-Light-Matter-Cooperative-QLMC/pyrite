@@ -99,13 +99,32 @@ def default_settings(fidelity: str = "full"):
 DEFAULT_CATALOG_DETECTOR = Detector()
 
 
-def catalog_detector(catalog_profile: str = "standard") -> Detector:
+def catalog_detector(catalog_profile: str = "standard", detector_id: str | None = None) -> Detector:
     """Build the detector a catalog profile resolves to.
 
     ``Catalog.profile_detector`` returns validated acceptance fields; an empty
     mapping means every default stands.
     """
-    spec = _catalog(catalog_profile).profile_detector(catalog_profile)
+    detectors = _catalog(catalog_profile).profile_detector_set(catalog_profile)
+    if detector_id is None:
+        detector_id = next(iter(detectors))
+    try:
+        spec = detectors[detector_id]
+    except KeyError:
+        raise ValueError(
+            f"unknown detector {detector_id!r} in profile {catalog_profile!r}; "
+            f"have {list(detectors)}"
+        ) from None
+    if "distance_mm" in spec:
+        from .observation import physical_detector_from_config
+
+        projection = physical_detector_from_config(spec).scalar_detector()
+        return replace(
+            DEFAULT_CATALOG_DETECTOR,
+            observation_angle_deg=projection.observation_angle_deg,
+            polar_acceptance_deg=projection.polar_acceptance_deg,
+            solid_angle_sr=projection.solid_angle_sr,
+        )
     return replace(DEFAULT_CATALOG_DETECTOR, **dict(spec))
 
 
@@ -160,6 +179,7 @@ def material_sweep(
     fidelity="full",
     theta_obs_deg: Any = None,
     detector: Any = None,
+    detector_id: Any = None,
     catalog_profile="standard",
     profile=None,
     **overrides: Any,
@@ -204,7 +224,7 @@ def material_sweep(
             beam_changes.setdefault("transverse_fwhm_x_mm", None)
             beam_changes.setdefault("transverse_fwhm_y_mm", None)
         beam = beam_replace(beam, **beam_changes)
-    resolved_catalog_detector = catalog_detector(catalog_profile)
+    resolved_catalog_detector = catalog_detector(catalog_profile, detector_id)
     legacy_detector = {
         "observation_angle_deg": theta_obs_deg,
         "polar_acceptance_deg": overrides.pop("dtheta_obs_deg", None),
@@ -222,7 +242,9 @@ def material_sweep(
     resolved_detector = (
         detector if detector is not None else replace(resolved_catalog_detector, **supplied_legacy)
     )
-    observation = resolve_profile_observation(_catalog(catalog_profile), catalog_profile)
+    observation = resolve_profile_observation(
+        _catalog(catalog_profile), catalog_profile, detector_id=detector_id
+    )
     if observation is not None:
         # A counting physical detector is the one source of observation
         # geometry: the scalar acceptance the source cases are built with is
@@ -236,13 +258,7 @@ def material_sweep(
                 "detector=/theta_obs_deg/dtheta_obs_deg/domega_sr override or change the "
                 "physical detector pose instead"
             )
-        projection = observation.scalar_detector()
-        resolved_detector = replace(
-            resolved_catalog_detector,
-            observation_angle_deg=projection.observation_angle_deg,
-            polar_acceptance_deg=projection.polar_acceptance_deg,
-            solid_angle_sr=projection.solid_angle_sr,
-        )
+        resolved_detector = resolved_catalog_detector
     current_bins = resolved_detector.energy_bins
     missing = object()
     line_override = overrides.pop("E_grid_line", missing)

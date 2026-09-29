@@ -213,6 +213,34 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if isinstance(row.get("physical_detector"), Mapping)
     }
+    profile_detector_sets: dict[str, Mapping[str, Mapping[str, object]]] = {}
+    for name, row in profiles.items():
+        declared = row.get("detectors")
+        if isinstance(declared, Mapping):
+            resolved: dict[str, Mapping[str, object]] = {}
+            for detector_id, value in declared.items():
+                if isinstance(value, str):
+                    detector_spec = detectors.get(value)
+                    if detector_spec is None:
+                        errors.add(
+                            f"profiles.{name}.detectors.{detector_id}",
+                            f"unknown detector {value!r}",
+                        )
+                        continue
+                    resolved[detector_id] = detector_spec
+                else:
+                    resolved[detector_id] = cast(Mapping[str, object], value)
+        else:
+            resolved = {}
+            if name in profile_physical_detectors:
+                resolved["physical"] = profile_physical_detectors[name]
+            if name in profile_detectors:
+                resolved["default"] = profile_detectors[name]
+            if not resolved:
+                resolved["default"] = MappingProxyType({})
+        profile_detector_sets[name] = MappingProxyType(resolved)
+    if errors.items:
+        raise MaterialConfigError(errors.items, profile=profile)
     return MaterialCatalog(
         schema_version=1,
         crystals=MappingProxyType(crystals),
@@ -228,6 +256,7 @@ def _load_material_catalog_cached(
         profile_line_grid_policies=MappingProxyType(profile_line_grid_policies),
         profile_filters=MappingProxyType(profile_filters),
         profile_physical_detectors=MappingProxyType(profile_physical_detectors),
+        profile_detector_sets=MappingProxyType(profile_detector_sets),
         profile_energy_grid_refs=MappingProxyType(profile_energy_grid_refs),
         resolved_energy_grid_refs=MappingProxyType(resolved_energy_grid_refs),
         beams=MappingProxyType(beams),

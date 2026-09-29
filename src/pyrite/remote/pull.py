@@ -101,10 +101,14 @@ def _profile_pull_candidates(material):
         match = _VARIANT_STEM_RE.fullmatch(name)
         if match is not None and match["material"] == material and name not in candidates:
             candidates.append(name)
+        elif name.startswith(f"{material}_quick_") and name not in candidates:
+            candidates.append(name)
     return candidates
 
 
-def resolve_profile_stem(material, catalog_profile, *, fidelity=None, hash_prefix=None):
+def resolve_profile_stem(
+    material, catalog_profile, *, fidelity=None, hash_prefix=None, detector_id=None
+):
     """Resolve a ``MATERIAL@PROFILE`` pull selector to one exact on-disk
     checkpoint stem.
 
@@ -125,11 +129,22 @@ def resolve_profile_stem(material, catalog_profile, *, fidelity=None, hash_prefi
         identity = meta.get("dataset_identity") or {}
         profile = identity.get("catalog_profile") or "standard"
         digest = str(identity.get("parameter_sha256", ""))
-        found.append((stem, profile, str(identity.get("fidelity", "full")), digest, mtime))
+        found.append(
+            (
+                stem,
+                profile,
+                str(identity.get("fidelity", "full")),
+                digest,
+                mtime,
+                identity.get("detector_id"),
+            )
+        )
     matches = [
         item
         for item in found
-        if item[1] == catalog_profile and (fidelity is None or item[2] == fidelity)
+        if item[1] == catalog_profile
+        and (fidelity is None or item[2] == fidelity)
+        and (detector_id is None or item[5] == detector_id)
     ]
     if hash_prefix is not None:
         matches = [item for item in matches if item[3].startswith(hash_prefix)]
@@ -137,11 +152,13 @@ def resolve_profile_stem(material, catalog_profile, *, fidelity=None, hash_prefi
         available = sorted(
             {
                 f"{profile}/{found_fidelity}:{digest[:12]}"
-                for _, profile, found_fidelity, digest, _ in found
+                for _, profile, found_fidelity, digest, _, _ in found
             }
         )
         detail = f"; found on the box: {', '.join(available)}" if available else "; none found"
         selector = f"{material}@{catalog_profile}"
+        if detector_id is not None:
+            selector += f" detector {detector_id}"
         if hash_prefix is not None:
             selector += f" --hash {hash_prefix}"
         raise SystemExit(f"no remote checkpoint matches {selector}{detail}")
@@ -201,6 +218,9 @@ def pull(
     if hash_prefix is not None and len(qualified) != 1:
         raise SystemExit("--hash requires exactly one MATERIAL@PROFILE selector to pull")
     if qualified:
+        from ..campaign.profiles import detector_variant
+        from ..materials import CATALOG, load_material_catalog
+
         resolved_stems = []
         for stem, selector in zip(stems, selectors, strict=True):
             if selector is None:
@@ -208,7 +228,33 @@ def pull(
                 continue
             material, profile = selector
             transport._check_shell_tokens([material])
-            resolved_stems.append(resolve_profile_stem(material, profile, hash_prefix=hash_prefix))
+            try:
+                catalog = (
+                    CATALOG if profile == "standard" else load_material_catalog(profile=profile)
+                )
+                detector_ids = tuple(catalog.profile_detector_set(profile))
+            except KeyError, ValueError:
+                resolved_stems.append(
+                    resolve_profile_stem(material, profile, hash_prefix=hash_prefix)
+                )
+                continue
+            if hash_prefix is not None:
+                resolved_stems.append(
+                    resolve_profile_stem(material, profile, hash_prefix=hash_prefix)
+                )
+                continue
+            for detector_id in detector_ids:
+                selected_id = (
+                    detector_id if detector_variant(profile, detector_id) is not None else None
+                )
+                resolved_stems.append(
+                    resolve_profile_stem(
+                        material,
+                        profile,
+                        hash_prefix=hash_prefix,
+                        detector_id=selected_id,
+                    )
+                )
         stems = resolved_stems
     transport._check_shell_tokens(stems)
     if dataset is None:
@@ -243,7 +289,9 @@ def pull(
             # it -- see test_pull_quick_stem_does_not_resolve_survey_siblings
             # and test_pull_dataset_merge_skips_survey_discovery).
             resolved_identity = identity_from_stem(stem, dest)
-            if resolved_identity is None and profiles._VARIANT_STEM_RE.fullmatch(stem):
+            if resolved_identity is None and (
+                profiles._VARIANT_STEM_RE.fullmatch(stem) or "_quick_" in stem
+            ):
                 remote_meta = _remote_meta_json(stem)
                 if remote_meta is not None:
                     resolved_identity = remote_meta[1].get("dataset_identity")

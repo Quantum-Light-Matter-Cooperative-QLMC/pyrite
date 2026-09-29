@@ -29,5 +29,11 @@ def warn_implicit_instrument(profile: str) -> None:
     subject = f"profile '{profile}'"
     if CATALOG.profile_beam(profile) is None:
         warn_implicit_default("beam", subject)
-    if profile not in CATALOG.profile_detectors:
+    detectors = CATALOG.profile_detector_set(profile)
+    if (
+        profile not in CATALOG.profile_detectors
+        and profile not in CATALOG.profile_physical_detectors
+        and tuple(detectors) == ("default",)
+        and not detectors["default"]
+    ):
         warn_implicit_default("detector", subject)

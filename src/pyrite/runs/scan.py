@@ -470,22 +470,30 @@ def run(args):
 
     try:
         incomplete = False
-        for material in materials:
-            remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
-            try:
-                complete = _run_material(args, material, max_seconds=remaining)
-            except Exception as error:
-                from ..montecarlo.trajectories import TrajectoryArtifactError
+        from ..materials import CATALOG, load_material_catalog
 
-                if not isinstance(error, TrajectoryArtifactError):
-                    raise
-                # An actionable user error (existing/stale artifacts), not a crash.
-                raise SystemExit(str(error)) from None
-            if not complete:
-                incomplete = True
+        profile = _effective_catalog_profile(args)
+        catalog = CATALOG if profile == "standard" else load_material_catalog(profile=profile)
+        detector_ids = tuple(catalog.profile_detector_set(profile))
+        for material in materials:
+            for detector_id in detector_ids:
+                args.detector_id = detector_id
+                remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+                try:
+                    complete = _run_material(args, material, max_seconds=remaining)
+                except Exception as error:
+                    from ..montecarlo.trajectories import TrajectoryArtifactError
+
+                    if not isinstance(error, TrajectoryArtifactError):
+                        raise
+                    raise SystemExit(str(error)) from None
+                if not complete:
+                    incomplete = True
         if incomplete:
             raise SystemExit(75)  # EX_TEMPFAIL: budget hit, work remains
     finally:
+        if hasattr(args, "detector_id"):
+            del args.detector_id
         if use_dashboard:
             _dashboard_stop.set()
             t.join(timeout=2.0)
@@ -511,25 +519,38 @@ def _run_json(args):
     errors = {}
     resumable = False
     args.no_progress = True
-    for material in materials:
-        remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
-        try:
-            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
-                complete = _run_material(args, material, max_seconds=remaining)
-        except (Exception, SystemExit) as exc:
-            failed.append(material)
-            errors[material] = str(exc) or type(exc).__name__
-            continue
-        if complete:
-            completed.append(material)
-        else:
-            failed.append(material)
-            errors[material] = "resumable work remains"
-            resumable = True
-    checkpoints = [
-        os.path.join(args.checkpoint_dir, _checkpoint_stem(args, material))
-        for material in [*completed, *failed]
-    ]
+    from ..materials import CATALOG, load_material_catalog
+
+    profile = _effective_catalog_profile(args)
+    catalog = CATALOG if profile == "standard" else load_material_catalog(profile=profile)
+    detector_ids = tuple(catalog.profile_detector_set(profile))
+    checkpoints = []
+    try:
+        for material in materials:
+            material_errors = []
+            for detector_id in detector_ids:
+                args.detector_id = detector_id
+                remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+                try:
+                    with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                        complete = _run_material(args, material, max_seconds=remaining)
+                    checkpoints.append(
+                        os.path.join(args.checkpoint_dir, _checkpoint_stem(args, material))
+                    )
+                except (Exception, SystemExit) as exc:
+                    material_errors.append(f"{detector_id}: {str(exc) or type(exc).__name__}")
+                    continue
+                if not complete:
+                    material_errors.append(f"{detector_id}: resumable work remains")
+                    resumable = True
+            if material_errors:
+                failed.append(material)
+                errors[material] = "; ".join(material_errors)
+            else:
+                completed.append(material)
+    finally:
+        if hasattr(args, "detector_id"):
+            del args.detector_id
     result = cli_json.operation_summary(
         "run",
         materials,
@@ -543,7 +564,7 @@ def _run_json(args):
     _cli_core.emit_json_result(
         result,
         failure_exit=75
-        if resumable and all(message == "resumable work remains" for message in errors.values())
+        if resumable and all("resumable work remains" in message for message in errors.values())
         else 1,
     )
 
@@ -609,6 +630,8 @@ def _resolved_run(args, material):
     # incoherent <material> stem.
     from ..materials import CATALOG
 
+    detector_id = getattr(args, "detector_id", None)
+
     catalog_emission = CATALOG.profile_emission(catalog_profile)
     if catalog_emission is not None:
         settings = replace(settings, emission=catalog_emission)
@@ -631,9 +654,14 @@ def _resolved_run(args, material):
         # the valid line-grid energies; _select_quick_energies keeps the standard
         # profile's [30, 50] bit-for-bit where both are valid.
         probe = (
-            material_sweep(material, catalog_profile=catalog_profile)
+            material_sweep(material, catalog_profile=catalog_profile, detector_id=detector_id)
             if fidelity == "full"
-            else material_sweep(material, fidelity=fidelity, catalog_profile=catalog_profile)
+            else material_sweep(
+                material,
+                fidelity=fidelity,
+                catalog_profile=catalog_profile,
+                detector_id=detector_id,
+            )
         )
         overrides.update(
             # Start at 5 deg, not 0: tilt=0 is a banned emission geometry
@@ -652,10 +680,16 @@ def _resolved_run(args, material):
     # Analytic beam settings remain profile-owned. Explicit GDF overrides
     # participate in dataset identity and force a variant checkpoint stem.
     sweep = (
-        material_sweep(material, catalog_profile=catalog_profile, **overrides)
+        material_sweep(
+            material, catalog_profile=catalog_profile, detector_id=detector_id, **overrides
+        )
         if fidelity == "full"
         else material_sweep(
-            material, fidelity=fidelity, catalog_profile=catalog_profile, **overrides
+            material,
+            fidelity=fidelity,
+            catalog_profile=catalog_profile,
+            detector_id=detector_id,
+            **overrides,
         )
     )
 
@@ -682,7 +716,7 @@ def _resolved_run(args, material):
         sweep = replace(sweep, beam=beam_replace(sweep.beam, energy_keV=kept))
 
     from ..campaign.geometry import Stack
-    from ..campaign.profiles import dataset_identity, variant_stem
+    from ..campaign.profiles import dataset_identity, detector_variant, variant_stem
     from ..xsgen.sbethe import resolve_catalog_table
     from ..xsgen.store import identity_markers
 
@@ -714,19 +748,28 @@ def _resolved_run(args, material):
             table.key: table.digest for table in load_bremsstrahlung_tables(elements).values()
         }
 
+    if detector_id is None:
+        detector_id = next(iter(CATALOG.profile_detector_set(catalog_profile)))
+    variant = detector_variant(
+        catalog_profile, detector_id, quick=bool(getattr(args, "quick", False))
+    )
+    named_variant = variant is not None and variant != "quick"
     identity = dataset_identity(
         material,
         fidelity,
         settings,
         sweep,
-        variant="quick" if getattr(args, "quick", False) else None,
+        variant=variant,
         catalog_profile=catalog_profile,
         xsgen_tables=xsgen_tables,
     )
+    if named_variant:
+        identity["detector_id"] = detector_id
     canonical_full = (
         fidelity == "full"
         and not overrides
         and not getattr(args, "quick", False)
+        and not named_variant
         and catalog_profile == "standard"
         and settings.emission == "incoherent"
         and not settings.straggling
@@ -739,6 +782,8 @@ def _resolved_run(args, material):
         and settings.radiative_cutoff_eV is None
     )
     stem = variant_stem(identity, canonical_full=canonical_full)
+    if getattr(args, "quick", False) and named_variant:
+        stem = f"{material}_quick_{detector_id}"
     return settings, sweep, identity, stem
 
 
@@ -754,7 +799,8 @@ def _sweep_observation(args, identity, settings, stem, content_key_fn):
 
     profile = str(identity.get("catalog_profile", "standard"))
     catalog = CATALOG if profile == "standard" else load_material_catalog(profile=profile)
-    observation = resolve_profile_observation(catalog, profile)
+    detector_id = getattr(args, "detector_id", None)
+    observation = resolve_profile_observation(catalog, profile, detector_id=detector_id)
     if observation is None:
         return None
     from ..api import run_provenance
@@ -766,7 +812,10 @@ def _sweep_observation(args, identity, settings, stem, content_key_fn):
         store=ObservationStore(stem, Path(args.checkpoint_dir).resolve().parent / "observations"),
         content_key_fn=content_key_fn,
         emission=settings.emission,
-        provenance_fn=lambda case: run_provenance(case, xsgen_tables),
+        provenance_fn=lambda case: {
+            **run_provenance(case, xsgen_tables),
+            **({"detector_id": detector_id} if detector_id is not None else {}),
+        },
     )
 
 
@@ -791,7 +840,7 @@ def _run_material(args, material, max_seconds=None):
     if summary is not None:
         print(summary)
     print(
-        f"{material}: {len(cases)} cases across "
+        f"{material} [{getattr(args, 'detector_id', 'default')}]: {len(cases)} cases across "
         f"{len({c['name'] for c in cases})} configs "
         f"[profile={fidelity}, parameters={identity['parameter_sha256'][:12]}]"
         + (" (quick grid)" if args.quick else "")
