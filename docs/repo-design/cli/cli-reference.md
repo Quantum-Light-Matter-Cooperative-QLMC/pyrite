@@ -153,6 +153,9 @@ Options:
                                   overrides it.
   --wait                          Wait for remote completion and pull results.
   --detach                        Return after remote submission.
+  --chunk-minutes MINUTES         With -R/--remote, self-resubmitting SLURM slice
+                                  length; defaults to 10, or 0 (one unchunked
+                                  allocation) for profiling captures.
   --source [analytic|gpt_gdf]     Override beam source; gpt_gdf replaces analytic phase
                                   space (local runs).
   --gdf-shape-only / --no-gdf-shape-only
