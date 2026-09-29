@@ -99,9 +99,7 @@ def _simulation_scene(document, material, profile_name):
         substrate=spec.substrate,
         stack=spec.stack or None,
     )
-    physical = catalog.profile_physical_detectors.get(
-        profile_name, catalog.profile_physical_detectors.get("standard")
-    )
+    physical = catalog.profile_physical_detectors.get(profile_name)
     if physical is None:
         raise ValueError(
             "material simulate requires [profiles.NAME.physical_detector]; "

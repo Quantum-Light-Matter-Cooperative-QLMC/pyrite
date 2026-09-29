@@ -67,6 +67,7 @@ Edges (importer -> imported):
   p13 -> p6
   p13 -> p9
   p14 -> p10
+  p14 -> p12
   p14 -> p15
   p14 -> p16
   p14 -> p17
@@ -140,6 +141,7 @@ Edges (importer -> imported):
 - **`pyrite.simulate(beam, target, detector, ...)`** → `api:simulate`: lower one scalar scene to the typed `Case`, run it without checkpoint I/O, and return response-free source arrays plus resolved provenance in `Result`.
 - **`pyrite profile ...`** → `cli.commands.profile`: manage named campaign defaults and material membership through `set|add|remove`; an absent membership key means all catalog materials.
 - **`pyrite profile physical-detector show|set|reset`** → `cli.commands._physical_detector` (registered on `profile`): the profile's physical pixel detector, scorer, response, and acquisition, with merge/reset primitives in `campaign/profile_edit.py`. An acquisition makes the profile a counting observation whose projection supersedes the scalar detector for sweeps. **`pyrite profile filter add|set|rm|list|show`** → `cli.commands._profile_filters` (registered on `profile`): edits ordered plates and no longer touches the physical detector.
+- **`pyrite profile create NAME [--from SOURCE]`** → `cli.commands.profile` and `campaign.profile_edit`: without `--from`, copies packaged `standard` sweep ranges, inline bremsstrahlung grid, applicable material overrides, and membership into a new profile; with `--from`, explicitly clones SOURCE except material overrides. Omitted detector and physical-detector fields resolve to code defaults and none, respectively.
 - **`pyrite material show|set MATERIAL [--profile NAME]`** → `cli.commands.material`: inspect effective ranges and edit per-profile material overrides. `pyrite material blaze MATERIAL ...` routes to the specialized blazed sweep. Hidden compatibility aliases remain under `pyrite sweep`.
 - **`pyrite material validate [catalog]`** → `cli.commands.check_config:_run`: validate bundled offline catalog or explicit complete catalog without starting simulation; hidden alias: `pyrite check-config`.
 - **`pyrite checkpoint ...`** → `cli.commands.checkpoint:command`: grouped local checkpoint shrink, component recompute, archive, restore, list, and merge operations. `checkpoint recompute brem|line -R[=TARGET]` reuses the remote SLURM orchestrators with uniform `--wait` / `--detach`; hidden compatibility paths: `remote rebrem`, `remote reline`.
