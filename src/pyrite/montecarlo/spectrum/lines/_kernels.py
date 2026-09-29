@@ -337,34 +337,58 @@ def _line_tabulation_grid(crystal_info, composition, lo, hi):
     return np.unique(np.concatenate(grids))
 
 
-def _line_table_nan_ceiling(crystal_info, composition, use_henke):
-    """Energy at and above which every line coupling table is NaN, in eV.
+def _line_table_nan_onsets(crystal_info, composition, use_henke):
+    """Energies at and above which each line coupling table is NaN, in eV.
 
     The line tables read atomic data that end: the Chantler ``f'``/``f''``
     tables return NaN for ``E >= Emax`` of each element, and the Elam
     scattering term for ``E > ELAM_E_MAX_EV``. Per table,
 
-    - ``chi_g``/``U_g``: NaN once any anomalous basis element is (a NaN term
-      poisons the element sum), i.e. from ``min_d Emax_d``;
-    - ``Re n``: NaN from ``min_basis Emax`` when ``use_henke``, else finite;
+    - ``chi_g``/``U_g``: NaN from ``min_d Emax_d`` over the anomalous basis
+      elements (all of them with ``use_henke``, else the edge-prone ones), since
+      a NaN term poisons the element sum; finite without any;
+    - ``Re n``: NaN from ``min_basis Emax`` with ``use_henke``, else finite;
     - each absorber's ``log(mu_i)``: NaN from ``min(Emax_i, ELAM_E_MAX_EV+)``.
 
-    The maximum of those onsets is where all of them are NaN. Returns ``inf``
-    with ``use_henke=False``: ``Re n`` then carries no anomalous term and stays
-    finite, so the grid is never cut. (With ``use_henke`` every basis element
-    is anomalous, so the ``chi_g``/``U_g`` and ``Re n`` onsets coincide.)
+    Returns one onset per table, ``inf`` for a table that never turns NaN.
 
     Validation: line-tabulation-nan-ceiling
     """
     from ....materials.atomic import ELAM_E_MAX_EV, _chantler_bounds
+    from ....materials.crystal import _EDGE_PRONE
 
-    if not use_henke:
-        return np.inf
     basis = {element for element, _ in crystal_info["basis"]}
-    onsets = [min(_chantler_bounds(el)[1] for el in basis)]
+    anomalous = [el for el in basis if use_henke or el in _EDGE_PRONE]
+    onsets = [min((_chantler_bounds(el)[1] for el in anomalous), default=np.inf)]
+    onsets.append(min(_chantler_bounds(el)[1] for el in basis) if use_henke else np.inf)
     elam_onset = np.nextafter(ELAM_E_MAX_EV, np.inf)
     onsets.extend(min(_chantler_bounds(el)[1], elam_onset) for el, _density in composition)
-    return float(max(onsets))
+    return [float(onset) for onset in onsets]
+
+
+def _line_table_nan_ceiling(crystal_info, composition, use_henke):
+    """Energy at and above which EVERY line coupling table is NaN, in eV.
+
+    The maximum of :func:`_line_table_nan_onsets`: past it the tabulation mesh
+    can stop without changing any interpolated value. ``inf`` when some table
+    stays finite (``use_henke=False`` leaves ``Re n`` finite).
+
+    Validation: line-tabulation-nan-ceiling
+    """
+    return max(_line_table_nan_onsets(crystal_info, composition, use_henke))
+
+
+def _line_emission_ceiling(crystal_info, composition, use_henke=True):
+    """Energy at and above which no line can emit, in eV.
+
+    The minimum of :func:`_line_table_nan_onsets`: a resonance there reads a NaN
+    coupling, refractive index or attenuation and is dropped by the line
+    kernels' finite mask, so no line centre lies at or above it. Always finite,
+    because every absorber's attenuation ends.
+
+    Validation: line-grid-emission-ceiling
+    """
+    return min(_line_table_nan_onsets(crystal_info, composition, use_henke))
 
 
 def _interp_gather2d(idx, frac, below, above, tables, gcol):
