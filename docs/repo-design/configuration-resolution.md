@@ -93,6 +93,7 @@ chunking or a backend can alter floating-point reduction order.
 | variable | format and unset behavior | owner |
 |---|---|---|
 | `PYRITE_MC_SPEC_CHUNK`, `PYRITE_MC_BREM_CHUNK` | Positive segments-per-spectrum/brems chunk; unset `0` selects adaptive sizing. Explicit CLI chunk options win. | `runner.chunking` |
+| `PYRITE_MC_MIN_CHUNK` | Positive smallest segment chunk the device budget must admit before a case falls back to CPU; unset `1000`. Malformed or non-positive values raise. Lower it to keep very wide grids on the GPU at smaller chunks. | `montecarlo._resources` |
 | `PYRITE_MC_SPEC_BUDGET_MB` | Positive MiB spectrum working-set budget; unset is `min(1920, resolved device budget)`. | `runner.chunking` |
 | `PYRITE_MC_FREE_EVERY` | Positive case cadence for releasing GPU-pool blocks; unset comes from the resource policy. | `runner.chunking` |
 | `PYRITE_MC_FREE_WATERMARK_MB` | Positive MiB free-memory watermark; unset `0` disables the watermark. | `runner.chunking` |
@@ -116,6 +117,7 @@ owner states it.
 | `PYRITE_MC_NSYS` | `runs.scan` and remote queue scripts set `1` for an Nsight child. | `runner.chunking` enables NVTX ranges; unset disables them. |
 | `PYRITE_LOCAL_DASHBOARD` | `runs.scan` sets `1` while its local dashboard runs, then clears it. | `runner.scheduling` enables dashboard progress only for `1`. |
 | `PYRITE_MC_SPEC_CHUNK`, `PYRITE_MC_BREM_CHUNK`, `PYRITE_MC_GPU_SHARE` | CLI and remote scripts may write these runtime overrides. | See the diagnostic table above. |
+| `PYRITE_MC_TRANSPORT_CORE`, `PYRITE_MC_RESOURCE_POLICY`, `PYRITE_MC_MIN_CHUNK` | Remote queue scripts copy the submitter's values into the job, validated before submission. | See the tables above. |
 
 ### Validation, documentation, and test controls
 

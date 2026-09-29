@@ -478,6 +478,20 @@ def test_preallocation_admission_caps_or_errors():
         )
 
 
+def test_preallocation_admission_minimum_chunk_env_override(monkeypatch):
+    kwargs = dict(requested_chunk=1_000, bins=2_000_000, itemsize=4, budget_bytes=13 * GIB)
+    kwargs["intermediates"] = 8
+    with pytest.raises(_backend.BackendResourceError, match="cannot admit"):
+        admitted_chunk(**kwargs)
+
+    monkeypatch.setenv("PYRITE_MC_MIN_CHUNK", "100")
+    assert admitted_chunk(**kwargs) == 13 * GIB // (8 * 4 * 2_000_000)
+
+    monkeypatch.setenv("PYRITE_MC_MIN_CHUNK", "0")
+    with pytest.raises(_backend.BackendResourceError, match="PYRITE_MC_MIN_CHUNK"):
+        admitted_chunk(**kwargs)
+
+
 def test_cpu_fallback_requires_host_ram_admission(monkeypatch):
     monkeypatch.setattr(runner._RESOURCE_POLICY, "total_mem_mb", 8_000)
     monkeypatch.setattr(runner._RESOURCE_POLICY, "available_mem_mb", lambda: 4_000)
