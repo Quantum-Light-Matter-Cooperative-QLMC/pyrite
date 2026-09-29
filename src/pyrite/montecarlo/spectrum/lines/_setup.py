@@ -38,6 +38,11 @@ from ._kernels import (
 LINE_ESCAPE_MODEL = "segment-mean-v2-coherent-formation"
 
 
+#: Size of the most recent line setups' tabulation, for performance telemetry.
+#: The runner clears it before a case and reads it after, when timing is on.
+SETUP_STATS: dict[str, float] = {}
+
+
 @dataclass(frozen=True, eq=False)
 class SpectrumRequest:
     """The 27 inputs of :func:`mc_spectrum`, bound into one value.
@@ -411,6 +416,13 @@ def _prepare_spectrum(request):
         _hi = max(_ceiling, _lo + 1.0)
     E_tab = _line_tabulation_grid(info, abs_comp, _lo, _hi)
     E_tab_g = xp.asarray(E_tab, dtype=REAL)
+    # chi/U re+im per reflection, log(mu) per absorber, Re n.
+    _table_rows = 4 * len(request.hkl_list) + len(abs_comp) + 1
+    SETUP_STATS["line_tab_points"] = max(SETUP_STATS.get("line_tab_points", 0), int(E_tab.size))
+    SETUP_STATS["line_table_mib"] = max(
+        SETUP_STATS.get("line_table_mib", 0.0),
+        _table_rows * E_tab.size * np.dtype(REAL).itemsize / 2**20,
+    )
     # Each elemental coefficient is stored as log(mu_i) [log(1/Ang)] and
     # interpolated linearly against log(E) before summing. This reproduces the
     # pinned xraydb non-f1 Chantler rule; interpolating the compound total in

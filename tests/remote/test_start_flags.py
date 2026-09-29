@@ -25,6 +25,7 @@ DEFAULT_FLAGS = {
     "spec_chunk": None,
     "brem_chunk": None,
     "nsys": False,
+    "py_spy": False,
     "cpu": False,
     "cpu_only": False,
     "no_cache": False,

@@ -6,7 +6,7 @@ from ...console.output import confirm_destructive, emit_result, output_option
 from ...remote import lifecycle, viewer
 from .. import _completion as _cli_completion
 from . import remote as remote_cli
-from ._remote_actions import _cli_jobs, _cli_logs, _cli_status
+from ._remote_actions import _cli_jobs, _cli_logs, _cli_stack, _cli_status
 
 
 @click.group("job", no_args_is_help=True)
@@ -68,6 +68,37 @@ def logs_command(jobid: str | None, follow: bool):
         _cli_logs,
         jobid=jobid,
         follow=follow,
+    )
+
+
+@command.command(
+    "stack",
+    help=(
+        "Print the Python stack of every thread in a running job's scans; JOBID defaults "
+        "to latest. Signals the scan (SIGUSR1) without stopping it; jobs submitted "
+        "before this command existed cannot answer."
+    ),
+)
+@click.argument(
+    "jobid",
+    required=False,
+    metavar="[JOBID]",
+    shell_complete=_cli_completion.complete_job_id,
+)
+@click.option(
+    "--wait",
+    "wait_seconds",
+    type=click.FloatRange(min=0.0),
+    default=2.0,
+    show_default=True,
+    metavar="SECONDS",
+    help="Seconds to let the dump reach the job log before reading it.",
+)
+def stack_command(jobid: str | None, wait_seconds: float):
+    return remote_cli._invoke_action(
+        _cli_stack,
+        jobid=jobid,
+        wait_seconds=wait_seconds,
     )
 
 

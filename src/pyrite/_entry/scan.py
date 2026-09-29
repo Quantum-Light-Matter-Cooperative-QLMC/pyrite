@@ -18,8 +18,24 @@ except MaterialConfigError as exc:
     raise SystemExit(str(exc)) from None
 
 
+def enable_stack_dump_signal():
+    """Let ``SIGUSR1`` print every thread's Python stack to stderr.
+
+    Remote scans write stderr to the job log, so ``pyrite job stack`` can ask a
+    live scan what it is doing without ptrace or stopping it. The handler is a
+    C-level ``faulthandler`` hook: it also answers while Python is blocked in a
+    long NumPy or CuPy call. A no-op where ``SIGUSR1`` does not exist.
+    """
+    import faulthandler
+    import signal
+
+    if hasattr(signal, "SIGUSR1"):
+        faulthandler.register(signal.SIGUSR1, all_threads=True, chain=False)
+
+
 def main(argv=None):
     """Run the scan command under the pyrite exit contract."""
+    enable_stack_dump_signal()
     return run(command, argv, prog_name="pyrite run")
 
 

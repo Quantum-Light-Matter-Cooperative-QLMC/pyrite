@@ -62,6 +62,7 @@ def start_queue(
     cpu_only=False,
     no_cache=False,
     recompute=False,
+    py_spy=False,
 ):
     """Submit a material queue to SLURM. Returns its job id.
 
@@ -88,6 +89,8 @@ def start_queue(
     ``nsys`` wraps one uncached single-material session with Nsight Systems and
     stores its CUDA/NVTX trace beside the performance NDJSON. ``cpu`` appends a
     bounded serial cProfile phase; ``cpu_only`` runs that phase alone.
+    ``py_spy`` samples each material's uncached session with py-spy and stores a
+    speedscope profile beside the performance NDJSON.
     """
     transport._check_materials(materials)
     transport._check_shell_tokens(
@@ -108,6 +111,7 @@ def start_queue(
         or spec_chunk is not None
         or brem_chunk is not None
         or nsys
+        or py_spy
         or cpu
         or cpu_only
     ):
@@ -121,6 +125,12 @@ def start_queue(
         raise SystemExit("no-cache and recompute modes are mutually exclusive")
     if cpu_only and nsys:
         raise SystemExit("cpu-only mode cannot be combined with nsys")
+    if py_spy and (nsys or cpu_only):
+        raise SystemExit("py-spy cannot be combined with nsys or cpu-only mode")
+    if py_spy and chunked:
+        raise SystemExit("py-spy requires a monolithic allocation")
+    if py_spy and performance_repetitions != 1:
+        raise SystemExit("py-spy requires exactly one performance repetition")
     if cpu_only and performance_repetitions != 1:
         raise SystemExit("cpu-only mode cannot use performance repetitions")
     if cpu_only and performance_interval != 5.0:
@@ -208,6 +218,7 @@ def start_queue(
             cpu_only,
             no_cache,
             recompute,
+            py_spy=py_spy,
         )
         time_limit = config.SLURM_TIME
     workers_per_material = config.SLURM_CPUS_PER_MATERIAL if workers is None else max(1, workers)
@@ -243,6 +254,7 @@ def start_queue(
             cpu_only,
             no_cache,
             recompute,
+            py_spy=py_spy,
         ),
     )
     submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)

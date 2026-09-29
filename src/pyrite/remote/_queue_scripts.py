@@ -5,6 +5,12 @@ import shlex
 import uuid
 
 from .._env import env_value
+from ..perf.py_spy import (
+    PY_SPY_REQUIREMENT,
+    PY_SPY_STATUS_SUFFIX,
+    PY_SPY_SUFFIX,
+    py_spy_record_args,
+)
 from ..validation._zhai import ZHAI_CACHE_SCHEMA, ZHAI_DETECTOR
 from . import config
 
@@ -199,6 +205,7 @@ def _queue_script(
     cpu_only=False,
     no_cache=False,
     recompute=False,
+    py_spy=False,
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
     parallel_materials = _validate_parallel_materials(parallel_materials)
@@ -210,6 +217,8 @@ def _queue_script(
         raise ValueError("cpu and cpu_only are mutually exclusive")
     if cpu_only and nsys:
         raise ValueError("cpu_only cannot be combined with nsys")
+    if py_spy and (performance_profile is None or nsys or cpu_only):
+        raise ValueError("py_spy requires a performance profile and excludes nsys/cpu_only")
     if no_cache and recompute:
         raise ValueError("no_cache and recompute are mutually exclusive")
     flags = ""
@@ -253,6 +262,11 @@ def _queue_script(
     runtime_exports += _forwarded_env_exports()
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
+    # The output path stays a double-quoted shell word so "$trace_base" expands.
+    py_spy_args = " ".join(
+        f'"$trace_base{PY_SPY_SUFFIX}"' if arg == "__OUTPUT__" else config.shell_word(arg)
+        for arg in py_spy_record_args("__OUTPUT__")
+    )
     return f"""JOBDIR={config.shell_word(jobdir)}
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
@@ -266,6 +280,7 @@ parallel_materials={parallel_materials}
 export PYRITE_MC_GPU_SHARE={parallel_materials}
 performance_repetitions={performance_repetitions}{runtime_exports}
 nsys_enabled={int(bool(nsys))}
+py_spy_enabled={int(bool(py_spy))}
 cpu_enabled={int(bool(cpu))}
 cpu_only_enabled={int(bool(cpu_only))}
 n=0
@@ -286,15 +301,17 @@ run_material() {{
     echo "running primary $m [$i/$total] since $(date -Is)" > "$JOBDIR/state"
   for (( repetition=1; repetition<=performance_repetitions; repetition++ )); do
     checkpoint_flags=()
-    if [ "$performance_repetitions" -gt 1 ] || [ "$nsys_enabled" -eq 1 ]; then
+    if [ "$performance_repetitions" -gt 1 ] || [ "$nsys_enabled" -eq 1 ] || [ "$py_spy_enabled" -eq 1 ]; then
       checkpoint_flags=(--checkpoint-dir "$JOBDIR/performance-checkpoints/$m/$repetition")
     fi
     if [ "$performance_repetitions" -gt 1 ]; then
       printf '%s\\n' "performance repetition $repetition/$performance_repetitions" >> "$JOBDIR/log"
     elif [ "$nsys_enabled" -eq 1 ]; then
       printf '%s\\n' "Nsight Systems uncached trace" >> "$JOBDIR/log"
+    elif [ "$py_spy_enabled" -eq 1 ]; then
+      printf '%s\\n' "py-spy uncached sampling profile" >> "$JOBDIR/log"
     fi
-    if [ "$nsys_enabled" -eq 1 ]; then
+    if [ "$nsys_enabled" -eq 1 ] || [ "$py_spy_enabled" -eq 1 ]; then
       scan_launcher=({config.shell_remote_path(".venv", "bin", "python")})
     else
       scan_launcher=({config.shell_remote_uv()} run --no-sync python)
@@ -336,6 +353,19 @@ run_material() {{
         "${{nsys_cmd[@]}}" \\
           "${{scan_command[@]}}" >> "$JOBDIR/log" 2>&1 || scan_rc=$?
       fi
+    elif [ "$py_spy_enabled" -eq 1 ]; then
+      trace_base="$JOBDIR/performance/{performance_profile}/$m"
+      mkdir -p "$(dirname "$trace_base")"
+      # py-spy launches the scan itself, so it needs no ptrace permission. With
+      # --subprocesses it exits 0 whatever the scan does; the status wrapper
+      # records the scan's own exit status instead.
+      rm -f "$trace_base{PY_SPY_STATUS_SUFFIX}"
+      {config.shell_remote_uv()} tool run --from {config.shell_word(PY_SPY_REQUIREMENT)} py-spy \\
+        {py_spy_args} \\
+        {config.shell_remote_path(".venv", "bin", "python")} -m pyrite.perf.py_spy \\
+        "$trace_base{PY_SPY_STATUS_SUFFIX}" -- \\
+        "${{scan_command[@]}}" >> "$JOBDIR/log" 2>&1
+      scan_rc=$(cat "$trace_base{PY_SPY_STATUS_SUFFIX}" 2>/dev/null || echo 1)
     else
       "${{scan_command[@]}}" >> "$JOBDIR/log" 2>&1 || scan_rc=$?
     fi
@@ -1017,6 +1047,7 @@ def _queue_metadata(
     cpu_only: bool = False,
     no_cache: bool = False,
     recompute: bool = False,
+    py_spy: bool = False,
 ):
     """Static metadata persisted before a queue becomes visible to SLURM."""
     return "\n".join(
@@ -1036,6 +1067,7 @@ def _queue_metadata(
             f"spec_chunk: {spec_chunk}",
             f"brem_chunk: {brem_chunk}",
             f"nsys: {bool(nsys)}",
+            f"py_spy: {bool(py_spy)}",
             f"cpu: {bool(cpu)}",
             f"cpu_only: {bool(cpu_only)}",
             f"no_cache: {bool(no_cache)}",

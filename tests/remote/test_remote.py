@@ -6474,3 +6474,71 @@ def test_sync_cli_exposes_force_and_defaults_to_refusing(monkeypatch):
     assert _remote_main(["sync", "--force"]) in (0, None)
 
     assert seen == [False, True]
+
+
+def test_queue_script_wraps_sessions_with_py_spy_and_isolates_checkpoints():
+    script = remote._queue_script(
+        "j",
+        ["hopg"],
+        quick=False,
+        workers=None,
+        performance_profile="sub_100keV",
+        py_spy=True,
+    )
+
+    assert "py_spy_enabled=1" in script
+    assert 'tool run --from "py-spy>=0.4" py-spy' in script
+    assert '"--output" "$trace_base.py-spy.json" "--"' in script
+    assert '"--subprocesses"' in script and '"--nonblocking"' in script
+    assert '-m pyrite.perf.py_spy \\\n        "$trace_base.py-spy.status" --' in script
+    assert 'scan_rc=$(cat "$trace_base.py-spy.status" 2>/dev/null || echo 1)' in script
+    assert '[ "$py_spy_enabled" -eq 1 ]; then\n      checkpoint_flags=' in script
+    metadata = remote._queue_metadata("j", ["hopg"], False, None, py_spy=True)
+    assert "py_spy: True" in metadata
+
+
+def test_queue_script_refuses_py_spy_with_nsys():
+    with pytest.raises(ValueError, match="py_spy"):
+        remote._queue_script(
+            "j",
+            ["hopg"],
+            quick=False,
+            workers=None,
+            performance_profile="p",
+            nsys=True,
+            py_spy=True,
+        )
+
+
+def test_stack_dump_signals_only_handler_registered_scans():
+    from pyrite.remote import viewer
+
+    command = viewer._stack_dump_command("j", 2)
+    assert 'srun --jobid="$SID" --overlap --ntasks=1' in command
+    assert "SigCgt" in command and ">> 9" in command
+    assert "-m pyrite\\\\._entry\\\\.scan" in command  # not the uv wrapper or workers
+    assert 'tail -c +"$((start + 1))" "$D/log"' in command
+
+
+@pytest.mark.parametrize(
+    ("returncode", "stdout", "expected", "message"),
+    [
+        (0, "STACK j\n\nThread 0x1 (most recent call first):\n", 0, "signalled 1"),
+        (3, "", 1, "predates the SIGUSR1 handler"),
+    ],
+)
+def test_stack_dump_reports_signalled_and_legacy_jobs(
+    monkeypatch, capsys, returncode, stdout, expected, message
+):
+    from pyrite.remote import viewer
+
+    stderr = f"CXR_STACK_SIGNALLED {1 if returncode == 0 else 0} {0 if returncode == 0 else 1}\n"
+    monkeypatch.setattr(
+        viewer.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(a, returncode, stdout, stderr),
+    )
+    assert viewer.stack_dump("j", 0) == expected
+    captured = capsys.readouterr()
+    assert captured.out == stdout
+    assert message in captured.err

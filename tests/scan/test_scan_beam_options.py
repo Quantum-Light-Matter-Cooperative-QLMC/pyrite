@@ -240,3 +240,42 @@ def test_reexec_under_nsys_errors_when_nsys_missing(monkeypatch):
             quick=False,
             n_families=None,
         )
+
+
+def test_py_spy_reexec_command_samples_an_uncached_child():
+    argv, output, status = scan._py_spy_reexec_command(
+        ["py-spy"],
+        catalog_profile="sub_100keV",
+        material="hopg",
+        performance_profile="sub_100keV",
+        performance_dir=None,
+        performance_interval=5.0,
+        workers=None,
+        fidelity="full",
+        quick=False,
+        n_families=None,
+    )
+
+    separator = argv.index("--")
+    assert argv[:2] == ["py-spy", "record"]
+    assert {"--subprocesses", "--nonblocking", "--idle"} <= set(argv[:separator])
+    assert argv[argv.index("--output") + 1] == str(output)
+    assert str(output) == "performance-profiles/sub_100keV/hopg.py-spy.json"
+    wrapper = argv[separator + 1 :]
+    assert wrapper[1:3] == ["-m", "pyrite.perf.py_spy"]
+    assert wrapper[3] == str(status) == "performance-profiles/sub_100keV/hopg.py-spy.status"
+    child = wrapper[wrapper.index("--") + 1 :]
+    assert child[1:4] == ["-m", "pyrite._dev", "perf"]
+    assert "--py-spy" not in child  # child must not recurse
+    assert "performance-profiles/sub_100keV/py-spy-checkpoints/hopg" in child
+
+
+def test_perf_rejects_py_spy_with_nsys(monkeypatch):
+    monkeypatch.setattr(
+        scan, "_reexec_under_py_spy", lambda **_: pytest.fail("must not launch py-spy")
+    )
+    result = CliRunner().invoke(
+        performance_command, ["sub_100keV", "-m", "hopg", "--py-spy", "--nsys"]
+    )
+    assert result.exit_code == 2
+    assert "--py-spy and --nsys are mutually exclusive" in result.output

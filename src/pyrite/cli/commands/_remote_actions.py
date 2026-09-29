@@ -345,6 +345,7 @@ def _cli_start(
     cpu_only,
     no_cache,
     recompute,
+    py_spy=False,
 ):
     materials, high_energy_min_kev = _start_selected(materials, catalog_profile)
     if nsys and len(materials) != 1:
@@ -370,6 +371,7 @@ def _cli_start(
         cpu_only=cpu_only,
         no_cache=no_cache,
         recompute=recompute,
+        py_spy=py_spy,
     )
     if dry_run:
         return
@@ -394,7 +396,7 @@ def _cli_start(
                 "performance run did not complete successfully; "
                 "skipping automatic performance-artifact pull"
             )
-    profiling_only = performance_repetitions > 1 or nsys or cpu or cpu_only
+    profiling_only = performance_repetitions > 1 or nsys or py_spy or cpu or cpu_only
     if no_pull or profiling_only:
         if profiling_only:
             emit_diagnostic(
@@ -489,6 +491,10 @@ def _cli_status(*, jobid, verbose, attach, json_output):
 
 def _cli_logs(*, jobid, follow):
     return viewer.tail_logs(jobid, follow)
+
+
+def _cli_stack(*, jobid, wait_seconds):
+    return viewer.stack_dump(jobid, wait_seconds)
 
 
 def _cli_profile_pull(*, profile):

@@ -393,3 +393,29 @@ def test_gpu_pipeline_evaluates_directions_on_the_pipelined_transport(monkeypatc
     assert directional_calls == [("observed", 3)]
     assert out[0]["directional"]["spec_by_direction"].shape == (3, 2)
     assert "directional" not in out[1]
+
+
+def test_device_transport_serial_path_reports_timing(monkeypatch):
+    seen = []
+
+    def fake_run_case(case, record_timing=False, **kwargs):
+        seen.append((record_timing, kwargs.get("keep_segments_on_device")))
+        return {"name": case["name"], "_t_spectrum": 0.3, "_line_axis_nodes": 1234}
+
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(scheduling, "_cuda_transport_run", lambda cases: True)
+    monkeypatch.setattr(scheduling, "case_runtime_plan", lambda case: {})
+    monkeypatch.setattr(scheduling, "_ensure_pool_limit", lambda: None)
+    monkeypatch.setattr(scheduling, "run_case", fake_run_case)
+    timings = []
+
+    out = runner.run_cases(
+        [{"name": "case-0"}, {"name": "case-1"}],
+        progress=False,
+        on_timing=timings.append,
+    )
+
+    assert [item["name"] for item in out] == ["case-0", "case-1"]
+    assert seen == [(True, True), (True, True)]
+    assert [item["spectrum_seconds"] for item in timings] == [0.3, 0.3]
+    assert all(item["line_axis_nodes"] == 1234 for item in timings)

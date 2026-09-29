@@ -192,7 +192,7 @@ def validate_materials(materials: list[str]) -> None:
         raise SystemExit(f"unknown material(s): {', '.join(unknown)}")
 
 
-def _nsys_reexec_command(
+def _profiled_child_command(
     *,
     catalog_profile,
     material,
@@ -206,24 +206,22 @@ def _nsys_reexec_command(
     max_minutes=None,
     no_cache=False,
     recompute=False,
+    checkpoint_subdir="nsys-checkpoints",
 ):
-    """Build the ``nsys profile ... python -m pyrite._dev perf`` argv and the
-    trace-output stem for a local ``--nsys`` capture.
+    """The ``python -m pyrite._dev perf`` child a local profiler wraps, and its
+    output stem.
 
-    Pure (no side effects) so the argv/trace contract is unit-testable. The
-    child re-runs this same command WITHOUT ``--nsys`` (so it cannot recurse)
-    under PYRITE_MC_NSYS=1, mirroring the remote job script's nsys launcher
-    (:mod:`pyrite.remote.scripts`). It points the child at an isolated,
-    always-uncached checkpoint dir so the trace covers real GPU work rather
-    than a fast checkpoint resume. ``material`` is optional: when omitted the
-    capture covers the profile's full membership and the trace/checkpoint stem
-    falls back to the profile name."""
+    The child re-runs this same command WITHOUT the profiler flag (so it cannot
+    recurse), against an isolated, always-uncached checkpoint dir so the capture
+    covers real work rather than a fast checkpoint resume. ``material`` is
+    optional: when omitted the capture covers the profile's full membership and
+    the output/checkpoint stem falls back to the profile name."""
     perf_root = (
         Path(performance_dir) if performance_dir is not None else Path("performance-profiles")
     )
     stem = material if material is not None else performance_profile
     trace_base = perf_root / performance_profile / stem
-    checkpoint_dir = perf_root / performance_profile / "nsys-checkpoints" / stem
+    checkpoint_dir = perf_root / performance_profile / checkpoint_subdir / stem
     child = [
         sys.executable,
         "-m",
@@ -252,6 +250,44 @@ def _nsys_reexec_command(
     elif recompute:
         child += ["--recompute"]
     child += ["--checkpoint-dir", str(checkpoint_dir)]
+    return child, trace_base
+
+
+def _nsys_reexec_command(
+    *,
+    catalog_profile,
+    material,
+    performance_profile,
+    performance_dir,
+    performance_interval,
+    workers,
+    fidelity,
+    quick,
+    n_families,
+    max_minutes=None,
+    no_cache=False,
+    recompute=False,
+):
+    """Build the ``nsys profile ... python -m pyrite._dev perf`` argv and the
+    trace-output stem for a local ``--nsys`` capture.
+
+    Pure (no side effects) so the argv/trace contract is unit-testable. The
+    child is :func:`_profiled_child_command` under PYRITE_MC_NSYS=1, mirroring
+    the remote job script's nsys launcher (:mod:`pyrite.remote.scripts`)."""
+    child, trace_base = _profiled_child_command(
+        catalog_profile=catalog_profile,
+        material=material,
+        performance_profile=performance_profile,
+        performance_dir=performance_dir,
+        performance_interval=performance_interval,
+        workers=workers,
+        fidelity=fidelity,
+        quick=quick,
+        n_families=n_families,
+        max_minutes=max_minutes,
+        no_cache=no_cache,
+        recompute=recompute,
+    )
     nsys_cmd = [
         "nsys",
         "profile",
@@ -278,6 +314,46 @@ def _reexec_under_nsys(**kwargs):
     # The parent already warned about any deprecated option it forwards.
     set_canonical_env(GENERATED_INVOCATION_ENV, "1")
     os.execvp(argv[0], argv)
+
+
+def _py_spy_reexec_command(launcher, **kwargs):
+    """Build the ``py-spy record ... -- python -m pyrite._dev perf`` argv, the
+    profile output path, and the exit-status file for a local ``--py-spy``
+    capture.
+
+    Pure (no side effects) so the argv contract is unit-testable; ``launcher``
+    is the py-spy executable argv (:func:`pyrite.perf.py_spy.py_spy_launcher`).
+    The child runs through :func:`pyrite.perf.py_spy.main`, which records the
+    exit status ``py-spy record --subprocesses`` would otherwise discard."""
+    from ..perf.py_spy import (
+        PY_SPY_STATUS_SUFFIX,
+        PY_SPY_SUFFIX,
+        py_spy_record_args,
+        status_wrapped,
+    )
+
+    child, trace_base = _profiled_child_command(**kwargs, checkpoint_subdir="py-spy-checkpoints")
+    output = Path(f"{trace_base}{PY_SPY_SUFFIX}")
+    status = Path(f"{trace_base}{PY_SPY_STATUS_SUFFIX}")
+    argv = [*launcher, *py_spy_record_args(str(output)), *status_wrapped(str(status), child)]
+    return argv, output, status
+
+
+def _reexec_under_py_spy(**kwargs):
+    """Run py-spy sampling a :func:`_profiled_child_command` run, writing a
+    speedscope profile next to the perf log, and exit with the child's status."""
+    from ..perf.py_spy import py_spy_launcher, read_status
+
+    launcher = py_spy_launcher()
+    if launcher is None:
+        raise click.UsageError("--py-spy requested but neither py-spy nor uv is on PATH")
+    argv, output, status = _py_spy_reexec_command(launcher, **kwargs)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    status.unlink(missing_ok=True)
+    # The parent already warned about any deprecated option it forwards.
+    set_canonical_env(GENERATED_INVOCATION_ENV, "1")
+    subprocess.run(argv, check=False)  # noqa: S603 -- argv built above
+    raise SystemExit(read_status(status))
 
 
 def _resolve_catalog_profile(catalog_profile: str, performance_profile: str | None) -> str:
@@ -788,15 +864,23 @@ def _run_material(args, material, max_seconds=None):
     performance_lock = threading.Lock()
 
     def _case_summary(case):
+        from .._backend import BackendResourceError
         from ..montecarlo import runner as montecarlo_runner
 
+        # The runtime plan is informational here. A grid the device budget
+        # cannot admit is the scheduler's to handle (CPU fallback or refusal);
+        # progress reporting must not raise it first.
+        try:
+            plan = montecarlo_runner.case_runtime_plan(case)
+        except BackendResourceError as error:
+            plan = {"runtime_plan_error": str(error)}
         return {
             "configuration": str(case["name"]),
             "energy_keV": round(float(case["E0_keV"]), 3),
             "tilt_deg": round(float(case["tilt_deg"]), 2),
             "azimuth_deg": round(float(case["tilt_azim_deg"]), 2),
             "thickness_um": round(float(case["thickness_ang"]) / 1e4, 4),
-            **montecarlo_runner.case_runtime_plan(case),
+            **plan,
         }
 
     def _note_case(case):

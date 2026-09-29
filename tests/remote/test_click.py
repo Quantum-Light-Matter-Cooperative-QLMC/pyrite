@@ -118,6 +118,7 @@ def test_run_click_defaults_and_zero_meanings(monkeypatch):
                 "cpu_only": False,
                 "no_cache": False,
                 "recompute": False,
+                "py_spy": False,
             },
         )
     ]
@@ -128,6 +129,9 @@ def test_run_click_defaults_and_zero_meanings(monkeypatch):
     [
         (["--cpu", "--cpu-only"], "--cpu and --cpu-only are mutually exclusive"),
         (["--cpu-only", "--nsys"], "--cpu-only cannot be combined with --nsys"),
+        (["--py-spy", "--nsys"], "--py-spy and --nsys are mutually exclusive"),
+        (["--cpu-only", "--py-spy"], "--cpu-only cannot be combined with --py-spy"),
+        (["--py-spy", "--chunk-minutes", "5"], "--py-spy requires --chunk-minutes 0"),
         (["--cpu", "--chunk-minutes", "1"], "--cpu requires --chunk-minutes 0"),
         (["--cpu-only", "--chunk-minutes", "1"], "--cpu-only requires --chunk-minutes 0"),
         (["--cpu-only", "--perf-reps", "2"], "cannot be combined with --perf-reps"),

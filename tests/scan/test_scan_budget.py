@@ -261,3 +261,29 @@ def test_resume_loading_preserves_previous_progress_counts(monkeypatch, tmp_path
     assert result.exit_code == 75
     assert snapshots[0]["activity"] == "loading"
     assert snapshots[0]["cached_cases"] + snapshots[0]["completed_new_cases"] == 1
+
+
+def test_progress_summary_survives_a_case_the_device_budget_cannot_admit(monkeypatch, tmp_path):
+    from pyrite._backend import BackendResourceError
+    from pyrite.montecarlo import runner as montecarlo_runner
+
+    def refuse(_case):
+        raise BackendResourceError("device budget 11.14 GiB cannot admit minimum chunk")
+
+    monkeypatch.setattr(montecarlo_runner, "case_runtime_plan", refuse)
+    progress = tmp_path / "hopg.json"
+    snapshots = []
+
+    def fake_run_sweep(*_args, **kwargs):
+        case = {**_fake_cases()[0], "tilt_azim_deg": 0.0}
+        kwargs["on_activity"]({"phase": "computing", "case": case, "in_flight_case_count": 1})
+        snapshots.append(json.loads(progress.read_text()))
+        return False
+
+    monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
+    _stub_cases(monkeypatch)
+
+    result = _invoke("hopg", 1.0, progress, "--checkpoint-dir", str(tmp_path))
+
+    assert result.exit_code == 75
+    assert "cannot admit" in snapshots[0]["current"]["runtime_plan_error"]

@@ -37,6 +37,7 @@ from ..spectrum import (
 from ..spectrum import (
     mc_characteristic_spectrum as mc_characteristic_spectrum,
 )
+from ..spectrum.lines import _setup as _line_setup
 from ..trajectories import TrajectoryCapture
 from ..transport import (
     TransportLUTConfig,
@@ -810,6 +811,40 @@ def _line_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=Fa
     return spec, spec_coherent, characteristic
 
 
+def _stage_counters(tp):
+    """Work sizes of one case's spectrum phase, for performance telemetry.
+
+    Sizes sit next to the phase times so a slow case shows *what* grew: the
+    resolved line/brem axes, the transported segments, the line tabulation mesh
+    and its tables, and host memory at the end of the phase.
+    """
+    counters = {
+        "_line_axis_nodes": int(tp["E_grid"].size),
+        "_brem_axis_nodes": int(tp["E_brem"].size),
+    }
+    segments = tp.get("segs")
+    if isinstance(segments, Mapping) and "L_ang" in segments:
+        counters["_segments"] = int(segments["L_ang"].size)
+    for key, value in _line_setup.SETUP_STATS.items():
+        counters[f"_{key}"] = value
+    counters.update(_host_rss_mib())
+    return counters
+
+
+def _host_rss_mib():
+    """Current and peak resident set size of this process, in MiB (Linux)."""
+    try:
+        import resource
+
+        peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+        with open("/proc/self/statm") as handle:
+            pages = int(handle.read().split()[1])
+        current = pages * os.sysconf("SC_PAGE_SIZE") / 2**20
+    except ImportError, OSError, ValueError, IndexError:
+        return {}
+    return {"_host_rss_mib": round(current, 1), "_host_rss_peak_mib": round(peak, 1)}
+
+
 def _effective_spec_chunk(case, tp):
     """Resolve one case's line-spectrum chunk without changing the case."""
     return _admit_chunk(
@@ -919,8 +954,14 @@ def _spectrum_case(case, tp, record_timing=False):
     """GPU phase of run_case: line spectrum + brem from the already-transported
     segments ``tp`` (from _transport_case). Runs in the main process, so only one
     CUDA context ever touches the device."""
+    timed = _TIMING or record_timing
+    if timed:
+        _line_setup.SETUP_STATS.clear()
     with _nsys_range(f"cxr.spectrum_case:{case.get('name', 'case')}"):
-        return _spectrum_case_impl(case, tp, record_timing)
+        out = _spectrum_case_impl(case, tp, record_timing)
+    if timed:
+        out.update(_stage_counters(tp))
+    return out
 
 
 def _spectrum_case_impl(case, tp, record_timing=False):

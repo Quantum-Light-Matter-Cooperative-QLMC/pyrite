@@ -399,9 +399,11 @@ def run_cases(
                         else run_case(cases[i], **capture_kw, **_direction_kwargs(i))
                     )
 
+                # Both run_case routes report timing; the device-resident one
+                # (CUDA transport) used to skip this and emitted none.
+                if out is not None:
                     if fallback_reason is not None:
                         out["_backend_fallback_reason"] = fallback_reason
-
                     _collect_timing(i, out)
 
                 results[i] = out

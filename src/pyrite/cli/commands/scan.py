@@ -175,6 +175,16 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     ),
 )
 @click.option(
+    "--py-spy",
+    "py_spy",
+    is_flag=True,
+    help=(
+        "Sample the whole uncached run with py-spy (every thread and worker "
+        "process, including idle waits) and write a .py-spy.json speedscope "
+        "profile next to the perf log; exclusive with --nsys. Requires -p/--perf."
+    ),
+)
+@click.option(
     "-c",
     "--cpu",
     is_flag=True,
@@ -362,6 +372,7 @@ def _command(
     spec_chunk,
     brem_chunk,
     nsys,
+    py_spy,
     cpu,
     cpu_only,
     no_cache,
@@ -437,6 +448,8 @@ def _command(
         raise click.UsageError("--chunk-minutes requires -R/--remote")
     if no_cache and recompute:
         raise click.UsageError("--no-cache and --recompute are mutually exclusive")
+    if py_spy and nsys:
+        raise click.UsageError("--py-spy and --nsys are mutually exclusive")
     if overwrite_trajectories and trajectories is None:
         raise click.UsageError("--overwrite-trajectories requires --trajectories")
     zhai_parameters = {
@@ -470,6 +483,7 @@ def _command(
             "spec_chunk": "--spec-chunk",
             "brem_chunk": "--brem-chunk",
             "nsys": "--nsys",
+            "py_spy": "--py-spy",
             "cpu": "--cpu",
             "cpu_only": "--cpu-only",
             "chunk_minutes": "--chunk-minutes",
@@ -555,6 +569,7 @@ def _command(
                 spec_chunk=spec_chunk,
                 brem_chunk=brem_chunk,
                 nsys=nsys,
+                py_spy=py_spy,
                 cpu=cpu,
                 cpu_only=cpu_only,
                 no_cache=no_cache,
@@ -579,6 +594,8 @@ def _command(
         raise click.UsageError("--spec-chunk/--brem-chunk require -p/--perf")
     if nsys and performance_profile is None:
         raise click.UsageError("--nsys requires -p/--perf")
+    if py_spy and performance_profile is None:
+        raise click.UsageError("--py-spy requires -p/--perf")
     # Shared per-case cache gates (see run_sweep's content-addressable store).
     #   default    -> read + write
     #   --recompute-> skip read, still repopulate (write)
@@ -600,6 +617,22 @@ def _command(
         set_canonical_env("PYRITE_MC_BREM_CHUNK", str(brem_chunk))
     if nsys:
         _scan._reexec_under_nsys(
+            catalog_profile=catalog_profile,
+            material=material,
+            performance_profile=performance_profile,
+            performance_dir=performance_dir,
+            performance_interval=performance_interval,
+            workers=workers,
+            fidelity=fidelity,
+            quick=quick,
+            n_families=n_families,
+            max_minutes=max_minutes,
+            no_cache=no_cache,
+            recompute=recompute,
+        )
+        return None  # os.execvp already replaced the process; defensive.
+    if py_spy:
+        _scan._reexec_under_py_spy(
             catalog_profile=catalog_profile,
             material=material,
             performance_profile=performance_profile,
@@ -683,6 +716,7 @@ _PERF_PARAMETER_NAMES = frozenset(
         "spec_chunk",
         "brem_chunk",
         "nsys",
+        "py_spy",
         "cpu",
         "cpu_only",
     }
@@ -713,6 +747,12 @@ def _derived_command(name, *, excluded, implied, help):
                 cloned.help = (
                     "Capture one uncached Nsight Systems CUDA/NVTX trace of the run "
                     "(writes a .nsys-rep next to the perf log)."
+                )
+            elif cloned.name == "py_spy":
+                cloned.help = (
+                    "Sample the whole uncached run with py-spy (every thread and "
+                    "worker process, including idle waits) and write a .py-spy.json "
+                    "speedscope profile next to the perf log; exclusive with --nsys."
                 )
             elif cloned.name == "cpu":
                 cloned.help = (
@@ -752,6 +792,7 @@ command = _derived_command(
         "spec_chunk": None,
         "brem_chunk": None,
         "nsys": False,
+        "py_spy": False,
         "cpu": False,
         "cpu_only": False,
     },

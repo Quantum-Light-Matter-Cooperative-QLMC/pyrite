@@ -23,10 +23,12 @@ def _jobs_remote_command():
         'C=$(sed -n "s/^cpu: //p" "$d/meta" 2>/dev/null | tail -1); '
         'O=$(sed -n "s/^cpu_only: //p" "$d/meta" 2>/dev/null | tail -1); '
         'N=$(sed -n "s/^nsys: //p" "$d/meta" 2>/dev/null | tail -1); '
+        'Y=$(sed -n "s/^py_spy: //p" "$d/meta" 2>/dev/null | tail -1); '
         'if [ "$O" = True ]; then Q=cpu-only; '
         'elif [ "$C" = True ] && [ "$N" = True ]; then Q=nsys+cpu; '
         'elif [ "$C" = True ]; then Q=cpu; '
-        'elif [ "$N" = True ]; then Q=nsys; fi; '
+        'elif [ "$N" = True ]; then Q=nsys; '
+        'elif [ "$Y" = True ]; then Q=py-spy; fi; '
         'K=$(sed -n "s/^kind: //p" "$d/meta" 2>/dev/null | tail -1); '
         '[ -n "$K" ] || { grep -q "^ne: " "$d/meta" 2>/dev/null && K=check || K=scan; }; '
         'M=$(sed -n "s/^materials: //p" "$d/meta" 2>/dev/null | tail -1); '
@@ -67,6 +69,7 @@ def list_jobs(kind=None):
             "cpu-only": "CPU-only",
             "nsys": "Nsight",
             "nsys+cpu": "Nsight + CPU",
+            "py-spy": "py-spy",
         }.get(quick, "?")
         rows.append(
             (
@@ -211,6 +214,81 @@ def tail_logs(jobid=None, follow=False):
     else:
         print(transport._ssh_capture(remote), end="")
         return 0
+
+
+#: Signal ``pyrite._entry.scan`` registers for a stack dump; bit 9 of
+#: ``/proc/PID/status`` SigCgt on Linux. A process that has not registered it
+#: (older code) would be killed by it, so it is never signalled.
+_STACK_SIGNAL_BIT = 9
+_STACK_MARKER = "CXR_STACK_SIGNALLED"
+
+# Runs on the job's node inside its allocation: signal only this user's scan
+# interpreters (not the uv wrapper, not multiprocessing workers) that catch
+# SIGUSR1.
+_STACK_SIGNAL_SCRIPT = (
+    "n=0; skipped=0; "
+    "for p in $(pgrep -u \"$(id -u)\" -f '^[^ ]*python[0-9.]* .*-m pyrite\\._entry\\.scan'); do "
+    "mask=$(awk '/^SigCgt:/{print $2}' \"/proc/$p/status\" 2>/dev/null); "
+    '[ -n "$mask" ] || continue; '
+    f"if [ $(( (0x$mask >> {_STACK_SIGNAL_BIT}) & 1 )) -eq 1 ]; then "
+    'kill -USR1 "$p" && n=$((n+1)); else skipped=$((skipped+1)); fi; done; '
+    f'echo "{_STACK_MARKER} $n $skipped"'
+)
+
+
+def _stack_dump_command(jobid, wait_seconds):
+    """Remote command: signal a live job's scans, then print the log they dumped to."""
+    return (
+        f"JOBS={config.shell_remote_path(config.JOBS_SUBDIR)}; "
+        f"{scripts._job_assign(jobid)}; "
+        'D="$JOBS/$JOB"; '
+        'if [ -z "$JOB" ] || [ ! -d "$D" ]; then echo "no such job: ${JOB:-<none>}" >&2; exit 1; fi; '
+        'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
+        'case "$SID" in ""|*[!0-9]*) echo "job $JOB has no scheduler job id" >&2; exit 1;; esac; '
+        'start=$(stat -c %s "$D/log" 2>/dev/null || echo 0); '
+        'out=$(srun --jobid="$SID" --overlap --ntasks=1 --quiet bash -c '
+        f"{config.shell_word(_STACK_SIGNAL_SCRIPT)}) || "
+        '{ echo "job $JOB (SLURM $SID) is not running" >&2; exit 1; }; '
+        f'echo "$out" | grep "^{_STACK_MARKER} " >&2; '
+        f'case "$out" in *"{_STACK_MARKER} 0 "*) exit 3;; esac; '
+        f"sleep {float(wait_seconds):g}; "
+        'printf "STACK %s\n\n" "$JOB"; '
+        'tail -c +"$((start + 1))" "$D/log"'
+    )
+
+
+def stack_dump(jobid=None, wait_seconds=2.0):
+    """Print every thread's Python stack of a live job's scan processes.
+
+    Sends ``SIGUSR1`` inside the job's allocation to scan interpreters that
+    registered it (``pyrite._entry.scan``); each writes its stacks to the job
+    log without stopping, and the new log bytes are printed. Scans started by
+    older code have no handler and are skipped rather than signalled.
+    """
+    result = subprocess.run(
+        ["ssh", "-n", config.remote_host(), _stack_dump_command(jobid, wait_seconds)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    for line in result.stderr.splitlines():
+        if line.startswith(_STACK_MARKER):
+            _marker, signalled, skipped = (line.split() + ["0", "0"])[:3]
+            print(f"signalled {signalled} scan process(es); skipped {skipped}", file=sys.stderr)
+        elif line.strip():
+            print(line, file=sys.stderr)
+    if result.returncode == 3:
+        print(
+            "no scan process in this job can dump its stack: it predates the SIGUSR1 "
+            "handler; resubmit the job to enable `pyrite job stack`",
+            file=sys.stderr,
+        )
+        return 1
+    if result.returncode != 0:
+        return 1
+    print(result.stdout, end="")
+    return 0
 
 
 def _disconnect_hint(jobid):

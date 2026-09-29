@@ -53,6 +53,13 @@ class _TimingAgg:
                 "_attempted_brem_chunk",
                 "_effective_brem_chunk",
                 "_learned_spec_chunk",
+                "_line_axis_nodes",
+                "_brem_axis_nodes",
+                "_segments",
+                "_line_tab_points",
+                "_line_table_mib",
+                "_host_rss_mib",
+                "_host_rss_peak_mib",
             )
             if key in out
         }

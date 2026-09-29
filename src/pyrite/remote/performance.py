@@ -9,7 +9,7 @@ from . import config, state, transport
 
 
 def pull_performance_profile(profile: str) -> list[Path]:
-    """Pull performance NDJSON plus any Nsight report artifacts."""
+    """Pull performance NDJSON plus any Nsight, CPU-profile, and py-spy artifacts."""
     transport._check_shell_tokens([profile])
     jobs = config.remote_path(config.JOBS_SUBDIR)
     listing = transport._ssh_capture(
@@ -19,12 +19,21 @@ def pull_performance_profile(profile: str) -> list[Path]:
         f'p="$d/performance/{profile}"; [ -d "$p" ] || continue; '
         'find "$p" -maxdepth 1 -type f '
         "\\( -name '*.ndjson' -o -name '*.nsys-rep' -o -name '*.sqlite' "
-        "-o -name '*.nsys-stats.txt' -o -name '*.cpu.prof' -o -name '*.cpu.txt' \\) "
+        "-o -name '*.nsys-stats.txt' -o -name '*.cpu.prof' -o -name '*.cpu.txt' "
+        "-o -name '*.py-spy.json' \\) "
         "-printf '%f\\n' | while IFS= read -r f; do "
         'printf "%s\\t%s\\n" "$(basename "$d")" "$f"; done; done'
     )
     artifacts = []
-    suffixes = (".nsys-stats.txt", ".cpu.prof", ".cpu.txt", ".nsys-rep", ".ndjson", ".sqlite")
+    suffixes = (
+        ".nsys-stats.txt",
+        ".py-spy.json",
+        ".cpu.prof",
+        ".cpu.txt",
+        ".nsys-rep",
+        ".ndjson",
+        ".sqlite",
+    )
     for line in listing.splitlines():
         jobid, separator, filename = line.partition("\t")
         suffix = next((item for item in suffixes if filename.endswith(item)), "")

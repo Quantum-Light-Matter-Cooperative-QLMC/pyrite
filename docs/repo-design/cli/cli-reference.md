@@ -998,7 +998,7 @@ Options:
 
 Commands:
   list  List remote performance artifact directories.
-  pull  Fetch one profile's NDJSON, Nsight, and CPU-profile artifacts.
+  pull  Fetch one profile's NDJSON, Nsight, CPU-profile, and py-spy artifacts.
   rm    Delete selected terminal-job performance artifacts; preview by default.
 ```
 
@@ -1018,7 +1018,7 @@ Options:
 ```text
 Usage: pyrite remote performance pull [OPTIONS] PERFORMANCE_PROFILE
 
-  Fetch one profile's NDJSON, Nsight, and CPU-profile artifacts.
+  Fetch one profile's NDJSON, Nsight, CPU-profile, and py-spy artifacts.
 
 Options:
   -v, --verbose  Print raw ssh/scp commands instead of a status line.
@@ -1138,6 +1138,7 @@ Commands:
   attach  Monitor one job until terminal or interrupted.
   list    List jobs with scheduler IDs, kinds, materials, and states.
   logs    Show a job diagnostic log; JOBID defaults to latest.
+  stack   Print the Python stack of every thread in a running job's scans; JOBID...
   status  Show one job snapshot; JOBID defaults to latest.
   stop    Preview or stop one job, one profile's jobs, or all jobs.
 ```
@@ -1179,6 +1180,21 @@ Usage: pyrite job logs [OPTIONS] [JOBID]
 Options:
   -f, --follow  Stream until interrupted.
   -h, --help    Show this message and exit.
+```
+
+## `pyrite job stack`
+
+```text
+Usage: pyrite job stack [OPTIONS] [JOBID]
+
+  Print the Python stack of every thread in a running job's scans; JOBID defaults to
+  latest. Signals the scan (SIGUSR1) without stopping it; jobs submitted before this
+  command existed cannot answer.
+
+Options:
+  --wait SECONDS  Seconds to let the dump reach the job log before reading it.
+                  [default: 2.0; x>=0.0]
+  -h, --help      Show this message and exit.
 ```
 
 ## `pyrite job status`

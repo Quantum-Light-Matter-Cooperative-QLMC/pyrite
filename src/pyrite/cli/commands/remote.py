@@ -249,6 +249,7 @@ class _StartFlags:
     spec_chunk: int | None
     brem_chunk: int | None
     nsys: bool
+    py_spy: bool
     cpu: bool
     cpu_only: bool
     no_cache: bool
@@ -279,6 +280,10 @@ def _reject_exclusive_start_flags(flags):
         raise click.UsageError("--no-cache and --recompute are mutually exclusive")
     if flags.cpu_only and flags.nsys:
         raise click.UsageError("--cpu-only cannot be combined with --nsys")
+    if flags.py_spy and flags.nsys:
+        raise click.UsageError("--py-spy and --nsys are mutually exclusive")
+    if flags.cpu_only and flags.py_spy:
+        raise click.UsageError("--cpu-only cannot be combined with --py-spy")
     if flags.cpu_only and flags.performance_repetitions != 1:
         raise click.UsageError("--cpu-only cannot be combined with --perf-reps")
     if flags.cpu_only and flags.performance_interval != 5.0:
@@ -289,7 +294,7 @@ def _reject_exclusive_start_flags(flags):
 
 def _resolve_performance_profile(flags, catalog_profile):
     """Name the profile to instrument, or reject telemetry knobs given without --perf."""
-    if flags.perf or flags.nsys or flags.cpu or flags.cpu_only:
+    if flags.perf or flags.nsys or flags.py_spy or flags.cpu or flags.cpu_only:
         return catalog_profile
     if flags.performance_repetitions != 1:
         raise click.UsageError("--perf-reps requires --perf")
@@ -306,7 +311,13 @@ def _resolve_start_chunk_minutes(flags):
     """Default the SLURM slice length; profiling modes need one monolithic job."""
     if flags.chunk_minutes is not None:
         return flags.chunk_minutes
-    monolithic = flags.performance_repetitions > 1 or flags.nsys or flags.cpu or flags.cpu_only
+    monolithic = (
+        flags.performance_repetitions > 1
+        or flags.nsys
+        or flags.py_spy
+        or flags.cpu
+        or flags.cpu_only
+    )
     return 0.0 if monolithic else 10.0
 
 
@@ -322,6 +333,10 @@ def _reject_start_allocation_conflicts(flags, chunk_minutes):
         raise click.UsageError("--nsys requires --perf-reps 1")
     if flags.nsys and flags.parallel_materials not in (None, 1):
         raise click.UsageError("--nsys requires one material process per GPU")
+    if flags.py_spy and chunk_minutes != 0:
+        raise click.UsageError("--py-spy requires --chunk-minutes 0")
+    if flags.py_spy and flags.performance_repetitions != 1:
+        raise click.UsageError("--py-spy requires --perf-reps 1")
     if flags.cpu and chunk_minutes != 0:
         raise click.UsageError("--cpu requires --chunk-minutes 0")
     if flags.cpu_only and chunk_minutes != 0:
@@ -464,6 +479,16 @@ _start_performance_options = _option_group(
         ),
     ),
     click.option(
+        "--py-spy",
+        "py_spy",
+        is_flag=True,
+        help=(
+            "Sample each material's uncached session with py-spy and store a "
+            ".py-spy.json speedscope profile beside the performance NDJSON; implies "
+            "--perf and --chunk-minutes 0; exclusive with --nsys and --cpu-only."
+        ),
+    ),
+    click.option(
         "-c",
         "--cpu",
         is_flag=True,
@@ -583,6 +608,7 @@ def start_command(**params):
         spec_chunk=flags.spec_chunk,
         brem_chunk=flags.brem_chunk,
         nsys=flags.nsys,
+        py_spy=flags.py_spy,
         cpu=flags.cpu,
         cpu_only=flags.cpu_only,
         no_cache=flags.no_cache,
@@ -614,7 +640,7 @@ def performance_list_command():
 
 @performance_command.command(
     "pull",
-    help="Fetch one profile's NDJSON, Nsight, and CPU-profile artifacts.",
+    help="Fetch one profile's NDJSON, Nsight, CPU-profile, and py-spy artifacts.",
 )
 @click.argument("profile", callback=_performance_profile_name, metavar="PERFORMANCE_PROFILE")
 @_verbose_option
