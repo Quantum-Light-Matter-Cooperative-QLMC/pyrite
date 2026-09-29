@@ -315,3 +315,72 @@ def _implied_dest(param_decls: Sequence[str]) -> str:
             return decl
     longest = max((decl for decl in param_decls if decl.startswith("--")), key=len)
     return longest.lstrip("-").replace("-", "_")
+
+
+# --------------------------------------------------------------------------- #
+# Implicit defaults (issue #214)
+# --------------------------------------------------------------------------- #
+#
+# Not a spelling: a value the CLI fills in when the user names none. The
+# bundled `standard` profile and the bundled `default` beam and detector are
+# examples, not anyone's hardware, so resolving them silently is on the same
+# support window as a retired spelling. Stage 1 warns; at `remove_in` the value
+# must be named. Nothing about the `standard` profile itself is deprecated.
+
+
+@dataclass(frozen=True)
+class ImplicitDefault:
+    """One value resolved implicitly, and how to name it explicitly instead."""
+
+    key: str
+    fallback: str
+    replacement: str
+    deprecated_in: str
+    remove_in: str
+    note: str = ""
+
+
+def _implicit(
+    key: str, fallback: str, replacement: str, *, since: str = "0.3.0", note: str = ""
+) -> ImplicitDefault:
+    return ImplicitDefault(key, fallback, replacement, since, _window(since), note)
+
+
+#: Keyed by what the user left unnamed. Rendered into the deprecation reference.
+IMPLICIT_DEFAULTS: dict[str, ImplicitDefault] = {
+    "profile": _implicit(
+        "profile",
+        "the `standard` profile",
+        "pass PROFILE, set PYRITE_PROFILE, or run 'pyrite config set profile.current NAME'",
+        note="`pyrite run` and `pyrite remote start`; `standard` stays a named profile.",
+    ),
+    "beam": _implicit(
+        "beam",
+        "the built-in example beam (5 kHz, 1 pC, as bundled `default`)",
+        "set the profile's `beam` with 'pyrite profile set NAME --beam BEAM'",
+        note="Profiles in a user-selected catalog; bundled example profiles are exempt.",
+    ),
+    "detector": _implicit(
+        "detector",
+        "the `standard` profile's detector (bundled: the 90-degree `default` example)",
+        "set the profile's `detector` with 'pyrite profile set NAME --detector DETECTOR'",
+        note="Profiles in a user-selected catalog; bundled example profiles are exempt.",
+    ),
+}
+
+
+def implicit_default_message(key: str, subject: str) -> str:
+    """Render the stderr warning for *subject* resolving *key* implicitly."""
+    entry = IMPLICIT_DEFAULTS[key]
+    fallback = entry.fallback.replace("`", "'")
+    replacement = entry.replacement.replace("`", "'")
+    return (
+        f"warning: {subject} names no {entry.key}; using {fallback}. Implicit "
+        f"{entry.key} selection is deprecated and will be an error in "
+        f"{entry.remove_in}; {replacement}"
+    )
+
+
+def warn_implicit_default(key: str, subject: str) -> None:
+    """Emit the implicit-default warning for *key* on stderr."""
+    click.echo(implicit_default_message(key, subject), err=True)

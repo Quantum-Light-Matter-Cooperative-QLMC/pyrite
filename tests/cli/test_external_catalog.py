@@ -72,3 +72,45 @@ def test_missing_selected_catalog_fails_without_fallback(tmp_path, monkeypatch):
     assert by_option.exit_code != 0
     assert by_env.exit_code != 0
     assert "standard:" not in by_env.output
+
+
+@pytest.mark.parametrize(
+    ("profile", "warned"),
+    [("coh_test", ("beam",)), ("hopg_short", ("detector",)), ("standard", ("beam",))],
+)
+def test_selected_catalog_run_warns_for_implicit_example_instrument(
+    tmp_path, monkeypatch, profile, warned
+):
+    from pyrite.runs import scan as runs_scan
+
+    monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
+    monkeypatch.delenv("PYRITE_CATALOG", raising=False)
+    monkeypatch.setattr(runs_scan, "run", lambda args: None)
+    catalog = tmp_path / "catalog"
+    shutil.copytree(bundled_catalog(), catalog)
+
+    result = CliRunner().invoke(
+        command,
+        ["--catalog", str(catalog), "run", profile, "-m", "hopg"],
+        env={"PYRITE_MC_BACKEND": "cpu"},
+    )
+
+    assert result.exit_code == 0, result.output
+    for key in ("beam", "detector"):
+        line = f"warning: profile '{profile}' names no {key};"
+        assert (line in result.stderr) is (key in warned), result.stderr
+
+
+def test_bundled_catalog_run_does_not_warn_for_example_instrument(tmp_path, monkeypatch):
+    from pyrite.runs import scan as runs_scan
+
+    monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
+    monkeypatch.delenv("PYRITE_CATALOG", raising=False)
+    monkeypatch.setattr(runs_scan, "run", lambda args: None)
+
+    result = CliRunner().invoke(
+        command, ["run", "coh_test", "-m", "hopg"], env={"PYRITE_MC_BACKEND": "cpu"}
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.stderr == ""

@@ -40,6 +40,12 @@ and run commands. Edits write the selected catalog. An invalid selected path
 fails instead of falling back to bundled definitions. Remote submissions stage
 the selected catalog in the remote checkout and run against that copy.
 
+The bundled `default` beam and detector are examples. Give each lab profile its
+own with `pyrite profile set NAME --beam BEAM --detector DETECTOR`: a run from a
+selected catalog whose profile names neither falls back to the bundled examples
+and warns, and that fallback is scheduled for removal (see
+[Bundled examples and implicit defaults](sweep-profiles.md#bundled-examples-and-implicit-defaults)).
+
 Keep generated output separate from the catalog. Set an external workspace for
 checkpoints, observations, and generated cross-section data:
 

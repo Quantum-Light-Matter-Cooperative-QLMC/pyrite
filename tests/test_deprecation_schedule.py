@@ -19,7 +19,7 @@ import pytest
 from pyrite import __version__
 from pyrite._module_deprecations import MODULE_DEPRECATIONS
 from pyrite.campaign.model import FROM_LEGACY_REMOVE_IN
-from pyrite.cli._deprecations import DEPRECATED_FLAGS, DEPRECATIONS
+from pyrite.cli._deprecations import DEPRECATED_FLAGS, DEPRECATIONS, IMPLICIT_DEFAULTS
 
 
 def _minor(version: str) -> tuple[int, int]:
@@ -60,6 +60,16 @@ def test_no_deprecated_option_spelling_is_past_its_removal_target() -> None:
 
     assert not overdue, (
         f"pyrite-xray {__version__} still ships {len(overdue)} option spelling(s) "
+        f"at or past their removal target: {sorted(overdue)}."
+    )
+
+
+def test_no_implicit_default_is_past_its_removal_target() -> None:
+    """Stage 2 of issue #214 turns each implicit default into a required choice."""
+    overdue = _overdue({key: entry.remove_in for key, entry in IMPLICIT_DEFAULTS.items()})
+
+    assert not overdue, (
+        f"pyrite-xray {__version__} still resolves {len(overdue)} implicit default(s) "
         f"at or past their removal target: {sorted(overdue)}."
     )
 

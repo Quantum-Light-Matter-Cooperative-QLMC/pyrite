@@ -11,6 +11,7 @@ from ...console import config as _cli_config
 from ...console import output as _cli_core
 from ...runs import scan as _scan
 from .. import _completion as _cli_completion
+from .. import _implicit_defaults
 from .._options import remote_option
 
 _PERFORMANCE_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
@@ -52,7 +53,8 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     "run",
     help=(
         "Run a catalog profile's MC sweeps and write checkpoints.\n\n"
-        "PROFILE defaults to the current configured profile (standard built-in) "
+        "PROFILE defaults to the current configured profile (standard built-in; "
+        "the built-in fallback warns and is deprecated) "
         "and owns material membership, campaign ranges, and workload settings. "
         "Use -m/--material to run one profile member instead of the full resolved "
         "membership.\n\n"
@@ -404,9 +406,11 @@ def _command(
     if gdf_time_s is not None and gdf_screen_position_m is not None:
         raise click.UsageError("--gdf-time-s and --gdf-screen-position-m are mutually exclusive")
     raw_catalog_profile = catalog_profile
+    resolved_profile = None
     if preset is None:
         try:
-            catalog_profile = _cli_config.resolve("profile.current", catalog_profile).value
+            resolved_profile = _cli_config.resolve("profile.current", catalog_profile)
+            catalog_profile = resolved_profile.value
         except _cli_config.ConfigError as exc:
             raise _cli_core.CLIError(str(exc)) from exc
     if wait and detach:
@@ -492,6 +496,8 @@ def _command(
                 detach=detach,
                 dry_run=dry_run,
             )
+    if resolved_profile is not None:
+        _implicit_defaults.warn_implicit_profile(resolved_profile)
     if remote_target is not None:
         if json_output:
             raise click.UsageError("remote run does not yet support --output json")
@@ -543,6 +549,8 @@ def _command(
                 headless=detach,
                 no_pull=False,
             )
+    if resolved_profile is not None:
+        _implicit_defaults.warn_implicit_instrument(catalog_profile)
     if quick and fidelity != "full":
         raise click.UsageError("--quick cannot be combined with --fidelity survey")
     if perf and performance_profile is None:

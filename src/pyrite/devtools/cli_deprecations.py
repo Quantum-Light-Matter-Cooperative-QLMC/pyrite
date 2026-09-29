@@ -9,7 +9,12 @@ import argparse
 from pathlib import Path
 
 from pyrite import __version__
-from pyrite.cli._deprecations import DEPRECATED_FLAGS, DEPRECATIONS, SUPPORT_WINDOW_MINORS
+from pyrite.cli._deprecations import (
+    DEPRECATED_FLAGS,
+    DEPRECATIONS,
+    IMPLICIT_DEFAULTS,
+    SUPPORT_WINDOW_MINORS,
+)
 
 _EMPTY_COMMANDS = (
     "No command spelling is currently deprecated. Every spelling the CLI accepts "
@@ -78,6 +83,26 @@ def build_deprecations() -> str:
             )
     else:
         lines.append(_EMPTY_OPTIONS)
+    lines.extend(
+        (
+            "",
+            "## Implicit defaults",
+            "",
+            (
+                "A run that leaves one of these unnamed still resolves the fallback, "
+                "warns on stderr, and must name it explicitly from the removal release."
+            ),
+            "",
+            "| Unnamed | Current fallback | Name it explicitly | Deprecated in | Remove in | Note |",
+            "| --- | --- | --- | --- | --- | --- |",
+        )
+    )
+    for key in sorted(IMPLICIT_DEFAULTS):
+        implicit = IMPLICIT_DEFAULTS[key]
+        lines.append(
+            f"| {implicit.key} | {implicit.fallback} | {implicit.replacement} "
+            f"| {implicit.deprecated_in} | {implicit.remove_in} | {implicit.note} |"
+        )
     lines.append("")
     return "\n".join(lines)
 
