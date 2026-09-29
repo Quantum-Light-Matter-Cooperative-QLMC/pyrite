@@ -47,6 +47,8 @@ Use the project runner rather than bare `pytest` or an environment-specific Pyth
 
 Suite ownership uses deterministic filename rules in `pyrite._dev`. A regression test requires the four domain suites to cover every test module exactly once, so a new test cannot silently disappear from focused coverage. The integration suite intentionally overlaps domain suites; it exercises public imports/data, exports, CLI contract, remote, sweep/run, and a headless app path. `pyrite-dev docs` performs the clean offline warnings-as-errors Sphinx build; `verify` includes that documentation gate along with skills, imports, generated repository structure, lint, types, and tests. CI runs the four domain suites once each (core with two file-grouped workers and slow-test timings) and uses `verify --skip-tests` for the remaining checks; local `verify` still runs everything.
 
+`pyrite-dev test` (and the test step of `verify`) runs the whole suite on `pytest-xdist` workers: `min(CPUs, available memory / 2 GiB, 6)`, since a worker peaks at roughly 1.2–1.8 GiB. Set `PYRITE_TEST_WORKERS=N` to choose the count (`1` runs serially). Runs that name test paths, or already pass `-n`/`--numprocesses` or `-p no:xdist`, are forwarded unchanged. Pytest keeps `tmp_path` directories only for failed tests.
+
 ## Coverage
 
 ```bash

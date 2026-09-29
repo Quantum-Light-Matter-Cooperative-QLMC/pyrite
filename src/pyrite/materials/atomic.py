@@ -23,6 +23,7 @@ Conventions:
 """
 
 import hashlib
+import json
 from collections import OrderedDict
 from functools import cache
 
@@ -185,9 +186,8 @@ def henke_dispersion(element, E_eV, on_out_of_range="nan"):
 
 
 # Coherent+incoherent scattering shares henke_dispersion's access pattern (same
-# element, same energy grid, re-requested once per reflection), but mu_elam is
-# ~20x costlier per call than f2_chantler because xraydb rebuilds the spline
-# each time. Memoize on the exact energy bytes, as above.
+# element, same energy grid, re-requested once per reflection). Memoize on the
+# exact energy bytes, as above.
 _ELAM_MEMO: OrderedDict[tuple, np.ndarray] = OrderedDict()
 _ELAM_MEMO_MAX = 256
 
@@ -200,6 +200,54 @@ ELAM_E_MAX_EV = 8.0e5
 def _atomic_mass_g_per_mol(element):
     """Elam-table standard atomic weight [g/mol]; one sqlite hit per element."""
     return float(xraydb.atomic_mass(element))
+
+
+@cache
+def _elam_scattering_table(element, kind):
+    """Elam ``(log E, log sigma, spline)`` knots for ``kind`` in {"coh", "incoh"}.
+
+    The same rows ``xraydb.XrayDB.cross_section_elam`` reads, parsed once per
+    element instead of once per call.
+    """
+    xdb = xraydb.get_xraydb()
+    row = xdb.get_cache("scattering", column="element", value=xdb.symbol(element))[0]
+    values, spline = {
+        "coh": (row.log_coherent_scatter, row.log_coherent_scatter_spline),
+        "incoh": (row.log_incoherent_scatter, row.log_incoherent_scatter_spline),
+    }[kind]
+    tables = tuple(np.array(json.loads(col)) for col in (row.log_energy, values, spline))
+    for table in tables:
+        table.flags.writeable = False
+    return tables
+
+
+def _elam_spline(xin, yin, yspl_in, x):
+    """Vectorized ``xraydb.utils.elam_spline``, bit-for-bit identical.
+
+    xraydb brackets each ``x`` with a per-point ``np.where`` scan -- O(N*M) in
+    Python, ~3 s per call on a 1 eV grid to 800 keV. ``searchsorted`` yields the
+    same brackets (``lo`` = last knot strictly below, ``hi`` = first strictly
+    above, clamped to the table ends, so an exact knot hit straddles it), and
+    the cubic-spline arithmetic below is xraydb's, term for term.
+    """
+    lo = np.maximum(np.searchsorted(xin, x, side="left") - 1, 0)
+    hi = np.minimum(np.searchsorted(xin, x, side="right"), len(xin) - 1)
+    diff = xin[hi] - xin[lo]
+    if np.any(diff <= 0):
+        raise ValueError("x must be strictly increasing")
+    a = (xin[hi] - x) / diff
+    b = (x - xin[lo]) / diff
+    return (
+        a * yin[lo]
+        + b * yin[hi]
+        + (diff * diff / 6) * ((a * a - 1) * a * yspl_in[lo] + (b * b - 1) * b * yspl_in[hi])
+    )
+
+
+def _mu_elam_scattering(element, E_eV, kind):
+    """``xraydb.mu_elam(element, E_eV, kind)`` [cm^2/g] for ``E_eV`` in the Elam band."""
+    log_energy, log_values, log_spline = _elam_scattering_table(element, kind)
+    return np.exp(_elam_spline(log_energy, log_values, log_spline, np.log(E_eV)))
 
 
 def elam_scattering_cross_section_ang2(element, E_eV):
@@ -271,8 +319,8 @@ def elam_scattering_cross_section_ang2(element, E_eV):
 
     Eflat = np.atleast_1d(E).ravel()
     queried = np.clip(Eflat, ELAM_E_MIN_EV, ELAM_E_MAX_EV)
-    mu_rho = np.asarray(xraydb.mu_elam(element, queried, "coh"), dtype=float) + np.asarray(
-        xraydb.mu_elam(element, queried, "incoh"), dtype=float
+    mu_rho = _mu_elam_scattering(element, queried, "coh") + _mu_elam_scattering(
+        element, queried, "incoh"
     )
     # cm^2/g -> cm^2/atom -> Angstrom^2/atom.
     sigma = mu_rho * (_atomic_mass_g_per_mol(element) / _AVOGADRO) * 1.0e16

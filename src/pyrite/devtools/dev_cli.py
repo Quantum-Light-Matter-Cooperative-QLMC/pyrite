@@ -18,7 +18,9 @@ Commands:
     nbstrip    strip notebook outputs in-place
     test       run pytest, forwarding selectors and arguments
                (--numba disables JIT via NUMBA_DISABLE_JIT=1, must precede
-               other forwarded args, to measure @njit bodies under --cov)
+               other forwarded args, to measure @njit bodies under --cov;
+               runs without test paths use memory-bounded xdist workers,
+               PYRITE_TEST_WORKERS=N overrides, 1 = serial)
     test-suite run one stable core/CLI/app/packaging/integration test suite
     package-smoke build and install clean wheel/editable environments
     smoke      exercise checkpoint loading and plotting
@@ -269,8 +271,57 @@ def cmd_nbstrip(_: argparse.Namespace) -> None:
     run("-m", "nbstripout", *[str(p) for p in notebooks])
 
 
+# Measured per-worker peak RSS over the full suite is ~1.2-1.8 GiB; budget 2 GiB
+# so a laptop with other work running does not swap or OOM.
+TEST_WORKER_MEMORY_BYTES = 2 * 1024**3
+MAX_TEST_WORKERS = 6
+
+
+def default_test_workers() -> int:
+    """xdist worker count for a full-suite run: ``PYRITE_TEST_WORKERS`` or a
+    CPU- and available-memory-bounded default (1 means serial)."""
+    override = os.environ.get("PYRITE_TEST_WORKERS")
+    if override:
+        return max(1, int(override))
+    import psutil
+
+    by_memory = psutil.virtual_memory().available // TEST_WORKER_MEMORY_BYTES
+    return max(1, min(os.cpu_count() or 1, by_memory, MAX_TEST_WORKERS))
+
+
+def _selects_test_paths(pytest_args: list[str]) -> bool:
+    return any(
+        not arg.startswith("-") and ("::" in arg or (ROOT / arg).exists() or Path(arg).exists())
+        for arg in pytest_args
+    )
+
+
+def parallel_pytest_args(pytest_args: list[str]) -> list[str]:
+    """Prepend xdist workers to a full-suite run.
+
+    Runs that name test paths, or already choose ``-n``/``--numprocesses`` or
+    disable xdist, are forwarded unchanged.
+    """
+    explicit = any(
+        arg in {"-n", "--numprocesses", "no:xdist"}
+        or arg.startswith(("-n=", "--numprocesses="))
+        or (arg.startswith("-n") and arg[2:].isdigit())
+        for arg in pytest_args
+    )
+    if explicit or _selects_test_paths(pytest_args):
+        return pytest_args
+    workers = default_test_workers()
+    if workers < 2:
+        return pytest_args
+    print(
+        f"pyrite-dev test: {workers} xdist workers (PYRITE_TEST_WORKERS=1 for serial)",
+        file=sys.stderr,
+    )
+    return ["-n", str(workers), "--dist", "worksteal", *pytest_args]
+
+
 def cmd_test(args: argparse.Namespace) -> None:
-    pytest_args = getattr(args, "pytest_args", [])
+    pytest_args = parallel_pytest_args(getattr(args, "pytest_args", []))
     if getattr(args, "numba", False):
         run("-m", "pytest", *pytest_args, extra_env={"NUMBA_DISABLE_JIT": "1"})
     else:

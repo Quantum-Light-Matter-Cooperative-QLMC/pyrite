@@ -1,6 +1,7 @@
 """Tests for the repository developer command runner."""
 
 from argparse import Namespace
+from types import SimpleNamespace
 
 import pytest
 
@@ -166,6 +167,7 @@ def test_main_strips_leading_numba_flag_before_pytest_args(dev_module, monkeypat
 
 def test_test_numba_sets_disable_jit_env_for_pytest_subprocess(dev_module, monkeypatch) -> None:
     calls = []
+    monkeypatch.setenv("PYRITE_TEST_WORKERS", "1")
     monkeypatch.setattr(dev_module, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     dev_module.cmd_test(Namespace(numba=True, pytest_args=["--cov"]))
@@ -175,11 +177,54 @@ def test_test_numba_sets_disable_jit_env_for_pytest_subprocess(dev_module, monke
 
 def test_test_without_numba_omits_extra_env_kwarg(dev_module, monkeypatch) -> None:
     calls = []
+    monkeypatch.setenv("PYRITE_TEST_WORKERS", "1")
     monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
 
     dev_module.cmd_test(Namespace(numba=False, pytest_args=["-k", "forward"]))
 
     assert calls == [("-m", "pytest", "-k", "forward")]
+
+
+def test_full_suite_test_run_adds_memory_bounded_xdist_workers(dev_module, monkeypatch) -> None:
+    monkeypatch.delenv("PYRITE_TEST_WORKERS", raising=False)
+    monkeypatch.setattr(dev_module.os, "cpu_count", lambda: 16)
+    available = SimpleNamespace(available=7 * dev_module.TEST_WORKER_MEMORY_BYTES // 2)
+    monkeypatch.setattr("psutil.virtual_memory", lambda: available)
+
+    assert dev_module.parallel_pytest_args(["-k", "forward"]) == [
+        "-n",
+        "3",
+        "--dist",
+        "worksteal",
+        "-k",
+        "forward",
+    ]
+
+
+@pytest.mark.parametrize(
+    "pytest_args",
+    [
+        ["tests/dev/test_dev_cli.py"],
+        ["tests/dev/test_dev_cli.py::test_run_merges_extra_env_into_subprocess_environment"],
+        ["-n", "2"],
+        ["-n4"],
+        ["--numprocesses=2"],
+        ["-p", "no:xdist"],
+    ],
+)
+def test_targeted_or_explicit_test_runs_keep_their_worker_choice(
+    dev_module, monkeypatch, pytest_args
+) -> None:
+    monkeypatch.setenv("PYRITE_TEST_WORKERS", "4")
+
+    assert dev_module.parallel_pytest_args(pytest_args) == pytest_args
+
+
+@pytest.mark.parametrize(("override", "expected"), [("1", []), ("0", []), ("5", ["-n", "5"])])
+def test_test_workers_env_override(dev_module, monkeypatch, override, expected) -> None:
+    monkeypatch.setenv("PYRITE_TEST_WORKERS", override)
+
+    assert dev_module.parallel_pytest_args([])[:2] == expected
 
 
 def test_run_merges_extra_env_into_subprocess_environment(dev_module, monkeypatch) -> None:

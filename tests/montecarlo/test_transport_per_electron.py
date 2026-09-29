@@ -252,16 +252,6 @@ def test_per_electron_core_matches_lockstep_physics():
     case = dict(BASE_CASE)
     case.update(Ne=BASE_CASE["Ne"] if tracing_numba else 3000)
     seeds = range(1, 5) if tracing_numba else range(1, 9)
-    lockstep = [simulate_trajectories(**{**case, "seed": s}) for s in seeds]
-    per_electron = [
-        simulate_trajectories(**{**case, "seed": s, "transport_core": "per-electron"})
-        for s in seeds
-    ]
-
-    def observable(runs, fn):
-        vals = np.array([fn(r) for r in runs])
-        return vals.mean(), vals.std(ddof=1) / np.sqrt(len(vals))
-
     metrics = {
         "backscatter fraction": lambda r: r["n_backscattered"] / r["Ne"],
         "transmit fraction": lambda r: r["n_transmitted"] / r["Ne"],
@@ -270,9 +260,26 @@ def test_per_electron_core_matches_lockstep_physics():
         "mean segment energy": lambda r: r["E_keV"].mean(),
         "mean depth": lambda r: r["r_mid"][:, 2].mean(),
     }
-    for name, fn in metrics.items():
-        a, a_err = observable(lockstep, fn)
-        b, b_err = observable(per_electron, fn)
+
+    # Reduce each run to its observables at once: holding all 16 full segment
+    # tables alive costs ~3 GB, which caps how many test workers fit in RAM.
+    def observables(**core):
+        rows = []
+        for s in seeds:
+            run = simulate_trajectories(**{**case, "seed": s, **core})
+            rows.append({name: fn(run) for name, fn in metrics.items()})
+        return rows
+
+    lockstep = observables()
+    per_electron = observables(transport_core="per-electron")
+
+    def observable(rows, name):
+        vals = np.array([row[name] for row in rows])
+        return vals.mean(), vals.std(ddof=1) / np.sqrt(len(vals))
+
+    for name in metrics:
+        a, a_err = observable(lockstep, name)
+        b, b_err = observable(per_electron, name)
         spread = np.hypot(a_err, b_err)
         assert abs(a - b) < 4.0 * spread, f"{name}: {a} +-{a_err} vs {b} +-{b_err}"
 
