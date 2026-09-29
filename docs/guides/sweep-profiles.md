@@ -48,12 +48,13 @@ Existing `profile create|set --ne-line/--ne-brem`, `--straggling`, `--energy-mod
 
 ## Line-grid policy
 
-By default each case's line axis spans a closed-form kinematic bandwidth at the measured sinc spacing. At MeV beam energies that axis needs millions of nodes. A profile can instead name measured policies:
+By default each case's line axis spans a closed-form kinematic bandwidth at the measured sinc spacing. That bandwidth is capped at the beam's kinetic energy and at the end of the atomic data (about 800 keV for most elements), above which no line can emit in this model. At MeV beam energies that axis needs millions of nodes. A profile can instead name measured policies:
 
 ```text
 [line_grid_policy]
 bandwidth = "resonance-population"  # stop from the case's own line population
 resolution = "resonance-local"      # fine spacing only where narrow lines resonate
+quadrature = "bin-mean"             # exact integrated yield across spacing changes
 ```
 
 The table applies to every case of the profile and joins its dataset identity. `high_energy` uses it. A measured-bandwidth case records its upper-edge truncation audit and the line yield's per-electron relative standard error in `line_grid_resolved`. When a few electrons carry the yield (relative standard error above 0.1, typical at 5 MeV where rare electrons scatter into the detector's radiation cone), the case still runs, is flagged `statistics_limited`, and raises `LineYieldStatisticsWarning`.

@@ -574,7 +574,7 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
     `mc_spectrum` on the SAME segments -- the single-transport / dual-kernel
     invariant."""
     # Both accumulation routes tabulate reflections through `_kernels`, so that
-    # is the one place a `chi_g` counter sees every evaluation.
+    # is the one place a tabulation counter sees every evaluation.
     import pyrite.montecarlo.runner as runner
     from pyrite.montecarlo.spectrum.lines import _kernels as line_kernels
 
@@ -584,21 +584,21 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
         "_characteristic_from_segments",
         lambda *a, **k: np.zeros_like(E_GRID),
     )
-    real_chi_g = line_kernels.chi_g
-    chi_g_calls = 0
+    real_tables = line_kernels.reflection_coupling_tables
+    tabulated = []
 
-    def counted_chi_g(*args, **kwargs):
-        nonlocal chi_g_calls
-        chi_g_calls += 1
-        return real_chi_g(*args, **kwargs)
+    def counted_tables(crystal, hkl_list, *args, **kwargs):
+        tabulated.append(len(hkl_list))
+        return real_tables(crystal, hkl_list, *args, **kwargs)
 
-    monkeypatch.setattr(line_kernels, "chi_g", counted_chi_g)
+    monkeypatch.setattr(line_kernels, "reflection_coupling_tables", counted_tables)
     segs = _segments(2)
     tp = _runner_tp(segs, ne_lines=2, ne_brem=2)
 
     case = _runner_case(coherent=True)
     out = runner._spectrum_case_impl(case, tp)
-    assert chi_g_calls == len(KWARGS["hkl_list"])
+    # One tabulation covers every reflection and serves both kernels.
+    assert tabulated == [len(KWARGS["hkl_list"])]
 
     direct_incoherent = mc_spectrum(segs, E_GRID, coherent=False, **KWARGS)
     direct_coherent = mc_spectrum(segs, E_GRID, coherent=True, **KWARGS)

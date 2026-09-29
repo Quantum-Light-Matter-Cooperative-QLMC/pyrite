@@ -259,3 +259,86 @@ def test_host_evaluator_blocks_do_not_change_the_result(monkeypatch):
     np.testing.assert_array_equal(
         to_host(bq.sincsq_bin_lineshape(a, e_r, edges, inv_width)), to_host(whole)
     )
+
+
+# Far-field envelope beyond BIN_MEAN_EXACT_WIDTHS (Validation: sinc-bin-far-envelope)
+
+
+def _hybrid_population(seed=5, count=200):
+    rng = np.random.default_rng(seed)
+    width = np.exp(rng.uniform(np.log(0.05), np.log(30.0), count))
+    return np.pi / width, rng.uniform(3000.0, 17000.0, count), width
+
+
+@pytest.mark.parametrize("step", [0.5, 3.0])
+@pytest.mark.parametrize("exact_widths", [16.0, bq.BIN_MEAN_EXACT_WIDTHS])
+def test_far_envelope_yield_error_stays_inside_its_bound(step, exact_widths):
+    """Per-line yield change <= 3/(2 pi^3 K^2); pointwise <= 1/(pi^2 K^2) of the peak."""
+    grid = np.arange(0.0, 20000.0 + step / 2, step)
+    edges, widths = _energy_bin_edges_and_widths(grid)
+    a, e_r, width = _hybrid_population()
+    exact = bq._host_bin_mean(a, e_r, edges, 1.0 / widths)
+    hybrid = bq._host_bin_mean(a, e_r, edges, 1.0 / widths, exact_widths=exact_widths)
+    yield_error = np.abs(((hybrid - exact) * widths).sum(axis=1)) / width
+    assert yield_error.max() <= 3.0 / (2.0 * np.pi**3 * exact_widths**2)
+    assert np.abs(hybrid - exact).max() <= 1.0 / (np.pi**2 * exact_widths**2)
+
+
+def test_far_envelope_leaves_near_bins_exact_and_uses_the_closed_form_beyond():
+    grid = np.arange(0.0, 2000.0, 0.5)
+    edges, widths = _energy_bin_edges_and_widths(grid)
+    a, e_r = np.array([np.pi / 2.0]), np.array([1000.3])
+    exact = bq._host_bin_mean(a, e_r, edges, 1.0 / widths)[0]
+    hybrid = bq._host_bin_mean(a, e_r, edges, 1.0 / widths, exact_widths=64.0)[0]
+    x = (edges - e_r[0]) / 2.0
+    far = (x[:-1] >= 64.0) | (x[1:] <= -64.0)
+    assert far.any() and (~far).any()
+    np.testing.assert_array_equal(hybrid[~far], exact[~far])
+    np.testing.assert_allclose(
+        hybrid[far], 1.0 / (2.0 * np.pi**2 * x[:-1][far] * x[1:][far]), rtol=1e-6
+    )
+
+
+def test_production_lineshape_defaults_to_the_far_envelope():
+    grid = np.arange(0.0, 2000.0, 0.5)
+    edges, inv_width = bq.bin_axis(grid)
+    a, e_r = np.array([np.pi / 2.0]), np.array([1000.3])
+    default = np.asarray(bq.sincsq_bin_lineshape(a, e_r, edges, inv_width))
+    hybrid = bq._host_bin_mean(
+        a, e_r, np.asarray(edges), np.asarray(inv_width), exact_widths=bq.BIN_MEAN_EXACT_WIDTHS
+    )
+    exact = np.asarray(bq.sincsq_bin_lineshape(a, e_r, edges, inv_width, exact_widths=None))
+    np.testing.assert_allclose(default, hybrid.astype(default.dtype), rtol=1e-6)
+    assert not np.array_equal(default, exact)
+
+
+@pytest.mark.parametrize("exact_widths", [16.0, bq.BIN_MEAN_EXACT_WIDTHS])
+def test_far_envelope_bound_holds_at_mev_resonances_on_narrow_lines(exact_widths):
+    """E_res / w ~ 1.6e8: the resonance and edges must keep their float32
+    remainders, or the far set shifts by ulp(E_res)/w widths (fresh-context
+    verification, #192)."""
+    # Far bins on one side only, so a shifted far set cannot cancel across sides.
+    width = np.array([0.01, 0.02, 0.05])
+    e_r = np.array([1_600_000.0123, 1_600_000.0567, 1_600_000.0901])
+    grid = np.arange(1_599_999.9, 1_600_020.0, 0.005)
+    edges, widths = _energy_bin_edges_and_widths(grid)
+    a = np.pi / width
+    exact = bq._host_bin_mean(a, e_r, edges, 1.0 / widths)
+    hybrid = bq._host_bin_mean(a, e_r, edges, 1.0 / widths, exact_widths=exact_widths)
+    yield_error = np.abs(((hybrid - exact) * widths).sum(axis=1)) / width
+    assert yield_error.max() <= 3.0 / (2.0 * np.pi**3 * exact_widths**2)
+    # A dropped edge remainder mostly telescopes out of the yield but not per bin.
+    assert np.abs(hybrid - exact).max() <= 1.0 / (np.pi**2 * exact_widths**2)
+
+
+def test_far_envelope_never_claims_the_core_of_a_sub_mev_width_line():
+    """w = 0.1 meV at 1.6 MeV: ulp(E)/w ~ 1250 widths. Without the edge
+    float32 remainders every edge collapses onto one head, ~123 widths from the
+    resonance, and the resonance bins would classify as far."""
+    width, e_r = np.array([0.0001]), np.array([1_600_000.01234])
+    grid = np.arange(1_600_000.0, 1_600_000.05, 0.00005)
+    edges, widths = _energy_bin_edges_and_widths(grid)
+    a = np.pi / width
+    exact = bq._host_bin_mean(a, e_r, edges, 1.0 / widths)
+    hybrid = bq._host_bin_mean(a, e_r, edges, 1.0 / widths, exact_widths=64.0)
+    assert np.abs(hybrid - exact).max() <= 1.0 / (np.pi**2 * 64.0**2)

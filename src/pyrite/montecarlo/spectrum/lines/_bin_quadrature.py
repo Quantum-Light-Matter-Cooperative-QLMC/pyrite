@@ -38,7 +38,23 @@ evaluated in FP64 and cast to the working precision only as a finished bin mean.
   ``gcc -O2 -ffp-contract=off`` build measures 7.8e-16.
 * Other accelerators (SYCL): the NumPy evaluator on host.
 
+Production routes (``sincsq_bin_lineshape``, ``run_bin_mean_reduction_kernel``)
+evaluate this exact mean only for bins within ``BIN_MEAN_EXACT_WIDTHS``
+first-zero widths of the resonance. A bin wholly beyond that on one side
+(``x_lo >= K`` or ``x_hi <= -K``) takes the exact bin mean of the
+``sin^2``-averaged envelope ``1/(2 pi^2 x^2)``,
+
+    ``mean = 1 / (2 pi^2 x_lo x_hi)``,
+
+in float32 arithmetic. Adjacent envelope bins share edges, so their masses
+telescope; the only yield change is the omitted oscillatory term
+``-cos(2 pi x)/(2 pi^2 x^2)`` over the far region, at most ``3/(4 pi^3 K^2)``
+of the line per side (integration by parts), ``1.2e-5`` in total at ``K = 64``.
+It removes the FP64 sine-integral evaluation from all but ~``4K`` bins per
+line, which dominates bin-mean cost on consumer GPUs.
+
 Validation: sinc-bin-integration
+Validation: sinc-bin-far-envelope
 """
 
 import numpy as np
@@ -56,6 +72,11 @@ _SI_ASYMPTOTIC_T = 48.0
 #: Asymptotic terms. The first omitted term at ``t = 48`` is 26!/48**26 < 1e-17
 #: of the leading one, and it only shrinks as ``t`` grows.
 _SI_ASYMPTOTIC_TERMS = 13
+#: First-zero widths from the resonance within which production bin means are
+#: exact; beyond, the averaged envelope (yield error <= 3/(2 pi^3 K^2) = 1.2e-5
+#: per line). ``None`` on the routes' ``exact_widths`` keeps every bin exact.
+#: Validation: sinc-bin-far-envelope
+BIN_MEAN_EXACT_WIDTHS = 64.0
 #: Host evaluator block size in (line, bin) elements, bounding its temporaries.
 _HOST_BLOCK_ELEMENTS = 1 << 22
 
@@ -173,6 +194,43 @@ static __device__ double pyrite_sincsq_bin_mean(
     }
     return mass * (PYRITE_PI / a) * inv_width;
 }
+
+/* Far-field classification and value, all in float32 (Validation:
+   sinc-bin-far-envelope). Each FP64 edge and the resonance are split into a
+   float32 head and float32 remainder, so edge - e_r stays near float32 relative
+   accuracy (degrading only for E_res/|edge - e_r| >~ 1e6) (an FP64 resonance rounded to float32 first
+   would shift x by ulp(E_res)/w, beyond the bound once E_res/w nears 2^23). x = (a / pi)(edge - e_r); a bin is far when both edges lie
+   >= exact_widths widths from e_r on one side, and its mean is then the
+   sin^2-averaged envelope's, 1/(2 pi^2 x_lo x_hi). Host and device evaluate
+   this same float32 sequence, so they classify every bin alike. */
+static __device__ bool pyrite_sincsq_far_mean(
+    float a, float e_f, float e_c, float lo_f, float lo_c, float hi_f, float hi_c,
+    float exact_widths, float *mean
+) {
+    const float scale = a * 0.318309886f;
+    const float x_lo = scale * ((lo_f - e_f) + (lo_c - e_c));
+    const float x_hi = scale * ((hi_f - e_f) + (hi_c - e_c));
+    if (x_lo >= exact_widths || x_hi <= -exact_widths) {
+        *mean = 1.0f / (19.7392088f * (x_lo * x_hi));
+        return true;
+    }
+    return false;
+}
+
+/* Production bin mean: the far envelope beyond exact_widths, else exact. */
+static __device__ double pyrite_sincsq_bin_mean_hybrid(
+    double a, double e_r, double e_lo, double e_hi, double inv_width, double exact_widths
+) {
+    const float lo_f = (float)e_lo, hi_f = (float)e_hi;
+    const float e_f = (float)e_r;
+    float mean;
+    if (pyrite_sincsq_far_mean(
+            (float)a, e_f, (float)(e_r - (double)e_f), lo_f, (float)(e_lo - (double)lo_f), hi_f,
+            (float)(e_hi - (double)hi_f), (float)exact_widths, &mean)) {
+        return (double)mean;
+    }
+    return pyrite_sincsq_bin_mean(a, e_r, e_lo, e_hi, inv_width);
+}
 """
 
 
@@ -253,15 +311,58 @@ def sincsq_antiderivative(x: object) -> np.ndarray:
     return sincsq_tail(x) + np.where(x >= 0.0, 0.5, -0.5)
 
 
-def _host_bin_mean(a_width, E_res, edges, inv_width):
-    """``[line, bin]`` bin means on host, in FP64."""
+def _far_envelope_float32(a_width, E_res, edges, exact_widths):
+    """``(far, mean)`` of the far-field envelope, ``[line, bin]``, in the exact
+    float32 operation order of ``pyrite_sincsq_far_mean``.
+
+    Validation: sinc-bin-far-envelope
+    """
+    f32 = np.float32
+    edges = np.asarray(edges, dtype=np.float64)
+    head = edges.astype(f32)
+    carry = (edges - head.astype(np.float64)).astype(f32)
+    a = np.asarray(a_width).astype(f32)[:, None]
+    e_r64 = np.asarray(E_res, dtype=np.float64)
+    e_head = e_r64.astype(f32)
+    e_carry = (e_r64 - e_head.astype(np.float64)).astype(f32)
+    scale = a * f32(0.318309886)
+    x = scale * ((head[None, :] - e_head[:, None]) + (carry[None, :] - e_carry[:, None]))
+    x_lo, x_hi = x[:, :-1], x[:, 1:]
+    limit = f32(exact_widths)
+    far = (x_lo >= limit) | (x_hi <= -limit)
+    with np.errstate(divide="ignore", over="ignore"):
+        mean = f32(1.0) / (f32(19.7392088) * (x_lo * x_hi))
+    return far, mean.astype(np.float64)
+
+
+def _host_bin_mean(a_width, E_res, edges, inv_width, exact_widths=None):
+    """``[line, bin]`` bin means on host, in FP64.
+
+    ``exact_widths=None`` evaluates every bin exactly; a number applies the
+    far-field envelope beyond that many first-zero widths, as the device route.
+    """
     a = np.asarray(a_width, dtype=np.float64)[:, None]
     x = a * (np.asarray(edges, dtype=np.float64)[None, :] - np.asarray(E_res, np.float64)[:, None])
     x = x / np.pi
-    tail = sincsq_tail(x)
+    scale = (np.pi / a) * np.asarray(inv_width, dtype=np.float64)[None, :]
+    if exact_widths is None:
+        tail = sincsq_tail(x)
+        mass = tail[:, 1:] - tail[:, :-1]
+        mass += (x[:, :-1] < 0.0) & (x[:, 1:] >= 0.0)
+        return mass * scale
+    # Validation: sinc-bin-far-envelope -- the device's float32 sequence
+    far, far_mean = _far_envelope_float32(a[:, 0], E_res, edges, float(exact_widths))
+    x_lo, x_hi = x[:, :-1], x[:, 1:]
+    needed = np.zeros(x.shape, dtype=bool)
+    needed[:, :-1] |= ~far
+    needed[:, 1:] |= ~far
+    tail = np.zeros_like(x)
+    tail[needed] = sincsq_tail(x[needed])
     mass = tail[:, 1:] - tail[:, :-1]
-    mass += (x[:, :-1] < 0.0) & (x[:, 1:] >= 0.0)
-    return mass * (np.pi / a) * np.asarray(inv_width, dtype=np.float64)[None, :]
+    mass += (x_lo < 0.0) & (x_hi >= 0.0)
+    mean = mass * scale
+    mean[far] = far_mean[far]
+    return mean
 
 
 def sincsq_bin_masses(a_width: object, E_res: object, edges_eV: object) -> np.ndarray:
@@ -319,13 +420,15 @@ def _bin_mean_kernel():
         import cupy
 
         _BIN_MEAN_KERNEL = cupy.ElementwiseKernel(
-            "raw T aw, raw T e_r, raw float64 edges, raw float64 inv_width, int64 n_e",
+            "raw T aw, raw T e_r, raw float64 edges, raw float64 inv_width, int64 n_e, "
+            "float64 exact_widths",
             "T out",
             r"""
             const long long row = (long long)(i / n_e);
             const long long col = (long long)(i % n_e);
-            out = (T)pyrite_sincsq_bin_mean(
-                (double)aw[row], (double)e_r[row], edges[col], edges[col + 1], inv_width[col]
+            out = (T)pyrite_sincsq_bin_mean_hybrid(
+                (double)aw[row], (double)e_r[row], edges[col], edges[col + 1], inv_width[col],
+                exact_widths
             );
             """,
             "pyrite_sincsq_bin_mean_matrix",
@@ -334,49 +437,126 @@ def _bin_mean_kernel():
     return _BIN_MEAN_KERNEL
 
 
-def _bin_reduce_kernel():
-    """Fused ``(bin, line block)`` reduction. Built on first use; CuPy only.
+#: Threads per bin in the fused reduction; lines stride across them.
+_REDUCE_THREADS = 256
 
-    One CUDA thread per (bin, block of lines) pair, so both axes run in
-    parallel; the per-block partial sums are then added along the block axis.
+_BIN_REDUCE_SOURCE = r"""
+/* One block per bin; lines stride across its threads a tile at a time.
+   Far pairs add to a compensated float32 sum on the spot. Near pairs, which
+   need the FP64 sine integral, are compacted into a shared queue in lane
+   order (warp ballot + prefix) and evaluated together once the queue fills,
+   so FP64 work runs on full warps instead of one lane of a divergent warp.
+   Queue order and the queue-to-thread assignment are fixed, so the result is
+   deterministic. */
+extern "C" __global__ void pyrite_sincsq_bin_mean_reduce(
+    const float *e_r, const float *aw, const float *w, const double *edges,
+    const double *inv_width, double *out, const long long n_lines, const float far_widths
+) {
+    extern __shared__ double shared[];
+    const unsigned int tid = threadIdx.x;
+    const unsigned int threads = blockDim.x;
+    const unsigned int lane = tid & 31u;
+    const unsigned int warp = tid >> 5;
+    const unsigned int n_warps = (threads + 31u) >> 5;
+    double *partial = shared;
+    long long *queue = (long long *)(partial + threads);
+    int *warp_offset = (int *)(queue + 2 * threads);
+    int *queue_count = warp_offset + 32;
+
+    const long long bin = blockIdx.x;
+    const double lo = edges[bin];
+    const double hi = edges[bin + 1];
+    const double iw = inv_width[bin];
+    const float lo_f = (float)lo, hi_f = (float)hi;
+    const float lo_c = (float)(lo - (double)lo_f), hi_c = (float)(hi - (double)hi_f);
+    if (tid == 0) {
+        *queue_count = 0;
+    }
+    double near = 0.0;
+    float far_sum = 0.0f, far_carry = 0.0f;
+    for (long long base = 0; base < n_lines; base += threads) {
+        const long long line = base + tid;
+        bool is_near = false;
+        if (line < n_lines) {
+            const float wt = w[line];
+            if (wt != 0.0f) {
+                float mean;
+                /* e_r is already float32 here: no resonance remainder. */
+                if (pyrite_sincsq_far_mean(
+                        aw[line], e_r[line], 0.0f, lo_f, lo_c, hi_f, hi_c, far_widths, &mean)) {
+                    const float y = wt * mean - far_carry;
+                    const float t = far_sum + y;
+                    far_carry = (t - far_sum) - y;
+                    far_sum = t;
+                } else {
+                    is_near = true;
+                }
+            }
+        }
+        const unsigned int mask = __ballot_sync(0xffffffffu, is_near);
+        if (lane == 0) {
+            warp_offset[warp] = __popc(mask);
+        }
+        __syncthreads();
+        if (tid == 0) {
+            int running = *queue_count;
+            for (unsigned int k = 0; k < n_warps; ++k) {
+                const int count = warp_offset[k];
+                warp_offset[k] = running;
+                running += count;
+            }
+            *queue_count = running;
+        }
+        __syncthreads();
+        if (is_near) {
+            queue[warp_offset[warp] + __popc(mask & ((1u << lane) - 1u))] = line;
+        }
+        __syncthreads();
+        const int pending = *queue_count;
+        if (pending >= (int)threads || base + threads >= n_lines) {
+            for (int k = tid; k < pending; k += threads) {
+                const long long q = queue[k];
+                near += (double)w[q] * pyrite_sincsq_bin_mean(
+                    (double)aw[q], (double)e_r[q], lo, hi, iw);
+            }
+            __syncthreads();
+            if (tid == 0) {
+                *queue_count = 0;
+            }
+            __syncthreads();
+        }
+    }
+    partial[tid] = near + ((double)far_sum - (double)far_carry);
+    __syncthreads();
+    for (unsigned int stride = threads / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            partial[tid] += partial[tid + stride];
+        }
+        __syncthreads();
+    }
+    if (tid == 0) {
+        out[bin] = partial[0];
+    }
+}
+"""
+
+
+def _bin_reduce_kernel():
+    """Fused bin-mean reduction: one block per bin, lines strided across its
+    threads (coalesced, like the node kernel), one FP64 sum per bin. Built on
+    first use; CuPy only.
+
+    Validation: sinc-bin-integration
+    Validation: sinc-bin-far-envelope
     """
     global _BIN_REDUCE_KERNEL
     if _BIN_REDUCE_KERNEL is None:
         import cupy
 
-        _BIN_REDUCE_KERNEL = cupy.ElementwiseKernel(
-            "raw float32 e_r, raw float32 aw, raw float32 w, raw float64 edges, "
-            "raw float64 inv_width, int64 n_lines, int64 n_blocks, int64 block",
-            "float64 acc",
-            r"""
-            const long long bin = (long long)(i / n_blocks);
-            const long long first = (long long)(i % n_blocks) * block;
-            const long long stop = (first + block < n_lines) ? first + block : n_lines;
-            const double lo = edges[bin];
-            const double hi = edges[bin + 1];
-            const double iw = inv_width[bin];
-            double total = 0.0;
-            for (long long line = first; line < stop; ++line) {
-                const double wt = (double)w[line];
-                if (wt == 0.0) {
-                    continue;
-                }
-                total += wt * pyrite_sincsq_bin_mean(
-                    (double)aw[line], (double)e_r[line], lo, hi, iw
-                );
-            }
-            acc = total;
-            """,
-            "pyrite_sincsq_bin_mean_reduce",
-            preamble=SINCSQ_BIN_PREAMBLE,
+        _BIN_REDUCE_KERNEL = cupy.RawKernel(
+            SINCSQ_BIN_PREAMBLE + _BIN_REDUCE_SOURCE, "pyrite_sincsq_bin_mean_reduce"
         )
     return _BIN_REDUCE_KERNEL
-
-
-#: Fused reduction scratch bound, in (bin, line block) float64 partial sums.
-_REDUCE_SCRATCH_ELEMENTS = 1 << 24
-#: Smallest line block the fused reduction splits a flush into.
-_REDUCE_MIN_BLOCK = 64
 
 
 def bin_axis(E_grid_eV: object):
@@ -398,14 +578,19 @@ def bin_axis(E_grid_eV: object):
     return edges, inv_width
 
 
-def sincsq_bin_lineshape(a_width_j, E_res_j, edges, inv_width):
+def sincsq_bin_lineshape(
+    a_width_j, E_res_j, edges, inv_width, *, exact_widths: float | None = BIN_MEAN_EXACT_WIDTHS
+):
     """Bin-mean counterpart of ``_sincsq_lineshape``: ``(n_line, n_bin)`` in ``REAL``.
 
     ``a_width_j`` and ``E_res_j`` are 1-D device arrays of lines; ``edges`` and
-    ``inv_width`` come from :func:`bin_axis`.
+    ``inv_width`` come from :func:`bin_axis`. Bins beyond ``exact_widths``
+    first-zero widths take the far-field envelope; ``None`` keeps all exact.
 
     Validation: sinc-bin-integration
+    Validation: sinc-bin-far-envelope
     """
+    far_widths = np.inf if exact_widths is None else float(exact_widths)
     n_e = int(inv_width.shape[0])
     if _cupy_backend():
         out = xp.empty((int(a_width_j.size), n_e), dtype=REAL)
@@ -416,6 +601,7 @@ def sincsq_bin_lineshape(a_width_j, E_res_j, edges, inv_width):
                 xp.ascontiguousarray(edges),
                 xp.ascontiguousarray(inv_width),
                 np.int64(n_e),
+                np.float64(far_widths),
                 out,
             )
         return out
@@ -428,21 +614,27 @@ def sincsq_bin_lineshape(a_width_j, E_res_j, edges, inv_width):
     rows = max(1, _HOST_BLOCK_ELEMENTS // max(n_e, 1))
     for r0 in range(0, a_host.size, rows):
         r1 = min(r0 + rows, a_host.size)
-        host[r0:r1] = _host_bin_mean(a_host[r0:r1], e_host[r0:r1], edges, inv_width)
+        host[r0:r1] = _host_bin_mean(a_host[r0:r1], e_host[r0:r1], edges, inv_width, exact_widths)
     if getattr(xp, "__name__", "") == "numpy":
         return host
     return xp.asarray(host, dtype=REAL)
 
 
-def run_bin_mean_reduction_kernel(E_r, aw, w, edges, inv_width, *, out):
+def run_bin_mean_reduction_kernel(
+    E_r, aw, w, edges, inv_width, *, out, exact_widths: float | None = BIN_MEAN_EXACT_WIDTHS,
+    method: str = "auto",
+):
     """Fused CUDA bin-mean line reduction: ``out[k] += sum_l w_l * mean_k(line l)``.
 
     The bin-mean counterpart of ``line_jit_kernel.run_reduction_kernel``: no
-    ``(line, bin)`` matrix, one launch per flush over (bin, line block) pairs
-    with at most ``_REDUCE_SCRATCH_ELEMENTS`` FP64 partial sums, FP64
-    accumulation, and one cast to the float32 spectrum.
+    ``(line, bin)`` matrix, one launch per flush with one block per bin, FP64
+    accumulation of near pairs, compensated float32 far pairs, and one cast to
+    the spectrum dtype. Bins beyond
+    ``exact_widths`` first-zero widths take the far-field envelope.
 
     Validation: sinc-bin-integration
+    Validation: sinc-bin-far-envelope
+    Validation: sinc-bin-near-far
     """
     import cupy
 
@@ -450,20 +642,34 @@ def run_bin_mean_reduction_kernel(E_r, aw, w, edges, inv_width, *, out):
     n_lines = int(E_r.size)
     if n_bins == 0 or n_lines == 0:
         return out
-    n_blocks = max(1, min(-(-n_lines // _REDUCE_MIN_BLOCK), _REDUCE_SCRATCH_ELEMENTS // n_bins))
-    block = -(-n_lines // n_blocks)
-    n_blocks = -(-n_lines // block)
-    partial = cupy.empty((n_bins, n_blocks), dtype=cupy.float64)
+    if method not in ("auto", "pairs", "tree"):
+        raise ValueError("method must be 'auto', 'pairs', or 'tree'")
+    # The host tree setup is O(lines) (~0.09 s for 400k synthetic lines on
+    # the development CPU). The #192 all-pairs kernel measured ~19B pairs/s
+    # on the lab GPU; use a conservative crossover until matched case timing
+    # establishes a better one. An infinite exact window has no far nodes.
+    use_tree = method == "tree" or (method == "auto" and n_bins * n_lines >= 5_000_000_000)
+    if use_tree and exact_widths is not None:
+        from ._bin_tree import run_tree_reduction
+
+        return run_tree_reduction(E_r, aw, w, edges, inv_width, out=out, exact_widths=exact_widths)
+    per_bin = cupy.empty(n_bins, dtype=cupy.float64)
+    threads = int(_REDUCE_THREADS)
     _bin_reduce_kernel()(
-        cupy.ascontiguousarray(E_r, dtype=cupy.float32),
-        cupy.ascontiguousarray(aw, dtype=cupy.float32),
-        cupy.ascontiguousarray(w, dtype=cupy.float32),
-        cupy.ascontiguousarray(edges, dtype=cupy.float64),
-        cupy.ascontiguousarray(inv_width, dtype=cupy.float64),
-        np.int64(n_lines),
-        np.int64(n_blocks),
-        np.int64(block),
-        partial,
+        (n_bins,),
+        (threads,),
+        (
+            cupy.ascontiguousarray(E_r, dtype=cupy.float32),
+            cupy.ascontiguousarray(aw, dtype=cupy.float32),
+            cupy.ascontiguousarray(w, dtype=cupy.float32),
+            cupy.ascontiguousarray(edges, dtype=cupy.float64),
+            cupy.ascontiguousarray(inv_width, dtype=cupy.float64),
+            per_bin,
+            np.int64(n_lines),
+            np.float32(np.inf if exact_widths is None else float(exact_widths)),
+        ),
+        # partial sums, a two-tile line queue, warp offsets, the queue count
+        shared_mem=threads * 8 + 2 * threads * 8 + 33 * 4,
     )
-    out += partial.sum(axis=1).astype(out.dtype)
+    out += per_bin.astype(out.dtype)
     return out

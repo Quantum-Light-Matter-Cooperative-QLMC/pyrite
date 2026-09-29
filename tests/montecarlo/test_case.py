@@ -115,3 +115,19 @@ def test_run_case_accepts_typed_case_and_legacy_mapping(monkeypatch):
     assert typed["case"] is case
     assert legacy["case"] == case.to_dict()
     assert seen == [case, case.to_dict()]
+
+
+def test_case_refuses_resonance_local_without_bin_mean():
+    """A hand-built or pre-refusal payload cannot run the local grid under node
+    quadrature, whose spacing joins lose unbounded yield (#192)."""
+    payload = _legacy_case(
+        line_grid_policy={
+            "bandwidth": "resonance-population",
+            "resolution": "resonance-local",
+            "quadrature": "bin-mean",
+        }
+    )
+    assert Case(**payload).to_dict()["line_quadrature"] == "bin-mean"
+    del payload["line_quadrature"]
+    with pytest.raises(ValueError, match="needs line_quadrature='bin-mean'"):
+        Case(**payload)

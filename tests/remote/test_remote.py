@@ -549,6 +549,35 @@ def test_queue_script_no_flags_when_unset():
     assert "--profile" not in s
 
 
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: remote._queue_script("j", ["hopg"], quick=False, workers=None),
+        lambda: remote._chunked_queue_script("j", ["hopg"], False, None, 10),
+    ],
+)
+@pytest.mark.parametrize(
+    ("name", "value", "invalid"),
+    [
+        ("PYRITE_MC_TRANSPORT_CORE", "cuda", "gpu"),
+        ("PYRITE_MC_RESOURCE_POLICY", "throughput", "max"),
+        ("PYRITE_MC_MIN_CHUNK", "100", "0"),
+    ],
+)
+def test_queue_scripts_forward_local_runtime_pins(monkeypatch, build, name, value, invalid):
+    monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
+    monkeypatch.delenv("PYRITE_MC_RESOURCE_POLICY", raising=False)
+    monkeypatch.delenv("PYRITE_MC_MIN_CHUNK", raising=False)
+    assert name not in build()
+
+    monkeypatch.setenv(name, value.upper())
+    assert f"export {name}={value}" in build()
+
+    monkeypatch.setenv(name, invalid)
+    with pytest.raises(ValueError, match=name):
+        build()
+
+
 def test_queue_script_profiles_uncached_repetitions_with_fixed_runtime_knobs():
     script = remote._queue_script(
         "j",
@@ -2518,8 +2547,8 @@ def test_job_status_double_verbose_renders_case_progress(monkeypatch, capsys):
     assert "Host memory" in output and "8.0/16.0 GiB" in output
     assert "GPU" in output and "80.0%" in output
     assert "GPU VRAM" in output and "12000/24000 MiB" in output
-    assert "COUPLING PROVENANCE" in output
-    assert "1 stored spectra; 2 cases recomputed χ_g/U_g" in output
+    assert "COUPLING PROVENANCE" not in output
+    assert "χ_g/U_g" not in output
     assert '{"material"' not in output
     assert "last log line" in output
     assert '"$D"/progress/*.json' in commands[0]

@@ -560,29 +560,6 @@ def _format_performance_profiles(payload):
     return "\n".join(lines)
 
 
-def _format_coupling_provenance(records, materials=()):
-    """Explain checkpoint reuse versus χ_g/U_g recomputation per material."""
-    order = [material for material in materials if material in records]
-    order.extend(material for material in records if material not in order)
-    if not order:
-        return "  No case progress reported yet."
-    lines = []
-    for material in order:
-        record = records[material]
-        cached = record["cached_cases"]
-        recomputed = record["completed_new_cases"]
-        if cached and recomputed:
-            status = f"mixed: {cached} stored spectra; {recomputed} cases recomputed χ_g/U_g"
-        elif cached:
-            status = f"stored spectra reused for {cached} cases; χ_g/U_g not recomputed"
-        elif recomputed:
-            status = f"χ_g/U_g recomputed for {recomputed} cases"
-        else:
-            status = "waiting; no cached or recomputed cases yet"
-        lines.append(f"  {_material_label(material):<16} {status}")
-    return "\n".join(lines)
-
-
 def _active_work_label(state):
     match = re.match(r"(?:running|warning at)\s+(.+)", state, flags=re.IGNORECASE)
     if match is None:
@@ -823,9 +800,6 @@ def format_job_status(sections, detail):
                 "",
                 "COMPUTE USAGE",
                 _format_compute_usage(sections.get("RESOURCES", "")),
-                "",
-                "COUPLING PROVENANCE",
-                _format_coupling_provenance(records, materials),
             ]
         )
         output.extend(

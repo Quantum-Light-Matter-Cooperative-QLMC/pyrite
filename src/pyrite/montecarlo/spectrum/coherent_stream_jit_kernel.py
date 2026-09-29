@@ -148,6 +148,7 @@ def _coherent_prologue_kernel(
     u_re_tab,
     u_im_tab,
     log_mu_tab,
+    table_row,
     n_re_tab,
     E_r_out,
     aw_out,
@@ -253,10 +254,11 @@ def _coherent_prologue_kernel(
     bounded_energy = min(max(E_res, x0), E_tab[idx])
     log_frac = xp.log1p((bounded_energy - x0) / x0) / xp.log1p((E_tab[idx] - x0) / x0)
 
-    chi_re = _interp_row(chi_re_tab, g, idx, frac, below, above, n_tab)
-    chi_im = _interp_row(chi_im_tab, g, idx, frac, below, above, n_tab)
-    u_re = _interp_row(u_re_tab, g, idx, frac, below, above, n_tab)
-    u_im = _interp_row(u_im_tab, g, idx, frac, below, above, n_tab)
+    row = table_row[g]
+    chi_re = _interp_row(chi_re_tab, row, idx, frac, below, above, n_tab)
+    chi_im = _interp_row(chi_im_tab, row, idx, frac, below, above, n_tab)
+    u_re = _interp_row(u_re_tab, row, idx, frac, below, above, n_tab)
+    u_im = _interp_row(u_im_tab, row, idx, frac, below, above, n_tab)
     mu = _interp_elemental_mu(log_mu_tab, idx, log_frac, below, above, n_mu, n_tab)
 
     # k.v = omega (1 - denom) survives the substitution exactly (denom absorbed
@@ -822,6 +824,7 @@ def run_coherent_prologue_kernel(
     n_re_tab=None,
     L_start=None,
     L_end=None,
+    table_row=None,
     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
 ):
     """Build g-major coherent line data for one contiguous segment block.
@@ -856,6 +859,11 @@ def run_coherent_prologue_kernel(
     tuple gains three pair-layout entries ``(apb, bma, q)`` of
     ``_formation.formation_coefficients`` for the field kernels.
     Validation: coherent-formation-absorption
+
+    ``table_row[g]`` names the coupling-table row g row reads, so mosaic
+    orientations share their reflection's tables; omitted, row ``g`` reads
+    table row ``g``.
+    Validation: line-reflection-coupling-tables
     """
     nthreads = int(config.prologue_nthreads)
     _validate_threads(nthreads, "prologue_nthreads")
@@ -869,6 +877,12 @@ def run_coherent_prologue_kernel(
     if n_g <= 0 or n_tab < 2:
         raise ValueError("coherent prologue requires at least one g row and two tabulation points")
     n_pairs = n_g * n_seg
+    if table_row is None:
+        table_row = xp.arange(n_g, dtype=xp.uint32)
+    else:
+        table_row = xp.ascontiguousarray(table_row, dtype=xp.uint32)
+        if int(table_row.size) != n_g:
+            raise ValueError("table_row must have one entry per g row")
 
     if (v_dot_n is None) != (n_re_tab is None):
         raise ValueError("v_dot_n and n_re_tab must be given together")
@@ -968,6 +982,7 @@ def run_coherent_prologue_kernel(
             u_re_kernel,
             u_im_kernel,
             log_mu_kernel,
+            table_row,
             n_re_tab,
             E_r,
             aw_seg,

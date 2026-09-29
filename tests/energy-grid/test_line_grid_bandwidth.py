@@ -26,7 +26,7 @@ from pyrite._line_grid_policy import (
 )
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import build_cases
-from pyrite.energy_grid.bandwidth_check import reference_axis
+from pyrite.energy_grid.bandwidth_check import reference_axis, shape_and_counts
 from pyrite.montecarlo.runner.line_grid import (
     LINE_YIELD_RELATIVE_SE_LIMIT,
     _measured_line_grid,
@@ -364,3 +364,73 @@ def test_light_far_line_spends_the_share_instead_of_widening_the_axis():
     assert both < 60_000.0
     assert both == pytest.approx(alone, abs=200.0)
     assert summary["proxy_truncated_fraction"] <= 1e-5
+
+
+def _lines(E, shift=0.0):
+    centres = np.array([1500.0, 2200.0, 3100.0])
+    return sum(np.exp(-0.5 * ((E - c - shift) / 30.0) ** 2) for c in centres)
+
+
+def test_shape_and_counts_agree_for_one_spectrum_on_two_axes():
+    """Same density on a fine uniform and a coarse piecewise axis: every shape
+    and detected-count deviation is quadrature-small."""
+    reference = np.arange(1000.0, 4000.0 + 0.25, 0.5)
+    candidate = np.unique(np.r_[np.arange(1000.0, 2000.0, 2.0), np.arange(2000.0, 4000.0 + 1, 3.0)])
+    out = shape_and_counts(
+        reference, _lines(reference), candidate, _lines(candidate), detector_max_eV=4000.0
+    )
+    assert out["intrinsic_bins"]["l1_rel"] < 1e-3
+    assert abs(out["fwhm_rel"]) < 1e-2
+    assert abs(out["eaglexo_counts_rel"]) < 1e-4
+    assert abs(out["timepix3"]["counts_rel"]) < 1e-4
+    assert out["timepix3"]["l1_rel"] < 1e-3
+
+
+def test_shape_and_counts_detect_a_shifted_line():
+    reference = np.arange(1000.0, 4000.0 + 0.25, 0.5)
+    out = shape_and_counts(
+        reference,
+        _lines(reference),
+        reference,
+        _lines(reference, shift=60.0),
+        detector_max_eV=4000.0,
+    )
+    assert out["intrinsic_bins"]["l1_rel"] > 0.1
+    assert out["timepix3"]["l1_rel"] > 0.05
+
+
+def test_intrinsic_bins_are_exact_for_a_line_on_a_bin_edge():
+    """One sinc**2 line straddling a 100 eV edge, bin-mean on a fine and a 3 eV
+    axis: edges snapped to the candidate's cells leave no split artifact (a
+    fixed 100 eV lattice misplaces ~17% of the line)."""
+    from pyrite.energy_grid.bandwidth_check import _intrinsic_bins
+    from pyrite.montecarlo.spectrum.lines._bin_quadrature import bin_axis, sincsq_bin_lineshape
+
+    def density(axis):
+        cells, inv_width = bin_axis(axis)
+        return np.asarray(
+            sincsq_bin_lineshape(
+                np.pi / np.array([3.0]),
+                np.array([2000.5]),
+                np.asarray(cells),
+                inv_width,
+                exact_widths=None,
+            )
+        )[0]
+
+    fine, coarse = np.arange(1000.0, 3000.1, 0.5), np.arange(1000.0, 3000.1, 3.0)
+    out = _intrinsic_bins(
+        fine, density(fine), coarse, density(coarse), bin_eV=100.0, quadrature="bin-mean"
+    )
+    assert out["l1_rel"] < 1e-6
+    assert out["reference_split_bound"] > out["l1_rel"]
+
+
+def test_dominant_fwhm_matches_a_gaussian():
+    from pyrite.energy_grid.bandwidth_check import _dominant_fwhm_eV
+
+    E = np.linspace(0.0, 100.0, 20_001)
+    density = np.exp(-0.5 * ((E - 40.0) / 2.0) ** 2) + 0.3 * np.exp(-0.5 * ((E - 70.0) / 1.0) ** 2)
+    assert _dominant_fwhm_eV(E, density) == pytest.approx(
+        2.0 * np.sqrt(2.0 * np.log(2.0)) * 2.0, rel=1e-6
+    )

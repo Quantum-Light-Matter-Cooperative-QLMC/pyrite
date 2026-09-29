@@ -109,7 +109,9 @@ radiation-physics/narrow-beam-total-attenuation
 radiation-physics/pxr-amplitude
 radiation-physics/self-absorption
 radiation-physics/segment-escape-average
+radiation-physics/sinc-bin-far-envelope
 radiation-physics/sinc-bin-integration
+radiation-physics/sinc-bin-near-far
 radiation-physics/transverse-bunch-form-factor
 radiation-physics/xray-chi-zero
 radiation-physics/xray-in-medium-propagation-phase

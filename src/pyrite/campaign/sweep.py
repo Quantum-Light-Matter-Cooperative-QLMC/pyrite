@@ -24,6 +24,7 @@ energy grid) is looked up per material; the detector geometry defaults to the
 are imported here (no GPU), so this module is cheap to import and test.
 """
 
+import math
 import warnings
 from collections.abc import Sequence
 from dataclasses import InitVar, asdict, dataclass, field, replace
@@ -37,6 +38,7 @@ from .._grid_semantics import resolution_num
 from .._line_grid_policy import (
     AUTOMATIC_BANDWIDTH_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
+    STOP_ROUND_TO_EV,
     LineGridPolicy,
     LineGridToleranceError,
     environment_overrides_present,
@@ -597,12 +599,34 @@ def _automatic_line_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Li
     magnitudes = [reciprocal_g_vector(hkl, spec.lattice)[1] for hkl in cp["hkl_list"]]
     start = line_start_eV(energy_keV)
     stop = kinematic_line_stop_eV(magnitudes, energy_keV)
-    return resolve_line_grid_policy(
+    policy = resolve_line_grid_policy(
         start_eV=start,
         stop_eV=stop,
         bandwidth_policy=AUTOMATIC_BANDWIDTH_POLICY,
         per_call=sweep.line_grid_policy,
     )
+    if policy.bandwidth_policy != AUTOMATIC_BANDWIDTH_POLICY:
+        # The measured bandwidth keeps the closed-form bound as its cap; its
+        # axis already stops where the case's own lines do.
+        return policy
+    # The classical resonance bound has no electron recoil and can exceed the
+    # beam's kinetic energy, which no photon can; and no line emits at or above
+    # the atomic data's end, where its couplings or attenuation are NaN and the
+    # line kernels drop it. The axis stops at the lowest of the three.
+    # Validation: line-grid-emission-ceiling
+    from ..materials.crystal import CRYSTALS
+    from ..montecarlo.spectrum.lines import _line_emission_ceiling
+
+    limits = {
+        "energy conservation": energy_keV * 1.0e3,
+        "atomic data ceiling": _line_emission_ceiling(CRYSTALS[cp["crystal"]], cp["composition"]),
+    }
+    label, cap = min(limits.items(), key=lambda item: item[1])
+    cap = math.ceil(cap / STOP_ROUND_TO_EV) * STOP_ROUND_TO_EV
+    if not start < cap < policy.stop_eV:
+        return policy
+    sources = {**dict(policy.sources), "stop_eV": label}
+    return replace(policy, stop_eV=float(cap), sources=tuple(sorted(sources.items())))
 
 
 def _line_grid_for_energy(

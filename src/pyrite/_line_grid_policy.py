@@ -177,8 +177,10 @@ AUTOMATIC_RESOLUTION_POLICY = "sinc-nyquist"
 #: that population.
 LOCAL_RESOLUTION_POLICY = "resonance-local"
 RESOLUTION_POLICIES = (AUTOMATIC_RESOLUTION_POLICY, LOCAL_RESOLUTION_POLICY)
-#: Per-line tail share outside the fine halo of ``resonance-local``: the
-#: quadrature-backbone row of ``tbl-line-budget-allocation`` split in two.
+#: Per-line, per-side tail share outside the fine halo of ``resonance-local``
+#: (at most twice this in total), charged with the bandwidth share to the
+#: feature-window row of ``tbl-line-budget-allocation``, which measured-bandwidth
+#: cases do not otherwise spend.
 DEFAULT_LOCAL_HALO_LIMIT = 1.0e-4
 
 #: Coarsest automatic spacing. Matches the catalog's historical 3 eV line-grid
@@ -651,6 +653,15 @@ def resolve_line_grid_policy(
             raise ValueError(
                 "the resonance-local resolution reads the measured resonance population "
                 "and needs the resonance-population bandwidth"
+            )
+        # Node quadrature on a piecewise axis loses up to ~(h/w)**2 of a line's
+        # mass at every spacing join, unbounded by the halo or core rule; the
+        # bin means telescope to the exact integral at any spacing (#192).
+        # Validation: line-grid-resonance-local-spacing
+        if quadrature != "bin-mean":
+            raise ValueError(
+                "the resonance-local resolution needs bin-mean quadrature: node "
+                "quadrature loses unbounded yield at its spacing joins"
             )
         halo_limit = DEFAULT_LOCAL_HALO_LIMIT
     truncation = None

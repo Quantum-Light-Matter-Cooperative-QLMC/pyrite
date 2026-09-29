@@ -85,6 +85,7 @@ Then run `pyrite app analysis launch <material>` (the `src/pyrite/apps/analysis_
 - **`--quick`** runs a tiny smoke grid into the `<material>_quick/` component directory — use it to validate your sbatch script cheaply before submitting the full sweep.
 - **fp64:** set `PYRITE_FP64=1` for double-precision reference runs (the GPU path defaults to fp32). Devices without native fp64 (e.g. Intel Arc/integrated GPUs) are refused regardless of `PYRITE_FP64`: explicit selection errors and automatic selection runs on CPU.
 - **small devices:** `PYRITE_MC_RESOURCE_POLICY=auto` selects `conservative` below 8 GiB and admits chunks before allocation. Use `balanced` or `throughput` only after measuring headroom on the target node.
+- **runtime pins on remote runs:** `pyrite run --remote` copies `PYRITE_MC_TRANSPORT_CORE`, `PYRITE_MC_RESOURCE_POLICY`, and `PYRITE_MC_MIN_CHUNK` from the submitting shell into the job script; other variables do not reach the job. For example, `PYRITE_MC_TRANSPORT_CORE=cuda pyrite run PROFILE --remote` forces device transport below the automatic electron-count threshold.
 
 ## Lab-box remote helper
 

@@ -8,7 +8,9 @@ characteristic reductions (:class:`pyrite.energy_grid.convergence_case.CaseLadde
 Under ``node`` quadrature a node's density does not depend on how far the axis
 extends, so one reference evaluation gives the true truncated yield at any
 ``stop``: the measured edge, the edge with twice its margin, and the ceiling.
-The production audit bound is reported beside the true fraction.
+The production audit bound is reported beside the true fraction. Each
+measured (and ``--compare-resolution``) axis also reports line shape and
+detected counts against the reference (:func:`shape_and_counts`).
 
 ``reference`` runs under FP64 and pickles its transport; ``candidate`` reloads
 it in a float32 process and evaluates only the measured axis, so ``compare``
@@ -75,6 +77,7 @@ def build_case(
     policy = {"bandwidth": RESONANCE_BANDWIDTH_POLICY}
     if resolution == "local":
         policy["resolution"] = "resonance-local"
+        policy["quadrature"] = "bin-mean"
     elif resolution != "uniform":
         raise ValueError(f"unknown bandwidth resolution {resolution!r}")
     sweep = dataclasses.replace(sweep, line_grid_policy=policy)
@@ -119,6 +122,216 @@ def _piecewise(evaluate, grid: np.ndarray, piece: int = PIECE_POINTS) -> np.ndar
 def _yield_and_centroid(E_grid: np.ndarray, density: np.ndarray) -> tuple[float, float]:
     total = float(np.trapezoid(density, E_grid))
     return total, float(np.trapezoid(density * E_grid, E_grid)) / total if total else float("nan")
+
+
+#: Intrinsic line-shape comparison bin (eV): coarser than every axis spacing,
+#: finer than any detector resolution.
+SHAPE_BIN_EV = 100.0
+#: Upper edge (eV) of the band scored through the Timepix3 response; its matrix
+#: costs ~1 s per keV of band on the host, and silicon efficiency is small above.
+DEFAULT_DETECTOR_MAX_EV = 60_000.0
+
+
+def _bin_masses(
+    E_grid: np.ndarray, density: np.ndarray, edges: np.ndarray, *, quadrature: str = "node"
+) -> np.ndarray:
+    """Mass of ``density`` in each ``edges`` bin, consistent with its quadrature.
+
+    Under ``node`` the cumulative mass is the trapezoid at the nodes; under
+    ``bin-mean`` each node carries its cell's mean over the ``bin_axis``
+    midpoint cells, so the cumulative steps at those cell edges. Mass is linear
+    within a cell, so a cell straddling a bin edge splits linearly.
+    """
+    if quadrature == "bin-mean":
+        from ..montecarlo.spectrum.lines._bin_quadrature import bin_axis
+
+        cells = np.asarray(_to_host(bin_axis(E_grid)[0]), dtype=float)
+        cumulative = np.concatenate(([0.0], np.cumsum(density * np.diff(cells))))
+        return np.diff(np.interp(edges, cells, cumulative))
+    cumulative = np.concatenate(
+        ([0.0], np.cumsum(0.5 * (density[1:] + density[:-1]) * np.diff(E_grid)))
+    )
+    return np.diff(np.interp(edges, E_grid, cumulative))
+
+
+def _to_host(value):
+    from .._backend import _to_cpu
+
+    return _to_cpu(value)
+
+
+def _histogram_deviation(reference: np.ndarray, candidate: np.ndarray) -> dict[str, float]:
+    """L1 and peak-normalized worst-bin difference of two histograms."""
+    total = float(np.abs(reference).sum())
+    peak = float(np.abs(reference).max()) if reference.size else 0.0
+    difference = np.abs(candidate - reference)
+    return {
+        "l1_rel": float(difference.sum()) / total if total > 0.0 else float("nan"),
+        "max_bin_rel": float(difference.max()) / peak if peak > 0.0 else float("nan"),
+    }
+
+
+def _relative(candidate: float, reference: float) -> float:
+    return (candidate - reference) / reference if reference else float("nan")
+
+
+def _cells(E_grid: np.ndarray, quadrature: str) -> np.ndarray:
+    """Cell edges the density's mass lives on: ``bin_axis`` midpoint cells under
+    ``bin-mean``; the nodes themselves (trapezoid cells) under ``node``."""
+    if quadrature != "bin-mean":
+        return E_grid
+    from ..montecarlo.spectrum.lines._bin_quadrature import bin_axis
+
+    return np.asarray(_to_host(bin_axis(E_grid)[0]), dtype=float)
+
+
+def _intrinsic_bins(
+    ref_E: np.ndarray,
+    ref: np.ndarray,
+    cand_E: np.ndarray,
+    cand: np.ndarray,
+    *,
+    bin_eV: float,
+    quadrature: str,
+) -> dict[str, float]:
+    """Intrinsic bin masses on ~``bin_eV`` bins whose edges are the candidate's
+    own cell edges, so its masses are exact.
+
+    Neither spectrum resolves mass inside a cell. A bin edge inside a
+    reference cell is split linearly, and ``reference_split_bound`` bounds what
+    that split can move: twice the mass of the reference cells holding
+    interior edges, over the total. An ``l1_rel`` below it cannot be told
+    apart from the sub-cell ambiguity.
+    """
+    cand_cells = _cells(cand_E, quadrature)
+    lo, hi = float(cand_E[0]), float(cand_E[-1])
+    nominal = lo + bin_eV * np.arange(1, int(np.ceil((hi - lo) / bin_eV)))
+    inner = cand_cells[(cand_cells > lo) & (cand_cells < hi)]
+    snapped = np.unique(inner[np.clip(np.searchsorted(inner, nominal), 0, inner.size - 1)])
+    edges = np.r_[lo, snapped, hi]
+    ref_masses = _bin_masses(ref_E, ref, edges, quadrature=quadrature)
+    cand_masses = _bin_masses(cand_E, cand, edges, quadrature=quadrature)
+    ref_cells = _cells(ref_E, quadrature)
+    if quadrature == "bin-mean":
+        cell_mass = ref * np.diff(ref_cells)
+    else:
+        cell_mass = 0.5 * (ref[1:] + ref[:-1]) * np.diff(ref_cells)
+    holding = np.clip(np.searchsorted(ref_cells, snapped, side="right") - 1, 0, cell_mass.size - 1)
+    total = float(ref_masses.sum())
+    return {
+        "bin_eV": bin_eV,
+        "n_bins": int(edges.size - 1),
+        **_histogram_deviation(ref_masses, cand_masses),
+        "reference_split_bound": 2.0 * float(cell_mass[holding].sum()) / total
+        if total > 0.0
+        else float("nan"),
+    }
+
+
+def _dominant_fwhm_eV(E_grid: np.ndarray, density: np.ndarray) -> float:
+    """FWHM of the highest line: linear half-maximum crossings either side of
+    the global peak. O(n), unlike prominence peak-finding, which is quadratic
+    on multi-million-node reference axes."""
+    peak = int(np.argmax(density))
+    half = 0.5 * float(density[peak])
+    if not half > 0.0:
+        return float("nan")
+    below = np.flatnonzero(density[:peak] < half)
+    above = np.flatnonzero(density[peak:] < half)
+    if below.size == 0 or above.size == 0:
+        return float("nan")
+    i, j = int(below[-1]), peak + int(above[0])
+
+    def crossing(low: int, high: int) -> float:
+        """Energy where the density passes ``half`` between node ``low``
+        (below half) and its neighbour ``high`` (at or above half)."""
+        rise = float(density[high] - density[low])
+        return float(E_grid[low] + (half - density[low]) * (E_grid[high] - E_grid[low]) / rise)
+
+    return crossing(j, j - 1) - crossing(i, i + 1)
+
+
+def shape_and_counts(
+    reference_E: np.ndarray,
+    reference_density: np.ndarray,
+    candidate_E: np.ndarray,
+    candidate_density: np.ndarray,
+    *,
+    detector_max_eV: float = DEFAULT_DETECTOR_MAX_EV,
+    shape_bin_eV: float = SHAPE_BIN_EV,
+    quadrature: str = "node",
+) -> dict[str, Any]:
+    """Line shape and detected counts of a candidate axis against a reference.
+
+    The two densities live on different axes (local vs full-ceiling uniform),
+    so every comparison goes through a binning both share: ``shape_bin_eV``
+    bins of intrinsic mass over the candidate's span; the highest line's FWHM
+    (:func:`_dominant_fwhm_eV`, sensitive to local sampling of that one line); EagleXO
+    counts (QE only) over each full axis; and Timepix3 detected events on its
+    fixed native output bins, both spectra cut to ``[start, detector_max_eV]``
+    so one response lattice serves both. Intrinsic mass above the cut is
+    reported beside it; the detector can see at most that much more.
+    """
+    from ..detectors.spec import EagleXO, Timepix3
+
+    ref_E = np.asarray(reference_E, dtype=float)
+    ref = np.asarray(reference_density, dtype=float)
+    cand_E = np.asarray(candidate_E, dtype=float)
+    cand = np.asarray(candidate_density, dtype=float)
+    stop = float(cand_E[-1])
+    out: dict[str, Any] = {
+        "intrinsic_bins": _intrinsic_bins(
+            ref_E, ref, cand_E, cand, bin_eV=shape_bin_eV, quadrature=quadrature
+        )
+    }
+    ref_fwhm, cand_fwhm = _dominant_fwhm_eV(ref_E, ref), _dominant_fwhm_eV(cand_E, cand)
+    out["fwhm_rel"] = _relative(cand_fwhm, ref_fwhm)
+    out["reference_fwhm_eV"] = ref_fwhm
+    eaglexo = EagleXO()
+    ref_counts = float(np.trapezoid(eaglexo.score(ref_E, ref, fwhm_eV=None, scale=1.0), ref_E))
+    cand_counts = float(np.trapezoid(eaglexo.score(cand_E, cand, fwhm_eV=None, scale=1.0), cand_E))
+    out["eaglexo_counts_rel"] = _relative(cand_counts, ref_counts)
+
+    # Timepix3: exact (overlap-split) mass in the response's fixed input
+    # channels, through one response matrix for both spectra, so the detected
+    # difference is the line grid's alone. ``native_score`` (``apply_native``)
+    # assigns each node's whole cell to the channel holding the node (#219);
+    # that axis-dependent resampling term is reported separately.
+    from ..detectors.timepix_response import get_response
+
+    cut = min(float(detector_max_eV), stop)
+    ref_band, cand_band = ref_E <= cut, cand_E <= cut
+    detector = Timepix3()
+    response = get_response(
+        ref_E[ref_band],
+        dE_mc=detector.dE_mc,
+        dE_out=detector.dE_out,
+        n_mc=detector.n_mc,
+        seed=detector.seed,
+        thickness_um=detector.thickness_um,
+        bias_v=detector.bias_v,
+    )
+    channels = np.asarray(response.in_edges, dtype=float)
+    ref_events = (
+        _bin_masses(ref_E[ref_band], ref[ref_band], channels, quadrature=quadrature) @ response.R.T
+    )
+    cand_events = (
+        _bin_masses(cand_E[cand_band], cand[cand_band], channels, quadrature=quadrature)
+        @ response.R.T
+    )
+    ref_native = float(np.sum(detector.native_score(ref_E[ref_band], ref[ref_band]).events))
+    cand_native = float(np.sum(detector.native_score(cand_E[cand_band], cand[cand_band]).events))
+    total = float(np.trapezoid(ref, ref_E))
+    above = float(np.trapezoid(ref[~ref_band], ref_E[~ref_band])) if (~ref_band).sum() > 1 else 0.0
+    out["timepix3"] = {
+        "band_max_eV": cut,
+        "counts_rel": _relative(float(cand_events.sum()), float(ref_events.sum())),
+        "reference_counts": float(ref_events.sum()),
+        "intrinsic_fraction_above_band": above / total if total > 0.0 else 0.0,
+        **_histogram_deviation(ref_events, cand_events),
+        "node_rebin_counts_rel": _relative(cand_native, ref_native),
+    }
+    return out
 
 
 def _peak_mib() -> float | None:
@@ -173,6 +386,14 @@ def _alternate_resolution(args, config, case, ladder, axis, reference_lines):
         "yield_rel": (total - kept) / total if total else 0.0,
         "centroid_shift_eV": kept_centroid - centroid,
         "true_fraction_above_stop": truncated_fraction(axis, reference, float(grid[-1])),
+        "shape": shape_and_counts(
+            axis,
+            reference,
+            grid,
+            lines,
+            detector_max_eV=args.detector_max_eV,
+            quadrature=case.get("line_quadrature", "node"),
+        ),
     }
     return {"row": row, "payload": {"grid": grid, "lines_fp64": lines}}
 
@@ -205,7 +426,7 @@ def reference(args: argparse.Namespace) -> dict[str, Any]:
             timings[name] = time.perf_counter() - started
         stop = float(measured[-1])
         doubled = float(measured[0]) + 2.0 * (stop - float(measured[0]))
-        row = {
+        row: dict[str, Any] = {
             **config,
             "real": np.dtype(REAL).name,
             "n_segments": int(np.asarray(ladder.segments["L_ang"]).size),
@@ -228,7 +449,7 @@ def reference(args: argparse.Namespace) -> dict[str, Any]:
             kept, kept_centroid = _yield_and_centroid(
                 measured, np.asarray(spectra["measured"][component], dtype=float)
             )
-            row[component] = {
+            component_row: dict[str, Any] = {
                 "reference_yield": total,
                 "measured_yield": kept,
                 "yield_rel": (total - kept) / total if total else 0.0,
@@ -236,6 +457,25 @@ def reference(args: argparse.Namespace) -> dict[str, Any]:
                 "true_fraction_above_stop": truncated_fraction(axis, density, stop),
                 "true_fraction_above_2x": truncated_fraction(axis, density, doubled),
             }
+            row[component] = component_row
+        row["lines"]["shape"] = shape_and_counts(
+            axis,
+            np.asarray(spectra["reference"]["lines"], dtype=float),
+            measured,
+            np.asarray(spectra["measured"]["lines"], dtype=float),
+            detector_max_eV=args.detector_max_eV,
+            quadrature=case.get("line_quadrature", "node"),
+        )
+        row["total_shape"] = shape_and_counts(
+            axis,
+            np.asarray(spectra["reference"]["lines"], dtype=float)
+            + np.asarray(spectra["reference"]["characteristic"], dtype=float),
+            measured,
+            np.asarray(spectra["measured"]["lines"], dtype=float)
+            + np.asarray(spectra["measured"]["characteristic"], dtype=float),
+            detector_max_eV=args.detector_max_eV,
+            quadrature=case.get("line_quadrature", "node"),
+        )
         alternate = None
         if args.compare_resolution is not None:
             alternate = _alternate_resolution(
@@ -535,6 +775,13 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("uniform", "local"),
         default=None,
         help="also resolve and evaluate this resolution on the same segments",
+    )
+    ref.add_argument(
+        "--detector-max-eV",
+        dest="detector_max_eV",
+        type=float,
+        default=DEFAULT_DETECTOR_MAX_EV,
+        help="upper edge of the Timepix3-scored band",
     )
     ref.add_argument("--payload", required=True)
     ref.add_argument("--json-out", required=True)

@@ -8,6 +8,8 @@ from typing import Any, Literal, cast
 
 import numpy as np
 
+from .._line_grid_policy import LOCAL_RESOLUTION_POLICY
+
 type Composition = list[tuple[str, float]]
 type MillerIndex = tuple[int, int, int]
 type EnergyGrid = tuple[float, float, float] | np.ndarray
@@ -320,6 +322,15 @@ class Case(Mapping[str, Any]):
             raise ValueError("radiative_model and radiative_cutoff_eV are set together")
         if self.radiative_model is not _ABSENT:
             self._validate_radiative()
+        if isinstance(self.line_grid_policy, Mapping):
+            resolution = self.line_grid_policy.get("resolution")
+            policy = resolution.get("policy") if isinstance(resolution, Mapping) else None
+            # Validation: line-grid-resonance-local-spacing
+            if policy == LOCAL_RESOLUTION_POLICY and self.line_quadrature != "bin-mean":
+                raise ValueError(
+                    "the resonance-local line grid needs line_quadrature='bin-mean': node "
+                    "quadrature loses unbounded yield at its spacing joins (#192)"
+                )
         if self.line_quadrature is not _ABSENT:
             if self.line_quadrature != "bin-mean":
                 raise ValueError("line_quadrature must be absent or 'bin-mean'")

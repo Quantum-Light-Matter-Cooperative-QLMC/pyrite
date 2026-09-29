@@ -550,6 +550,7 @@ def test_profile_transport_numerics_are_validated_and_exposed(tmp_path):
         ('"resonance-population"', '"coverage-0.95"', "line_grid_policy.bandwidth"),
         ('"resonance-local"', '"log"', "line_grid_policy.resolution"),
         ('resolution = "resonance-local"', 'windows = "on"', "line_grid_policy"),
+        ('resolution = "resonance-local"', 'quadrature = "simpson"', "line_grid_policy.quadrature"),
     ],
 )
 def test_profile_line_grid_policy_is_validated_and_exposed(tmp_path, old, new, match):

@@ -232,6 +232,11 @@ def store_result(results, case, out):
         results[name][E0]["spec_coherent"] = out["spec_coherent"]
     if out.get("spec_characteristic") is not None:
         results[name][E0]["spec_characteristic"] = out["spec_characteristic"]
+    # Resolved automatic line grid and its truncation/statistics audit, so scan
+    # checkpoints carry ``capped_at_ceiling`` / ``statistics_limited`` rather
+    # than only log warnings (#192). Absent for fixed-grid cases.
+    if out.get("line_grid_resolved") is not None:
+        results[name][E0]["line_grid_resolved"] = out["line_grid_resolved"]
 
 
 def detected_background(r, settings, convolve=None):

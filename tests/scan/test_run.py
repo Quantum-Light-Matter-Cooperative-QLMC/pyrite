@@ -1230,6 +1230,63 @@ def test_run_sweep_reuses_cases_across_stems_by_content_key(tmp_path, monkeypatc
     assert results_b["cfg_a"][30.0]["case"] is cases[0]
 
 
+def _resolved_grid_run_cases(cases, **kwargs):
+    """``stub_run_cases`` whose outputs carry a resolved automatic line grid."""
+
+    def with_grid(i, case, out):
+        if out is not None:
+            out["line_grid_resolved"] = {
+                "policy": "resonance-population",
+                "coordinate_count": 8891,
+                "truncation_audit": {
+                    "capped_at_ceiling": True,
+                    "upper_bound": 5.0e-5,
+                    "line_yield_statistics": {
+                        "n": 300,
+                        "relative_standard_error": 0.155,
+                        "statistics_limited": True,
+                    },
+                },
+            }
+        if callback is not None:
+            callback(i, case, out)
+
+    callback = kwargs.pop("callback", None)
+    return stub_run_cases(cases, callback=with_grid, **kwargs)
+
+
+def test_scan_checkpoint_persists_resolved_line_grid(tmp_path, monkeypatch):
+    """Scan checkpoints and CAS replays keep ``line_grid_resolved`` (#192), so
+    ``statistics_limited`` / ``capped_at_ceiling`` survive past the log."""
+    from pyrite.campaign.profiles import case_content_key
+
+    monkeypatch.setattr("pyrite.runs.run.run_cases", _resolved_grid_run_cases)
+    cases = [_fake_case("cfg_a", 30.0)]
+    run_sweep(
+        cases,
+        {},
+        checkpoint_path=str(tmp_path / "hopg@a-000000000000"),
+        content_key_fn=case_content_key,
+        progress=False,
+    )
+    saved = load_checkpoint("hopg@a-000000000000", checkpoint_dir=str(tmp_path))
+    audit = saved["cfg_a"][30.0]["line_grid_resolved"]["truncation_audit"]
+    assert audit["capped_at_ceiling"]
+    assert audit["line_yield_statistics"]["statistics_limited"]
+
+    monkeypatch.setattr("pyrite.runs.run.run_cases", stub_run_cases)
+    replayed = {}
+    run_sweep(
+        cases,
+        replayed,
+        checkpoint_path=str(tmp_path / "hopg@b-111111111111"),
+        content_key_fn=case_content_key,
+        progress=False,
+    )
+    grid = replayed["cfg_a"][30.0]["line_grid_resolved"]
+    assert grid["truncation_audit"]["line_yield_statistics"]["relative_standard_error"] == 0.155
+
+
 def test_no_cache_neither_reads_nor_writes(tmp_path, monkeypatch):
     from pyrite.campaign.profiles import case_content_key
 

@@ -11,7 +11,7 @@ import numpy as np
 
 from ...._backend import REAL, _to_cpu, array_namespace, xp
 from ....materials.attenuation import _mu_total_inv_ang
-from ....materials.crystal import HBARC_EV_ANG, M_E_EV, U_g, chi_g
+from ....materials.crystal import HBARC_EV_ANG, reflection_coupling_tables
 from ...geometry import first_prism_exit
 from ...groove import _THETA_TOL
 from ...transport import (
@@ -337,10 +337,64 @@ def _line_tabulation_grid(crystal_info, composition, lo, hi):
     return np.unique(np.concatenate(grids))
 
 
+def _line_table_nan_onsets(crystal_info, composition, use_henke):
+    """Energies at and above which each line coupling table is NaN, in eV.
+
+    The line tables read atomic data that end: the Chantler ``f'``/``f''``
+    tables return NaN for ``E >= Emax`` of each element, and the Elam
+    scattering term for ``E > ELAM_E_MAX_EV``. Per table,
+
+    - ``chi_g``/``U_g``: NaN from ``min_d Emax_d`` over the anomalous basis
+      elements (all of them with ``use_henke``, else the edge-prone ones), since
+      a NaN term poisons the element sum; finite without any;
+    - ``Re n``: NaN from ``min_basis Emax`` with ``use_henke``, else finite;
+    - each absorber's ``log(mu_i)``: NaN from ``min(Emax_i, ELAM_E_MAX_EV+)``.
+
+    Returns one onset per table, ``inf`` for a table that never turns NaN.
+
+    Validation: line-tabulation-nan-ceiling
+    """
+    from ....materials.atomic import ELAM_E_MAX_EV, _chantler_bounds
+    from ....materials.crystal import _EDGE_PRONE
+
+    basis = {element for element, _ in crystal_info["basis"]}
+    anomalous = [el for el in basis if use_henke or el in _EDGE_PRONE]
+    onsets = [min((_chantler_bounds(el)[1] for el in anomalous), default=np.inf)]
+    onsets.append(min(_chantler_bounds(el)[1] for el in basis) if use_henke else np.inf)
+    elam_onset = np.nextafter(ELAM_E_MAX_EV, np.inf)
+    onsets.extend(min(_chantler_bounds(el)[1], elam_onset) for el, _density in composition)
+    return [float(onset) for onset in onsets]
+
+
+def _line_table_nan_ceiling(crystal_info, composition, use_henke):
+    """Energy at and above which EVERY line coupling table is NaN, in eV.
+
+    The maximum of :func:`_line_table_nan_onsets`: past it the tabulation mesh
+    can stop without changing any interpolated value. ``inf`` when some table
+    stays finite (``use_henke=False`` leaves ``Re n`` finite).
+
+    Validation: line-tabulation-nan-ceiling
+    """
+    return max(_line_table_nan_onsets(crystal_info, composition, use_henke))
+
+
+def _line_emission_ceiling(crystal_info, composition, use_henke=True):
+    """Energy at and above which no line can emit, in eV.
+
+    The minimum of :func:`_line_table_nan_onsets`: a resonance there reads a NaN
+    coupling, refractive index or attenuation and is dropped by the line
+    kernels' finite mask, so no line centre lies at or above it. Always finite,
+    because every absorber's attenuation ends.
+
+    Validation: line-grid-emission-ceiling
+    """
+    return min(_line_table_nan_onsets(crystal_info, composition, use_henke))
+
+
 def _interp_gather2d(idx, frac, below, above, tables, gcol):
     """Per-column gather+blend for the shared ``_interp_index`` bracket against
-    per-``g`` ``tables`` of shape ``(N_g, n)`` (``gcol == arange(N_g)``, hoisted
-    once). Bit-for-bit the batched per-reflection ``xp.interp`` blend it replaces
+    ``tables`` of shape ``(N_rows, n)``; ``gcol[g]`` is the row column ``g``
+    reads (``arange(N_g)`` when every column has its own row). Bit-for-bit the batched per-reflection ``xp.interp`` blend it replaces
     (Validation: line-hkl-batch). This remains unchanged debt."""
     _xp = array_namespace(idx, frac, tables)
     f0 = tables[gcol, idx - 1]
@@ -372,12 +426,12 @@ if hasattr(xp, "ElementwiseKernel"):
         "raw I idx, raw float32 frac, raw float32 log_frac, raw bool below, raw bool above, "
         "raw float32 chi_re_tab, raw float32 chi_im_tab, "
         "raw float32 u_re_tab, raw float32 u_im_tab, raw float32 log_mu_tab, "
-        "int32 n_g, int32 n_mu, int32 n_tab",
+        "raw int32 table_row, int32 n_g, int32 n_mu, int32 n_tab",
         "float32 chi_re, float32 chi_im, float32 u_re, float32 u_im, float32 mu",
         r"""
         const long long bracket = (long long)idx[i];
         const int g = (int)(i % (size_t)n_g);
-        const long long base = (long long)g * (long long)n_tab;
+        const long long base = (long long)table_row[g] * (long long)n_tab;
         const long long lo = base + bracket - 1;
         const long long hi = base + bracket;
         const bool use_lo = below[i];
@@ -428,8 +482,17 @@ def _interp_gather_line_tables(
     u_re_tab,
     u_im_tab,
     log_mu_tab,
+    table_row=None,
 ):
-    """Gather every line-coupling table from one shared interpolation bracket."""
+    """Gather every line-coupling table from one shared interpolation bracket.
+
+    ``idx`` and friends are ``(n_seg, N_g)``; the coupling tables hold one row
+    per reflection, and ``table_row[g]`` names the row column ``g`` reads
+    (default: row ``g``, one column per table row).
+    """
+    n_g = idx.shape[-1]
+    if table_row is None:
+        table_row = xp.arange(n_g, dtype=xp.int32)
     if (
         _INTERP_GATHER_LINE_TABLES_F32 is not None
         and idx.dtype.kind in "iu"
@@ -437,7 +500,7 @@ def _interp_gather_line_tables(
         and chi_re_tab.dtype == xp.float32
         and log_mu_tab.dtype == xp.float32
     ):
-        n_g, n_tab = chi_re_tab.shape
+        n_tab = chi_re_tab.shape[1]
         n_mu = log_mu_tab.shape[0]
         flat = _INTERP_GATHER_LINE_TABLES_F32(
             idx,
@@ -450,6 +513,7 @@ def _interp_gather_line_tables(
             u_re_tab,
             u_im_tab,
             log_mu_tab,
+            xp.ascontiguousarray(table_row, dtype=xp.int32),
             np.int32(n_g),
             np.int32(n_mu),
             np.int32(n_tab),
@@ -457,8 +521,7 @@ def _interp_gather_line_tables(
         )
         return tuple(value.reshape(idx.shape) for value in flat)
 
-    n_g = chi_re_tab.shape[0]
-    gcol = xp.arange(n_g)
+    gcol = table_row
     return (
         _interp_gather2d(idx, frac, below, above, chi_re_tab, gcol),
         _interp_gather2d(idx, frac, below, above, chi_im_tab, gcol),
@@ -892,17 +955,19 @@ def _flight_blocks(bounds, chunk):
         yield ka, n_groups
 
 
-def _reflection_tabulation(crystal, hkl, E_tab, B_ang2, use_henke):
-    """Tabulate one reflection's susceptibility and structure factor.
+def _reflection_tables(crystal, hkl_list, E_tab, B_ang2, use_henke):
+    """Tabulate every reflection's susceptibility and ``U_g/m_e`` on ``xp``.
 
-    ``U_g/m_e`` is stored rather than ``U_g`` because the mass scaling is
-    energy-independent: the division happens once per reflection instead of
-    once per interpolated pair.
+    Returns ``(N_hkl, N_tab)`` REAL arrays ``(chi_re, chi_im, u_re, u_im)``,
+    one row per reflection. Mosaic orientations share their reflection's row
+    (the couplings depend on ``|g|``, not its direction), so callers index rows
+    through a row-to-reflection map instead of copying them.
 
-    Both accumulation routes call this rather than ``chi_g``/``U_g`` directly,
-    so the per-reflection evaluation count has exactly one seam -- the coherent
-    emission tests patch ``chi_g`` here and see both routes.
+    Both accumulation routes call this rather than the materials layer
+    directly, so the tabulation count has exactly one seam -- the coherent
+    emission tests patch it here and see both routes.
+
+    Validation: line-reflection-coupling-tables
     """
-    chi_tab = np.asarray(chi_g(crystal, hkl, E_tab, B_ang2, use_henke))
-    u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke)) / M_E_EV
-    return chi_tab, u_tab
+    tables = reflection_coupling_tables(crystal, hkl_list, E_tab, B_ang2, use_henke, xp=xp)
+    return tuple(xp.ascontiguousarray(table, dtype=REAL) for table in tables)

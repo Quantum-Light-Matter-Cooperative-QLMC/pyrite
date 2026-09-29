@@ -1,8 +1,10 @@
 """Queue payload and metadata string builders (pure, no ssh)."""
 
 import datetime
+import shlex
 import uuid
 
+from .._env import env_value
 from ..validation._zhai import ZHAI_CACHE_SCHEMA, ZHAI_DETECTOR
 from . import config
 
@@ -10,6 +12,40 @@ from . import config
 # high-energy floor instead of a catalog profile identity. New submissions use
 # the explicit ``high_energy`` profile and never consult this mapping.
 _LEGACY_HIGH_ENERGY_MATERIALS = frozenset({"tise2", "gep", "ges", "rese2"})
+
+
+# Local process pins copied into generated job scripts; the remote job has no
+# other route to the submitter's environment.
+_FORWARDED_ENV = ("PYRITE_MC_TRANSPORT_CORE", "PYRITE_MC_RESOURCE_POLICY", "PYRITE_MC_MIN_CHUNK")
+
+
+def _forwarded_env_choices(name):
+    if name == "PYRITE_MC_MIN_CHUNK":
+        return None
+    if name == "PYRITE_MC_TRANSPORT_CORE":
+        from ..montecarlo.transport.batching import TRANSPORT_CORES
+
+        return TRANSPORT_CORES
+    from ..montecarlo._resources import _VALID_POLICIES
+
+    return _VALID_POLICIES
+
+
+def _forwarded_env_exports():
+    """``export`` lines for each forwarded variable set in this process."""
+    exports = ""
+    for name in _FORWARDED_ENV:
+        value = env_value(name, "").strip().lower()
+        if not value:
+            continue
+        choices = _forwarded_env_choices(name)
+        if choices is None:
+            if not value.isdigit() or int(value) < 1:
+                raise ValueError(f"{name} must be a positive integer; got {value!r}")
+        elif value not in choices:
+            raise ValueError(f"{name} must be one of {', '.join(choices)}; got {value!r}")
+        exports += f"\nexport {name}={shlex.quote(value)}"
+    return exports
 
 
 # ---- detached job queue -------------------------------------------------------
@@ -214,6 +250,7 @@ def _queue_script(
         runtime_exports += f"\nexport PYRITE_MC_SPEC_CHUNK={spec_chunk}"
     if brem_chunk is not None:
         runtime_exports += f"\nexport PYRITE_MC_BREM_CHUNK={brem_chunk}"
+    runtime_exports += _forwarded_env_exports()
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     return f"""JOBDIR={config.shell_word(jobdir)}
@@ -529,6 +566,7 @@ def _chunked_queue_script(
         runtime_exports += f"\nexport PYRITE_MC_SPEC_CHUNK={spec_chunk}"
     if brem_chunk is not None:
         runtime_exports += f"\nexport PYRITE_MC_BREM_CHUNK={brem_chunk}"
+    runtime_exports += _forwarded_env_exports()
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))

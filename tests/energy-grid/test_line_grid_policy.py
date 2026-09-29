@@ -27,9 +27,11 @@ from pyrite.campaign.config import material_sweep
 from pyrite.campaign.profiles import case_content_key
 from pyrite.campaign.sweep import build_cases
 from pyrite.materials.crystal import (
+    CRYSTALS,
     HBARC_EV_ANG,
     M_E_EV,
     beta_from_Ee,
+    reciprocal_g_vector,
 )
 
 _ENV_NAMES = (
@@ -213,6 +215,72 @@ def test_high_energy_hbn_rejects_impossible_budget_before_transport(monkeypatch)
     assert "hbn at 5000 keV" in message
     assert "even at the 3 eV maximum spacing" in message
     assert "No transport was started" in message
+
+
+def _automatic_policy(material, energy_keV, per_call=None):
+    from types import SimpleNamespace
+
+    from pyrite.campaign.geometry import crystal_params
+    from pyrite.campaign.sweep import _automatic_line_grid_policy
+
+    sweep = SimpleNamespace(line_grid_policy=per_call)
+    return _automatic_line_grid_policy(sweep, crystal_params(material), energy_keV)
+
+
+def _kinematic_stop(material, energy_keV):
+    from pyrite.campaign.geometry import crystal_params
+
+    cp = crystal_params(material)
+    lattice = CRYSTALS[cp["crystal"]]["lattice"]
+    return kinematic_line_stop_eV(
+        [reciprocal_g_vector(hkl, lattice)[1] for hkl in cp["hkl_list"]], energy_keV
+    )
+
+
+def test_automatic_stop_is_capped_at_the_atomic_data_emission_ceiling():
+    """Validation: line-grid-emission-ceiling"""
+    from pyrite.campaign.geometry import crystal_params
+    from pyrite.montecarlo.spectrum.lines import _line_emission_ceiling
+
+    cp = crystal_params("hopg")
+    ceiling = _line_emission_ceiling(CRYSTALS[cp["crystal"]], cp["composition"])
+    policy = _automatic_policy("hopg", 5000.0)
+    assert _kinematic_stop("hopg", 5000.0) > ceiling
+    assert ceiling <= policy.stop_eV < ceiling + 100.0
+    assert dict(policy.sources)["stop_eV"] == "atomic data ceiling"
+
+
+def test_automatic_stop_keeps_the_kinematic_bound_when_it_is_lowest():
+    """Validation: line-grid-emission-ceiling"""
+    policy = _automatic_policy("hopg", 300.0)
+    assert policy.stop_eV == _kinematic_stop("hopg", 300.0)
+    assert "stop_eV" not in dict(policy.sources)
+
+
+def test_automatic_stop_is_capped_at_the_beam_kinetic_energy(monkeypatch):
+    """Validation: line-grid-emission-ceiling"""
+    import pyrite.montecarlo.spectrum.lines as lines
+
+    monkeypatch.setattr(lines, "_line_emission_ceiling", lambda *args, **kwargs: float("inf"))
+    policy = _automatic_policy("hopg", 50_000.0)
+    assert _kinematic_stop("hopg", 50_000.0) > 50.0e6
+    assert policy.stop_eV == 50.0e6
+    assert dict(policy.sources)["stop_eV"] == "energy conservation"
+
+
+def test_measured_bandwidth_keeps_the_kinematic_cap():
+    """Validation: line-grid-emission-ceiling"""
+    policy = _automatic_policy(
+        "hopg",
+        5000.0,
+        {
+            "bandwidth": "resonance-population",
+            "resolution": "resonance-local",
+            "quadrature": "bin-mean",
+        },
+    )
+    assert policy.stop_eV == _kinematic_stop("hopg", 5000.0)
+    assert "stop_eV" not in dict(policy.sources)
 
 
 def test_stored_row_still_wins_over_automatic_resolution():

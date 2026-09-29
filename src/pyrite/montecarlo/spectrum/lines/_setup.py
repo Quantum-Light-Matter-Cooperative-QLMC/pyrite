@@ -22,6 +22,7 @@ from ._formation import expand_escape_pieces
 from ._kernels import (
     _clip_segments_to_cutoff,
     _elemental_log_mu_table,
+    _line_table_nan_ceiling,
     _line_tabulation_grid,
     _matvec3,
     _observation_direction,
@@ -399,6 +400,15 @@ def _prepare_spectrum(request):
     _pad = 0.2 * (float(E_grid_eV[-1]) - float(E_grid_eV[0]))
     _lo, _hi = float(E_grid_eV[0]) - _pad, float(E_grid_eV[-1]) + _pad
     _lo = max(_lo, 1.0)  # keep tabulation energies positive: chi_g/U_g need lambda = HC_EV_ANG / E
+    # Above the atomic tables' end every coupling table is NaN, and a line
+    # there interpolates NaN whichever NaN nodes bracket it. Stop the mesh at
+    # its first node at or above that ceiling: nodes below it are unchanged,
+    # and E_res past the last node clamps to a NaN value, as before. At MeV
+    # beam energies this cuts E_tab from ~1e7-1e8 nodes to ~1e6.
+    # Validation: line-tabulation-nan-ceiling
+    _ceiling = _line_table_nan_ceiling(info, abs_comp, use_henke)
+    if _ceiling < _hi:
+        _hi = max(_ceiling, _lo + 1.0)
     E_tab = _line_tabulation_grid(info, abs_comp, _lo, _hi)
     E_tab_g = xp.asarray(E_tab, dtype=REAL)
     # Each elemental coefficient is stored as log(mu_i) [log(1/Ang)] and

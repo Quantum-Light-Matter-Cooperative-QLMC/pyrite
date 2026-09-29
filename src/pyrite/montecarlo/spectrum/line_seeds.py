@@ -930,6 +930,11 @@ def case_line_stop_eV(
 
 
 LOCAL_SPACING_SOURCE = "pxr-local"
+#: Half-width, in first-zero widths, of the ``h <= w / 2`` core that
+#: :func:`local_spacing_seeds` keeps free of coarser spacing around each line.
+LOCAL_CORE_WIDTHS = 10.0
+#: Core spacing as a fraction of the first-zero width ``w``.
+LOCAL_CORE_FRACTION = 0.5
 
 
 def local_spacing_seeds(
@@ -941,14 +946,17 @@ def local_spacing_seeds(
     max_spacing_eV: float,
     halo_limit: float,
     bin_eV: float = 100.0,
+    core_widths: float = LOCAL_CORE_WIDTHS,
+    core_fraction: float = LOCAL_CORE_FRACTION,
 ) -> tuple[list[FeatureSeed], dict[str, Any]]:
     """Energy-dependent spacing: fine only where narrow lines resonate.
 
     Each line narrower than ``max_spacing_eV`` needs nodes no farther apart
     than its first-zero width ``w`` (``h <= pi / a_w`` integrates its
     ``sinc**2`` exactly on a uniform grid, ledger row ``line-grid-sinc-convergence``),
-    but only within a halo ``D = w / (pi**2 halo_limit)``: beyond it the line
-    keeps at most ``halo_limit`` of its mass (:func:`sincsq_upper_tail_bound`),
+    but only within a halo ``D = w / (pi**2 halo_limit)``: beyond each edge the
+    line keeps at most ``halo_limit`` of its mass, ``2 halo_limit`` in total
+    (:func:`sincsq_upper_tail_bound`),
     which is all a coarser sampling there can misplace. Required spacings are
     quantised to ``floor_spacing_eV * 2**k``, with ``floor_spacing_eV`` the
     case's global sinc-Nyquist step, so lines the global rule already lets alias
@@ -956,11 +964,23 @@ def local_spacing_seeds(
     rather than refined further. Bins of ``bin_eV`` take the finest level any
     overlapping halo asks for; runs of equal level become one seed each.
 
+    A spacing join inside a line's core breaks the uniform-grid exactness: at
+    ``h ~ w`` its error decays only like ``w / (2 pi**2 d)`` with the distance
+    ``d`` to the join, and a population concentrated near one join exceeds the
+    1e-3 intrinsic-source budget (fresh-context verification, #192). So every
+    line narrower than twice the backbone -- including those wider than it,
+    which get no halo -- also asks for ``h <= w / 2`` within ``core_widths * w``
+    of its resonance. That lowers node-quadrature join error but bounds no join
+    term (joins between finer levels remain inside a core), so the policy
+    requires ``bin-mean`` quadrature, whose bin means telescope to the exact
+    integral at any spacing.
+
     Assumptions: no weighting beyond the population itself -- every
     sub-backbone line is resolved within its halo, so this is at least as fine
-    as the uniform step around every line that step resolves. Nonuniform
-    trapezoid error inside a halo is not bounded here; the window ladder
-    measures it.
+    as the uniform step around every line that step resolves. The required
+    ``bin-mean`` quadrature makes integrated yield independent of the axis;
+    line-shape effects are measured on identical trajectories
+    (:func:`pyrite.energy_grid.bandwidth_check.shape_and_counts`).
 
     Limiting case: one line of width ``w`` gives one window of spacing
     ``<= w`` spanning ``E_res +- D``, rounded out to bins, on the backbone.
@@ -975,6 +995,8 @@ def local_spacing_seeds(
         raise ValueError("floor_spacing_eV must be positive")
     if not 0.0 < float(halo_limit) < 1.0:
         raise ValueError("halo_limit must lie in (0, 1)")
+    if not (0.0 < float(core_fraction) and 0.0 < float(core_widths)):
+        raise ValueError("core_fraction and core_widths must be positive")
     start, stop = float(start_eV), float(stop_eV)
     levels = [floor * 2.0**k for k in range(64) if floor * 2.0**k < backbone]
     summary: dict[str, Any] = {
@@ -982,24 +1004,21 @@ def local_spacing_seeds(
         "max_spacing_eV": backbone,
         "halo_limit": float(halo_limit),
         "bin_eV": float(bin_eV),
+        "core_widths": float(core_widths),
+        "core_fraction": float(core_fraction),
         "narrow_lines": 0,
+        "cored_lines": 0,
     }
     if not levels:
         return [], {**summary, "windows": 0}
     n_bins = int(np.ceil((stop - start) / float(bin_eV)))
     required = np.full(n_bins, len(levels), dtype=np.int64)
     coverage = np.zeros((len(levels), n_bins + 1), dtype=np.int64)
-    for energy_block, _, width_block in _population_blocks(populations):
-        narrow = np.isfinite(energy_block) & np.isfinite(width_block) & (width_block < backbone)
-        if not narrow.any():
-            continue
-        energy = energy_block[narrow]
-        width = width_block[narrow]
-        summary["narrow_lines"] += int(width.size)
-        level = np.clip(np.floor(np.log2(np.maximum(width, floor) / floor)), 0, len(levels) - 1)
-        halo = width / (np.pi**2 * float(halo_limit))
-        first = np.clip(np.floor((energy - halo - start) / bin_eV), 0, n_bins).astype(np.int64)
-        last = np.clip(np.ceil((energy + halo - start) / bin_eV), 0, n_bins).astype(np.int64)
+
+    def cover(energy, spacing, reach):
+        level = np.clip(np.floor(np.log2(np.maximum(spacing, floor) / floor)), 0, len(levels) - 1)
+        first = np.clip(np.floor((energy - reach - start) / bin_eV), 0, n_bins).astype(np.int64)
+        last = np.clip(np.ceil((energy + reach - start) / bin_eV), 0, n_bins).astype(np.int64)
         inside = last > first
         first, last, level = first[inside], last[inside], level[inside].astype(np.int64)
         for k in range(len(levels)):
@@ -1008,7 +1027,20 @@ def local_spacing_seeds(
                 continue
             np.add.at(coverage[k], first[chosen], 1)
             np.add.at(coverage[k], last[chosen], -1)
-    if summary["narrow_lines"] == 0:
+
+    for energy_block, _, width_block in _population_blocks(populations):
+        finite = np.isfinite(energy_block) & np.isfinite(width_block)
+        narrow = finite & (width_block < backbone)
+        if narrow.any():
+            width = width_block[narrow]
+            summary["narrow_lines"] += int(width.size)
+            cover(energy_block[narrow], width, width / (np.pi**2 * float(halo_limit)))
+        cored = finite & (float(core_fraction) * width_block < backbone)
+        if cored.any():
+            width = width_block[cored]
+            summary["cored_lines"] += int(width.size)
+            cover(energy_block[cored], float(core_fraction) * width, float(core_widths) * width)
+    if summary["narrow_lines"] == 0 and summary["cored_lines"] == 0:
         return [], {**summary, "windows": 0}
     for k in range(len(levels)):
         covered = np.cumsum(coverage[k, :-1]) > 0
