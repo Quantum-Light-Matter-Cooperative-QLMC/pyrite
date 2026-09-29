@@ -28,3 +28,19 @@ resonance_eV = 23.0
 basis = "pi+sigma bulk plasmon peak in thick-terrace STEM-EELS, reported as around 23 eV; the separate 8.6 eV pi plasmon is not represented"
 source = "E. Moynihan et al., J. Microsc. 279, 256 (2020)"
 doi = "10.1111/jmi.12900"
+
+[hopg]
+formula = { C = 1 }
+electrons_per_formula = 4
+resonance_eV = 25.0
+basis = "pi+sigma maximum of the optical energy-loss function -Im(1/eps) (q=0, E perpendicular to c, i.e. in-plane q as for c-normal incidence) from Kramers-Kronig analysis of reflectance measured to 26 eV; the separate 7 eV pi plasmon is not represented; EELS on a graphite single crystal gives 28 eV at q=0.25 A^-1 in-plane (Marinopoulos et al., Phys. Rev. Lett. 89, 076402 (2002), doi:10.1103/PhysRevLett.89.076402)"
+source = "E. A. Taft and H. R. Philipp, Phys. Rev. 138, A197 (1965)"
+doi = "10.1103/PhysRev.138.A197"
+
+[hbn]
+formula = { B = 1, N = 1 }
+electrons_per_formula = 8
+resonance_eV = 26.4
+basis = "total (sigma+pi) bulk plasmon in low-q transmission EELS with q in the basal plane (Kramers-Kronig-analysed 0-60 eV loss function); q along c gives 23 eV; the separate 8.5 eV pi plasmon is not represented"
+source = "C. Tarrio and S. E. Schnatterly, Phys. Rev. B 40, 7852 (1989)"
+doi = "10.1103/PhysRevB.40.7852"

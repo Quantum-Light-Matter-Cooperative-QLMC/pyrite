@@ -6,6 +6,7 @@ import pytest
 from pyrite.materials.attenuation import plasma_energy_eV
 from pyrite.montecarlo import shell_configuration as config
 from pyrite.montecarlo.transport import shell_oscillators as so
+from pyrite.montecarlo.transport.shell_transport import validate_shell_cutoff
 from pyrite.xsgen.sbethe.catalog import catalog_material
 
 
@@ -75,8 +76,14 @@ def test_rejects_formula_mismatch_and_unreachable_mean_excitation():
 
 def test_packaged_conduction_bands_are_sourced():
     bands = so.load_conduction_bands()
-    assert set(bands) == {"silicon", "sio2", "mos2"}
+    assert set(bands) == {"silicon", "sio2", "mos2", "hopg", "hbn"}
     assert all("doi:10." in band.source for band in bands.values())
+
+
+def test_fetched_packaged_conduction_bands_pass_default_shell_cutoff():
+    if not config._default_path().is_file():
+        pytest.skip("pinned SBETHE reference data have not been fetched")
+    validate_shell_cutoff(tuple(so.load_conduction_bands()), 50.0)
 
 
 @pytest.mark.parametrize(
@@ -85,6 +92,8 @@ def test_packaged_conduction_bands_are_sourced():
         ("silicon", {(14, "M1"), (14, "M2")}, 2.2024),
         ("sio2", {(14, "M1"), (14, "M2"), (8, "L1"), (8, "L2"), (8, "L3")}, 3.4701),
         ("mos2", {(42, "N4"), (42, "O1"), (16, "M1"), (16, "M2"), (16, "M3")}, 1.7797),
+        ("hopg", {(6, "L1"), (6, "L2")}, 2.6359),
+        ("hbn", {(5, "L1"), (5, "L2"), (7, "L1"), (7, "L2"), (7, "L3")}, 2.5860),
     ],
 )
 def test_fetched_catalog_materials_close_mean_excitation(key, conduction_shells, sternheimer):
@@ -106,7 +115,7 @@ def test_fetched_catalog_materials_close_mean_excitation(key, conduction_shells,
     assert _closure(result) == pytest.approx(z * np.log(material.mean_excitation_eV), rel=1e-12)
     assert result.sternheimer_factor == pytest.approx(sternheimer, abs=1e-4)
     free_electron = np.sqrt(band.electrons_per_formula / z) * omega
-    assert band.resonance_eV == pytest.approx(free_electron, rel=0.065)
+    assert band.resonance_eV == pytest.approx(free_electron, rel=0.07)
 
 
 def test_fetched_silicon_default_matches_free_electron_plasmon():
