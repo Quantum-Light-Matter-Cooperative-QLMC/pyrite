@@ -11,7 +11,7 @@ from pyrite.apps.analysis_ui.pixels import (
     resolve_pixel_image,
     spectrum_components,
 )
-from pyrite.apps.analysis_ui.views import render_pixel_detector
+from pyrite.apps.analysis_ui.views.pixels import render_pixel_detector
 from pyrite.observations import ObservationStore, observation_from_result, observation_inventory
 from tests.observations.test_store import _acquisition, _simulate, fake_directional  # noqa: F401
 

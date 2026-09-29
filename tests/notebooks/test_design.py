@@ -61,7 +61,14 @@ def test_marimo_starts_in_pyrite_default_light_theme() -> None:
     config = tomllib.loads(project.read_text())
 
     assert config["tool"]["marimo"]["display"]["theme"] == "light"
-    for app in ("analysis_app.py", "scan_app.py", "trace_app.py", "validation_app.py"):
+    for app in (
+        "analysis_app.py",
+        "compare_app.py",
+        "pixel_app.py",
+        "scan_app.py",
+        "trace_app.py",
+        "validation_app.py",
+    ):
         source = (root / "src" / "pyrite" / "apps" / app).read_text()
         assert '# theme = "light"' in source
         assert '# theme = "system"' not in source

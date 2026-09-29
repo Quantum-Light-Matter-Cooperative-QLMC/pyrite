@@ -51,6 +51,8 @@ def _inspect_wheel(wheel: Path) -> None:
     assert "pyrite/data/catalog/catalog.toml" in names
     assert "pyrite/data/catalog/profiles/standard.toml" in names
     assert "pyrite/apps/analysis_app.py" in names
+    assert "pyrite/apps/compare_app.py" in names
+    assert "pyrite/apps/pixel_app.py" in names
     assert "pyrite/apps/_design.css" in names
     assert "pyrite/apps/trace_app.py" in names
     assert "pyrite/apps/validation_app.py" in names
@@ -120,6 +122,8 @@ def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
         cwd=root,
     )
     _run(pyrite, "app", "analysis", "launch", "--smoke", cwd=root)
+    _run(pyrite, "app", "pixels", "launch", "--smoke", cwd=root)
+    _run(pyrite, "app", "compare", "launch", "--smoke", cwd=root)
     _run(pyrite, "app", "viewer", "launch", "--smoke", cwd=root)
     _run(
         str(_python(venv)),

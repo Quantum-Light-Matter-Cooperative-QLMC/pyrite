@@ -1,4 +1,4 @@
-"""Pixel-detector observation controls and state for the analysis app.
+"""Pixel-detector observation controls and state for the pixel app.
 
 Discovery, loading, control construction, and image resolution live here so
 the marimo cells only wire widgets. Nothing here renders; see

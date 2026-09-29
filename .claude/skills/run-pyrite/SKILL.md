@@ -5,7 +5,7 @@ description: Use when running, launching, smoke-testing, or confirming real PyRI
 
 # Run PyRITE
 
-User surfaces: `uv run pyrite ...`; four packaged marimo apps under
+User surfaces: `uv run pyrite ...`; six packaged marimo apps under
 `src/pyrite/apps/`; library under `src/pyrite/`. Active checkpoints:
 `checkpoints/<stem>/{line,brem}.pkl`.
 

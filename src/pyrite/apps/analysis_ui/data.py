@@ -20,6 +20,30 @@ def _selected_value(widget) -> str | None:
     return value
 
 
+def resolve_checkpoint_stem(
+    material: str | None, face: str | None, profile: str | None
+) -> str | None:
+    """The checkpoint stem a material/face/profile selection names, or ``None``.
+
+    A profile other than the material's own standard stem selects its checkpoint
+    directly; otherwise the material and face resolve the stem.
+    """
+    if profile is not None and profile != material:
+        return profile
+    if material is not None and face is not None:
+        return checkpoint_stem(material, face)
+    return None
+
+
+def selected_checkpoint_stem(material_widget, face_widget, profile_widget) -> str | None:
+    """Resolve the picker widgets' checkpoint stem without loading the checkpoint."""
+    return resolve_checkpoint_stem(
+        _selected_value(material_widget),
+        _selected_value(face_widget),
+        _selected_value(profile_widget),
+    )
+
+
 def load_context(material_widget, face_widget, profile_widget) -> AnalysisContext:
     """Resolve the UI selection and load exactly one analysis checkpoint."""
 
@@ -27,13 +51,7 @@ def load_context(material_widget, face_widget, profile_widget) -> AnalysisContex
     face = _selected_value(face_widget)
     profile = _selected_value(profile_widget)
     settings = default_settings()
-
-    if profile is not None and profile != material:
-        stem = profile
-    elif material is not None and face is not None:
-        stem = checkpoint_stem(material, face)
-    else:
-        stem = None
+    stem = resolve_checkpoint_stem(material, face, profile)
 
     loaded = load_analysis_checkpoint(stem) if stem is not None else None
     load_error = None

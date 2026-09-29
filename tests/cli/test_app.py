@@ -8,6 +8,7 @@ from pyrite import cli
 from pyrite.cli.commands import app_analysis as analyze
 from pyrite.cli.commands import app_validation as check
 from pyrite.cli.commands import app_viewer as viewer
+from pyrite.cli.commands import app_views as views
 
 
 def test_app_help_imports_only_the_group(monkeypatch):
@@ -25,6 +26,8 @@ def test_app_help_imports_only_the_group(monkeypatch):
     assert "analysis" in result.output
     assert "viewer" in result.output
     assert "validation" in result.output
+    assert "pixels" in result.output
+    assert "compare" in result.output
     assert imported == ["pyrite.cli.commands.app"]
 
 
@@ -114,3 +117,69 @@ def test_implicit_app_launch_retired_in_favour_of_the_explicit_leaf(monkeypatch)
     assert implicit.exit_code == 2
     assert explicit.exit_code == 0
     assert launched["material"] == "mose2"
+
+
+def test_pixels_and_compare_leaves_launch_their_own_notebooks(monkeypatch):
+    launched = []
+    monkeypatch.setattr(
+        views, "_launch", lambda app, material, **kwargs: launched.append((app, material, kwargs))
+    )
+    monkeypatch.setattr(views, "get_analysis_default", lambda: "wse2")
+
+    runner = CliRunner()
+    pixels = runner.invoke(cli.command, ["app", "pixels", "launch", "mose2", "--smoke"])
+    compare = runner.invoke(cli.command, ["app", "compare", "launch", "--tunnel"])
+
+    assert pixels.exit_code == 0, pixels.output
+    assert compare.exit_code == 0, compare.output
+    assert launched[0][0] is views.PIXELS and launched[0][1] == "mose2"
+    assert launched[0][2]["smoke"] is True
+    # No MATERIAL: the analysis app's persisted default seeds the picker.
+    assert launched[1][0] is views.COMPARE and launched[1][1] == "wse2"
+    assert launched[1][2]["tunnel"] is True
+
+
+def test_pixels_and_compare_never_persist_a_default():
+    for leaf in ("pixels", "compare"):
+        result = CliRunner().invoke(cli.command, ["app", leaf, "launch", "-d", "hopg"])
+        assert result.exit_code == 2
+        assert "No such option" in result.output
+
+
+def test_split_app_material_falls_back_to_hopg(monkeypatch):
+    monkeypatch.setattr(views, "get_analysis_default", lambda: None)
+
+    assert views.resolve_material(None) == "hopg"
+    assert views.resolve_material("mose2") == "mose2"
+
+
+def test_split_app_commands_target_their_notebooks_and_ports():
+    assert views.PIXELS.notebook.endswith("pixel_app.py")
+    assert views.COMPARE.notebook.endswith("compare_app.py")
+    ports = {analyze.TUNNEL_PORT, viewer.TUNNEL_PORT, views.PIXELS.tunnel_port}
+    assert len(ports | {views.COMPARE.tunnel_port}) == 4
+
+    run = views._command(views.PIXELS, "hopg", tunnel=True, no_token=True)
+    assert run[3:8] == ["run", "--port", "2720", "--no-token", views.PIXELS.notebook]
+    assert run[-2:] == ["--material", "hopg"]
+    smoke = views._smoke_command(views.COMPARE, "hopg", "out.html")
+    assert smoke[3:7] == ["export", "html", views.COMPARE.notebook, "--output"]
+    assert smoke[-2:] == ["--material", "hopg"]
+
+
+def test_split_app_export_never_launches(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        views.subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs))
+    )
+    monkeypatch.setattr(views, "get_analysis_default", lambda: None)
+
+    named = CliRunner().invoke(cli.command, ["app", "pixels", "export", "mose2", "--stem", "px"])
+    default = CliRunner().invoke(cli.command, ["app", "compare", "export"])
+
+    assert named.exit_code == 0 and default.exit_code == 0
+    assert calls[0][0][0] == views._smoke_command(views.PIXELS, "mose2", "results/px.html")
+    assert calls[1][0][0] == views._smoke_command(
+        views.COMPARE, "hopg", "results/pyrite_compare_hopg.html"
+    )
+    assert calls[1][1]["env"]["PYRITE_ANALYZE_INITIAL"] == "hopg"

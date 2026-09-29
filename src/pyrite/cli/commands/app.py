@@ -9,11 +9,15 @@ from .._groups import LazyGroup
 
 _LEAVES = {
     "analysis": "pyrite.cli.commands.app.analysis_command",
+    "pixels": "pyrite.cli.commands.app.pixels_command",
+    "compare": "pyrite.cli.commands.app.compare_command",
     "viewer": "pyrite.cli.commands.app.viewer_command",
     "validation": "pyrite.cli.commands.app.validation_command",
 }
 _HELP = {
     "analysis": "Launch or export the analysis app.",
+    "pixels": "Launch or export the pixel-detector observation app.",
+    "compare": "Launch or export the case and cross-material comparison app.",
     "viewer": "Launch or export the 3D trajectory viewer.",
     "validation": "Launch or export cached validation figures.",
 }
@@ -62,6 +66,22 @@ def analysis_command() -> click.Group:
         "analysis",
         "pyrite.cli.commands.app_analysis.command",
         "pyrite.cli.commands.export.command",
+    )
+
+
+def pixels_command() -> click.Group:
+    return _launch_leaf(
+        "pixels",
+        "pyrite.cli.commands.app_views.pixels_command",
+        "pyrite.cli.commands.app_views.pixels_export_command",
+    )
+
+
+def compare_command() -> click.Group:
+    return _launch_leaf(
+        "compare",
+        "pyrite.cli.commands.app_views.compare_command",
+        "pyrite.cli.commands.app_views.compare_export_command",
     )
 
 
