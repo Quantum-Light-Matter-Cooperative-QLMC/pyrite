@@ -541,7 +541,11 @@ def pull(args: argparse.Namespace) -> Path:
     destination = Path(args.dest)
     destination.mkdir(parents=True, exist_ok=True)
     local = destination / args.json_out
-    remote._run(["scp", remote.scp_remote_path(remote.remote_path(args.json_out)), str(local)])
+    remote._run(
+        remote.config.scp_argv(
+            remote.scp_remote_path(remote.remote_path(args.json_out)), str(local)
+        )
+    )
     print(local)
     return local
 

@@ -9,27 +9,25 @@ from . import config, scripts, state, transport
 def _stage_job_script(jobid: str, stems: list[str], upload: str, script: str) -> None:
     """Reserve stems and upload a batch script, releasing on upload failure."""
     transport._run(
-        [
-            "ssh",
+        config.ssh_argv(
             "-n",
             config.remote_host(),
             scripts._reserve_checkpoint_stems_command(jobid, stems),
-        ]
+        )
     )
     try:
         subprocess.run(
-            ["ssh", config.remote_host(), upload],
+            config.ssh_argv(config.remote_host(), upload),
             input=script.replace("\r\n", "\n").encode(),
             check=True,
         )
     except BaseException:
         transport._run(
-            [
-                "ssh",
+            config.ssh_argv(
                 "-n",
                 config.remote_host(),
                 scripts._release_checkpoint_stems_command(jobid, stems),
-            ]
+            )
         )
         raise
 
@@ -60,12 +58,11 @@ def _release_if_submission_definitely_failed(jobid: str, stems: list[str]) -> No
         return
     if definitely_failed:
         transport._run(
-            [
-                "ssh",
+            config.ssh_argv(
                 "-n",
                 config.remote_host(),
                 scripts._release_checkpoint_stems_command(jobid, stems),
-            ]
+            )
         )
 
 
@@ -106,7 +103,9 @@ def _stop_jobid(jobid):
         f'echo "cancelled [{scheduler_id}] $(date -Is)" > "$D/state"; '
         f'echo "cancelled SLURM job {scheduler_id} for job {jobid}"'
     )
-    transport._run(["ssh", "-n", config.remote_host(), remote], label=f"Cancelling job {jobid}...")
+    transport._run(
+        config.ssh_argv("-n", config.remote_host(), remote), label=f"Cancelling job {jobid}..."
+    )
 
 
 def _stop_jobids(jobids):
@@ -120,7 +119,7 @@ def _stop_jobids(jobids):
     the granular :func:`_stop_jobid` error semantics."""
     transport._check_shell_tokens(list(jobids))
     transport._run(
-        ["ssh", "-n", config.remote_host(), scripts._scancel_jobs_command(list(jobids))],
+        config.ssh_argv("-n", config.remote_host(), scripts._scancel_jobs_command(list(jobids))),
         label=f"Cancelling {len(jobids)} job(s)...",
     )
 
@@ -207,7 +206,7 @@ def reap_reservations(min_age_minutes=5.0, yes=False):
         return
     for jobid in sorted(orphans):
         transport._run(
-            ["ssh", "-n", config.remote_host(), scripts._reap_job_command(jobid)],
+            config.ssh_argv("-n", config.remote_host(), scripts._reap_job_command(jobid)),
             label=f"Reaping orphaned job {jobid}...",
         )
     print(f"reaped {len(orphans)} orphaned job(s)")

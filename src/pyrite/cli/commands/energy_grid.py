@@ -69,7 +69,7 @@ def _pull_combined(json_name=None, *, dest_dir):
     job._validate_remote_output_name(name)
     local = str(Path(dest_dir) / name)
     remote_path = remote.remote_path(name)
-    remote._run(["scp", remote.scp_remote_path(remote_path), local])
+    remote._run(remote.config.scp_argv(remote.scp_remote_path(remote_path), local))
     return local
 
 

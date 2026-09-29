@@ -65,7 +65,7 @@ def _ssh_capture(remote_cmd):
     `jobs`, and `logs` would crash mid-read. `errors="replace"` keeps any stray
     non-UTF-8 byte from aborting the whole command."""
     r = subprocess.run(
-        ["ssh", "-n", config.remote_host(), remote_cmd],
+        config.ssh_argv("-n", config.remote_host(), remote_cmd),
         capture_output=True,
         encoding="utf-8",
         errors="replace",
@@ -81,7 +81,9 @@ def _ssh_download(remote_cmd: str, destination: Path, *, label=None) -> None:
     destination = Path(destination)
     try:
         with destination.open("wb") as output:
-            _run(["ssh", "-n", config.remote_host(), remote_cmd], stdout=output, label=label)
+            _run(
+                config.ssh_argv("-n", config.remote_host(), remote_cmd), stdout=output, label=label
+            )
     except BaseException:
         destination.unlink(missing_ok=True)
         raise
@@ -434,7 +436,7 @@ def sync_code(*, force: bool = False):
                     continue
                 _add_to_tar(t, f, arc)
         _run(
-            ["scp", tarpath, config.scp_remote_path("/tmp/pyrite_code.tgz")],
+            config.scp_argv(tarpath, config.scp_remote_path("/tmp/pyrite_code.tgz")),
             label="Syncing code to remote box...",
         )
     # -n: redirect ssh's stdin from null. Without it, ssh.exe inherits the
@@ -451,8 +453,7 @@ def sync_code(*, force: bool = False):
         else ""
     )
     _run(
-        [
-            "ssh",
+        config.ssh_argv(
             "-n",
             config.remote_host(),
             f"mkdir -p {config.shell_remote_dir()} && cd {config.shell_remote_dir()} "
@@ -461,5 +462,5 @@ def sync_code(*, force: bool = False):
             f"&& {clear_catalog}tar xzf /tmp/pyrite_code.tgz && rm -f /tmp/pyrite_code.tgz "
             f"&& printf %s {config.shell_arg(stamp.render())} "
             f"> {config.shell_single_word(config.remote_sync_stamp_path())}",
-        ]
+        )
     )

@@ -1,5 +1,6 @@
 """Environment + configuration constants for the remote job subsystem."""
 
+import os
 import re
 import shlex
 import subprocess
@@ -153,12 +154,50 @@ def override_remote_host(value: str | None):
         HOST = previous
 
 
+def ssh_mux_options() -> list[str]:
+    """OpenSSH options that share one persistent connection per host.
+
+    Every remote command otherwise pays a full connect (through the lab's
+    ``cloudflared`` proxy, ~4 s); with a control master only the first does.
+    The socket directory is deliberately short: ``ControlPath`` is capped near
+    108 bytes. Disable with ``PYRITE_SSH_MUX=0``; skipped off POSIX, where
+    OpenSSH has no control sockets.
+    """
+    if os.name != "posix" or env_value("PYRITE_SSH_MUX", "1") == "0":
+        return []
+    runtime = os.environ.get("XDG_RUNTIME_DIR")
+    base = Path(runtime) if runtime and os.path.isdir(runtime) else Path.home() / ".cache"
+    sockets = base / "pyrite-ssh"
+    try:
+        sockets.mkdir(mode=0o700, parents=True, exist_ok=True)
+    except OSError:
+        return []
+    return [
+        "-o",
+        "ControlMaster=auto",
+        "-o",
+        f"ControlPath={sockets}/%C",
+        "-o",
+        "ControlPersist=10m",
+    ]
+
+
+def ssh_argv(*args: str) -> list[str]:
+    """Return an ``ssh`` command line with connection sharing enabled."""
+    return ["ssh", *ssh_mux_options(), *args]
+
+
+def scp_argv(*args: str) -> list[str]:
+    """Return an ``scp`` command line with connection sharing enabled."""
+    return ["scp", *ssh_mux_options(), *args]
+
+
 @cache
 def _remote_home(host: str) -> str:
     """Return the absolute login home of ``host`` (one ssh round trip, cached)."""
     try:
         result = subprocess.run(
-            ["ssh", "-n", "-o", "BatchMode=yes", host, 'printf %s "$HOME"'],
+            ssh_argv("-n", "-o", "BatchMode=yes", host, 'printf %s "$HOME"'),
             capture_output=True,
             text=True,
             timeout=60,

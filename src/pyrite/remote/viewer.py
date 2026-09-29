@@ -206,7 +206,7 @@ def tail_logs(jobid=None, follow=False):
         try:
             # Close stdin so Windows OpenSSH cannot hang on console forwarding,
             # while stdout/stderr still inherit for live streaming and Ctrl-C.
-            result = subprocess.run(["ssh", "-n", config.remote_host(), remote])
+            result = subprocess.run(config.ssh_argv("-n", config.remote_host(), remote))
         except KeyboardInterrupt:
             print("\n(stopped following; the job is unaffected)", file=sys.stderr)
             return 130
@@ -266,7 +266,7 @@ def stack_dump(jobid=None, wait_seconds=2.0):
     older code have no handler and are skipped rather than signalled.
     """
     result = subprocess.run(
-        ["ssh", "-n", config.remote_host(), _stack_dump_command(jobid, wait_seconds)],
+        config.ssh_argv("-n", config.remote_host(), _stack_dump_command(jobid, wait_seconds)),
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -319,7 +319,7 @@ def _status_stream(remote: str):
         lines: list[str] = []
         try:
             process = subprocess.Popen(
-                ["ssh", "-n", config.remote_host(), stream_command],
+                config.ssh_argv("-n", config.remote_host(), stream_command),
                 stdout=subprocess.PIPE,
                 text=True,
                 encoding="utf-8",

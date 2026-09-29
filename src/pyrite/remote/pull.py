@@ -395,7 +395,7 @@ def pull_zhai_cache():
     dest.mkdir(parents=True, exist_ok=True)
     for name in names:
         transport._run(
-            ["scp", config.scp_remote_path(f"{remote_dir}/{name}"), str(dest / name)],
+            config.scp_argv(config.scp_remote_path(f"{remote_dir}/{name}"), str(dest / name)),
             label=f"Pulling {name}...",
         )
     print(f"pulled -> checkpoints/zhai_reproduction/ ({len(names)} cache files)")

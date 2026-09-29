@@ -60,6 +60,7 @@ def _pin_remote_paths(monkeypatch):
     against the remote login home over ssh; tests must never do that. Tests that
     exercise the ``~`` expansion or the real defaults set their own values.
     """
+    monkeypatch.setenv("PYRITE_SSH_MUX", "0")
     config = sys.modules.get("pyrite.remote.config")
     if config is None:
         return

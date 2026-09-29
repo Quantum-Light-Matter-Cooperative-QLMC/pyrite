@@ -6546,3 +6546,18 @@ def test_stack_dump_reports_signalled_and_legacy_jobs(
     captured = capsys.readouterr()
     assert captured.out == stdout
     assert message in captured.err
+
+
+def test_ssh_argv_shares_one_connection_per_host(monkeypatch, tmp_path):
+    monkeypatch.setenv("PYRITE_SSH_MUX", "1")
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    argv = remote.config.ssh_argv("-n", "box", "true")
+    assert argv[0] == "ssh" and argv[-3:] == ["-n", "box", "true"]
+    assert "ControlMaster=auto" in argv
+    assert f"ControlPath={tmp_path}/pyrite-ssh/%C" in argv
+    assert remote.config.scp_argv("a", "b")[0] == "scp"
+
+
+def test_ssh_argv_mux_can_be_disabled(monkeypatch):
+    monkeypatch.setenv("PYRITE_SSH_MUX", "0")
+    assert remote.config.ssh_argv("box") == ["ssh", "box"]
