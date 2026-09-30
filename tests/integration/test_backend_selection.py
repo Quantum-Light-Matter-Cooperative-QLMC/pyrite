@@ -474,16 +474,19 @@ def test_preallocation_admission_caps_or_errors():
             requested_chunk=40_000,
             bins=20_000,
             itemsize=8,
-            budget_bytes=1_000_000,
+            budget_bytes=100_000,
         )
 
 
 def test_preallocation_admission_minimum_chunk_env_override(monkeypatch):
     kwargs = dict(requested_chunk=1_000, bins=2_000_000, itemsize=4, budget_bytes=13 * GIB)
     kwargs["intermediates"] = 8
+    # No default floor: 13 GiB // (8 * 4 * 2e6) = 217 segments is admitted.
+    assert admitted_chunk(**kwargs) == 13 * GIB // (8 * 4 * 2_000_000)
+
+    monkeypatch.setenv("PYRITE_MC_MIN_CHUNK", "1000")
     with pytest.raises(_backend.BackendResourceError, match="cannot admit"):
         admitted_chunk(**kwargs)
-
     monkeypatch.setenv("PYRITE_MC_MIN_CHUNK", "100")
     assert admitted_chunk(**kwargs) == 13 * GIB // (8 * 4 * 2_000_000)
 
@@ -616,3 +619,35 @@ def test_cpu_spectrum_backend_restores_backend() -> None:
         runner._spectrum_mod.xp,
         runner._spectrum_mod.REAL,
     ) == original
+
+
+def test_wide_brem_grid_admits_below_the_old_1000_segment_floor():
+    # hopg_high_energy: 399_999 brem bins, 8 fp32 intermediates, 11.14 GiB budget.
+    chunk = admitted_chunk(
+        requested_chunk=150,
+        bins=399_999,
+        itemsize=4,
+        budget_bytes=int(11.14 * GIB),
+        intermediates=8,
+    )
+    assert chunk == 150
+    assert (
+        admitted_chunk(
+            requested_chunk=100_000,
+            bins=399_999,
+            itemsize=4,
+            budget_bytes=int(11.14 * GIB),
+            intermediates=8,
+        )
+        == 934
+    )
+
+
+def test_startup_plan_targets_the_widest_later_case():
+    from pyrite.montecarlo.runner.scheduling import _most_demanding_cases
+
+    narrow = {"E_grid": [1.0, 2.0], "E_grid_brem": [1.0, 2.0]}
+    wide = {"E_grid": [1.0, 2.0, 3.0, 4.0], "E_grid_brem": [1.0, 2.0, 3.0]}
+
+    assert _most_demanding_cases([narrow, wide]) == [wide]
+    assert _most_demanding_cases([wide, narrow]) == [wide]

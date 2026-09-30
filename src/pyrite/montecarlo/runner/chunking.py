@@ -136,7 +136,7 @@ def _adaptive_chunk(nbins, *, intermediates=3):
     per_row_bytes = int(intermediates) * nbins * itemsize
 
     requested = max(
-        1000,
+        1,
         min(
             1_000_000 * _RESOURCE_POLICY.spec_budget_mb // per_row_bytes,
             100_000,

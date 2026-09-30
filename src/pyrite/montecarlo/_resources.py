@@ -93,11 +93,13 @@ def admitted_chunk(
     intermediates: int = 3,
     minimum_chunk: int | None = None,
 ) -> int:
-    """Cap chunk before allocation; fail when even minimum cannot fit.
+    """Cap chunk to the device budget before allocation.
 
-    ``minimum_chunk`` defaults to ``PYRITE_MC_MIN_CHUNK`` or 1000. Lowering it
-    keeps very wide grids on the device at smaller chunks; chunking only
-    partitions a sum over segments, so it changes speed, not results.
+    Returns ``min(requested_chunk, cap)`` and fails only when not even one
+    segment fits (``cap < 1``). ``minimum_chunk`` defaults to
+    ``PYRITE_MC_MIN_CHUNK`` when set, else 1; an explicit floor makes smaller
+    caps fail. Chunking only partitions a sum over segments, so it changes
+    speed, not results.
     """
 
     if budget_bytes is None or bins <= 0:
@@ -117,7 +119,7 @@ def admitted_chunk(
 def _minimum_chunk() -> int:
     raw = env_value("PYRITE_MC_MIN_CHUNK", "").strip()
     if not raw:
-        return 1_000
+        return 1
     try:
         value = int(raw)
     except ValueError:

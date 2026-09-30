@@ -93,7 +93,7 @@ chunking or a backend can alter floating-point reduction order.
 | variable | format and unset behavior | owner |
 |---|---|---|
 | `PYRITE_MC_SPEC_CHUNK`, `PYRITE_MC_BREM_CHUNK` | Positive segments-per-spectrum/brems chunk; unset `0` selects adaptive sizing. Explicit CLI chunk options win. | `runner.chunking` |
-| `PYRITE_MC_MIN_CHUNK` | Positive smallest segment chunk the device budget must admit before a case falls back to CPU; unset `1000`. Malformed or non-positive values raise. Lower it to keep very wide grids on the GPU at smaller chunks. | `montecarlo._resources` |
+| `PYRITE_MC_MIN_CHUNK` | Positive smallest segment chunk the device budget must admit before a case falls back to CPU; unset `1` (chunks follow the budget; only a single segment that cannot fit falls back). Malformed or non-positive values raise. Raise it to force CPU fallback for grids whose chunks would be too small to be efficient. | `montecarlo._resources` |
 | `PYRITE_MC_SPEC_BUDGET_MB` | Positive MiB spectrum working-set budget; unset is `min(1920, resolved device budget)`. | `runner.chunking` |
 | `PYRITE_MC_FREE_EVERY` | Positive case cadence for releasing GPU-pool blocks; unset comes from the resource policy. | `runner.chunking` |
 | `PYRITE_MC_FREE_WATERMARK_MB` | Positive MiB free-memory watermark; unset `0` disables the watermark. | `runner.chunking` |
