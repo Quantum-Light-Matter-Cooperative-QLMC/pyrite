@@ -9,7 +9,6 @@ with::
 then open ``docs/_build/html/index.html``.
 """
 
-import logging
 import os
 import sys
 import tempfile
@@ -28,10 +27,6 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from pyrite import __version__
-
-# Missing optional Mott tables are a documented runtime fallback, not a docs
-# build diagnostic; importing the full API otherwise logs one warning per element.
-logging.getLogger("pyrite.materials.catalog").setLevel(logging.ERROR)
 
 # Catalog schema classes keep their historical public ``__module__`` for
 # pickle compatibility. During this documentation process only, point Sphinx's

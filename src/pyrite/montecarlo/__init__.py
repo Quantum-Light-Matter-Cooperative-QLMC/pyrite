@@ -117,10 +117,9 @@ from .spectrum import (
     mc_spectrum_solid_angle,
 )
 from .transport import (
-    _NO_MOTT,
     A0_SQ_CM2,
-    MOTT_DIR,
     TRANSPORT_ELEMENTS,
+    MottTableUnavailableError,
     _alpha_from_first_moment,
     _alpha_sr_joy,
     _dEds_bs_compound,
@@ -135,6 +134,7 @@ from .transport import (
     _sample_cos_theta,
     _sigma_browning_cm2,
     beta_from_keV,
+    mott_tables_dir,
     simulate_trajectories,
 )
 
@@ -155,7 +155,8 @@ __all__ = [
     "_stack_tau",
     # transport
     "TRANSPORT_ELEMENTS",
-    "MOTT_DIR",
+    "MottTableUnavailableError",
+    "mott_tables_dir",
     "A0_SQ_CM2",
     "beta_from_keV",
     "_sigma_browning_cm2",
@@ -163,7 +164,6 @@ __all__ = [
     "_alpha_from_first_moment",
     "_load_mott_transport",
     "_mott_alpha_table",
-    "_NO_MOTT",
     "_sample_cos_theta",
     "_dEds_keV_per_ang",
     "_dEds_compound",

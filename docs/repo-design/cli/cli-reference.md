@@ -781,6 +781,8 @@ Commands:
                            PYRITE_XSGEN_ELSEPA_SOURCE; ../elsepa-2020
     xsgen.sbethe_source    SBETHE source tree for table generation.
                            PYRITE_XSGEN_SBETHE_SOURCE; ../sbethe
+    mott.tables_dir        NIST SRD 64 tables you downloaded, for 'mott'.
+                           PYRITE_MOTT_TABLES_DIR; unset
 ```
 
 ## `pyrite config get`
@@ -840,6 +842,8 @@ Options:
                            PYRITE_XSGEN_ELSEPA_SOURCE; ../elsepa-2020
     xsgen.sbethe_source    SBETHE source tree for table generation.
                            PYRITE_XSGEN_SBETHE_SOURCE; ../sbethe
+    mott.tables_dir        NIST SRD 64 tables you downloaded, for 'mott'.
+                           PYRITE_MOTT_TABLES_DIR; unset
 ```
 
 ## `pyrite config unset`

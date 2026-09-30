@@ -71,45 +71,49 @@ def test_titanium_transport_parameters():
     }
 
 
-def test_niobium_transport_parameters_and_fallback(monkeypatch):
+def test_niobium_transport_parameters():
     params = TRANSPORT_ELEMENTS["Nb"]
     assert params == {"Z": 41, "A": pytest.approx(92.906, abs=0.001), "J_keV": 0.417}
 
-    mott_calls = []
+
+def test_mott_missing_table_raises_naming_config_key(monkeypatch, tmp_path):
+    """No SRD 64 table: ``"mott"`` fails naming the fix, never SR angles (#263)."""
     fallback_calls = []
-    original_fallback = transport._sample_cos_theta_sr_numba
-
-    def missing_mott_table(element, Z):
-        mott_calls.append((element, Z))
-        raise FileNotFoundError
-
-    def spy_fallback(Z, E_keV, R):
-        fallback_calls.append((Z, E_keV.copy(), R.copy()))
-        return original_fallback(Z, E_keV, R)
-
-    # Patched on the owning submodule, not the package re-export: `_sample_cos_theta`
-    # resolves `_mott_alpha_table`/`_sample_cos_theta_sr_numba` in its own module
-    # globals (transport.scattering), which a patch on the package object never touches.
-    monkeypatch.setattr(transport.scattering, "_mott_alpha_table", missing_mott_table)
-    monkeypatch.setattr(transport.scattering, "_sample_cos_theta_sr_numba", spy_fallback)
-
-    previous_no_mott = set(transport._NO_MOTT)
-    transport._NO_MOTT.discard("Nb")
+    monkeypatch.setattr(
+        transport.scattering,
+        "_sample_cos_theta_sr_numba",
+        lambda *args: fallback_calls.append(args),
+    )
+    monkeypatch.setenv("PYRITE_MOTT_TABLES_DIR", str(tmp_path))
     energies = np.array([30.0, 25.0])
-    try:
+    with pytest.raises(transport.MottTableUnavailableError, match=r"mott\.tables_dir") as err:
         transport._sample_cos_theta(41, energies, np.random.default_rng(1), "mott", "Nb")
-        transport._sample_cos_theta(41, energies, np.random.default_rng(2), "mott", "Nb")
+    assert "DisplayCalcTCSTableForNb.csv" in str(err.value)
+    assert "srdata.nist.gov/srd64" in str(err.value)
+    assert fallback_calls == []
 
-        assert mott_calls == [("Nb", 41)]
-        assert len(fallback_calls) == 2
-        for called_Z, called_energies, random_draws in fallback_calls:
-            assert called_Z == 41
-            np.testing.assert_array_equal(called_energies, energies)
-            assert random_draws.shape == energies.shape
-        assert "Nb" in transport._NO_MOTT
-    finally:
-        transport._NO_MOTT.clear()
-        transport._NO_MOTT.update(previous_no_mott)
+    monkeypatch.delenv("PYRITE_MOTT_TABLES_DIR")
+    with pytest.raises(transport.MottTableUnavailableError, match="is not set"):
+        transport._mott_alpha_table("Nb", 41)
+
+
+def test_mott_missing_table_fails_layer_tables_before_transport(monkeypatch, tmp_path):
+    from pyrite.montecarlo.transport.layer_tables import build_layer_tables
+
+    monkeypatch.setenv("PYRITE_MOTT_TABLES_DIR", str(tmp_path))
+    layers = [(0.0, 1.0e4, [("Si", 0.05)])]
+    with pytest.raises(transport.MottTableUnavailableError, match="Si"):
+        build_layer_tables(layers, "mott", None)
+    # Other models never read the tables.
+    build_layer_tables(layers, "sr", None)
+
+
+def test_synthetic_mott_fixture_reproduces_analytic_screening():
+    """The test fixture's tables calibrate back to Joy/Bishop alpha (see helper)."""
+    logE, logA = transport._mott_alpha_table("Si", 14)
+    energy_keV = np.logspace(-1.5, 4.5, 200)
+    alpha = 10.0 ** np.interp(np.log10(energy_keV * 1e3), logE, logA)
+    np.testing.assert_allclose(alpha, transport._alpha_sr_joy(14, energy_keV), rtol=1e-12)
 
 
 @pytest.mark.parametrize(
@@ -123,48 +127,6 @@ def test_niobium_transport_parameters_and_fallback(monkeypatch):
 )
 def test_new_element_transport_parameters(element, expected):
     assert TRANSPORT_ELEMENTS[element] == expected
-
-
-@pytest.mark.parametrize(("element", "Z"), [("Fe", 26), ("Bi", 83), ("Re", 75), ("Ta", 73)])
-def test_new_elements_use_analytic_fallback_without_mott_table(monkeypatch, element, Z):
-    mott_calls = []
-    fallback_calls = []
-    original_fallback = transport._sample_cos_theta_sr_numba
-
-    def missing_mott_table(called_element, called_Z):
-        mott_calls.append((called_element, called_Z))
-        raise FileNotFoundError
-
-    def spy_fallback(Z, E_keV, R):
-        fallback_calls.append((Z, E_keV.copy(), R.copy()))
-        return original_fallback(Z, E_keV, R)
-
-    # Patched on the owning submodule, not the package re-export: `_sample_cos_theta`
-    # resolves `_mott_alpha_table`/`_sample_cos_theta_sr_numba` in its own module
-    # globals (transport.scattering), which a patch on the package object never touches.
-    monkeypatch.setattr(transport.scattering, "_mott_alpha_table", missing_mott_table)
-    monkeypatch.setattr(transport.scattering, "_sample_cos_theta_sr_numba", spy_fallback)
-
-    previous_no_mott = set(transport._NO_MOTT)
-    transport._NO_MOTT.discard(element)
-    energies = np.array([30.0, 25.0])
-    try:
-        cos_theta = transport._sample_cos_theta(
-            Z, energies, np.random.default_rng(1), "mott", element
-        )
-        transport._sample_cos_theta(Z, energies, np.random.default_rng(2), "mott", element)
-
-        assert mott_calls == [(element, Z)]
-        assert len(fallback_calls) == 2
-        for called_Z, called_energies, random_draws in fallback_calls:
-            assert called_Z == Z
-            np.testing.assert_array_equal(called_energies, energies)
-            assert random_draws.shape == energies.shape
-        assert np.all((-1.0 <= cos_theta) & (cos_theta <= 1.0))
-        assert element in transport._NO_MOTT
-    finally:
-        transport._NO_MOTT.clear()
-        transport._NO_MOTT.update(previous_no_mott)
 
 
 def test_hbn_composition_runs_transport():

@@ -964,17 +964,3 @@ def _parse_energy_grids(raw: object, errors: _Errors) -> dict[str, LineGridByEne
         if rows is not None:
             out[material_key] = rows
     return out
-
-
-def _warn_missing_mott(materials: Mapping[str, MaterialSpec], crystals, media) -> None:
-    elements = set()
-    for material in materials.values():
-        elements.update(_material_elements(material, crystals, media))
-    mott_dir = DATA_DIR / "mott_transport_cross_sections"
-    for element in sorted(elements):
-        path = mott_dir / f"DisplayCalcTCSTableFor{element}.csv"
-        if not path.exists():
-            logger.warning(
-                "material catalog: no Mott transport table for %s; transport will use the analytic fallback",
-                element,
-            )

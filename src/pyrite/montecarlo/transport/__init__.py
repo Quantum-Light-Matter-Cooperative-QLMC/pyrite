@@ -40,7 +40,8 @@ from .kinematics import (
 )
 
 from .scattering import (
-    MOTT_DIR,
+    MottTableUnavailableError,
+    mott_tables_dir,
     A0_SQ_CM2,
     _sigma_browning_cm2,
     _sigma_browning_cm2_scalar,
@@ -50,7 +51,6 @@ from .scattering import (
     _alpha_from_first_moment,
     _load_mott_transport,
     _mott_alpha_table,
-    _NO_MOTT,
     _scatter_rates_mott_scalar,
     _scatter_rates_sr_scalar,
     _sample_cos_theta_sr_numba,

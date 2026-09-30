@@ -107,8 +107,8 @@ change.
   - none (removed)
   - Deleted; nothing read it.
 * - `mott_transport_cross_sections/`
-  - a, pending licence
-  - Unchanged; blocked on the NIST finding in decision 6.
+  - none (removed)
+  - Deleted: NIST SRD 64 may not be redistributed (decision 6). `elastic_model="mott"` reads user-downloaded tables from `mott.tables_dir`.
 ```
 
 ### Accepted decisions
@@ -142,7 +142,14 @@ change.
      location.
    - `atomic_scattering_factors/` is deleted.
    - **Mott tables:** redistribution appears prohibited without permission.
-     No action has been taken; a human decision is required.
+     *Decided 2026-09-30 (#263), implemented:* the five CSVs are removed from
+     the tree and the wheel and stay only in Git history (decision 7). The
+     opt-in `elastic_model="mott"` is kept: it reads SRD 64 exports the user
+     downloads into the directory named by the `mott.tables_dir` config key
+     (`PYRITE_MOTT_TABLES_DIR`), and a run fails naming that key and the
+     element when a table is absent. The former silent per-element fallback
+     to analytic screening is gone. Tests use synthetic SRD 64-format tables
+     (`tests/data/mott_srd64_synthetic/`). The finding that led here:
      - The five `DisplayCalcTCSTableFor<El>.csv` files are transport
        cross-section tables exported from NIST SRD 64 (Electron
        Elastic-Scattering Cross-Section Database). The code docstring

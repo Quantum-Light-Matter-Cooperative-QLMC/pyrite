@@ -66,6 +66,24 @@ tables derived or resampled from their output.
   534--572) and its File 23/26 bremsstrahlung totals and photon spectra (MT
   527).
 
+## NIST SRD 64 (not redistributed)
+
+- **Source**: NIST Standard Reference Database 64, *NIST Electron
+  Elastic-Scattering Cross-Section Database*, <https://srdata.nist.gov/srd64/>.
+- **Terms**: NIST Standard Reference Data are copyrighted by the U.S.
+  Secretary of Commerce under the Standard Reference Data Act and may not be
+  reproduced or redistributed without prior permission
+  (<https://www.nist.gov/srd/public-law>).
+- **Nature of PyRITE's use**: PyRITE ships none of it. Earlier revisions
+  packaged five exported transport cross-section tables
+  (`mott_transport_cross_sections/DisplayCalcTCSTableFor<El>.csv`); they were
+  removed from the tree and the wheel under #263 and remain only in Git
+  history. The opt-in `elastic_model="mott"` reads tables each user exports
+  from SRD 64 into the directory named by the `mott.tables_dir` config key.
+  The test suite uses synthetic tables in the same file format
+  (`tests/data/mott_srd64_synthetic/`), whose numbers are computed from an
+  analytic formula and are not NIST data.
+
 ELSEPA and SBETHE are both CC BY-NC 3.0. PyRITE is itself distributed for
 academic/nonprofit use only, so the NonCommercial clause imposes no
 additional restriction, and neither carries ShareAlike, so no copyleft

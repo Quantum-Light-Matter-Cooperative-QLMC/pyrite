@@ -41,6 +41,7 @@ _SETTINGS = {
     "xsgen.bremslib_source": ("PYRITE_XSGEN_BREMSLIB_SOURCE", "../BremsLib_v2.0.8"),
     "xsgen.elsepa_source": ("PYRITE_XSGEN_ELSEPA_SOURCE", "../elsepa-2020"),
     "xsgen.sbethe_source": ("PYRITE_XSGEN_SBETHE_SOURCE", "../sbethe"),
+    "mott.tables_dir": ("PYRITE_MOTT_TABLES_DIR", ""),
 }
 
 # One-line help per key, shown by ``pyrite config --help`` / ``config set --help``.
@@ -56,10 +57,12 @@ _DESCRIPTIONS = {
     "xsgen.bremslib_source": "BremsLib source tree for table generation.",
     "xsgen.elsepa_source": "ELSEPA source tree for table generation.",
     "xsgen.sbethe_source": "SBETHE source tree for table generation.",
+    "mott.tables_dir": "NIST SRD 64 tables you downloaded, for 'mott'.",
 }
 # Built-in defaults that read better as a phrase than as their raw value.
 _DEFAULT_LABELS = {
     "remote.target": "unset",
+    "mott.tables_dir": "unset",
     "workspace.root": "current directory",
     "catalog.path": "bundled catalog",
 }

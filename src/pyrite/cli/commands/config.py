@@ -57,6 +57,11 @@ def _validated(key: str, value: str) -> str:
         return str(Path(value).expanduser().resolve())
     if key.startswith("xsgen."):
         return _validated_code_source(key, value)
+    if key == "mott.tables_dir":
+        path = Path(value).expanduser().resolve()
+        if not path.is_dir():
+            raise click.BadParameter(f"{path} is not a directory", param_hint="VALUE")
+        return str(path)
     if key == "profile.current":
         from ...materials import CATALOG
 

@@ -70,10 +70,10 @@ The asymmetry with the X-ray side is intentional and worth stating plainly:
   - one hand-added row with citations
 * - Mott elastic transport cross sections
   - NIST SRD 64 CSV per element
-  - a downloaded table, or accept the analytic fallback
+  - a user-downloaded table (`elastic_model="mott"` only)
 ```
 
-Only five elements — C, Si, Ge, Se, Mo — ship NIST Mott transport tables. Everything else falls back to the analytic screened-Rutherford screening parameter; see [Elastic scattering](../beam-transport/elastic-scattering.md) for what that fallback does and does not preserve. So an element can be fully supported for X-ray couplings, adequately supported for stopping and bremsstrahlung, and still be on the approximate branch for elastic deflection — three different coverage tiers over the same periodic table.
+PyRITE ships no NIST Mott transport tables: NIST SRD 64 may not be redistributed (#263). The opt-in `elastic_model="mott"` reads tables the user downloads and fails naming the element when one is missing; the default ELSEPA model and the analytic `"sr"` model need none. See [Elastic scattering](../beam-transport/elastic-scattering.md#installing-the-mott-tables). So an element can be fully supported for X-ray couplings, adequately supported for stopping and bremsstrahlung, and still need data the user supplies for one elastic model — three different coverage tiers over the same periodic table.
 
 ## Assumptions and limits
 

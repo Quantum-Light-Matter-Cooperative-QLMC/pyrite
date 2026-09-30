@@ -37,7 +37,8 @@ FROZEN_EXPORTS = frozenset(
         "_stack_tau",
         # transport
         "TRANSPORT_ELEMENTS",
-        "MOTT_DIR",
+        "MottTableUnavailableError",
+        "mott_tables_dir",
         "A0_SQ_CM2",
         "beta_from_keV",
         "_sigma_browning_cm2",
@@ -45,7 +46,6 @@ FROZEN_EXPORTS = frozenset(
         "_alpha_from_first_moment",
         "_load_mott_transport",
         "_mott_alpha_table",
-        "_NO_MOTT",
         "_sample_cos_theta",
         "_dEds_keV_per_ang",
         "_dEds_compound",

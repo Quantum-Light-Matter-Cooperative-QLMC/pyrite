@@ -10,7 +10,7 @@ import logging
 import numpy as np
 
 from ...materials._transport_data import TRANSPORT_ELEMENTS
-from .scattering import _NO_MOTT, _flatten_mott_tables, _mott_alpha_table, pack_elsepa_tables
+from .scattering import _flatten_mott_tables, _mott_alpha_table, pack_elsepa_tables
 from .stopping import _element_crossover_keV
 
 logger = logging.getLogger(__name__)
@@ -57,13 +57,9 @@ def build_layer_tables(layers, elastic_model, elastic_tables):
             coeff_arr.append(coeff_i)
             E_cross_arr.append(_element_crossover_keV(el, Z_i, A_i, J_i))
 
-            table = None
-            if elastic_model == "mott" and el not in _NO_MOTT:
-                try:
-                    table = _mott_alpha_table(el, Z_i)
-                except FileNotFoundError:
-                    logger.debug("No NIST Mott table for %s; using analytic SR angles", el)
-                    _NO_MOTT.add(el)
+            # A missing SRD 64 table raises MottTableUnavailableError here,
+            # before any transport runs, instead of degrading to SR angles.
+            table = _mott_alpha_table(el, Z_i) if elastic_model == "mott" else None
             layer_mott_tables.append(table)
 
         L_Zs.append(np.asarray(Z_arr, dtype=float))

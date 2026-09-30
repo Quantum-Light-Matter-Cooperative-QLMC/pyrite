@@ -24,6 +24,13 @@ os.environ["PYRITE_MC_BACKEND"] = _TEST_BACKEND
 # depend on it nor write generated tables into it. Drop it before any module
 # resolves import-time workspace defaults; tests that exercise it set their own.
 os.environ.pop("PYRITE_HOME", None)
+# PyRITE ships no NIST SRD 64 tables (#263); a real user configures
+# ``mott.tables_dir``. Point ``elastic_model="mott"`` at the synthetic
+# SRD 64-format fixture, whose numbers reproduce the analytic Joy/Bishop
+# screening (``tests/helpers/mott_synthetic.py``). Set at import so module- and
+# session-scoped fixtures see it too; tests of the missing-table error unset it.
+MOTT_SYNTHETIC_DIR = Path(__file__).parent / "data" / "mott_srd64_synthetic"
+os.environ["PYRITE_MOTT_TABLES_DIR"] = str(MOTT_SYNTHETIC_DIR)
 
 try:
     import pyarrow  # noqa: F401
