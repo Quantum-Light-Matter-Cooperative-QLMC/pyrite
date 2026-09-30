@@ -113,7 +113,9 @@ def test_geometry_then_acquisition_makes_a_counting_observation(catalog) -> None
     assert "response: ideal (default)" in human.stdout
     assert "scalar projection used by sweeps: observation angle 60 deg" in human.stdout
     shown = invoke(profile.command, ["show", "standard"])
-    assert "superseded by the physical detector's projection" in shown.stdout
+    assert "    physical: pixel\n" in shown.stdout
+    assert "      observation angle: 60 deg\n" in shown.stdout
+    assert "      acquisition: {'exposure_s': 2.0" in shown.stdout
 
 
 def test_reporting_axis_spellings_replace_each_other(catalog) -> None:

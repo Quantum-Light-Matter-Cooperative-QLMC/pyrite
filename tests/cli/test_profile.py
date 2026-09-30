@@ -192,8 +192,8 @@ def test_show_and_bare_name_alias(tmp_path, monkeypatch):
     assert "[sub_100keV]" in shown.stdout
     assert "energy: [30, 50]" in shown.stdout
     assert "materials: hopg" in shown.stdout
-    assert "  detector: none\n" in shown.stdout
-    assert "physical detector: none" in shown.stdout
+    assert "  detectors:\n    default: scalar\n" in shown.stdout
+    assert "pixel" not in shown.stdout
     assert "emission: incoherent (default)" in shown.stdout
     assert "straggling: False (default)" in shown.stdout
     assert "energy model: midpoint (default)" in shown.stdout

@@ -653,15 +653,8 @@ def _resolved_run(args, material):
         # sweep (same catalog_profile/fidelity, no beam/tilt overrides) exposes
         # the valid line-grid energies; _select_quick_energies keeps the standard
         # profile's [30, 50] bit-for-bit where both are valid.
-        probe = (
-            material_sweep(material, catalog_profile=catalog_profile, detector_id=detector_id)
-            if fidelity == "full"
-            else material_sweep(
-                material,
-                fidelity=fidelity,
-                catalog_profile=catalog_profile,
-                detector_id=detector_id,
-            )
+        probe = material_sweep(
+            material, fidelity=fidelity, catalog_profile=catalog_profile, detector_id=detector_id
         )
         overrides.update(
             # Start at 5 deg, not 0: tilt=0 is a banned emission geometry
@@ -679,18 +672,12 @@ def _resolved_run(args, material):
         overrides["beam_uvw"] = tuple(args.beam_uvw)
     # Analytic beam settings remain profile-owned. Explicit GDF overrides
     # participate in dataset identity and force a variant checkpoint stem.
-    sweep = (
-        material_sweep(
-            material, catalog_profile=catalog_profile, detector_id=detector_id, **overrides
-        )
-        if fidelity == "full"
-        else material_sweep(
-            material,
-            fidelity=fidelity,
-            catalog_profile=catalog_profile,
-            detector_id=detector_id,
-            **overrides,
-        )
+    sweep = material_sweep(
+        material,
+        fidelity=fidelity,
+        catalog_profile=catalog_profile,
+        detector_id=detector_id,
+        **overrides,
     )
 
     # Legacy remote records may carry a high-energy floor. Preserve that private

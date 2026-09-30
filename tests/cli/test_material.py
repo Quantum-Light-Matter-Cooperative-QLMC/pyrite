@@ -227,6 +227,7 @@ def test_simulate_formats_result_and_uses_single_scene_api(monkeypatch):
             "acquisition",
             "numerics",
             "incoherent",
+            "pixel_a",
         ),
     )
 
@@ -248,10 +249,12 @@ def test_simulate_formats_result_and_uses_single_scene_api(monkeypatch):
     assert calls[0][1]["pixel_scorer"] == "scorer"
     assert calls[0][1]["acquisition"] == "acquisition"
     assert payload["acquisition"] is None
+    assert payload["detector_id"] == "pixel_a"
 
     wide = invoke(material.command, ["simulate", "hopg", "-o", "wide"])
     assert_clean_result(wide)
     assert "material=hopg" in wide.stdout
+    assert "detector=pixel_a" in wide.stdout
 
 
 def test_simulate_json_reports_resolution_errors(monkeypatch):
@@ -317,7 +320,7 @@ def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
     from pyrite.instrument import FilterPlate, PlanarDetector
 
     document = _single_scene_catalog(tmp_path, monkeypatch)
-    beam, target, detector, filters, scorer, acquisition, numerics, emission = (
+    beam, target, detector, filters, scorer, acquisition, numerics, emission, detector_id = (
         material._simulation_scene(document, "hopg", "single")
     )
 
@@ -334,6 +337,7 @@ def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
     assert numerics.straggling is True
     assert numerics.energy_model == "midpoint"
     assert emission == "incoherent"
+    assert detector_id == "physical"
     assert scorer.angular_shape == (1, 1)
     assert acquisition is None
 
@@ -353,7 +357,7 @@ exposure_s = 2.0
 measured_edges_eV = [0.0, 100.0, 200.0]
 """,
     )
-    _beam, _target, detector, _filters, scorer, acquisition, _numerics, _emission = (
+    _beam, _target, detector, _filters, scorer, acquisition, _numerics, _emission, _id = (
         material._simulation_scene(document, "hopg", "single")
     )
 

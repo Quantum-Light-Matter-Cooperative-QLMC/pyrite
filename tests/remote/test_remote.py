@@ -1024,14 +1024,16 @@ def test_stems_predicts_qualified_stem_for_non_standard_catalog_profile(monkeypa
 
     calls = []
 
-    def fake_named_profile_stem(material, fidelity, *, catalog_profile="standard"):
-        calls.append((material, fidelity, catalog_profile))
+    def fake_named_profile_stem(
+        material, fidelity, *, catalog_profile="standard", detector_id=None
+    ):
+        calls.append((material, fidelity, catalog_profile, detector_id))
         return f"{material}--{fidelity}-qualified"
 
     monkeypatch.setattr(profiles_module, "named_profile_stem", fake_named_profile_stem)
 
     assert scripts._stems(["mos2"], False, catalog_profile="sub_100keV") == ["mos2--full-qualified"]
-    assert calls == [("mos2", "full", "sub_100keV")]
+    assert calls == [("mos2", "full", "sub_100keV", "default")]
 
 
 def test_queue_script_and_stem_resolve_survey_profile():
@@ -4176,14 +4178,17 @@ def test_profile_checkpoint_stems_discovers_previous_profile_identity(monkeypatc
     old = "hopg@hopg_hbn-111111111111"
     same_label_variant = "hbn@hopg_hbn-222222222222"
     unrelated = "hopg@other-333333333333"
+    detector_labelled = "hopg@pixel_a-444444444444"
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda _command: f"{old}\n{same_label_variant}\n{unrelated}\n",
+        lambda _command: f"{old}\n{same_label_variant}\n{unrelated}\n{detector_labelled}\n",
     )
     identities = {
         old: {"catalog_profile": "hopg_hbn"},
         same_label_variant: {"catalog_profile": "standard", "variant": "hopg_hbn"},
+        unrelated: {"catalog_profile": "other"},
+        detector_labelled: {"catalog_profile": "hopg_hbn", "detector_id": "pixel_a"},
     }
     monkeypatch.setattr(
         lifecycle_pull,
@@ -4197,6 +4202,7 @@ def test_profile_checkpoint_stems_discovers_previous_profile_identity(monkeypatc
     ) == [
         old,
         "hopg@hopg_hbn-aaaaaaaaaaaa",
+        detector_labelled,
     ]
 
 
