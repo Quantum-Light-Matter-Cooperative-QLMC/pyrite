@@ -12,6 +12,7 @@ development-workspace
 documentation
 configuration-resolution
 materials-catalog-schema
+data-distribution-and-repository-size
 core-architecture-rfc
 ../repo_map
 ```
