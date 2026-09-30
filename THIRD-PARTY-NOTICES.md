@@ -10,7 +10,7 @@ per issue #162.
 
 None of PyRITE's own source is licensed under any of the terms below. This
 file exists to satisfy the attribution obligations that follow from
-redistributing these codes, from invoking them, and from redistributing
+redistributing or downloading these codes and data, from invoking them, and from redistributing
 tables derived or resampled from their output.
 
 ## EPICS2025 EADL atomic relaxation data
@@ -24,8 +24,9 @@ tables derived or resampled from their output.
   <https://nuclear.llnl.gov/EPICS/ENDF2025/EADL2025.ALL>, evaluated August
   2023 and distributed January 2025. SHA-256:
   `78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c`.
-- **Nature of PyRITE's use**: PyRITE redistributes the published file unchanged
-  and reads its File 28 (MT 533) subshell binding energies, occupancies, and
+- **Nature of PyRITE's use**: PyRITE does not ship the file. `pyrite tables
+  fetch eadl` downloads the published file unchanged from the URL above into
+  the user's data directory, and PyRITE reads its File 28 (MT 533) subshell binding energies, occupancies, and
   radiative and nonradiative transition data for the characteristic-radiation
   relaxation cascade.
 
@@ -59,10 +60,14 @@ tables derived or resampled from their output.
   [EPICS2025 distribution page](https://nuclear.llnl.gov/EPICS/index.html).
 - **Source**: the unmodified ENDF-6 file from
   <https://nuclear.llnl.gov/EPICS/ENDF2025/EEDL2025.ALL>, evaluated August
-  2023 and distributed January 2025, packaged as `EEDL.endf`. SHA-256:
-  `f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c`.
-- **Nature of PyRITE's use**: PyRITE redistributes the published file unchanged
-  and reads its File 23 subshell electroionization cross sections (MT
+  2023 and distributed January 2025, installed as `EEDL.endf`. SHA-256 of
+  the installed bytes:
+  `f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c` (the
+  published file with its final CRLF removed; see
+  `src/pyrite/data/characteristic_cross_sections/README.md`).
+- **Nature of PyRITE's use**: PyRITE does not ship the file. `pyrite tables
+  fetch eedl` downloads it from the URL above into the user's data directory,
+  and PyRITE reads its File 23 subshell electroionization cross sections (MT
   534--572) and its File 23/26 bremsstrahlung totals and photon spectra (MT
   527).
 

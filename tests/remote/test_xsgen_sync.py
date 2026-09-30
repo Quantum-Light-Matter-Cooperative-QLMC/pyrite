@@ -53,13 +53,14 @@ def test_one_round_trip_carries_both_inventories(monkeypatch):
 
     monkeypatch.setattr(transport, "_ssh_capture", capture)
 
-    artifacts, tables = transport._remote_inventories(artifacts=True, tables=True)
+    artifacts, tables, datasets = transport._remote_inventories(artifacts=True, tables=True)
 
     assert len(commands) == 1
     assert "energy-grid-artifacts" in commands[0] and "/remote/xsgen/tables" in commands[0]
     assert ".local/share}/pyrite/xsgen/tables" in commands[0]  # legacy migration
     assert artifacts == frozenset({digest})
     assert tables == {f"{KEY_A}.npz": "c" * 64}
+    assert datasets == {}
 
 
 def test_missing_section_marker_fails_closed(monkeypatch):
@@ -120,7 +121,7 @@ def test_stamp_renders_tables_digest_only_when_present():
     assert with_tables.render().endswith(f"code_tables_digest: {'f' * 64}\n")
 
 
-def _sync(tmp_path, monkeypatch, local, remote):
+def _sync(tmp_path, monkeypatch, local, remote, datasets=None, remote_datasets=None):
     root = tmp_path / "repo"
     (root / "src").mkdir(parents=True, exist_ok=True)
     (root / "src" / "m.py").write_text("X = 1\n")
@@ -128,6 +129,7 @@ def _sync(tmp_path, monkeypatch, local, remote):
     monkeypatch.setattr(config, "SYNC_PATHS", ["src"])
     monkeypatch.setattr(config, "REMOTE_DIR", "/remote")
     monkeypatch.setattr(transport, "_local_xsgen_tables", lambda: local)
+    monkeypatch.setattr(transport, "_local_datasets", lambda: datasets or {})
     captured = []
 
     def capture(command):
@@ -135,19 +137,28 @@ def _sync(tmp_path, monkeypatch, local, remote):
             return ""
         captured.append(command)
         body = "".join(f"{d}  ./{n}\n" for n, d in remote.items())
-        return transport._XSGEN_SECTION_MARK + "\n" + body
+        out = transport._XSGEN_SECTION_MARK + "\n" + body
+        if transport._DATASET_SECTION_MARK in command:
+            out += transport._DATASET_SECTION_MARK + "\n"
+            out += "".join(f"{d}  {n}\n" for n, d in (remote_datasets or {}).items())
+        return out
 
     monkeypatch.setattr(transport, "_ssh_capture", capture)
     archived, commands = [], []
+    contents = {}
 
     def fake_run(argv, **kwargs):
         commands.append(argv)
         if argv[0] == "scp":
             with tarfile.open(argv[1], "r:gz") as bundle:
                 archived.extend(bundle.getnames())
+                for member in bundle.getmembers():
+                    if member.name.startswith("datasets/"):
+                        contents[member.name] = bundle.extractfile(member).read()
 
     monkeypatch.setattr(transport, "_run", fake_run)
     transport.sync_code()
+    _sync.contents = contents
     return archived, commands, captured
 
 
@@ -205,7 +216,7 @@ def test_local_tables_skip_packaged_tier_and_unpaired_files(tmp_path, monkeypatc
 
 def test_job_script_preflights_tables_and_fails_fast_before_the_sweep():
     block = _queue_scripts._tables_preflight_block()
-    assert "pyrite tables verify" in block
+    assert "pyrite tables verify --require bremslib,elsepa,eedl,eadl" in block
     assert 'echo "FAILED (tables)' in block
     assert "exit 1" in block
     assert "PYRITE_HOME=" in block
@@ -247,3 +258,82 @@ def test_generated_script_stops_in_preflight_before_any_transport(monkeypatch, t
     assert "missing: elsepa Z=6" in (jobdir / "log").read_text()
     assert not ran.exists()
     assert not (jobdir / ".tables_ok").exists()
+
+
+# --- fetched datasets ----------------------------------------------------------
+
+EEDL_ARC = "datasets/eedl/EEDL.endf"
+EADL_ARC = "datasets/eadl/EADL2025.ALL"
+
+
+def _datasets(tmp_path):
+    root = tmp_path / "datasets"
+    found = {}
+    for arc, data in ((EEDL_ARC, b"eedl record\r\n"), (EADL_ARC, b"eadl record\r\n")):
+        path = tmp_path / arc
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        found[arc] = path
+    assert root.is_dir()
+    return found
+
+
+def test_dataset_inventory_migrates_legacy_copies_and_parses_known_names(monkeypatch):
+    monkeypatch.setattr(config, "REMOTE_DIR", "/remote")
+    command = transport._dataset_inventory_command()
+    assert "cd /remote" in command
+    assert "cp -n src/pyrite/data/characteristic_cross_sections/EEDL.endf" in command
+    assert "datasets/eedl/EEDL.endf" in command
+    out = f"{'c' * 64}  {EEDL_ARC}\n{'d' * 64}  datasets/eedl/notes.txt\n"
+    assert transport._parse_dataset_inventory(out) == {EEDL_ARC: "c" * 64}
+    with pytest.raises(SystemExit, match="invalid remote dataset inventory"):
+        transport._parse_dataset_inventory("garbage\n")
+
+
+def test_missing_dataset_marker_fails_closed(monkeypatch):
+    monkeypatch.setattr(
+        transport, "_ssh_capture", lambda command: transport._XSGEN_SECTION_MARK + "\n"
+    )
+    with pytest.raises(SystemExit, match="invalid remote dataset inventory"):
+        transport._remote_inventories(artifacts=False, tables=True, datasets=True)
+
+
+def test_sync_ships_datasets_verbatim_once_and_stamps_them(tmp_path, monkeypatch):
+    datasets = _datasets(tmp_path)
+    digests = {arc: _sha(path.read_bytes()) for arc, path in datasets.items()}
+
+    archived, commands, captured = _sync(tmp_path, monkeypatch, {}, {}, datasets, {})
+    assert sorted(n for n in archived if n.startswith("datasets/")) == [EADL_ARC, EEDL_ARC]
+    assert _sync.contents[EEDL_ARC] == b"eedl record\r\n"  # CRLF kept: pins cover it
+    assert len(captured) == 1 and transport._DATASET_SECTION_MARK in captured[0]
+    stamp = f"code_tables_digest: {transport._xsgen_tables_digest(digests)}"
+    assert stamp in commands[-1][3]
+
+    tampered = {**digests, EADL_ARC: "0" * 64}
+    archived, _, _ = _sync(tmp_path, monkeypatch, {}, {}, datasets, tampered)
+    assert [n for n in archived if n.startswith("datasets/")] == [EADL_ARC]
+
+    archived, _, _ = _sync(tmp_path, monkeypatch, {}, {}, datasets, digests)
+    assert not [n for n in archived if n.startswith("datasets/")]
+
+
+def test_sync_refuses_when_a_dataset_is_missing_locally(monkeypatch, tmp_path):
+    from pyrite import datasets
+
+    monkeypatch.setattr(datasets, "datasets_dir", lambda: tmp_path)
+    with pytest.raises(SystemExit, match=r"fix: pyrite tables fetch eedl"):
+        transport._real_local_datasets()
+
+
+def test_local_datasets_map_arcnames_to_verified_files(monkeypatch, tmp_path):
+    from pyrite import datasets
+
+    monkeypatch.setattr(datasets, "datasets_dir", lambda: tmp_path)
+    monkeypatch.setattr(datasets, "verify_dataset", lambda name: datasets.OK)
+
+    found = transport._real_local_datasets()
+
+    assert found == {
+        EEDL_ARC: tmp_path / "eedl" / "EEDL.endf",
+        EADL_ARC: tmp_path / "eadl" / "EADL2025.ALL",
+    }

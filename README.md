@@ -28,6 +28,8 @@ Requires Python ≥3.14 and [uv](https://docs.astral.sh/uv/).
 git clone <repository-url> pyrite
 cd pyrite
 uv sync
+uv run pyrite tables fetch eedl     # EPICS2025 electron data every run reads (25 MB)
+uv run pyrite tables fetch eadl     # EPICS2025 atomic relaxation every run reads (8 MB)
 uv run pyrite tables fetch elsepa   # elastic cross sections the default transport reads
 uv run pyrite tables fetch bremslib # default bremsstrahlung source; without it runs warn and use EEDL
 uv run pyrite config setup   # optional first-run backend detection

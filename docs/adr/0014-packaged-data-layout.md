@@ -90,10 +90,10 @@ change.
   - Still packaged; they move once #167 hosts the archives (decision 3).
 * - `characteristic_cross_sections/EEDL.endf`, `EADL2025.ALL`
   - b
-  - Still packaged; they move after #261 (decision 2).
+  - Moved out of the wheel (decision 2): fetched with `pyrite tables fetch eedl` / `eadl` into `<data root>/datasets/`; the README stays as provenance.
 * - `photon_cross_sections/epdl2025_mf23.npz` (added by #274)
-  - b
-  - Packaged derived table, 1.5 MB, with provenance and modifications note in its README; moves with EEDL/EADL.
+  - a
+  - Stays packaged: derived table, 1.5 MB, provenance and modifications note in its README. Not a verbatim upstream file, so it is not a pinned fetch.
 * - ELSEPA sources and `database/`; `sbethe.f`
   - c
   - Moved to `vendor/xsgen/elsepa/` and `vendor/xsgen/sbethe/`.
@@ -118,12 +118,23 @@ change.
 2. **EEDL and EADL** become a class (b) dataset. They will be fetched from the
    LLNL URLs pinned in the characteristic-cross-sections README and cached in
    the workspace data root.
-   - *Follow-up, not yet implemented:* the move waits until #261 lands, so the
-     box receives the files once through content-addressed sync rather than
-     in every 19.9 MiB code sync.
-   - The follow-up must repoint `montecarlo/eedl_ionization.py` and the
-     bremsstrahlung loader, keep the SHA-256 pins in the model identity
-     markers, and extend the remote preflight.
+   - *Implemented in #263 after #261:* `pyrite/datasets.py` pins both files;
+     `pyrite tables fetch eedl|eadl` downloads them (or copies
+     `--archive PATH`), verifies the SHA-256, and installs them at
+     `<data root>/datasets/<name>/`, the data root being the one xsgen
+     tables use. The EEDL, EADL, characteristic and bremsstrahlung loaders
+     resolve them there, verify the pin before first use, and fail naming
+     the fetch command. The pins and the model identity markers are
+     unchanged.
+   - The published EEDL file ends with one more CRLF than the vetted bytes
+     the pin covers; the fetch accepts either and installs the vetted form
+     (see the characteristic-cross-sections README).
+   - `pyrite remote sync` ships both files once by content digest to
+     `<REMOTE_DIR>/datasets/`, first adopting a pre-#263 code-synced copy on
+     the box; the job preflight is
+     `pyrite tables verify --require bremslib,elsepa,eedl,eadl`.
+   - Nothing downloads implicitly at run time: compute nodes may have no
+     network.
 3. **SBETHE tables** become class (b), with a `sbethe-tables.json` release
    index like ELSEPA's and BremsLib's. *Follow-up:* they move once #167 hosts
    the release archives. Until then they stay packaged, because moving them
@@ -211,13 +222,13 @@ Stages not yet built are projections from the per-entry compressed sizes.
 * - After #263 (decisions 4 and 6)
   - 16.06 (measured)
   - 45.9
+* - Plus decision 2 (EEDL and EADL) and the Mott removal, #263
+  - 7.36 (measured)
+  - 13.1
 * - Plus #264 (BELLS)
-  - about 13.0
-  - about 40.3
+  - about 4.2
+  - about 7.5
 * - Plus decision 3 (SBETHE tables)
-  - about 10.3
-  - about 37.5
-* - Plus decision 2 (EEDL and EADL)
   - about 1.6
   - about 4.7
 ```

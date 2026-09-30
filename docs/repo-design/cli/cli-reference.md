@@ -1579,7 +1579,7 @@ Options:
                                   released BremsLib tables with their angular model when
                                   installed ('pyrite tables fetch bremslib') and warns
                                   and falls back to EEDL otherwise; bremslib requires
-                                  them; eedl is the packaged EEDL continuum with an
+                                  them; eedl is the fetched EEDL continuum with an
                                   isotropic photon angle.
   --radiative-model [auto|uncoupled|bremslib-soft-hard]
                                   Radiative energy loss: auto (default) couples when
@@ -2478,6 +2478,8 @@ Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
     pyrite tables fetch sbethe
     pyrite tables fetch bremslib
     pyrite tables fetch elsepa
+    pyrite tables fetch eedl
+    pyrite tables fetch eadl
     pyrite tables verify
     pyrite tables sources list
     pyrite tables sources set elsepa ../elsepa-2020
@@ -2492,13 +2494,13 @@ Commands:
   path      Print the directory your generated tables...
   show      Print the provenance manifest for the...
   sources   Show and configure where the external code...
-  verify    Check that every pinned release table is...
+  verify    Check that every pinned release table and...
 ```
 
 ## `pyrite tables fetch`
 
 ```text
-Usage: pyrite tables fetch [OPTIONS] {sbethe|bremslib|elsepa}
+Usage: pyrite tables fetch [OPTIONS] {sbethe|bremslib|elsepa|eedl|eadl}
 
   Fetch pinned data for CODE into your user data directory.
 
@@ -2510,14 +2512,20 @@ Usage: pyrite tables fetch [OPTIONS] {sbethe|bremslib|elsepa}
   elsepa    ELSEPA elastic tables (free atoms for every transport element,
             muffin-tin tables for elementary crystals) that the default
             elastic model reads, so no Fortran run is needed for them.
+  eedl      EPICS2025 EEDL electron data (25 MB), which every run reads
+            for shell ionization and the EEDL bremsstrahlung model.
+  eadl      EPICS2025 EADL atomic relaxation data (8 MB), which every run
+            reads for the characteristic-radiation cascade.
 
-  The archive is SHA-256 verified before anything is installed, whether it was
-  downloaded or given with --archive. A complete existing install returns successfully
-  without network access.
+  Data lands in the user data directory, or in the selected workspace when PYRITE_HOME
+  or workspace.root is set. The archive or file is SHA-256 verified before anything is
+  installed, whether it was downloaded or given with --archive. A complete existing
+  install returns successfully without network access.
 
 Options:
-  --archive FILE                  Install from a local copy of the pinned archive
-                                  instead of downloading it.
+  --archive FILE                  Install from a local copy of the pinned archive (for
+                                  eedl and eadl, of the pinned file itself) instead of
+                                  downloading it.
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
@@ -2673,19 +2681,20 @@ Options:
 ```text
 Usage: pyrite tables verify [OPTIONS]
 
-  Check that every pinned release table is present and matches its pin.
+  Check that every pinned release table and dataset is present and intact.
 
   Resolves each table pinned by the shipped release indexes and compares its stored
-  manifest digest with the pin. Payloads are not hashed, so the check is fast enough to
-  gate a job. Exits 1 when any table is missing or differs, naming the fix; exits 0 when
-  all are intact. Read-only.
+  manifest digest with the pin; table payloads are not hashed. The EEDL and EADL files
+  are hashed in full against their pinned SHA-256 (about 0.1 s). Fast enough to gate a
+  job. Exits 1 when anything is missing or differs, naming the fix; exits 0 when all are
+  intact. Read-only.
 
   Remote jobs run this before the sweep and fail with state `FAILED (tables)`.
 
 Options:
-  --require TEXT                  Comma-separated codes whose pinned tables must be
-                                  present (bremslib, elsepa).  [default:
-                                  bremslib,elsepa]
+  --require TEXT                  Comma-separated codes whose pinned tables or datasets
+                                  must be present (bremslib, elsepa, eedl, eadl).
+                                  [default: bremslib,elsepa,eedl,eadl]
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.

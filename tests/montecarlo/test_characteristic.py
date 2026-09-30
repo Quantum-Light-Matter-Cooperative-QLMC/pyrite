@@ -37,15 +37,16 @@ def _carbon_segments(lengths: list[float]) -> dict[str, object]:
     }
 
 
-def test_packaged_eedl_bytes_match_pinned_checksum():
+def test_fetched_eedl_bytes_match_pinned_checksum():
     """Guard the pin against line-ending renormalization.
 
-    Upstream EEDL ships 75-column CRLF records. The repository normalizes text
-    to LF (`.gitattributes`), which rewrites these bytes and breaks the pin
-    unless the file stays marked `-text`, so assert the shipped bytes directly
-    rather than only through the loader.
+    Upstream EEDL ships 75-column CRLF records; any copy step that normalizes
+    text to LF rewrites these bytes and breaks the pin, so assert the
+    installed bytes directly rather than only through the loader.
     """
-    path = characteristic.CHARACTERISTIC_DATA_DIR / characteristic.CHARACTERISTIC_EEDL_FILENAME
+    from pyrite.datasets import require_dataset
+
+    path = require_dataset("eedl")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
 
     assert digest == characteristic.CHARACTERISTIC_EEDL_SHA256
@@ -53,9 +54,11 @@ def test_packaged_eedl_bytes_match_pinned_checksum():
         assert stream.readline().endswith(b"\r\n"), "CRLF lost to eol normalization"
 
 
-def test_packaged_eadl_bytes_match_published_file():
+def test_fetched_eadl_bytes_match_published_file():
     """Keep the cascade's source file byte-for-byte reproducible."""
-    path = characteristic.CHARACTERISTIC_DATA_DIR / characteristic.CHARACTERISTIC_EADL_FILENAME
+    from pyrite.datasets import require_dataset
+
+    path = require_dataset("eadl")
 
     assert hashlib.sha256(path.read_bytes()).hexdigest() == (
         "78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c"

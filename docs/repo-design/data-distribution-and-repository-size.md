@@ -11,7 +11,9 @@ is kept so they can be re-measured.
 **18.5 MB (17.65 MiB)** on disk, 922 files, **50.6 MiB** installed.
 After #263 moved the generator sources to `vendor/` and deleted
 `atomic_scattering_factors/`, the wheel is 16.8 MB (16.06 MiB), 693 files,
-45.9 MiB installed.
+45.9 MiB installed. After EEDL and EADL became fetched datasets and the NIST
+Mott tables were removed (also #263), it is 7.7 MB (7.36 MiB), 688 files,
+13.1 MiB installed.
 
 Issue #264 subsequently removed `BELLS_gpt.out.gdf` from the tree and wheel.
 The baseline tables below retain its measurements to document the decision;

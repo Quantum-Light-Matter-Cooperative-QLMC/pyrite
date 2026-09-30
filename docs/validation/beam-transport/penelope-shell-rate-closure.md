@@ -103,7 +103,7 @@ shells are Si K, L1–L3; O K; S K, L1–L3; and Mo K, L1–L3, M1–M5, N1. Mo 
 
 ### Ionization cross sections and adopted stopping
 
-$\sigma_{{\rm si},i}$ comes from packaged EEDL MF=23, not PENELOPE's
+$\sigma_{{\rm si},i}$ comes from pinned EEDL MF=23, not PENELOPE's
 DWBA/Bote–Salvat database. This is an owner-approved baseline; the
 Bote–Salvat backend is #92. It is interpolated linearly by
 `material_shell_ionization_rates` ([`eedl-material-shell-rates`](eedl-material-shell-rates.md)).

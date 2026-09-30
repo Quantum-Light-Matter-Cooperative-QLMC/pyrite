@@ -21,6 +21,20 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-groups --locked
 
+      # EEDL and EADL are hash-pinned fetched datasets, not packaged (ADR-0014,
+      # #263). The key follows the pins, so a repin refetches; a cache hit
+      # needs no network. `fetch` re-verifies a cached copy and exits 0.
+      - name: Cache EPICS2025 datasets
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pyrite/datasets
+          key: pyrite-datasets-${{ hashFiles('src/pyrite/datasets.py') }}
+
+      - name: Fetch EPICS2025 datasets
+        run: |
+          uv run pyrite tables fetch eedl
+          uv run pyrite tables fetch eadl
+
       - name: Test ${{ matrix.suite }} suite
         run: |
           if [ "${{ matrix.suite }}" = core ]; then

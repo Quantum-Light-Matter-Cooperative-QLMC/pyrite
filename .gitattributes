@@ -3,10 +3,6 @@
 *.ipynb diff=ipynb
 * text=auto eol=lf
 
-# Upstream EPICS ENDF files ship CRLF; their SHA-256 pins assert published bytes.
-src/pyrite/data/characteristic_cross_sections/EEDL.endf -text
-src/pyrite/data/characteristic_cross_sections/EADL2025.ALL -text -diff
-
 # Vendored upstream payloads retain their deposit bytes for provenance hashes.
 vendor/xsgen/elsepa/** -text -diff
 vendor/xsgen/sbethe/sbethe.f -text -diff

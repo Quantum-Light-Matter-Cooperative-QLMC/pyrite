@@ -216,8 +216,19 @@ def catalog_path(explicit: str | PathLike[str] | None = None) -> Path:
     return Path(value).expanduser().resolve()
 
 
+def fetched_data_root() -> Path:
+    """Return the root for generated tables and fetched datasets.
+
+    The platform user data directory by default, so one install serves every
+    working directory; an explicit workspace (``PYRITE_HOME`` or
+    ``workspace.root``) owns its own copy, which is how the remote box finds
+    what ``pyrite remote sync`` shipped.
+    """
+    if resolve("workspace.root").source == "built-in default":
+        return user_data_dir()
+    return workspace_root()
+
+
 def xsgen_data_root() -> Path:
     """Put generated tables beside checkpoints in an explicit workspace."""
-    if resolve("workspace.root").source == "built-in default":
-        return user_data_dir() / "xsgen"
-    return workspace_root() / "xsgen"
+    return fetched_data_root() / "xsgen"

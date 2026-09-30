@@ -229,9 +229,9 @@ def _local_xsgen_tables() -> dict[str, Path]:
     locally, since nothing could be shipped for it.
     """
     from ..xsgen.store import packaged_table_dir, search_dirs
-    from ..xsgen.verify import OK, verify_pinned
+    from ..xsgen.verify import OK, TABLE_CODES, verify_pinned
 
-    failed = [check for check in verify_pinned() if check.status != OK]
+    failed = [check for check in verify_pinned(TABLE_CODES) if check.status != OK]
     if failed:
         codes = sorted({check.code for check in failed})
         detail = ", ".join(f"{check.code} {check.label} ({check.status})" for check in failed[:6])
@@ -293,8 +293,14 @@ def _parse_xsgen_inventory(output: str) -> dict[str, str]:
     return digests
 
 
-def _remote_inventories(*, artifacts: bool, tables: bool) -> tuple[frozenset[str], dict[str, str]]:
-    """Inventory energy-grid artifacts and xsgen tables in one SSH round trip."""
+def _remote_inventories(
+    *, artifacts: bool, tables: bool, datasets: bool = False
+) -> tuple[frozenset[str], dict[str, str], dict[str, str]]:
+    """Inventory energy-grid artifacts, xsgen tables and datasets in one SSH round trip.
+
+    Each section runs in its own subshell, so one section's ``cd`` cannot
+    move the next.
+    """
     commands: list[str] = []
     remote_root = ""
     if artifacts:
@@ -302,17 +308,106 @@ def _remote_inventories(*, artifacts: bool, tables: bool) -> tuple[frozenset[str
         commands.append(command)
     if tables:
         commands.append(f"echo {_XSGEN_SECTION_MARK}")
-        commands.append(_xsgen_inventory_command())
+        commands.append(f"( {_xsgen_inventory_command()} )")
+    if datasets:
+        commands.append(f"echo {_DATASET_SECTION_MARK}")
+        commands.append(f"( {_dataset_inventory_command()} )")
     if not commands:
-        return frozenset(), {}
+        return frozenset(), {}, {}
     output = _ssh_capture("; ".join(commands))
-    artifact_part, _, table_part = output.partition(_XSGEN_SECTION_MARK + "\n")
-    if tables and _XSGEN_SECTION_MARK not in output:
+    head, _, dataset_part = output.partition(_DATASET_SECTION_MARK + "\n")
+    if datasets and _DATASET_SECTION_MARK not in output:
+        raise SystemExit("invalid remote dataset inventory")
+    artifact_part, _, table_part = head.partition(_XSGEN_SECTION_MARK + "\n")
+    if tables and _XSGEN_SECTION_MARK not in head:
         raise SystemExit("invalid remote xsgen table inventory")
     found_artifacts = (
         _parse_energy_grid_inventory(artifact_part, remote_root) if artifacts else frozenset()
     )
-    return found_artifacts, _parse_xsgen_inventory(table_part) if tables else {}
+    return (
+        found_artifacts,
+        _parse_xsgen_inventory(table_part) if tables else {},
+        _parse_dataset_inventory(dataset_part) if datasets else {},
+    )
+
+
+# --- fetched datasets (EEDL, EADL) -------------------------------------------
+#
+# Single pinned files, installed on the box at ``<REMOTE_DIR>/datasets/<name>/``
+# (``PYRITE_HOME`` is REMOTE_DIR there). Judged by content digest like the
+# tables; a box that has no internet receives them only this way. A box synced
+# before #263 still holds them under ``src/pyrite/data/characteristic_cross_sections``
+# (code sync overlays, it does not delete), so the inventory first copies those
+# into place without clobbering; the digest check then decides what ships.
+
+_DATASET_SECTION_MARK = "---pyrite-dataset-inventory---"
+_LEGACY_DATASET_DIR = "src/pyrite/data/characteristic_cross_sections"
+
+
+def _dataset_arcnames() -> dict[str, str]:
+    """Return ``{dataset name: arcname below REMOTE_DIR}``."""
+    from ..datasets import DATASETS
+
+    return {name: f"datasets/{name}/{d.filename}" for name, d in DATASETS.items()}
+
+
+def _local_datasets() -> dict[str, Path]:
+    """Return ``{arcname: local path}`` for every pinned dataset a sync ships.
+
+    Refuses when one is missing or differs locally: a run on the box needs
+    every one of them, and a box without internet cannot fetch them itself.
+    """
+    from ..datasets import OK, dataset_path, verify_dataset
+
+    arcnames = _dataset_arcnames()
+    failed = [(name, status) for name in arcnames if (status := verify_dataset(name)) != OK]
+    if failed:
+        detail = ", ".join(f"{name} ({status})" for name, status in failed)
+        raise SystemExit(
+            f"refusing to sync: pinned dataset(s) are not intact locally: {detail}.\n"
+            + "\n".join(f"  fix: pyrite tables fetch {name}" for name, _ in failed)
+        )
+    return {arc: dataset_path(name) for name, arc in arcnames.items()}
+
+
+def _dataset_inventory_command() -> str:
+    """Shell that migrates legacy code-synced copies, then digests the datasets."""
+    from ..datasets import DATASETS
+
+    root = config.shell_arg(config.remote_dir().rstrip("/"))
+    migrate = " ".join(
+        f"if [ -f {_LEGACY_DATASET_DIR}/{d.filename} ] && [ ! -e datasets/{name}/{d.filename} ]; "
+        f"then mkdir -p datasets/{name} && cp -n {_LEGACY_DATASET_DIR}/{d.filename} "
+        f"datasets/{name}/{d.filename}; fi;"
+        for name, d in DATASETS.items()
+    )
+    return (
+        f"mkdir -p {root} && cd {root} && {migrate} "
+        "if [ -d datasets ]; then find datasets -mindepth 2 -maxdepth 2 -type f "
+        "-exec sha256sum {} +; fi"
+    )
+
+
+def _parse_dataset_inventory(output: str) -> dict[str, str]:
+    """Parse ``sha256sum`` lines into ``{arcname: digest}``, failing closed."""
+    known = set(_dataset_arcnames().values())
+    digests: dict[str, str] = {}
+    for line in output.splitlines():
+        if not line.strip():
+            continue
+        match = re.fullmatch(r"([0-9a-fA-F]{64})\s+\*?(?:\./)?(.+)", line.strip())
+        if match is None:
+            raise SystemExit("invalid remote dataset inventory")
+        if match.group(2) in known:
+            digests[match.group(2)] = match.group(1).lower()
+    return digests
+
+
+def _datasets_to_ship(
+    local: dict[str, Path], local_digests: dict[str, str], remote: dict[str, str]
+) -> list[tuple[str, Path]]:
+    """Return ``(arcname, path)`` for datasets the box lacks or holds differently."""
+    return [(arc, local[arc]) for arc in sorted(local) if remote.get(arc) != local_digests[arc]]
 
 
 def _xsgen_tables_digest(local_digests: dict[str, str]) -> str:
@@ -570,10 +665,13 @@ def sync_code(*, force: bool = False):
     local_artifacts = _local_energy_grid_artifacts()
     local_tables = _local_xsgen_tables()
     local_table_digests = {name: _local_sha256(path) or "" for name, path in local_tables.items()}
-    remote_artifacts, remote_tables = _remote_inventories(
-        artifacts=bool(local_artifacts), tables=bool(local_tables)
+    local_datasets = _local_datasets()
+    local_dataset_digests = {arc: _local_sha256(path) or "" for arc, path in local_datasets.items()}
+    remote_artifacts, remote_tables, remote_datasets = _remote_inventories(
+        artifacts=bool(local_artifacts), tables=bool(local_tables), datasets=bool(local_datasets)
     )
     table_files = _xsgen_to_ship(local_tables, local_table_digests, remote_tables)
+    dataset_files = _datasets_to_ship(local_datasets, local_dataset_digests, remote_datasets)
     with tempfile.TemporaryDirectory() as td:
         tarpath = os.path.join(td, "pyrite_code.tgz")
         with tarfile.open(tarpath, "w:gz") as t:
@@ -586,6 +684,17 @@ def sync_code(*, force: bool = False):
                 _add_to_tar(t, f, arc)
             for arc, f in table_files:
                 t.add(f, arcname=arc)
+            # Verbatim, never CRLF-normalized: the pins cover the CRLF bytes.
+            for arc, f in dataset_files:
+                t.add(f, arcname=arc)
+        if local_datasets:
+            shipped = sum(f.stat().st_size for _, f in dataset_files)
+            print(
+                f"datasets: shipping {len(dataset_files)} of {len(local_datasets)} "
+                f"({shipped / 1e6:.1f} MB)",
+                flush=True,
+                file=sys.stderr,
+            )
         if local_tables:
             shipped = sum(f.stat().st_size for _, f in table_files)
             print(
@@ -605,7 +714,8 @@ def sync_code(*, force: bool = False):
     # once, last, and only after the extraction it describes succeeded. A failed
     # tar leaves the previous stamp in place rather than claiming code that
     # never landed.
-    stamp = _sync_stamp(digest, _xsgen_tables_digest(local_table_digests) if local_tables else "")
+    guaranteed = {**local_table_digests, **local_dataset_digests}
+    stamp = _sync_stamp(digest, _xsgen_tables_digest(guaranteed) if guaranteed else "")
     clear_catalog = (
         "rm -rf external-catalog external-catalog.toml && "
         if config.remote_catalog_path() is not None
