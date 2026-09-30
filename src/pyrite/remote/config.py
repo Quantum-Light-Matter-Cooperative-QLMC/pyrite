@@ -70,6 +70,8 @@ SYNC_PATHS = [
     "README.md",
     "LICENSE.txt",
     "THIRD-PARTY-NOTICES.md",
+    # Generator sources (ADR-0014): lets the box run `pyrite tables generate`.
+    "vendor",
 ]
 
 

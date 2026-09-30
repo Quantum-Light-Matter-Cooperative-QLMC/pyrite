@@ -25,7 +25,7 @@ Evaluation of whether to replace the project's hand-maintained atomic scattering
 
 The public API — `cromer_mann_f0`, `henke_dispersion`, `atomic_form_factor`, `Z_TABLE`, `load_henke` — is the **single choke point** and was kept byte-for-byte compatible (signatures, shapes, NaN-out-of-range contract, the names `cromer_mann_f0`/`henke_dispersion` even though the data is now Waasmaier/Chantler), so everything downstream (`structure_factor`, `chi_g`, `U_g`, `absorption_length_ang`, the `checks/`) is untouched.
 
-The CXRO `.nff` CSVs in `data/atomic_scattering_factors/` are now **legacy / unused by the code** (kept for provenance and any future A/B against Henke).
+The CXRO `.nff` CSVs that used to live in `data/atomic_scattering_factors/` were unused after this swap and were removed under [ADR-0014](../../adr/0014-packaged-data-layout.md). Git history keeps them for any future A/B comparison against Henke.
 
 **Why a library:** the "adding an element" chore touched ~8 non-colocated registries, ~4 of them atomic data. The swap eliminates the two worst (typing Cromer–Mann coefficients, downloading a CXRO `.nff` per element) — a new element is now free for f0/f′/f″/Z. **The cost:** xraydb is Chantler, not Henke, so numbers shift a few percent and the validation anchors had to be re-run (they held — see below).
 

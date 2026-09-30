@@ -19,6 +19,7 @@ output collection in one pass, against numbers PyRITE did not produce.
 
 import os
 import shutil
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -108,7 +109,14 @@ def test_elsepa_reproduces_its_own_published_test_run():
         timeout=900,
     )
 
-    reference_path = source.root / "test-run-output" / "dcs_1p000e03.dat"
+    reference_path = (
+        Path(__file__).resolve().parents[1]
+        / "data"
+        / "xsgen"
+        / "elsepa"
+        / "test-run-output"
+        / "dcs_1p000e03.dat"
+    )
     produced = _numeric_rows(result.text("dcs_1p000e03.dat"))
     reference = _numeric_rows(reference_path.read_text(encoding="latin-1"))
 

@@ -8,5 +8,6 @@ src/pyrite/data/characteristic_cross_sections/EEDL.endf -text
 src/pyrite/data/characteristic_cross_sections/EADL2025.ALL -text -diff
 
 # Vendored upstream payloads retain their deposit bytes for provenance hashes.
-src/pyrite/data/xsgen/elsepa/** -text -diff
-src/pyrite/data/xsgen/sbethe/sbethe.f -text -diff
+vendor/xsgen/elsepa/** -text -diff
+vendor/xsgen/sbethe/sbethe.f -text -diff
+tests/data/xsgen/elsepa/** -text -diff

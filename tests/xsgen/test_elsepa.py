@@ -5,7 +5,6 @@ from typing import Any, cast
 import numpy as np
 import pytest
 
-from pyrite.paths import data_dir
 from pyrite.xsgen.elsepa import (
     ElsepaDeck,
     generate_element,
@@ -15,9 +14,19 @@ from pyrite.xsgen.elsepa import (
 )
 from pyrite.xsgen.toolchain import Toolchain
 
+#: ELSEPA's published test-run output, kept as a test fixture (ADR-0014).
+ELSEPA_REFERENCE_OUTPUT = (
+    Path(__file__).resolve().parents[1]
+    / "data"
+    / "xsgen"
+    / "elsepa"
+    / "test-run-output"
+    / "dcs_1p000e03.dat"
+)
+
 
 def _reference_output() -> bytes:
-    return (data_dir() / "xsgen" / "elsepa" / "test-run-output" / "dcs_1p000e03.dat").read_bytes()
+    return ELSEPA_REFERENCE_OUTPUT.read_bytes()
 
 
 def test_free_atom_deck_is_explicit_and_predicts_fixed_output_names():

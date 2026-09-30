@@ -5695,6 +5695,7 @@ def test_sync_paths_ship_checks_entry_shims_and_build_metadata():
     assert "README.md" in remote.SYNC_PATHS
     assert "LICENSE.txt" in remote.SYNC_PATHS
     assert "THIRD-PARTY-NOTICES.md" in remote.SYNC_PATHS
+    assert "vendor" in remote.SYNC_PATHS
     assert "scan.py" not in remote.SYNC_PATHS
     assert "reproduce_zhai.py" not in remote.SYNC_PATHS
 
