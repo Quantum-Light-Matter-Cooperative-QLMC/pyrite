@@ -3,6 +3,8 @@
 Validation: elsepa-elastic-sampling
 """
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -13,13 +15,19 @@ from pyrite.montecarlo.transport.scattering import (
     elsepa_angular_pdf,
     pack_elsepa_tables,
 )
-from pyrite.paths import data_dir
 from pyrite.xsgen.elsepa import parse_dcs, table_arrays
 
 
 @pytest.fixture(scope="module")
 def reference():
-    path = data_dir() / "xsgen" / "elsepa" / "test-run-output" / "dcs_1p000e03.dat"
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "data"
+        / "xsgen"
+        / "elsepa"
+        / "test-run-output"
+        / "dcs_1p000e03.dat"
+    )
     return parse_dcs(path.read_bytes())
 
 

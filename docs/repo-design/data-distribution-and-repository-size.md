@@ -9,6 +9,9 @@ is kept so they can be re-measured.
 
 `uv build --wheel` at 135105de produces `pyrite_xray-0.4.0-py3-none-any.whl`:
 **18.5 MB (17.65 MiB)** on disk, 922 files, **50.6 MiB** installed.
+After #263 moved the generator sources to `vendor/` and deleted
+`atomic_scattering_factors/`, the wheel is 16.8 MB (16.06 MiB), 693 files,
+45.9 MiB installed.
 
 ```{list-table} Wheel contents by data entry (MiB).
 :name: tbl-data-wheel-baseline
@@ -256,6 +259,19 @@ not installed on the development machine.
 
 **C′. `git lfs migrate import --everything`.** This rewrites history. It has
 option B's costs, and the files still download on checkout.
+
+**D. Archive and fresh start (chosen; ADR-0014 decision 7).** This happens at
+go-public time (#167), after #263 and #264 have removed the files:
+
+1. Push the full history to an archived `pyrite-history` repository.
+2. Give the existing repository an orphan-commit `main` of the cleaned tree.
+3. Delete the old branches.
+4. Rejoin history locally with `git replace --graft`.
+
+The new repository's clone is roughly the size of the cleaned tree: well under
+the B-series figures, because it has no history. The costs follow B's list,
+except that no rewrite tool runs: every clone is re-cloned, open branches are
+rebased onto the orphan `main`, and old SHAs resolve only in the archive.
 
 ## How other codes distribute data
 

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from pyrite.paths import data_dir
 from pyrite.xsgen._errors import SourceUnavailableError
 from pyrite.xsgen.sources import (
     code_names,
@@ -17,6 +18,7 @@ from pyrite.xsgen.sources import (
     missing_data_dirs,
     resolve_source,
     source_digest,
+    vendor_dir,
     vendored_root,
 )
 
@@ -70,7 +72,7 @@ def test_a_configured_path_beats_the_vendored_tree(elsepa_tree, monkeypatch, tmp
     vendored = tmp_path / "vendored" / "xsgen" / "elsepa"
     (vendored / "database").mkdir(parents=True)
     (vendored / "elscata.f").write_text("vendored\n", encoding="utf-8")
-    monkeypatch.setattr("pyrite.xsgen.sources.data_dir", lambda: tmp_path / "vendored")
+    monkeypatch.setattr("pyrite.xsgen.sources.vendor_dir", lambda: tmp_path / "vendored")
     monkeypatch.setenv("PYRITE_XSGEN_ELSEPA_SOURCE", str(elsepa_tree))
 
     resolved = resolve_source("elsepa")
@@ -83,7 +85,7 @@ def test_the_vendored_tree_is_used_when_nothing_is_configured(monkeypatch, tmp_p
     vendored = tmp_path / "vendored" / "xsgen" / "elsepa"
     (vendored / "database").mkdir(parents=True)
     (vendored / "elscata.f").write_text("vendored\n", encoding="utf-8")
-    monkeypatch.setattr("pyrite.xsgen.sources.data_dir", lambda: tmp_path / "vendored")
+    monkeypatch.setattr("pyrite.xsgen.sources.vendor_dir", lambda: tmp_path / "vendored")
     monkeypatch.delenv("PYRITE_XSGEN_ELSEPA_SOURCE", raising=False)
     monkeypatch.setattr("pyrite.console.config._read_store", dict)
 
@@ -99,7 +101,7 @@ def test_the_sibling_checkout_is_the_last_resort(elsepa_tree, monkeypatch, tmp_p
     """
     checkout = tmp_path / "pyrite"
     checkout.mkdir()
-    monkeypatch.setattr("pyrite.xsgen.sources.data_dir", lambda: tmp_path / "absent")
+    monkeypatch.setattr("pyrite.xsgen.sources.vendor_dir", lambda: tmp_path / "absent")
     monkeypatch.delenv("PYRITE_XSGEN_ELSEPA_SOURCE", raising=False)
     monkeypatch.setattr("pyrite.console.config._read_store", dict)
     monkeypatch.chdir(checkout)
@@ -110,7 +112,7 @@ def test_the_sibling_checkout_is_the_last_resort(elsepa_tree, monkeypatch, tmp_p
 
 
 def test_an_unresolvable_tree_names_every_tier_the_fix_and_the_upstream(monkeypatch, tmp_path):
-    monkeypatch.setattr("pyrite.xsgen.sources.data_dir", lambda: tmp_path / "absent")
+    monkeypatch.setattr("pyrite.xsgen.sources.vendor_dir", lambda: tmp_path / "absent")
     monkeypatch.delenv("PYRITE_XSGEN_SBETHE_SOURCE", raising=False)
     monkeypatch.setattr("pyrite.console.config._read_store", dict)
     monkeypatch.chdir(tmp_path)
@@ -160,7 +162,7 @@ def test_fetched_data_directory_fills_a_tree_that_only_ships_source(
     (source_root / "sbethe.f").write_text("      PROGRAM sbethe\n")
     fetched = tmp_path / "user" / "xsgen" / "reference-data" / "sbethe" / "sdbase"
     fetched.mkdir(parents=True)
-    monkeypatch.setattr("pyrite.xsgen.sources.data_dir", lambda: tmp_path / "packaged")
+    monkeypatch.setattr("pyrite.xsgen.sources.vendor_dir", lambda: tmp_path / "packaged")
     monkeypatch.setattr("pyrite.xsgen.sources.user_data_dir", lambda: tmp_path / "user")
     monkeypatch.delenv("PYRITE_XSGEN_SBETHE_SOURCE", raising=False)
     monkeypatch.setattr("pyrite.console.config._read_store", dict)
@@ -178,10 +180,20 @@ def test_vendored_root_is_reportable_before_anything_is_vendored():
 
 
 def test_iter_sources_reports_one_failure_without_hiding_the_others(elsepa_tree, monkeypatch):
-    monkeypatch.setattr("pyrite.xsgen.sources.data_dir", lambda: elsepa_tree / "absent")
+    monkeypatch.setattr("pyrite.xsgen.sources.vendor_dir", lambda: elsepa_tree / "absent")
     monkeypatch.setenv("PYRITE_XSGEN_ELSEPA_SOURCE", str(elsepa_tree))
     monkeypatch.setenv("PYRITE_XSGEN_SBETHE_SOURCE", str(elsepa_tree / "nope"))
 
     report = dict(iter_sources(["elsepa", "sbethe"]))
     assert not isinstance(report["elsepa"], str)
     assert isinstance(report["sbethe"], str)
+
+
+def test_generator_sources_are_vendored_in_the_checkout_not_the_package():
+    """ADR-0014: generator inputs ship with the checkout and the sdist, not the wheel."""
+    for code in ("elsepa", "sbethe"):
+        assert not (data_dir() / "xsgen" / code).exists()
+        root = vendored_root(code)
+        assert root.parent.parent == vendor_dir()
+        assert root.is_dir(), f"checkout is missing vendor/xsgen/{code}"
+        assert resolve_source(code, root).origin == "explicit path"

@@ -25,7 +25,26 @@ tables derived or resampled from their output.
   2023 and distributed January 2025. SHA-256:
   `78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c`.
 - **Nature of PyRITE's use**: PyRITE redistributes the published file unchanged
-  for future atomic-relaxation calculations. The current model does not read it.
+  and reads its File 28 (MT 533) subshell binding energies, occupancies, and
+  radiative and nonradiative transition data for the characteristic-radiation
+  relaxation cascade.
+
+## EPICS2025 EEDL electron interaction data
+
+- **Author**: D. E. Cullen, Livermore Evaluated Electron Data Library (EEDL),
+  `NDS-IAEA-226`, translated from ENDL to ENDF-6 and distributed by the IAEA
+  Nuclear Data Section.
+- **License**: Creative Commons Attribution 4.0 International,
+  <https://creativecommons.org/licenses/by/4.0/>, as stated on the
+  [EPICS2025 distribution page](https://nuclear.llnl.gov/EPICS/index.html).
+- **Source**: the unmodified ENDF-6 file from
+  <https://nuclear.llnl.gov/EPICS/ENDF2025/EEDL2025.ALL>, evaluated August
+  2023 and distributed January 2025, packaged as `EEDL.endf`. SHA-256:
+  `f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c`.
+- **Nature of PyRITE's use**: PyRITE redistributes the published file unchanged
+  and reads its File 23 subshell electroionization cross sections (MT
+  534--572) and its File 23/26 bremsstrahlung totals and photon spectra (MT
+  527).
 
 ELSEPA and SBETHE are both CC BY-NC 3.0. PyRITE is itself distributed for
 academic/nonprofit use only, so the NonCommercial clause imposes no
@@ -43,8 +62,11 @@ require derived or adapted material to be marked as such.
   (version-pinned). Program article: DOI
   [10.1016/j.cpc.2020.107704](https://doi.org/10.1016/j.cpc.2020.107704).
 - **Nature of PyRITE's use**: PyRITE **redistributes** the ELSEPA Fortran
-  source and its `database/` directory inside the PyRITE distribution, so
-  that elastic-table generation works offline. PyRITE compiles that source
+  source and its `database/` directory in its source distribution (the
+  repository checkout and the sdist, under `vendor/xsgen/elsepa/`; not the
+  wheel), so that elastic-table generation works offline. The upstream
+  test-run output `dcs_1p000e03.dat` is redistributed unchanged as a test
+  fixture under `tests/data/xsgen/elsepa/`. PyRITE compiles that source
   and invokes the `elscata` program to generate elastic scattering
   cross-section tables. Redistribution is unmodified unless a modification is
   recorded at the vendored tree; tables derived or resampled from ELSEPA
@@ -60,7 +82,8 @@ require derived or adapted material to be marked as such.
 - **Archive**: DOI [10.17632/7zw25f428t.2](https://doi.org/10.17632/7zw25f428t.2)
   (version-pinned), <https://data.mendeley.com/datasets/7zw25f428t/2>.
 - **Nature of PyRITE's use**: PyRITE **redistributes** the SBETHE Fortran
-  source `sbethe.f` inside the PyRITE distribution, compiles it, and invokes
+  source `sbethe.f` in its source distribution (the repository checkout and
+  the sdist, under `vendor/xsgen/sbethe/`; not the wheel), compiles it, and invokes
   the resulting program to generate material-scoped stopping-power and
   related inelastic cross-section tables. PyRITE does **not** redistribute
   the accompanying `sdbase/` database, the bundled prebuilt Windows binary,

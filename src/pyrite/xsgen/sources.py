@@ -1,16 +1,23 @@
 """Resolve a usable source tree for each external code, and digest it.
 
 Three codes, three ways their tree can arrive, and one rule for choosing
-between them. A tree is either *vendored* inside the PyRITE distribution
-(ELSEPA and ``sbethe.f``, per D4), *configured* by the user through the
-context store, or a *conventional sibling checkout* beside the PyRITE
-checkout. BremsLib is only ever the latter two: its sources are GPL-3 and its
-library is 810 MB, so neither is redistributed.
+between them. A tree is either *vendored* in the PyRITE source checkout
+(ELSEPA and ``sbethe.f`` under ``vendor/xsgen/``, per D4 as restated by
+ADR-0014), *configured* by the user through the context store, or a
+*conventional sibling checkout* beside the PyRITE checkout. BremsLib is only
+ever the latter two: its sources are GPL-3 and its library is 810 MB, so
+neither is redistributed.
+
+The vendored trees are generator inputs, not runtime data, so they are not in
+the wheel. They ship in the checkout and the sdist, and ``pyrite remote sync``
+carries ``vendor/`` to the box. Offline generation therefore works from any
+checkout, sdist, or synced box; a bare wheel install needs a configured path
+or a sibling checkout.
 
 Resolution order is explicit override, then configured path, then vendored
 tree, then sibling checkout. Configured beats vendored so a user testing a
-patched upstream is not silently served the packaged copy; vendored beats the
-sibling so an installed wheel with no checkout anywhere still works offline,
+patched upstream is not silently served the vendored copy; vendored beats the
+sibling so a checkout with no upstream deposit beside it still works offline,
 which is what the ``pyrite remote`` cluster workflow needs.
 
 When nothing resolves this raises rather than degrading. D9 forbids a silent
@@ -28,7 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..console import config as _config
-from ..paths import data_dir, user_data_dir
+from ..paths import user_data_dir
 from ._errors import SourceUnavailableError
 
 #: Chunk size for hashing Fortran sources. They are small (the largest is
@@ -177,13 +184,23 @@ def code_spec(code: str) -> CodeSpec:
         raise KeyError(f"unknown external code {code!r}; known codes: {known}") from None
 
 
+def vendor_dir() -> Path:
+    """Return the ``vendor/`` directory of the checkout this package runs from.
+
+    ``src/pyrite/xsgen/sources.py`` sits three levels below the checkout root.
+    From an installed wheel the path does not exist, so the vendored tier
+    simply fails to match and resolution moves on.
+    """
+    return Path(__file__).resolve().parents[3] / "vendor"
+
+
 def vendored_root(code: str) -> Path:
     """Return where a vendored tree for ``code`` would live.
 
     The path is returned whether or not it exists, so callers can quote it in
     an error message.
     """
-    return data_dir() / "xsgen" / code_spec(code).name
+    return vendor_dir() / "xsgen" / code_spec(code).name
 
 
 def fetched_data_dir(code: str, name: str) -> Path:
@@ -420,5 +437,6 @@ __all__ = [
     "resolve_source",
     "source_digest",
     "validate_source_path",
+    "vendor_dir",
     "vendored_root",
 ]

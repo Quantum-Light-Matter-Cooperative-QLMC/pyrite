@@ -63,4 +63,4 @@ In other words:
 | [0010](0010-reduce-cli-noun-surface.md)             | Reduce the CLI noun surface          | Accepted                               |
 | [0012](0012-backlog-in-github-issues.md)            | Backlog in GitHub Issues, not TODO.md | Accepted                               |
 | [0013](0013-automatic-line-grids-by-default.md)     | Automatic line grids by default      | Accepted                               |
-| [0014](0014-packaged-data-layout.md)                | Packaged data layout                 | Proposed                               |
+| [0014](0014-packaged-data-layout.md)                | Packaged data layout                 | Accepted                               |
