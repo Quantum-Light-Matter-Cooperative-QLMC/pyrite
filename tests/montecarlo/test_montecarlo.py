@@ -957,7 +957,7 @@ def test_cgroup_cpu_quota_reads_v2_then_v1(monkeypatch, tmp_path):
 # The fixed spec/brem chunk defaults were tuned on the old ~2000-bin line grid;
 # widening the grid to 30000 eV (~6000 bins) silently tripled the (chunk, nbins)
 # matmul transients per worker. _adaptive_chunk holds the byte product constant:
-# chunk = budget_bytes // (3 arrays * nbins * 8 B), clamped to [1000, 100_000].
+# chunk = budget_bytes // (3 arrays * nbins * 8 B), clamped to [1, 100_000].
 
 
 def _patch_cpu_chunk_policy(monkeypatch, *, budget_mb=1920, device_budget_bytes=None):
@@ -981,9 +981,10 @@ def test_adaptive_chunk_shrinks_on_the_widened_grid(monkeypatch):
     assert runner._adaptive_chunk(6000) == 13_333
 
 
-def test_adaptive_chunk_preferred_size_has_floor_and_ceiling(monkeypatch):
+def test_adaptive_chunk_preferred_size_follows_budget_and_ceiling(monkeypatch):
     runner = _patch_cpu_chunk_policy(monkeypatch)
-    assert runner._adaptive_chunk(200_000) == 1000
+    # 1.92e9 B // (3 * 8 B * 200_000 bins) = 400: no 1000-segment floor.
+    assert runner._adaptive_chunk(200_000) == 400
     assert runner._adaptive_chunk(1) == 100_000
 
 
@@ -993,7 +994,7 @@ def test_adaptive_chunk_cpu_path_does_not_apply_device_admission(monkeypatch):
         device_budget_bytes=1,
     )
     # CPU mode deliberately ignores accelerator device-memory admission.
-    assert runner._adaptive_chunk(10**9) == 1000
+    assert runner._adaptive_chunk(10**9) == 1
 
 
 def test_adaptive_chunk_honors_budget_override(monkeypatch):

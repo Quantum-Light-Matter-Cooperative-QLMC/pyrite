@@ -415,6 +415,10 @@ run_material() {{
     else
       "${{scan_command[@]}}" >> "$JOBDIR/log" 2>&1 || scan_rc=$?
     fi
+    if [ "$scan_rc" -eq 143 ] && [ -f "$JOBDIR/STOP" ]; then
+      echo "cancelled: scan for $m stopped by cancel request" >> "$JOBDIR/log"
+      return 1
+    fi
     if [ "$scan_rc" -ne 0 ]; then
       if [ "$performance_repetitions" -gt 1 ]; then
         echo "WARNING: scan failed for $m repetition $repetition; continuing" >> "$JOBDIR/log"
@@ -459,8 +463,12 @@ if compgen -G "$JOBDIR/cpu-failures/*" >/dev/null; then
   cpu_failure_count=$(find "$JOBDIR/cpu-failures" -maxdepth 1 -type f | wc -l)
   echo "FAILED CPU profile ($cpu_failure_count material(s)) $(date -Is)" > "$JOBDIR/state"
   exit 1
+elif [ "$failures" -gt 0 ] && [ -f "$JOBDIR/STOP" ]; then
+  echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"
+  exit 0
 elif [ "$failures" -gt 0 ]; then
-  echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
+  echo "FAILED ($failures of $total material(s) failed) $(date -Is)" > "$JOBDIR/state"
+  exit 1
 elif [ "$cpu_enabled" -eq 1 ] || [ "$cpu_only_enabled" -eq 1 ]; then
   echo "done CPU profile [$total/$total] $(date -Is)" > "$JOBDIR/state"
 else
@@ -570,10 +578,12 @@ for m in "${{mats[@]}}"; do
 done
 if [ "$unresolved" -eq 0 ]; then
   if [ "$failures" -gt 0 ]; then
-    echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
-  else
-    echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
+    # Chain-terminal: the FAILED state is the signal; exit 0 keeps the resubmit
+    # chain's own exit status out of it.
+    echo "FAILED ($failures of $total material(s) failed) $(date -Is)" > "$JOBDIR/state"
+    exit 0
   fi
+  echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
   exit 0
 fi
 [ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
@@ -686,6 +696,8 @@ for m in "${{mats[@]}}"; do
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
 {_chunked_timeout_result()}
+  elif [ "$rc" -eq 143 ] && [ -f "$JOBDIR/STOP" ]; then
+    echo "cancelled: scan for $m stopped by cancel request" >> "$JOBDIR/log"
   elif [ "$rc" -ne 75 ]; then
     echo "WARNING: scan failed for $m (exit $rc); will not retry" >> "$JOBDIR/log"
     echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
@@ -791,7 +803,8 @@ for m in "${{mats[@]}}"; do
   echo "completed: $m" >> "$JOBDIR/log"
 done
 if [ "$failures" -gt 0 ]; then
-  echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
+  echo "FAILED ($failures of $total material(s) failed) $(date -Is)" > "$JOBDIR/state"
+  exit 1
 else
   echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
 fi
@@ -969,7 +982,8 @@ for m in "${{mats[@]}}"; do
   echo "completed: $m" >> "$JOBDIR/log"
 done
 if [ "$failures" -gt 0 ]; then
-  echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
+  echo "FAILED ($failures of $total material(s) failed) $(date -Is)" > "$JOBDIR/state"
+  exit 1
 else
   echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
 fi
@@ -1040,6 +1054,8 @@ for m in "${{mats[@]}}"; do
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
 {_chunked_timeout_result()}
+  elif [ "$rc" -eq 143 ] && [ -f "$JOBDIR/STOP" ]; then
+    echo "cancelled: scan for $m stopped by cancel request" >> "$JOBDIR/log"
   elif [ "$rc" -ne 75 ]; then
     echo "WARNING: scan failed for $m (exit $rc); will not retry" >> "$JOBDIR/log"
     echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"

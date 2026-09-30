@@ -71,6 +71,23 @@ def case_runtime_plan(case):
     }
 
 
+def _most_demanding_cases(cases):
+    """Cases with the widest line grid and the widest brem grid (may coincide).
+
+    Device admission scales with bins, so planning these two bounds every case;
+    ``cases[0]`` can be a narrow case that hides a later infeasible one.
+    """
+
+    def _bins(key):
+        return lambda case: decode_energy_grid(case.get(key, [])).size
+
+    widest = {}
+    for key in ("E_grid", "E_grid_brem"):
+        case = max(cases, key=_bins(key))
+        widest[id(case)] = case
+    return list(widest.values())
+
+
 def _cuda_transport_run(cases):
     """Whether a whole run transports on the device.
 
@@ -321,7 +338,8 @@ def run_cases(
     fallback_reason = None
     if use_gpu:
         try:
-            case_runtime_plan(cases[0])
+            for demanding in _most_demanding_cases(cases):
+                case_runtime_plan(demanding)
         except BackendResourceError as error:
             if engine != "auto" or env_value("PYRITE_MC_BACKEND", "auto").lower() != "auto":
                 raise
@@ -537,12 +555,17 @@ def run_cases(
                         else _spectrum_case_retry(cases[i], tp, spec_chunk_cap=learned_spec_chunk)
                     )  # accelerator, THIS process only
                 except Exception as error:
-                    if not _is_gpu_oom(error):
+                    resource_error = isinstance(error, BackendResourceError)
+                    if not (resource_error or _is_gpu_oom(error)):
                         raise
                     if engine != "auto" or env_value("PYRITE_MC_BACKEND", "auto").lower() != "auto":
                         raise
                     _admit_cpu_fallback()
-                    reason = f"accelerator_oom_retries_exhausted: {error}"
+                    reason = (
+                        f"device_budget_infeasible: {error}"
+                        if resource_error
+                        else f"accelerator_oom_retries_exhausted: {error}"
+                    )
                     warnings.warn(
                         f"{reason}; rerunning spectrum phase on CPU NumPy",
                         RuntimeWarning,

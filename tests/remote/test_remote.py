@@ -1044,12 +1044,13 @@ def test_queue_script_and_stem_resolve_survey_profile():
     assert remote._stems(["mos2"], False, "survey") == [named_profile_stem("mos2", "survey")]
 
 
-def test_queue_script_warns_and_continues_after_a_material_fails():
+def test_queue_script_continues_then_fails_the_job_when_a_material_fails():
     script = remote._queue_script("j", ["hopg", "hbn"], quick=False, workers=None)
 
     assert "WARNING: scan failed for $m; continuing" in script
     assert "wait -n" in script
-    assert "done with $failures warning(s)" in script
+    assert "FAILED ($failures of $total material(s) failed)" in script
+    assert "done with $failures warning(s)" not in script
 
 
 def test_slurm_batch_script_requests_the_lab_gpu_profile():
@@ -4455,8 +4456,8 @@ def test_parallel_queue_script_preserves_partial_failure_results(monkeypatch, tm
 
     result = subprocess.run([bash, "-c", script], capture_output=True, text=True)
 
-    assert result.returncode == 0, result.stderr
-    assert (jobdir / "state").read_text().startswith("done with 1 warning(s)")
+    assert result.returncode == 1, result.stderr
+    assert (jobdir / "state").read_text().startswith("FAILED (1 of 3 material(s) failed)")
     log = (jobdir / "log").read_text()
     assert "completed: hopg" in log
     assert "completed: hfse2" in log
@@ -4595,7 +4596,7 @@ def test_chunked_script_skips_failed_materials_and_terminates_without_resubmitti
     result = subprocess.run([bash, "-c", script], capture_output=True, text=True, env=env)
 
     assert result.returncode == 0, result.stderr
-    assert (jobdir / "state").read_text().startswith("done with 1 warning(s)")
+    assert (jobdir / "state").read_text().startswith("FAILED (1 of")
     assert not marker.exists(), "a fully-resolved chain must not resubmit"
     log = (jobdir / "log").read_text()
     assert log.count("failed: hopg") == 1
@@ -4701,7 +4702,7 @@ def test_chunked_script_marks_hard_failure_and_never_retries(monkeypatch, tmp_pa
     log = (jobdir / "log").read_text()
     assert "WARNING: scan failed for hopg (exit 7); will not retry" in log
     assert "failed: hopg" in log
-    assert (jobdir / "state").read_text().startswith("done with 1 warning(s)")
+    assert (jobdir / "state").read_text().startswith("FAILED (1 of")
 
 
 @pytest.mark.parametrize(
