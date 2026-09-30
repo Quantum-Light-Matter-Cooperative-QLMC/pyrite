@@ -16,7 +16,13 @@ from dataclasses import dataclass
 
 import click
 
-from ...console.output import CLIError, emit_json, emit_result, output_option
+from ...console.output import (
+    CLIError,
+    emit_diagnostic,
+    emit_json,
+    emit_result,
+    output_option,
+)
 from .._groups import LazyGroup
 
 #: Projectile names accepted by ``--projectile``. Spelled here rather than
@@ -197,6 +203,7 @@ def command() -> None:
       pyrite tables fetch sbethe
       pyrite tables fetch bremslib
       pyrite tables fetch elsepa
+      pyrite tables verify
       pyrite tables sources list
       pyrite tables sources set elsepa ../elsepa-2020
     """
@@ -595,6 +602,76 @@ def fetch_command(code: str, archive: str | None, json_output: bool) -> None:
     action = "installed" if result.installed else "already installed"
     unit = "files" if result.code == "sbethe" else "tables"
     emit_result(f"{action}: {result.path} ({result.file_count} {unit})")
+
+
+@command.command("verify")
+@click.option(
+    "--require",
+    "require",
+    default="bremslib,elsepa",
+    show_default=True,
+    help="Comma-separated codes whose pinned tables must be present (bremslib, elsepa).",
+)
+@output_option
+def verify_command(require: str, json_output: bool) -> None:
+    """Check that every pinned release table is present and matches its pin.
+
+    Resolves each table pinned by the shipped release indexes and compares its
+    stored manifest digest with the pin. Payloads are not hashed, so the check
+    is fast enough to gate a job. Exits 1 when any table is missing or differs,
+    naming the fix; exits 0 when all are intact. Read-only.
+
+    Remote jobs run this before the sweep and fail with state `FAILED (tables)`.
+    """
+    from ...xsgen.verify import CODES, OK, verify_pinned
+
+    codes = tuple(
+        dict.fromkeys(part.strip().lower() for part in require.split(",") if part.strip())
+    )
+    unknown = [code for code in codes if code not in CODES]
+    if not codes or unknown:
+        raise click.BadParameter(
+            f"{', '.join(unknown) or require!r} is not a known code; choose from {', '.join(CODES)}",
+            param_hint="--require",
+        )
+    checks = verify_pinned(codes)
+    failed = [check for check in checks if check.status != OK]
+    failing_codes = sorted({check.code for check in failed})
+    fix = (
+        "fix: run `pyrite remote sync` from a machine holding these tables, or "
+        + "; ".join(f"`pyrite tables fetch {code} --archive PATH`" for code in failing_codes)
+        if failed
+        else ""
+    )
+    if json_output:
+        emit_json(
+            "pyrite.tables.verify.v1",
+            {
+                "required": list(codes),
+                "checked": len(checks),
+                "failed": [
+                    {
+                        "code": check.code,
+                        "label": check.label,
+                        "key": check.key,
+                        "status": check.status,
+                    }
+                    for check in failed
+                ],
+                "fix": fix or None,
+            },
+            errors=[{"code": "tables-not-verified", "message": f"{len(failed)} of {len(checks)}"}]
+            if failed
+            else (),
+        )
+    else:
+        for check in failed:
+            emit_diagnostic(f"{check.status}: {check.code} {check.label} {check.key}")
+        emit_result(f"{len(checks) - len(failed)}/{len(checks)} pinned tables verified")
+        if failed:
+            emit_diagnostic(fix)
+    if failed:
+        raise click.exceptions.Exit(1)
 
 
 @command.group("sources", cls=LazyGroup)
