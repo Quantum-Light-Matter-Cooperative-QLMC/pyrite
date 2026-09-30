@@ -177,13 +177,17 @@ def _local_energy_grid_artifacts() -> dict[str, Path]:
     return found
 
 
-def _remote_energy_grid_artifacts() -> frozenset[str]:
-    """Inventory remotely verified immutable objects in one SSH round trip."""
+def _energy_grid_inventory_command() -> tuple[str, str]:
+    """Return ``(remote_root, shell command)`` listing artifact digests."""
     remote_root = f"{config.remote_dir().rstrip('/')}/{_ENERGY_GRID_ARTIFACT_ROOT.as_posix()}"
-    output = _ssh_capture(
+    return remote_root, (
         f"if [ -d {config.shell_arg(remote_root)} ]; then "
         f"find {config.shell_arg(remote_root)} -type f -name '*.json' -exec sha256sum {{}} +; fi"
     )
+
+
+def _parse_energy_grid_inventory(output: str, remote_root: str) -> frozenset[str]:
+    """Keep only remote objects whose content digest matches their name."""
     verified: set[str] = set()
     for line in output.splitlines():
         match = re.fullmatch(r"([0-9a-fA-F]{64})\s+(.+)", line.strip())
@@ -195,6 +199,143 @@ def _remote_energy_grid_artifacts() -> frozenset[str]:
         if reported_path == expected_path:
             verified.add(actual)
     return frozenset(verified)
+
+
+def _remote_energy_grid_artifacts() -> frozenset[str]:
+    """Inventory remotely verified immutable objects in one SSH round trip."""
+    remote_root, command = _energy_grid_inventory_command()
+    return _parse_energy_grid_inventory(_ssh_capture(command), remote_root)
+
+
+# --- xsgen tables -----------------------------------------------------------
+#
+# Tables are immutable ``<key>.npz`` + ``<key>.json`` pairs keyed by content
+# identity, like the energy-grid artifacts above. The box's copy is judged by
+# file digest, never mtime, so a truncated or edited file is replaced on the
+# next sync. ``PYRITE_HOME`` is REMOTE_DIR on the box, so the selected table
+# tier there is ``<REMOTE_DIR>/xsgen/tables``.
+
+_XSGEN_TABLE_DIR = "xsgen/tables"
+_XSGEN_NAME_RE = re.compile(r"[0-9a-f]{64}\.(?:npz|json)")
+_XSGEN_SECTION_MARK = "---pyrite-xsgen-inventory---"
+
+
+def _local_xsgen_tables() -> dict[str, Path]:
+    """Return ``{file name: path}`` for every table file a sync must guarantee.
+
+    That is every locally stored non-packaged table (pinned releases, muffin-tin
+    solids, other generated tables; packaged ones already ride with
+    ``src/pyrite``). Refuses when a pinned release table is absent or differs
+    locally, since nothing could be shipped for it.
+    """
+    from ..xsgen.store import packaged_table_dir, search_dirs
+    from ..xsgen.verify import OK, verify_pinned
+
+    failed = [check for check in verify_pinned() if check.status != OK]
+    if failed:
+        codes = sorted({check.code for check in failed})
+        detail = ", ".join(f"{check.code} {check.label} ({check.status})" for check in failed[:6])
+        more = f" and {len(failed) - 6} more" if len(failed) > 6 else ""
+        raise SystemExit(
+            f"refusing to sync: {len(failed)} pinned xsgen table(s) are not intact locally: "
+            f"{detail}{more}.\n"
+            + "\n".join(f"  fix: pyrite tables fetch {code} --archive PATH" for code in codes)
+        )
+    found: dict[str, Path] = {}
+    claimed: set[str] = set()
+    for root in search_dirs():
+        if root == packaged_table_dir() or not root.is_dir():
+            continue
+        for manifest in sorted(root.glob("*.json")):
+            payload = manifest.with_suffix(".npz")
+            key = manifest.stem
+            if (
+                key in claimed
+                or not _XSGEN_NAME_RE.fullmatch(manifest.name)
+                or not payload.is_file()
+            ):
+                continue
+            claimed.add(key)
+            found[payload.name] = payload
+            found[manifest.name] = manifest
+    return found
+
+
+def _xsgen_inventory_command() -> str:
+    """Shell that migrates legacy-tier tables, then digests the synced tier.
+
+    Migration is non-clobbering (``cp -n``) and payload-before-manifest, so an
+    interrupted copy leaves a payload without a manifest, which the store
+    ignores. Migrated files are then judged by the same digest inventory as any
+    other, so a bad legacy copy is replaced by the shipped one.
+    """
+    dest = config.shell_arg(f"{config.remote_dir().rstrip('/')}/{_XSGEN_TABLE_DIR}")
+    legacy = '"${XDG_DATA_HOME:-$HOME/.local/share}/pyrite/xsgen/tables"'
+    return (
+        f"mkdir -p {dest} && if [ -d {legacy} ]; then "
+        f'for f in {legacy}/*.npz {legacy}/*.json; do [ -f "$f" ] && cp -n "$f" {dest}/; done; '
+        f"fi; cd {dest} && "
+        "find . -maxdepth 1 -type f \\( -name '*.npz' -o -name '*.json' \\) -exec sha256sum {} +"
+    )
+
+
+def _parse_xsgen_inventory(output: str) -> dict[str, str]:
+    """Parse ``sha256sum`` lines into ``{file name: digest}``, failing closed."""
+    digests: dict[str, str] = {}
+    for line in output.splitlines():
+        if not line.strip():
+            continue
+        match = re.fullmatch(r"([0-9a-fA-F]{64})\s+\*?(?:\./)?(.+)", line.strip())
+        if match is None:
+            raise SystemExit("invalid remote xsgen table inventory")
+        if _XSGEN_NAME_RE.fullmatch(match.group(2)):
+            digests[match.group(2)] = match.group(1).lower()
+    return digests
+
+
+def _remote_inventories(*, artifacts: bool, tables: bool) -> tuple[frozenset[str], dict[str, str]]:
+    """Inventory energy-grid artifacts and xsgen tables in one SSH round trip."""
+    commands: list[str] = []
+    remote_root = ""
+    if artifacts:
+        remote_root, command = _energy_grid_inventory_command()
+        commands.append(command)
+    if tables:
+        commands.append(f"echo {_XSGEN_SECTION_MARK}")
+        commands.append(_xsgen_inventory_command())
+    if not commands:
+        return frozenset(), {}
+    output = _ssh_capture("; ".join(commands))
+    artifact_part, _, table_part = output.partition(_XSGEN_SECTION_MARK + "\n")
+    if tables and _XSGEN_SECTION_MARK not in output:
+        raise SystemExit("invalid remote xsgen table inventory")
+    found_artifacts = (
+        _parse_energy_grid_inventory(artifact_part, remote_root) if artifacts else frozenset()
+    )
+    return found_artifacts, _parse_xsgen_inventory(table_part) if tables else {}
+
+
+def _xsgen_tables_digest(local_digests: dict[str, str]) -> str:
+    """Identify the guaranteed table set by names and content digests."""
+    digest = hashlib.sha256()
+    for name in sorted(local_digests):
+        digest.update(f"{name}\0{local_digests[name]}\0".encode())
+    return digest.hexdigest()
+
+
+def _xsgen_to_ship(local: dict[str, Path], local_digests: dict[str, str], remote: dict[str, str]):
+    """Return local table files the box lacks or holds with different content.
+
+    A key ships as a pair if either of its files differs, payload first.
+    """
+    stale_keys = {
+        Path(name).stem for name, digest in local_digests.items() if remote.get(name) != digest
+    }
+    return [
+        (f"{_XSGEN_TABLE_DIR}/{key}{suffix}", local[f"{key}{suffix}"])
+        for suffix in (".npz", ".json")
+        for key in sorted(stale_keys)
+    ]
 
 
 def _sync_entries() -> list[tuple[str, Path]]:
@@ -311,6 +452,7 @@ class SyncStamp:
     dirty: bool
     synced_at: str
     source: str
+    tables_digest: str = ""
 
     def render(self) -> str:
         """Render the stamp as ``key: value`` lines, matching job ``meta``.
@@ -326,11 +468,12 @@ class SyncStamp:
                 ("code_dirty", self.dirty),
                 ("code_synced_at", self.synced_at),
                 ("code_source", self.source),
+                *((("code_tables_digest", self.tables_digest),) if self.tables_digest else ()),
             )
         )
 
 
-def _sync_stamp(digest: str) -> SyncStamp:
+def _sync_stamp(digest: str, tables_digest: str = "") -> SyncStamp:
     """Build the stamp for a payload about to be unpacked on the box."""
     revision, dirty = _local_revision()
     try:
@@ -344,6 +487,7 @@ def _sync_stamp(digest: str) -> SyncStamp:
         dirty=dirty,
         synced_at=datetime.now(UTC).isoformat(timespec="seconds"),
         source=source,
+        tables_digest=tables_digest,
     )
 
 
@@ -424,7 +568,12 @@ def sync_code(*, force: bool = False):
     # Guard first: a refusal must cost no transfer at all.
     _refuse_conflicting_live_jobs(digest, force=force)
     local_artifacts = _local_energy_grid_artifacts()
-    remote_artifacts = _remote_energy_grid_artifacts() if local_artifacts else frozenset()
+    local_tables = _local_xsgen_tables()
+    local_table_digests = {name: _local_sha256(path) or "" for name, path in local_tables.items()}
+    remote_artifacts, remote_tables = _remote_inventories(
+        artifacts=bool(local_artifacts), tables=bool(local_tables)
+    )
+    table_files = _xsgen_to_ship(local_tables, local_table_digests, remote_tables)
     with tempfile.TemporaryDirectory() as td:
         tarpath = os.path.join(td, "pyrite_code.tgz")
         with tarfile.open(tarpath, "w:gz") as t:
@@ -435,6 +584,16 @@ def sync_code(*, force: bool = False):
                 if artifact_digest in local_artifacts and artifact_digest in remote_artifacts:
                     continue
                 _add_to_tar(t, f, arc)
+            for arc, f in table_files:
+                t.add(f, arcname=arc)
+        if local_tables:
+            shipped = sum(f.stat().st_size for _, f in table_files)
+            print(
+                f"xsgen tables: shipping {len(table_files) // 2} of "
+                f"{len(local_tables) // 2} ({shipped / 1e6:.1f} MB)",
+                flush=True,
+                file=sys.stderr,
+            )
         _run(
             config.scp_argv(tarpath, config.scp_remote_path("/tmp/pyrite_code.tgz")),
             label="Syncing code to remote box...",
@@ -446,7 +605,7 @@ def sync_code(*, force: bool = False):
     # once, last, and only after the extraction it describes succeeded. A failed
     # tar leaves the previous stamp in place rather than claiming code that
     # never landed.
-    stamp = _sync_stamp(digest)
+    stamp = _sync_stamp(digest, _xsgen_tables_digest(local_table_digests) if local_tables else "")
     clear_catalog = (
         "rm -rf external-catalog external-catalog.toml && "
         if config.remote_catalog_path() is not None

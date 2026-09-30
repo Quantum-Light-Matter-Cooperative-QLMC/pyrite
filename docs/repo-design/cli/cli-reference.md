@@ -2472,6 +2472,7 @@ Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
     pyrite tables fetch sbethe
     pyrite tables fetch bremslib
     pyrite tables fetch elsepa
+    pyrite tables verify
     pyrite tables sources list
     pyrite tables sources set elsepa ../elsepa-2020
 
@@ -2485,6 +2486,7 @@ Commands:
   path      Print the directory your generated tables...
   show      Print the provenance manifest for the...
   sources   Show and configure where the external code...
+  verify    Check that every pinned release table is...
 ```
 
 ## `pyrite tables fetch`
@@ -2658,4 +2660,27 @@ Usage: pyrite tables sources set [OPTIONS] CODE PATH
 
 Options:
   -h, --help  Show this message and exit.
+```
+
+## `pyrite tables verify`
+
+```text
+Usage: pyrite tables verify [OPTIONS]
+
+  Check that every pinned release table is present and matches its pin.
+
+  Resolves each table pinned by the shipped release indexes and compares its stored
+  manifest digest with the pin. Payloads are not hashed, so the check is fast enough to
+  gate a job. Exits 1 when any table is missing or differs, naming the fix; exits 0 when
+  all are intact. Read-only.
+
+  Remote jobs run this before the sweep and fail with state `FAILED (tables)`.
+
+Options:
+  --require TEXT                  Comma-separated codes whose pinned tables must be
+                                  present (bremslib, elsepa).  [default:
+                                  bremslib,elsepa]
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```

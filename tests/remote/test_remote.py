@@ -4442,6 +4442,7 @@ def test_parallel_queue_script_preserves_partial_failure_results(monkeypatch, tm
     fake_uv.write_text(
         "#!/bin/sh\n"
         'if [ "$1" = sync ]; then exit 0; fi\n'
+        'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         'case "$*" in *hbn*) exit 7 ;; esac\n'
         "exit 0\n"
     )
@@ -4473,6 +4474,7 @@ def test_parallel_queue_script_enforces_process_limit(monkeypatch, tmp_path, par
     fake_uv.write_text(
         "#!/bin/sh\n"
         'if [ "$1" = sync ]; then exit 0; fi\n'
+        'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         f'echo "start $$" >> "{trace.as_posix()}"\n'
         "sleep 0.05\n"
         f'echo "end $$" >> "{trace.as_posix()}"\n'
@@ -4515,6 +4517,7 @@ def test_chunked_script_hands_off_state_before_resubmitting(monkeypatch, tmp_pat
     fake_uv.write_text(
         "#!/bin/sh\n"
         'if [ "$1" = sync ]; then exit 0; fi\n'
+        'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         'case "$*" in\n'
         "  *hopg*) exit 75 ;;\n"  # stays unresolved: budget hit, not a failure
         "  *hbn*) exit 0 ;;\n"
@@ -4569,6 +4572,7 @@ def test_chunked_script_skips_failed_materials_and_terminates_without_resubmitti
     fake_uv.write_text(
         "#!/bin/sh\n"
         'if [ "$1" = sync ]; then exit 0; fi\n'
+        'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         'case "$*" in\n'
         "  *hbn*) exit 0 ;;\n"
         "esac\n"
@@ -4616,6 +4620,7 @@ def test_chunked_script_fails_closed_when_resubmission_fails(monkeypatch, tmp_pa
     fake_uv.write_text(
         "#!/bin/sh\n"
         'if [ "$1" = sync ]; then exit 0; fi\n'
+        'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         "exit 75\n"  # budget hit every slice: hopg stays unresolved
     )
     fake_uv.chmod(0o755)
@@ -4648,7 +4653,9 @@ def test_chunked_script_honors_stop_sentinel_without_resubmitting(monkeypatch, t
     jobdir.mkdir(parents=True)
     (jobdir / "STOP").write_text("")
     fake_uv = tmp_path / "uv"
-    fake_uv.write_text('#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\nexit 75\n')
+    fake_uv.write_text(
+        '#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\ncase "$*" in *"tables verify"*) exit 0 ;; esac\nexit 75\n'
+    )
     fake_uv.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -4678,7 +4685,9 @@ def test_chunked_script_marks_hard_failure_and_never_retries(monkeypatch, tmp_pa
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
     fake_uv = tmp_path / "uv"
-    fake_uv.write_text('#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\nexit 7\n')
+    fake_uv.write_text(
+        '#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\ncase "$*" in *"tables verify"*) exit 0 ;; esac\nexit 7\n'
+    )
     fake_uv.chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
     monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
@@ -4727,6 +4736,7 @@ def test_chunked_prelimit_signal_resumes_only_143_with_checkpoint_progress(
     fake_uv.write_text(
         "#!/bin/sh\n"
         'if [ "$1" = sync ]; then exit 0; fi\n'
+        'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         + (
             f"printf '%s\\n' '{{\"cached_cases\":0,\"completed_new_cases\":1}}' > '{jobdir}/progress/hopg.json'\n"
             if progress
@@ -4770,7 +4780,9 @@ def test_chunked_no_progress_slices_stop_after_three(monkeypatch, tmp_path):
     jobdir.mkdir(parents=True)
     (jobdir / "meta").write_text("slurm_job_id: 100\n")
     fake_uv = tmp_path / "uv"
-    fake_uv.write_text('#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\nexit 75\n')
+    fake_uv.write_text(
+        '#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\ncase "$*" in *"tables verify"*) exit 0 ;; esac\nexit 75\n'
+    )
     fake_uv.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()

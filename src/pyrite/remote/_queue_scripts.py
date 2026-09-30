@@ -143,6 +143,24 @@ def _validate_parallel_materials(parallel_materials):
     return parallel_materials
 
 
+def _tables_preflight_block() -> str:
+    """Bash that fails the job fast when a pinned xsgen table is missing.
+
+    Runs ``pyrite tables verify`` (manifest digests only, no payload hashing)
+    once per chain, guarded like the dependency sync by ``$JOBDIR/.tables_ok``,
+    before any transport runs. A miss records ``FAILED (tables)`` and exits 1;
+    the verify output, which names the fix, lands in the job log."""
+    verify = f"{config.remote_runtime_env()} {config.shell_remote_uv()} run --no-sync pyrite tables verify --require bremslib,elsepa"
+    return f"""if [ ! -f "$JOBDIR/.tables_ok" ]; then
+  if {verify} >> "$JOBDIR/log" 2>&1; then
+    : > "$JOBDIR/.tables_ok"
+  else
+    echo "FAILED (tables) $(date -Is)" > "$JOBDIR/state"
+    exit 1
+  fi
+fi"""
+
+
 def _uv_sync_block(once: bool = False) -> str:
     """Bash that records dependency-sync wall time without changing exit semantics.
 
@@ -299,6 +317,7 @@ cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {_uv_sync_block(once=True)}
+{_tables_preflight_block()}
 mats=({mats})
 total=${{#mats[@]}}
 parallel_materials={parallel_materials}
@@ -632,6 +651,7 @@ cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {_uv_sync_block(once=True)}
+{_tables_preflight_block()}
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
@@ -691,6 +711,7 @@ def _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh):
 cd {config.shell_remote_dir()} || exit 1
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {_uv_sync_block(once=True)}
+{_tables_preflight_block()}
 echo "running zhai reproduction since $(date -Is)" > "$JOBDIR/state"
 if ! {config.shell_remote_uv()} run --no-sync python -m pyrite._entry.reproduce_zhai{flags} >> "$JOBDIR/log" 2>&1
 then
@@ -749,6 +770,7 @@ cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {_uv_sync_block(once=True)}
+{_tables_preflight_block()}
 mats=({mats})
 total=${{#mats[@]}}
 n=0
@@ -806,6 +828,7 @@ cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {_uv_sync_block(once=True)}
+{_tables_preflight_block()}
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
@@ -925,6 +948,7 @@ cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {_uv_sync_block(once=True)}
+{_tables_preflight_block()}
 mats=({mats})
 total=${{#mats[@]}}
 n=0
@@ -982,6 +1006,7 @@ cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {_uv_sync_block(once=True)}
+{_tables_preflight_block()}
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}

@@ -645,3 +645,86 @@ def test_the_cli_projectile_list_matches_the_deck():
     from pyrite.xsgen.sbethe.deck import PROJECTILES
 
     assert tables_command._PROJECTILES == tuple(sorted(PROJECTILES))
+
+
+# --- verify ---------------------------------------------------------------
+
+
+def _pin(monkeypatch, request: TableRequest, *, digest: str | None = None):
+    from pyrite.xsgen import verify
+
+    stored = store(request, {"theta_deg": np.linspace(0.0, 180.0, 4)}, overwrite=True)
+    row = ("elsepa", "Z=29", request.key, digest or stored.digest)
+    monkeypatch.setattr(verify, "pinned_tables", lambda codes=verify.CODES: [row])
+    return stored
+
+
+def test_verify_passes_when_the_pinned_manifest_digest_matches(isolated, monkeypatch):
+    _pin(monkeypatch, _store_one())
+
+    result = invoke(tables_command.command, ["verify"])
+
+    assert_clean_result(result, stdout="1/1 pinned tables verified\n")
+
+
+def test_verify_exits_one_naming_the_fix_when_a_pinned_table_is_missing(isolated, monkeypatch):
+    from pyrite.xsgen import verify
+
+    monkeypatch.setattr(
+        verify,
+        "pinned_tables",
+        lambda codes=verify.CODES: [("bremslib", "Z=79", "f" * 64, "0" * 64)],
+    )
+
+    result = invoke(tables_command.command, ["verify"])
+
+    assert result.exit_code == 1
+    assert result.stdout == "0/1 pinned tables verified\n"
+    assert "missing: bremslib Z=79" in result.stderr
+    assert "pyrite tables fetch bremslib --archive PATH" in result.stderr
+    assert "Traceback" not in result.output
+
+
+def test_verify_flags_a_manifest_that_is_not_the_pinned_one(isolated, monkeypatch):
+    _pin(monkeypatch, _store_one(), digest="1" * 64)
+
+    result = invoke(tables_command.command, ["verify"])
+
+    assert result.exit_code == 1
+    assert "mismatch: elsepa Z=29" in result.stderr
+
+
+def test_verify_flags_an_edited_manifest_as_corrupt(isolated, monkeypatch):
+    stored = _pin(monkeypatch, _store_one())
+    manifest = stored.path.with_suffix(".json")
+    body = json.loads(manifest.read_text(encoding="utf-8"))
+    body["target_label"] = "tampered"
+    manifest.write_text(json.dumps(body), encoding="utf-8")
+
+    result = invoke(tables_command.command, ["verify"])
+
+    assert result.exit_code == 1
+    assert "corrupt: elsepa Z=29" in result.stderr
+
+
+def test_verify_json_is_one_envelope_and_still_exits_one(isolated, monkeypatch):
+    from pyrite.xsgen import verify
+
+    monkeypatch.setattr(
+        verify, "pinned_tables", lambda codes=verify.CODES: [("elsepa", "Z=6", "e" * 64, "0" * 64)]
+    )
+
+    result = invoke(tables_command.command, ["verify", "-o", "json"])
+
+    assert result.exit_code == 1
+    envelope = json.loads(result.stdout)
+    assert envelope["schema"] == "pyrite.tables.verify.v1"
+    assert envelope["ok"] is False
+    assert envelope["payload"]["failed"][0]["status"] == "missing"
+    assert result.stderr == ""
+
+
+def test_verify_rejects_an_unknown_code_as_a_usage_error(isolated):
+    result = invoke(tables_command.command, ["verify", "--require", "sbethe"])
+
+    assert result.exit_code == 2
