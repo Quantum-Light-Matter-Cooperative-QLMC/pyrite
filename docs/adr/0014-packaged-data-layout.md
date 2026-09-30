@@ -203,6 +203,15 @@ The legacy `~/.local/share/pyrite/xsgen/tables` tier, and the legacy
 migration. After that, a resolution from the legacy tier warns for one
 release, and then the tier is removed.
 
+*Implemented for the table tier (#263):* #261's sync migrates the box's legacy
+tier on every inventory. Locally, a table served from the legacy tier, which
+exists only when an explicit workspace is selected, emits one `FutureWarning`
+per process naming `pyrite tables migrate`. That command copies every legacy
+table the workspace lacks, payload first and atomically, and never deletes or
+overwrites anything. `pyrite tables list` labels those rows `legacy`. The
+tier stops being searched in 0.5.0 (`LEGACY_TABLE_TIER_REMOVE_IN`, held by
+`tests/test_deprecation_schedule.py`). The legacy sdbase path is unchanged.
+
 ## Consequences
 
 Measured wheel sizes are in

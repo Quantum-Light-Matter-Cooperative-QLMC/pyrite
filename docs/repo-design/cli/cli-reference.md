@@ -2467,7 +2467,9 @@ Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
 
   Tables are produced by external Fortran codes (ELSEPA, SBETHE, BremsLib) and resolved
   in two tiers: your own tables first, then the tables shipped with PyRITE. Consumers
-  cannot tell the two apart.
+  cannot tell the two apart. With an explicit workspace, the deprecated pre-workspace
+  directory is searched between them until the next release; `pyrite tables migrate`
+  copies it forward.
 
   Examples:
     pyrite tables path
@@ -2481,6 +2483,7 @@ Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
     pyrite tables fetch eedl
     pyrite tables fetch eadl
     pyrite tables verify
+    pyrite tables migrate --dry-run
     pyrite tables sources list
     pyrite tables sources set elsepa ../elsepa-2020
 
@@ -2491,6 +2494,7 @@ Commands:
   fetch     Fetch pinned data for CODE into your user...
   generate  Generate or reuse one external-code table.
   list      List stored tables, most-preferred tier...
+  migrate   Copy tables from the deprecated legacy...
   path      Print the directory your generated tables...
   show      Print the provenance manifest for the...
   sources   Show and configure where the external code...
@@ -2593,6 +2597,28 @@ Usage: pyrite tables list [OPTIONS]
   A table present in both tiers is listed once, as the tier that would be served.
 
 Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables migrate`
+
+```text
+Usage: pyrite tables migrate [OPTIONS]
+
+  Copy tables from the deprecated legacy directory into your workspace.
+
+  With a workspace selected (PYRITE_HOME or workspace.root), tables are stored in
+  <workspace>/xsgen/tables, but the pre-workspace directory <user data dir>/xsgen/tables
+  is still searched as a deprecated tier; it stops being searched in the next release.
+  This copies every table found there that the workspace lacks. Nothing is deleted or
+  overwritten: legacy files stay in place, and a key the workspace already holds is
+  skipped. Without a workspace the two directories are the same and there is nothing to
+  do. Exits 0.
+
+Options:
+  --dry-run                       Report what would be copied without writing anything.
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.

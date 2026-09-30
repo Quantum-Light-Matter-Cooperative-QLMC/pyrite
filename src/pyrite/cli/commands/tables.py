@@ -192,7 +192,9 @@ def command() -> None:
 
     Tables are produced by external Fortran codes (ELSEPA, SBETHE, BremsLib)
     and resolved in two tiers: your own tables first, then the tables shipped
-    with PyRITE. Consumers cannot tell the two apart.
+    with PyRITE. Consumers cannot tell the two apart. With an explicit
+    workspace, the deprecated pre-workspace directory is searched between them
+    until the next release; `pyrite tables migrate` copies it forward.
 
     \b
     Examples:
@@ -207,6 +209,7 @@ def command() -> None:
       pyrite tables fetch eedl
       pyrite tables fetch eadl
       pyrite tables verify
+      pyrite tables migrate --dry-run
       pyrite tables sources list
       pyrite tables sources set elsepa ../elsepa-2020
     """
@@ -715,6 +718,52 @@ def verify_command(require: str, json_output: bool) -> None:
             emit_diagnostic(fix)
     if failed:
         raise click.exceptions.Exit(1)
+
+
+@command.command("migrate")
+@click.option(
+    "--dry-run", is_flag=True, help="Report what would be copied without writing anything."
+)
+@output_option
+def migrate_command(dry_run: bool, json_output: bool) -> None:
+    """Copy tables from the deprecated legacy directory into your workspace.
+
+    With a workspace selected (PYRITE_HOME or workspace.root), tables are
+    stored in <workspace>/xsgen/tables, but the pre-workspace directory
+    <user data dir>/xsgen/tables is still searched as a deprecated tier; it
+    stops being searched in the next release. This copies every table found
+    there that the workspace lacks. Nothing is deleted or overwritten: legacy
+    files stay in place, and a key the workspace already holds is skipped.
+    Without a workspace the two directories are the same and there is nothing
+    to do. Exits 0.
+    """
+    from ...xsgen.store import migrate_legacy_tables
+
+    try:
+        report = migrate_legacy_tables(dry_run=dry_run)
+    except OSError as exc:
+        raise CLIError(f"could not migrate tables: {exc}") from exc
+    if json_output:
+        emit_json(
+            "pyrite.tables.migrate.v1",
+            {
+                "source": str(report.source),
+                "destination": str(report.destination),
+                "active": report.active,
+                "dry_run": report.dry_run,
+                "copied": list(report.copied),
+                "present": list(report.present),
+            },
+        )
+        return
+    if not report.active:
+        emit_result(f"nothing to migrate: {report.source} is the selected table directory")
+        return
+    verb = "would copy" if dry_run else "copied"
+    emit_result(
+        f"{verb} {len(report.copied)} table(s) from {report.source} to {report.destination}; "
+        f"{len(report.present)} already present"
+    )
 
 
 @command.group("sources", cls=LazyGroup)
