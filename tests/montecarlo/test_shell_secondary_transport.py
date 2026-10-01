@@ -361,7 +361,7 @@ def test_incoherent_lines_add_tracks_and_coherent_rejects_showers():
     """Flights group by track: a shower's spectrum is the sum over its tracks."""
     from pyrite.montecarlo.spectrum import mc_spectrum
 
-    result = _run(Ne=12, max_dE_frac=0.05)
+    result = _run(Ne=12, max_dE_frac=0.05, elastic_model="sr")
     kwargs = {
         "crystal": "silicon",
         "hkl_list": [(2, 2, 0)],

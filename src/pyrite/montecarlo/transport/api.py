@@ -48,7 +48,7 @@ def simulate_trajectories(
     E_cut_keV=5.0,
     seed=0,
     max_steps=20000,
-    elastic_model="mott",
+    elastic_model="elsepa",
     beam_dir=None,
     composition=None,
     layers=None,
@@ -101,17 +101,19 @@ def simulate_trajectories(
     parameter contract and the BIT-FOR-BIT
     limiting case each one must preserve.
 
-    elastic_model: "mott" (default, NIST SRD 64 Mott transport cross section
-      via a Browning fit), "sr" (analytic screened-Rutherford, no data
-      files), or "elsepa" (tabulated ELSEPA total cross sections and full
-      angular distributions from ``elastic_tables``; exact cores only, the
-      transport LUT is bypassed). See
+    elastic_model: "elsepa" (default; tabulated ELSEPA total cross sections
+      and full angular distributions from ``elastic_tables``, resolved from
+      the stored production tables when not passed; exact cores only, the
+      transport LUT is bypassed), "sr" (analytic screened-Rutherford, no
+      data files), or "mott" (deprecated; NIST SRD 64 Mott transport cross
+      section via a Browning fit, read from the user-supplied
+      ``mott.tables_dir``). See
       docs/physics/beam-transport/elastic-scattering.md.
       Validation: electron-transport
       Validation: elsepa-elastic-sampling
 
-    elastic_tables: required by, and only accepted with,
-      ``elastic_model="elsepa"``. One entry per layer, each a sequence of one mapping per
+    elastic_tables: only accepted with ``elastic_model="elsepa"``, which
+      resolves the stored production tables when omitted. One entry per layer, each a sequence of one mapping per
       element in composition order holding ``energy_eV``,
       ``total_elastic_cm2``, ``mu`` and ``dcs_cm2_sr`` on ELSEPA's shared
       angular grid. Every incident energy and cutoff must lie inside every
@@ -458,10 +460,12 @@ def simulate_trajectories(
 
     if elastic_model not in ("mott", "sr", "elsepa"):
         raise ValueError("elastic_model must be 'mott', 'sr', or 'elsepa'")
-    if (elastic_model == "elsepa") != (elastic_tables is not None):
-        raise ValueError(
-            "elastic_tables is required by, and only valid with, elastic_model='elsepa'"
-        )
+    if elastic_model != "elsepa" and elastic_tables is not None:
+        raise ValueError("elastic_tables is only valid with elastic_model='elsepa'")
+    if elastic_model == "elsepa" and elastic_tables is None:
+        from ...xsgen.elsepa.catalog import resolve_stack_tables
+
+        elastic_tables = resolve_stack_tables(layers)
     if energy_model not in ("frozen", "midpoint"):
         raise ValueError("energy_model must be 'frozen' or 'midpoint'")
     shell_mode = validate_inelastic_args(

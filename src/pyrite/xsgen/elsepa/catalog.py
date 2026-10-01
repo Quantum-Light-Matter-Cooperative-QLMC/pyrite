@@ -265,6 +265,11 @@ def resolve_layer_tables(
     return tuple(out)
 
 
+def resolve_stack_tables(layers) -> list[list[dict]]:
+    """Production ELSEPA arrays for each ``(z0, z1, composition)`` layer."""
+    return [[entry.arrays for entry in resolve_layer_tables(layer[2])] for layer in layers]
+
+
 def resolve_catalog_tables(key: str) -> tuple[StoredTable, ...]:
     """Every stored table a catalog material's elastic model reads, for identity."""
     return tuple(

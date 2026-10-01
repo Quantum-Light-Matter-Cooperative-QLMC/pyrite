@@ -5,7 +5,7 @@ Monte Carlo CXR (PXR + CBS) from scattered electrons in thick crystals,
 following Zhai et al., Nat. Commun. 16, 11218 (2025), SI Sections S1-S5:
 
   1. Electron transport (SI S2): single-scattering Monte Carlo with
-     Joy-Luo continuous slowing-down. Elastic scattering (default "mott"):
+     Joy-Luo continuous slowing-down. Elastic scattering ("mott", deprecated):
      free paths from the Browning fit to the Mott total cross sections, and
      scattering angles from a screened-Rutherford form whose screening
      parameter alpha(E) is calibrated, per element, to reproduce the NIST

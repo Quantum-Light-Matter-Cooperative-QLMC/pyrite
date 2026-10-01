@@ -6,7 +6,7 @@ PyRITE uses a single-scattering (CASINO-style) treatment: every elastic event is
 
 ## Selecting a model
 
-`elastic_model` chooses between three internally consistent models. Runs built from `pyrite.Numerics` (and every profile) default to `"elsepa"`; `"mott"` remains selectable and is still the default of the low-level `simulate_trajectories`, which cannot sample ELSEPA without tables passed in.
+`elastic_model` chooses between three internally consistent models. Runs built from `pyrite.Numerics` (and every profile) default to `"elsepa"`; `"mott"` is deprecated but remains selectable. The low-level `simulate_trajectories` also defaults to `"elsepa"`, resolving the stored production tables when none are passed.
 
 ```{list-table} Elastic model options.
 :name: tbl-elastic-model-options
