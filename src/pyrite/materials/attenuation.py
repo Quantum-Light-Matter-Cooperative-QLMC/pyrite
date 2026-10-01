@@ -258,9 +258,14 @@ def _finite_mu_or_raise(mu, energy_eV, context):
     ``E >= EPDL_E_MIN_EV`` raises. Nodes below ``EPDL_E_MIN_EV`` (``E = 0`` on
     a grid that was not floored) sit below every modelled band
     (``_photon_continuum_floor``) and keep the historical ``mu = 0``.
-    """
-    from .._backend import xp
 
+    Validation: narrow-beam-total-attenuation
+    """
+    from .._backend import array_namespace
+
+    # The namespace that owns the operands, not the selected backend: the
+    # hard-event scorer guards host arrays while an accelerator is selected.
+    xp = array_namespace(mu, energy_eV)
     below_floor = xp.asarray(energy_eV) < EPDL_E_MIN_EV
     undefined = ~xp.isfinite(mu)
     if bool(xp.any(undefined & ~below_floor)):

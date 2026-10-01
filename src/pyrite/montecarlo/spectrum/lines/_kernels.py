@@ -328,6 +328,8 @@ def _epdl_mesh_nodes(element, lo, hi):
     become mesh nodes. At a photoionization edge ``mu`` is discontinuous: a
     pair of adjacent float32 values with the edge in ``(below, above]`` keeps
     the jump inside one ulp-wide interval at either ``REAL`` precision.
+
+    Validation: line-absorption-tabulation
     """
     from ....materials.atomic import Z_TABLE
     from ....materials.photon_cross_sections import _table, photoelectric_edges

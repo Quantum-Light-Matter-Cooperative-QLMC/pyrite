@@ -631,6 +631,8 @@ def absorption_edge_brackets(
     Shared by the line-axis window seeds (issue #101) and the photon-continuum
     node refinement (:mod:`pyrite.energy_grid.refine`, issue #100) so both read
     one locator rather than two copies of an edge list.
+
+    Validation: continuum-node-refinement
     """
     import xraydb
 

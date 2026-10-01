@@ -117,6 +117,8 @@ def _interpolate(knots_e: np.ndarray, knots_s: np.ndarray, energy: np.ndarray) -
     Below the first knot the channel is zero (it starts at a threshold). The
     interval index uses ``side="right"``, so an energy equal to an edge selects
     the interval that starts at the edge's upper (post-edge) value.
+
+    Validation: narrow-beam-total-attenuation
     """
     out = np.zeros_like(energy)
     inside = energy >= knots_e[0]
@@ -204,6 +206,8 @@ def photoelectric_edges(element: str) -> tuple[tuple[float, float], ...]:
     discontinuous there, ``sigma(E_edge^-)`` below and ``sigma(E_edge)`` (the
     right-continuous value) above. ``jump_ratio`` is above/below; the
     first-ionization onset, where the value below is zero, is not an edge.
+
+    Validation: narrow-beam-total-attenuation
     """
     energy, sigma = _table()[_atomic_number(element)][PHOTON_CHANNELS["photoelectric"]]
     out = []
