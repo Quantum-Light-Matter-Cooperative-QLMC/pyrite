@@ -58,7 +58,7 @@ Earlier releases stored a derived uniform `E_grid_brem` override for each materi
 
 ## Line-grid policy
 
-By default each case's line axis spans a closed-form kinematic bandwidth at the measured sinc spacing. That bandwidth is capped at the beam's kinetic energy and at the end of the atomic data (about 800 keV for most elements), above which no line can emit in this model. At MeV beam energies that axis needs millions of nodes. A profile can instead name measured policies:
+By default each case's line axis spans a closed-form kinematic bandwidth at the measured sinc spacing. That bandwidth is capped at the beam's kinetic energy and at the end of the Chantler coupling data (about 966 keV for every element), above which no line can emit in this model. At MeV beam energies that axis needs millions of nodes. A profile can instead name measured policies:
 
 ```text
 [line_grid_policy]

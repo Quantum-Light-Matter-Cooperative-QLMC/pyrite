@@ -29,6 +29,26 @@ tables derived or resampled from their output.
   radiative and nonradiative transition data for the characteristic-radiation
   relaxation cascade.
 
+## EPICS2025 EPDL photon interaction data
+
+- **Author**: D. E. Cullen, Livermore Evaluated Photon Data Library (EPDL),
+  `NDS-IAEA-225`, distributed by the IAEA Nuclear Data Section.
+- **License**: Creative Commons Attribution 4.0 International,
+  <https://creativecommons.org/licenses/by/4.0/>, as stated for the EPICS
+  library on the
+  [EPICS2025 distribution page](https://nuclear.llnl.gov/EPICS/index.html).
+- **Source**: the ENDF-6 file
+  <https://nuclear.llnl.gov/EPICS/ENDF2025/EPDL2025.ALL>, evaluated August 2023
+  and distributed January 2025. SHA-256:
+  `59bbd8c559685dda0bf0de2762bc43126f599cd154d635940f17b6a59c1c43fd`.
+- **Nature of PyRITE's use**: PyRITE redistributes a **derived** table,
+  `src/pyrite/data/photon_cross_sections/epdl2025_mf23.npz`, not the upstream
+  file. It keeps five File 23 integrated cross sections (MT 522, 502, 504, 517,
+  515) for Z = 1--100. **Modifications:** knots were removed where lin-lin
+  interpolation through the kept knots reproduces every removed upstream value
+  to 5e-4 relative, and cross sections are stored as float32. The generator is
+  `scripts/release_epdl_table.py`; see the table's README for provenance.
+
 ## EPICS2025 EEDL electron interaction data
 
 - **Author**: D. E. Cullen, Livermore Evaluated Electron Data Library (EEDL),

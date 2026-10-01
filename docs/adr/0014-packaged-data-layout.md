@@ -91,6 +91,9 @@ change.
 * - `characteristic_cross_sections/EEDL.endf`, `EADL2025.ALL`
   - b
   - Still packaged; they move after #261 (decision 2).
+* - `photon_cross_sections/epdl2025_mf23.npz` (added by #274)
+  - b
+  - Packaged derived table, 1.5 MB, with provenance and modifications note in its README; moves with EEDL/EADL.
 * - ELSEPA sources and `database/`; `sbethe.f`
   - c
   - Moved to `vendor/xsgen/elsepa/` and `vendor/xsgen/sbethe/`.

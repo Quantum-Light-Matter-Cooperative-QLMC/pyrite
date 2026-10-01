@@ -75,6 +75,14 @@ the blob remains in Git history.
   - 1.40
 ```
 
+Issue #274 (2026-10-01) adds `data/photon_cross_sections/epdl2025_mf23.npz`,
+1.49 MiB installed and about 1.4 MiB compressed in the wheel (already
+deflated). It is derived from the 86 MB upstream `EPDL2025.ALL` by
+lin-lin knot thinning to `5e-4` relative; at `1e-3` it would be 1.30 MiB, and a
+log-log thinning reached 0.73 MiB but departed from the upstream lin-lin law
+by up to 67% across single steep intervals, so it was rejected. It is classed
+(b) beside EEDL and EADL in ADR-0014.
+
 ## Repository size
 
 ```{list-table} Clone and pack sizes.
