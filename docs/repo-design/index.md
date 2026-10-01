@@ -10,6 +10,7 @@ It is intended primarily for contributors and maintainers. User-facing instructi
 
 development-workspace
 documentation
+../validation/formatting-style
 configuration-resolution
 materials-catalog-schema
 data-distribution-and-repository-size
@@ -19,16 +20,9 @@ core-architecture-rfc
 
 ```{toctree}
 :maxdepth: 1
-:caption: Command-line interface
-
-cli/cli-reference
-cli/cli-deprecations
-```
-
-```{toctree}
-:maxdepth: 1
 :caption: Compute optimization/GPU Acceleration
 
+../guides/performance-profile-analysis
 compute/coherent-streaming-rawkernel.md
 compute/compute-performance-optimization.md
 compute/gpu-transport-rawkernel.md
@@ -44,6 +38,7 @@ compute/transport-jit-kernel-walkthrough.md
 storage/checkpoint-case-store
 storage/dataset-identity-and-storage
 storage/result-schema
+../physics/beam-transport/transport-outputs
 ```
 
 ## Architecture decision records

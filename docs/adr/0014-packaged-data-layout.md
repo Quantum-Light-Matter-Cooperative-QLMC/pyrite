@@ -99,7 +99,7 @@ change.
   - Moved to `tests/data/xsgen/elsepa/test-run-output/`.
 * - `BELLS_gpt.out.gdf`
   - none (removed)
-  - Removal and the GPT guide rework are #264.
+  - Removed in #264; the GPT guide now uses a user-supplied file or a generated fixture.
 * - `atomic_scattering_factors/` (CXRO/Henke f1/f2)
   - none (removed)
   - Deleted; nothing read it.

@@ -87,6 +87,7 @@ instance/
 .scrapy
 
 # Sphinx documentation
+!docs/_templates/*.html
 docs/_build/
 docs/_autosummary/
 

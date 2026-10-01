@@ -1,4 +1,4 @@
-# Physics validation
+# Physics Validation
 
 This section records the independent checks used to establish confidence in the physical models and numerical implementations used by Pyrite.
 
@@ -14,7 +14,6 @@ physics-validation-ledger
 status-summary
 domain-inventories
 methodology
-formatting-style
 ```
 
 ```{toctree}

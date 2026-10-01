@@ -4,6 +4,12 @@ Every external source cited from the physics, validation, and computation sectio
 
 A source belongs here once a page depends on it for an equation, a constant, a tabulated dataset, or a numerical comparison. Data provenance for individual catalog crystals stays in the [crystal structure provenance ledger](validation/ledger-crystal-structure-provenance.md), which records per-material refinements rather than shared literature.
 
+```{toctree}
+:maxdepth: 1
+
+physics/atomic-physics/atomic-data-sources
+```
+
 ```{bibliography}
 :all:
 ```
