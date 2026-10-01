@@ -414,12 +414,11 @@ def _transport_case(
     # Coupled radiative rows complete their photons on the host.
     resident = keep_segments_on_device and core == "cuda" and "radiative_model" not in case
     straggling = bool(case.get("straggling", False))
-    # The CUDA LUT kernel has no Urban sampler and no shell soft/hard mode.
-    # Production straggling or shell runs therefore select the exact CUDA
-    # kernel rather than failing or silently computing other physics. Direct
-    # simulate_trajectories calls retain the fail-closed CUDA-LUT guards as a
+    # The CUDA LUT kernel has no shell soft/hard mode, so production shell runs
+    # select the exact CUDA kernel rather than failing. Direct
+    # simulate_trajectories calls retain the fail-closed CUDA-LUT guard as a
     # lower-level contract.
-    exact_only = straggling or case.get("inelastic_model") is not None
+    exact_only = case.get("inelastic_model") is not None
     transport_lut_config = (
         TransportLUTConfig(enabled=False) if core == "cuda" and exact_only else None
     )

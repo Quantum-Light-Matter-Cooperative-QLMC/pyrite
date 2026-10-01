@@ -34,12 +34,21 @@ def run_transport_lut_kernel(
     control,
     geometry,
     lut,
+    materials,
     state,
     segments,
     pe_out,
+    straggling,
     config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
 ):
-    """Launch the energy-LUT transport kernel."""
+    """Launch the energy-LUT transport kernel.
+
+    Signature matches the CPU ``_transport_core_ungrooved_perelectron_lut``
+    positionally. ``materials`` is the padded per-element
+    ``(L_Js, L_Zs, L_ks, L_coeffs, L_E_cross)`` tables plus the SBETHE group the
+    Urban sampler reads; without straggling they are one-row dummies the kernel
+    never touches. ``straggling`` is ``(straggle_on, stragg_dE)``.
+    """
     (e_start, e_count, cap, stream_key) = run
     (max_steps, _max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
     (
@@ -63,6 +72,8 @@ def run_transport_lut_kernel(
         lut_cdf,
         lut_alpha,
     ) = lut
+    (L_Js, L_Zs, L_ks, L_coeffs, L_E_cross) = materials[:5]
+    sbethe_on = bool(materials[5])
     (alive, clock, pos, dirs, E_keV, E_cut_by_electrons) = state
     (
         seg_dir,
@@ -79,6 +90,7 @@ def run_transport_lut_kernel(
         seg_event,
     ) = segments
     (seg_count, exit_code) = pe_out
+    (straggle_on, stragg_dE) = straggling
     nthreads = int(config.nthreads)
     if nthreads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
@@ -138,6 +150,15 @@ def run_transport_lut_kernel(
             seg_event,
             seg_count,
             exit_code,
+            np.int32(1 if straggle_on else 0),
+            stragg_dE,
+            L_Js.reshape(-1),
+            L_Zs.reshape(-1),
+            L_ks.reshape(-1),
+            L_coeffs.reshape(-1),
+            L_E_cross.reshape(-1),
+            np.int32(L_Zs.shape[1]),
+            np.int32(1 if sbethe_on else 0),
         ),
     )
 
@@ -146,16 +167,7 @@ def make_cuda_transport_lut_core(config=DEFAULT_TRANSPORT_KERNEL_CONFIG):
     """Return the LUT CUDA core and CuPy array module for the shared driver."""
 
     def core(*args):
-        # Shared driver (_run_per_electron_transport_lut) also passes the CPU
-        # LUT core (_transport_core_ungrooved_perelectron_lut) its straggling
-        # extras -- the exact per-element ``materials`` tables and the
-        # ``straggling`` group; the CUDA LUT kernel has no straggling support
-        # (see api.py's NotImplementedError for straggle_on=True on this path),
-        # so drop them before forwarding.
-        run, control, geometry, lut, _materials, state, segments, pe_out, _straggling = args
-        run_transport_lut_kernel(
-            run, control, geometry, lut, state, segments, pe_out, config=config
-        )
+        run_transport_lut_kernel(*args, config=config)
 
     return core, xp
 

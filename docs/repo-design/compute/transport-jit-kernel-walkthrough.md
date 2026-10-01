@@ -310,11 +310,11 @@ For a two-element layer, suppose element 0's cumulative probabilities at the sam
 
 After the energy update, the kernel recomputes the interpolation coordinate at the new energy before reading the selected element's `lut_alpha`. Scattering therefore uses the post-flight energy, matching the direct kernel.
 
-The LUT core has no Urban straggling branch. Its factory drops the seven straggling arguments appended for the shared CPU driver, and the API rejects a straggling request on this route instead of silently changing the model.
+With straggling on, the LUT kernel follows the CPU LUT core's straggled branch: the deterministic `max_dE_frac` cap uses the interpolated `lut_dEds`, then the Urban loss is sampled per element from the exact padded `(L_Js, L_Zs, L_ks, L_coeffs, L_E_cross)` tables the shared driver uploads, and the cutoff is the sampled-loss crossing test. Under SBETHE stopping the elemental `C_i` are rescaled by `lut_dEds / _dEds_packed`, as on the host. The clock still reads `lut_inv_beta`. Both kernels call the same `_urban_sample_compound` device function, so they sample one law in one draw order.
 
 ## Straggling stream separation
 
-When enabled in the direct kernel, Urban loss does not consume from the base free-path/scattering counter. It hashes the electron key into a separate `urban_key`, then derives a `flight_key` from `(urban_key, flight_id, substep_id)`. A local straggling counter starts at zero for that key.
+When enabled in either kernel, Urban loss does not consume from the base free-path/scattering counter. It hashes the electron key into a separate `urban_key`, then derives a `flight_key` from `(urban_key, flight_id, substep_id)`. A local straggling counter starts at zero for that key.
 
 Consequently, enabling straggling cannot shift which base uniforms select the elastic collision distance or angles. Within the straggling stream, the kernel draws exact Poisson channel counts by inverse CDF, splitting large means into bounded chunks whose independent Poisson counts add. Continuum ionisation then uses one additional uniform per sampled quantum. The sampled row loss is accumulated in `stragg_dE`; if it crosses the cutoff, the row length is fluidly interpolated to the crossing and the applied end energy is exactly the cutoff.
 
@@ -333,7 +333,7 @@ CPU/CUDA straggling is not promised bit-for-bit after transcendental functions: 
 | Scatter parameter | formula or Mott table | interpolated `lut_alpha` |
 | Midpoint propagation | direct stopping evaluations | repeated table interpolation |
 | Energy substeps | supported | supported |
-| Urban straggling | supported | rejected by API |
+| Urban straggling | supported | supported (exact element tables, LUT cap and clock) |
 | Geometry and output slots | identical structure | identical structure |
 
 ## Reading and changing these kernels safely

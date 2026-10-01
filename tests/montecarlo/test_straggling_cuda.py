@@ -1,20 +1,15 @@
 """Straggling on the CUDA transport kernels.
 
-Slice F of ``feature/energy-loss-straggling``. Two disjoint halves:
+Slice F of ``feature/energy-loss-straggling`` wired the exact CUDA kernel;
+issue #280 wired the CUDA *LUT* kernel through the same shared
+``_urban_sample_compound`` device sampler. Two halves:
 
-* **The fail-closed raise**, which needs no device and runs everywhere. The
-  CUDA *LUT* kernel (``_transport_lut_kernel``) is deliberately not wired for
-  straggling -- it carries no per-element split to sample from, no duplicated
-  Urban sampler, and ``run_transport_lut_kernel`` does not accept the
-  straggling parameters at all. ``simulate_trajectories`` must therefore raise
-  for that combination rather than silently return an unstraggled result or an
-  opaque ``TypeError``, matching the ``energy_model`` fail-closed precedent the
-  task doc names. Asserted here rather than merely documented.
+* **Core selection**, which needs no device: a straggled production case keeps
+  the CUDA LUT core instead of being forced onto the exact one.
 
-* **Hardware parity**, gated on an actual CUDA device. Slices D, E and F were
-  authored on a machine without CUDA, so these tests close the transcription
-  gap. Post-fix validation passed all five tests on an RTX 5080 with driver
-  610.47 and CuPy 14.1.1 through ``pyrite remote``.
+* **Hardware parity**, gated on an actual CUDA device and run through
+  ``pyrite remote``. Slices D, E and F were authored on a machine without CUDA,
+  so these tests close the transcription gap.
 
 The parity claim is deliberately *not* bit-for-bit and is not stated per row.
 ``_urban_poisson_scalar`` inverts a floating-point CDF, so a last-bit libm
@@ -26,12 +21,19 @@ comparable quantity is therefore the *first* row of each electron -- taken at
 the unperturbed start energy, before any straggling draw has been applied --
 which is exactly the scope
 ``test_transport_per_electron.py::test_cuda_first_step_agrees_with_the_cpu_reference``
-already uses for the deterministic path.
+already uses for the deterministic path. LUT-versus-exact agreement is a
+distribution claim on top of that, with the LUT table error bounded separately
+by ``test_transport_lut.py``.
+
+Validation: energy-loss-straggling
 """
 
 import numpy as np
 import pytest
 
+from pyrite.campaign.config import material_sweep
+from pyrite.campaign.sweep import build_cases
+from pyrite.montecarlo import runner
 from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectories
 
 NO_LUT = TransportLUTConfig(enabled=False)
@@ -54,41 +56,36 @@ def _run(**overrides):
     return simulate_trajectories(**kwargs)
 
 
-# --- fail-closed: the one path slice F deliberately left unwired -------------
+# --- core selection ----------------------------------------------------------
 
 
-def test_cuda_lut_core_raises_rather_than_running_unstraggled():
-    """``straggling=True`` with ``transport_core='cuda'`` and the LUT enabled
-    (the default LUT configuration) must raise ``NotImplementedError``.
+def test_straggled_production_case_keeps_the_cuda_lut(monkeypatch):
+    """Straggling no longer forces the exact CUDA kernel (#280)."""
+    from pyrite.montecarlo.transport import batching
 
-    This runs without a CUDA device because the guard sits in
-    ``simulate_trajectories`` ahead of the ``transport._jit_launch`` import, by
-    construction: the point of a fail-closed guard is that it fires before
-    anything device-specific is reached. The message must name both escapes so
-    a caller who hits it can act on it.
-    """
-    with pytest.raises(NotImplementedError) as excinfo:
-        _run(straggling=True, transport_core="cuda")
-    message = str(excinfo.value)
-    assert "CUDA LUT core" in message
-    assert "TransportLUTConfig(enabled=False)" in message
-    assert "per-electron" in message
+    monkeypatch.setattr(batching, "_cuda_transport_available", lambda: True)
+    monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
+    case = dict(
+        build_cases(material_sweep("silicon"), 4, 4, energy_model="midpoint", straggling=True)[0]
+    )
+    case["Ne"] = 10**5
+    assert runner._case_transport_core(case) == "cuda"
 
-
-def test_cuda_lut_core_does_not_raise_with_straggling_off():
-    """The guard is scoped to ``straggling=True`` and must not have made the
-    ordinary CUDA LUT path unreachable. Without a device this resolves away
-    from CUDA before the guard, so the assertion is that *no*
-    ``NotImplementedError`` escapes, on either kind of machine."""
-    try:
-        _run(straggling=False, transport_core="cuda")
-    except NotImplementedError:  # pragma: no cover - would be the bug
-        pytest.fail("the straggling guard fired with straggling off")
-    except Exception:
-        # No CUDA device on this machine: `resolve_transport_core` refuses the
-        # request long before the straggling guard. That is not what this test
-        # is about.
+    class Launched(Exception):
         pass
+
+    seen = {}
+
+    def launch(*args, **kwargs):
+        seen.update(kwargs)
+        raise Launched
+
+    monkeypatch.setattr(runner, "simulate_trajectories", launch)
+    with pytest.raises(Launched):
+        runner._transport_case(case)
+    assert seen["transport_core"] == "cuda"
+    assert seen["straggling"] is True
+    assert "transport_lut_config" not in seen
 
 
 # --- hardware parity ---------------------------------------------------------
@@ -104,6 +101,8 @@ requires_cuda = pytest.mark.skipif(not _HAS_CUDA, reason="no CUDA device")
 
 CUDA = dict(transport_core="cuda", transport_lut_config=NO_LUT)
 HOST = dict(transport_core="per-electron", transport_lut_config=NO_LUT)
+CUDA_LUT = dict(transport_core="cuda")
+HOST_LUT = dict(transport_core="per-electron")
 
 
 @pytest.mark.hardware
@@ -222,3 +221,130 @@ def test_cuda_straggling_matches_the_host_in_distribution():
     gpu = _run(**CUDA, straggling=True, Ne=512)
     assert gpu["straggle_dE_keV"].sum() == pytest.approx(cpu["straggle_dE_keV"].sum(), rel=0.02)
     assert gpu["n_cutoff_stopped"] == pytest.approx(cpu["n_cutoff_stopped"], rel=0.05, abs=2)
+
+
+# --- CUDA LUT kernel (#280) --------------------------------------------------
+
+
+@pytest.mark.hardware
+@requires_cuda
+def test_cuda_lut_straggling_off_is_bit_for_bit():
+    """The LUT kernel's straggled branch leaves the off path untouched."""
+    default = _run(**CUDA_LUT)
+    explicit_off = _run(**CUDA_LUT, straggling=False)
+    assert "straggle_dE_keV" not in default
+    for key, left in default.items():
+        right = explicit_off[key]
+        if isinstance(left, np.ndarray):
+            np.testing.assert_array_equal(left, right, err_msg=key)
+        elif isinstance(left, (int, float, np.number)):
+            assert left == right, key
+
+
+@pytest.mark.hardware
+@requires_cuda
+def test_cuda_lut_straggling_is_deterministic():
+    a = _run(**CUDA_LUT, straggling=True, energy_model="midpoint", max_dE_frac=0.02)
+    b = _run(**CUDA_LUT, straggling=True, energy_model="midpoint", max_dE_frac=0.02)
+    for key in ("L_ang", "E_keV", "E_end_keV", "straggle_dE_keV", "elec_id", "substep_id"):
+        np.testing.assert_array_equal(a[key], b[key], err_msg=key)
+
+
+@pytest.mark.hardware
+@requires_cuda
+@pytest.mark.parametrize(
+    "numerics",
+    [
+        dict(energy_model="frozen"),
+        dict(energy_model="midpoint", max_dE_frac=0.02),
+        dict(
+            energy_model="midpoint",
+            stopping_tables=[
+                {
+                    "stopping_energy_eV": np.array([5.0e3, 10.0e3, 25.0e3]),
+                    "stopping_eV_per_angstrom": np.array([1.0, 1.0, 1.0]),
+                }
+            ],
+        ),
+    ],
+    ids=["frozen", "midpoint-cap", "midpoint-sbethe"],
+)
+def test_cuda_lut_first_row_matches_the_cpu_lut_core_under_straggling(numerics):
+    """Transcription check of the LUT kernel against its CPU twin.
+
+    Same scope as the exact-kernel first-row test: identical LUT inputs,
+    streams and branches, so only libm rounding separates the two on the row
+    taken at the unperturbed start energy. The SBETHE case exercises the
+    ``stopping_scale`` rescaling of ``C_i`` to the LUT stopping.
+    """
+    cpu = _run(**HOST_LUT, straggling=True, **numerics)
+    gpu = _run(**CUDA_LUT, straggling=True, **numerics)
+
+    cpu_first = np.flatnonzero(np.diff(cpu["elec_id"], prepend=-1))
+    gpu_first = np.flatnonzero(np.diff(gpu["elec_id"], prepend=-1))
+    assert np.array_equal(cpu["elec_id"][cpu_first], gpu["elec_id"][gpu_first])
+    np.testing.assert_allclose(cpu["L_ang"][cpu_first], gpu["L_ang"][gpu_first], rtol=1e-12)
+    end = "E_end_keV" if "E_end_keV" in cpu else "E_keV"
+    np.testing.assert_allclose(cpu[end][cpu_first], gpu[end][gpu_first], rtol=1e-12)
+    np.testing.assert_allclose(cpu["r_mid"][cpu_first], gpu["r_mid"][gpu_first], rtol=1e-12)
+
+
+def _pooled(core, numerics, seeds, Ne):
+    """Per-electron sampled loss and cutoff count pooled over ``seeds``."""
+    losses, n_cutoff = [], 0
+    for seed in seeds:
+        out = _run(
+            **core,
+            straggling=True,
+            seed=seed,
+            Ne=Ne,
+            thickness_ang=60000.0,
+            max_steps=20000,
+            **numerics,
+        )
+        losses.append(out["straggle_dE_keV"])
+        n_cutoff += int(out["n_cutoff_stopped"])
+    return np.concatenate(losses), n_cutoff
+
+
+@pytest.mark.hardware
+@requires_cuda
+@pytest.mark.parametrize(
+    "numerics",
+    [dict(energy_model="frozen"), dict(energy_model="midpoint", max_dE_frac=0.02)],
+    ids=["no-cap", "binding-cap"],
+)
+def test_cuda_lut_matches_exact_cuda_in_distribution(numerics):
+    """LUT and exact CUDA cores agree in distribution under straggling.
+
+    Mean, variance and upper tail of the per-electron sampled loss, and the
+    cutoff fraction, pooled over seeds. Tolerances are four standard errors of
+    *independent* samples; the two cores share stream keys, so their runs are
+    positively correlated and the test is conservative. The LUT table error
+    (``test_transport_lut.py``) is far below these Monte Carlo errors.
+    """
+    seeds, Ne = (11, 22, 33, 44), 1024
+    exact, exact_cut = _pooled(CUDA, numerics, seeds, Ne)
+    lut, lut_cut = _pooled(CUDA_LUT, numerics, seeds, Ne)
+    n = exact.size
+    assert lut.size == n
+
+    se_mean = np.sqrt((exact.var(ddof=1) + lut.var(ddof=1)) / n)
+    assert abs(lut.mean() - exact.mean()) < 4.0 * se_mean
+
+    # Var(s^2) ~ (mu4 - sigma^4)/n per sample.
+    def var_se(x):
+        c = x - x.mean()
+        return np.sqrt(max((np.mean(c**4) - np.mean(c**2) ** 2) / n, 0.0))
+
+    se_var = np.hypot(var_se(exact), var_se(lut))
+    assert abs(lut.var(ddof=1) - exact.var(ddof=1)) < 4.0 * se_var
+
+    # Upper tail: fraction of LUT electrons above the exact 95th percentile.
+    q95 = np.quantile(exact, 0.95)
+    tail = np.mean(lut > q95)
+    assert abs(tail - 0.05) < 4.0 * np.sqrt(2.0 * 0.05 * 0.95 / n)
+
+    p_exact, p_lut = exact_cut / n, lut_cut / n
+    p_pool = 0.5 * (p_exact + p_lut)
+    assert abs(p_lut - p_exact) < 4.0 * np.sqrt(2.0 * p_pool * (1.0 - p_pool) / n) + 1.0 / n

@@ -299,7 +299,7 @@ def simulate_trajectories(
           Elastic hazard stays frozen at the start energy within each row;
           `max_dE_frac` substeps re-evaluate it at the next row's start. The
           lockstep, per-electron, grooved, and CUDA cores all implement the
-          midpoint schema; unsupported CUDA-LUT/straggling combinations fail
+          midpoint schema; the unsupported CUDA-LUT/shell combination fails
           closed separately.
 
     See docs/validation/beam-transport/transport-midpoint-stopping.md.
@@ -329,10 +329,12 @@ def simulate_trajectories(
       -- and returns the summed per-electron SAMPLED loss as
       ``result["straggle_dE_keV"]``.
 
-      The sampled loss is applied on every host core and the exact CUDA core.
-      The CUDA LUT combination raises rather than silently returning an
-      unstraggled result; production core selection falls back to exact CUDA
-      when straggling is enabled. ``E_keV``/``E_end_keV``, cutoff crossing and
+      The sampled loss is applied on every host core and on both CUDA cores.
+      The LUT cores (CPU and CUDA) interpolate the mean stopping, hazard and
+      deterministic ``max_dE_frac`` cap from the energy LUT but sample the
+      Urban loss per element from the exact packed tables, so the per-flight
+      law is the exact core's at the LUT's own row length.
+      ``E_keV``/``E_end_keV``, cutoff crossing and
       ``n_cutoff_stopped`` reflect the sampled loss. On a cutoff row the
       applied loss is ``E_start - E_cut``; the diagnostic retains the full
       sampled loss, including the discarded overshoot.
@@ -801,7 +803,8 @@ def simulate_trajectories(
     # Straggling (slice D): False skips the Urban sampler on every core,
     # BIT-FOR-BIT. Lockstep/grooved cores key it by ``stragg_stream_keys``;
     # per-electron cores reuse their own stream keys. ``stragg_layer_tables``
-    # gives the per-electron LUT core the per-element split the LUT lacks.
+    # gives the per-electron LUT cores (CPU and CUDA) the per-element split
+    # the LUT lacks.
     layer_arrays = (
         L_Js,
         L_Zs,
@@ -877,17 +880,6 @@ def simulate_trajectories(
     vac_id = np.empty(0, dtype=np.int64)
     if groove is None and transport_lut is not None and transport_core != "lockstep":
         if transport_core == "cuda":
-            if straggle_on:
-                # Only the exact CUDA kernel carries the Urban sampler; the LUT
-                # kernel has no per-element split to sample from. Raise rather
-                # than return an unstraggled result.
-                raise NotImplementedError(
-                    "straggling=True is not implemented on the CUDA LUT core "
-                    "(transport_core='cuda' with the LUT enabled); disable the "
-                    "LUT (transport_lut_config=TransportLUTConfig(enabled=False)) "
-                    "to reach the CUDA exact per-electron core, or run off CUDA "
-                    "with transport_core='per-electron' or 'lockstep'"
-                )
             if shell_mode:
                 raise NotImplementedError(
                     "inelastic_model='shell-soft-hard' is not implemented on the CUDA "

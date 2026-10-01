@@ -268,6 +268,148 @@ def _dEds_spliced_element(J, k, coeff, E_cross, E_i):
 
 
 @jit.rawkernel(device=True)
+def _urban_poisson(lam, key, counter):
+    """Poisson count with mean ``lam`` drawn from ``(key, counter...)``.
+
+    Mirrors transport._urban_poisson_scalar: bounded-rate inverse-CDF chunks,
+    one uniform each, summed by Poisson additivity. Device functions return one
+    value, so the caller advances its own counter by the chunk count
+    ``_urban_poisson_chunks(lam)``.
+    """
+    n = I32_ZERO
+    if lam > F64_ZERO:
+        chunks = np.int32(xp.ceil(lam / URBAN_POISSON_CHUNK_MAX))
+        chunk_lam = lam / np.float64(chunks)
+        chunk = I32_ZERO
+        while chunk < chunks:
+            u = _stream_uniform(key, counter + np.uint64(chunk))
+            p = xp.exp(-chunk_lam)
+            cdf = p
+            k = I32_ZERO
+            while u >= cdf:
+                k += I32_ONE
+                p = p * chunk_lam / np.float64(k)
+                next_cdf = cdf + p
+                if next_cdf <= cdf:
+                    break
+                cdf = next_cdf
+            n += k
+            chunk += I32_ONE
+    return n
+
+
+@jit.rawkernel(device=True)
+def _urban_poisson_chunks(lam):
+    """Uniforms :func:`_urban_poisson` consumes for mean ``lam``."""
+    chunks = U64_ZERO
+    if lam > F64_ZERO:
+        chunks = np.uint64(xp.ceil(lam / URBAN_POISSON_CHUNK_MAX))
+    return chunks
+
+
+@jit.rawkernel(device=True)
+def _urban_sample_compound(
+    L_Zs, L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, E_j, step_j, stopping_scale, flight_key
+):
+    """Urban collision loss of one layer row over ``step_j`` [keV, positive].
+
+    Mirrors transport._urban_sample_compound_keV / _urban_sample_element_keV /
+    _urban_channels_scalar / _urban_levels_scalar / _urban_poisson_scalar: one
+    independent Bragg-additive draw per element with its own ``C_i``, scaled by
+    ``stopping_scale``, from ``(flight_key, counter)`` with the counter starting
+    at 0 for every ``(flight, substep)``. Shared by the exact and LUT kernels so
+    both sample the same law in the same draw order.
+
+    Validation: energy-loss-straggling
+    """
+    counter = U64_ZERO
+    loss = F64_ZERO
+    tau_u = E_j / F64_MC2_KEV
+    gamma_u = F64_ONE + tau_u
+    beta_sq_u = F64_ONE - F64_ONE / (gamma_u * gamma_u)
+    two_mc2_bg2_u = F64_TWO * F64_MC2_KEV * tau_u * (tau_u + F64_TWO)
+    T_up_u = F64_HALF * E_j
+    i_el = I32_ZERO
+    while i_el < n_el:
+        Zc = L_Zs[row + i_el]
+        Jc = L_Js[row + i_el]
+        Cc = (
+            -_dEds_spliced_element(
+                Jc, L_ks[row + i_el], L_coeffs[row + i_el], L_E_cross[row + i_el], E_j
+            )
+            * stopping_scale
+        )
+
+        valid_u = T_up_u > URBAN_E0_KEV and Cc > F64_ZERO
+        L_I_u = F64_ZERO
+        if valid_u:
+            L_I_u = xp.log(two_mc2_bg2_u / Jc) - beta_sq_u
+            valid_u = L_I_u > F64_ZERO
+
+        dE_elem = F64_ZERO
+        if not valid_u:
+            dE_elem = Cc * step_j
+        else:
+            # Levels (transport._urban_levels_scalar): the K-shell channel
+            # E_2 = 10 Z^2 eV re-solves to f_1=1, E_1=I whenever it is
+            # inadmissible, which keeps <dE> = C s exact rather than
+            # overshooting under a naive clamp.
+            E_2_u = URBAN_E2_KEV_PER_Z2 * Zc * Zc
+            f_2_u = F64_TWO / Zc if Zc > F64_TWO else F64_ONE
+            f_1_u = F64_ONE
+            E_1_u = Jc
+            resolved_u = False
+            if (
+                Zc > F64_TWO
+                and E_2_u < T_up_u
+                and xp.log(two_mc2_bg2_u / E_2_u) - beta_sq_u > F64_ZERO
+            ):
+                f_1_cand = F64_ONE - f_2_u
+                E_1_cand = xp.exp((xp.log(Jc) - f_2_u * xp.log(E_2_u)) / f_1_cand)
+                if xp.log(two_mc2_bg2_u / E_1_cand) - beta_sq_u > F64_ZERO:
+                    f_1_u = f_1_cand
+                    E_1_u = E_1_cand
+                    resolved_u = True
+            if not resolved_u:
+                f_1_u = F64_ONE
+                E_1_u = Jc
+                f_2_u = F64_ZERO
+
+            soft_u = Cc * (F64_ONE - URBAN_RATE) / L_I_u
+            sigma_1_u = soft_u * (f_1_u / E_1_u) * (xp.log(two_mc2_bg2_u / E_1_u) - beta_sq_u)
+            sigma_2_u = F64_ZERO
+            if f_2_u > F64_ZERO:
+                sigma_2_u = soft_u * (f_2_u / E_2_u) * (xp.log(two_mc2_bg2_u / E_2_u) - beta_sq_u)
+            sigma_3_u = (
+                Cc
+                * URBAN_RATE
+                * (T_up_u - URBAN_E0_KEV)
+                / (URBAN_E0_KEV * T_up_u * xp.log(T_up_u / URBAN_E0_KEV))
+            )
+
+            lam1 = sigma_1_u * step_j
+            dE_elem += np.float64(_urban_poisson(lam1, flight_key, counter)) * E_1_u
+            counter = counter + _urban_poisson_chunks(lam1)
+            lam2 = sigma_2_u * step_j
+            dE_elem += np.float64(_urban_poisson(lam2, flight_key, counter)) * E_2_u
+            counter = counter + _urban_poisson_chunks(lam2)
+            # n_3, then its continuum quanta: exact inverse CDF of the 1/E^2
+            # spectrum, one uniform each (transport._urban_sample_element_keV).
+            lam3 = sigma_3_u * step_j
+            n3 = _urban_poisson(lam3, flight_key, counter)
+            counter = counter + _urban_poisson_chunks(lam3)
+            kq = I32_ZERO
+            while kq < n3:
+                dE_elem += _urban_ionisation(_stream_uniform(flight_key, counter), T_up_u)
+                counter = counter + U64_ONE
+                kq += I32_ONE
+
+        loss += dE_elem
+        i_el += I32_ONE
+    return loss
+
+
+@jit.rawkernel(device=True)
 def _lut_lerp_at(table, row_base, lut_n_energy, lut_log_E_min, lut_inv_dlogE, E_i):
     """Interpolate a flattened LUT row at an arbitrary energy.
 
