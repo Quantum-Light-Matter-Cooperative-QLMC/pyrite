@@ -363,23 +363,5 @@ def _(
     return
 
 
-@app.cell(hide_code=True)
-def _():
-    note = (
-        "*3D trajectory and crystal-structure views live in `trace_app.py` "
-        "(`marimo run src/pyrite/apps/trace_app.py`).*"
-    )
-    mo.vstack(
-        [
-            mo.md(note),
-            mo.md(
-                "*Pixel-detector observations: `pyrite app pixels launch`. Case baskets and "
-                "cross-material comparison: `pyrite app compare launch`.*"
-            ),
-        ]
-    )
-    return
-
-
 if __name__ == "__main__":
     app.run()
