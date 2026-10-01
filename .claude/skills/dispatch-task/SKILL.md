@@ -69,8 +69,10 @@ available, return this filled handoff and target skill instead.
 Dispatch is the issue writer unless it granted `issue-writer: yes`. Verify each
 reported item against the branch diff and checks, then tick the matching
 Plan/Acceptance boxes in the issue body (`gh issue edit <n> --body-file`),
-preserving all other text. Leave unverified items unticked and note why in the
-reply. Re-dispatch any remainder as a new slice.
+preserving all other text. A physics claim item is verified when the ledger row
+shows its target `rederived`/`anchored` status; sign-off never gates ticking or
+closure. Leave unverified items unticked and note why in the reply.
+Re-dispatch any remainder as a new slice.
 
 ## After landing
 

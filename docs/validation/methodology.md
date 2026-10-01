@@ -91,7 +91,7 @@ Return this concise structure:
 - **Re-derivation**: `matches` | `differs` — `<exact divergent term or convention>`
 - **Verdict**: `filtered` | `rederived` | `discrepancy`
 - **Write-up**: `docs/validation/<domain>/<id>.md`
-- **Suggested ledger change**: `<proposed row edit or none; human applies it>`
+- **Suggested ledger change**: `<proposed row edit or none; the task owner applies it, never as signed-off>`
 ```
 
 For a discrepancy, identify the first exact factor, sign, exponent, unit, or convention that diverges. Do not substitute a general narrative for that diff.
@@ -102,6 +102,15 @@ For a discrepancy, identify the first exact factor, sign, exponent, unit, or con
 - New physics lands **with** a ledger row + a limiting-case test, or it doesn't land.
 - Verification is done by a **different context/model** than the one that wrote the code.
 - Only a **human** moves a claim to `signed-off`.
+
+## Agent done criteria
+
+For agent task work, a new or edited ledger claim is done at the status the task targets, never at `signed-off`:
+
+- **`rederived`** — derivation/verification tasks: a fresh-context verifier returned `rederived` and the task owner (not the verifier) applied it to the ledger row.
+- **`anchored`** — tasks that also pin the claim: `rederived` plus a regression test against a reference value, green, named in the row's `Anchor` field.
+
+Issue acceptance items name the target status per claim id (e.g. "`<id>` ledger row at `anchored`"). Never write a `signed-off` acceptance item, and never keep a task issue open awaiting sign-off. Human sign-off is tracked only by the single standing ledger-review issue ([#277](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/277)), which a human works through independently of task issues.
 
 ## Design note
 

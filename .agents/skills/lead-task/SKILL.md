@@ -19,7 +19,9 @@ Own the issue outcome, not unlimited repository scope.
    Serena when symbol-level navigation materially helps; do not perform tool
    setup ceremony by default.
 3. Invoke only matching domain skills. Require fresh-context physics validation
-   for changed physics; route heavy compute through `remote-gpu-jobs`.
+   for changed physics; a claim is done at its target ledger status
+   (`rederived` or `anchored`), applied by you from the verifier's verdict,
+   never `signed-off`. Route heavy compute through `remote-gpu-jobs`.
 4. The issue body is the task record. Refine its `## Plan` only with
    `issue-writer: yes`; otherwise propose plan changes in the report. Keep
    disposable working notes in ignored `scratch/`; use `agentdocs/plans/` only

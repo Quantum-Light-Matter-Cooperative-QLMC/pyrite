@@ -41,6 +41,11 @@ task docs, commit, or push. `dispatch-task` owns routing to a worker.
 
    Omit empty sections. Put durable design decisions in their owning docs once
    implemented, not in a second backlog file.
+   For new/edited physics claims, each acceptance item names the claim id and
+   its target ledger status: `rederived` (derivation/verification work) or
+   `anchored` (also pinned by a regression test). Never add a `signed-off`
+   item; human sign-off lives only in the standing ledger-review issue #277 (see
+   `docs/validation/methodology.md` "Agent done criteria").
 4. Use existing `area:*`/type labels when clearly applicable, and apply
    `status:backlog` (accepted, not yet scheduled; `dispatch-task` sets
    `status:active`). Use native issue relations (`--blocked-by`, `--blocking`,

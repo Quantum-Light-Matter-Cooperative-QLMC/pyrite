@@ -102,4 +102,6 @@ read-only.
 
 New/edited physics requires source equation, assumptions, limiting case,
 `Validation: <id>`, and ledger row. Fresh context verifies it; only human marks
-`signed-off`.
+`signed-off`. Agent task "done" for a claim is `rederived` or `anchored` per
+the task, never `signed-off`; human sign-off is tracked only in #277 (see
+`docs/validation/methodology.md`).

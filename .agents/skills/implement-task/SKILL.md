@@ -18,6 +18,9 @@ description: Use when implementing a coherent, bounded slice of a PyRITE GitHub 
    activation/manual/config ceremony unless troubleshooting the tool itself.
 4. Invoke only domain skills materially relevant to the slice. Stop for a
    material design decision not resolved by the issue.
+5. A physics claim is done at its target ledger status (`rederived` or
+   `anchored`), applied by you after a fresh-context verifier's verdict; never
+   mark or wait for `signed-off`.
 
 ## Implement and verify
 
