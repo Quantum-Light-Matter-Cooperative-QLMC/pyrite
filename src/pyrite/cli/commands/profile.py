@@ -50,7 +50,7 @@ _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 #: to avoid coupling this CLI module to that private catalog constant).
 _EMISSION_VALUES = ("incoherent", "coherent", "both")
 _ENERGY_MODEL_VALUES = ("frozen", "midpoint")
-_INELASTIC_MODEL_VALUES = ("continuous", "shell-soft-hard")
+_INELASTIC_MODEL_VALUES = ("auto", "continuous", "shell-soft-hard")
 _ELASTIC_MODEL_VALUES = ("mott", "elsepa")
 _BREMSSTRAHLUNG_MODEL_VALUES = ("auto", "eedl", "bremslib")
 _RADIATIVE_MODEL_VALUES = ("auto", "uncoupled", "bremslib-soft-hard")
@@ -274,10 +274,13 @@ def _emit_show(payload):
         display = f"{value:g}" if key == "max_dE_frac" else str(value)
         emit_result(f"  {label}: {display}{' (default)' if key not in numerics else ''}")
     if "inelastic_model" in numerics:
+        cutoff = numerics.get("inelastic_cutoff_eV")
         emit_result(
             f"  inelastic model: {numerics['inelastic_model']}"
-            f" (W_c {numerics.get('inelastic_cutoff_eV', 0.0):g} eV)"
+            + ("" if cutoff is None else f" (W_c {cutoff:g} eV)")
         )
+    else:
+        emit_result("  inelastic model: auto (default)")
     if "secondary_threshold_eV" in numerics:
         emit_result(f"  secondary threshold: {numerics['secondary_threshold_eV']:g} eV")
     if "elastic_model" in numerics:
@@ -454,8 +457,9 @@ def numerics_show_command(name, fidelity, json_output):
     "--inelastic-model",
     type=click.Choice(_INELASTIC_MODEL_VALUES),
     help=(
-        "Collision energy-loss scheme: continuous stopping, or the opt-in shell-soft-hard "
-        "mixed scheme (requires midpoint and --inelastic-cutoff-ev; CPU transport only)."
+        "Collision energy-loss scheme: auto (default; shell-soft-hard hard inelastic "
+        "collisions where every layer has shell data, otherwise continuous with a warning), "
+        "continuous stopping, or shell-soft-hard (requires midpoint and --inelastic-cutoff-ev)."
     ),
 )
 @click.option(
@@ -463,7 +467,7 @@ def numerics_show_command(name, fidelity, json_output):
     type=click.FloatRange(min=0.0, min_open=True),
     metavar="EV",
     help=(
-        "Soft/hard energy-loss cutoff W_c in eV for shell-soft-hard; must exceed each "
+        "Soft/hard energy-loss cutoff W_c in eV (default 50 under auto); must exceed each "
         "material's conduction-band resonance (Si 16.7, SiO2 22, MoS2 23 eV)."
     ),
 )

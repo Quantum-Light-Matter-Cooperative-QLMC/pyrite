@@ -1,34 +1,43 @@
 """Per-case transport-layer material resolution: SBETHE, ELSEPA and BremsLib tables, shell keys."""
 
 
+def case_shell_materials(case):
+    """Catalog key of each transport layer for the shell model, ``None`` where absent.
+
+    The case crystal for a single slab or the first layer, a radiator's
+    crystal for radiator layers; any other absorber layer has no catalog key.
+    """
+    layers = case.get("abs_layers")
+    if layers is None:
+        return [str(case["crystal"])]
+    radiators = case.get("layer_radiators") or [None] * len(layers)
+    materials = []
+    for index in range(len(layers)):
+        radiator = radiators[index] if index < len(radiators) else None
+        if radiator is not None:
+            materials.append(str(radiator["crystal"]))
+        else:
+            materials.append(str(case["crystal"]) if index == 0 else None)
+    return materials
+
+
 def _case_inelastic_kwargs(case):
-    """``simulate_trajectories`` kwargs of a case's opt-in inelastic mode.
+    """``simulate_trajectories`` kwargs of a case's shell soft/hard inelastic mode.
 
     Empty for continuous stopping. The shell soft/hard mode names one catalog
-    key per transport layer, resolved like :func:`_case_stopping_table_records`:
-    the case crystal for a single slab or the first layer, a radiator's crystal
-    for radiator layers; any other absorber layer has no shell model and raises.
+    key per transport layer (:func:`case_shell_materials`); an absorber layer
+    without one raises.
     """
     model = case.get("inelastic_model")
     if model is None:
         return {}
-    layers = case.get("abs_layers")
-    if layers is None:
-        materials = [str(case["crystal"])]
-    else:
-        radiators = case.get("layer_radiators") or [None] * len(layers)
-        materials = []
-        for index in range(len(layers)):
-            radiator = radiators[index] if index < len(radiators) else None
-            if radiator is not None:
-                materials.append(str(radiator["crystal"]))
-            elif index == 0:
-                materials.append(str(case["crystal"]))
-            else:
-                raise ValueError(
-                    f"inelastic_model={model!r} needs a catalog material for every "
-                    f"layer; absorber layer {index} has none"
-                )
+    materials = case_shell_materials(case)
+    for index, material in enumerate(materials):
+        if material is None:
+            raise ValueError(
+                f"inelastic_model={model!r} needs a catalog material for every "
+                f"layer; absorber layer {index} has none"
+            )
     return dict(
         inelastic_model=model,
         inelastic_cutoff_eV=float(case["inelastic_cutoff_eV"]),

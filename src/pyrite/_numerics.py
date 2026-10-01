@@ -22,10 +22,14 @@ TRANSPORT_KEYS = (
     "radiative_model",
     "radiative_cutoff_eV",
 )
-#: ``simulate_trajectories`` collision-loss schemes; mirrors
+#: Collision-loss schemes a run may select: ``"auto"`` (the default) plus the
+#: ``simulate_trajectories`` schemes of
 #: ``montecarlo.transport.hard_inelastic.INELASTIC_MODELS`` (a test keeps the
-#: two in step) without importing the transport package here.
-INELASTIC_MODELS = ("continuous", "shell-soft-hard")
+#: two in step) without importing the transport package here. ``"auto"``
+#: resolves per case to ``"shell-soft-hard"`` where the shell model covers
+#: every layer and to ``"continuous"`` otherwise; a case records only the result.
+INELASTIC_MODELS = ("auto", "continuous", "shell-soft-hard")
+DEFAULT_INELASTIC_CUTOFF_EV = 50.0
 #: Elastic models a case may select. ``"elsepa"`` (the default, issue #89)
 #: samples resolved ELSEPA tables; ``"mott"`` is the historical model.
 ELASTIC_MODELS = ("mott", "elsepa")
@@ -99,10 +103,13 @@ class Numerics:
         Maximum predicted fractional mean loss per row. Zero disables
         substepping; a positive value requires ``energy_model="midpoint"``.
     inelastic_model, inelastic_cutoff_eV
-        ``"continuous"`` stopping, or the opt-in ``"shell-soft-hard"`` mixed
-        scheme with its energy-loss cutoff ``W_c`` in eV (required by, and
-        only valid with, that mode, which also requires
-        ``energy_model="midpoint"``).
+        ``"auto"`` (default) uses the ``"shell-soft-hard"`` mixed scheme with
+        explicit hard inelastic collisions for each case whose layers all have
+        shell data, when ungrooved and ``energy_model="midpoint"``, and
+        otherwise warns and keeps ``"continuous"`` stopping. ``W_c`` is the
+        energy-loss cutoff in eV (default 50 under ``"auto"``; required by
+        explicit ``"shell-soft-hard"``, which also requires
+        ``energy_model="midpoint"``; invalid with ``"continuous"``).
     secondary_threshold_eV
         Opt-in transport of hard-collision secondaries (shell-soft-hard only):
         one threshold in eV is both production cut and secondary tracking
@@ -139,7 +146,7 @@ class Numerics:
     straggling: bool = False
     energy_model: Literal["frozen", "midpoint"] = "midpoint"
     max_dE_frac: float = 0.0
-    inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
+    inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "auto"
     inelastic_cutoff_eV: float | None = None
     secondary_threshold_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
@@ -237,7 +244,7 @@ def validate_radiative_numerics(
 def validate_inelastic_numerics(
     model: object, cutoff_eV: object, energy_model: object, secondary_threshold_eV: object = None
 ) -> None:
-    """Validate the opt-in inelastic mode's settings (not its per-material W_cb).
+    """Validate the inelastic mode's settings (not its per-material W_cb).
 
     The per-material ``W_c > W_cb`` requirement and the secondary threshold's
     table coverage are checked where the layer materials are known, by the
@@ -259,6 +266,8 @@ def validate_inelastic_numerics(
         if cutoff_eV is not None:
             raise ValueError("inelastic_cutoff_eV requires inelastic_model='shell-soft-hard'")
         return
+    if model == "auto" and cutoff_eV is None:
+        return
     if (
         isinstance(cutoff_eV, bool)
         or not isinstance(cutoff_eV, (int, float))
@@ -266,9 +275,9 @@ def validate_inelastic_numerics(
         or cutoff_eV <= 0.0
     ):
         raise ValueError(
-            "inelastic_model='shell-soft-hard' requires a finite positive inelastic_cutoff_eV"
+            f"inelastic_model={model!r} requires a finite positive inelastic_cutoff_eV"
         )
-    if energy_model != "midpoint":
+    if model == "shell-soft-hard" and energy_model != "midpoint":
         raise ValueError("inelastic_model='shell-soft-hard' requires energy_model='midpoint'")
 
 

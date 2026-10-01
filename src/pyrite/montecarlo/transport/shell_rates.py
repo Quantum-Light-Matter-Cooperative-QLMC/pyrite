@@ -242,13 +242,19 @@ def catalog_shell_oscillators(key: str) -> MaterialShellOscillators:
 
     Validation: penelope-shell-oscillators
     """
+    bands = load_conduction_bands()
+    if key not in bands:
+        raise ValueError(
+            f"{key!r} has no conduction-band shell data; the shell model covers "
+            f"{', '.join(sorted(bands))}"
+        )
     inputs = catalog_material(key)
     return build_shell_oscillators(
         inputs.composition,
         inputs.mean_excitation_eV,
         plasma_energy_eV(key),
         load_atomic_shells(),
-        load_conduction_bands()[key],
+        bands[key],
     )
 
 

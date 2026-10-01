@@ -163,8 +163,8 @@ def _simulation_scene(document, material, profile_name, detector_id=None):
             energy_model=cast(Literal["frozen", "midpoint"], energy_model),
             max_dE_frac=float(max_dE_frac),
             inelastic_model=cast(
-                Literal["continuous", "shell-soft-hard"],
-                transport.get("inelastic_model", "continuous"),
+                Literal["auto", "continuous", "shell-soft-hard"],
+                transport.get("inelastic_model", "auto"),
             ),
             inelastic_cutoff_eV=cast(float | None, transport.get("inelastic_cutoff_eV")),
             secondary_threshold_eV=cast(float | None, transport.get("secondary_threshold_eV")),

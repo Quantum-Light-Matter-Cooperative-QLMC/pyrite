@@ -762,7 +762,8 @@ def _resolved_run(args, material):
         and not settings.straggling
         and settings.energy_model == "midpoint"
         and settings.max_dE_frac == 0.0
-        and settings.inelastic_model == "continuous"
+        and settings.inelastic_model == "auto"
+        and settings.inelastic_cutoff_eV is None
         and settings.elastic_model == "elsepa"
         and settings.bremsstrahlung_model == "bremslib"
         and settings.radiative_model == "auto"

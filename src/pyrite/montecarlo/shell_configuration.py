@@ -73,6 +73,12 @@ def load_atomic_shells(path: str | Path | None = None) -> dict[int, tuple[Atomic
     Validation: sbethe-atomic-shell-inputs
     """
     source = _default_path() if path is None else Path(path)
+    if path is None and not source.is_file():
+        from ..xsgen._errors import DataFetchError
+
+        raise DataFetchError(
+            f"SBETHE shell data is not installed ({source}); run `pyrite tables fetch sbethe`"
+        )
     data = source.read_bytes()
     if path is None and hashlib.sha256(data).hexdigest() != PDATCONF_SHA256:
         raise ValueError(f"{source}: pdatconf.p14 checksum mismatch")

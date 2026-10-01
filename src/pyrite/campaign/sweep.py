@@ -48,6 +48,7 @@ from .._line_grid_policy import (
     resolve_line_grid_policy,
 )
 from .._numerics import (
+    DEFAULT_INELASTIC_CUTOFF_EV,
     validate_bremsstrahlung_model,
     validate_elastic_model,
     validate_inelastic_numerics,
@@ -86,6 +87,7 @@ from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is th
     target_from_flat,
     target_replace,
 )
+from .inelastic_cases import resolve_auto_inelastic
 from .longitudinal import LongitudinalDistribution, resolve_longitudinal_distribution
 
 MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
@@ -696,7 +698,7 @@ def build_cases(
     straggling=False,
     energy_model="midpoint",
     max_dE_frac=0.0,
-    inelastic_model="continuous",
+    inelastic_model="auto",
     inelastic_cutoff_eV=None,
     elastic_model="elsepa",
     bremsstrahlung_model="auto",
@@ -1013,15 +1015,15 @@ def build_cases(
                         **({"straggling": True} if straggling else {}),
                         **({"energy_model": "midpoint"} if energy_model == "midpoint" else {}),
                         **({"max_dE_frac": float(max_dE_frac)} if max_dE_frac > 0.0 else {}),
-                        # Opt-in shell soft/hard inelastic mode: divergence-only
-                        # keys, so continuous-stopping case payloads (and their
-                        # content keys) stay bit-for-bit.
+                        # Shell soft/hard inelastic mode: divergence-only keys,
+                        # so continuous-stopping case payloads (and their content
+                        # keys) stay bit-for-bit. "auto" joins after resolution.
                         **(
                             {
                                 "inelastic_model": inelastic_model,
                                 "inelastic_cutoff_eV": float(cast(float, inelastic_cutoff_eV)),
                             }
-                            if inelastic_model != "continuous"
+                            if inelastic_model == "shell-soft-hard"
                             else {}
                         ),
                         # Opt-in secondary transport (#94): divergence-only.
@@ -1055,6 +1057,14 @@ def build_cases(
                         domega_sr=domega,
                     )
                 )
+    if inelastic_model == "auto":
+        cases = resolve_auto_inelastic(
+            cases,
+            DEFAULT_INELASTIC_CUTOFF_EV
+            if inelastic_cutoff_eV is None
+            else float(cast(float, inelastic_cutoff_eV)),
+            energy_model,
+        )
     if bremsstrahlung_model == "auto":
         cases = resolve_auto_bremsstrahlung(cases, radiative)
     return cases

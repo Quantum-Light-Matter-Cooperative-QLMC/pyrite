@@ -54,9 +54,8 @@ table boundary.
 - segments below the cutoff radiate essentially nothing in the spectral window of
   interest, so the discarded path length does not carry the observables, while
   the elastic mean free path keeps shortening and the step count keeps growing;
-- the remaining energy is deposited and not tracked in the default continuous
-  mode. Opt-in shell soft/hard transport can launch secondaries above its
-  configured threshold;
+- the remaining energy is deposited and not tracked. Shell soft/hard transport
+  can launch secondaries above an opt-in threshold;
 - historical cutoff-sensitivity measurements below 1 keV used the former
   stopping law and do not establish SBETHE behavior below its table boundary.
 
@@ -77,9 +76,9 @@ where a study needs it.
 
 ## Assumptions and limits
 
-- Transport uses continuous SBETHE **collision** stopping by default. When BremsLib tables are unavailable or uncoupled transport is selected, bremsstrahlung and characteristic radiation are scored from the electron histories and do not debit electron energy. The default [BremsLib soft/hard radiative mode](../radiation-physics/hard-bremsstrahlung-events.md) adds its separate soft loss and sampled hard-photon debits.
+- Transport removes SBETHE **collision** stopping continuously, or splits it into soft loss and hard collisions in the default shell mode where it applies. When BremsLib tables are unavailable or uncoupled transport is selected, bremsstrahlung and characteristic radiation are scored from the electron histories and do not debit electron energy. The default [BremsLib soft/hard radiative mode](../radiation-physics/hard-bremsstrahlung-events.md) adds its separate soft loss and sampled hard-photon debits.
 - With `straggling=True`, Urban fluctuations are scaled to the SBETHE mean; the default is deterministic. See `Validation: energy-loss-straggling` and the [derivation and observable checks](../../validation/beam-transport/energy-loss-straggling.md).
-- The continuous model omits discrete knock-on electrons. The opt-in [shell soft/hard mode](shell-soft-hard-transport.md) samples hard inelastic transfers and can launch secondaries above its threshold; it uses SBETHE to close the mean collision loss.
+- The continuous model omits discrete knock-on electrons. The [shell soft/hard mode](shell-soft-hard-transport.md), the production default where shell data covers every layer, samples hard inelastic transfers and can launch secondaries above its threshold; it uses SBETHE to close the mean collision loss.
 - SBETHE includes shell and density-effect corrections above its material-dependent `ECUT`; below that it supplies an empirical extrapolation. PyRITE accepts its table only from 1 keV to 1 GeV and does not extrapolate outside those nodes.
 
 ## Validation

@@ -1,6 +1,6 @@
-# Shell soft/hard inelastic transport (opt-in)
+# Shell soft/hard inelastic transport
 
-The default transport removes the whole corrected collision stopping continuously (see [Stopping power](stopping-power.md)). `simulate_trajectories(inelastic_model="shell-soft-hard")` instead follows PENELOPE's mixed scheme{cite:p}`salvat2024penelope`: energy losses $W\le W_c$ stay continuous, and losses $W>W_c$ become discrete hard collisions that lower the primary energy by $W$ and deflect it by the sampled recoil. Both parts come from one stopping-closed shell generalized-oscillator-strength (GOS) model, so neither is added on top of the other. The mode is opt-in and requires `energy_model="midpoint"`. With the default `inelastic_model="continuous"`, transport is bit-for-bit unchanged.
+Continuous stopping removes the whole corrected collision stopping continuously (see [Stopping power](stopping-power.md)). `simulate_trajectories(inelastic_model="shell-soft-hard")` instead follows PENELOPE's mixed scheme{cite:p}`salvat2024penelope`: energy losses $W\le W_c$ stay continuous, and losses $W>W_c$ become discrete hard collisions that lower the primary energy by $W$ and deflect it by the sampled recoil. Both parts come from one stopping-closed shell generalized-oscillator-strength (GOS) model, so neither is added on top of the other. The mode requires `energy_model="midpoint"`. Production runs select it by default (see [Configuration](#configuration)); direct `simulate_trajectories` calls default to `inelastic_model="continuous"`, which is bit-for-bit unchanged.
 
 ## Model
 
@@ -96,6 +96,6 @@ Hard draws use a counter-addressed SplitMix64 stream keyed by the electron's str
 
 ## Configuration
 
-Profiles and `Numerics` carry `inelastic_model` and `inelastic_cutoff_eV`; `pyrite profile numerics set --inelastic-model shell-soft-hard --inelastic-cutoff-ev 50 --energy-model midpoint` sets them. Cases carry them only when the mode is on, so dataset identities and case content keys of continuous runs are unchanged.
+Profiles, `Numerics` and `Settings` carry `inelastic_model` and `inelastic_cutoff_eV`. The default `inelastic_model="auto"` (issue #281) resolves each case to `shell-soft-hard` with $W_c=50$ eV, or the given `inelastic_cutoff_eV`, when the run uses `energy_model="midpoint"`, is ungrooved, and every transport layer names a catalog crystal with packaged conduction-band shell data. Today that means silicon, SiO₂, MoS₂, HOPG and hBN. An amorphous absorber layer names no crystal. Any other case keeps continuous stopping, and one warning names the materials and the reason. Missing installable reference data is not a fallback: absent `pdatconf.p14` raises with `pyrite tables fetch sbethe`, and a cutoff at or below a layer's $W_{cb}$ raises. `pyrite profile numerics set --inelastic-model continuous` opts out; `--inelastic-model shell-soft-hard --inelastic-cutoff-ev 50` requires the mode, so an uncovered material raises. Cases and dataset identities carry the keys only when the mode resolves on, so continuous runs keep their content keys and digests.
 
 `Validation: shell-soft-hard-transport` (unverified). See [shell soft/hard transport validation](../../validation/beam-transport/shell-soft-hard-transport.md).

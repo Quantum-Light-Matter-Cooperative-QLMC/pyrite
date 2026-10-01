@@ -41,7 +41,7 @@ The focused CPU anchor `tests/montecarlo/test_shell_soft_hard_transport.py` pass
 [shell soft/hard transport](../../physics/beam-transport/shell-soft-hard-transport.md).
 Ledger row: [`shell-soft-hard-transport`](../ledger-transport-background.md#shell-soft-hard-transport).
 
-This record covers the opt-in `inelastic_model="shell-soft-hard"` CPU transport:
+This record covers the `inelastic_model="shell-soft-hard"` CPU transport:
 the tables built from the stopping-closed shell partition, the Numba hard-event
 and soft-loss kernels, their integration into the flight scheduler and event
 contract, and the macroscopic transport observables. The partition, sampler,
