@@ -16,6 +16,9 @@ Mott tables were removed (also #263), it is 7.7 MB (7.36 MiB), 688 files,
 13.1 MiB installed.
 
 Issue #264 subsequently removed `BELLS_gpt.out.gdf` from the tree and wheel.
+With #264 and the #274 EPDL table on `main`, the wheel measured on
+2026-10-01 is 5.97 MB (5.69 MiB), 690 files: 2.64 MiB SBETHE tables, 1.49 MiB
+EPDL table, 1.41 MiB code. That is a 68% cut from the 17.65 MiB baseline.
 The baseline tables below retain its measurements to document the decision;
 the blob remains in Git history.
 
