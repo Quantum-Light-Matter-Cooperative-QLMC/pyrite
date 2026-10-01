@@ -538,3 +538,18 @@ def test_startup_check_sends_run_to_cpu_when_a_later_case_is_infeasible(monkeypa
         timing["backend_fallback_reason"].startswith("device_budget_infeasible: ")
         for timing in timings
     )
+
+
+def test_oom_halving_never_raises_a_chunk_below_the_old_1000_floor():
+    # #266: a wide grid's adaptive chunk is already below 1000 segments;
+    # halving must shrink it, not reset it to 1000.
+    tp = _tp()
+    case = {"spec_chunk": 150, "brem_chunk": 150}
+
+    runner._halve_case_spec_chunk(case, tp)
+    runner._halve_case_brem_chunk(case, tp)
+    assert (case["spec_chunk"], case["brem_chunk"]) == (75, 75)
+
+    case = {"spec_chunk": 1, "brem_chunk": 1}
+    runner._halve_case_chunks(case, tp)
+    assert (case["spec_chunk"], case["brem_chunk"]) == (1, 1)

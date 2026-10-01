@@ -869,7 +869,7 @@ def _halve_case_spec_chunk(case, tp):
     spec_cur = (
         case.get("spec_chunk") or _RESOURCE_POLICY.spec_chunk or _adaptive_chunk(tp["E_grid"].size)
     )
-    case["spec_chunk"] = max(1000, spec_cur // 2)
+    case["spec_chunk"] = max(1, spec_cur // 2)
 
 
 def _halve_case_brem_chunk(case, tp):
@@ -879,7 +879,7 @@ def _halve_case_brem_chunk(case, tp):
         or _RESOURCE_POLICY.brem_chunk
         or _adaptive_chunk(tp["E_brem"].size, intermediates=_EEDL_BREM_DENSE_INTERMEDIATES)
     )
-    case["brem_chunk"] = max(1000, brem_cur // 2)
+    case["brem_chunk"] = max(1, brem_cur // 2)
 
 
 def _halve_case_chunks(case, tp):
