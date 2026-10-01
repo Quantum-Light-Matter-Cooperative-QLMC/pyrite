@@ -1,4 +1,4 @@
-# Computation and statistics
+# Computation and Statistics
 
 These pages explain execution, numerical precision, and statistical uncertainty in PyRITE.
 
@@ -16,6 +16,7 @@ Physical models are documented in [Physics and simulation models](../physics/ind
 execution-and-acceleration
 memory-and-scheduling
 precision-and-tolerances
+../physics/radiation-physics/energy-grid-semantics
 statistical-methods
 random-streams
 ```

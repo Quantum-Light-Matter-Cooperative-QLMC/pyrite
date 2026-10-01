@@ -1,4 +1,4 @@
-# Physical models
+# Physical Models
 
 This section documents the physical models, assumptions, conventions, and numerical treatments used by the simulation.
 
@@ -38,7 +38,6 @@ These pages describe **how the simulated physical system is represented**. For e
 
 atomic-physics/atomic-form-factors
 atomic-physics/elemental-transport-data
-atomic-physics/atomic-data-sources
 ```
 
 ```{toctree}
@@ -52,7 +51,6 @@ beam-transport/elastic-scattering
 beam-transport/stopping-power
 beam-transport/inelastic-scattering-events
 beam-transport/shell-soft-hard-transport
-beam-transport/transport-outputs
 ```
 
 ```{toctree}
@@ -66,7 +64,6 @@ radiation-physics/hard-bremsstrahlung-events
 radiation-physics/characteristic-radiation
 radiation-physics/photon-escape-and-dispersion
 radiation-physics/spectral-observables
-radiation-physics/energy-grid-semantics
 ```
 
 ```{toctree}

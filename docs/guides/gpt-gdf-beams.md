@@ -19,6 +19,51 @@ gpt -o beam.gdf beam.in
 uv run pyrite beam gdf-times beam.gdf
 ```
 
+If you do not yet have GPT output, save this small fixture generator as
+`make_example_gdf.py`. It uses the same EasyGDF structure as PyRITE's tests:
+
+```python
+import easygdf
+import numpy as np
+from scipy.constants import electron_mass, elementary_charge
+
+arrays = {
+    "x": np.array([1e-5, -2e-5]),
+    "y": np.array([3e-5, 4e-5]),
+    "z": np.array([0.1, 0.1]),
+    "Bx": np.array([0.01, -0.02]),
+    "By": np.array([-0.01, 0.02]),
+    "Bz": np.array([0.328, 0.328]),
+    "m": np.full(2, electron_mass),
+    "q": np.full(2, -elementary_charge),
+    "nmacro": np.array([1.0, 9.0]),
+}
+blocks = [{
+    "name": "time",
+    "value": 1e-9,
+    "children": [{"name": name, "value": value} for name, value in arrays.items()],
+}]
+easygdf.save("beam.gdf", blocks=blocks, creator="GPT")
+```
+
+Generate and inspect `beam.gdf`:
+
+```bash
+uv run python make_example_gdf.py
+uv run pyrite beam gdf-times beam.gdf
+uv run pyrite beam gdf-inspect beam.gdf --time-s 1e-9
+```
+
+The equivalent Python workflow is:
+
+```python
+from pyrite.montecarlo.gdf import list_gdf_times, load_gdf_beam
+
+print(list_gdf_times("beam.gdf"))
+beam = load_gdf_beam("beam.gdf", time_s=1e-9)
+print(beam.energy_keV)
+```
+
 Keep the native particle output, not a `gdfa` statistical summary or an ASCII
 conversion. See the [GPT user manual](https://wiki.jlab.org/ciswiki/images/4/42/UserManual.pdf)
 for `tout` and output-field controls, and the
@@ -120,8 +165,8 @@ beam = "gpt_import"
 emission = "incoherent"
 ```
 
-The example origin is the final plane in the supplied reference file; choose
-an origin appropriate to **your** beam and target. Catalog GDF paths resolve
+The example origin matches the fixture above; choose an origin appropriate to
+**your** beam and target. Catalog GDF paths resolve
 relative to the catalog file. Inline `[profiles.NAME.beam]` tables accept the
 same fields. Run this profile with `uv run pyrite run gpt_import -m hopg`.
 
@@ -144,9 +189,9 @@ Equivalent overrides on an existing profile:
 ```bash
 uv run pyrite run standard -m hopg \
   --source gpt_gdf \
-  --gdf-path src/pyrite/data/sample_beam.gdf \
+  --gdf-path beam.gdf \
   --gdf-time-s 1e-9 --gdf-time-tolerance-s 1e-15 \
-  --gdf-z-origin-m 0.09844470106002952 \
+  --gdf-z-origin-m 0.1 \
   --gdf-normalization gdf_charge --gdf-repetition-rate-hz 1e6
 ```
 
@@ -155,8 +200,8 @@ for configured current. CLI paths resolve relative to the working directory.
 GDF overrides are local-run options; remote file staging is not implemented.
 They cannot accompany `--preset` or developer `--nsys` re-execution.
 File-content hashes join case and dataset identities; mutation after case
-construction is rejected before transport. The supplied sample stays untracked;
-automated tests generate small GDF fixtures with EasyGDF.
+construction is rejected before transport. PyRITE does not ship a sample GDF;
+automated tests generate small fixtures with EasyGDF.
 
 For the Python API, set `Beam(source="gpt_gdf", energy_keV=30,
 transverse_fwhm_x_mm=None, transverse_fwhm_y_mm=None, gdf_path="beam.gdf",
@@ -187,16 +232,16 @@ transport; actual GPU validation has not been performed for this source.
 
 ## Inspect coordinates and select a screen
 
-List outputs and inspect the sole time snapshot automatically:
+List outputs and inspect the sole time snapshot in `beam.gdf` automatically:
 
 ```bash
-uv run pyrite beam gdf-inspect src/pyrite/data/BELLS_gpt.out.gdf
+uv run pyrite beam gdf-inspect beam.gdf
 ```
 
 Inspect a particular screen, including actual lab x/y/z ranges and weighted means:
 
 ```bash
-uv run pyrite beam gdf-inspect src/pyrite/data/BELLS_gpt.out.gdf --screen-position-m 1.05
+uv run pyrite beam gdf-inspect screen.gdf --screen-position-m 1.05
 ```
 
 Add `-o json` for structured output. Use the physical target's lab-z coordinate
@@ -208,7 +253,7 @@ x/y ranges with the finite target footprint.
 For a target placed at lab z = 1.05 m, import that screen with:
 
 ```bash
-uv run pyrite run standard -m hopg --source gpt_gdf --gdf-path src/pyrite/data/BELLS_gpt.out.gdf --gdf-screen-position-m 1.05 --gdf-z-origin-m 1.05
+uv run pyrite run standard -m hopg --source gpt_gdf --gdf-path screen.gdf --gdf-screen-position-m 1.05 --gdf-z-origin-m 1.05
 ```
 
 `gdf_screen_position_m` and `gdf_time_s` are mutually exclusive. The screen
@@ -228,10 +273,10 @@ screen crossing-time differences are discarded; signed flight-time offsets
 to the target are computed from the newly assigned energy. Normalization
 and the selected target origin retain their usual meanings.
 
-For the near-zero BELLS screen and the standard profile energies:
+For the generated time snapshot and the standard profile energies:
 
 ```bash
-uv run pyrite run standard -m hopg --source gpt_gdf --gdf-path src/pyrite/data/BELLS_gpt.out.gdf --gdf-screen-position-m 4.5796699765787707e-16 --gdf-z-origin-m 0 --gdf-shape-only
+uv run pyrite run standard -m hopg --source gpt_gdf --gdf-path beam.gdf --gdf-time-s 1e-9 --gdf-z-origin-m 0.1 --gdf-shape-only
 ```
 
 Catalog/Python field: `gdf_shape_only = true` / `gdf_shape_only=True`.

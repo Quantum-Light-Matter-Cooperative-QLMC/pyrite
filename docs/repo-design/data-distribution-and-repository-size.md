@@ -13,6 +13,10 @@ After #263 moved the generator sources to `vendor/` and deleted
 `atomic_scattering_factors/`, the wheel is 16.8 MB (16.06 MiB), 693 files,
 45.9 MiB installed.
 
+Issue #264 subsequently removed `BELLS_gpt.out.gdf` from the tree and wheel.
+The baseline tables below retain its measurements to document the decision;
+the blob remains in Git history.
+
 ```{list-table} Wheel contents by data entry (MiB).
 :name: tbl-data-wheel-baseline
 :header-rows: 1
@@ -165,10 +169,10 @@ blobs that are not in the `main` tree.
   - n/a
 ```
 
-Except for the duplicate EEDL revisions, no large blob exists only in history.
-All the large files are still in the `main` tree. Moving them out of the tree
-therefore makes shallow and blobless clones smaller at once. Full clones keep
-their current size unless history is rewritten.
+At the recorded baseline, no large blob except the duplicate EEDL revisions
+existed only in history. Removing `BELLS_gpt.out.gdf` from the current tree
+makes shallow and blobless clones smaller at once. Full clones keep its blob
+unless history is rewritten.
 
 ### Options and projected savings
 
@@ -210,13 +214,15 @@ Measured against a clean repack instead of GitHub's current pack, B3 saves
 rewrite forces.
 
 If the recommended entries leave the tree without a rewrite, the checkout
-drops by about 16 MiB compressed. That cuts a `--depth=1` clone from 22.7 to
+drops by about 16 MiB compressed; #264 accounts for 3.16 MiB of that total.
+That cuts a `--depth=1` clone from 22.7 to
 about 7 MiB and a blobless clone from 24.9 to about 9 MiB. Full clones grow
 only by future commits.
 
 The `pyrite remote sync` payload also shrinks. Each sync tars `src/`,
 `checks/`, and the root metadata into a 19.9 MiB `.tgz`. Excluding EEDL, EADL,
-BELLS, the ELSEPA tree, and the SBETHE tables gives 4.0 MiB. That holds only
+the removed BELLS file, the ELSEPA tree, and the SBETHE tables gives 4.0 MiB.
+That holds only
 if the box receives the fetched datasets once through content-addressed sync
 (#261), not through every code sync.
 

@@ -138,16 +138,20 @@ exclude_patterns = [
     "_build",
     "Thumbs.db",
     ".DS_Store",
-    "*-rfc.md",
     "*-plan.md",
 ]
 
 # -- HTML output -------------------------------------------------------------
 html_theme = "pydata_sphinx_theme"
+templates_path = ["_templates"]
+html_sidebars = {"**": ["sidebar-collapse.html", "sidebar-sections.html"]}
 html_title = "PyRITE"
 
 
 html_theme_options = {
+    "navigation_depth": 4,
+    "show_nav_level": 1,
+    "collapse_navigation": False,
     "logo": {
         "text": "PyRITE",
         "image_light": "_static/pyrite_full.jpg",
