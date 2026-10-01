@@ -419,3 +419,137 @@ def test_device_transport_serial_path_reports_timing(monkeypatch):
     assert seen == [(True, True), (True, True)]
     assert [item["spectrum_seconds"] for item in timings] == [0.3, 0.3]
     assert all(item["line_axis_nodes"] == 1234 for item in timings)
+
+
+def test_gpu_pipeline_falls_back_per_case_when_a_later_case_is_infeasible(monkeypatch):
+    # #266: only the later wide case exceeds the device budget; earlier cases
+    # stay on the device and the run completes.
+    from pyrite._backend import BackendResourceError
+
+    def fake_transport(case, record_timing=False):
+        return {"E_grid": np.zeros(2), "E_brem": np.zeros(2), "name": case["name"]}
+
+    def fake_retry(case, tp, **_kwargs):
+        if case["name"] == "wide":
+            raise BackendResourceError("device budget cannot admit 1 segment")
+        return {"name": case["name"], "backend": "device"}
+
+    @contextmanager
+    def cpu_spectrum_backend():
+        yield
+
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(scheduling, "case_runtime_plan", lambda case: {})
+    monkeypatch.setattr(scheduling, "_gpu_pipeline_workers", lambda *_args: 2)
+    monkeypatch.setattr(scheduling, "_ensure_pool_limit", lambda: None)
+    monkeypatch.setattr(scheduling, "_admit_cpu_fallback", lambda: None)
+    monkeypatch.setattr(scheduling, "_process_pool_kwargs", lambda: {})
+    monkeypatch.setattr(scheduling, "_transport_case", fake_transport)
+    monkeypatch.setattr(scheduling, "_spectrum_case_retry", fake_retry)
+    monkeypatch.setattr(scheduling, "_cpu_spectrum_backend", cpu_spectrum_backend)
+    monkeypatch.setattr(
+        scheduling,
+        "_spectrum_case",
+        lambda case, *_args, **_kwargs: {"name": case["name"], "backend": "cpu"},
+    )
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
+    monkeypatch.setenv("PYRITE_MC_BACKEND", "auto")
+
+    timings = []
+    with pytest.warns(RuntimeWarning, match="device_budget_infeasible"):
+        out = runner.run_cases(
+            [{"name": "narrow-0"}, {"name": "narrow-1"}, {"name": "wide"}],
+            max_workers=2,
+            progress=False,
+            engine="auto",
+            on_timing=timings.append,
+        )
+
+    assert [(item["name"], item["backend"]) for item in out] == [
+        ("narrow-0", "device"),
+        ("narrow-1", "device"),
+        ("wide", "cpu"),
+    ]
+    reasons = [timing.get("backend_fallback_reason") for timing in timings]
+    assert reasons[:2] == [None, None]
+    assert reasons[2].startswith("device_budget_infeasible: ")
+
+
+def test_gpu_pipeline_reraises_infeasible_case_when_engine_is_forced(monkeypatch):
+    from pyrite._backend import BackendResourceError
+
+    def fake_transport(case, record_timing=False):
+        return {"E_grid": np.zeros(2), "E_brem": np.zeros(2), "name": case["name"]}
+
+    def fake_retry(case, tp, **_kwargs):
+        raise BackendResourceError("device budget cannot admit 1 segment")
+
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(scheduling, "case_runtime_plan", lambda case: {})
+    monkeypatch.setattr(scheduling, "_gpu_pipeline_workers", lambda *_args: 2)
+    monkeypatch.setattr(scheduling, "_ensure_pool_limit", lambda: None)
+    monkeypatch.setattr(scheduling, "_process_pool_kwargs", lambda: {})
+    monkeypatch.setattr(scheduling, "_transport_case", fake_transport)
+    monkeypatch.setattr(scheduling, "_spectrum_case_retry", fake_retry)
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
+
+    with pytest.raises(BackendResourceError, match="cannot admit"):
+        runner.run_cases([{"name": "wide"}], max_workers=2, progress=False, engine="gpu")
+
+
+def test_startup_check_sends_run_to_cpu_when_a_later_case_is_infeasible(monkeypatch):
+    # #266: a fresh run used to plan only cases[0] (narrow), stay on the
+    # device, and die on the later wide case.
+    from pyrite._backend import BackendResourceError
+
+    narrow = {"name": "narrow", "E_grid": [1.0, 2.0], "E_grid_brem": [1.0, 2.0]}
+    wide = {"name": "wide", "E_grid": [1.0, 2.0, 3.0], "E_grid_brem": [1.0, 2.0, 3.0]}
+    planned = []
+
+    def fake_plan(case):
+        planned.append(case["name"])
+        if case is wide:
+            raise BackendResourceError("device budget cannot admit 1 segment")
+        return {}
+
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(scheduling, "case_runtime_plan", fake_plan)
+    monkeypatch.setattr(scheduling, "_admit_cpu_fallback", lambda: None)
+    monkeypatch.setattr(
+        scheduling,
+        "run_case",
+        lambda case, *_args, **_kwargs: {"name": case["name"], "gpu": runner._RESOURCE_POLICY.gpu},
+    )
+    monkeypatch.setenv("PYRITE_MC_BACKEND", "auto")
+
+    timings = []
+    with pytest.warns(RuntimeWarning, match="device_budget_infeasible"):
+        out = runner.run_cases(
+            [narrow, wide],
+            max_workers=0,
+            progress=False,
+            engine="auto",
+            on_timing=timings.append,
+        )
+
+    assert planned == ["wide"]
+    assert [(item["name"], item["gpu"]) for item in out] == [("narrow", False), ("wide", False)]
+    assert all(
+        timing["backend_fallback_reason"].startswith("device_budget_infeasible: ")
+        for timing in timings
+    )
+
+
+def test_oom_halving_never_raises_a_chunk_below_the_old_1000_floor():
+    # #266: a wide grid's adaptive chunk is already below 1000 segments;
+    # halving must shrink it, not reset it to 1000.
+    tp = _tp()
+    case = {"spec_chunk": 150, "brem_chunk": 150}
+
+    runner._halve_case_spec_chunk(case, tp)
+    runner._halve_case_brem_chunk(case, tp)
+    assert (case["spec_chunk"], case["brem_chunk"]) == (75, 75)
+
+    case = {"spec_chunk": 1, "brem_chunk": 1}
+    runner._halve_case_chunks(case, tp)
+    assert (case["spec_chunk"], case["brem_chunk"]) == (1, 1)
