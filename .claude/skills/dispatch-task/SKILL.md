@@ -5,18 +5,20 @@ description: Use when an approved GitHub issue needs a linked branch/worktree, w
 
 # Dispatch Task
 
-Coordinate one approved GitHub issue. `triage` owns planning; worker skills own
-implementation; `repo-cleanup` owns generic git hygiene.
+Coordinate one reviewed GitHub issue. `triage` owns planning (the issue body is
+the task record); worker skills own implementation;
+`repo-cleanup` owns generic git hygiene.
 
 ## Start an approved issue
 
 1. Read the issue with `gh issue view <n> --json number,title,body,labels,state,url`
-   and confirm it is open, approved, and actionable. Inspect existing linked
-   branches with `gh issue develop --list <n>` and current worktrees/status.
+   and confirm it is open, reviewed (carries a `status:*` label), and
+   actionable. Inspect `gh issue develop --list <n>` and current
+   worktrees/status.
 2. Reuse an existing clean linked branch/worktree when unambiguous. Otherwise
    create one linked development branch from `main` with `gh issue develop`;
    prefer `issue-<n>-<short-slug>` naming. Fetch it and attach a dedicated
-   worktree using the repository's normal worktree convention.
+   worktree under `.worktrees/`. Set the issue to `status:active`.
 3. Stop on overlapping dirty state in the target worktree, an already-active
    conflicting branch, or a material decision missing from the issue. Unrelated
    dirt in another worktree is not a blocker.
@@ -66,9 +68,10 @@ When explicitly asked to retire completed work:
 
 1. Verify the change landed on `main` and identify its PR/commit.
 2. Prefer a PR containing `Closes #<n>` so GitHub closes the issue on merge. If
-   the change landed without automatic closure, close the issue with a short
-   landing reference.
-3. Ensure durable decisions/documentation live in their owning artifacts. Do not
+   the change landed without automatic closure, close the issue with
+   `gh issue close` and a comment pointing at the landing commit/PR.
+3. Ensure durable decisions/documentation live in their owning artifacts
+   (`README.md`, `docs/`, ADR, source documentation, or tests). Do not
    preserve disposable agent scratch merely for history.
 4. Hand safe worktree/local-ref removal to `repo-cleanup` and report recovery
    SHAs.

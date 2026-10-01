@@ -64,15 +64,17 @@ If `uv run` cannot write project environment, add
 ## Task dispatch
 
 - Use `triage` for new `>user<` prose, GitHub issues carrying no `status:*`
-  label, or `/triage <text>` direct input. It drafts task docs and local
-  branches/worktrees, opens/updates the canonical GitHub issue (labels,
-  branch/task-doc pointer in the body), commits task-doc setup on `main`,
-  pushes `main` and the task branches, then stops for review.
-- Use `dispatch-task` to route backlog work. It resolves task worktree/branch,
-  verifies approved setup, owns landed teardown, writes explicit
-  authority/acceptance handoff, then selects:
+  label, or `/triage <text>` direct input. It turns the task into a canonical
+  GitHub issue (executable body, `area:*`/type labels, `status:backlog`,
+  native dependency relations), then stops for review. It never implements and
+  creates no branches, worktrees, task docs, commits, or pushes.
+- Use `dispatch-task` to route reviewed backlog work. It creates or reuses the
+  linked `issue-<n>-<slug>` branch/worktree (`.worktrees/`), moves the issue to
+  `status:active`, writes explicit authority/acceptance handoff, then selects:
   `implement-task-lite` for small mechanical slices, `implement-task` for
   normal checklist slices, or `lead-task` for complex/integrating ownership.
+  It also owns landed teardown: close the issue, promote durable content, hand
+  worktree/ref removal to `repo-cleanup`.
 - Example model tiers: Haiku/Luna → lite; Sonnet/Terra → normal;
   Opus/Sol/Fable/K3 → lead. Risk and scope override model label.
 - Use `repo-cleanup` for git hygiene. It fans cheap subagents out per item to
@@ -91,17 +93,12 @@ If `uv run` cannot write project environment, add
 ## Backlog and physics
 
 Backlog is tracked in GitHub Issues (`gh issue list`/`gh issue view`), not a
-repo file. One issue per item, labelled `status:*`/`area:*`, with a branch and
-`agentdocs/tasks/<branch-name>/` pointer in the body where one exists.
-`dispatch-task` closes an issue when its task lands. Tracked agent plans and
-handoffs live only in `agentdocs/`, outside the public documentation tree.
-Branch detail belongs in `agentdocs/tasks/<branch-name>/` (full task branch
-name; entry doc `README.md`); see `agentdocs/README.md`. `todo-sync` audits
-open-issue/task-doc consistency read-only.
-
-New/edited physics requires source equation, assumptions, limiting case,
-`Validation: <id>`, and ledger row. Fresh context verifies it; only human marks
-`signed-off`.
+repo file. One issue per item, labelled `status:*`/`area:*`; the issue body is
+the sole task record (goal, scope, plan checklist, acceptance, decisions).
+`dispatch-task` closes an issue when its task lands. Cross-task agent plans
+live only in `agentdocs/plans/`, outside the public documentation tree; see
+`agentdocs/README.md`. `issue-audit` audits backlog/branch consistency
+read-only.
 
 New/edited physics requires source equation, assumptions, limiting case,
 `Validation: <id>`, and ledger row. Fresh context verifies it; only human marks

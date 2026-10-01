@@ -5,15 +5,17 @@ description: Use when new task prose or an existing GitHub issue must become a r
 
 # Triage
 
-GitHub Issues are the backlog and task-plan source of truth. Triage plans work;
-it does not implement it, create worktrees, or push branches.
+GitHub Issues are the backlog and task-plan source of truth. Triage plans work
+and stops for review; it does not implement it, create branches/worktrees or
+task docs, commit, or push. `dispatch-task` owns routing to a worker.
 
 ## Input
 
 - `/triage <text>`: triage only the supplied task text.
 - `/triage #<n>` or an issue URL: refine that issue.
-- `/triage` with no target: choose an open, unassigned/unowned issue only when
-  selection is unambiguous; otherwise report the best candidates.
+- `/triage` with no target: choose an open issue carrying no `status:*` label
+  (or new `>user<` prose) only when selection is unambiguous; otherwise report
+  the best candidates.
 
 ## Workflow
 
@@ -39,13 +41,13 @@ it does not implement it, create worktrees, or push branches.
 
    Omit empty sections. Put durable design decisions in their owning docs once
    implemented, not in a second backlog file.
-4. Use existing `area:*`/type labels when clearly applicable. Use native issue
-   relations (`--blocked-by`, `--blocking`, parent/sub-issue) when they express
-   real dependencies; do not duplicate dependency state in prose.
-5. Create/update the issue with `gh issue create` or `gh issue edit`. Do not
-   create a branch or worktree yet.
-6. Report the issue number/link, key assumptions, unresolved material decisions,
-   and whether it is ready for dispatch.
-
-`agentdocs/tasks/` is optional working scratch for complex implementation and
-is never canonical backlog state.
+4. Use existing `area:*`/type labels when clearly applicable, and apply
+   `status:backlog` (accepted, not yet scheduled; `dispatch-task` sets
+   `status:active`). Use native issue relations (`--blocked-by`, `--blocking`,
+   parent/sub-issue) when they express real dependencies; do not duplicate
+   dependency state in prose.
+5. Create/update the issue with `gh issue create` or `gh issue edit`. The issue
+   body is the only task record; do not create `agentdocs/tasks/` files.
+6. Stop for review. Report the issue number/link, key assumptions, unresolved
+   material decisions, and whether it is ready for dispatch. Review feedback
+   returns through `triage` as an issue-body edit.
