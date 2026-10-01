@@ -30,6 +30,7 @@ from .._numerics import CONVERGENCE_KEYS
 from ..detectors import Detector, EnergyBins
 from ..materials import CATALOG, MaterialSpec, load_material_catalog
 from ..montecarlo import simulate_trajectories
+from ..montecarlo.runner.case_tables import _case_elastic_kwargs
 from ..montecarlo.transverse import TransverseDistribution
 from ..results import Settings
 from .longitudinal import LongitudinalDistribution
@@ -507,6 +508,7 @@ def gate_cases_by_penetration(
                 composition=ref["composition"],
                 layers=abs_layers,
                 seed=seed,
+                **_case_elastic_kwargs(ref),
             )
             fraction = float(segs["n_transmitted"]) / Ne
             if fraction < floor:

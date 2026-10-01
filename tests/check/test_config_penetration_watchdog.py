@@ -121,3 +121,22 @@ def test_gate_cases_by_penetration_drops_with_real_transport():
 
     assert 100.0 in {c["thickness_ang"] for c in kept}
     assert {c["thickness_ang"] for c in dropped} == {2_000_000.0}
+
+
+def test_gate_cases_by_penetration_follows_the_case_elastic_model(monkeypatch):
+    seen = []
+
+    def fake_simulate_trajectories(E0_keV, Ne, thickness_ang, **kwargs):
+        seen.append(kwargs)
+        return {"n_transmitted": Ne}
+
+    monkeypatch.setattr(config, "simulate_trajectories", fake_simulate_trajectories)
+    monkeypatch.setattr(
+        config,
+        "_case_elastic_kwargs",
+        lambda case: {"elastic_model": "elsepa", "elastic_tables": ["sentinel"]},
+    )
+    config.gate_cases_by_penetration([_case(30.0, 100.0)], Ne=10)
+
+    assert seen[0]["elastic_model"] == "elsepa"
+    assert seen[0]["elastic_tables"] == ["sentinel"]
