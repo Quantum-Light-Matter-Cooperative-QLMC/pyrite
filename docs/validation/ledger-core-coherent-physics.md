@@ -15,7 +15,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `coherent-line-spectrum`
 
 - **Claim:** `\|A_PXR + A_CBS\|²` segment-sum line spectrum, exact mosaic average
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum`
+- **Code:** `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum`
 - **Source:** Feranchuk–Spence 2000 Eq.(10),(12); Zhai 2025
 - **Status:** rederived
 - **Checks:** units; prefactor, squaring, summation order, per-electron normalization, and mosaic weighting reproduced term for term (absolute normalization to `6.7e-10` relative, whose entire budget is the repository's truncated fine-structure literal); incoherence structure confirmed by exact `1/N` subdivision falloff, bitwise reflection additivity, and invariance of the per-electron spectrum under electron replication; mosaic average is a unit-weight Gauss–Hermite intensity average collapsing to the perfect crystal as `η→0`
@@ -25,7 +25,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `coherent-emission`
 
 - **Claim:** opt-in phased segment sum `dN/dE dΩ ∝ \|Σ_j A_j·exp{i[ω(t_abs,j−n̂·r_j)−g·r_j]}\|²`; intra-electron plus inter-electron/superradiant cross terms and Gaussian inter-electron form factor `exp[−(ωσ_z)²]`
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (`coherent=True`); profile policy `campaign/profiles.py::FidelityPreset.emission` (`"coherent"`/`"both"`, surfaced by `pyrite profile set --emission` and `pyrite profile add/remove --coherent`)
+- **Code:** `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum` (`coherent=True`); profile policy `campaign/profiles.py::FidelityPreset.emission` (`"coherent"`/`"both"`, surfaced by `pyrite profile set --emission` and `pyrite profile add/remove --coherent`)
 - **Source:** Feranchuk–Spence 2000; Zhai 2025; far-field phased-array sum; Gaussian characteristic function
 - **Status:** rederived
 - **Checks:** units/sign; repository `S(+g)` ↔ `χ_g exp(−ig·r)` mapping; straight-trajectory phase stationarity at `ω=v·g/(1−v·n̂)`; full/cutoff sinc paths; mosaic placement; self/coincident/qualified decoherent limits
@@ -35,7 +35,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `coherent-segment-midpoint-time`
 
 - **Claim:** coherent finite-segment phase pairs stored midpoint position with midpoint transport age `t_mid = t_ang + L_ang/(2β)` while preserving `t_ang` as segment-start age
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (`coherent=True`)
+- **Code:** `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum` (`coherent=True`)
 - **Source:** centered constant-amplitude finite-time integral; Feranchuk–Spence 2000 Eqs. (8), (10), (12)--(14) as derived under `coherent-emission`
 - **Status:** rederived
 - **Checks:** units; `L→0`; single-segment self-term; one straight flight versus two contiguous halves, including interference with a fixed reference emitter — the independent centered-segment integral matches to 1e-11 rel, and since issue #181 the full kernel matches to rounding (see Notes)
@@ -45,7 +45,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `coherent-formation-absorption`
 
 - **Claim:** the phased-field line reductions (coherent route; flight-grouped incoherent reduction) give each linear escape piece the exact formation integral under absorption and the in-medium escape leg: field `t_L e^{iΦ_c} F`, `F = e^{−τ_c/2} sinh(w)/w = [e^{−τ_end/2}e^{iv} − e^{−τ_start/2}e^{−iv}]/(2w)`, `w = iv − q`, `q = (τ_end − τ_start)/4`, `v = a_vac(E − E_vac) − δ(E)ω(E)ΔL_esc/2` on the vacuum sinc centre/width
-- **Code:** `montecarlo/spectrum/lines/_formation.py`; `montecarlo/spectrum/lines/_setup.py::_prepare_spectrum` (escape-piece rows); `lines/_batched.py::_batched_coherent_block`, `lines/_per_hkl.py` (coherent and flight-grouped); CUDA `coherent_jit_kernel.py::run_coherent_reduction_kernel`, `coherent_stream_jit_kernel.py::{run_coherent_prologue_kernel,run_coherent_field_accumulation_kernel}`, `coherent_grouped_jit_kernel.py::run_coherent_grouped_intensity_kernel`
+- **Code:** `montecarlo/spectrum/lines/_formation.py`; `montecarlo/spectrum/lines/_setup.py::_prepare_spectrum` (escape-piece rows); `montecarlo/spectrum/lines/_batched.py::_batched_coherent_block`, `montecarlo/spectrum/lines/_per_hkl.py` (coherent and flight-grouped); CUDA `montecarlo/spectrum/coherent_jit_kernel.py::run_coherent_reduction_kernel`, `montecarlo/spectrum/coherent_stream_jit_kernel.py::{run_coherent_prologue_kernel,run_coherent_field_accumulation_kernel}`, `montecarlo/spectrum/coherent_grouped_jit_kernel.py::run_coherent_grouped_intensity_kernel`
 - **Source:** Feranchuk–Spence 2000 Eqs. (8), (10), (12)–(14) finite-time field with the Beer–Lambert amplitude `e^{−τ/2}` (`self-absorption`) and the escape-leg phase `−δωL_esc` (`xray-in-medium-propagation-phase`) integrated along the piece
 - **Status:** rederived
 - **Checks:** units; `μ → 0` gives the sinc; uniform damping gives the midpoint model; opaque end finite; `\|F\| ≤ 1/\|v\|`; quadrature agreement to 1e-9; Parseval `∫\|F\|²dv = π⟨e^{−τ}⟩` (the coherent self-term integrates to the `segment-escape-average` yield); coherent spectrum split invariant under absorption and refraction on the batched slab, batched finite-box face switch and per-reflection routes; single-segment coherent peak on the closed-form escape-path root; CUDA formation branches against the NumPy reference (gated)
@@ -55,7 +55,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `cross-reflection-coherence`
 
 - **Claim:** the coherent segment sum drops the cross-reflection terms of `\|Σ_g F_g\|²`, keeping `Σ_g \|F_g\|²` — distinct reflections (and mosaic orientations) add as intensities while the segment sum inside a row keeps its phase
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (`coherent=True`, the per-`(reflection, orientation)` squaring); inherited by `montecarlo/spectrum/coherent_jit_kernel.py::run_coherent_reduction_kernel`
+- **Code:** `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum` (`coherent=True`, the per-`(reflection, orientation)` squaring); inherited by `montecarlo/spectrum/coherent_jit_kernel.py::run_coherent_reduction_kernel`
 - **Source:** none — an approximation to the phased-array sum derived under `coherent-emission`, not a separate equation
 - **Status:** filtered
 - **Checks:** per-reflection coherent spectra re-sum to the shipped all-reflections call to `1.2e-07`–`2.7e-07` of peak (float32 reassociation), so the split is a faithful decomposition. Two independent suppression mechanisms measured over hopg 30 keV/500 nm, h-BN 30 keV/921 nm, and hopg 100 keV/10 µm: the Cauchy–Schwarz bound `2√(S_g S_g')/Σ_g S_g` is `9.4e-04`–`1.4e-02` at the line centres of the forward harmonics `(0,0,2)`/`(0,0,4)` that carry the yield (the anti-parallel `(0,0,±)` partners carry `≤1.8e-05` of peak and their own maxima sit where the bound is vacuous at `1.2`–`1.5`), `9.3e-02`/`1.9e-01`/`4.7e-01` at the worst bin above `1e-3` of peak (all of them inter-line valleys carrying `1`–`3e-3` of peak), and `1.0e-02`/`1.4e-02`/`1.6e-02` of the integrated yield; the independent reciprocal-lattice decorrelation factor `\|⟨exp(−i Δg·r)⟩\|` is `8.3e-03`/`8.4e-03`/`4.0e-02`, consistent with the `1/√n_seg` random walk that makes the dropped term zero-mean rather than merely bounded
@@ -65,7 +65,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `transverse-bunch-form-factor`
 
 - **Claim:** the coherent segment sum applies **no** transverse bunch form factor: the per-electron transverse offset drawn from `beam_fwhm_mm` enters every cross-electron term as `exp[-i(omega n̂ + g)·Δr⊥]` and is evaluated as one sampled realization rather than averaged over its distribution. The ensemble average is analytic — `exp[-(q⊥σ⊥)²]` with `q⊥ = (omega n̂ + g)⊥`, the transverse partner of the longitudinal `exp[-(ωσ_z)²]` already carried by `coherent-emission` — and is numerically zero for any spot above a nanometre, leaving `Σ_e|Σ_{j∈e}E_j|²`
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (`coherent=True`); offsets sampled by `montecarlo/transport/api.py::simulate_trajectories` (`beam_fwhm_mm`, `beam_fwhm_y_mm`, `transverse_distribution`)
+- **Code:** `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum` (`coherent=True`); offsets sampled by `montecarlo/transport/api.py::simulate_trajectories` (`beam_fwhm_mm`, `beam_fwhm_y_mm`, `transverse_distribution`)
 - **Source:** none — a missing ensemble average over the phased-array sum derived under `coherent-emission`, not a separate equation; the form factor is the Gaussian characteristic function already used for `σ_z`
 - **Status:** rederived
 - **Checks:** units; the `σ⊥→0` limit returns the point source exactly. **Fails realization independence:** single-`n̂` coherent peak height scatters `std/mean` `0.31`–`0.41` across transport seeds at spots of 1 µm / 50 µm / 1 mm (min/max `0.32`–`0.40`), against a `0.074` Monte Carlo counting-noise floor measured on the incoherent path from the same trajectories. The contrast does **not** fall with electron count, as speckle contrast from randomly phased emitters is `N`-independent. Seed-averaging recovers a spot-independent enhancement of `2.83`–`3.25` over incoherent at `N_e = 300` (`2.80`–`3.74` at `N_e = 80`), stable in both spot size and electron count — the intra-electron floor the form factor would give deterministically. Angular integration does not recover it numerically: face-integral L1 error against an `n_side=11` reference plateaus at `11.3%` by `n_side=9` (`49.0%→4.1%` for the point source, `81.2%→11.3%` at a 50 µm spot) where the incoherent path converges `5.47%→0.01%`
@@ -75,7 +75,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `coherent-inter-electron-decoherence`
 
 - **Claim:** the coherent segment sum's inter-electron cross terms are blended analytically instead of summed as one stochastic realization: `⟨|E_tot|²⟩ = (1-F)·Σ_e|S_e|² + F·|Σ_e S_e|²`, where `S_e` is electron `e`'s own coherent segment sum evaluated at its offset-free position/time, and `F = exp[-(ωσ_z)² - (q⊥σ⊥)²]` is the joint longitudinal×transverse decoherence factor — exactly the product of the two single-offset form factors already on record (`coherent-emission`'s `exp[-(ωσ_z)²]`, `transverse-bunch-form-factor`'s `exp[-(q⊥σ⊥)²]`), because the two offsets are drawn independently (separate RNG child streams) so their joint characteristic function factorizes. Implemented via the EMPIRICAL characteristic function of the actual per-electron offset population (`F = |mean_e exp(i·(ωt0_e − q⊥·Δr⊥,e))|²`, from `initial_t0_ang`/`initial_r_ang`) rather than a per-policy closed-form `σ`, so it needs no new resolution logic for `bunch_length_fs`, `long_offsets_fs`, `compressed`, `microtrain`, or elliptical/Courant–Snyder transverse spots, and converges to the closed form via ordinary `1/√Nₑ` statistics instead of the non-converging speckle the naive sum shows
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (`coherent=True`, both the per-hkl `_accumulate_per_hkl` path and the batched `(n_seg, N_g)` path — shared `_row_decoherence_factor`/`_coherent_electron_grouped_row` helpers); all three float32 CUDA-JIT fast paths carry the blend natively. The flat and grouped reductions reuse the same accumulating kernels, and issue #60 adds one launch-uniform `sinc_cutoff` branch to both CUDA reducers so the same segment window is applied before either square. The streaming path blends per row in plain CuPy array math instead of `finalize_coherent_fields`, whose fused collapse would sum rows before `F` could multiply them.
+- **Code:** `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum` (`coherent=True`, both the per-hkl `_accumulate_per_hkl` path and the batched `(n_seg, N_g)` path — shared `_row_decoherence_factor`/`_coherent_electron_grouped_row` helpers); all three float32 CUDA-JIT fast paths carry the blend natively. The flat and grouped reductions reuse the same accumulating kernels, and issue #60 adds one launch-uniform `sinc_cutoff` branch to both CUDA reducers so the same segment window is applied before either square. The streaming path blends per row in plain CuPy array math instead of `finalize_coherent_fields`, whose fused collapse would sum rows before `F` could multiply them.
 - **Source:** independent fresh-context derivation (per-electron phase factoring + Gaussian characteristic function, recovering both `coherent-emission`'s and `transverse-bunch-form-factor`'s single-offset results as the `σ_z→0`/`σ⊥→0` special cases); no published source beyond the two rows it combines
 - **Status:** rederived
 - **Checks:** units (all dimensionless products in the `c=1`, Å convention); both limiting cases (`σ_z,σ⊥→0 → F→1 →` exact `N²` coherent limit; `ωσ_z≫1` and/or `q⊥σ⊥≫1 → F→0 →` intra-electron floor, "and/or" because `F` is a product of two independent exponentials); `test_coherent_decoherence_blend_matches_reference_formula` checks the actual blended output against an independently-computed reference built ENTIRELY from already-validated, decoherence-inactive `mc_spectrum` sub-calls (the fully-coherent flat term and the per-electron floor) plus the empirical `F` computed independently in the test — not a self-consistency check against the same code; `test_coherent_decoherence_inactive_by_default` pins bit-for-bit equality with the pre-existing path whenever no offset population is supplied (every pre-existing fixture/profile)
@@ -85,7 +85,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `finite-footprint-longitudinal-decoherence`
 
 - **Claim:** conditional on one sampled finite-footprint transverse/transport realization, independent Gaussian longitudinal arrival offsets give `⟨|Σ_e S_e exp(iωt_e)|²⟩_(t|S) = (1-F_z)Σ_e|S_e|² + F_z|Σ_eS_e|²`, with `F_z=exp[-(ωcσ_t)²]`; each `S_e` retains its actual transverse phase, hit/miss history, escape distance, attenuation, and transport state
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (`coherent=True`, finite `crystal_width_ang`/`crystal_height_ang` branch)
+- **Code:** `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum` (`coherent=True`, finite `crystal_width_ang`/`crystal_height_ang` branch)
 - **Source:** Gaussian characteristic function and conditional expectation; implementation-context derivation only, no external source
 - **Status:** filtered
 - **Checks:** dimensionless `ωcσ_t`; `σ_t→0` recovers the full sampled finite-crystal coherent field; `ωcσ_t→∞` recovers the per-electron coherent floor; one electron is invariant for every `F_z`
@@ -95,7 +95,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `coherent-line-hkl-batch`
 
 - **Claim:** batched `(n_seg, N_g)` evaluation of the coherent line path: steps 1–6 (kinematics, detuning, gathered interpolation, escape length) are shared with the incoherent batch, the complex per-polarization amplitude `A_PXR + A_CBS` is kept on the full grid, and `\|Σ_j\|²` is taken per `(reflection, mosaic orientation)` row — so reflections and mosaic orientations stay **incoherent** while the segment sum inside a row keeps its phase. No new equation; identical to the per-hkl `_accumulate_per_hkl` loop up to float reassociation
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (batched branch, `coherent=True`)
+- **Code:** `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum` (batched branch, `coherent=True`)
 - **Source:** none — amplitudes unchanged from `coherent-emission` / `cbs-amplitude`; this is an evaluation-order claim
 - **Status:** filtered
 - **Checks:** limiting cases inherited and re-run green: single-segment coherent == incoherent self-term, `N²` in-phase build-up, on-resonance phase cancellation. Direct numerical diff vs the per-hkl loop on hopg 30 keV / Ne=10000 / 1.83e6 segments / 4 reflections / 831 bins, float32: max abs `2.58e-14` = `1.7e-6` of peak, max relative `2.0e-5` on bins above peak×1e-6, sum relative difference `0.0` — inside the `√N·eps ≈ 1.6e-4` float32 reassociation envelope
@@ -105,7 +105,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `line-hkl-batch`
 
 - **Claim:** batched `(n_seg, N_g)` evaluation of the **incoherent** line path: kinematics, detuning, the shared interpolation bracket for `chi`/`U`/`mu`, escape length, both polarization amplitudes, and the `\|A\|²` accumulation run ONCE over an `(n_seg, N_g)` grid instead of `N_g` separate per-hkl `_accumulate_reflection` passes. `g`-independent segment quantities are hoisted out of the pass, length-3 contractions are spelled elementwise (see `line-gemv-elementwise`), and the sinc reduction is taken over the union bin order. No new equation; identical to the per-hkl `_accumulate_per_hkl` loop up to float reassociation
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (batched branch, `coherent=False`)
+- **Code:** `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum` (batched branch, `coherent=False`)
 - **Source:** none — amplitudes unchanged from `pxr-amplitude` / `cbs-amplitude` / `finite-time-lineshape`; this is an evaluation-order claim
 - **Status:** filtered
 - **Checks:** Direct A/B against the per-hkl `_accumulate_per_hkl` reference loop, reached by source-patching the branch gate (the loop is otherwise unreachable for an ungrooved, unlayered, incoherent run). hopg, CPU `REAL = float64`, 250 bins: 25 keV / Ne=40 / 14,970 segments at 2 and 4 reflections, and 60 keV / Ne=120 / 96,478 segments at 2 reflections. Max abs difference `1.70e-15`–`1.15e-14` of peak; max relative `6.26e-15`–`1.59e-14` on bins above peak×1e-6; integral relative difference `0.0`–`7.83e-16` — all inside the `√n_seg·eps ≈ 2.7e-14`–`6.9e-14` float64 reassociation envelope. `components=True` PXR/CBS split agrees to `2.34e-14`. **Single-segment / single-reflection limit is bitwise identical between the two arms.** Shared-bracket gather: at-node identity exact, below/above-grid endpoint clamps exact, float32 gather vs per-reflection `np.interp` max relative `3.31e-07` (float64 `2.10e-16`)
@@ -115,7 +115,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `line-amplitude-fusion`
 
 - **Claim:** incoherent `\|A_PXR + A_CBS\|²` evaluated by expanding the complex amplitude onto real/imaginary components with REAL scalar shape factors `f_pxr = [(v·k_g)(g·e) − ω²(v·e)] / detuning` and `f_cbs = −[{g·e − (v·g)(v·e)} + (v·e){k·g − (k·v)(v·g)}/(v·g)] / [γ (v·g)]`, so `Re A = χ_re f_pxr + u_re f_cbs`, `Im A = χ_im f_pxr + u_im f_cbs`, `\|A\|² = Re² + Im²`, and the components as `\|χ\|² f_pxr²` and `\|eU_g/m\|² f_cbs²`. One fused real kernel; algebraically identical to the complex expression, reassociated (`χ·(N/detuning)` vs `(χ/detuning)·N`)
-- **Code:** `montecarlo/spectrum/lines.py::_line_amp_sq_core` (+ its call site in `mc_spectrum`'s batched incoherent branch)
+- **Code:** `montecarlo/spectrum/lines/_kernels.py::_line_amp_sq_core` (+ its call site in `mc_spectrum`'s batched incoherent branch)
 - **Source:** none new — same `A_PXR`/`A_CBS` as `pxr-amplitude` / `cbs-amplitude`; algebraic expansion of `\|z\|²` for `z = χ f_pxr + (eU_g/m) f_cbs`
 - **Status:** filtered
 - **Checks:** Against the retained complex expression (the coherent branch's verbatim form), 2e6 adversarial samples per dtype. float32: `\|A\|²` median `1.06e-07` (0.9 eps), p99 `5.58e-07`, max `3.12e-04` = 2613 eps; `\|A_PXR\|²` max `6.66e-07` (5.6 eps); `\|A_CBS\|²` max `7.39e-07` (6.2 eps). float64: `\|A\|²` median `1.92e-16`, max `3.83e-13` (1725 eps). The `\|A\|²` tail is entirely PXR/CBS near-cancellation — at the worst sample `\|A\|² / max(\|A_PXR\|², \|A_CBS\|²) = 7.3e-07`; restricted to the 98.3% of samples with `\|A\|² > 0.1 max(…)` the float32 max falls to `1.46e-06` (12 eps). Limits: `U_g→0` zeroes `\|A_CBS\|²` exactly and reproduces `\|A_PXR\|²` to `6.21e-16`; `χ→0` zeroes `\|A_PXR\|²` exactly and reproduces `\|A_CBS\|²` to `6.57e-16`; `χ = U = 0` is identically zero; `\|A\|²` is quadratic in `(χ, U)` to `6.93e-14` under a ×3 rescale. All three outputs non-negative by construction
@@ -125,7 +125,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `line-gemv-elementwise`
 
 - **Claim:** the length-3 contractions of the line path (`v·g`, `v·n̂`, `k·g`, `v·e`, the `k_g·k_g` / `v·k_g` einsums, and the `r·g` phase) evaluated as `a₀b₀ + a₁b₁ + a₂b₂` rather than as a cuBLAS GEMV/GEMM with inner dimension 3. One helper serves both `M @ v` (scalar `b`) and the row-wise `einsum('ij,ij->i')` (columns of a second `(N,3)`). No new equation; a fixed left-to-right association of a three-term inner product
-- **Code:** `montecarlo/spectrum/lines.py::_dot3_core` (via `::_matvec3`, `::_rowdot3`)
+- **Code:** `montecarlo/spectrum/lines/_kernels.py::_dot3_core` (via `::_matvec3`, `::_rowdot3`)
 - **Source:** none — definition of the Euclidean inner product in 3-D
 - **Status:** filtered
 - **Checks:** 2e6 random `(N,3)` rows on the NumPy backend. float32: **bitwise identical** to both `np.einsum('ij,ij->i', A, B)` and `A @ v`. float64: max relative `2.50e-11` (row dot) and `9.06e-11` (matvec) against the BLAS-backed reference — reassociation only, no term dropped. Symmetry `a·b == b·a` bitwise; `a·a ≥ 0` everywhere; the orthogonality limit `e_x·e_y` is exactly `0.0` with no drift. Units inherit from the operands (the helper is dimensionless bookkeeping)
@@ -165,7 +165,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `finite-time-lineshape`
 
 - **Claim:** `\|Q\|² = t_L²·sinc_N²(P·t_L/π)`, `sinc_N(x)=sin(πx)/(πx)` (replaces absorption-limited δ)
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum`
+- **Code:** `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum`
 - **Source:** Feranchuk 2000 (finite interaction length)
 - **Status:** anchored
 - **Checks:** units and NumPy sinc convention; exact area `πt_L`; peak/width scaling and `t_L→∞` delta limit; energy-coordinate Jacobian
@@ -216,7 +216,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `cbs-amplitude`
 
 - **Claim:** `U_g` CBS potential amplitude + relativistic 1/γ braced terms
-- **Code:** `materials/crystal.py::U_g` (+ amplitude assembly in `montecarlo/spectrum/lines.py`)
+- **Code:** `materials/crystal.py::U_g` (+ amplitude assembly in `montecarlo/spectrum/lines/`)
 - **Source:** Feranchuk 2000
 - **Status:** rederived
 - **Checks:** units+limits+signs (`U_g` rederived from Poisson); braced `A_CBS` tensor prefactor, single `1/γ`, `(v·g)` / `(v·g)²` denominator placement, and the PXR+CBS relative sign independently rederived from the relativistic equation of motion plus the Liénard–Wiechert radiation integral, with `A_PXR` rederived in the same normalization; certified numerically against direct RK4 trajectory integration (rel. dev. `<3e-6` at 30/100/300 keV, both polarizations; the `1/γ²` variant is rejected by exactly a factor `γ`)

@@ -25,7 +25,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `surface-hkl-orientation`
 
 - **Claim:** reciprocal cleavage-plane normal `g_hkl = h b1 + k b2 + l b3` is mapped to sample `+z` by a proper minimal rotation, followed by the configured right-handed azimuth about `+z`
-- **Code:** `montecarlo/geometry.py::_orientation_R`; plumbing through `sweep.py`, `montecarlo/spectrum/lines.py`, `montecarlo/detector.py`, and `montecarlo/runner/__init__.py`
+- **Code:** `montecarlo/geometry.py::_orientation_R`; plumbing through `sweep.py`, `montecarlo/spectrum/lines/`, `montecarlo/detector.py`, and `montecarlo/runner/__init__.py`
 - **Source:** standard reciprocal-lattice geometry and Rodrigues rotation
 - **Status:** rederived
 - **Checks:** reciprocal/direct equivalence for orthogonal one-axis cuts; nonorthogonal reciprocal-normal alignment; determinant/azimuth handedness; mutually exclusive parser/API inputs; legacy direct-axis matrix frozen bit-for-bit
@@ -65,7 +65,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `dans-diffraction-oracle`
 
 - **Claim:** optional independent `Dans_Diffraction` lattice, reciprocal-geometry, and `\|F_hkl\|²` comparison harness
-- **Code:** `validation_oracles.py::validate_dans_crystal`, `::compare_lattice`, `::compare_reflection_geometry`, `::compare_structure_factor_magnitudes`
+- **Code:** `validation/validation_oracles.py::validate_dans_crystal`, `::compare_lattice`, `::compare_reflection_geometry`, `::compare_structure_factor_magnitudes`
 - **Source:** `Dans_Diffraction` 3.4.0 generated API/docs; Waasmaier–Kirfel (1995); independent Henke/CXRO dispersion tables; local pyrite conventions
 - **Status:** unverified
 - **Checks:** fail-closed threshold evaluator; fake-oracle unit tests; pinned real-backend test at 1, 2, 3, and 8 keV
@@ -125,7 +125,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `xray-in-medium-resonance`
 
 - **Claim:** CXR line kinematics on the in-medium photon dispersion `k = Re n(ω) ω n̂`: resonance `ω_res = v·g / (1 − Re n (v·n̂))`, `k·v = ω(1 − denom)`, `k·g = Re n ω (n̂·g)`, PXR detuning `\|k+g\|² − k² = g² + 2k·g` and PXR numerator `k² = (Re n ω)²`
-- **Code:** `montecarlo/spectrum/lines.py::_in_medium_kinematics`, `::mc_spectrum` (unconditional — there is no vacuum-dispersion switch); CUDA port of the same fixed point in `montecarlo/spectrum/coherent_stream_jit_kernel.py::_coherent_prologue_kernel`
+- **Code:** `montecarlo/spectrum/lines/_kernels.py::_in_medium_kinematics`, `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum` (unconditional — there is no vacuum-dispersion switch); CUDA port of the same fixed point in `montecarlo/spectrum/coherent_stream_jit_kernel.py::_coherent_prologue_kernel`
 - **Source:** energy–momentum conservation `ω = v·(k+g)` closed with the Maxwell dispersion relation in a homogeneous dielectric, `k² = (1 + χ₀)ω²` (`xray-refractive-index`); Feranchuk–Spence 2000 Eq. (10)/(13) with `k² → εω²` rather than an ad hoc `n` inserted into the vacuum result
 - **Status:** rederived
 - **Checks:** limiting case — the production switch that forced `k = ω` is retired, so the vacuum limit is now checked where it is physical (`χ₀ → 0` at high energy, under `xray-chi-zero`) and, at kernel level, by feeding `Re n = 1` to the CUDA prologue; absolute root — the measured peak lands on the closed-form in-medium fixed point to inside one grid step (2.5e-5 eV), which pins the root itself rather than an increment between two code paths; sign — with the detector upstream (`v·n̂ < 0`) the in-medium denominator exceeds the vacuum one and the line moves UP in energy; magnitude — the measured fractional line shift matches the closed form `−δ (v·n̂)/(1 − v·n̂)` to 4e-4 rel (hopg 002, 100 keV, θ_obs = 119°: +6.382e-2 eV on a 1600.32 eV line, δ = 1.900e-4), identically on BOTH the batched and the per-hkl accumulation paths; fixed-point solve of the implicit resonance contracts at rate ~δ ~ 1e-5 per pass, 3 passes taken — but **only in the X-ray regime**, so convergence is now VERIFIED per sample rather than assumed: the last pass must move `denom` by less than `_RESONANCE_ROOT_RTOL = 1e-3` (a genuine contraction moves it by ~δ³ ~ 1e-15 in float64, floored by float32 rounding ~1e-7 on the device twin — five orders of margin either side), and failures carry NaN out of `denom` onto the caller's existing finite mask
@@ -135,7 +135,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `xray-in-medium-propagation-phase`
 
 - **Claim:** coherent segment-to-segment propagation phase on the in-medium wavevector: segment `j` accumulates `−δ(E) ω(E) L_esc,j` on top of the vacuum `ω d_j`, with `d_j = t_j − n̂·r_j` and `L_esc,j` the in-crystal escape path
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (`coherent=True`; the in-medium leg is unconditional)
+- **Code:** `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum` (`coherent=True`; the in-medium leg is unconditional)
 - **Source:** observation-time phase `ω(t_j + n_med L_esc,j + L_vac,j)` (Jackson 14.65 kernel `exp{iω t_obs}`) with the first-order far-field path split `L_esc + L_vac = R − n̂·r_j`; the medium leg contributes `ω(Re n − 1) L_esc = −δ ω L_esc`, and `exp(i n ω L) = exp(iωL)·exp(−iδωL)·exp(−βωL)` shows it is the real partner of the Beer-Lambert amplitude `exp(−βωL) = √(exp(−μL))` already applied over the SAME path
 - **Status:** rederived
 - **Checks:** limiting cases — a SINGLE segment reproduced the incoherent result to 1e-10 rel, so the new factor was pure phase and did not leak into intensity (superseded by issue #181: the leg's within-segment slope now enters each piece's formation factor, which shifts a single segment's line to the escape-path root — see Notes); normal exit (`n̂` along the face normal) reduces to the naive `k(E) n̂·r_j` form up to a segment-independent global phase. Magnitude/sign — the relative phase between two segments at depths 5000 Å and 10000 Å (hopg 002, 100 keV, θ_obs = 119°, δ = 1.900e-4) matches the closed form `−δ(E) ω(E) (z₁ − z₂)/(−n̂_z)` = +1.588643 rad to 5.7e-13 rad (float64 rounding), identically on BOTH the batched and the per-hkl accumulation paths. Accumulation scale — ~1 µm of depth separation gives ≈π, i.e. δ ~ 1e-4 does reach order-unity phase over micron trajectories, which was the open question left by `xray-refractive-index`
@@ -145,7 +145,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `self-absorption`
 
 - **Claim:** per-segment Beer–Lambert path-to-surface, cross-stack
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum`; `materials/attenuation.py::_stack_tau`
+- **Code:** `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum`; `materials/attenuation.py::_stack_tau`
 - **Source:** Beer–Lambert
 - **Status:** rederived
 - **Checks:** units, zero/single-layer/subdivision limits, front/back sign, lateral finite-prism path, and two-layer closed form checked
