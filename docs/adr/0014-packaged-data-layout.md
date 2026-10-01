@@ -92,8 +92,8 @@ change.
   - b
   - Moved out of the wheel (decision 2): fetched with `pyrite tables fetch eedl` / `eadl` into `<data root>/datasets/`; the README stays as provenance.
 * - `photon_cross_sections/epdl2025_mf23.npz` (added by #274)
-  - a
-  - Stays packaged: derived table, 1.5 MB, provenance and modifications note in its README. Not a verbatim upstream file, so it is not a pinned fetch.
+  - b
+  - Still packaged; it moves once #167 hosts a pinned release archive. Derived from upstream (not a verbatim upstream file), so there is no public URL to pin; provenance and modifications note stay in its README.
 * - ELSEPA sources and `database/`; `sbethe.f`
   - c
   - Moved to `vendor/xsgen/elsepa/` and `vendor/xsgen/sbethe/`.
