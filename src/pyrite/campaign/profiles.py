@@ -20,6 +20,7 @@ from typing import Any, Literal, cast
 import numpy as np
 
 from .._numerics import (
+    DEFAULT_INELASTIC_CUTOFF_EV,
     DEFAULT_RADIATIVE_CUTOFF_EV,
     PROFILE_NUMERICS_KEYS,
     SAMPLING_KEYS,
@@ -37,6 +38,11 @@ from ..montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
 from ..montecarlo.transport import STOPPING_MODEL
 from ..results import EmissionMode, Settings
 from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
+from .inelastic_cases import (
+    covered_shell_materials,
+    shell_fallback_reason,
+    target_shell_materials,
+)
 from .sweep import (
     Sweep,
     beam_replace,
@@ -561,7 +567,7 @@ def _identity_v1(
         straggling = bool(settings_payload.pop("straggling", False))
         energy_model = str(settings_payload.pop("energy_model", "frozen"))
         max_dE_frac = float(settings_payload.pop("max_dE_frac", 0.0))
-        inelastic_model = str(settings_payload.pop("inelastic_model", "continuous"))
+        inelastic_model = str(settings_payload.pop("inelastic_model", "auto"))
         inelastic_cutoff_eV = settings_payload.pop("inelastic_cutoff_eV", None)
         secondary_threshold_eV = settings_payload.pop("secondary_threshold_eV", None)
         elastic_model = str(settings_payload.pop("elastic_model", "mott"))
@@ -573,7 +579,7 @@ def _identity_v1(
         straggling = bool(getattr(settings, "straggling", False))
         energy_model = str(getattr(settings, "energy_model", "frozen"))
         max_dE_frac = float(getattr(settings, "max_dE_frac", 0.0))
-        inelastic_model = str(getattr(settings, "inelastic_model", "continuous"))
+        inelastic_model = str(getattr(settings, "inelastic_model", "auto"))
         inelastic_cutoff_eV = getattr(settings, "inelastic_cutoff_eV", None)
         secondary_threshold_eV = getattr(settings, "secondary_threshold_eV", None)
         elastic_model = str(getattr(settings, "elastic_model", "mott"))
@@ -589,9 +595,22 @@ def _identity_v1(
         transport_numerics["energy_model"] = energy_model
     if max_dE_frac != 0.0:
         transport_numerics["max_dE_frac"] = max_dE_frac
-    # Divergence-only like the three keys above: continuous stopping (the
-    # default) leaves every existing digest unchanged.
-    if inelastic_model != "continuous":
+    # Divergence-only like the three keys above: continuous stopping leaves
+    # every existing digest unchanged. "auto" (#281) records shell soft/hard
+    # only when the run's layers resolve to it, as its cases do.
+    if inelastic_model == "auto":
+        materials = target_shell_materials(sweep.target, crystallography["crystal"])
+        fallback = shell_fallback_reason(
+            materials,
+            grooved=sweep_payload.get("groove_spacing_ang") is not None,
+            energy_model=energy_model,
+            covered=covered_shell_materials(),
+        )
+        if fallback is None:
+            inelastic_model = "shell-soft-hard"
+            if inelastic_cutoff_eV is None:
+                inelastic_cutoff_eV = DEFAULT_INELASTIC_CUTOFF_EV
+    if inelastic_model == "shell-soft-hard":
         transport_numerics["inelastic_model"] = inelastic_model
         transport_numerics["inelastic_cutoff_eV"] = float(cast(float, inelastic_cutoff_eV))
     if secondary_threshold_eV is not None:  # divergence-only (#94)

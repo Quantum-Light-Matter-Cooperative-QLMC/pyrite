@@ -117,7 +117,7 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
         straggling=getattr(settings, "straggling", False),
         energy_model=getattr(settings, "energy_model", "frozen"),
         max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
-        inelastic_model=getattr(settings, "inelastic_model", "continuous"),
+        inelastic_model=getattr(settings, "inelastic_model", "auto"),
         inelastic_cutoff_eV=getattr(settings, "inelastic_cutoff_eV", None),
         secondary_threshold_eV=getattr(settings, "secondary_threshold_eV", None),
         elastic_model=getattr(settings, "elastic_model", "elsepa"),

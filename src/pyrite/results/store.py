@@ -97,7 +97,10 @@ class Settings:
     energy_model, max_dE_frac
         Flight integration rule and optional fractional-loss substep cap.
     inelastic_model, inelastic_cutoff_eV
-        Collision-loss scheme and the opt-in shell mode's cutoff in eV.
+        Collision-loss scheme: ``"auto"`` (default) runs shell soft/hard hard
+        inelastic collisions where every layer has shell data and otherwise
+        warns and keeps ``"continuous"``; and the shell cutoff ``W_c`` in eV
+        (50 eV under ``"auto"`` when ``None``).
     secondary_threshold_eV
         Opt-in secondary transport threshold in eV (shell mode only).
     elastic_model
@@ -127,7 +130,7 @@ class Settings:
     straggling: bool = False
     energy_model: Literal["frozen", "midpoint"] = "midpoint"
     max_dE_frac: float = 0.0
-    inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
+    inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "auto"
     inelastic_cutoff_eV: float | None = None
     secondary_threshold_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"

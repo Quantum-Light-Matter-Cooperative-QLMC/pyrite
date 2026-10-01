@@ -90,6 +90,8 @@ def test_catalog_profile_transport_numerics_reach_run_identity(monkeypatch):
         "straggling": True,
         "energy_model": "midpoint",
         "max_dE_frac": 0.02,
+        "inelastic_model": "shell-soft-hard",
+        "inelastic_cutoff_eV": 50.0,
         "elastic_model": "elsepa",
         "radiative_model": "bremslib-soft-hard",
         "radiative_cutoff_eV": 1000.0,

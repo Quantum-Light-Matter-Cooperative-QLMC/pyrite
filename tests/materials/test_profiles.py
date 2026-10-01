@@ -100,9 +100,12 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # `eadl-cascade` marker: the EADL relaxation cascade replaces direct-vacancy
     # xraydb yields, so v6 records are not the same spectrum. Re-minted again
     # for issue #274's `attenuation_model` marker: every escape factor now
-    # reads EPDL2025 mu instead of Chantler f2 + Elam scattering.
+    # reads EPDL2025 mu instead of Chantler f2 + Elam scattering. Re-minted
+    # again for issue #281: hopg has shell data, so the default
+    # inelastic_model="auto" adds the shell soft/hard keys and every trajectory
+    # changes.
     assert case_content_key(case) == (
-        "276fa72437e3dc6d84568411b75f2c3e6fae715e2d0d0da5665cffdaa24125a6"
+        "5048ed741753a2a9fb1224d5654cceb0bbfb4775784232e0ca5040b40b534b61"
     )
 
 
@@ -113,7 +116,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "698e42bc42b40b5f13e982971f6279b891625807df440fb08a09117bfe7b3b69"
+        "e030e2f5272384acf5f74cdcac277864fcf04969aad825dfac61db884c575db3"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -226,6 +229,8 @@ def test_transport_numerics_fork_dataset_identity_only_when_nondefault():
     assert explicit_defaults["parameter_sha256"] == base["parameter_sha256"]
     assert base["resolved_parameters"]["transport_numerics"] == {
         "energy_model": "midpoint",
+        "inelastic_model": "shell-soft-hard",
+        "inelastic_cutoff_eV": 50.0,
         "elastic_model": "elsepa",
         "radiative_model": "bremslib-soft-hard",
         "radiative_cutoff_eV": 1000.0,
@@ -235,6 +240,8 @@ def test_transport_numerics_fork_dataset_identity_only_when_nondefault():
         "straggling": True,
         "energy_model": "midpoint",
         "max_dE_frac": 0.02,
+        "inelastic_model": "shell-soft-hard",
+        "inelastic_cutoff_eV": 50.0,
         "elastic_model": "elsepa",
         "radiative_model": "bremslib-soft-hard",
         "radiative_cutoff_eV": 1000.0,
@@ -438,7 +445,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "698e42bc42b40b5f13e982971f6279b891625807df440fb08a09117bfe7b3b69"
+        "e030e2f5272384acf5f74cdcac277864fcf04969aad825dfac61db884c575db3"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -452,42 +459,42 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "aeb2184e0d57d1a0c61015367e2837d1d047705499ff8e6aae67a9afbc9476c1",
+            "b4ffefc2a5e47be77db6076f5e315ddf732e46d8222387d90b6bbcb739473d0d",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "2816adc6286f3c4a1f274c7aa8a11f23c137bbe1da309f702a81438a5bf080ad",
+            "d0eed50e3759ba0e95eec5a2e72e0a46ed7d542178b4930ef51db6a2a860dfa6",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "6acdac47878eae414d7d3b578604e3f4bd1f49b37bf9fa9ba4d9c5fc7cbb17b0",
+            "fd41745dea47b82056730448ea456441650bfd19ce326a0f7a31bf53dfd18048",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "00ea78b7044753fac08feaa08c819182d7e164717fb895d4755f70c05f5ed2c2",
+            "54e32c38f3cb381ba3eef2a581bfb80e27e01df7ab682bf142677c726364b13d",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "fdb9eaa8c02bc62ca8be5d97999a3b9bff35e94f649bfc15823006f4526ed4a9",
+            "b0e701aed0de41baa7b68446df3e8ce5f588638927f26828e47f33e6e118f21e",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "97afc55bd2fdc7572414c3afbbf1a1bece2aaa08366a19ffab970a5ef094601c",
+            "f83a42604ced37a7b77ea54f57d2e5e87ebb47ef98dd57c8de8728a8ebb17ff8",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "21dc3072c004f3a3fac46f1f97796a8af5fce91f8bcf01e8743675b75b8ec611",
+            "3e9558881cf2b04f2ce612cdb95bb29b28d945392db28791c48a983ba1af3d98",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "96fac886d45a80f93cd33af71e661897e9d4abfc4e2f8f513ad4462002e06116",
+            "c38bba6e974403ec40f8e29543470e990efb8966d1c583d9f5d30ea1d0d8354c",
         ),
     ],
 )
@@ -660,7 +667,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # issue #256's dropped uniform E_grid_brem override, which the sweep-level
     # payload hashes although no case grid changed) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "698e42bc42b40b5f13e982971f6279b891625807df440fb08a09117bfe7b3b69"
+        "e030e2f5272384acf5f74cdcac277864fcf04969aad825dfac61db884c575db3"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -758,22 +765,19 @@ def test_identity_from_stem_reads_sidecar_when_profile_edited_after_run(tmp_path
 
 
 def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
-    settings = replace(default_settings(), energy_model="midpoint")
+    default = replace(default_settings(), energy_model="midpoint")
+    settings = replace(default, inelastic_model="continuous")
     sweep = material_sweep("silicon")
     base = dataset_identity("silicon", "full", settings, sweep)
-    explicit_default = dataset_identity(
-        "silicon",
-        "full",
-        replace(settings, inelastic_model="continuous", inelastic_cutoff_eV=None),
-        sweep,
-    )
     shell = replace(settings, inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
     active = dataset_identity("silicon", "full", shell, sweep)
+    # The "auto" default (#281) resolves silicon to the shell mode at 50 eV.
+    explicit_default = dataset_identity("silicon", "full", default, sweep)
     other_cutoff = dataset_identity(
         "silicon", "full", replace(shell, inelastic_cutoff_eV=100.0), sweep
     )
 
-    assert explicit_default["parameter_sha256"] == base["parameter_sha256"]
+    assert explicit_default["parameter_sha256"] == active["parameter_sha256"]
     assert "inelastic_model" not in base["resolved_parameters"]["transport_numerics"]
     assert active["resolved_parameters"]["transport_numerics"] == {
         "energy_model": "midpoint",
@@ -790,7 +794,7 @@ def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
         == 3
     )
 
-    legacy_case = build_cases(sweep, 4, 4, energy_model="midpoint")[0]
+    legacy_case = build_cases(sweep, 4, 4, energy_model="midpoint", inelastic_model="continuous")[0]
     shell_case = build_cases(
         sweep,
         4,
@@ -853,6 +857,8 @@ def test_default_elsepa_model_forks_identity_and_case_payload_from_mott():
     assert explicit_default["parameter_sha256"] == base["parameter_sha256"]
     assert base["resolved_parameters"]["transport_numerics"] == {
         "energy_model": "midpoint",
+        "inelastic_model": "shell-soft-hard",
+        "inelastic_cutoff_eV": 50.0,
         "elastic_model": "elsepa",
         "radiative_model": "bremslib-soft-hard",
         "radiative_cutoff_eV": 1000.0,

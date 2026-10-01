@@ -6,13 +6,13 @@ This page states the transport loop and the propagation rules that control it. T
 
 ## Model
 
-At each material step the transport samples an elastic free path, advances the electron, applies either the mean energy loss or a fluctuation about that mean, and samples an elastic deflection. The default elastic model uses ELSEPA partial-wave tables; Mott/Browning remains selectable. Each layer's collision stopping comes from its SBETHE material table. The opt-in shell soft/hard model also samples discrete inelastic collisions. In a stack, the active layer determines rates, stopping and straggling; flights are truncated at interfaces before continuing with the next medium.
+At each material step the transport samples an elastic free path, advances the electron, applies either the mean energy loss or a fluctuation about that mean, and samples an elastic deflection. The default elastic model uses ELSEPA partial-wave tables; Mott/Browning remains selectable. Each layer's collision stopping comes from its SBETHE material table. The shell soft/hard model, the production default where shell data covers every layer, also samples discrete inelastic collisions. In a stack, the active layer determines rates, stopping and straggling; flights are truncated at interfaces before continuing with the next medium.
 
 Vacuum legs do not scatter, stop, or radiate, but their distance advances the transport clock. Transport ends when the electron exits permanently, falls below the model cutoff, or exhausts the bounded step budget.
 
 ### Stochastic energy loss
 
-In the default continuous inelastic mode, `straggling=False` gives deterministic loss from the layer's SBETHE table, with positive stopping magnitude $S(E)=\lvert dE/ds\rvert$. With `straggling=True`, that loss is replaced by an unrestricted Urban compound-Poisson draw whose mean is scaled to $S(E)$. The construction follows the Geant4 Physics Reference Manual and Bichsel's thin-detector treatment{cite:p}`geant4prm,bichsel1988`:
+In the continuous inelastic mode, `straggling=False` gives deterministic loss from the layer's SBETHE table, with positive stopping magnitude $S(E)=\lvert dE/ds\rvert$. With `straggling=True`, that loss is replaced by an unrestricted Urban compound-Poisson draw whose mean is scaled to $S(E)$. The construction follows the Geant4 Physics Reference Manual and Bichsel's thin-detector treatment{cite:p}`geant4prm,bichsel1988`:
 
 $$
 \Delta E

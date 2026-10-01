@@ -1,4 +1,4 @@
-"""Configuration threading of the opt-in shell soft/hard inelastic mode.
+"""Configuration threading of the shell soft/hard inelastic mode and its ``auto`` default.
 
 Validation: shell-soft-hard-transport
 """
@@ -18,12 +18,13 @@ from pyrite.results.store import Settings
 
 
 def test_numerics_inelastic_models_track_the_transport_constant():
-    assert _numerics.INELASTIC_MODELS == INELASTIC_MODELS
+    assert _numerics.INELASTIC_MODELS == ("auto", *INELASTIC_MODELS)
 
 
 @pytest.mark.parametrize("owner", (Numerics, Settings))
 def test_inelastic_settings_validate_coupling(owner):
-    assert owner().inelastic_model == "continuous"
+    assert owner().inelastic_model == "auto"
+    owner(inelastic_cutoff_eV=60.0)
     owner(energy_model="midpoint", inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
     with pytest.raises(ValueError, match="requires energy_model='midpoint'"):
         owner(
@@ -35,7 +36,9 @@ def test_inelastic_settings_validate_coupling(owner):
     with pytest.raises(ValueError, match="finite positive inelastic_cutoff_eV"):
         owner(energy_model="midpoint", inelastic_model="shell-soft-hard")
     with pytest.raises(ValueError, match="requires inelastic_model"):
-        owner(inelastic_cutoff_eV=50.0)
+        owner(inelastic_model="continuous", inelastic_cutoff_eV=50.0)
+    with pytest.raises(ValueError, match="requires inelastic_model"):
+        owner(secondary_threshold_eV=100.0)
     with pytest.raises(ValueError, match="inelastic_model must be one of"):
         owner(inelastic_model="dielectric")
 
@@ -46,7 +49,7 @@ def _case(**kw):
 
 
 def test_case_schema_and_runner_kwargs():
-    legacy = _case()
+    legacy = _case(inelastic_model="continuous")
     assert runner._case_inelastic_kwargs(legacy) == {}
     shell = _case(inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
     assert isinstance(shell, Case)
@@ -110,3 +113,70 @@ def test_shell_case_runs_on_the_exact_cuda_core(monkeypatch):
     assert seen["transport_core"] == "cuda"
     assert seen["transport_lut_config"].enabled is False
     assert seen["inelastic_model"] == "shell-soft-hard"
+
+
+def test_auto_resolves_covered_material_to_shell_mode():
+    case = _case()
+    assert case["inelastic_model"] == "shell-soft-hard"
+    assert case["inelastic_cutoff_eV"] == _numerics.DEFAULT_INELASTIC_CUTOFF_EV
+    assert _case(inelastic_cutoff_eV=80.0)["inelastic_cutoff_eV"] == 80.0
+    with pytest.raises(ValueError, match="conduction-band resonance"):
+        _case(inelastic_cutoff_eV=10.0)
+
+
+@pytest.mark.parametrize(
+    ("material", "energy_model", "reason"),
+    (
+        ("ws2", "midpoint", "no conduction-band shell data for 'ws2'"),
+        ("silicon", "frozen", "energy_model='frozen'"),
+    ),
+)
+def test_auto_falls_back_to_continuous_with_a_warning(material, energy_model, reason):
+    with pytest.warns(UserWarning, match=reason):
+        cases = build_cases(
+            material_sweep(material),
+            4,
+            4,
+            energy_model=energy_model,
+            radiative_model="uncoupled",
+        )
+    assert all(case.get("inelastic_model") is None for case in cases)
+    assert runner._case_inelastic_kwargs(cases[0]) == {}
+
+
+@pytest.mark.parametrize(("material", "shell"), (("silicon", True), ("ws2", False)))
+def test_auto_identity_records_the_resolved_model(material, shell):
+    from pyrite.campaign.config import default_settings
+    from pyrite.campaign.profiles import dataset_identity
+
+    settings = default_settings()
+    identity = dataset_identity(material, "full", settings, material_sweep(material))
+    numerics = identity["resolved_parameters"]["transport_numerics"]
+    if shell:
+        assert numerics["inelastic_model"] == "shell-soft-hard"
+        assert numerics["inelastic_cutoff_eV"] == 50.0
+    else:
+        assert "inelastic_model" not in numerics
+        continuous = dataset_identity(
+            material,
+            "full",
+            replace(settings, inelastic_model="continuous"),
+            material_sweep(material),
+        )
+        assert continuous["parameter_sha256"] == identity["parameter_sha256"]
+
+
+def test_missing_shell_reference_data_names_the_fetch_command(monkeypatch, tmp_path):
+    from pyrite.montecarlo import shell_configuration
+    from pyrite.xsgen._errors import DataFetchError
+
+    monkeypatch.setattr(shell_configuration, "_default_path", lambda: tmp_path / "pdatconf.p14")
+    with pytest.raises(DataFetchError, match="pyrite tables fetch sbethe"):
+        shell_configuration.load_atomic_shells()
+
+
+def test_uncovered_material_names_the_covered_set():
+    from pyrite.montecarlo.transport.shell_rates import catalog_shell_oscillators
+
+    with pytest.raises(ValueError, match="'ws2' has no conduction-band shell data.*silicon"):
+        catalog_shell_oscillators("ws2")

@@ -9,7 +9,7 @@ These pages describe **how the simulated physical system is represented**. For e
 ### Beam and electron transport
 
 - Electron position, direction, energy, and arrival time are sampled at the target entrance. Upstream beamline transport and space charge are excluded; see [Beam phase space](beam-transport/beam-phase-space.md).
-- Independent electrons follow piecewise-linear flights through slabs or layer stacks. Elastic collisions are explicit. Collision loss is continuous by default, with optional Urban straggling; the opt-in shell model samples hard inelastic collisions and can track secondary electrons, with PENELOPE soft-loss straggling. See [Electron transport](beam-transport/electron-transport.md) and [Inelastic scattering](beam-transport/inelastic-scattering-events.md).
+- Independent electrons follow piecewise-linear flights through slabs or layer stacks. Elastic collisions are explicit. By default, production runs sample hard inelastic collisions with the shell model wherever every layer has shell data, with optional PENELOPE soft-loss straggling and opt-in secondary tracking; elsewhere collision loss is continuous, with optional Urban straggling. See [Electron transport](beam-transport/electron-transport.md) and [Inelastic scattering](beam-transport/inelastic-scattering-events.md).
 - The default elastic model samples ELSEPA Dirac partial-wave total and differential cross sections (muffin-tin tables for single-element crystals); the Browning/NIST Mott-calibrated model remains selectable. Collision stopping uses a material-level SBETHE table for each layer; see [Elastic scattering](beam-transport/elastic-scattering.md) and [Stopping power](beam-transport/stopping-power.md).
 
 ### Crystal and coherent emission
