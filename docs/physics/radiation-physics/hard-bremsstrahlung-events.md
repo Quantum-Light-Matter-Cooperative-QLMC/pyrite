@@ -30,12 +30,12 @@ Emitted photons are scored, not transported. A hard photon's only effect on the 
 
 - scattered photons that still reach the detector (no build-up factor);
 - fluorescence and photoelectrons from photoabsorption, including characteristic lines excited by bremsstrahlung rather than by the beam;
-- pair production above {math}`2m_ec^2 = 1.022` MeV, both as a secondary process and as a term in {math}`\mu`;
+- pair production above {math}`2m_ec^2 = 1.022` MeV as a secondary process (it is a term in {math}`\mu`, which removes the photon from the ray);
 - photon energy deposited in the target.
 
-These omissions scale with the probability that a photon interacts before escaping. For normal escape through the full thickness, `materials.attenuation` gives at most {math}`4.3\times10^{-6}` for silicon and HOPG and {math}`2.5\times10^{-4}` for WSe₂ through 1000 Å between 100 and 790 keV. Through 100 µm it is at most {math}`4.3\times10^{-3}` for silicon and HOPG, but 0.22 for WSe₂ at 100 keV. The scored-only treatment is therefore accurate for thin targets and becomes an explicit error term for thick, high-{math}`Z` ones.
+These omissions scale with the probability that a photon interacts before escaping. For normal escape through the full thickness, `materials.attenuation` gives at most {math}`4.3\times10^{-6}` for silicon and HOPG and {math}`2.5\times10^{-4}` for WSe₂ through 1000 Å between 100 keV and 10 MeV. Through 100 µm it is at most {math}`4.3\times10^{-3}` for silicon and HOPG, but 0.22 for WSe₂ at 100 keV. The scored-only treatment is therefore accurate for thin targets and becomes an explicit error term for thick, high-{math}`Z` ones.
 
-The attenuation tables also end: the Elam scattering data at `ELAM_E_MAX_EV` = 800 keV and Chantler photoabsorption near 966 keV. Above 800 keV {math}`\mu` is NaN. `mc_hard_brem_event_spectrum`, like the wide soft grid, treats an unavailable {math}`\mu` as zero, so photons above 800 keV currently escape with unit transmission. No catalogue grid reaches that energy (the widest `E_grid_brem` stops at 262.4 keV). A coupled run with MeV photons nevertheless has an undefined escape factor. Multi-MeV use of this mode needs an extended attenuation table that includes pair production, not only the coupled electron treatment.
+The escape coefficient {math}`\mu` is the EPDL2025 narrow-beam total (photoelectric, coherent, incoherent, and pair production in the nuclear and electron fields), defined from 1 eV to 100 GeV (issue #274; Validation: `narrow-beam-total-attenuation`). MeV photons therefore get a defined escape factor that includes the pair term. Outside that band {math}`\mu` is NaN, and `mc_hard_brem_event_spectrum`, like the wide soft grid, raises rather than reading it as transparency. Before #274, {math}`\mu` ended at 800 keV and photons above it escaped with unit transmission.
 
 ## Straggling and supported scope
 

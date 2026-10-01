@@ -161,7 +161,7 @@ This is a free-electron estimate, not an exact optical threshold for each crysta
 
 *Limiting case.* $n_e \to 0$ gives $\hbar\omega_p \to 0$: an empty medium imposes no low-energy bound, and the floor falls back to pure table support.
 
-**Data support.** The second bound is the lowest energy at which every table the continuum pipeline evaluates carries a real tabulated value rather than an extrapolation, measured from the packaged data and recorded with its provenance in `_photon_continuum_floor.py::DATA_SUPPORT_LIMITS_EV`: EEDL MF=26/MT=527 photon spectra reach 0.1 eV for every transport element, Chantler/FFAST reaches 1.01 eV (admitted on the strict interior, so 1.01 eV itself reads as out of range), and the digitized Eagle XO QE curve is documented valid from 12 eV. The QE table therefore binds, at 12 eV.
+**Data support.** The second bound is the lowest energy at which every table the continuum pipeline evaluates carries a real tabulated value rather than an extrapolation, measured from the packaged data and recorded with its provenance in `_photon_continuum_floor.py::DATA_SUPPORT_LIMITS_EV`: EEDL MF=26/MT=527 photon spectra reach 0.1 eV for every transport element, the EPDL2025 attenuation cross sections start at 1 eV, Chantler/FFAST (still read by the Si sensor models) reaches 1.01 eV (admitted on the strict interior, so 1.01 eV itself reads as out of range), and the digitized Eagle XO QE curve is documented valid from 12 eV. The QE table therefore binds, at 12 eV.
 
 The plasma-energy term sets a material-dependent floor where it exceeds the data-support bound. Node placement above the floor is handled separately.
 

@@ -109,9 +109,10 @@ def test_stack_tau_carries_scattering_for_a_crystalline_source():
     a coherent or incoherent scatter on the way out removes the photon from the
     line/brem ray exactly as photoabsorption does (#104). Pinned on graphite at
     20 keV, where the scattering term is the larger half of ``mu``: a
-    photoabsorption-only escape would be wrong by a factor 2.09 in ``tau``.
+    photoabsorption-only escape would be wrong by XCOM's total/photoelectric
+    ratio, 0.4420/0.2177 = 2.030, in ``tau``.
     """
-    from pyrite.materials.crystal import absorption_length_ang
+    from pyrite.materials.photon_cross_sections import photon_cross_sections_ang2
 
     n_c = 2.26 / 12.011 * 0.602214076
     comp = [("C", n_c)]
@@ -120,9 +121,10 @@ def test_stack_tau_carries_scattering_for_a_crystalline_source():
     thickness, n_z = 2000.0, +0.6
 
     tau = _stack_tau([(0.0, thickness, comp)], z, n_z, E)
-    tau_photo = ((thickness - z) / n_z) * (1.0 / absorption_length_ang("C", E, n_c))
+    sigma_photo = photon_cross_sections_ang2("C", E)["photoelectric"]
+    tau_photo = ((thickness - z) / n_z) * n_c * sigma_photo
 
-    assert np.allclose(tau / tau_photo, 2.0893, rtol=2.0e-3)
+    assert np.allclose(tau / tau_photo, 2.030, rtol=5.0e-3)
 
 
 def test_stack_tau_substrate_adds_depth_on_back_exit():

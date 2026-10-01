@@ -46,10 +46,9 @@ def detector_efficiency(E_eV, polymer_nm=300.0, al_nm=40.0, grid_open=0.78):
     )
     n_al = 2.70 / 26.982 * 0.602214076
     mu_al = _mu_total_inv_ang([("Al", n_al)], E)
-    # Above the Henke ceiling (~30 keV) the window attenuation is unavailable
-    # (NaN, and inf at E=0); the thin polymer/Al window is transparent to hard
-    # X-rays, so treat an unavailable mu as zero -> QE -> grid_open rather than
-    # NaN (which would clip the detected spectrum on a log plot). NB this
+    # Below the EPDL floor (1 eV, e.g. an E=0 plotting node) the window
+    # attenuation is undefined (NaN); treat it as zero -> QE -> grid_open rather
+    # than NaN, which would clip the detected spectrum on a log plot. NB this
     # window-transmission model assumes the Si diode is fully absorbing, so it
     # OVERestimates QE above ~20 keV where the Si itself turns transparent -- use
     # the Timepix forward model (plot_timepix_detected) for a faithful hard-X-ray

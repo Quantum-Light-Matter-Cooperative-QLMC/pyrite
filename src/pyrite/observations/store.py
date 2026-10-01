@@ -74,6 +74,7 @@ _PROVENANCE_KEYS = (
     "device",
     "stopping_model",
     "characteristic_model",
+    "attenuation_model",
     "bremsstrahlung_model",
     "xsgen_tables",
 )

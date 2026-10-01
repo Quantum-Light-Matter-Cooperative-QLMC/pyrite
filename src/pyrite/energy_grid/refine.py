@@ -153,9 +153,10 @@ def continuum_refinement_marks(
 
     Edge positions are *located*, never listed: they come from
     :func:`~pyrite.montecarlo.spectrum.line_seeds.absorption_edge_brackets`,
-    which finds the steepest adjacent Chantler ``f2`` step near each xraydb edge
-    energy -- the jump the escape model's own ``mu`` actually contains, in the
-    table it actually reads. An element whose edges all fall outside
+    in the table each element is actually read from -- the medium's EPDL2025
+    photoionization edges, which its escape ``mu`` contains as exact
+    discontinuities, and the detection path's Chantler ``f2`` jumps, which the
+    Si sensor response reads. An element whose edges all fall outside
     ``[floor_eV, stop_eV]`` contributes nothing and is not an error.
 
     Parameters
@@ -188,8 +189,15 @@ def continuum_refinement_marks(
     if not np.isfinite(floor) or not np.isfinite(stop) or stop <= floor:
         raise ValueError("refinement band must be finite with stop_eV above floor_eV")
 
-    elements = _medium_elements(material) | {str(value) for value in path_elements}
-    brackets, edge_summary = absorption_edge_brackets(elements, floor, stop)
+    # The medium's escape mu is EPDL; the detection path's Si sensor response
+    # reads Chantler f2. Each contributes the edges of the table it reads.
+    medium = _medium_elements(material)
+    path = {str(value) for value in path_elements}
+    elements = medium | path
+    brackets, edge_summary = absorption_edge_brackets(medium, floor, stop, tables=("epdl",))
+    path_brackets, path_summary = absorption_edge_brackets(path, floor, stop, tables=("chantler",))
+    brackets = brackets + path_brackets
+    edge_summary = {"skipped": [*edge_summary["skipped"], *path_summary["skipped"]]}
 
     marks: list[RefinementMark] = []
     outside: list[str] = []

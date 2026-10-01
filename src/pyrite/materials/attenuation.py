@@ -16,7 +16,11 @@ from scipy.constants import hbar as _HBAR
 
 from . import CATALOG, MediumSpec
 from .atomic import Z_TABLE
-from .crystal import absorption_length_ang, scattering_attenuation_inv_ang
+from .photon_cross_sections import (
+    EPDL_E_MAX_EV,
+    EPDL_E_MIN_EV,
+    total_photon_cross_section_ang2,
+)
 
 
 def linear_attenuation_inv_mm(material: str | MediumSpec, energy_eV: object) -> np.ndarray:
@@ -26,12 +30,12 @@ def linear_attenuation_inv_mm(material: str | MediumSpec, energy_eV: object) -> 
     photon is removed from the unscattered ray by any channel. Element
     contributions add as
 
-        ``mu(E) = sum_i [ 1 / L_abs,i(E) + n_i sigma_scat,i(E) ]``,
+        ``mu(E) = sum_i n_i sigma_tot,i(E)``,
 
-    photoabsorption from the Chantler ``f2`` absorption length plus the
-    coherent + incoherent term of
-    :func:`~pyrite.materials.crystal.scattering_attenuation_inv_ang`. Both are
-    homogeneous and passive; this helper adds no fluorescence, diffraction,
+    with ``sigma_tot`` the EPDL2025 per-atom total (photoelectric + coherent +
+    incoherent + pair production) of
+    :func:`~pyrite.materials.photon_cross_sections.total_photon_cross_section_ang2`.
+    It is homogeneous and passive; this helper adds no fluorescence, diffraction,
     secondary production, or build-up factor, so it assumes good geometry --
     scattered photons leave the collection solid angle rather than reaching the
     pixel. As every elemental coefficient tends to zero, so does the returned
@@ -200,21 +204,22 @@ def _normalize_composition(element, n_atoms_per_ang3, composition):
 def _mu_total_inv_ang(comp, E_eV):
     """Total narrow-beam linear attenuation [1/Angstrom] summed over elements.
 
-    Per element this is photoabsorption plus coherent plus incoherent removal,
+    Per element this is the number density times the EPDL2025 per-atom total,
 
-        mu_i = 1 / L_abs,i(E)  +  n_i sigma_scat,i(E),
+        mu_i = n_i [sigma_photo + sigma_coh + sigma_incoh
+                    + sigma_pair,nuc + sigma_pair,el]_i(E),
 
-    the first term from ``absorption_length_ang`` (Chantler f2) and the second
-    from ``scattering_attenuation_inv_ang`` (Elam). Every consumer of this
-    helper -- filter plates, crystal-source self-absorption, the brem and
-    characteristic escape factors, the per-line tabulation, and the detector
-    window -- models removal of a photon from an unscattered ray, so all of
-    them want the total, not the photoabsorption part. Callers that want the
-    photoabsorption coefficient alone, because they are building a refractive
-    index, must use ``absorption_length_ang``/``optical_constants`` directly.
+    from :func:`~pyrite.materials.photon_cross_sections.total_photon_cross_section_ang2`.
+    Every consumer of this helper -- filter plates, crystal-source
+    self-absorption, the PXR/CBS line escape, the brem and characteristic
+    escape factors, the hard-photon event scorer, and the detector window --
+    models removal of a photon from an unscattered ray, so all of them want the
+    total. Callers that want the photoabsorption coefficient of the refractive
+    index (``beta`` from Chantler ``f2``) must use
+    ``absorption_length_ang``/``optical_constants`` directly; that is a
+    different compilation by design.
 
-    absorption_length_ang and the Elam accessor (from crystallography and the
-    atomic-data layer) are CPU-only, so the sum is always computed on the CPU.
+    The EPDL accessor is CPU-only, so the sum is always computed on the CPU.
     The result is returned on the SAME device as E_eV: a GPU array if the
     caller passed one (mc_spectrum, mixing it with on-device factors), a numpy
     array otherwise (detector_efficiency, whose output is multiplied into the
@@ -222,10 +227,10 @@ def _mu_total_inv_ang(comp, E_eV):
     global _GPU flag -- keeps the CPU post-processing path numpy even when a
     GPU is present.
 
-    Out-of-domain energies keep the photoabsorption path's NaN policy: the
-    scattering term is finite everywhere (the Elam accessor clamps), so a bin
-    outside the Chantler table stays NaN through the sum and is handled by the
-    callers' existing ``nan_to_num``.
+    Energies outside the EPDL band (1 eV to 100 GeV) are NaN. Callers must not
+    read NaN as transparency: the line routes drop such samples, and the
+    continuum routes reject them through :func:`_finite_mu_or_raise` (which
+    keeps ``mu = 0`` only below 1 eV, under every modelled band).
 
     The backend import stays function-local for import cost, not for cycles:
     importing pyrite._backend runs the accelerator probe, and the catalog and
@@ -238,11 +243,37 @@ def _mu_total_inv_ang(comp, E_eV):
     E_cpu = _to_cpu(E_eV)
     mu = 0.0
     for el, n_i in comp:
-        mu = mu + 1.0 / absorption_length_ang(el, E_cpu, n_i)
-        mu = mu + scattering_attenuation_inv_ang(el, E_cpu, n_i)
+        mu = mu + n_i * total_photon_cross_section_ang2(el, E_cpu)
     if is_device_array(E_eV):
         return xp.asarray(mu, dtype=REAL)
     return mu
+
+
+def _finite_mu_or_raise(mu, energy_eV, context):
+    """Escape-factor ``mu``: refuse it where undefined, except below 1 eV.
+
+    The continuum scorers must not read an undefined coefficient as
+    transparency: above ``EPDL_E_MAX_EV`` a NaN ``mu`` would let a photon
+    escape any thickness with unit transmission, so any non-finite value at
+    ``E >= EPDL_E_MIN_EV`` raises. Nodes below ``EPDL_E_MIN_EV`` (``E = 0`` on
+    a grid that was not floored) sit below every modelled band
+    (``_photon_continuum_floor``) and keep the historical ``mu = 0``.
+
+    Validation: narrow-beam-total-attenuation
+    """
+    from .._backend import array_namespace
+
+    # The namespace that owns the operands, not the selected backend: the
+    # hard-event scorer guards host arrays while an accelerator is selected.
+    xp = array_namespace(mu, energy_eV)
+    below_floor = xp.asarray(energy_eV) < EPDL_E_MIN_EV
+    undefined = ~xp.isfinite(mu)
+    if bool(xp.any(undefined & ~below_floor)):
+        raise ValueError(
+            f"{context}: photon attenuation is undefined at some energies; the EPDL2025 "
+            f"cross sections cover {EPDL_E_MIN_EV:g} eV to {EPDL_E_MAX_EV:g} eV"
+        )
+    return xp.where(undefined, 0.0, mu)
 
 
 # ---- layered (film-on-substrate) self-absorption ----------------------------

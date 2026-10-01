@@ -15,7 +15,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `mosaic-mc`
 
 - **Claim:** exact per-orientation incoherent average (2-D Gauss–Hermite)
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum`; `montecarlo/geometry.py::_mosaic_quadrature`
+- **Code:** `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum`; `montecarlo/geometry.py::_mosaic_quadrature`
 - **Source:** `docs/physics/materials/crystal-mosaicity.md`
 - **Status:** rederived
 - **Checks:** `1/π` normalization, positive symmetric weights, radial variance, proper rotations, η→0, constant-spectrum preservation, and incoherent intensity average checked

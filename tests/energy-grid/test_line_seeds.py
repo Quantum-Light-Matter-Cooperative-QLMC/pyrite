@@ -171,7 +171,7 @@ def test_mosaic_spread_widens_the_window():
 
 
 def test_edge_anchors_bracket_the_chantler_jump_not_the_nominal_edge():
-    seeds, summary = absorption_edge_seeds(["C"], 100.0, 1000.0)
+    seeds, summary = absorption_edge_seeds(["C"], 100.0, 1000.0, tables=("chantler",))
     native, _f1, f2 = load_henke("C")
     anchors = sorted(seed.centre_eV for seed in seeds if seed.anchor)
     assert [seed.label for seed in seeds] == ["C K", "C K above"]
@@ -188,7 +188,7 @@ def test_edge_anchors_bracket_the_chantler_jump_not_the_nominal_edge():
 def test_a_secondary_shell_beside_a_stronger_jump_gets_its_own_anchors():
     # Se L2 (1474 eV) sits 2.8% above L3; Chantler smears the L3 jump over
     # several brackets, and L2 must anchor on its own step, not L3's tail.
-    seeds, _ = absorption_edge_seeds(["Se"], 1000.0, 2000.0)
+    seeds, _ = absorption_edge_seeds(["Se"], 1000.0, 2000.0, tables=("chantler",))
     native, _f1, f2 = load_henke("Se")
     centres = {seed.label: seed.centre_eV for seed in seeds}
     assert set(centres) == {"Se L3", "Se L3 above", "Se L2", "Se L2 above"}
@@ -198,12 +198,25 @@ def test_a_secondary_shell_beside_a_stronger_jump_gets_its_own_anchors():
     assert f2[below + 1] / f2[below] >= EDGE_MIN_F2_RATIO
 
 
-def test_edge_bracket_is_a_single_pair_of_nodes_in_the_plan():
-    seeds, _ = absorption_edge_seeds(["C"], 100.0, 1000.0)
+@pytest.mark.parametrize("table", ["chantler", "epdl"])
+def test_edge_bracket_is_a_single_pair_of_nodes_in_the_plan(table):
+    seeds, _ = absorption_edge_seeds(["C"], 100.0, 1000.0, tables=(table,))
     grid = build_window_plan(100.0, 1000.0, 3.0, seeds).coordinates()
     below, above = sorted(seed.centre_eV for seed in seeds)
     i = int(np.flatnonzero(grid == below)[0])
     assert grid[i + 1] == above
+
+
+def test_epdl_edge_anchors_straddle_the_exact_discontinuity():
+    """The escape mu jumps exactly at the EPDL edge (C K 288 eV), a few eV from
+    Chantler's; its anchor pair is centred on it, so the bin boundary is the edge."""
+    seeds, _ = absorption_edge_seeds(["C"], 100.0, 1000.0)
+    centres = {seed.label: seed.centre_eV for seed in seeds}
+    assert set(centres) == {"C K", "C K above", "C K (EPDL)", "C K (EPDL) above"}
+    assert 0.5 * (centres["C K (EPDL)"] + centres["C K (EPDL) above"]) == pytest.approx(288.0)
+    assert centres["C K (EPDL)"] < 288.0 < centres["C K (EPDL) above"]
+    with pytest.raises(ValueError, match="subset"):
+        absorption_edge_seeds(["C"], 100.0, 1000.0, tables=("henke",))
 
 
 def test_characteristic_windows_follow_the_emitted_lines():

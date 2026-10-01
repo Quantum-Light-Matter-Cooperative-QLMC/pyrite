@@ -7,25 +7,21 @@ Line, bremsstrahlung, and characteristic radiation use straight-ray Beer--Lamber
 Escape is a **narrow-beam** problem: a photon counts as escaped only if it reaches the surface unscattered, so every interaction channel removes it, not only the ones that absorb it. The coefficient is therefore the total
 
 $$
-\mu(E)=\mu_{\rm photo}(E)+\mu_{\rm scat}(E)
-     = n\bigl[\sigma_{\rm photo}+\sigma_{\rm coh}+\sigma_{\rm incoh}\bigr]
+\mu(E)=n\bigl[\sigma_{\rm photo}+\sigma_{\rm coh}+\sigma_{\rm incoh}
+      +\sigma_{\rm pair,nuc}+\sigma_{\rm pair,el}\bigr](E)
   \quad[\text{\AA}^{-1}],
 \qquad I(z)=I(0)e^{-\mu z}.
 $$
 
-The photoabsorption part comes from the Henke/Chantler imaginary scattering factor $f_2(E)$, through $\beta_{\rm idx}=r_e\lambda^2 n f_2/(2\pi)$ and $\mu_{\rm photo}=2k\beta_{\rm idx}$:
+Every per-atom cross section comes from one evaluated library, EPDL2025 (the EPICS2025 photo-atomic data of D. E. Cullen, `NDS-IAEA-225`){cite:p}`epdl2025,cullen1997epdl`, for Z = 1--100 from 1 eV to 100 GeV. The two pair terms are zero below their thresholds, $2m_ec^2=1.022$ MeV in the nuclear field and $4m_ec^2$ in the electron field. The cross sections are evaluated lin-lin between the library's knots, as the ENDF file declares, and are right-continuous at each photoionization edge. Against NIST XCOM{cite:p}`berger2010xcom` the total agrees within 0.5% for light and mid-Z elements and within 3% for W and Pb, away from edges (Validation: `narrow-beam-total-attenuation`). No build-up factor is applied: scattered photons leave the ray and are not returned to it. Pairs are a removal term only; they are not created or transported.
 
-$$
-\mu_{\rm photo}(E)=2\,r_e\,\lambda\,n\,f_2(E).
-$$
-
-The coherent (Rayleigh) and incoherent (Compton) part comes from the Elam cross sections. No build-up factor is applied: scattered photons leave the ray and are not returned to it.
+This $\mu$ is deliberately **not** the photoabsorption of the refractive index. The PXR/CBS couplings, $\beta_{\rm idx}=r_e\lambda^2 n f_2/(2\pi)$ and the Si sensor response keep the Chantler/FFAST $f_2$ (`absorption-length`). The two compilations differ by a few percent in photoabsorption, more within a few eV of an edge, because each places its edges at its own energies (C K: 288 eV in EPDL, 283.8 eV in Chantler). Grid refinement and line-window seeding locate edges in the table each quantity reads.
 
 Compounds add inverse lengths, $\mu=\sum_i \mu_i$. The absorber composition defaults to the crystal's own basis at its total atom density — exact for elemental crystals — and can be given explicitly as `[(element, n_per_Ang3), ...]`.
 
-The line kernel needs $\mu$ at each segment's own resonance energy, which would otherwise mean a host round-trip per segment. Instead each element's $\log\mu_i$ is tabulated and interpolated **linearly in $\log E$**, then summed: that reproduces the pinned xraydb rule for non-`f1` Chantler data exactly for the photoabsorption part, whereas interpolating the compound total in either linear or log space does not. The scattering term rides on the same tabulation and is *not* exactly log-linear there, since a sum of two log-linear terms with different slopes is not one; the residual is bounded at $1.5\times10^{-4}$ relative over the production bands, with node values still exact. The shared grid is a 1 eV mesh unioned with the native Chantler nodes of every basis *and* explicitly named absorber element, so edge jumps — tens of percent at, say, the C K-edge — are resolved rather than smeared. Layered and grooved escape keep exact per-point $\mu$ instead of the tabulation.
+The line kernel needs $\mu$ at each segment's own resonance energy, which would otherwise mean a host round-trip per segment. Instead each element's $\log\mu_i$ is tabulated and interpolated **linearly in $\log E$**, then summed; interpolating the compound total instead does not reproduce a sum of elemental terms. The shared grid is a 1 eV mesh unioned with the native Chantler nodes of every basis and absorber element, every EPDL knot of each absorber, and a float32-adjacent node pair at each EPDL edge. No mesh interval therefore straddles an EPDL slope change, and the one interval that straddles an edge jump is one ulp wide. The residual against direct evaluation is below $10^{-4}$ relative, and node values are exact. Layered and grooved escape keep exact per-point $\mu$ instead of the tabulation.
 
-Outside the tabulated range the coefficient is unavailable. The line kernel lets NaN propagate and drops the segment on its finite mask; the wide bremsstrahlung grid instead treats an unavailable $\mu$ as zero, i.e. fully transparent. See [Bremsstrahlung](bremsstrahlung.md) for what that means at the extremes of a wide grid.
+Outside 1 eV -- 100 GeV the coefficient is unavailable (NaN). The line kernel drops such segments on its finite mask. The continuum scorers (wide bremsstrahlung grid, hard-photon events, characteristic escape) raise instead of reading NaN as transparency; only sub-eV nodes of a grid that was not floored keep $\mu=0$. See [Bremsstrahlung](bremsstrahlung.md).
 
 ## Escape geometry
 

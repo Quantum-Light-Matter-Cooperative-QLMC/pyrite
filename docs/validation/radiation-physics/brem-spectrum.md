@@ -93,6 +93,8 @@ The largest corresponding increase of surviving density is 1.20099%, for W at 10
 
 A bounded attenuation probe used one 100-angstrom C segment at 30 keV, density 0.1 atoms per cubic angstrom, two incident electrons (only one emitting), a 50-angstrom escape path, and a 1-keV photon. Injected finite coefficients $\mu=0$, $0.02$, and $2$ inverse angstrom gave respectively $1.448373123340891\times10^{-11}$, $5.328266952223835\times10^{-12}$, and $5.388058060454713\times10^{-55}$ photons per eV per steradian per incident electron. The ratios are $1$, $\exp(-1)$ and $\exp(-100)$.
 
+> **Superseded by issue #274 (2026-10-01).** `mc_brem_spectrum` now passes its coefficients through `materials/attenuation.py::_finite_mu_or_raise`: an undefined coefficient at a node `E ≥ 1 eV` raises, and only sub-eV nodes keep zero attenuation. EPDL2025 coefficients are finite at 1 eV. The paragraph below records the policy as validated at the time.
+
 Nonfinite coefficients follow a separate policy: `nan_to_num` in `mc_brem_spectrum` maps NaN and either infinity to zero attenuation. Injecting positive infinity or NaN therefore returns the vacuum value, not the opaque limit. No ordinary finite-opacity failure was demonstrated. A real coefficient lookup at positive photon energy 1 eV returns NaN for C and W, demonstrating an out-of-coverage case. This policy must be excluded from a claim of validated self-absorption at all energies; unknown absorption is not physical transparency. Direct 30, 50 and 100 keV lookups were finite for both elements, so the old inline comment claiming missing attenuation above 30 keV is not a current coverage bound.
 
 The focused command

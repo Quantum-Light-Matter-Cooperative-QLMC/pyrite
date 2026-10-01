@@ -111,7 +111,7 @@ When a caller explicitly asks for the non-resonant treatment, an element-level o
 
 The anomalous terms depend only on `(element, energy grid)`, never on $g$ or $hkl$, but the per-reflection spectrum loop re-requests the same pair once per reflection. They are therefore memoized on the exact energy-array bytes and returned frozen read-only, collapsing the repeats to one spline pass per element.
 
-The spectrum kernels do not evaluate the tables per energy bin either. They build a shared tabulation grid — a 1 eV uniform mesh unioned with the **native Chantler nodes** of every basis and absorber element in range — evaluate the couplings and $\mu$ once on it, and interpolate at each segment's own resonance energy. Including the native nodes is what keeps the edge jumps resolved: a plain 1 eV mesh would alias a discontinuity that the tables place exactly.
+The spectrum kernels do not evaluate the tables per energy bin either. They build a shared tabulation grid — a 1 eV uniform mesh unioned with the **native Chantler nodes** of every basis and absorber element in range, plus the EPDL2025 knots and edge node pairs of every absorber (the escape $\mu$ comes from EPDL; see [Photon escape](../radiation-physics/photon-escape-and-dispersion.md)) — evaluate the couplings and $\mu$ once on it, and interpolate at each segment's own resonance energy. Including the native nodes is what keeps the edge jumps resolved: a plain 1 eV mesh would alias a discontinuity that the tables place exactly.
 
 ## Assumptions and limits
 

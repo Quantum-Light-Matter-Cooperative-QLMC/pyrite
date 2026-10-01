@@ -5,6 +5,7 @@ import pytest
 
 from pyrite.materials.attenuation import _mu_total_inv_ang
 from pyrite.materials.crystal import CRYSTALS, reflection_coupling_tables, refractive_index
+from pyrite.materials.photon_cross_sections import EPDL_E_MAX_EV, photoelectric_edges
 from pyrite.montecarlo.spectrum.lines import (
     _elemental_log_mu_table,
     _interp_elemental_mu,
@@ -25,30 +26,29 @@ def _composition(crystal):
     return [(element, count / info["V_cell"]) for element, count in counts.items()]
 
 
+def _straddles_an_edge(grid, composition):
+    """Mesh intervals ``(g_i, g_i+1]`` that contain an EPDL photoionization edge."""
+    edges = np.array([e for element, _ in composition for e, _jump in photoelectric_edges(element)])
+    return np.array(
+        [np.any((edges > grid[i]) & (edges <= grid[i + 1])) for i in range(grid.size - 1)]
+    )
+
+
 @pytest.mark.parametrize(
     ("crystal", "lo", "hi"),
     [("hopg", 100.0, 1500.0), ("mos2", 350.0, 3500.0), ("mose2", 350.0, 3500.0)],
 )
-def test_elemental_log_mu_matches_pinned_chantler_interpolation(crystal, lo, hi):
+def test_elemental_log_mu_matches_the_epdl_attenuation(crystal, lo, hi):
     """Adversarial midpoints exercise every table interval, including edges.
 
-    The oracle is the repository-pinned xraydb path used by
-    ``_mu_total_inv_ang``. xraydb interpolates Chantler ``f2`` linearly in
-    log(f2) versus log(E); since ``mu_photo,i`` is proportional to
-    ``f2_i / E``, log(mu_photo,i) is exactly linear on the same intervals, and
-    the tabulation reproduces it to rounding.
-
-    Since #104 the tabulated coefficient also carries the Elam coherent +
-    incoherent term, which lives on its own nodes. ``log(a + b)`` is not linear
-    when ``log a`` and ``log b`` are linear with different slopes, so the
-    midpoints now carry a genuine interpolation residual instead of pure
-    rounding. Measured worst case over the production bands is ``1.5e-4``
-    (MoS2, 350-3500 eV), reached where the photoabsorption and scattering
-    log-log slopes differ most, just above an edge. It enters the physics as
-    a relative error on ``tau``, so the escape factor is unaffected at any
-    depth of interest -- four orders below the ~109% bias the scattering term
-    removes. The node values themselves stay exact, which the second assertion
-    below still pins at ``5e-15``.
+    The oracle is ``_mu_total_inv_ang``, the EPDL2025 total, lin-lin between
+    EPDL knots. Every EPDL knot is a mesh node, so inside each mesh interval
+    the log-log interpolation departs from lin-lin only at second order in the
+    node spacing: measured worst case ``9e-5`` over these bands (MoSe2 near the
+    Se L2 edge). Each photoionization edge is a float32-adjacent node pair; the
+    one-ulp interval between them straddles a true discontinuity, where any
+    interpolant is two-valued, and is excluded. The node values themselves stay
+    exact, which the second assertion below pins at ``5e-15``.
     """
     composition = _composition(crystal)
     grid = _line_tabulation_grid(CRYSTALS[crystal], composition, lo, hi)
@@ -59,12 +59,10 @@ def test_elemental_log_mu_matches_pinned_chantler_interpolation(crystal, lo, hi)
         idx, log_frac, below, above, _elemental_log_mu_table(composition, grid)
     )
     expected = _mu_total_inv_ang(composition, query)
-    finite = np.isfinite(expected)
+    keep = ~_straddles_an_edge(grid, composition)
 
-    # Log-linear interpolation of a two-slope sum, bounded above; see the
-    # docstring. FITPACK rounding (~1e-12) is far inside this.
-    np.testing.assert_allclose(got[finite], expected[finite], rtol=5e-4, atol=0.0)
-    assert np.all(got[finite] > 0.0)
+    np.testing.assert_allclose(got[keep], expected[keep], rtol=2e-4, atol=0.0)
+    assert np.all(got > 0.0)
 
     node_idx, _node_frac, node_below, node_above = _interp_index(grid, grid)
     at_nodes = _interp_elemental_mu(
@@ -91,11 +89,11 @@ def test_float32_edge_midpoints_stay_within_backend_tolerance(crystal, lo, hi):
     idx, _linear_frac, below, above = _interp_index(query, grid)
     got = _interp_elemental_mu(idx, _log_interp_fraction(query, grid, idx), below, above, table)
     expected = _mu_total_inv_ang(composition, query.astype(np.float64))
-    finite = np.isfinite(expected)
+    keep = ~_straddles_an_edge(grid64, composition)
 
     # float32 storage (~1e-7 relative) on top of the float64 interpolation
     # residual documented in the test above.
-    np.testing.assert_allclose(got[finite], expected[finite], rtol=5e-4, atol=0.0)
+    np.testing.assert_allclose(got[keep], expected[keep], rtol=2e-4, atol=0.0)
 
 
 def test_explicit_absorber_contributes_native_nodes_and_clamps_endpoints():
@@ -146,41 +144,26 @@ def _interpolate(grid, tables, query):
     [None, [("Si", 0.05)]],
     ids=["basis-absorbers", "explicit-si-absorber"],
 )
-def test_nan_ceiling_cut_leaves_every_interpolated_table_unchanged(composition):
-    """Validation: line-tabulation-nan-ceiling"""
+def test_absorber_mu_outlives_the_chantler_coupling_ceiling(composition):
+    """Validation: line-tabulation-nan-ceiling
+
+    The couplings and refractive index end with Chantler (~966 keV for C), but
+    the EPDL ``mu`` runs to 100 GeV, so with an absorber present the mesh has
+    no all-NaN ceiling inside any reachable band: its value is the EPDL one.
+    """
     crystal = "hopg"
     composition = composition or _composition(crystal)
     info = CRYSTALS[crystal]
     lo, hi = 700_000.0, 1_150_000.0
     ceiling = _line_table_nan_ceiling(info, composition, True)
-    assert lo < ceiling < hi
+    assert ceiling == np.nextafter(EPDL_E_MAX_EV, np.inf)
 
-    full = _line_tabulation_grid(info, composition, lo, hi)
-    cut = _line_tabulation_grid(info, composition, lo, ceiling)
-    assert cut.size < full.size
-    np.testing.assert_array_equal(cut[cut < ceiling], full[full < ceiling])
-
-    full_tables = _line_tables(crystal, composition, full)
-    # The ceiling claim itself: every table is NaN at every node at or above it.
-    beyond = full >= ceiling
-    couplings, n_re, log_mu = full_tables
-    for table in (*couplings, n_re[None, :], log_mu):
-        assert np.all(np.isnan(table[:, beyond]))
-        assert np.any(np.isfinite(table[:, ~beyond]))
-
-    rng = np.random.default_rng(248)
-    query = np.concatenate(
-        [
-            rng.uniform(lo - 50.0, hi + 50.0, 4000),
-            full[(full > ceiling - 5.0) & (full < ceiling + 5.0)],
-            cut[-3:],
-            [lo - 1.0, ceiling, hi + 1.0],
-        ]
-    )
-    got = _interpolate(cut, _line_tables(crystal, composition, cut), query)
-    want = _interpolate(full, full_tables, query)
-    for g, w in zip(got, want, strict=True):
-        np.testing.assert_array_equal(g, w)
+    grid = _line_tabulation_grid(info, composition, lo, hi)
+    couplings, n_re, log_mu = _line_tables(crystal, composition, grid)
+    assert np.all(np.isfinite(log_mu))
+    chantler_end = grid >= 1.0e6
+    for table in (*couplings, n_re[None, :]):
+        assert np.all(np.isnan(table[:, chantler_end]))
 
 
 def test_nan_ceiling_is_inactive_without_anomalous_refraction():

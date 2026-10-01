@@ -77,12 +77,18 @@ EDGE_MIN_F2_RATIO = 1.05
 #: Native Chantler nodes kept on each side of the steepest bracket; the
 #: measured jumps are complete within three.
 EDGE_NATIVE_NODES = 3
+#: Edge tables :func:`absorption_edge_brackets` can locate.
+EDGE_TABLES: tuple[str, ...] = ("chantler", "epdl")
+#: Relative anchor spacing for an EPDL edge with no Chantler bracket of the same
+#: shell to borrow a resolution from.
+EPDL_EDGE_SPACING_FRACTION = 1.0e-3
 
 #: Bumped whenever the same inputs would seed different windows; it keys the
 #: resolved-grid speed cache so a plan from older seeding is not reused.
 #: 2: in-medium kinematic root; secondary absorption edges.
 #: 3: measured bandwidth and local spacing use production line weights.
-SEEDING_REVISION = 3
+#: 4: EPDL2025 photoionization edges (the escape ``mu``) bracketed as well.
+SEEDING_REVISION = 4
 
 #: Kinematic resonances below this are dropped by the line kernels too.
 _MIN_RESONANCE_EV = 10.0
@@ -585,15 +591,30 @@ def absorption_edge_brackets(
     elements: Iterable[str],
     start_eV: float,
     stop_eV: float,
+    *,
+    tables: Iterable[str] = EDGE_TABLES,
 ) -> tuple[list[EdgeBracket], dict[str, Any]]:
-    """Locate the absorption jumps the attenuation model actually contains.
+    """Locate the absorption jumps the attenuation models actually contain.
 
-    The emission and escape models attenuate with ``mu`` from the Chantler
-    ``f2`` table (``materials.crystal.absorption_length_ang``), so a jump is
-    located in *that* table rather than taken from a nominal edge energy: the
-    steepest adjacent ``f2`` ratio within :data:`EDGE_SEARCH_FRACTION` of each
-    xraydb edge energy. The two tables disagree by up to ~2.1% below 1 keV, so
-    the xraydb energy is only a locator.
+    Two tables carry edges; ``tables`` selects which are returned (both by
+    default, as the line route reads both):
+
+    * **Chantler ``f2``** (``materials.crystal.absorption_length_ang``) -- the
+      PXR/CBS couplings, the refractive index, and the Si sensor response. A
+      jump is located in that table rather than taken from a nominal edge
+      energy: the steepest adjacent ``f2`` ratio within
+      :data:`EDGE_SEARCH_FRACTION` of each xraydb edge energy. The two tables
+      disagree by up to ~2.1% below 1 keV, so the xraydb energy is only a
+      locator.
+    * **EPDL2025 photoionization** (``materials.photon_cross_sections``) -- the
+      narrow-beam escape ``mu``. EPDL stores each edge as an exact
+      discontinuity, a few eV from Chantler's for light elements (C K: 288 vs
+      283.8 eV). Its bracket is an anchor pair straddling the edge
+      symmetrically, so the midpoint bin boundary falls exactly on it, at the
+      native spacing of the same shell's Chantler bracket when there is one
+      (else :data:`EPDL_EDGE_SPACING_FRACTION` of the edge energy). Edges with
+      a jump below :data:`EDGE_MIN_F2_RATIO` are skipped. Labels carry an
+      ``(EPDL)`` suffix.
 
     Shells whose steepest ratio is below :data:`EDGE_MIN_F2_RATIO` are reported
     as ``skipped``. Chantler smears a jump over several brackets, so shells are
@@ -610,15 +631,25 @@ def absorption_edge_brackets(
     Shared by the line-axis window seeds (issue #101) and the photon-continuum
     node refinement (:mod:`pyrite.energy_grid.refine`, issue #100) so both read
     one locator rather than two copies of an edge list.
+
+    Validation: continuum-node-refinement
     """
     import xraydb
 
     from ...materials.atomic import load_henke
+    from ...materials.photon_cross_sections import photoelectric_edges
 
+    selected = set(tables)
+    if not selected or not selected <= set(EDGE_TABLES):
+        raise ValueError(f"tables must be a non-empty subset of {EDGE_TABLES}")
     brackets: list[EdgeBracket] = []
     skipped: list[str] = []
     start, stop = float(start_eV), float(stop_eV)
     for element in sorted(set(elements)):
+        # Chantler brackets are always located: an EPDL bracket borrows the
+        # resolution of the same shell's Chantler bracket.
+        chantler: list[EdgeBracket] = []
+        chantler_skipped: list[str] = []
         native, _f1, f2 = load_henke(element)
         claimed: set[int] = set()  # bracket indices inside an already-claimed window
         edges = sorted(
@@ -640,13 +671,13 @@ def absorption_edge_brackets(
             label = f"{element} {shell}"
             near = np.flatnonzero((native[:-1] >= lower) & (native[1:] <= upper))
             if near.size == 0:
-                skipped.append(label)
+                chantler_skipped.append(label)
                 continue
             with np.errstate(divide="ignore", invalid="ignore"):
                 ratio = f2[near + 1] / f2[near]
             ratio = np.where(np.isfinite(ratio), ratio, 0.0)
             if ratio.max() < EDGE_MIN_F2_RATIO:
-                skipped.append(label)
+                chantler_skipped.append(label)
                 continue
             unclaimed = ~np.isin(near, list(claimed))
             if not (unclaimed & (ratio >= EDGE_MIN_F2_RATIO)).any():
@@ -655,7 +686,7 @@ def absorption_edge_brackets(
             first = max(index - EDGE_NATIVE_NODES, 0)
             last = min(index + 1 + EDGE_NATIVE_NODES, native.size - 1)
             claimed.update(range(first, last))
-            brackets.append(
+            chantler.append(
                 EdgeBracket(
                     label=label,
                     below_eV=float(native[index]),
@@ -665,6 +696,36 @@ def absorption_edge_brackets(
                     spacing_eV=float(np.median(np.diff(native[first : last + 1]))),
                 )
             )
+        if "chantler" in selected:
+            brackets.extend(chantler)
+            skipped.extend(chantler_skipped)
+        if "epdl" not in selected:
+            continue
+        shells = {shell: float(edge.energy) for shell, edge in xraydb.xray_edges(element).items()}
+        for edge_eV, jump in photoelectric_edges(element):
+            shell = min(shells, key=lambda name: abs(shells[name] - edge_eV), default=None)
+            if shell is not None and abs(shells[shell] / edge_eV - 1.0) > EDGE_SEARCH_FRACTION:
+                shell = None
+            label = f"{element} {shell or f'{edge_eV:g} eV'} (EPDL)"
+            if jump < EDGE_MIN_F2_RATIO:
+                if start <= edge_eV <= stop:
+                    skipped.append(label)
+                continue
+            twin = [b for b in chantler if b.label == f"{element} {shell}"]
+            spacing = twin[0].spacing_eV if twin else EPDL_EDGE_SPACING_FRACTION * edge_eV
+            reach = (EDGE_NATIVE_NODES + 0.5) * spacing
+            if edge_eV + reach < start or edge_eV - reach > stop:
+                continue
+            brackets.append(
+                EdgeBracket(
+                    label=label,
+                    below_eV=edge_eV - 0.5 * spacing,
+                    above_eV=edge_eV + 0.5 * spacing,
+                    first_eV=edge_eV - reach,
+                    last_eV=edge_eV + reach,
+                    spacing_eV=spacing,
+                )
+            )
     return brackets, {"skipped": skipped}
 
 
@@ -672,6 +733,8 @@ def absorption_edge_seeds(
     elements: Iterable[str],
     start_eV: float,
     stop_eV: float,
+    *,
+    tables: Iterable[str] = EDGE_TABLES,
 ) -> tuple[list[FeatureSeed], dict[str, Any]]:
     """Anchored windows on the absorption jumps the attenuation model contains.
 
@@ -686,7 +749,7 @@ def absorption_edge_seeds(
 
     Validation: line-window-seeding
     """
-    brackets, summary = absorption_edge_brackets(elements, start_eV, stop_eV)
+    brackets, summary = absorption_edge_brackets(elements, start_eV, stop_eV, tables=tables)
     seeds: list[FeatureSeed] = []
     for bracket in brackets:
         seeds.append(

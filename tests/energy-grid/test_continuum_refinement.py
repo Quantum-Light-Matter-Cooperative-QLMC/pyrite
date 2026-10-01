@@ -38,11 +38,12 @@ TINY = dict(thickness_ang=1.0e4, n_electrons=3, seed=0)
 
 
 def test_edge_refinement_anchors_the_jump_where_an_edge_exists():
-    """The located Chantler bracket nodes appear in the grid exactly."""
+    """The located bracket nodes appear in the grid exactly."""
     marks, summary = continuum_refinement_marks("hopg", HOPG_FLOOR, 29_000.0)
     labels = {mark.label for mark in marks}
-    # The medium's own carbon, and the detector path's silicon sensor.
-    assert labels == {"C K", "Si K"}
+    # The medium's own carbon in the table its escape mu reads (EPDL), and the
+    # detector path's silicon sensor in the table its response reads (Chantler).
+    assert labels == {"C K (EPDL)", "Si K"}
     assert all(mark.kind == EDGE_KIND for mark in marks)
     assert summary["edges_outside_band"] == []
 
@@ -69,7 +70,7 @@ def test_edges_come_from_the_medium_not_a_hardcoded_list():
         "wse2", photon_continuum_floor_eV("wse2"), 29_000.0
     )
     labels = {mark.label for mark in tungsten_selenide}
-    assert {"W L3", "Se K"} <= labels
+    assert {"W L3 (EPDL)", "Se K (EPDL)"} <= labels
     assert not any(label.startswith("C ") for label in labels)
 
     graphite, _ = continuum_refinement_marks("hopg", HOPG_FLOOR, 29_000.0)
@@ -90,10 +91,10 @@ def test_no_edge_and_no_endpoint_returns_the_geometric_baseline_identically():
 
 def test_an_edge_just_outside_the_band_degrades_gracefully():
     """A jump above the ceiling is reported and dropped, never refused."""
-    stop = 280.0  # C K jumps at ~283.7 eV: inside the search interval, outside the band
+    stop = 288.0  # EPDL C K jumps at exactly 288 eV: its anchor pair straddles the ceiling
     marks, summary = continuum_refinement_marks("hopg", HOPG_FLOOR, stop)
     assert marks == []
-    assert "C K" in summary["edges_outside_band"]
+    assert "C K (EPDL)" in summary["edges_outside_band"]
 
     refined = refined_continuum_grid("hopg", stop, 513)
     assert np.array_equal(refined, geometric_continuum_grid("hopg", stop, 513))
