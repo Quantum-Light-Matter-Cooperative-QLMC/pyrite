@@ -12,8 +12,9 @@ the task record); worker skills own implementation;
 ## Start an approved issue
 
 1. Read the issue with `gh issue view <n> --json number,title,body,labels,state,url`
-   and confirm it is open, reviewed (carries a `status:*` label), and
-   actionable. Inspect `gh issue develop --list <n>` and current
+   and confirm it is open, reviewed, and actionable: `status:backlog` (new
+   start) or `status:active` (resume). Stop on `status:gated`,
+   `status:paused`, or no `status:*` label (route to `triage`). Inspect `gh issue develop --list <n>` and current
    worktrees/status.
 2. Reuse an existing clean linked branch/worktree when unambiguous. Otherwise
    create one linked development branch from `main` with `gh issue develop`;
@@ -43,8 +44,8 @@ Worker skill:
 Issue: #<n> <url>
 Worktree:
 Branch:
-Slice / non-goals:
-Done when:
+Slice / non-goals:    (issue Plan items assigned)
+Done when:            (issue Acceptance items)
 Required skills:
 Expected owners/tests:
 Authority:
@@ -54,13 +55,22 @@ Authority:
   pr: yes | no
   delegate: yes | no
 Stop conditions:
-Report:
+Report: changed paths; commits + ahead count; checks + results; issue
+  Plan/Acceptance items completed (quoted) and remaining; blockers
 ```
 
 Default direct-user authority: `commits: checkpoint`, `push: no`,
 `issue-writer: no`, `pr: no`, `delegate: no`. One writer per mutable worktree;
 parallel edits require isolated branches/worktrees. If worker dispatch is not
 available, return this filled handoff and target skill instead.
+
+## After a worker report
+
+Dispatch is the issue writer unless it granted `issue-writer: yes`. Verify each
+reported item against the branch diff and checks, then tick the matching
+Plan/Acceptance boxes in the issue body (`gh issue edit <n> --body-file`),
+preserving all other text. Leave unverified items unticked and note why in the
+reply. Re-dispatch any remainder as a new slice.
 
 ## After landing
 

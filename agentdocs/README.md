@@ -1,8 +1,9 @@
 # Agent work records
 
-This is the sole tracked home for agent-authored implementation plans,
-branch-task records, handoffs, and reports. It is intentionally outside
-`docs/`, which contains durable project documentation and may be published.
+This is the sole tracked home for agent-authored cross-task plans, specs, and
+retained historical handoffs. Per-task records live in the GitHub issue body,
+not here. It is intentionally outside `docs/`, which contains durable project
+documentation and may be published.
 Use ignored `scratch/` or `/tmp` for disposable notes; do not create parallel
 `docs/plans`, `docs/temp`, root `tasks`, `.remember`, or untracked `agentdocs`
 surfaces.
@@ -12,8 +13,8 @@ surfaces.
 - `archive/` — retained historical handoffs only; never an active authority.
 
 Promote durable outcomes to `README.md`, `docs/`, an ADR, source documentation,
-or tests.
-Retire landed task directories once the GitHub issue and durable docs are correct.
+or tests. Delete a legacy `tasks/` directory once its issue and durable docs
+are correct.
 
 ## Invariant
 
@@ -31,7 +32,9 @@ Retire landed task directories once the GitHub issue and durable docs are correc
    `status:active`, and assigns `implement-task-lite`, `implement-task`, or
    `lead-task` by scope/risk with explicit authority and acceptance checks.
 3. Workers commit independently valid checkpoints when authorized: focused
-   checks pass, scoped diff reviewed, explicit paths staged.
+   checks pass, scoped diff reviewed, explicit paths staged. They report
+   completed issue Plan/Acceptance items; `dispatch-task` verifies and ticks
+   them.
 4. `dispatch-task` retires landed work: confirm durable content lives in its
    owning artifact, close the issue, then `repo-cleanup` removes the
    branch/worktree after verification.
