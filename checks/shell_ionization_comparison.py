@@ -1,6 +1,6 @@
 """EEDL shell ionization and characteristic production against Bote--Salvat.
 
-For every catalogue transport element, compares the packaged EEDL MF=23
+For every catalogue transport element, compares the pinned EEDL MF=23
 subshell cross sections with the Bote--Salvat formulas for each K/L/M shell
 both tabulate, at overvoltages 1.1--1000, at the same incident energy and with
 Bote--Salvat evaluated at EEDL's binding energy; repeats the comparison at

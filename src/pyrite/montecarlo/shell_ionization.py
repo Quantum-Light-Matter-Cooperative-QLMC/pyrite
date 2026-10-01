@@ -44,7 +44,7 @@ class MaterialShellIonizationRates:
 def material_shell_ionization_rates(
     composition: Sequence[tuple[str, float]], energy_ev: float
 ) -> MaterialShellIonizationRates:
-    """Interpolate packaged EEDL subshell rates and sum elemental macroscopic rates.
+    """Interpolate fetched EEDL subshell rates and sum elemental macroscopic rates.
 
     ``composition`` contains unique element symbols and number densities in
     atoms/Å³, as on catalog crystal and medium records. A channel's rate is

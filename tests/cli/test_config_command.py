@@ -10,6 +10,7 @@ def _isolated_store(monkeypatch, tmp_path):
     monkeypatch.setattr(_config, "CONFIG_PATH", path)
     monkeypatch.delenv("PYRITE_PROFILE", raising=False)
     monkeypatch.delenv("PYRITE_REMOTE_HOST", raising=False)
+    monkeypatch.delenv("PYRITE_MOTT_TABLES_DIR", raising=False)
     monkeypatch.setattr(remote_config, "HOST", None)
     for name in (
         "PYRITE_REMOTE_GPU_VENDOR",
@@ -51,6 +52,7 @@ def test_config_set_get_and_list_effective_values(monkeypatch, tmp_path):
             "xsgen.bremslib_source\t../BremsLib_v2.0.8\tbuilt-in default\n"
             "xsgen.elsepa_source\t../elsepa-2020\tbuilt-in default\n"
             "xsgen.sbethe_source\t../sbethe\tbuilt-in default\n"
+            "mott.tables_dir\t\tbuilt-in default\n"
         ),
     )
     assert path.is_file()
@@ -211,3 +213,17 @@ def test_run_is_silent_for_an_explicitly_named_standard_profile(monkeypatch, tmp
     monkeypatch.setattr(scan._scan, "run", lambda args: None)
 
     assert_clean_result(invoke(scan.command, ["standard"]))
+
+
+def test_config_set_mott_tables_dir_requires_a_directory(monkeypatch, tmp_path):
+    _isolated_store(monkeypatch, tmp_path)
+    tables = tmp_path / "srd64"
+
+    missing = invoke(config_command.command, ["set", "mott.tables_dir", str(tables)])
+    assert missing.exit_code == 2
+    assert "is not a directory" in missing.stderr
+
+    tables.mkdir()
+    stored = invoke(config_command.command, ["set", "mott.tables_dir", str(tables)])
+    assert_clean_result(stored, stdout=f"mott.tables_dir = {tables.resolve()}\n")
+    assert _config.resolve("mott.tables_dir").value == str(tables.resolve())

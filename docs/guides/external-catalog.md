@@ -53,15 +53,20 @@ checkpoints, observations, and generated cross-section data:
 pyrite config set workspace.root ~/pyrite-lab/workspace
 ```
 
-With an explicit workspace, generated tables use `workspace/xsgen/tables/` and
+With an explicit workspace, generated tables use `workspace/xsgen/tables/`,
 fetched SBETHE reference data use
-`workspace/xsgen/reference-data/sbethe/sdbase/`. Existing tables in the older
-per-user data directory remain readable; new writes go to the workspace. With
-no explicit workspace, PyRITE retains the per-user data directory default for
-generated tables. Existing tables and fetched SBETHE data are not deleted or
-copied automatically; copy the old `xsgen/` tree to the workspace if you want
-all generated data in one location, then verify the table inventory with
-`pyrite tables list` before removing the old copy.
+`workspace/xsgen/reference-data/sbethe/sdbase/`, and the fetched EEDL and EADL
+files use `workspace/datasets/`. New writes go to the workspace. Tables in the
+older per-user data directory (`~/.local/share/pyrite/xsgen/tables` on Linux)
+remain readable for one more release as a deprecated tier: `pyrite tables list`
+shows them as `legacy`, the first one a run reads prints a `FutureWarning`, and
+PyRITE 0.5.0 stops searching there. `pyrite tables migrate` (try `--dry-run`
+first) copies every legacy table the workspace lacks into it; it never deletes
+or overwrites anything, so remove the old copy yourself once `pyrite tables
+list` shows no `legacy` rows. With no explicit workspace, the per-user data
+directory is the selected tier and nothing is deprecated. Fetched SBETHE data
+and the EEDL/EADL datasets are not copied automatically; rerun
+`pyrite tables fetch` in the workspace, or copy them.
 
 Version the catalog and its CIFs separately from PyRITE. Checkpoint identity
 depends on resolved simulation inputs rather than the local catalog path, so

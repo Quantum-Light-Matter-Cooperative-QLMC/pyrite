@@ -1,4 +1,4 @@
-"""Independent internal-consistency checks on the packaged EEDL subshell read.
+"""Independent internal-consistency checks on the fetched EEDL subshell read.
 
 ``test_characteristic`` pins carbon ``sigma_K`` against the implementation: a
 regression pin that cannot catch a designator-map or unit error. These checks
@@ -12,9 +12,8 @@ from endf_parserpy import EndfFile
 
 from pyrite.montecarlo.eadl_relaxation import load_eadl_relaxation
 from pyrite.montecarlo.eedl_ionization import (
-    EEDL_DATA_DIR,
-    EEDL_FILENAME,
     EEDL_SUBSHELL_LABELS,
+    eedl_path,
     load_eedl_shell_ionization,
 )
 
@@ -23,7 +22,7 @@ ENERGIES_EV = (1.0e3, 1.0e4, 1.0e5, 1.0e6)
 
 def _total_electroionization_barn(atomic_number: int) -> tuple[np.ndarray, np.ndarray]:
     """EEDL MF=23/MT=522, read straight from the tape (the loader never reads it)."""
-    with EndfFile(EEDL_DATA_DIR / EEDL_FILENAME, on_error="raise") as tape:
+    with EndfFile(eedl_path(), on_error="raise") as tape:
         for position in range(len(tape)):
             material = tape[position]
             if round(float(material.za) / 1000.0) == atomic_number:

@@ -6,7 +6,7 @@ PyRITE uses a single-scattering (CASINO-style) treatment: every elastic event is
 
 ## Selecting a model
 
-`elastic_model` chooses between three internally consistent models. Runs built from `pyrite.Numerics` (and every profile) default to `"elsepa"`; `"mott"` remains selectable and is still the default of the low-level `simulate_trajectories`, which cannot sample ELSEPA without tables passed in.
+`elastic_model` chooses between three internally consistent models. Runs built from `pyrite.Numerics` (and every profile) default to `"elsepa"`; `"mott"` is deprecated but remains selectable. The low-level `simulate_trajectories` also defaults to `"elsepa"`, resolving the stored production tables when none are passed.
 
 ```{list-table} Elastic model options.
 :name: tbl-elastic-model-options
@@ -23,7 +23,7 @@ PyRITE uses a single-scattering (CASINO-style) treatment: every elastic event is
 * - `"mott"`
   - Browning fit to tabulated Mott totals
   - calibrated per element against NIST SRD 64 Mott transport cross sections
-  - `mott_transport_cross_sections/DisplayCalcTCSTableFor<El>.csv`
+  - user-downloaded NIST SRD 64 tables, `DisplayCalcTCSTableFor<El>.csv` in `mott.tables_dir`
 * - `"sr"`
   - relativistic screened-Rutherford total
   - analytic Bishop/Joy form
@@ -157,9 +157,19 @@ Energies outside a table are refused, never extrapolated. A layer whose tables a
 
 **Stated tolerance.** Sampled first and second transport moments, $\langle 1 - P_\ell(\cos\theta)\rangle$, reproduce ELSEPA's own $\sigma_\ell/\sigma$ within 0.9 % across every released table and energy. Above about 10 MeV the forward peak outruns ELSEPA's native angular grid, so the trapezoid integral of the DCS exceeds ELSEPA's total by up to 1.4 %. The flight rate uses ELSEPA's total directly, so only the angular shape carries this error.
 
+### Installing the Mott tables
+
+PyRITE does not ship the NIST SRD 64 tables: NIST Standard Reference Data may not be redistributed without prior permission (#263). To use `elastic_model="mott"`:
+
+1. At <https://srdata.nist.gov/srd64/>, open the elastic-scattering calculation for each element the run contains, choose the relativistic **transport** cross sections, and export the table as CSV. Keep NIST's file name, `DisplayCalcTCSTableFor<El>.csv` (for example `DisplayCalcTCSTableForSi.csv`).
+2. Put the files in one directory and select it: `pyrite config set mott.tables_dir DIR`, or set `PYRITE_MOTT_TABLES_DIR=DIR` for one shell. The environment variable wins over the stored value.
+3. For remote runs, set `PYRITE_MOTT_TABLES_DIR` on the box or copy the directory there yourself; `pyrite remote sync` does not ship it.
+
+The parser reads the rows `No, Energy [eV], transport cross section [a0^2]` below the header; any energy grid is accepted, and the calibration of {eq}`eq-elastic-alpha-calibration` runs on the rows as given.
+
 ### Missing tables
 
-Elements without a NIST transport table (tungsten among them) fall back to {eq}`eq-elastic-screening-joy` for the angular draw while keeping the Browning total. The miss is cached per element per process and logged once at `DEBUG` (`PYRITE_MC_DEBUG=1` to see it); a worker pool logs once per worker.
+A `"mott"` run fails before transport starts when any element of any layer has no table in `mott.tables_dir`, or when the key is unset. The error names the element, the expected file, and the config key. There is no silent fallback to {eq}`eq-elastic-screening-joy`: choose `elastic_model="sr"` for the analytic angles, or the default `"elsepa"`. Before #263 the five packaged tables (C, Si, Ge, Se, Mo) were used and every other element, tungsten and sulfur among them, fell back to {eq}`eq-elastic-screening-joy` with the Browning total, logged only at `DEBUG`. Results recorded under that behaviour for such elements (for example the tungsten cases in `checks/full_track_bremslib/`) used analytic angles for those elements.
 
 ## Compounds and layers
 

@@ -46,7 +46,7 @@ The result is photons eV$^{-1}$ sr$^{-1}$ per incident electron. The factor $1/(
 - Dividing the analytically integrated Lorentzian mass by $\Delta E_b$ produces the spectral density represented on PyRITE's line-grid centres. Detector broadening remains a separate downstream operation.
 - Every line above the relaxation-data cutoff contributes its physical mass in the requested line grid, including tails from an off-grid centre. No finite-window renormalization is applied.
 - The transition FWHM is the sum of the pertinent initial- and final-hole widths. Combined final labels such as `M4,5` use the mean available component width. A missing final width contributes zero; a missing initial width fails closed.
-- Packaged EEDL bytes are verified before first use against SHA-256 `f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c`, and packaged EADL bytes against `78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c`. Both checksum prefixes, the endf-parserpy and xraydb versions, and the fluorescence-yield source are part of the characteristic-model checkpoint marker.
+- Fetched EEDL bytes are verified before first use against SHA-256 `f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c`, and fetched EADL bytes against `78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c`. Both checksum prefixes, the endf-parserpy and xraydb versions, and the fluorescence-yield source are part of the characteristic-model checkpoint marker.
 - EADL binding and transition energies are in eV and EADL probabilities are dimensionless, so $V^a$, $R^a$ and $V^aR^a$ are dimensionless counts per primary vacancy.
 
 ## Assumptions and scope

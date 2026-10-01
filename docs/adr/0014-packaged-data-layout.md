@@ -90,10 +90,10 @@ change.
   - Still packaged; they move once #167 hosts the archives (decision 3).
 * - `characteristic_cross_sections/EEDL.endf`, `EADL2025.ALL`
   - b
-  - Still packaged; they move after #261 (decision 2).
+  - Moved out of the wheel (decision 2): fetched with `pyrite tables fetch eedl` / `eadl` into `<data root>/datasets/`; the README stays as provenance.
 * - `photon_cross_sections/epdl2025_mf23.npz` (added by #274)
   - b
-  - Packaged derived table, 1.5 MB, with provenance and modifications note in its README; moves with EEDL/EADL.
+  - Still packaged; it moves once #167 hosts a pinned release archive. Derived from upstream (not a verbatim upstream file), so there is no public URL to pin; provenance and modifications note stay in its README.
 * - ELSEPA sources and `database/`; `sbethe.f`
   - c
   - Moved to `vendor/xsgen/elsepa/` and `vendor/xsgen/sbethe/`.
@@ -107,8 +107,8 @@ change.
   - none (removed)
   - Deleted; nothing read it.
 * - `mott_transport_cross_sections/`
-  - a, pending licence
-  - Unchanged; blocked on the NIST finding in decision 6.
+  - none (removed)
+  - Deleted: NIST SRD 64 may not be redistributed (decision 6). `elastic_model="mott"` reads user-downloaded tables from `mott.tables_dir`.
 ```
 
 ### Accepted decisions
@@ -118,12 +118,23 @@ change.
 2. **EEDL and EADL** become a class (b) dataset. They will be fetched from the
    LLNL URLs pinned in the characteristic-cross-sections README and cached in
    the workspace data root.
-   - *Follow-up, not yet implemented:* the move waits until #261 lands, so the
-     box receives the files once through content-addressed sync rather than
-     in every 19.9 MiB code sync.
-   - The follow-up must repoint `montecarlo/eedl_ionization.py` and the
-     bremsstrahlung loader, keep the SHA-256 pins in the model identity
-     markers, and extend the remote preflight.
+   - *Implemented in #263 after #261:* `pyrite/datasets.py` pins both files;
+     `pyrite tables fetch eedl|eadl` downloads them (or copies
+     `--archive PATH`), verifies the SHA-256, and installs them at
+     `<data root>/datasets/<name>/`, the data root being the one xsgen
+     tables use. The EEDL, EADL, characteristic and bremsstrahlung loaders
+     resolve them there, verify the pin before first use, and fail naming
+     the fetch command. The pins and the model identity markers are
+     unchanged.
+   - The published EEDL file ends with one more CRLF than the vetted bytes
+     the pin covers; the fetch accepts either and installs the vetted form
+     (see the characteristic-cross-sections README).
+   - `pyrite remote sync` ships both files once by content digest to
+     `<REMOTE_DIR>/datasets/`, first adopting a pre-#263 code-synced copy on
+     the box; the job preflight is
+     `pyrite tables verify --require bremslib,elsepa,eedl,eadl`.
+   - Nothing downloads implicitly at run time: compute nodes may have no
+     network.
 3. **SBETHE tables** become class (b), with a `sbethe-tables.json` release
    index like ELSEPA's and BremsLib's. *Follow-up:* they move once #167 hosts
    the release archives. Until then they stay packaged, because moving them
@@ -142,7 +153,14 @@ change.
      location.
    - `atomic_scattering_factors/` is deleted.
    - **Mott tables:** redistribution appears prohibited without permission.
-     No action has been taken; a human decision is required.
+     *Decided 2026-09-30 (#263), implemented:* the five CSVs are removed from
+     the tree and the wheel and stay only in Git history (decision 7). The
+     opt-in `elastic_model="mott"` is kept: it reads SRD 64 exports the user
+     downloads into the directory named by the `mott.tables_dir` config key
+     (`PYRITE_MOTT_TABLES_DIR`), and a run fails naming that key and the
+     element when a table is absent. The former silent per-element fallback
+     to analytic screening is gone. Tests use synthetic SRD 64-format tables
+     (`tests/data/mott_srd64_synthetic/`). The finding that led here:
      - The five `DisplayCalcTCSTableFor<El>.csv` files are transport
        cross-section tables exported from NIST SRD 64 (Electron
        Elastic-Scattering Cross-Section Database). The code docstring
@@ -185,6 +203,15 @@ The legacy `~/.local/share/pyrite/xsgen/tables` tier, and the legacy
 migration. After that, a resolution from the legacy tier warns for one
 release, and then the tier is removed.
 
+*Implemented for the table tier (#263):* #261's sync migrates the box's legacy
+tier on every inventory. Locally, a table served from the legacy tier, which
+exists only when an explicit workspace is selected, emits one `FutureWarning`
+per process naming `pyrite tables migrate`. That command copies every legacy
+table the workspace lacks, payload first and atomically, and never deletes or
+overwrites anything. `pyrite tables list` labels those rows `legacy`. The
+tier stops being searched in 0.5.0 (`LEGACY_TABLE_TIER_REMOVE_IN`, held by
+`tests/test_deprecation_schedule.py`). The legacy sdbase path is unchanged.
+
 ## Consequences
 
 Measured wheel sizes are in
@@ -204,13 +231,13 @@ Stages not yet built are projections from the per-entry compressed sizes.
 * - After #263 (decisions 4 and 6)
   - 16.06 (measured)
   - 45.9
+* - Plus decision 2 (EEDL and EADL) and the Mott removal, #263
+  - 7.36 (measured)
+  - 13.1
 * - Plus #264 (BELLS)
-  - about 13.0
-  - about 40.3
+  - about 4.2
+  - about 7.5
 * - Plus decision 3 (SBETHE tables)
-  - about 10.3
-  - about 37.5
-* - Plus decision 2 (EEDL and EADL)
   - about 1.6
   - about 4.7
 ```

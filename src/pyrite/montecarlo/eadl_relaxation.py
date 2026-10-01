@@ -1,6 +1,5 @@
 """Validated EADL atomic-relaxation data and the deterministic vacancy cascade."""
 
-import hashlib
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -11,12 +10,12 @@ from typing import Any
 import numpy as np
 from endf_parserpy import EndfFile
 
+from ..datasets import EADL, DatasetMismatchError, file_sha256, require_dataset
 from ..materials.atomic import Z_TABLE
-from .eedl_ionization import EEDL_DATA_DIR, EEDL_SUBSHELL_LABELS, _readonly, _require_finite
+from .eedl_ionization import EEDL_SUBSHELL_LABELS, _readonly, _require_finite
 
-EADL_DATA_DIR = EEDL_DATA_DIR
-EADL_FILENAME = "EADL2025.ALL"
-EADL_SHA256 = "78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c"
+EADL_FILENAME = EADL.filename
+EADL_SHA256 = EADL.sha256
 
 #: Tolerance on ``sum FTR = 1`` per subshell. EADL prints FTR to six
 #: significant figures; the worst packaged subshell misses unity by 1.7e-6.
@@ -249,21 +248,31 @@ def _load_eadl_relaxation(
     )
 
 
+def eadl_path() -> Path:
+    """Return the installed, checksum-verified EADL tape.
+
+    The tape is a fetched dataset (ADR-0014 class b), not packaged data.
+
+    Raises
+    ------
+    pyrite.datasets.DatasetNotFoundError
+        If it is not installed; the message names ``pyrite tables fetch eadl``.
+    pyrite.datasets.DatasetMismatchError
+        If the installed bytes differ from the vetted input.
+    """
+    path = require_dataset("eadl")
+    _verify_eadl_file(str(path))
+    return path
+
+
 @cache
-def _verify_packaged_eadl() -> None:
-    """Fail closed if the packaged EADL bytes differ from the vetted input."""
-    path = EADL_DATA_DIR / EADL_FILENAME
-    digest = hashlib.sha256()
-    try:
-        with path.open("rb") as stream:
-            for block in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(block)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"packaged EADL database is missing: expected {path}") from None
-    actual = digest.hexdigest()
+def _verify_eadl_file(path: str) -> None:
+    """Fail closed if the installed EADL bytes differ from the vetted input."""
+    actual = file_sha256(Path(path))
     if actual != EADL_SHA256:
-        raise ValueError(
-            f"packaged EADL database checksum mismatch: expected {EADL_SHA256}, got {actual}"
+        raise DatasetMismatchError(
+            f"EADL database checksum mismatch at {path}: expected {EADL_SHA256}, got {actual}; "
+            "remove it and run `pyrite tables fetch eadl`"
         )
 
 
@@ -274,7 +283,8 @@ def load_eadl_relaxation(
 ) -> EADLRelaxation:
     """Load one element's validated EADL MF=28 atomic-relaxation data.
 
-    The packaged EPICS2025 tape is checksum-pinned; ``data_dir`` may instead
+    The fetched EPICS2025 tape (``pyrite tables fetch eadl``) is
+    checksum-pinned; ``data_dir`` may instead
     name an explicit ENDF-6 file or a directory containing ``EADL2025.ALL``.
     Validation enforces ``sum FTR = 1`` per decaying subshell, daughter
     designators present and strictly less bound than the parent, positive
@@ -287,14 +297,15 @@ def load_eadl_relaxation(
         atomic_number = Z_TABLE[element]
     except KeyError as exc:
         raise ValueError(f"unknown element {element!r}") from exc
-    candidate = EADL_DATA_DIR if data_dir is None else Path(data_dir)
-    path = candidate if candidate.is_file() else candidate / EADL_FILENAME
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"no EADL atomic-relaxation database for {element}: expected {path}"
-        )
     if data_dir is None:
-        _verify_packaged_eadl()
+        path = eadl_path()
+    else:
+        candidate = Path(data_dir)
+        path = candidate if candidate.is_file() else candidate / EADL_FILENAME
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"no EADL atomic-relaxation database for {element}: expected {path}"
+            )
     resolved_path = path.resolve()
     stat = resolved_path.stat()
     return _load_eadl_relaxation(resolved_path, stat.st_size, stat.st_mtime_ns, atomic_number)
@@ -461,7 +472,7 @@ def relaxation_energy_budget(
 
 __all__ = [
     "EADL_BRANCHING_SUM_TOLERANCE",
-    "EADL_DATA_DIR",
+    "eadl_path",
     "EADL_FILENAME",
     "EADL_SHA256",
     "EADLRelaxation",

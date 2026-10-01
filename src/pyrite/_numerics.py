@@ -124,7 +124,7 @@ class Numerics:
         angular model (``pyrite tables fetch bremslib``) when every layer
         element's table is installed, and otherwise warns and falls back to
         EEDL. ``"bremslib"`` requires the tables; ``"eedl"`` selects the
-        packaged EEDL continuum with an isotropic photon angle.
+        fetched EEDL continuum with an isotropic photon angle.
     radiative_model, radiative_cutoff_eV
         ``"auto"`` (default) couples when BremsLib resolves for every layer
         and otherwise uses uncoupled EEDL scoring. ``"uncoupled"`` always

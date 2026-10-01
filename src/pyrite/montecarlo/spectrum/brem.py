@@ -18,7 +18,7 @@ from ...materials.attenuation import (
     _normalize_composition,
 )
 from ...materials.crystal import ALPHA_FS
-from ..eedl_ionization import _verify_packaged_eedl
+from ..eedl_ionization import eedl_path
 from ..transport import TRANSPORT_ELEMENTS
 from .brem_bremslib import (
     BremsLibBremsstrahlungTable,
@@ -28,7 +28,6 @@ from .brem_bremslib import (
     stage_bremslib_table,
 )
 from .brem_unit_base import _unit_base_panels
-from .characteristic import CHARACTERISTIC_DATA_DIR as BREMSSTRAHLUNG_DATA_DIR
 from .characteristic import CHARACTERISTIC_EEDL_FILENAME as BREMSSTRAHLUNG_EEDL_FILENAME
 from .characteristic import CHARACTERISTIC_EEDL_SHA256 as BREMSSTRAHLUNG_EEDL_SHA256
 from .characteristic import (
@@ -343,8 +342,7 @@ def _parse_bremsstrahlung_file(
 def _load_packaged_bremsstrahlung_cross_sections(
     element: str,
 ) -> BremsstrahlungCrossSectionTable:
-    _verify_packaged_eedl()
-    path = BREMSSTRAHLUNG_DATA_DIR / BREMSSTRAHLUNG_EEDL_FILENAME
+    path = eedl_path()
     stat = path.stat()
     return _parse_bremsstrahlung_file(
         path.resolve(), stat.st_size, stat.st_mtime_ns, element, Z_TABLE[element]
@@ -358,7 +356,8 @@ def load_bremsstrahlung_cross_sections(
 ) -> BremsstrahlungCrossSectionTable:
     """Read EEDL MF=23/527 and MF=26/527 for one element.
 
-    The packaged file is checksum-pinned. ``data_dir`` is an explicit testing
+    The fetched file (``pyrite tables fetch eedl``) is checksum-pinned.
+    ``data_dir`` is an explicit testing
     and expert override; its file is still structurally validated.
     """
     try:

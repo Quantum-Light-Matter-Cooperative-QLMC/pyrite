@@ -36,8 +36,10 @@ def _forbid_real_ssh(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _no_local_xsgen_tables(monkeypatch):
-    """Sync tests must not depend on the developer's real table store."""
+    """Sync tests must not depend on the developer's real table or dataset store."""
     monkeypatch.setattr(
         transport, "_real_local_xsgen_tables", transport._local_xsgen_tables, raising=False
     )
     monkeypatch.setattr(transport, "_local_xsgen_tables", lambda: {})
+    monkeypatch.setattr(transport, "_real_local_datasets", transport._local_datasets, raising=False)
+    monkeypatch.setattr(transport, "_local_datasets", lambda: {})

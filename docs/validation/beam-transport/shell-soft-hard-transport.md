@@ -247,7 +247,7 @@ transport uses. It evaluates $1/\lambda_{\rm in,1}^{(s)}$ from the soft
 distant longitudinal DCS (recoil density $1/[Q(Q+2m_ec^2)]$ on
 $[Q_-,Q'_k]$, $\mu(Q)$ from Eq. 4.101) and the soft close DCS ($Q=W$,
 Eq. 3.134); distant transverse losses do not deflect. It compares that rate
-with the elastic $1/\lambda_{\rm el,1}$ of the default `mott` model (NIST
+with the elastic $1/\lambda_{\rm el,1}$ of the `mott` model (NIST
 SRD 64 transport cross sections; screened Rutherford with the Joy $\alpha$
 for O, as transport does). The close-collision quadrature reproduces
 `shell_gos`'s $\sigma^{(0)}$ to $6\times10^{-15}$.

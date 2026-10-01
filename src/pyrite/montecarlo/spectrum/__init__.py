@@ -8,7 +8,6 @@ their owning radiation path.
 
 from .brem import (
     BREM_ENDF_PARSERPY_VERSION,
-    BREMSSTRAHLUNG_DATA_DIR,
     BREMSSTRAHLUNG_EEDL_FILENAME,
     BREMSSTRAHLUNG_EEDL_SHA256,
     BREMSSTRAHLUNG_MODEL,
@@ -26,7 +25,6 @@ from .brem import (
     mc_brem_spectrum,
 )
 from .characteristic import (
-    CHARACTERISTIC_DATA_DIR,
     CHARACTERISTIC_EEDL_FILENAME,
     CHARACTERISTIC_EEDL_SHA256,
     CHARACTERISTIC_MODEL,

@@ -7,8 +7,9 @@ came from, where they live, and which code trees PyRITE can currently reach.
 material path, whose options are largely disjoint: an option belonging to
 another code is rejected rather than silently ignored. ``fetch`` installs
 SBETHE's pinned reference database without extracting the archive's prebuilt
-executable or documentation, and the pinned releases of BremsLib-derived and
-ELSEPA elastic tables for the catalogue elements.
+executable or documentation, the pinned releases of BremsLib-derived and
+ELSEPA elastic tables for the catalogue elements, and the pinned EPICS2025
+EEDL and EADL files every run reads.
 """
 
 import json
@@ -191,7 +192,9 @@ def command() -> None:
 
     Tables are produced by external Fortran codes (ELSEPA, SBETHE, BremsLib)
     and resolved in two tiers: your own tables first, then the tables shipped
-    with PyRITE. Consumers cannot tell the two apart.
+    with PyRITE. Consumers cannot tell the two apart. With an explicit
+    workspace, the deprecated pre-workspace directory is searched between them
+    until the next release; `pyrite tables migrate` copies it forward.
 
     \b
     Examples:
@@ -203,7 +206,10 @@ def command() -> None:
       pyrite tables fetch sbethe
       pyrite tables fetch bremslib
       pyrite tables fetch elsepa
+      pyrite tables fetch eedl
+      pyrite tables fetch eadl
       pyrite tables verify
+      pyrite tables migrate --dry-run
       pyrite tables sources list
       pyrite tables sources set elsepa ../elsepa-2020
     """
@@ -555,12 +561,18 @@ def _emit_table(selected: str, result, *, json_output: bool) -> None:
 
 
 @command.command("fetch")
-@click.argument("code", type=click.Choice(["sbethe", "bremslib", "elsepa"], case_sensitive=False))
+@click.argument(
+    "code",
+    type=click.Choice(["sbethe", "bremslib", "elsepa", "eedl", "eadl"], case_sensitive=False),
+)
 @click.option(
     "--archive",
     type=click.Path(exists=True, dir_okay=False),
     default=None,
-    help="Install from a local copy of the pinned archive instead of downloading it.",
+    help=(
+        "Install from a local copy of the pinned archive (for eedl and eadl, of the "
+        "pinned file itself) instead of downloading it."
+    ),
 )
 @output_option
 def fetch_command(code: str, archive: str | None, json_output: bool) -> None:
@@ -575,55 +587,82 @@ def fetch_command(code: str, archive: str | None, json_output: bool) -> None:
     elsepa    ELSEPA elastic tables (free atoms for every transport element,
               muffin-tin tables for elementary crystals) that the default
               elastic model reads, so no Fortran run is needed for them.
+    eedl      EPICS2025 EEDL electron data (25 MB), which every run reads
+              for shell ionization and the EEDL bremsstrahlung model.
+    eadl      EPICS2025 EADL atomic relaxation data (8 MB), which every run
+              reads for the characteristic-radiation cascade.
 
-    The archive is SHA-256 verified before anything is installed, whether it
-    was downloaded or given with --archive. A complete existing install
-    returns successfully without network access.
+    Data lands in the user data directory, or in the selected workspace when
+    PYRITE_HOME or workspace.root is set. The archive or file is SHA-256
+    verified before anything is installed, whether it was downloaded or given
+    with --archive. A complete existing install returns successfully without
+    network access.
     """
     from ...xsgen import DataFetchError
-    from ...xsgen.fetch import fetch_bremslib, fetch_elsepa, fetch_sbethe
 
-    fetch = {"bremslib": fetch_bremslib, "elsepa": fetch_elsepa}.get(code.lower(), fetch_sbethe)
+    selected = code.lower()
     try:
-        result = fetch(archive)
+        if selected in ("eedl", "eadl"):
+            from ...datasets import fetch_dataset
+
+            fetched = fetch_dataset(selected, archive)
+            payload = {
+                "code": selected,
+                "path": str(fetched.path),
+                "archive_sha256": fetched.sha256,
+                "file_count": 1,
+                "installed": fetched.installed,
+            }
+        else:
+            from ...xsgen.fetch import fetch_bremslib, fetch_elsepa, fetch_sbethe
+
+            fetch = {"bremslib": fetch_bremslib, "elsepa": fetch_elsepa}.get(selected, fetch_sbethe)
+            result = fetch(archive)
+            payload = {
+                "code": selected,
+                "path": str(result.path),
+                "archive_sha256": result.archive_sha256,
+                "file_count": result.file_count,
+                "installed": result.installed,
+            }
     except DataFetchError as exc:
         raise CLIError(str(exc)) from exc
 
-    payload = {
-        "code": code.lower(),
-        "path": str(result.path),
-        "archive_sha256": result.archive_sha256,
-        "file_count": result.file_count,
-        "installed": result.installed,
-    }
     if json_output:
         emit_json("pyrite.tables.fetch.v1", payload)
         return
-    action = "installed" if result.installed else "already installed"
-    unit = "files" if result.code == "sbethe" else "tables"
-    emit_result(f"{action}: {result.path} ({result.file_count} {unit})")
+    action = "installed" if payload["installed"] else "already installed"
+    if selected in ("eedl", "eadl"):
+        emit_result(f"{action}: {payload['path']}")
+        return
+    unit = "files" if selected == "sbethe" else "tables"
+    emit_result(f"{action}: {payload['path']} ({payload['file_count']} {unit})")
 
 
 @command.command("verify")
 @click.option(
     "--require",
     "require",
-    default="bremslib,elsepa",
+    default="bremslib,elsepa,eedl,eadl",
     show_default=True,
-    help="Comma-separated codes whose pinned tables must be present (bremslib, elsepa).",
+    help=(
+        "Comma-separated codes whose pinned tables or datasets must be present "
+        "(bremslib, elsepa, eedl, eadl)."
+    ),
 )
 @output_option
 def verify_command(require: str, json_output: bool) -> None:
-    """Check that every pinned release table is present and matches its pin.
+    """Check that every pinned release table and dataset is present and intact.
 
     Resolves each table pinned by the shipped release indexes and compares its
-    stored manifest digest with the pin. Payloads are not hashed, so the check
-    is fast enough to gate a job. Exits 1 when any table is missing or differs,
-    naming the fix; exits 0 when all are intact. Read-only.
+    stored manifest digest with the pin; table payloads are not hashed. The
+    EEDL and EADL files are hashed in full against their pinned SHA-256
+    (about 0.1 s). Fast enough to gate a job. Exits 1 when anything is missing
+    or differs, naming the fix; exits 0 when all are intact. Read-only.
 
     Remote jobs run this before the sweep and fail with state `FAILED (tables)`.
     """
-    from ...xsgen.verify import CODES, OK, verify_pinned
+    from ...xsgen.verify import CODES, DATASET_CODES, OK, verify_pinned
 
     codes = tuple(
         dict.fromkeys(part.strip().lower() for part in require.split(",") if part.strip())
@@ -639,7 +678,12 @@ def verify_command(require: str, json_output: bool) -> None:
     failing_codes = sorted({check.code for check in failed})
     fix = (
         "fix: run `pyrite remote sync` from a machine holding these tables, or "
-        + "; ".join(f"`pyrite tables fetch {code} --archive PATH`" for code in failing_codes)
+        + "; ".join(
+            f"`pyrite tables fetch {code}`"
+            if code in DATASET_CODES
+            else f"`pyrite tables fetch {code} --archive PATH`"
+            for code in failing_codes
+        )
         if failed
         else ""
     )
@@ -667,11 +711,59 @@ def verify_command(require: str, json_output: bool) -> None:
     else:
         for check in failed:
             emit_diagnostic(f"{check.status}: {check.code} {check.label} {check.key}")
-        emit_result(f"{len(checks) - len(failed)}/{len(checks)} pinned tables verified")
+        emit_result(
+            f"{len(checks) - len(failed)}/{len(checks)} pinned tables and datasets verified"
+        )
         if failed:
             emit_diagnostic(fix)
     if failed:
         raise click.exceptions.Exit(1)
+
+
+@command.command("migrate")
+@click.option(
+    "--dry-run", is_flag=True, help="Report what would be copied without writing anything."
+)
+@output_option
+def migrate_command(dry_run: bool, json_output: bool) -> None:
+    """Copy tables from the deprecated legacy directory into your workspace.
+
+    With a workspace selected (PYRITE_HOME or workspace.root), tables are
+    stored in <workspace>/xsgen/tables, but the pre-workspace directory
+    <user data dir>/xsgen/tables is still searched as a deprecated tier; it
+    stops being searched in the next release. This copies every table found
+    there that the workspace lacks. Nothing is deleted or overwritten: legacy
+    files stay in place, and a key the workspace already holds is skipped.
+    Without a workspace the two directories are the same and there is nothing
+    to do. Exits 0.
+    """
+    from ...xsgen.store import migrate_legacy_tables
+
+    try:
+        report = migrate_legacy_tables(dry_run=dry_run)
+    except OSError as exc:
+        raise CLIError(f"could not migrate tables: {exc}") from exc
+    if json_output:
+        emit_json(
+            "pyrite.tables.migrate.v1",
+            {
+                "source": str(report.source),
+                "destination": str(report.destination),
+                "active": report.active,
+                "dry_run": report.dry_run,
+                "copied": list(report.copied),
+                "present": list(report.present),
+            },
+        )
+        return
+    if not report.active:
+        emit_result(f"nothing to migrate: {report.source} is the selected table directory")
+        return
+    verb = "would copy" if dry_run else "copied"
+    emit_result(
+        f"{verb} {len(report.copied)} table(s) from {report.source} to {report.destination}; "
+        f"{len(report.present)} already present"
+    )
 
 
 @command.group("sources", cls=LazyGroup)

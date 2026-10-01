@@ -1,6 +1,5 @@
 """Validated EEDL electron-impact subshell data shared by transport and scoring."""
 
-import hashlib
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -11,12 +10,11 @@ from typing import Any
 import numpy as np
 from endf_parserpy import EndfFile
 
-from .. import DATA_DIR
+from ..datasets import EEDL, DatasetMismatchError, file_sha256, require_dataset
 from ..materials.atomic import Z_TABLE
 
-EEDL_DATA_DIR = DATA_DIR / "characteristic_cross_sections"
-EEDL_FILENAME = "EEDL.endf"
-EEDL_SHA256 = "f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c"
+EEDL_FILENAME = EEDL.filename
+EEDL_SHA256 = EEDL.sha256
 
 # ENDF-6 MF=23 subshell order: designator = MT - 533, with O8/O9 before P1.
 EEDL_SUBSHELL_LABELS = {
@@ -219,21 +217,31 @@ def _load_eedl_subshell_tables(
     )
 
 
+def eedl_path() -> Path:
+    """Return the installed, checksum-verified EEDL tape.
+
+    The tape is a fetched dataset (ADR-0014 class b), not packaged data.
+
+    Raises
+    ------
+    pyrite.datasets.DatasetNotFoundError
+        If it is not installed; the message names ``pyrite tables fetch eedl``.
+    pyrite.datasets.DatasetMismatchError
+        If the installed bytes differ from the vetted input.
+    """
+    path = require_dataset("eedl")
+    _verify_eedl_file(str(path))
+    return path
+
+
 @cache
-def _verify_packaged_eedl() -> None:
-    """Fail closed if the packaged EEDL bytes differ from the vetted input."""
-    path = EEDL_DATA_DIR / EEDL_FILENAME
-    digest = hashlib.sha256()
-    try:
-        with path.open("rb") as stream:
-            for block in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(block)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"packaged EEDL database is missing: expected {path}") from None
-    actual = digest.hexdigest()
+def _verify_eedl_file(path: str) -> None:
+    """Fail closed if the installed EEDL bytes differ from the vetted input."""
+    actual = file_sha256(Path(path))
     if actual != EEDL_SHA256:
-        raise ValueError(
-            f"packaged EEDL database checksum mismatch: expected {EEDL_SHA256}, got {actual}"
+        raise DatasetMismatchError(
+            f"EEDL database checksum mismatch at {path}: expected {EEDL_SHA256}, got {actual}; "
+            "remove it and run `pyrite tables fetch eedl`"
         )
 
 
@@ -244,8 +252,9 @@ def load_eedl_shell_ionization(
 ) -> tuple[EEDLSubshellTable, ...]:
     """Load EEDL electron-impact subshell rates without relaxation data.
 
-    The packaged EPICS2025 tape is checksum-pinned; ``data_dir`` may instead
-    name an explicit ENDF-6 file or directory. Each shell keeps its native
+    The fetched EPICS2025 tape (``pyrite tables fetch eedl``) is
+    checksum-pinned; ``data_dir`` may instead name an explicit ENDF-6 file or
+    directory. Each shell keeps its native
     projectile-energy grid, EEDL binding energy, and cross section in cm².
     This supplies total ionization rates, not a differential transfer law.
     """
@@ -255,12 +264,15 @@ def load_eedl_shell_ionization(
         atomic_number = Z_TABLE[element]
     except KeyError as exc:
         raise ValueError(f"unknown element {element!r}") from exc
-    candidate = EEDL_DATA_DIR if data_dir is None else Path(data_dir)
-    path = candidate if candidate.is_file() else candidate / EEDL_FILENAME
-    if not path.is_file():
-        raise FileNotFoundError(f"no EEDL shell-ionization database for {element}: expected {path}")
     if data_dir is None:
-        _verify_packaged_eedl()
+        path = eedl_path()
+    else:
+        candidate = Path(data_dir)
+        path = candidate if candidate.is_file() else candidate / EEDL_FILENAME
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"no EEDL shell-ionization database for {element}: expected {path}"
+            )
     resolved_path = path.resolve()
     stat = resolved_path.stat()
     return _load_eedl_subshell_tables(

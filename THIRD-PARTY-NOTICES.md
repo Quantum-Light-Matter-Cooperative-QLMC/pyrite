@@ -10,7 +10,7 @@ per issue #162.
 
 None of PyRITE's own source is licensed under any of the terms below. This
 file exists to satisfy the attribution obligations that follow from
-redistributing these codes, from invoking them, and from redistributing
+redistributing or downloading these codes and data, from invoking them, and from redistributing
 tables derived or resampled from their output.
 
 ## EPICS2025 EADL atomic relaxation data
@@ -24,8 +24,9 @@ tables derived or resampled from their output.
   <https://nuclear.llnl.gov/EPICS/ENDF2025/EADL2025.ALL>, evaluated August
   2023 and distributed January 2025. SHA-256:
   `78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c`.
-- **Nature of PyRITE's use**: PyRITE redistributes the published file unchanged
-  and reads its File 28 (MT 533) subshell binding energies, occupancies, and
+- **Nature of PyRITE's use**: PyRITE does not ship the file. `pyrite tables
+  fetch eadl` downloads the published file unchanged from the URL above into
+  the user's data directory, and PyRITE reads its File 28 (MT 533) subshell binding energies, occupancies, and
   radiative and nonradiative transition data for the characteristic-radiation
   relaxation cascade.
 
@@ -59,12 +60,34 @@ tables derived or resampled from their output.
   [EPICS2025 distribution page](https://nuclear.llnl.gov/EPICS/index.html).
 - **Source**: the unmodified ENDF-6 file from
   <https://nuclear.llnl.gov/EPICS/ENDF2025/EEDL2025.ALL>, evaluated August
-  2023 and distributed January 2025, packaged as `EEDL.endf`. SHA-256:
-  `f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c`.
-- **Nature of PyRITE's use**: PyRITE redistributes the published file unchanged
-  and reads its File 23 subshell electroionization cross sections (MT
+  2023 and distributed January 2025, installed as `EEDL.endf`. SHA-256 of
+  the installed bytes:
+  `f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c` (the
+  published file with its final CRLF removed; see
+  `src/pyrite/data/characteristic_cross_sections/README.md`).
+- **Nature of PyRITE's use**: PyRITE does not ship the file. `pyrite tables
+  fetch eedl` downloads it from the URL above into the user's data directory,
+  and PyRITE reads its File 23 subshell electroionization cross sections (MT
   534--572) and its File 23/26 bremsstrahlung totals and photon spectra (MT
   527).
+
+## NIST SRD 64 (not redistributed)
+
+- **Source**: NIST Standard Reference Database 64, *NIST Electron
+  Elastic-Scattering Cross-Section Database*, <https://srdata.nist.gov/srd64/>.
+- **Terms**: NIST Standard Reference Data are copyrighted by the U.S.
+  Secretary of Commerce under the Standard Reference Data Act and may not be
+  reproduced or redistributed without prior permission
+  (<https://www.nist.gov/srd/public-law>).
+- **Nature of PyRITE's use**: PyRITE ships none of it. Earlier revisions
+  packaged five exported transport cross-section tables
+  (`mott_transport_cross_sections/DisplayCalcTCSTableFor<El>.csv`); they were
+  removed from the tree and the wheel under #263 and remain only in Git
+  history. The opt-in `elastic_model="mott"` reads tables each user exports
+  from SRD 64 into the directory named by the `mott.tables_dir` config key.
+  The test suite uses synthetic tables in the same file format
+  (`tests/data/mott_srd64_synthetic/`), whose numbers are computed from an
+  analytic formula and are not NIST data.
 
 ELSEPA and SBETHE are both CC BY-NC 3.0. PyRITE is itself distributed for
 academic/nonprofit use only, so the NonCommercial clause imposes no

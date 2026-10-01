@@ -1,6 +1,6 @@
 """EEDL shell ionization and characteristic production against Bote--Salvat.
 
-Compares PyRITE's packaged EEDL MF=23 subshell electro-ionization cross
+Compares PyRITE's fetched EEDL MF=23 subshell electro-ionization cross
 sections with the Bote--Salvat analytical formulas (D. Bote et al., At. Data
 Nucl. Data Tables 95, 871 (2009)) for K, L1--L3 and M1--M5 shells, Z = 1--99,
 fitted to their distorted-wave and plane-wave Born calculations (Phys. Rev. A

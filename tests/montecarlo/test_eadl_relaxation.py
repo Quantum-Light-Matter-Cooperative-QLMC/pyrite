@@ -113,16 +113,23 @@ def test_every_packaged_element_passes_validation():
         assert sum(shell.electrons for shell in relaxation.subshells) == atomic_number
 
 
-def test_packaged_checksum_mismatch_fails_closed(monkeypatch, tmp_path):
-    fake = tmp_path / eadl.EADL_FILENAME
+def test_fetched_checksum_mismatch_fails_closed(monkeypatch, tmp_path):
+    from pyrite import datasets
+
+    fake = tmp_path / "eadl" / eadl.EADL_FILENAME
+    fake.parent.mkdir()
     fake.write_bytes(b"not eadl")
-    monkeypatch.setattr(eadl, "EADL_DATA_DIR", tmp_path)
-    eadl._verify_packaged_eadl.cache_clear()
-    try:
-        with pytest.raises(ValueError, match="checksum mismatch"):
-            eadl.load_eadl_relaxation("Cu")
-    finally:
-        eadl._verify_packaged_eadl.cache_clear()
+    monkeypatch.setattr(datasets, "datasets_dir", lambda: tmp_path)
+    with pytest.raises(ValueError, match="checksum mismatch"):
+        eadl.load_eadl_relaxation("Cu")
+
+
+def test_missing_eadl_names_the_fetch_command(monkeypatch, tmp_path):
+    from pyrite import datasets
+
+    monkeypatch.setattr(datasets, "datasets_dir", lambda: tmp_path)
+    with pytest.raises(datasets.DatasetNotFoundError, match="pyrite tables fetch eadl"):
+        eadl.load_eadl_relaxation("Cu")
 
 
 def test_cascade_energy_budget_closes_within_the_eadl_transition_defect():

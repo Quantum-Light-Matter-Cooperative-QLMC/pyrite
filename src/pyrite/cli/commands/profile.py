@@ -495,7 +495,7 @@ def numerics_show_command(name, fidelity, json_output):
     help=(
         "Continuum bremsstrahlung: auto (default) uses the released BremsLib tables with "
         "their angular model when installed ('pyrite tables fetch bremslib') and warns and "
-        "falls back to EEDL otherwise; bremslib requires them; eedl is the packaged EEDL "
+        "falls back to EEDL otherwise; bremslib requires them; eedl is the fetched EEDL "
         "continuum with an isotropic photon angle."
     ),
 )

@@ -662,9 +662,9 @@ def _pin(monkeypatch, request: TableRequest, *, digest: str | None = None):
 def test_verify_passes_when_the_pinned_manifest_digest_matches(isolated, monkeypatch):
     _pin(monkeypatch, _store_one())
 
-    result = invoke(tables_command.command, ["verify"])
+    result = invoke(tables_command.command, ["verify", "--require", "bremslib,elsepa"])
 
-    assert_clean_result(result, stdout="1/1 pinned tables verified\n")
+    assert_clean_result(result, stdout="1/1 pinned tables and datasets verified\n")
 
 
 def test_verify_exits_one_naming_the_fix_when_a_pinned_table_is_missing(isolated, monkeypatch):
@@ -676,10 +676,10 @@ def test_verify_exits_one_naming_the_fix_when_a_pinned_table_is_missing(isolated
         lambda codes=verify.CODES: [("bremslib", "Z=79", "f" * 64, "0" * 64)],
     )
 
-    result = invoke(tables_command.command, ["verify"])
+    result = invoke(tables_command.command, ["verify", "--require", "bremslib,elsepa"])
 
     assert result.exit_code == 1
-    assert result.stdout == "0/1 pinned tables verified\n"
+    assert result.stdout == "0/1 pinned tables and datasets verified\n"
     assert "missing: bremslib Z=79" in result.stderr
     assert "pyrite tables fetch bremslib --archive PATH" in result.stderr
     assert "Traceback" not in result.output
@@ -688,7 +688,7 @@ def test_verify_exits_one_naming_the_fix_when_a_pinned_table_is_missing(isolated
 def test_verify_flags_a_manifest_that_is_not_the_pinned_one(isolated, monkeypatch):
     _pin(monkeypatch, _store_one(), digest="1" * 64)
 
-    result = invoke(tables_command.command, ["verify"])
+    result = invoke(tables_command.command, ["verify", "--require", "bremslib,elsepa"])
 
     assert result.exit_code == 1
     assert "mismatch: elsepa Z=29" in result.stderr
@@ -701,7 +701,7 @@ def test_verify_flags_an_edited_manifest_as_corrupt(isolated, monkeypatch):
     body["target_label"] = "tampered"
     manifest.write_text(json.dumps(body), encoding="utf-8")
 
-    result = invoke(tables_command.command, ["verify"])
+    result = invoke(tables_command.command, ["verify", "--require", "bremslib,elsepa"])
 
     assert result.exit_code == 1
     assert "corrupt: elsepa Z=29" in result.stderr
@@ -714,7 +714,9 @@ def test_verify_json_is_one_envelope_and_still_exits_one(isolated, monkeypatch):
         verify, "pinned_tables", lambda codes=verify.CODES: [("elsepa", "Z=6", "e" * 64, "0" * 64)]
     )
 
-    result = invoke(tables_command.command, ["verify", "-o", "json"])
+    result = invoke(
+        tables_command.command, ["verify", "--require", "bremslib,elsepa", "-o", "json"]
+    )
 
     assert result.exit_code == 1
     envelope = json.loads(result.stdout)
@@ -728,3 +730,67 @@ def test_verify_rejects_an_unknown_code_as_a_usage_error(isolated):
     result = invoke(tables_command.command, ["verify", "--require", "sbethe"])
 
     assert result.exit_code == 2
+
+
+# --- fetched datasets (eedl, eadl) -------------------------------------------
+
+
+@pytest.fixture
+def small_dataset(monkeypatch):
+    """Swap the 25 MB EEDL pin for a few bytes with the same install shape."""
+    import hashlib
+    from dataclasses import replace
+
+    from pyrite import datasets
+
+    body = b"eedl record\r\n"
+    fake = replace(datasets.EEDL, sha256=hashlib.sha256(body).hexdigest(), download_sha256=None)
+    monkeypatch.setitem(datasets.DATASETS, "eedl", fake)
+    return body
+
+
+def test_fetch_installs_a_dataset_from_a_local_file(isolated, small_dataset, tmp_path):
+    source = tmp_path / "EEDL2025.ALL"
+    source.write_bytes(small_dataset)
+
+    result = invoke(tables_command.command, ["fetch", "eedl", "--archive", str(source)])
+
+    installed = isolated / "data" / "datasets" / "eedl" / "EEDL.endf"
+    assert_clean_result(result, stdout=f"installed: {installed}\n")
+    assert installed.read_bytes() == small_dataset
+    again = invoke(
+        tables_command.command, ["fetch", "eedl", "--archive", str(source), "-o", "json"]
+    )
+    envelope = json.loads(again.stdout)
+    assert envelope["payload"]["installed"] is False
+    assert envelope["payload"]["file_count"] == 1
+
+
+def test_fetch_refuses_a_dataset_that_does_not_match_its_pin(isolated, small_dataset, tmp_path):
+    source = tmp_path / "EEDL2025.ALL"
+    source.write_bytes(b"something else")
+
+    result = invoke(tables_command.command, ["fetch", "eedl", "--archive", str(source)])
+
+    assert result.exit_code == 1
+    assert "SHA-256 mismatch" in result.stderr and "nothing was installed" in result.stderr
+    assert not (isolated / "data" / "datasets" / "eedl" / "EEDL.endf").exists()
+
+
+def test_verify_reports_a_missing_dataset_with_its_fetch_command(isolated, small_dataset):
+    result = invoke(tables_command.command, ["verify", "--require", "eedl"])
+
+    assert result.exit_code == 1
+    assert result.stdout == "0/1 pinned tables and datasets verified\n"
+    assert "missing: eedl EEDL.endf" in result.stderr
+    assert "`pyrite tables fetch eedl`" in result.stderr
+
+
+def test_verify_passes_an_installed_dataset(isolated, small_dataset, tmp_path):
+    source = tmp_path / "EEDL2025.ALL"
+    source.write_bytes(small_dataset)
+    invoke(tables_command.command, ["fetch", "eedl", "--archive", str(source)])
+
+    result = invoke(tables_command.command, ["verify", "--require", "eedl"])
+
+    assert_clean_result(result, stdout="1/1 pinned tables and datasets verified\n")

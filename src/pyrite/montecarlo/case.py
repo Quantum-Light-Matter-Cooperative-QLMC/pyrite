@@ -171,7 +171,7 @@ class Case(Mapping[str, Any]):
         historical ``"mott"`` model, so pre-ELSEPA case keys stay valid.
     bremsstrahlung_model
         Opt-in ``"bremslib"`` continuum source with its angular model; absent
-        is the packaged EEDL continuum, so existing case keys stay valid.
+        is the fetched EEDL continuum, so existing case keys stay valid.
     radiative_model, radiative_cutoff_eV
         Opt-in ``"bremslib-soft-hard"`` coupled radiative transport and its
         hard-photon cutoff in eV; both absent is uncoupled post-hoc scoring.

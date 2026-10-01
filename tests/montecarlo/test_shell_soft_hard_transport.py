@@ -54,6 +54,7 @@ def _composition(key):
 
 def _run(key="silicon", *, cutoff=50.0, Ne=40, E0=20.0, E_cut=10.0, **kw):
     kw.setdefault("energy_model", "midpoint")
+    kw.setdefault("elastic_model", "sr")
     return simulate_trajectories(
         E0,
         Ne,
@@ -154,6 +155,7 @@ def test_cutoff_above_every_channel_is_bitwise_the_continuous_transport(core, lu
         transport_core=core,
         transport_lut_config=TransportLUTConfig(enabled=lut),
         energy_model="midpoint",
+        elastic_model="sr",
     )
     legacy = simulate_trajectories(
         20.0,

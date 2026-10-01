@@ -44,6 +44,7 @@ BASE_KWARGS = dict(
     n_atoms_per_ang3=0.1136,
     seed=1234,
     max_steps=4000,
+    elastic_model="sr",
 )
 
 

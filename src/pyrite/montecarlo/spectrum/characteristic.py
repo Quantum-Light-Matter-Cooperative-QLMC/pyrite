@@ -27,7 +27,6 @@ from ..eadl_relaxation import (
     load_eadl_relaxation,
     vacancy_cascade,
 )
-from ..eedl_ionization import EEDL_DATA_DIR as CHARACTERISTIC_DATA_DIR
 from ..eedl_ionization import EEDL_FILENAME as CHARACTERISTIC_EEDL_FILENAME
 from ..eedl_ionization import EEDL_SHA256 as CHARACTERISTIC_EEDL_SHA256
 from ..eedl_ionization import (
@@ -35,7 +34,7 @@ from ..eedl_ionization import (
     _load_eedl_subshell_tables,
     _readonly,
     _require_finite,
-    _verify_packaged_eedl,
+    eedl_path,
 )
 from ..eedl_ionization import EEDLSubshellTable as EEDLSubshellTable
 from ..eedl_ionization import load_eedl_shell_ionization as load_eedl_shell_ionization
@@ -455,9 +454,8 @@ def _load_packaged_characteristic_cross_sections(
     element: str,
     fluorescence_yields: FluorescenceYieldSource,
 ) -> CharacteristicCrossSectionTable:
-    _verify_packaged_eedl()
     return _parse_characteristic_file(
-        CHARACTERISTIC_DATA_DIR / CHARACTERISTIC_EEDL_FILENAME,
+        eedl_path(),
         None,
         element,
         fluorescence_yields,
@@ -478,9 +476,10 @@ def load_characteristic_cross_sections(
         Chemical symbol, such as ``"C"`` or ``"Si"``.
     data_dir
         Optional EEDL ENDF-6 file or directory containing ``EEDL.endf``. The
-        checksum-pinned packaged tape is used by default. A directory that
-        also contains ``EADL2025.ALL`` supplies the relaxation data too;
-        otherwise the checksum-pinned packaged EADL is used.
+        checksum-pinned fetched tape (``pyrite tables fetch eedl``) is used by
+        default. A directory that also contains ``EADL2025.ALL`` supplies the
+        relaxation data too; otherwise the checksum-pinned fetched EADL
+        (``pyrite tables fetch eadl``) is used.
     fluorescence_yields
         ``"eadl"`` (default) keeps EADL's radiative branching. ``"elam"``
         rescales each subshell's radiative branch to xraydb's Elam/Krause
@@ -503,15 +502,15 @@ def load_characteristic_cross_sections(
         raise ValueError("element must be a chemical symbol such as 'C' or 'Si'")
     if fluorescence_yields not in _FLUORESCENCE_YIELD_SOURCES:
         raise ValueError(f"fluorescence_yields must be one of {_FLUORESCENCE_YIELD_SOURCES}")
-    candidate = CHARACTERISTIC_DATA_DIR if data_dir is None else Path(data_dir)
+    if data_dir is None:
+        return _load_packaged_characteristic_cross_sections(element, fluorescence_yields)
+    candidate = Path(data_dir)
     path = candidate if candidate.is_file() else candidate / CHARACTERISTIC_EEDL_FILENAME
     if not path.is_file():
         raise FileNotFoundError(
             f"no EEDL shell-ionization database for {element}: expected {path}; "
             "add an ENDF-6 EEDL electro-atomic file with MF=23/MT=534-572"
         )
-    if data_dir is None:
-        return _load_packaged_characteristic_cross_sections(element, fluorescence_yields)
     eadl_path = (
         candidate
         if candidate.is_dir() and (candidate / CHARACTERISTIC_EADL_FILENAME).is_file()
@@ -875,7 +874,6 @@ def mc_characteristic_spectrum(
 
 
 __all__ = [
-    "CHARACTERISTIC_DATA_DIR",
     "CHARACTERISTIC_EADL_FILENAME",
     "CHARACTERISTIC_EADL_SHA256",
     "CHARACTERISTIC_EEDL_FILENAME",

@@ -1,19 +1,73 @@
 """Elastic scattering: Browning free paths, NIST-Mott-calibrated
-screened-Rutherford angles, and the analytic SR fallback."""
+screened-Rutherford angles, and the analytic SR model.
+
+The ``"mott"`` model reads NIST SRD 64 transport cross-section tables that the
+user downloads: NIST Standard Reference Data may not be redistributed without
+permission, so PyRITE ships none. :func:`mott_tables_dir` resolves the
+``mott.tables_dir`` config key (``PYRITE_MOTT_TABLES_DIR``); a missing table
+raises :class:`MottTableUnavailableError` rather than degrading to another
+model.
+"""
 
 import logging
-import os
 from functools import cache
+from pathlib import Path
 
 import numpy as np
 from numba import njit
 
-from ... import DATA_DIR
-
 logger = logging.getLogger(__name__)
 
-MOTT_DIR = str(DATA_DIR / "mott_transport_cross_sections")
 A0_SQ_CM2 = 2.8002852e-17  # Bohr radius squared [cm^2] (NIST SRD 64 unit)
+
+#: Config key naming the directory of user-downloaded SRD 64 tables.
+MOTT_TABLES_CONFIG_KEY = "mott.tables_dir"
+#: Environment override for :data:`MOTT_TABLES_CONFIG_KEY`.
+MOTT_TABLES_ENV = "PYRITE_MOTT_TABLES_DIR"
+#: Where the tables are downloaded from.
+MOTT_SRD64_URL = "https://srdata.nist.gov/srd64/"
+
+
+class MottTableUnavailableError(FileNotFoundError):
+    """``elastic_model="mott"`` needs an SRD 64 table that is not installed."""
+
+
+def mott_table_filename(element: str) -> str:
+    """Return the SRD 64 export file name PyRITE reads for ``element``."""
+    return f"DisplayCalcTCSTableFor{element}.csv"
+
+
+def mott_tables_dir() -> Path | None:
+    """Return the configured SRD 64 table directory, or ``None`` when unset.
+
+    Resolves ``mott.tables_dir`` with the usual precedence:
+    ``PYRITE_MOTT_TABLES_DIR``, then the config store.
+    """
+    from ...console.config import resolve
+
+    value = resolve(MOTT_TABLES_CONFIG_KEY).value
+    return Path(value).expanduser().resolve() if value else None
+
+
+def _mott_table_path(element: str) -> Path:
+    """Return the configured table for ``element``, or raise naming the fix."""
+    root = mott_tables_dir()
+    name = mott_table_filename(element)
+    if root is not None and (root / name).is_file():
+        return root / name
+    where = (
+        f"{root / name} does not exist"
+        if root is not None
+        else f"{MOTT_TABLES_CONFIG_KEY} is not set"
+    )
+    raise MottTableUnavailableError(
+        f"elastic_model='mott' needs the NIST SRD 64 transport cross-section table for "
+        f"{element}, but {where}. PyRITE does not redistribute NIST SRD 64. Export the "
+        f"relativistic transport cross sections for {element} from {MOTT_SRD64_URL} as "
+        f"{name}, then point `pyrite config set {MOTT_TABLES_CONFIG_KEY} DIR` "
+        f"(or {MOTT_TABLES_ENV}) at that directory; or choose elastic_model='elsepa' "
+        "(the default) or 'sr'."
+    )
 
 
 # ---- elastic scattering models ------------------------------------------------
@@ -90,21 +144,24 @@ def _alpha_from_first_moment(target):
     return 10.0 ** (0.5 * (lo + hi))
 
 
-@cache
 def _load_mott_transport(element):
     """
     NIST SRD 64 relativistic Mott TRANSPORT cross sections
-    sigma_tr = integral (1-cos theta) dsigma, from
-    mott_transport_cross_sections/DisplayCalcTCSTableFor<El>.csv
-    (50 eV - 300 keV, 401 points). Returns (E_eV, sigma_tr_cm2).
+    sigma_tr = integral (1-cos theta) dsigma, read from the user-supplied
+    ``DisplayCalcTCSTableFor<El>.csv`` in :func:`mott_tables_dir`
+    (SRD 64 exports 50 eV - 300 keV, 401 points). Returns (E_eV, sigma_tr_cm2).
+
+    Raises
+    ------
+    MottTableUnavailableError
+        If no table for ``element`` is configured.
     """
-    path = os.path.join(MOTT_DIR, f"DisplayCalcTCSTableFor{element}.csv")
-    if not os.path.exists(path):
-        raise FileNotFoundError(
-            f"No NIST Mott transport table for '{element}' ({path}). "
-            f"Download from https://srdata.nist.gov/srd64/ or use "
-            f"elastic_model='sr'."
-        )
+    return _read_mott_transport(str(_mott_table_path(element)))
+
+
+@cache
+def _read_mott_transport(path):
+    """Parse one SRD 64 transport table (``No, Energy, sigma_tr [a0^2]`` rows)."""
     E, sig = [], []
     with open(path) as f:
         for line in f:
@@ -112,10 +169,11 @@ def _load_mott_transport(element):
             if len(parts) == 3 and parts[0].isdigit():
                 E.append(float(parts[1]))
                 sig.append(float(parts[2]))
+    if not E:
+        raise ValueError(f"{path}: no SRD 64 transport cross-section rows")
     return np.array(E), np.array(sig) * A0_SQ_CM2
 
 
-@cache
 def _mott_alpha_table(element, Z):
     """
     Screening parameter alpha(E) calibrated so the screened-Rutherford
@@ -123,14 +181,21 @@ def _mott_alpha_table(element, Z):
         sigma_tr / sigma_el = <1-cos theta>(alpha)
     with sigma_el from the Browning fit to the Mott totals. Returns
     (log10_E_eV_grid, log10_alpha_grid) for interpolation.
+
+    Raises
+    ------
+    MottTableUnavailableError
+        If no table for ``element`` is configured.
     """
-    E_eV, sig_tr = _load_mott_transport(element)
+    return _mott_alpha_from_table(str(_mott_table_path(element)), float(Z))
+
+
+@cache
+def _mott_alpha_from_table(path, Z):
+    E_eV, sig_tr = _read_mott_transport(path)
     sig_el = _sigma_browning_cm2(Z, E_eV / 1e3)
     alpha = _alpha_from_first_moment(sig_tr / sig_el)
     return np.log10(E_eV), np.log10(alpha)
-
-
-_NO_MOTT = set()  # elements with no NIST Mott table -> screened-Rutherford
 
 
 @njit(cache=True)
@@ -216,29 +281,16 @@ def _sample_cos_theta_mott_scalar(E_keV, rng, logE, logA):
 
 def _sample_cos_theta(Z, E_keV, rng, elastic_model, element):
     """Polar scattering angle from the screened-Rutherford inversion, with the
-    screening parameter from the chosen model. If elastic_model="mott" but no
-    NIST Mott transport table exists for `element` (e.g. W), fall back to the
-    analytic screened-Rutherford screening for that element. The miss is cached
-    in _NO_MOTT so we don't re-stat the filesystem every transport step
-    (lru_cache doesn't cache the FileNotFoundError); logged once per element
-    per process at DEBUG (silent by default -- set PYRITE_MC_DEBUG=1 to see it;
-    a ProcessPoolExecutor worker pool re-logs once per worker, since each
-    worker gets its own _NO_MOTT cache)."""
+    screening parameter from the chosen model: the SRD 64-calibrated table for
+    ``elastic_model="mott"``, the analytic Joy/Bishop screening otherwise.
+    A ``"mott"`` request for an element without a configured table raises
+    :class:`MottTableUnavailableError`; it never degrades to analytic
+    screening."""
     R = rng.random(E_keV.shape)
-    if elastic_model == "mott" and element not in _NO_MOTT:
-        try:
-            logE, logA = _mott_alpha_table(element, Z)
-            alpha = 10.0 ** np.interp(np.log10(E_keV * 1e3), logE, logA)
-
-            return 1.0 - 2.0 * alpha * R / (1.0 + alpha - R)
-
-        except FileNotFoundError:
-            logger.debug(
-                "no Mott transport table for %s; transport will use the analytic fallback",
-                element,
-            )
-            _NO_MOTT.add(element)
-
+    if elastic_model == "mott":
+        logE, logA = _mott_alpha_table(element, Z)
+        alpha = 10.0 ** np.interp(np.log10(E_keV * 1e3), logE, logA)
+        return 1.0 - 2.0 * alpha * R / (1.0 + alpha - R)
     return _sample_cos_theta_sr_numba(Z, E_keV, R)
 
 

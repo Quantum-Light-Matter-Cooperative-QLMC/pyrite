@@ -111,3 +111,14 @@ def test_the_comparison_actually_fails_on_an_overdue_row() -> None:
     assert _overdue({"retired-in-0.3.0": "0.3.0"}) == {"retired-in-0.3.0": "0.3.0"}
     assert _overdue({"older": "0.1.0"}) == {"older": "0.1.0"}
     assert _overdue({"future": "0.5.0"}) == {}
+
+
+def test_legacy_table_tier_is_not_past_its_removal_target() -> None:
+    """ADR-0014: the pre-workspace xsgen table tier warns for one release."""
+    from pyrite.xsgen.store import LEGACY_TABLE_TIER_REMOVE_IN
+
+    assert not _overdue({"xsgen legacy table tier": LEGACY_TABLE_TIER_REMOVE_IN}), (
+        f"pyrite-xray {__version__} still searches the legacy "
+        "~/.local/share/pyrite/xsgen/tables tier; remove it from "
+        "pyrite.xsgen.store.search_dirs together with `pyrite tables migrate`."
+    )

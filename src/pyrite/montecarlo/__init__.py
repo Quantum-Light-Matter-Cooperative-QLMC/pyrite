@@ -5,7 +5,7 @@ Monte Carlo CXR (PXR + CBS) from scattered electrons in thick crystals,
 following Zhai et al., Nat. Commun. 16, 11218 (2025), SI Sections S1-S5:
 
   1. Electron transport (SI S2): single-scattering Monte Carlo with
-     Joy-Luo continuous slowing-down. Elastic scattering (default "mott"):
+     Joy-Luo continuous slowing-down. Elastic scattering ("mott", deprecated):
      free paths from the Browning fit to the Mott total cross sections, and
      scattering angles from a screened-Rutherford form whose screening
      parameter alpha(E) is calibrated, per element, to reproduce the NIST
@@ -89,11 +89,9 @@ from .runner import (
 from .spectrum import (
     _SEG_ARRAYS,
     BREM_ENDF_PARSERPY_VERSION,
-    BREMSSTRAHLUNG_DATA_DIR,
     BREMSSTRAHLUNG_EEDL_FILENAME,
     BREMSSTRAHLUNG_EEDL_SHA256,
     BREMSSTRAHLUNG_MODEL,
-    CHARACTERISTIC_DATA_DIR,
     CHARACTERISTIC_EEDL_FILENAME,
     CHARACTERISTIC_EEDL_SHA256,
     CHARACTERISTIC_MODEL,
@@ -117,10 +115,9 @@ from .spectrum import (
     mc_spectrum_solid_angle,
 )
 from .transport import (
-    _NO_MOTT,
     A0_SQ_CM2,
-    MOTT_DIR,
     TRANSPORT_ELEMENTS,
+    MottTableUnavailableError,
     _alpha_from_first_moment,
     _alpha_sr_joy,
     _dEds_bs_compound,
@@ -135,6 +132,7 @@ from .transport import (
     _sample_cos_theta,
     _sigma_browning_cm2,
     beta_from_keV,
+    mott_tables_dir,
     simulate_trajectories,
 )
 
@@ -155,7 +153,8 @@ __all__ = [
     "_stack_tau",
     # transport
     "TRANSPORT_ELEMENTS",
-    "MOTT_DIR",
+    "MottTableUnavailableError",
+    "mott_tables_dir",
     "A0_SQ_CM2",
     "beta_from_keV",
     "_sigma_browning_cm2",
@@ -163,7 +162,6 @@ __all__ = [
     "_alpha_from_first_moment",
     "_load_mott_transport",
     "_mott_alpha_table",
-    "_NO_MOTT",
     "_sample_cos_theta",
     "_dEds_keV_per_ang",
     "_dEds_compound",
@@ -196,13 +194,11 @@ __all__ = [
     "_polarization_pair",
     "_observation_direction",
     "_escape_length",
-    "CHARACTERISTIC_DATA_DIR",
     "CHARACTERISTIC_EEDL_FILENAME",
     "CHARACTERISTIC_EEDL_SHA256",
     "CHARACTERISTIC_MODEL",
     "CHARACTERISTIC_XRAYDB_VERSION",
     "BREM_ENDF_PARSERPY_VERSION",
-    "BREMSSTRAHLUNG_DATA_DIR",
     "BREMSSTRAHLUNG_EEDL_FILENAME",
     "BREMSSTRAHLUNG_EEDL_SHA256",
     "BREMSSTRAHLUNG_MODEL",

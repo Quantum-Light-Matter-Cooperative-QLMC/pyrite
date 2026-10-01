@@ -10,7 +10,11 @@ silently served.
 Resolution is two-tier (D3): the user table directory first, then the packaged
 one. Consumers call :func:`resolve` and never learn which tier answered, so a
 shipped table and a user-generated one are indistinguishable to
-:mod:`pyrite.montecarlo.transport.lut` and its peers.
+:mod:`pyrite.montecarlo.transport.lut` and its peers. With an explicit
+workspace the pre-workspace ``<user data dir>/xsgen/tables`` is still searched
+between the two, as a deprecated legacy tier: serving from it warns once per
+process, ``pyrite tables migrate`` copies it forward, and it stops being
+searched in :data:`LEGACY_TABLE_TIER_REMOVE_IN` (ADR-0014).
 
 Each table carries a sidecar JSON manifest recording how it was made (D5):
 source digest, compiler version, deck hash, model parameters, PyRITE version,
@@ -22,6 +26,10 @@ parameters cannot resume a checkpoint computed from the old one.
 
 import hashlib
 import json
+import os
+import shutil
+import tempfile
+import warnings
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -358,11 +366,52 @@ def packaged_table_dir() -> Path:
     return data_dir() / "xsgen" / "tables"
 
 
+#: Release in which the legacy tier stops being searched (ADR-0014).
+LEGACY_TABLE_TIER_REMOVE_IN = "0.5.0"
+
+_WARNED_LEGACY: set[Path] = set()
+
+
+def legacy_table_dir() -> Path:
+    """Return the deprecated pre-workspace table directory.
+
+    ``<user data dir>/xsgen/tables``. When no workspace is selected this *is*
+    the selected tier, and nothing about it is deprecated; it is legacy only
+    when an explicit workspace moved the selected tier elsewhere.
+    """
+    return user_data_dir() / "xsgen" / "tables"
+
+
+def _legacy_tier_active() -> bool:
+    return legacy_table_dir() != user_table_dir()
+
+
 def search_dirs() -> tuple[Path, ...]:
     """Return the resolution tiers, most-preferred first."""
-    legacy = user_data_dir() / "xsgen" / "tables"
-    selected = user_table_dir()
-    return tuple(dict.fromkeys((selected, legacy, packaged_table_dir())))
+    return tuple(dict.fromkeys((user_table_dir(), legacy_table_dir(), packaged_table_dir())))
+
+
+def _tier(root: Path) -> str:
+    if root == packaged_table_dir():
+        return "packaged"
+    if root == legacy_table_dir() and _legacy_tier_active():
+        return "legacy"
+    return "user"
+
+
+def _warn_legacy(root: Path) -> None:
+    """Warn once per process that a table was served from the legacy tier."""
+    if root in _WARNED_LEGACY:
+        return
+    _WARNED_LEGACY.add(root)
+    warnings.warn(
+        f"cross-section tables were found in the legacy directory {root}, which is "
+        f"deprecated and stops being searched in PyRITE {LEGACY_TABLE_TIER_REMOVE_IN}. "
+        f"Run `pyrite tables migrate` to copy them into the selected workspace "
+        f"({user_table_dir()}); the legacy files are left in place.",
+        FutureWarning,
+        stacklevel=3,
+    )
 
 
 @dataclass(frozen=True)
@@ -378,8 +427,9 @@ class StoredTable:
     manifest
         Parsed sidecar manifest.
     tier
-        ``"user"`` or ``"packaged"``. Display and diagnostics only; no
-        consumer branches on it.
+        ``"user"``, ``"legacy"`` (the deprecated pre-workspace directory,
+        see :func:`legacy_table_dir`), or ``"packaged"``. Display and
+        diagnostics only; no consumer branches on it.
     """
 
     key: str
@@ -410,11 +460,13 @@ def resolve(key: str) -> StoredTable | None:
     overrides a shipped one without having to delete it.
     """
     for root in search_dirs():
-        tier = "packaged" if root == packaged_table_dir() else "user"
+        tier = _tier(root)
         payload, manifest_path = _paths_for(root, key)
         if not (payload.is_file() and manifest_path.is_file()):
             continue
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if tier == "legacy":
+            _warn_legacy(root)
         return StoredTable(key=key, path=payload, manifest=manifest, tier=tier)
     return None
 
@@ -562,7 +614,7 @@ def iter_stored() -> Iterator[StoredTable]:
     """Yield every stored table, user tier first, without duplicate keys."""
     seen: set[str] = set()
     for root in search_dirs():
-        tier = "packaged" if root == packaged_table_dir() else "user"
+        tier = _tier(root)
         if not root.is_dir():
             continue
         for manifest_path in sorted(root.glob("*.json")):
@@ -575,12 +627,79 @@ def iter_stored() -> Iterator[StoredTable]:
             yield StoredTable(key=key, path=payload, manifest=manifest, tier=tier)
 
 
+@dataclass(frozen=True)
+class MigrationReport:
+    """Outcome of :func:`migrate_legacy_tables`.
+
+    ``copied`` lists keys copied (or, in a dry run, that would be);
+    ``present`` keys already in the destination, which are never replaced.
+    """
+
+    source: Path
+    destination: Path
+    copied: tuple[str, ...]
+    present: tuple[str, ...]
+    dry_run: bool
+    active: bool
+
+
+def migrate_legacy_tables(*, dry_run: bool = False) -> MigrationReport:
+    """Copy legacy-tier tables into the selected table directory.
+
+    Non-destructive: legacy files are never modified or deleted, and a key the
+    destination already holds is left alone (it already wins resolution).
+    Each pair is copied payload first, each file through a temporary name and
+    an atomic rename, so an interrupted run leaves at most a payload without a
+    manifest, which :func:`resolve` ignores. Inactive (nothing to do) when no
+    workspace is selected, because the legacy directory is then the selected
+    one.
+    """
+    source = legacy_table_dir()
+    destination = user_table_dir()
+    active = _legacy_tier_active()
+    copied: list[str] = []
+    present: list[str] = []
+    if active and source.is_dir():
+        for manifest_path in sorted(source.glob("*.json")):
+            key = manifest_path.stem
+            payload = source / f"{key}.npz"
+            if not payload.is_file():
+                continue
+            target_payload, target_manifest = _paths_for(destination, key)
+            if target_payload.is_file() and target_manifest.is_file():
+                present.append(key)
+                continue
+            copied.append(key)
+            if dry_run:
+                continue
+            destination.mkdir(parents=True, exist_ok=True)
+            for src, dst in ((payload, target_payload), (manifest_path, target_manifest)):
+                fd, temporary = tempfile.mkstemp(dir=destination, prefix=f".{dst.name}.")
+                os.close(fd)
+                try:
+                    shutil.copyfile(src, temporary)
+                    os.replace(temporary, dst)
+                except BaseException:
+                    Path(temporary).unlink(missing_ok=True)
+                    raise
+    return MigrationReport(
+        source=source,
+        destination=destination,
+        copied=tuple(copied),
+        present=tuple(present),
+        dry_run=dry_run,
+        active=active,
+    )
+
+
 __all__ = [
     "KEY_SCHEMA",
+    "LEGACY_TABLE_TIER_REMOVE_IN",
     "MANIFEST_SCHEMA",
     "MODIFICATIONS_NOTE",
     "ElementTarget",
     "MaterialTarget",
+    "MigrationReport",
     "StoredTable",
     "TableManifest",
     "TableRequest",
@@ -588,8 +707,10 @@ __all__ = [
     "arrays_digest",
     "identity_markers",
     "iter_stored",
+    "legacy_table_dir",
     "manifest_digest",
     "material_identity",
+    "migrate_legacy_tables",
     "packaged_table_dir",
     "require",
     "resolve",

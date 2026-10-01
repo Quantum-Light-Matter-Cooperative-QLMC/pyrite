@@ -23,7 +23,6 @@ from ._parse import (
     _parse_materials,
     _parse_media,
     _parse_profiles,
-    _warn_missing_mott,
 )
 from ._schema import (
     _PROFILE_SCALAR_NUMERICS_KEYS,
@@ -135,7 +134,6 @@ def _load_material_catalog_cached(
     )
     if errors.items:
         raise MaterialConfigError(errors.items, profile=profile)
-    _warn_missing_mott(materials, crystals, media)
     profile_memberships = {
         name: tuple(cast("list[str]", row["materials"]))
         for name, row in profiles.items()

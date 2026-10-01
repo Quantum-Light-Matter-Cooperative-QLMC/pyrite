@@ -50,7 +50,7 @@ The attenuation entry point also validates its inputs strictly rather than coerc
 
 A material's composition is the union over its film crystal and every substrate or stack layer. That union must be a subset of the supported transport-element table, and catalog validation rejects the material by name if it is not — at load time, with the unsupported symbols listed, rather than partway into a sweep.
 
-This is the practical meaning of the coverage tiers described in [Elemental transport data](../atomic-physics/elemental-transport-data.md): X-ray response is available for any element, transport constants for 24, and tabulated Mott elastic cross sections for 5.
+This is the practical meaning of the coverage tiers described in [Elemental transport data](../atomic-physics/elemental-transport-data.md): X-ray response is available for any element, transport constants for 24, and Mott elastic cross sections only for elements whose NIST SRD 64 tables the user supplies.
 
 ## Assumptions and limits
 

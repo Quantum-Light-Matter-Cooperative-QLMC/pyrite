@@ -1922,7 +1922,8 @@ display_name = "LiF"
         load_material_catalog(_write_catalog(tmp_path, text))
 
 
-def test_missing_mott_tables_warn_without_rejecting_catalog(tmp_path, caplog):
+def test_catalog_loads_without_mott_tables(tmp_path, caplog):
+    """Mott tables are user-supplied (#263); loading a catalog never checks them."""
     from pyrite.materials import load_material_catalog
 
     text = _minimal_catalog(
@@ -1935,7 +1936,7 @@ display_name = "WS2"
     catalog = load_material_catalog(_write_catalog(tmp_path, text))
 
     assert catalog.material_keys == ("ws2",)
-    assert "no Mott transport table for W" in caplog.text
+    assert "Mott" not in caplog.text
 
 
 def _array_fingerprint(values):

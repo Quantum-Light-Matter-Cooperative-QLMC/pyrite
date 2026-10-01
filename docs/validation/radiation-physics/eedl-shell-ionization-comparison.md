@@ -2,7 +2,7 @@
 
 ## Scope and reference
 
-Validation: `eedl-shell-ionization-comparison`. This is an implementation-context comparison for #86, not independent fresh-context validation. It compares PyRITE's packaged EEDL MF=23 subshell ionization with the Bote–Salvat model for the 24 catalogue transport elements. The reference parameters are NIST's public-domain [BoteSalvatICX.jl `xione.jl` at pinned commit `8520cf5`](https://github.com/usnistgov/BoteSalvatICX.jl/blob/8520cf5d002b11c3cf6669ebd5fedbb3de8d1fdb/src/xione.jl), fetched on demand and SHA-256 checked; they are not packaged. The fit follows Bote et al., *Atomic Data and Nuclear Data Tables* **95**, 871 (2009), and the distorted-wave/plane-wave calculation of Bote and Salvat, *Physical Review A* **77**, 042701 (2008).
+Validation: `eedl-shell-ionization-comparison`. This is an implementation-context comparison for #86, not independent fresh-context validation. It compares PyRITE's pinned EEDL MF=23 subshell ionization with the Bote–Salvat model for the 24 catalogue transport elements. The reference parameters are NIST's public-domain [BoteSalvatICX.jl `xione.jl` at pinned commit `8520cf5`](https://github.com/usnistgov/BoteSalvatICX.jl/blob/8520cf5d002b11c3cf6669ebd5fedbb3de8d1fdb/src/xione.jl), fetched on demand and SHA-256 checked; they are not packaged. The fit follows Bote et al., *Atomic Data and Nuclear Data Tables* **95**, 871 (2009), and the distorted-wave/plane-wave calculation of Bote and Salvat, *Physical Review A* **77**, 042701 (2008).
 
 ## Equations and method
 

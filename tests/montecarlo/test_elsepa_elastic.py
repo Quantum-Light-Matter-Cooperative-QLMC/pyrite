@@ -219,9 +219,7 @@ def test_sr_shaped_elsepa_tables_reproduce_sr_transport(reference, core):
 def test_elsepa_requires_tables_and_covering_energies(reference):
     table = _sr_table(14.0, np.geomspace(6.0, 40.0, 11), reference.mu)
 
-    with pytest.raises(ValueError, match="elastic_tables is required"):
-        _run("lockstep", elastic_model="elsepa")
-    with pytest.raises(ValueError, match="elastic_tables is required"):
+    with pytest.raises(ValueError, match="elastic_tables is only valid"):
         _run("lockstep", elastic_model="sr", elastic_tables=[[table]])
     with pytest.raises(ValueError, match="within ELSEPA table"):
         _run("lockstep", elastic_model="elsepa", elastic_tables=[[table]])
