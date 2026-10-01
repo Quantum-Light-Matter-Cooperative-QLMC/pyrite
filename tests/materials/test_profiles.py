@@ -98,9 +98,11 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # now scores the segment-mean escape, and the coherent route the per-piece
     # formation integral under absorption. Re-minted again for issue #91's
     # `eadl-cascade` marker: the EADL relaxation cascade replaces direct-vacancy
-    # xraydb yields, so v6 records are not the same spectrum.
+    # xraydb yields, so v6 records are not the same spectrum. Re-minted again
+    # for issue #274's `attenuation_model` marker: every escape factor now
+    # reads EPDL2025 mu instead of Chantler f2 + Elam scattering.
     assert case_content_key(case) == (
-        "bb97f4c173f606963027dce33523fb4b42875638b33c953f45acb78d7ae478a8"
+        "276fa72437e3dc6d84568411b75f2c3e6fae715e2d0d0da5665cffdaa24125a6"
     )
 
 
@@ -111,7 +113,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "84c8b00abd6282598a6429c03c0c5dc82d1a5088b13a92245d2e6db7c8deee52"
+        "698e42bc42b40b5f13e982971f6279b891625807df440fb08a09117bfe7b3b69"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -436,7 +438,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "84c8b00abd6282598a6429c03c0c5dc82d1a5088b13a92245d2e6db7c8deee52"
+        "698e42bc42b40b5f13e982971f6279b891625807df440fb08a09117bfe7b3b69"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -450,42 +452,42 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "2ce67bbf1e9804510f49435f72ec87bffd51e2c1fa9707cede605982b325f4ef",
+            "aeb2184e0d57d1a0c61015367e2837d1d047705499ff8e6aae67a9afbc9476c1",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "3b85f20a2a6ebc3b70f7e7730ed305d4e4dbbeadd0076c004d5d6bb7571069b8",
+            "2816adc6286f3c4a1f274c7aa8a11f23c137bbe1da309f702a81438a5bf080ad",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "c8458f70ed2659f597dbb8af7730fb4d26b5e78363e48dc9579c48cc9f025a30",
+            "6acdac47878eae414d7d3b578604e3f4bd1f49b37bf9fa9ba4d9c5fc7cbb17b0",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "ede19bbd58758a436c7cde7787e2b7c4fe7e69c951d7e386557759d7edb01269",
+            "00ea78b7044753fac08feaa08c819182d7e164717fb895d4755f70c05f5ed2c2",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "ab46c148adce29c519b2472b80c5cb98abeb05a30f18a3c4ae359011a79a866b",
+            "fdb9eaa8c02bc62ca8be5d97999a3b9bff35e94f649bfc15823006f4526ed4a9",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "3b044260a64f02030814e922dc8561c538f41ccb44c8eb6cf10cb88fe3fa4695",
+            "97afc55bd2fdc7572414c3afbbf1a1bece2aaa08366a19ffab970a5ef094601c",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "b2948de4447238e41b6cc64d9b97c126f16e007ad631e6bd249ac8f349527a2b",
+            "21dc3072c004f3a3fac46f1f97796a8af5fce91f8bcf01e8743675b75b8ec611",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "2ecf38fc7599c7832bdbc45c9bcf1b398d02a62c4cef6c1b762f319cc01a3c02",
+            "96fac886d45a80f93cd33af71e661897e9d4abfc4e2f8f513ad4462002e06116",
         ),
     ],
 )
@@ -658,7 +660,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # issue #256's dropped uniform E_grid_brem override, which the sweep-level
     # payload hashes although no case grid changed) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "84c8b00abd6282598a6429c03c0c5dc82d1a5088b13a92245d2e6db7c8deee52"
+        "698e42bc42b40b5f13e982971f6279b891625807df440fb08a09117bfe7b3b69"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -673,7 +675,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # uniform override was dropped, so the hashed sweep grid is the profile
     # default (the resolved case grids are unchanged).
     assert survey_incoherent["parameter_sha256"] == (
-        "b4671ad59302fd4268453fd85b11197df25ec65e4794cba485ca091a819e98e2"
+        "6938b622c1a713b73eb1b3f78465640be7a3e3b2c4305b9c09acac30de1c33b9"
     )
 
 

@@ -15,6 +15,7 @@ import xraydb
 from ..._backend import REAL, _to_cpu, xp
 from ...materials.atomic import Z_TABLE
 from ...materials.attenuation import (
+    _finite_mu_or_raise,
     _mu_total_inv_ang,
     _normalize_composition,
 )
@@ -817,21 +818,18 @@ def mc_characteristic_spectrum(
             profile_cpu = weights_cpu / bin_widths
             profile = xp.asarray(profile_cpu, dtype=REAL)
             if layers is None:
-                mu = _mu_total_inv_ang(
-                    comp,
-                    xp.asarray([line_energy], dtype=REAL),
+                line_grid = xp.asarray([line_energy], dtype=REAL)
+                mu = _finite_mu_or_raise(
+                    _mu_total_inv_ang(comp, line_grid), line_grid, "characteristic line energy"
                 )[0]
-                mu = xp.nan_to_num(mu, nan=0.0, posinf=0.0, neginf=0.0)
                 layer_mu = ()
             else:
                 mu = None
+                line_grid = xp.asarray([line_energy], dtype=REAL)
                 layer_mu = [
-                    xp.nan_to_num(
-                        _mu_total_inv_ang(c, xp.asarray([line_energy], dtype=REAL))[0],
-                        nan=0.0,
-                        posinf=0.0,
-                        neginf=0.0,
-                    )
+                    _finite_mu_or_raise(
+                        _mu_total_inv_ang(c, line_grid), line_grid, "characteristic line energy"
+                    )[0]
                     for _z_top, _z_bot, c in layers
                 ]
             response = xp.asarray(line_yield_per_vacancy[:, line_index], dtype=REAL)

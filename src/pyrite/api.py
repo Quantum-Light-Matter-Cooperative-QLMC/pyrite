@@ -28,6 +28,7 @@ from .instrument import (
     ResolvedObservation,
 )
 from .materials import CATALOG, MediumSpec
+from .materials.photon_cross_sections import ATTENUATION_MODEL
 from .montecarlo import Case, run_case
 from .montecarlo.runner import (
     _case_bremslib_table_records,
@@ -148,6 +149,7 @@ def run_provenance(case: Case | Mapping[str, Any], xsgen_tables: Mapping[str, st
         "xsgen_tables": xsgen_tables,
         "stopping_model": STOPPING_MODEL,
         "characteristic_model": CHARACTERISTIC_MODEL,
+        "attenuation_model": ATTENUATION_MODEL,
         "bremsstrahlung_model": case_bremsstrahlung_marker(case),
         "backend": BACKEND.name,
         "device": BACKEND.device,

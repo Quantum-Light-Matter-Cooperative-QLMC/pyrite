@@ -23,13 +23,11 @@ Conventions:
 """
 
 import hashlib
-import json
 from collections import OrderedDict
 from functools import cache
 
 import numpy as np
 import xraydb
-from scipy.constants import Avogadro as _AVOGADRO
 
 
 # ---- atomic numbers ---------------------------------------------------------
@@ -183,155 +181,6 @@ def henke_dispersion(element, E_eV, on_out_of_range="nan"):
         if len(_HENKE_MEMO) > _HENKE_MEMO_MAX:
             _HENKE_MEMO.popitem(last=False)
     return out_fp, out_fpp
-
-
-# Coherent+incoherent scattering shares henke_dispersion's access pattern (same
-# element, same energy grid, re-requested once per reflection). Memoize on the
-# exact energy bytes, as above.
-_ELAM_MEMO: OrderedDict[tuple, np.ndarray] = OrderedDict()
-_ELAM_MEMO_MAX = 256
-
-# xraydb warns outside this band; the Elam tables are not claimed to hold there.
-ELAM_E_MIN_EV = 100.0
-ELAM_E_MAX_EV = 8.0e5
-
-
-@cache
-def _atomic_mass_g_per_mol(element):
-    """Elam-table standard atomic weight [g/mol]; one sqlite hit per element."""
-    return float(xraydb.atomic_mass(element))
-
-
-@cache
-def _elam_scattering_table(element, kind):
-    """Elam ``(log E, log sigma, spline)`` knots for ``kind`` in {"coh", "incoh"}.
-
-    The same rows ``xraydb.XrayDB.cross_section_elam`` reads, parsed once per
-    element instead of once per call.
-    """
-    xdb = xraydb.get_xraydb()
-    row = xdb.get_cache("scattering", column="element", value=xdb.symbol(element))[0]
-    values, spline = {
-        "coh": (row.log_coherent_scatter, row.log_coherent_scatter_spline),
-        "incoh": (row.log_incoherent_scatter, row.log_incoherent_scatter_spline),
-    }[kind]
-    tables = tuple(np.array(json.loads(col)) for col in (row.log_energy, values, spline))
-    for table in tables:
-        table.flags.writeable = False
-    return tables
-
-
-def _elam_spline(xin, yin, yspl_in, x):
-    """Vectorized ``xraydb.utils.elam_spline``, bit-for-bit identical.
-
-    xraydb brackets each ``x`` with a per-point ``np.where`` scan -- O(N*M) in
-    Python, ~3 s per call on a 1 eV grid to 800 keV. ``searchsorted`` yields the
-    same brackets (``lo`` = last knot strictly below, ``hi`` = first strictly
-    above, clamped to the table ends, so an exact knot hit straddles it), and
-    the cubic-spline arithmetic below is xraydb's, term for term.
-    """
-    lo = np.maximum(np.searchsorted(xin, x, side="left") - 1, 0)
-    hi = np.minimum(np.searchsorted(xin, x, side="right"), len(xin) - 1)
-    diff = xin[hi] - xin[lo]
-    if np.any(diff <= 0):
-        raise ValueError("x must be strictly increasing")
-    a = (xin[hi] - x) / diff
-    b = (x - xin[lo]) / diff
-    return (
-        a * yin[lo]
-        + b * yin[hi]
-        + (diff * diff / 6) * ((a * a - 1) * a * yspl_in[lo] + (b * b - 1) * b * yspl_in[hi])
-    )
-
-
-def _mu_elam_scattering(element, E_eV, kind):
-    """``xraydb.mu_elam(element, E_eV, kind)`` [cm^2/g] for ``E_eV`` in the Elam band."""
-    log_energy, log_values, log_spline = _elam_scattering_table(element, kind)
-    return np.exp(_elam_spline(log_energy, log_values, log_spline, np.log(E_eV)))
-
-
-def elam_scattering_cross_section_ang2(element, E_eV):
-    """Per-atom coherent + incoherent scattering cross section, in Angstrom^2.
-
-    ``xraydb.mu_elam`` returns the Elam/Scofield mass attenuation coefficient
-    ``(mu/rho)`` in cm^2/g, partitioned into ``photo``, ``coh`` and ``incoh``.
-    The scattering part is converted to a per-atom cross section by the atomic
-    mass ``m_a = A / N_A``,
-
-        sigma_scat(E) = [(mu/rho)_coh + (mu/rho)_incoh] * A / N_A * 1e16,
-
-    the last factor being cm^2 -> Angstrom^2. This is atomic data access, not a
-    physical model: the caller multiplies by a number density to get an
-    attenuation coefficient (see ``crystal.scattering_attenuation_inv_ang``).
-
-    The two ends of the table are treated ASYMMETRICALLY, because the physics
-    is asymmetric.
-
-    Below ``ELAM_E_MIN_EV`` the energy is CLAMPED rather than returned as NaN,
-    unlike ``henke_dispersion``. Photoabsorption dominates there by orders of
-    magnitude -- the frozen scattering term is ~5e-5 of carbon's total at
-    50 eV, and even for the worst case among the catalog's elements (Se, whose
-    photoabsorption sits in an inter-shell minimum there) it is 4.7%, at an
-    attenuation length of ~1e3 Angstrom where transmission is numerically zero
-    either way. A NaN would instead poison soft-X-ray attenuation that is
-    otherwise well tabulated, and production brem grids do start at 0-75 eV,
-    so this path is exercised.
-
-    Above ``ELAM_E_MAX_EV`` the result is NaN. Freezing there would be the
-    opposite situation: scattering is essentially all of ``mu`` above 800 keV,
-    so a frozen value over-estimates it by the Klein-Nishina ratio (x1.11 at
-    1 MeV, x2.8 at 5 MeV) and pair production is missing above 1.022 MeV as
-    well. NaN puts the band under the same out-of-domain policy as the
-    Chantler table, whose own ceiling (~966 keV) is just above it. No catalog
-    grid reaches either: the widest ``E_grid_brem`` stop is 262.4 keV.
-
-    The clamp also keeps xraydb's own out-of-range warnings out of library
-    output.
-
-    Parameters
-    ----------
-    element
-        Element symbol.
-    E_eV
-        Scalar or array photon energies in eV.
-
-    Returns
-    -------
-    numpy.ndarray
-        Read-only cross sections in Angstrom^2 per atom, shaped like ``E_eV``.
-
-    Raises
-    ------
-    KeyError
-        If ``element`` is unknown.
-    """
-    if element not in Z_TABLE:
-        raise KeyError(f"Unknown element symbol '{element}'.")
-    E = np.asarray(E_eV, dtype=float)
-    shape = E.shape
-
-    digest = hashlib.blake2b(np.ascontiguousarray(E).tobytes()).digest()
-    key = (element, shape, digest)
-    cached = _ELAM_MEMO.get(key)
-    if cached is not None:
-        _ELAM_MEMO.move_to_end(key)
-        return cached
-
-    Eflat = np.atleast_1d(E).ravel()
-    queried = np.clip(Eflat, ELAM_E_MIN_EV, ELAM_E_MAX_EV)
-    mu_rho = _mu_elam_scattering(element, queried, "coh") + _mu_elam_scattering(
-        element, queried, "incoh"
-    )
-    # cm^2/g -> cm^2/atom -> Angstrom^2/atom.
-    sigma = mu_rho * (_atomic_mass_g_per_mol(element) / _AVOGADRO) * 1.0e16
-    sigma[Eflat > ELAM_E_MAX_EV] = np.nan
-    out = sigma.reshape(shape)
-    out.flags.writeable = False
-
-    _ELAM_MEMO[key] = out
-    if len(_ELAM_MEMO) > _ELAM_MEMO_MAX:
-        _ELAM_MEMO.popitem(last=False)
-    return out
 
 
 def atomic_form_factor(element, g, E_eV, on_out_of_range="nan"):

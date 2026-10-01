@@ -30,6 +30,7 @@ from .._numerics import (
     validate_profile_numerics,
 )
 from ..detectors import EnergyBins
+from ..materials.photon_cross_sections import ATTENUATION_MODEL
 from ..montecarlo.case import Case
 from ..montecarlo.spectrum import BREMSSTRAHLUNG_MODEL, CHARACTERISTIC_MODEL, LINE_ESCAPE_MODEL
 from ..montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
@@ -621,6 +622,9 @@ def _identity_v1(
     # The PXR/CBS line route's escape model is unconditional physics too
     # (segment-mean escape since issue #181); same constant-marker rule.
     resolved["line_escape_model"] = LINE_ESCAPE_MODEL
+    # Every photon-escape factor reads the narrow-beam mu, sourced from EPDL2025
+    # since issue #274 (was Chantler f2 + Elam); same constant-marker rule.
+    resolved["attenuation_model"] = ATTENUATION_MODEL
     # The continuum now defaults to evaluated EEDL MF=23/527 + MF=26/527
     # instead of the historical analytic Bethe--Heitler approximation.
     requested = settings_brem_model if bremsstrahlung_model is None else bremsstrahlung_model
@@ -746,8 +750,9 @@ def case_content_key(
     case whose seed differs simply gets a distinct key and recomputes; the store
     never serves a mismatched-seed result.
 
-    The stopping, characteristic-radiation and line-escape markers, plus the
-    selected bremsstrahlung model marker, join the payload alongside the case. Without
+    The stopping, characteristic-radiation, line-escape and attenuation markers,
+    plus the selected bremsstrahlung model marker, join the payload alongside
+    the case. Without
     them a blob from an earlier physics/data generation could be served silently.
 
     ``xsgen_tables`` is the same thing for externally generated cross-section
@@ -764,6 +769,7 @@ def case_content_key(
         "stopping_model": STOPPING_MODEL,
         "characteristic_model": CHARACTERISTIC_MODEL,
         "line_escape_model": LINE_ESCAPE_MODEL,
+        "attenuation_model": ATTENUATION_MODEL,
         "bremsstrahlung_model": (
             case_bremsstrahlung_marker(case)
             if bremsstrahlung_model is None

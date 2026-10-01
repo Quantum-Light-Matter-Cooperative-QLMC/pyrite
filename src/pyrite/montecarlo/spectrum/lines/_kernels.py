@@ -289,11 +289,13 @@ def _log_interp_fraction(x, grid, idx):
 def _interp_elemental_mu(idx, log_frac, below, above, log_mu_table):
     """Interpolate elemental ``log(mu_i)`` rows, exponentiate, then sum.
 
-    xraydb's non-``f1`` Chantler rule is log-linear in energy. Since
-    ``mu_i = 2 r_e lambda n_i f2_i`` is proportional to ``f2_i / E``, each
-    ``log(mu_i)`` is linear on the same native interval. Compound attenuation
-    is the sum of the interpolated elemental coefficients, not a log-linear
-    interpolation of their total. Validation: line-absorption-tabulation
+    ``mu_i`` is the EPDL2025 total, lin-lin between EPDL knots. Every EPDL
+    knot is a mesh node and every edge a float32-adjacent node pair
+    (``_epdl_mesh_nodes``), so no mesh interval straddles a slope change or a
+    jump; inside one, log-log departs from lin-lin only at second order in the
+    node spacing. Compound attenuation is the sum of the
+    interpolated elemental coefficients, not a log-linear interpolation of
+    their total. Validation: line-absorption-tabulation
     """
     _xp = array_namespace(idx, log_frac, log_mu_table)
     f0 = log_mu_table[:, idx - 1]
@@ -318,8 +320,38 @@ def _elemental_log_mu_table(composition, energy_grid):
     return np.log(np.stack(rows, axis=0))
 
 
+def _epdl_mesh_nodes(element, lo, hi):
+    """EPDL knots of ``element`` in ``[lo, hi]``, edges as float32-exact pairs.
+
+    The escape ``mu`` is lin-lin between EPDL knots, so a mesh interval that
+    straddles a knot interpolates across a slope change; every channel's knots
+    become mesh nodes. At a photoionization edge ``mu`` is discontinuous: a
+    pair of adjacent float32 values with the edge in ``(below, above]`` keeps
+    the jump inside one ulp-wide interval at either ``REAL`` precision.
+    """
+    from ....materials.atomic import Z_TABLE
+    from ....materials.photon_cross_sections import _table, photoelectric_edges
+
+    nodes = [
+        knots[(knots >= lo) & (knots <= hi)]
+        for knots, _sigma in _table()[Z_TABLE[element]].values()
+    ]
+    for edge_eV, _jump in photoelectric_edges(element):
+        if not lo <= edge_eV <= hi:
+            continue
+        above = np.float32(edge_eV)
+        if float(above) < edge_eV:
+            above = np.nextafter(above, np.float32(np.inf))
+        below = np.nextafter(above, np.float32(-np.inf))
+        nodes.append(np.array([float(below), float(above)]))
+    return np.concatenate(nodes)
+
+
 def _line_tabulation_grid(crystal_info, composition, lo, hi):
     """Shared 1 eV/native-Chantler line grid, including absorber elements.
+
+    Absorber elements also contribute their EPDL knots and edge node pairs,
+    where the escape ``mu`` changes slope or jumps (:func:`_epdl_mesh_nodes`).
 
     Validation: line-absorption-tabulation
     """
@@ -334,6 +366,8 @@ def _line_tabulation_grid(crystal_info, composition, lo, hi):
             grids.append(native_energy[(native_energy >= lo) & (native_energy <= hi)])
         except Exception:
             pass
+    for element, _density in composition:
+        grids.append(_epdl_mesh_nodes(element, lo, hi))
     return np.unique(np.concatenate(grids))
 
 
@@ -341,28 +375,29 @@ def _line_table_nan_onsets(crystal_info, composition, use_henke):
     """Energies at and above which each line coupling table is NaN, in eV.
 
     The line tables read atomic data that end: the Chantler ``f'``/``f''``
-    tables return NaN for ``E >= Emax`` of each element, and the Elam
-    scattering term for ``E > ELAM_E_MAX_EV``. Per table,
+    tables return NaN for ``E >= Emax`` of each element, and the EPDL2025
+    attenuation for ``E > EPDL_E_MAX_EV``. Per table,
 
     - ``chi_g``/``U_g``: NaN from ``min_d Emax_d`` over the anomalous basis
       elements (all of them with ``use_henke``, else the edge-prone ones), since
       a NaN term poisons the element sum; finite without any;
     - ``Re n``: NaN from ``min_basis Emax`` with ``use_henke``, else finite;
-    - each absorber's ``log(mu_i)``: NaN from ``min(Emax_i, ELAM_E_MAX_EV+)``.
+    - each absorber's ``log(mu_i)``: NaN above ``EPDL_E_MAX_EV`` (100 GeV).
 
     Returns one onset per table, ``inf`` for a table that never turns NaN.
 
     Validation: line-tabulation-nan-ceiling
     """
-    from ....materials.atomic import ELAM_E_MAX_EV, _chantler_bounds
+    from ....materials.atomic import _chantler_bounds
     from ....materials.crystal import _EDGE_PRONE
+    from ....materials.photon_cross_sections import EPDL_E_MAX_EV
 
     basis = {element for element, _ in crystal_info["basis"]}
     anomalous = [el for el in basis if use_henke or el in _EDGE_PRONE]
     onsets = [min((_chantler_bounds(el)[1] for el in anomalous), default=np.inf)]
     onsets.append(min(_chantler_bounds(el)[1] for el in basis) if use_henke else np.inf)
-    elam_onset = np.nextafter(ELAM_E_MAX_EV, np.inf)
-    onsets.extend(min(_chantler_bounds(el)[1], elam_onset) for el, _density in composition)
+    epdl_onset = np.nextafter(EPDL_E_MAX_EV, np.inf)
+    onsets.extend(epdl_onset for _el, _density in composition)
     return [float(onset) for onset in onsets]
 
 

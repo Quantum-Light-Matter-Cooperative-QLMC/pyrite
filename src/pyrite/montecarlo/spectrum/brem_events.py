@@ -9,7 +9,11 @@ import numpy as np
 
 from ..._backend import BACKEND
 from ..._grid_semantics import node_bin_edges_and_widths
-from ...materials.attenuation import _mu_total_inv_ang, _normalize_composition
+from ...materials.attenuation import (
+    _finite_mu_or_raise,
+    _mu_total_inv_ang,
+    _normalize_composition,
+)
 from ..transport.events import EVENT_CUTOFF, EVENT_HARD_RADIATIVE
 from .brem import mc_brem_spectrum
 from .brem_bremslib import (
@@ -221,7 +225,9 @@ def mc_hard_brem_event_spectrum(
     tau = np.zeros(k.size, dtype=float)
     for index, layer_comp in enumerate(layer_comps):
         mu = np.asarray(BACKEND.to_cpu(_mu_total_inv_ang(layer_comp, k)), dtype=float)
-        tau += path[:, index] * np.nan_to_num(mu, nan=0.0, posinf=0.0, neginf=0.0)
+        tau += path[:, index] * np.asarray(
+            _finite_mu_or_raise(mu, k, "hard-radiative photon energy")
+        )
     transmission = np.exp(-tau)
     tables_by_Z = {table.atomic_number: table for table in bremslib_tables.values()}
     # One vectorized pass per emitting element: each event is evaluated at

@@ -56,8 +56,13 @@ __all__ = [
 #:   every element in ``montecarlo.transport.TRANSPORT_ELEMENTS``; EEDL
 #:   tabulates all of them from 0.1 eV, so bremsstrahlung emission itself is
 #:   never the binding constraint.
+#: * ``epdl_photon_cross_sections`` -- ``EPDL_E_MIN_EV``, the first energy of
+#:   every EPDL2025 MF=23 section packaged in
+#:   ``data/photon_cross_sections``; the narrow-beam ``mu`` of every escape
+#:   factor reads it.
 #: * ``chantler_scattering_factors`` -- ``min(xraydb.chantler_energies(el))``,
-#:   which is 1.01 eV for every element. ``materials/atomic.py::
+#:   which is 1.01 eV for every element; the Si sensor absorption of the
+#:   detector models still reads it. ``materials/atomic.py::
 #:   henke_dispersion`` admits the *strict* interior ``E > Emin``, so 1.01 eV
 #:   itself reads as out of range and returns NaN.
 #: * ``eaglexo_quantum_efficiency`` -- the first row of ``data/eaglexo_qe.csv``,
@@ -66,6 +71,7 @@ __all__ = [
 #:   extrapolation rather than measured ordinates.
 DATA_SUPPORT_LIMITS_EV: dict[str, float] = {
     "eedl_photon_spectra": 0.1,
+    "epdl_photon_cross_sections": 1.0,
     "chantler_scattering_factors": 1.01,
     "eaglexo_quantum_efficiency": 12.0,
 }

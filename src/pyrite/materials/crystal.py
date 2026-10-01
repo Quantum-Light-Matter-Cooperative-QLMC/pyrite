@@ -36,7 +36,6 @@ from .atomic import (
     Z_TABLE,
     atomic_form_factor,
     cromer_mann_f0,
-    elam_scattering_cross_section_ang2,
     henke_dispersion,
 )
 
@@ -558,85 +557,6 @@ def absorption_length_ang(element, photon_E_eV, number_density_per_ang3):
         k = 2.0 * np.pi / lam
         mu = 2.0 * k * beta_idx  # 1/Angstrom
         return 1.0 / mu
-
-
-def scattering_attenuation_inv_ang(element, photon_E_eV, number_density_per_ang3):
-    """Coherent + incoherent removal from the primary beam, in 1/Angstrom.
-
-    Narrow-beam (good-geometry) Bouguer-Beer attenuation counts *every* channel
-    that takes a photon out of the unscattered ray, not only the ones that
-    destroy it:
-
-        mu_tot(E) = n_a [sigma_photo(E) + sigma_coh(E) + sigma_incoh(E)].
-
-    :func:`absorption_length_ang` returns the first term alone, as
-    ``mu_photo = 2 r_e lambda n_a f2``, because ``f2`` is a photoabsorption
-    tabulation. This function returns the other two,
-
-        mu_scat(E) = n_a sigma_scat(E),   sigma_scat = sigma_coh + sigma_incoh,
-
-    so that a transmission model can form the total the exponent actually
-    needs.  The photoabsorption-only coefficient remains the right quantity for
-    the refractive index (``optical_constants``, ``chi_0``), where ``beta`` is
-    by construction ``f2``; this term must not be added there.
-
-    Source. Per-atom cross sections from the Elam compilation -- Elam, Ravel &
-    Sieber (2002), *Radiation Physics and Chemistry* **63**, 121-128, DOI
-    `10.1016/S0969-806X(01)00227-4
-    <https://doi.org/10.1016/S0969-806X(01)00227-4>`_ -- served by
-    ``xraydb.mu_elam(..., kind="coh"/"incoh")`` and converted from mass to
-    atomic basis in :func:`~pyrite.materials.atomic.elam_scattering_cross_section_ang2`.
-    Its scattering columns rest on the usual relativistic form-factor /
-    incoherent-scattering-function tabulation (Hubbell et al. 1975, *J. Phys.
-    Chem. Ref. Data* **4**, 471). The additive decomposition of ``mu/rho`` into
-    photoabsorption, coherent and incoherent parts is the definition used by
-    Hubbell & Seltzer, NIST Standard Reference Database 126 (XCOM).
-
-    Assumptions.
-
-    * *Good geometry.* Scattered photons are assumed to leave the beam and are
-      never counted back in; no build-up factor is applied. Small-angle
-      coherent scatter that stays inside the collection solid angle is
-      therefore over-counted as removal, which is what bounds the validity of
-      the narrow-beam form for a plate close to the detector.
-    * *Mixed compilations.* The photoabsorption term keeps its Chantler/FFAST
-      tabulation, shared with the refractive index; only the scattering term is
-      Elam's. The two compilations differ on photoabsorption itself by 2-6% at
-      8-20 keV for C and Al, which is the price of the mixture and roughly an
-      order of magnitude below the bias it removes for low-Z filters.
-    * *Independent atoms.* Molecular and solid-state modification of the
-      coherent form factor at small ``q`` is ignored, as is Bragg scattering:
-      for an oriented single crystal at a reflection condition the coherent
-      removal can exceed this isotropic-average term.
-    * Energies are clamped into the Elam table's stated band by the accessor;
-      see its docstring for why that is preferred to NaN below 100 eV.
-
-    Limiting cases. ``number_density_per_ang3 -> 0`` gives ``mu_scat -> 0``, so
-    an empty medium attenuates nothing and the total collapses to the
-    photoabsorption-only result. In the free-electron (Compton) limit the
-    incoherent part per electron approaches the Klein-Nishina total cross
-    section: at 500 keV the tabulated ``sigma_incoh / Z`` reproduces
-    ``sigma_KN`` to 0.2% for C, Al and Si.
-
-    Parameters
-    ----------
-    element
-        Element symbol.
-    photon_E_eV
-        Scalar or array photon energy in eV.
-    number_density_per_ang3
-        Element number density in atoms per cubic angstrom.
-
-    Returns
-    -------
-    numpy.ndarray
-        Scattering contribution to the linear attenuation coefficient in
-        inverse angstroms, shaped like ``photon_E_eV``.
-
-    Validation: narrow-beam-total-attenuation
-    """
-    sigma = elam_scattering_cross_section_ang2(element, photon_E_eV)
-    return number_density_per_ang3 * sigma
 
 
 def crystal_absorption_length_ang(crystal, photon_E_eV):

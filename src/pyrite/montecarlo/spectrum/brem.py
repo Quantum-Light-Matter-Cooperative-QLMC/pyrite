@@ -13,6 +13,7 @@ from endf_parserpy import EndfFile
 from ..._backend import BACKEND, REAL, _to_cpu, xp
 from ...materials.atomic import Z_TABLE
 from ...materials.attenuation import (
+    _finite_mu_or_raise,
     _mu_total_inv_ang,
     _normalize_composition,
 )
@@ -948,17 +949,14 @@ def mc_brem_spectrum(
         _validate_groove_escape_direction(n_hat, groove)
 
     E_grid = xp.asarray(E_grid_eV, dtype=REAL)
-    mu = _mu_total_inv_ang(comp, E_grid)  # (NE,) [1/Ang], single-slab fallback
-    # The Henke absorption tables span ~20 eV - 30 keV; outside that the wide
-    # brem grid gets NaN (above 30 keV) or inf (at E=0), and a single bad bin
-    # makes brem_wide -- and its integrated count rate -- NaN. Hard X-rays escape
-    # essentially unattenuated, so treat an unavailable mu as zero (transparent).
-    mu = xp.nan_to_num(mu, nan=0.0, posinf=0.0, neginf=0.0)
+    # (NE,) [1/Ang], single-slab fallback. EPDL covers 1 eV - 100 GeV; a node
+    # outside it fails closed rather than escaping with unit transmission.
+    mu = _finite_mu_or_raise(_mu_total_inv_ang(comp, E_grid), E_grid, "mc_brem_spectrum E_grid_eV")
     # layered (film-on-substrate) absorber: precompute each layer's mu(E_grid);
     # the per-segment z-path dz folds in inside the chunk loop. None -> single slab.
     if layers is not None:
         layer_mu = [
-            xp.nan_to_num(_mu_total_inv_ang(c, E_grid), nan=0.0, posinf=0.0, neginf=0.0)
+            _finite_mu_or_raise(_mu_total_inv_ang(c, E_grid), E_grid, "mc_brem_spectrum E_grid_eV")
             for (_, _, c) in layers
         ]
 
