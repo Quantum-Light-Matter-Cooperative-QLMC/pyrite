@@ -563,6 +563,88 @@ def test_fetch_rejects_a_code_without_downloadable_data(isolated):
     assert result.stdout == ""
 
 
+def _fake_fetches(monkeypatch, tmp_path, failing=()):
+    """Stub every fetch; codes in ``failing`` raise ``DataFetchError``."""
+    from pyrite.datasets import DatasetFetchResult
+    from pyrite.xsgen import DataFetchError
+    from pyrite.xsgen.fetch import FetchResult
+
+    calls = []
+
+    def table_fetch(code):
+        def fetch(archive=None):
+            calls.append(code)
+            if code in failing:
+                raise DataFetchError(f"{code} unreachable")
+            return FetchResult(code, tmp_path / code, "a" * 64, 3, True)
+
+        return fetch
+
+    def dataset_fetch(name, archive=None):
+        calls.append(name)
+        if name in failing:
+            raise DataFetchError(f"{name} unreachable")
+        return DatasetFetchResult(name, tmp_path / name, "b" * 64, True, "https://x")
+
+    for code, attr in (
+        ("bremslib", "fetch_bremslib"),
+        ("elsepa", "fetch_elsepa"),
+        ("sbethe", "fetch_sbethe"),
+        ("sbethe-tables", "fetch_sbethe_tables"),
+    ):
+        monkeypatch.setattr(f"pyrite.xsgen.fetch.{attr}", table_fetch(code))
+    monkeypatch.setattr("pyrite.datasets.fetch_dataset", dataset_fetch)
+    return calls
+
+
+def test_bare_fetch_installs_every_code_in_order(isolated, monkeypatch, tmp_path):
+    calls = _fake_fetches(monkeypatch, tmp_path)
+
+    result = invoke(tables_command.command, ["fetch"])
+
+    assert result.exit_code == 0
+    assert calls == list(tables_command.FETCH_CODES)
+    assert result.stdout.count("installed: ") == len(tables_command.FETCH_CODES)
+
+
+def test_bare_fetch_reports_a_failure_runs_the_rest_and_exits_1(isolated, monkeypatch, tmp_path):
+    calls = _fake_fetches(monkeypatch, tmp_path, failing=("epdl",))
+
+    result = invoke(tables_command.command, ["fetch"])
+
+    assert result.exit_code == 1
+    assert calls == list(tables_command.FETCH_CODES)
+    assert "failed: epdl: epdl unreachable" in result.stderr
+    assert "1 of 7 failed: epdl" in result.stderr
+    assert "epdl" not in result.stdout
+
+
+def test_bare_fetch_json_lists_results_and_failures(isolated, monkeypatch, tmp_path):
+    _fake_fetches(monkeypatch, tmp_path, failing=("bremslib",))
+
+    result = invoke(tables_command.command, ["fetch", "-o", "json"])
+
+    assert result.exit_code == 1
+    envelope = json.loads(result.stdout)
+    assert envelope["schema"] == "pyrite.tables.fetch-all.v1"
+    assert [row["code"] for row in envelope["payload"]["results"]] == [
+        code for code in tables_command.FETCH_CODES if code != "bremslib"
+    ]
+    assert envelope["payload"]["failed"] == [
+        {"code": "bremslib", "message": "bremslib unreachable"}
+    ]
+
+
+def test_archive_without_a_code_is_a_usage_error(isolated, tmp_path):
+    archive = tmp_path / "a.zip"
+    archive.write_bytes(b"x")
+
+    result = invoke(tables_command.command, ["fetch", "--archive", str(archive)])
+
+    assert result.exit_code == 2
+    assert "name it" in result.stderr
+
+
 # --- sources --------------------------------------------------------------
 
 

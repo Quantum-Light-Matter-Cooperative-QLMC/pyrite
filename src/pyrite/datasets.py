@@ -22,6 +22,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _CHUNK = 1 << 20
+#: PyRITE's own GitHub Release downloads: mirrors and derived data.
+_RELEASES = "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download"
 
 
 @dataclass(frozen=True)
@@ -68,7 +70,10 @@ class Dataset:
 EEDL = Dataset(
     name="eedl",
     filename="EEDL.endf",
-    urls=("https://nuclear.llnl.gov/EPICS/ENDF2025/EEDL2025.ALL",),
+    urls=(
+        "https://nuclear.llnl.gov/EPICS/ENDF2025/EEDL2025.ALL",
+        f"{_RELEASES}/mirror-eedl2025-1/EEDL.endf",
+    ),
     sha256="f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c",
     description="EPICS2025 EEDL electron data (25 MB): ionization and bremsstrahlung",
     # The published file ends with one more CRLF than the bytes PyRITE vetted
@@ -82,12 +87,25 @@ EEDL = Dataset(
 EADL = Dataset(
     name="eadl",
     filename="EADL2025.ALL",
-    urls=("https://nuclear.llnl.gov/EPICS/ENDF2025/EADL2025.ALL",),
+    urls=(
+        "https://nuclear.llnl.gov/EPICS/ENDF2025/EADL2025.ALL",
+        f"{_RELEASES}/mirror-eadl2025-1/EADL2025.ALL",
+    ),
     sha256="78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c",
     description="EPICS2025 EADL atomic relaxation data (8 MB)",
 )
+#: PyRITE-derived EPDL2025 photon cross sections (``scripts/release_epdl_table.py``).
+#: Derived data, so PyRITE's release is the only location; it keeps the
+#: provenance and modifications note in its release notes.
+EPDL = Dataset(
+    name="epdl",
+    filename="epdl2025_mf23.npz",
+    urls=(f"{_RELEASES}/tables-epdl-1/epdl2025_mf23.npz",),
+    sha256="fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9",
+    description="EPDL2025 MF=23 photon cross sections, knot-thinned by PyRITE (1.5 MB)",
+)
 #: Every fetched dataset, in report order.
-DATASETS: dict[str, Dataset] = {dataset.name: dataset for dataset in (EEDL, EADL)}
+DATASETS: dict[str, Dataset] = {dataset.name: dataset for dataset in (EEDL, EADL, EPDL)}
 
 #: Outcomes of :func:`verify_dataset`; ``ok`` is the only passing one.
 OK = "ok"
@@ -313,6 +331,7 @@ __all__ = [
     "DATASETS",
     "EADL",
     "EEDL",
+    "EPDL",
     "MISMATCH",
     "MISSING",
     "OK",

@@ -36,6 +36,20 @@ def test_real_pins_match_the_model_identity_constants():
 
     assert datasets.EEDL.sha256 == EEDL_SHA256
     assert datasets.EADL.sha256 == EADL_SHA256
+
+
+def test_the_epdl_pin_matches_the_photon_table_constant():
+    from pyrite.materials.photon_cross_sections import EPDL_TABLE_SHA256
+
+    assert datasets.EPDL.sha256 == EPDL_TABLE_SHA256
+
+
+def test_mirrors_follow_upstream_and_derived_data_has_only_pyrite_releases():
+    release = "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/"
+    for dataset in (datasets.EEDL, datasets.EADL):
+        assert dataset.urls[0].startswith("https://nuclear.llnl.gov/")
+        assert dataset.urls[1].startswith(release)
+    assert datasets.EPDL.urls == (f"{release}tables-epdl-1/epdl2025_mf23.npz",)
     assert datasets.EEDL.url.startswith("https://nuclear.llnl.gov/EPICS/ENDF2025/")
     assert datasets.EADL.download_sha256 is None
 

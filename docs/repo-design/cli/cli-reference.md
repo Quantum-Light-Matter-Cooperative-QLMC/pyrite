@@ -2488,11 +2488,8 @@ Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
     pyrite tables show 4f3a9c
     pyrite tables generate --code elsepa --element 79 --energy 1e3
     pyrite tables generate --code bremslib --element 79
-    pyrite tables fetch sbethe
-    pyrite tables fetch bremslib
+    pyrite tables fetch
     pyrite tables fetch elsepa
-    pyrite tables fetch eedl
-    pyrite tables fetch eadl
     pyrite tables verify
     pyrite tables migrate --dry-run
     pyrite tables sources list
@@ -2502,7 +2499,7 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  fetch     Fetch pinned data for CODE into your user...
+  fetch     Fetch pinned data into your user data...
   generate  Generate or reuse one external-code table.
   list      List stored tables, most-preferred tier...
   migrate   Copy tables from the deprecated legacy...
@@ -2515,36 +2512,45 @@ Commands:
 ## `pyrite tables fetch`
 
 ```text
-Usage: pyrite tables fetch [OPTIONS] {sbethe|bremslib|elsepa|eedl|eadl}
+Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|sbethe|sbethe-
+                           tables|elsepa|bremslib]
 
-  Fetch pinned data for CODE into your user data directory.
+  Fetch pinned data into your user data directory; without CODE, all of it.
 
-  sbethe    SBETHE's 18 MB sdbase/ reference database. Only sdbase/ is
-            extracted from the upstream archive.
-  bremslib  BremsLib-derived bremsstrahlung tables for every element a
-            catalogue material may contain, so no BremsLib checkout is
-            needed for them.
-  elsepa    ELSEPA elastic tables (free atoms for every transport element,
-            muffin-tin tables for elementary crystals) that the default
-            elastic model reads, so no Fortran run is needed for them.
-  eedl      EPICS2025 EEDL electron data (25 MB), which every run reads
-            for shell ionization and the EEDL bremsstrahlung model.
-  eadl      EPICS2025 EADL atomic relaxation data (8 MB), which every run
-            reads for the characteristic-radiation cascade.
+  eedl           EPICS2025 EEDL electron data (25 MB), which every run reads
+                 for shell ionization and the EEDL bremsstrahlung model.
+  eadl           EPICS2025 EADL atomic relaxation data (8 MB), which every
+                 run reads for the characteristic-radiation cascade.
+  epdl           EPDL2025 photon cross sections (1.5 MB, knot-thinned by
+                 PyRITE) for narrow-beam attenuation.
+  sbethe         SBETHE's 18 MB sdbase/ reference database, which the shell
+                 inelastic model and SBETHE generation read. Only sdbase/ is
+                 extracted from the upstream archive.
+  sbethe-tables  SBETHE stopping tables for every catalogue material and
+                 medium (3 MB), so no Fortran run is needed for them.
+  elsepa         ELSEPA elastic tables (free atoms for every transport
+                 element, muffin-tin tables for elementary crystals) that the
+                 default elastic model reads.
+  bremslib       BremsLib-derived bremsstrahlung tables for every element a
+                 catalogue material may contain, so no BremsLib checkout is
+                 needed for them.
 
-  Data lands in the user data directory, or in the selected workspace when PYRITE_HOME
-  or workspace.root is set. The archive or file is SHA-256 verified before anything is
-  installed, whether it was downloaded or given with --archive. A complete existing
-  install returns successfully without network access.
+  Without CODE every one is fetched in the order above; one that fails is reported and
+  the rest still run, and the command exits 1 if any failed. Data lands in the user data
+  directory, or in the selected workspace when PYRITE_HOME or workspace.root is set.
+  Each archive or file is SHA-256 verified before anything is installed, whether it was
+  downloaded or given with --archive. Download locations are tried in order (upstream,
+  then PyRITE's mirror). A complete existing install returns successfully without
+  network access.
 
-  The elsepa archive is on a private GitHub Release; downloading it needs a token with
-  read access to the repository, from PYRITE_GITHUB_TOKEN, GITHUB_TOKEN, or a logged-in
-  `gh`.
+  PyRITE's own archives (epdl, sbethe-tables, elsepa, bremslib, and the eedl and eadl
+  mirrors) are on private GitHub Releases; downloading them needs a token with read
+  access to the repository, from PYRITE_GITHUB_TOKEN, GITHUB_TOKEN, or a logged-in `gh`.
 
 Options:
-  --archive FILE                  Install from a local copy of the pinned archive (for
-                                  eedl and eadl, of the pinned file itself) instead of
-                                  downloading it.
+  --archive FILE                  Install CODE from a local copy of the pinned archive
+                                  (for eedl, eadl and epdl, of the pinned file itself)
+                                  instead of downloading it. Needs CODE.
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.

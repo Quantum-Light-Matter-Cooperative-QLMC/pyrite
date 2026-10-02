@@ -203,11 +203,8 @@ def command() -> None:
       pyrite tables show 4f3a9c
       pyrite tables generate --code elsepa --element 79 --energy 1e3
       pyrite tables generate --code bremslib --element 79
-      pyrite tables fetch sbethe
-      pyrite tables fetch bremslib
+      pyrite tables fetch
       pyrite tables fetch elsepa
-      pyrite tables fetch eedl
-      pyrite tables fetch eadl
       pyrite tables verify
       pyrite tables migrate --dry-run
       pyrite tables sources list
@@ -560,87 +557,144 @@ def _emit_table(selected: str, result, *, json_output: bool) -> None:
     emit_result(f"{action}: {table.key}\npath: {table.path}")
 
 
+#: Every code ``pyrite tables fetch`` installs, in the order a bare fetch runs.
+FETCH_CODES = ("eedl", "eadl", "epdl", "sbethe", "sbethe-tables", "elsepa", "bremslib")
+_DATASET_FETCH_CODES = ("eedl", "eadl", "epdl")
+
+
+def _fetch_one(code: str, archive: str | None) -> dict:
+    """Install one code and return its machine-readable outcome."""
+    if code in _DATASET_FETCH_CODES:
+        from ...datasets import fetch_dataset
+
+        fetched = fetch_dataset(code, archive)
+        return {
+            "code": code,
+            "path": str(fetched.path),
+            "archive_sha256": fetched.sha256,
+            "file_count": 1,
+            "installed": fetched.installed,
+        }
+    from ...xsgen.fetch import fetch_bremslib, fetch_elsepa, fetch_sbethe, fetch_sbethe_tables
+
+    fetch = {
+        "bremslib": fetch_bremslib,
+        "elsepa": fetch_elsepa,
+        "sbethe": fetch_sbethe,
+        "sbethe-tables": fetch_sbethe_tables,
+    }[code]
+    result = fetch(archive)
+    return {
+        "code": code,
+        "path": str(result.path),
+        "archive_sha256": result.archive_sha256,
+        "file_count": result.file_count,
+        "installed": result.installed,
+    }
+
+
+def _fetch_line(payload: dict) -> str:
+    action = "installed" if payload["installed"] else "already installed"
+    if payload["code"] in _DATASET_FETCH_CODES:
+        return f"{action}: {payload['path']}"
+    unit = "files" if payload["code"] == "sbethe" else "tables"
+    return f"{action}: {payload['path']} ({payload['file_count']} {unit})"
+
+
 @command.command("fetch")
 @click.argument(
     "code",
-    type=click.Choice(["sbethe", "bremslib", "elsepa", "eedl", "eadl"], case_sensitive=False),
+    required=False,
+    type=click.Choice(FETCH_CODES, case_sensitive=False),
 )
 @click.option(
     "--archive",
     type=click.Path(exists=True, dir_okay=False),
     default=None,
     help=(
-        "Install from a local copy of the pinned archive (for eedl and eadl, of the "
-        "pinned file itself) instead of downloading it."
+        "Install CODE from a local copy of the pinned archive (for eedl, eadl and "
+        "epdl, of the pinned file itself) instead of downloading it. Needs CODE."
     ),
 )
 @output_option
-def fetch_command(code: str, archive: str | None, json_output: bool) -> None:
-    """Fetch pinned data for CODE into your user data directory.
+def fetch_command(code: str | None, archive: str | None, json_output: bool) -> None:
+    """Fetch pinned data into your user data directory; without CODE, all of it.
 
     \b
-    sbethe    SBETHE's 18 MB sdbase/ reference database. Only sdbase/ is
-              extracted from the upstream archive.
-    bremslib  BremsLib-derived bremsstrahlung tables for every element a
-              catalogue material may contain, so no BremsLib checkout is
-              needed for them.
-    elsepa    ELSEPA elastic tables (free atoms for every transport element,
-              muffin-tin tables for elementary crystals) that the default
-              elastic model reads, so no Fortran run is needed for them.
-    eedl      EPICS2025 EEDL electron data (25 MB), which every run reads
-              for shell ionization and the EEDL bremsstrahlung model.
-    eadl      EPICS2025 EADL atomic relaxation data (8 MB), which every run
-              reads for the characteristic-radiation cascade.
+    eedl           EPICS2025 EEDL electron data (25 MB), which every run reads
+                   for shell ionization and the EEDL bremsstrahlung model.
+    eadl           EPICS2025 EADL atomic relaxation data (8 MB), which every
+                   run reads for the characteristic-radiation cascade.
+    epdl           EPDL2025 photon cross sections (1.5 MB, knot-thinned by
+                   PyRITE) for narrow-beam attenuation.
+    sbethe         SBETHE's 18 MB sdbase/ reference database, which the shell
+                   inelastic model and SBETHE generation read. Only sdbase/ is
+                   extracted from the upstream archive.
+    sbethe-tables  SBETHE stopping tables for every catalogue material and
+                   medium (3 MB), so no Fortran run is needed for them.
+    elsepa         ELSEPA elastic tables (free atoms for every transport
+                   element, muffin-tin tables for elementary crystals) that the
+                   default elastic model reads.
+    bremslib       BremsLib-derived bremsstrahlung tables for every element a
+                   catalogue material may contain, so no BremsLib checkout is
+                   needed for them.
 
+    Without CODE every one is fetched in the order above; one that fails is
+    reported and the rest still run, and the command exits 1 if any failed.
     Data lands in the user data directory, or in the selected workspace when
-    PYRITE_HOME or workspace.root is set. The archive or file is SHA-256
+    PYRITE_HOME or workspace.root is set. Each archive or file is SHA-256
     verified before anything is installed, whether it was downloaded or given
-    with --archive. A complete existing install returns successfully without
+    with --archive. Download locations are tried in order (upstream, then
+    PyRITE's mirror). A complete existing install returns successfully without
     network access.
 
-    The elsepa archive is on a private GitHub Release; downloading it needs a
+    PyRITE's own archives (epdl, sbethe-tables, elsepa, bremslib, and the eedl
+    and eadl mirrors) are on private GitHub Releases; downloading them needs a
     token with read access to the repository, from PYRITE_GITHUB_TOKEN,
     GITHUB_TOKEN, or a logged-in `gh`.
     """
     from ...xsgen import DataFetchError
 
+    if code is None:
+        if archive is not None:
+            raise click.UsageError("--archive installs one CODE; name it, e.g. `fetch elsepa`")
+        results, failed = [], []
+        for selected in FETCH_CODES:
+            try:
+                payload = _fetch_one(selected, None)
+            except DataFetchError as exc:
+                failed.append({"code": selected, "message": str(exc)})
+                if not json_output:
+                    emit_diagnostic(f"failed: {selected}: {exc}")
+                continue
+            results.append(payload)
+            if not json_output:
+                emit_result(_fetch_line(payload))
+        if json_output:
+            emit_json(
+                "pyrite.tables.fetch-all.v1",
+                {"results": results, "failed": failed},
+                errors=[{"code": "fetch-failed", "message": item["code"]} for item in failed],
+            )
+        if failed:
+            if not json_output:
+                emit_diagnostic(
+                    f"{len(failed)} of {len(FETCH_CODES)} failed: "
+                    + ", ".join(item["code"] for item in failed)
+                )
+            raise click.exceptions.Exit(1)
+        return
+
     selected = code.lower()
     try:
-        if selected in ("eedl", "eadl"):
-            from ...datasets import fetch_dataset
-
-            fetched = fetch_dataset(selected, archive)
-            payload = {
-                "code": selected,
-                "path": str(fetched.path),
-                "archive_sha256": fetched.sha256,
-                "file_count": 1,
-                "installed": fetched.installed,
-            }
-        else:
-            from ...xsgen.fetch import fetch_bremslib, fetch_elsepa, fetch_sbethe
-
-            fetch = {"bremslib": fetch_bremslib, "elsepa": fetch_elsepa}.get(selected, fetch_sbethe)
-            result = fetch(archive)
-            payload = {
-                "code": selected,
-                "path": str(result.path),
-                "archive_sha256": result.archive_sha256,
-                "file_count": result.file_count,
-                "installed": result.installed,
-            }
+        payload = _fetch_one(selected, archive)
     except DataFetchError as exc:
         raise CLIError(str(exc)) from exc
 
     if json_output:
         emit_json("pyrite.tables.fetch.v1", payload)
         return
-    action = "installed" if payload["installed"] else "already installed"
-    if selected in ("eedl", "eadl"):
-        emit_result(f"{action}: {payload['path']}")
-        return
-    unit = "files" if selected == "sbethe" else "tables"
-    emit_result(f"{action}: {payload['path']} ({payload['file_count']} {unit})")
+    emit_result(_fetch_line(payload))
 
 
 @command.command("verify")
