@@ -2531,6 +2531,10 @@ Usage: pyrite tables fetch [OPTIONS] {sbethe|bremslib|elsepa|eedl|eadl}
   installed, whether it was downloaded or given with --archive. A complete existing
   install returns successfully without network access.
 
+  The elsepa archive is on a private GitHub Release; downloading it needs a token with
+  read access to the repository, from PYRITE_GITHUB_TOKEN, GITHUB_TOKEN, or a logged-in
+  `gh`.
+
 Options:
   --archive FILE                  Install from a local copy of the pinned archive (for
                                   eedl and eadl, of the pinned file itself) instead of

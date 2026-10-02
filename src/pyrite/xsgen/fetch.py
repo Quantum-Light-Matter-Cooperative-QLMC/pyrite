@@ -11,18 +11,28 @@ user table directory, where :func:`pyrite.xsgen.store.resolve` finds it.
 Either archive may come from a local copy rather than the network, which is
 how a cluster without outbound access is provisioned; the pinned digest is
 checked the same way.
+
+PyRITE's own table archives are pinned at GitHub Release download URLs. While
+the repository is private those need a token, so :func:`_download` resolves
+such a URL through the GitHub API with the first of ``PYRITE_GITHUB_TOKEN``,
+``GITHUB_TOKEN``, or ``gh auth token``. The token is sent only to
+``api.github.com``, never across the redirect to the asset store, and never
+appears in a message or manifest. Without a token the plain URL is tried, so
+the same pin keeps working once the release is public.
 """
 
 import hashlib
 import json
 import os
+import re
 import shutil
 import stat
+import subprocess
 import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 import numpy as np
@@ -46,6 +56,18 @@ SBETHE_ARCHIVE_URL = (
 SBETHE_ARCHIVE_SHA256 = "d5d4879c2073ada3bd799fe0727054549cd6ec65cc699acbd0ff25fd5c3c4144"
 SBETHE_DEPOSIT = "10.17632/7zw25f428t.2"
 _CHUNK = 1 << 20
+#: Environment variables read for a GitHub token, in order; ``gh auth token``
+#: is the last resort.
+GITHUB_TOKEN_ENV = ("PYRITE_GITHUB_TOKEN", "GITHUB_TOKEN")
+_GITHUB_API = "https://api.github.com"
+_RELEASE_ASSET_URL = re.compile(
+    r"https://github\.com/(?P<repo>[^/]+/[^/]+)/releases/download/(?P<tag>[^/]+)/(?P<name>[^/]+)"
+)
+_PRIVATE_RELEASE_HINT = (
+    "; the archive is on a private GitHub Release: set PYRITE_GITHUB_TOKEN or "
+    "GITHUB_TOKEN to a token with read access to the repository (or run `gh auth "
+    "login`), or install from a local copy with --archive PATH"
+)
 _USER_AGENT = "PyRITE xsgen (+https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite)"
 # The shared (non per-element) sdbase files. `atparams.tab` and `exp-param.tab`
 # are the decisive ones: `sbethe.f` OPENs both, and neither exists in deposit
@@ -84,10 +106,45 @@ def _data_file_count(path: Path) -> int:
     )
 
 
-def _download(url: str, destination: Path, label: str) -> str:
-    """Stream ``url`` to ``destination`` and return its SHA-256."""
+def _github_token() -> tuple[str, str] | None:
+    """Return ``(token, source)`` for GitHub downloads, or ``None``.
+
+    ``source`` names where the token came from, for messages; the token
+    itself must never be shown.
+    """
+    for name in GITHUB_TOKEN_ENV:
+        if token := os.environ.get(name, "").strip():
+            return token, name
+    gh = shutil.which("gh")
+    if gh is None:
+        return None
+    try:
+        completed = subprocess.run(  # noqa: S603 - fixed argv, no shell
+            [gh, "auth", "token", "--hostname", "github.com"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+    except OSError, subprocess.SubprocessError:
+        return None
+    token = completed.stdout.strip()
+    return (token, "`gh auth token`") if completed.returncode == 0 and token else None
+
+
+def _authorized(url: str, token: str, accept: str) -> Request:
+    """Return a request carrying ``token`` that is dropped on any redirect."""
+    request = Request(url, headers={"User-Agent": _USER_AGENT, "Accept": accept})
+    # Unredirected: GitHub answers an asset download with a redirect to a
+    # pre-signed storage URL, which must not receive the token.
+    request.add_unredirected_header("Authorization", f"Bearer {token}")
+    request.add_unredirected_header("X-GitHub-Api-Version", "2022-11-28")
+    return request
+
+
+def _stream(request: Request, destination: Path, label: str, hint: str = "") -> str:
+    """Stream ``request`` to ``destination`` and return its SHA-256."""
     digest = hashlib.sha256()
-    request = Request(url, headers={"User-Agent": _USER_AGENT})
     try:
         with urlopen(request, timeout=60) as response:  # noqa: S310 - pinned HTTPS URL
             with destination.open("wb") as stream:
@@ -95,8 +152,61 @@ def _download(url: str, destination: Path, label: str) -> str:
                     stream.write(chunk)
                     digest.update(chunk)
     except (OSError, URLError) as exc:
-        raise DataFetchError(f"could not download {label}: {exc}") from exc
+        raise DataFetchError(f"could not download {label}: {exc}{hint}") from exc
     return digest.hexdigest()
+
+
+def _release_asset_api_url(
+    repo: str, tag: str, name: str, token: tuple[str, str], label: str
+) -> str:
+    """Return the API URL of release asset ``name``, which a token can download."""
+    secret, source = token
+    request = _authorized(
+        f"{_GITHUB_API}/repos/{repo}/releases/tags/{tag}", secret, "application/vnd.github+json"
+    )
+    try:
+        with urlopen(request, timeout=60) as response:  # noqa: S310 - fixed HTTPS host
+            release = json.load(response)
+    except HTTPError as exc:
+        if exc.code == 401:
+            reason = f"the GitHub token from {source} was rejected"
+        else:
+            reason = (
+                f"release {tag} of {repo} was not found, or the token from {source} "
+                "cannot read the repository"
+            )
+        raise DataFetchError(
+            f"could not download {label}: {reason} (HTTP {exc.code}); "
+            "or install from a local copy with --archive PATH"
+        ) from exc
+    except (OSError, URLError, ValueError) as exc:
+        raise DataFetchError(f"could not download {label}: {exc}") from exc
+    for asset in release.get("assets", ()):
+        if asset.get("name") == name:
+            return str(asset["url"])
+    raise DataFetchError(f"could not download {label}: release {tag} of {repo} has no {name}")
+
+
+def _download(url: str, destination: Path, label: str) -> str:
+    """Download ``url`` to ``destination`` and return its SHA-256.
+
+    A GitHub Release download URL goes through the API when a token is
+    available (see the module docstring); any other URL is fetched as is.
+    """
+    asset = _RELEASE_ASSET_URL.fullmatch(url)
+    if asset is None:
+        return _stream(Request(url, headers={"User-Agent": _USER_AGENT}), destination, label)
+    token = _github_token()
+    if token is None:
+        return _stream(
+            Request(url, headers={"User-Agent": _USER_AGENT}),
+            destination,
+            label,
+            _PRIVATE_RELEASE_HINT,
+        )
+    api_url = _release_asset_api_url(asset["repo"], asset["tag"], asset["name"], token, label)
+    request = _authorized(api_url, token[0], "application/octet-stream")
+    return _stream(request, destination, label)
 
 
 def _obtain(archive: Path | None, url: str | None, work: Path, label: str, expected: str) -> Path:
@@ -405,6 +515,7 @@ def fetch_elsepa(
 
 
 __all__ = [
+    "GITHUB_TOKEN_ENV",
     "FetchResult",
     "SBETHE_ARCHIVE_SHA256",
     "SBETHE_ARCHIVE_URL",
