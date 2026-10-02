@@ -87,6 +87,7 @@ NUMERICS_GROUPS = (
             ("bremsstrahlung_model", "bremsstrahlung model"),
             ("radiative_model", "radiative model"),
             ("radiative_cutoff_eV", "radiative cutoff (eV)"),
+            ("pair_production_model", "pair production model"),
         ),
     ),
 )
@@ -336,6 +337,7 @@ def resolve_numerics(
         "bremsstrahlung_model": numerics.bremsstrahlung_model,
         "radiative_model": numerics.radiative_model,
         "radiative_cutoff_eV": numerics.radiative_cutoff_eV,
+        "pair_production_model": numerics.pair_production_model,
     }
     sources = {
         key: (
@@ -575,6 +577,7 @@ def _identity_v1(
         settings_brem_model = str(settings_payload.pop("bremsstrahlung_model", "auto"))
         radiative_model = str(settings_payload.pop("radiative_model", "uncoupled"))
         radiative_cutoff_eV = settings_payload.pop("radiative_cutoff_eV", None)
+        pair_production_model = settings_payload.pop("pair_production_model", None)
     else:  # pragma: no cover - settings is always a jsonable Mapping here
         emission = str(getattr(settings, "emission", "incoherent"))
         temporal_profile = bool(getattr(settings, "temporal_profile", False))
@@ -588,6 +591,7 @@ def _identity_v1(
         settings_brem_model = str(getattr(settings, "bremsstrahlung_model", "auto"))
         radiative_model = str(getattr(settings, "radiative_model", "uncoupled"))
         radiative_cutoff_eV = getattr(settings, "radiative_cutoff_eV", None)
+        pair_production_model = getattr(settings, "pair_production_model", None)
     if emission != "incoherent":
         resolved["emission"] = emission
     # Opt-in line I(t) (#292): divergence-only, so off keeps every digest.
@@ -668,6 +672,9 @@ def _identity_v1(
             if radiative_cutoff_eV is None
             else float(cast(float, radiative_cutoff_eV))
         )
+        # Pair conversion (#275) rides on the coupling: divergence-only too.
+        if pair_production_model is not None:
+            transport_numerics["pair_production_model"] = str(pair_production_model)
         resolved["transport_numerics"] = transport_numerics
     # Externally generated cross-section tables (issue #161), as table key ->
     # provenance-manifest digest. A *divergence-only* key, like `emission` and

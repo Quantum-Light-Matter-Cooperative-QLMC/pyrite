@@ -21,6 +21,7 @@ TRANSPORT_KEYS = (
     "bremsstrahlung_model",
     "radiative_model",
     "radiative_cutoff_eV",
+    "pair_production_model",
 )
 #: Collision-loss schemes a run may select: ``"auto"`` (the default) plus the
 #: ``simulate_trajectories`` schemes of
@@ -38,6 +39,10 @@ ELASTIC_MODELS = ("mott", "elsepa")
 #: which is BremsLib when every layer element's table is installed and EEDL,
 #: with a warning, otherwise. A case records only the resolved choice.
 BREMSSTRAHLUNG_MODELS = ("auto", "eedl", "bremslib")
+#: Opt-in pair conversion of coupled hard photons (issue #275); mirrors
+#: ``montecarlo.transport.pair_production.PAIR_PRODUCTION_MODELS`` (a test
+#: keeps the two in step) without importing the transport package here.
+PAIR_PRODUCTION_MODELS = ("penelope-2024",)
 #: The default resolves coupling when BremsLib tables are available.
 RADIATIVE_MODELS = ("auto", "uncoupled", "bremslib-soft-hard")
 DEFAULT_RADIATIVE_CUTOFF_EV = 1000.0
@@ -133,6 +138,12 @@ class Numerics:
         cutoff ``k_c`` in eV and sampled hard photons above it. The default
         cutoff is 1000 eV. Coupling requires ``energy_model="midpoint"``;
         ``k_c`` must not exceed the electron cutoffs.
+    pair_production_model
+        Opt-in pair conversion of coupled hard photons above ``2 m_e c^2``
+        (``"penelope-2024"``); requires ``secondary_threshold_eV`` and coupled
+        radiative transport, and applies only to cases that resolve to it.
+        Positrons are recorded, not transported. ``None`` (default) converts
+        nothing.
     convergence
         Reflection and mosaic convergence controls.
     """
@@ -153,6 +164,7 @@ class Numerics:
     bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
     radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "auto"
     radiative_cutoff_eV: float | None = None
+    pair_production_model: Literal["penelope-2024"] | None = None
     convergence: Convergence = field(default_factory=Convergence)
 
     def __post_init__(self) -> None:
@@ -192,6 +204,31 @@ class Numerics:
             self.straggling,
             self.bremsstrahlung_model,
         )
+        validate_pair_production_numerics(
+            self.pair_production_model,
+            self.secondary_threshold_eV,
+            self.radiative_model,
+            self.bremsstrahlung_model,
+        )
+
+
+def validate_pair_production_numerics(
+    model: object,
+    secondary_threshold_eV: object,
+    radiative_model: object,
+    bremsstrahlung_model: object,
+) -> None:
+    """Validate opt-in pair conversion: it needs secondaries and coupled photons."""
+    if model is None:
+        return
+    if model not in PAIR_PRODUCTION_MODELS:
+        raise ValueError(
+            f"pair_production_model must be one of {', '.join(PAIR_PRODUCTION_MODELS)} or None"
+        )
+    if secondary_threshold_eV is None:
+        raise ValueError("pair_production_model requires secondary_threshold_eV")
+    if radiative_model == "uncoupled" or bremsstrahlung_model == "eedl":
+        raise ValueError("pair_production_model requires coupled BremsLib radiative transport")
 
 
 def validate_elastic_model(model: object) -> None:

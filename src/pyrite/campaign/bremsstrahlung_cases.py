@@ -9,21 +9,43 @@ needs BremsLib, so its divergence-only keys follow the same resolution.
 from dataclasses import replace
 from typing import Any, cast
 
-from .._numerics import DEFAULT_RADIATIVE_CUTOFF_EV, validate_radiative_numerics
+from .._numerics import (
+    DEFAULT_RADIATIVE_CUTOFF_EV,
+    validate_pair_production_numerics,
+    validate_radiative_numerics,
+)
 from ..montecarlo.case import Case
 
 
 def radiative_case_keys(
-    model, cutoff_eV, energy_model, straggling, bremsstrahlung_model
+    model,
+    cutoff_eV,
+    energy_model,
+    straggling,
+    bremsstrahlung_model,
+    pair_production_model=None,
+    secondary_threshold_eV=None,
 ) -> dict[str, Any]:
-    """Validate the coupled radiative settings; return its case keys (empty if uncoupled)."""
+    """Validate the coupled radiative settings; return its case keys (empty if uncoupled).
+
+    Opt-in pair conversion (#275) rides on the coupled keys, so it joins only
+    cases that resolve to coupled BremsLib transport.
+    """
     validate_radiative_numerics(model, cutoff_eV, energy_model, straggling, bremsstrahlung_model)
+    validate_pair_production_numerics(
+        pair_production_model, secondary_threshold_eV, model, bremsstrahlung_model
+    )
     if model == "uncoupled" or (model == "auto" and bremsstrahlung_model == "eedl"):
         return {}
     return {
         "radiative_model": "bremslib-soft-hard",
         "radiative_cutoff_eV": (
             DEFAULT_RADIATIVE_CUTOFF_EV if cutoff_eV is None else float(cast(float, cutoff_eV))
+        ),
+        **(
+            {}
+            if pair_production_model is None
+            else {"pair_production_model": pair_production_model}
         ),
     }
 

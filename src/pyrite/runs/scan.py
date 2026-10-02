@@ -624,10 +624,9 @@ def _resolved_run(args, material):
     # override flag. A catalog_profile emission key (set via `pyrite profile
     # set/add/remove --emission/--coherent/--incoherent`) overrides the
     # fidelity preset's emission; absent means the fidelity's own emission
-    # stands. The resolved settings.emission drives the dataset_identity
-    # divergence key (profiles.dataset_identity) and the canonical_full
-    # collision guard below, so a coherent/both run never shares the plain
-    # incoherent <material> stem.
+    # stands. settings.emission drives the dataset_identity divergence key and
+    # the canonical_full collision guard below, so a coherent/both run never
+    # shares the plain incoherent <material> stem.
     from ..materials import CATALOG
 
     detector_id = getattr(args, "detector_id", None)
@@ -635,7 +634,8 @@ def _resolved_run(args, material):
     catalog_emission = CATALOG.profile_emission(catalog_profile)
     if catalog_emission is not None:
         settings = replace(settings, emission=catalog_emission)
-    settings = replace(settings, temporal_profile=CATALOG.profile_temporal_profile(catalog_profile))
+    if CATALOG.profile_temporal_profile(catalog_profile):  # opt-in; absent keeps the preset
+        settings = replace(settings, temporal_profile=True)
     catalog_numerics = CATALOG.profile_numerics(catalog_profile)
     from .._numerics import TRANSPORT_KEYS
     from ..campaign.profiles import resolve_numerics

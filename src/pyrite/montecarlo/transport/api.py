@@ -87,6 +87,7 @@ def simulate_trajectories(
     max_secondary_generations=64,
     max_secondary_tracks=None,
     *,
+    pair_production_model=None,
     _secondary=None,
 ):
     """
@@ -251,11 +252,10 @@ def simulate_trajectories(
 
     radiative_model: "auto" (default) couples when BremsLib tables are supplied,
       otherwise keeps post-hoc brem scoring and the existing tracks.
-      "bremslib-soft-hard" (exact cores only, no LUT) adds
-      soft BremsLib loss below ``radiative_cutoff_eV`` and explicit photons
-      above it; see ``hard_radiative.validate_radiative_args`` for its
-      requirements and ``spectrum.brem_events`` for scoring. Validation:
-      bremslib-radiative-partition, bremslib-radiative-event-spectrum.
+      "bremslib-soft-hard" (exact cores only, no LUT) adds soft BremsLib loss
+      below ``radiative_cutoff_eV`` and explicit photons above it; see
+      ``hard_radiative.validate_radiative_args`` and ``spectrum.brem_events``.
+      Validation: bremslib-radiative-partition, bremslib-radiative-event-spectrum.
 
     secondary_threshold_eV: opt-in transport of hard-collision secondaries
       (shell-soft-hard only); one threshold [eV] is production cut and
@@ -263,7 +263,8 @@ def simulate_trajectories(
       and ``max_secondary_tracks`` (default ``1000 * Ne``), which raise. Rows
       gain ``track_id``/``parent_id``/``generation``; ``electron_id`` stays the
       primary history. None (default) is BIT-FOR-BIT primary-only transport.
-      See shell-soft-hard-transport.md. Validation: shell-secondary-transport
+      ``pair_production_model`` adds pair conversion (``pair_production.py``).
+      Validation: shell-secondary-transport, photon-pair-first-interaction
 
     transport_core: which ungrooved core runs the electrons. "auto" (default) --
     the CUDA core when this process has a CUDA device, the run is ungrooved,
@@ -430,7 +431,7 @@ def simulate_trajectories(
     Validation: electron-transport, energy-loss-straggling, finite-beam-size,
     finite-transverse-crystal, grazing-beam-projection, multilayer-stack
     """
-    if secondary_threshold_eV is not None:
+    if secondary_threshold_eV is not None or pair_production_model is not None:
         arguments = dict(locals())
         from .secondaries import transport_secondary_cascade
 

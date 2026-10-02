@@ -124,6 +124,7 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
         bremsstrahlung_model=getattr(settings, "bremsstrahlung_model", "auto"),
         radiative_model=getattr(settings, "radiative_model", "uncoupled"),
         radiative_cutoff_eV=getattr(settings, "radiative_cutoff_eV", None),
+        pair_production_model=getattr(settings, "pair_production_model", None),
         convergence=Convergence(
             n_families=old_sweep.n_families,
             max_reflections=old_sweep.max_reflections,

@@ -35,6 +35,9 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # Decision evidence for the pixel angular-reconstruction policy (#23); v1
     # makes no ledgered reconstruction-accuracy claim, so it emits no records.
     "checks/pixel_reconstruction_oracle.py": (),
+    # Sizing evidence for pair conversion (#275): magnitudes, no pass/fail
+    # anchor, so it emits no records.
+    "checks/pair_conversion_yield.py": (),
     "checks/shell_ionization_comparison.py": ("eedl-shell-ionization-comparison",),
     "checks/brem_angular_comparison.py": ("bremslib-angular-schiff",),
     "checks/radiation_error_estimator_calibration.py": ("radiation-error-estimators",),

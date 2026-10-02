@@ -706,6 +706,7 @@ def build_cases(
     radiative_model="auto",
     radiative_cutoff_eV=None,
     temporal_profile=False,
+    pair_production_model=None,
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -731,9 +732,11 @@ def build_cases(
     )
     validate_elastic_model(elastic_model)
     validate_bremsstrahlung_model(bremsstrahlung_model)
-    # Opt-in coupled radiative keys (#172); under "auto" they join after resolution.
+    # Opt-in coupled radiative keys (#172), with pair conversion (#275) riding on
+    # them; under "auto" they join after resolution.
+    pair = (pair_production_model, secondary_threshold_eV)
     radiative = radiative_case_keys(
-        radiative_model, radiative_cutoff_eV, energy_model, straggling, bremsstrahlung_model
+        radiative_model, radiative_cutoff_eV, energy_model, straggling, bremsstrahlung_model, *pair
     )
     target = sweep.target
     cp = sweep_crystal_params(sweep)

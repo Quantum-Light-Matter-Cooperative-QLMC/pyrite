@@ -22,6 +22,7 @@ from .._numerics import (
     validate_bremsstrahlung_model,
     validate_elastic_model,
     validate_inelastic_numerics,
+    validate_pair_production_numerics,
     validate_radiative_numerics,
 )
 from .._spectral_components import line_spectrum
@@ -112,6 +113,9 @@ class Settings:
         ``"auto"`` (default) couples when BremsLib resolves; ``"uncoupled"``
         selects post-hoc continuum scoring. The hard-photon cutoff defaults
         to 1000 eV when coupling runs.
+    pair_production_model
+        Opt-in ``"penelope-2024"`` pair conversion of coupled hard photons
+        (requires the secondary threshold and coupling).
     emission
         ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
     temporal_profile
@@ -139,6 +143,7 @@ class Settings:
     bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
     radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "auto"
     radiative_cutoff_eV: float | None = None
+    pair_production_model: Literal["penelope-2024"] | None = None
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so
@@ -173,6 +178,12 @@ class Settings:
             self.radiative_cutoff_eV,
             self.energy_model,
             self.straggling,
+            self.bremsstrahlung_model,
+        )
+        validate_pair_production_numerics(
+            self.pair_production_model,
+            self.secondary_threshold_eV,
+            self.radiative_model,
             self.bremsstrahlung_model,
         )
 
