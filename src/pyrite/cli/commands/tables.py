@@ -597,6 +597,10 @@ def fetch_command(code: str, archive: str | None, json_output: bool) -> None:
     verified before anything is installed, whether it was downloaded or given
     with --archive. A complete existing install returns successfully without
     network access.
+
+    The elsepa archive is on a private GitHub Release; downloading it needs a
+    token with read access to the repository, from PYRITE_GITHUB_TOKEN,
+    GITHUB_TOKEN, or a logged-in `gh`.
     """
     from ...xsgen import DataFetchError
 
