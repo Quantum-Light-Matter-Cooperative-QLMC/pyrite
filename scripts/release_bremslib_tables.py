@@ -34,7 +34,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--out", type=Path, default=_REPO / "build" / "xsgen-release", help="output directory"
     )
-    parser.add_argument("--url", default=None, help="where the archive will be published")
+    parser.add_argument(
+        "--url",
+        action="append",
+        default=[],
+        help="where the archive will be published (repeatable, in fetch order)",
+    )
     parser.add_argument(
         "--t1-max", type=float, default=COMPLETE_T1_MAX_MEV, help="energy bound in MeV"
     )
@@ -49,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
         source_path=args.source,
         elements=args.element,
         t1_max_MeV=args.t1_max,
-        url=args.url,
+        urls=args.url,
     )
     print(f"archive: {archive} ({index.archive_bytes / 1e6:.1f} MB)")
     print(f"sha256:  {index.archive_sha256}")
@@ -61,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         shutil.copyfile(archive.with_suffix(".json"), pinned)
         print(f"pinned:  {pinned}")
-    if index.url is None:
+    if not index.urls:
         print("no --url given: the index pins the digest only; install with --archive")
     return 0
 

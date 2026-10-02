@@ -36,6 +36,20 @@ def test_real_pins_match_the_model_identity_constants():
 
     assert datasets.EEDL.sha256 == EEDL_SHA256
     assert datasets.EADL.sha256 == EADL_SHA256
+
+
+def test_the_epdl_pin_matches_the_photon_table_constant():
+    from pyrite.materials.photon_cross_sections import EPDL_TABLE_SHA256
+
+    assert datasets.EPDL.sha256 == EPDL_TABLE_SHA256
+
+
+def test_mirrors_follow_upstream_and_derived_data_has_only_pyrite_releases():
+    release = "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/"
+    for dataset in (datasets.EEDL, datasets.EADL):
+        assert dataset.urls[0].startswith("https://nuclear.llnl.gov/")
+        assert dataset.urls[1].startswith(release)
+    assert datasets.EPDL.urls == (f"{release}tables-epdl-1/epdl2025_mf23.npz",)
     assert datasets.EEDL.url.startswith("https://nuclear.llnl.gov/EPICS/ENDF2025/")
     assert datasets.EADL.download_sha256 is None
 
@@ -66,6 +80,52 @@ def test_published_bytes_install_as_the_vetted_form(pinned, tmp_path, monkeypatc
     assert pinned.read_bytes() == VETTED
     assert datasets.verify_dataset("eedl") == datasets.OK
     assert datasets.require_verified("eedl") == pinned
+
+
+def test_an_unreachable_upstream_falls_back_to_the_mirror(pinned, monkeypatch):
+    mirrored = replace(
+        datasets.DATASETS["eedl"],
+        urls=("https://upstream.invalid/EEDL", "https://mirror.invalid/EEDL"),
+    )
+    monkeypatch.setitem(datasets.DATASETS, "eedl", mirrored)
+    tried = []
+
+    def fake_download(url, destination, label):
+        tried.append(url)
+        if "upstream" in url:
+            raise DataFetchError(f"could not download {label}: unreachable")
+        destination.write_bytes(VETTED)
+        return _sha(VETTED)
+
+    monkeypatch.setattr("pyrite.xsgen.fetch._download", fake_download)
+
+    result = datasets.fetch_dataset("eedl")
+
+    assert tried == list(mirrored.urls)
+    assert result.installed and result.source == "https://mirror.invalid/EEDL"
+    assert pinned.read_bytes() == VETTED
+
+
+def test_a_tampered_mirror_is_rejected_and_every_attempt_is_reported(pinned, monkeypatch):
+    mirrored = replace(
+        datasets.DATASETS["eedl"],
+        urls=("https://upstream.invalid/EEDL", "https://mirror.invalid/EEDL"),
+    )
+    monkeypatch.setitem(datasets.DATASETS, "eedl", mirrored)
+
+    def fake_download(url, destination, label):
+        if "upstream" in url:
+            raise DataFetchError(f"could not download {label}: unreachable")
+        destination.write_bytes(b"tampered")
+        return _sha(b"tampered")
+
+    monkeypatch.setattr("pyrite.xsgen.fetch._download", fake_download)
+
+    with pytest.raises(DataFetchError, match="every download location") as caught:
+        datasets.fetch_dataset("eedl")
+    assert "unreachable" in str(caught.value)
+    assert "SHA-256 mismatch" in str(caught.value)
+    assert not pinned.exists()
 
 
 @pytest.mark.parametrize("body", [VETTED, PUBLISHED])

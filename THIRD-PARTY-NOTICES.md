@@ -25,8 +25,10 @@ tables derived or resampled from their output.
   2023 and distributed January 2025. SHA-256:
   `78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c`.
 - **Nature of PyRITE's use**: PyRITE does not ship the file. `pyrite tables
-  fetch eadl` downloads the published file unchanged from the URL above into
-  the user's data directory, and PyRITE reads its File 28 (MT 533) subshell binding energies, occupancies, and
+  fetch eadl` downloads the published file unchanged from the URL above (or,
+  when it is unreachable, from PyRITE's private mirror release
+  `mirror-eadl2025-1`, which holds the same bytes) into the user's data
+  directory, and PyRITE reads its File 28 (MT 533) subshell binding energies, occupancies, and
   radiative and nonradiative transition data for the characteristic-radiation
   relaxation cascade.
 
@@ -43,8 +45,8 @@ tables derived or resampled from their output.
   and distributed January 2025. SHA-256:
   `59bbd8c559685dda0bf0de2762bc43126f599cd154d635940f17b6a59c1c43fd`.
 - **Nature of PyRITE's use**: PyRITE redistributes a **derived** table,
-  `src/pyrite/data/photon_cross_sections/epdl2025_mf23.npz`, not the upstream
-  file. It keeps five File 23 integrated cross sections (MT 522, 502, 504, 517,
+  `epdl2025_mf23.npz`, not the upstream file. It is published on PyRITE's
+  release `tables-epdl-1` and installed with `pyrite tables fetch epdl`. It keeps five File 23 integrated cross sections (MT 522, 502, 504, 517,
   515) for Z = 1--100. **Modifications:** knots were removed where lin-lin
   interpolation through the kept knots reproduces every removed upstream value
   to 5e-4 relative, and cross sections are stored as float32. The generator is
@@ -66,7 +68,9 @@ tables derived or resampled from their output.
   published file with its final CRLF removed; see
   `src/pyrite/data/characteristic_cross_sections/README.md`).
 - **Nature of PyRITE's use**: PyRITE does not ship the file. `pyrite tables
-  fetch eedl` downloads it from the URL above into the user's data directory,
+  fetch eedl` downloads it from the URL above (or, when it is unreachable,
+  from PyRITE's private mirror release `mirror-eedl2025-1`, which holds the
+  installed bytes) into the user's data directory,
   and PyRITE reads its File 23 subshell electroionization cross sections (MT
   534--572) and its File 23/26 bremsstrahlung totals and photon spectra (MT
   527).
@@ -134,7 +138,10 @@ require derived or adapted material to be marked as such.
   pinned deposit above into the user's own data directory. Tables derived or
   resampled from SBETHE output are **adaptations** under the license and are
   marked as such in the provenance manifest stored beside each generated
-  table.
+  table. PyRITE **redistributes** the stopping tables for its catalogue
+  materials as one SHA-256-pinned archive on its release `tables-sbethe-1`,
+  installed with `pyrite tables fetch sbethe-tables`; the release notes carry
+  this attribution and the modifications statement.
 
 ## BremsLib (2.0.8)
 
@@ -169,7 +176,8 @@ require derived or adapted material to be marked as such.
   - PyRITE **does** redistribute cross-section tables **derived** from that
     library, for every element its built-in catalogue materials may contain.
     They are not in the PyRITE package: they are published as one
-    SHA-256-pinned archive that `pyrite tables fetch bremslib` installs into
+    SHA-256-pinned archive (PyRITE release `tables-bremslib-1`) that
+    `pyrite tables fetch bremslib` installs into
     the user's own data directory. These are **adaptations** of a CC BY 4.0
     work and are not the upstream data: they are parsed and restructured on
     the library's own grids, per-node angular integrals are added, the

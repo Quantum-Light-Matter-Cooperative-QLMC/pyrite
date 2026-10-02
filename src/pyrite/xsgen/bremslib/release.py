@@ -41,6 +41,7 @@ import numpy as np
 from ...materials._transport_data import TRANSPORT_ELEMENTS
 from ...paths import data_dir
 from .._errors import TableNotFoundError
+from .._urls import archive_urls, as_urls
 from ..sources import resolve_source
 from ..store import MODIFICATIONS_NOTE, StoredTable, resolve, store
 from .convert import build_table
@@ -137,9 +138,10 @@ class ReleaseIndex:
         Energy bound every table was built with.
     archive_sha256, archive_bytes
         Digest and size of the release zip.
-    url
-        Where the archive is published, or ``None`` if it is not yet. A
-        missing URL still permits installing from a local copy.
+    urls
+        Where the archive is published, tried in order (see
+        :mod:`pyrite.xsgen._urls`); empty if it is not yet. A missing URL
+        still permits installing from a local copy.
     tables
         One entry per element, sorted by atomic number.
     """
@@ -149,7 +151,7 @@ class ReleaseIndex:
     t1_max_MeV: float
     archive_sha256: str
     archive_bytes: int
-    url: str | None
+    urls: tuple[str, ...]
     tables: tuple[ReleaseEntry, ...]
 
     def record(self) -> dict[str, Any]:
@@ -162,7 +164,7 @@ class ReleaseIndex:
             "archive": {
                 "sha256": self.archive_sha256,
                 "bytes": self.archive_bytes,
-                "url": self.url,
+                "urls": list(self.urls),
             },
             "tables": [
                 {"z": entry.z, "key": entry.key, "manifest_sha256": entry.manifest_sha256}
@@ -185,7 +187,7 @@ class ReleaseIndex:
             t1_max_MeV=float(record["t1_max_MeV"]),
             archive_sha256=str(archive["sha256"]),
             archive_bytes=int(archive["bytes"]),
-            url=None if archive.get("url") is None else str(archive["url"]),
+            urls=archive_urls(archive),
             tables=tuple(
                 ReleaseEntry(
                     z=int(row["z"]),
@@ -242,14 +244,14 @@ def build_release(
     source_path: str | Path | None = None,
     elements: Iterable[int] | None = None,
     t1_max_MeV: float = COMPLETE_T1_MAX_MEV,
-    url: str | None = None,
+    urls: Iterable[str] = (),
 ) -> tuple[Path, ReleaseIndex]:
     """Build the release archive and its index from a BremsLib checkout.
 
     Maintainer-only: it needs the 810 MB library. Writes
     ``bremslib-tables.zip`` and ``bremslib-tables.json`` into ``out_dir``;
     the JSON is what gets committed to the wheel, the zip is what gets
-    published at ``url``.
+    published at ``urls``.
 
     Parameters
     ----------
@@ -262,8 +264,9 @@ def build_release(
         Atomic numbers to release. Defaults to :func:`catalogue_elements`.
     t1_max_MeV
         Energy bound for every table.
-    url
-        Where the archive will be published, recorded in the index.
+    urls
+        Where the archive will be published, in fetch order, recorded in the
+        index.
 
     Returns
     -------
@@ -307,7 +310,7 @@ def build_release(
         t1_max_MeV=float(t1_max_MeV),
         archive_sha256=file_sha256(archive),
         archive_bytes=archive.stat().st_size,
-        url=url,
+        urls=as_urls(urls),
         tables=tuple(
             ReleaseEntry(z=z, key=table.key, manifest_sha256=table.digest)
             for z, table in zip(zs, tables, strict=True)

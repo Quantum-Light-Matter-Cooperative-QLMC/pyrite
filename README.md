@@ -28,18 +28,16 @@ Requires Python ≥3.14 and [uv](https://docs.astral.sh/uv/).
 git clone <repository-url> pyrite
 cd pyrite
 uv sync
-uv run pyrite tables fetch eedl     # EPICS2025 electron data every run reads (25 MB)
-uv run pyrite tables fetch eadl     # EPICS2025 atomic relaxation every run reads (8 MB)
-uv run pyrite tables fetch elsepa   # elastic cross sections the default transport reads
-uv run pyrite tables fetch bremslib # default bremsstrahlung source; without it runs warn and use EEDL
+uv run pyrite tables fetch   # every pinned dataset and table (about 100 MB): EEDL, EADL, EPDL, SBETHE, ELSEPA, BremsLib
 uv run pyrite config setup   # optional first-run backend detection
 uv run pyrite --help
 ```
 
-The `elsepa` archive is hosted on a private GitHub Release: `fetch` needs a
-token with read access to this repository, taken from `PYRITE_GITHUB_TOKEN`,
-`GITHUB_TOKEN`, or a logged-in `gh`. Without one, install from a local copy
-with `--archive PATH`.
+PyRITE's own table archives are hosted on private GitHub Releases: `fetch`
+needs a token with read access to this repository, taken from
+`PYRITE_GITHUB_TOKEN`, `GITHUB_TOKEN`, or a logged-in `gh`. Without one,
+install a code from a local copy with `pyrite tables fetch CODE --archive PATH`.
+`pyrite tables fetch --help` lists the codes.
 
 Focused contributor and CI commands are documented in
 [development workspace guide](docs/repo-design/development-workspace.md).

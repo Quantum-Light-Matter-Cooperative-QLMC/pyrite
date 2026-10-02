@@ -18,7 +18,8 @@ narrow-beam (good-geometry) attenuation coefficient. Photonuclear absorption is
 not in EPDL; it is a sub-percent giant-resonance term near 10--30 MeV and is
 not modelled.
 
-The packaged ``data/photon_cross_sections/epdl2025_mf23.npz`` is derived from
+The table ``epdl2025_mf23.npz`` (a fetched dataset, ``pyrite tables fetch
+epdl``; see :mod:`pyrite.datasets`) is derived from
 the SHA-256-pinned upstream tape by ``scripts/release_epdl_table.py``. The only
 modification is knot thinning under the upstream lin-lin law (ENDF
 interpolation law 2) that reproduces every upstream node to the stored relative
@@ -41,10 +42,8 @@ from functools import cache
 
 import numpy as np
 
-from .. import DATA_DIR
 from .atomic import Z_TABLE
 
-EPDL_TABLE_PATH = DATA_DIR / "photon_cross_sections" / "epdl2025_mf23.npz"
 EPDL_TABLE_SHA256 = "fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9"
 
 #: Generation marker for the narrow-beam attenuation data, hashed into the
@@ -73,19 +72,17 @@ _TOTAL_MEMO_MAX = 256
 
 @cache
 def _table() -> dict[int, dict[int, tuple[np.ndarray, np.ndarray]]]:
-    """Verify and unpack the packaged table into ``{Z: {MT: (E_eV, sigma_ang2)}}``."""
-    try:
-        data = EPDL_TABLE_PATH.read_bytes()
-    except FileNotFoundError:
-        raise FileNotFoundError(
-            f"packaged EPDL photon cross sections are missing: expected {EPDL_TABLE_PATH}"
-        ) from None
+    """Verify and unpack the table into ``{Z: {MT: (E_eV, sigma_ang2)}}``."""
+    from ..datasets import require_dataset
+
+    path = require_dataset("epdl")
+    data = path.read_bytes()
     actual = hashlib.sha256(data).hexdigest()
     if actual != EPDL_TABLE_SHA256:
         raise ValueError(
-            f"packaged EPDL table checksum mismatch: expected {EPDL_TABLE_SHA256}, got {actual}"
+            f"EPDL table {path} checksum mismatch: expected {EPDL_TABLE_SHA256}, got {actual}"
         )
-    with np.load(EPDL_TABLE_PATH) as archive:
+    with np.load(path) as archive:
         z = archive["z"].astype(int)
         mt = archive["mt"].astype(int)
         offsets = archive["offsets"]

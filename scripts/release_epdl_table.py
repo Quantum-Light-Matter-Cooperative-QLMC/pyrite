@@ -1,8 +1,10 @@
 """Derive PyRITE's compact EPDL2025 photon cross-section table.
 
 Maintainer-only. Reads the SHA-256-pinned upstream EPICS2025 photo-atomic tape
-(``EPDL2025.ALL``, about 86 MB) and writes the small packaged table that
-:mod:`pyrite.materials.photon_cross_sections` reads at runtime.
+(``EPDL2025.ALL``, about 86 MB) and writes the small table that
+:mod:`pyrite.materials.photon_cross_sections` reads at runtime. Publish it as a
+PyRITE release asset and pin its URL in ``pyrite.datasets.EPDL``; users
+install it with ``pyrite tables fetch epdl``.
 
 For every element Z=1--100 the table keeps the five MF=23 integrated cross
 sections whose sum is the narrow-beam total:
@@ -26,7 +28,8 @@ are stored as float32 (relative rounding ~6e-8, far below the tolerance).
 
 The output is a deterministic ``.npz``: fixed member order and zip timestamps,
 so a rerun from the same tape and tolerance reproduces the same bytes. Pin the
-printed SHA-256 in ``photon_cross_sections.EPDL_TABLE_SHA256``.
+printed SHA-256 in ``photon_cross_sections.EPDL_TABLE_SHA256`` and
+``pyrite.datasets.EPDL``.
 
 Usage::
 
@@ -48,14 +51,7 @@ EPDL_SHA256 = "59bbd8c559685dda0bf0de2762bc43126f599cd154d635940f17b6a59c1c43fd"
 CHANNEL_MTS = (522, 502, 504, 517, 515)
 DEFAULT_TOLERANCE = 5.0e-4
 Z_MAX = 100
-OUTPUT = (
-    Path(__file__).resolve().parents[1]
-    / "src"
-    / "pyrite"
-    / "data"
-    / "photon_cross_sections"
-    / "epdl2025_mf23.npz"
-)
+OUTPUT = Path(__file__).resolve().parents[1] / "build" / "xsgen-release" / "epdl2025_mf23.npz"
 
 
 def _chord_ok(e: np.ndarray, s: np.ndarray, i: int, j: int, tolerance: float) -> bool:
@@ -200,7 +196,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source", type=Path, help="local EPDL2025.ALL (else download)")
     parser.add_argument("--tolerance", type=float, default=DEFAULT_TOLERANCE)
     parser.add_argument("--output", type=Path, default=OUTPUT)
-    parser.add_argument("--write", action="store_true", help="write the packaged table")
+    parser.add_argument("--write", action="store_true", help="write the table")
     args = parser.parse_args(argv)
 
     source = args.source

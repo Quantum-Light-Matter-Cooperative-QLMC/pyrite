@@ -32,12 +32,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--out", type=Path, default=_REPO / "build" / "xsgen-release", help="output directory"
     )
-    parser.add_argument("--url", default=None, help="where the archive will be published")
+    parser.add_argument(
+        "--url",
+        action="append",
+        default=[],
+        help="where the archive will be published (repeatable, in fetch order)",
+    )
     parser.add_argument("--generate", action="store_true", help="generate absent tables")
     parser.add_argument("--pin", action="store_true", help="copy the index into the package")
     args = parser.parse_args(argv)
 
-    archive, index = build_release(args.out, url=args.url, generate=args.generate)
+    archive, index = build_release(args.out, urls=args.url, generate=args.generate)
     print(f"archive: {archive} ({index.archive_bytes / 1e6:.1f} MB)")
     print(f"sha256:  {index.archive_sha256}")
     print(f"tables:  {len(index.tables)} ({', '.join(e.label for e in index.tables)})")
@@ -48,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         shutil.copyfile(archive.with_suffix(".json"), pinned)
         print(f"pinned:  {pinned}")
-    if index.url is None:
+    if not index.urls:
         print("no --url given: the index pins the digest only; install with --archive")
     return 0
 

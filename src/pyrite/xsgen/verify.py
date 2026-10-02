@@ -1,13 +1,13 @@
 """Check that every pinned release table and fetched dataset is intact.
 
-The release indexes shipped in the wheel (``bremslib-tables.json`` and
-``elsepa-tables.json``) record each table's key and manifest digest. This
+The release indexes shipped in the wheel (``bremslib-tables.json``,
+``elsepa-tables.json``, and ``sbethe-tables.json``) record each table's key and manifest digest. This
 module resolves each key through the store and compares the stored manifest
 against the pin. It reads table manifests only, never payloads, so it is cheap
 enough to run as a job preflight; table payload integrity is the remote sync's
 content-addressed inventory.
 
-The fetched datasets (:mod:`pyrite.datasets`: EEDL and EADL) are single files
+The fetched datasets (:mod:`pyrite.datasets`: EEDL, EADL, EPDL) are single files
 pinned by SHA-256; they are hashed in full, about 0.1 s together.
 """
 
@@ -18,9 +18,9 @@ from dataclasses import dataclass
 from .store import manifest_digest, resolve
 
 #: Codes whose release indexes pin tables, in report order.
-TABLE_CODES = ("bremslib", "elsepa")
+TABLE_CODES = ("bremslib", "elsepa", "sbethe-tables")
 #: Fetched single-file datasets, in report order (see :mod:`pyrite.datasets`).
-DATASET_CODES = ("eedl", "eadl")
+DATASET_CODES = ("eedl", "eadl", "epdl")
 #: Everything ``pyrite tables verify`` can require.
 CODES = TABLE_CODES + DATASET_CODES
 
@@ -64,6 +64,12 @@ def pinned_tables(codes: Iterable[str] = TABLE_CODES) -> list[tuple[str, str, st
         elsepa = load_elsepa()
         for entry in () if elsepa is None else elsepa.tables:
             rows.append(("elsepa", entry.label, entry.key, entry.manifest_sha256))
+    if "sbethe-tables" in wanted:
+        from .sbethe.release import load_release_index as load_sbethe
+
+        sbethe = load_sbethe()
+        for entry in () if sbethe is None else sbethe.tables:
+            rows.append(("sbethe-tables", entry.label, entry.key, entry.manifest_sha256))
     return rows
 
 

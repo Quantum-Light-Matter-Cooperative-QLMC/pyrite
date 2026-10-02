@@ -168,7 +168,7 @@ def test_fetch_downloads_the_pinned_url(release, monkeypatch):
     import io
 
     archive, index = release
-    pinned = replace(index, url="https://example.invalid/tables.zip")
+    pinned = replace(index, urls=("https://example.invalid/tables.zip",))
     seen = []
 
     class _Response(io.BytesIO):

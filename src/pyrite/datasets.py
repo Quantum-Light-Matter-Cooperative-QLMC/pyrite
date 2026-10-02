@@ -22,6 +22,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _CHUNK = 1 << 20
+#: PyRITE's own GitHub Release downloads: mirrors and derived data.
+_RELEASES = "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download"
 
 
 @dataclass(frozen=True)
@@ -34,8 +36,10 @@ class Dataset:
         Short name used by ``pyrite tables fetch NAME`` and the install path.
     filename
         Installed file name, which the loaders open.
-    url
-        Pinned HTTPS download location.
+    urls
+        Pinned HTTPS download locations, tried in order: upstream first,
+        then PyRITE's mirror. The SHA-256 decides what installs, so a mirror
+        cannot change it (see :mod:`pyrite.xsgen._urls`).
     sha256
         SHA-256 of the published bytes. Loaders and ``pyrite tables verify``
         check it; it also enters the model identity markers.
@@ -50,18 +54,26 @@ class Dataset:
 
     name: str
     filename: str
-    url: str
+    urls: tuple[str, ...]
     sha256: str
     description: str
     download_sha256: str | None = None
     strip_suffix: bytes = b""
+
+    @property
+    def url(self) -> str:
+        """The first (preferred) download location."""
+        return self.urls[0]
 
 
 #: EPICS2025 EEDL (NDS-IAEA-226), electroionization and bremsstrahlung.
 EEDL = Dataset(
     name="eedl",
     filename="EEDL.endf",
-    url="https://nuclear.llnl.gov/EPICS/ENDF2025/EEDL2025.ALL",
+    urls=(
+        "https://nuclear.llnl.gov/EPICS/ENDF2025/EEDL2025.ALL",
+        f"{_RELEASES}/mirror-eedl2025-1/EEDL.endf",
+    ),
     sha256="f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c",
     description="EPICS2025 EEDL electron data (25 MB): ionization and bremsstrahlung",
     # The published file ends with one more CRLF than the bytes PyRITE vetted
@@ -75,12 +87,25 @@ EEDL = Dataset(
 EADL = Dataset(
     name="eadl",
     filename="EADL2025.ALL",
-    url="https://nuclear.llnl.gov/EPICS/ENDF2025/EADL2025.ALL",
+    urls=(
+        "https://nuclear.llnl.gov/EPICS/ENDF2025/EADL2025.ALL",
+        f"{_RELEASES}/mirror-eadl2025-1/EADL2025.ALL",
+    ),
     sha256="78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c",
     description="EPICS2025 EADL atomic relaxation data (8 MB)",
 )
+#: PyRITE-derived EPDL2025 photon cross sections (``scripts/release_epdl_table.py``).
+#: Derived data, so PyRITE's release is the only location; it keeps the
+#: provenance and modifications note in its release notes.
+EPDL = Dataset(
+    name="epdl",
+    filename="epdl2025_mf23.npz",
+    urls=(f"{_RELEASES}/tables-epdl-1/epdl2025_mf23.npz",),
+    sha256="fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9",
+    description="EPDL2025 MF=23 photon cross sections, knot-thinned by PyRITE (1.5 MB)",
+)
 #: Every fetched dataset, in report order.
-DATASETS: dict[str, Dataset] = {dataset.name: dataset for dataset in (EEDL, EADL)}
+DATASETS: dict[str, Dataset] = {dataset.name: dataset for dataset in (EEDL, EADL, EPDL)}
 
 #: Outcomes of :func:`verify_dataset`; ``ok`` is the only passing one.
 OK = "ok"
@@ -212,6 +237,21 @@ def _strip_suffix(path: Path, suffix: bytes) -> str:
     return file_sha256(path)
 
 
+def _verify_staged(dataset: Dataset, staged: Path, origin: str) -> str | None:
+    """Bring ``staged`` to the pinned form; return why it failed, or ``None``.
+
+    Accepts the pinned bytes, or the published bytes followed by the declared
+    ``strip_suffix`` transformation.
+    """
+    actual = file_sha256(staged)
+    if actual != dataset.sha256 and actual == dataset.download_sha256:
+        actual = _strip_suffix(staged, dataset.strip_suffix)
+    if actual == dataset.sha256:
+        return None
+    expected = " or ".join(digest for digest in (dataset.sha256, dataset.download_sha256) if digest)
+    return f"{dataset.name} SHA-256 mismatch: expected {expected}, received {actual} from {origin}"
+
+
 def fetch_dataset(name: str, source: str | Path | None = None) -> DatasetFetchResult:
     """Install dataset ``name`` from its pinned URL or a local copy.
 
@@ -257,20 +297,29 @@ def fetch_dataset(name: str, source: str | Path | None = None) -> DatasetFetchRe
                 shutil.copyfile(source, staged)
             except OSError as exc:
                 raise DataFetchError(f"could not read {name} file {source}: {exc}") from exc
-            actual = file_sha256(staged)
+            failure = _verify_staged(dataset, staged, origin)
+            if failure is not None:
+                raise DataFetchError(f"{failure}; nothing was installed")
         else:
-            origin = dataset.url
-            actual = _download(dataset.url, staged, f"{name} ({dataset.url})")
-        if actual != dataset.sha256 and actual == dataset.download_sha256:
-            actual = _strip_suffix(staged, dataset.strip_suffix)
-        if actual != dataset.sha256:
-            expected = " or ".join(
-                digest for digest in (dataset.sha256, dataset.download_sha256) if digest
-            )
-            raise DataFetchError(
-                f"{name} SHA-256 mismatch: expected {expected}, received {actual} "
-                f"from {origin}; nothing was installed"
-            )
+            failures = []
+            for url in dataset.urls:
+                try:
+                    _download(url, staged, f"{name} ({url})")
+                except DataFetchError as exc:
+                    failures.append(str(exc))
+                    continue
+                failure = _verify_staged(dataset, staged, url)
+                if failure is None:
+                    origin = url
+                    break
+                failures.append(failure)
+            else:
+                if len(failures) == 1:
+                    raise DataFetchError(f"{failures[0]}; nothing was installed")
+                raise DataFetchError(
+                    f"every download location for {name} failed; nothing was installed:\n"
+                    + "\n".join(f"- {failure}" for failure in failures)
+                )
         try:
             os.replace(staged, destination)
         except OSError as exc:
@@ -282,6 +331,7 @@ __all__ = [
     "DATASETS",
     "EADL",
     "EEDL",
+    "EPDL",
     "MISMATCH",
     "MISSING",
     "OK",

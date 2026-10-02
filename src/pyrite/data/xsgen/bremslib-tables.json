@@ -6,7 +6,9 @@
   "archive": {
     "sha256": "05a74ee9d95b8a578c9087982e995f6a5977d622838a62777297df8c9250e152",
     "bytes": 23066359,
-    "url": null
+    "urls": [
+      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-bremslib-1/bremslib-tables.zip"
+    ]
   },
   "tables": [
     {
