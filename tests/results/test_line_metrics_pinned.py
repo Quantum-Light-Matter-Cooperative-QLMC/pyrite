@@ -1,13 +1,17 @@
 """Pin line_index / line_quality / line_metrics outputs on synthetic spectra.
 
 Guards the peak-finding fast path (issue #232): optimizations must leave every
-value byte-identical. Expected values were recorded from the pre-optimization
-implementation; they are exact (==) on purpose."""
+value unchanged. Expected values were recorded from the pre-optimization
+implementation. ``line_index`` and the metric key order are exact; floats use a
+few-ulp relative tolerance (``_REL``, NaN-aware) because summation order, SIMD,
+and libm differ across platforms (issue #302: CI differed by one ulp)."""
 
 import numpy as np
 import pytest
 
 from pyrite.results import Settings, line_index, line_metrics, line_quality
+
+_REL = 1e-13
 
 _E = np.linspace(1000.0, 5000.0, 400)
 
@@ -435,9 +439,9 @@ def test_pinned_line_outputs(name, metric):
     idx, quality, metrics = _observed()[(name, metric)]
     e_idx, e_quality, e_metrics = EXPECTED[(name, metric)]
     assert idx == e_idx
-    assert quality == e_quality
-    # repr comparison: exact floats, and NaN == NaN
-    assert repr(metrics) == repr(e_metrics)
+    assert quality == pytest.approx(e_quality, rel=_REL, abs=0.0, nan_ok=True)
+    assert list(metrics) == list(e_metrics)
+    assert metrics == pytest.approx(e_metrics, rel=_REL, abs=0.0, nan_ok=True)
     assert metrics["line_quality"] == quality
 
 
