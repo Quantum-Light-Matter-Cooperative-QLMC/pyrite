@@ -66,7 +66,16 @@ def test_straggled_production_case_keeps_the_cuda_lut(monkeypatch):
     monkeypatch.setattr(batching, "_cuda_transport_available", lambda: True)
     monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
     case = dict(
-        build_cases(material_sweep("silicon"), 4, 4, energy_model="midpoint", straggling=True)[0]
+        build_cases(
+            material_sweep("silicon"),
+            4,
+            4,
+            energy_model="midpoint",
+            straggling=True,
+            # "auto" resolves silicon to shell soft/hard, which alone keeps
+            # the exact kernel; continuous stopping isolates straggling.
+            inelastic_model="continuous",
+        )[0]
     )
     case["Ne"] = 10**5
     assert runner._case_transport_core(case) == "cuda"
@@ -85,6 +94,7 @@ def test_straggled_production_case_keeps_the_cuda_lut(monkeypatch):
         runner._transport_case(case)
     assert seen["transport_core"] == "cuda"
     assert seen["straggling"] is True
+    assert "inelastic_model" not in seen
     assert "transport_lut_config" not in seen
 
 
