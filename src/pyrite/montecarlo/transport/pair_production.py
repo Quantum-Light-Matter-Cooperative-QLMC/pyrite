@@ -153,8 +153,10 @@ def sample_pair_reduced_energy(photon_energy_eV: float, Z: int, rng: np.random.G
     """Sample ``eps`` by PENELOPE-2024's composition/rejection, Eqs. 2.91--2.96.
 
     Just above threshold ``F_0`` can make both ``phi`` vanish at ``eps = 1/2``
-    (the fitted DCS shifts the threshold up slightly); there the density is
-    taken flat on its range, the limit of the symmetric DCS as the range closes.
+    (the fitted DCS shifts the threshold up slightly; this happens only for
+    Z >= 85 below 1.031--1.087 MeV); there the density is taken flat on its
+    range, the limit of the symmetric DCS as the range closes. This fallback
+    is a PyRITE convention, not part of the manual.
     Validation: pair-production-sampling
     """
     kappa = float(photon_energy_eV) / _ELECTRON_REST_EV
@@ -194,6 +196,7 @@ def sample_pair_polar_cosine(kinetic_eV, uniform):
 
 def _rotate(direction, cos_theta: float, phi: float) -> np.ndarray:
     """Unit vector at polar ``theta``/azimuth ``phi`` about ``direction``."""
+    direction = direction / np.linalg.norm(direction)
     reference = np.array([1.0, 0.0, 0.0]) if abs(direction[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
     transverse = np.cross(direction, reference)
     transverse /= np.linalg.norm(transverse)
@@ -246,7 +249,13 @@ def _mix(x):
 
 
 def pair_photon_stream_key(seed, parent_track, photon_ordinal):
-    """Per-photon stream keys from (seed, parent track, photon ordinal)."""
+    """Per-photon stream keys from (seed, parent track, photon ordinal).
+
+    ``parent_track`` is the cascade's global track id, so keys of photons from
+    generation-1 and later parents depend on ``Ne`` and on earlier launches,
+    as secondary keys do; never on batch size or processing order.
+    Validation: photon-pair-first-interaction
+    """
     with np.errstate(over="ignore"):
         x = np.uint64(seed) ^ _PAIR_PHOTON_SALT
         parent = np.asarray(parent_track, dtype=np.uint64)
@@ -331,6 +340,9 @@ def photon_first_interactions(
     compositions = [_normalize_composition(None, None, layer[2]) for layer in layers]
     coefficients = [_channel_coefficients(comp, energies) for comp in compositions]
     mu = np.stack([pair.sum(axis=0) + other.sum(axis=0) for pair, other in coefficients], axis=1)
+    if not np.all(np.isfinite(mu)):
+        # EPDL is NaN outside 1 eV--100 GeV; refuse rather than read it as escape.
+        raise ValueError("photon energy is outside the EPDL2025 attenuation domain")
     length = end - start
     with np.errstate(invalid="ignore"):
         tau_layer = np.where(length > 0.0, mu * length, 0.0)

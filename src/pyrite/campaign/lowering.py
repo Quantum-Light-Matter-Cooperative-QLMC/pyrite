@@ -45,6 +45,7 @@ def build_case(scene: Scene, numerics: Numerics) -> Case:
         bremsstrahlung_model=numerics.bremsstrahlung_model,
         radiative_model=numerics.radiative_model,
         radiative_cutoff_eV=numerics.radiative_cutoff_eV,
+        pair_production_model=numerics.pair_production_model,
     )
     if len(cases) != 1:  # Scene rejects every implicit multi-value field.
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
@@ -71,6 +72,7 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             radiative_model=getattr(settings, "radiative_model", "uncoupled"),
             radiative_cutoff_eV=getattr(settings, "radiative_cutoff_eV", None),
             temporal_profile=getattr(settings, "temporal_profile", False),
+            pair_production_model=getattr(settings, "pair_production_model", None),
         )
     resolved = Numerics() if numerics is None else numerics
     cases = []

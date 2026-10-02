@@ -57,9 +57,18 @@ with {math}`g_0=4\ln(Rm_ec/\hbar)-4f_C(Z)+F_0(\kappa,Z)` (Eqs. 2.85–2.88; scre
 
 **Daughters.** A pair electron with {math}`E_->T_s` is launched in the next cascade generation from the interaction point with the sampled direction, and is marked `launch_kind = 2` in `secondary_tracks` (shell secondaries are 1, primaries 0); its `parent_hard_ordinal` holds the photon ordinal on the parent track. Its stream key hashes (seed, parent track, photon ordinal) under its own salt. A smaller {math}`E_-` is deposited locally. The positron is **recorded, not transported** until positron transport lands (#276). The run warns, and `result["pair_production"]` carries `positrons_transported = False`, every event (row, photon energy, atom, point, clock, both energies and directions, launched track), and photon outcome counts. `secondary_energy_balance` removes each converted photon from `radiated` and adds `pair_rest_mass` ({math}`2m_ec^2`), `positron` ({math}`E_+`) and `pair_subthreshold` (part of `deposited`), so the balance still closes per history.
 
-**RNG.** Each photon owns a Philox stream keyed on (seed, parent track, photon ordinal on that track). Its outcome is therefore independent of batching, generation order and transport core. The step runs on the host after photon completion, which is already host-side in this mode. Identical transport rows therefore give identical pairs on CPU and CUDA cores.
+**RNG.** Each photon owns a Philox stream keyed on (seed, parent track, photon ordinal on that track). Its outcome is therefore independent of batch size, processing order and transport core. Parent track ids are global, so keys for photons from generation-1 and later parents depend on `Ne` and on earlier launches, as for shell secondaries. The step runs on the host after photon completion, which is already host-side in this mode. Identical transport rows therefore give identical pairs on CPU and CUDA cores.
 
-**Magnitude.** Conversion needs both a hard photon above 1.022 MeV and a pair interaction before it leaves the target. At REGAE-scale beam energies (≤5 MeV) both factors are small for thin targets. Pairs matter only for thick targets and MeV beams. The production continuum scorer is a track-length estimator of the BremsLib DDCS, with escape transmission that already removes converted photons. Pair conversion therefore changes scored spectra only through the radiation of the launched daughter electrons.
+**Magnitude.** Conversion needs both a hard photon above 1.022 MeV and a pair interaction before it leaves the target. `checks/pair_conversion_yield.py` evaluates the expected conversion probability of every such photon along its sampled direction (400 primaries per case, normal incidence, released BremsLib tables). The results:
+
+| Target | Beam | Photons above $2m_ec^2$ per primary | Mean conversion probability | Pairs per primary |
+| --- | --- | --- | --- | --- |
+| Si, 1 mm | 3 MeV | 0.0075 | $7.6\times10^{-5}$ | $(6\pm5)\times10^{-7}$ |
+| Si, 1 mm | 5 MeV | 0.018 | $1.5\times10^{-4}$ | $(2.6\pm1.7)\times10^{-6}$ |
+| MoS₂, 0.1 mm | 5 MeV | 0.013 | $4.4\times10^{-5}$ | $(5\pm3)\times10^{-7}$ |
+| MoS₂, 1 mm | 5 MeV | 0.053 | $8.7\times10^{-4}$ | $(4.5\pm1.5)\times10^{-5}$ |
+
+At REGAE-scale beam energies (≤5 MeV) pairs are therefore a $10^{-5}$-per-primary effect even in millimetre targets, and negligible in thin ones. The mode exists for energy-accounting completeness and thick-target studies; analog statistics need on the order of $10^5$–$10^6$ primaries per pair. The production continuum scorer is a track-length estimator of the BremsLib DDCS, with escape transmission that already removes converted photons. Pair conversion therefore changes scored spectra only through the radiation of the launched daughter electrons.
 
 ## Straggling and supported scope
 

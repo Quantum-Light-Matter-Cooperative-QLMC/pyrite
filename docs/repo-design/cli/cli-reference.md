@@ -1525,7 +1525,7 @@ Usage: pyrite profile numerics reset [OPTIONS] NAME [line-electrons|bremsstrahlu
                                      energy-loss|inelastic-model|inelastic-cutoff-
                                      ev|secondary-threshold-ev|elastic-
                                      model|bremsstrahlung-model|radiative-
-                                     model|radiative-cutoff-ev]...
+                                     model|radiative-cutoff-ev|pair-production-model]...
 
   Reset selected FIELDs, or every explicit numeric when none are named.
 
@@ -1591,6 +1591,12 @@ Options:
   --radiative-cutoff-ev EV        Hard-photon cutoff k_c in eV for coupled transport
                                   (default 1000); must not exceed the continuum electron
                                   cutoff (1000 eV by default).  [x>0.0]
+  --pair-production-model [penelope-2024]
+                                  Convert coupled hard photons above 1.022 MeV to e-/e+
+                                  pairs (opt-in). Requires --secondary-threshold-ev and
+                                  coupled BremsLib transport; pair electrons are
+                                  transported as secondaries, positrons are recorded but
+                                  not transported.
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.

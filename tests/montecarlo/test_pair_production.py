@@ -412,3 +412,14 @@ def test_pair_mode_rejects_unsupported_configurations(kw, message):
             transport_core="per-electron",
             **kw,
         )
+
+
+def test_photon_outside_epdl_domain_is_refused():
+    with pytest.raises(ValueError, match="outside the EPDL2025"):
+        photon_first_interactions(
+            [[0.0, 0.0, 1.0]],
+            [[0.0, 0.0, 1.0]],
+            [2.0e11],
+            [[0.5, 0.5]],
+            [(0.0, 10.0, [("Pb", 0.03)])],
+        )

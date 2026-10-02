@@ -177,6 +177,9 @@ def _simulation_scene(document, material, profile_name, detector_id=None):
                 transport.get("radiative_model", "uncoupled"),
             ),
             radiative_cutoff_eV=cast(float | None, transport.get("radiative_cutoff_eV")),
+            pair_production_model=cast(
+                Literal["penelope-2024"] | None, transport.get("pair_production_model")
+            ),
         ),
         catalog.profile_emission(profile_name) or "incoherent",
         detector_id,

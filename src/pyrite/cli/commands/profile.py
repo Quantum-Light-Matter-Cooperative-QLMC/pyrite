@@ -54,6 +54,7 @@ _INELASTIC_MODEL_VALUES = ("auto", "continuous", "shell-soft-hard")
 _ELASTIC_MODEL_VALUES = ("mott", "elsepa")
 _BREMSSTRAHLUNG_MODEL_VALUES = ("auto", "eedl", "bremslib")
 _RADIATIVE_MODEL_VALUES = ("auto", "uncoupled", "bremslib-soft-hard")
+_PAIR_PRODUCTION_MODEL_VALUES = ("penelope-2024",)
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
     "line-electrons": "n_electrons",
@@ -72,6 +73,7 @@ _NUMERICS_FIELD_NAMES = {
     "bremsstrahlung-model": "bremsstrahlung_model",
     "radiative-model": "radiative_model",
     "radiative-cutoff-ev": "radiative_cutoff_eV",
+    "pair-production-model": "pair_production_model",
 }
 _RANGE_OPTIONS = (
     ("thickness", "--thickness", THICKNESS_CSV_RANGE, "ANGSTROM,..."),
@@ -291,6 +293,8 @@ def _emit_show(payload):
     if "radiative_model" in numerics:
         k_c = numerics.get("radiative_cutoff_eV") or DEFAULT_RADIATIVE_CUTOFF_EV
         emit_result(f"  radiative model: {numerics['radiative_model']} (k_c {k_c:g} eV)")
+    if "pair_production_model" in numerics:
+        emit_result(f"  pair production model: {numerics['pair_production_model']}")
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
     refs = payload["energy_grid_refs"]
@@ -517,6 +521,15 @@ def numerics_show_command(name, fidelity, json_output):
     help=(
         "Hard-photon cutoff k_c in eV for coupled transport (default 1000); must not exceed the "
         "continuum electron cutoff (1000 eV by default)."
+    ),
+)
+@click.option(
+    "--pair-production-model",
+    type=click.Choice(_PAIR_PRODUCTION_MODEL_VALUES),
+    help=(
+        "Convert coupled hard photons above 1.022 MeV to e-/e+ pairs (opt-in). Requires "
+        "--secondary-threshold-ev and coupled BremsLib transport; pair electrons are "
+        "transported as secondaries, positrons are recorded but not transported."
     ),
 )
 @click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")

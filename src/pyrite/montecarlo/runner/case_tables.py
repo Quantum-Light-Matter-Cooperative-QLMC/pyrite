@@ -146,6 +146,12 @@ def _case_radiative_kwargs(case):
         radiative_model=model,
         radiative_cutoff_eV=float(case["radiative_cutoff_eV"]),
         bremslib_tables=_case_bremslib_tables(case),
+        # Opt-in pair conversion (#275); absent leaves every photon radiated.
+        **(
+            {"pair_production_model": case["pair_production_model"]}
+            if case.get("pair_production_model") is not None
+            else {}
+        ),
     )
 
 

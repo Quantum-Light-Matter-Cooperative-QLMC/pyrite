@@ -76,6 +76,7 @@ _CASE_KEY_ORDER = (
     "bremsstrahlung_model",
     "radiative_model",
     "radiative_cutoff_eV",
+    "pair_production_model",
     "beam_uvw",
     "surface_hkl",
     "mosaic_fwhm_rad",
@@ -182,6 +183,10 @@ class Case(Mapping[str, Any]):
         Requires BremsLib, ``energy_model``, no grooves, a
         cutoff no higher than the continuum electron cutoff, and a continuum
         cutoff no higher than the line cutoff (the soft scorer cannot reclip).
+    pair_production_model
+        Opt-in ``"penelope-2024"`` pair conversion of coupled hard photons;
+        requires ``secondary_threshold_eV`` and ``radiative_model``. Absent
+        converts nothing.
     E_cut_lines_keV, E_cut_brem_keV, sinc_cutoff, brem_step_eV
         Legacy/manual cutoff, truncation, and grid controls.
     """
@@ -256,6 +261,7 @@ class Case(Mapping[str, Any]):
     bremsstrahlung_model: Literal["bremslib"] | _Absent = _ABSENT
     radiative_model: Literal["bremslib-soft-hard"] | _Absent = _ABSENT
     radiative_cutoff_eV: float | _Absent = _ABSENT
+    pair_production_model: Literal["penelope-2024"] | _Absent = _ABSENT
 
     # Legacy/manual-only controls accepted during the Mapping support window.
     azimuth_rad: float | _Absent = _ABSENT
@@ -329,6 +335,13 @@ class Case(Mapping[str, Any]):
             raise ValueError("radiative_model and radiative_cutoff_eV are set together")
         if self.radiative_model is not _ABSENT:
             self._validate_radiative()
+        if self.pair_production_model is not _ABSENT:
+            if self.pair_production_model != "penelope-2024":
+                raise ValueError("pair_production_model must be absent or 'penelope-2024'")
+            if self.secondary_threshold_eV is _ABSENT or self.radiative_model is _ABSENT:
+                raise ValueError(
+                    "pair_production_model requires secondary_threshold_eV and radiative_model"
+                )
         if isinstance(self.line_grid_policy, Mapping):
             resolution = self.line_grid_policy.get("resolution")
             policy = resolution.get("policy") if isinstance(resolution, Mapping) else None

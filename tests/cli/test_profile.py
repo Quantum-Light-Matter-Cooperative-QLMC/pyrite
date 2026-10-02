@@ -1561,6 +1561,24 @@ def test_numerics_set_shell_inelastic_mode_validates_and_resets(tmp_path, monkey
     assert "secondary_threshold_eV = 1000.0" in catalog.read_text()
     shown = invoke(profile.command, ["show", "sub_100keV"])
     assert "secondary threshold: 1000 eV" in shown.stdout
+    pair = invoke(
+        profile.command,
+        ["numerics", "set", "sub_100keV", "--pair-production-model", "penelope-2024"],
+    )
+    assert_clean_result(pair, stdout="updated numerics for profile sub_100keV\n")
+    assert 'pair_production_model = "penelope-2024"' in catalog.read_text()
+    shown = invoke(profile.command, ["show", "sub_100keV"])
+    assert "pair production model: penelope-2024" in shown.stdout
+    bad_pair = invoke(
+        profile.command, ["numerics", "set", "sub_100keV", "--pair-production-model", "bh"]
+    )
+    assert bad_pair.exit_code == 2
+    unpaired = invoke(
+        profile.command,
+        ["numerics", "reset", "sub_100keV", "pair-production-model", "--yes"],
+    )
+    assert unpaired.exit_code == 0
+    assert "pair_production_model" not in catalog.read_text()
     cleared = invoke(
         profile.command,
         ["numerics", "reset", "sub_100keV", "secondary-threshold-ev", "--yes"],

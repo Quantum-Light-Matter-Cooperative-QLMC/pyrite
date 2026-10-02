@@ -360,7 +360,7 @@ def transport_secondary_cascade(simulate, kw):
     """Run ``simulate`` over primaries and every launched generation; join rows.
 
     ``kw`` is the caller's full :func:`simulate_trajectories` argument mapping.
-    Validation: shell-secondary-transport
+    Validation: shell-secondary-transport, photon-pair-first-interaction
     """
     threshold_keV, max_generations, max_tracks = _validate(kw)
     seed = kw["seed"]
@@ -500,6 +500,7 @@ def _merge_pair_launches(harvest, events, seed):
 
     ``ordinal`` is the photon ordinal on the parent track; ``pair_index`` is
     each launched pair electron's position within this generation's launches.
+    Validation: photon-pair-first-interaction
     """
     launched = events["electron_launched"]
     n_shell = harvest["parent"].size
