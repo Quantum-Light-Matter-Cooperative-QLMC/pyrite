@@ -24,12 +24,12 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-groups --locked
 
-      # EEDL, EADL, SBETHE sdbase/ and the ELSEPA tables are hash-pinned
-      # fetched data, not packaged (ADR-0014, #263, #284). The key follows the
-      # pins, so a repin refetches; a cache hit needs no network. `fetch`
-      # re-verifies a cached copy and exits 0. The ELSEPA archive is a private
-      # release asset, read with this job's GITHUB_TOKEN (fork PRs may lack
-      # access).
+      # Every hash-pinned fetched dataset and table release (ADR-0014): EEDL,
+      # EADL, EPDL, SBETHE sdbase/ and catalogue tables, ELSEPA, BremsLib
+      # (#263, #282, #284). The key follows the pins, so a repin refetches; a
+      # cache hit needs no network. `fetch` re-verifies a cached copy and
+      # exits 0. PyRITE's own archives are private release assets, read with
+      # this job's GITHUB_TOKEN (fork PRs may lack access).
       - name: Cache pinned data
         uses: actions/cache@v4
         with:
@@ -37,16 +37,12 @@ jobs:
             ~/.local/share/pyrite/datasets
             ~/.local/share/pyrite/xsgen/tables
             ~/.local/share/pyrite/xsgen/reference-data
-          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/elsepa-tables.json') }}
+          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
 
       - name: Fetch pinned data
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          uv run pyrite tables fetch eedl
-          uv run pyrite tables fetch eadl
-          uv run pyrite tables fetch sbethe
-          uv run pyrite tables fetch elsepa
+        run: uv run pyrite tables fetch
 
       - name: Test ${{ matrix.suite }} suite
         run: |

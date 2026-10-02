@@ -216,7 +216,7 @@ def test_local_tables_skip_packaged_tier_and_unpaired_files(tmp_path, monkeypatc
 
 def test_job_script_preflights_tables_and_fails_fast_before_the_sweep():
     block = _queue_scripts._tables_preflight_block()
-    assert "pyrite tables verify --require bremslib,elsepa,eedl,eadl" in block
+    assert "pyrite tables verify --require bremslib,elsepa,sbethe-tables,eedl,eadl,epdl" in block
     assert 'echo "FAILED (tables)' in block
     assert "exit 1" in block
     assert "PYRITE_HOME=" in block
@@ -336,4 +336,5 @@ def test_local_datasets_map_arcnames_to_verified_files(monkeypatch, tmp_path):
     assert found == {
         EEDL_ARC: tmp_path / "eedl" / "EEDL.endf",
         EADL_ARC: tmp_path / "eadl" / "EADL2025.ALL",
+        "datasets/epdl/epdl2025_mf23.npz": tmp_path / "epdl" / "epdl2025_mf23.npz",
     }

@@ -7,9 +7,10 @@ came from, where they live, and which code trees PyRITE can currently reach.
 material path, whose options are largely disjoint: an option belonging to
 another code is rejected rather than silently ignored. ``fetch`` installs
 SBETHE's pinned reference database without extracting the archive's prebuilt
-executable or documentation, the pinned releases of BremsLib-derived and
-ELSEPA elastic tables for the catalogue elements, and the pinned EPICS2025
-EEDL and EADL files every run reads.
+executable or documentation, the pinned releases of BremsLib-derived,
+ELSEPA elastic and SBETHE catalogue stopping tables, and the pinned EPICS2025
+EEDL, EADL and derived EPDL files every run reads; without a code it installs
+all of them.
 """
 
 import json
@@ -701,11 +702,11 @@ def fetch_command(code: str | None, archive: str | None, json_output: bool) -> N
 @click.option(
     "--require",
     "require",
-    default="bremslib,elsepa,eedl,eadl",
+    default="bremslib,elsepa,sbethe-tables,eedl,eadl,epdl",
     show_default=True,
     help=(
         "Comma-separated codes whose pinned tables or datasets must be present "
-        "(bremslib, elsepa, eedl, eadl)."
+        "(bremslib, elsepa, sbethe-tables, eedl, eadl, epdl)."
     ),
 )
 @output_option
@@ -714,7 +715,7 @@ def verify_command(require: str, json_output: bool) -> None:
 
     Resolves each table pinned by the shipped release indexes and compares its
     stored manifest digest with the pin; table payloads are not hashed. The
-    EEDL and EADL files are hashed in full against their pinned SHA-256
+    EEDL, EADL and EPDL files are hashed in full against their pinned SHA-256
     (about 0.1 s). Fast enough to gate a job. Exits 1 when anything is missing
     or differs, naming the fix; exits 0 when all are intact. Read-only.
 

@@ -2731,17 +2731,18 @@ Usage: pyrite tables verify [OPTIONS]
   Check that every pinned release table and dataset is present and intact.
 
   Resolves each table pinned by the shipped release indexes and compares its stored
-  manifest digest with the pin; table payloads are not hashed. The EEDL and EADL files
-  are hashed in full against their pinned SHA-256 (about 0.1 s). Fast enough to gate a
-  job. Exits 1 when anything is missing or differs, naming the fix; exits 0 when all are
-  intact. Read-only.
+  manifest digest with the pin; table payloads are not hashed. The EEDL, EADL and EPDL
+  files are hashed in full against their pinned SHA-256 (about 0.1 s). Fast enough to
+  gate a job. Exits 1 when anything is missing or differs, naming the fix; exits 0 when
+  all are intact. Read-only.
 
   Remote jobs run this before the sweep and fail with state `FAILED (tables)`.
 
 Options:
   --require TEXT                  Comma-separated codes whose pinned tables or datasets
-                                  must be present (bremslib, elsepa, eedl, eadl).
-                                  [default: bremslib,elsepa,eedl,eadl]
+                                  must be present (bremslib, elsepa, sbethe-tables,
+                                  eedl, eadl, epdl).  [default: bremslib,elsepa,sbethe-
+                                  tables,eedl,eadl,epdl]
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
