@@ -4,7 +4,9 @@
   "archive": {
     "sha256": "7f690120e71bcbede4602845e4e171665d3767f8906823c1459dc7861987df89",
     "bytes": 2982571,
-    "urls": []
+    "urls": [
+      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-sbethe-1/sbethe-tables.zip"
+    ]
   },
   "tables": [
     {
