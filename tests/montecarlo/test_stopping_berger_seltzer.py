@@ -529,4 +529,13 @@ def test_cuda_stopping_carries_the_sbethe_table_and_straggling_scale():
     kernel = resources.files("pyrite.montecarlo.transport").joinpath("_jit_kernel.py").read_text()
     assert "dEds = _dEds_sbethe(" in kernel
     assert "stopping_scale = dEds / reference_dEds" in kernel
-    assert "* stopping_scale" in kernel
+    # Both kernels hand the scale to the shared Urban device sampler (#280).
+    sampler_start = device.index("def _urban_sample_compound(")
+    sampler = device[sampler_start : device.index("\n@", sampler_start)]
+    assert "* stopping_scale" in sampler
+    lut_kernel = (
+        resources.files("pyrite.montecarlo.transport").joinpath("_jit_lut_kernel.py").read_text()
+    )
+    assert "stopping_scale = dEds / _dEds_packed(" in lut_kernel
+    for source in (kernel, lut_kernel):
+        assert "_urban_sample_compound(" in source

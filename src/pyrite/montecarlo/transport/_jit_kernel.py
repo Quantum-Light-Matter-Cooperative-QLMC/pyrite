@@ -42,7 +42,6 @@ from ._jit_device import (
     F64_EPS,
     F64_HALF,
     F64_INF,
-    F64_MC2_KEV,
     F64_ONE,
     F64_PI,
     F64_TEN,
@@ -67,15 +66,10 @@ from ._jit_device import (
     I32_ZERO,
     U64_ONE,
     U64_ZERO,
-    URBAN_E0_KEV,
-    URBAN_E2_KEV_PER_Z2,
-    URBAN_POISSON_CHUNK_MAX,
-    URBAN_RATE,
     _alpha_sr_joy,
     _beta_from_keV,
     _dEds_packed,
     _dEds_sbethe,
-    _dEds_spliced_element,
     _elsepa_invert_row,
     _interp_mott_log_alpha,
     _rate_mott,
@@ -83,7 +77,7 @@ from ._jit_device import (
     _searchsorted_right,
     _stream_uniform,
     _urban_flight_key,
-    _urban_ionisation,
+    _urban_sample_compound,
     _urban_stream_key,
 )
 from ._jit_radiative_device import (
@@ -512,12 +506,9 @@ def _transport_kernel(
         # indicator `dE >= E_start - E_cut`, and the fluid crossing location
         # `s_cut = s (E_start - E_cut) / dE`. `exit_code` is derived from the
         # same local booleans below, so the flag clearing transcribes as is.
-        # Mirrors transport._urban_sample_compound_keV /
-        # _urban_sample_element_keV / _urban_channels_scalar /
-        # _urban_poisson_scalar. Inlined rather than split into device
-        # functions: this needs several outputs per element plus a mutable
-        # draw counter, and device functions in this file return one value
-        # (see the prism-exit comment in the step-2 boundary block above).
+        # The sampler itself is the shared `_urban_sample_compound` device
+        # function (mirrors transport._urban_sample_compound_keV), which the
+        # LUT kernel calls too.
         if inelastic_on == I32_ONE and straggle_on == I32_ONE:
             # Shell mode: soft losses only. dEds is the soft stopping and the
             # hard tail is explicit, so PENELOPE's two-moment sampler replaces
@@ -578,161 +569,19 @@ def _transport_kernel(
 
             urban_key = _urban_stream_key(key)
             flight_key = _urban_flight_key(urban_key, np.uint64(flight_id), np.uint64(substep_id))
-            stragg_counter = U64_ZERO
-            # Accumulated per row into a thread-local before the single global
-            # update, matching the host's `_urban_sample_compound_keV`, which
-            # sums its per-element losses into a local starting at 0. The row
-            # total is also what the crossing rule needs.
-            stragg_loss = F64_ZERO
-            i_el2 = I32_ZERO
-            while i_el2 < n_el:
-                Zc = L_Zs[row + i_el2]
-                Jc = L_Js[row + i_el2]
-                kc = L_ks[row + i_el2]
-                coeffc = L_coeffs[row + i_el2]
-                E_crossc = L_E_cross[row + i_el2]
-                Cc = -_dEds_spliced_element(Jc, kc, coeffc, E_crossc, E_j) * stopping_scale
-
-                tau_u = E_j / F64_MC2_KEV
-                gamma_u = F64_ONE + tau_u
-                beta_sq_u = F64_ONE - F64_ONE / (gamma_u * gamma_u)
-                two_mc2_bg2_u = F64_TWO * F64_MC2_KEV * tau_u * (tau_u + F64_TWO)
-                T_up_u = F64_HALF * E_j
-
-                valid_u = T_up_u > URBAN_E0_KEV and Cc > F64_ZERO
-                L_I_u = F64_ZERO
-                if valid_u:
-                    L_I_u = xp.log(two_mc2_bg2_u / Jc) - beta_sq_u
-                    valid_u = L_I_u > F64_ZERO
-
-                dE_elem = F64_ZERO
-                if not valid_u:
-                    dE_elem = Cc * step_j
-                else:
-                    # Levels (transport._urban_levels_scalar): the K-shell
-                    # channel E_2 = 10 Z^2 eV re-solves to f_1=1, E_1=I
-                    # whenever it is inadmissible, which keeps <dE> = C s
-                    # exact rather than overshooting under a naive clamp.
-                    E_2_u = URBAN_E2_KEV_PER_Z2 * Zc * Zc
-                    f_2_u = F64_TWO / Zc if Zc > F64_TWO else F64_ONE
-                    f_1_u = F64_ONE
-                    E_1_u = Jc
-                    resolved_u = False
-                    if (
-                        Zc > F64_TWO
-                        and E_2_u < T_up_u
-                        and xp.log(two_mc2_bg2_u / E_2_u) - beta_sq_u > F64_ZERO
-                    ):
-                        f_1_cand = F64_ONE - f_2_u
-                        E_1_cand = xp.exp((xp.log(Jc) - f_2_u * xp.log(E_2_u)) / f_1_cand)
-                        if xp.log(two_mc2_bg2_u / E_1_cand) - beta_sq_u > F64_ZERO:
-                            f_1_u = f_1_cand
-                            E_1_u = E_1_cand
-                            resolved_u = True
-                    if not resolved_u:
-                        f_1_u = F64_ONE
-                        E_1_u = Jc
-                        f_2_u = F64_ZERO
-
-                    soft_u = Cc * (F64_ONE - URBAN_RATE) / L_I_u
-                    sigma_1_u = (
-                        soft_u * (f_1_u / E_1_u) * (xp.log(two_mc2_bg2_u / E_1_u) - beta_sq_u)
-                    )
-                    sigma_2_u = F64_ZERO
-                    if f_2_u > F64_ZERO:
-                        sigma_2_u = (
-                            soft_u * (f_2_u / E_2_u) * (xp.log(two_mc2_bg2_u / E_2_u) - beta_sq_u)
-                        )
-                    sigma_3_u = (
-                        Cc
-                        * URBAN_RATE
-                        * (T_up_u - URBAN_E0_KEV)
-                        / (URBAN_E0_KEV * T_up_u * xp.log(T_up_u / URBAN_E0_KEV))
-                    )
-
-                    # Exact Poisson counts by bounded-rate inverse-CDF chunks.
-                    # Poisson additivity preserves the law for oversized means;
-                    # mirrors transport._urban_poisson_scalar.
-                    lam1 = sigma_1_u * step_j
-                    n1 = I32_ZERO
-                    if lam1 > F64_ZERO:
-                        chunks1 = np.int32(xp.ceil(lam1 / URBAN_POISSON_CHUNK_MAX))
-                        chunk_lam1 = lam1 / np.float64(chunks1)
-                        chunk1 = I32_ZERO
-                        while chunk1 < chunks1:
-                            u1 = _stream_uniform(flight_key, stragg_counter)
-                            stragg_counter = stragg_counter + U64_ONE
-                            p1 = xp.exp(-chunk_lam1)
-                            cdf1 = p1
-                            k1 = I32_ZERO
-                            while u1 >= cdf1:
-                                k1 += I32_ONE
-                                p1 = p1 * chunk_lam1 / np.float64(k1)
-                                next_cdf1 = cdf1 + p1
-                                if next_cdf1 <= cdf1:
-                                    break
-                                cdf1 = next_cdf1
-                            n1 += k1
-                            chunk1 += I32_ONE
-                    dE_elem += np.float64(n1) * E_1_u
-
-                    # n_2, same recurrence.
-                    lam2 = sigma_2_u * step_j
-                    n2 = I32_ZERO
-                    if lam2 > F64_ZERO:
-                        chunks2 = np.int32(xp.ceil(lam2 / URBAN_POISSON_CHUNK_MAX))
-                        chunk_lam2 = lam2 / np.float64(chunks2)
-                        chunk2 = I32_ZERO
-                        while chunk2 < chunks2:
-                            u2 = _stream_uniform(flight_key, stragg_counter)
-                            stragg_counter = stragg_counter + U64_ONE
-                            p2 = xp.exp(-chunk_lam2)
-                            cdf2 = p2
-                            k2 = I32_ZERO
-                            while u2 >= cdf2:
-                                k2 += I32_ONE
-                                p2 = p2 * chunk_lam2 / np.float64(k2)
-                                next_cdf2 = cdf2 + p2
-                                if next_cdf2 <= cdf2:
-                                    break
-                                cdf2 = next_cdf2
-                            n2 += k2
-                            chunk2 += I32_ONE
-                    dE_elem += np.float64(n2) * E_2_u
-
-                    # n_3, then its continuum quanta: exact inverse CDF of the
-                    # 1/E^2 spectrum, one uniform each. Mirrors
-                    # transport._urban_sample_element_keV's tail loop.
-                    lam3 = sigma_3_u * step_j
-                    n3 = I32_ZERO
-                    if lam3 > F64_ZERO:
-                        chunks3 = np.int32(xp.ceil(lam3 / URBAN_POISSON_CHUNK_MAX))
-                        chunk_lam3 = lam3 / np.float64(chunks3)
-                        chunk3 = I32_ZERO
-                        while chunk3 < chunks3:
-                            u3 = _stream_uniform(flight_key, stragg_counter)
-                            stragg_counter = stragg_counter + U64_ONE
-                            p3 = xp.exp(-chunk_lam3)
-                            cdf3 = p3
-                            k3 = I32_ZERO
-                            while u3 >= cdf3:
-                                k3 += I32_ONE
-                                p3 = p3 * chunk_lam3 / np.float64(k3)
-                                next_cdf3 = cdf3 + p3
-                                if next_cdf3 <= cdf3:
-                                    break
-                                cdf3 = next_cdf3
-                            n3 += k3
-                            chunk3 += I32_ONE
-                    kq = I32_ZERO
-                    while kq < n3:
-                        uq = _stream_uniform(flight_key, stragg_counter)
-                        stragg_counter = stragg_counter + U64_ONE
-                        dE_elem += _urban_ionisation(uq, T_up_u)
-                        kq += I32_ONE
-
-                stragg_loss += dE_elem
-                i_el2 += I32_ONE
+            stragg_loss = _urban_sample_compound(
+                L_Zs,
+                L_Js,
+                L_ks,
+                L_coeffs,
+                L_E_cross,
+                row,
+                n_el,
+                E_j,
+                step_j,
+                stopping_scale,
+                flight_key,
+            )
             stragg_loss += rad_dEds * step_j
 
             # Diagnostic, unchanged from slice D: the SAMPLED loss, which on a

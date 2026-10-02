@@ -280,7 +280,7 @@ matching the ledger's explicit convention that geometry wins an exact row-end ti
 
 ## Production integration and observable evidence
 
-The sampler is now applied by every host transport core and the exact CUDA kernel. The CUDA LUT combination raises rather than returning an unstraggled result; production selection routes a straggled CUDA run to the exact kernel. The exact CUDA implementation is verified on hardware: all five straggling tests pass on an NVIDIA GeForce RTX 5080 (driver 610.47, CuPy 14.1.1), covering disabled-path bit identity, deterministic replay, finite/nonnegative energy bookkeeping, first-row transport-state parity, and ensemble distributional agreement. Direct host/device parity of the first applied loss remains untested because that check compares the row-start `E_keV`, not `E_end_keV`. With `straggling=False` (the default), every transport core remains bit-for-bit identical to the pre-feature path and no straggling output is emitted.
+The sampler is now applied by every host transport core and both CUDA kernels. The CUDA LUT kernel (#280) calls the same `_urban_sample_compound` device sampler as the exact kernel, from the exact element tables, so straggling no longer forces production CUDA runs off the LUT (ELSEPA elastic runs bypass the LUT regardless). **CUDA LUT hardware validation (#280, 2026-10-01):** on NVIDIA GeForce RTX 5080, driver 610.47, CuPy 14.2.0, the LUT kernel's first row matches the CPU LUT core to `rtol=1e-12` (frozen, binding `max_dE_frac`, SBETHE rescaling), replays deterministically, and agrees with exact CUDA in mean, variance and 95th-percentile tail of `straggle_dE_keV` and in `n_cutoff_stopped` within four independent-sample standard errors over four seeds x 1024 electrons at `max_dE_frac=0` and `0.02`; `straggling=False` LUT output digests are identical to the pre-change kernel. The exact CUDA implementation is verified on hardware: all five straggling tests pass on an NVIDIA GeForce RTX 5080 (driver 610.47, CuPy 14.1.1), covering disabled-path bit identity, deterministic replay, finite/nonnegative energy bookkeeping, first-row transport-state parity, and ensemble distributional agreement. Direct host/device parity of the first applied loss remains untested because that check compares the row-start `E_keV`, not `E_end_keV`. With `straggling=False` (the default), every transport core remains bit-for-bit identical to the pre-feature path and no straggling output is emitted.
 
 Except for the geometry-event tie convention, the cutoff indicator is exact for a nonnegative frozen-row loss: $\Delta E \ge E_{\rm start}-E_{\rm cut}$ if and only if passage occurs by the row end. The crossing position uses the fluid interpolation $s_{\rm cut}=s(E_{\rm start}-E_{\rm cut})/\Delta E$ and ends at $E_{\rm cut}$ exactly. At frozen energy, splitting is distributionally invariant for all supported means because bounded-rate chunks preserve the Poisson law. With evolving energy, subdivision discretizes the state-dependent jump kernel through the full generator and covariance terms derived above.
 
@@ -289,3 +289,55 @@ The committed paired-seed observable check used HOPG at 25 keV. At 1 um of fixed
 The 250 eV--25 keV bremsstrahlung integral changes by $+0.140\% \pm 0.627\%$ (not resolved from zero); normalized spectral total variation is $0.334\% \pm 0.053\%$. In the production coherent HOPG (002) pure-geometry, zero-bunch-offset limit, integrated line yield falls $12.52\% \pm 2.54\%$ and peak height falls $19.50\% \pm 2.12\%$. Those line figures are not an angle- or bunch-averaged experimental observable, and the separate mean-stopping uncertainty remains owned by `feature/reference-electron-stopping-data`.
 
 Verdict from this fresh-context post-fix verification: `rederived`. Mean closure, both continuum moments, inverse CDF, units, signs, $s\to0$, exact bounded-rate Poisson additivity, evolving-energy generator/covariance semantics, and the geometry-tie convention reproduce independently. The covariance term is not separately numerically anchored. Exact CUDA hardware re-validation passes. Suggested human ledger edit: retain `rederived` and the covariance and CUDA applied-loss anchor qualifications. Only a human may adjudicate or move the claim to `signed-off`.
+
+## Fresh-context validation of the CUDA LUT path (#280)
+
+Scope: `montecarlo/transport/_jit_lut_kernel.py::_transport_lut_kernel` (straggled branch), the extracted `montecarlo/transport/_jit_device.py::_urban_sample_compound`, the CUDA LUT launcher, the removed `api.py` guard, and the runner's `exact_only` rule. The Urban law itself is unchanged and was rederived above.
+
+### Expected straggled LUT row, derived before reading the kernel
+
+Let $E$ be the row-start energy, $S_{\rm LUT}(E)>0$ the interpolated layer stopping magnitude, $C_i(E)$ the exact per-element spliced stopping magnitudes, and $s_0$ the geometry-limited flight length. A straggled LUT row should compute:
+
+1. **Deterministic cap first.** With $f=$ `max_dE_frac`, if $f>0$ then $s=\min\!\bigl(s_0,\ fE/S_{\rm LUT}(E)\bigr)$, and a binding cap clears every geometry flag, including the tie-breaking `geometry_event`. If $f=0$ there is no cap. The cap depends only on the mean, so the substep partition is not random. That preserves the frozen-energy infinite divisibility.
+2. **Stopping scale.** Under SBETHE, the mean the sampler reproduces should be the LUT stopping, so $\kappa=S_{\rm LUT}(E)/\sum_iC_i(E)$. Otherwise $\kappa=1$, and the mean is the exact splice $\sum_iC_i(E)\,s$. Both stopping values carry the same sign, so $\kappa>0$ and is dimensionless.
+3. **Draw.** $\Delta E=\sum_i\Delta E_i$, with $\Delta E_i$ drawn from the Urban law at rate scale $\kappa C_i(E)$ over $s$. It uses key $k_{\rm fl}=h(h(k_e\oplus\text{salt}),\ \text{flight},\ \text{substep})$ and a counter that starts at $0$. This is the same key domain as the exact kernel, so $\langle\Delta E\rangle=\kappa\sum_iC_is$.
+4. **Cutoff.** Set $\delta=E-E_{\rm cut}$. A cutoff wins if $\Delta E>\delta$, or if $\Delta E=\delta$ and no geometry event occurs. Then $s\to s\,\delta/\Delta E$ (or $0$ when $\Delta E=0$) and $E_{\rm end}=E_{\rm cut}$. Otherwise $E_{\rm end}=E-\Delta E$. The diagnostic accumulates the full sampled $\Delta E$.
+5. **Clock.** $t_{\rm end}=t+s\,\beta_{\rm LUT}^{-1}(\bar E)$, with $\bar E=E$ for `frozen` and $\bar E=(E+E_{\rm end})/2$ for `midpoint`.
+
+Limits:
+
+- When the Urban width goes to $0$, $\Delta E\to\kappa\sum_iC_is$. Under SBETHE with `frozen`, this is $S_{\rm LUT}s$, which is the deterministic LUT update.
+- Without SBETHE, the result differs from the deterministic LUT update only by the table's $\lvert S_{\rm LUT}-\sum_iC_i\rvert$. `test_transport_lut.py` bounds that difference at relative $5\times10^{-5}$.
+- Under `midpoint`, the deterministic path uses a midpoint rate, while the straggled mean is the documented left-endpoint quadrature, which `max_dE_frac` controls.
+
+### Diff against the implementation
+
+| item | expected | implementation | result |
+|---|---|---|---|
+| cap before draw | $fE/S_{\rm LUT}$, applied only if $f>0$; clears geometry flags and `geometry_event` | `energy_controlled = max_dE_frac > 0`; `max_dE_frac*E_j/(-dEds)` with LUT `dEds<0`, applied before `_urban_sample_compound` | matches |
+| stopping scale | $S_{\rm LUT}/\sum C_i$ under SBETHE, else $1$ | `dEds / _dEds_packed(...)`, both negative; computed only if `sbethe_on` | matches the CPU `stopping_scale = dEds/reference_dEds` |
+| tables | exact packed per-element rows | `stragg_row = L*stragg_width`, `n_el = L_nel[L]`, flat `reshape(-1)` of the padded `(n_layers, max_el)` tables the shared driver uploads | matches |
+| key domain | `_urban_flight_key(_urban_stream_key(key), flight, substep)`, counter $0$ | same calls; flight and substep counters predate this change and are unchanged | matches the exact kernel and the CPU |
+| cutoff | strict $>$, tie goes to geometry, fluid $s$, $0/0\to0$ | same | matches |
+| clock | LUT $\beta^{-1}$ at $E$ or at the realized midpoint | `inv_beta_j`, or `_lut_lerp_at(lut_inv_beta, ..., 0.5*(E_j+E_end_j))` | matches |
+| diagnostic init | zero per electron when enabled | `stragg_dE[e]=0` after the `i<e_count` guard and before the `alive` return, as in the CPU core | matches |
+
+**Sampler extraction (item 2).** Compared with `main:_jit_kernel.py`, `_urban_sample_compound` keeps every expression and every accumulation order: the levels re-solve, $\Sigma_{1,2,3}$, `dE_elem` order $n_1E_1$, $n_2E_2$, then the quanta, and the invalid-element fallback $C_is$. The Poisson recurrence is the same. The only structural change is how the counter is addressed. The old code incremented the counter once per chunk. The new code reads `counter + chunk` and then advances by `_urban_poisson_chunks(lam)`, which equals $\lceil\lambda/64\rceil$ for $\lambda>0$ and $0$ otherwise, the same as `chunks` in `_urban_poisson`. Each draw therefore reads the same uniform index, and the extraction preserves behaviour. The row-invariant quantities $\tau,\gamma,\beta^2,2mc^2\beta^2\gamma^2,T_{\rm up}$ are now computed once instead of once per element, with identical values.
+
+**Straggling off (item 4).** The `else` branch is the previous body verbatim. Only `geometry_event` and `limited_j=False` were hoisted, and neither depends on the cutoff test. The off branch adds no RNG draws. The new kernel arguments are read only under `straggle_on == 1`.
+
+**Guards (item 6).** `api.py` still raises `NotImplementedError` for `transport_core="cuda"` with the LUT enabled and `shell_mode`. The runner sets `exact_only = inelastic_model is not None` and still forces `TransportLUTConfig(enabled=False)` for shell runs. `test_straggling_surface.py::test_runner_falls_back_from_cuda_lut_to_exact_for_straggled_shell_mode` covers this, and `test_straggling_cuda.py::test_straggled_production_case_keeps_the_cuda_lut` covers the converse. Both pass on CPU.
+
+**LUT error separation (item 5).** The ledger note, `electron-transport.md` and the walkthrough all state the same thing: LUT interpolation enters only the cap, clock, hazard and, under SBETHE, the stopping scale. They state it is bounded separately from substep convergence. This matches the code: the sampled law reads exact tables and only $\kappa$ reads the LUT. `tests/montecarlo/test_transport_lut.py` exists and bounds `dEds` at `rtol=5e-5` and the rate and $\beta^{-1}$ at $10^{-5}$.
+
+### Findings (#280 scope)
+
+| # | finding | severity |
+|---|---|---|
+| L1 | Under non-SBETHE stopping, the cap uses $S_{\rm LUT}$ while the sampled mean uses $\sum_iC_i$, so `max_dE_frac` bounds the LUT mean, not the realized mean. The relative mismatch is at most $5\times10^{-5}$, and the CPU LUT core behaves the same way. | informational |
+| L2 | The ledger note says the LUT error is "bounded separately by the transport-LUT tests" but does not name `tests/montecarlo/test_transport_lut.py`, and the Anchor field omits that file. | anchor citation gap |
+| L3 | "`straggling=False` LUT output digests are identical to the pre-change kernel" is a one-off hardware observation. The committed `test_cuda_lut_straggling_off_is_bit_for_bit` compares default with explicit-off on the same build, not with the pre-change kernel. Likewise, no committed test asserts bit-identity of the exact kernel's straggled path across the extraction. Code reading shows both are behaviour-preserving. | anchor gap, minor |
+| L4 | The LUT first-row parity test compares `E_end_keV` for the two midpoint cases, which anchors the applied straggled loss on the LUT kernel. The frozen case still compares only the row-start `E_keV`. | partial closure of finding 11 for the LUT kernel |
+| L5 | The hardware tests (`@pytest.mark.hardware`) were not run in this context because no CUDA device is available. The verdict relies on code comparison and the recorded RTX 5080 run. | provenance note |
+
+Verdict for the #280 scope: `rederived`. The LUT straggled branch matches the CPU LUT core's straggled branch term for term. It samples the shared Urban law on the exact kernel's key domain, and the extraction preserves the exact kernel's behaviour. Only a human may move the claim to `signed-off`.

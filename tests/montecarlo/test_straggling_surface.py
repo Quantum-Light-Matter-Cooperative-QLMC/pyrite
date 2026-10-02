@@ -41,9 +41,11 @@ def test_transport_controls_lower_into_case_and_content_identity():
     assert case_content_key(active) != case_content_key(base)
 
 
-def test_runner_falls_back_from_cuda_lut_to_exact_for_straggling():
-    # Fixed line grid keeps this fallback-plumbing test independent of
-    # automatic line-grid resolution, which needs real transport segments.
+def test_runner_falls_back_from_cuda_lut_to_exact_for_straggled_shell_mode():
+    # Straggling alone keeps the CUDA LUT (#280); "auto" resolves HOPG to shell
+    # soft/hard, which the LUT kernel lacks. Fixed line grid keeps this
+    # fallback-plumbing test independent of automatic line-grid resolution,
+    # which needs real transport segments.
     case = build_cases(
         material_sweep(
             "hopg",
@@ -58,6 +60,7 @@ def test_runner_falls_back_from_cuda_lut_to_exact_for_straggling():
         max_dE_frac=0.02,
     )[0]
     assert case.get("line_grid_policy") is None
+    assert case["inelastic_model"] == "shell-soft-hard"
     segments = {"sentinel": object()}
 
     with (

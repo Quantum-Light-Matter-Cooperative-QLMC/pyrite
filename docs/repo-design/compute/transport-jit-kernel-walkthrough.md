@@ -3,7 +3,7 @@
 This reference follows the arithmetic and control flow of the two CUDA transport kernels in [`transport/_jit_kernel.py`](../../../src/pyrite/montecarlo/transport/_jit_kernel.py) and [`transport/_jit_lut_kernel.py`](../../../src/pyrite/montecarlo/transport/_jit_lut_kernel.py), whose device-side constants and helpers live in [`transport/_jit_device.py`](../../../src/pyrite/montecarlo/transport/_jit_device.py) and whose host launchers live in [`transport/_jit_launch.py`](../../../src/pyrite/montecarlo/transport/_jit_launch.py):
 
 - `_transport_kernel` evaluates elastic rates, stopping power, and optional Urban energy-loss straggling directly, and carries the opt-in shell soft/hard inelastic mode (helpers in `_jit_shell_device.py`; see [shell soft/hard transport](../../physics/beam-transport/shell-soft-hard-transport.md)) and the opt-in coupled BremsLib radiative mode (helpers in `_jit_radiative_device.py`; see [bremsstrahlung](../../physics/radiation-physics/hard-bremsstrahlung-events.md));
-- `_transport_lut_kernel` linearly interpolates precomputed energy tables and supports neither straggling nor the shell mode.
+- `_transport_lut_kernel` linearly interpolates precomputed energy tables, samples optional Urban straggling through the same device sampler from the exact element tables, and does not support the shell mode.
 
 Both are `cupyx.jit.rawkernel` implementations of the same ungrooved, per-electron transport algorithm. The examples below use artificial inputs so that every operation can be followed by hand. They explain implementation of existing claims; they do not independently revalidate the physical models. Validation status remains owned by the [`gpu-transport-core`](../../validation/ledger-transport-background.md#gpu-transport-core), [`electron-transport`](../../validation/ledger-transport-background.md#electron-transport), [`relativistic-bethe-stopping`](../../validation/ledger-transport-background.md#relativistic-bethe-stopping), [`transport-midpoint-stopping`](../../validation/ledger-transport-background.md#transport-midpoint-stopping), [`energy-controlled-propagation`](../../validation/ledger-transport-background.md#energy-controlled-propagation), and [`energy-loss-straggling`](../../validation/ledger-transport-background.md#energy-loss-straggling) records.
 
@@ -310,11 +310,11 @@ For a two-element layer, suppose element 0's cumulative probabilities at the sam
 
 After the energy update, the kernel recomputes the interpolation coordinate at the new energy before reading the selected element's `lut_alpha`. Scattering therefore uses the post-flight energy, matching the direct kernel.
 
-The LUT core has no Urban straggling branch. Its factory drops the seven straggling arguments appended for the shared CPU driver, and the API rejects a straggling request on this route instead of silently changing the model.
+With straggling on, the LUT kernel follows the CPU LUT core's straggled branch: the deterministic `max_dE_frac` cap uses the interpolated `lut_dEds`, then the Urban loss is sampled per element from the exact padded `(L_Js, L_Zs, L_ks, L_coeffs, L_E_cross)` tables the shared driver uploads, and the cutoff is the sampled-loss crossing test. Under SBETHE stopping the elemental `C_i` are rescaled by `lut_dEds / _dEds_packed`, as on the host. The clock still reads `lut_inv_beta`. Both kernels call the same `_urban_sample_compound` device function, so they sample one law in one draw order.
 
 ## Straggling stream separation
 
-When enabled in the direct kernel, Urban loss does not consume from the base free-path/scattering counter. It hashes the electron key into a separate `urban_key`, then derives a `flight_key` from `(urban_key, flight_id, substep_id)`. A local straggling counter starts at zero for that key.
+When enabled in either kernel, Urban loss does not consume from the base free-path/scattering counter. It hashes the electron key into a separate `urban_key`, then derives a `flight_key` from `(urban_key, flight_id, substep_id)`. A local straggling counter starts at zero for that key.
 
 Consequently, enabling straggling cannot shift which base uniforms select the elastic collision distance or angles. Within the straggling stream, the kernel draws exact Poisson channel counts by inverse CDF, splitting large means into bounded chunks whose independent Poisson counts add. Continuum ionisation then uses one additional uniform per sampled quantum. The sampled row loss is accumulated in `stragg_dE`; if it crosses the cutoff, the row length is fluidly interpolated to the crossing and the applied end energy is exactly the cutoff.
 
@@ -333,7 +333,7 @@ CPU/CUDA straggling is not promised bit-for-bit after transcendental functions: 
 | Scatter parameter | formula or Mott table | interpolated `lut_alpha` |
 | Midpoint propagation | direct stopping evaluations | repeated table interpolation |
 | Energy substeps | supported | supported |
-| Urban straggling | supported | rejected by API |
+| Urban straggling | supported | supported (exact element tables, LUT cap and clock) |
 | Geometry and output slots | identical structure | identical structure |
 
 ## Reading and changing these kernels safely

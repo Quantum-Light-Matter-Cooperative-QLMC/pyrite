@@ -3,8 +3,9 @@
 Port of :func:`pyrite.montecarlo.transport._transport_core_ungrooved_perelectron_lut`,
 kept beside the exact kernel in :mod:`._jit_kernel` and split out only so each
 file stays within the module line budget; the arithmetic, draw order and launch
-parameters are unchanged. It carries no straggling and no shell soft/hard
-inelastic mode (both fail closed in ``simulate_trajectories``). See
+parameters are unchanged. Straggling samples the shared Urban device sampler
+from the exact packed element tables, as the CPU LUT core does; shell soft/hard
+inelastic mode is not ported (it fails closed in ``simulate_trajectories``). See
 ``docs/repo-design/compute/gpu-transport-rawkernel.md``.
 """
 
@@ -39,9 +40,13 @@ from ._jit_device import (
     I32_ZERO,
     U64_ONE,
     U64_ZERO,
+    _dEds_packed,
     _lut_lerp_at,
     _searchsorted_right,
     _stream_uniform,
+    _urban_flight_key,
+    _urban_sample_compound,
+    _urban_stream_key,
 )
 from .events import (
     EVENT_CUTOFF,
@@ -102,6 +107,15 @@ def _transport_lut_kernel(
     seg_event,
     seg_count,
     exit_code,
+    straggle_on,
+    stragg_dE,
+    L_Js,
+    L_Zs,
+    L_ks,
+    L_coeffs,
+    L_E_cross,
+    stragg_width,
+    sbethe_on,
 ):
     """LUT transport kernel: one thread owns one electron start-to-finish."""
     i = np.int32(jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x)
@@ -111,6 +125,8 @@ def _transport_lut_kernel(
     seg_count[i] = I32_ZERO
     exit_code[i] = I8_NOT_ENTERED
     e = e_start + i
+    if straggle_on == I32_ONE:
+        stragg_dE[e] = F64_ZERO
     if alive[e] == np.uint8(0):
         return
     exit_code[i] = I8_STEP_LIMITED
@@ -238,69 +254,140 @@ def _transport_lut_kernel(
         b0 = lut_inv_beta[lut_i]
         inv_beta_j = b0 + lut_f * (lut_inv_beta[lut_i + I32_ONE] - b0)
         layer_base = L * lut_n_energy
-        cutoff_j = False
-        if energy_model_code == I32_ONE:
-            cutoff_distance = (E_cut_e - E_j) / _lut_lerp_at(
-                lut_dEds,
-                layer_base,
-                lut_n_energy,
-                lut_log_E_min,
-                lut_inv_dlogE,
-                F64_HALF * (E_j + E_cut_e),
-            )
-        else:
-            cutoff_distance = (E_cut_e - E_j) / dEds
         geometry_event = cross_up_j or cross_dn_j or exit_side_j
-        if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
-            step_j = cutoff_distance
-            cutoff_j = True
-            cross_up_j = False
-            cross_dn_j = False
-            exit_top_j = False
-            exit_bot_j = False
-            exit_side_j = False
-
-        # The numerical energy-loss cap is the only step limit that does not
-        # close a physical flight.
+        cutoff_j = False
         limited_j = False
-        if energy_controlled and not cutoff_j:
-            step_energy = max_dE_frac * E_j / (-dEds)
-            if step_energy < step_j:
-                step_j = step_energy
-                limited_j = True
+        if straggle_on == I32_ONE:
+            # Mirrors the straggled branch of the CPU LUT core
+            # (``transport.cores``, ``lut=True``): the deterministic cap comes
+            # first, from the LUT mean rate; the Urban loss is then sampled
+            # per element from the exact packed tables on the exact kernel's
+            # per-``(flight, substep)`` key domain, and the cutoff is the exact
+            # crossing test on the sampled loss. The LUT has no per-element
+            # split, so only an SBETHE run rescales ``C_i`` to the LUT stopping.
+            stopping_scale = F64_ONE
+            stragg_row = L * stragg_width
+            if sbethe_on == I32_ONE:
+                stopping_scale = dEds / _dEds_packed(
+                    L_Js, L_ks, L_coeffs, L_E_cross, stragg_row, n_el, E_j
+                )
+            if energy_controlled:
+                step_energy = max_dE_frac * E_j / (-dEds)
+                if step_energy < step_j:
+                    step_j = step_energy
+                    limited_j = True
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+                    geometry_event = False
+            flight_key = _urban_flight_key(
+                _urban_stream_key(key), np.uint64(flight_id), np.uint64(substep_id)
+            )
+            stragg_loss = _urban_sample_compound(
+                L_Zs,
+                L_Js,
+                L_ks,
+                L_coeffs,
+                L_E_cross,
+                stragg_row,
+                n_el,
+                E_j,
+                step_j,
+                stopping_scale,
+                flight_key,
+            )
+            stragg_dE[e] += stragg_loss
+            delta_cut = E_j - E_cut_e
+            if stragg_loss > delta_cut or (stragg_loss == delta_cut and not geometry_event):
+                # 0/0 would be a silent NaN on the device.
+                if stragg_loss > F64_ZERO:
+                    step_j = step_j * (delta_cut / stragg_loss)
+                else:
+                    step_j = F64_ZERO
+                cutoff_j = True
+                limited_j = False
+                cross_up_j = False
+                cross_dn_j = False
+                exit_top_j = False
+                exit_bot_j = False
+                exit_side_j = False
+                E_end_j = E_cut_e
+            else:
+                E_end_j = E_j - stragg_loss
+            if energy_model_code == I32_ONE:
+                t_end_j = clock[e] + step_j * _lut_lerp_at(
+                    lut_inv_beta,
+                    I32_ZERO,
+                    lut_n_energy,
+                    lut_log_E_min,
+                    lut_inv_dlogE,
+                    F64_HALF * (E_j + E_end_j),
+                )
+            else:
+                t_end_j = clock[e] + step_j * inv_beta_j
+        else:
+            if energy_model_code == I32_ONE:
+                cutoff_distance = (E_cut_e - E_j) / _lut_lerp_at(
+                    lut_dEds,
+                    layer_base,
+                    lut_n_energy,
+                    lut_log_E_min,
+                    lut_inv_dlogE,
+                    F64_HALF * (E_j + E_cut_e),
+                )
+            else:
+                cutoff_distance = (E_cut_e - E_j) / dEds
+            if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+                step_j = cutoff_distance
+                cutoff_j = True
                 cross_up_j = False
                 cross_dn_j = False
                 exit_top_j = False
                 exit_bot_j = False
                 exit_side_j = False
 
-        if energy_model_code == I32_ONE:
-            if cutoff_j:
-                E_end_j = E_cut_e
-            else:
-                E_pred = E_j + dEds * step_j
-                E_end_j = E_j + step_j * _lut_lerp_at(
-                    lut_dEds,
-                    layer_base,
+            # The numerical energy-loss cap is the only step limit that does not
+            # close a physical flight.
+            if energy_controlled and not cutoff_j:
+                step_energy = max_dE_frac * E_j / (-dEds)
+                if step_energy < step_j:
+                    step_j = step_energy
+                    limited_j = True
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+
+            if energy_model_code == I32_ONE:
+                if cutoff_j:
+                    E_end_j = E_cut_e
+                else:
+                    E_pred = E_j + dEds * step_j
+                    E_end_j = E_j + step_j * _lut_lerp_at(
+                        lut_dEds,
+                        layer_base,
+                        lut_n_energy,
+                        lut_log_E_min,
+                        lut_inv_dlogE,
+                        F64_HALF * (E_j + E_pred),
+                    )
+                t_end_j = clock[e] + step_j * _lut_lerp_at(
+                    lut_inv_beta,
+                    I32_ZERO,
                     lut_n_energy,
                     lut_log_E_min,
                     lut_inv_dlogE,
-                    F64_HALF * (E_j + E_pred),
+                    F64_HALF * (E_j + E_end_j),
                 )
-            t_end_j = clock[e] + step_j * _lut_lerp_at(
-                lut_inv_beta,
-                I32_ZERO,
-                lut_n_energy,
-                lut_log_E_min,
-                lut_inv_dlogE,
-                F64_HALF * (E_j + E_end_j),
-            )
-        else:
-            if cutoff_j:
-                E_end_j = E_cut_e
             else:
-                E_end_j = E_j + dEds * step_j
-            t_end_j = clock[e] + step_j * inv_beta_j
+                if cutoff_j:
+                    E_end_j = E_cut_e
+                else:
+                    E_end_j = E_j + dEds * step_j
+                t_end_j = clock[e] + step_j * inv_beta_j
 
         # The row's end event; see `transport.events`. A winning cap or
         # cutoff has already cleared the geometry flags below it.
