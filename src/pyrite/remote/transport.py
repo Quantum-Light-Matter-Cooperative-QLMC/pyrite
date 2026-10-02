@@ -294,9 +294,9 @@ def _parse_xsgen_inventory(output: str) -> dict[str, str]:
 
 
 def _remote_inventories(
-    *, artifacts: bool, tables: bool, datasets: bool = False
-) -> tuple[frozenset[str], dict[str, str], dict[str, str]]:
-    """Inventory energy-grid artifacts, xsgen tables and datasets in one SSH round trip.
+    *, artifacts: bool, tables: bool, datasets: bool = False, sdbase: bool = False
+) -> tuple[frozenset[str], dict[str, str], dict[str, str], dict[str, str]]:
+    """Inventory artifacts, xsgen tables, datasets and sdbase in one SSH round trip.
 
     Each section runs in its own subshell, so one section's ``cd`` cannot
     move the next.
@@ -312,9 +312,15 @@ def _remote_inventories(
     if datasets:
         commands.append(f"echo {_DATASET_SECTION_MARK}")
         commands.append(f"( {_dataset_inventory_command()} )")
+    if sdbase:
+        commands.append(f"echo {_SDBASE_SECTION_MARK}")
+        commands.append(f"( {_sdbase_inventory_command()} )")
     if not commands:
-        return frozenset(), {}, {}
+        return frozenset(), {}, {}, {}
     output = _ssh_capture("; ".join(commands))
+    if sdbase and _SDBASE_SECTION_MARK not in output:
+        raise SystemExit("invalid remote sdbase inventory")
+    output, _, sdbase_part = output.partition(_SDBASE_SECTION_MARK + "\n")
     head, _, dataset_part = output.partition(_DATASET_SECTION_MARK + "\n")
     if datasets and _DATASET_SECTION_MARK not in output:
         raise SystemExit("invalid remote dataset inventory")
@@ -328,6 +334,7 @@ def _remote_inventories(
         found_artifacts,
         _parse_xsgen_inventory(table_part) if tables else {},
         _parse_dataset_inventory(dataset_part) if datasets else {},
+        _parse_sdbase_inventory(sdbase_part) if sdbase else {},
     )
 
 
@@ -408,6 +415,76 @@ def _datasets_to_ship(
 ) -> list[tuple[str, Path]]:
     """Return ``(arcname, path)`` for datasets the box lacks or holds differently."""
     return [(arc, local[arc]) for arc in sorted(local) if remote.get(arc) != local_digests[arc]]
+
+
+# --- SBETHE sdbase/ ----------------------------------------------------------
+#
+# The ~600-file reference directory the default shell model reads
+# (``pdatconf.p14``) and SBETHE table generation runs against. Upstream-only
+# (no PyRITE release hosts it), so a sync copies the user's own fetched copy to
+# ``<REMOTE_DIR>/xsgen/reference-data/sbethe/sdbase/`` (``PYRITE_HOME`` is
+# REMOTE_DIR there), file by file, by content digest. A box fetched by hand
+# before #305 holds it in the pre-workspace user data directory instead; the
+# inventory first copies that whole directory into place when the target is
+# absent, so only differing files then ship.
+
+_SDBASE_SECTION_MARK = "---pyrite-sdbase-inventory---"
+_SDBASE_DIR = "xsgen/reference-data/sbethe/sdbase"
+
+
+def _local_sdbase() -> dict[str, Path]:
+    """Return ``{arcname: local path}`` for every installed ``sdbase/`` file.
+
+    Refuses when the installed copy fails ``pyrite tables verify --require
+    sbethe``: every default-model run on the box reads it.
+    """
+    from ..xsgen.sources import installed_data_dir
+    from ..xsgen.verify import OK, verify_pinned
+
+    failed = [check for check in verify_pinned(("sbethe",)) if check.status != OK]
+    if failed:
+        detail = ", ".join(f"{check.label} ({check.status})" for check in failed)
+        raise SystemExit(
+            f"refusing to sync: SBETHE sdbase/ is not intact locally: {detail}.\n"
+            "  fix: pyrite tables fetch sbethe"
+        )
+    root = installed_data_dir("sbethe", "sdbase")
+    return {
+        f"{_SDBASE_DIR}/{path.relative_to(root).as_posix()}": path
+        for path in sorted(root.rglob("*"))
+        if path.is_file() and not path.is_symlink()
+    }
+
+
+def _sdbase_inventory_command() -> str:
+    """Shell that migrates a legacy box copy, then digests the synced tier.
+
+    The legacy copy is staged beside the target and renamed into place, so an
+    interrupted copy never leaves a partial ``sdbase/`` behind.
+    """
+    root = config.shell_arg(config.remote_dir().rstrip("/"))
+    legacy = '"${XDG_DATA_HOME:-$HOME/.local/share}/pyrite/' + _SDBASE_DIR + '"'
+    return (
+        f"mkdir -p {root} && cd {root} && "
+        f"if [ ! -e {_SDBASE_DIR} ] && [ -d {legacy} ]; then "
+        f"mkdir -p {Path(_SDBASE_DIR).parent.as_posix()} && rm -rf {_SDBASE_DIR}.partial && "
+        f"cp -R {legacy} {_SDBASE_DIR}.partial && mv {_SDBASE_DIR}.partial {_SDBASE_DIR}; fi; "
+        f"if [ -d {_SDBASE_DIR} ]; then find {_SDBASE_DIR} -type f -exec sha256sum {{}} +; fi"
+    )
+
+
+def _parse_sdbase_inventory(output: str) -> dict[str, str]:
+    """Parse ``sha256sum`` lines into ``{arcname: digest}``, failing closed."""
+    digests: dict[str, str] = {}
+    for line in output.splitlines():
+        if not line.strip():
+            continue
+        match = re.fullmatch(r"([0-9a-fA-F]{64})\s+\*?(?:\./)?(.+)", line.strip())
+        if match is None:
+            raise SystemExit("invalid remote sdbase inventory")
+        if match.group(2).startswith(_SDBASE_DIR + "/"):
+            digests[match.group(2)] = match.group(1).lower()
+    return digests
 
 
 def _xsgen_tables_digest(local_digests: dict[str, str]) -> str:
@@ -667,11 +744,17 @@ def sync_code(*, force: bool = False):
     local_table_digests = {name: _local_sha256(path) or "" for name, path in local_tables.items()}
     local_datasets = _local_datasets()
     local_dataset_digests = {arc: _local_sha256(path) or "" for arc, path in local_datasets.items()}
-    remote_artifacts, remote_tables, remote_datasets = _remote_inventories(
-        artifacts=bool(local_artifacts), tables=bool(local_tables), datasets=bool(local_datasets)
+    local_sdbase = _local_sdbase()
+    local_sdbase_digests = {arc: _local_sha256(path) or "" for arc, path in local_sdbase.items()}
+    remote_artifacts, remote_tables, remote_datasets, remote_sdbase = _remote_inventories(
+        artifacts=bool(local_artifacts),
+        tables=bool(local_tables),
+        datasets=bool(local_datasets),
+        sdbase=bool(local_sdbase),
     )
     table_files = _xsgen_to_ship(local_tables, local_table_digests, remote_tables)
     dataset_files = _datasets_to_ship(local_datasets, local_dataset_digests, remote_datasets)
+    sdbase_files = _datasets_to_ship(local_sdbase, local_sdbase_digests, remote_sdbase)
     with tempfile.TemporaryDirectory() as td:
         tarpath = os.path.join(td, "pyrite_code.tgz")
         with tarfile.open(tarpath, "w:gz") as t:
@@ -685,12 +768,20 @@ def sync_code(*, force: bool = False):
             for arc, f in table_files:
                 t.add(f, arcname=arc)
             # Verbatim, never CRLF-normalized: the pins cover the CRLF bytes.
-            for arc, f in dataset_files:
+            for arc, f in (*dataset_files, *sdbase_files):
                 t.add(f, arcname=arc)
         if local_datasets:
             shipped = sum(f.stat().st_size for _, f in dataset_files)
             print(
                 f"datasets: shipping {len(dataset_files)} of {len(local_datasets)} "
+                f"({shipped / 1e6:.1f} MB)",
+                flush=True,
+                file=sys.stderr,
+            )
+        if local_sdbase:
+            shipped = sum(f.stat().st_size for _, f in sdbase_files)
+            print(
+                f"sdbase: shipping {len(sdbase_files)} of {len(local_sdbase)} files "
                 f"({shipped / 1e6:.1f} MB)",
                 flush=True,
                 file=sys.stderr,
@@ -714,7 +805,7 @@ def sync_code(*, force: bool = False):
     # once, last, and only after the extraction it describes succeeded. A failed
     # tar leaves the previous stamp in place rather than claiming code that
     # never landed.
-    guaranteed = {**local_table_digests, **local_dataset_digests}
+    guaranteed = {**local_table_digests, **local_dataset_digests, **local_sdbase_digests}
     stamp = _sync_stamp(digest, _xsgen_tables_digest(guaranteed) if guaranteed else "")
     clear_catalog = (
         "rm -rf external-catalog external-catalog.toml && "

@@ -88,7 +88,7 @@ def test_fetch_identifies_itself_to_the_upstream_host(monkeypatch, tmp_path):
 def test_complete_install_is_idempotent_without_network(monkeypatch, tmp_path):
     destination = tmp_path / "sbethe" / "sdbase"
     destination.mkdir(parents=True)
-    for name in fetch_module._REQUIRED_SBETHE_FILES:
+    for name in fetch_module.REQUIRED_SBETHE_FILES:
         (destination / name).write_text("present\n")
     monkeypatch.setattr(fetch_module, "fetched_data_dir", lambda code, name: destination)
     monkeypatch.setattr(

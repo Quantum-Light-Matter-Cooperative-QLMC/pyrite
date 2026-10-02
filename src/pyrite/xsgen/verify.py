@@ -8,9 +8,12 @@ enough to run as a job preflight; table payload integrity is the remote sync's
 content-addressed inventory.
 
 The fetched datasets (:mod:`pyrite.datasets`: EEDL, EADL, EPDL) are single files
-pinned by SHA-256; they are hashed in full, about 0.1 s together.
+pinned by SHA-256; they are hashed in full, about 0.1 s together. SBETHE's
+``sdbase/`` (``sbethe``) is checked for its required files, and its
+``pdatconf.p14``, which every default-model run reads, against its pin.
 """
 
+import hashlib
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -21,8 +24,12 @@ from .store import manifest_digest, resolve
 TABLE_CODES = ("bremslib", "elsepa", "sbethe-tables")
 #: Fetched single-file datasets, in report order (see :mod:`pyrite.datasets`).
 DATASET_CODES = ("eedl", "eadl", "epdl")
+#: Fetched reference-data directories, in report order.
+REFERENCE_CODES = ("sbethe",)
+#: Codes fixed by ``pyrite tables fetch CODE`` alone, without ``--archive``.
+BARE_FETCH_CODES = DATASET_CODES + REFERENCE_CODES
 #: Everything ``pyrite tables verify`` can require.
-CODES = TABLE_CODES + DATASET_CODES
+CODES = TABLE_CODES + DATASET_CODES + REFERENCE_CODES
 
 #: Per-table outcomes. ``ok`` is the only passing one.
 OK = "ok"
@@ -45,7 +52,8 @@ class TableCheck:
 def pinned_tables(codes: Iterable[str] = TABLE_CODES) -> list[tuple[str, str, str, str]]:
     """Return ``(code, label, key, manifest_sha256)`` for every pinned table.
 
-    Dataset codes in ``codes`` are accepted and contribute no rows.
+    Dataset and reference-data codes in ``codes`` are accepted and
+    contribute no rows.
     """
     wanted = tuple(codes)
     unknown = [code for code in wanted if code not in CODES]
@@ -80,7 +88,9 @@ def verify_pinned(codes: Iterable[str] = CODES) -> list[TableCheck]:
     digest (edited or truncated), or a dataset could not be read;
     ``mismatch`` means it is internally consistent but is not the pinned
     table, or a dataset's bytes differ from its pinned SHA-256. Dataset rows
-    carry the file name as ``label`` and the pinned SHA-256 as ``key``.
+    carry the file name as ``label`` and the pinned SHA-256 as ``key``. The
+    ``sbethe`` row is ``mismatch`` when ``pdatconf.p14`` differs from its pin
+    and ``corrupt`` when another required ``sdbase/`` file is absent.
     """
     wanted = tuple(codes)
     checks: list[TableCheck] = []
@@ -116,4 +126,30 @@ def verify_pinned(codes: Iterable[str] = CODES) -> list[TableCheck]:
             outcome = CORRUPT
         status = {datasets.OK: OK, datasets.MISSING: MISSING}.get(outcome, outcome)
         checks.append(TableCheck(code, dataset.filename, dataset.sha256, status))
+    if "sbethe" in wanted:
+        checks.append(_verify_sdbase())
     return checks
+
+
+def _verify_sdbase() -> TableCheck:
+    """Check the installed ``sdbase/`` the default shell model would read."""
+    from ..montecarlo.shell_configuration import PDATCONF_SHA256
+    from .fetch import REQUIRED_SBETHE_FILES
+    from .sources import installed_data_dir
+
+    root = installed_data_dir("sbethe", "sdbase")
+    label = "sdbase/pdatconf.p14"
+    pdatconf = root / "pdatconf.p14"
+    if not pdatconf.is_file():
+        return TableCheck("sbethe", label, PDATCONF_SHA256, MISSING)
+    try:
+        digest = hashlib.sha256(pdatconf.read_bytes()).hexdigest()
+    except OSError:
+        return TableCheck("sbethe", label, PDATCONF_SHA256, CORRUPT)
+    if digest != PDATCONF_SHA256:
+        status = MISMATCH
+    elif not all((root / name).is_file() for name in REQUIRED_SBETHE_FILES):
+        status = CORRUPT
+    else:
+        status = OK
+    return TableCheck("sbethe", label, PDATCONF_SHA256, status)

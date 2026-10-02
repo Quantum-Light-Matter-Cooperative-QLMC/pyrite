@@ -809,9 +809,55 @@ def test_verify_json_is_one_envelope_and_still_exits_one(isolated, monkeypatch):
 
 
 def test_verify_rejects_an_unknown_code_as_a_usage_error(isolated):
-    result = invoke(tables_command.command, ["verify", "--require", "sbethe"])
+    result = invoke(tables_command.command, ["verify", "--require", "penelope"])
 
     assert result.exit_code == 2
+
+
+@pytest.fixture
+def small_sdbase(isolated, monkeypatch):
+    """Return an empty sdbase install target with a few-byte pdatconf.p14 pin."""
+    import hashlib
+
+    from pyrite.montecarlo import shell_configuration
+    from pyrite.xsgen import fetch
+
+    body = b"shells\n"
+    monkeypatch.setattr(shell_configuration, "PDATCONF_SHA256", hashlib.sha256(body).hexdigest())
+    target = isolated / "data" / "xsgen" / "reference-data" / "sbethe" / "sdbase"
+
+    def install(pdatconf: bytes = body, omit: str | None = None) -> None:
+        target.mkdir(parents=True)
+        for name in fetch.REQUIRED_SBETHE_FILES:
+            if name != omit:
+                (target / name).write_bytes(pdatconf if name == "pdatconf.p14" else b"x")
+
+    return install
+
+
+def test_verify_reports_missing_sdbase_with_its_fetch_command(small_sdbase):
+    result = invoke(tables_command.command, ["verify", "--require", "sbethe"])
+
+    assert result.exit_code == 1
+    assert "missing: sbethe sdbase/pdatconf.p14" in result.stderr
+    assert "`pyrite tables fetch sbethe`" in result.stderr
+    assert "sbethe --archive" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "status"),
+    [({}, None), ({"pdatconf": b"edited\n"}, "mismatch"), ({"omit": "atparams.tab"}, "corrupt")],
+)
+def test_verify_checks_the_installed_sdbase(small_sdbase, kwargs, status):
+    small_sdbase(**kwargs)
+
+    result = invoke(tables_command.command, ["verify", "--require", "sbethe"])
+
+    if status is None:
+        assert_clean_result(result, stdout="1/1 pinned tables and datasets verified\n")
+    else:
+        assert result.exit_code == 1
+        assert f"{status}: sbethe sdbase/pdatconf.p14" in result.stderr
 
 
 # --- fetched datasets (eedl, eadl) -------------------------------------------

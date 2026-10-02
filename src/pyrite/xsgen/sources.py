@@ -219,6 +219,18 @@ def fetched_data_dir(code: str, name: str) -> Path:
     return root / "xsgen" / "reference-data" / spec.name / name
 
 
+def installed_data_dir(code: str, name: str) -> Path:
+    """Return the fetched data directory in use: selected tier, else legacy.
+
+    The pre-workspace ``<user data dir>`` location is used only when it exists
+    and the selected tier does not. The path is returned whether or not it
+    exists, so callers can quote it in an error message.
+    """
+    selected = fetched_data_dir(code, name)
+    legacy = user_data_dir() / "xsgen" / "reference-data" / code_spec(code).name / name
+    return selected if selected.is_dir() or not legacy.is_dir() else legacy
+
+
 def _accepts(spec: CodeSpec, candidate: Path) -> bool:
     return any(_marker_path(candidate, pattern) is not None for pattern in spec.markers)
 
@@ -261,15 +273,7 @@ class ResolvedSource:
         resolved: dict[str, Path] = {}
         for name in self.spec.data_dirs:
             local = self.root / name
-            fetched = fetched_data_dir(self.spec.name, name)
-            legacy = user_data_dir() / "xsgen" / "reference-data" / self.spec.name / name
-            resolved[name] = (
-                local
-                if local.is_dir()
-                else fetched
-                if fetched.is_dir() or not legacy.is_dir()
-                else legacy
-            )
+            resolved[name] = local if local.is_dir() else installed_data_dir(self.spec.name, name)
         return resolved
 
 

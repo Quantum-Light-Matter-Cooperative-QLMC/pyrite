@@ -144,14 +144,14 @@ def _validate_parallel_materials(parallel_materials):
 
 
 def _tables_preflight_block() -> str:
-    """Bash that fails the job fast when a pinned table or dataset is missing.
+    """Bash that fails the job fast when pinned tables, datasets or sdbase are missing.
 
     Runs ``pyrite tables verify`` (table manifest digests; the EEDL, EADL and EPDL
-    files hashed in full) once per chain, guarded like the dependency sync by
-    ``$JOBDIR/.tables_ok``, before any transport runs. A miss records
+    files hashed in full; SBETHE's ``sdbase/``) once per chain, guarded like
+    the dependency sync by ``$JOBDIR/.tables_ok``, before any transport runs. A miss records
     ``FAILED (tables)`` and exits 1; the verify output, which names the fix,
     lands in the job log."""
-    verify = f"{config.remote_runtime_env()} {config.shell_remote_uv()} run --no-sync pyrite tables verify --require bremslib,elsepa,sbethe-tables,eedl,eadl,epdl"
+    verify = f"{config.remote_runtime_env()} {config.shell_remote_uv()} run --no-sync pyrite tables verify --require bremslib,elsepa,sbethe-tables,eedl,eadl,epdl,sbethe"
     return f"""if [ ! -f "$JOBDIR/.tables_ok" ]; then
   if {verify} >> "$JOBDIR/log" 2>&1; then
     : > "$JOBDIR/.tables_ok"
