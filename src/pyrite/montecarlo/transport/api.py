@@ -87,6 +87,7 @@ def simulate_trajectories(
     max_secondary_generations=64,
     max_secondary_tracks=None,
     *,
+    pair_production_model=None,
     _secondary=None,
 ):
     """
@@ -265,6 +266,15 @@ def simulate_trajectories(
       primary history. None (default) is BIT-FOR-BIT primary-only transport.
       See shell-soft-hard-transport.md. Validation: shell-secondary-transport
 
+    pair_production_model: opt-in pair conversion of coupled hard photons
+      above ``2 m_e c^2`` ("penelope-2024"); requires ``secondary_threshold_eV``
+      and coupled BremsLib radiative transport. Each such photon gets one
+      analog EPDL first-interaction step; a pair launches its electron as a
+      secondary (above the threshold) and records its positron, which is not
+      transported (#276). None (default) leaves every photon radiated. See
+      hard-bremsstrahlung-events.md. Validation: photon-pair-first-interaction,
+      pair-production-sampling
+
     transport_core: which ungrooved core runs the electrons. "auto" (default) --
     the CUDA core when this process has a CUDA device, the run is ungrooved,
     and Ne > CUDA_TRANSPORT_MIN_ELECTRONS; the lockstep core otherwise (see
@@ -430,6 +440,8 @@ def simulate_trajectories(
     Validation: electron-transport, energy-loss-straggling, finite-beam-size,
     finite-transverse-crystal, grazing-beam-projection, multilayer-stack
     """
+    if pair_production_model is not None and secondary_threshold_eV is None:
+        raise ValueError("pair_production_model requires secondary_threshold_eV")
     if secondary_threshold_eV is not None:
         arguments = dict(locals())
         from .secondaries import transport_secondary_cascade

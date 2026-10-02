@@ -13,9 +13,16 @@ under its own salt, so it depends on neither batch size nor processing order.
 Its hard, soft-straggling and coupled-radiative streams derive from that key
 exactly as a primary's derive from its own.
 
-Validation: shell-secondary-transport
+With ``pair_production_model`` each generation's coupled hard photons above
+``2 m_e c^2`` also get one first-interaction step (``pair_production.py``); a
+pair's electron above ``T_s`` joins the next generation keyed on (seed, parent
+track, photon ordinal) under a salt of its own, and its positron is recorded,
+not transported (#276).
+
+Validation: shell-secondary-transport, photon-pair-first-interaction
 """
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -43,6 +50,9 @@ __all__ = [
 # Distinct from the hard, Urban and radiative salts and the photon salt below.
 _SECONDARY_STREAM_SALT = np.uint64(0x7F4A7C159E3779B9)
 _PHOTON_SEED_SALT = np.uint64(0x2545F4914F6CDD1D)
+_PAIR_ELECTRON_STREAM_SALT = np.uint64(0x9B05688C2B3E6C1F)
+#: ``secondary_tracks["launch_kind"]`` values.
+LAUNCH_PRIMARY, LAUNCH_SHELL, LAUNCH_PAIR = 0, 1, 2
 DEFAULT_MAX_SECONDARY_GENERATIONS = 64
 DEFAULT_SECONDARY_TRACKS_PER_PRIMARY = 1000
 # Per-row result arrays joined across generations. Aliases are re-pointed after.
@@ -126,10 +136,10 @@ def _mix(x):
     return x ^ (x >> _SM64_S31)
 
 
-def secondary_stream_keys(seed, parent_track, parent_ordinal):
+def secondary_stream_keys(seed, parent_track, parent_ordinal, *, salt=_SECONDARY_STREAM_SALT):
     """Stream keys of secondaries from (seed, parent track, parent hard ordinal)."""
     with np.errstate(over="ignore"):
-        x = np.uint64(seed) ^ _SECONDARY_STREAM_SALT
+        x = np.uint64(seed) ^ np.uint64(salt)
         parent = np.asarray(parent_track, dtype=np.uint64)
         ordinal = np.asarray(parent_ordinal, dtype=np.uint64)
         x = _mix(x + _SM64_GOLDEN * (parent + _SM64_ONE))
@@ -201,7 +211,65 @@ def _validate(kw):
         raise ValueError("max_secondary_tracks must be a positive integer")
     threshold_keV = float(threshold_eV) * 1e-3
     _validate_coverage(kw, threshold_keV)
+    _validate_pair_model(kw)
     return threshold_keV, int(generations), int(tracks)
+
+
+def _validate_pair_model(kw):
+    """Pair conversion needs coupled hard photons: BremsLib tables, no groove."""
+    from .pair_production import PAIR_PRODUCTION_MODELS
+
+    model = kw.get("pair_production_model")
+    if model is None:
+        return
+    if model not in PAIR_PRODUCTION_MODELS:
+        raise ValueError(f"pair_production_model must be one of {PAIR_PRODUCTION_MODELS} or None")
+    if (
+        kw["radiative_model"] == "uncoupled"
+        or kw["bremslib_tables"] is None
+        or kw["groove"] is not None
+    ):
+        raise ValueError(
+            "pair_production_model requires coupled BremsLib radiative transport "
+            "(bremslib_tables, no groove)"
+        )
+
+
+def _stack_geometry(kw):
+    """Layer stack and finite footprint [Angstrom] the photons cross."""
+    from ...materials.attenuation import _normalize_composition
+
+    layers = kw["layers"]
+    if layers is None:
+        layers = [
+            (
+                0.0,
+                float(kw["thickness_ang"]),
+                _normalize_composition(kw["element"], kw["n_atoms_per_ang3"], kw["composition"]),
+            )
+        ]
+    width, height = kw["crystal_width_mm"], kw["crystal_height_mm"]
+    return (
+        layers,
+        None if width is None else float(width) * 1.0e7,
+        None if height is None else float(height) * 1.0e7,
+    )
+
+
+def _pair_rows(result):
+    """Host copies of the row fields the photon step reads."""
+    keys = (
+        "electron_id",
+        "flight_id",
+        "substep_id",
+        "r_mid",
+        "v_hat",
+        "L_ang",
+        "t_end_ang",
+        "hard_radiative_k_eV",
+        "hard_radiative_direction",
+    )
+    return {k: _host(result[k]) for k in keys}
 
 
 def _validate_coverage(kw, threshold_keV):
@@ -299,8 +367,16 @@ def transport_secondary_cascade(simulate, kw):
     base = {
         k: v
         for k, v in kw.items()
-        if k != "_secondary" and not k.startswith(("secondary_", "max_secondary_"))
+        if k not in ("_secondary", "pair_production_model")
+        and not k.startswith(("secondary_", "max_secondary_"))
     }
+    pair_model = kw.get("pair_production_model")
+    if pair_model is not None:
+        from .pair_production import convert_hard_photons
+
+        pair_layers, pair_width, pair_height = _stack_geometry(kw)
+    pair_events = []
+    pair_counts = []
     E_cut = kw["E_cut_by_electrons"]
     cut_min = float(kw["E_cut_keV"] if E_cut is None else np.min(E_cut))
     lo = min(cut_min, threshold_keV)
@@ -320,6 +396,7 @@ def transport_secondary_cascade(simulate, kw):
         "generation": [np.zeros(Ne, dtype=np.int16)],
         "electron_id": [np.arange(Ne, dtype=np.int64)],
         "parent_hard_ordinal": [np.full(Ne, -1, dtype=np.int64)],
+        "launch_kind": [np.full(Ne, LAUNCH_PRIMARY, dtype=np.int8)],
         "launch_E_keV": [np.asarray(gen0["initial_E_keV"], dtype=float)],
         "launch_r_ang": [np.asarray(gen0["initial_r_ang"], dtype=float)],
         "launch_v_hat": [np.asarray(gen0["initial_v_hat"], dtype=float)],
@@ -332,9 +409,32 @@ def transport_secondary_cascade(simulate, kw):
     electron_of = tracks["electron_id"][0]
     t0_of = np.asarray(gen0["initial_t0_ang"], dtype=float)
     current = gen0
+    row_offset = 0
     while True:
         g = len(generations)
         harvest = _harvest(current, threshold_keV)
+        harvest["kind"] = np.full(harvest["parent"].size, LAUNCH_SHELL, dtype=np.int8)
+        harvest["keys"] = secondary_stream_keys(
+            seed, track_offset[-1] + harvest["parent"], harvest["ordinal"]
+        )
+        if pair_model is not None:
+            events, photon_counts = convert_hard_photons(
+                _pair_rows(current),
+                seed=seed,
+                parent_track_offset=track_offset[-1],
+                layers=pair_layers,
+                width_ang=pair_width,
+                height_ang=pair_height,
+            )
+            events["electron_launched"] = events["electron_keV"] > threshold_keV
+            events["global_row"] = row_offset + events["row"]
+            events["parent_track"] = track_offset[-1] + events["parent"]
+            events["electron_id"] = electron_of[events["parent"]]
+            events["electron_track"] = np.full(events["row"].size, -1, dtype=np.int64)
+            pair_events.append(events)
+            pair_counts.append(photon_counts)
+            harvest = _merge_pair_launches(harvest, events, seed)
+        row_offset += _host(current["electron_id"]).size
         n_new = int(harvest["parent"].size)
         if n_new == 0:
             break
@@ -348,7 +448,10 @@ def transport_secondary_cascade(simulate, kw):
                 f"(generation {g} would add {n_new})"
             )
         parent_track = track_offset[-1] + harvest["parent"]
-        keys = secondary_stream_keys(seed, parent_track, harvest["ordinal"])
+        keys = harvest["keys"]
+        if pair_model is not None:
+            launched = np.flatnonzero(pair_events[-1]["electron_launched"])
+            pair_events[-1]["electron_track"][launched] = n_tracks + harvest["pair_index"]
         electrons = electron_of[harvest["parent"]]
         t0 = t0_of[harvest["parent"]]
         launch = LaunchState(
@@ -375,6 +478,7 @@ def transport_secondary_cascade(simulate, kw):
         tracks["generation"].append(np.full(n_new, g, dtype=np.int16))
         tracks["electron_id"].append(electrons)
         tracks["parent_hard_ordinal"].append(harvest["ordinal"].astype(np.int64))
+        tracks["launch_kind"].append(harvest["kind"])
         tracks["launch_E_keV"].append(harvest["E_keV"])
         tracks["launch_r_ang"].append(harvest["r_ang"])
         tracks["launch_v_hat"].append(harvest["v_hat"])
@@ -385,7 +489,75 @@ def transport_secondary_cascade(simulate, kw):
         n_tracks += n_new
         electron_of, t0_of = electrons, t0
     track_table = {k: np.concatenate(v) for k, v in tracks.items()}
-    return _join(generations, track_offset, track_table, counts, threshold_keV)
+    out = _join(generations, track_offset, track_table, counts, threshold_keV)
+    if pair_model is not None:
+        out["pair_production"] = _pair_summary(pair_model, pair_events, pair_counts)
+    return out
+
+
+def _merge_pair_launches(harvest, events, seed):
+    """Append launched pair electrons after the shell launches, same fields.
+
+    ``ordinal`` is the photon ordinal on the parent track; ``pair_index`` is
+    each launched pair electron's position within this generation's launches.
+    """
+    launched = events["electron_launched"]
+    n_shell = harvest["parent"].size
+    n_pair = int(np.count_nonzero(launched))
+    keys = secondary_stream_keys(
+        seed,
+        events["parent_track"][launched],
+        events["photon_ordinal"][launched],
+        salt=_PAIR_ELECTRON_STREAM_SALT,
+    )
+    merged = dict(harvest)
+    for name, extra in (
+        ("parent", events["parent"][launched]),
+        ("ordinal", events["photon_ordinal"][launched]),
+        ("r_ang", events["r_ang"][launched]),
+        ("v_hat", events["electron_v_hat"][launched]),
+        ("E_keV", events["electron_keV"][launched]),
+        ("t_ang", events["t_ang"][launched]),
+        ("kind", np.full(n_pair, LAUNCH_PAIR, dtype=np.int8)),
+        ("keys", keys),
+    ):
+        merged[name] = np.concatenate(
+            [np.asarray(harvest[name]), extra.astype(np.asarray(harvest[name]).dtype)]
+        )
+    merged["pair_index"] = n_shell + np.arange(n_pair)
+    return merged
+
+
+def _pair_summary(model, pair_events, pair_counts):
+    """Joined pair events and photon outcome counts; warns on untransported e+."""
+    from .pair_production import _empty_events
+
+    fields = list(_empty_events()) + [
+        "electron_launched",
+        "global_row",
+        "parent_track",
+        "electron_id",
+        "electron_track",
+    ]
+    events = {name: np.concatenate([e[name] for e in pair_events]) for name in fields}
+    events["row"] = events.pop("global_row")
+    counts = {
+        name: int(sum(c[name] for c in pair_counts))
+        for name in ("photons", "pair", "other", "escaped")
+    }
+    if counts["pair"]:
+        warnings.warn(
+            f"{counts['pair']} pair-production positrons are recorded but not "
+            "transported (#276); their kinetic energy is reported, not deposited",
+            UserWarning,
+            stacklevel=3,
+        )
+    return {
+        "model": model,
+        "positrons_transported": False,
+        "photon_counts": counts,
+        "events": events,
+    }
 
 
 def _counts(result):
@@ -441,7 +613,12 @@ def secondary_energy_balance(result, *, per_history=False):
     In the coupled radiative mode the continuous loss includes the soft
     radiative share. With ``per_history`` every term is an array over the
     primary histories (``electron_id``), each closing on its own.
-    Validation: shell-secondary-transport
+
+    With pair production a converted photon leaves ``radiated`` and splits
+    exactly into ``pair_rest_mass`` (``2 m_e c^2``), the untransported
+    ``positron`` kinetic energy, and its electron: a launched track's own rows,
+    or ``pair_subthreshold`` (part of ``deposited``) at or below the threshold.
+    Validation: shell-secondary-transport, photon-pair-first-interaction
     """
     from .shell_transport import hard_event_energy_accounting
 
@@ -484,15 +661,33 @@ def secondary_energy_balance(result, *, per_history=False):
         "cutoff_residual_keV": total(history[cut], (E1 - W - photon)[cut]),
         "subthreshold_keV": total(history[acc["row"][below]], kinetic[below]),
         "binding_reserved_keV": total(history[acc["row"]], acc["binding_keV"]),
-        "radiated_keV": total(history, photon),
     }
+    pair = result.get("pair_production")
+    radiated = photon
+    if pair is not None:
+        from .pair_production import PAIR_THRESHOLD_EV
+
+        events = pair["events"]
+        radiated = photon.copy()
+        radiated[events["row"]] = 0.0
+        owner = events["electron_id"].astype(np.int64)
+        kept = ~events["electron_launched"]
+        terms["pair_rest_mass_keV"] = total(owner, np.full(owner.size, PAIR_THRESHOLD_EV * 1e-3))
+        terms["positron_keV"] = total(owner, events["positron_keV"])
+        terms["pair_subthreshold_keV"] = total(owner[kept], events["electron_keV"][kept])
+    terms["radiated_keV"] = total(history, radiated)
     terms["deposited_keV"] = (
-        terms["continuous_keV"] + terms["cutoff_residual_keV"] + terms["subthreshold_keV"]
+        terms["continuous_keV"]
+        + terms["cutoff_residual_keV"]
+        + terms["subthreshold_keV"]
+        + terms.get("pair_subthreshold_keV", 0.0)
     )
     terms["residual_keV"] = terms["incident_keV"] - (
         terms["escaped_keV"]
         + terms["deposited_keV"]
         + terms["binding_reserved_keV"]
         + terms["radiated_keV"]
+        + terms.get("pair_rest_mass_keV", 0.0)
+        + terms.get("positron_keV", 0.0)
     )
     return terms
