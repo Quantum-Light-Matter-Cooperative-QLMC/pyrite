@@ -29,7 +29,7 @@ no index.
 import json
 import shutil
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -38,6 +38,7 @@ from ...materials import CATALOG
 from ...materials._transport_data import TRANSPORT_ELEMENTS
 from ...paths import data_dir
 from .._errors import TableNotFoundError
+from .._urls import archive_urls, as_urls
 from ..bremslib.release import file_sha256, write_archive
 from ..store import StoredTable, resolve
 from .catalog import (
@@ -76,14 +77,15 @@ class ElsepaReleaseEntry:
 class ElsepaReleaseIndex:
     """The pinned description of one released ELSEPA table archive.
 
-    ``url`` is ``None`` until the archive is published; installing from a
-    local copy works either way.
+    ``urls`` is empty until the archive is published and is tried in order
+    (see :mod:`pyrite.xsgen._urls`); installing from a local copy works
+    either way.
     """
 
     upstream: str
     archive_sha256: str
     archive_bytes: int
-    url: str | None
+    urls: tuple[str, ...]
     tables: tuple[ElsepaReleaseEntry, ...]
 
     def record(self) -> dict[str, Any]:
@@ -94,7 +96,7 @@ class ElsepaReleaseIndex:
             "archive": {
                 "sha256": self.archive_sha256,
                 "bytes": self.archive_bytes,
-                "url": self.url,
+                "urls": list(self.urls),
             },
             "tables": [
                 {"label": e.label, "key": e.key, "manifest_sha256": e.manifest_sha256}
@@ -115,7 +117,7 @@ class ElsepaReleaseIndex:
             upstream=str(record["upstream"]),
             archive_sha256=str(archive["sha256"]),
             archive_bytes=int(archive["bytes"]),
-            url=None if archive.get("url") is None else str(archive["url"]),
+            urls=archive_urls(archive),
             tables=tuple(
                 ElsepaReleaseEntry(
                     label=str(row["label"]),
@@ -185,12 +187,12 @@ def release_tables(*, generate: bool = False) -> list[tuple[str, StoredTable]]:
 
 
 def build_release(
-    out_dir: str | Path, *, url: str | None = None, generate: bool = False
+    out_dir: str | Path, *, urls: Iterable[str] = (), generate: bool = False
 ) -> tuple[Path, ElsepaReleaseIndex]:
     """Build the release archive and its index from stored production tables.
 
     Writes ``elsepa-tables.zip`` and ``elsepa-tables.json`` into ``out_dir``;
-    the JSON is committed to the wheel and the zip is published at ``url``.
+    the JSON is committed to the wheel and the zip is published at ``urls``.
     """
     destination = Path(out_dir)
     destination.mkdir(parents=True, exist_ok=True)
@@ -204,7 +206,7 @@ def build_release(
         upstream=UPSTREAM,
         archive_sha256=file_sha256(archive),
         archive_bytes=archive.stat().st_size,
-        url=url,
+        urls=as_urls(urls),
         tables=tuple(
             ElsepaReleaseEntry(label=label, key=table.key, manifest_sha256=table.digest)
             for label, table in labelled

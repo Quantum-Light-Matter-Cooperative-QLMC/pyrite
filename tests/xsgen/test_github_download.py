@@ -42,8 +42,8 @@ def no_token(monkeypatch):
 def test_the_shipped_elsepa_index_pins_a_github_release_url():
     index = load_release_index()
 
-    assert index is not None and index.url is not None
-    assert fetch_module._RELEASE_ASSET_URL.fullmatch(index.url)
+    assert index is not None and index.urls
+    assert fetch_module._RELEASE_ASSET_URL.fullmatch(index.urls[0])
 
 
 def test_token_order_is_pyrite_then_github_then_gh(no_token, monkeypatch):
@@ -188,5 +188,32 @@ def test_a_tampered_release_asset_fails_digest_verification(no_token, monkeypatc
     monkeypatch.setattr(fetch_module, "urlopen", open_url)
 
     with pytest.raises(DataFetchError, match="SHA-256 mismatch") as caught:
-        fetch_module._obtain(None, URL, tmp_path, "ELSEPA tables", "0" * 64)
+        fetch_module._obtain(None, (URL,), tmp_path, "ELSEPA tables", "0" * 64)
     assert TOKEN not in str(caught.value)
+
+
+def test_release_indexes_read_the_legacy_single_url():
+    from pyrite.xsgen._urls import archive_urls
+
+    assert archive_urls({"url": None}) == ()
+    assert archive_urls({"url": URL}) == (URL,)
+    assert archive_urls({"urls": [URL, "https://mirror.invalid/a.zip"]}) == (
+        URL,
+        "https://mirror.invalid/a.zip",
+    )
+    with pytest.raises(ValueError, match="list"):
+        archive_urls({"urls": URL})
+
+
+def test_archive_download_falls_through_to_the_next_location(no_token, monkeypatch, tmp_path):
+    def open_url(request, **kwargs):
+        if "first.invalid" in request.full_url:
+            raise HTTPError(request.full_url, 503, "Unavailable", {}, None)
+        return _Response(PAYLOAD)
+
+    monkeypatch.setattr(fetch_module, "urlopen", open_url)
+    urls = ("https://first.invalid/a.zip", "https://second.invalid/a.zip")
+
+    path = fetch_module._obtain(None, urls, tmp_path, "tables", hashlib.sha256(PAYLOAD).hexdigest())
+
+    assert path.read_bytes() == PAYLOAD

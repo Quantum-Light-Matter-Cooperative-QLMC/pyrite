@@ -4,7 +4,9 @@
   "archive": {
     "sha256": "5f588621dc35216aac4ecfa17fa7fe986e0c309fee06245d08ba5c4465b2840a",
     "bytes": 25178906,
-    "url": "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-1/elsepa-tables.zip"
+    "urls": [
+      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-1/elsepa-tables.zip"
+    ]
   },
   "tables": [
     {

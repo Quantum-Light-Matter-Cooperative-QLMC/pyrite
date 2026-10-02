@@ -209,11 +209,15 @@ def _download(url: str, destination: Path, label: str) -> str:
     return _stream(request, destination, label)
 
 
-def _obtain(archive: Path | None, url: str | None, work: Path, label: str, expected: str) -> Path:
+def _obtain(
+    archive: Path | None, urls: tuple[str, ...], work: Path, label: str, expected: str
+) -> Path:
     """Return a verified archive: a local copy if given, else a download.
 
     The digest is checked before anything is extracted, whichever the
-    source, so a local copy is exactly as trusted as the network.
+    source, so a local copy is exactly as trusted as the network. Download
+    locations are tried in order; one that fails or serves other bytes is
+    skipped, and the error lists every attempt.
     """
     if archive is not None:
         path = Path(archive)
@@ -221,17 +225,33 @@ def _obtain(archive: Path | None, url: str | None, work: Path, label: str, expec
             actual = file_sha256(path)
         except OSError as exc:
             raise DataFetchError(f"could not read {label} archive {path}: {exc}") from exc
-    else:
-        if url is None:
-            raise DataFetchError(f"no download location is pinned for {label}")
-        path = work / "archive.zip"
-        actual = _download(url, path, label)
-    if actual != expected:
-        raise DataFetchError(
-            f"{label} archive SHA-256 mismatch: expected {expected}, received {actual}; "
-            "nothing was installed"
+        if actual != expected:
+            raise DataFetchError(
+                f"{label} archive SHA-256 mismatch: expected {expected}, received {actual}; "
+                "nothing was installed"
+            )
+        return path
+    if not urls:
+        raise DataFetchError(f"no download location is pinned for {label}")
+    path = work / "archive.zip"
+    failures = []
+    for url in urls:
+        try:
+            actual = _download(url, path, label)
+        except DataFetchError as exc:
+            failures.append(str(exc))
+            continue
+        if actual == expected:
+            return path
+        failures.append(
+            f"{label} archive SHA-256 mismatch: expected {expected}, received {actual} from {url}"
         )
-    return path
+    if len(failures) == 1:
+        raise DataFetchError(f"{failures[0]}; nothing was installed")
+    raise DataFetchError(
+        f"every download location for {label} failed; nothing was installed:\n"
+        + "\n".join(f"- {failure}" for failure in failures)
+    )
 
 
 def _extract_sdbase(archive: Path, destination: Path) -> int:
@@ -299,7 +319,7 @@ def fetch_sbethe(archive: str | Path | None = None) -> FetchResult:
         work = Path(temp)
         bundle = _obtain(
             None if archive is None else Path(archive),
-            SBETHE_ARCHIVE_URL,
+            (SBETHE_ARCHIVE_URL,),
             work,
             f"SBETHE data ({SBETHE_DEPOSIT})",
             SBETHE_ARCHIVE_SHA256,
@@ -410,7 +430,7 @@ def _install_release(
             file_count=len(pinned.tables),
             installed=False,
         )
-    if archive is None and pinned.url is None:
+    if archive is None and not pinned.urls:
         raise DataFetchError(
             f"the pinned {name} table release is not published for download yet; "
             "install from a copy of the release archive with "
@@ -423,7 +443,7 @@ def _install_release(
         label = f"{name} tables ({pinned.upstream})"
         bundle_path = _obtain(
             None if archive is None else Path(archive),
-            pinned.url,
+            pinned.urls,
             work,
             label,
             pinned.archive_sha256,
