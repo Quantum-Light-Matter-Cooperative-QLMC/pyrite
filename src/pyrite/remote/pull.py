@@ -173,6 +173,35 @@ def resolve_profile_stem(
     return matches[0][0]
 
 
+def resolve_profile_stems(material, catalog_profile, *, fidelity=None):
+    """Resolve every detector stem MATERIAL holds under CATALOG_PROFILE: one
+    :func:`resolve_profile_stem` per detector of the profile's detector set
+    (a single stem when the catalog cannot enumerate the profile's detectors)."""
+    from ..campaign.profiles import detector_variant
+    from ..materials import CATALOG, load_material_catalog
+
+    try:
+        catalog = (
+            CATALOG
+            if catalog_profile == "standard"
+            else load_material_catalog(profile=catalog_profile)
+        )
+        detector_ids = tuple(catalog.profile_detector_set(catalog_profile))
+    except KeyError, ValueError:
+        return [resolve_profile_stem(material, catalog_profile, fidelity=fidelity)]
+    return [
+        resolve_profile_stem(
+            material,
+            catalog_profile,
+            fidelity=fidelity,
+            detector_id=(
+                detector_id if detector_variant(catalog_profile, detector_id) is not None else None
+            ),
+        )
+        for detector_id in detector_ids
+    ]
+
+
 def pull(
     stems,
     grid=False,
@@ -218,9 +247,6 @@ def pull(
     if hash_prefix is not None and len(qualified) != 1:
         raise SystemExit("--hash requires exactly one MATERIAL@PROFILE selector to pull")
     if qualified:
-        from ..campaign.profiles import detector_variant
-        from ..materials import CATALOG, load_material_catalog
-
         resolved_stems = []
         for stem, selector in zip(stems, selectors, strict=True):
             if selector is None:
@@ -228,33 +254,12 @@ def pull(
                 continue
             material, profile = selector
             transport._check_shell_tokens([material])
-            try:
-                catalog = (
-                    CATALOG if profile == "standard" else load_material_catalog(profile=profile)
-                )
-                detector_ids = tuple(catalog.profile_detector_set(profile))
-            except KeyError, ValueError:
-                resolved_stems.append(
-                    resolve_profile_stem(material, profile, hash_prefix=hash_prefix)
-                )
-                continue
             if hash_prefix is not None:
                 resolved_stems.append(
                     resolve_profile_stem(material, profile, hash_prefix=hash_prefix)
                 )
                 continue
-            for detector_id in detector_ids:
-                selected_id = (
-                    detector_id if detector_variant(profile, detector_id) is not None else None
-                )
-                resolved_stems.append(
-                    resolve_profile_stem(
-                        material,
-                        profile,
-                        hash_prefix=hash_prefix,
-                        detector_id=selected_id,
-                    )
-                )
+            resolved_stems.extend(resolve_profile_stems(material, profile))
         stems = resolved_stems
     transport._check_shell_tokens(stems)
     if dataset is None:

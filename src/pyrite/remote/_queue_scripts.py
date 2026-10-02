@@ -60,6 +60,19 @@ def _stems(materials, quick, fidelity="full", high_energy_min_kev=None, catalog_
     <material>_quick/ for --quick runs). ``high_energy_min_kev`` predicts the
     non-canonical stem for materials classified by legacy job records (a no-op
     stem-wise for every other material)."""
+    return [
+        stem
+        for _, stem in _material_stems(
+            materials, quick, fidelity, high_energy_min_kev, catalog_profile
+        )
+    ]
+
+
+def _material_stems(
+    materials, quick, fidelity="full", high_energy_min_kev=None, catalog_profile="standard"
+):
+    """``(material, stem)`` pairs behind :func:`_stems`; a multi-detector
+    profile yields one pair per detector for each material."""
     from ..materials import CATALOG, load_material_catalog
 
     catalog = (
@@ -73,18 +86,21 @@ def _stems(materials, quick, fidelity="full", high_energy_min_kev=None, catalog_
     )
     if quick:
         return [
-            f"{material}_quick_{detector_id}" if multiple else f"{material}_quick"
+            (material, f"{material}_quick_{detector_id}" if multiple else f"{material}_quick")
             for material in materials
             for detector_id in detector_ids
         ]
     if high_energy_min_kev is None:
         if fidelity == "full" and catalog_profile == "standard" and not multiple:
-            return list(materials)
+            return [(material, material) for material in materials]
         from ..campaign.profiles import named_profile_stem
 
         return [
-            named_profile_stem(
-                material, fidelity, catalog_profile=catalog_profile, detector_id=detector_id
+            (
+                material,
+                named_profile_stem(
+                    material, fidelity, catalog_profile=catalog_profile, detector_id=detector_id
+                ),
             )
             for material in materials
             for detector_id in detector_ids
@@ -95,23 +111,20 @@ def _stems(materials, quick, fidelity="full", high_energy_min_kev=None, catalog_
     for material in materials:
         for detector_id in detector_ids:
             if material in _LEGACY_HIGH_ENERGY_MATERIALS:
-                stems.append(
-                    high_energy_floor_stem(
-                        material,
-                        high_energy_min_kev,
-                        fidelity,
-                        catalog_profile=catalog_profile,
-                        detector_id=detector_id,
-                    )
+                stem = high_energy_floor_stem(
+                    material,
+                    high_energy_min_kev,
+                    fidelity,
+                    catalog_profile=catalog_profile,
+                    detector_id=detector_id,
                 )
             elif fidelity == "full" and catalog_profile == "standard" and not multiple:
-                stems.append(material)
+                stem = material
             else:
-                stems.append(
-                    named_profile_stem(
-                        material, fidelity, catalog_profile=catalog_profile, detector_id=detector_id
-                    )
+                stem = named_profile_stem(
+                    material, fidelity, catalog_profile=catalog_profile, detector_id=detector_id
                 )
+            stems.append((material, stem))
     return stems
 
 
