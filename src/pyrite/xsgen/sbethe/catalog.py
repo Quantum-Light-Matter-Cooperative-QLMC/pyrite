@@ -1,5 +1,6 @@
 """Resolve catalog compositions into reproducible SBETHE material inputs."""
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -66,7 +67,7 @@ def material_inputs_from_composition(
         mass_sum += n_i * a_i
         electron_weight = n_i * z_i
         electron_sum += electron_weight
-        log_i_sum += electron_weight * np.log(i_ev)
+        log_i_sum += electron_weight * math.log(i_ev)
 
     # SBETHE's keyboard composition is a molecular stoichiometry, not a number
     # density.  CIF-derived densities share one common cell-volume factor, so
@@ -81,7 +82,11 @@ def material_inputs_from_composition(
     }
 
     density_g_cm3 = mass_sum / (Avogadro * 1.0e-24)
-    mean_excitation_eV = float(np.exp(log_i_sum / electron_sum))
+    # ``math``, not ``np``: this value is hashed into the table key, and
+    # numpy's log/exp pick CPU-dependent kernels that differ in the last bit
+    # (``pdse2`` re-keyed on the CI runner), whereas glibc's are the same on
+    # every x86-64 Linux host. Locally both agree for every catalogue key.
+    mean_excitation_eV = math.exp(log_i_sum / electron_sum)
     return CatalogMaterial(
         key=str(key),
         composition=stoichiometry,
