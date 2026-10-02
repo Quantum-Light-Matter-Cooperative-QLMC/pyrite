@@ -24,6 +24,10 @@ os.environ["PYRITE_MC_BACKEND"] = _TEST_BACKEND
 # depend on it nor write generated tables into it. Drop it before any module
 # resolves import-time workspace defaults; tests that exercise it set their own.
 os.environ.pop("PYRITE_HOME", None)
+# Likewise a developer's PYRITE_CATALOG names their real catalog. CLI editors
+# honor the test-patched path only while the bundled catalog is selected, so an
+# ambient value would let profile/detector tests rewrite the real catalog.
+os.environ.pop("PYRITE_CATALOG", None)
 # PyRITE ships no NIST SRD 64 tables (#263); a real user configures
 # ``mott.tables_dir``. Point ``elastic_model="mott"`` at the synthetic
 # SRD 64-format fixture, whose numbers reproduce the analytic Joy/Bishop
