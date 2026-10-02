@@ -412,7 +412,7 @@ def _cli_start(
         return
     materials_needing_pull = set(state._materials_needing_pull(jobid, completed))
     if quick or (fidelity == "full" and catalog_profile == "standard"):
-        stems = scripts._stems(
+        material_stems = scripts._material_stems(
             completed,
             quick,
             fidelity,
@@ -423,16 +423,19 @@ def _cli_start(
         # The synchronized box is authoritative after a potentially long job.
         # Recomputing identity hashes locally after attachment can target a
         # nonexistent directory when profile/catalog inputs changed meanwhile.
-        stems = [
-            lifecycle.resolve_profile_stem(material, catalog_profile, fidelity=fidelity)
+        material_stems = [
+            (material, stem)
             for material in completed
+            for stem in lifecycle.resolve_profile_stems(
+                material, catalog_profile, fidelity=fidelity
+            )
         ]
     from ...checkpoints import _checkpoint_store
 
     checkpoint_root = config.LOCAL_ROOT / "checkpoints"
     stems = [
         stem
-        for material, stem in zip(completed, stems, strict=True)
+        for material, stem in material_stems
         if material in materials_needing_pull
         or not _checkpoint_store.checkpoint_exists(stem, checkpoint_root)
     ]

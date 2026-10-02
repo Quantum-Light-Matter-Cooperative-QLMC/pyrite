@@ -13,6 +13,7 @@ _LEGACY_HIGH_ENERGY_MATERIALS = _queue_scripts._LEGACY_HIGH_ENERGY_MATERIALS
 _SBATCH_RETRY_ATTEMPTS = _queue_scripts._SBATCH_RETRY_ATTEMPTS
 _SBATCH_RETRY_SECONDS = _queue_scripts._SBATCH_RETRY_SECONDS
 _stems = _queue_scripts._stems
+_material_stems = _queue_scripts._material_stems
 _list_checkpoint_dirs_command = _queue_scripts._list_checkpoint_dirs_command
 _validate_parallel_materials = _queue_scripts._validate_parallel_materials
 _uv_sync_block = _queue_scripts._uv_sync_block

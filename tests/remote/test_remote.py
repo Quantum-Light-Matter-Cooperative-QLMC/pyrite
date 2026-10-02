@@ -1775,7 +1775,7 @@ def test_successful_profile_run_resolves_remote_stem_before_real_pull(monkeypatc
         resolved.append((material, profile, fidelity))
         return remote_stem
 
-    monkeypatch.setattr(lifecycle, "resolve_profile_stem", resolve)
+    monkeypatch.setattr(lifecycle_pull, "resolve_profile_stem", resolve)
     monkeypatch.setattr(
         lifecycle_pull,
         "_remote_meta_json",
@@ -1804,6 +1804,64 @@ def test_successful_profile_run_resolves_remote_stem_before_real_pull(monkeypatc
     assert resolved == [("hopg", "sub_100keV", "full")]
     assert len(transfers) == 1
     assert _checkpoint_store.checkpoint_exists(remote_stem, tmp_path / "checkpoints")
+
+
+@pytest.fixture
+def multi_detector_standard(tmp_path, monkeypatch):
+    """Bundled catalog whose ``standard`` profile also declares a physical
+    detector, so it resolves the two detector IDs ``physical`` and ``default``."""
+    from pyrite import DATA_DIR, materials
+    from pyrite.campaign import config as campaign_config
+    from pyrite.materials import load_material_catalog
+
+    root = tmp_path / "catalog"
+    shutil.copytree(DATA_DIR / "catalog", root)
+    with (root / "profiles" / "standard.toml").open("a") as handle:
+        handle.write("\n[physical_detector]\ndistance_mm = 300.0\nshape = [2, 3]\n")
+        handle.write("pitch_mm = [0.1, 0.2]\n")
+    catalog = load_material_catalog(root)
+    monkeypatch.setenv("PYRITE_CATALOG", str(root))
+    monkeypatch.setattr(materials, "CATALOG", catalog)
+    monkeypatch.setattr(campaign_config, "CATALOG", catalog)
+    assert len(catalog.profile_detector_set("standard")) == 2
+    return catalog
+
+
+def test_successful_multi_detector_run_pulls_every_stem_of_completed_material(
+    monkeypatch, multi_detector_standard
+):
+    """Regression (#289): a multi-detector profile yields one stem per detector
+    per material; the post-wait pull keeps every detector stem of a completed
+    material instead of zipping stems against materials."""
+    pairs = scripts._material_stems(["hopg", "hbn"], False, "full", catalog_profile="standard")
+    assert [material for material, _ in pairs] == ["hopg", "hopg", "hbn", "hbn"]
+    pulled = []
+
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _materials, **_kwargs: "job")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(state, "_completed_materials", lambda _jobid, _materials: ["hopg"])
+    monkeypatch.setattr(state, "_materials_needing_pull", lambda _jobid, mats: list(mats))
+    monkeypatch.setattr(lifecycle, "pull", lambda stems, **_kwargs: pulled.append(list(stems)))
+
+    _remote_main(["run", "standard", "-m", "hopg", "-m", "hbn", "--no-sync"])
+
+    assert pulled == [[stem for material, stem in pairs if material == "hopg"]]
+
+
+def test_resolve_profile_stems_resolves_one_stem_per_detector(monkeypatch, multi_detector_standard):
+    seen = []
+
+    def resolve(material, profile, *, fidelity=None, detector_id=None, **_kwargs):
+        seen.append(detector_id)
+        return f"{material}-{detector_id}"
+
+    monkeypatch.setattr(lifecycle_pull, "resolve_profile_stem", resolve)
+
+    stems = lifecycle.resolve_profile_stems("hopg", "standard", fidelity="full")
+
+    assert len(stems) == 2
+    assert len(set(stems)) == 2
+    assert len(seen) == 2
 
 
 @pytest.mark.parametrize("cache_flag", ["--no-cache", "--recompute"])
