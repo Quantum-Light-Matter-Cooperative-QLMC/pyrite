@@ -46,6 +46,8 @@ from .bremslib.release import (
 )
 from .elsepa.release import ElsepaReleaseIndex
 from .elsepa.release import load_release_index as load_elsepa_release_index
+from .sbethe.release import SbetheReleaseIndex
+from .sbethe.release import load_release_index as load_sbethe_release_index
 from .sources import fetched_data_dir
 from .store import arrays_digest, manifest_digest, resolve, user_table_dir
 
@@ -534,6 +536,32 @@ def fetch_elsepa(
     return _install_release("elsepa", "ELSEPA", pinned, archive, exact=False)
 
 
+def fetch_sbethe_tables(
+    archive: str | Path | None = None, *, index: SbetheReleaseIndex | None = None
+) -> FetchResult:
+    """Install the pinned SBETHE catalogue stopping tables into the user table directory.
+
+    As :func:`fetch_elsepa`: a table already stored under a released key
+    counts as installed, since the key fixes the material inputs, the
+    vendored source, and the deck. Distinct from :func:`fetch_sbethe`, which
+    installs the ``sdbase/`` reference data that generation and the shell
+    model read.
+
+    Raises
+    ------
+    DataFetchError
+        If this build pins no release, or the archive cannot be obtained or
+        does not verify.
+    """
+    pinned = load_sbethe_release_index() if index is None else index
+    if pinned is None:
+        raise DataFetchError(
+            "this PyRITE build pins no SBETHE table release; generate tables with "
+            "`pyrite tables generate --code sbethe --material NAME`"
+        )
+    return _install_release("sbethe-tables", "SBETHE", pinned, archive, exact=False)
+
+
 __all__ = [
     "GITHUB_TOKEN_ENV",
     "FetchResult",
@@ -542,4 +570,5 @@ __all__ = [
     "fetch_bremslib",
     "fetch_elsepa",
     "fetch_sbethe",
+    "fetch_sbethe_tables",
 ]

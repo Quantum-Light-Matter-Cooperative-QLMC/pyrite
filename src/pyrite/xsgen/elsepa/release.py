@@ -32,7 +32,7 @@ import tempfile
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, Self
 
 from ...materials import CATALOG
 from ...materials._transport_data import TRANSPORT_ELEMENTS
@@ -79,8 +79,14 @@ class ElsepaReleaseIndex:
 
     ``urls`` is empty until the archive is published and is tried in order
     (see :mod:`pyrite.xsgen._urls`); installing from a local copy works
-    either way.
+    either way. :class:`pyrite.xsgen.sbethe.release.SbetheReleaseIndex`
+    reuses the same shape under its own :attr:`SCHEMA`.
     """
+
+    #: Schema this index class reads and writes.
+    SCHEMA: ClassVar[str] = RELEASE_SCHEMA
+    #: Code name used in error messages.
+    NAME: ClassVar[str] = "ELSEPA"
 
     upstream: str
     archive_sha256: str
@@ -91,7 +97,7 @@ class ElsepaReleaseIndex:
     def record(self) -> dict[str, Any]:
         """Return the JSON-serializable index body."""
         return {
-            "schema": RELEASE_SCHEMA,
+            "schema": self.SCHEMA,
             "upstream": self.upstream,
             "archive": {
                 "sha256": self.archive_sha256,
@@ -105,12 +111,12 @@ class ElsepaReleaseIndex:
         }
 
     @classmethod
-    def from_record(cls, record: Mapping[str, Any]) -> ElsepaReleaseIndex:
+    def from_record(cls, record: Mapping[str, Any]) -> Self:
         """Parse an index body, rejecting any other schema."""
-        if record.get("schema") != RELEASE_SCHEMA:
+        if record.get("schema") != cls.SCHEMA:
             raise ValueError(
-                f"unsupported ELSEPA release index schema {record.get('schema')!r}; "
-                f"expected {RELEASE_SCHEMA!r}"
+                f"unsupported {cls.NAME} release index schema {record.get('schema')!r}; "
+                f"expected {cls.SCHEMA!r}"
             )
         archive = record["archive"]
         return cls(
