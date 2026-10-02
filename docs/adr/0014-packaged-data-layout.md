@@ -87,13 +87,13 @@ change.
   - The pin registry (the pooch-registry analogue) travels with the code. Each records an ordered `archive.urls` list (#282); the digest decides what installs.
 * - `xsgen/tables/` (49 SBETHE tables)
   - b
-  - Hosted on the private release `tables-sbethe-1` and fetched with `pyrite tables fetch sbethe-tables` (#282). The packaged copy is removed once CI installs the hosted archives end to end.
+  - Moved out of the wheel (#282): hosted on the private release `tables-sbethe-1` and fetched with `pyrite tables fetch sbethe-tables`.
 * - `characteristic_cross_sections/EEDL.endf`, `EADL2025.ALL`
   - b
   - Moved out of the wheel (decision 2): fetched with `pyrite tables fetch eedl` / `eadl` into `<data root>/datasets/` from LLNL, then the private mirror releases `mirror-eedl2025-1` / `mirror-eadl2025-1` (#282); the README stays as provenance.
 * - `photon_cross_sections/epdl2025_mf23.npz` (added by #274)
   - b
-  - Hosted on the private release `tables-epdl-1` and fetched with `pyrite tables fetch epdl` (#282), the only location since it is derived data; provenance and modifications note travel in the release notes and its README. The packaged copy is read until it is removed once CI installs the hosted file end to end.
+  - Moved out of the wheel (#282): hosted on the private release `tables-epdl-1` and fetched with `pyrite tables fetch epdl`, the only location since it is derived data; provenance and modifications note travel in the release notes and its README.
 * - ELSEPA sources and `database/`; `sbethe.f`
   - c
   - Moved to `vendor/xsgen/elsepa/` and `vendor/xsgen/sbethe/`.
@@ -138,9 +138,8 @@ change.
      network.
 3. **SBETHE tables** become class (b), with a `sbethe-tables.json` release
    index like ELSEPA's and BremsLib's. #282 hosts the archive on a private
-   GitHub Release (interim to the Zenodo deposit, #167); the packaged copy
-   goes only after CI installs it end to end, because moving them first would
-   break default runs on a fresh install.
+   GitHub Release (interim to the Zenodo deposit, #167) and removed the
+   packaged copy once CI installed it end to end.
 4. **ELSEPA and SBETHE sources** are class (c), in `vendor/`. `vendor` is
    added to `pyrite remote` `SYNC_PATHS`, and `test-run-output` becomes a test
    fixture. Implemented in #263.
@@ -239,9 +238,9 @@ Stages not yet built are projections from the per-entry compressed sizes.
 * - Plus #264 (BELLS)
   - about 4.2
   - about 7.5
-* - Plus decision 3 (SBETHE tables)
-  - about 1.6
-  - about 4.7
+* - Plus decision 3 (SBETHE tables) and the EPDL table, #282
+  - 1.57 (measured)
+  - 4.78
 ```
 
 - A clean install needs one documented step, `pyrite tables fetch` for all

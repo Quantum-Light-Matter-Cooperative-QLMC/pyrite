@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 
 from pyrite.materials.photon_cross_sections import (
-    EPDL_TABLE_PATH,
     PHOTON_CHANNELS,
     _table,
     photoelectric_edges,
@@ -66,8 +65,11 @@ def test_packaged_table_is_pinned_and_compact() -> None:
     assert sorted(tables) == list(range(1, 101))
     assert all(sorted(tables[z]) == sorted(PHOTON_CHANNELS.values()) for z in tables)
     # ADR-0014 class (a) neighbourhood; the upstream tape is 86 MB.
-    assert EPDL_TABLE_PATH.stat().st_size < 2 * 1024 * 1024
-    with np.load(EPDL_TABLE_PATH) as archive:
+    from pyrite.datasets import require_dataset
+
+    path = require_dataset("epdl")
+    assert path.stat().st_size < 2 * 1024 * 1024
+    with np.load(path) as archive:
         assert archive["tolerance"].item() == 5.0e-4
 
 

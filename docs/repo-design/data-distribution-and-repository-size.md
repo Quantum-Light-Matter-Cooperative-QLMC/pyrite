@@ -22,6 +22,11 @@ EPDL table, 1.41 MiB code. That is a 68% cut from the 17.65 MiB baseline.
 The baseline tables below retain its measurements to document the decision;
 the blob remains in Git history.
 
+Issue #282 then moved the SBETHE tables and the EPDL table to hosted releases:
+the wheel measured on 2026-10-02 is 1.65 MB (1.57 MiB), 4.78 MiB installed,
+down from 5.73 MiB (9.11 MiB installed) on the same branch before the removal.
+That is a 91% cut from the 17.65 MiB baseline.
+
 ```{list-table} Wheel contents by data entry (MiB).
 :name: tbl-data-wheel-baseline
 :header-rows: 1

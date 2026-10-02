@@ -1,6 +1,7 @@
 # Photon interaction cross sections
 
-`epdl2025_mf23.npz` holds per-atom photon cross sections for Z = 1--100 from
+`epdl2025_mf23.npz` (not in the package: PyRITE release `tables-epdl-1`,
+installed with `pyrite tables fetch epdl`) holds per-atom photon cross sections for Z = 1--100 from
 1 eV to 100 GeV. It is **derived** from the 2025 Livermore Evaluated Photon
 Data Library (EPDL) by D. E. Cullen, distributed by the IAEA Nuclear Data
 Section as part of EPICS2025 (`NDS-IAEA-225`, evaluated August 2023,
