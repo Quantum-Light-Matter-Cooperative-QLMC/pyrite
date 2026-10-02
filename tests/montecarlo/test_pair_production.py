@@ -3,6 +3,8 @@
 Validation: pair-production-sampling, photon-pair-first-interaction
 """
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 from scipy import integrate, stats
@@ -113,6 +115,86 @@ def test_pair_conserves_energy_and_returns_unit_directions():
                 assert np.linalg.norm(direction) == pytest.approx(1.0, abs=1e-12)
 
 
+def _beta(kinetic_eV):
+    return np.sqrt(kinetic_eV * (kinetic_eV + 2 * MC2)) / (kinetic_eV + MC2)
+
+
+def _leading_term_cdf(c, beta):
+    return (1 / (1 - beta * c) - 1 / (1 + beta)) / (1 / (1 - beta) - 1 / (1 + beta))
+
+
+@pytest.mark.parametrize("Z", [6, 82])
+def test_sampled_pair_angles_match_leading_term_per_particle(Z):
+    """``sample_pair`` end to end: each cosine about the photon follows Eq. 2.99
+    at its own particle's beta (probability-integral transform, then KS)."""
+    rng = np.random.default_rng(2750 + Z)
+    photon = np.array([0.36, -0.48, 0.8])
+    e1 = np.array([1.0, 0.0, 0.0]) - 0.36 * photon
+    e1 /= np.linalg.norm(e1)
+    e2 = np.cross(photon, e1)
+    for k in (1.5e6, 4.0e6, 10.0e6):
+        pit, azimuth = [], []
+        for _ in range(3_000):
+            pair = sample_pair(k, Z, photon, rng)
+            total = pair.electron_eV + pair.positron_eV + PAIR_THRESHOLD_EV
+            assert abs(total - k) <= 2 * np.spacing(k)  # exact up to summation rounding
+            for kinetic, direction in (
+                (pair.electron_eV, pair.electron_direction),
+                (pair.positron_eV, pair.positron_direction),
+            ):
+                pit.append(_leading_term_cdf(float(direction @ photon), _beta(kinetic)))
+            transverse = pair.electron_direction - (pair.electron_direction @ photon) * photon
+            azimuth.append(np.arctan2(transverse @ e2, transverse @ e1))
+        assert stats.kstest(pit, "uniform").pvalue > 1e-3, k
+        assert stats.kstest(np.asarray(azimuth), stats.uniform(-np.pi, 2 * np.pi).cdf).pvalue > (
+            1e-3
+        )
+
+
+GEANT4_REFERENCE = (
+    Path(__file__).resolve().parents[2] / "checks" / "pair_production_geant4" / "reference"
+)
+
+
+def _merged_two_sample_chi2(a, b):
+    """Two-sample chi-square on bins merged left to right until both hold 10."""
+    merged, acc = [], np.zeros(2)
+    for pair in zip(a, b, strict=True):
+        acc += pair
+        if acc.min() >= 10:
+            merged.append(acc)
+            acc = np.zeros(2)
+    merged[-1] = merged[-1] + acc
+    return stats.chi2_contingency(np.array(merged).T, correction=False).pvalue
+
+
+@pytest.mark.parametrize("case", ["c_2mev", "c_5mev", "pb_2mev", "pb_5mev"])
+def test_sample_pair_matches_geant4_penelope_reference(case):
+    """Regression anchor: binned ``x = E_-/(k - 2mc^2)`` and both polar cosines
+    against Geant4 11.4.2 ``G4PenelopeGammaConversionModel`` (TestEm5, see
+    ``checks/pair_production_geant4``), the same PENELOPE section 2.4 model."""
+    import json
+
+    ref = json.loads((GEANT4_REFERENCE / f"{case}_empenelope.json").read_text())
+    Z, k = ref["Z"], ref["photon_energy_eV"]
+    rng = np.random.default_rng(27_500 + Z + int(k // 1e6))
+    photon = np.array([1.0, 0.0, 0.0])
+    n = 8_000
+    x, cos_minus, cos_plus = np.empty(n), np.empty(n), np.empty(n)
+    for i in range(n):
+        pair = sample_pair(k, Z, photon, rng)
+        x[i] = pair.electron_eV / (k - PAIR_THRESHOLD_EV)
+        cos_minus[i] = pair.electron_direction[0]
+        cos_plus[i] = pair.positron_direction[0]
+    for name, values, edges in (
+        ("x", x, ref["x_edges"]),
+        ("cos_minus", cos_minus, ref["cos_edges"]),
+        ("cos_plus", cos_plus, ref["cos_edges"]),
+    ):
+        ours, _ = np.histogram(values, edges)
+        assert _merged_two_sample_chi2(ours, ref[name]) > 1e-3, name
+
+
 def _slab(composition, thickness):
     return [(0.0, thickness, composition)]
 
@@ -181,6 +263,46 @@ def test_first_interaction_crosses_layers_backwards_and_picks_elements():
     in_bottom = hit["pair"] & (hit["layer"] == 1)
     lead = int(np.count_nonzero(hit["element"][in_bottom] == 0))
     assert stats.binomtest(lead, int(in_bottom.sum()), pair_b[0] / sum(pair_b)).pvalue > 1e-3
+
+
+def test_first_interaction_depth_follows_layered_optical_depth():
+    """An oblique ray through three layers: escape, depth CDF and pair share per layer.
+
+    The depth CDF is ``1 - exp(-tau(s))`` with ``tau`` piecewise linear in the
+    path length, conditioned on interacting before the exit face.
+    """
+    stack = [[("C", 0.11)], [("Pb", 0.02), ("O", 0.06)], [("Si", 0.05)]]
+    E = 5.0e6
+    mus = [_mu(comp, E) for comp in stack]
+    mu = np.array([pair + other for pair, other in mus])
+    cos_z = 0.6
+    path = np.array([0.6, 0.4, 0.5]) / mu  # path length per layer
+    bounds = np.concatenate([[0.0], np.cumsum(path * cos_z)])
+    layers = [(bounds[i], bounds[i + 1], comp) for i, comp in enumerate(stack)]
+    n = 60_000
+    rng = np.random.default_rng(6)
+    direction = [np.sqrt(1 - cos_z**2), 0.0, cos_z]
+    hit = photon_first_interactions(
+        np.zeros((n, 3)), np.tile(direction, (n, 1)), np.full(n, E), rng.random((n, 2)), layers
+    )
+    s_edges = np.concatenate([[0.0], np.cumsum(path)])
+    tau_edges = np.concatenate([[0.0], np.cumsum(mu * path)])
+
+    def tau(s):
+        return np.interp(s, s_edges, tau_edges)
+
+    p_escape = np.exp(-tau_edges[-1])
+    interacts = np.isfinite(hit["distance_ang"])
+    assert stats.binomtest(int(np.count_nonzero(~interacts)), n, p_escape).pvalue > 1e-3
+    depth = hit["distance_ang"][interacts]
+    assert stats.kstest(depth, lambda s: (1 - np.exp(-tau(s))) / (1 - p_escape)).pvalue > 1e-3
+    np.testing.assert_array_equal(
+        hit["layer"][interacts], np.searchsorted(s_edges, depth, side="right") - 1
+    )
+    for index, (mu_pair, mu_other) in enumerate(mus):
+        here = hit["layer"] == index
+        share = mu_pair / (mu_pair + mu_other)
+        assert stats.binomtest(int(hit["pair"][here].sum()), int(here.sum()), share).pvalue > 1e-3
 
 
 def test_first_interaction_respects_finite_footprint():

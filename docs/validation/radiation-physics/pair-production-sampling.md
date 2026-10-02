@@ -246,3 +246,15 @@ normalizes its input direction; the docstring of
 fallback window ($Z\ge85$ below 1.031–1.087 MeV) as a PyRITE convention; the
 ledger quotes the measured $-0.1774$ overestimates. Table 2.2 stops at
 $Z=99$, so a $Z=100$ layer raises; no catalog material is affected.
+
+## Anchoring (2026-10-02)
+
+The ledger row moved from `rederived` to `anchored` after the verdict above.
+`tests/montecarlo/test_pair_production.py` now also pins:
+
+- `sample_pair` end to end at 1.5, 4 and 10 MeV for Z = 6 and 82. Energy
+  closes to two ulp. Each particle's cosine follows Eq. 2.99 at its own
+  $\beta$ (probability-integral transform, KS), and the azimuth is uniform.
+- The binned energy share and both polar cosines, compared with the committed
+  Geant4 `empenelope` references in `checks/pair_production_geant4/reference/`
+  (C and Pb, 2 and 5 MeV, two-sample chi-square).
