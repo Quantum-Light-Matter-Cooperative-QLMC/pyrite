@@ -104,7 +104,31 @@ the move to public Zenodo records (#167) swaps the URL and drops the token.
 * - `tables-elsepa-1`
   - `elsepa-tables.zip` (25,178,906 B, 28 tables)
   - `src/pyrite/data/xsgen/elsepa-tables.json`
+* - `tables-bremslib-1`
+  - `bremslib-tables.zip` (23,066,359 B, 24 tables)
+  - `src/pyrite/data/xsgen/bremslib-tables.json`
+* - `tables-sbethe-1`
+  - `sbethe-tables.zip` (49 catalogue stopping tables)
+  - `src/pyrite/data/xsgen/sbethe-tables.json`
+* - `tables-epdl-1`
+  - `epdl2025_mf23.npz` (derived EPDL2025 photon table)
+  - `pyrite.datasets.EPDL`
+* - `mirror-eedl2025-1`
+  - `EEDL.endf` (fallback after LLNL)
+  - `pyrite.datasets.EEDL`
+* - `mirror-eadl2025-1`
+  - `EADL2025.ALL` (fallback after LLNL)
+  - `pyrite.datasets.EADL`
 ```
+
+Each index and dataset lists its download locations in order (`archive.urls`
+in the table indexes, `Dataset.urls` in `pyrite.datasets`): upstream first
+where one exists, then PyRITE's release, later a Zenodo record. A location
+that fails or serves other bytes is skipped; the pinned SHA-256 decides what
+installs, so adding a mirror cannot change it. The SBETHE `sdbase/` database
+stays upstream-only (its redistribution terms are unconfirmed), and NIST SRD 64
+Mott tables are never hosted. `pyrite tables fetch` without a code installs
+everything.
 
 `pyrite tables fetch` resolves a `github.com/.../releases/download/<tag>/<asset>`
 URL through the GitHub API with the first token found in `PYRITE_GITHUB_TOKEN`,
@@ -119,6 +143,8 @@ To cut or refresh a release (maintainer):
 
 1. Build the archive and index from the stored tables, for example
    `uv run python scripts/release_elsepa_tables.py --out build/xsgen-release`
+   (likewise `release_bremslib_tables.py`, `release_sbethe_tables.py`;
+   `release_epdl_table.py` writes the EPDL npz)
    (add `--generate` for missing tables). The archive is deterministic: an
    unchanged table set reproduces the pinned SHA-256.
 2. If the digest differs from the pin, use a new tag (`tables-elsepa-<n+1>`);
@@ -129,8 +155,9 @@ To cut or refresh a release (maintainer):
    statement (see `THIRD-PARTY-NOTICES.md`).
 4. Download the asset back (`gh release download <tag> -p <asset> -O - | sha256sum`)
    and check it matches the index.
-5. Rebuild with `--url <release download URL> --pin` (or edit
-   `archive.url`) and commit the index; CI's cache key follows it.
+5. Rebuild with `--url <release download URL> --pin` (`--url` repeats, in
+   fetch order; or edit `archive.urls`) and commit the index; CI's cache key
+   follows it. A dataset's URLs and SHA-256 live in `pyrite.datasets`.
 
 ## Repository size
 
