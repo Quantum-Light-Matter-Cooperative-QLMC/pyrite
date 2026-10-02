@@ -98,6 +98,7 @@ radiation-physics/coherent-formation-absorption
 radiation-physics/coherent-inter-electron-decoherence
 radiation-physics/coherent-line-spectrum
 radiation-physics/coherent-segment-midpoint-time
+radiation-physics/temporal-intensity-profile
 radiation-physics/cross-reflection-coherence
 radiation-physics/external-brem-subtraction
 radiation-physics/finite-footprint-longitudinal-decoherence
