@@ -189,6 +189,8 @@ def _concat(parts):
 def _validate(kw):
     """Threshold [keV] and caps; raise on every unsupported combination."""
     threshold_eV = kw["secondary_threshold_eV"]
+    if threshold_eV is None:  # the cascade was entered for pair_production_model
+        raise ValueError("pair_production_model requires secondary_threshold_eV")
     if (
         isinstance(threshold_eV, bool)
         or not np.isfinite(threshold_eV)

@@ -52,7 +52,6 @@ from .._numerics import (
     validate_bremsstrahlung_model,
     validate_elastic_model,
     validate_inelastic_numerics,
-    validate_pair_production_numerics,
 )
 from .._photon_continuum_floor import floored_lattice_start_eV
 from ..detectors import Detector
@@ -733,17 +732,12 @@ def build_cases(
     )
     validate_elastic_model(elastic_model)
     validate_bremsstrahlung_model(bremsstrahlung_model)
-    # Opt-in coupled radiative keys (#172); under "auto" they join after resolution.
+    # Opt-in coupled radiative keys (#172), with pair conversion (#275) riding on
+    # them; under "auto" they join after resolution.
+    pair = (pair_production_model, secondary_threshold_eV)
     radiative = radiative_case_keys(
-        radiative_model, radiative_cutoff_eV, energy_model, straggling, bremsstrahlung_model
+        radiative_model, radiative_cutoff_eV, energy_model, straggling, bremsstrahlung_model, *pair
     )
-    # Opt-in pair conversion (#275) rides on the coupled keys, so it joins only
-    # cases that resolve to coupled BremsLib transport.
-    validate_pair_production_numerics(
-        pair_production_model, secondary_threshold_eV, radiative_model, bremsstrahlung_model
-    )
-    if pair_production_model is not None and radiative:
-        radiative = {**radiative, "pair_production_model": pair_production_model}
     target = sweep.target
     cp = sweep_crystal_params(sweep)
     # line grid: fine + narrow (per-material default or detector mapping/fixed
