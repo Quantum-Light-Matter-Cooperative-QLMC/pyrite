@@ -264,6 +264,7 @@ def _emit_show(payload):
                 f"{tuple(row.get('size_mm', ()))} mm"
             )
     emit_result(f"  emission: {payload['emission'] or 'incoherent (default)'}")
+    emit_result("  temporal profile: " + ("on" if payload["temporal_profile"] else "off (default)"))
     numerics = payload["transport_numerics"]
     for key, label, default in (
         ("straggling", "straggling", False),
@@ -713,6 +714,7 @@ def create_command(
                     ("physical_detector", "physical detector"),
                     ("filters", "filters"),
                     ("emission", "emission"),
+                    ("temporal_profile", "temporal profile"),
                 )
                 if key in source_row
             ]
@@ -774,6 +776,16 @@ def create_command(
     type=click.Choice(_EMISSION_VALUES),
     help="Replace the emission policy (incoherent/coherent/both).",
 )
+@click.option(
+    "--temporal-profile/--no-temporal-profile",
+    "temporal_profile",
+    default=None,
+    help=(
+        "Also compute the line temporal intensity profile I(t) (photons/sr/electron/fs) "
+        "beside each line spectrum. Off by default; on runs the slower per-reflection "
+        "line route and changes the dataset identity."
+    ),
+)
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def set_command(
@@ -792,6 +804,7 @@ def set_command(
     detector_name,
     all_materials,
     emission,
+    temporal_profile,
     yes,
     dry_run,
 ):
@@ -826,9 +839,11 @@ def set_command(
         and materials is None
         and not all_materials
         and emission is None
+        and temporal_profile is None
     ):
         raise click.UsageError(
-            "provide a range, beam, detector, transport, membership, or emission option"
+            "provide a range, beam, detector, transport, membership, emission, "
+            "or temporal-profile option"
         )
     try:
         original, document = _catalog_io.catalog_text()
@@ -842,6 +857,7 @@ def set_command(
             materials=materials,
             all_materials=all_materials,
             emission=emission,
+            temporal_profile=temporal_profile,
         )
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
@@ -853,6 +869,7 @@ def set_command(
         or materials is not None
         or all_materials
         or emission is not None
+        or temporal_profile is not None
     ):
         action_fields = list(dict.fromkeys(overwriting))
         if beam_name is not None:
@@ -861,6 +878,8 @@ def set_command(
             action_fields.append("detector")
         if emission is not None:
             action_fields.append("emission")
+        if temporal_profile is not None:
+            action_fields.append("temporal profile")
         action_fields.extend(transport_updates)
         _confirm_standard(name, f"set {', '.join(action_fields) or 'materials'} on", yes, dry_run)
     changes = "; ".join(

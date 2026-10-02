@@ -564,6 +564,7 @@ def _identity_v1(
     settings_payload = resolved["settings"]
     if isinstance(settings_payload, Mapping):
         emission = str(settings_payload.pop("emission", "incoherent"))
+        temporal_profile = bool(settings_payload.pop("temporal_profile", False))
         straggling = bool(settings_payload.pop("straggling", False))
         energy_model = str(settings_payload.pop("energy_model", "frozen"))
         max_dE_frac = float(settings_payload.pop("max_dE_frac", 0.0))
@@ -576,6 +577,7 @@ def _identity_v1(
         radiative_cutoff_eV = settings_payload.pop("radiative_cutoff_eV", None)
     else:  # pragma: no cover - settings is always a jsonable Mapping here
         emission = str(getattr(settings, "emission", "incoherent"))
+        temporal_profile = bool(getattr(settings, "temporal_profile", False))
         straggling = bool(getattr(settings, "straggling", False))
         energy_model = str(getattr(settings, "energy_model", "frozen"))
         max_dE_frac = float(getattr(settings, "max_dE_frac", 0.0))
@@ -588,6 +590,9 @@ def _identity_v1(
         radiative_cutoff_eV = getattr(settings, "radiative_cutoff_eV", None)
     if emission != "incoherent":
         resolved["emission"] = emission
+    # Opt-in line I(t) (#292): divergence-only, so off keeps every digest.
+    if temporal_profile:
+        resolved["temporal_profile"] = True
     transport_numerics = {}
     if straggling:
         transport_numerics["straggling"] = True

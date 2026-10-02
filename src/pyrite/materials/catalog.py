@@ -183,6 +183,9 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if isinstance(row.get("emission"), str)
     }
+    profile_temporal_profiles = {
+        name: True for name, row in profiles.items() if row.get("temporal_profile") is True
+    }
     profile_line_grid_policies = {
         name: MappingProxyType(dict(cast("Mapping[str, str]", row["line_grid_policy"])))
         for name, row in profiles.items()
@@ -250,6 +253,7 @@ def _load_material_catalog_cached(
         profile_beams=MappingProxyType(profile_beams),
         profile_detectors=MappingProxyType(profile_detectors),
         profile_emissions=MappingProxyType(profile_emissions),
+        profile_temporal_profiles=MappingProxyType(profile_temporal_profiles),
         profile_transport_numerics=MappingProxyType(profile_transport_numerics),
         profile_line_grid_policies=MappingProxyType(profile_line_grid_policies),
         profile_filters=MappingProxyType(profile_filters),

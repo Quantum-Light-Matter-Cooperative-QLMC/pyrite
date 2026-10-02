@@ -114,6 +114,8 @@ class Settings:
         to 1000 eV when coupling runs.
     emission
         ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
+    temporal_profile
+        Also compute the line temporal intensity profile ``I(t)`` (#292).
     """
 
     beam_current_na: float = DEFAULT_BEAM_CURRENT_NA
@@ -144,8 +146,12 @@ class Settings:
     # "incoherent" (divergence-only rule); an incoherent run's parameter_sha256
     # -- and its checkpoint stem -- stays unchanged.
     emission: EmissionMode = "incoherent"
+    # Opt-in line I(t) (#292). Divergence-only in dataset_identity, like emission.
+    temporal_profile: bool = False
 
     def __post_init__(self) -> None:
+        if not isinstance(self.temporal_profile, bool):
+            raise TypeError("temporal_profile must be a bool")
         if not isinstance(self.straggling, bool):
             raise TypeError("straggling must be a bool")
         if self.energy_model not in {"frozen", "midpoint"}:
@@ -197,6 +203,14 @@ def line_fwhm_eV(case: dict, E_pk: float, mosaic_rad: float | None) -> float:
 
 
 # ---- results store -----------------------------------------------------------
+#: Optional record keys of the line temporal intensity profile (#292).
+TEMPORAL_RECORD_KEYS = (
+    "temporal_t_fs",
+    "temporal_intensity",
+    "temporal_intensity_coherent",
+)
+
+
 def store_result(results, case, out):
     """Post-process one finished case into ``results[name][E0]`` (in place)."""
     name, E0 = case["name"], case["E0_keV"]
@@ -235,6 +249,10 @@ def store_result(results, case, out):
         results[name][E0]["spec_coherent"] = out["spec_coherent"]
     if out.get("spec_characteristic") is not None:
         results[name][E0]["spec_characteristic"] = out["spec_characteristic"]
+    # Opt-in line temporal intensity profile (#292); absent unless requested.
+    for key in TEMPORAL_RECORD_KEYS:
+        if out.get(key) is not None:
+            results[name][E0][key] = out[key]
     # Resolved automatic line grid and its truncation/statistics audit, so scan
     # checkpoints carry ``capped_at_ceiling`` / ``statistics_limited`` rather
     # than only log warnings (#192). Absent for fixed-grid cases.

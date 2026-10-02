@@ -70,6 +70,7 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             bremsstrahlung_model=getattr(settings, "bremsstrahlung_model", "auto"),
             radiative_model=getattr(settings, "radiative_model", "uncoupled"),
             radiative_cutoff_eV=getattr(settings, "radiative_cutoff_eV", None),
+            temporal_profile=getattr(settings, "temporal_profile", False),
         )
     resolved = Numerics() if numerics is None else numerics
     cases = []

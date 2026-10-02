@@ -98,6 +98,16 @@ class TemporalProfile:
         """Bin edges centred on the samples, for box integration."""
         return self.t_start_ang + self.dt_ang * (np.arange(self.n + 1) - 0.5)
 
+    def empty_like(self):
+        """A fresh accumulator on the same grid."""
+        return TemporalProfile(
+            t_start_ang=self.t_start_ang,
+            dt_ang=self.dt_ang,
+            E_start_eV=self.E_start_eV,
+            dE_eV=self.dE_eV,
+            n=self.n,
+        )
+
     def buffer(self):
         return xp.zeros(self.n, dtype=np.float64)
 
@@ -156,6 +166,7 @@ def temporal_profile_for(segments, E_grid_eV, n_hats, *, max_samples=TEMPORAL_MA
         raise ValueError("temporal profile needs a line axis with nonzero energy span")
     lo, hi = np.inf, -np.inf
     for n_hat in np.atleast_2d(np.asarray(n_hats, dtype=float)):
+        n_hat = n_hat / np.linalg.norm(n_hat)
         if int(np.asarray(segments["L_ang"]).shape[0]) == 0:
             continue
         d, t_L = segment_arrival_times(segments, n_hat, xp=np)
@@ -183,6 +194,29 @@ def temporal_profile_for(segments, E_grid_eV, n_hats, *, max_samples=TEMPORAL_MA
         dE_eV=float(dE),
         n=n,
     )
+
+
+def case_temporal_profiles(case, tp, want_coherent):
+    """Runner accumulators ``(incoherent, coherent_or_None)`` for one case.
+
+    ``(None, None)`` unless the case opts in. A directional run passes its
+    joint ``tp["temporal_grid"]`` so every direction shares one time grid.
+    """
+    if not case.get("temporal_profile"):
+        return None, None
+    grid = tp.get("temporal_grid") or temporal_profile_for(tp["segs"], tp["E_grid"], [tp["n_hat"]])
+    return grid.empty_like(), (grid.empty_like() if want_coherent else None)
+
+
+def temporal_outputs(temporal, temporal_coherent):
+    """Runner output keys for finished accumulators (empty when off)."""
+    if temporal is None:
+        return {}
+    profile = temporal.result()
+    out = {"temporal_t_fs": profile["t_fs"], "temporal_intensity": profile["intensity"]}
+    if temporal_coherent is not None:
+        out["temporal_intensity_coherent"] = temporal_coherent.result()["intensity"]
+    return out
 
 
 def add_boxes(profile, buf, tau, half_width, mass):
@@ -394,9 +428,11 @@ __all__ = [
     "TemporalProfile",
     "add_boxes",
     "add_coherent_row",
+    "case_temporal_profiles",
     "coherent_offset_chi",
     "delta_omega_on_profile",
     "formation_mean_transmission",
     "segment_arrival_times",
+    "temporal_outputs",
     "temporal_profile_for",
 ]

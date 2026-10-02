@@ -154,3 +154,112 @@ def test_energy_grid_conjugate_to_time_grid():
     assert profile.n * profile.dt_ang * profile.dE_eV == pytest.approx(
         2.0 * np.pi * HBARC_EV_ANG, rel=1e-12
     )
+
+
+def _stub_continuum(monkeypatch, runner):
+    monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
+    monkeypatch.setattr(
+        runner, "_characteristic_from_segments", lambda *a, **k: np.zeros_like(E_GRID)
+    )
+
+
+def _runner_inputs(*, coherent, temporal):
+    segments = _segments([0.0, 500.0])
+    case = {
+        "crystal": "hopg",
+        "hkl_list": KWARGS["hkl_list"],
+        "B_ang2": KWARGS["B_ang2"],
+        "composition": None,
+        "E0_keV": 30.0,
+        "coherent_emission": coherent,
+        **({"temporal_profile": True} if temporal else {}),
+    }
+    tp = {
+        "E_grid": E_GRID,
+        "E_brem": E_GRID,
+        "n_hat": N_HAT / np.linalg.norm(N_HAT),
+        "segs": segments,
+        "Ne_lines": 1,
+        "Ne_brem": 1,
+        "groove": None,
+    }
+    return case, tp
+
+
+def test_runner_attaches_profiles_only_when_opted_in(monkeypatch):
+    import pyrite.montecarlo.runner as runner
+
+    _stub_continuum(monkeypatch, runner)
+    off = runner._spectrum_case_impl(*_runner_inputs(coherent=True, temporal=False))
+    assert not any(key.startswith("temporal") for key in off)
+
+    case, tp = _runner_inputs(coherent=True, temporal=True)
+    out = runner._spectrum_case_impl(case, tp)
+    np.testing.assert_allclose(out["spec"], off["spec"], rtol=1e-6)
+    np.testing.assert_allclose(out["spec_coherent"], off["spec_coherent"], rtol=1e-6)
+    t = out["temporal_t_fs"]
+    assert t.shape == out["temporal_intensity"].shape == out["temporal_intensity_coherent"].shape
+    dE = E_GRID[1] - E_GRID[0]
+    for key, spec in (
+        ("temporal_intensity", "spec"),
+        ("temporal_intensity_coherent", "spec_coherent"),
+    ):
+        assert out[key].sum() * (t[1] - t[0]) == pytest.approx(out[spec].sum() * dE, rel=2e-2)
+
+
+def test_store_result_keeps_temporal_keys():
+    from pyrite.results import store_result
+
+    E = np.arange(50.0, 151.0)
+    out = {
+        "E_grid": E,
+        "spec": np.exp(-0.5 * ((E - 100.0) / 3.0) ** 2),
+        "brem": np.zeros_like(E),
+        "eta": 1.0,
+        "temporal_t_fs": np.arange(4.0),
+        "temporal_intensity": np.ones(4),
+    }
+    case = {
+        "name": "t",
+        "E0_keV": 30.0,
+        "theta_obs_rad": 1.0,
+        "dtheta_obs_rad": 0.0,
+        "domega_sr": 1.0,
+    }
+    results = {}
+    store_result(results, case, out)
+    record = results["t"][30.0]
+    np.testing.assert_array_equal(record["temporal_intensity"], np.ones(4))
+    assert "temporal_intensity_coherent" not in record
+
+
+def test_directions_share_one_time_grid(monkeypatch):
+    import pyrite.montecarlo.runner as runner
+    from pyrite.montecarlo.runner import directions
+
+    _stub_continuum(monkeypatch, runner)
+    monkeypatch.setattr(directions, "resolve_observation_line_grid", lambda *a, **k: (E_GRID, None))
+    case, tp = _runner_inputs(coherent=True, temporal=True)
+    n_hats = np.array([N_HAT, [1.0, 0.0, 0.05]])
+    n_hats /= np.linalg.norm(n_hats, axis=1)[:, None]
+    out = directions.directional_outputs(case, tp, n_hats, runner._spectrum_case_impl)
+    for key in ("temporal_intensity_by_direction", "temporal_intensity_coherent_by_direction"):
+        assert out[key].shape == (2, out["temporal_t_fs"].size)
+        assert np.all(out[key].sum(axis=1) > 0.0)
+
+
+def test_temporal_chart_renders_only_with_profiles():
+    from pyrite.plots.altair.temporal import temporal_chart, temporal_frame
+
+    t = np.linspace(-1.0, 1.0, 50)
+    record = {
+        "case": {"E0_keV": 30.0},
+        "temporal_t_fs": t,
+        "temporal_intensity": np.exp(-(t**2)),
+        "temporal_intensity_coherent": 2 * np.exp(-(t**2)),
+    }
+    results = {"c": {30.0: record}}
+    frame = temporal_frame(results)
+    assert set(frame["component"]) == {"incoherent", "coherent"}
+    assert temporal_chart(results) is not None
+    assert temporal_chart({"c": {30.0: {"case": {"E0_keV": 30.0}}}}) is None

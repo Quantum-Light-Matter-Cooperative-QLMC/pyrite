@@ -85,6 +85,9 @@ _CAS_OPTIONAL_PAYLOAD_KEYS = frozenset(
         "hit_frac",
         "spec_coherent",
         "spec_characteristic",
+        "temporal_t_fs",
+        "temporal_intensity",
+        "temporal_intensity_coherent",
         "line_grid_resolved",
     }
 )

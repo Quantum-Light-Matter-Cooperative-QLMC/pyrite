@@ -327,6 +327,7 @@ def profile_payload(document, name):
             else dict(physical.unwrap() if hasattr(physical, "unwrap") else physical)
         ),
         "emission": profile.get("emission"),
+        "temporal_profile": profile.get("temporal_profile") is True,
         "transport_numerics": {key: profile[key] for key in TRANSPORT_KEYS if key in profile},
         "overrides": {
             material: sorted(row)
@@ -731,8 +732,13 @@ def set_profile(
     materials,
     all_materials,
     emission,
+    temporal_profile=None,
 ):
-    """Replace supplied profile fields and return overwritten field labels."""
+    """Replace supplied profile fields and return overwritten field labels.
+
+    ``temporal_profile`` True writes the opt-in key; False removes it (off is
+    the absent default).
+    """
     target = existing_profile(document, name)
     if beam_name is not None and beam_name not in beam_rows(document):
         unknown_beam(document, beam_name)
@@ -759,6 +765,10 @@ def set_profile(
         target.pop("materials", None)
     if emission is not None:
         target["emission"] = emission
+    if temporal_profile is True:
+        target["temporal_profile"] = True
+    elif temporal_profile is False:
+        target.pop("temporal_profile", None)
     return overwriting
 
 

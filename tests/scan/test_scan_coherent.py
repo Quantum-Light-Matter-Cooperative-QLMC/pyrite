@@ -171,3 +171,28 @@ def test_quick_run_is_incoherent_quick_stem(monkeypatch):
 
     assert settings.emission == "incoherent"
     assert stem == "hopg_quick"
+
+
+def test_temporal_profile_opt_in_is_divergence_only(monkeypatch):
+    """#292: off adds no identity key; on gets its own digest, stem, and case key."""
+    _s_def, sweep_def, id_def, stem_def = _resolved_run(monkeypatch, [])
+    assert "temporal_profile" not in id_def["resolved_parameters"]
+
+    scan._load_runtime()
+    base = scan.default_settings
+    monkeypatch.setattr(
+        scan,
+        "default_settings",
+        lambda *a, **k: replace(base(*a, **k), temporal_profile=True),
+    )
+    settings, _sweep, identity, stem = _resolved_run(monkeypatch, [])
+
+    assert settings.temporal_profile is True
+    assert identity["resolved_parameters"]["temporal_profile"] is True
+    assert identity["parameter_sha256"] != id_def["parameter_sha256"]
+    assert stem != stem_def
+    from pyrite.api import build_configured_cases
+
+    cases = build_configured_cases(_sweep, settings)
+    assert all(case["temporal_profile"] is True for case in cases)
+    assert all("temporal_profile" not in case for case in build_configured_cases(sweep_def, _s_def))

@@ -705,6 +705,7 @@ def build_cases(
     secondary_threshold_eV=None,
     radiative_model="auto",
     radiative_cutoff_eV=None,
+    temporal_profile=False,
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -722,6 +723,7 @@ def build_cases(
     ``n_electrons_brem`` sweep grids (catalog profile settings) cross
     electron-count statistics into the product and suffix the case name with
     ``ne=<line>/<brem>``; ``None`` keeps the scalar counts passed by the caller.
+    ``temporal_profile`` adds the opt-in line ``I(t)`` key to every case (#292).
     Returns the ``cases`` list; preview it with :func:`geometry_table`."""
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     validate_inelastic_numerics(
@@ -1012,6 +1014,7 @@ def build_cases(
                         # coherent segment sum: divergence-only key (absent -> the
                         # incoherent default, bit-for-bit case payload).
                         **({"coherent_emission": True} if coherent_emission else {}),
+                        **({"temporal_profile": True} if temporal_profile else {}),
                         **({"straggling": True} if straggling else {}),
                         **({"energy_model": "midpoint"} if energy_model == "midpoint" else {}),
                         **({"max_dE_frac": float(max_dE_frac)} if max_dE_frac > 0.0 else {}),

@@ -2,6 +2,7 @@
 
 from pyrite.apps._design import static_altair_chart
 from pyrite.plots.altair.spectra import compare_spectrum_chart
+from pyrite.plots.altair.temporal import temporal_chart
 from pyrite.results import records, select_results, sweep_values
 
 from ..controls import axes_panel
@@ -137,6 +138,15 @@ def render_spectra(
                 static_altair_chart(mo, chart)
                 if chart is not None
                 else mo.md(f"*No {heading.lower()} spectra for this slice.*"),
+            ]
+        )
+    # Opt-in line I(t) (#292): shown only when the checkpoint stored it.
+    temporal = temporal_chart(selected, hue=spec.varying_key)
+    if temporal is not None:
+        parts.extend(
+            [
+                mo.md("**Temporal profile**"),
+                static_altair_chart(mo, context.title_for_face(themed_chart(temporal, theme))),
             ]
         )
     return mo.vstack(parts)
