@@ -36,6 +36,11 @@ uv run pyrite config setup   # optional first-run backend detection
 uv run pyrite --help
 ```
 
+The `elsepa` archive is hosted on a private GitHub Release: `fetch` needs a
+token with read access to this repository, taken from `PYRITE_GITHUB_TOKEN`,
+`GITHUB_TOKEN`, or a logged-in `gh`. Without one, install from a local copy
+with `--archive PATH`.
+
 Focused contributor and CI commands are documented in
 [development workspace guide](docs/repo-design/development-workspace.md).
 

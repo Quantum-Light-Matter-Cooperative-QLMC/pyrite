@@ -88,6 +88,50 @@ log-log thinning reached 0.73 MiB but departed from the upstream lin-lin law
 by up to 67% across single steep intervals, so it was rejected. It is classed
 (b) beside EEDL and EADL in ADR-0014.
 
+## Hosted table releases
+
+PyRITE's own pinned table archives are published as GitHub Release assets of
+this repository, one release per dataset (issues #284, #282). While the
+repository is private, downloading one needs a GitHub token with read access;
+the move to public Zenodo records (#167) swaps the URL and drops the token.
+
+```{list-table}
+:header-rows: 1
+
+* - Release
+  - Asset
+  - Pinned by
+* - `tables-elsepa-1`
+  - `elsepa-tables.zip` (25,178,906 B, 28 tables)
+  - `src/pyrite/data/xsgen/elsepa-tables.json`
+```
+
+`pyrite tables fetch` resolves a `github.com/.../releases/download/<tag>/<asset>`
+URL through the GitHub API with the first token found in `PYRITE_GITHUB_TOKEN`,
+`GITHUB_TOKEN`, or `gh auth token`. The token goes only to `api.github.com`;
+it is not forwarded on the redirect to the asset store and never appears in
+output or manifests. Without a token the plain URL is tried, which fails with a
+message naming the token variables and `--archive PATH`. CI passes the job's
+`GITHUB_TOKEN`. The remote box has no token; `pyrite remote sync` ships the
+installed tables instead.
+
+To cut or refresh a release (maintainer):
+
+1. Build the archive and index from the stored tables, for example
+   `uv run python scripts/release_elsepa_tables.py --out build/xsgen-release`
+   (add `--generate` for missing tables). The archive is deterministic: an
+   unchanged table set reproduces the pinned SHA-256.
+2. If the digest differs from the pin, use a new tag (`tables-elsepa-<n+1>`);
+   never replace an asset under an existing tag, since older indexes pin it.
+3. Publish with
+   `gh release create <tag> build/xsgen-release/elsepa-tables.zip --title ... --notes-file NOTES.md`.
+   The notes carry the upstream attribution, licence, and a modifications
+   statement (see `THIRD-PARTY-NOTICES.md`).
+4. Download the asset back (`gh release download <tag> -p <asset> -O - | sha256sum`)
+   and check it matches the index.
+5. Rebuild with `--url <release download URL> --pin` (or edit
+   `archive.url`) and commit the index; CI's cache key follows it.
+
 ## Repository size
 
 ```{list-table} Clone and pack sizes.

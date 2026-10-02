@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   focused:
     strategy:
@@ -21,19 +24,26 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-groups --locked
 
-      # EEDL and EADL are hash-pinned fetched datasets, not packaged (ADR-0014,
-      # #263). The key follows the pins, so a repin refetches; a cache hit
-      # needs no network. `fetch` re-verifies a cached copy and exits 0.
-      - name: Cache EPICS2025 datasets
+      # EEDL, EADL and the ELSEPA tables are hash-pinned fetched data, not
+      # packaged (ADR-0014, #263, #284). The key follows the pins, so a repin
+      # refetches; a cache hit needs no network. `fetch` re-verifies a cached
+      # copy and exits 0. The ELSEPA archive is a private release asset, read
+      # with this job's GITHUB_TOKEN (fork PRs may lack access).
+      - name: Cache pinned data
         uses: actions/cache@v4
         with:
-          path: ~/.local/share/pyrite/datasets
-          key: pyrite-datasets-${{ hashFiles('src/pyrite/datasets.py') }}
+          path: |
+            ~/.local/share/pyrite/datasets
+            ~/.local/share/pyrite/xsgen/tables
+          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/data/xsgen/elsepa-tables.json') }}
 
-      - name: Fetch EPICS2025 datasets
+      - name: Fetch pinned data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           uv run pyrite tables fetch eedl
           uv run pyrite tables fetch eadl
+          uv run pyrite tables fetch elsepa
 
       - name: Test ${{ matrix.suite }} suite
         run: |
