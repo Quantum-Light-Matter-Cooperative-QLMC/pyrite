@@ -28,6 +28,7 @@ from ._kernels import (
     _observation_direction,
     _validate_groove_escape_direction,
 )
+from ._temporal import segment_arrival_times
 
 # Generation marker for the line route's photon-escape model, hashed into the
 # dataset and case-content identities like ``characteristic_model``. A
@@ -88,6 +89,7 @@ class SpectrumRequest:
     longitudinal_rms_fs: Any = None
     line_quadrature: Any = "node"
     truncation_audit: Any = None
+    temporal: Any = None
 
 
 @dataclass
@@ -157,6 +159,12 @@ class _SpectrumSetup:
     # accumulation routes' device (``_bin_quadrature.bin_axis``).
     bin_edges: Any = None
     bin_inv_width: Any = None
+    # Opt-in temporal profile only: this call's float64 buffer and the
+    # realized / offset-free retarded arrival times per row.
+    # Validation: temporal-intensity-profile
+    temporal_buf: Any = None
+    temporal_tau: Any = None
+    temporal_tau_geo: Any = None
 
 
 def _prepare_spectrum(request):
@@ -582,6 +590,24 @@ def _prepare_spectrum(request):
         else segment_escape_pieces(segments, n_hat, layers=layers, groove=groove, xp=xp)
     )
 
+    temporal_buf = temporal_tau = temporal_tau_geo = None
+    if request.temporal is not None:
+        temporal_buf = request.temporal.buffer()
+        temporal_tau, _ = segment_arrival_times(segments, n_hat, xp=xp)
+        temporal_tau_geo = temporal_tau
+        if decoherence_active:
+            # Same offset-free arrival as ``d_all_geom``, in float64.
+            t0_seg = xp.asarray(
+                segments.get("t0_ang", np.zeros(temporal_tau.size)),
+                dtype=np.float64,
+            )
+            temporal_tau_geo = temporal_tau - t0_seg
+            if not finite_footprint_now:
+                seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
+                xy0 = xp.asarray(xy0_pop, dtype=np.float64)[seg_elec_id_clamped]
+                n64 = xp.asarray(n_hat_d, dtype=np.float64)
+                temporal_tau_geo = temporal_tau_geo + xy0 @ n64[:2]
+
     return _SpectrumSetup(
         request=request,
         info=info,
@@ -627,4 +653,7 @@ def _prepare_spectrum(request):
         bin_inv_width=bin_inv_width,
         escape_pieces=escape_pieces,
         escape_ends=escape_ends,
+        temporal_buf=temporal_buf,
+        temporal_tau=temporal_tau,
+        temporal_tau_geo=temporal_tau_geo,
     )
