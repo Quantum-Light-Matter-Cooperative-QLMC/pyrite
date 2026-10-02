@@ -65,6 +65,7 @@ _CASE_KEY_ORDER = (
     "tilt_azim_deg",
     "groove_spacing_ang",
     "coherent_emission",
+    "temporal_profile",
     "straggling",
     "energy_model",
     "max_dE_frac",
@@ -159,6 +160,9 @@ class Case(Mapping[str, Any]):
         ``sinc^2`` lines; absent samples nodes.
     coherent_emission, straggling, energy_model, max_dE_frac
         Result-affecting opt-in transport and radiation policies.
+    temporal_profile
+        Opt-in line temporal intensity profile ``I(t)`` beside each line
+        spectrum (#292); absent computes none.
     inelastic_model, inelastic_cutoff_eV
         Opt-in ``"shell-soft-hard"`` collision-loss scheme and its cutoff in
         eV; both absent is continuous stopping. Requires ``energy_model``.
@@ -241,6 +245,7 @@ class Case(Mapping[str, Any]):
     line_quadrature: Literal["bin-mean"] | _Absent = _ABSENT
     groove_spacing_ang: float | _Absent = _ABSENT
     coherent_emission: Literal[True] | _Absent = _ABSENT
+    temporal_profile: Literal[True] | _Absent = _ABSENT
     straggling: Literal[True] | _Absent = _ABSENT
     energy_model: Literal["midpoint"] | _Absent = _ABSENT
     max_dE_frac: float | _Absent = _ABSENT
@@ -294,6 +299,8 @@ class Case(Mapping[str, Any]):
                 _positive_int(name, value)
         if self.coherent_emission is not _ABSENT and self.coherent_emission is not True:
             raise ValueError("coherent_emission must be absent or True")
+        if self.temporal_profile is not _ABSENT and self.temporal_profile is not True:
+            raise ValueError("temporal_profile must be absent or True")
         if self.straggling is not _ABSENT and self.straggling is not True:
             raise ValueError("straggling must be absent or True")
         if self.energy_model is not _ABSENT and self.energy_model != "midpoint":

@@ -38,6 +38,7 @@ from ..spectrum import (
     mc_characteristic_spectrum as mc_characteristic_spectrum,
 )
 from ..spectrum.lines import _setup as _line_setup
+from ..spectrum.lines._temporal import case_temporal_profiles, temporal_outputs
 from ..trajectories import TrajectoryCapture
 from ..transport import (
     TransportLUTConfig,
@@ -541,6 +542,7 @@ def _lines_for_segments(
     Ne=None,
     table_cache=None,
     truncation_audit=None,
+    temporal=None,
 ):
     """:func:`_lines_for_segments_once` in electron-aligned device blocks (#192).
 
@@ -562,9 +564,11 @@ def _lines_for_segments(
         Ne=Ne,
         table_cache=table_cache,
         truncation_audit=truncation_audit,
+        temporal=temporal,
     )
     wants_coherent = case.get("coherent_emission", False) if coherent is None else coherent
-    if bool(wants_coherent) or not _RESOURCE_POLICY.gpu:
+    # An in-place temporal profile (#292) cannot be split and retried.
+    if bool(wants_coherent) or temporal is not None or not _RESOURCE_POLICY.gpu:
         return once(segs)
     n_segments = int(segs["L_ang"].shape[0])
     n_blocks = max(
@@ -607,6 +611,7 @@ def _lines_for_segments_once(
     Ne=None,
     table_cache=None,
     truncation_audit=None,
+    temporal=None,
 ):
     """Coherent line spectrum on ``E_grid`` from already-transported line
     segments ``segs``. Single slab (``layer_radiators`` absent) radiates from
@@ -625,7 +630,8 @@ def _lines_for_segments_once(
     Line kinematics always run on the crystal's bulk in-medium dispersion
     ``k = Re n(omega) omega``; there is no vacuum switch.
 
-    ``truncation_audit`` is forwarded to every ``mc_spectrum`` call (#192)."""
+    ``truncation_audit`` is forwarded to every ``mc_spectrum`` call (#192), and
+    so is the opt-in ``temporal`` profile, which every layer adds into (#292)."""
     radiators = case.get("layer_radiators")
     mosaic_kw = dict(
         mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
@@ -673,6 +679,7 @@ def _lines_for_segments_once(
             _table_cache=table_cache,
             line_quadrature=line_quadrature,
             truncation_audit=truncation_audit,
+            temporal=temporal,
             **mosaic_kw,
         )
     assert case.get("groove_spacing_ang") is None
@@ -705,6 +712,7 @@ def _lines_for_segments_once(
             _table_cache=table_cache,
             line_quadrature=line_quadrature,
             truncation_audit=truncation_audit,
+            temporal=temporal,
             **mosaic_kw,
         )
     return spec
@@ -999,6 +1007,8 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     want_coherent = bool(case.get("coherent_emission", False))
     spec_coherent = None
     line_table_cache = {}
+    # Opt-in temporal profile (#292): one accumulator per emission policy.
+    temporal, temporal_coherent = case_temporal_profiles(case, tp, want_coherent)
     truncation_audit = line_truncation_audit(case, E_grid, n_electrons=Ne_lines)
     with _nsys_range("cxr.lines"):
         try:
@@ -1013,6 +1023,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 Ne=Ne_lines,
                 table_cache=line_table_cache,
                 truncation_audit=truncation_audit,
+                temporal=temporal,
             )
 
             if want_coherent:
@@ -1026,6 +1037,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                     coherent=True,
                     Ne=Ne_lines,
                     table_cache=line_table_cache,
+                    temporal=temporal_coherent,
                 )
         except Exception as error:
             if not _is_gpu_oom(error):
@@ -1133,6 +1145,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 }
     if spec_coherent is not None:
         out["spec_coherent"] = spec_coherent
+    out.update(temporal_outputs(temporal, temporal_coherent))
     if timed:
         # Ride the phase deltas back to the driver on the result dict; run_cases'
         # _TimingAgg.collect strips both keys before the result is stored. Carry

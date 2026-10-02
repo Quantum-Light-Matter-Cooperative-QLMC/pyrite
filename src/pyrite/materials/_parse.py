@@ -497,6 +497,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 "filters",
                 "physical_detector",
                 "emission",
+                "temporal_profile",
                 "line_grid_policy",
                 *_PROFILE_SCALAR_NUMERICS_KEYS,
                 "energy_grid_refs",
@@ -525,6 +526,8 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         emission = row.get("emission")
         if emission is not None and emission not in _EMISSION_VALUES:
             errors.add(f"{path}.emission", f"must be one of {_EMISSION_VALUES}")
+        if "temporal_profile" in row and type(row["temporal_profile"]) is not bool:
+            errors.add(f"{path}.temporal_profile", "must be a boolean")
         scalar_numerics = {name: row[name] for name in _PROFILE_SCALAR_NUMERICS_KEYS if name in row}
         try:
             validate_profile_numerics(scalar_numerics)

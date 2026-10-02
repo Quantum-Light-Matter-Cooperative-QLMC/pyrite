@@ -1828,6 +1828,11 @@ Options:
   --emission [incoherent|coherent|both]
                                   Replace the emission policy
                                   (incoherent/coherent/both).
+  --temporal-profile / --no-temporal-profile
+                                  Also compute the line temporal intensity profile I(t)
+                                  (photons/sr/electron/fs) beside each line spectrum.
+                                  Off by default; on runs the slower per-reflection line
+                                  route and changes the dataset identity.
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.

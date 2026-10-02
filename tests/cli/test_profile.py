@@ -726,6 +726,25 @@ def test_set_emission_replaces_and_reports_in_show(tmp_path, monkeypatch):
     assert 'emission = "both"' in catalog.read_text()
 
 
+def test_set_temporal_profile_toggles_key_and_show(tmp_path, monkeypatch):
+    """#292: --temporal-profile writes the opt-in key; --no-temporal-profile drops it."""
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    shown = invoke(profile.command, ["show", "sub_100keV"])
+    assert "temporal profile: off (default)" in shown.stdout
+    machine = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
+    assert json.loads(machine.stdout)["payload"]["temporal_profile"] is False
+
+    result = invoke(profile.command, ["set", "sub_100keV", "--temporal-profile"])
+    assert_clean_result(result, stdout="updated profile sub_100keV\n")
+    assert "temporal_profile = true" in catalog.read_text()
+    assert "temporal profile: on" in invoke(profile.command, ["show", "sub_100keV"]).stdout
+
+    result = invoke(profile.command, ["set", "sub_100keV", "--no-temporal-profile"])
+    assert_clean_result(result, stdout="updated profile sub_100keV\n")
+    assert "temporal_profile" not in catalog.read_text()
+
+
 def test_set_emission_invalid_value_rejected(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
@@ -1090,7 +1109,10 @@ def test_empty_updates_are_usage_errors(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
     expected_by_verb = {
-        "set": "provide a range, beam, detector, transport, membership, or emission option",
+        "set": (
+            "provide a range, beam, detector, transport, membership, emission, "
+            "or temporal-profile option"
+        ),
         "add": "provide a range, membership, or emission option",
         "remove": "provide a range, membership, beam, or emission option",
     }

@@ -43,9 +43,17 @@ def directional_outputs(case, transport, n_hats, spectrum) -> dict[str, Any]:
         case.get("abs_layers"),
         transport.get("groove"),
     )
+    temporal_grid = None
+    if case.get("temporal_profile"):
+        from ..spectrum.lines import temporal_profile_for
+
+        # One time grid for every direction so the profiles stack (#292).
+        temporal_grid = temporal_profile_for(transport["segs"], E_grid, directions)
     outputs = []
     for direction in directions:
         directional_transport = dict(transport)
+        if temporal_grid is not None:
+            directional_transport["temporal_grid"] = temporal_grid
         directional_transport["n_hat"] = direction
         directional_transport["E_grid"] = E_grid
         directional_transport.pop("diagnostic_grid", None)
@@ -55,7 +63,16 @@ def directional_outputs(case, transport, n_hats, spectrum) -> dict[str, Any]:
     result = {
         key: value
         for key, value in first.items()
-        if key not in {"spec", "spec_coherent", "spec_characteristic", "brem", "brem_wide"}
+        if key
+        not in {
+            "spec",
+            "spec_coherent",
+            "spec_characteristic",
+            "brem",
+            "brem_wide",
+            "temporal_intensity",
+            "temporal_intensity_coherent",
+        }
     }
     if grid_record is not None:
         result["line_grid_resolved"] = grid_record
@@ -73,4 +90,9 @@ def directional_outputs(case, transport, n_hats, spectrum) -> dict[str, Any]:
         result["spec_coherent_by_direction"] = np.stack(
             [np.asarray(output["spec_coherent"]) for output in outputs]
         )
+    for key in ("temporal_intensity", "temporal_intensity_coherent"):
+        if key in first:
+            result[f"{key}_by_direction"] = np.stack(
+                [np.asarray(output[key]) for output in outputs]
+            )
     return result

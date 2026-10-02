@@ -16,6 +16,7 @@ The implementation is split by phase, bottom-up:
 ``_per_hkl``   accumulation one reflection at a time (the reference route)
 ``_batched``   accumulation over stacked reflection tables (the default route)
 ``_spectrum``  ``mc_spectrum``, route dispatch, finalization
+``_temporal``  opt-in temporal intensity profile ``I(t)`` (per-hkl route)
 
 This module re-exports the pre-split surface, so
 ``pyrite.montecarlo.spectrum.lines.<name>`` still resolves for every consumer.
@@ -92,6 +93,7 @@ from ._policy import (
     _USE_JIT_LINE_REDUCTION,
 )
 from ._setup import LINE_ESCAPE_MODEL, SpectrumRequest, _prepare_spectrum, _SpectrumSetup
+from ._temporal import TemporalProfile, temporal_profile_for
 from ._spectrum import (
     _finalize_spectrum,
     _mc_spectrum,

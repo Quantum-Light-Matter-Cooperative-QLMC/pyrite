@@ -635,6 +635,7 @@ def _resolved_run(args, material):
     catalog_emission = CATALOG.profile_emission(catalog_profile)
     if catalog_emission is not None:
         settings = replace(settings, emission=catalog_emission)
+    settings = replace(settings, temporal_profile=CATALOG.profile_temporal_profile(catalog_profile))
     catalog_numerics = CATALOG.profile_numerics(catalog_profile)
     from .._numerics import TRANSPORT_KEYS
     from ..campaign.profiles import resolve_numerics
@@ -759,7 +760,7 @@ def _resolved_run(args, material):
         and not named_variant
         and catalog_profile == "standard"
         and settings.emission == "incoherent"
-        and not settings.straggling
+        and not (settings.temporal_profile or settings.straggling)
         and settings.energy_model == "midpoint"
         and settings.max_dE_frac == 0.0
         and settings.inelastic_model == "auto"

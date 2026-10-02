@@ -44,6 +44,7 @@ def mc_spectrum(
     longitudinal_rms_fs=None,
     line_quadrature="node",
     truncation_audit=None,
+    temporal=None,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron] on
@@ -140,6 +141,11 @@ def mc_spectrum(
         incoherent routes add each line's whole and out-of-axis mass bound
         (``line_mass``, ``mass_above``, ``mass_below``, un-normalised device
         scalars). Validation: line-grid-resonance-bandwidth
+    temporal
+        Optional :class:`~._temporal.TemporalProfile` (opt-in). This call adds
+        its per-electron ``I(t)`` for ``n_hat`` into the profile, from the
+        same lines and emission policy as the spectrum. Forces the per-hkl
+        route. Validation: temporal-intensity-profile
 
     Returns
     -------
@@ -188,6 +194,7 @@ def mc_spectrum(
         longitudinal_rms_fs=longitudinal_rms_fs,
         line_quadrature=line_quadrature,
         truncation_audit=truncation_audit,
+        temporal=temporal,
     )
     return _mc_spectrum(request)
 
@@ -205,6 +212,8 @@ def _finalize_spectrum(st):
     spec = st.spec
     spec_pxr = st.spec_pxr
     spec_cbs = st.spec_cbs
+    if st.temporal_buf is not None:
+        st.request.temporal.commit(st.temporal_buf, 1.0 / Ne)
 
     if components:
         return _to_cpu(spec / Ne), _to_cpu(spec_pxr / Ne), _to_cpu(spec_cbs / Ne)
@@ -225,6 +234,9 @@ def _needs_per_hkl_route(st):
     has no batched or device counterpart yet, and correctness of the default
     incoherent yield outranks the batched path's launch-count win on the
     substepped configuration.
+
+    An opt-in temporal profile also takes this route: its hooks sit on the
+    per-row line data every policy computes here.
     """
     req = st.request
     stream_handles_cutoff = (
@@ -237,6 +249,7 @@ def _needs_per_hkl_route(st):
         or req.groove is not None
         or req.layers is not None
         or st.grouped
+        or req.temporal is not None
     )
 
 

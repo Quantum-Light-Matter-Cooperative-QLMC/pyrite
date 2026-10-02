@@ -419,6 +419,8 @@ class MaterialCatalog:
         Profile names and optional explicit material membership lists.
     profile_beams, profile_detectors, profile_emissions
         Resolved per-profile beam, scalar-detector, and emission overrides.
+    profile_temporal_profiles
+        Profiles that opt in to the line temporal intensity profile ``I(t)``.
     profile_transport_numerics
         Per-profile result-affecting scalar numerical controls.
     profile_line_grid_policies
@@ -464,6 +466,8 @@ class MaterialCatalog:
     #: "both"), keyed by profile; profiles with no emission key are absent (the
     #: active fidelity preset's emission stands unmodified).
     profile_emissions: Mapping[str, str] = MappingProxyType({})
+    #: ``profiles.NAME.temporal_profile = true`` opt-ins (#292); absent is off.
+    profile_temporal_profiles: Mapping[str, bool] = MappingProxyType({})
     #: Explicit scalar result-affecting numerics, keyed by profile. Electron
     #: count grids remain on each resolved :class:`ScanSpec`.
     profile_transport_numerics: Mapping[str, Mapping[str, object]] = MappingProxyType({})
@@ -510,6 +514,10 @@ class MaterialCatalog:
         profile carries no emission key. Consumed by :func:`scan._resolved_run`
         to override the active fidelity preset's emission."""
         return self.profile_emissions.get(name)
+
+    def profile_temporal_profile(self, name: str) -> bool:
+        """Whether ``profiles.NAME`` opts in to the line ``I(t)`` profile (#292)."""
+        return bool(self.profile_temporal_profiles.get(name, False))
 
     def profile_numerics(self, name: str) -> Mapping[str, object] | None:
         """Explicit result-affecting transport numerics for ``name``."""

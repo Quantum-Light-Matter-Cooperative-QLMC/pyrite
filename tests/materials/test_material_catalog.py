@@ -2220,3 +2220,20 @@ def test_geometry_only_physical_detector_keeps_the_scalar_detector(tmp_path, mon
     detector = config.material_sweep("mos2").detector
 
     assert detector.observation_angle_deg == config.catalog_detector().observation_angle_deg
+
+
+def test_profile_temporal_profile_opt_in_parses_and_validates(tmp_path):
+    """#292: ``temporal_profile = true`` opts a profile in; non-booleans fail."""
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    def catalog(extra: str) -> str:
+        return _catalog_with_per_beam_line_grids().replace(
+            "[profiles.standard]\n", f"[profiles.standard]\n{extra}", 1
+        )
+
+    off = load_material_catalog(_write_catalog(tmp_path, catalog("")))
+    assert off.profile_temporal_profile("standard") is False
+    on = load_material_catalog(_write_catalog(tmp_path, catalog("temporal_profile = true\n")))
+    assert on.profile_temporal_profile("standard") is True
+    with pytest.raises(MaterialConfigError, match="temporal_profile"):
+        load_material_catalog(_write_catalog(tmp_path, catalog('temporal_profile = "yes"\n')))

@@ -34,6 +34,14 @@ from ._kernels import (
     _rowdot3,
     _sincsq_lineshape,
 )
+from ._temporal import (
+    CoherentRow,
+    add_boxes,
+    add_coherent_row,
+    coherent_offset_chi,
+    delta_omega_on_profile,
+    formation_mean_transmission,
+)
 
 
 def _sinc_window_bounds(E_grid, lo, hi):
@@ -256,6 +264,39 @@ def _coherent_jit_grouped_row(st, elec_id_sel, per_line_sel, L_esc_sel, formatio
     return out
 
 
+def _temporal_coherent_row(st, g_vec_d, wm, idx, coefs, good, lines, L_esc):
+    """Add this row's coherent ``I(t)`` to the temporal buffer.
+
+    Realized phases use the float64 arrival ``temporal_tau`` and ``seg_r``;
+    offset-free ones ``temporal_tau_geo`` and ``seg_r_geom`` (identical
+    without bunch offsets). Validation: temporal-intensity-profile
+    """
+    profile = st.request.temporal
+    sel = xp.flatnonzero(good)
+    if sel.size == 0:
+        return
+    rows = idx[sel]
+    g64 = xp.asarray(g_vec_d, dtype=np.float64)
+    row = CoherentRow(
+        coefs=[c[sel] for c in coefs],
+        d=st.temporal_tau[rows],
+        g_phase=xp.asarray(st.seg_r[rows], dtype=np.float64) @ g64,
+        d_geo=st.temporal_tau_geo[rows],
+        g_phase_geo=xp.asarray(st.seg_r_geom[rows], dtype=np.float64) @ g64,
+        lines=tuple(a[sel] for a in lines),
+        L_esc=L_esc[sel],
+        electron=st.seg_elec_id[rows],
+    )
+    add_coherent_row(
+        profile,
+        st.temporal_buf,
+        row,
+        wm,
+        delta_omega=delta_omega_on_profile(st, profile),
+        chi=coherent_offset_chi(st, profile, g_vec_d),
+    )
+
+
 def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines, pol_A):
     """Step 7c: coherent (phased) accumulation for one reflection and
     crystallite orientation.
@@ -294,6 +335,8 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
     coefs = [(amp * t_L) * A_e for A_e in pol_A]  # complex per polarization
     good = _formation_good(amp, t_L, lines)
     E_vac, a_vac, half_dL, apb, bma, q = lines
+    if st.temporal_buf is not None:
+        _temporal_coherent_row(st, g_vec_d, wm, idx, coefs, good, lines, L_esc)
 
     # GPU float32 fast path: reduce the two complex polarization fields
     # directly in a raw kernel. This avoids materializing the dense
@@ -617,6 +660,19 @@ def _accumulate_reflection(
         sel = np.flatnonzero(good)
         if sel.size == 0:
             return
+        if st.temporal_buf is not None:
+            # Substep pieces tile their flight's pulse in arrival time, so
+            # per-piece boxes square per flight. Validation: temporal-intensity-profile
+            _, a_vac, _, apb, bma, q = (a[sel] for a in lines)
+            c2 = sum(xp.abs(c[sel]) ** 2 for c in coefs)
+            mass = c2 * xp.pi * formation_mean_transmission(apb, bma, q) / a_vac * wm
+            add_boxes(
+                req.temporal,
+                st.temporal_buf,
+                st.temporal_tau[idx[sel]],
+                HBARC_EV_ANG * a_vac,
+                mass,
+            )
         gid = gid_all[idx[sel]]
         # Gather this flight's rows together; a stable sort leaves already
         # grouped input (and each group's internal row order) untouched.
@@ -673,6 +729,16 @@ def _accumulate_reflection(
     if st.request.truncation_audit is not None and "collect" in st.request.truncation_audit:
         _nsys_pop()
         return
+    if st.temporal_buf is not None:
+        # Each line's inverse transform is a box of duration 2 hbar c a_width
+        # carrying its whole sinc^2 mass. Validation: temporal-intensity-profile
+        add_boxes(
+            req.temporal,
+            st.temporal_buf,
+            st.temporal_tau[idx][good],
+            HBARC_EV_ANG * a_width[good],
+            weight[good] * xp.pi / a_width[good],
+        )
 
     if st.bin_edges is not None:
         # Bin-mean quadrature (setup refused sinc_cutoff): each row's profile
