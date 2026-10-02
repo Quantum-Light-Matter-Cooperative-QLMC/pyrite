@@ -702,11 +702,11 @@ def fetch_command(code: str | None, archive: str | None, json_output: bool) -> N
 @click.option(
     "--require",
     "require",
-    default="bremslib,elsepa,sbethe-tables,eedl,eadl,epdl",
+    default="bremslib,elsepa,sbethe-tables,eedl,eadl,epdl,sbethe",
     show_default=True,
     help=(
         "Comma-separated codes whose pinned tables or datasets must be present "
-        "(bremslib, elsepa, sbethe-tables, eedl, eadl, epdl)."
+        "(bremslib, elsepa, sbethe-tables, eedl, eadl, epdl, sbethe)."
     ),
 )
 @output_option
@@ -716,12 +716,14 @@ def verify_command(require: str, json_output: bool) -> None:
     Resolves each table pinned by the shipped release indexes and compares its
     stored manifest digest with the pin; table payloads are not hashed. The
     EEDL, EADL and EPDL files are hashed in full against their pinned SHA-256
-    (about 0.1 s). Fast enough to gate a job. Exits 1 when anything is missing
-    or differs, naming the fix; exits 0 when all are intact. Read-only.
+    (about 0.1 s); SBETHE's sdbase/ must hold its required files, with
+    pdatconf.p14 matching its pin. Fast enough to gate a job. Exits 1 when
+    anything is missing or differs, naming the fix; exits 0 when all are
+    intact. Read-only.
 
     Remote jobs run this before the sweep and fail with state `FAILED (tables)`.
     """
-    from ...xsgen.verify import CODES, DATASET_CODES, OK, verify_pinned
+    from ...xsgen.verify import BARE_FETCH_CODES, CODES, OK, verify_pinned
 
     codes = tuple(
         dict.fromkeys(part.strip().lower() for part in require.split(",") if part.strip())
@@ -739,7 +741,7 @@ def verify_command(require: str, json_output: bool) -> None:
         "fix: run `pyrite remote sync` from a machine holding these tables, or "
         + "; ".join(
             f"`pyrite tables fetch {code}`"
-            if code in DATASET_CODES
+            if code in BARE_FETCH_CODES
             else f"`pyrite tables fetch {code} --archive PATH`"
             for code in failing_codes
         )

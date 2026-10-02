@@ -7,7 +7,6 @@ from pathlib import Path
 import numpy as np
 
 from ..materials.atomic import Z_TABLE
-from ..paths import user_data_dir
 from .eedl_ionization import EEDL_SUBSHELL_LABELS, load_eedl_shell_ionization
 
 PDATCONF_SHA256 = "cd239554bb6e823692ea4611d443df8684b4cace06006fc271a4168cb78c62d2"
@@ -53,11 +52,9 @@ def _nl(label: str) -> str:
 
 
 def _default_path() -> Path:
-    from ..xsgen.sources import fetched_data_dir
+    from ..xsgen.sources import installed_data_dir
 
-    selected = fetched_data_dir("sbethe", "sdbase") / "pdatconf.p14"
-    legacy = user_data_dir() / "xsgen/reference-data/sbethe/sdbase/pdatconf.p14"
-    return selected if selected.is_file() or not legacy.is_file() else legacy
+    return installed_data_dir("sbethe", "sdbase") / "pdatconf.p14"
 
 
 def load_atomic_shells(path: str | Path | None = None) -> dict[int, tuple[AtomicShell, ...]]:

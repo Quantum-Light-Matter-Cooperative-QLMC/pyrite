@@ -43,3 +43,5 @@ def _no_local_xsgen_tables(monkeypatch):
     monkeypatch.setattr(transport, "_local_xsgen_tables", lambda: {})
     monkeypatch.setattr(transport, "_real_local_datasets", transport._local_datasets, raising=False)
     monkeypatch.setattr(transport, "_local_datasets", lambda: {})
+    monkeypatch.setattr(transport, "_real_local_sdbase", transport._local_sdbase, raising=False)
+    monkeypatch.setattr(transport, "_local_sdbase", lambda: {})

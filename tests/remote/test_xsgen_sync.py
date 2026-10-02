@@ -53,14 +53,14 @@ def test_one_round_trip_carries_both_inventories(monkeypatch):
 
     monkeypatch.setattr(transport, "_ssh_capture", capture)
 
-    artifacts, tables, datasets = transport._remote_inventories(artifacts=True, tables=True)
+    artifacts, tables, datasets, sdbase = transport._remote_inventories(artifacts=True, tables=True)
 
     assert len(commands) == 1
     assert "energy-grid-artifacts" in commands[0] and "/remote/xsgen/tables" in commands[0]
     assert ".local/share}/pyrite/xsgen/tables" in commands[0]  # legacy migration
     assert artifacts == frozenset({digest})
     assert tables == {f"{KEY_A}.npz": "c" * 64}
-    assert datasets == {}
+    assert datasets == {} and sdbase == {}
 
 
 def test_missing_section_marker_fails_closed(monkeypatch):
@@ -121,7 +121,16 @@ def test_stamp_renders_tables_digest_only_when_present():
     assert with_tables.render().endswith(f"code_tables_digest: {'f' * 64}\n")
 
 
-def _sync(tmp_path, monkeypatch, local, remote, datasets=None, remote_datasets=None):
+def _sync(
+    tmp_path,
+    monkeypatch,
+    local,
+    remote,
+    datasets=None,
+    remote_datasets=None,
+    sdbase=None,
+    remote_sdbase=None,
+):
     root = tmp_path / "repo"
     (root / "src").mkdir(parents=True, exist_ok=True)
     (root / "src" / "m.py").write_text("X = 1\n")
@@ -130,6 +139,7 @@ def _sync(tmp_path, monkeypatch, local, remote, datasets=None, remote_datasets=N
     monkeypatch.setattr(config, "REMOTE_DIR", "/remote")
     monkeypatch.setattr(transport, "_local_xsgen_tables", lambda: local)
     monkeypatch.setattr(transport, "_local_datasets", lambda: datasets or {})
+    monkeypatch.setattr(transport, "_local_sdbase", lambda: sdbase or {})
     captured = []
 
     def capture(command):
@@ -141,6 +151,9 @@ def _sync(tmp_path, monkeypatch, local, remote, datasets=None, remote_datasets=N
         if transport._DATASET_SECTION_MARK in command:
             out += transport._DATASET_SECTION_MARK + "\n"
             out += "".join(f"{d}  {n}\n" for n, d in (remote_datasets or {}).items())
+        if transport._SDBASE_SECTION_MARK in command:
+            out += transport._SDBASE_SECTION_MARK + "\n"
+            out += "".join(f"{d}  {n}\n" for n, d in (remote_sdbase or {}).items())
         return out
 
     monkeypatch.setattr(transport, "_ssh_capture", capture)
@@ -153,7 +166,7 @@ def _sync(tmp_path, monkeypatch, local, remote, datasets=None, remote_datasets=N
             with tarfile.open(argv[1], "r:gz") as bundle:
                 archived.extend(bundle.getnames())
                 for member in bundle.getmembers():
-                    if member.name.startswith("datasets/"):
+                    if member.name.startswith(("datasets/", "xsgen/reference-data/")):
                         contents[member.name] = bundle.extractfile(member).read()
 
     monkeypatch.setattr(transport, "_run", fake_run)
@@ -216,7 +229,10 @@ def test_local_tables_skip_packaged_tier_and_unpaired_files(tmp_path, monkeypatc
 
 def test_job_script_preflights_tables_and_fails_fast_before_the_sweep():
     block = _queue_scripts._tables_preflight_block()
-    assert "pyrite tables verify --require bremslib,elsepa,sbethe-tables,eedl,eadl,epdl" in block
+    assert (
+        "pyrite tables verify --require bremslib,elsepa,sbethe-tables,eedl,eadl,epdl,sbethe"
+        in block
+    )
     assert 'echo "FAILED (tables)' in block
     assert "exit 1" in block
     assert "PYRITE_HOME=" in block
@@ -338,3 +354,79 @@ def test_local_datasets_map_arcnames_to_verified_files(monkeypatch, tmp_path):
         EADL_ARC: tmp_path / "eadl" / "EADL2025.ALL",
         "datasets/epdl/epdl2025_mf23.npz": tmp_path / "epdl" / "epdl2025_mf23.npz",
     }
+
+
+# --- SBETHE sdbase/ --------------------------------------------------------------
+
+SDBASE = "xsgen/reference-data/sbethe/sdbase"
+
+
+def _sdbase(tmp_path):
+    root = tmp_path / "sdbase"
+    found = {}
+    for name, data in (("pdatconf.p14", b"shells\n"), ("elements/z029.dat", b"cu\r\n")):
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        found[f"{SDBASE}/{name}"] = path
+    return found
+
+
+def test_sdbase_inventory_migrates_a_legacy_box_copy_and_parses_its_files(monkeypatch):
+    monkeypatch.setattr(config, "REMOTE_DIR", "/remote")
+    command = transport._sdbase_inventory_command()
+    assert "cd /remote" in command
+    assert ".local/share}/pyrite/xsgen/reference-data/sbethe/sdbase" in command
+    assert f"mv {SDBASE}.partial {SDBASE}" in command  # never a partial target
+    out = f"{'c' * 64}  {SDBASE}/pdatconf.p14\n{'d' * 64}  elsewhere/x\n"
+    assert transport._parse_sdbase_inventory(out) == {f"{SDBASE}/pdatconf.p14": "c" * 64}
+    with pytest.raises(SystemExit, match="invalid remote sdbase inventory"):
+        transport._parse_sdbase_inventory("garbage\n")
+
+
+def test_missing_sdbase_marker_fails_closed(monkeypatch):
+    monkeypatch.setattr(transport, "_ssh_capture", lambda command: "")
+    with pytest.raises(SystemExit, match="invalid remote sdbase inventory"):
+        transport._remote_inventories(artifacts=False, tables=False, sdbase=True)
+
+
+def test_sync_ships_sdbase_verbatim_once_and_stamps_it(tmp_path, monkeypatch):
+    sdbase = _sdbase(tmp_path)
+    digests = {arc: _sha(path.read_bytes()) for arc, path in sdbase.items()}
+
+    archived, commands, captured = _sync(tmp_path, monkeypatch, {}, {}, sdbase=sdbase)
+    assert sorted(n for n in archived if n.startswith(SDBASE)) == sorted(sdbase)
+    assert _sync.contents[f"{SDBASE}/elements/z029.dat"] == b"cu\r\n"
+    assert len(captured) == 1 and transport._SDBASE_SECTION_MARK in captured[0]
+    stamp = f"code_tables_digest: {transport._xsgen_tables_digest(digests)}"
+    assert stamp in commands[-1][3]
+
+    tampered = {**digests, f"{SDBASE}/pdatconf.p14": "0" * 64}
+    archived, _, _ = _sync(tmp_path, monkeypatch, {}, {}, sdbase=sdbase, remote_sdbase=tampered)
+    assert [n for n in archived if n.startswith(SDBASE)] == [f"{SDBASE}/pdatconf.p14"]
+
+    archived, _, _ = _sync(tmp_path, monkeypatch, {}, {}, sdbase=sdbase, remote_sdbase=digests)
+    assert not [n for n in archived if n.startswith(SDBASE)]
+
+
+def test_sync_refuses_when_sdbase_is_missing_locally(monkeypatch, tmp_path):
+    from pyrite.xsgen import sources
+
+    monkeypatch.setattr(sources, "installed_data_dir", lambda code, name: tmp_path / "absent")
+    with pytest.raises(
+        SystemExit, match=r"sdbase/ is not intact locally.*\n.*fix: pyrite tables fetch sbethe"
+    ):
+        transport._real_local_sdbase()
+
+
+def test_local_sdbase_maps_every_file_to_its_box_arcname(monkeypatch, tmp_path):
+    from pyrite.xsgen import sources, verify
+
+    root = tmp_path / "sdbase"
+    expected = {arc: path for arc, path in _sdbase(tmp_path).items()}
+    monkeypatch.setattr(sources, "installed_data_dir", lambda code, name: root)
+    monkeypatch.setattr(
+        verify, "verify_pinned", lambda codes: [verify.TableCheck("sbethe", "x", "k", verify.OK)]
+    )
+
+    assert transport._real_local_sdbase() == expected

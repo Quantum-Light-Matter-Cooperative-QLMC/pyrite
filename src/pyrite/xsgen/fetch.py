@@ -75,7 +75,7 @@ _USER_AGENT = "PyRITE xsgen (+https://github.com/Quantum-Light-Matter-Cooperativ
 # are the decisive ones: `sbethe.f` OPENs both, and neither exists in deposit
 # version 1, so an sdbase left over from that version is rejected rather than
 # failing later inside the Fortran run.
-_REQUIRED_SBETHE_FILES = (
+REQUIRED_SBETHE_FILES = (
     "atparams.tab",
     "exp-param.tab",
     "pdatconf.p14",
@@ -97,7 +97,7 @@ class FetchResult:
 
 def _installed_sbethe(path: Path) -> bool:
     """Return whether ``path`` has the minimum complete-install markers."""
-    return path.is_dir() and all((path / name).is_file() for name in _REQUIRED_SBETHE_FILES)
+    return path.is_dir() and all((path / name).is_file() for name in REQUIRED_SBETHE_FILES)
 
 
 def _data_file_count(path: Path) -> int:
@@ -330,7 +330,7 @@ def fetch_sbethe(archive: str | Path | None = None) -> FetchResult:
         staged = work / "sdbase"
         staged.mkdir()
         file_count = _extract_sdbase(bundle, staged)
-        missing = [name for name in _REQUIRED_SBETHE_FILES if not (staged / name).is_file()]
+        missing = [name for name in REQUIRED_SBETHE_FILES if not (staged / name).is_file()]
         if missing:
             raise DataFetchError(
                 "SBETHE archive is missing required sdbase files: " + ", ".join(missing)
