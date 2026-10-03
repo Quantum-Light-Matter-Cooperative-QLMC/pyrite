@@ -18,6 +18,7 @@ from pyrite.montecarlo.transport.events import (
     check_segment_event_contract,
 )
 from pyrite.montecarlo.transport.hard_inelastic import (
+    _hard_secondary_cosine,
     _hard_secondary_direction,
     _sample_hard_transfer_eV,
     hard_stream_keys,
@@ -105,6 +106,15 @@ def test_in_kernel_secondary_direction_matches_host_sampler(key, energy_eV):
                 u_loss,
             )
             assert host.loss.branch == BRANCHES[branch]
+            cosine = _hard_secondary_cosine(
+                energy_eV,
+                osc.ionization_energy_eV,
+                osc.resonance_energy_eV,
+                branch,
+                w,
+                u_recoil,
+            )
+            np.testing.assert_allclose(cosine, host.cos_secondary, rtol=0.0, atol=1e-13)
             direction = _hard_secondary_direction(
                 *incoming,
                 energy_eV,
@@ -115,7 +125,11 @@ def test_in_kernel_secondary_direction_matches_host_sampler(key, energy_eV):
                 u_recoil,
                 u_phi,
             )
-            np.testing.assert_allclose(direction, world.secondary, rtol=0.0, atol=1e-9)
+            # sin = sqrt(1 - cos^2) maps a one-ulp cosine difference near cos = 1
+            # (u_recoil = 0 puts Q at Q_min, a forward secondary) to ~sqrt(2 eps).
+            near_forward = 1.0 - host.cos_secondary < 1e-12
+            atol = np.sqrt(8.0 * np.finfo(float).eps) if near_forward else 1e-9
+            np.testing.assert_allclose(direction, world.secondary, rtol=0.0, atol=atol)
             checked += 1
     assert checked >= 6
 
