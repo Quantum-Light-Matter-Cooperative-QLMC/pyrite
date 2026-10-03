@@ -161,12 +161,6 @@ def _slurm_batch_script(
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     sbatch_jobdir = config.sbatch_remote_path(config.JOBS_SUBDIR, jobid)
     reservations = _reservation_root()
-    remote_catalog = config.remote_catalog_path()
-    catalog_export = (
-        f"export PYRITE_CATALOG={config.shell_word(remote_catalog)}\n"
-        if remote_catalog is not None
-        else ""
-    )
     release_lines = (
         "\n  ".join(
             f'if [ "$(cat "$RESERVATIONS/{stem}/jobid" 2>/dev/null)" = "$JOBID" ]; then rm -rf "$RESERVATIONS/{stem}"; fi;'
@@ -192,7 +186,7 @@ set -u
 export PYRITE_HOME={config.shell_word(config.remote_dir())}
 # argv below is generated; deprecated options it carries were warned locally.
 export {GENERATED_INVOCATION_ENV}=1
-{catalog_export}
+export PYRITE_CATALOG={config.shell_word(config.remote_catalog_path())}
 JOBDIR={config.shell_word(jobdir)}
 JOBID={config.shell_word(jobid)}
 RESERVATIONS={config.shell_word(reservations)}

@@ -75,24 +75,39 @@ SYNC_PATHS = [
 ]
 
 
-def remote_catalog_path() -> str | None:
-    """Return the staged catalog path when a non-bundled catalog is selected."""
+# The bundled catalog inside the synced checkout (``src`` is in SYNC_PATHS).
+REMOTE_BUNDLED_CATALOG = "src/pyrite/data/catalog"
+
+
+def external_catalog_selected() -> bool:
+    """Whether the selected catalog is staged rather than the bundled one."""
     from .._catalog_layout import bundled_catalog, selected_catalog
 
-    source = selected_catalog()
-    if source == bundled_catalog().resolve():
-        return None
-    name = "external-catalog" if source.is_dir() else "external-catalog.toml"
+    return selected_catalog().resolve() != bundled_catalog().resolve()
+
+
+def remote_catalog_path() -> str:
+    """Return the remote catalog path matching the local selection.
+
+    Always explicit: the bundled selection maps to the synced checkout's
+    bundled catalog, so a catalog configured or staged on the box never wins.
+    """
+    from .._catalog_layout import selected_catalog
+
+    if not external_catalog_selected():
+        return remote_path(REMOTE_BUNDLED_CATALOG)
+    name = "external-catalog" if selected_catalog().is_dir() else "external-catalog.toml"
     return remote_path(name)
 
 
 def remote_runtime_env() -> str:
     """Environment assignments for direct remote PyRITE invocations."""
-    assignments = [f"PYRITE_HOME={shell_word(remote_dir())}"]
-    catalog = remote_catalog_path()
-    if catalog is not None:
-        assignments.append(f"PYRITE_CATALOG={shell_word(catalog)}")
-    return " ".join(assignments)
+    return " ".join(
+        (
+            f"PYRITE_HOME={shell_word(remote_dir())}",
+            f"PYRITE_CATALOG={shell_word(remote_catalog_path())}",
+        )
+    )
 
 
 # text extensions whose CRLF is normalized to LF before tarring (see _add_to_tar):
