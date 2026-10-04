@@ -37,3 +37,25 @@ def test_external_catalog_is_staged_and_exported(tmp_path, monkeypatch):
     (catalog / "cifs" / "leak.cif").symlink_to(outside)
     with pytest.raises(SystemExit, match="unsafe symlink"):
         transport._sync_entries()
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+def test_bundled_catalog_is_exported_explicitly(explicit, monkeypatch):
+    """Regression (#290): selecting the bundled catalog must override any
+    catalog configured or staged on the box, not fall back to it."""
+    from pyrite._catalog_layout import bundled_catalog
+
+    if explicit:
+        monkeypatch.setenv("PYRITE_CATALOG", str(bundled_catalog()))
+    else:
+        monkeypatch.delenv("PYRITE_CATALOG", raising=False)
+        # built-in default, regardless of the developer's config store
+        monkeypatch.setattr("pyrite._catalog_layout.selected_catalog", bundled_catalog)
+    monkeypatch.setattr(config, "SYNC_PATHS", [])
+    bundled = config.shell_word(config.remote_path("src/pyrite/data/catalog"))
+
+    assert not config.external_catalog_selected()
+    assert transport._sync_entries() == []
+    script = scripts._slurm_batch_script("job1", "echo ok", job_name="catalog-test")
+    assert f"export PYRITE_CATALOG={bundled}" in script
+    assert f"PYRITE_CATALOG={bundled}" in config.remote_runtime_env()

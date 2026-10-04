@@ -528,10 +528,10 @@ def _sync_entries() -> list[tuple[str, Path]]:
                     entries.append(((Path(p) / relative).as_posix(), f))
         else:
             entries.append((Path(p).as_posix(), local))
-    from .._catalog_layout import bundled_catalog, read_sources, selected_catalog
+    from .._catalog_layout import read_sources, selected_catalog
 
     catalog = selected_catalog()
-    if catalog != bundled_catalog().resolve():
+    if config.external_catalog_selected():
         if not catalog.exists():
             raise SystemExit(f"selected catalog does not exist: {catalog}")
         if catalog.is_dir():
@@ -809,7 +809,7 @@ def sync_code(*, force: bool = False):
     stamp = _sync_stamp(digest, _xsgen_tables_digest(guaranteed) if guaranteed else "")
     clear_catalog = (
         "rm -rf external-catalog external-catalog.toml && "
-        if config.remote_catalog_path() is not None
+        if config.external_catalog_selected()
         else ""
     )
     _run(
