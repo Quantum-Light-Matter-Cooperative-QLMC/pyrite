@@ -47,6 +47,7 @@ In other words:
 0012-backlog-in-github-issues
 0013-automatic-line-grids-by-default
 0014-packaged-data-layout
+0015-xraydb-atomic-scattering-data
 ```
 
 | ADR                                                 | Title                               | Status                                 |
@@ -64,3 +65,4 @@ In other words:
 | [0012](0012-backlog-in-github-issues.md)            | Backlog in GitHub Issues, not TODO.md | Accepted                               |
 | [0013](0013-automatic-line-grids-by-default.md)     | Automatic line grids by default      | Accepted                               |
 | [0014](0014-packaged-data-layout.md)                | Packaged data layout                 | Accepted                               |
+| [0015](0015-xraydb-atomic-scattering-data.md)       | xraydb as the atomic scattering data source | Accepted                         |

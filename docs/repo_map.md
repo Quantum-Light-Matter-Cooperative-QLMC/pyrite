@@ -357,7 +357,7 @@ Domain operations over parsed catalog documents for profile creation, updates, m
 
 ### `energy_grid/` (package)
 Photon-energy-grid derivation, bounds analysis, and catalog application (user inspection nests under `pyrite material` and `pyrite profile`). The compact case-grid codec shared by campaign, checkpoints, and Monte Carlo lives below this driver package at `pyrite._energy_grid_encoding`; `encoding.py` is its public compatibility facade.
-- The `pyrite energy-grid` Click group lives in `cli/commands/energy_grid.py` with every other CLI surface — it used to sit here as `_command.py` and be re-exported lazily, which put this package and `cli` in an import cycle. This package is now Click-free and reaches up to nothing. Monkeypatch seams for `remote`/`cli_json`/ `emit_json_result` live on the command module.
+- The `pyrite energy-grid` Click group lives in `cli/commands/energy_grid.py` with every other CLI surface. This package is Click-free and imports nothing from `cli`. Monkeypatch seams for `remote`/`cli_json`/ `emit_json_result` live on the command module.
 - The artifact store itself lives at `pyrite._energy_grid_artifacts` (below this package; see Core physics), because `materials.catalog` reads it too. `gc.py` resolves profile/campaign-lock reachability, out-of-band orphan ages, preview revalidation, and deletion.
 - Also: `derive`, `bounds`, `apply`, `defaults`, `provenance`, `golden`, `job`.
 
@@ -586,7 +586,7 @@ Optional SSH/SLURM orchestration for a configured remote host: sync, bounded and
   - `viewer.py` — one-shot/attached status and logs rendering; attached status reuses one framed SSH stream across refreshes. Names re-export as import-time snapshots; internal cross-module calls resolve through the owning submodule, so tests patch the owner (e.g. `transport._ssh_capture`), not the facade.
 
 ### `cli/commands/export.py`
-`pyrite app analysis export` subcommand — `marimo export html` of `src/pyrite/apps/analysis_app.py` → `results/<stem>.html` (replaces the retired nbconvert-PDF path). Body and Click wiring are both here; the body used to live in `apps/export.py`, which reached back into `cli._core` (now `console.output`).
+`pyrite app analysis export` subcommand — `marimo export html` of `src/pyrite/apps/analysis_app.py` → `results/<stem>.html`. Body and Click wiring are both here.
 - Public: `command`, `main`.
 
 ### `checkpoints/slim.py`
