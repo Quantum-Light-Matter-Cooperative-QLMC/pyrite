@@ -62,14 +62,27 @@ $Z_S = \sum_i p_i Z_i(Z_i+\xi_0)$, $Z_E = \sum_i p_i Z_i(Z_i+\xi_0)\ln Z_i^{-2/3
 
 Write both moments in units $mc^2 = 2\pi r_0^2 = 1$. The screened-Rutherford nucleus, $d\sigma/d\mu = Z^2/[\beta^2\tau(\tau+2)(1-\mu+2\eta)^2]$, has $\int(1-\mu^2)\,d\sigma = 2 Z^2 g_R/[\beta^2\tau(\tau+2)]$. The Møller cross section per electron, with the primary's deflection $\sin^2\theta = 2w/[\tau(\tau-w+2)]$ after losing $w$, gives the same prefactor times $2 g_M$; a direct quadrature of the Møller DCS reproduces {eq}`eq-aed-gm` to $10^{-9}$. If all atomic-electron deflection is $Z\xi_0$ in units of the nuclear scattering power, the explicit hard part is $Z g_M/g_R$, which leaves $Z(Z + \xi_0 - g_M/g_R)$, i.e. {eq}`eq-aed-xi`.
 
-PIRS-701 Eq. 4.7.20 prints $\xi = \xi_0[1 - g_M/((\bar Z+\xi_0)g_R)]$, which removes only a $1/(\bar Z+1)$ fraction of the hard share. Geant4's `G4eDPWAElasticDCS::InitSCPCorrection`{cite:p}`geant4dpwa` instead multiplies $Z(Z+1)$ by $1 - g_M/[(Z+1)g_R]$, which for one element is {eq}`eq-aed-xi`. PyRITE follows the derivation above. Geant4 also omits $(mc^2)^2$ from $\eta$, making it about 3.8 times smaller; that matters only above twice its production cut, so not in the #183 references.
+PIRS-701 Eq. 4.7.20 prints $\xi = \xi_0[1 - g_M/((\bar Z+\xi_0)g_R)]$, which removes only a $1/(\bar Z+1)$ fraction of the hard share. Geant4's `G4eDPWAElasticDCS::InitSCPCorrection`{cite:p}`geant4dpwa` instead multiplies $Z(Z+1)$ by $1 - g_M/[(Z+1)g_R]$, which for one element is {eq}`eq-aed-xi`. PyRITE follows the derivation above; the printed Eq. 4.7.20 bracket is the multiplier of $Z(Z+\xi_0)$, not $\xi$. The printed Eq. 4.7.22 also misplaces its bracket, $(1+2\eta)[\ln(1+1/\eta)-2]$, which turns negative above $\eta \approx 0.16$; {eq}`eq-aed-gr` is the $\sin^2$ moment derived directly. Geant4 also omits $(mc^2)^2$ from $\eta$, making it about 3.8 times smaller; that matters only above twice its production cut, so not in the #183 references.
 
 ## Mode by mode
 
 - **Continuous stopping** samples no atomic-electron collision, so $T_c = \infty$ and $\xi = 1$: every element's rate is scaled by $(Z_i+1)/Z_i$. The factor is constant, so it multiplies the screened-Rutherford, Mott and ELSEPA rate coefficients exactly, on every core, the energy LUT and the element choice.
 - **Shell soft/hard** deflects explicitly in hard collisions above $W_c$, so $T_c = W_c$. The energy-dependent $\xi$ is evaluated on each ELSEPA energy node and joins the log-log rate interpolation. The analytic `"sr"` and `"mott"` rates have no energy grid to carry it, so `simulate_trajectories` rejects the combination, and a run case on deprecated Mott that resolves to shell transport keeps elastic-only deflection with a warning.
 
-At the production cutoff $W_c = 50$ eV in silicon, $g_M > g_R$ from about 500 eV upward, so $\xi$ clips to 0 and shell transport is unchanged there ($\xi = 0.16$ at 200 eV). The free-electron Møller law overstates distant soft collisions near binding energies. The shell GOS model gives a soft share of 0.3–1.6 % of the angular diffusion rate (`checks/soft_inelastic_deflection.py`), which this correction does not restore. For $W_c \ge 1$ keV, $\xi$ is between 0.29 and 1 for Si from 2.5 keV to 1 MeV.
+At the production cutoff $W_c = 50$ eV in silicon, $g_M > g_R$ from 315 eV upward, so $\xi$ clips to 0 and shell transport is unchanged there ($\xi = 0.16$ at 200 eV, 0.012 at 300 eV). The free-electron Møller law overstates distant soft collisions near binding energies. The shell GOS model gives a soft share of 0.3–1.6 % of the angular diffusion rate (`checks/soft_inelastic_deflection.py`), which this correction does not restore. For $W_c \ge 1$ keV, $\xi$ is between 0.29 and 1 for Si from 2.5 keV to 1 MeV.
+
+## Measured effect
+
+Against Geant4 11.4.2 TestEm5 with event-by-event DPWA elastic scattering (`isscpcor` on), 100,000 primaries per case, ELSEPA + SBETHE + coupled BremsLib, 10 keV cutoff, continuous stopping, no straggling (`checks/full_track_bremslib/`, 2026-10-04):
+
+| Case | Geant4 DPWA T / R | PyRITE `"none"` T / R (z) | PyRITE `"kawrakow"` T / R (z) |
+|---|---|---|---|
+| Si 300 keV, 100 µm | 0.8428 / 0.1109 | 0.8613 / 0.0987 (+11.7 / −8.9) | 0.8469 / 0.1084 (+2.6 / −1.8) |
+| Si 800 keV, 100 µm | 0.9936 / 0.0063 | 0.9943 / 0.0056 (+2.1 / −2.0) | 0.9936 / 0.0063 (0.0 / 0.0) |
+| W 300 keV, 10 µm | 0.5448 / 0.4248 | 0.5486 / 0.4207 (+1.7 / −1.9) | 0.5443 / 0.4247 (−0.2 / −0.1) |
+| W 800 keV, 10 µm | 0.9191 / 0.0806 | 0.9221 / 0.0775 (+2.5 / −2.6) | 0.9202 / 0.0794 (+1.0 / −1.0) |
+
+T and R are the transmitted and backscattered primary fractions; z is the difference in combined binomial standard errors. Shell soft/hard Si runs at $W_c = 50$ eV are unchanged by the correction, count for count, because $\xi = 0$ above the 10 keV cutoff.
 
 ## Assumptions
 
