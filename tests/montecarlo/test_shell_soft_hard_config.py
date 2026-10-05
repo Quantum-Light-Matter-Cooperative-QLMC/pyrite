@@ -127,7 +127,7 @@ def test_auto_resolves_covered_material_to_shell_mode():
 @pytest.mark.parametrize(
     ("material", "energy_model", "reason"),
     (
-        ("ws2", "midpoint", "no conduction-band shell data for 'ws2'"),
+        ("hfs2", "midpoint", "no conduction-band shell data for 'hfs2'"),
         ("silicon", "frozen", "energy_model='frozen'"),
     ),
 )
@@ -144,7 +144,7 @@ def test_auto_falls_back_to_continuous_with_a_warning(material, energy_model, re
     assert runner._case_inelastic_kwargs(cases[0]) == {}
 
 
-@pytest.mark.parametrize(("material", "shell"), (("silicon", True), ("ws2", False)))
+@pytest.mark.parametrize(("material", "shell"), (("silicon", True), ("hfs2", False)))
 def test_auto_identity_records_the_resolved_model(material, shell):
     from pyrite.campaign.config import default_settings
     from pyrite.campaign.profiles import dataset_identity
@@ -178,5 +178,5 @@ def test_missing_shell_reference_data_names_the_fetch_command(monkeypatch, tmp_p
 def test_uncovered_material_names_the_covered_set():
     from pyrite.montecarlo.transport.shell_rates import catalog_shell_oscillators
 
-    with pytest.raises(ValueError, match="'ws2' has no conduction-band shell data.*silicon"):
-        catalog_shell_oscillators("ws2")
+    with pytest.raises(ValueError, match="'hfs2' has no conduction-band shell data.*silicon"):
+        catalog_shell_oscillators("hfs2")
