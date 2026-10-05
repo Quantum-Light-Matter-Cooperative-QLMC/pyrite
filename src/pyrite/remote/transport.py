@@ -859,24 +859,32 @@ def _rsync_code(entries: list[tuple[str, Path]], workdir: str) -> None:
     """
     label = "Syncing code to remote box (rsync)..."
     stats = ("--stats",) if _VERBOSE else ()
+    files: list[str] = []
     for sync_path in config.SYNC_PATHS:
         local = config.LOCAL_ROOT / sync_path
         if not local.exists():
             continue
+        if not local.is_dir():
+            # ``/./`` marks where -R starts the path kept below the remote root.
+            files.append(f"{config.LOCAL_ROOT}/./{sync_path}")
+            continue
         dest = config.rsync_remote_path(config.remote_path(sync_path))
-        if local.is_dir():
-            argv = config.rsync_argv(
-                *_RSYNC_FLAGS,
-                *stats,
-                "--delete",
-                *_rsync_cache_filters(),
-                *_rsync_protected(sync_path),
-                f"{local}/",
-                f"{dest}/",
-            )
-        else:
-            argv = config.rsync_argv(*_RSYNC_FLAGS, *stats, str(local), dest)
+        argv = config.rsync_argv(
+            *_RSYNC_FLAGS,
+            *stats,
+            "--delete",
+            *_rsync_cache_filters(),
+            *_rsync_protected(sync_path),
+            f"{local}/",
+            f"{dest}/",
+        )
         _run(argv, label=label)
+        label = None
+    if files:
+        # Plain files share one call (each call pays an ssh/rsync startup); no
+        # --delete, so the checkout root as destination is safe.
+        root = config.rsync_remote_path(config.remote_dir().rstrip("/") or "/")
+        _run(config.rsync_argv(*_RSYNC_FLAGS, *stats, "-R", *files, f"{root}/"), label=label)
         label = None
     catalog = [arc for arc, _ in entries if arc.startswith("external-catalog/")]
     if catalog:

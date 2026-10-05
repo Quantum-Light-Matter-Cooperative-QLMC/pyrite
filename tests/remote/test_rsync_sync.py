@@ -29,12 +29,16 @@ def _tree(root):
     (pkg / "__pycache__").mkdir()
     (pkg / "__pycache__" / "keep.cpython-314.pyc").write_bytes(b"bytecode")
     (root / "pyproject.toml").write_text("[project]\nname = 'x'\n")
+    (root / "cfg").mkdir()
+    (root / "cfg" / "nested.toml").write_text("n = 1\n")
     return pkg
 
 
 def _configure(monkeypatch, local, remote_dir, mode="auto"):
     monkeypatch.setattr(config, "LOCAL_ROOT", local)
-    monkeypatch.setattr(config, "SYNC_PATHS", ["src", "pyproject.toml", "missing-dir"])
+    monkeypatch.setattr(
+        config, "SYNC_PATHS", ["src", "pyproject.toml", "cfg/nested.toml", "missing-dir"]
+    )
     monkeypatch.setattr(config, "HOST", HOST)
     monkeypatch.setattr(config, "REMOTE_DIR", str(remote_dir))
     monkeypatch.setenv("PYRITE_SSH_MUX", "0")
@@ -96,6 +100,7 @@ def test_rsync_mirrors_deletions_and_spares_box_state(tmp_path, monkeypatch):
     transport.sync_code()
     assert [c[0] for c in calls] == ["rsync", "rsync", "ssh"]
     assert (box / "src/pyrite/gone.py").is_file()
+    assert (box / "cfg/nested.toml").read_text() == "n = 1\n"  # -R keeps the subpath
     assert not (box / "src/pyrite/__pycache__").exists()  # caches never ship
     kept_inode = (box / "src/pyrite/data.bin").stat().st_ino
 
@@ -226,13 +231,17 @@ def test_rsync_argv_shape_per_sync_path(tmp_path, monkeypatch):
 
     rsyncs = [c for c in calls if c[0] == "rsync"]
     remote = tmp_path / "box"
-    assert [c[-1] for c in rsyncs] == [f"{HOST}:{remote}/src/", f"{HOST}:{remote}/pyproject.toml"]
-    src, pyproject = rsyncs
+    assert [c[-1] for c in rsyncs] == [f"{HOST}:{remote}/src/", f"{HOST}:{remote}/"]
+    src, files = rsyncs
     assert src[:4] == ["rsync", "-s", "-e", "ssh"]
     for flag in ("-a", "--checksum", "--delay-updates", "--delete", "--filter=-p __pycache__/"):
         assert flag in src
     assert src[-2] == f"{tmp_path / 'local' / 'src'}/"
-    assert "--delete" not in pyproject and pyproject[-2] == str(tmp_path / "local/pyproject.toml")
+    assert "--delete" not in files and "-R" in files
+    assert files[-3:-1] == [
+        f"{tmp_path / 'local'}/./pyproject.toml",
+        f"{tmp_path / 'local'}/./cfg/nested.toml",
+    ]
     assert calls[-1][0] == "ssh" and "tar xzf" not in calls[-1][-1]
 
 
@@ -263,7 +272,7 @@ def test_rsync_failure_leaves_the_old_stamp(tmp_path, monkeypatch):
 
     def run(argv, **_kwargs):
         calls.append(argv)
-        if argv[0] == "rsync" and argv[-1].endswith("pyproject.toml"):
+        if argv[0] == "rsync" and "-R" in argv:  # the plain-file call, after src/
             raise subprocess.CalledProcessError(23, argv)
 
     monkeypatch.setattr(transport, "_run", run)
