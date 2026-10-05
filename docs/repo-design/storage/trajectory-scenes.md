@@ -81,4 +81,16 @@ pvpython --force-offscreen-rendering checks/trajectory_paraview_probe.py \
 
 The optional `checks/trajectory_trame_probe.py` smoke starts a live `VtkRemoteView` server, changes energy and secondary controls through state callbacks, renders and exports an image. On the same capture, energy ≥10 keV reduced cells from 29,756 to 23,504, disabling secondaries reduced them to 22,370, and restoring controls recovered all cells. No browser connected. Its event-loop-yield timings are deliberately **not** browser latency evidence. Time filtering, picking, clipping, VRAM and complete process-tree memory remain unmeasured.
 
+The probe also has an opt-in interactive mode:
+
+```bash
+uv run --with pyvista --with trame --with trame-vtk --with trame-vuetify \
+  python checks/trajectory_trame_probe.py tracks.vtp image.png report.json \
+  --serve --port 8765
+```
+
+Open `http://127.0.0.1:8765` in a browser. The energy slider and secondary switch share the smoke's filtering path; preset buttons reproduce its selections, and the footer reports selected cells. Drag the view to rotate the camera, then use **Save report** to write the current screenshot and JSON report. The report includes connection count, input hash/bytes, versions, initial/final camera, server callback costs and Python/native peak RSS. A client connection alone does not prove image delivery or correct controls: inspect the visible image and counts. Callback costs end at update submission and exclude browser delivery/display; the report does not measure first visible frame, camera latency, browser memory or VRAM. Empty energy selections clear the actor and can be restored. The automatic smoke verifies this recovery.
+
+The raw trial record also includes `trame_continuation`: a fresh no-client smoke verifies the empty-selection recovery and records callback costs without an event-loop delay. Client-visible images and camera changes remain unverified; no connected-browser results are recorded.
+
 **Choice:** implement an optional standalone PyVista/trame saved-capture app in [#319](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/319). The measured export and memory scaling justify that investment and a movie-export investigation. Retain the live Plotly preview while the new app demonstrates its connected-browser workflow. ParaView scene export is usable now. There is no supported production segment ceiling yet: native rendering succeeded up to roughly ten million replicated cells on this machine, while browser delivery and independent large captures still require validation. The follow-up starts with bounded whole-history/track and attribute selection, then measures those missing behaviors before advertising a workload range.

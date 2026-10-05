@@ -73,7 +73,7 @@ run through the collector.
 Run commands are documented in each check. Heavy Monte Carlo or GPU work must
 use `pyrite remote`; do not launch it locally from this directory.
 
-Optional viewer evaluation probes: `trajectory_paraview_probe.py` (pvpython), `trajectory_trame_probe.py` (live server smoke without a client). Raw repeated results: `trajectory_viewer_results.json`; interpretation and limitations: [trajectory scenes](../docs/repo-design/storage/trajectory-scenes.md).
+Optional viewer evaluation probes: `trajectory_paraview_probe.py` (pvpython), `trajectory_trame_probe.py` (automatic no-client smoke; `--serve` for manual connected-browser inspection and report export). Raw repeated results: `trajectory_viewer_results.json`; interpretation, commands and limitations: [trajectory scenes](../docs/repo-design/storage/trajectory-scenes.md).
 
 To diagnose an earlier physical-population run with updated code, pass
 `--transport-record OLD.json --out NEW.json` to
