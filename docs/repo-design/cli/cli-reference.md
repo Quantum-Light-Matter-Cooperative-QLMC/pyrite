@@ -100,7 +100,7 @@ Commands:
 ```text
 Usage: pyrite run [OPTIONS] [PROFILE]
 
-  Run a catalog profile's MC sweeps and write checkpoints.
+  Run a catalog profile's MC sweeps or one ephemeral pixel scene.
 
   PROFILE defaults to the current configured profile (standard built-in; the built-in
   fallback warns and is deprecated) and owns material membership, campaign ranges, and
@@ -108,11 +108,20 @@ Usage: pyrite run [OPTIONS] [PROFILE]
   resolved membership.
 
   Resumes compatible checkpoints in CHECKPOINTS. Full writes component data beneath
-  <material>/; variants use identity-qualified stems.
+  <material>/; variants use identity-qualified stems. With --ephemeral, require -m and
+  singleton scene/workload grids, run one pixel detector without checkpoint, cache, or
+  observation-store I/O, and optionally export factorized arrays.
 
 Options:
   -m, --material MATERIAL         Run one member of PROFILE instead of its full
                                   membership.
+  --ephemeral                     Run one local pixel scene without
+                                  checkpoint/cache/observation I/O; requires -m and
+                                  singleton grids.
+  --detector ID                   Pixel detector ID for --ephemeral; required when
+                                  several pixel detectors exist.
+  --output-file FILE              With --ephemeral, write full factorized arrays as a
+                                  new compressed .npz file; never overwrite.
   --workers NUMBER                run_cases max_workers (default auto; 0 = serial, no
                                   transport pool).
   --quick                         Use a tiny smoke-test grid and write the
@@ -123,8 +132,9 @@ Options:
   --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
                                   resumable work remains.
   --no-cache                      Neither read nor write the shared per-case checkpoint
-                                  cache: an ephemeral run that recomputes every case and
-                                  stores nothing shared.
+                                  cache: a run that recomputes every case but still
+                                  writes campaign checkpoints. Use --ephemeral for no
+                                  checkpoint or observation-store I/O.
   --recompute                     Ignore cached cases and recompute fresh, but
                                   repopulate the shared per-case cache with the results.
   --trajectories DIR              Opt in to saving each transported case's full

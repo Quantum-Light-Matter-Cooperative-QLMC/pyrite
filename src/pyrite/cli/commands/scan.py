@@ -53,7 +53,7 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
 @click.command(
     "run",
     help=(
-        "Run a catalog profile's MC sweeps and write checkpoints.\n\n"
+        "Run a catalog profile's MC sweeps or one ephemeral pixel scene.\n\n"
         "PROFILE defaults to the current configured profile (standard built-in; "
         "the built-in fallback warns and is deprecated) "
         "and owns material membership, campaign ranges, and workload settings. "
@@ -61,7 +61,9 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
         "membership.\n\n"
         "Resumes compatible checkpoints in CHECKPOINTS. Full writes component "
         "data beneath <material>/; variants use "
-        "identity-qualified stems."
+        "identity-qualified stems. With --ephemeral, require -m and singleton "
+        "scene/workload grids, run one pixel detector without checkpoint, cache, "
+        "or observation-store I/O, and optionally export factorized arrays."
     ),
 )
 @click.argument(
@@ -78,6 +80,22 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     default=None,
     shell_complete=_cli_completion.complete_material,
     help="Run one member of PROFILE instead of its full membership.",
+)
+@click.option(
+    "--ephemeral",
+    is_flag=True,
+    help="Run one local pixel scene without checkpoint/cache/observation I/O; requires -m and singleton grids.",
+)
+@click.option(
+    "--detector",
+    "detector_id",
+    metavar="ID",
+    help="Pixel detector ID for --ephemeral; required when several pixel detectors exist.",
+)
+@click.option(
+    "--output-file",
+    type=click.Path(path_type=Path, dir_okay=False, writable=True),
+    help="With --ephemeral, write full factorized arrays as a new compressed .npz file; never overwrite.",
 )
 @click.option(
     "--workers",
@@ -205,8 +223,9 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     "--no-cache",
     is_flag=True,
     help=(
-        "Neither read nor write the shared per-case checkpoint cache: an "
-        "ephemeral run that recomputes every case and stores nothing shared."
+        "Neither read nor write the shared per-case checkpoint cache: a "
+        "run that recomputes every case but still writes campaign checkpoints. "
+        "Use --ephemeral for no checkpoint or observation-store I/O."
     ),
 )
 @click.option(
@@ -359,6 +378,9 @@ def _command(
     ctx,
     catalog_profile,
     material,
+    ephemeral,
+    detector_id,
+    output_file,
     workers,
     fidelity,
     quick,
@@ -408,6 +430,61 @@ def _command(
     gdf_screen_tolerance_m,
 ):
     """Click entry point for the staged root migration."""
+    if not ephemeral and (detector_id is not None or output_file is not None):
+        raise click.UsageError("--detector/--output-file require --ephemeral")
+    if ephemeral:
+        from ._simulation import execute_simulation, resolve_scene, simulation_usage_error
+
+        # output_option returns a bool; Click retains the original human format
+        # in its metadata so wide output can share the simulate presentation.
+        output_format = "json" if json_output else ctx.meta.get("pyrite.output_format", "table")
+        allowed = {
+            "catalog_profile",
+            "material",
+            "ephemeral",
+            "detector_id",
+            "output_file",
+            "json_output",
+            "no_progress",
+            "verbose",
+        }
+        incompatible = [
+            parameter.opts[0]
+            for parameter in ctx.command.params
+            if parameter.name not in allowed
+            and ctx.get_parameter_source(parameter.name)
+            in {
+                click.core.ParameterSource.COMMANDLINE,
+                click.core.ParameterSource.ENVIRONMENT,
+                click.core.ParameterSource.DEFAULT_MAP,
+            }
+        ]
+        if incompatible:
+            simulation_usage_error(
+                "--ephemeral does not support option(s): " + ", ".join(incompatible), output_format
+            )
+        if material is None:
+            simulation_usage_error("--ephemeral requires -m/--material MATERIAL", output_format)
+        try:
+            resolved = _cli_config.resolve("profile.current", catalog_profile)
+        except _cli_config.ConfigError as exc:
+            raise _cli_core.CLIError(str(exc)) from exc
+        _implicit_defaults.warn_implicit_profile(resolved)
+
+        def resolver(document, material, profile_name, detector_id):
+            return resolve_scene(
+                document, material, profile_name, detector_id, command_name="run --ephemeral"
+            )
+
+        return execute_simulation(
+            material,
+            resolved.value,
+            detector_id,
+            output_format,
+            output_file,
+            resolver=resolver,
+            usage_errors=True,
+        )
     gdf_overrides = {
         key: value
         for key, value in {
@@ -806,10 +883,16 @@ performance_command = _derived_command(
         "performance_profile",
         "trajectories",
         "overwrite_trajectories",
+        "ephemeral",
+        "detector_id",
+        "output_file",
         *_PRESET_PARAMETER_NAMES,
     },
     implied={
         "perf": True,
+        "ephemeral": False,
+        "detector_id": None,
+        "output_file": None,
         "trajectories": None,
         "overwrite_trajectories": False,
         "performance_profile": None,
