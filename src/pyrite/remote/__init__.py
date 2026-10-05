@@ -48,8 +48,9 @@ time with `attach`/`status`/`logs`, then `pull` once state is `done`.
 
 Then locally: run ``pyrite app analysis <material>`` or ``pyrite app analysis export [stem]``.
 
-Transport uses ssh/scp and the configured SSH options; it has no rsync
-dependency. The remote checkout and ``uv`` default to ``~/pyrite`` and
+Transport uses ssh/scp and the configured SSH options. Code sync uses rsync
+when both ends have it (``PYRITE_SYNC_TRANSPORT``) and otherwise falls back to
+tar+scp, so rsync is never required. The remote checkout and ``uv`` default to ``~/pyrite`` and
 ``~/.local/bin/uv`` (``~`` is the remote login home); set ``PYRITE_REMOTE_DIR``
 and ``PYRITE_REMOTE_UV`` when they differ.
 """

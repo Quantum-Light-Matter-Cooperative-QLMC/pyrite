@@ -579,7 +579,7 @@ Optional SSH/SLURM orchestration for a configured remote host: sync, bounded and
 - Public CLI: `add_subparser`, `main`.
 - The public package contains the former facade and implementation modules (acyclic: `config` ◄ `transport` ◄ `scripts` ◄ `state` ◄ `lifecycle`/`viewer`; the Click wiring lives in `cli/commands/remote.py` and the frame rendering in `console/dashboard/`):
   - `config.py` — env-driven hosts/paths/SLURM constants.
-  - `transport.py` — ssh/scp primitives, streamed downloads, hashing, generated-cache-filtered code-tar sync, selected external-catalog staging, material checks; one-round-trip immutable energy-grid hash inventory skips remote objects already present with matching content.
+  - `transport.py` — ssh/scp primitives, streamed downloads, hashing, code sync (per-sync-path rsync mirror when both ends have rsync, else generated-cache-filtered tar+scp; `PYRITE_SYNC_TRANSPORT`), selected external-catalog staging, material checks; one-round-trip immutable energy-grid hash inventory skips remote objects already present with matching content.
   - `scripts.py` — pure SLURM/shell string + command builders, job-id minting, per-allocation dependency-sync timing.
   - `state.py` — read-only job/reservation state queries over ssh; live-job discovery joins metadata against one scheduler snapshot.
   - `lifecycle.py` — submit/stage/stop/clear/pull job lifecycle; checkpoint pulls slim, stream, and clean up through one SSH session per stem; remote performance inventory and terminal-job-only pruning revalidate scheduler, job-state, and artifact inventory before deletion.
