@@ -92,7 +92,7 @@ Caveats on these inputs:
 - **h-BN value and density.** Tarrio & Schnatterly's samples are described
   only as hexagonal BN of varying purity; whether 26.4 eV is a $q\to0$
   extrapolation or a low-$q$ peak was not verified. Its 6.9% excess over
-  Eq. 3.62 is the largest in the table. The catalog density (2.279 g/cm³)
+  Eq. 3.62 is second only to WSe₂. The catalog density (2.279 g/cm³)
   is ideal-crystal; pyrolytic or turbostratic BN (1.9–2.2 g/cm³) gives a
   lower plasmon. c-BN values (about 30 eV) do not apply.
 - **WSe₂ value.** Ahmad et al. measured transmission EELS on ~100 nm 2H
@@ -124,8 +124,7 @@ it reaches $f_{cb}$. A boundary that splits a shell, or a group of shells
 with equal $U$, raises. Si uses M1+M2 (next shell 104 eV); SiO₂ uses Si
 M1+M2 and O L1–L3 (next 104 eV); MoS₂ uses Mo N4+O1 and S M1–M3 (next
 42 eV); HOPG uses C L1+L2 (next 288 eV); h-BN uses B L1+L2 and N L1–L3
-(next 192 eV); WSe₂ uses W O4+P1 and Se N1–N3 (next W N7, 36 eV). Unlike the 15 eV default, this includes O 2s (28.5 eV) and S 3s
-(20.2 eV) valence electrons. Materials without a measured entry use the
+(next 192 eV); WSe₂ uses W O4+P1 and Se N1–N3 (next W N7, 36 eV). Unlike the 15 eV default, this includes O 2s (28.5 eV), S 3s (20.2 eV) and Se 4s (20.15 eV) valence electrons. Materials without a measured entry use the
 manual default, labelled in `conduction_source`.
 
 ## Checks and limits

@@ -304,3 +304,125 @@ equations and code are unchanged. The SiO₂ factor becomes $a=3.4701$, and
 22 eV lies 0.25% below Eq. 3.62 at catalog density. The status stays
 `rederived` because only a verified input value changed; a fresh check can
 confirm the new $a$.
+
+## Addendum: WSe2 (issue #218)
+
+Scope: only the new `wse2` entry in `src/pyrite/data/conduction_band.toml`,
+with its rows in `penelope-shell-oscillators.md`, the test pin and the
+ledger row (commit `be71f4ac`). The equations and code are unchanged and
+were verified above.
+
+- **Claim**: `penelope-shell-oscillators`, WSe₂ input. Code:
+  `data/conduction_band.toml::wse2` used by
+  `montecarlo/transport/shell_oscillators.py::build_shell_oscillators`.
+  Source: Ahmad et al., J. Phys.: Condens. Matter 29, 165502 (2017),
+  with PENELOPE-2024 Eqs. 3.62 and 3.64.
+- **Filters**: units pass; limits pass ($f_{cb}+\sum_k f_k=142=Z$, and
+  every bound $W_k>U_k$); signs and conventions pass.
+- **Re-derivation**: `matches` ($a=2.03826$ against the pinned 2.0383).
+- **Verdict**: `rederived`, with three wording fixes (see below). None of
+  them changes a number.
+- **Write-up**: `docs/validation/beam-transport/penelope-shell-oscillators-verification.md`
+  (this addendum).
+
+### Source
+
+I fetched and read the arXiv preprint 1701.06293 (pdftotext, plus a render
+of Fig. 1). I did not read the published JPCM version, which is paywalled.
+`doi:10.1088/1361-648X/aa63a7` resolves to the IOP article page.
+
+- Sample: "high quality thin films of a thickness of about 100 nm were
+  prepared via mechanical exfoliation from single crystals". The authors
+  "verified the pure hexagonal phase of WSe2 by measuring the electron
+  diffraction profile". The material is 2H-WSe₂. They measured at 20 K
+  with a 172 keV beam, $\Delta E=82$ meV and $\Delta q=0.04$ Å⁻¹.
+- Geometry: the spectra run "along the ΓM direction of the Brillouin zone.
+  The momentum transfer is 0.1 Å⁻¹, which corresponds to the optical
+  limit". ΓM lies in the basal plane, and the exfoliated films are
+  c-normal, so $q$ is in-plane.
+- Value: "dominated by a strong feature at about 22 eV which can be
+  associated with the volume plasmon, a collective excitation of all
+  valence electrons." In Fig. 1, the undoped peak sits just above the
+  20 eV tick, consistent with 22 eV. Fig. 1 plots the measured loss
+  spectrum, not a tabulated KK loss function. That supports the doc's
+  "read from text" and its ±0.5 eV reading-uncertainty caveat. The ±0.5 eV
+  bound is the author's judgement; I did not derive it.
+- Other features: a broad feature "around 44 eV" from "multiple scattering
+  and shallow core level excitations from the W 5p levels", and excitons at
+  1.8 and about 2.3 eV.
+
+The TOML `basis`, `source` and `doi` fields, the table row and the WSe₂
+caveat bullet all match the source.
+
+### $f_{cb}=18$ and shell consumption
+
+The chemical valence is W $5d^46s^2$ (6) plus $2\times$ Se $4s^24p^4$ (12),
+giving 18. I recomputed the SHA-256 of the pinned `pdatconf.p14`
+(`cd239554…62d2`), and it matches the record. My own parse gives
+$\sum f=74$ for W and 34 for Se.
+
+I sorted every shell in the formula unit by $U$ and weighted each shell's
+occupation by stoichiometry:
+
+| shells | $U$ (eV) | electrons | running total |
+| --- | ---: | ---: | ---: |
+| W O4 ($5d_{3/2}$, 4) + W P1 ($6s$, 2) | 8.667 | 6 | 6 |
+| Se N2 + N3 ($4p$), $\times2$ | 9.75 | 8 | 14 |
+| Se N1 ($4s$), $\times2$ | 20.15 | 4 | 18 |
+| next: W N7 ($4f_{7/2}$) | 36.0 | — | — |
+
+The count reaches 18 exactly at a shell boundary. No shell is split, and
+each equal-$U$ group (W O4/P1, Se N2/N3) is consumed whole. The pdatconf W
+configuration is O4 = 4 plus P1 = 2, which matches $5d^46s^2$. W N7, N6, O3
+and O2 sit at 36, 38, 41 and 51 eV, which confirms "W 4f and 5p at
+36–51 eV".
+
+### Numbers
+
+I computed these with my own script; no repository helper went into them.
+
+- Density from the packaged CIF: $a=3.282$ Å, $c=12.96$ Å, $\gamma=120^\circ$,
+  $V=120.896$ Å³, two formula units per cell, $M=341.78$ g/mol. That gives
+  $\rho=9.3889$ g/cm³, the same as the catalog's 9.388917.
+- All-electron plasma energy with $Z=142$:
+  $\Omega_p=\hbar\sqrt{n_e e^2/(\varepsilon_0 m_e)}=56.9128$ eV. The
+  repository `plasma_energy_eV("wse2")` gives 56.91282.
+- Eq. 3.62: $\sqrt{18/142}\,\Omega_p=20.263$ eV. So 22.0 eV is $+8.57\%$
+  above it (doc: 20.26 eV, 8.6%). It is under the 9% test tolerance.
+- $I$: the Bragg-additive value from ICRU 37 elemental values (W 727 eV,
+  Se 348 eV) is $\exp[(74\ln727+68\ln348)/142]=510.877$ eV. This equals the
+  catalog `mean_excitation_eV`.
+- Eq. 3.64, solved for $a$ by Brent root-finding over the 21 remaining
+  bound shells, with $f_k$ = stoichiometry × occupation:
+  $a=2.038262$, which rounds to 2.0383. The other convention, one
+  oscillator per atom, gives 2.03917, so the 1e-4 pin tells the two apart.
+  The pin matches the per-formula grouping that the earlier MoS₂ entry
+  already uses. The smallest bound $W_k$ is 74.2 eV, above its $U_k$.
+- Cutoff: $W_{cb}=22<50$ eV. `validate_shell_cutoff` requires
+  cutoff $>W_{cb}$, so it passes.
+- `uv run pyrite-dev test tests/montecarlo/test_shell_oscillators.py`
+  gave 20 passed, 0 skipped. The pinned data were present.
+
+### Doc and ledger findings
+
+These are wording issues, not discrepancies. I have not applied them.
+
+1. `penelope-shell-oscillators.md`, h-BN caveat: "Its 6.9% excess over
+   Eq. 3.62 is the largest in the table" is now stale. WSe₂ (8.6%) is
+   larger, and the WSe₂ bullet says so. Drop the h-BN sentence or reword it
+   to "second largest".
+2. Same file, consumption paragraph: "Unlike the 15 eV default, this
+   includes O 2s (28.5 eV) and S 3s (20.2 eV)" should also list Se 4s
+   (20.15 eV). That shell lies above the 15 eV default and is consumed by
+   the WSe₂ band.
+3. Ledger `penelope-shell-oscillators` Notes: replace "its fresh-context
+   verification is pending" with a pointer to this addendum. The other
+   ledger text (Source, Checks with "within 9%", pinned 2.0383, and the
+   WSe₂ shell assignment) is accurate.
+
+### Suggested ledger change
+
+Keep the status at `rederived`, since the WSe₂ input is rederived. In
+Notes, replace "its fresh-context verification is pending" with "verified
+in the WSe₂ addendum of the verification record". Never mark the row
+`signed-off`; only a human may do that (#277).
