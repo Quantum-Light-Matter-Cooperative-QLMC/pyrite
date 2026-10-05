@@ -343,7 +343,9 @@ def _record_frame(
         # The coherent curve shares the total's grid. Its wide tail contains
         # brem in summed mode and zeros in decomposition mode.
         tail_len = total_E.size - E.size
-        coherent_total = coherent_line + brem_det if sum_components and include_brem else coherent_line
+        coherent_total = (
+            coherent_line + brem_det if sum_components and include_brem else coherent_line
+        )
         coherent_tail = (
             brem_tail if tail_len and sum_components and include_brem else np.zeros(tail_len)
         )

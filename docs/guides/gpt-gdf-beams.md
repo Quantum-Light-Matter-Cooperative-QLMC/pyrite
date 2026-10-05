@@ -38,11 +38,13 @@ arrays = {
     "q": np.full(2, -elementary_charge),
     "nmacro": np.array([1.0, 9.0]),
 }
-blocks = [{
-    "name": "time",
-    "value": 1e-9,
-    "children": [{"name": name, "value": value} for name, value in arrays.items()],
-}]
+blocks = [
+    {
+        "name": "time",
+        "value": 1e-9,
+        "children": [{"name": name, "value": value} for name, value in arrays.items()],
+    }
+]
 easygdf.save("beam.gdf", blocks=blocks, creator="GPT")
 ```
 

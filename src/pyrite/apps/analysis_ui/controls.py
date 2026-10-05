@@ -117,7 +117,9 @@ def make_slice_controls(mo, results):
         "energy": mo.ui.dropdown(
             energy_options, value=next(iter(energy_options)), label="Beam energy (keV)"
         ),
-        "tilt": mo.ui.dropdown(tilt_options, value=next(iter(tilt_options)), label="Polar tilt (deg)"),
+        "tilt": mo.ui.dropdown(
+            tilt_options, value=next(iter(tilt_options)), label="Polar tilt (deg)"
+        ),
         "azimuth": mo.ui.dropdown(
             azimuth_options, value=next(iter(azimuth_options)), label="Azimuth (deg)"
         ),
