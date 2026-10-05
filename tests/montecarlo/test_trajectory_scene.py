@@ -195,15 +195,15 @@ def test_scene_resume_rejects_changed_snapshot_without_changing_case_digest(tmp_
 
 
 def test_run_scene_handles_scalar_defaults():
-    from pyrite.runs.scan import _trajectory_scene
+    from pyrite.campaign.observation import profile_trajectory_scene
 
-    scene = _trajectory_scene(SimpleNamespace(), {"catalog_profile": "standard"})
+    scene = profile_trajectory_scene("standard")
     assert scene["detector"] is None
 
 
 def test_run_scene_snapshots_physical_geometry_without_acquisition(monkeypatch):
     import pyrite.materials as materials
-    from pyrite.runs.scan import _trajectory_scene
+    from pyrite.campaign.observation import profile_trajectory_scene
 
     row = dict(distance_mm=30.0, shape=(2, 3), pitch_mm=(0.2, 0.1))
     fake = SimpleNamespace(
@@ -221,9 +221,7 @@ def test_run_scene_snapshots_physical_geometry_without_acquisition(monkeypatch):
         },
     )
     monkeypatch.setattr(materials, "CATALOG", fake)
-    scene = _trajectory_scene(
-        SimpleNamespace(detector_id="camera"), {"catalog_profile": "standard"}
-    )
+    scene = profile_trajectory_scene("standard", "camera")
     assert scene["detector"]["pixels"]["shape"] == [2, 3]
     assert scene["filters"][0]["name"] == "window"
 

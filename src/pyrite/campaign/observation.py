@@ -124,8 +124,26 @@ def resolve_profile_observation(
     )
 
 
+def profile_trajectory_scene(profile_name: str, detector_id: str | None = None) -> dict[str, Any]:
+    """Snapshot a profile's physical filter/detector geometry for trajectory capture.
+
+    Independent of counting policy: a detector row without ``distance_mm`` has
+    no physical pose and is omitted rather than invented.
+    """
+    from ..instrument.scene import scene_payload
+    from ..materials import CATALOG, load_material_catalog
+
+    catalog = CATALOG if profile_name == "standard" else load_material_catalog(profile=profile_name)
+    detectors = catalog.profile_detector_set(profile_name)
+    row = detectors[detector_id or next(iter(detectors))]
+    detector = physical_detector_from_config(row) if "distance_mm" in row else None
+    filters = tuple(filter_from_config(f) for f in catalog.profile_filters.get(profile_name, ()))
+    return scene_payload(filters, detector)
+
+
 __all__ = [
     "filter_from_config",
     "physical_detector_from_config",
+    "profile_trajectory_scene",
     "resolve_profile_observation",
 ]

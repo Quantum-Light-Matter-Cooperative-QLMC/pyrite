@@ -808,22 +808,6 @@ def _sweep_observation(args, identity, settings, stem, content_key_fn):
     )
 
 
-def _trajectory_scene(args, identity):
-    """Snapshot selected physical geometry independently of counting policy."""
-    from ..campaign.observation import filter_from_config, physical_detector_from_config
-    from ..instrument.scene import scene_payload
-    from ..materials import CATALOG, load_material_catalog
-
-    profile = str(identity.get("catalog_profile", "standard"))
-    catalog = CATALOG if profile == "standard" else load_material_catalog(profile=profile)
-    detectors = catalog.profile_detector_set(profile)
-    detector_id = getattr(args, "detector_id", None) or next(iter(detectors))
-    row = detectors[detector_id]
-    detector = physical_detector_from_config(row) if "distance_mm" in row else None
-    filters = tuple(filter_from_config(row) for row in catalog.profile_filters.get(profile, ()))
-    return scene_payload(filters, detector)
-
-
 def _checkpoint_stem(args, material):
     return _resolved_run(args, material)[3]
 
@@ -1119,20 +1103,10 @@ def _run_material(args, material, max_seconds=None):
     capture_kw = {}
     trajectory_dir = getattr(args, "trajectories", None)
     if trajectory_dir is not None:
-        from ..montecarlo.trajectories import TrajectoryCapture
+        from ._trajectory_capture import scan_trajectory_capture
 
-        capture_kw["trajectory_capture"] = TrajectoryCapture(
-            root=os.path.join(os.fspath(trajectory_dir), stem),
-            overwrite=bool(getattr(args, "overwrite_trajectories", False)),
-            scene=_trajectory_scene(args, identity),
-            provenance={
-                "material": material,
-                "checkpoint_stem": stem,
-                "catalog_profile": identity.get("catalog_profile", "standard"),
-                "fidelity": fidelity,
-                "parameter_sha256": identity["parameter_sha256"],
-                "dataset_identity": identity,
-            },
+        capture_kw["trajectory_capture"] = scan_trajectory_capture(
+            args, identity, stem, material, fidelity
         )
     from ..api import source_content_key_fn
 
