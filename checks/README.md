@@ -50,6 +50,7 @@ run through the collector.
 | `multilayer_validation_check.py` | Closed-form stack attenuation and depth-range scaling anchors. |
 | `pair_production_geant4/` | Pair-conversion e⁻/e⁺ energy share and polar angles from `sample_pair` against Geant4 11.4.2 TestEm5 (`empenelope`, `emstandard_opt0`, `emstandard_opt4`) for C and Pb at 2 and 5 MeV, from committed binned references (#275). |
 | `pair_conversion_yield.py` | Expected pair conversions per primary for Si and MoS2 slabs at 3–5 MeV under coupled BremsLib transport: hard photons above 2mₑc², their expected first-interaction pair probability, and pairs per primary (#275); sizing evidence only, emits no records. |
+| `positron_table_inventory.py` | Real ELSEPA positron free-atom Si/W and muffin-tin Si outputs, and SBETHE positron Si/W outputs, against the native parsers and stopping loader (#276). Generator-format inventory only; no Monte Carlo or transport-validation claim. `--out` retains decks, native outputs, source hashes, and compiler provenance. |
 | `pixel_reconstruction_oracle.py` | Nearest-tile pixel angular reconstruction against direct per-pixel evaluation from one transport, across angular shapes and representative pixels (#23); decision evidence only, no ledger claim, emits no records. |
 | `radiation_error_estimator_calibration.py` | Calibrates warning thresholds for the radiation error estimator. |
 | `shell_ionization_comparison.py` | Pinned Bote–Salvat `xion.f` transcription, local EEDL shell interpolation, and characteristic-production ratios for the 24 catalogue elements. |

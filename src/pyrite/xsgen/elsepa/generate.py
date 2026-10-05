@@ -32,10 +32,14 @@ class GenerationResult:
 
 
 def element_request(
-    z: int, energies_ev: Iterable[float], *, source_path: str | Path | None = None
+    z: int,
+    energies_ev: Iterable[float],
+    *,
+    projectile: str = "electron",
+    source_path: str | Path | None = None,
 ) -> tuple[TableRequest, ElsepaDeck]:
     """Return the store request and deck for one free-atom table."""
-    deck = ElsepaDeck.free_atom(z, energies_ev)
+    deck = ElsepaDeck.free_atom(z, energies_ev, projectile=projectile)
     source = resolve_source("elsepa", source_path)
     request = TableRequest(
         code="elsepa",
@@ -53,6 +57,7 @@ def muffin_tin_request(
     energies_ev: Iterable[float],
     *,
     radius_cm: float,
+    projectile: str = "electron",
     density_g_cm3: float,
     absorption_strength: float = DEFAULT_ABSORPTION_STRENGTH,
     absorption_gap_eV: float | None = None,
@@ -68,6 +73,7 @@ def muffin_tin_request(
         z,
         energies_ev,
         radius_cm=radius_cm,
+        projectile=projectile,
         absorption_strength=absorption_strength,
         absorption_gap_eV=absorption_gap_eV,
     )
@@ -126,12 +132,13 @@ def generate_element(
     z: int,
     energies_ev: Iterable[float],
     *,
+    projectile: str = "electron",
     source_path: str | Path | None = None,
     overwrite: bool = False,
     keep_on_failure: bool = False,
 ) -> GenerationResult:
     """Generate or resolve a free-atom ELSEPA differential-cross-section table."""
-    request, deck = element_request(z, energies_ev, source_path=source_path)
+    request, deck = element_request(z, energies_ev, projectile=projectile, source_path=source_path)
     return _generate(
         request,
         deck,
@@ -147,6 +154,7 @@ def generate_muffin_tin(
     energies_ev: Iterable[float],
     *,
     radius_cm: float,
+    projectile: str = "electron",
     density_g_cm3: float,
     absorption_gap_eV: float | None = None,
     source_path: str | Path | None = None,
@@ -159,6 +167,7 @@ def generate_muffin_tin(
         z,
         energies_ev,
         radius_cm=radius_cm,
+        projectile=projectile,
         density_g_cm3=density_g_cm3,
         absorption_gap_eV=absorption_gap_eV,
         source_path=source_path,

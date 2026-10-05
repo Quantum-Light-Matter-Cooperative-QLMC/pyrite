@@ -38,6 +38,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # Sizing evidence for pair conversion (#275): magnitudes, no pass/fail
     # anchor, so it emits no records.
     "checks/pair_conversion_yield.py": (),
+    # Native-output/parser inventory (#276), not a transport-physics anchor.
+    "checks/positron_table_inventory.py": (),
     "checks/shell_ionization_comparison.py": ("eedl-shell-ionization-comparison",),
     "checks/brem_angular_comparison.py": ("bremslib-angular-schiff",),
     "checks/radiation_error_estimator_calibration.py": ("radiation-error-estimators",),

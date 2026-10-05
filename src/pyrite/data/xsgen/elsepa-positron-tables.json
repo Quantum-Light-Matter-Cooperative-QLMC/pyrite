@@ -1,0 +1,153 @@
+{
+  "schema": "pyrite.xsgen.elsepa-release.v1",
+  "upstream": "ELSEPA 2020, Mendeley Data doi:10.17632/w4hm5vymym.1",
+  "archive": {
+    "sha256": "31e0ab9aaf1c077eb2b88c992566e6ae7fbb9a982a313033aa34cd14f913e4ae",
+    "bytes": 25869683,
+    "urls": [
+      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-positron-1/elsepa-positron-tables.zip"
+    ]
+  },
+  "tables": [
+    {
+      "label": "Z=5",
+      "key": "f320edfc2364fca87e3d07f2fc10002061fd5a4018e622bcde6f80f6a68b89e0",
+      "manifest_sha256": "d3c963aa2fa064455ba6364bce1d347fcf6c52085624e58e431f00e770d17e22"
+    },
+    {
+      "label": "Z=6",
+      "key": "b1900ed0e3446972ee451ba3c60c9d31295dd76a10eb7db7404530542314c6ee",
+      "manifest_sha256": "fa7cfb0bc0794843e8501050946dd75d4b318179ce572ec03207ab9c300f3836"
+    },
+    {
+      "label": "Z=7",
+      "key": "9660fb26472fed6c9851a0f5aa0cf38fdd25ac5a4b42f6c40aeef2a8c0b12ffe",
+      "manifest_sha256": "988a4f170592cd3699713fd446a44d15950a9faa02e8f561734d121f470d9e67"
+    },
+    {
+      "label": "Z=8",
+      "key": "6792485b8d7d308029a8a24a6421c3d4a7cffcde8b8c8b06c0e9bc5655e981b3",
+      "manifest_sha256": "72085c117460e87f92c84b8e3c04eb2beeb5740950c29f92e42fde80d94f1890"
+    },
+    {
+      "label": "Z=13",
+      "key": "3a9f78777168ff88c6842e4f7218b684f4325cf60a421855756ca336343ae494",
+      "manifest_sha256": "33174daabe0a2ed3acc4743c375564158966da6df91ba0df59385745bb7d2b4c"
+    },
+    {
+      "label": "Z=14",
+      "key": "f626f26d018a7de832c8dfd9fcff51dd8b2fe6957b831bc231d47248f59c3e93",
+      "manifest_sha256": "f3661630df2c61fde47bd116420be6c422801b1c4722b9fc162de17060787ddd"
+    },
+    {
+      "label": "Z=15",
+      "key": "b3d9b2ba07c4394ae33017e8e94ded797b438a0729d8a079e752a80765c8b507",
+      "manifest_sha256": "309fe82d617bf3668f73530a464c65dea2302c0f6405d25f0d3a8ce6d482f1c3"
+    },
+    {
+      "label": "Z=16",
+      "key": "77d9f41c8470602ab8cdd54a01b26adbf70f6dc1b7a949b5f404bf80da4a3d30",
+      "manifest_sha256": "aa192303b788241f259ad51cd55fc34fdf59f4baa79c84213a87b8185ec91429"
+    },
+    {
+      "label": "Z=22",
+      "key": "8bbfa8a238d2b417e060d71ce618a8ca16d39fbb3a062e51d38dc08caa0c4042",
+      "manifest_sha256": "be46543bb7ac8fd0629b4570bb5f009e15f97fe58fd6374907cf0824c57dd40c"
+    },
+    {
+      "label": "Z=23",
+      "key": "6940faf8dad287c1e8deb007cb58018cc57864f262d00e8496eac1ab846920b0",
+      "manifest_sha256": "d823f798e0dcc5c813a8dc3ab1867743124ba601e02692de3342a7370924a221"
+    },
+    {
+      "label": "Z=26",
+      "key": "1e736dd897ccc33a2f68f174c73bc87b12adbff85a781c42f12f15c0a990b759",
+      "manifest_sha256": "18a72c88b326179debc29a1a0dbccd59e66a87c2bcd9abf16310c54fb6f0f6c4"
+    },
+    {
+      "label": "Z=32",
+      "key": "fa7fe0e37d03086cc67244ff86a4566643a5c0e01b9b4b724d5fc035764fc80c",
+      "manifest_sha256": "c28e284a865cc28341c33b90c06b6209dff1eb3e08e5aa0dc24f08e7221df218"
+    },
+    {
+      "label": "Z=34",
+      "key": "73daaceb8e17c51bd7f5421c6da4ea91d4d74349b45b86e718bd1b73017615be",
+      "manifest_sha256": "7554c3b9a7ae7d2808a70a148cc57932bf97065aea6599b2a0e272fca2fede59"
+    },
+    {
+      "label": "Z=40",
+      "key": "414f5971b220f547501f18b0535002b646778b3956ec257b70bfb9b14e981b91",
+      "manifest_sha256": "dafc6a042b7e616c01deb1fc3f34e45efbb8c8957fabfa8d3510842d0b81b5a3"
+    },
+    {
+      "label": "Z=41",
+      "key": "af4d3f63fc29205fc88fa6d7c4e4ac16bb544a879630ae6e540e60e23c8215bc",
+      "manifest_sha256": "b4a734096c799854f9d015aeb1ab1c189c174875c13348e670f482323ca0cd2d"
+    },
+    {
+      "label": "Z=42",
+      "key": "a03a5fc2b40c3246ce76156309b5ebae9f222dc955b044000ef90b675c340181",
+      "manifest_sha256": "a495f280eaccf87327062b83afdd11cf376c4336229db4c2a9ed92e18f9760ec"
+    },
+    {
+      "label": "Z=46",
+      "key": "e9ad499ff92395e69530b048409bd2e3369ec601362095a4491a626cf3dc5729",
+      "manifest_sha256": "d029b0f7f7848e00eaa4900a275d7efbf219adee053dc9b42c7765616c75f867"
+    },
+    {
+      "label": "Z=52",
+      "key": "56919b361789dffcc10679123ead7d1039b073353eb39ee77ef5f3c9f5d9713e",
+      "manifest_sha256": "937f43fcd3d3ecf3a55dff2939af1ee700f731165274b233f9f5075f30247454"
+    },
+    {
+      "label": "Z=72",
+      "key": "46f50f7778c587ddde5e47a7ee9688b6dab779ade53dd423e2ecad18398120f2",
+      "manifest_sha256": "393be252bb5e91c754f7e89e55281018c0016484689a3c4dc5382b19cf25fd29"
+    },
+    {
+      "label": "Z=73",
+      "key": "e053a1b8a62ef18aa24983451988d77d73be6f2595c9470628e350f0a70748bc",
+      "manifest_sha256": "037bd90dede7f366fa089bc16791381e4416294a001ddd9d2554bae24442b12b"
+    },
+    {
+      "label": "Z=74",
+      "key": "1bf24b3158eaeb6b30c9327ba59a733f350c89d06f5a6e49d128b48eff7357ae",
+      "manifest_sha256": "6e1aacccdb98958593862ec5b39efb0ea1444e7c1c4aeffef1961319a61940e5"
+    },
+    {
+      "label": "Z=75",
+      "key": "f7cfc50f6010e7d272b760df8eb92c03a2a3a6038d839eca2b502bb7bafc4a34",
+      "manifest_sha256": "e4bab1a9f84560cfdb59e941540a2692dec4c17110df63072d31808af7b438fc"
+    },
+    {
+      "label": "Z=78",
+      "key": "57239157f3b1f2a07de72425554579422bafb0bbfdcf2577606ada213a567923",
+      "manifest_sha256": "f9423a609803bd2c32ba3cfe61a796bb429d9fe3aa89b33228927fb0ef22d096"
+    },
+    {
+      "label": "Z=83",
+      "key": "8ae9d573624a1bfabc007b4e24c26cffb0a997124462f406bc5e1ac3a0dfd8af",
+      "manifest_sha256": "344ccdb12c19e036d2244e4d376d4d65e5bd88c8831c9e939f8176f208874dcf"
+    },
+    {
+      "label": "black_phosphorus",
+      "key": "e8d9afbc45b8a6207a0616b2f102601d2476cd462d02d45d0b13f47c7688ba61",
+      "manifest_sha256": "81ee17930cdb5c678bad066a3d7783d6b04765bcb48e64a6dcd1bfbc4b740122"
+    },
+    {
+      "label": "diamond",
+      "key": "72e113300207cfae5c879446b5f6faad2343ab07531d8a9bea4dab7d355326f6",
+      "manifest_sha256": "cc0971d40d3234be8d56c47f57a4e41b88e1e84a0b3f32d9a3a672c1aea3799b"
+    },
+    {
+      "label": "hopg",
+      "key": "0cd4a27554493cecc5cf3fdcc97f7f99c4ec6875cb1677862d12c09875a3a2df",
+      "manifest_sha256": "521c0e8fb1b6364c3e8ecc8129f9f85b0b565c1d38871700d1628b27156a919e"
+    },
+    {
+      "label": "silicon",
+      "key": "0c463f50df80c5fc1d2fc26165ce83ba7dfd585c27e1d498de8ebe1d29ad81e4",
+      "manifest_sha256": "e0043c1c6bc6a6b068859241a884250dbe00d61defa80c08e3961c96e3231e7a"
+    }
+  ]
+}

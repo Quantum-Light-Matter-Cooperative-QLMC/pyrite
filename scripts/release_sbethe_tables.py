@@ -1,5 +1,8 @@
 """Build the SBETHE catalogue table release and, optionally, pin it in the wheel.
 
+With ``--projectile positron``, the archive and index names include
+``-positron`` and ``--pin`` writes the separate positron index.
+
 Maintainer-only: needs gfortran and the fetched SBETHE ``sdbase`` tree for any
 table not already in the user table store. Writes ``sbethe-tables.zip`` and
 ``sbethe-tables.json`` into ``--out``. Publish the zip at ``--url`` and commit
@@ -38,6 +41,12 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         help="where the archive will be published (repeatable, in fetch order)",
     )
+    parser.add_argument(
+        "--projectile",
+        choices=("electron", "positron"),
+        default="electron",
+        help="table species (default: electron); positrons use separate archive/index names",
+    )
     parser.add_argument("--generate", action="store_true", help="generate absent tables")
     parser.add_argument(
         "--material", action="append", default=None, help="restrict to catalogue key (repeatable)"
@@ -46,13 +55,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     archive, index = build_release(
-        args.out, urls=args.url, generate=args.generate, keys=args.material
+        args.out,
+        urls=args.url,
+        generate=args.generate,
+        keys=args.material,
+        projectile=args.projectile,
     )
     print(f"archive: {archive} ({index.archive_bytes / 1e6:.1f} MB)")
     print(f"sha256:  {index.archive_sha256}")
     print(f"tables:  {len(index.tables)}")
     if args.pin:
-        pinned = release_index_path()
+        pinned = release_index_path(projectile=args.projectile)
         if not pinned.resolve().is_relative_to(_REPO):
             print(f"refusing to pin outside the checkout: {pinned}", file=sys.stderr)
             return 1

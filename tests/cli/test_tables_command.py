@@ -175,6 +175,41 @@ def test_fetch_reports_the_installed_bremslib_tables(isolated, monkeypatch, tmp_
     assert seen == [str(archive)]
 
 
+@pytest.mark.parametrize("code", ["elsepa", "sbethe-tables"])
+def test_fetch_positron_selects_species_pin(isolated, monkeypatch, tmp_path, code):
+    from pyrite.xsgen.fetch import FetchResult
+
+    seen = []
+
+    def fetch(archive=None, *, projectile):
+        seen.append((archive, projectile))
+        return FetchResult(code, tmp_path, "c" * 64, 2, True)
+
+    name = "fetch_elsepa" if code == "elsepa" else "fetch_sbethe_tables"
+    monkeypatch.setattr(f"pyrite.xsgen.fetch.{name}", fetch)
+    archive = tmp_path / "pos.zip"
+    archive.write_bytes(b"zip")
+    result = invoke(
+        tables_command.command,
+        ["fetch", code, "--projectile", "POSITRON", "--archive", str(archive), "-o", "json"],
+    )
+    assert result.exit_code == 0
+    assert result.stderr == ""
+    assert seen == [(str(archive), "positron")]
+    assert json.loads(result.stdout)["payload"]["projectile"] == "positron"
+
+
+@pytest.mark.parametrize("code", [None, "sbethe", "bremslib", "eedl"])
+def test_fetch_positron_rejects_species_independent_code_before_fetch(isolated, code):
+    args = ["fetch", "--projectile", "positron"]
+    if code is not None:
+        args.append(code)
+    result = invoke(tables_command.command, args)
+    assert result.exit_code == 2
+    assert result.stdout == ""
+    assert "requires CODE elsepa or sbethe-tables" in result.stderr
+
+
 def test_fetch_reports_a_missing_release_as_a_cli_error(isolated, monkeypatch):
     from pyrite.xsgen import DataFetchError
 
@@ -252,7 +287,95 @@ def test_generate_elsepa_material_reports_every_table(isolated, monkeypatch, tmp
             f"reused: {'b' * 64}\npath: {results[1].table.path}\n"
         ),
     )
-    assert calls == [("silicon", {"overwrite": False, "keep_on_failure": False})]
+    assert calls == [
+        ("silicon", {"projectile": "electron", "overwrite": False, "keep_on_failure": False})
+    ]
+
+
+def test_generate_elsepa_material_uses_positron_species(isolated, monkeypatch, tmp_path):
+    _, calls = _fake_elsepa_material_tables(monkeypatch, tmp_path)
+    result = invoke(
+        tables_command.command,
+        [
+            "generate",
+            "--code",
+            "elsepa",
+            "--material",
+            "silicon",
+            "--projectile",
+            "POSITRON",
+            "-o",
+            "json",
+        ],
+    )
+    assert result.exit_code == 0, result.stderr
+    assert calls[0][1]["projectile"] == "positron"
+    assert json.loads(result.stdout)["schema"] == "pyrite.tables.generate-material.v1"
+    assert result.stderr == ""
+
+
+def test_generate_elsepa_free_atom_uses_positron_species(isolated, monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    calls = []
+
+    def generate(z, energies, **kwargs):
+        calls.append((z, energies, kwargs))
+        return SimpleNamespace(
+            generated=True,
+            table=SimpleNamespace(
+                key="a" * 64,
+                path=tmp_path / "table.npz",
+                tier="user",
+                manifest={"manifest_sha256": "b" * 64},
+            ),
+        )
+
+    monkeypatch.setattr("pyrite.xsgen.elsepa.generate_element", generate)
+    result = invoke(
+        tables_command.command,
+        [
+            "generate",
+            "--code",
+            "elsepa",
+            "--element",
+            "14",
+            "--energy",
+            "1000",
+            "--projectile",
+            "positron",
+        ],
+    )
+    assert result.exit_code == 0, result.stderr
+    assert calls[0][0] == 14
+    assert calls[0][2]["projectile"] == "positron"
+
+
+@pytest.mark.parametrize(
+    ("code", "projectile", "allowed"),
+    [
+        ("elsepa", "muon", "electron or positron"),
+        ("elsepa", "proton", "electron or positron"),
+        ("bremslib", "positron", "electron"),
+    ],
+)
+def test_generate_rejects_species_unsupported_by_source(isolated, code, projectile, allowed):
+    result = invoke(
+        tables_command.command,
+        [
+            "generate",
+            "--code",
+            code,
+            "--element",
+            "14",
+            "--projectile",
+            projectile,
+        ],
+    )
+    assert result.exit_code == 2
+    assert result.stdout == ""
+    assert "--projectile" in result.stderr and projectile in result.stderr
+    assert f"choose {allowed}" in result.stderr
 
 
 def test_generate_elsepa_material_json_is_one_envelope(isolated, monkeypatch, tmp_path):

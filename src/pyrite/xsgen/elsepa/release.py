@@ -135,14 +135,19 @@ class ElsepaReleaseIndex:
         )
 
 
-def release_index_path() -> Path:
+def release_index_path(*, projectile: str = "electron") -> Path:
     """Return the release index shipped inside the wheel."""
-    return data_dir() / "xsgen" / "elsepa-tables.json"
+    if projectile not in ("electron", "positron"):
+        raise ValueError("projectile must be electron or positron")
+    suffix = "" if projectile == "electron" else "-positron"
+    return data_dir() / "xsgen" / f"elsepa{suffix}-tables.json"
 
 
-def load_release_index(path: Path | None = None) -> ElsepaReleaseIndex | None:
+def load_release_index(
+    path: Path | None = None, *, projectile: str = "electron"
+) -> ElsepaReleaseIndex | None:
     """Return the shipped release index, or ``None`` if this build pins none."""
-    source = release_index_path() if path is None else Path(path)
+    source = release_index_path(projectile=projectile) if path is None else Path(path)
     if not source.is_file():
         return None
     return ElsepaReleaseIndex.from_record(json.loads(source.read_text(encoding="utf-8")))
@@ -161,7 +166,9 @@ def _required(table: StoredTable | None, label: str) -> StoredTable:
     return table
 
 
-def release_tables(*, generate: bool = False) -> list[tuple[str, StoredTable]]:
+def release_tables(
+    *, generate: bool = False, projectile: str = "electron"
+) -> list[tuple[str, StoredTable]]:
     """Return ``(label, table)`` for every production table, in index order.
 
     Free atoms for every transport element by atomic number, then muffin-tin
@@ -170,10 +177,10 @@ def release_tables(*, generate: bool = False) -> list[tuple[str, StoredTable]]:
     """
     out = []
     for z in sorted(int(row["Z"]) for row in TRANSPORT_ELEMENTS.values()):
-        request, _ = element_request(z, PRODUCTION_ENERGIES_EV)
+        request, _ = element_request(z, PRODUCTION_ENERGIES_EV, projectile=projectile)
         table = resolve(request.key)
         if table is None and generate:
-            table = generate_element(z, PRODUCTION_ENERGIES_EV).table
+            table = generate_element(z, PRODUCTION_ENERGIES_EV, projectile=projectile).table
         out.append((f"Z={z}", _required(table, f"Z={z}")))
     for key in elementary_crystals():
         solid = elemental_solid(key)
@@ -181,29 +188,44 @@ def release_tables(*, generate: bool = False) -> list[tuple[str, StoredTable]]:
         energies = _muffin_tin_energies()
         radius, density = solid.radius_cm, solid.density_g_cm3
         request, _ = muffin_tin_request(
-            key, solid.z, energies, radius_cm=radius, density_g_cm3=density
+            key, solid.z, energies, radius_cm=radius, density_g_cm3=density, projectile=projectile
         )
         table = resolve(request.key)
         if table is None and generate:
             table = generate_muffin_tin(
-                key, solid.z, energies, radius_cm=radius, density_g_cm3=density
+                key,
+                solid.z,
+                energies,
+                radius_cm=radius,
+                density_g_cm3=density,
+                projectile=projectile,
             ).table
         out.append((key, _required(table, key)))
     return out
 
 
 def build_release(
-    out_dir: str | Path, *, urls: Iterable[str] = (), generate: bool = False
+    out_dir: str | Path,
+    *,
+    urls: Iterable[str] = (),
+    generate: bool = False,
+    projectile: str = "electron",
 ) -> tuple[Path, ElsepaReleaseIndex]:
     """Build the release archive and its index from stored production tables.
 
     Writes ``elsepa-tables.zip`` and ``elsepa-tables.json`` into ``out_dir``;
     the JSON is committed to the wheel and the zip is published at ``urls``.
+    ``projectile="positron"`` uses ``elsepa-positron-tables`` for both files,
+    preserving the electron release. Both species use the existing table
+    schema; their request keys identify the projectile.
     """
+    if projectile not in ("electron", "positron"):
+        raise ValueError("projectile must be electron or positron")
+    suffix = "" if projectile == "electron" else "-positron"
     destination = Path(out_dir)
     destination.mkdir(parents=True, exist_ok=True)
-    labelled = release_tables(generate=generate)
-    archive = destination / "elsepa-tables.zip"
+    labelled = release_tables(generate=generate, projectile=projectile)
+    archive = destination / f"elsepa{suffix}-tables.zip"
     with tempfile.TemporaryDirectory(prefix=".elsepa-release-", dir=destination) as temp:
         partial = Path(temp) / archive.name
         write_archive(partial, [table for _, table in labelled])
@@ -218,7 +240,7 @@ def build_release(
             for label, table in labelled
         ),
     )
-    (destination / "elsepa-tables.json").write_text(
+    (destination / f"elsepa{suffix}-tables.json").write_text(
         json.dumps(index.record(), indent=2) + "\n", encoding="utf-8"
     )
     return archive, index
