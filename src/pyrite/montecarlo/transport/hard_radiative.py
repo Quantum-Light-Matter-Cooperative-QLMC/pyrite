@@ -5,7 +5,7 @@ Validation: bremslib-radiative-partition
 
 import warnings
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -309,6 +309,62 @@ def complete_hard_radiative_events(segments, tables, seed: int) -> None:
         momenta[index] = photon.target_momentum_eV_c
     segments["hard_radiative_direction"] = directions
     segments["hard_radiative_target_momentum_eV_c"] = momenta
+
+
+# PENELOPE-2024 Eq. 3.154 polynomial coefficients of t, t^2, ..., t^7.
+_FP_COEFFICIENTS = (
+    -1.2359e-1,
+    6.1274e-2,
+    -3.1516e-2,
+    7.7446e-3,
+    -1.0595e-3,
+    7.0568e-5,
+    -1.8080e-6,
+)
+
+
+def positron_brems_factor(atomic_number, energy_eV):
+    """Positron/electron radiative cross-section ratio ``F_p(Z, E)``.
+
+    Source: PENELOPE-2024 Eqs. 3.153–3.155 (fit to Kim et al. 1986, ~0.5%),
+    ``F_p = 1 - exp(sum_j a_j t^j)``, ``t = ln(1 + 10^6 E/(Z^2 m_e c^2))``;
+    SBETHE ``RSTP`` applies the same factor in positron mode. The factor is
+    independent of the reduced photon energy, so it scales the integrated
+    and differential cross sections alike.
+    Limits: ``F_p -> 1`` for ``E -> inf``; ``F_p -> 0`` as ``E -> 0``.
+
+    Units: E in eV. Validation: positron-brems-scaling
+    """
+    z = np.asarray(atomic_number, dtype=float)
+    t = np.log1p(1.0e6 * np.asarray(energy_eV, dtype=float) / (_ELECTRON_REST_EV * z * z))
+    exponent = np.zeros_like(t)
+    for coefficient in reversed(_FP_COEFFICIENTS):
+        exponent = (exponent + coefficient) * t
+    return 1.0 - np.exp(exponent)
+
+
+def positron_bremslib_tables(
+    tables: Mapping[str, BremsLibBremsstrahlungTable],
+) -> dict[str, BremsLibBremsstrahlungTable]:
+    """Electron BremsLib tables rescaled to positrons by ``F_p(Z, T_1)``.
+
+    Multiplies each element's scaled SDCS and DDCS at every incident node
+    ``T_1`` by :func:`positron_brems_factor` (PENELOPE-2024 Eq. 3.153): the
+    photon-energy and angular shapes are the electron ones. ``key`` gains a
+    ``+positron-fp`` suffix so a run identity cannot confuse the two.
+
+    Validation: positron-brems-scaling
+    """
+    out = {}
+    for element, table in tables.items():
+        factor = positron_brems_factor(table.atomic_number, table.incident_energy_keV * 1e3)
+        out[element] = replace(
+            table,
+            key=f"{table.key}+positron-fp",
+            scaled_sdcs_mb=table.scaled_sdcs_mb * factor[:, None],
+            scaled_ddcs_mb_sr=table.scaled_ddcs_mb_sr * factor[:, None, None],
+        )
+    return out
 
 
 def pack_radiative_layer_tables(

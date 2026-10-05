@@ -153,6 +153,7 @@ def resolve_pixel_scene(
             pair_production_model=cast(
                 Literal["penelope-2024"] | None, transport.get("pair_production_model")
             ),
+            positron_transport=bool(transport.get("positron_transport", False)),
             atomic_electron_deflection=cast(
                 Literal["kawrakow", "none"],
                 transport.get("atomic_electron_deflection", "kawrakow"),

@@ -1569,6 +1569,16 @@ def test_numerics_set_shell_inelastic_mode_validates_and_resets(tmp_path, monkey
     assert 'pair_production_model = "penelope-2024"' in catalog.read_text()
     shown = invoke(profile.command, ["show", "sub_100keV"])
     assert "pair production model: penelope-2024" in shown.stdout
+    positron = invoke(profile.command, ["numerics", "set", "sub_100keV", "--positron-transport"])
+    assert_clean_result(positron, stdout="updated numerics for profile sub_100keV\n")
+    assert "positron_transport = true" in catalog.read_text()
+    shown = invoke(profile.command, ["show", "sub_100keV"])
+    assert "positron transport: on" in shown.stdout
+    unpositron = invoke(
+        profile.command, ["numerics", "reset", "sub_100keV", "positron-transport", "--yes"]
+    )
+    assert unpositron.exit_code == 0
+    assert "positron_transport" not in catalog.read_text()
     bad_pair = invoke(
         profile.command, ["numerics", "set", "sub_100keV", "--pair-production-model", "bh"]
     )

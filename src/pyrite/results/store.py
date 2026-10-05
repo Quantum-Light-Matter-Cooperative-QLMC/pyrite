@@ -117,6 +117,8 @@ class Settings:
     pair_production_model
         Opt-in ``"penelope-2024"`` pair conversion of coupled hard photons
         (requires the secondary threshold and coupling).
+    positron_transport
+        Opt-in transport of the pair positrons (#276; requires pair conversion).
     atomic_electron_deflection
         ``"kawrakow"`` (default) atomic-electron angular deflection as a
         ``Z(Z + xi)`` elastic-rate correction, or ``"none"``.
@@ -148,6 +150,7 @@ class Settings:
     radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "auto"
     radiative_cutoff_eV: float | None = None
     pair_production_model: Literal["penelope-2024"] | None = None
+    positron_transport: bool = False
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_spectrum;
@@ -190,6 +193,7 @@ class Settings:
             self.secondary_threshold_eV,
             self.radiative_model,
             self.bremsstrahlung_model,
+            self.positron_transport,
         )
         validate_atomic_electron_deflection(self.atomic_electron_deflection)
 

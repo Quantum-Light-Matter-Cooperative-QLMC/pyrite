@@ -8,7 +8,12 @@ from scipy.optimize import brentq
 
 from .core_geometry import _rotate_direction_scalar
 from .inelastic import _qmin_ev
-from .shell_gos import _moller_integrals, _triangle_moments
+from .shell_gos import (
+    _bhabha_integrals,
+    _moller_integrals,
+    _triangle_moments,
+    max_energy_loss_eV,
+)
 from .shell_oscillators import MaterialShellOscillators
 from .shell_partition import ShellSoftHardPartition
 
@@ -96,14 +101,15 @@ def _loss_bounds(
     energy = partition.closure.raw.energy_eV
     u, w = osc.ionization_energy_eV, osc.resonance_energy_eV
     lower = partition.cutoff_eV
+    w_max = max_energy_loss_eV(energy, u, partition.closure.projectile)
     if branch == 2:
-        return max(u if u > 0.0 else w, lower), (energy + u) / 2.0, 0.0
+        return max(u if u > 0.0 else w, lower), w_max, 0.0
     if u == 0.0:
         return w, w, 0.0
     w_dis = 3.0 * w - 2.0 * u
     if energy <= w_dis:
         w_dis = energy
-    return max(u, lower), min(w_dis, (energy + u) / 2.0), w_dis
+    return max(u, lower), min(w_dis, w_max), w_dis
 
 
 def sample_shell_hard_loss(
@@ -118,7 +124,8 @@ def sample_shell_hard_loss(
 
     Source: PENELOPE-2024 Eqs. 3.76, 3.87, 3.94, 3.96, 3.104 and 3.124. The
     bound-shell distant conditional density is ``p_dis(W)/W``; the close
-    conditional density is ``F^(-)(E+U,W)/W^2``. A conduction-band distant
+    conditional density is ``F^(-)(E+U,W)/W^2`` for electrons and Bhabha
+    ``F^(+)(E,W)/W^2`` up to ``W_max = E`` for positrons (Eq. 3.92). A conduction-band distant
     loss is a delta at its resonance. All shells use the hard interval
     ``W > W_c`` used by the partition.
     The manual's Eq. 3.125 instead samples ``p_dis(W)`` without ``1/W``;
@@ -134,7 +141,7 @@ def sample_shell_hard_loss(
     loss lies inside its channel's hard interval; local plus emitted plus
     reserved energy equals the primary loss. Recoil and azimuth are not
     returned here.
-    Validation: penelope-shell-hard-loss-sampling
+    Validation: penelope-shell-hard-loss-sampling, bhabha-close
     """
     if partition.closure.raw.oscillators != material.oscillators:
         raise ValueError("partition was not built from these oscillators")
@@ -156,7 +163,12 @@ def sample_shell_hard_loss(
     if branch != 2 and osc.ionization_energy_eV == 0.0:
         transfer = lower
     else:
-        if branch == 2:
+        if branch == 2 and partition.closure.projectile == "positron":
+            energy = partition.closure.raw.energy_eV
+
+            def integral(w: float) -> float:
+                return float((_bhabha_integrals(energy, w) - _bhabha_integrals(energy, lower))[0])
+        elif branch == 2:
             prime = partition.closure.raw.energy_eV + osc.ionization_energy_eV
 
             def integral(w: float) -> float:

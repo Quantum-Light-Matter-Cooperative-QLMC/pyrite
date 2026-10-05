@@ -34,6 +34,7 @@ from .events import (
     EVENT_SUBSTEP,
 )
 from .hard_inelastic import (
+    POSITRON_BRANCH_OFFSET,
     _hard_primary_cosine,
     _hard_secondary_direction,
     _log_grid_frac,
@@ -721,6 +722,10 @@ def make_cpu_transport_core(
                         il_cutoff_eV,
                         u_w,
                     )
+                    if il_ch_branch[L, ch] >= POSITRON_BRANCH_OFFSET:
+                        # W_max = E at the row start can exceed the soft-debited
+                        # row-end energy only for positrons; absorb, never overdraw.
+                        W_eV = min(W_eV, E_end_j * 1.0e3)
                     hard_W_keV, hard_code = W_eV * 1.0e-3, il_ch_code[L, ch]
                     if sec_on:
                         sec_x, sec_y, sec_z = _hard_secondary_direction(

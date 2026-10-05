@@ -17,7 +17,7 @@ from ...xsgen.sbethe.catalog import catalog_material, resolve_catalog_table
 from ..eedl_ionization import EEDL_SUBSHELL_LABELS
 from ..shell_configuration import AtomicShell, load_atomic_shells, match_eedl_shells
 from ..shell_ionization import material_shell_ionization_rates
-from .shell_gos import ShellGOSMoments, shell_gos_moments
+from .shell_gos import ShellGOSMoments, check_projectile, shell_gos_moments
 from .shell_oscillators import (
     MaterialShellOscillators,
     ShellOscillator,
@@ -52,6 +52,7 @@ class ShellRateClosure:
     scale: np.ndarray
     outer_scale: float
     stopping_eV_cm2: float
+    projectile: str = "electron"
 
 
 def inner_shell_cutoff_eV(
@@ -130,11 +131,39 @@ def eedl_inner_cross_sections(
     return adopted
 
 
+def gos_inner_cross_sections(
+    material: MaterialShellOscillators,
+    energy_eV: float,
+    cutoff_eV: float,
+    *,
+    projectile: str = "electron",
+) -> dict[tuple[int, str], float]:
+    """Inner oscillators' own GOS ``sigma^(0)`` without ``delta_F``, cm² per formula unit.
+
+    Passed to :func:`close_shell_rates`, these leave every inner oscillator
+    unscaled (``scale = 1``), so inner shells keep the raw GOS of the
+    projectile. Used for positrons, which have no EEDL-like impact-ionization
+    table here (PENELOPE's ``pdpsi`` DWBA positron tables are not vendored).
+
+    Validation: penelope-shell-rate-closure, bhabha-close
+    """
+    bare = shell_gos_moments(
+        replace(material, plasma_energy_eV=0.0), energy_eV, projectile=projectile
+    ).per_shell[:, 0]
+    return {
+        (o.atomic_number, o.label): float(bare[k])
+        for k, o in enumerate(material.oscillators)
+        if is_inner_shell(o, cutoff_eV)
+    }
+
+
 def close_shell_rates(
     material: MaterialShellOscillators,
     energy_eV: float,
     stopping_eV_cm2: float,
     inner_cross_sections_cm2: Mapping[tuple[int, str], float],
+    *,
+    projectile: str = "electron",
 ) -> ShellRateClosure:
     """Substitute inner-shell cross sections and close outer shells to stopping.
 
@@ -156,6 +185,8 @@ def close_shell_rates(
     inner cross section, an unknown or non-inner key, or a positive
     ``sigma_si`` where the GOS shell cross section vanishes.
 
+    ``projectile`` selects the close Møller or Bhabha GOS moments.
+
     Units: E in eV; stopping in eV cm²; cross sections in cm² per formula unit.
     Validation: penelope-shell-rate-closure
     """
@@ -168,8 +199,10 @@ def close_shell_rates(
     }
     if len(index) != sum(o.atomic_number > 0 for o in material.oscillators):
         raise ValueError("bound oscillators must have unique (Z, label) keys")
-    raw = shell_gos_moments(material, energy_eV)
-    bare = shell_gos_moments(replace(material, plasma_energy_eV=0.0), energy_eV)
+    raw = shell_gos_moments(material, energy_eV, projectile=projectile)
+    bare = shell_gos_moments(
+        replace(material, plasma_energy_eV=0.0), energy_eV, projectile=projectile
+    )
     if (
         bare.density_effect != 0.0
         or not np.array_equal(bare.distant_longitudinal, raw.distant_longitudinal)
@@ -214,19 +247,20 @@ def close_shell_rates(
         raw.close * factor,
     )
     return ShellRateClosure(
-        raw, moments, inner, ratio, adopted, scale, outer_scale, float(stopping_eV_cm2)
+        raw, moments, inner, ratio, adopted, scale, outer_scale, float(stopping_eV_cm2), projectile
     )
 
 
-def adopted_stopping_cs(key: str, energy_eV: float) -> float:
+def adopted_stopping_cs(key: str, energy_eV: float, *, projectile: str = "electron") -> float:
     """Corrected SBETHE ``stp.dat`` stopping, eV cm² per formula unit.
 
     Log-log interpolation of the catalog table; energies outside its grid
     raise. Owner-adopted stopping for #93 (not PENELOPE's GOS stopping).
+    ``projectile`` selects the electron or positron SBETHE table (#276).
 
-    Validation: penelope-shell-rate-closure
+    Validation: penelope-shell-rate-closure, sbethe-positron-stopping
     """
-    arrays = resolve_catalog_table(key).arrays()
+    arrays = resolve_catalog_table(key, projectile=check_projectile(projectile)).arrays()
     grid = np.asarray(arrays["stopping_energy_eV"], dtype=np.float64)
     stopping = np.asarray(arrays["stopping_cs_eV_cm2"], dtype=np.float64)
     if not np.isfinite(energy_eV) or energy_eV < grid[0] or energy_eV > grid[-1]:
@@ -263,18 +297,25 @@ def catalog_shell_rate_closure(
     energy_eV: float,
     *,
     inner_threshold_eV: float = DEFAULT_INNER_SHELL_THRESHOLD_EV,
+    projectile: str = "electron",
 ) -> ShellRateClosure:
     """EEDL-substituted, ``stp.dat``-closed shell moments for a catalog material.
 
     Builds the measured-conduction-band oscillators, selects inner shells with
     :func:`inner_shell_cutoff_eV`, and applies :func:`close_shell_rates`.
+    Positrons close on the positron SBETHE table and keep the Bhabha GOS of
+    their inner shells (:func:`gos_inner_cross_sections`): EEDL is
+    electron-impact only.
 
-    Validation: penelope-shell-rate-closure
+    Validation: penelope-shell-rate-closure, bhabha-close
     """
     inputs = catalog_material(key)
     shells = load_atomic_shells()
     material = catalog_shell_oscillators(key)
-    stopping = adopted_stopping_cs(key, energy_eV)
+    stopping = adopted_stopping_cs(key, energy_eV, projectile=projectile)
     cutoff = inner_shell_cutoff_eV(inputs.composition, shells, inner_threshold_eV)
-    sigma = eedl_inner_cross_sections(inputs.composition, shells, material, energy_eV, cutoff)
-    return close_shell_rates(material, energy_eV, stopping, sigma)
+    if projectile == "positron":
+        sigma = gos_inner_cross_sections(material, energy_eV, cutoff, projectile=projectile)
+    else:
+        sigma = eedl_inner_cross_sections(inputs.composition, shells, material, energy_eV, cutoff)
+    return close_shell_rates(material, energy_eV, stopping, sigma, projectile=projectile)

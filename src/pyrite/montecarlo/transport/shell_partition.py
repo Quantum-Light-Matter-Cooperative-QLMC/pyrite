@@ -84,7 +84,9 @@ class ShellSoftHardPartition:
 
 
 def partition_shell_rates(
-    material: MaterialShellOscillators, closure: ShellRateClosure, cutoff_eV: float
+    material: MaterialShellOscillators,
+    closure: ShellRateClosure,
+    cutoff_eV: float,
 ) -> ShellSoftHardPartition:
     """Split closed shell GOS moments at the energy-loss cutoff ``W_c``.
 
@@ -102,9 +104,11 @@ def partition_shell_rates(
     soft plus hard first moments equal the
     adopted stopping for every ``W_c``.
 
+    Windows use the projectile ``closure`` was built for.
+
     Units: ``W_c`` in eV; moments per formula unit as in
     :class:`~.shell_gos.ShellGOSMoments`.
-    Validation: penelope-shell-soft-hard-partition
+    Validation: penelope-shell-soft-hard-partition, bhabha-close
     """
     if not np.isfinite(cutoff_eV) or cutoff_eV < 0.0:
         raise ValueError("energy-loss cutoff must be finite and non-negative")
@@ -112,8 +116,9 @@ def partition_shell_rates(
     if raw.oscillators != material.oscillators:
         raise ValueError("closure was not built from these oscillators")
     energy = raw.energy_eV
-    below = windowed_shell_gos_moments(material, energy, 0.0, cutoff_eV)
-    above = windowed_shell_gos_moments(material, energy, cutoff_eV, np.inf)
+    projectile = closure.projectile
+    below = windowed_shell_gos_moments(material, energy, 0.0, cutoff_eV, projectile=projectile)
+    above = windowed_shell_gos_moments(material, energy, cutoff_eV, np.inf, projectile=projectile)
     scale = closure.scale[:, None]
 
     def split(name: str) -> tuple[np.ndarray, np.ndarray]:
@@ -137,11 +142,14 @@ def catalog_shell_partition(
     cutoff_eV: float,
     *,
     inner_threshold_eV: float = DEFAULT_INNER_SHELL_THRESHOLD_EV,
+    projectile: str = "electron",
 ) -> ShellSoftHardPartition:
     """Soft/hard partition of :func:`~.shell_rates.catalog_shell_rate_closure`.
 
-    Validation: penelope-shell-soft-hard-partition
+    Validation: penelope-shell-soft-hard-partition, bhabha-close
     """
     material = catalog_shell_oscillators(key)
-    closure = catalog_shell_rate_closure(key, energy_eV, inner_threshold_eV=inner_threshold_eV)
+    closure = catalog_shell_rate_closure(
+        key, energy_eV, inner_threshold_eV=inner_threshold_eV, projectile=projectile
+    )
     return partition_shell_rates(material, closure, cutoff_eV)

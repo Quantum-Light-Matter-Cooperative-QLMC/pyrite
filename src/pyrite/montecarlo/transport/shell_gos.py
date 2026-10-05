@@ -1,8 +1,10 @@
-"""Host-side PENELOPE-2024 shell GOS energy-loss moments for electrons.
+"""Host-side PENELOPE-2024 shell GOS energy-loss moments for electrons and positrons.
 
 Evaluates the integrated cross sections of PENELOPE-2024 §3.2.3 from the
 oscillators of :func:`~.shell_oscillators.build_shell_oscillators`. The raw
 moments are neither calibrated nor sampled, and no transport mode uses them.
+``projectile="positron"`` replaces the close Møller factor by the Bhabha
+factor (Eqs. 3.89–3.92) and the largest loss ``(E + U_k)/2`` by ``E``.
 """
 
 from dataclasses import dataclass
@@ -18,6 +20,15 @@ _MC2_EV = m_e * c * c / e
 _RE_CM = 100.0 * physical_constants["classical electron radius"][0]
 # 2 pi e^4 / (m_e c^2) in eV cm^2; divide by beta^2 for 2 pi e^4 / (m_e v^2).
 _PREF_EV_CM2 = 2.0 * np.pi * _RE_CM**2 * _MC2_EV
+#: Charged leptons the shell GOS describes; distant terms are charge-independent.
+PROJECTILES = ("electron", "positron")
+
+
+def check_projectile(projectile: str) -> str:
+    """Return ``projectile`` if it names a supported lepton, else raise."""
+    if projectile not in PROJECTILES:
+        raise ValueError(f"projectile must be one of {', '.join(PROJECTILES)}")
+    return projectile
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,8 +138,54 @@ def _moller_integrals(energy_eV: float, prime_eV: float, w: float) -> np.ndarray
     return np.array([j0, j1, j2])
 
 
-def shell_gos_moments(material: MaterialShellOscillators, energy_eV: float) -> ShellGOSMoments:
-    """Raw zeroth, first and second energy-loss moments for an electron.
+def bhabha_coefficients(energy_eV: float) -> tuple[float, float, float, float]:
+    """Bhabha factor coefficients ``b_1..b_4`` of PENELOPE-2024 Eq. 3.90.
+
+    With ``g = ((gamma - 1)/gamma)^2``: ``b_1 = g (2(gamma+1)^2 - 1)/(gamma^2 - 1)``,
+    ``b_2 = g (3(gamma+1)^2 + 1)/(gamma+1)^2``, ``b_3 = g 2 gamma(gamma-1)/(gamma+1)^2``,
+    ``b_4 = g (gamma-1)^2/(gamma+1)^2``. ``b_1`` uses ``g/(gamma^2-1) =
+    (gamma-1)/(gamma^2 (gamma+1))`` so it stays finite as ``gamma -> 1``.
+    Limits: every ``b_k -> 0`` for ``E -> 0`` (Rutherford); at ``gamma -> inf``,
+    ``b_1 -> 2``, ``b_2 -> 3``, ``b_3 -> 2``, ``b_4 -> 1``.
+
+    Validation: bhabha-close
+    """
+    gamma = 1.0 + energy_eV / _MC2_EV
+    g = ((gamma - 1.0) / gamma) ** 2
+    gp1 = gamma + 1.0
+    b1 = (gamma - 1.0) / (gamma * gamma * gp1) * (2.0 * gp1 * gp1 - 1.0)
+    b2 = g * (3.0 * gp1 * gp1 + 1.0) / (gp1 * gp1)
+    b3 = g * 2.0 * gamma * (gamma - 1.0) / (gp1 * gp1)
+    b4 = g * (gamma - 1.0) ** 2 / (gp1 * gp1)
+    return b1, b2, b3, b4
+
+
+def _bhabha_integrals(energy_eV: float, w: float) -> np.ndarray:
+    """Antiderivatives ``J_n^(+)`` of ``W^(n-2) F^(+)(E, W)`` (Eqs. 3.111–3.114).
+
+    Validation: bhabha-close
+    """
+    b1, b2, b3, b4 = bhabha_coefficients(energy_eV)
+    x = w / energy_eV
+    j0 = -1.0 / w + (-b1 * np.log(w) + b2 * x - b3 * x * x / 2.0 + b4 * x**3 / 3.0) / energy_eV
+    j1 = np.log(w) - b1 * x + b2 * x * x / 2.0 - b3 * x**3 / 3.0 + b4 * x**4 / 4.0
+    j2 = w * (1.0 - b1 * x / 2.0 + b2 * x * x / 3.0 - b3 * x**3 / 4.0 + b4 * x**4 / 5.0)
+    return np.array([j0, j1, j2])
+
+
+def max_energy_loss_eV(energy_eV: float, ionization_eV: float, projectile: str) -> float:
+    """Largest allowed loss: ``(E + U_k)/2`` for electrons, ``E`` for positrons.
+
+    Source: PENELOPE-2024 Eq. 3.88 and the sentence after Eq. 3.92.
+    Validation: bhabha-close
+    """
+    return energy_eV if projectile == "positron" else 0.5 * (energy_eV + ionization_eV)
+
+
+def shell_gos_moments(
+    material: MaterialShellOscillators, energy_eV: float, *, projectile: str = "electron"
+) -> ShellGOSMoments:
+    """Raw zeroth, first and second energy-loss moments for an electron or positron.
 
     Source: PENELOPE-2024 §§3.2.2–3.2.3 (NEA/MBDAV/R(2024)1). Per oscillator,
     with ``pref = 2 pi e^4/(m_e v^2)``:
@@ -161,14 +218,23 @@ def shell_gos_moments(material: MaterialShellOscillators, energy_eV: float) -> S
     (Eqs. 3.115–3.121); an untruncated ``p_dis`` has ``<W> = W_k``
     (Eq. 3.77), so ``sigma_dis^(2) = W_k sigma_dis^(1)``.
 
+    Positrons (Eqs. 3.89–3.92, 3.111–3.114): the close term integrates
+    ``W^(n-2) F^(+)(E, W)`` and every channel's largest loss is ``E``; the
+    distant terms are unchanged. Inner shells keep ``Q_k = U_k``.
+
     Units: E in eV; per formula unit in cm^2, eV cm^2, eV^2 cm^2.
-    Validation: penelope-shell-gos-moments
+    Validation: penelope-shell-gos-moments, bhabha-close
     """
-    return _windowed_moments(material, energy_eV, 0.0, np.inf)
+    return _windowed_moments(material, energy_eV, 0.0, np.inf, check_projectile(projectile))
 
 
 def windowed_shell_gos_moments(
-    material: MaterialShellOscillators, energy_eV: float, lower_eV: float, upper_eV: float
+    material: MaterialShellOscillators,
+    energy_eV: float,
+    lower_eV: float,
+    upper_eV: float,
+    *,
+    projectile: str = "electron",
 ) -> ShellGOSMoments:
     """Moments of :func:`shell_gos_moments` restricted to losses ``lower < W <= upper``.
 
@@ -184,15 +250,21 @@ def windowed_shell_gos_moments(
     windows ``(0, W_c]`` and ``(W_c, inf)`` sum to it for any ``W_c >= 0``.
 
     Units: as :func:`shell_gos_moments`.
-    Validation: penelope-shell-soft-hard-partition
+    Validation: penelope-shell-soft-hard-partition, bhabha-close
     """
     if not (0.0 <= lower_eV <= upper_eV) or np.isnan(upper_eV) or np.isinf(lower_eV):
         raise ValueError("loss window needs 0 <= lower <= upper with a finite lower bound")
-    return _windowed_moments(material, energy_eV, float(lower_eV), float(upper_eV))
+    return _windowed_moments(
+        material, energy_eV, float(lower_eV), float(upper_eV), check_projectile(projectile)
+    )
 
 
 def _windowed_moments(
-    material: MaterialShellOscillators, energy_eV: float, lower_eV: float, upper_eV: float
+    material: MaterialShellOscillators,
+    energy_eV: float,
+    lower_eV: float,
+    upper_eV: float,
+    projectile: str = "electron",
 ) -> ShellGOSMoments:
     if not np.isfinite(energy_eV) or energy_eV <= 0.0:
         raise ValueError("electron kinetic energy must be finite and positive")
@@ -205,7 +277,7 @@ def _windowed_moments(
     dis_l, dis_t, close = np.zeros((n, 3)), np.zeros((n, 3)), np.zeros((n, 3))
     for i, osc in enumerate(material.oscillators):
         u, w, f = osc.ionization_energy_eV, osc.resonance_energy_eV, osc.strength
-        w_max = 0.5 * (energy_eV + u)
+        w_max = max_energy_loss_eV(energy_eV, u, projectile)
         if u > 0.0:
             if energy_eV <= u:
                 continue
@@ -234,32 +306,45 @@ def _windowed_moments(
         q_close = max(u if u > 0.0 else q_mod, lower_eV)
         w_top = min(w_max, upper_eV)
         if q_close < w_top:
-            prime = energy_eV + u
-            j = _moller_integrals(energy_eV, prime, w_top) - _moller_integrals(
-                energy_eV, prime, q_close
-            )
+            if projectile == "positron":
+                j = _bhabha_integrals(energy_eV, w_top) - _bhabha_integrals(energy_eV, q_close)
+            else:
+                prime = energy_eV + u
+                j = _moller_integrals(energy_eV, prime, w_top) - _moller_integrals(
+                    energy_eV, prime, q_close
+                )
             close[i] = pref * f * j
     return ShellGOSMoments(float(energy_eV), material.oscillators, delta, dis_l, dis_t, close)
 
 
-def bethe_stopping_cs(material: MaterialShellOscillators, energy_eV: float) -> float:
-    """High-energy electron Bethe stopping cross section, eV cm^2 per formula unit.
+def bethe_stopping_cs(
+    material: MaterialShellOscillators, energy_eV: float, *, projectile: str = "electron"
+) -> float:
+    """High-energy Bethe stopping cross section, eV cm^2 per formula unit.
 
     Source: PENELOPE-2024 Eqs. 3.120–3.121,
     ``pref Z [ln(E^2 (gamma+1)/(2 I^2)) + f^(-)(gamma) - delta_F]`` with
     ``f^(-) = 1 - beta^2 - (2 gamma - 1) ln 2/gamma^2 + ((gamma-1)/gamma)^2/8``
     and the same oscillator ``delta_F``. Assumption: ``E >> U_k``; this is
     the limit :func:`shell_gos_moments` must reach, not a low-energy model.
+    Positrons use Eq. 3.122,
+    ``f^(+) = 2 ln 2 - (beta^2/12)[23 + 14/(gamma+1) + 10/(gamma+1)^2 + 4/(gamma+1)^3]``.
 
-    Validation: penelope-shell-gos-moments
+    Validation: penelope-shell-gos-moments, bhabha-close
     """
     gamma, beta2 = _kinematics(energy_eV)
-    f_minus = (
-        1.0
-        - beta2
-        - (2.0 * gamma - 1.0) / gamma**2 * np.log(2.0)
-        + ((gamma - 1.0) / gamma) ** 2 / 8.0
-    )
+    if check_projectile(projectile) == "positron":
+        gp1 = gamma + 1.0
+        f_minus = 2.0 * np.log(2.0) - beta2 / 12.0 * (
+            23.0 + 14.0 / gp1 + 10.0 / gp1**2 + 4.0 / gp1**3
+        )
+    else:
+        f_minus = (
+            1.0
+            - beta2
+            - (2.0 * gamma - 1.0) / gamma**2 * np.log(2.0)
+            + ((gamma - 1.0) / gamma) ** 2 / 8.0
+        )
     log_term = np.log(energy_eV**2 * (gamma + 1.0) / (2.0 * material.mean_excitation_eV**2))
     delta = density_effect_correction(material, energy_eV)
     return float(

@@ -90,6 +90,7 @@ NUMERICS_GROUPS = (
             ("radiative_model", "radiative model"),
             ("radiative_cutoff_eV", "radiative cutoff (eV)"),
             ("pair_production_model", "pair production model"),
+            ("positron_transport", "positron transport"),
             ("atomic_electron_deflection", "atomic-electron deflection"),
         ),
     ),
@@ -344,6 +345,7 @@ def resolve_numerics(
         "radiative_model": numerics.radiative_model,
         "radiative_cutoff_eV": numerics.radiative_cutoff_eV,
         "pair_production_model": numerics.pair_production_model,
+        "positron_transport": numerics.positron_transport,
         "atomic_electron_deflection": numerics.atomic_electron_deflection,
     }
     sources = {
@@ -585,6 +587,7 @@ def _identity_v1(
         radiative_model = str(settings_payload.pop("radiative_model", "uncoupled"))
         radiative_cutoff_eV = settings_payload.pop("radiative_cutoff_eV", None)
         pair_production_model = settings_payload.pop("pair_production_model", None)
+        positron_transport = bool(settings_payload.pop("positron_transport", False))
         # Absent in a record minted before #317: elastic-only, as it ran.
         atomic_electron_deflection = str(settings_payload.pop("atomic_electron_deflection", "none"))
     else:  # pragma: no cover - settings is always a jsonable Mapping here
@@ -601,6 +604,7 @@ def _identity_v1(
         radiative_model = str(getattr(settings, "radiative_model", "uncoupled"))
         radiative_cutoff_eV = getattr(settings, "radiative_cutoff_eV", None)
         pair_production_model = getattr(settings, "pair_production_model", None)
+        positron_transport = bool(getattr(settings, "positron_transport", False))
         atomic_electron_deflection = str(getattr(settings, "atomic_electron_deflection", "none"))
     if emission != "incoherent":
         resolved["emission"] = emission
@@ -693,6 +697,9 @@ def _identity_v1(
         # Pair conversion (#275) rides on the coupling: divergence-only too.
         if pair_production_model is not None:
             transport_numerics["pair_production_model"] = str(pair_production_model)
+        # Positron transport (#276) rides on pair conversion: divergence-only.
+        if positron_transport:
+            transport_numerics["positron_transport"] = True
         resolved["transport_numerics"] = transport_numerics
     # Externally generated cross-section tables (issue #161), as table key ->
     # provenance-manifest digest. A *divergence-only* key, like `emission` and

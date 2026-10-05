@@ -77,6 +77,7 @@ _CASE_KEY_ORDER = (
     "radiative_model",
     "radiative_cutoff_eV",
     "pair_production_model",
+    "positron_transport",
     "atomic_electron_deflection",
     "beam_uvw",
     "surface_hkl",
@@ -188,6 +189,9 @@ class Case(Mapping[str, Any]):
         Opt-in ``"penelope-2024"`` pair conversion of coupled hard photons;
         requires ``secondary_threshold_eV`` and ``radiative_model``. Absent
         converts nothing.
+    positron_transport
+        Opt-in ``True`` transport of pair positrons (#276); requires
+        ``pair_production_model``. Absent records them only.
     atomic_electron_deflection
         ``"kawrakow"`` atomic-electron angular deflection as a ``Z(Z + xi)``
         elastic-rate correction, which :class:`~pyrite.Numerics` lowers to by
@@ -268,6 +272,7 @@ class Case(Mapping[str, Any]):
     radiative_model: Literal["bremslib-soft-hard"] | _Absent = _ABSENT
     radiative_cutoff_eV: float | _Absent = _ABSENT
     pair_production_model: Literal["penelope-2024"] | _Absent = _ABSENT
+    positron_transport: Literal[True] | _Absent = _ABSENT
     atomic_electron_deflection: Literal["kawrakow"] | _Absent = _ABSENT
 
     # Legacy/manual-only controls accepted during the Mapping support window.
@@ -349,6 +354,11 @@ class Case(Mapping[str, Any]):
                 raise ValueError(
                     "pair_production_model requires secondary_threshold_eV and radiative_model"
                 )
+        if self.positron_transport is not _ABSENT:
+            if self.positron_transport is not True:
+                raise ValueError("positron_transport must be absent or True")
+            if self.pair_production_model is _ABSENT:
+                raise ValueError("positron_transport requires pair_production_model")
         if self.atomic_electron_deflection is not _ABSENT:
             if self.atomic_electron_deflection != "kawrakow":
                 raise ValueError("atomic_electron_deflection must be absent or 'kawrakow'")
