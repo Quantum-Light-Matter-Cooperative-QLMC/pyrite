@@ -19,7 +19,8 @@ independent uniform azimuths. Triplet production enters only through the EPDL
 total and is simulated as a pair, as in PENELOPE; its threshold-scale share is
 below 10 % of the pair cross section for every catalog element up to 5 MeV.
 
-Positrons are recorded and energy-accounted, not transported (#276).
+Positrons are recorded and energy-accounted, and transported and annihilated
+only with ``positron_transport`` (#276, #295).
 
 RNG. Every photon owns a Philox stream keyed on (seed, parent track, photon
 ordinal on that track) under its own salt, so a photon's interaction does not

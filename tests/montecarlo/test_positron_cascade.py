@@ -21,8 +21,7 @@ def _require_positron_tables():
 
 
 def _positrons(monkeypatch, **kw):
-    with pytest.warns(UserWarning, match="not annihilated"):
-        return _cascade(monkeypatch, pair_scale=1e9, positron_transport=True, **kw)
+    return _cascade(monkeypatch, pair_scale=1e9, positron_transport=True, **kw)
 
 
 def test_positrons_are_launched_transported_and_energy_closes(monkeypatch):
@@ -53,9 +52,15 @@ def test_positrons_are_launched_transported_and_energy_closes(monkeypatch):
 
     terms = secondary_energy_balance(result)
     assert "positron_keV" not in terms and "pair_rest_mass_keV" not in terms
-    assert terms["positron_rest_pending_keV"] == pytest.approx(
-        events["row"].size * PAIR_THRESHOLD_EV * 1e-3
+    # Each pair's 2 m_e c^2 leaves with an escaping positron or as annihilation
+    # photons, which also carry the kinetic energy of an in-flight annihilation.
+    leaving = (
+        terms["positron_escaped_rest_keV"]
+        + terms["annihilation_escaped_keV"]
+        + terms["annihilation_absorbed_keV"]
     )
+    expected = events["row"].size * PAIR_THRESHOLD_EV * 1e-3 + np.nansum(events["annihilation_keV"])
+    assert leaving == pytest.approx(expected, rel=1e-12)
     stopped = ~launched
     assert terms["positron_subthreshold_keV"] == pytest.approx(
         float(np.sum(events["positron_keV"][stopped]))

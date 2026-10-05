@@ -45,6 +45,8 @@ EVENT_CUTOFF = np.int8(7)
 EVENT_HARD_INELASTIC = np.int8(8)
 EVENT_HARD_RADIATIVE = np.int8(9)
 EVENT_DELTA = np.int8(10)
+# A transported positron annihilated in flight (#295); always its track's last row.
+EVENT_ANNIHILATION = np.int8(11)
 
 
 class SegmentEvent(IntEnum):
@@ -61,6 +63,7 @@ class SegmentEvent(IntEnum):
     HARD_INELASTIC = int(EVENT_HARD_INELASTIC)
     HARD_RADIATIVE = int(EVENT_HARD_RADIATIVE)
     DELTA = int(EVENT_DELTA)
+    ANNIHILATION = int(EVENT_ANNIHILATION)
 
 
 RESERVED_EVENTS = frozenset(
@@ -90,6 +93,7 @@ TERMINAL_EVENTS = frozenset(
         SegmentEvent.EXIT_BOTTOM,
         SegmentEvent.EXIT_SIDE,
         SegmentEvent.CUTOFF,
+        SegmentEvent.ANNIHILATION,
     }
 )
 # Events after which the electron keeps its direction. Hard radiative events

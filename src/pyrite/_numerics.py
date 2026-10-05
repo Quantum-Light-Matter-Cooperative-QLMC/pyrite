@@ -155,8 +155,8 @@ class Numerics:
     positron_transport
         Opt-in transport of pair positrons above the secondary threshold
         (issue #276; Bhabha, positron SBETHE/ELSEPA, ``F_p``-scaled BremsLib);
-        requires ``pair_production_model``. Positrons are not annihilated
-        (#295). ``False`` (default) records them only.
+        requires ``pair_production_model``. Positrons annihilate in flight and
+        at rest (#295). ``False`` (default) records them only.
     atomic_electron_deflection
         ``"kawrakow"`` (default) adds angular deflection by atomic electrons
         to the elastic rate, ``Z^2 -> Z(Z + xi)``: ``xi = 1`` under continuous

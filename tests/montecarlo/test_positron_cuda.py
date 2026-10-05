@@ -1,12 +1,13 @@
-"""Positron transport (#276) on the exact CUDA kernel.
+"""Positron transport (#276) and annihilation (#295) on the exact CUDA kernel.
 
 The device-free half lives in ``test_positron_shell_transport.py`` and
 ``test_positron_cascade.py``. These tests need a CUDA device and run through
 the lab GPU partition. The device Bhabha twins are compared with the Numba
 kernels from identical inputs; the cascade, whose positrons start from CUDA
-generation-0 rows, is compared in aggregate.
+generation-0 rows, is compared in aggregate. Annihilation runs on the host
+from the transported rows, so it is compared the same way.
 
-Validation: bhabha-close
+Validation: bhabha-close, heitler-annihilation
 """
 
 import numpy as np
@@ -33,7 +34,6 @@ except Exception:
 pytestmark = [
     pytest.mark.hardware,
     pytest.mark.skipif(not _HAS_CUDA, reason="no CUDA device"),
-    pytest.mark.filterwarnings("ignore:.*not annihilated:UserWarning"),
 ]
 
 
@@ -111,7 +111,7 @@ def test_cuda_positron_cascade_is_deterministic_and_closes_energy():
     for name in ("E_end_keV", "hard_W_keV", "track_id"):
         np.testing.assert_array_equal(a[name], b[name], err_msg=name)
     terms = secondary_energy_balance(a)
-    assert terms["positron_rest_pending_keV"] > 0.0
+    assert terms["positron_escaped_rest_keV"] + terms["annihilation_escaped_keV"] > 0.0
     assert abs(terms["residual_keV"]) <= 1e-9 * terms["incident_keV"]
     per_history = secondary_energy_balance(a, per_history=True)
     np.testing.assert_allclose(per_history["residual_keV"], 0.0, atol=1e-9 * 3000.0)
@@ -125,3 +125,45 @@ def test_cuda_positron_launches_agree_with_the_cpu_core():
         counts.append(int(np.count_nonzero(tracks["launch_kind"] == LAUNCH_POSITRON)))
     a, b = counts
     assert a > 0 and abs(a - b) < 5.0 * np.sqrt(a + b), (a, b)
+
+
+@pytest.fixture
+def _thick_annihilating(monkeypatch):
+    """A 100 um slab and a boosted Heitler cross section, so positrons annihilate."""
+    from pyrite.montecarlo.transport import annihilation
+
+    from . import test_pair_production_cuda
+
+    base = annihilation.heitler_cross_section_ang2
+    monkeypatch.setattr(test_pair_production_cuda, "THICKNESS_ANG", 1.0e6)
+    monkeypatch.setattr(annihilation, "heitler_cross_section_ang2", lambda E: 300.0 * base(E))
+
+
+@pytest.mark.usefixtures("_thick_annihilating")
+def test_cuda_annihilation_is_deterministic_and_closes_energy():
+    from pyrite.montecarlo.transport.secondaries import FATE_IN_FLIGHT
+
+    a, b = _positrons(**CUDA), _positrons(**CUDA)
+    fate = a["pair_production"]["events"]["positron_fate"]
+    assert np.any(fate == FATE_IN_FLIGHT)
+    np.testing.assert_array_equal(fate, b["pair_production"]["events"]["positron_fate"])
+    for name in ("k_keV", "direction", "distance_ang"):
+        np.testing.assert_array_equal(
+            a["pair_production"]["annihilation_photons"][name],
+            b["pair_production"]["annihilation_photons"][name],
+        )
+    per_history = secondary_energy_balance(a, per_history=True)
+    np.testing.assert_allclose(per_history["residual_keV"], 0.0, atol=1e-9 * 3000.0)
+
+
+@pytest.mark.usefixtures("_thick_annihilating")
+def test_cuda_annihilation_fates_agree_with_the_cpu_core():
+    """Positron fates agree in aggregate (five Poisson sigma per fate)."""
+    fates = []
+    for core in (HOST, CUDA):
+        fate = _positrons(Ne=32, seed=5, **core)["pair_production"]["events"]["positron_fate"]
+        fates.append(np.bincount(fate, minlength=4))
+    a, b = fates
+    assert a[2] > 0
+    for x, y in zip(a, b, strict=True):
+        assert abs(int(x) - int(y)) <= 5.0 * np.sqrt(x + y + 1.0), (a, b)
