@@ -327,6 +327,8 @@ def apply_characteristic(results, *, include: bool):
     consumers add it through :func:`pyrite._spectral_components.line_spectrum`.
     When ``include`` is false, return shallow record copies without that
     component. Source records are never mutated.
+
+    Validation: characteristic-radiation
     """
     if include or not any(
         record.get("spec_characteristic") is not None

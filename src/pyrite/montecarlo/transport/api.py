@@ -1,4 +1,7 @@
-"""Public transport entry point: :func:`simulate_trajectories`."""
+"""Public transport entry point: :func:`simulate_trajectories`.
+
+Validation: sbethe-corrected-stopping
+"""
 
 import logging
 
@@ -434,6 +437,9 @@ def simulate_trajectories(
 
     Validation: electron-transport, energy-loss-straggling, finite-beam-size,
     finite-transverse-crystal, grazing-beam-projection, multilayer-stack
+
+    Validation: substep-radiation-invariance
+    Validation: transverse-bunch-form-factor
     """
     if secondary_threshold_eV is not None or pair_production_model is not None:
         arguments = dict(locals())

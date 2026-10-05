@@ -506,6 +506,10 @@ def resolve_line_grid_policy(
     Per-observable tolerances are kept separate. ``PYRITE_ENERGY_GRID_RTOL`` is
     the global *fallback* for observables with no override; a per-observable
     ``PYRITE_ENERGY_GRID_RTOL_<OBSERVABLE>`` outranks it.
+
+    Validation: line-grid-resonance-bandwidth
+    Validation: line-grid-resonance-local-spacing
+    Validation: sinc-bin-integration
     """
     per_call = dict(per_call or {})
     stored = dict(stored or {})

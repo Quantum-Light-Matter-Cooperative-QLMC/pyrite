@@ -51,6 +51,8 @@ def moliere_screening_eta(composition, tau):
 
     ``composition`` is ``[(element, number_density), ...]``; only the atom
     fractions enter. ``tau = T / mc^2``.
+
+    Validation: inelastic-angular-deflection
     """
     z = np.asarray([float(TRANSPORT_ELEMENTS[el]["Z"]) for el, _ in composition])
     p = np.asarray([float(n) for _, n in composition])
@@ -65,7 +67,10 @@ def moliere_screening_eta(composition, tau):
 
 
 def screened_rutherford_g(eta):
-    """``g_R(eta) = (1 + 2 eta) ln(1 + 1/eta) - 2``: half the ``sin^2`` moment."""
+    """``g_R(eta) = (1 + 2 eta) ln(1 + 1/eta) - 2``: half the ``sin^2`` moment.
+
+    Validation: inelastic-angular-deflection
+    """
     eta = np.asarray(eta, dtype=np.float64)
     return (1.0 + 2.0 * eta) * np.log1p(1.0 / eta) - 2.0
 
@@ -74,6 +79,8 @@ def moller_g(tau, tau_c):
     """Moller ``sin^2`` moment for ``W in [T_c, T/2]`` (PIRS-701 Eq. 4.7.21).
 
     Zero where no hard Moller collision exists (``tau <= 2 tau_c``).
+
+    Validation: inelastic-angular-deflection
     """
     tau = np.asarray(tau, dtype=np.float64)
     out = np.zeros_like(tau)
@@ -96,6 +103,8 @@ def atomic_electron_xi(energy_eV, composition, cutoff_eV=None):
 
     ``cutoff_eV=None`` means no atomic-electron collision is simulated
     explicitly (continuous stopping), so ``xi = xi_0`` everywhere.
+
+    Validation: inelastic-angular-deflection
     """
     energy_eV = np.asarray(energy_eV, dtype=np.float64)
     if cutoff_eV is None:
@@ -108,5 +117,8 @@ def atomic_electron_xi(energy_eV, composition, cutoff_eV=None):
 
 
 def elastic_rate_scale(Z, xi):
-    """Per-element factor ``1 + xi / Z`` on the elastic rate."""
+    """Per-element factor ``1 + xi / Z`` on the elastic rate.
+
+    Validation: inelastic-angular-deflection
+    """
     return 1.0 + np.asarray(xi, dtype=np.float64) / np.asarray(Z, dtype=np.float64)

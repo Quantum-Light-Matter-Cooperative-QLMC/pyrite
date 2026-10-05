@@ -692,6 +692,8 @@ def run_coherent_reduction_kernel(
     The attenuation lives in ``F``, so ``c_s``/``c_p`` carry none. Omitted, the
     kernel evaluates the legacy real-sinc expression unchanged.
     Validation: coherent-formation-absorption
+
+    Validation: cross-reflection-coherence
     """
     nthreads = int(config.nthreads)
     epb = int(config.energies_per_block)

@@ -35,6 +35,8 @@ Usage::
 
     UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python scripts/release_epdl_table.py \\
         --source /path/to/EPDL2025.ALL --write
+
+Validation: narrow-beam-total-attenuation
 """
 
 import argparse

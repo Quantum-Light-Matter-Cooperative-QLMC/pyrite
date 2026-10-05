@@ -369,6 +369,9 @@ def pack_elsepa_tables(elastic_tables, L_ncm3, rate_scales=None):
     log-log in the macroscopic cross section. ``rate_scales[L][i]``, when
     given, multiplies that element's rate node by node (atomic-electron
     deflection); the angular density is unchanged.
+
+    Validation: elsepa-elastic-sampling
+    Validation: inelastic-angular-deflection
     """
     if elastic_tables is None:
         empty2 = np.zeros((1, 1), dtype=np.float64)
@@ -430,7 +433,10 @@ def pack_elsepa_tables(elastic_tables, L_ncm3, rate_scales=None):
 
 
 def check_elsepa_coverage(elastic_tables, E_min_keV, E_max_keV):
-    """Reject a transport energy range outside any ELSEPA table; never extrapolate."""
+    """Reject a transport energy range outside any ELSEPA table; never extrapolate.
+
+    Validation: elsepa-elastic-sampling
+    """
     for layer_tables in elastic_tables or ():
         for table in layer_tables:
             energy_eV = np.asarray(table["energy_eV"], dtype=float)
@@ -465,7 +471,10 @@ def check_mott_coverage(layers, E_min_keV, E_max_keV):
 
 @njit(cache=True)
 def _elsepa_bracket(logE, logE_flat, start, length):
-    """Grid interval and fraction for ``logE``, clamped to the table's ends."""
+    """Grid interval and fraction for ``logE``, clamped to the table's ends.
+
+    Validation: elsepa-elastic-sampling
+    """
     first = start
     last = start + length - 1
     if logE <= logE_flat[first]:
@@ -485,7 +494,10 @@ def _elsepa_bracket(logE, logE_flat, start, length):
 
 @njit(cache=True)
 def _elsepa_rate_scalar(E_keV, logE_flat, log_rate_flat, start, length):
-    """Macroscopic elastic cross section [1/cm], log-log in energy."""
+    """Macroscopic elastic cross section [1/cm], log-log in energy.
+
+    Validation: elsepa-elastic-sampling
+    """
     row, f = _elsepa_bracket(np.log(E_keV * 1e3), logE_flat, start, length)
     return np.exp(log_rate_flat[row] + f * (log_rate_flat[row + 1] - log_rate_flat[row]))
 
@@ -499,6 +511,8 @@ def _elsepa_invert_row(cdf, pdf, mu, row, xi):
     ``F = F_k + dmu*(p_k*t + (p_k+1 - p_k)*t^2/2)``. The root is taken in the
     cancellation-free form ``t = 2r / (b + sqrt(b^2 + 2*dmu*(p_k+1 - p_k)*r))``
     with ``b = dmu*p_k`` and ``r = xi - F_k``.
+
+    Validation: elsepa-elastic-sampling
     """
     n = mu.size
     lo = 0

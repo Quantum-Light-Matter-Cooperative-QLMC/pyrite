@@ -371,6 +371,8 @@ class TimepixResponse:
     thickness_um, bias_v
         Optional silicon thickness in micrometres and bias in volts; ``None``
         uses module hardware defaults.
+
+    Validation: detector-timepix
     """
 
     def __init__(

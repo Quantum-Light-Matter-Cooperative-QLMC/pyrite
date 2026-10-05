@@ -5,6 +5,8 @@ needs neither gfortran nor a scratch directory. What it shares with the other
 two generators is everything after that -- one normalized request, one key,
 one manifest, and a resolve that reuses an existing table instead of reading
 the library again.
+
+Validation: bremslib-library-reference
 """
 
 from collections.abc import Mapping

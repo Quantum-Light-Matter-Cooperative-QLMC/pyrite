@@ -165,6 +165,8 @@ def _sample_hard_transfer_eV(energy_eV, ionization_eV, resonance_eV, branch, cut
     Limits: ``u = 0`` returns the lower bound; a degenerate interval (only
     reachable where an interpolated rate straddles a channel threshold)
     returns its lower bound. Validation: penelope-shell-hard-loss-sampling
+
+    Validation: shell-soft-hard-transport
     """
     lower, upper, peak_end = _hard_loss_bounds(
         energy_eV, ionization_eV, resonance_eV, branch, cutoff_eV
@@ -217,6 +219,8 @@ def _hard_primary_cosine(energy_eV, ionization_eV, resonance_eV, branch, transfe
     Limit: ``u = 0`` gives the minimum longitudinal ``Q`` and no deflection.
     An empty recoil interval (interpolation-edge only) returns 1.
     Validation: penelope-shell-hard-recoil
+
+    Validation: shell-soft-hard-transport
     """
     two_mc2 = 2.0 * _MC2_EV
     if branch == 1:

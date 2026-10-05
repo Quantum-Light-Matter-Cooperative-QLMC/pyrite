@@ -327,6 +327,8 @@ def validate_backend_coordinates(
     precision at 200 eV, not at the top of the axis. On a uniform grid this is
     weaker than :func:`validate_backend_spacing`, which judges every interval at
     the largest node. Returns the smallest interval after the cast, in eV.
+
+    Validation: line-window-seeding
     """
     if not np.isfinite(safety_ulps) or safety_ulps <= 0.0:
         raise ValueError("backend ULP safety factor must be finite and positive")

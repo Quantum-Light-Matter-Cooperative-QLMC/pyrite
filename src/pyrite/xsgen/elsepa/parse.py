@@ -1,4 +1,7 @@
-"""Parse native-grid differential cross sections written by ELSEPA."""
+"""Parse native-grid differential cross sections written by ELSEPA.
+
+Validation: elsepa-vendor-reference
+"""
 
 import re
 from collections.abc import Iterable

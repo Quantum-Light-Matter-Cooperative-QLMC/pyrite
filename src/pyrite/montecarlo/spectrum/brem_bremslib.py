@@ -74,6 +74,8 @@ class BremsLibBremsstrahlungTable:
     scaled_ddcs_mb_sr
         Scaled DDCS in mb/sr, shape ``(n_T1, 13, n_theta)``, renormalized so
         that its linear-in-``theta`` solid-angle integral is ``scaled_sdcs_mb``.
+
+    Validation: bremslib-angular-schiff
     """
 
     atomic_number: int
@@ -116,6 +118,8 @@ def solid_angle_integral(theta_rad: np.ndarray, values: np.ndarray) -> np.ndarra
     ``values`` carries ``theta`` on its last axis. Per interval ``[a, b]`` of
     width ``h`` with end values ``f_a, f_b``:
     ``int f sin = f_a (cos a - cos b) + (f_b - f_a)/h (sin b - sin a - h cos b)``.
+
+    Validation: bremslib-angular-model
     """
     theta = np.asarray(theta_rad, dtype=np.float64)
     f = np.asarray(values, dtype=np.float64)
@@ -210,6 +214,8 @@ def _refine_incident_grid(t1_MeV, sdcs, shape, theta):
     Runtime interpolation on the refined grid is then linear, so the exact
     angular normalization of every convex combination is kept. Original nodes
     are reproduced unchanged.
+
+    Validation: bremslib-angular-model
     """
     refine = _INCIDENT_REFINEMENT
     fractions = np.arange(refine) / refine
@@ -302,6 +308,8 @@ def bremslib_segment_state(staged: _StagedBremsLib, T_keV, cos_theta=None):
     With ``cos_theta`` the node values are the scaled DDCS at each segment's
     emission angle, interpolated linearly in ``theta``; without it they are
     the scaled SDCS.
+
+    Validation: bremslib-angular-model
     """
     T, available, row, fraction = _incident_bracket(staged, T_keV)
     if cos_theta is None:

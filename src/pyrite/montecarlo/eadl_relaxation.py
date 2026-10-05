@@ -108,7 +108,10 @@ def _extract_eadl_relaxation(
     atomic_number: int,
     section: Mapping[str, Any],
 ) -> EADLRelaxation:
-    """Validate one decoded MF=28/MT=533 section and put it in cascade order."""
+    """Validate one decoded MF=28/MT=533 section and put it in cascade order.
+
+    Validation: characteristic-radiation
+    """
     where = f"{path}: EADL Z={atomic_number} MF=28/MT=533"
     try:
         n_subshell = int(section["NSS"])
@@ -290,6 +293,8 @@ def load_eadl_relaxation(
     designators present and strictly less bound than the parent, positive
     photon energies, nonnegative electron energies, and subshell occupancies
     within ``2j + 1`` summing to ``Z``.
+
+    Validation: characteristic-radiation
     """
     if not isinstance(element, str) or re.fullmatch(r"[A-Z][a-z]?", element) is None:
         raise ValueError("element must be a chemical symbol such as 'C' or 'Si'")

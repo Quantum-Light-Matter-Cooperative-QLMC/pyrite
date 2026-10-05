@@ -6,6 +6,9 @@ Parallel case driver: the per-case transport + spectrum + brem worker
 CPU transport across a worker pool behind the single-CUDA-context GPU phase.
 The phase functions stay module-level so they pickle into Windows spawn
 workers.
+
+Validation: blazed-groove-geometry
+Validation: surface-hkl-orientation
 """
 
 import os
@@ -369,7 +372,10 @@ def _transport_case(
     and spectrum share a process.
 
     trajectory_capture: optional ``TrajectoryCapture``; writes the result here,
-    in whichever process transported it, before the spectrum phase sees it."""
+    in whichever process transported it, before the spectrum phase sees it.
+
+    Validation: grazing-beam-projection
+    """
     timed = _TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
     E_grid, E_brem, beam, n_hat, groove = _case_geometry(case)
@@ -955,7 +961,10 @@ def _spectrum_case(case, tp, record_timing=False):
 
 
 def _spectrum_case_impl(case, tp, record_timing=False):
-    """Implement :func:`_spectrum_case` inside its optional Nsight range."""
+    """Implement :func:`_spectrum_case` inside its optional Nsight range.
+
+    Validation: temporal-intensity-profile
+    """
     timed = _TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
     E_grid, E_brem, n_hat = tp["E_grid"], tp["E_brem"], tp["n_hat"]

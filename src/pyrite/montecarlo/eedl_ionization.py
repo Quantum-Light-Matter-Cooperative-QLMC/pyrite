@@ -1,4 +1,7 @@
-"""Validated EEDL electron-impact subshell data shared by transport and scoring."""
+"""Validated EEDL electron-impact subshell data shared by transport and scoring.
+
+Validation: eedl-shell-ionization-comparison
+"""
 
 import re
 from collections.abc import Mapping
@@ -257,6 +260,8 @@ def load_eedl_shell_ionization(
     directory. Each shell keeps its native
     projectile-energy grid, EEDL binding energy, and cross section in cm².
     This supplies total ionization rates, not a differential transfer law.
+
+    Validation: eedl-material-shell-rates
     """
     if not isinstance(element, str) or re.fullmatch(r"[A-Z][a-z]?", element) is None:
         raise ValueError("element must be a chemical symbol such as 'C' or 'Si'")

@@ -14,6 +14,8 @@ The shape function itself is not stored. It is the DDCS divided by its own
 angular integral, and both of those are, so storing it would repeat about a
 third of the table's bytes to save one division. :func:`shape_function`
 performs that division for a consumer.
+
+Validation: bremslib-library-reference
 """
 
 from collections.abc import Mapping

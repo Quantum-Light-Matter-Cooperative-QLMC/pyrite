@@ -156,6 +156,8 @@ def segment_escape_paths(segments, index, n_hat, *, layers=None, groove=None, xp
     at source-layer boundaries, photon exit-layer boundaries, and competing
     box faces makes endpoint integration exact for planar layers and boxes.
     Groove relief uses one-sided values at its periodic path jumps.
+
+    Validation: segment-escape-average
     """
     if segments.get("v_hat") is None:
         raise ValueError("segment escape integration requires per-segment directions v_hat")

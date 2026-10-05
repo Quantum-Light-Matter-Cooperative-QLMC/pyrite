@@ -196,6 +196,8 @@ def build_window_plan(
     spacing at that neighbour's spacing; a locally finest sliver therefore
     shrinks its window by less than half of one of its own steps. Adjacent
     pieces at one spacing with no anchor between them then become one piece.
+
+    Validation: line-window-seeding
     """
     start = _finite(start_eV, "start_eV")
     stop = _finite(stop_eV, "stop_eV")

@@ -4,6 +4,8 @@ The route ``_needs_per_hkl_route`` selects when a request carries something the
 batched tables cannot express (layered stacks, grooved escape, flight-grouped
 coherence). It walks one reflection at a time and is the reference the batched
 route is checked against.
+
+Validation: coherent-formation-absorption
 """
 
 import numpy as np
@@ -485,7 +487,11 @@ def _accumulate_reflection(
     tabulations (chi/u on E_tab_g) depend on hkl and energy only -- NOT on
     the mosaic orientation -- while g and its sigma/pi polarization pair
     (``e_s``, ``e_p``) vary per orientation. wm = 1.0 for the perfect-crystal
-    path."""
+    path.
+
+    Validation: segment-escape-average
+    Validation: temporal-intensity-profile
+    """
     # NVTX sub-ranges are a no-op off the profiled GPU path. Lazy import:
     # runner imports this module, so a top-level import would be circular.
     from ...runner import _nsys_pop, _nsys_push

@@ -359,6 +359,8 @@ def load_bremsstrahlung_cross_sections(
     The fetched file (``pyrite tables fetch eedl``) is checksum-pinned.
     ``data_dir`` is an explicit testing
     and expert override; its file is still structurally validated.
+
+    Validation: brem-spectrum
     """
     try:
         atomic_number = Z_TABLE[element]
@@ -507,6 +509,8 @@ def _prepare_eedl_grid(
     The photon grid is invariant across every segment chunk. Evaluating and
     transferring these panel rows here avoids repeating that work inside
     ``_eedl_brem_dsigma_dk`` for every chunk.
+
+    Validation: brem-spectrum
     """
     photon_energy_host = np.asarray(_to_cpu(photon_energy_eV), dtype=float)
     panels = _unit_base_panels(table)
@@ -564,7 +568,10 @@ def _prepare_eedl_grid(
 
 
 def _panel_cdf_at(prepared: _PreparedEEDLGrid, panel, photon_eV):
-    """Probability below ``photon_eV`` in each selected unit-base panel."""
+    """Probability below ``photon_eV`` in each selected unit-base panel.
+
+    Validation: brem-spectrum
+    """
     low = prepared.panel_photon_min_eV[panel]
     high = prepared.panel_photon_max_eV[panel]
     query = xp.clip((photon_eV - low) / (high - low), REAL(0.0), REAL(1.0))
@@ -750,6 +757,10 @@ def _bremsstrahlung_dsigma_dk(
     ``"bremslib"`` evaluates the BremsLib SDCS; an element absent from
     ``bremslib_tables``, or an incident energy outside its table, falls back to
     EEDL with a ``RuntimeWarning``.
+
+    Validation: brem-source-comparison
+    Validation: brem-spectrum
+    Validation: bremslib-angular-model
     """
     model = _validate_bremsstrahlung_model(cross_section_model)
     try:
@@ -922,6 +933,9 @@ def mc_brem_spectrum(
 
     Validation: brem-spectrum, finite-transverse-crystal, blazed-groove-geometry,
     bremslib-angular-model
+
+    Validation: segment-escape-average
+    Validation: substep-radiation-invariance
     """
     if segments.get("radiative", {}).get("model") == "bremslib-soft-hard":
         raise ValueError(

@@ -236,6 +236,8 @@ def _measured_line_grid(payload, case, segments, n_hats, Ne, target_step, abs_la
     refines the union of every direction's local-spacing seeds, so one
     direction reproduces the single-direction axis exactly.
     Returns ``(grid, record, bandwidth_record)``.
+
+    Validation: line-grid-resonance-local-spacing
     """
     bandwidth = payload["bandwidth"]
     resolution = payload["resolution"]

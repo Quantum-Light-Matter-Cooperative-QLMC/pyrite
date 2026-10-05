@@ -156,6 +156,9 @@ def build_gos_partition(
     Units: E, W in eV; cross sections per molecule in cm² and eV cm².
     Limit: Wc >= E makes every interaction soft and the hard rate zero.
     Validation: gos-soft-hard-partition
+
+    Validation: gos-distant-response
+    Validation: gos-moller-close
     """
     e0 = np.asarray(arrays["stopping_energy_eV"], dtype=np.float64)
     s0 = np.asarray(arrays["stopping_cs_eV_cm2"], dtype=np.float64)

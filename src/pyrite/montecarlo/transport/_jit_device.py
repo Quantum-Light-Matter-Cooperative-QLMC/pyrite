@@ -14,6 +14,8 @@ module the calling kernel is defined in.
 Like its siblings, this module imports ``cupy`` at module scope, so it must
 stay out of the package ``__init__`` and be reached only through deferred,
 function-local imports.
+
+Validation: sbethe-corrected-stopping
 """
 
 import cupy as xp
@@ -151,6 +153,8 @@ def _dEds_packed(L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, E_i):
     call site passes ``0.0``, and ``x - 0.0`` is exactly ``x``, so the two agree
     bit-for-bit today. Whoever lands the density effect (checklist B) has to add
     it *here* as well, which is the one place the shared signature does not force.
+
+    Validation: relativistic-bethe-stopping
     """
     tau = E_i / F64_MC2_KEV
     gamma = F64_ONE + tau

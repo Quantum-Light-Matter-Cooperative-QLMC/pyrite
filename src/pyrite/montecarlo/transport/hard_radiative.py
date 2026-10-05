@@ -56,7 +56,10 @@ class RadiativePartition:
     total_stopping_cs_eV_cm2: float
 
     def sample_photon_energy(self, uniform: float) -> float:
-        """Sample a hard photon from the exact piecewise-linear SDCS CDF."""
+        """Sample a hard photon from the exact piecewise-linear SDCS CDF.
+
+        Validation: bremslib-radiative-partition
+        """
         if self.hard_rate_cs_cm2 <= 0.0:
             raise ValueError("partition has no hard photons")
         if not 0.0 <= uniform < 1.0:
@@ -284,6 +287,8 @@ def complete_hard_radiative_events(segments, tables, seed: int) -> None:
     This uses a stream separate from electron transport, so adding photon
     directions cannot perturb the electron tracks or their sampled energies.
     Both vector fields are zero on rows without a hard photon.
+
+    Validation: bremslib-radiative-partition
     """
     energies = np.asarray(segments["hard_radiative_k_eV"])
     directions = np.zeros((energies.size, 3), dtype=float)

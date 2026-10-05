@@ -27,6 +27,8 @@ Three file shapes, per the upstream manual (``BremsLib_v2.0.pdf``):
 Both cross sections carry the upstream ``k / Z**2`` scaling factor, which is
 preserved here: it cancels in the shape function, and unscaling belongs to
 whichever consumer wants an absolute cross section.
+
+Validation: bremslib-library-reference
 """
 
 import hashlib

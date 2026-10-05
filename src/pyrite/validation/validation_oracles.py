@@ -170,7 +170,10 @@ def build_dans_crystal_from_pyrite(crystal: str, *, uiso: float = 0.0) -> _DansC
 
 
 def compare_lattice(crystal: str, oracle_crystal: _DansCrystalLike) -> LatticeComparison:
-    """Compare lattice lengths, angles, and unit-cell volume."""
+    """Compare lattice lengths, angles, and unit-cell volume.
+
+    Validation: dans-diffraction-oracle
+    """
 
     pyrite_lattice = _pyrite_lattice_tuple(crystal)
     oracle_lattice = _float_tuple(oracle_crystal.Cell.lp(), "oracle Cell.lp()", size=6)
@@ -194,7 +197,10 @@ def compare_lattice(crystal: str, oracle_crystal: _DansCrystalLike) -> LatticeCo
 def compare_reflection_geometry(
     crystal: str, oracle_crystal: _DansCrystalLike, hkls: Sequence[Sequence[int]]
 ) -> list[ReflectionGeometryComparison]:
-    """Compare ``|g| = 2*pi/d`` against ``Dans_Diffraction.Cell.Qmag``."""
+    """Compare ``|g| = 2*pi/d`` against ``Dans_Diffraction.Cell.Qmag``.
+
+    Validation: dans-diffraction-oracle
+    """
 
     qmag = getattr(oracle_crystal.Cell, "Qmag", None)
     if not callable(qmag):
@@ -239,6 +245,8 @@ def compare_structure_factor_magnitudes(
     true, otherwise ``"xray"``. The default comparison avoids phase sign
     ambiguity and normalizes no scale factors; large relative deltas should be
     inspected before any physics claim is promoted in the validation ledger.
+
+    Validation: dans-diffraction-oracle
     """
 
     scatter = oracle_crystal.Scatter

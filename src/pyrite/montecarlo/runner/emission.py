@@ -159,6 +159,8 @@ def _characteristic_from_segments(
     low-energy ionization path that a line-only 5 keV cutoff would discard.
     Characteristic scoring itself enforces its documented 1 keV transport-
     validity floor even if a case requests a lower background cutoff.
+
+    Validation: characteristic-radiation
     """
     from .. import runner
 
@@ -211,7 +213,10 @@ def _brem_for_case(case, E_brem):
     so :func:`pyrite.runs.run.repair_brem_wide` reuses the EXACT live-sweep path.
     Previously the repair rebuilt single-slab brem by hand -- ``layers=`` omitted,
     no per-layer sum, ``brem_chunk`` ignored -- silently dropping substrate
-    backscatter/brem and cross-stack absorption on stacked/multilayer records."""
+    backscatter/brem and cross-stack absorption on stacked/multilayer records.
+
+    Validation: grazing-beam-projection
+    """
     from .. import runner
 
     abs_layers = case.get("abs_layers")

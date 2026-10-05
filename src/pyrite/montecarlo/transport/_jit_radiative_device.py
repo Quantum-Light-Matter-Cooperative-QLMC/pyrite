@@ -146,7 +146,10 @@ def _rad_cell_rate(left, right, chi_left, chi_right):
 def _rad_moment(
     which, incident, nominal, top, chi, slot, max_t, n_red, n_t, z, energy_eV, cutoff_eV
 ):
-    """Soft first moment or hard rate per atom; host ``radiative_moments_scalar``."""
+    """Soft first moment or hard rate per atom; host ``radiative_moments_scalar``.
+
+    Validation: bremslib-radiative-partition
+    """
     t_base = slot * max_t
     nom_base = slot * n_red
     chi_base = slot * max_t * n_red
@@ -231,7 +234,10 @@ def _rad_layer_moment(
 def _rad_sample_photon_eV(
     incident, nominal, top, chi, slot, max_t, n_red, n_t, z, energy_eV, cutoff_eV, uniform
 ):
-    """Invert the hard zeroth-moment CDF; host ``sample_hard_photon_energy_scalar``."""
+    """Invert the hard zeroth-moment CDF; host ``sample_hard_photon_energy_scalar``.
+
+    Validation: bremslib-radiative-partition
+    """
     hard_rate = _rad_moment(
         RAD_HARD_RATE, incident, nominal, top, chi, slot, max_t, n_red, n_t, z, energy_eV, cutoff_eV
     )

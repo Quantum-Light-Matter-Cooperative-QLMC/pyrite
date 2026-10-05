@@ -1,4 +1,11 @@
-"""Numba transport cores generated from one axis-specialized CPU body."""
+"""Numba transport cores generated from one axis-specialized CPU body.
+
+Validation: energy-controlled-propagation
+Validation: energy-loss-straggling
+Validation: transport-midpoint-stopping
+
+Validation: sbethe-corrected-stopping
+"""
 
 import numpy as np
 from numba import njit
@@ -94,6 +101,10 @@ def make_cpu_transport_core(
     specialization, so the ``inelastic=False`` cores are the unchanged
     historical ones; it requires the midpoint row schema and is not
     available for grooved transport.
+
+    Validation: gpu-transport-core
+    Validation: shell-secondary-transport
+    Validation: shell-soft-hard-transport
     """
     if grooved and (per_electron or lut):
         raise ValueError("grooved transport has only an exact lockstep specialization")

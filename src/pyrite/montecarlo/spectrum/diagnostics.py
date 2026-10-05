@@ -508,6 +508,8 @@ def brem_endpoint_quadrature_error(
     whose angle-integrated SDCS is compared.
 
     Validation: radiation-error-estimators
+
+    Validation: brem-spectrum
     """
     if warn_threshold is None:
         warn_threshold = DEFAULT_BREM_QUADRATURE_WARN

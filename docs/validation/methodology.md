@@ -9,11 +9,11 @@ Agreement with Zhai/Feranchuk is necessary but not sufficient — it can hide **
 ## The pieces
 
 - **The ledger** — [physics validation ledger](physics-validation-ledger.md) is the single source of truth: one record per atomic physics claim, keyed by a stable `id`, anchored on `file::symbol`. The unit of trust is the **equation, not the module**. An anchor names the definition site, not a re-export; use its repository-relative path. The ledger is split into domain parts (`docs/validation/ledger-*.md`) listed by that index; edit the part that owns the claim, then regenerate the compact views with `pyrite-dev validation-ledger --write`.
-- **In-code back-reference** — every annotated physics function carries a one-line `Validation: <id>` marker in its docstring, tying code↔ledger both ways. A physics `def` with no marker is an unledgered claim — find them with:
+- **In-code back-reference** — every annotated physics function carries a `Validation: <id>` marker in its docstring, tying code↔ledger both ways. Multiple IDs may be comma-separated and wrapped. Class fields use their owning class's docstring; bare Python module anchors use the module docstring. The ledger's `Code` field accepts `file.py::symbol`, shorthand `::symbol`, and brace lists. Definition sites must resolve locally; re-exports are not function owners. Run the symbol-level coverage and status checks with:
   ```bash
-  # physics symbols missing a Validation: back-reference
-  grep -L "Validation:" src/pyrite/{montecarlo,crystallography,atomic_form_factors}.py src/pyrite/detectors/{eaglexo_response,timepix_response}.py
+  UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/dev/test_validation_ledger.py
   ```
+  The check parses source without importing it, including optional GPU modules. Catalog/data records carry provenance in their data metadata; research and proposed records have no implementation marker requirement. For records explicitly labelled `measurement only`, the check owns the marker, while Python references after `against` identify the measured system. Markers link claims to owners; they do not certify the claim.
 - **Re-derivation write-ups** — `docs/validation/<domain>/<id>.md` holds each independent derivation, its diff against the implementation, and the adjudication. Domain directories mirror the physics hierarchy where practical; the ledger is the location authority. Write and format the math per the [LaTeX/MyST style rules](formatting-style.md).
 - **Anchors** — regression tests (mostly under `checks/`) that pin a claim to a reference value with a tolerance.
 
@@ -53,6 +53,8 @@ unverified → filtered → rederived → anchored → signed-off
 | `anchored`    | a regression test pins it to a reference value, green in CI                                        |
 | `signed-off`  | **a human** read the source and the diff and certified it — the only state that gates publication  |
 | `discrepancy` | a check failed; under investigation                                                                |
+
+Hardware or source availability blockers belong in the record’s `Notes`, not in a separate status. Use `unverified` until the claim has the evidence required for a lifecycle status; operator bookkeeping tests alone do not validate detector hardware.
 
 ## Workflow
 
@@ -114,4 +116,4 @@ Issue acceptance items name the target status per claim id (e.g. "`<id>` ledger 
 
 ## Design note
 
-The ledger is plain markdown (not an in-code decorator DSL + generator) on purpose: a physicist edits a table, not a parser; it renders on GitHub; it's git-diffable; and an agent can update it and grep for gaps with no tooling. If the ledger and code ever drift in practice, add a CI check that cross-references `Validation:` markers against ledger `id`s — but not before drift is actually observed.
+The ledger is plain markdown (not an in-code decorator DSL + generator) on purpose: a physicist edits a table, not a parser; it renders on GitHub; it's git-diffable; and an agent can update it and grep for gaps with no tooling. The ledger/source coverage regression checks every listed Python owner for its matching `Validation:` marker, and checks status vocabulary against this methodology. These checks run with the normal test suite to prevent the observed traceability drift from recurring.

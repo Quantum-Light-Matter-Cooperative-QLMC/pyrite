@@ -1,4 +1,7 @@
-"""Write explicit, reproducible ELSEPA ``elscata`` input decks."""
+"""Write explicit, reproducible ELSEPA ``elscata`` input decks.
+
+Validation: elsepa-vendor-reference
+"""
 
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -117,6 +120,8 @@ class ElsepaDeck:
 
         ``absorption_gap_eV=None`` keeps ELSEPA's tabulated experimental
         first-excitation energy for ``z`` as the gap.
+
+        Validation: elsepa-muffin-tin-inputs
         """
         return cls(
             z=z,

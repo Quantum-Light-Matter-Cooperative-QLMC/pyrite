@@ -22,6 +22,8 @@ Crystallography (composition, dominant reflections, zone axis, B-factor, default
 energy grid) is looked up per material; the detector geometry defaults to the
 2x2 Timepix3 quad. Only ``materials.crystal`` and the immutable material catalog
 are imported here (no GPU), so this module is cheap to import and test.
+
+Validation: surface-hkl-orientation
 """
 
 import math
@@ -338,6 +340,8 @@ class Sweep:
     longitudinal bunch / rep-rate / (future) emittance fields. Defaults to
     ``BeamSpec()`` -- a 1 mm isotropic spot, point bunch, 5 kHz / 1 pC.
     The remaining fields are fixed setup that rarely changes per run.
+
+    Validation: blazed-groove-geometry
     """
 
     # ``material`` stays a real field: it is the sweep's identity, read far
@@ -596,6 +600,9 @@ def _automatic_line_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Li
     measures it from the case's own trajectories -- so building a case starts no
     simulation, reads no checkpoint, and writes nothing to the profile or the
     catalog.
+
+    Validation: line-grid-emission-ceiling
+    Validation: line-grid-kinematic-bandwidth
     """
     spec = CATALOG.crystal(cp["crystal"])
     magnitudes = [reciprocal_g_vector(hkl, spec.lattice)[1] for hkl in cp["hkl_list"]]
@@ -726,7 +733,10 @@ def build_cases(
     electron-count statistics into the product and suffix the case name with
     ``ne=<line>/<brem>``; ``None`` keeps the scalar counts passed by the caller.
     ``temporal_profile`` adds the opt-in line ``I(t)`` key to every case (#292).
-    Returns the ``cases`` list; preview it with :func:`geometry_table`."""
+    Returns the ``cases`` list; preview it with :func:`geometry_table`.
+
+    Validation: inelastic-angular-deflection
+    """
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     validate_inelastic_numerics(
         inelastic_model, inelastic_cutoff_eV, energy_model, secondary_threshold_eV

@@ -1,4 +1,7 @@
-"""Generate and cache free-atom and muffin-tin ELSEPA tables."""
+"""Generate and cache free-atom and muffin-tin ELSEPA tables.
+
+Validation: elsepa-vendor-reference
+"""
 
 from collections.abc import Iterable
 from dataclasses import dataclass

@@ -37,6 +37,8 @@ def build_layer_tables(
     (``None`` under continuous stopping). There ``xi`` depends on energy,
     which the analytic ``"sr"``/``"mott"`` rate coefficients cannot carry, so
     that combination is rejected. ``None`` leaves every coefficient bit for bit.
+
+    Validation: inelastic-angular-deflection
     """
     atomic_electrons = validate_atomic_electron_deflection(atomic_electron_deflection)
     if atomic_electrons and hard_cutoff_eV is not None and elastic_model != "elsepa":

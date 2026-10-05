@@ -32,6 +32,14 @@ draw order, and the launch parameters are unchanged by the split.
 this file holds the exact ``__global__`` kernel and ``_jit_lut_kernel.py`` the
 LUT one; ``_jit_launch.py`` holds the host-side launchers and the launch
 geometry.
+
+Validation: energy-controlled-propagation
+Validation: energy-loss-straggling
+Validation: transport-midpoint-stopping
+
+Validation: sbethe-corrected-stopping
+Validation: shell-secondary-transport
+Validation: shell-soft-hard-transport
 """
 
 import cupy as xp
