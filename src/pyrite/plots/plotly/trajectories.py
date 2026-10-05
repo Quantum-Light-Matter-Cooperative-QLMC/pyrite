@@ -10,12 +10,12 @@ is intentionally imported directly rather than re-exported from
 import numpy as np
 import plotly.graph_objects as go
 
-from ...montecarlo.geometry import project_beam_entry, sample_to_lab_R
-from .._common import (
-    _case_of,
-    _groove_spec,
-    groove_profile_knots,
-)
+from ..._scene_geometry import beam_footprint_outline as _beam_footprint_outline
+from ..._scene_geometry import case_rotation as _case_R
+from ..._scene_geometry import crystal_footprint_extent as _crystal_footprint_extent
+from ..._scene_geometry import crystal_mesh, groove_mesh
+from ..._scene_geometry import rotate as _rotate
+from .._common import _case_of
 from .._frames import _trajectory_data
 from .camera import eye_angles
 
@@ -26,12 +26,6 @@ _DETECTOR = "#42C7C7"
 _GROOVE = "#E9C46A"
 _FIELD = "#17202A"
 _GRID = "#34495E"
-
-# Cap on how many groove periods the corrugated entrance surface will draw
-# before falling back to the flat face (see _groove_surface_mesh): a realistic
-# mm-scale footprint over a micron-scale spacing spans thousands of teeth, which
-# is neither legible nor cheap as a mesh.
-_GROOVE_MAX_PERIODS = 200
 
 # Zoomed (non-realistic) view spot FWHM [mm]: a micron-scale beam so the incident
 # bundle has visible width at the fitted, sub-micron cascade scale.
@@ -51,20 +45,6 @@ _CAMERA_EYE = tuple((_CAMERA_EYE_DIRECTION / np.linalg.norm(_CAMERA_EYE_DIRECTIO
 # camera controls can seed themselves from THIS scene's hand-tuned view and
 # reproduce it exactly rather than to slider resolution.
 VOLUME_CAMERA_ANGLES = eye_angles(_CAMERA_EYE)
-
-
-def _case_R(case):
-    """Sample -> lab rotation for this case's tilt (``v_lab = R @ v_sample``);
-    see :func:`pyrite.montecarlo.geometry.sample_to_lab_R`."""
-    return sample_to_lab_R(
-        np.deg2rad(case.get("tilt_deg", 0.0)), np.deg2rad(case.get("tilt_azim_deg", 0.0))
-    )
-
-
-def _rotate(points, R):
-    """Apply the sample -> lab rotation ``R`` (``v_lab = R @ v_sample``) to an
-    ``(N, 3)`` array of points/vectors. NaN rows (segment separators) stay NaN."""
-    return np.asarray(points, dtype=float) @ R.T
 
 
 def track_vertices_3d(data, *, t_fs=None, reveal_until_fs=None):
@@ -328,26 +308,9 @@ def _zoom_scene_ranges(lox, hix, loy, hiy, thick, span, R):
 
 
 def _crystal_mesh(lox, hix, loy, hiy, thick, *, R=_IDENTITY_R):
-    corners = _rotate(
-        np.array(
-            [
-                [lox, loy, 0.0],
-                [hix, loy, 0.0],
-                [hix, hiy, 0.0],
-                [lox, hiy, 0.0],
-                [lox, loy, thick],
-                [hix, loy, thick],
-                [hix, hiy, thick],
-                [lox, hiy, thick],
-            ]
-        ),
-        R,
-    )
-    x, y, z = corners[:, 0].tolist(), corners[:, 1].tolist(), corners[:, 2].tolist()
-    # Two triangles per face.  Slight transparency keeps internal tracks legible.
-    i = [0, 0, 4, 4, 0, 0, 1, 1, 2, 2, 3, 3]
-    j = [1, 2, 5, 6, 1, 5, 2, 6, 3, 7, 0, 4]
-    k = [2, 3, 6, 7, 5, 4, 6, 5, 7, 6, 4, 7]
+    corners, triangles = crystal_mesh(lox, hix, loy, hiy, thick, R=R)
+    x, y, z = corners.T.tolist()
+    i, j, k = triangles.T.tolist()
     return go.Mesh3d(
         x=x,
         y=y,
@@ -365,49 +328,11 @@ def _crystal_mesh(lox, hix, loy, hiy, thick, *, R=_IDENTITY_R):
 
 
 def _groove_surface_mesh(case, lox, hix, loy, hiy, u, *, R=_IDENTITY_R):
-    """Corrugated blazed-groove entrance surface as a ``Mesh3d`` ribbon, or
-    ``None`` when the case is ungrooved or the extent spans too many teeth.
-
-    The sawtooth is invariant along y (the grooves run along y) and periodic in
-    the sample-frame lateral coordinate x, so the ribbon is the profile
-    ``groove_profile_z(x)`` (in display units) extruded across the displayed y
-    span ``[loy, hiy]``. Apexes sit at ``x = k * spacing`` (``z = 0``); valleys
-    reach the groove depth. Every vertex is rotated through the sample -> lab
-    rotation ``R`` (see :func:`_case_R`) exactly like the crystal mesh and the
-    tracks, so on a tilted slab the corrugation reads correctly rather than
-    face-on.
-
-    Falls back to ``None`` (leaving the flat crystal entrance face already drawn
-    by :func:`_crystal_mesh`) when the displayed lateral extent would need more
-    than :data:`_GROOVE_MAX_PERIODS` teeth -- e.g. a realistic mm-scale footprint
-    over a micron-scale spacing.
-    """
-    spec = _groove_spec(case)
-    if spec is None:
+    mesh = groove_mesh(case, lox, hix, loy, hiy, u, R=R)
+    if mesh is None:
         return None
-    knots = groove_profile_knots(lox * u, hix * u, spec, max_periods=_GROOVE_MAX_PERIODS)
-    if knots is None:
-        return None
-    xs_ang, zs_ang = knots
-    xs = xs_ang / u  # sample-frame display units, same as lox/hix
-    zs = zs_ang / u
-    n = len(xs)
-    # Two y-rows (front loy, back hiy) of the same x/z profile; triangulate each
-    # x-interval into the quad (front_i, front_i+1, back_i+1, back_i).
-    verts = _rotate(
-        np.column_stack(
-            (
-                np.concatenate((xs, xs)),
-                np.concatenate((np.full(n, loy), np.full(n, hiy))),
-                np.concatenate((zs, zs)),
-            )
-        ),
-        R,
-    )
-    a = np.arange(n - 1)  # front-row left vertices
-    i = np.concatenate((a, a))
-    j = np.concatenate((a + 1, a + 1 + n))
-    k = np.concatenate((a + 1 + n, a + n))
+    verts, triangles = mesh
+    i, j, k = triangles.T
     return go.Mesh3d(
         x=verts[:, 0].tolist(),
         y=verts[:, 1].tolist(),
@@ -472,54 +397,6 @@ def _direction_arrow(direction, length, *, color, name, reverse=False):
         showlegend=False,
     )
     return line, cone
-
-
-def _crystal_footprint_extent(case, u):
-    """True lateral crystal extent ``(lox, hix, loy, hiy)`` in display units.
-
-    Uses the case's finite footprint (``crystal_width_mm`` x ``crystal_height_mm``,
-    full dimensions centred on the transverse origin); a missing/None dimension
-    falls back to the 5 mm default. 1 mm = 1e7 Ang.
-    """
-    width_mm = case.get("crystal_width_mm") or 5.0
-    height_mm = case.get("crystal_height_mm") or 5.0
-    hx = 0.5 * float(width_mm) * 1e7 / u
-    hy = 0.5 * float(height_mm) * 1e7 / u
-    return -hx, hx, -hy, hy
-
-
-def _beam_footprint_outline(case, u, fwhm_mm, *, R=_IDENTITY_R, n_points=96):
-    """Closed ``(x, y, z)`` outline [display units] of the collimated beam spot
-    where it strikes the tilted entrance face ``z = 0`` (SAMPLE frame), for the
-    realistic-scale view, rotated into the lab frame by ``R``.
-
-    The lab beam is a round spot travelling along ``+z_lab``; on a face tilted by
-    (``tilt_deg``, ``tilt_azim_deg``) its footprint elongates by ``1 / cos(tilt)``
-    along the azimuth -- the grazing-incidence stretch that can outgrow the finite
-    crystal. Reuse :func:`pyrite.montecarlo.geometry.project_beam_entry` so the
-    drawn outline matches transport's own entry mapping exactly. Returns ``None``
-    for the legacy point beam (``fwhm_mm`` falsy / absent).
-
-    ``fwhm_mm`` is the ALREADY-RESOLVED lab-plane spot FWHM (the caller's
-    ``beam_fwhm_mm`` override or the case's own default -- resolved once by the
-    caller so this draws exactly the spot that was transported, never re-reading
-    ``case`` itself). Draw the outline at the FWHM contour (lab radius =
-    ``fwhm_mm / 2``, mm -> Ang factor 1e7). Sample a ring of ``n_points`` lab
-    offsets ``(u_i, v_i)`` on that circle, project them, and divide the
-    resulting sample-frame (x, y) by ``u`` for display units before rotating.
-    """
-    if not fwhm_mm:
-        return None
-    radius_ang = 0.5 * float(fwhm_mm) * 1e7  # FWHM-contour radius, mm -> Ang
-    phi = np.linspace(0.0, 2.0 * np.pi, n_points, endpoint=True)  # closed loop
-    offsets_uv = radius_ang * np.column_stack((np.cos(phi), np.sin(phi)))
-    entry = project_beam_entry(
-        offsets_uv,
-        np.deg2rad(case.get("tilt_deg", 0.0)),
-        np.deg2rad(case.get("tilt_azim_deg", 0.0)),
-    )
-    pts = _rotate(np.column_stack((entry[:, 0] / u, entry[:, 1] / u, np.zeros(len(entry)))), R)
-    return pts[:, 0], pts[:, 1], pts[:, 2]
 
 
 def _incident_beam_lines(data, length, *, R=_IDENTITY_R):

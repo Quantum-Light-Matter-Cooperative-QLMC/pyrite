@@ -1,0 +1,2349 @@
+{
+  "date": "2026-10-04",
+  "environment": {
+    "os": "Ubuntu 26.04 / Linux x86_64",
+    "cpu_threads": 16,
+    "ram_gib": 30.5,
+    "renderer": "Mesa 26.0.8 llvmpipe LLVM 21.1.8 (software)",
+    "paraview": "6.0.1"
+  },
+  "inputs": {
+    "20-continuous.h5": {
+      "sha256": "d29ffe22a1864bf6305851886e0d3741be91299a5683d6ec6100a68675c93667",
+      "bytes": 288854
+    },
+    "20-shell-soft-hard.h5": {
+      "sha256": "8108de708b6b307b7133856d5d9f6845176006de65cc5d53324576206531767d",
+      "bytes": 561838
+    },
+    "200-continuous.h5": {
+      "sha256": "504251a6279348e1a8a529ef60427220df4d7deb583046da3022314487902c3d",
+      "bytes": 2725192
+    },
+    "200-shell-soft-hard.h5": {
+      "sha256": "baf2233dc83f4b934b0f00dd29f058258653ec3b4b83101182b4df8687a781db",
+      "bytes": 5548087
+    }
+  },
+  "notes": [
+    "Three sequential fresh-process trials per backend/input; tracks only, 800x600.",
+    "Replicated cases repeat whole showers with distinct identities; not fresh large transport.",
+    "Plotly Kaleido PNG exports launch Chrome per sample; PyVista retains its render window. No interactive FPS comparison.",
+    "Peak RSS is Python/native process only; excludes Chrome subprocesses. VRAM and whole-process-tree memory not measured.",
+    "ParaView Show/ResetCamera can initialize rendering before the first explicit Render; compare load/build/render together.",
+    "Plotly ten-million arm not attempted; native ten-million success is not a supported workload promise."
+  ],
+  "trame": {
+    "mode": "VtkRemoteView",
+    "client_connected": false,
+    "transitions": [
+      {
+        "energy_min": 0,
+        "secondaries": true,
+        "cells": 29756,
+        "state_to_update_s": 0.02014058499935345
+      },
+      {
+        "energy_min": 10,
+        "secondaries": true,
+        "cells": 23504,
+        "state_to_update_s": 0.032408754999778466
+      },
+      {
+        "energy_min": 10,
+        "secondaries": false,
+        "cells": 22370,
+        "state_to_update_s": 0.0300189629997476
+      },
+      {
+        "energy_min": 0,
+        "secondaries": true,
+        "cells": 29756,
+        "state_to_update_s": 0.0314976879999449
+      }
+    ],
+    "notes": "No client attached. Rendered mapper cell counts verified. Timings include a deliberate 20ms event-loop yield and are not interaction measurements."
+  },
+  "runs": [
+    {
+      "artifact": "20-continuous.h5",
+      "case": {
+        "E0_keV": 20.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "inelastic_model": "continuous",
+        "name": "Si-20keV-continuous",
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 20000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 1961,
+      "tracks": 8,
+      "input_bytes": 288854,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.12986264400024083,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.0044383549993654015,
+      "serialized_bytes": 648795,
+      "filter_s": 0.00011959200037381379,
+      "filter_cells": 1230,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.0924827329999971,
+      "first_render_s": 4.127512123000088,
+      "repeat_camera_render_s": [
+        4.012006074000055,
+        4.263214309999967
+      ],
+      "peak_rss_mib": 374.59375,
+      "png_bytes": 89217,
+      "trial": 0,
+      "probe": "20-continuous-plotly"
+    },
+    {
+      "artifact": "20-continuous.h5",
+      "case": {
+        "E0_keV": 20.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "inelastic_model": "continuous",
+        "name": "Si-20keV-continuous",
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 20000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 1961,
+      "tracks": 8,
+      "input_bytes": 288854,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.11203114799991454,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.005647969999699853,
+      "serialized_bytes": 648795,
+      "filter_s": 0.00015822300065337913,
+      "filter_cells": 1230,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.11268743200071185,
+      "first_render_s": 2.838788363999811,
+      "repeat_camera_render_s": [
+        2.7496111750006094,
+        3.3105673569998544
+      ],
+      "peak_rss_mib": 374.828125,
+      "png_bytes": 89217,
+      "trial": 1,
+      "probe": "20-continuous-plotly"
+    },
+    {
+      "artifact": "20-continuous.h5",
+      "case": {
+        "E0_keV": 20.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "inelastic_model": "continuous",
+        "name": "Si-20keV-continuous",
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 20000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 1961,
+      "tracks": 8,
+      "input_bytes": 288854,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.15963625200038223,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.004130612000153633,
+      "serialized_bytes": 648795,
+      "filter_s": 0.00019214699932490475,
+      "filter_cells": 1230,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.13184607699986373,
+      "first_render_s": 3.269347067000126,
+      "repeat_camera_render_s": [
+        2.8605166259994803,
+        3.088074674999916
+      ],
+      "peak_rss_mib": 374.06640625,
+      "png_bytes": 89217,
+      "trial": 2,
+      "probe": "20-continuous-plotly"
+    },
+    {
+      "artifact": "20-continuous.h5",
+      "case": {
+        "E0_keV": 20.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "inelastic_model": "continuous",
+        "name": "Si-20keV-continuous",
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 20000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 1961,
+      "tracks": 8,
+      "input_bytes": 288854,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.09801919700021244,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.0019144830002915114,
+      "filter_cells": 1230,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:42:53 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.013065619000371953,
+      "build_s": 0.6840715300004376,
+      "first_render_s": 0.5385218940000414,
+      "repeat_camera_render_s": [
+        0.0016300679999403656,
+        0.001083617999938724
+      ],
+      "peak_rss_mib": 648.3984375,
+      "png_bytes": 32114,
+      "trial": 0,
+      "probe": "20-continuous-pyvista"
+    },
+    {
+      "artifact": "20-continuous.h5",
+      "case": {
+        "E0_keV": 20.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "inelastic_model": "continuous",
+        "name": "Si-20keV-continuous",
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 20000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 1961,
+      "tracks": 8,
+      "input_bytes": 288854,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.1510409750007966,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.0010020569998232531,
+      "filter_cells": 1230,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:43:09 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.015335842999775195,
+      "build_s": 0.8571861059999719,
+      "first_render_s": 0.6246982819993718,
+      "repeat_camera_render_s": [
+        0.0013841050003975397,
+        0.0010304580000592978
+      ],
+      "peak_rss_mib": 648.890625,
+      "png_bytes": 32114,
+      "trial": 1,
+      "probe": "20-continuous-pyvista"
+    },
+    {
+      "artifact": "20-continuous.h5",
+      "case": {
+        "E0_keV": 20.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "inelastic_model": "continuous",
+        "name": "Si-20keV-continuous",
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 20000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 1961,
+      "tracks": 8,
+      "input_bytes": 288854,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.16321406499992008,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.0020367510005598888,
+      "filter_cells": 1230,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:43:26 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.012946314999680908,
+      "build_s": 0.6992812700000286,
+      "first_render_s": 0.4824370259993884,
+      "repeat_camera_render_s": [
+        0.005658807999679993,
+        0.006143916999462817
+      ],
+      "peak_rss_mib": 648.4375,
+      "png_bytes": 32114,
+      "trial": 2,
+      "probe": "20-continuous-pyvista"
+    },
+    {
+      "artifact": "20-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 20.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-20keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 20000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 2561,
+      "tracks": 17,
+      "input_bytes": 561838,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.13911391500005266,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.004716593999546603,
+      "serialized_bytes": 848590,
+      "filter_s": 0.00023010099994280608,
+      "filter_cells": 1478,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.0845192760007194,
+      "first_render_s": 3.2580241949999618,
+      "repeat_camera_render_s": [
+        2.821780753999519,
+        3.021889826000006
+      ],
+      "peak_rss_mib": 377.6328125,
+      "png_bytes": 97844,
+      "trial": 0,
+      "probe": "20-shell-soft-hard-plotly"
+    },
+    {
+      "artifact": "20-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 20.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-20keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 20000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 2561,
+      "tracks": 17,
+      "input_bytes": 561838,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.16514864700002363,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.006575341999450757,
+      "serialized_bytes": 848590,
+      "filter_s": 0.00014891600039845798,
+      "filter_cells": 1478,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.11275091200059251,
+      "first_render_s": 3.8278918380001414,
+      "repeat_camera_render_s": [
+        2.980426608000016,
+        3.6161901300001773
+      ],
+      "peak_rss_mib": 378.796875,
+      "png_bytes": 97844,
+      "trial": 1,
+      "probe": "20-shell-soft-hard-plotly"
+    },
+    {
+      "artifact": "20-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 20.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-20keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 20000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 2561,
+      "tracks": 17,
+      "input_bytes": 561838,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.13046550099988963,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.004975345999810088,
+      "serialized_bytes": 848590,
+      "filter_s": 0.0001482010002291645,
+      "filter_cells": 1478,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.081063358999927,
+      "first_render_s": 2.5649588529995526,
+      "repeat_camera_render_s": [
+        2.8797012499999255,
+        3.416769330000534
+      ],
+      "peak_rss_mib": 377.046875,
+      "png_bytes": 97844,
+      "trial": 2,
+      "probe": "20-shell-soft-hard-plotly"
+    },
+    {
+      "artifact": "20-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 20.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-20keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 20000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 2561,
+      "tracks": 17,
+      "input_bytes": 561838,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.1910596670004452,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.0011431220000304165,
+      "filter_cells": 1478,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:43:43 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.01403176399981021,
+      "build_s": 0.7043652219999785,
+      "first_render_s": 0.7376923969995914,
+      "repeat_camera_render_s": [
+        0.0016422629996668547,
+        0.0011598040000535548
+      ],
+      "peak_rss_mib": 662.65625,
+      "png_bytes": 36565,
+      "trial": 0,
+      "probe": "20-shell-soft-hard-pyvista"
+    },
+    {
+      "artifact": "20-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 20.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-20keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 20000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 2561,
+      "tracks": 17,
+      "input_bytes": 561838,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.15562797199982015,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.0009971400004360476,
+      "filter_cells": 1478,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:44:01 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.014161746999889147,
+      "build_s": 0.6823511140000846,
+      "first_render_s": 0.8489284910001516,
+      "repeat_camera_render_s": [
+        0.001402358999257558,
+        0.0009433860004719463
+      ],
+      "peak_rss_mib": 661.9453125,
+      "png_bytes": 36565,
+      "trial": 1,
+      "probe": "20-shell-soft-hard-pyvista"
+    },
+    {
+      "artifact": "20-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 20.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-20keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 20000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 2561,
+      "tracks": 17,
+      "input_bytes": 561838,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.14131829100006144,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.0017268780002268613,
+      "filter_cells": 1478,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:44:17 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.014563386000190803,
+      "build_s": 0.7067435260005368,
+      "first_render_s": 0.748482941000475,
+      "repeat_camera_render_s": [
+        0.006876689999444352,
+        0.00826323000001139
+      ],
+      "peak_rss_mib": 663.625,
+      "png_bytes": 36565,
+      "trial": 2,
+      "probe": "20-shell-soft-hard-pyvista"
+    },
+    {
+      "artifact": "200-continuous.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "inelastic_model": "continuous",
+        "name": "Si-200keV-continuous",
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 20559,
+      "tracks": 8,
+      "input_bytes": 2725192,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.10623469699930865,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.03858569299973169,
+      "serialized_bytes": 6725466,
+      "filter_s": 0.0005072059993835865,
+      "filter_cells": 10024,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.10130390400081524,
+      "first_render_s": 3.4587254680000115,
+      "repeat_camera_render_s": [
+        3.1832818129996667,
+        3.451297390000036
+      ],
+      "peak_rss_mib": 508.6328125,
+      "png_bytes": 89274,
+      "trial": 0,
+      "probe": "200-continuous-plotly"
+    },
+    {
+      "artifact": "200-continuous.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "inelastic_model": "continuous",
+        "name": "Si-200keV-continuous",
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 20559,
+      "tracks": 8,
+      "input_bytes": 2725192,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.10913696599982359,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.026828114999261743,
+      "serialized_bytes": 6725466,
+      "filter_s": 0.00042042499990202487,
+      "filter_cells": 10024,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.08987184800025716,
+      "first_render_s": 3.373885300999973,
+      "repeat_camera_render_s": [
+        4.624448517999554,
+        5.009244707000107
+      ],
+      "peak_rss_mib": 486.0546875,
+      "png_bytes": 89274,
+      "trial": 1,
+      "probe": "200-continuous-plotly"
+    },
+    {
+      "artifact": "200-continuous.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "inelastic_model": "continuous",
+        "name": "Si-200keV-continuous",
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 20559,
+      "tracks": 8,
+      "input_bytes": 2725192,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.09927637100008724,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.03420463099973858,
+      "serialized_bytes": 6725466,
+      "filter_s": 0.00042989700068574166,
+      "filter_cells": 10024,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.11352698500013503,
+      "first_render_s": 3.3425719030001346,
+      "repeat_camera_render_s": [
+        3.3003160869993735,
+        3.6474302719998377
+      ],
+      "peak_rss_mib": 545.1328125,
+      "png_bytes": 89274,
+      "trial": 2,
+      "probe": "200-continuous-plotly"
+    },
+    {
+      "artifact": "200-continuous.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "inelastic_model": "continuous",
+        "name": "Si-200keV-continuous",
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 20559,
+      "tracks": 8,
+      "input_bytes": 2725192,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.1003753790000701,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.0062869530001989915,
+      "filter_cells": 10024,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:44:35 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.014103835999776493,
+      "build_s": 0.688473757999418,
+      "first_render_s": 0.5596325420001449,
+      "repeat_camera_render_s": [
+        0.003912279999894963,
+        0.006235020000531222
+      ],
+      "peak_rss_mib": 658.2421875,
+      "png_bytes": 40673,
+      "trial": 0,
+      "probe": "200-continuous-pyvista"
+    },
+    {
+      "artifact": "200-continuous.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "inelastic_model": "continuous",
+        "name": "Si-200keV-continuous",
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 20559,
+      "tracks": 8,
+      "input_bytes": 2725192,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.11738760499974887,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.002110683999489993,
+      "filter_cells": 10024,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:44:55 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.02018678500007809,
+      "build_s": 0.6769930109994675,
+      "first_render_s": 0.5169433460005166,
+      "repeat_camera_render_s": [
+        0.003753919999326172,
+        0.0011626830000750488
+      ],
+      "peak_rss_mib": 656.7265625,
+      "png_bytes": 40673,
+      "trial": 1,
+      "probe": "200-continuous-pyvista"
+    },
+    {
+      "artifact": "200-continuous.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "inelastic_model": "continuous",
+        "name": "Si-200keV-continuous",
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 20559,
+      "tracks": 8,
+      "input_bytes": 2725192,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.10042555600011838,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.00187017600001127,
+      "filter_cells": 10024,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:45:12 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.012300354999752017,
+      "build_s": 0.5231858939996528,
+      "first_render_s": 0.42495413100004953,
+      "repeat_camera_render_s": [
+        0.0013547059998018085,
+        0.0009360089998153853
+      ],
+      "peak_rss_mib": 657.58203125,
+      "png_bytes": 40673,
+      "trial": 2,
+      "probe": "200-continuous-pyvista"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 29756,
+      "tracks": 113,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.11167470999953366,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.0363026479999462,
+      "serialized_bytes": 9740668,
+      "filter_s": 0.0004892139995718026,
+      "filter_cells": 11673,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.08207032900008926,
+      "first_render_s": 2.970868165999491,
+      "repeat_camera_render_s": [
+        2.99327313699996,
+        2.933413636000296
+      ],
+      "peak_rss_mib": 572.84375,
+      "png_bytes": 90481,
+      "trial": 0,
+      "probe": "200-shell-soft-hard-plotly"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 29756,
+      "tracks": 113,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.13669850099995529,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.0420811859994501,
+      "serialized_bytes": 9740668,
+      "filter_s": 0.0005276029996821308,
+      "filter_cells": 11673,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.1044108590003816,
+      "first_render_s": 3.432799219000117,
+      "repeat_camera_render_s": [
+        3.5639152610001474,
+        3.226818557000115
+      ],
+      "peak_rss_mib": 539.671875,
+      "png_bytes": 90481,
+      "trial": 1,
+      "probe": "200-shell-soft-hard-plotly"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 29756,
+      "tracks": 113,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.11540129199966032,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.03879939799935528,
+      "serialized_bytes": 9740668,
+      "filter_s": 0.0005543560000660364,
+      "filter_cells": 11673,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.08930906500063429,
+      "first_render_s": 3.987119191000602,
+      "repeat_camera_render_s": [
+        3.4217183589998967,
+        3.7282469080000737
+      ],
+      "peak_rss_mib": 539.5546875,
+      "png_bytes": 90481,
+      "trial": 2,
+      "probe": "200-shell-soft-hard-plotly"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 29756,
+      "tracks": 113,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.10785962699992524,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.0019084850000581355,
+      "filter_cells": 11673,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:45:27 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.016294062999804737,
+      "build_s": 0.4979559210005391,
+      "first_render_s": 0.5266525199995158,
+      "repeat_camera_render_s": [
+        0.0013859079999747337,
+        0.0013128390000929357
+      ],
+      "peak_rss_mib": 673.23046875,
+      "png_bytes": 39597,
+      "trial": 0,
+      "probe": "200-shell-soft-hard-pyvista"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 29756,
+      "tracks": 113,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.11910748699938267,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.0019144010002491996,
+      "filter_cells": 11673,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:45:44 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.01321085600011429,
+      "build_s": 0.5610006920005617,
+      "first_render_s": 0.5533865440002046,
+      "repeat_camera_render_s": [
+        0.0012935249997099163,
+        0.0009544630001983023
+      ],
+      "peak_rss_mib": 672.75390625,
+      "png_bytes": 39597,
+      "trial": 1,
+      "probe": "200-shell-soft-hard-pyvista"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 1,
+      "synthetic_scaling": false,
+      "segments": 29756,
+      "tracks": 113,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.11124372199992649,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.00209367299976293,
+      "filter_cells": 11673,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:46:01 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.014284626000517164,
+      "build_s": 0.5185968400001002,
+      "first_render_s": 0.5318307730003653,
+      "repeat_camera_render_s": [
+        0.0013374350000958657,
+        0.0008899660006136401
+      ],
+      "peak_rss_mib": 672.55859375,
+      "png_bytes": 39597,
+      "trial": 2,
+      "probe": "200-shell-soft-hard-pyvista"
+    },
+    {
+      "version": "(6, 0)",
+      "input": "200-shell-soft-hard.vtp",
+      "load_s": 0.11557992800044303,
+      "build_s": 2.4780844759998217,
+      "first_render_s": 0.009986369999751332,
+      "repeat_render_s": [
+        0.010961825999402208,
+        0.011605145999965316,
+        0.010993296000378905
+      ],
+      "screenshot_s": 0.049786024000241014,
+      "filter_s": 0.018525813999985985,
+      "secondary_cells": 6224,
+      "peak_rss_mib": 731.5,
+      "trial": 0,
+      "probe": "paraview"
+    },
+    {
+      "version": "(6, 0)",
+      "input": "200-shell-soft-hard.vtp",
+      "load_s": 0.08291032099987206,
+      "build_s": 1.9313345840000693,
+      "first_render_s": 0.009804024999539251,
+      "repeat_render_s": [
+        0.010411440000098082,
+        0.009748545000547892,
+        0.010419446999549109
+      ],
+      "screenshot_s": 0.04265451100036444,
+      "filter_s": 0.01443599800040829,
+      "secondary_cells": 6224,
+      "peak_rss_mib": 732.78515625,
+      "trial": 1,
+      "probe": "paraview"
+    },
+    {
+      "version": "(6, 0)",
+      "input": "200-shell-soft-hard.vtp",
+      "load_s": 0.13365900499957206,
+      "build_s": 2.1467996350002068,
+      "first_render_s": 0.013193466000302578,
+      "repeat_render_s": [
+        0.0381537200000821,
+        0.05496609000056196,
+        0.012200333000691899
+      ],
+      "screenshot_s": 0.03392284599976847,
+      "filter_s": 0.009962630999325484,
+      "secondary_cells": 6224,
+      "peak_rss_mib": 732.80078125,
+      "trial": 2,
+      "probe": "paraview"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 336,
+      "synthetic_scaling": true,
+      "segments": 9998016,
+      "tracks": 37968,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.3783496739997645,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.6851423019998037,
+      "filter_cells": 3922128,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:53:22 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.021156133000658883,
+      "build_s": 3.634880988000077,
+      "first_render_s": 3.7305162359998576,
+      "repeat_camera_render_s": [
+        0.001160821000667056,
+        0.0010307120001016301
+      ],
+      "peak_rss_mib": 6023.1640625,
+      "png_bytes": 39582,
+      "trial": 0,
+      "probe": "replicate-336-pyvista"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 336,
+      "synthetic_scaling": true,
+      "segments": 9998016,
+      "tracks": 37968,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.3640790449999258,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.6373488549998001,
+      "filter_cells": 3922128,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:53:34 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.014934816999812028,
+      "build_s": 3.457262219000768,
+      "first_render_s": 3.6662171099997067,
+      "repeat_camera_render_s": [
+        0.003390357000171207,
+        0.0033163139996759128
+      ],
+      "peak_rss_mib": 5959.53515625,
+      "png_bytes": 39582,
+      "trial": 1,
+      "probe": "replicate-336-pyvista"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 336,
+      "synthetic_scaling": true,
+      "segments": 9998016,
+      "tracks": 37968,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.5349913380005091,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 1.1715376709998964,
+      "filter_cells": 3922128,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:53:49 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.019906642000023567,
+      "build_s": 4.108326253000087,
+      "first_render_s": 4.757602820000102,
+      "repeat_camera_render_s": [
+        0.001724805999401724,
+        0.0015627650000169524
+      ],
+      "peak_rss_mib": 5886.27734375,
+      "png_bytes": 39582,
+      "trial": 2,
+      "probe": "replicate-336-pyvista"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 34,
+      "synthetic_scaling": true,
+      "segments": 1011704,
+      "tracks": 3842,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.12883262400009698,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 1.4446432350005125,
+      "serialized_bytes": 330149182,
+      "filter_s": 0.01508131099944876,
+      "filter_cells": 396882,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.4371436760002325,
+      "first_render_s": 28.444970773000023,
+      "repeat_camera_render_s": [
+        30.73835522599984,
+        29.465093273999628
+      ],
+      "peak_rss_mib": 2113.31640625,
+      "png_bytes": 90474,
+      "trial": 0,
+      "probe": "replicate-34-plotly"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 34,
+      "synthetic_scaling": true,
+      "segments": 1011704,
+      "tracks": 3842,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.13788284699967335,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 1.2786823489996095,
+      "serialized_bytes": 330149182,
+      "filter_s": 0.012953178999850934,
+      "filter_cells": 396882,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.43111671400038176,
+      "first_render_s": 28.268233960000543,
+      "repeat_camera_render_s": [
+        28.339381843999945,
+        28.57994385299935
+      ],
+      "peak_rss_mib": 2113.37109375,
+      "png_bytes": 90474,
+      "trial": 1,
+      "probe": "replicate-34-plotly"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 34,
+      "synthetic_scaling": true,
+      "segments": 1011704,
+      "tracks": 3842,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.13012512900058937,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 1.1992789590003667,
+      "serialized_bytes": 330149182,
+      "filter_s": 0.013560288000007858,
+      "filter_cells": 396882,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.4291386879995116,
+      "first_render_s": 28.15896721199988,
+      "repeat_camera_render_s": [
+        26.87601953000012,
+        27.837860575999912
+      ],
+      "peak_rss_mib": 2112.68359375,
+      "png_bytes": 90474,
+      "trial": 2,
+      "probe": "replicate-34-plotly"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 34,
+      "synthetic_scaling": true,
+      "segments": 1011704,
+      "tracks": 3842,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.13418243399974017,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.057288396999865654,
+      "filter_cells": 396882,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:48:45 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.01163672700022289,
+      "build_s": 0.7191605139996682,
+      "first_render_s": 0.7514837839999018,
+      "repeat_camera_render_s": [
+        0.0009780079999472946,
+        0.0008341310003743274
+      ],
+      "peak_rss_mib": 1196.84765625,
+      "png_bytes": 39582,
+      "trial": 0,
+      "probe": "replicate-34-pyvista"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 34,
+      "synthetic_scaling": true,
+      "segments": 1011704,
+      "tracks": 3842,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.12364311600049405,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.052333194999846455,
+      "filter_cells": 396882,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:50:18 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.011739399000362027,
+      "build_s": 0.6930740119996699,
+      "first_render_s": 0.7450725110002168,
+      "repeat_camera_render_s": [
+        0.0009330040002168971,
+        0.0007773269999233889
+      ],
+      "peak_rss_mib": 1191.08984375,
+      "png_bytes": 39582,
+      "trial": 1,
+      "probe": "replicate-34-pyvista"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 34,
+      "synthetic_scaling": true,
+      "segments": 1011704,
+      "tracks": 3842,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.12714767799934634,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.05480061999969621,
+      "filter_cells": 396882,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:51:48 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.011856940000143368,
+      "build_s": 0.6653154540008472,
+      "first_render_s": 0.6958607099995788,
+      "repeat_camera_render_s": [
+        0.0009034669992615818,
+        0.0007613400002810522
+      ],
+      "peak_rss_mib": 1189.44921875,
+      "png_bytes": 39582,
+      "trial": 2,
+      "probe": "replicate-34-pyvista"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 4,
+      "synthetic_scaling": true,
+      "segments": 119024,
+      "tracks": 452,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.12186669099992287,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.14674572700005228,
+      "serialized_bytes": 38883189,
+      "filter_s": 0.00253353399966727,
+      "filter_cells": 46692,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.1453765050000584,
+      "first_render_s": 5.589580301000751,
+      "repeat_camera_render_s": [
+        5.433631341999899,
+        5.477762444999826
+      ],
+      "peak_rss_mib": 610.45703125,
+      "png_bytes": 90529,
+      "trial": 0,
+      "probe": "replicate-4-plotly"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 4,
+      "synthetic_scaling": true,
+      "segments": 119024,
+      "tracks": 452,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.11747548099992855,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.13616696799999772,
+      "serialized_bytes": 38883189,
+      "filter_s": 0.0017822250001700013,
+      "filter_cells": 46692,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.15235622500040336,
+      "first_render_s": 5.264311701999759,
+      "repeat_camera_render_s": [
+        5.094880652000029,
+        5.1413044610008
+      ],
+      "peak_rss_mib": 634.10546875,
+      "png_bytes": 90529,
+      "trial": 1,
+      "probe": "replicate-4-plotly"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "plotly",
+      "replicate": 4,
+      "synthetic_scaling": true,
+      "segments": 119024,
+      "tracks": 452,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.11858263800058921,
+      "render_size": [
+        800,
+        600
+      ],
+      "serialize_s": 0.13706504099991434,
+      "serialized_bytes": 38883189,
+      "filter_s": 0.0018459290004102513,
+      "filter_cells": 46692,
+      "kaleido": "1.4.0",
+      "renderer": "Kaleido Chrome; each image export includes browser lifecycle",
+      "build_s": 0.11865675299941358,
+      "first_render_s": 6.01323177499944,
+      "repeat_camera_render_s": [
+        5.18899975199929,
+        5.077238091000254
+      ],
+      "peak_rss_mib": 622.234375,
+      "png_bytes": 90529,
+      "trial": 2,
+      "probe": "replicate-4-plotly"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 4,
+      "synthetic_scaling": true,
+      "segments": 119024,
+      "tracks": 452,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.12495218499952898,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.007651623000128893,
+      "filter_cells": 46692,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:46:24 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.01191985500008741,
+      "build_s": 0.6233307540005626,
+      "first_render_s": 0.6328789910003252,
+      "repeat_camera_render_s": [
+        0.0010852200002773316,
+        0.001047742999617185
+      ],
+      "peak_rss_mib": 716.203125,
+      "png_bytes": 39584,
+      "trial": 0,
+      "probe": "replicate-4-pyvista"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 4,
+      "synthetic_scaling": true,
+      "segments": 119024,
+      "tracks": 452,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.11623455599965382,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.006991740000557911,
+      "filter_cells": 46692,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:46:45 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.011886543000400707,
+      "build_s": 0.5095330700005434,
+      "first_render_s": 0.5422792299996217,
+      "repeat_camera_render_s": [
+        0.0011301150007057004,
+        0.000992563999716367
+      ],
+      "peak_rss_mib": 716.31640625,
+      "png_bytes": 39584,
+      "trial": 1,
+      "probe": "replicate-4-pyvista"
+    },
+    {
+      "artifact": "200-shell-soft-hard.h5",
+      "case": {
+        "E0_keV": 200.0,
+        "Ne": 8,
+        "beam_fwhm_mm": null,
+        "composition": [
+          [
+            "Si",
+            0.049942993373787194
+          ]
+        ],
+        "crystal": "silicon",
+        "crystal_height_mm": null,
+        "crystal_width_mm": null,
+        "energy_model": "midpoint",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_model": "shell-soft-hard",
+        "name": "Si-200keV-shell-soft-hard",
+        "secondary_threshold_eV": 1000.0,
+        "seed": 11,
+        "theta_obs_rad": 1.5707963267948966,
+        "thickness_ang": 2000000.0,
+        "tilt_azim_deg": 0.0,
+        "tilt_deg": 0.0
+      },
+      "backend": "pyvista",
+      "replicate": 4,
+      "synthetic_scaling": true,
+      "segments": 119024,
+      "tracks": 452,
+      "input_bytes": 5548087,
+      "python": "3.14.4",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+      "numpy": "2.5.3",
+      "plotly": "7.1.0",
+      "prepare_s": 0.1079812789994321,
+      "render_size": [
+        800,
+        600
+      ],
+      "filter_s": 0.006640122999669984,
+      "filter_cells": 46692,
+      "pyvista": "0.49.0",
+      "vtk": "9.7.1",
+      "renderer": "\n--------------------------------------------------------------------------------\n  Date: Mon Oct 05 01:47:08 2026 UTC\n\n                OS : Linux (Ubuntu 26.04)\n            CPU(s) : 16\n           Machine : x86_64\n      Architecture : 64bit\n               RAM : 30.5 GiB\n       Environment : Python\n       File system : ext4\n        GPU Vendor : Mesa\n      GPU Renderer : llvmpipe (LLVM 21.1.8, 256 bits)\n       GPU Version : 4.5 (Core Profile) Mesa 26.0.8-1ubuntu0.3\n     Render Window : vtkXOpenGLRenderWindow\n  MathText Support : True\n\n  Python 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]\n\n           pyvista : 0.49.0\n               vtk : 9.7.1\n             numpy : 2.5.3\n        matplotlib : 3.11.2\n            scooby : 0.12.0\n             pooch : 1.9.0\n            pillow : 12.3.0\n typing-extensions : 4.16.0\n          cyclopts : 5.1.1\npyvista-validation : 0.2.2\n           IPython : 9.17.1\n             scipy : 1.18.1\n              tqdm : 4.70.1\n           imageio : 2.37.4\n          colorcet : 3.2.1\n        ipywidgets : 8.1.9\n--------------------------------------------------------------------------------",
+      "png_encode_s": 0.011874314000124286,
+      "build_s": 0.5196197290006239,
+      "first_render_s": 0.5368624019993149,
+      "repeat_camera_render_s": [
+        0.0011089269992226036,
+        0.0009058750001713634
+      ],
+      "peak_rss_mib": 717.08203125,
+      "png_bytes": 39584,
+      "trial": 2,
+      "probe": "replicate-4-pyvista"
+    }
+  ]
+}

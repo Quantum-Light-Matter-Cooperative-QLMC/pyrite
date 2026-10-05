@@ -18,6 +18,7 @@ Layout (``schema_version`` 2)::
                                case_type -- "Case" or "mapping"
     /case/payload       the same case as a typed node tree (exact round trip)
     /provenance         attrs: json -- run-level identity (stem, profile, ...)
+    /scene              optional attrs: json -- resolved physical scene (lab mm)
     /settings           attrs: json -- resolved transport controls
                         E_cut_by_electrons  (Ne_transport,) keV
     /spectrum_inputs    optional typed tree: every non-segment input the
@@ -186,11 +187,15 @@ class TrajectoryCapture:
     provenance
         JSON-safe run-level identity recorded in every artifact. A
         ``parameter_sha256`` entry also takes part in stale-artifact detection.
+    scene
+        Optional JSON-safe resolved downstream geometry, independent of the
+        case digest. Preserved in every captured artifact.
     """
 
     root: str
     overwrite: bool = False
     provenance: Mapping[str, Any] = field(default_factory=dict)
+    scene: Mapping[str, Any] | None = None
 
     def path_for(self, case: Mapping[str, Any]) -> Path:
         """Final artifact path of ``case``."""
@@ -210,6 +215,7 @@ class TrajectoryCapture:
             case=case,
             settings=settings,
             provenance=self.provenance,
+            scene=self.scene,
             overwrite=self.overwrite,
             spectrum_inputs=spectrum_inputs,
         )
@@ -382,6 +388,7 @@ def write_trajectory_artifact(
     case: Mapping[str, Any],
     settings: Mapping[str, Any] | None = None,
     provenance: Mapping[str, Any] | None = None,
+    scene: Mapping[str, Any] | None = None,
     overwrite: bool = False,
     spectrum_inputs: Mapping[str, Any] | None = None,
 ) -> Path:
@@ -402,6 +409,9 @@ def write_trajectory_artifact(
         as a dataset; everything else as JSON.
     provenance
         JSON-safe run-level identity.
+    scene
+        Optional resolved physical geometry in lab mm, separate from transport
+        identity. Old artifacts without this group remain readable.
     overwrite
         Replace an existing complete artifact at ``path``.
     spectrum_inputs
@@ -449,6 +459,9 @@ def write_trajectory_artifact(
             _write_node(case_group, "payload", dict(case), {}, None)
             handle.create_group("provenance").attrs["json"] = _dumps(provenance or {})
             handle.attrs["parameter_sha256"] = str((provenance or {}).get("parameter_sha256", ""))
+            if scene is not None:
+                handle.create_group("scene").attrs["json"] = _dumps(scene)
+                handle.attrs["scene_sha256"] = case_digest(scene)
             settings_group = handle.create_group("settings")
             settings_group.attrs["json"] = _dumps(settings)
             if cutoffs is not None:
@@ -557,6 +570,7 @@ class TrajectoryArtifact:
     units: dict[str, str]
     attrs: dict[str, Any]
     spectrum_inputs: dict[str, Any] | None = None
+    scene: dict[str, Any] | None = None
 
 
 def _header_attrs(handle) -> dict[str, Any]:
@@ -617,6 +631,7 @@ def read_trajectory_artifact(
             schema_version=int(handle.attrs["schema_version"]),
             case=_read_case(handle["case"]),
             provenance=json.loads(handle["provenance"].attrs["json"]),
+            scene=json.loads(handle["scene"].attrs["json"]) if "scene" in handle else None,
             settings=settings,
             transport=(
                 _read_node(
@@ -796,13 +811,16 @@ def preflight_capture(
             and stored_parameters is not None
             and stored_parameters != expected_parameters
         )
+        mismatched |= capture.scene is not None and header.get("scene_sha256") != case_digest(
+            capture.scene
+        )
         if will_run:
             if not capture.overwrite:
                 existing_to_run.append(path)
             replaced += 1
         elif mismatched:
             raise TrajectoryArtifactError(
-                f"trajectory artifact {path} records different physics than the requested "
+                f"trajectory artifact {path} records different physics or scene than the requested "
                 "case; remove it or choose another trajectory directory"
             )
         else:

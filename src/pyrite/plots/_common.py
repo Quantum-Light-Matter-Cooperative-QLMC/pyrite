@@ -9,6 +9,8 @@ mpl/altair/plotly backends. No matplotlib, Altair or Plotly imports here --
 
 import numpy as np
 
+from .._scene_geometry import groove_profile_knots as groove_profile_knots
+from .._scene_geometry import groove_spec as _groove_spec  # noqa: F401
 from .._spectral_components import incident_spectrum, line_spectrum
 from ..detectors import Detector, EagleXO, LegacyEDS, Timepix3
 from ..detectors import eaglexo_response as eag
@@ -172,32 +174,6 @@ def _case_of(rec_or_case):
     return rec_or_case.get("case", rec_or_case)
 
 
-def _groove_spec(case):
-    """Blazed :class:`~pyrite.montecarlo.groove.GrooveSpec` for a case carrying a
-    ``groove_spacing_ang`` knob, or ``None`` when it is absent.
-
-    Mirrors ``montecarlo.runner._transport_case``'s spec construction exactly
-    (``blazed_groove_spec(spacing, theta_obs_rad, tilt_polar_rad,
-    tilt_azim_rad)``) so the penetration figures transport electrons through the
-    SAME relief facets the spectrum runner does -- no new physics, no new
-    convention. ``blazed_groove_spec`` validates the restricted geometry
-    (theta_obs = 90 deg, tilt_azim = 180 deg, 0 < tilt_polar < 90 deg) and
-    raises ``ValueError`` otherwise; callers that build cases via
-    ``sweep.build_cases`` never hit that because it rejects the same geometries
-    up front."""
-    spacing = case.get("groove_spacing_ang")
-    if spacing is None:
-        return None
-    from ..montecarlo import blazed_groove_spec
-
-    return blazed_groove_spec(
-        spacing,
-        case["theta_obs_rad"],
-        np.deg2rad(case.get("tilt_deg", 0.0)),
-        np.deg2rad(case.get("tilt_azim_deg", 0.0)),
-    )
-
-
 def groove_profile_z(x_ang, spec):
     """Sawtooth surface depth [Ang] into the slab at sample-frame lateral position
     ``x_ang`` [Ang].
@@ -209,30 +185,6 @@ def groove_profile_z(x_ang, spec):
     surface -- it introduces no new physics. numpy ufuncs only, so array input
     works elementwise."""
     return surface_depth_ang(x_ang, spec)
-
-
-def groove_profile_knots(x_lo_ang, x_hi_ang, spec, *, max_periods=200):
-    """Minimal sample-frame sawtooth vertices ``(x_ang, z_ang)`` covering
-    ``[x_lo_ang, x_hi_ang]``: two knots per period (apex at ``z = 0``, valley
-    floor at ``z = depth``), so a corrugated surface needs only ~2 vertices per
-    groove instead of a dense sweep.
-
-    Returns ``None`` when the requested span exceeds ``max_periods`` grooves --
-    the caller then falls back to the flat entrance face (drawing thousands of
-    teeth is neither legible nor cheap). ``x`` is returned strictly increasing so
-    the vertices trace the profile directly as a polyline."""
-    lam = spec.spacing_ang
-    k0 = int(np.floor(x_lo_ang / lam))
-    k1 = int(np.ceil(x_hi_ang / lam))
-    if k1 - k0 > max_periods:
-        return None
-    x_valley = spec.depth_ang * np.tan(spec.tilt_polar_rad)
-    xs = np.empty(2 * (k1 - k0 + 1))
-    ks = np.arange(k0, k1 + 1)
-    xs[0::2] = ks * lam  # apexes (z = 0)
-    xs[1::2] = ks * lam + x_valley  # valley floors (z = depth)
-    zs = groove_profile_z(xs, spec)
-    return xs, zs
 
 
 def _beam_detector_basis(beam, n_hat):

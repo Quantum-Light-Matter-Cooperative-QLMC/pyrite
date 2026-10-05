@@ -38,6 +38,7 @@ compute/transport-jit-kernel-walkthrough.md
 storage/checkpoint-case-store
 storage/dataset-identity-and-storage
 storage/result-schema
+storage/trajectory-scenes
 ../physics/beam-transport/transport-outputs
 ```
 

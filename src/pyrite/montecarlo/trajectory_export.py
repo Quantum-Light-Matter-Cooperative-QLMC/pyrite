@@ -26,6 +26,7 @@ blocks, so export memory does not scale with the segment count.
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from xml.sax.saxutils import quoteattr
@@ -33,6 +34,20 @@ from xml.sax.saxutils import quoteattr
 import numpy as np
 
 from .trajectories import TrajectoryArtifactError, read_trajectory_header
+
+
+def _field_data(metadata):
+    """VTK XML string arrays store null-terminated UTF-8 character codes."""
+    xml = ["<FieldData>\n"]
+    for name, value in metadata.items():
+        value = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+        codes = " ".join(str(byte) for byte in value.encode("utf-8") + b"\0")
+        xml.append(
+            f'<Array type="String" Name={quoteattr(name)} NumberOfTuples="1" '
+            f'format="ascii">{codes}</Array>\n'
+        )
+    return "".join([*xml, "</FieldData>\n"])
+
 
 _BLOCK_ROWS = 1 << 20
 
@@ -90,6 +105,9 @@ def export_segments_vtp(
     output: str | os.PathLike[str],
     *,
     include_vacuum: bool = True,
+    _rotation=None,
+    _origin_ang=None,
+    _metadata=None,
 ) -> dict[str, int | list[str]]:
     """Write one artifact's segments as a VTK XML PolyData file.
 
@@ -137,11 +155,17 @@ def export_segments_vtp(
             if stop <= n_seg:
                 mid = _rows("r_mid", start, stop).astype("<f8")
                 half = 0.5 * _rows("L_ang", start, stop)[:, None] * _rows("v_hat", start, stop)
-                return np.stack([mid - half, mid + half], axis=1).reshape(-1, 3)
-            a, b = start - n_seg, stop - n_seg
-            return np.stack(
-                [_rows("vacuum_start_ang", a, b), _rows("vacuum_end_ang", a, b)], axis=1
-            ).reshape(-1, 3)
+                points = np.stack([mid - half, mid + half], axis=1).reshape(-1, 3)
+            else:
+                a, b = start - n_seg, stop - n_seg
+                points = np.stack(
+                    [_rows("vacuum_start_ang", a, b), _rows("vacuum_end_ang", a, b)], axis=1
+                ).reshape(-1, 3)
+            if _rotation is not None:
+                points = points @ _rotation.T
+            if _origin_ang is not None:
+                points = points + _origin_ang
+            return points
 
         def _vacuum_values(name, a, b, dtype, components):
             shape = (b - a,) if components == 1 else (b - a, components)
@@ -178,6 +202,21 @@ def export_segments_vtp(
                 a, b = max(start, n_seg) - n_seg, stop - n_seg
                 parts.append(_vacuum_values(name, a, b, dtype, components))
             block = np.concatenate(parts) if len(parts) > 1 else parts[0]
+            if (
+                name
+                in {
+                    "v_hat",
+                    "hard_secondary_v_hat",
+                    "hard_radiative_direction",
+                    "hard_radiative_target_momentum_eV_c",
+                }
+                and _rotation is not None
+            ):
+                block = block @ _rotation.T
+            if name == "r_mid" and _rotation is not None:
+                block = block @ _rotation.T
+                if _origin_ang is not None:
+                    block = block + _origin_ang
             return np.asarray(block).astype(dtype, copy=False).reshape(stop - start, components)
 
         # Appended-raw layout: each array is a UInt64 byte count then its bytes.
@@ -200,6 +239,7 @@ def export_segments_vtp(
             '<VTKFile type="PolyData" version="1.0" byte_order="LittleEndian" '
             'header_type="UInt64">\n',
             "  <PolyData>\n",
+            _field_data(_metadata) if _metadata is not None else "",
             f'    <Piece NumberOfPoints="{2 * n_cells}" NumberOfVerts="0" '
             f'NumberOfLines="{n_cells}" NumberOfStrips="0" NumberOfPolys="0">\n',
             "      <Points>\n",

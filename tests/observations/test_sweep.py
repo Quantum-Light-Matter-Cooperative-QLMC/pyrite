@@ -93,6 +93,29 @@ def _run(tmp_path, observation, results=None):
     return complete, results
 
 
+def test_observation_capture_stores_scene_without_mutating_capture(tmp_path):
+    from pyrite.instrument.scene import scene_payload
+    from pyrite.montecarlo.trajectories import TrajectoryCapture, read_trajectory_artifact
+
+    observation = _sweep_observation(tmp_path)
+    capture = TrajectoryCapture(str(tmp_path / "trajectories"))
+    complete = run_sweep(
+        [dict(case) for case in CASES],
+        {},
+        checkpoint_dir=str(tmp_path / "checkpoints"),
+        content_key_fn=case_content_key,
+        progress=False,
+        max_workers=0,
+        observation=observation,
+        trajectory_capture=capture,
+    )
+    assert complete
+    assert capture.scene is None
+    expected = scene_payload(observation.observation.filters, observation.observation.detector)
+    for case in CASES:
+        assert read_trajectory_artifact(capture.path_for(case)).scene == expected
+
+
 @pytest.fixture
 def transports(monkeypatch) -> list[str]:
     calls: list[str] = []

@@ -733,14 +733,18 @@ Usage: pyrite checkpoint export-trajectories [OPTIONS] ARTIFACT...
   ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, or a directory
   searched recursively for them. Each artifact becomes one .vtp of two-point line cells
   in the slab frame [angstrom] with per-segment cell data, including electron_id; per-
-  electron arrays, tallies, and metadata stay only in the HDF5 artifact. Opens in
-  ParaView, VisIt, and PyVista.
+  electron arrays, tallies, and complete transport metadata stay in the authoritative
+  HDF5 artifact. Opens in ParaView, VisIt, and PyVista. --scene also exports lab-frame
+  geometry as separate close-up and instrument scenes.
 
 Options:
   --out-dir DIR  Write .vtp files under DIR, mirroring each ARTIFACT directory (default:
                  beside each artifact).
   --no-vacuum    Omit grooved runs' vacuum legs.
-  --overwrite    Replace existing .vtp outputs.
+  --overwrite    Replace existing .vtp outputs and, with --scene, scene manifests.
+  --scene        Also write separate .vtm close-up [angstrom] and .instrument.vtm [mm]
+                 scenes with private sidecar files; missing recorded geometry is
+                 omitted.
   -h, --help     Show this message and exit.
 ```
 

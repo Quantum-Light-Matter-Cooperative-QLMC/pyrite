@@ -477,6 +477,17 @@ def run_sweep(
     cached_cases = len(cases) - len(todo)
     print(f"{len(todo)} of {len(cases)} cases to run ({cached_cases} cached)")
     if trajectory_capture is not None:
+        if trajectory_capture.scene is None and observation is not None:
+            from dataclasses import replace
+
+            from ..instrument.scene import scene_payload
+
+            trajectory_capture = replace(
+                trajectory_capture,
+                scene=scene_payload(
+                    observation.observation.filters, observation.observation.detector
+                ),
+            )
         from ..montecarlo.trajectories import preflight_capture
 
         plan = preflight_capture(trajectory_capture, cases, todo)

@@ -130,6 +130,33 @@ Segments are read in whole-electron blocks of at most `--max-segments` rows (def
 
 Prefer artifact reuse when you redo only the spectrum phase of the same transported electrons, for example after a change to line, characteristic, or bremsstrahlung scoring. Prefer a seeded re-transport (`pyrite checkpoint recompute line|brem`) when no artifact exists or the change affects transport. Measured on the default 40 keV `standard` sweeps (CPU transport feeding CUDA spectra), transport took 6 to 14 times as long as the spectrum phase per case, and the GPU waited on transport 55 to 89 percent of the time. On the CPU an artifact holds about 216 bytes per segment and reads in about 1.2 microseconds per segment with a warm file cache, against about 9.6 microseconds per segment for lockstep transport. Artifacts cost disk, though: a 30,000-electron, 20 µm hopg case wrote 1.5 GB. CUDA-core transport and cold remote reads are not yet measured.
 
+### Export scene geometry
+
+```bash
+uv run pyrite checkpoint export-trajectories trajectories/hopg/ --scene
+```
+
+In addition to each original slab-frame `.vtp`, `--scene` writes two independently viewable scenes:
+
+- `<case>.vtm`: lab-frame tracks, a capture-fitted crystal crop, layer boundaries, grooves (up to 200 periods), and an entry-beam axis, in **angstrom**.
+- `<case>.instrument.vtm`: the finite target footprint and round beam FWHM outline when their dimensions were recorded, ordered filter volumes, the physical detector face with pixel-grid metadata, and the incident beam axis, in **mm**.
+
+Open these in separate views. Their coordinate scales differ by $10^7$; combining their raw coordinates in one view misrepresents physical distances. The sample entrance origin is the target reference point. Scene tracks and vectors use the recorded sample-to-lab rotation; the original `.vtp` retains its slab frame. Each scene block carries units, frame, material, case digest and transform in VTK FieldData. Grooved vacuum legs retain unknown `track_id`, `parent_id` and `generation` (`-1`); `electron_id` alone cannot recover their ancestry.
+
+New capture-enabled profile runs snapshot downstream geometry in the HDF5 artifact, independently of whether counting acquisition is requested. Old captures remain readable and exportable. When downstream geometry was not captured, the scene omits filters and detector and marks them unavailable; it does not reconstruct them from today's catalog. The beam axis is a reference direction, not a reconstruction of individual incoming particles.
+
+`--out-dir DIR` mirrors the input directory layout for tracks and manifests. `--overwrite` permits replacing their existing outputs. Each scene export owns an immutable `<case>.scene-<id>/` directory; all blocks are completed before publishing a manifest. Keep that directory with its manifests when copying or sharing a scene. Overwrite leaves older sidecar directories intact so previous manifests remain usable; delete an older directory only after verifying no retained manifest references it.
+
+### Inspect trajectories in ParaView
+
+1. **File → Open** the `.vtp` or one `.vtm`, then **Apply**. For a scene, use the block selector or **Extract Block** to select `tracks`. Use a separate render view for the instrument scene.
+2. In the colouring menu choose the **cell** array `E_start_keV`; rescale to the data range. Each two-point cell represents a captured segment, so colour is constant on that segment.
+3. To isolate transported secondaries, apply **Threshold** to cell `generation` with a lower bound of `1` and an upper bound at the recorded maximum. Primaries have generation `0`; unknown groove-vacuum ancestry is `-1`. A capture without secondary transport has no generation array.
+4. To inspect groove-gap flights, threshold cell `is_vacuum` to `1`; threshold to `0` for material segments. The array is present when vacuum diagnostics are included; `--no-vacuum` omits those cells.
+5. Threshold `electron_id` to select a complete primary history/shower, or `track_id` to select one electron trajectory. Use **Spreadsheet View** to inspect track, parent, energy and event attributes. Use **Clip** to inspect a depth range without changing the original artifact.
+
+Large showers may require substantial reader and rendering memory even though export itself streams in bounded blocks. A standalone PyVista viewer is under evaluation; marimo embedding constraints do not rule it out. See [trajectory scene design and viewer evaluation](../repo-design/storage/trajectory-scenes.md).
+
 ## Preserve or reduce data
 
 Use checkpoint commands instead of manually editing checkpoint directories:

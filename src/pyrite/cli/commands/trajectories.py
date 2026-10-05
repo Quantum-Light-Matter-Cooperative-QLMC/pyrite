@@ -33,8 +33,9 @@ def _artifacts(paths):
         "directory searched recursively for them. Each artifact becomes one .vtp "
         "of two-point line cells in the slab frame [angstrom] with per-segment "
         "cell data, including electron_id; per-electron arrays, tallies, and "
-        "metadata stay only in the HDF5 artifact. Opens in ParaView, VisIt, and "
-        "PyVista."
+        "complete transport metadata stay in the authoritative HDF5 artifact. "
+        "Opens in ParaView, VisIt, and PyVista. --scene also exports lab-frame "
+        "geometry as separate close-up and instrument scenes."
     ),
 )
 @click.argument(
@@ -52,10 +53,20 @@ def _artifacts(paths):
     help="Write .vtp files under DIR, mirroring each ARTIFACT directory (default: beside each artifact).",
 )
 @click.option("--no-vacuum", is_flag=True, help="Omit grooved runs' vacuum legs.")
-@click.option("--overwrite", is_flag=True, help="Replace existing .vtp outputs.")
-def command(artifacts, out_dir, no_vacuum, overwrite):
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    help="Replace existing .vtp outputs and, with --scene, scene manifests.",
+)
+@click.option(
+    "--scene",
+    is_flag=True,
+    help="Also write separate .vtm close-up [angstrom] and .instrument.vtm [mm] scenes with private sidecar files; missing recorded geometry is omitted.",
+)
+def command(artifacts, out_dir, no_vacuum, overwrite, scene):
     from ...montecarlo.trajectories import TrajectoryArtifactError
     from ...montecarlo.trajectory_export import export_segments_vtp
+    from ...montecarlo.trajectory_scene import export_trajectory_scene, scene_output_paths
 
     paths = _artifacts(artifacts)
     if not paths:
@@ -65,10 +76,16 @@ def command(artifacts, out_dir, no_vacuum, overwrite):
         for path, rel in paths
     ]
     names = [target for target, _ in targets]
+    if scene:
+        names += [path for target, _ in targets for path in scene_output_paths(target)]
     if len(set(names)) != len(names):
         raise click.UsageError(
-            "several artifacts map to the same output path; pass their common "
-            "directory instead of individual files"
+            "several artifacts map to the same output path; "
+            + (
+                "rename conflicting artifacts or export them to separate output directories"
+                if scene
+                else "pass their common directory instead of individual files"
+            )
         )
     existing = [target for target in names if target.exists()]
     if existing and not overwrite:
@@ -78,9 +95,21 @@ def command(artifacts, out_dir, no_vacuum, overwrite):
     for target, path in targets:
         try:
             summary = export_segments_vtp(path, target, include_vacuum=not no_vacuum)
-        except TrajectoryArtifactError as error:
+            manifests = (
+                export_trajectory_scene(
+                    path,
+                    target,
+                    include_vacuum=not no_vacuum,
+                    overwrite=overwrite,
+                )
+                if scene
+                else ()
+            )
+        except (TrajectoryArtifactError, OSError, ValueError, KeyError) as error:
             raise _cli_core.CLIError(str(error)) from error
         click.echo(f"{target}  {summary['cells']} cells ({summary['vacuum_legs']} vacuum)")
+        for manifest in manifests:
+            click.echo(str(manifest))
 
 
 @click.command(
