@@ -22,6 +22,7 @@ TRANSPORT_KEYS = (
     "radiative_model",
     "radiative_cutoff_eV",
     "pair_production_model",
+    "atomic_electron_deflection",
 )
 #: Collision-loss schemes a run may select: ``"auto"`` (the default) plus the
 #: ``simulate_trajectories`` schemes of
@@ -43,6 +44,12 @@ BREMSSTRAHLUNG_MODELS = ("auto", "eedl", "bremslib")
 #: ``montecarlo.transport.pair_production.PAIR_PRODUCTION_MODELS`` (a test
 #: keeps the two in step) without importing the transport package here.
 PAIR_PRODUCTION_MODELS = ("penelope-2024",)
+#: Atomic-electron angular deflection (issue #317): ``"kawrakow"`` (the
+#: default) folds it into the elastic rate as ``Z(Z + xi)``; ``"none"`` keeps
+#: elastic-only deflection. Mirrors
+#: ``montecarlo.transport.atomic_electrons.ATOMIC_ELECTRON_DEFLECTION_MODELS``
+#: plus the ``"none"`` opt-out (a test keeps them in step).
+ATOMIC_ELECTRON_DEFLECTION_MODELS = ("kawrakow", "none")
 #: The default resolves coupling when BremsLib tables are available.
 RADIATIVE_MODELS = ("auto", "uncoupled", "bremslib-soft-hard")
 DEFAULT_RADIATIVE_CUTOFF_EV = 1000.0
@@ -144,6 +151,13 @@ class Numerics:
         radiative transport, and applies only to cases that resolve to it.
         Positrons are recorded, not transported. ``None`` (default) converts
         nothing.
+    atomic_electron_deflection
+        ``"kawrakow"`` (default) adds angular deflection by atomic electrons
+        to the elastic rate, ``Z^2 -> Z(Z + xi)``: ``xi = 1`` under continuous
+        stopping, and the Moller share above ``W_c`` removed under shell
+        soft/hard transport. A deprecated-``"mott"`` case that resolves to
+        shell soft/hard keeps elastic-only deflection, with a warning.
+        ``"none"`` reproduces elastic-only transport bit for bit.
     convergence
         Reflection and mosaic convergence controls.
     """
@@ -165,6 +179,7 @@ class Numerics:
     radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "auto"
     radiative_cutoff_eV: float | None = None
     pair_production_model: Literal["penelope-2024"] | None = None
+    atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
     convergence: Convergence = field(default_factory=Convergence)
 
     def __post_init__(self) -> None:
@@ -209,6 +224,16 @@ class Numerics:
             self.secondary_threshold_eV,
             self.radiative_model,
             self.bremsstrahlung_model,
+        )
+        validate_atomic_electron_deflection(self.atomic_electron_deflection)
+
+
+def validate_atomic_electron_deflection(model: object) -> None:
+    """Validate a run-level atomic-electron deflection model name."""
+    if model not in ATOMIC_ELECTRON_DEFLECTION_MODELS:
+        raise ValueError(
+            "atomic_electron_deflection must be one of "
+            + ", ".join(ATOMIC_ELECTRON_DEFLECTION_MODELS)
         )
 
 

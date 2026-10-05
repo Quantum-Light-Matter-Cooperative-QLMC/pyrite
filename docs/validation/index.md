@@ -37,6 +37,7 @@ beam-transport/dielectric-bulk-loss
 beam-transport/eedl-material-shell-rates
 beam-transport/elsepa-elastic-sampling
 beam-transport/elsepa-muffin-tin-inputs
+beam-transport/inelastic-angular-deflection
 beam-transport/penelope-shell-oscillators
 beam-transport/penelope-shell-oscillators-verification
 beam-transport/penelope-shell-gos-moments

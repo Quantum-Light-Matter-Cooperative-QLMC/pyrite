@@ -87,7 +87,7 @@ from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is th
     target_from_flat,
     target_replace,
 )
-from .inelastic_cases import resolve_auto_inelastic
+from .inelastic_cases import resolve_atomic_electron_deflection, resolve_auto_inelastic
 from .longitudinal import LongitudinalDistribution, resolve_longitudinal_distribution
 
 MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
@@ -707,6 +707,7 @@ def build_cases(
     radiative_cutoff_eV=None,
     temporal_profile=False,
     pair_production_model=None,
+    atomic_electron_deflection="kawrakow",
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -732,8 +733,7 @@ def build_cases(
     )
     validate_elastic_model(elastic_model)
     validate_bremsstrahlung_model(bremsstrahlung_model)
-    # Opt-in coupled radiative keys (#172), with pair conversion (#275) riding on
-    # them; under "auto" they join after resolution.
+    # Opt-in coupled radiative keys (#172) and pair conversion (#275); "auto" resolves later.
     pair = (pair_production_model, secondary_threshold_eV)
     radiative = radiative_case_keys(
         radiative_model, radiative_cutoff_eV, energy_model, straggling, bremsstrahlung_model, *pair
@@ -741,9 +741,8 @@ def build_cases(
     target = sweep.target
     cp = sweep_crystal_params(sweep)
     # line grid: fine + narrow (per-material default or detector mapping/fixed
-    # binning). brem grid: coarse + wide
-    # -- each case spans up to that case's beam energy because brem cuts off at
-    # the particle energy.
+    # binning). brem grid: coarse + wide -- each case spans up to that case's
+    # beam energy because brem cuts off at the particle energy.
     # A uniform E_grid_brem keeps the legacy start/spacing behavior and extends
     # to each beam energy. Scalar/nonuniform grids are explicit and stay exact.
     gdf = sweep.beam.gdf_beam()
@@ -1071,6 +1070,7 @@ def build_cases(
             else float(cast(float, inelastic_cutoff_eV)),
             energy_model,
         )
+    cases = resolve_atomic_electron_deflection(cases, atomic_electron_deflection)
     if bremsstrahlung_model == "auto":
         cases = resolve_auto_bremsstrahlung(cases, radiative)
     return cases

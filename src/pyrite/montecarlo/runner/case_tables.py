@@ -98,14 +98,19 @@ def _case_elastic_kwargs(case):
     """``simulate_trajectories`` kwargs of a case's elastic model.
 
     A case without the ``elastic_model`` key is Mott; it is passed explicitly
-    because ``simulate_trajectories`` defaults to ELSEPA (#293).
+    because ``simulate_trajectories`` defaults to ELSEPA (#293). Atomic-electron
+    deflection (#317) rides here because it scales the elastic rate; absent
+    keeps elastic-only deflection.
     """
+    atomic = case.get("atomic_electron_deflection")
+    extra = {} if atomic is None else {"atomic_electron_deflection": atomic}
     entries = _case_elastic_entries(case)
     if entries is None:
-        return {"elastic_model": "mott"}
+        return {"elastic_model": "mott", **extra}
     return dict(
         elastic_model="elsepa",
         elastic_tables=[[entry.arrays for entry in layer] for layer in entries],
+        **extra,
     )
 
 

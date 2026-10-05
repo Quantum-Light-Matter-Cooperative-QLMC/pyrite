@@ -356,7 +356,7 @@ def elsepa_angular_pdf(mu, dcs):
     return pdf, cdf
 
 
-def pack_elsepa_tables(elastic_tables, L_ncm3):
+def pack_elsepa_tables(elastic_tables, L_ncm3, rate_scales=None):
     """Flatten per-layer, per-element ELSEPA tables into the cores' group.
 
     ``elastic_tables[L][i]`` is a mapping with ``energy_eV``,
@@ -366,7 +366,9 @@ def pack_elsepa_tables(elastic_tables, L_ncm3):
 
     Returns ``(has, start, length, logE, log_rate, cdf, pdf, mu)``: rates are
     stored as ``ln(n_cm3 * sigma_el)`` [1/cm] so energy interpolation is
-    log-log in the macroscopic cross section.
+    log-log in the macroscopic cross section. ``rate_scales[L][i]``, when
+    given, multiplies that element's rate node by node (atomic-electron
+    deflection); the angular density is unchanged.
     """
     if elastic_tables is None:
         empty2 = np.zeros((1, 1), dtype=np.float64)
@@ -408,7 +410,10 @@ def pack_elsepa_tables(elastic_tables, L_ncm3):
             start[L, i_el] = offset
             length[L, i_el] = energy.size
             logE.append(np.log(energy))
-            log_rate.append(np.log(float(n_cm3) * sigma))
+            rate = float(n_cm3) * sigma
+            if rate_scales is not None:
+                rate = rate * rate_scales[L][i_el]
+            log_rate.append(np.log(rate))
             cdf.append(row_cdf)
             pdf.append(row_pdf)
             offset += energy.size

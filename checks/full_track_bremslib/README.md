@@ -291,3 +291,54 @@ Remaining limits: the Mott elastic discrepancy (#183), photon transport and
 detected yield (#171 above 800 keV), electron–electron bremsstrahlung, and
 the directional point-detector scorer. Only a human may mark the ledger rows
 `signed-off`.
+
+## Production transport vs Geant4 DPWA single scattering (#183, #317)
+
+This comparison measures elastic transport, not radiation: primary
+transmitted (T) and backscattered (R) fractions for the production PyRITE
+stack against Geant4 event-by-event elastic scattering.
+
+**Reference.** The `*_ssdpwa.mac` macros run Geant4 11.4.2 TestEm5 with
+`emstandardSS` and `/process/em/setSingleScattering DPWA`. Elastic
+scattering is `G4eDPWACoulombScatteringModel`, 0–180°, with its default
+scattering-power correction `isscpcor` (atomic-electron deflection), plus
+Møller–Bhabha ionization without fluctuations. Every other setting matches the
+macros above. `run_ssdpwa.sbatch` writes 10 shards of 10,000 primaries per case,
+shard `i` seeded `12345+i 67890`; it reproduces the shard macros of the #183
+runs exactly. The shard logs are concatenated per case in
+`reference/<case>_ssdpwa.log.gz`.
+
+**PyRITE.** `prod_bench.py` is the #183 driver. It runs ELSEPA elastic
+scattering (Si with its catalog muffin-tin table), SBETHE stopping (W at
+19.3 g/cm³), coupled BremsLib at a 1 keV hard cutoff, a 10 keV electron
+cutoff, midpoint energy, no straggling and the per-electron core. Batch `b`
+uses seed `12345 + b`. The optional last argument selects
+`atomic_electron_deflection` (`none` reproduces the #183 runs).
+`run_issue317.sbatch` runs one batch per row of `issue317_tasks.txt` from a
+staged checkout. `PYRITE_HOME` must hold the tables. The 63 records of lab-box
+job 928 (commit `0b826c10`, 2026-10-04) are archived in
+`results/issue317_records.json.gz`. Recompute the comparison with:
+
+```bash
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python checks/full_track_bremslib/compare_issue317.py
+```
+
+It exits non-zero unless every continuous-mode case has 100,000 primaries
+and |z| < 3 for both T and R. The printed table is in
+`results/issue317_summary.json`.
+
+| Case | Geant4 DPWA T / R | PyRITE `none` T / R (z) | PyRITE `kawrakow` T / R (z) |
+|---|---|---|---|
+| Si 300 keV | 0.8428 / 0.1109 | 0.8613 / 0.0987 (+11.7 / −8.9) | 0.8469 / 0.1084 (+2.6 / −1.8) |
+| Si 800 keV | 0.9936 / 0.0063 | 0.9943 / 0.0056 (+2.1 / −2.0) | 0.9936 / 0.0063 (0.0 / 0.0) |
+| W 300 keV | 0.5448 / 0.4248 | 0.5486 / 0.4207 (+1.7 / −1.9) | 0.5443 / 0.4247 (−0.2 / −0.1) |
+| W 800 keV | 0.9191 / 0.0806 | 0.9221 / 0.0775 (+2.5 / −2.6) | 0.9202 / 0.0794 (+1.0 / −1.0) |
+
+The `none` column is the #183 measurement. Three of its batches (Si 300 b0,
+W 300 b3, Si 300 shell b0) were rerun on this commit and reproduce the #183
+counts exactly. The shell soft/hard Si rows at `W_c = 50` eV are
+unchanged by the correction (Si 300 keV 0.8431 / 0.1039, z +0.2 / −5.0;
+Si 800 keV 0.9944 / 0.0056), because `xi = 0` above 315 eV. Batch 0 is
+identical count for count. Their remaining R deficit is the soft-collision
+deflection that the free-electron correction does not restore (see
+`docs/physics/beam-transport/atomic-electron-deflection.md`).

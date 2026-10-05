@@ -180,6 +180,10 @@ def _simulation_scene(document, material, profile_name, detector_id=None):
             pair_production_model=cast(
                 Literal["penelope-2024"] | None, transport.get("pair_production_model")
             ),
+            atomic_electron_deflection=cast(
+                Literal["kawrakow", "none"],
+                transport.get("atomic_electron_deflection", "kawrakow"),
+            ),
         ),
         catalog.profile_emission(profile_name) or "incoherent",
         detector_id,

@@ -107,6 +107,7 @@ _RESOLUTION_INPUT_KEYS = (
     "radiative_model",
     "radiative_cutoff_eV",
     "pair_production_model",
+    "atomic_electron_deflection",
     "elastic_model",
     "abs_layers",
     "Ne",
