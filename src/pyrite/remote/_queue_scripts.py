@@ -456,23 +456,22 @@ run_material() {{
   fi
 {cpu_profile_block}  echo "completed: $m" >> "$JOBDIR/log"
 }}
+# `wait -n` only throttles: it returns 127 for a job bash reaped before the
+# call, so its status cannot count failures. Each material marks success.
+rm -rf "$JOBDIR/.material-ok"
+mkdir -p "$JOBDIR/.material-ok"
 for m in "${{mats[@]}}"; do
   n=$((n + 1))
-  run_material "$n" "$m" &
+  {{ run_material "$n" "$m" && : > "$JOBDIR/.material-ok/$n"; }} &
   active=$((active + 1))
   if [ "$active" -ge "$parallel_materials" ]; then
-    if ! wait -n; then
-      failures=$((failures + 1))
-    fi
+    wait -n || true
     active=$((active - 1))
   fi
 done
-while [ "$active" -gt 0 ]; do
-  if ! wait -n; then
-    failures=$((failures + 1))
-  fi
-  active=$((active - 1))
-done
+wait
+ok_count=$(find "$JOBDIR/.material-ok" -maxdepth 1 -type f | wc -l)
+failures=$((total - ok_count))
 if compgen -G "$JOBDIR/cpu-failures/*" >/dev/null; then
   cpu_failure_count=$(find "$JOBDIR/cpu-failures" -maxdepth 1 -type f | wc -l)
   echo "FAILED CPU profile ($cpu_failure_count material(s)) $(date -Is)" > "$JOBDIR/state"
