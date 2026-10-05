@@ -44,3 +44,11 @@ resonance_eV = 26.4
 basis = "total (sigma+pi) bulk plasmon in low-q transmission EELS with q in the basal plane (Kramers-Kronig-analysed 0-60 eV loss function); q along c gives 23 eV; the separate 8.5 eV pi plasmon is not represented"
 source = "C. Tarrio and S. E. Schnatterly, Phys. Rev. B 40, 7852 (1989)"
 doi = "10.1103/PhysRevB.40.7852"
+
+[wse2]
+formula = { W = 1, Se = 2 }
+electrons_per_formula = 18
+resonance_eV = 22.0
+basis = "volume plasmon of all valence electrons, reported as about 22 eV in transmission EELS at q=0.1 A^-1 along Gamma-M (in-plane, optical limit) on ~100 nm 2H films exfoliated from single crystals, 20 K"
+source = "M. Ahmad et al., J. Phys.: Condens. Matter 29, 165502 (2017)"
+doi = "10.1088/1361-648X/aa63a7"
