@@ -237,8 +237,99 @@ def angular_tiles(rays: PixelRays, angular_shape: tuple[int, int]) -> tuple[np.n
     return tile_index, directions
 
 
+#: Fraction of a knot interval within which a pixel snaps exactly onto a knot,
+#: absorbing round-off in the plane projection of a one-pixel tile.
+_KNOT_SNAP = 1.0e-9
+
+
+def _axis_weights(
+    coordinate: np.ndarray, knots: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return lower knot, upper knot, and upper weight of clamped linear interpolation."""
+    if knots.size == 1:
+        zero = np.zeros(coordinate.shape, dtype=np.int64)
+        return zero, zero, np.zeros(coordinate.shape)
+    lower = np.clip(np.searchsorted(knots, coordinate, side="right") - 1, 0, knots.size - 2)
+    upper = lower + 1
+    fraction = np.clip((coordinate - knots[lower]) / (knots[upper] - knots[lower]), 0.0, 1.0)
+    fraction[fraction < _KNOT_SNAP] = 0.0
+    fraction[fraction > 1.0 - _KNOT_SNAP] = 1.0
+    return lower, upper, fraction
+
+
+def angular_tile_weights(
+    detector: PlanarDetector,
+    directions_lab: np.ndarray,
+    angular_shape: tuple[int, int],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return per-pixel tiles and convex weights blending neighbouring tile spectra.
+
+    Each tile representative direction is projected onto the detector plane
+    along its source ray. Knots are the tile-column means of the projected
+    local ``x`` and the tile-row means of the projected local ``y``, so the
+    blend is a separable piecewise-linear interpolation in detector-local
+    coordinates evaluated at each pixel centre. Pixels outside the outermost
+    knots take the edge value (clamped, never extrapolated), and a one-tile
+    axis is constant. A representative direction projects to a convex
+    combination of its own pixel centres, so knots are strictly increasing,
+    and a one-pixel tile's knot is that pixel's centre: with
+    ``angular_shape`` equal to the pixel shape every pixel takes exactly its
+    own tile.
+
+    Parameters
+    ----------
+    detector
+        Pixelated planar detector the tiles were drawn on.
+    directions_lab
+        ``(n_tile, 3)`` representative lab directions from :func:`angular_tiles`.
+    angular_shape
+        ``(n_tile_rows, n_tile_columns)`` used by :func:`angular_tiles`.
+
+    Returns
+    -------
+    tile, weight
+        ``(ny, nx, 4)`` tile indices and non-negative weights summing to 1.
+
+    Validation: pixel-angular-interpolation
+    """
+    if detector.pixels is None:
+        raise ValueError("angular tile interpolation requires a pixelated detector")
+    ay, ax = angular_shape
+    directions = np.asarray(directions_lab, dtype=float)
+    if directions.shape != (ay * ax, 3):
+        raise ValueError("directions_lab must have shape (n_tile, 3) matching angular_shape")
+    ny, nx = detector.pixels.shape
+    pitch_y, pitch_x = detector.pixels.pitch_mm
+    center = np.asarray(detector.pose.center_mm)
+    x_axis = np.asarray(detector.pose.x_axis)
+    y_axis = np.asarray(detector.pose.y_axis)
+    normal = np.asarray(detector.pose.normal)
+    hits = directions * ((center @ normal) / (directions @ normal))[:, None] - center
+    local_x = (hits @ x_axis).reshape(ay, ax)
+    local_y = (hits @ y_axis).reshape(ay, ax)
+    lower_c, upper_c, fraction_x = _axis_weights(
+        (np.arange(nx) - (nx - 1) / 2.0) * pitch_x, np.mean(local_x, axis=0)
+    )
+    lower_r, upper_r, fraction_y = _axis_weights(
+        (np.arange(ny) - (ny - 1) / 2.0) * pitch_y, np.mean(local_y, axis=1)
+    )
+    rows = (lower_r[:, None], lower_r[:, None], upper_r[:, None], upper_r[:, None])
+    columns = (lower_c[None, :], upper_c[None, :], lower_c[None, :], upper_c[None, :])
+    tile = np.stack([r * ax + c for r, c in zip(rows, columns, strict=True)], axis=-1)
+    wy, wx = fraction_y[:, None], fraction_x[None, :]
+    weight = np.stack(
+        np.broadcast_arrays((1 - wy) * (1 - wx), (1 - wy) * wx, wy * (1 - wx), wy * wx), axis=-1
+    )
+    tile = np.ascontiguousarray(tile, dtype=np.int64)
+    weight = np.ascontiguousarray(weight)
+    tile.setflags(write=False)
+    weight.setflags(write=False)
+    return tile, weight
+
+
 __all__ = [
     "PixelRays",
+    "angular_tile_weights",
     "angular_tiles",
     "filter_path_lengths",
     "planar_detector_rays",

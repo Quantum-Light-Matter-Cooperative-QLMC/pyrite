@@ -200,6 +200,24 @@ def test_angular_shape_cannot_exceed_the_pixel_grid(catalog) -> None:
     assert catalog.read_text() == before
 
 
+def test_reconstruction_is_set_independently_of_angular_shape(catalog) -> None:
+    _create("standard", "--angular-shape", "2", "3")
+
+    result = invoke(profile.command, [*SET, "standard", "-y", "--reconstruction", "bilinear_tile"])
+
+    assert result.exit_code == 0
+    assert _show()["physical_detector"]["scorer"] == {
+        "reconstruction": "bilinear_tile",
+        "angular_shape": [2, 3],
+    }
+    reshaped = invoke(profile.command, [*SET, "standard", "-y", "--angular-shape", "1", "2"])
+    assert reshaped.exit_code == 0
+    assert _show()["physical_detector"]["scorer"]["reconstruction"] == "bilinear_tile"
+    bad = invoke(profile.command, [*SET, "standard", "-y", "--reconstruction", "cubic"])
+    assert bad.exit_code == 2
+    assert "'cubic' is not one of 'nearest_tile', 'bilinear_tile'" in bad.stderr
+
+
 def test_set_on_profile_without_detector_requires_geometry(catalog) -> None:
     _create("standard", *ACQUIRE)
     assert _show("high_energy")["source"] is None

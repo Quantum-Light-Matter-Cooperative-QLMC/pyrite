@@ -77,12 +77,14 @@ class PixelSampling:
         detector: PlanarDetector,
         filters: tuple[FilterPlate, ...],
         brem_source: str = "mc",
+        reconstruction: str = "nearest_tile",
     ) -> SpatialResult:
         """Assemble factorized spatial data from runner directional output.
 
         ``output`` is :func:`~pyrite.montecarlo.runner.run_case_directions`
         output or a scalar run's ``out["directional"]``. A non-``"mc"``
         ``brem_source`` zeroes the continuum, as the scalar path does.
+        ``reconstruction`` is the scorer's pixel reconstruction mode.
         """
         energy = np.asarray(output["E_grid"])
         background_energy = np.asarray(output["E_grid_brem"])
@@ -111,6 +113,7 @@ class PixelSampling:
                 energy, np.asarray(output["spec_characteristic_by_direction"]), line_mu
             ),
             tile_directions_lab=self.directions_lab,
+            reconstruction=reconstruction,
         )
 
 
@@ -221,6 +224,7 @@ class ObservationPlan:
             detector=observation.detector,
             filters=observation.filters,
             brem_source=self.brem_source,
+            reconstruction=observation.scorer.reconstruction,
         )
         identity = observation_identity(
             self.source_identity_digest,

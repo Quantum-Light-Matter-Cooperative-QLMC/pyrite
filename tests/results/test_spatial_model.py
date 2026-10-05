@@ -289,3 +289,88 @@ def test_512_square_detector_images_and_selections_stay_bounded() -> None:
     assert metadata.coordinates.shape == (1, 2)
     assert np.all(window <= total) and np.all(window > 0.0)
     assert peak < cube_bytes / 8
+
+
+def _tiled_spatial(angular_shape, reconstruction: str, shape=(6, 8)) -> SpatialResult:
+    from pyrite.instrument.geometry import angular_tiles, filter_path_lengths, planar_detector_rays
+
+    detector = PlanarDetector(
+        pose=PlanarPose.from_observation(80.0, 55.0, azimuth_deg=10.0),
+        pixels=PixelGrid(shape, (0.5, 0.5)),
+    )
+    rays = planar_detector_rays(detector)
+    tile_index, directions = angular_tiles(rays, angular_shape)
+    n_tile = angular_shape[0] * angular_shape[1]
+    energy = np.linspace(1.0, 4.0, 5)
+    intrinsic = (1.0 + np.arange(n_tile))[:, None] * np.linspace(1.0, 2.0, energy.size)
+    factors = SpectralFactors(energy, intrinsic, np.zeros((0, energy.size)))
+    ray_map = PixelRayMap(tile_index, rays.solid_angle_sr, filter_path_lengths(rays, ()))
+    return SpatialResult(
+        ray_map,
+        factors,
+        factors,
+        detector,
+        tile_directions_lab=directions,
+        reconstruction=reconstruction,
+    )
+
+
+def test_bilinear_reconstruction_is_the_weighted_tile_blend() -> None:
+    from pyrite.instrument.geometry import angular_tile_weights
+
+    spatial = _tiled_spatial((2, 3), "bilinear_tile")
+    assert spatial.tile_directions_lab is not None
+    tile, weight = angular_tile_weights(spatial.detector, spatial.tile_directions_lab, (2, 3))
+    region = (slice(None), slice(None))
+
+    _, spectra = spatial.spectra(region=region)
+
+    blended = np.einsum("yxk,yxke->yxe", weight, spatial.line.intrinsic_by_tile[tile])
+    expected = (blended * spatial.ray_map.solid_angle_sr[..., None]).reshape(-1, 5)
+    np.testing.assert_allclose(spectra, expected, rtol=1.0e-14)
+    assert np.all(spectra > 0.0)
+
+
+def test_bilinear_reconstruction_smooths_tile_steps_that_nearest_tile_keeps() -> None:
+    nearest = _tiled_spatial((1, 4), "nearest_tile").image((1.0, 4.0))
+    bilinear = _tiled_spatial((1, 4), "bilinear_tile").image((1.0, 4.0))
+    per_sr = _tiled_spatial((1, 4), "nearest_tile").ray_map.solid_angle_sr
+
+    nearest_steps = np.diff(nearest[0] / per_sr[0])
+    bilinear_steps = np.diff(bilinear[0] / per_sr[0])
+    assert np.count_nonzero(np.abs(nearest_steps) > 1.0e-9) == 3
+    assert np.max(bilinear_steps) < 0.75 * np.max(nearest_steps)
+    assert np.all(bilinear_steps > -1.0e-12)
+
+
+@pytest.mark.parametrize("shape", [(6, 8), (1, 1)])
+def test_bilinear_reconstruction_equals_nearest_tile_at_full_angular_resolution(shape) -> None:
+    nearest = _tiled_spatial(shape, "nearest_tile", shape=shape)
+    bilinear = _tiled_spatial(shape, "bilinear_tile", shape=shape)
+    region = (slice(None), slice(None))
+
+    np.testing.assert_array_equal(
+        bilinear.spectra(region=region)[1], nearest.spectra(region=region)[1]
+    )
+    np.testing.assert_array_equal(bilinear.average_density("line"), nearest.average_density("line"))
+
+
+def test_reconstruction_mode_is_validated() -> None:
+    spatial = _tiled_spatial((2, 3), "nearest_tile")
+    with pytest.raises(ValueError, match="reconstruction must be one of"):
+        SpatialResult(
+            spatial.ray_map,
+            spatial.line,
+            spatial.background,
+            spatial.detector,
+            tile_directions_lab=spatial.tile_directions_lab,
+            reconstruction="cubic",
+        )
+    with pytest.raises(ValueError, match="requires tile_directions_lab"):
+        SpatialResult(
+            spatial.ray_map,
+            spatial.line,
+            spatial.background,
+            spatial.detector,
+            reconstruction="bilinear_tile",
+        )

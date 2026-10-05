@@ -408,6 +408,10 @@ class PlanarDetector:
         )
 
 
+#: Pixel reconstruction modes accepted by :class:`PixelScorer`.
+RECONSTRUCTIONS = ("nearest_tile", "bilinear_tile")
+
+
 @dataclass(frozen=True)
 class PixelScorer:
     """Request factorized spatial output on a planar detector grid.
@@ -417,10 +421,16 @@ class PixelScorer:
     angular_shape
         Positive ``(n_polar, n_azimuth)`` count of source-direction tiles. Each
         count must not exceed the corresponding detector pixel count.
+    reconstruction
+        ``"nearest_tile"`` gives each pixel its own tile's intrinsic spectrum.
+        ``"bilinear_tile"`` blends the neighbouring tiles' spectra with convex
+        weights (:func:`~pyrite.instrument.geometry.angular_tile_weights`).
+        Blending mixes spectra at fixed energy, so a line whose energy shifts
+        with angle broadens or doubles instead of shifting.
     """
 
     angular_shape: tuple[int, int] = (1, 1)
-    reconstruction: Literal["nearest_tile"] = "nearest_tile"
+    reconstruction: Literal["nearest_tile", "bilinear_tile"] = "nearest_tile"
 
     def __post_init__(self) -> None:
         try:
@@ -434,8 +444,10 @@ class PixelScorer:
         if any(int(x) <= 0 for x in shape):
             raise ValueError("PixelScorer.angular_shape values must be positive")
         object.__setattr__(self, "angular_shape", (int(shape[0]), int(shape[1])))
-        if self.reconstruction != "nearest_tile":
-            raise ValueError("PixelScorer.reconstruction must be 'nearest_tile'")
+        if self.reconstruction not in RECONSTRUCTIONS:
+            raise ValueError(
+                "PixelScorer.reconstruction must be one of " + ", ".join(map(repr, RECONSTRUCTIONS))
+            )
 
 
 def validate_downstream_scene(filters: tuple[FilterPlate, ...], detector: PlanarDetector) -> None:
@@ -467,4 +479,5 @@ __all__ = [
     "PixelScorer",
     "PlanarDetector",
     "PlanarPose",
+    "RECONSTRUCTIONS",
 ]

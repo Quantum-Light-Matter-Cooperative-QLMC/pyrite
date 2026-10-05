@@ -124,7 +124,10 @@ def _simulation_scene(document, material, profile_name, detector_id=None):
         if observation is not None
         else PixelScorer()
         if scorer_row is None
-        else PixelScorer(angular_shape=tuple(scorer_row["angular_shape"]))
+        else PixelScorer(
+            angular_shape=tuple(scorer_row["angular_shape"]),
+            reconstruction=scorer_row.get("reconstruction", "nearest_tile"),
+        )
     )
     detector = replace(
         detector,

@@ -85,9 +85,9 @@ def command():
     of the profile's scalar detector.
 
     What an edit costs on the next run: pose and pixel grid change the
-    projection and therefore the dataset; the angular shape (and filters)
-    re-evaluate observations on new transport while cached scalar records
-    are kept; response and acquisition only rescore stored observations,
+    projection and therefore the dataset; the angular shape, reconstruction,
+    and filters re-evaluate observations on new transport while cached scalar
+    records are kept; response and acquisition only rescore stored observations,
     with no transport.
 
     A profile without its own table has no physical detector. Creating one
@@ -200,7 +200,12 @@ def _pair_positive(ctx, param, value):
     "--angular-shape",
     type=click.Tuple((POSITIVE_INT, POSITIVE_INT)),
     metavar="ROWS COLS",
-    help="Representative directions evaluated per transport (nearest-tile); at most --shape.",
+    help="Representative directions evaluated per transport; at most --shape.",
+)
+@click.option(
+    "--reconstruction",
+    type=click.Choice(("nearest_tile", "bilinear_tile")),
+    help="Pixel spectrum from its own tile, or blended from neighbouring tiles.",
 )
 @click.option(
     "--response",
@@ -289,11 +294,9 @@ def set_command(name, yes, dry_run, **values):
         )
         if values[key] is not None
     }
-    scorer = (
-        {}
-        if values["angular_shape"] is None
-        else {"reconstruction": "nearest_tile", "angular_shape": values["angular_shape"]}
-    )
+    scorer = {
+        key: values[key] for key in ("reconstruction", "angular_shape") if values[key] is not None
+    }
     response = {
         key: values[option]
         for key, option in (
