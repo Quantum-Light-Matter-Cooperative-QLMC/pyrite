@@ -105,6 +105,7 @@ class _BatchedBlock:
     k_dot_v: Any
     vdg: Any
     k_mag: Any
+    delta: Any
     E_res: Any
     keep: Any
     chi_re: Any
@@ -397,13 +398,7 @@ def _batched_tables(st):
 
 
 def _batched_block(st, bt, sb):
-    """Steps 1, 3 and 4 of the batched route for one segment block ``sb``.
-
-    Solves the in-medium resonance over the ``(n_block, N_g)`` grid, derives
-    the photon kinematics from it, masks the lines that miss the spectral
-    window, and gathers the chi/U/mu couplings at each resonance energy on a
-    single shared interpolation bracket.
-    """
+    """Solve each piece/reflection's Snell root and gather frozen couplings."""
     line_electron = st.line_electron
     v_all = st.v_all
     v_dot_n_all = st.v_dot_n_all
@@ -428,17 +423,19 @@ def _batched_block(st, bt, sb):
     vx = v_all[sb, 0][:, None]  # (nb, 1)F
     vy = v_all[sb, 1][:, None]
     vz = v_all[sb, 2][:, None]
-    # The in-medium root depends on g through E_res, so denom stops being
-    # a hoisted column and n.g stops being a hoisted row: both become
-    # (nb, N_g). _line_kin_core is elementwise, so it takes them
-    # unchanged.
+    # Refraction makes the denominator and k.g piece/reflection dependent.
     denom, n_re_blk = _in_medium_kinematics(
         v_dot_n_all[sb][:, None],
         vx * gx + vy * gy + vz * gz,
         n_re_tab_g,
         E_tab_g,
+        (v_all[sb] * st.escape_gradient[sb]).sum(axis=1)[:, None],
+        (st.escape_gradient[sb] ** 2).sum(axis=1)[:, None],
     )
-    n_dot_g_blk = n_re_blk * n_dot_g
+    delta = 1.0 - n_re_blk
+    grad = st.escape_gradient[sb]
+    grad_dot_g = grad[:, 0, None] * gx + grad[:, 1, None] * gy + grad[:, 2, None] * gz
+    n_dot_g_blk = n_dot_g + delta * grad_dot_g
     gamma = gamma_full[sb]
     t_L = t_L_full[sb]
     L_esc = L_esc_full[sb]
@@ -450,7 +447,8 @@ def _batched_block(st, bt, sb):
         vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g_blk
     )
     vdg = v_dot_g
-    k_mag = omega_res * n_re_blk
+    grad2 = (grad**2).sum(axis=1)[:, None]
+    k_mag = omega_res * xp.sqrt(xp.where(grad2 == 0.0, 1.0, 1.0 - 2.0 * delta + delta**2 * grad2))
     E_res = HBARC_EV_ANG * omega_res
 
     line_electron_block = line_electron[sb][:, None]
@@ -492,6 +490,7 @@ def _batched_block(st, bt, sb):
         k_dot_v=k_dot_v,
         vdg=vdg,
         k_mag=k_mag,
+        delta=delta,
         E_res=E_res,
         keep=keep,
         chi_re=chi_re,
@@ -544,35 +543,32 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
     u_im = blk.u_im
     mu = blk.mu
 
-    # -- 5c. COMPLEX amplitude per polarization ---------------------
-    # Eq. (13) PXR + relativistic Eq. (14) CBS, the SAME expression
-    # tree the per-hkl coherent path evaluates, now on the
-    # (n_block, N_g) grid. Assumptions are inherited unchanged:
-    # amplitudes frozen at E_res across the narrow line, orthogonal
-    # polarizations add incoherently, kinematics from steps 1/4.
-    # Every operation here is elementwise, so this step introduces NO
-    # reduction of its own -- the batch debt is the shared steps
-    # 1/3/4 (component dots, gathered interp).
+    # Frozen-root PXR and relativistic CBS amplitudes; orthogonal external
+    # polarizations add incoherently. Validation: xray-in-medium-resonance
     chi = chi_re + 1j * chi_im
     eUg_over_m = u_re + 1j * u_im  # u_re/u_im already carry 1/M_E_EV
     pol_A = []
     for E_pol, g_dot_e in ((ES, G_DOT_ES[None, :]), (EP, G_DOT_EP[None, :])):
         ex, ey, ez = E_pol[:, 0][None, :], E_pol[:, 1][None, :], E_pol[:, 2][None, :]
         v_dot_e = vx * ex + vy * ey + vz * ez  # (nb, N_g)
-        A_PXR = chi / detuning * (v_dot_kg * g_dot_e - k_mag**2 * v_dot_e)
+        grad = st.escape_gradient[blk.sb]
+        # External e is transverse to n_hat, not to the refracted k_eff.
+        # Maxwell inverse numerator uses (k+g).e, including k_eff.e.
+        delta = blk.delta
+        k_dot_e = (
+            omega_res
+            * delta
+            * (grad[:, 0, None] * ex + grad[:, 1, None] * ey + grad[:, 2, None] * ez)
+        )
+        A_PXR = chi / detuning * (v_dot_kg * (g_dot_e + k_dot_e) - k_mag**2 * v_dot_e)
         braced_ge = g_dot_e - vdg * v_dot_e
         braced_kg = k_dot_g - k_dot_v * vdg
         A_CBS = -eUg_over_m / (gamma * vdg) * (braced_ge + v_dot_e * braced_kg / vdg)
         pol_A.append(A_PXR + A_CBS)
 
-    # -- 6c. escape + field coefficients ---------------------------
-    # amp = sqrt(alpha omega / (4 pi^2 hbar c)) is the UN-squared
-    # prefactor (its square is the incoherent ``pref`` without t_L^2 and
-    # T_abs). The attenuation and the finite-time factor t_L F(.) -- F the
-    # complex formation factor of each linear escape piece, on the vacuum
-    # sinc centre/width with the escape-path refractive slope -- and the
-    # phase exp[i(omega d_j - g.r_j)] are applied by the reduction.
-    # Validation: coherent-formation-absorption
+    # Piece-end attenuation and escape-phase slope ride on the vacuum sinc
+    # centre/width. Refraction is already in F; shifting that centre again
+    # would double-count it. Validation: coherent-formation-absorption
     L_start = st.escape_ends[0][sb][:, None]
     L_end = st.escape_ends[1][sb][:, None]
     apb, bma, q = formation_coefficients(L_start * mu, L_end * mu, xp=xp)
@@ -591,19 +587,11 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
         & xp.isfinite(bma)
     )
     shape = omega_res.shape
-    # Flatten g-MAJOR so each row's kept lines land contiguously:
-    # one masked copy serves all N_g rows, and the per-row split is
-    # pure slicing. The row lengths stay ON DEVICE here and are
-    # fetched in a single sync after the block loop -- syncing per
-    # block drained the queue between blocks and cost more than the
-    # transfer itself.
+    # Flatten g-major for contiguous per-reflection records; keep counts on
+    # device until the final reduction.
     gm = xp.ascontiguousarray(good.T).reshape(-1)
     c_s, c_p = ((amp * t_L) * A_e for A_e in pol_A)
-    # Geometric-only (offset-free) phase: identical to
-    # d_all/seg_r when no decoherence-relevant offset is
-    # configured, so this is a no-op swap in that (default)
-    # case. See the coherent-inter-electron-decoherence block
-    # above (_accumulate's 7c does the same swap).
+    # Offset-free midpoint phase for the inter-electron blend.
     gxr, gyr, gzr = (
         seg_r_geom[sb, 0][:, None],
         seg_r_geom[sb, 1][:, None],
@@ -686,6 +674,15 @@ def _batched_incoherent_block(st, bt, blk, line_batch):
     for E_pol, g_dot_e in ((ES, G_DOT_ES[None, :]), (EP, G_DOT_EP[None, :])):
         ex, ey, ez = E_pol[:, 0][None, :], E_pol[:, 1][None, :], E_pol[:, 2][None, :]
         v_dot_e = vx * ex + vy * ey + vz * ez  # (nb, N_g)
+        grad = st.escape_gradient[blk.sb]
+        # External e is transverse to n_hat, not to the refracted k_eff.
+        # Maxwell inverse numerator uses (k+g).e, including k_eff.e.
+        delta = blk.delta
+        k_dot_e = (
+            omega_res
+            * delta
+            * (grad[:, 0, None] * ex + grad[:, 1, None] * ey + grad[:, 2, None] * ez)
+        )
         a2, a2p, a2c = _line_amp_sq_core(
             chi_re,
             chi_im,
@@ -700,6 +697,7 @@ def _batched_incoherent_block(st, bt, blk, line_batch):
             k_dot_v,
             gamma,
             detuning,
+            k_dot_e,
         )
         A2 = A2 + a2
         A2_pxr = A2_pxr + a2p
@@ -712,6 +710,7 @@ def _batched_incoherent_block(st, bt, blk, line_batch):
     # shape kept (issue #181). Validation: segment-escape-average
     frac, path_start, path_end = (a[blk.sb] for a in st.escape_pieces)
     T_abs = piece_mean_transmission(frac, path_start, path_end, mu[..., None], xp=xp)
+    T_abs *= st.piece_fraction[blk.sb][:, None]
     pref = _line_weight_core(omega_res, t_L, T_abs, ALPHA_FS, _PREF_C1)
     a_width = denom * t_L / (2.0 * HBARC_EV_ANG) * xp.ones_like(omega_res)
     weight = pref * A2 * WM
@@ -1152,6 +1151,7 @@ def _accumulate_batched(st):
                 g_dot_ep=_coh_g_dot_ep,
                 v_dot_n=v_dot_n_all[sel],
                 n_re_tab=n_re_tab_g,
+                escape_gradient=st.escape_gradient[sel],
                 L_start=_coh_L_start[sel],
                 L_end=_coh_L_end[sel],
                 table_row=bt.ROW_TABLE,

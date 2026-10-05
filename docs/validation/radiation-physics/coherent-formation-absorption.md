@@ -45,7 +45,7 @@ $a=e^{-\tau_\text{start}/2}$, $b=e^{-\tau_\text{end}/2}$. The midpoint phase $\P
 
 **Split invariance.** The slope inside a piece is the time derivative of the same $\Phi$ that separates pieces, so the pieces of a straight flight sum to its field exactly, absorption and escape-leg phase included. The previous model was exact only for the vacuum phase and moved at first order in $\delta\omega\,\Delta L_\text{esc}$ and in $\mu\,\Delta L_\text{esc}$ (`coherent-segment-midpoint-time`).
 
-**Parseval.** $\int|F|^2dv=\tfrac14\cdot2\pi\int_{-1}^{1}e^{-\tau(s)}ds=\pi\langle e^{-\tau}\rangle$, against $\int\operatorname{sinc}^2=\pi$. A piece's integrated coherent self-term is therefore exactly the incoherent route's segment-mean escape yield (`segment-escape-average`). Absorption only reshapes the line (damped, $q$-broadened); $|F|^2=(a^2+b^2-2ab\cos2v)/[4(v^2+q^2)]$ is even in $v$, so it never moves the centre.
+**Parseval.** $\int|F|^2dv=\tfrac14\cdot2\pi\int_{-1}^{1}e^{-\tau(s)}ds=\pi\langle e^{-\tau}\rangle$, against $\int\operatorname{sinc}^2=\pi$. In the constant-index limit, a piece's integrated coherent self-term is therefore exactly the incoherent route's segment-mean escape yield (`segment-escape-average`). With full δ(E), equality in energy also requires the Jacobian below. Absorption only reshapes the line (damped, $q$-broadened); $|F|^2=(a^2+b^2-2ab\cos2v)/[4(v^2+q^2)]$ is even in $v$, so it never moves the centre.
 
 ### Why the vacuum centre and width
 
@@ -57,7 +57,7 @@ For a flat exit face the escape-path root is also the physically refracted one. 
 \omega\Bigl(1-\beta n_z-\frac{\beta\,\delta}{-n_z}\Bigr)=\beta g_z .
 ```
 
-Snell refraction at the face conserves the tangential wavevector, so the in-medium normal component is $k_z=\omega\sqrt{n^2-n_\perp^2}\approx\omega\bigl(-n_z-\delta/(-n_z)\bigr)$: the same $\delta/(-n_z)$. The bulk root instead uses the unrefracted $k=\operatorname{Re}n\,\omega\hat{\mathbf n}$, i.e. $\delta(-n_z)$. The two agree only at normal exit. At hopg 002, 100 keV, $\theta_\text{obs}=119^\circ$ the coherent line sits at 1600.5865 eV, the bulk root at 1600.3788 eV, the vacuum root at 1600.3150 eV. The amplitudes ($\chi_g$, $U_g$, $\mu$) stay evaluated at the bulk $E_\text{res}$ -- a narrow-line freeze, as before -- and the incoherent route keeps the bulk root; see Open items.
+Snell refraction at the face conserves the tangential wavevector, so the in-medium normal component is $k_z=\omega\sqrt{n^2-n_\perp^2}\approx\omega\bigl(-n_z-\delta/(-n_z)\bigr)$: the same $\delta/(-n_z)$. The bulk root instead uses the unrefracted $k=\operatorname{Re}n\,\omega\hat{\mathbf n}$, i.e. $\delta(-n_z)$. The two agree only at normal exit. At hopg 002, 100 keV, $\theta_\text{obs}=119^\circ$ the coherent line sits at 1600.5865 eV, the bulk root at 1600.3788 eV, the vacuum root at 1600.3150 eV. Since issue #187 both routes and their frozen couplings use the escape-path root, with first-order Snell vector invariants and the external-polarization PXR correction. The coherent phase retains the full δ(E).
 
 ## Limits and checks
 
@@ -83,17 +83,23 @@ Snell refraction at the face conserves the tangential wavevector, so the in-medi
 - `tests/montecarlo/test_xray_dispersion.py::test_single_segment_coherent_line_sits_on_the_escape_path_root`: the absorbed single-segment coherent peak lands on the closed-form escape-path root to within two 2.5e-5 eV grid steps, more than 1000 steps from the bulk root.
 - `tests/montecarlo/test_substep_invariance.py::test_incoherent_cxr_converges_under_substep_refinement` (flight-grouped): finest-rung grid L1 $6.5\times10^{-6}$ and peak error $5.6\times10^{-8}$ (were $2.1\times10^{-4}$ and $2.7\times10^{-5}$).
 - `tests/montecarlo/test_coherent_formation_absorption_cuda.py` (CUDA-gated): the reduction kernel (1/2/3 energies per block), the stream field and grouped kernels against the float64 NumPy reference, with and without the cutoff; the prologue's formation outputs against its own legacy outputs (coefficients lose exactly $e^{-\mu L_\text{mid}/2}$, one $\mu$ across both ends, vacuum centre and width).
-- Identity: `LINE_ESCAPE_MODEL = "segment-mean-v2-coherent-formation"` forks line spectra; profile digests re-minted.
+- Identity: `LINE_ESCAPE_MODEL = "segment-mean-v3-snell-resonance"` forks line spectra; profile digests re-minted.
 
 ## Assumptions and scope
 
-- Constant velocity, energy and amplitude over a segment (the finite-time line model); $\mu$ and $\delta$ constant across the narrow line, evaluated at $E_\text{res}$ and on the output grid respectively, as before.
+- Constant velocity, energy and amplitude over a segment; μ is frozen at the refracted root, while δ(E) is evaluated on the output grid.
 - Escape is straight, single-slab, no re-entry; $L_\text{esc}$ affine on each piece (the `segment-escape-average` cut set). Layered stacks stay refused on the coherent route.
 - Bulk response only -- no interface/Fresnel amplitude; the refraction enters as the escape-leg phase, as in `xray-in-medium-propagation-phase`.
 
+## Issue #187: shared root and dispersive Jacobian
+
+Both routes now use $D(E)=1-\mathbf v\cdot\hat{\mathbf n}-\delta(E)\mathbf v\cdot\nabla L_{\rm esc}$ for the stationary root and evaluate amplitudes at it. The coherent formation factor still uses its vacuum centre/width plus the escape phase: inserting the new root into that factor as well would double-count refraction.
+
+The full coherent phase has local energy derivative $J=D-E\delta'\mathbf v\cdot\nabla L_{\rm esc}$, whereas the incoherent sinc's frozen-index width is $DT/(2\hbar c)$. Thus Parseval in the mismatch variable does not guarantee exact equality in energy: the narrow-line ratio is $D/J$. The user explicitly chose to preserve δ(E). `tests/montecarlo/test_xray_dispersion.py::test_dispersive_formation_integral_has_the_derivative_jacobian` pins both constant-index equality and an affine $E\delta(E)$ example with a nonzero residual.
+
 ## Open items
 
-- The incoherent route and every amplitude still use the bulk root $1-\operatorname{Re}n\,\mathbf v\cdot\hat{\mathbf n}$, which for a flat exit face is the unrefracted wavevector. Coherent and incoherent line centres therefore differ by $O(\delta)$ (0.21 eV of 1600 eV above). Moving `xray-in-medium-resonance` and the incoherent route to the escape-path root is tracked as issue #187, not changed here.
+- Historical issue #181 limitation (closed by #187): the incoherent route and every amplitude used the bulk root $1-\operatorname{Re}n\,\mathbf v\cdot\hat{\mathbf n}$, which for a flat exit face is the unrefracted wavevector. Coherent and incoherent line centres therefore differ by $O(\delta)$ (0.21 eV of 1600 eV above). Moving `xray-in-medium-resonance` and the incoherent route to the escape-path root is tracked as issue #187, not changed here.
 - `expand_escape_pieces` advances piece ages with a float64 $\beta$ while the device $t_L$ uses REAL $\beta$: a rounding-level clock mismatch on float32 backends.
 
 ## Fresh-context verification (2026-09-26)

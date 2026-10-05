@@ -74,6 +74,13 @@ def _transparent(monkeypatch):
 
 
 def _escape_ratio(monkeypatch, segments, **kwargs):
+    # Isolate attenuation: with dispersion, face switches have distinct roots
+    # and absorption can reshape their superposition (issue #187).
+    monkeypatch.setattr(
+        lines_setup,
+        "refractive_index",
+        lambda crystal, energy, *args: np.ones_like(energy, dtype=complex),
+    )
     absorbed = mc_spectrum(segments, E_GRID, CRYSTAL, [HKL], B_ang2=0.4, n_hat=N_HAT, **kwargs)
     with monkeypatch.context() as m:
         _transparent(m)

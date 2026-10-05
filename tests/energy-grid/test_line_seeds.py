@@ -71,12 +71,12 @@ def _in_medium_denominator(energy_keV, direction, hkl):
 
     vacuum = HBARC_EV_ANG * v_dot_g / (1.0 - v_dot_n)
     root = brentq(
-        lambda e: e * (1.0 - n_re(e) * v_dot_n) - HBARC_EV_ANG * v_dot_g,
+        lambda e: e * (1.0 - v_dot_n + (1.0 - n_re(e)) * v[2] / _N_HAT[2]) - HBARC_EV_ANG * v_dot_g,
         0.9 * vacuum,
         1.1 * vacuum,
         xtol=1e-9,
     )
-    return root, 1.0 - n_re(root) * v_dot_n
+    return root, 1.0 - v_dot_n + (1.0 - n_re(root)) * v[2] / _N_HAT[2]
 
 
 def test_band_seeds_centre_on_the_in_medium_root_the_kernels_use():

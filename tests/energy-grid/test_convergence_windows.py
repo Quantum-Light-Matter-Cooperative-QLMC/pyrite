@@ -24,7 +24,8 @@ BACKBONE_EV = 12.0
 
 @pytest.fixture(scope="module")
 def ladder():
-    case = cc.build_ladder_case("hopg", 30.0, 5.0, 95.0, thickness_ang=1.0e4, n_electrons=3, seed=0)
+    # Stay outside the first-order Snell critical-angle refusal.
+    case = cc.build_ladder_case("hopg", 30.0, 5.0, 45.0, thickness_ang=1.0e4, n_electrons=3, seed=0)
     return cc.CaseLadder(case, transport_core="lockstep")
 
 

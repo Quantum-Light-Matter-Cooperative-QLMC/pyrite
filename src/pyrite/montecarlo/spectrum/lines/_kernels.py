@@ -143,8 +143,9 @@ def _line_amp_sq_core(
     k_dot_v,
     gamma,
     detuning,
+    k_dot_e=0.0,
 ):
-    """One polarization's |A|^2, |A_PXR|^2, |A_CBS|^2 (Zhai Eq. 13/14) as a single
+    """One polarization's |A|^2, |A_PXR|^2, |A_CBS|^2 (Feranchuk Eq. 13/14) as a single
     fused GPU kernel. Replaces the per-reflection storm of complex CuPy elementwise
     kernels (chi/detuning, the CBS braced product, three ``abs()**2``) that made up
     the bulk of the residual ``cxr.lines`` GPU-idle after the sincsq fuse.
@@ -152,7 +153,7 @@ def _line_amp_sq_core(
     Split the complex amplitudes into real/imag: A_PXR = chi * f_pxr and
     A_CBS = eUg/m * f_cbs with REAL scalars
 
-        f_pxr = (v.kg * g.e - omega^2 v.e) / detuning
+        f_pxr = (v.kg * (g.e + k.e) - k^2 v.e) / detuning
         f_cbs = -({g.e - (v.g)(v.e)} + v.e * {k.g - (k.v)(v.g)}/(v.g)) / (gamma * v.g)
 
     so every op is real and the kernel fuses. |A_PXR + A_CBS|^2 is expanded on the
@@ -165,7 +166,7 @@ def _line_amp_sq_core(
     required -- regenerate the affected spectrum goldens (regen-golden) before this
     is signed off. Validation: line-amplitude-fusion
     """
-    f_pxr = (v_dot_kg * g_dot_e - om * om * v_dot_e) / detuning
+    f_pxr = (v_dot_kg * (g_dot_e + k_dot_e) - om * om * v_dot_e) / detuning
     braced_ge = g_dot_e - vdg * v_dot_e
     braced_kg = k_dot_g - k_dot_v * vdg
     f_cbs = -(braced_ge + v_dot_e * braced_kg / vdg) / (gamma * vdg)
@@ -589,7 +590,7 @@ def _line_kin_core(vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g):
     the expanded vector form at rounding level.
 
     The caller passes the in-medium ``denom`` and ``n_dot_g`` (the latter
-    carrying its factor of ``Re n``), both per (segment, g) rather than hoisted.
+    carrying the Snell correction ``delta grad L.g``), both per (segment, g) rather than hoisted.
     Every identity above survives that substitution unchanged -- see
     ``_in_medium_kinematics``.
     """
@@ -626,57 +627,26 @@ if hasattr(xp, "fuse"):
 _RESONANCE_ROOT_RTOL = 1e-3
 
 
-def _in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab):
-    """In-medium resonance denominator and refractive factor per segment.
+def _in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab, v_dot_grad=None, grad2=None):
+    """First-order Snell resonance on one linear photon-escape piece.
 
-    Energy-momentum conservation on a segment is ``omega = v.(k + g)``, and the
-    Maxwell dispersion relation in the bulk dielectric is ``k = n(omega) omega``
-    along the observation direction, so the vacuum resonance
-    ``omega_res = v.g / (1 - v.n_hat)`` becomes implicit:
-
-        omega_res = v.g / (1 - Re n(omega_res) (v.n_hat))
-
-    Only ``Re n`` enters. ``Im n`` is the same absorption already carried as the
-    Beer-Lambert ``mu(E)`` escape factor, so folding it in here as well would
-    double-count it.
-
-    Solved by fixed-point iteration from the vacuum root. The map's derivative is
-    ``(v.n_hat) (dn/dE) (dE/ddenom) ~ delta ~ 1e-5``, so each pass gains ~5
-    digits and two are already at float64 rounding; three are taken for margin.
-
-    That contraction rate assumes ``Re n = 1 - delta`` with ``delta ~ 1e-5-1e-3``,
-    which is only true in the X-ray regime. A segment scattered nearly
-    perpendicular to ``g`` puts the vacuum root down in the optical/UV, where the
-    tabulations are honest about ``Re n > 1`` (carbon: 6.24-285 eV, peaking at
-    4.766 at 6.40 eV). There ``Re n (v.n_hat)`` can approach unity, ``denom``
-    collapses toward a spurious Cherenkov-like zero, the map stops contracting,
-    and the iteration settles into a 2-cycle instead: three passes then return
-    whichever half of the cycle pass three lands on, and a keV-scale ``E_res``
-    comes back attached to a ``v.g`` four orders below the median. Downstream the
-    CBS amplitude's ``1/(gamma (v.g)^2)`` turns that into a line total ten orders
-    too large, and it is finite, so nothing flags it.
-
-    So convergence is checked rather than assumed: the last pass must have moved
-    ``denom`` by less than ``_RESONANCE_ROOT_RTOL``, which a genuine contraction
-    clears by five orders. Pairs that fail carry NaN out of ``denom`` and drop on
-    the caller's finite mask, the same route out-of-range tabulation energies
-    take. Rejection is the correct handling, not a workaround: those samples
-    violate the CBS amplitude's own perturbative validity condition
-    ``|U_g| g^2 / (gamma m c^2 (v.g)^2) << 1`` -- by a factor 15.6 on the sample
-    this was traced from.
-
-    Returns ``(denom, n_re)`` with the shape of ``v_dot_g``: the caller forms the
-    remaining in-medium scalars from ``n_re`` rather than re-deriving them, since
-    ``k.v = omega (1 - denom)`` still holds exactly while ``k.g`` and ``k^2``
-    pick up one and two powers of ``n_re`` respectively.
-
-    Out-of-range tabulation energies carry NaN out of ``n_re``, which propagates
-    to ``denom`` and drops the segment on the caller's finite/window mask -- the
-    same convention as the chi/U/mu tabulations.
+    Tangential continuity at a planar exit gives
+    ``k_eff = omega (n_hat + delta grad L)``, ``grad L = -e/(e.n_hat)``.
+    Energy conservation (Zhai SI Eqs. (7)–(9)) therefore requires
+    ``omega (1 - v.n_hat - delta v.grad L) = v.g``. The imaginary index
+    is counted only by Beer-Lambert absorption. Couplings sample this root.
+    At normal exit ``grad L = -n_hat`` and the bulk root is recovered.
+    Three fixed-point passes retain the float32-aware convergence guard.
+    Reject the critical-angle regime ``2 |delta| |grad L|^2 >= 1``;
+    first-order ray optics and the existing coherent phase are invalid there.
+    With omitted geometry, retain the bulk scalar convention for legacy
+    direct callers; production spectrum routes always supply the gradient.
 
     Validation: xray-in-medium-resonance
     """
     _xp = array_namespace(v_dot_n, v_dot_g, n_re_tab, E_tab)
+    if v_dot_grad is None:
+        v_dot_grad = -v_dot_n
     denom = 1.0 - v_dot_n
     n_re = None
     previous = denom
@@ -685,10 +655,16 @@ def _in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab):
         _ix, _fr, _blw, _abv = _interp_index(E_res, E_tab)
         n_re = _interp_gather1d(_ix, _fr, _blw, _abv, n_re_tab)
         previous = denom
-        denom = 1.0 - n_re * v_dot_n
+        denom = _xp.where(
+            v_dot_grad == -v_dot_n,
+            1.0 - n_re * v_dot_n,
+            1.0 - v_dot_n - (1.0 - n_re) * v_dot_grad,
+        )
     # NaN denominators compare False here and stay NaN, which is the wanted
     # outcome: an out-of-range root is already a rejected pair.
     settled = _xp.abs(denom - previous) <= _RESONANCE_ROOT_RTOL * _xp.abs(denom)
+    if grad2 is not None:
+        settled &= 2.0 * _xp.abs(1.0 - n_re) * grad2 < 1.0
     denom = _xp.where(settled, denom, REAL(_xp.nan))
     return denom, n_re
 

@@ -36,7 +36,7 @@ The optical depth is $\tau=\mu\,L_{\rm esc}$ and the transmission $T_{\rm abs}=e
 
 In a stack, emission is attenuated by every layer crossed on the escape path. See [Multilayer materials](../materials/multilayer-materials.md).
 
-For the blazed groove, the working facet is perpendicular to $\hat{\mathbf n}$ and the relief facet is perpendicular to the beam, so a photon leaving through its first working-facet crossing cannot re-enter material later — the first crossing *is* the complete material path. This holds only for the exact working-facet normal $\hat{\mathbf n}=(\cos t_p,0,-\sin t_p)$; other directions, and any combination with layers, raise rather than silently using a flat path. Grooving is purely an absorption-path effect in this model: emission amplitudes and resonance kinematics are untouched, and there is no wave-optical diffraction off the groove edges. A finite crystal footprint is permitted but only classifies launch hit/miss in transport; the groove escape treats the sawtooth as laterally periodic.
+For the blazed groove, the working facet is perpendicular to $\hat{\mathbf n}$ and the relief facet is perpendicular to the beam, so a photon leaving through its first working-facet crossing cannot re-enter material later — the first crossing *is* the complete material path. This holds only for the exact working-facet normal $\hat{\mathbf n}=(\cos t_p,0,-\sin t_p)$; other directions, and any combination with layers, raise rather than silently using a flat path. The working-facet normal also sets the refracted line kinematics. No wave-optical diffraction off the groove edges is included. A finite crystal footprint is permitted but only classifies launch hit/miss in transport; the groove escape treats the sawtooth as laterally periodic.
 
 ## In-medium dispersion
 
@@ -58,24 +58,35 @@ Only $\mathrm{Re}\,n$ enters the resonance and propagation phase. Photoabsorptio
 
 ### Resonance
 
-With $k=n(\omega)\,\omega$ along the observation direction, the resonance condition becomes implicit:
+For the external observation direction $\hat{\mathbf n}$ and a planar exit normal $\hat{\mathbf e}$, tangential wavevector continuity gives the first-order Snell vector
 
 $$
-\omega_{\rm res}=\frac{\mathbf v\cdot\mathbf g}
-{1-\mathrm{Re}\,n(\omega_{\rm res})\,(\mathbf v\cdot\hat{\mathbf n})} .
+\mathbf h=\nabla L_{\rm esc}=-\frac{\hat{\mathbf e}}{\hat{\mathbf e}\cdot\hat{\mathbf n}},
+\qquad \mathbf k_{\rm eff}=\omega(\hat{\mathbf n}+\delta\mathbf h),
+\qquad D(E)=1-\mathbf v\cdot\hat{\mathbf n}-\delta(E)\mathbf v\cdot\mathbf h.
 $$
 
-The implementation takes three fixed-point iterations from the vacuum root. Away from absorption edges in the X-ray regime, the refractive correction is small and iteration converges rapidly. This is not guaranteed near low-energy roots where the refractive index can differ substantially from unity.
+Both line routes now solve $E_{\rm res}D(E_{\rm res})=\hbar c\,\mathbf v\cdot\mathbf g$ on every affine escape piece. For parallel layer interfaces the emitting layer supplies its own refractive index; crossed layers supply attenuation. Normal exit has $\mathbf h=-\hat{\mathbf n}$ and reproduces the bulk root exactly. The entrance-face HOPG (002), 100 keV, 119° example gives 1600.5865 eV, replacing the old unrefracted bulk root at 1600.3788 eV.
 
-The final denominator update must be below a relative $10^{-3}$. Pairs that fail carry NaN and are dropped by the finite-value mask, as are out-of-range tabulation energies. This guard rejects an unsettled root; it does not repair the resonance or extend the perturbative emission model into that regime. See [Validation: `xray-in-medium-resonance`](../../validation/radiation-physics/xray-in-medium-resonance.md).
+Three fixed-point passes start from the vacuum root. The last denominator update must be below a relative $10^{-3}$; nonconverged and out-of-range pairs are dropped. The first-order model also drops pairs where $2|\delta|\,|\mathbf h|^2\ge1$, the critical-angle regime. It does not insert the exact Snell square root into one route while leaving the coherent phase first order. See [Validation: `xray-in-medium-resonance`](../../validation/radiation-physics/xray-in-medium-resonance.md).
 
-The substitution leaves every kinematic identity intact — $\mathbf k\cdot\mathbf v=\omega(1-{\rm denom})$ still holds exactly, while $\mathbf k\cdot\mathbf g$ picks up one power of $\mathrm{Re}\,n$ and the PXR numerator's $k^2$ two. Out-of-range tabulation energies carry NaN out of $\mathrm{Re}\,n$ and drop the segment on the caller's finite mask, matching the $\chi$/$U$/$\mu$ convention.
+At the new root, $\chi_g$, $U_g$ and $\mu$ are frozen across the line. The vector invariants are
+
+$$
+\mathbf k\cdot\mathbf v=\omega(1-D),\quad
+\mathbf k\cdot\mathbf g=\omega(\hat{\mathbf n}\cdot\mathbf g+\delta\mathbf h\cdot\mathbf g),\quad
+k^2=\omega^2(1-2\delta+\delta^2|\mathbf h|^2).
+$$
+
+The detuning remains $g^2+2\mathbf k\cdot\mathbf g$. For a fixed external transverse polarization $\mathbf e_s$, the PXR numerator uses $(\mathbf k+\mathbf g)\cdot\mathbf e_s$, including the nonzero $\mathbf k_{\rm eff}\cdot\mathbf e_s=\omega\delta\mathbf h\cdot\mathbf e_s$. CBS uses its existing braced products with the corrected vector invariants. This is a bulk general-vector amplitude approximation; internal-mode polarization matching and interface normalization remain outside its scope.
+
+Incoherent pieces retain the parent segment's duration in the sinc and weight, multiplied by each piece's length fraction and mean transmission. This preserves the original segment intensity model while allowing different face roots; geometric cuts do not create independent tiny emitters. `LINE_ESCAPE_MODEL = "segment-mean-v3-snell-resonance"` forks affected case and dataset identities.
 
 ### Propagation phase
 
 Under the coherent policy the same dispersion relation moves the segment-to-segment propagation phase: each segment's field picks up $-\delta(E)\,\omega(E)\,L_{{\rm esc},j}$ over its in-crystal escape path, the real partner of the amplitude factor $e^{-\tau/2}$ applied over that same path. This is refused for layered absorbers, whose per-layer $\delta$ is not modelled.
 
-Both factors vary along a segment, and both are integrated along each linear escape piece rather than frozen at its midpoint: the piece field is $t_L e^{i\Phi_c}F$ with $F=e^{-\tau_c/2}\sinh w/w$, $w=iv-q$, $q=(\tau_{\rm end}-\tau_{\rm start})/4$ and $v=a_{\rm vac}(E-E_{\rm vac})-\delta\omega\,\Delta L_{\rm esc}/2$ on the vacuum sinc centre and width. Pieces of a straight flight therefore sum to it exactly. The coherent line centre is where this full phase is stationary; for a flat exit face that is the Snell-refracted root, which differs from the bulk resonance above by $O(\delta)$ except at normal exit. The incoherent route keeps the bulk root. See [Validation: `coherent-formation-absorption`](../../validation/radiation-physics/coherent-formation-absorption.md).
+Both factors vary along a segment, and both are integrated along each linear escape piece rather than frozen at its midpoint: the piece field is $t_L e^{i\Phi_c}F$ with $F=e^{-\tau_c/2}\sinh w/w$, $w=iv-q$, $q=(\tau_{\rm end}-\tau_{\rm start})/4$ and $v=a_{\rm vac}(E-E_{\rm vac})-\delta\omega\,\Delta L_{\rm esc}/2$ on the vacuum sinc centre and width. Pieces of a straight flight therefore sum to it exactly. The coherent line centre is where this full phase is stationary: the same first-order Snell root as the incoherent route. See [Validation: `coherent-formation-absorption`](../../validation/radiation-physics/coherent-formation-absorption.md).
 
 That the phase runs over the *escape* path, and not some other length, is not a convention. The observation-time phase is $\omega\,(t_j + n\,L_{{\rm esc},j} + L_{\rm vac},j)$, and to first order the geometric total $L_{\rm esc}+L_{\rm vac}$ is $R-\hat{\mathbf n}\cdot\mathbf r_j$, so the vacuum term $\omega d_j$ (with $d_j=t_j-\hat{\mathbf n}\cdot\mathbf r_j$) picks up exactly the excess
 
@@ -88,9 +99,19 @@ The implementation keeps real propagation and attenuation separate. The escape f
 
 This is deliberately **not** $k(E)\,\hat{\mathbf n}\cdot\mathbf r_j$, which would charge the medium's index for the whole flight to the detector. The two agree only when the photon exits along the face normal, where $L_{\rm esc}$ and $\hat{\mathbf n}\cdot\mathbf r$ differ by a segment-independent constant — i.e. by a global phase. The term is tabulated on the **output** grid, because it is a propagation phase read across the whole spectrum rather than a coupling frozen at the line energy.
 
+### Energy-integrated yield
+
+Parseval is exact in the formation mismatch coordinate, $\int |F|^2\,dv=\pi\langle e^{-\tau}\rangle$. It translates to equal coherent/incoherent energy yields when $\delta$ is constant across a line. The coherent phase deliberately retains the full $\delta(E)$, while the incoherent sinc uses $a=D(E_{\rm res})T/(2\hbar c)$. Its coherent local Jacobian is instead
+
+$$
+J=D(E_{\rm res})-E_{\rm res}\delta'(E_{\rm res})\,\mathbf v\cdot\mathbf h.
+$$
+
+For a narrow line with slowly varying $J$, the coherent/incoherent integrated-yield ratio is $D/J$, in addition to finite spectral-window errors. Full dispersion is preserved rather than freezing the coherent phase to enforce equality. Both routes share the stationary root, while absorption and nonlinear dispersion can change the sampled shape. The constant-index limit and an exactly affine $E\delta(E)$ example are pinned by `test_dispersive_formation_integral_has_the_derivative_jacobian`.
+
 ## Assumptions and limits
 
-- straight photon rays: no refraction at interfaces, no Fresnel reflection or transmission, no diffraction off groove edges;
+- straight geometric escape rays with first-order Snell phase/kinematics; no Fresnel reflection or transmission, no diffraction off groove edges;
 - **bulk response only** — grazing observation geometry, where interface optics dominate, is out of scope for the refractive model;
 - passive attenuation: absorbed photons are gone, with no fluorescence, re-emission, or scattering into the detector direction;
 - the escape path is **affine on each piece** of a segment, which makes the segment-mean escape (incoherent) and the per-piece formation integral (coherent) exact; emission amplitudes and $\mu$ stay frozen at the segment's line energy;

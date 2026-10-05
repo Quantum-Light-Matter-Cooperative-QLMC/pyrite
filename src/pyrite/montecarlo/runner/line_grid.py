@@ -144,7 +144,7 @@ def _cached_grid(cached):
         return None
 
 
-def _windowed_line_grid(payload, case, segments, n_hats, Ne, feature_widths_eV):
+def _windowed_line_grid(payload, case, segments, n_hats, Ne, feature_widths_eV, groove=None):
     """Seed, plan and validate a piecewise line axis from this run's segments.
 
     The backbone is the policy's maximum spacing. Every provider the policy
@@ -171,6 +171,7 @@ def _windowed_line_grid(payload, case, segments, n_hats, Ne, feature_widths_eV):
             samples_per_feature=int(windows["samples_per_feature"]),
             aliased_weight_limit=float(payload["resolution"]["aliased_weight_limit"]),
             tail_widths=float(windows["tail_widths"]),
+            groove=groove,
         )
         direction_seeds, direction_summary = collect_feature_seeds(context, windows["providers"])
         seeds.extend(direction_seeds)
@@ -429,7 +430,9 @@ def _resolve_policy_grid(payload, case, segments, n_hats, Ne, abs_layers, groove
     bandwidth_record = None
     try:
         if windowed:
-            grid, record = _windowed_line_grid(payload, case, segments, n_hats, Ne, steps)
+            grid, record = _windowed_line_grid(
+                payload, case, segments, n_hats, Ne, steps, groove=groove
+            )
         elif measured:
             grid, record, bandwidth_record = _measured_line_grid(
                 payload, case, segments, n_hats, Ne, target_step, abs_layers, groove

@@ -20,7 +20,7 @@ KWARGS = {
     "crystal": "hopg",
     "hkl_list": [(0, 0, 2)],
     "B_ang2": 0.8,
-    "n_hat": np.array([1.0, 0.0, 0.01]),
+    "n_hat": np.array([1.0, 0.0, 0.1]),
 }
 
 RTOL = max(1e-12, 100.0 * float(np.finfo(REAL).eps))
@@ -130,16 +130,23 @@ def _constant_velocity_field(segments, energy_eV):
     return fields
 
 
-def test_single_segment_coherent_equals_incoherent_self_term():
+def test_single_segment_coherent_equals_incoherent_self_term(monkeypatch):
+    from pyrite.montecarlo.spectrum.lines import _setup
+
+    # Constant-index limit: full delta(E) has a derivative Jacobian, separately
+    # pinned by test_dispersive_formation_integral_has_the_derivative_jacobian.
+    monkeypatch.setattr(
+        _setup,
+        "refractive_index",
+        lambda crystal, energy, *args: np.ones_like(energy, dtype=complex),
+    )
     segments = _segments()
 
     incoherent = mc_spectrum(segments, E_GRID, coherent=False, **KWARGS)
     coherent = mc_spectrum(segments, E_GRID, coherent=True, **KWARGS)
-    # The coherent self-term is |t_L F|^2 of the complex formation integral,
-    # whose Parseval integral is the incoherent route's segment-mean escape
-    # (issue #181), so the integrated yields agree. The coherent line sits on
-    # the escape-path (Snell) root, the incoherent one on the bulk in-medium
-    # root: an O(delta) shift of a line ~1e5 times wider, the only residual.
+    # Parseval gives the same energy yield in this constant-index limit.
+    # Full delta(E) instead carries the derivative Jacobian documented and
+    # anchored under xray-in-medium-resonance.
     # Validation: coherent-formation-absorption
     assert np.max(incoherent) > 0.0
     np.testing.assert_allclose(coherent.sum(), incoherent.sum(), rtol=1e-6)

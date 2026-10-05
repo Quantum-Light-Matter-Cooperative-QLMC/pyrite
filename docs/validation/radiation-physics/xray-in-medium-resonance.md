@@ -1,5 +1,297 @@
 # `xray-in-medium-resonance`
 
+## Independent Snell derivation, 2026-10-05
+
+This section supersedes the historical bulk-direction claim below for an
+externally observed direction. The historical calculation remains valid when
+the supplied direction is the internal mode direction, and at normal exit.
+The verifier did not implement this change. The old write-up was read to
+preserve its history; the changed implementation bodies were not read before
+the derivation in this section was recorded.
+
+The source inputs are tangential wavevector continuity at a planar interface,
+the homogeneous real-index dispersion relation, and the conservation equation
+$\omega=\mathbf v\cdot(\mathbf k+\mathbf g)$ cited as Zhai SI Eq. (10) in
+the new derivation docstring (Feranchuk–Spence Eq. (10)/(13) in the historical
+ledger). Primary-source inspection subsequently found that citation number
+incorrect: Zhai SI Eq. (7) defines the mismatch and Eq. (9) gives the vacuum
+root; Eq. (10) specifies Gaussian beam coordinates. Here
+$\omega=E/(\hbar c)$ is in inverse angstroms, $\mathbf v$ is
+the dimensionless electron velocity, $\mathbf g$ is in inverse angstroms,
+$\hat{\mathbf n}$ is the external vacuum unit direction,
+$\delta(E)=1-\operatorname{Re}n(E)$, and $L(\mathbf r)$ is the vacuum-ray
+escape distance in angstroms. The supplied signature is
+`_in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab, v_dot_grad=None,
+grad2=None) -> (denom, n_re)`. This verification concerns one affine escape
+piece with fixed exit normal and straight electron velocity. It excludes
+critical/grazing exit, Fresnel transmission, multiple escape faces within
+one segment, and absorption already counted by Beer–Lambert attenuation.
+
+### Interface closure and cheap filters
+
+Let $\hat{\mathbf e}$ be the outward exit normal and
+$\mu=\hat{\mathbf e}\cdot\hat{\mathbf n}>0$. On this planar piece,
+$L=(d-\hat{\mathbf e}\cdot\mathbf r)/\mu$, hence
+$\mathbf a=\nabla L=-\hat{\mathbf e}/\mu$. Tangential continuity gives
+the internal wavevector divided by $\omega$ as
+
+$$
+\mathbf q
+=\hat{\mathbf n}-\mu\hat{\mathbf e}
++\sqrt{(1-\delta)^2-1+\mu^2}\,\hat{\mathbf e}
+=\hat{\mathbf n}+\delta\mathbf a
++O(\delta^2/\mu^3).
+$$
+
+The outgoing square-root branch fixes the sign. Expanding requires
+$2|\delta|/\mu^2\ll1$, equivalently
+$2|\delta|\,|\mathbf a|^2\ll1$. A guard at unity excludes the
+critical-angle regime; it does not assert a uniform small truncation error
+for all accepted points arbitrarily near that boundary.
+
+Define $A=\mathbf v\cdot\hat{\mathbf n}$,
+$B=\mathbf v\cdot\mathbf a$, and $G=\mathbf v\cdot\mathbf g$.
+Substitution into the conservation equation yields
+
+$$
+\boxed{D(E)=1-A-\delta(E)B,\qquad E_{\rm res}D(E_{\rm res})=\hbar c G.}
+$$
+
+All of $A,B,D,\delta,\mathbf a,\mathbf q$ are dimensionless, and both
+sides of the root equation are in eV. At zero index contrast the vacuum
+root is recovered. At normal exit $\mathbf a=-\hat{\mathbf n}$, giving
+$D=1-(1-\delta)A$, the historical bulk result. The sign of the shift
+depends on $B$, not on $A$ alone: to first order,
+$\Delta E/E_{\rm vac}=\delta(E_{\rm vac})B/(1-A)$. Reversing the exit
+normal and its denominator together leaves $\mathbf a$ unchanged.
+Units, limits, and signs therefore pass for this first-order closure.
+
+The three-pass fixed-point solve is conditional, not a consequence of
+$|\delta|\ll1$ alone. For $T(E)=\hbar cG/D(E)$, the derivative at a root is
+
+$$
+T'(E_{\rm res})
+=\frac{E_{\rm res}\delta'(E_{\rm res})B}{D(E_{\rm res})}.
+$$
+
+Convergence requires its modulus to be below unity; a small $D$, a large
+escape gradient, or sharp index dispersion can defeat contraction. The
+existing convergence rejection remains necessary.
+
+### Vector terms entering PXR and CBS
+
+The same vector must be used throughout the first-order kinematics:
+
+$$
+\begin{aligned}
+\mathbf k\cdot\mathbf v&=\omega(1-D),\\
+\mathbf k\cdot\mathbf g
+&=\omega\left(\hat{\mathbf n}\cdot\mathbf g
++\delta\mathbf a\cdot\mathbf g\right),\\
+\mathbf k\cdot\mathbf e_s
+&=\omega\delta\mathbf a\cdot\mathbf e_s,
+\quad \hat{\mathbf n}\cdot\mathbf e_s=0,\\
+k^2&=\omega^2|\hat{\mathbf n}+\delta\mathbf a|^2
+=\omega^2(1-2\delta)+O(\delta^2|\mathbf a|^2),\\
+|\mathbf k+\mathbf g|^2-k^2
+&=g^2+2\mathbf k\cdot\mathbf g.
+\end{aligned}
+$$
+
+Here $\hat{\mathbf n}\cdot\mathbf a=-1$ follows from the planar escape
+geometry. Squaring the first-order vector retains an incomplete
+second-order term; it does not make the approximation exact to second
+order. PXR's polarization numerator includes
+$[\mathbf v\cdot(\mathbf k+\mathbf g)]
+[(\mathbf k+\mathbf g)\cdot\mathbf e_s]-k^2(\mathbf v\cdot\mathbf e_s)$.
+External transverse polarization generally gives a nonzero
+$\mathbf k\cdot\mathbf e_s$ at oblique exit. Dropping that term while
+correcting only the resonance would be inconsistent at first order.
+
+### Full dispersion and the single-segment intensity
+
+For a straight segment with affine $L$ and constant coupling, the coherent
+phase, apart from a constant, is
+
+$$
+\Phi(E,t)
+=\omega[t-\hat{\mathbf n}\cdot\mathbf r(t)-\delta(E)L(\mathbf r(t))]
+-\mathbf g\cdot\mathbf r(t).
+$$
+
+For duration $T$ in angstroms, its squared time integral is
+
+$$
+|I(E)|^2
+=T^2\operatorname{sinc}^2\!\left(
+\frac{T}{2\hbar c}
+[E D(E)-\hbar cG]\right),
+\qquad\operatorname{sinc}x=\frac{\sin x}{x}.
+$$
+
+The local energy derivative at the root is
+
+$$
+\boxed{J
+=\frac{d[ED(E)]}{dE}\bigg|_{E_{\rm res}}
+=D(E_{\rm res})-E_{\rm res}\delta'(E_{\rm res})B.}
+$$
+
+A frozen-index incoherent sinc uses width
+$D(E_{\rm res})T/(2\hbar c)$; the local full-dispersion coherent width is
+$|J|T/(2\hbar c)$. With slowly varying prefactors and a narrow isolated
+line, energy integration gives $2\pi\hbar cT/|J|$ for the coherent
+time-integral factor, versus $2\pi\hbar cT/|D(E_{\rm res})|$ for the
+frozen-index expression. The ratio is $|D(E_{\rm res})/J|$.
+For a nonlinear dispersion relation the exact variable substitution also
+has an energy-dependent Jacobian, so even this local replacement is not
+an exact finite-width identity. General exact equality is therefore
+false. Constant index gives exact equality of the phase kernels;
+negligible $E\delta'B/D$ and negligible curvature over the line gives
+approximate equality. Energy-dependent coupling or attenuation further
+restricts an equality claim about total intensity.
+
+As an independent numerical check of the missing factor, take
+$A=0.3$, $B=-0.8$, $E_{\rm res}=1000$ eV and
+$\delta(E)=10^{-3}(1000\,\mathrm{eV}/E)^2$. Then
+$D=0.7008$, $E\delta'=-0.002$, and $J=0.6992$.
+The narrow-line coherent/frozen-index integrated ratio is
+$0.7008/0.6992=1.00228833$. This difference persists on a single segment
+without scattering or multiple-face geometry.
+
+### Source check for the polarization extension
+
+The [Zhai supplementary information](https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41467-025-66063-6/MediaObjects/41467_2025_66063_MOESM1_ESM.pdf),
+page 3, Eq. (3), displays the eigenfield numerator with
+$\mathbf g\cdot\mathbf e_s$, already specialized to a transverse incident
+mode. Its Eq. (6)/(7) defines the CBS braces. The Feranchuk primary PDF
+requires APS authentication, so its exact equation numbering was not
+confirmed here. The general-vector extension below follows directly from
+the Maxwell inverse, not from a claimed literal quotation of Eq. (13).
+
+For $\mathbf p=\mathbf k+\mathbf g$ and real medium wavenumber squared
+$K^2$, the Maxwell operator is
+$M=(p^2-K^2)I-\mathbf p\mathbf p^{\mathsf T}$, and
+
+$$
+M^{-1}=\frac{I-\mathbf p\mathbf p^{\mathsf T}/K^2}{p^2-K^2}.
+$$
+
+Thus its scattering numerator contains
+$\mathbf p(\mathbf p\cdot\mathbf e_s)-K^2\mathbf e_s$ before applying
+$\mathbf k\cdot\mathbf e_s=0$. With fixed external polarization, the
+first PXR term therefore needs $\mathbf g\cdot\mathbf e_s+
+\mathbf k_{\rm eff}\cdot\mathbf e_s$. This algebra alone does not certify
+the transmitted internal mode: a physical interface treatment must also
+enforce its internal transversality and boundary normalization. Fresnel
+amplitudes remain outside this claim.
+
+For CBS, perturbing the current gives a direct velocity term
+$\delta\mathbf v\cdot\mathbf e_s$ and a trajectory-phase term proportional
+to $(\mathbf k\cdot\delta\mathbf r)(\mathbf v\cdot\mathbf e_s)$.
+The force response is proportional to
+$\mathbf b=\mathbf g-\mathbf v(\mathbf v\cdot\mathbf g)$.
+Consequently the two terms are $\mathbf b\cdot\mathbf e_s$ and
+$(\mathbf v\cdot\mathbf e_s)(\mathbf k\cdot\mathbf b)/G$, respectively:
+the existing CBS braces remain valid with the corrected $\mathbf k$.
+No additional $\mathbf k\cdot\mathbf e_s$ term enters that current expansion.
+
+### Exterior synthetic zero-escape limit
+
+The maintained single-segment anchor places its synthetic flight outside
+the slab, ending on the entrance plane, with material escape distance
+identically zero. On this affine piece $L\equiv0$ implies
+$\mathbf a=\nabla L=0$. Therefore
+
+$$
+\mathbf k_{\rm eff}=\omega\hat{\mathbf n},\qquad
+D=1-\mathbf v\cdot\hat{\mathbf n},\qquad
+k^2=\omega^2,\qquad \mathbf k\cdot\mathbf e_s=0,\qquad J=D.
+$$
+
+The general norm identity is
+$|\hat{\mathbf n}+\delta\mathbf a|^2
+=1+2\delta\hat{\mathbf n}\cdot\mathbf a+\delta^2|\mathbf a|^2$.
+Its specialized interior form $1-2\delta+\delta^2|\mathbf a|^2$
+uses $\hat{\mathbf n}\cdot\mathbf a=-1$ and cannot be extended to zero
+gradient. Exterior slab rows therefore use zero gradient and vacuum
+wavevector magnitude; actual in-crystal rows retain the face-gradient
+formula. This is a synthetic radiation-model limit, not a claim of
+physical crystal emission from a charge outside the material. More
+generally, a constant material-path distance contributes only constant
+phase and attenuation, with no refractive slope along the flight.
+
+### Implementation comparison after independent derivation
+
+`_in_medium_kinematics` updates
+`denom = 1 - v_dot_n - (1 - n_re) * v_dot_grad`, with an algebraically
+equivalent bulk expression when `v_dot_grad == -v_dot_n`. Its final-pass
+relative convergence rejection and the
+`2 * abs(1 - n_re) * grad2 < 1` guard preserve the conditional domain.
+`segment_escape_gradient` returns the derived planar gradient, selects the
+finite-prism exit face on already split pieces, and uses the normal-exit
+gradient for the working-facet groove geometry. All production CPU and
+streaming callers pass this gradient explicitly; omitted geometry retains
+the historical bulk convention for direct callers.
+
+An independent constant-index numerical point with $A=0.3$, $B=-0.8$,
+$\delta=0.001$, $|\nabla L|^2=4$, and $\hbar cG=1000(0.7008)$ eV
+gave $D=0.7008$ and $E_{\rm res}=1000$ eV from the production helper,
+matching the direct conservation calculation to the displayed precision.
+No implementation helper was used to construct the expected denominator.
+
+The batched, per-reflection, and streaming prologue paths sample all
+couplings at this root. Their $\mathbf k\cdot\mathbf v$,
+$\mathbf k\cdot\mathbf g$, detuning, and squared magnitude agree with
+the same first-order vector. The squared magnitude keeps the explicit
+second-order square of that vector, with the truncation qualification above.
+The coherent formation argument retains the full tabulated
+$\delta(E)\omega(E)$ phase; the incoherent width remains frozen at
+$D(E_{\rm res})$. This is consistent with the requested kinematics scope
+and intentionally leaves the integrated-yield Jacobian residual.
+
+For incoherent splitting, the implementation retains parent duration
+$T_p$ in every piece's prefactor and width and multiplies its mean
+transmission by fraction $f_i$. The resulting model is
+
+$$
+S_p(E)=\sum_i f_i C_i T_p^2\bar{\mathcal T}_i
+\operatorname{sinc}^2\!\left[
+\frac{D_iT_p}{2\hbar c}(E-E_i)\right].
+$$
+
+Each $C_i$ includes the root-sampled coupling and spectral prefactor.
+Identical roots and couplings reduce to the parent sinc times its
+piece-averaged transmission, since $\sum_i f_i=1$. This is the intended
+segment-level incoherent approximation; using each tiny piece's duration
+instead would change the spectral shape. Different escape-face roots
+give a weighted mixture of parent-width lines, not an exact piecewise
+coherent integral. Coherent/grouped routes use actual piece duration and
+sum fields, as required by their distinct model.
+
+The follow-up implementation includes
+`k_dot_e = omega_res * delta * (grad L).e` in both eager amplitude paths,
+the fused real amplitude helper, and both streaming polarizations. Each
+PXR numerator now uses `g_dot_e + k_dot_e`; CBS retains its original
+brace expression with the corrected scalar wavevector terms. This matches
+the independent general-vector algebra. The fused helper defaults this
+new term to zero for historical direct callers.
+
+**Scoped verdict: rederived.** The first-order root, scalar vector
+invariants, general-vector PXR/CBS algebra, guard domain, and stated
+segment-level weighting match.
+Exact integrated-yield equality with the dispersive coherent route is
+excluded; its first local divergent factor is
+$D\mapsto J=D-E\delta'B$. The initially omitted PXR term
+$[\mathbf v\cdot(\mathbf k+\mathbf g)]
+\omega\delta\,\mathbf a\cdot\mathbf e_s$ was corrected and verified.
+This verdict excludes physical interface mode normalization, Fresnel
+transmission, and polarization matching across the boundary; it certifies
+the stated fixed-external-polarization algebra. The ledger must replace its historical bulk/external
+direction claim with this first-order interface kinematics, qualify
+contraction, and correct the Zhai equation citation. No human sign-off is
+implied.
+
 ## Claim and source
 
 - Claim: CXR line kinematics closed on the in-medium photon dispersion `k = Re n(ω) ω n̂`: resonance `ω_res = v·g / (1 − Re n (v·n̂))`, `k·v = ω(1 − denom)`, `k·g = Re n ω (n̂·g)`, PXR detuning `|k+g|² − k² = g² + 2 k·g`, and PXR numerator `k² = (Re n ω)²`.

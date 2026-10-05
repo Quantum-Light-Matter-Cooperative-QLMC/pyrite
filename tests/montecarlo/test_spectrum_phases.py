@@ -101,16 +101,10 @@ def _request(**over):
 
 
 def _resonance_eV():
-    """E_res from the in-medium fixed point, solved here from the materials layer.
+    """Independent entrance-face Snell root, using direct material dispersion.
 
-    Independent of ``spectrum.lines``: this is the model statement
-    ``omega_res = v.g / (1 - Re n(E_res) v.n_hat)`` iterated to convergence, not
-    a call into the code under test.
-
-    At this near-transverse geometry the in-medium shift is 0.007 eV, well below
-    the grid step, so the peak-position assertions gate the resonance relation
-    and not the dispersion refinement -- that is `xray-in-medium-resonance`'s
-    own row, exercised by tests/montecarlo/test_xray_dispersion.py.
+    The near-transverse exit amplifies the correction enough to resolve it on
+    this grid; dedicated dispersion anchors use a finer absolute-root grid.
     """
     g_vec, _ = reciprocal_g_vector(HKL, CRYSTALS[CRYSTAL]["lattice"])
     v = beta_from_keV(E_KEV) * np.array([0.0, 0.0, 1.0])
@@ -119,7 +113,7 @@ def _resonance_eV():
     E = HBARC_EV_ANG * v_dot_g / (1.0 - v_dot_n)  # vacuum seed
     for _ in range(64):
         n_re = float(np.asarray(refractive_index(CRYSTAL, np.array([E]), True).real)[0])
-        E = HBARC_EV_ANG * v_dot_g / (1.0 - n_re * v_dot_n)
+        E = HBARC_EV_ANG * v_dot_g / (1.0 - v_dot_n + (1.0 - n_re) * v[2] / N_HAT[2])
     return E
 
 
