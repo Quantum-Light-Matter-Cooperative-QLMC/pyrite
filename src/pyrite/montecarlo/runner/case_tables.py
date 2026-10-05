@@ -86,7 +86,7 @@ def _case_layer_compositions(case):
 
 
 def _case_elastic_entries(case):
-    """Per-layer ELSEPA table entries, or ``None`` for the default elastic model."""
+    """Per-layer ELSEPA table entries, or ``None`` for a Mott case."""
     if case.get("elastic_model") != "elsepa":
         return None
     from ...xsgen.elsepa.catalog import resolve_layer_tables
@@ -95,10 +95,14 @@ def _case_elastic_entries(case):
 
 
 def _case_elastic_kwargs(case):
-    """``simulate_trajectories`` kwargs of a case's opt-in elastic model; empty by default."""
+    """``simulate_trajectories`` kwargs of a case's elastic model.
+
+    A case without the ``elastic_model`` key is Mott; it is passed explicitly
+    because ``simulate_trajectories`` defaults to ELSEPA (#293).
+    """
     entries = _case_elastic_entries(case)
     if entries is None:
-        return {}
+        return {"elastic_model": "mott"}
     return dict(
         elastic_model="elsepa",
         elastic_tables=[[entry.arrays for entry in layer] for layer in entries],
@@ -106,7 +110,7 @@ def _case_elastic_kwargs(case):
 
 
 def _case_elastic_table_records(case):
-    """Stored ELSEPA tables a case reads, for run identity; empty by default."""
+    """Stored ELSEPA tables a case reads, for run identity; empty for a Mott case."""
     entries = _case_elastic_entries(case)
     if entries is None:
         return []

@@ -21,10 +21,11 @@ def test_numerics_accepts_only_known_elastic_models():
         Numerics(elastic_model="sr")  # type: ignore[arg-type]
 
 
-def test_default_cases_resolve_no_elastic_tables():
+def test_mott_cases_name_mott_and_resolve_no_elastic_tables():
+    """Absent key is Mott; it is spelled out since transport defaults to ELSEPA (#293)."""
     case = {"composition": [("Si", 0.05)]}
 
-    assert _case_elastic_kwargs(case) == {}
+    assert _case_elastic_kwargs(case) == {"elastic_model": "mott"}
     assert _case_elastic_table_records(case) == []
 
 
@@ -86,3 +87,37 @@ def test_elastic_kwargs_are_numpy_ready(monkeypatch):
     kwargs = _case_elastic_kwargs({"elastic_model": "elsepa", "composition": [("Si", 0.05)]})
 
     assert kwargs["elastic_tables"][0][0] is table
+
+
+@pytest.mark.parametrize("model", ["mott", "elsepa"])
+def test_every_transport_call_site_names_the_case_elastic_model(monkeypatch, model):
+    """Live transport, brem repair and the penetration gate all pass the case model (#293)."""
+    from pyrite.campaign import config
+    from pyrite.campaign.config import material_sweep
+    from pyrite.campaign.sweep import build_cases
+    from pyrite.montecarlo import runner
+
+    monkeypatch.setattr(
+        "pyrite.xsgen.elsepa.catalog.resolve_layer_tables",
+        lambda composition: (SimpleNamespace(arrays={}, tables=()),),
+    )
+    case = build_cases(material_sweep("silicon"), 4, 4, elastic_model=model)[0]
+    seen = []
+
+    def stop(*_args, **kwargs):
+        seen.append(kwargs.get("elastic_model"))
+        raise RuntimeError("stop")
+
+    def transmit(_E0_keV, Ne, _thickness_ang, **kwargs):
+        seen.append(kwargs.get("elastic_model"))
+        return {"n_transmitted": Ne}
+
+    monkeypatch.setattr(runner, "simulate_trajectories", stop)
+    monkeypatch.setattr(config, "simulate_trajectories", transmit)
+    with pytest.raises(RuntimeError, match="stop"):
+        runner._transport_case(case)
+    with pytest.raises(RuntimeError, match="stop"):
+        runner._brem_for_case(case, np.array([5000.0]))
+    config.gate_cases_by_penetration([case], Ne=10)
+
+    assert seen == [model, model, model]
