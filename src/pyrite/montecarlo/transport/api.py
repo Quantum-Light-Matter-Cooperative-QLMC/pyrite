@@ -30,7 +30,7 @@ from .hard_radiative import validate_radiative_args
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .layer_tables import build_layer_tables
 from .lut import DEFAULT_TRANSPORT_LUT_CONFIG, build_transport_energy_lut
-from .scattering import check_elsepa_coverage
+from .scattering import check_elsepa_coverage, check_mott_coverage
 from .stopping import (
     pack_sbethe_stopping_tables,
     prepare_sbethe_stopping_tables,
@@ -651,6 +651,8 @@ def simulate_trajectories(
                     f"transport energy range must be within SBETHE table [{lower:g}, {upper:g}] keV"
                 )
     check_elsepa_coverage(elastic_tables, float(np.min(E_cut_by_electrons)), float(np.max(E_keV)))
+    if elastic_model == "mott":
+        check_mott_coverage(layers, float(np.min(E_cut_by_electrons)), float(np.max(E_keV)))
     shell_tables = None
     if shell_mode:
         # Lazy: the host shell model pulls in catalog and EEDL data.

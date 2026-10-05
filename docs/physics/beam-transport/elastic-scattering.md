@@ -134,7 +134,9 @@ The calibration solves
 \frac{\sigma_{\rm tr}^{\rm NIST}(E)}{\sigma_{\rm el}^{\rm Browning}(E)}
 ```
 
-for $\alpha(E)$. The left side is monotonic in $\alpha$, so the inversion is a bisection in $\log_{10}\alpha$ over a fixed bracket, run once per element on the tabulated energy grid (50 eV–300 keV, 401 points) and cached. Transport then interpolates $\log_{10}\alpha$ linearly in $\log_{10}E$, clamped at both endpoints.
+for $\alpha(E)$. The left side is monotonic in $\alpha$, so the inversion is a bisection in $\log_{10}\alpha$ over a fixed bracket, run once per element on the tabulated energy grid (50 eV–300 keV, 401 points) and cached. Transport then interpolates $\log_{10}\alpha$ linearly in $\log_{10}E$.
+
+Mott transport rejects any energy range outside any element's configured SRD 64 table, including energies above 300 keV for the standard export. The checked range runs from the minimum electron cutoff to the maximum drawn incident energy, including energy spread, on every core and the transport LUT path. Both table endpoints are accepted; the scalar interpolation clamp remains a safeguard after this check. The error names the element and table range and directs the caller to `elastic_model="elsepa"`. This guard does not tighten the separate Browning 0.1–30 keV fit limitation.
 
 The result is a model whose collision rate matches Mott totals and whose momentum-transfer rate matches Mott transport cross sections, while retaining the analytically invertible angular law. It does **not** reproduce the full Mott differential cross section: structure beyond the first moment (diffraction minima, large-angle detail) is absorbed into a single effective screening parameter.
 

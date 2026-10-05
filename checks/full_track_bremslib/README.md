@@ -78,11 +78,17 @@ the contract; maximum recorded componentwise recoil residual is
 Geant4 momentum comparison.
 `run_sr_control.sbatch` repeats W at 1 keV photon cutoff with PyRITE's
 screened-Rutherford elastic option; all other settings are held fixed.
-`run_800kev.sbatch` runs W and Si at 800 keV with Mott elastic scattering and
+`run_800kev.sbatch` historically ran W and Si at 800 keV with Mott elastic scattering and
 the W screened-Rutherford control, 10,000 primaries each at a 1 keV hard
 cutoff (log `results/benchmark_800kev_117.log.gz`). The Si 800 keV
 screened-Rutherford control (`results/si_800kev_sr_1000ev.json`, about 10 s)
 was run on the local CPU with the same driver, commit and seed.
+
+The archived 800 keV Mott rows below are **invalid configurations**: they
+exceed the standard SRD 64 table's 300 keV ceiling. Issue #318 adds a coverage
+guard, so these rows cannot be reproduced with the current implementation
+and those tables. They remain here as evidence of the former clamp defect;
+use ELSEPA for new transport comparisons above the Mott table range.
 
 To repeat one case in a prepared remote PyRITE checkout, set
 `PYRITE_BENCH_CASE`, `PYRITE_BENCH_NE`, `PYRITE_BENCH_CUTOFF_EV`,
@@ -140,10 +146,13 @@ screened Rutherford is marginal (<3σ) for W 300 keV and Si 800 keV but fails
 for W 800 keV. The photon yield is insensitive to these changes. The
 disposition is an elastic-transport discrepancy outside the BremsLib
 radiative claims. The Si 800 keV Mott backscatter is about 4 times the
-Geant4 and 2.5 times the PyRITE screened-Rutherford value. Relativistic Mott
-suppresses large-angle scattering relative to Rutherford at low Z, so this
-excess is a candidate PyRITE Mott-model defect, tracked in issue #183. It needs separate
-investigation before electron-yield or detector claims depend on it.
+Geant4 and 2.5 times the PyRITE screened-Rutherford value. Issue #318 traced
+the #183 excess to screening clamped at the 300 keV SRD 64 endpoint while
+the Browning total kept falling: at 800 keV, Si's transport cross section
+was 1.72 times ELSEPA and its cross section above 90° was 3.83 times ELSEPA
+(W: 1.83 and 1.75 times). Current Mott transport rejects these out-of-table
+energies. The historical W 800 keV agreement does not validate that invalid
+configuration.
 
 **Energy accounting.** PyRITE's total primary energy debit (initial energy
 less terminal electron energy) is 70.28, 69.58 and 69.11 keV per W primary
