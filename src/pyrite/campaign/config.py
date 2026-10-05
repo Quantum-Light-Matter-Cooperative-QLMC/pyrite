@@ -31,6 +31,7 @@ from ..detectors import Detector, EnergyBins
 from ..materials import CATALOG, MaterialSpec, load_material_catalog
 from ..montecarlo import simulate_trajectories
 from ..montecarlo.runner.case_tables import _case_elastic_kwargs
+from ..montecarlo.runner.step_budget import retry_step_budget
 from ..montecarlo.transverse import TransverseDistribution
 from ..results import Settings
 from .longitudinal import LongitudinalDistribution
@@ -501,7 +502,8 @@ def gate_cases_by_penetration(
             ref = reference_case[(energy, thickness)]
             abs_layers = ref.get("abs_layers")
             total_thickness = float(abs_layers[-1][1]) if abs_layers is not None else thickness
-            segs = simulate_trajectories(
+            segs = retry_step_budget(
+                simulate_trajectories,
                 energy,
                 Ne,
                 total_thickness,

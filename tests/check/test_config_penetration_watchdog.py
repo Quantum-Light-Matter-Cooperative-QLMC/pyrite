@@ -6,7 +6,13 @@ selection), not real electron transport; test_gate_cases_by_penetration_
 drops_with_real_transport at the bottom of this file covers real physics.
 """
 
+import math
+
+import pytest
+
 from pyrite.campaign import config
+from pyrite.montecarlo import runner
+from pyrite.montecarlo.transport import TransportStepLimitError
 
 
 def _case(E0_keV, thickness_ang, tilt_deg=0.0, composition="C", abs_layers=None):
@@ -140,3 +146,36 @@ def test_gate_cases_by_penetration_follows_the_case_elastic_model(monkeypatch):
 
     assert seen[0]["elastic_model"] == "elsepa"
     assert seen[0]["elastic_tables"] == ["sentinel"]
+
+
+def _step_limited(monkeypatch, fail_below):
+    budgets = []
+
+    def fake_simulate_trajectories(E0_keV, Ne, thickness_ang, *, max_steps, **kwargs):
+        budgets.append(max_steps)
+        if max_steps < fail_below:
+            raise TransportStepLimitError(Ne, Ne, max_steps)
+        return {"n_transmitted": Ne if thickness_ang <= 100.0 else 0}
+
+    monkeypatch.setattr(config, "simulate_trajectories", fake_simulate_trajectories)
+    return budgets
+
+
+def test_gate_cases_by_penetration_retries_the_step_budget(monkeypatch):
+    # Thick MeV cases outlive the default budget (#315); the gate doubles it
+    # like the runner does instead of aborting the sweep.
+    base = runner.TRANSPORT_MAX_STEPS
+    budgets = _step_limited(monkeypatch, fail_below=2 * base)
+    cases = [_case(5000.0, t) for t in (100.0, 200.0, 400.0)]
+    kept, dropped = config.gate_cases_by_penetration(cases, floor=0.05, Ne=10, seed=0)
+
+    assert {c["thickness_ang"] for c in kept} == {100.0, 200.0}
+    assert {c["thickness_ang"] for c in dropped} == {400.0}
+    assert budgets == [base, 2 * base, base, 2 * base]
+
+
+def test_gate_cases_by_penetration_step_budget_stops_at_the_ceiling(monkeypatch):
+    budgets = _step_limited(monkeypatch, fail_below=math.inf)
+    with pytest.raises(TransportStepLimitError):
+        config.gate_cases_by_penetration([_case(5000.0, 100.0)], Ne=10)
+    assert budgets[-1] == runner.TRANSPORT_MAX_STEPS_CEILING

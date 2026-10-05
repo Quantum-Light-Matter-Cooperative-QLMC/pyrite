@@ -42,7 +42,6 @@ from ..spectrum.lines._temporal import case_temporal_profiles, temporal_outputs
 from ..trajectories import TrajectoryCapture
 from ..transport import (
     TransportLUTConfig,
-    TransportStepLimitError,
     resolve_transport_core,
     simulate_trajectories,
 )
@@ -210,12 +209,14 @@ from .oom import (
     _SpectrumPhaseOOM,
 )
 from .oom import _should_free as _should_free
+from .step_budget import (
+    TRANSPORT_MAX_STEPS as TRANSPORT_MAX_STEPS,
+)
+from .step_budget import (
+    TRANSPORT_MAX_STEPS_CEILING as TRANSPORT_MAX_STEPS_CEILING,
+)
+from .step_budget import retry_step_budget
 from .timing import _TimingAgg as _TimingAgg
-
-#: First per-electron transport step budget, and the largest the runner doubles
-#: it to after a :class:`TransportStepLimitError` (#192).
-TRANSPORT_MAX_STEPS = 20_000
-TRANSPORT_MAX_STEPS_CEILING = 8 * TRANSPORT_MAX_STEPS
 
 
 def _is_gpu_oom(error):
@@ -416,17 +417,7 @@ def _transport_case(
     stopping_tables = _case_stopping_tables(case)
 
     def _transport(keep):
-        # Thick MeV cases outlive the default step budget (5 MeV h-BN, 10 mm:
-        # ~23-32k steps). The trajectories depend on the seed alone, so a rerun
-        # at a doubled budget is exactly the run that budget gives from the start.
-        max_steps = TRANSPORT_MAX_STEPS
-        while True:
-            try:
-                return _simulate(keep, max_steps)
-            except TransportStepLimitError:
-                if max_steps >= TRANSPORT_MAX_STEPS_CEILING:
-                    raise
-                max_steps *= 2
+        return retry_step_budget(_simulate, keep)
 
     def _simulate(keep, max_steps):
         return simulate_trajectories(
