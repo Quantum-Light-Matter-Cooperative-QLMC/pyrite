@@ -247,7 +247,7 @@ forbidden_modules = [
 # `xsgen.store` for run identity.
 # `shell_configuration` locates the fetched SBETHE reference data on the host
 # to build PENELOPE shell oscillators, raising the xsgen fetch error when it is
-# absent; it is not a kernel import. `transport.api` resolves the default
+# absent; it is not a kernel import. `transport.arguments` resolves the default
 # ELSEPA stack tables on the host before entering the transport core, and
 # `transport.secondaries` resolves the positron SBETHE/ELSEPA tables (#276) on
 # the host before each positron generation's transport call.
@@ -260,7 +260,7 @@ ignore_imports = [
     "pyrite.montecarlo.spectrum.brem_bremslib -> pyrite.xsgen.bremslib.tables",
     "pyrite.montecarlo.shell_configuration -> pyrite.xsgen.sources",
     "pyrite.montecarlo.shell_configuration -> pyrite.xsgen._errors",
-    "pyrite.montecarlo.transport.api -> pyrite.xsgen.elsepa.catalog",
+    "pyrite.montecarlo.transport.arguments -> pyrite.xsgen.elsepa.catalog",
     "pyrite.montecarlo.transport.shell_rates -> pyrite.xsgen.sbethe.catalog",
     "pyrite.montecarlo.transport.shell_transport -> pyrite.xsgen.sbethe.catalog",
     "pyrite.montecarlo.transport.secondaries -> pyrite.xsgen.sbethe.catalog",
