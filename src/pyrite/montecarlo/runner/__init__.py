@@ -129,6 +129,12 @@ from .case_tables import (
 from .case_tables import (
     _case_stopping_table_records as _case_stopping_table_records,
 )
+from .case_tables import (
+    cached_case_table_markers as cached_case_table_markers,
+)
+from .case_tables import (
+    case_table_markers as case_table_markers,
+)
 from .chunking import (
     _EEDL_BREM_DENSE_INTERMEDIATES,
     _RESOURCE_POLICY,

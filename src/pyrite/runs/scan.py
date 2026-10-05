@@ -35,7 +35,6 @@ import threading
 import time
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
-from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -793,16 +792,17 @@ def _sweep_observation(args, identity, settings, stem, content_key_fn):
     if observation is None:
         return None
     from ..api import run_provenance
+    from ..montecarlo.runner import cached_case_table_markers
     from ..observations import ObservationStore, SweepObservation
 
-    xsgen_tables = identity["resolved_parameters"].get("xsgen_tables")
+    table_markers = cached_case_table_markers()
     return SweepObservation(
         observation=observation,
         store=ObservationStore(stem, Path(args.checkpoint_dir).resolve().parent / "observations"),
         content_key_fn=content_key_fn,
         emission=settings.emission,
         provenance_fn=lambda case: {
-            **run_provenance(case, xsgen_tables),
+            **run_provenance(case, table_markers(case)),
             **({"detector_id": detector_id} if detector_id is not None else {}),
         },
     )
@@ -1097,11 +1097,8 @@ def _run_material(args, material, max_seconds=None):
     # / a -p perf run narrow this (see the `run` command). cache_read also drives
     # the per-stem resume, so a --no-cache/--recompute/perf run recomputes rather
     # than resume-skipping (the perf-run "measures near-nothing" bug).
-    from ..campaign.profiles import case_content_key
-
     cache_read = getattr(args, "cache_read", True)
     cache_write = getattr(args, "cache_write", True)
-    xsgen_tables = identity["resolved_parameters"].get("xsgen_tables")
     # Opt-in transport artifacts (issue #159): absent unless --trajectories.
     capture_kw = {}
     trajectory_dir = getattr(args, "trajectories", None)
@@ -1119,7 +1116,9 @@ def _run_material(args, material, max_seconds=None):
                 "parameter_sha256": identity["parameter_sha256"],
             },
         )
-    content_key_fn = partial(case_content_key, xsgen_tables=xsgen_tables)
+    from ..api import source_content_key_fn
+
+    content_key_fn = source_content_key_fn()
     try:
         if progress_timer is not None:
             progress_timer.start()

@@ -243,6 +243,8 @@ forbidden_modules = [
 # resolve the same stored catalog tables; no Numba/CUDA kernel imports them.
 # The same host-side resolution applies to the opt-in ELSEPA elastic and
 # BremsLib bremsstrahlung tables (`case_tables`, `brem_bremslib`).
+# `case_tables` also maps those table records to identity markers through
+# `xsgen.store` for run identity.
 # `shell_configuration` locates the fetched SBETHE reference data on the host
 # to build PENELOPE shell oscillators, raising the xsgen fetch error when it is
 # absent; it is not a kernel import. `transport.api` resolves the default
@@ -252,6 +254,7 @@ ignore_imports = [
     "pyrite.montecarlo.runner.case_tables -> pyrite.xsgen.sbethe",
     "pyrite.montecarlo.runner.case_tables -> pyrite.xsgen.elsepa.catalog",
     "pyrite.montecarlo.runner.case_tables -> pyrite.xsgen.bremslib.tables",
+    "pyrite.montecarlo.runner.case_tables -> pyrite.xsgen.store",
     "pyrite.montecarlo.spectrum.brem_bremslib -> pyrite.xsgen.bremslib.tables",
     "pyrite.montecarlo.shell_configuration -> pyrite.xsgen.sources",
     "pyrite.montecarlo.shell_configuration -> pyrite.xsgen._errors",

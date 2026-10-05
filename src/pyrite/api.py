@@ -30,12 +30,7 @@ from .instrument import (
 from .materials import CATALOG, MediumSpec
 from .materials.photon_cross_sections import ATTENUATION_MODEL
 from .montecarlo import Case, run_case
-from .montecarlo.runner import (
-    _case_bremslib_table_records,
-    _case_elastic_table_records,
-    _case_stopping_table_records,
-    run_case_directions,
-)
+from .montecarlo.runner import cached_case_table_markers, case_table_markers, run_case_directions
 from .montecarlo.spectrum import (
     BREM_ENDF_PARSERPY_VERSION,
     CHARACTERISTIC_MODEL,
@@ -43,7 +38,6 @@ from .montecarlo.spectrum import (
 from .montecarlo.transport import STOPPING_MODEL
 from .observations.plan import ObservationPlan, PixelSampling
 from .results.model import Result
-from .xsgen.store import identity_markers
 
 
 def _canonical_value(value: Any) -> Any:
@@ -285,14 +279,23 @@ def simulate(
 def _source_case(scene: Scene, numerics: Numerics) -> tuple[Case, dict[str, str]]:
     """Lower ``scene`` to its transport case and cross-section table markers."""
     case = build_case(scene, numerics)
-    xsgen_tables = identity_markers(
-        [
-            *_case_stopping_table_records(case),
-            *_case_elastic_table_records(case),
-            *_case_bremslib_table_records(case),
-        ]
-    )
-    return case, xsgen_tables
+    return case, case_table_markers(case)
+
+
+def source_content_key_fn():
+    """Per-case source content key for a batch of cases, e.g. a sweep.
+
+    The key :func:`simulate` records as ``identity_digest`` for the same case:
+    both hash the tables the case itself reads (:func:`case_table_markers`),
+    never a dataset's union of table markers (#191). Table resolution is
+    memoized per call, so take one per run.
+    """
+    table_markers = cached_case_table_markers()
+
+    def content_key(case: Case | Mapping[str, Any]) -> str:
+        return case_content_key(case, xsgen_tables=table_markers(case))
+
+    return content_key
 
 
 def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
