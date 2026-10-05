@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -718,6 +719,48 @@ def _refuse_conflicting_live_jobs(digest: str, *, force: bool) -> None:
     )
 
 
+@contextmanager
+def _remote_sync_lock():
+    """Hold the box's exclusive checkout lock for the ``with`` body.
+
+    The lock lives in a remote ``flock`` held by one long-lived ssh session, so
+    it wraps whatever code-transfer transport runs inside (tar+scp today). The
+    remote shell keeps fd 9 open until its stdin reaches EOF; leaving the body
+    closes stdin, and a dropped connection does the same, so a crashed client
+    can never strand the lock. A holder is awaited for
+    ``config.SYNC_LOCK_WAIT_SECONDS``, then the sync fails with a clear message.
+    """
+    lock = config.shell_single_word(config.remote_sync_lock_path())
+    remote = (
+        f"mkdir -p {config.shell_remote_dir()} && exec 9>>{lock} "
+        f"&& {{ flock -x -w {config.SYNC_LOCK_WAIT_SECONDS} 9 || exit 75; }} "
+        "&& echo LOCKED && cat >/dev/null"
+    )
+    argv = config.ssh_argv(config.remote_host(), remote)
+    if _VERBOSE:
+        print("+", " ".join(argv[:-1]), "<remote sync lock>", flush=True, file=sys.stderr)
+    else:
+        print("Waiting for remote sync lock...", flush=True, file=sys.stderr)
+    proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    assert proc.stdin is not None and proc.stdout is not None  # PIPE requested above
+    try:
+        if proc.stdout.readline().strip() != "LOCKED":
+            proc.wait()
+            raise SystemExit(
+                "could not take the remote sync lock "
+                f"({config.remote_sync_lock_path()}, exit {proc.returncode}): another "
+                "pyrite remote sync is running, or the box is unreachable. "
+                "Retry once it finishes."
+            )
+        yield
+    finally:
+        try:
+            proc.stdin.close()
+        except OSError:
+            pass
+        proc.wait()
+
+
 def sync_code(*, force: bool = False):
     """Tar SYNC_PATHS up (CRLF->LF normalized for text, via _add_to_tar) and
     extract them over the repo on the box. Stale Python sources are removed
@@ -737,6 +780,14 @@ def sync_code(*, force: bool = False):
     the refusing default."""
     entries = _sync_entries()
     digest = _payload_digest(entries)
+    with _remote_sync_lock():
+        _sync_code_locked(entries, digest, force=force)
+
+
+def _sync_code_locked(entries, digest, *, force):
+    """Guard, upload, extract, stamp. Caller holds the remote sync lock, so the
+    live-job check cannot be outdated by another sync or a submission before the
+    replace below finishes."""
     # Guard first: a refusal must cost no transfer at all.
     _refuse_conflicting_live_jobs(digest, force=force)
     local_artifacts = _local_energy_grid_artifacts()
@@ -756,6 +807,8 @@ def sync_code(*, force: bool = False):
     dataset_files = _datasets_to_ship(local_datasets, local_dataset_digests, remote_datasets)
     sdbase_files = _datasets_to_ship(local_sdbase, local_sdbase_digests, remote_sdbase)
     with tempfile.TemporaryDirectory() as td:
+        # Unique per sync: nothing else on the box shares, extracts or removes it.
+        remote_tar = f"/tmp/pyrite_code.{digest[:12]}.{uuid.uuid4().hex}.tgz"
         tarpath = os.path.join(td, "pyrite_code.tgz")
         with tarfile.open(tarpath, "w:gz") as t:
             for arc, f in entries:
@@ -795,7 +848,7 @@ def sync_code(*, force: bool = False):
                 file=sys.stderr,
             )
         _run(
-            config.scp_argv(tarpath, config.scp_remote_path("/tmp/pyrite_code.tgz")),
+            config.scp_argv(tarpath, config.scp_remote_path(remote_tar)),
             label="Syncing code to remote box...",
         )
     # -n: redirect ssh's stdin from null. Without it, ssh.exe inherits the
@@ -812,15 +865,21 @@ def sync_code(*, force: bool = False):
         if config.external_catalog_selected()
         else ""
     )
+    stage = f".pyrite-stage.{uuid.uuid4().hex}"
+    tar_word = config.shell_single_word(remote_tar)
     _run(
         config.ssh_argv(
             "-n",
             config.remote_host(),
-            f"mkdir -p {config.shell_remote_dir()} && cd {config.shell_remote_dir()} "
-            '&& for p in src/pyrite checks; do if [ -d "$p" ]; then '
+            f"mkdir -p {config.shell_remote_dir()} && cd {config.shell_remote_dir()} || exit $?; "
+            # Unpack into a staging dir first: a truncated or corrupt upload fails
+            # here, before anything in the live tree is touched.
+            f"{{ mkdir {stage} && tar xzf {tar_word} -C {stage} "
+            f'&& {clear_catalog}for p in src/pyrite checks; do if [ -d "$p" ]; then '
             "find \"$p\" -type f -name '*.py' -delete; fi; done "
-            f"&& {clear_catalog}tar xzf /tmp/pyrite_code.tgz && rm -f /tmp/pyrite_code.tgz "
+            f"&& cp -a {stage}/. . "
             f"&& printf %s {config.shell_arg(stamp.render())} "
-            f"> {config.shell_single_word(config.remote_sync_stamp_path())}",
+            f"> {config.shell_single_word(config.remote_sync_stamp_path())}; }}; "
+            f"rc=$?; rm -rf {stage} {tar_word}; exit $rc",
         )
     )

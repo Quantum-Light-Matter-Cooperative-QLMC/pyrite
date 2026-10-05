@@ -7,6 +7,7 @@ the ``_materials_needing_pull`` call added in #119 shipped with
 ``tests/remote/test_click.py`` unstubbed. Fail loudly and locally instead.
 """
 
+import contextlib
 import subprocess
 
 import pytest
@@ -45,3 +46,12 @@ def _no_local_xsgen_tables(monkeypatch):
     monkeypatch.setattr(transport, "_local_datasets", lambda: {})
     monkeypatch.setattr(transport, "_real_local_sdbase", transport._local_sdbase, raising=False)
     monkeypatch.setattr(transport, "_local_sdbase", lambda: {})
+
+
+@pytest.fixture(autouse=True)
+def _no_remote_sync_lock(monkeypatch):
+    """Sync tests stub the box; the lock's own tests exercise the real context."""
+    monkeypatch.setattr(
+        transport, "_real_remote_sync_lock", transport._remote_sync_lock, raising=False
+    )
+    monkeypatch.setattr(transport, "_remote_sync_lock", contextlib.nullcontext)

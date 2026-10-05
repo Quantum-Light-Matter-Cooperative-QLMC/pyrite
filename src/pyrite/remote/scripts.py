@@ -228,6 +228,16 @@ echo "running $(date -Is)" > "$JOBDIR/state"
 {_VENDOR_LOG_PROBES.get(vendor, "")}  echo "started: $(date -Is)"
 }} >> "$JOBDIR/log"
 
+# Wait out any in-flight `pyrite remote sync` (it holds this lock exclusively), so
+# the job never starts importing a half-replaced tree. Released at once: a sync
+# against a live job is policed by the code-digest guard, not by this lock.
+if command -v flock >/dev/null 2>&1; then
+  if ! flock -s -w {config.SYNC_LOCK_WAIT_SECONDS} {config.shell_word(config.remote_sync_lock_path())} true; then
+    echo "FAILED (sync lock busy) $(date -Is)" > "$JOBDIR/state"
+    exit 1
+  fi
+fi
+
 {payload}"""
 
 
