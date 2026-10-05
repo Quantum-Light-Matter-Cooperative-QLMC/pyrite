@@ -77,6 +77,7 @@ _CASE_KEY_ORDER = (
     "radiative_model",
     "radiative_cutoff_eV",
     "pair_production_model",
+    "atomic_electron_deflection",
     "beam_uvw",
     "surface_hkl",
     "mosaic_fwhm_rad",
@@ -187,6 +188,11 @@ class Case(Mapping[str, Any]):
         Opt-in ``"penelope-2024"`` pair conversion of coupled hard photons;
         requires ``secondary_threshold_eV`` and ``radiative_model``. Absent
         converts nothing.
+    atomic_electron_deflection
+        ``"kawrakow"`` atomic-electron angular deflection as a ``Z(Z + xi)``
+        elastic-rate correction, which :class:`~pyrite.Numerics` lowers to by
+        default; absent is elastic-only deflection, so earlier case keys stay
+        valid. Shell soft/hard transport needs ``elastic_model``.
     E_cut_lines_keV, E_cut_brem_keV, sinc_cutoff, brem_step_eV
         Legacy/manual cutoff, truncation, and grid controls.
     """
@@ -262,6 +268,7 @@ class Case(Mapping[str, Any]):
     radiative_model: Literal["bremslib-soft-hard"] | _Absent = _ABSENT
     radiative_cutoff_eV: float | _Absent = _ABSENT
     pair_production_model: Literal["penelope-2024"] | _Absent = _ABSENT
+    atomic_electron_deflection: Literal["kawrakow"] | _Absent = _ABSENT
 
     # Legacy/manual-only controls accepted during the Mapping support window.
     azimuth_rad: float | _Absent = _ABSENT
@@ -341,6 +348,13 @@ class Case(Mapping[str, Any]):
             if self.secondary_threshold_eV is _ABSENT or self.radiative_model is _ABSENT:
                 raise ValueError(
                     "pair_production_model requires secondary_threshold_eV and radiative_model"
+                )
+        if self.atomic_electron_deflection is not _ABSENT:
+            if self.atomic_electron_deflection != "kawrakow":
+                raise ValueError("atomic_electron_deflection must be absent or 'kawrakow'")
+            if self.inelastic_model is not _ABSENT and self.elastic_model is _ABSENT:
+                raise ValueError(
+                    "atomic_electron_deflection with inelastic_model needs elastic_model='elsepa'"
                 )
         if isinstance(self.line_grid_policy, Mapping):
             resolution = self.line_grid_policy.get("resolution")

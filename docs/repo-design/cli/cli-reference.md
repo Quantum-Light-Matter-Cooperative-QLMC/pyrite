@@ -1558,7 +1558,8 @@ Usage: pyrite profile numerics reset [OPTIONS] NAME [line-electrons|bremsstrahlu
                                      energy-loss|inelastic-model|inelastic-cutoff-
                                      ev|secondary-threshold-ev|elastic-
                                      model|bremsstrahlung-model|radiative-
-                                     model|radiative-cutoff-ev|pair-production-model]...
+                                     model|radiative-cutoff-ev|pair-production-
+                                     model|atomic-electron-deflection]...
 
   Reset selected FIELDs, or every explicit numeric when none are named.
 
@@ -1630,6 +1631,13 @@ Options:
                                   coupled BremsLib transport; pair electrons are
                                   transported as secondaries, positrons are recorded but
                                   not transported.
+  --atomic-electron-deflection [kawrakow|none]
+                                  Angular deflection by atomic electrons: kawrakow
+                                  (default) scales each element's elastic rate by 1 +
+                                  xi/Z (xi = 1 under continuous stopping; the Moller
+                                  share above W_c is removed under shell-soft-hard,
+                                  which needs elsepa); none keeps elastic-only
+                                  deflection.
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.

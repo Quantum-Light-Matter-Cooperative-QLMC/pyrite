@@ -48,6 +48,7 @@ beam-transport/beam-phase-space
 beam-transport/longitudinal-structure
 beam-transport/electron-transport
 beam-transport/elastic-scattering
+beam-transport/atomic-electron-deflection
 beam-transport/stopping-power
 beam-transport/inelastic-scattering-events
 beam-transport/shell-soft-hard-transport

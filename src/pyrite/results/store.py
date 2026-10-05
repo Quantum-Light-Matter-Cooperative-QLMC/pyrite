@@ -19,6 +19,7 @@ EmissionMode = Literal["incoherent", "coherent", "both"]
 import numpy as np
 
 from .._numerics import (
+    validate_atomic_electron_deflection,
     validate_bremsstrahlung_model,
     validate_elastic_model,
     validate_inelastic_numerics,
@@ -116,6 +117,9 @@ class Settings:
     pair_production_model
         Opt-in ``"penelope-2024"`` pair conversion of coupled hard photons
         (requires the secondary threshold and coupling).
+    atomic_electron_deflection
+        ``"kawrakow"`` (default) atomic-electron angular deflection as a
+        ``Z(Z + xi)`` elastic-rate correction, or ``"none"``.
     emission
         ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
     temporal_profile
@@ -144,6 +148,7 @@ class Settings:
     radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "auto"
     radiative_cutoff_eV: float | None = None
     pair_production_model: Literal["penelope-2024"] | None = None
+    atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so
@@ -186,6 +191,7 @@ class Settings:
             self.radiative_model,
             self.bremsstrahlung_model,
         )
+        validate_atomic_electron_deflection(self.atomic_electron_deflection)
 
     @property
     def coherent_emission(self) -> bool:

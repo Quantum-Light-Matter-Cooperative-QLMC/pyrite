@@ -101,3 +101,33 @@ def resolve_auto_inelastic(cases: list[Case], cutoff_eV: float, energy_model: st
             stacklevel=3,
         )
     return out
+
+
+def resolve_atomic_electron_deflection(cases: list[Case], model: object) -> list[Case]:
+    """Add ``atomic_electron_deflection`` (#317) to every case that can run it.
+
+    Runs after inelastic resolution: shell soft/hard needs the energy-dependent
+    correction that only the ELSEPA rate carries, so a Mott case resolved to
+    it keeps elastic-only deflection, named in one warning. ``"none"`` adds
+    nothing, keeping the elastic-only payload.
+    """
+    from .._numerics import validate_atomic_electron_deflection
+
+    validate_atomic_electron_deflection(model)
+    if model == "none":
+        return cases
+    out, mott_shell = [], set()
+    for case in cases:
+        if case.get("elastic_model") is None and case.get("inelastic_model") is not None:
+            mott_shell.add(str(case["crystal"]))
+            out.append(case)
+        else:
+            out.append(replace(case, atomic_electron_deflection=model))
+    if mott_shell:
+        warnings.warn(
+            f"atomic_electron_deflection={model!r} needs elastic_model='elsepa' under "
+            f"shell soft/hard transport; elastic-only deflection for {', '.join(sorted(mott_shell))}",
+            UserWarning,
+            stacklevel=3,
+        )
+    return out

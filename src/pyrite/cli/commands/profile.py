@@ -55,6 +55,7 @@ _ELASTIC_MODEL_VALUES = ("mott", "elsepa")
 _BREMSSTRAHLUNG_MODEL_VALUES = ("auto", "eedl", "bremslib")
 _RADIATIVE_MODEL_VALUES = ("auto", "uncoupled", "bremslib-soft-hard")
 _PAIR_PRODUCTION_MODEL_VALUES = ("penelope-2024",)
+_ATOMIC_ELECTRON_DEFLECTION_VALUES = ("kawrakow", "none")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
     "line-electrons": "n_electrons",
@@ -74,6 +75,7 @@ _NUMERICS_FIELD_NAMES = {
     "radiative-model": "radiative_model",
     "radiative-cutoff-ev": "radiative_cutoff_eV",
     "pair-production-model": "pair_production_model",
+    "atomic-electron-deflection": "atomic_electron_deflection",
 }
 _RANGE_OPTIONS = (
     ("thickness", "--thickness", THICKNESS_CSV_RANGE, "ANGSTROM,..."),
@@ -295,6 +297,8 @@ def _emit_show(payload):
         emit_result(f"  radiative model: {numerics['radiative_model']} (k_c {k_c:g} eV)")
     if "pair_production_model" in numerics:
         emit_result(f"  pair production model: {numerics['pair_production_model']}")
+    if "atomic_electron_deflection" in numerics:
+        emit_result(f"  atomic-electron deflection: {numerics['atomic_electron_deflection']}")
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
     refs = payload["energy_grid_refs"]
@@ -530,6 +534,16 @@ def numerics_show_command(name, fidelity, json_output):
         "Convert coupled hard photons above 1.022 MeV to e-/e+ pairs (opt-in). Requires "
         "--secondary-threshold-ev and coupled BremsLib transport; pair electrons are "
         "transported as secondaries, positrons are recorded but not transported."
+    ),
+)
+@click.option(
+    "--atomic-electron-deflection",
+    type=click.Choice(_ATOMIC_ELECTRON_DEFLECTION_VALUES),
+    help=(
+        "Angular deflection by atomic electrons: kawrakow (default) scales each element's "
+        "elastic rate by 1 + xi/Z (xi = 1 under continuous stopping; the Moller share "
+        "above W_c is removed under shell-soft-hard, which needs elsepa); none keeps "
+        "elastic-only deflection."
     ),
 )
 @click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")

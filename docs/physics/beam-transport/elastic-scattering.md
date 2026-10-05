@@ -173,6 +173,10 @@ The parser reads the rows `No, Energy [eV], transport cross section [a0^2]` belo
 
 A `"mott"` run fails before transport starts when any element of any layer has no table in `mott.tables_dir`, or when the key is unset. The error names the element, the expected file, and the config key. There is no silent fallback to {eq}`eq-elastic-screening-joy`: choose `elastic_model="sr"` for the analytic angles, or the default `"elsepa"`. Before #263 the five packaged tables (C, Si, Ge, Se, Mo) were used and every other element, tungsten and sulfur among them, fell back to {eq}`eq-elastic-screening-joy` with the Browning total, logged only at `DEBUG`. Results recorded under that behaviour for such elements (for example the tungsten cases in `checks/full_track_bremslib/`) used analytic angles for those elements.
 
+## Atomic-electron deflection
+
+Runs built from `pyrite.Numerics` multiply every element's elastic rate by $1 + \xi/Z_i$, which folds the angular deflection by atomic electrons into the elastic collisions without changing their angular law. Element choice uses the scaled partial rates. See [Atomic-electron angular deflection](atomic-electron-deflection.md).
+
 ## Compounds and layers
 
 Rates are assembled per layer from element number densities, so a compound or an alloy is a sum over {eq}`eq-elastic-mean-free-path` with no mixing rule beyond additivity. When a flight ends in a collision, the scattering element is drawn with probability
@@ -190,6 +194,7 @@ which is the same partial-rate decomposition that produced $\lambda$. Layer swit
 - $\alpha \to 0$ (high energy, low $Z$) drives {eq}`eq-elastic-costheta-inversion` toward $\cos\theta \to 1$: forward-peaked, unscreened Rutherford behavior.
 - $\alpha \to \infty$ makes the angular law isotropic and {eq}`eq-elastic-first-moment` approach 1.
 - Single element with $n$ and $\sigma$ constant reduces {eq}`eq-elastic-mean-free-path` to $\lambda = 1/(n\sigma)$ up to the unit factor, and the flight law to the textbook exponential.
+- The tables hold scattering by the screened nucleus ($\propto Z^2$) only; deflection by atomic electrons enters through the rate factor above, or not at all with `atomic_electron_deflection="none"`.
 - Elastic events are treated as instantaneous, energy-conserving direction changes: no nuclear recoil energy loss, no spin-polarization bookkeeping, no coherent (crystal) elastic scattering. The lattice enters the radiation kernels, not the transport deflections.
 - Cross sections are isotropic material averages; channeling is not modeled.
 

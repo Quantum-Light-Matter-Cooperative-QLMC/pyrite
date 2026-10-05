@@ -88,6 +88,7 @@ def simulate_trajectories(
     max_secondary_tracks=None,
     *,
     pair_production_model=None,
+    atomic_electron_deflection=None,
     _secondary=None,
 ):
     """
@@ -249,6 +250,9 @@ def simulate_trajectories(
           ``hard_W_keV``/``hard_channel``/``inelastic`` to the result. See
           docs/physics/beam-transport/shell-soft-hard-transport.md.
           Validation: shell-soft-hard-transport
+
+    atomic_electron_deflection: None (default, BIT-FOR-BIT) or "kawrakow" (Numerics
+      default): elastic rate Z^2 -> Z(Z + xi). Validation: inelastic-angular-deflection
 
     radiative_model: "auto" (default) couples when BremsLib tables are supplied,
       otherwise keeps post-hoc brem scoring and the existing tracks.
@@ -551,7 +555,9 @@ def simulate_trajectories(
         L_mott_denom2,
         L_sr_joy_numer,
         mott_group,
-    ) = build_layer_tables(layers, elastic_model, elastic_tables)
+    ) = build_layer_tables(
+        layers, elastic_model, elastic_tables, atomic_electron_deflection, inelastic_cutoff_eV
+    )
     L_top = np.asarray([float(a) for (a, _, _) in layers], dtype=float)
     L_bot = np.asarray([float(b) for (_, b, _) in layers], dtype=float)
     internal_bounds = L_bot[:-1].copy()

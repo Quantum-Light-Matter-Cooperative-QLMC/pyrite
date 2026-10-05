@@ -88,6 +88,7 @@ NUMERICS_GROUPS = (
             ("radiative_model", "radiative model"),
             ("radiative_cutoff_eV", "radiative cutoff (eV)"),
             ("pair_production_model", "pair production model"),
+            ("atomic_electron_deflection", "atomic-electron deflection"),
         ),
     ),
 )
@@ -338,6 +339,7 @@ def resolve_numerics(
         "radiative_model": numerics.radiative_model,
         "radiative_cutoff_eV": numerics.radiative_cutoff_eV,
         "pair_production_model": numerics.pair_production_model,
+        "atomic_electron_deflection": numerics.atomic_electron_deflection,
     }
     sources = {
         key: (
@@ -578,6 +580,8 @@ def _identity_v1(
         radiative_model = str(settings_payload.pop("radiative_model", "uncoupled"))
         radiative_cutoff_eV = settings_payload.pop("radiative_cutoff_eV", None)
         pair_production_model = settings_payload.pop("pair_production_model", None)
+        # Absent in a record minted before #317: elastic-only, as it ran.
+        atomic_electron_deflection = str(settings_payload.pop("atomic_electron_deflection", "none"))
     else:  # pragma: no cover - settings is always a jsonable Mapping here
         emission = str(getattr(settings, "emission", "incoherent"))
         temporal_profile = bool(getattr(settings, "temporal_profile", False))
@@ -592,6 +596,7 @@ def _identity_v1(
         radiative_model = str(getattr(settings, "radiative_model", "uncoupled"))
         radiative_cutoff_eV = getattr(settings, "radiative_cutoff_eV", None)
         pair_production_model = getattr(settings, "pair_production_model", None)
+        atomic_electron_deflection = str(getattr(settings, "atomic_electron_deflection", "none"))
     if emission != "incoherent":
         resolved["emission"] = emission
     # Opt-in line I(t) (#292): divergence-only, so off keeps every digest.
@@ -626,6 +631,14 @@ def _identity_v1(
         transport_numerics["secondary_threshold_eV"] = float(secondary_threshold_eV)
     if elastic_model != "mott":
         transport_numerics["elastic_model"] = elastic_model
+    # Atomic-electron deflection (#317): on by default, so it forks every new
+    # run's digest once; "none" keeps the elastic-only digest. Recorded only
+    # where it runs, as its cases do: a Mott run resolved to shell soft/hard
+    # keeps elastic-only deflection.
+    if atomic_electron_deflection != "none" and (
+        elastic_model != "mott" or inelastic_model != "shell-soft-hard"
+    ):
+        transport_numerics["atomic_electron_deflection"] = atomic_electron_deflection
     if transport_numerics:
         resolved["transport_numerics"] = transport_numerics
     # The in-medium photon dispersion is unconditional physics now, not an opt-in
