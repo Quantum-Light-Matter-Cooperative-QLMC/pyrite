@@ -31,6 +31,9 @@ from ..trajectories import (
 #: whole-artifact read. Smaller blocks were not slower on CPU.
 STREAM_MAX_SEGMENTS = 1 << 20
 
+#: Case keys whose spectra need every segment at once, so they never stream.
+STREAM_REFUSED_KEYS = ("coherent_emission", "temporal_profile")
+
 
 def _case_geometry(case):
     """Case-determined grids and geometry shared by transport and spectrum.
@@ -129,7 +132,7 @@ def stream_spectrum_from_artifact(
 
     artifact = read_trajectory_artifact(path, load_transport=False)
     case, inputs = _checked_case_and_inputs(artifact, case)
-    for key in ("coherent_emission", "temporal_profile"):
+    for key in STREAM_REFUSED_KEYS:
         if case.get(key):
             raise TrajectoryArtifactError(
                 f"{key} needs every segment at once; score {artifact.path} with "

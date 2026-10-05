@@ -269,6 +269,9 @@ def store_result(results, case, out):
     # than only log warnings (#192). Absent for fixed-grid cases.
     if out.get("line_grid_resolved") is not None:
         results[name][E0]["line_grid_resolved"] = out["line_grid_resolved"]
+    # Artifact-scored records name the trajectory file they replayed (#186).
+    if out.get("source_trajectory") is not None:
+        results[name][E0]["source_trajectory"] = out["source_trajectory"]
 
 
 def detected_background(r, settings, convolve=None):

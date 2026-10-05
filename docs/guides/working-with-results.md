@@ -116,6 +116,20 @@ Every artifact becomes a VTK XML PolyData (`.vtp`) file beside it, readable by P
 
 VTK PolyData was chosen because it represents disconnected straight segments with arbitrary per-segment attributes and opens in the common scientific viewers without a plugin. It cannot carry the rest of the artifact, so the export omits the compatibility aliases, per-electron arrays (`initial_*`, `straggle_dE_keV`), tallies, nested metadata (`inelastic`, `radiative`, `secondaries`, `secondary_tracks`, `stopping_tables`, `transport_diagnostics`), the case, settings, provenance, and units. The HDF5 artifact stays the authoritative record.
 
+### Score spectra from saved trajectories
+
+```bash
+uv run pyrite checkpoint score-trajectories trajectories/hopg/
+```
+
+This replays only the spectrum phase (line, characteristic, and bremsstrahlung spectra) of every captured case and stores each result as an ordinary record of the checkpoint stem and run identity the capturing run recorded, under `--checkpoint-dir` (default `checkpoints/<stem>`). It never transports. Each new record carries `source_trajectory` with the artifact's path and SHA-256. Records that already exist are kept unless `--overwrite`, and records of cases without an artifact are never touched, so re-scoring a run's own checkpoint after a spectrum-phase change replaces exactly the captured cases. The shared per-case cache is neither read nor written.
+
+Every artifact is checked before anything is written. The command refuses artifacts from before this schema (re-run the case with `--trajectories`), incomplete or foreign files, artifacts written outside a run, two runs' artifacts for one stem, and a target checkpoint written by a different run. Spectrum inputs that the case alone determines are recomputed and must match what the artifact stored.
+
+Segments are read in whole-electron blocks of at most `--max-segments` rows (default 1,048,576), so host memory does not grow with the artifact. On a 7.1-million-segment CPU artifact, the peak above the process baseline was about 1.1 GiB at the default, 0.7 GiB at 262,144 rows, and 0.4 GiB at 65,536 rows. Reading the whole artifact at once peaked at 4.9 GiB. At a fixed block size the peak does not grow with the artifact: 65,536-row blocks peaked at 0.4 GiB for both 2.4 and 7.1 million segments, while whole-artifact reads grew from 1.7 to 4.9 GiB. Smaller blocks were not slower on the CPU. Scored spectra equal the live run's to floating-point summation order (relative 1e-12). Cases with coherent emission or a temporal profile need every segment at once and are refused; score those in Python with `pyrite.montecarlo.runner.spectrum_from_artifact`, which matches the live run bit for bit but holds the whole artifact in memory.
+
+Prefer artifact reuse when you redo only the spectrum phase of the same transported electrons, for example after a change to line, characteristic, or bremsstrahlung scoring. Prefer a seeded re-transport (`pyrite checkpoint recompute line|brem`) when no artifact exists or the change affects transport. Measured on the default 40 keV `standard` sweeps (CPU transport feeding CUDA spectra), transport took 6 to 14 times as long as the spectrum phase per case, and the GPU waited on transport 55 to 89 percent of the time. On the CPU an artifact holds about 216 bytes per segment and reads in about 1.2 microseconds per segment with a warm file cache, against about 9.6 microseconds per segment for lockstep transport. Artifacts cost disk, though: a 30,000-electron, 20 µm hopg case wrote 1.5 GB. CUDA-core transport and cold remote reads are not yet measured.
+
 ## Preserve or reduce data
 
 Use checkpoint commands instead of manually editing checkpoint directories:
