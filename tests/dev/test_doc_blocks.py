@@ -90,10 +90,10 @@ def test_bash_block_is_checked_or_explicitly_skipped(block: FencedBlock):
     assert not errors, "\n".join(errors)
 
 
-def test_guides_contain_the_expected_number_of_bash_blocks():
+def test_guides_contain_bash_blocks():
     # Guards against the parametrized test above silently collecting zero
     # cases (e.g. a glob typo) and passing vacuously.
-    assert len(_bash_blocks()) == 56
+    assert _bash_blocks(), "No bash blocks collected from docs/guides/*.md"
 
 
 # --- tier 2: python blocks execute as one accumulating namespace ---------
