@@ -1229,7 +1229,7 @@ distance_mm = 400.0
 [profiles.standard.physical_detector.scorer]
 reconstruction = "bilinear"
 """,
-            "reconstruction: must be 'nearest_tile'",
+            "reconstruction: must be one of 'nearest_tile', 'bilinear_tile'",
         ),
         (
             """

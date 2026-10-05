@@ -3,6 +3,7 @@ import pytest
 
 from pyrite.instrument import FilterPlate, PixelGrid, PlanarDetector, PlanarPose
 from pyrite.instrument.geometry import (
+    angular_tile_weights,
     angular_tiles,
     filter_path_lengths,
     planar_detector_rays,
@@ -192,3 +193,93 @@ def test_tile_inheritance_conserves_discrete_pixel_flux() -> None:
 def test_angular_tiles_reject_invalid_shape(angular_shape) -> None:
     with pytest.raises(ValueError):
         angular_tiles(planar_detector_rays(_detector()), angular_shape)
+
+
+def _oblique_detector(shape=(7, 9)) -> PlanarDetector:
+    return PlanarDetector(
+        pose=PlanarPose.from_observation(100.0, 60.0, azimuth_deg=20.0, roll_deg=15.0),
+        pixels=PixelGrid(shape, (0.5, 0.75)),
+    )
+
+
+def _blend(detector: PlanarDetector, angular_shape):
+    tile_index, directions = angular_tiles(planar_detector_rays(detector), angular_shape)
+    return tile_index, directions, *angular_tile_weights(detector, directions, angular_shape)
+
+
+def _knots(detector: PlanarDetector, directions: np.ndarray, angular_shape):
+    """Independent plane projection of the representative directions."""
+    pose = detector.pose
+    center, normal = np.asarray(pose.center_mm), np.asarray(pose.normal)
+    hits = directions * (center @ normal / (directions @ normal))[:, None] - center
+    x = (hits @ np.asarray(pose.x_axis)).reshape(angular_shape)
+    y = (hits @ np.asarray(pose.y_axis)).reshape(angular_shape)
+    return np.mean(x, axis=0), np.mean(y, axis=1)
+
+
+@pytest.mark.parametrize("angular_shape", [(1, 1), (1, 3), (3, 1), (3, 4), (7, 9)])
+def test_tile_weights_are_convex(angular_shape) -> None:
+    detector = _oblique_detector()
+    _, _, tile, weight = _blend(detector, angular_shape)
+
+    assert tile.shape == weight.shape == (7, 9, 4)
+    assert np.all(weight >= 0.0)
+    np.testing.assert_allclose(np.sum(weight, axis=-1), 1.0, rtol=0.0, atol=1.0e-15)
+    assert np.all((0 <= tile) & (tile < angular_shape[0] * angular_shape[1]))
+
+
+@pytest.mark.parametrize("shape", [(7, 9), (1, 1), (4, 1)])
+def test_tile_weights_reduce_to_nearest_tile_at_full_angular_resolution(shape) -> None:
+    detector = _oblique_detector(shape)
+    tile_index, _, tile, weight = _blend(detector, shape)
+    chosen = np.argmax(weight, axis=-1)[..., None]
+
+    np.testing.assert_array_equal(np.take_along_axis(weight, chosen, -1)[..., 0], 1.0)
+    np.testing.assert_array_equal(np.take_along_axis(tile, chosen, -1)[..., 0], tile_index)
+
+
+def test_one_tile_axis_is_constant_along_that_axis() -> None:
+    detector = _oblique_detector()
+    _, _, tile, weight = _blend(detector, (1, 3))
+
+    np.testing.assert_array_equal(tile, np.broadcast_to(tile[:1], tile.shape))
+    np.testing.assert_array_equal(weight, np.broadcast_to(weight[:1], weight.shape))
+    np.testing.assert_array_equal(weight[..., 2:], 0.0)
+
+
+def test_pixel_on_a_tile_centre_takes_that_tile_exactly() -> None:
+    # On-axis odd grid: the centre tile's representative direction is the
+    # central pixel's by symmetry.
+    detector = _detector(shape=(9, 9), distance=20.0)
+    _, _, tile, weight = _blend(detector, (3, 3))
+    centre = np.argmax(weight[4, 4])
+
+    assert weight[4, 4, centre] == 1.0
+    assert tile[4, 4, centre] == 4
+
+
+def test_tile_weights_reproduce_a_linear_field_and_clamp_outside_the_knots() -> None:
+    detector = _oblique_detector()
+    angular_shape = (3, 4)
+    _, directions, tile, weight = _blend(detector, angular_shape)
+    knot_x, knot_y = _knots(detector, directions, angular_shape)
+    field = (2.0 + 0.3 * knot_x[None, :] - 0.7 * knot_y[:, None]).ravel()
+
+    blended = np.sum(weight * field[tile], axis=-1)
+    ny, nx = 7, 9
+    x = np.clip((np.arange(nx) - (nx - 1) / 2.0) * 0.75, knot_x[0], knot_x[-1])
+    y = np.clip((np.arange(ny) - (ny - 1) / 2.0) * 0.5, knot_y[0], knot_y[-1])
+    expected = 2.0 + 0.3 * x[None, :] - 0.7 * y[:, None]
+
+    np.testing.assert_allclose(blended, expected, rtol=1.0e-13)
+    assert np.all(np.diff(knot_x) > 0.0) and np.all(np.diff(knot_y) > 0.0)
+
+
+def test_tile_weights_reject_mismatched_directions_and_unpixelated_detectors() -> None:
+    detector = _oblique_detector()
+    _, directions = angular_tiles(planar_detector_rays(detector), (3, 4))
+    with pytest.raises(ValueError, match="directions_lab"):
+        angular_tile_weights(detector, directions, (4, 3 + 1))
+    unpixelated = PlanarDetector(pose=detector.pose, size_mm=(5.0, 5.0))
+    with pytest.raises(ValueError, match="pixelated"):
+        angular_tile_weights(unpixelated, directions[:1], (1, 1))

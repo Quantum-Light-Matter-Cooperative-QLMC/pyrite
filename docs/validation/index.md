@@ -162,6 +162,7 @@ detectors/alexs-qe-absorption
 detectors/detector-eaglexo
 detectors/detector-line-broadening
 detectors/grazing-reflectivity
+detectors/pixel-angular-interpolation
 detectors/positioned-filter-attenuation
 ```
 

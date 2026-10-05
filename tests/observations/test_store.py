@@ -38,7 +38,9 @@ def _acquisition(**overrides) -> pr.Acquisition:
     return pr.Acquisition(**{**values, **overrides})
 
 
-def _simulate(*, acquisition=None, angular_shape=(2, 2), response=None) -> pr.Result:
+def _simulate(
+    *, acquisition=None, angular_shape=(2, 2), response=None, reconstruction="nearest_tile"
+) -> pr.Result:
     detector = pr.PlanarDetector(
         pose=pr.PlanarPose.from_observation(100.0, 60.0),
         pixels=pr.PixelGrid((4, 6), (0.5, 0.5)),
@@ -51,7 +53,7 @@ def _simulate(*, acquisition=None, angular_shape=(2, 2), response=None) -> pr.Re
         detector,
         numerics=pr.Numerics(n_electrons=1, n_electrons_brem=1),
         filters=(plate,),
-        pixel_scorer=pr.PixelScorer(angular_shape),
+        pixel_scorer=pr.PixelScorer(angular_shape, reconstruction),
         acquisition=_acquisition() if acquisition is None else acquisition,
     )
 
@@ -180,6 +182,48 @@ def test_angular_sampling_change_is_a_new_true_object(tmp_path) -> None:
     assert coarse.identity.true_spatial_digest != fine.identity.true_spatial_digest
     assert len(_true_objects(store)) == 2
     assert len(store.digests(coarse.source_identity_digest)) == 2
+
+
+def test_reconstruction_mode_is_a_new_true_object_and_survives_reopen(tmp_path) -> None:
+    store = ObservationStore("hopg", root=tmp_path)
+    nearest = observation_from_result(_simulate(angular_shape=(2, 3)))
+    bilinear_result = _simulate(angular_shape=(2, 3), reconstruction="bilinear_tile")
+    bilinear = observation_from_result(bilinear_result)
+    store.put(nearest)
+    digest = store.put(bilinear)
+
+    assert nearest.identity.payload["true_spatial"]["scorer"] == {
+        "angular_shape": [2, 3],
+        "reconstruction": "nearest_tile",
+    }
+    assert nearest.identity.true_spatial_digest != bilinear.identity.true_spatial_digest
+    assert len(_true_objects(store)) == 2
+    loaded = store.load(digest).spatial
+    assert loaded.reconstruction == "bilinear_tile"
+    assert bilinear_result.spatial is not None
+    region = (slice(None), slice(None))
+    np.testing.assert_array_equal(
+        loaded.spectra(region=region)[1], bilinear_result.spatial.spectra(region=region)[1]
+    )
+    assert not np.array_equal(
+        loaded.spectra(region=region)[1], nearest.spatial.spectra(region=region)[1]
+    )
+
+
+def test_acquisition_free_simulation_keeps_the_reconstruction_mode() -> None:
+    detector = pr.PlanarDetector(
+        pose=pr.PlanarPose.from_observation(100.0, 60.0), pixels=pr.PixelGrid((4, 6), (0.5, 0.5))
+    )
+    result = pr.simulate(
+        pr.Beam(30.0),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        detector,
+        numerics=pr.Numerics(n_electrons=1, n_electrons_brem=1),
+        pixel_scorer=pr.PixelScorer((2, 3), "bilinear_tile"),
+    )
+
+    assert result.spatial is not None
+    assert result.spatial.reconstruction == "bilinear_tile"
 
 
 def test_put_is_idempotent(tmp_path) -> None:

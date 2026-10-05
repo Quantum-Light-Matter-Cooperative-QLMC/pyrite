@@ -66,7 +66,8 @@ def _status_rows(observation, scored) -> list[dict[str, str]]:
         {
             "quantity": "angular tiles",
             "value": " x ".join(map(str, true_spatial["scorer"].get("angular_shape", ())))
-            + " (nearest-tile reconstruction)",
+            + f" ({true_spatial['scorer'].get('reconstruction', 'nearest_tile').replace('_', '-')}"
+            + " reconstruction)",
         },
         {"quantity": "observation digest", "value": observation.digest},
     ]

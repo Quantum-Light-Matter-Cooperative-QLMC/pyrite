@@ -371,7 +371,11 @@ def _simulate_planar(
             transport_core=numerics.transport_core,
         )
         spatial = sampling.spatial(
-            output, detector=detector, filters=scene.filters, brem_source=scene.brem_source
+            output,
+            detector=detector,
+            filters=scene.filters,
+            brem_source=scene.brem_source,
+            reconstruction=scorer.reconstruction,
         )
         observation_digest, observation = _observation_provenance(
             source_digest,

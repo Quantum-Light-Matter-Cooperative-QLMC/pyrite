@@ -1673,9 +1673,9 @@ Usage: pyrite profile physical-detector [OPTIONS] COMMAND [ARGS]...
   detector's projection instead of the profile's scalar detector.
 
   What an edit costs on the next run: pose and pixel grid change the projection and
-  therefore the dataset; the angular shape (and filters) re-evaluate observations on new
-  transport while cached scalar records are kept; response and acquisition only rescore
-  stored observations, with no transport.
+  therefore the dataset; the angular shape, reconstruction, and filters re-evaluate
+  observations on new transport while cached scalar records are kept; response and
+  acquisition only rescore stored observations, with no transport.
 
   A profile without its own table has no physical detector. Creating one requires
   --distance-mm.
@@ -1724,8 +1724,11 @@ Options:
                                   Timepix3 chip.
   --pitch-mm Y X                  Pixel pitch (y, x) in mm; a new table defaults to
                                   0.055 0.055.
-  --angular-shape ROWS COLS       Representative directions evaluated per transport
-                                  (nearest-tile); at most --shape.
+  --angular-shape ROWS COLS       Representative directions evaluated per transport; at
+                                  most --shape.
+  --reconstruction [nearest_tile|bilinear_tile]
+                                  Pixel spectrum from its own tile, or blended from
+                                  neighbouring tiles.
   --response [ideal|timepix3]     Detector response: unit-efficiency 'ideal' counter or
                                   uncalibrated 'timepix3'.
   --timepix-thickness-um UM       Timepix3 sensor thickness in micrometres.

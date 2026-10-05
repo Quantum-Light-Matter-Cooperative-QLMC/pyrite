@@ -577,6 +577,7 @@ class ObservationStore:
             coherent_line=factors.get("coherent_line"),
             characteristic_line=factors.get("characteristic_line"),
             tile_directions_lab=directions,
+            reconstruction=layers["true_spatial"]["scorer"].get("reconstruction", "nearest_tile"),
         )
         return StoredObservation(
             identity=identity,

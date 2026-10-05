@@ -148,7 +148,9 @@ class PixelMetadata:
     solid_angle_sr
         ``(n_pixel,)`` scored pixel solid angle in sr.
     tile_index
-        ``(n_pixel,)`` angular tile whose intrinsic spectrum the pixel uses.
+        ``(n_pixel,)`` angular tile containing the pixel: its sole intrinsic
+        spectrum under ``"nearest_tile"``, one of up to four blended tiles
+        under ``"bilinear_tile"``.
     tile_direction_lab
         ``(n_pixel, 3)`` representative tile direction, or ``None`` when the
         result does not retain tile directions.
@@ -195,6 +197,11 @@ class SpatialResult:
     tile_directions_lab
         Optional representative unit direction per angular tile with shape
         ``(n_tile, 3)`` in the lab frame; required to persist the result.
+    reconstruction
+        :class:`~pyrite.instrument.PixelScorer` reconstruction mode.
+        ``"nearest_tile"`` gives each pixel its tile's intrinsic spectrum;
+        ``"bilinear_tile"`` blends neighbouring tiles and requires
+        ``tile_directions_lab`` and a pixelated detector.
     """
 
     ray_map: PixelRayMap
@@ -204,8 +211,17 @@ class SpatialResult:
     coherent_line: SpectralFactors | None = None
     characteristic_line: SpectralFactors | None = None
     tile_directions_lab: np.ndarray | None = None
+    reconstruction: str = "nearest_tile"
 
     def __post_init__(self) -> None:
+        from ..instrument.model import RECONSTRUCTIONS
+
+        if self.reconstruction not in RECONSTRUCTIONS:
+            raise ValueError(
+                "reconstruction must be one of " + ", ".join(map(repr, RECONSTRUCTIONS))
+            )
+        if self.reconstruction == "bilinear_tile" and self.tile_directions_lab is None:
+            raise ValueError("bilinear_tile reconstruction requires tile_directions_lab")
         if self.tile_directions_lab is not None:
             directions = _readonly_array(self.tile_directions_lab, dtype=float)
             n_tile = int(np.max(self.ray_map.tile_index)) + 1
@@ -245,6 +261,20 @@ class SpatialResult:
         if rays.shape != self.ray_map.tile_index.shape:
             raise ValueError("detector pixel grid does not match ray_map")
         return rays
+
+    @cached_property
+    def _blend(self) -> tuple[np.ndarray, np.ndarray]:
+        from ..instrument.geometry import angular_tile_weights
+
+        tile_index = self.ray_map.tile_index
+        n_tile = int(np.max(tile_index)) + 1
+        n_column = int(tile_index[0, -1]) + 1
+        angular_shape = (n_tile // n_column, n_column)
+        assert self.tile_directions_lab is not None
+        tile, weight = angular_tile_weights(self.detector, self.tile_directions_lab, angular_shape)
+        if tile.shape[:2] != tile_index.shape:
+            raise ValueError("detector pixel grid does not match ray_map")
+        return tile, weight
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -415,14 +445,16 @@ class SpatialResult:
         from ..instrument import primary_transmission
 
         rows, columns = coordinates.T
-        tile = self.ray_map.tile_index[rows, columns]
         paths = self.ray_map.path_length_mm[rows, columns]
         transmission = primary_transmission(paths, factor.mu_by_filter_inv_mm)
-        return (
-            factor.intrinsic_by_tile[tile]
-            * self.ray_map.solid_angle_sr[rows, columns, None]
-            * transmission
-        )
+        if self.reconstruction == "bilinear_tile":
+            # Validation: pixel-angular-interpolation
+            tiles, weights = self._blend
+            tile, weight = tiles[rows, columns], weights[rows, columns]
+            intrinsic = np.einsum("pk,pke->pe", weight, factor.intrinsic_by_tile[tile])
+        else:
+            intrinsic = factor.intrinsic_by_tile[self.ray_map.tile_index[rows, columns]]
+        return intrinsic * self.ray_map.solid_angle_sr[rows, columns, None] * transmission
 
     def spectra(
         self,

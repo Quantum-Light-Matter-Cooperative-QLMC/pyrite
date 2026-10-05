@@ -28,6 +28,8 @@ _BEAM_POSITIVE_KEYS = frozenset(
     }
 )
 _BEAM_LONG_SHAPES = frozenset({"gaussian", "uniform"})
+# Mirrors ``instrument.model.RECONSTRUCTIONS``; local for the same import-cycle reason.
+_RECONSTRUCTIONS = ("nearest_tile", "bilinear_tile")
 _GDF_KEYS = {
     "source",
     "gdf_path",
@@ -517,8 +519,10 @@ def _parse_pixel_scorer(
         return None
     errors.keys(row, path, set(_PIXEL_SCORER_KEYS))
     reconstruction = row.get("reconstruction", "nearest_tile")
-    if reconstruction != "nearest_tile":
-        errors.add(f"{path}.reconstruction", "must be 'nearest_tile'")
+    if reconstruction not in _RECONSTRUCTIONS:
+        errors.add(
+            f"{path}.reconstruction", "must be one of " + ", ".join(map(repr, _RECONSTRUCTIONS))
+        )
     angular_shape = _pair(
         row.get("angular_shape", [1, 1]),
         f"{path}.angular_shape",
@@ -534,7 +538,7 @@ def _parse_pixel_scorer(
         )
     ):
         errors.add(f"{path}.angular_shape", "cannot exceed physical detector shape")
-    if reconstruction != "nearest_tile" or angular_shape is None:
+    if reconstruction not in _RECONSTRUCTIONS or angular_shape is None:
         return None
     return MappingProxyType(
         {
