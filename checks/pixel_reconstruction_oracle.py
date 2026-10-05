@@ -19,6 +19,15 @@ per-pixel, per-angular_shape error and asserts nothing about its magnitude.
 A physics reviewer sets the acceptance bar from this evidence before
 `PixelScorer` accuracy is claimed anywhere.
 
+Issue #212 adds `--reconstruction`: every row is reported for each requested
+mode, `nearest_tile` (the tile's own spectrum) and `bilinear_tile` (the
+convex blend of `instrument/geometry.py::angular_tile_weights`, claim
+`pixel-angular-interpolation`), plus characteristic-line flux error, the
+component that interpolation targets. The `tpx-test` geometry reproduces the
+user profile behind #212 (HOPG 1 mm, 30 keV, tilt 30 deg toward azimuth 180,
+90 deg detector at 100 mm covering one 14.08 mm Timepix chip) on a coarser
+15 x 15 point grid.
+
 v1 scope frozen for this evidence run (see task-doc "Decisions and open
 questions", confirmed 2026-08-21):
   - reconstruction policy under test: nearest-tile (current landed
@@ -54,6 +63,7 @@ import argparse
 import json
 import warnings
 from dataclasses import replace
+from itertools import product
 from pathlib import Path
 from typing import NamedTuple
 
@@ -65,14 +75,19 @@ from pyrite import api
 from pyrite.detectors import Timepix3
 from pyrite.instrument import FilterPlate, PixelGrid, PlanarDetector, PlanarPose
 from pyrite.instrument.attenuation import attenuation_matrix, primary_transmission
-from pyrite.instrument.geometry import angular_tiles, filter_path_lengths, planar_detector_rays
+from pyrite.instrument.geometry import (
+    angular_tile_weights,
+    angular_tiles,
+    filter_path_lengths,
+    planar_detector_rays,
+)
 from pyrite.montecarlo.geometry import directions_to_sample_frame
 from pyrite.montecarlo.runner import run_case_directions
 
 GRID_SHAPE = (9, 9)
 PITCH_MM = (1.5, 1.5)
 DISTANCE_MM = 80.0
-ANGULAR_SHAPES = [(1, 1), (3, 3), (5, 5), (9, 9)]
+RECONSTRUCTIONS = ("nearest_tile", "bilinear_tile")
 N_ELECTRONS = 200
 N_ELECTRONS_BREM = 100
 TIMEPIX_N_MC = 20_000
@@ -88,11 +103,25 @@ OUTPUT_PATH = Path(__file__).resolve().parent.parent / (
 
 
 class OracleGeometry(NamedTuple):
-    """Reviewed detector/target angles for one Slice 1 evidence case."""
+    """Reviewed detector/target geometry for one evidence case."""
 
     polar_deg: float
     tilt_deg: float
     tilt_azim_deg: float
+    distance_mm: float = DISTANCE_MM
+    grid_shape: tuple[int, int] = GRID_SHAPE
+    pitch_mm: tuple[float, float] = PITCH_MM
+    thickness_ang: float = 10_000.0
+
+    @property
+    def angular_shapes(self) -> list[tuple[int, int]]:
+        """Coarse-to-full tilings, ending at one tile per grid point."""
+        shapes = [(1, 1), (3, 3), (5, 5), self.grid_shape]
+        return [
+            shape
+            for shape in dict.fromkeys(shapes)
+            if all(a <= g for a, g in zip(shape, self.grid_shape, strict=True))
+        ]
 
 
 GEOMETRIES = {
@@ -100,6 +129,15 @@ GEOMETRIES = {
     "broken-symmetry": OracleGeometry(60.0, 30.0, 45.0),
     "detector-on-g": OracleGeometry(20.0, 20.0, 0.0),
     "near-pole-not-g-aligned": OracleGeometry(20.0, 30.0, 0.0),
+    "tpx-test": OracleGeometry(
+        90.0,
+        30.0,
+        180.0,
+        distance_mm=100.0,
+        grid_shape=(15, 15),
+        pitch_mm=(256 * 0.055 / 15, 256 * 0.055 / 15),
+        thickness_ang=10_000_000.0,
+    ),
 }
 
 
@@ -246,17 +284,17 @@ def _build_scene(
     beam = pr.Beam(energy_keV=30.0)
     target = pr.Slab(
         "hopg",
-        thickness_ang=10_000.0,
+        thickness_ang=geometry.thickness_ang,
         tilt_deg=geometry.tilt_deg,
         tilt_azim_deg=geometry.tilt_azim_deg,
     )
     pose = PlanarPose.from_observation(
-        distance_mm=DISTANCE_MM,
+        distance_mm=geometry.distance_mm,
         polar_deg=geometry.polar_deg,
     )
     detector = PlanarDetector(
         pose=pose,
-        pixels=PixelGrid(GRID_SHAPE, PITCH_MM),
+        pixels=PixelGrid(geometry.grid_shape, geometry.pitch_mm),
         response=Timepix3(n_mc=timepix_n_mc),
     )
     filter_pose = PlanarPose.from_observation(
@@ -280,6 +318,7 @@ def run(
     n_electrons_brem: int = N_ELECTRONS_BREM,
     timepix_n_mc: int = TIMEPIX_N_MC,
     seeds: tuple[int, ...] = SEEDS,
+    reconstructions: tuple[str, ...] = RECONSTRUCTIONS,
 ) -> list[dict]:
     geometry = GEOMETRIES[geometry_name]
     beam, target, detector, filters = _build_scene(
@@ -295,7 +334,7 @@ def run(
 
     rays = planar_detector_rays(detector)
     filter_paths_mm = filter_path_lengths(rays, filters)
-    pixels = _representative_pixels(GRID_SHAPE)
+    pixels = _representative_pixels(geometry.grid_shape)
     pixel_names = list(pixels)
     pixel_coords = [pixels[name] for name in pixel_names]
     fine_directions_lab = np.stack([rays.directions_lab[row, col] for row, col in pixel_coords])
@@ -306,8 +345,11 @@ def run(
         response = detector.response
         assert response is not None
         response = replace(response, seed=seed)
-        for angular_shape in ANGULAR_SHAPES:
+        for angular_shape in geometry.angular_shapes:
             tile_index, tile_directions_lab = angular_tiles(rays, angular_shape)
+            blend_tiles, blend_weights = angular_tile_weights(
+                detector, tile_directions_lab, angular_shape
+            )
             n_tile = tile_directions_lab.shape[0]
             tile_pixel_counts = np.bincount(tile_index.ravel(), minlength=n_tile)
 
@@ -323,22 +365,37 @@ def run(
             brem_energy = np.asarray(output["E_grid_brem"])
             spec_by_direction = np.asarray(output["spec_by_direction"])
             brem_by_direction = np.asarray(output["brem_wide_by_direction"])
+            char_by_direction = np.asarray(output["spec_characteristic_by_direction"])
 
             tile_spec = spec_by_direction[:n_tile]
             tile_brem = brem_by_direction[:n_tile]
             pixel_spec = spec_by_direction[n_tile:]
             pixel_brem = brem_by_direction[n_tile:]
+            tile_char = char_by_direction[:n_tile]
+            pixel_char = char_by_direction[n_tile:]
 
             line_mu = attenuation_matrix(filters, line_energy)
 
-            for pixel_slot, (name, (row, col)) in enumerate(
-                zip(pixel_names, pixel_coords, strict=True)
+            for reconstruction, (pixel_slot, (name, (row, col))) in product(
+                reconstructions, enumerate(zip(pixel_names, pixel_coords, strict=True))
             ):
                 tile = int(tile_index[row, col])
+                if reconstruction == "bilinear_tile":
+                    tiles, weights = blend_tiles[row, col], blend_weights[row, col]
+
+                    def reconstruct(by_tile, tiles=tiles, weights=weights):
+                        return weights @ by_tile[tiles]
+                else:
+
+                    def reconstruct(by_tile, tile=tile):
+                        return by_tile[tile]
+
                 direct_line = pixel_spec[pixel_slot]
-                recon_line = tile_spec[tile]
+                recon_line = reconstruct(tile_spec)
                 direct_brem = pixel_brem[pixel_slot]
-                recon_brem = tile_brem[tile]
+                recon_brem = reconstruct(tile_brem)
+                direct_char = pixel_char[pixel_slot]
+                recon_char = reconstruct(tile_char)
 
                 direct_centroid = _centroid_eV(line_energy, direct_line)
                 recon_centroid = _centroid_eV(line_energy, recon_line)
@@ -386,6 +443,7 @@ def run(
                         "timepix_n_mc": timepix_n_mc,
                         "seed": seed,
                         "angular_shape": list(angular_shape),
+                        "reconstruction": reconstruction,
                         "pixel": name,
                         "row": row,
                         "column": col,
@@ -423,6 +481,10 @@ def run(
                             _integrated_flux(line_energy, filtered_direct),
                             _integrated_flux(line_energy, filtered_recon),
                         ),
+                        "characteristic_relative_error": _relative_error(
+                            _integrated_flux(line_energy, direct_char),
+                            _integrated_flux(line_energy, recon_char),
+                        ),
                         "continuum_relative_error": _relative_error(
                             _integrated_flux(brem_energy, direct_brem),
                             _integrated_flux(brem_energy, recon_brem),
@@ -457,6 +519,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--n-electrons-brem", type=_positive_int, default=N_ELECTRONS_BREM)
     parser.add_argument("--timepix-n-mc", type=_positive_int, default=TIMEPIX_N_MC)
     parser.add_argument("--seeds", type=int, nargs="+", default=list(SEEDS))
+    parser.add_argument(
+        "--reconstruction",
+        choices=RECONSTRUCTIONS,
+        nargs="+",
+        default=list(RECONSTRUCTIONS),
+        help="pixel reconstruction modes to report (default: both)",
+    )
     parser.add_argument("--output", type=Path, default=OUTPUT_PATH)
     return parser.parse_args(argv)
 
@@ -469,6 +538,7 @@ def main(argv: list[str] | None = None) -> None:
         n_electrons_brem=args.n_electrons_brem,
         timepix_n_mc=args.timepix_n_mc,
         seeds=tuple(args.seeds),
+        reconstructions=tuple(args.reconstruction),
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
@@ -477,11 +547,14 @@ def main(argv: list[str] | None = None) -> None:
     def _finite_abs(value: float) -> float:
         return abs(value) if value == value else 0.0  # NaN != NaN
 
-    worst = max(report, key=lambda row: _finite_abs(row["line_flux_relative_error"]))
-    print(
-        f"largest line-flux relative error: {worst['line_flux_relative_error']:.4f} "
-        f"at angular_shape={worst['angular_shape']} pixel={worst['pixel']}"
-    )
+    for reconstruction in args.reconstruction:
+        rows = [row for row in report if row["reconstruction"] == reconstruction]
+        for key in ("characteristic_relative_error", "continuum_relative_error"):
+            worst = max(rows, key=lambda row, key=key: _finite_abs(row[key]))
+            print(
+                f"{reconstruction}: largest {key}: {worst[key]:.4f} "
+                f"at angular_shape={worst['angular_shape']} pixel={worst['pixel']}"
+            )
 
 
 if __name__ == "__main__":
