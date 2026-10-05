@@ -53,6 +53,12 @@ RESERVATIONS_SUBDIR = "reservations"
 # collected there can name a revision instead of shelling out to git.
 SYNC_STAMP_NAME = ".pyrite-sync"
 
+# flock target serializing every writer of the shared checkout. `sync` holds it
+# exclusively from the live-job check through the stamp; a job's startup takes it
+# shared, so a job never begins importing mid-sync. Seconds a holder is awaited.
+SYNC_LOCK_NAME = ".pyrite-sync.lock"
+SYNC_LOCK_WAIT_SECONDS = 300
+
 # The Zhai reproduction job has no crystal key of its own, but reusing the
 # existing material-stem bookkeeping (_refuse_if_busy / _live_jobs /
 # stop_jobs) needs one to key off of -- this is that synthetic token.
@@ -351,6 +357,11 @@ def remote_path(*parts: str) -> str:
 def remote_sync_stamp_path() -> str:
     """Absolute path of the code-identity stamp `sync` writes on the box."""
     return remote_path(SYNC_STAMP_NAME)
+
+
+def remote_sync_lock_path() -> str:
+    """Absolute path of the flock file guarding the shared checkout."""
+    return remote_path(SYNC_LOCK_NAME)
 
 
 def shell_word(value: str) -> str:

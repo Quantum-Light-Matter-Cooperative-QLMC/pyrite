@@ -5,6 +5,7 @@ These are pure-string/logic checks (no ssh), so they run anywhere. The one
 exception is the clear-listing regression test, which executes the box-side
 shell snippet under a local bash (skipped when bash is unavailable)."""
 
+import contextlib
 import importlib
 import io
 import json
@@ -231,7 +232,120 @@ def test_sync_removes_stale_remote_python_sources_before_extract(monkeypatch, tm
     remote_command = commands[-1]
     assert remote_command[:3] == ["ssh", "-n", remote.HOST]
     assert "find \"$p\" -type f -name '*.py' -delete" in remote_command[3]
-    assert remote_command[3].index("find") < remote_command[3].index("tar xzf")
+    assert remote_command[3].index("tar xzf") < remote_command[3].index("find")
+    assert remote_command[3].index("find") < remote_command[3].index("cp -a")
+
+
+def test_sync_uploads_to_unique_path_and_removes_only_that_file(monkeypatch, tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "a.py").write_text("A = 1\n")
+    commands = []
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(config, "SYNC_PATHS", ["src"])
+    monkeypatch.setattr(transport, "_run", lambda command, **_kwargs: commands.append(command))
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "")
+
+    transport.sync_code()
+    transport.sync_code()
+
+    uploads = [c[-1].split(":", 1)[-1] for c in commands if c[0] == "scp"]
+    assert len(set(uploads)) == 2
+    assert all(u.startswith("/tmp/pyrite_code.") and u != "/tmp/pyrite_code.tgz" for u in uploads)
+    remotes = [c[-1] for c in commands if c[0] == "ssh"]
+    for upload, remote_command in zip(uploads, remotes, strict=True):
+        assert f"tar xzf '{upload}'" in remote_command
+        assert "/tmp/pyrite_code.tgz" not in remote_command
+        assert "rm -rf .pyrite-stage." in remote_command and f"'{upload}'; exit" in remote_command
+
+
+def test_sync_stamp_is_written_after_swap_and_staging_is_always_cleaned(monkeypatch, tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "a.py").write_text("A = 1\n")
+    commands = []
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(config, "SYNC_PATHS", ["src"])
+    monkeypatch.setattr(transport, "_run", lambda command, **_kwargs: commands.append(command))
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "")
+
+    transport.sync_code()
+
+    script = commands[-1][-1]
+    assert script.index("cp -a") < script.index("printf %s") < script.index("rm -rf .pyrite-stage")
+    assert script.endswith("; exit $rc") or "exit $rc" in script
+
+
+def test_sync_runs_inside_lock_and_refusal_still_releases_it(monkeypatch, tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "a.py").write_text("A = 1\n")
+    events = []
+
+    @contextlib.contextmanager
+    def fake_lock():
+        events.append("lock")
+        try:
+            yield
+        finally:
+            events.append("unlock")
+
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(config, "SYNC_PATHS", ["src"])
+    monkeypatch.setattr(transport, "_remote_sync_lock", fake_lock)
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "")
+    monkeypatch.setattr(transport, "_run", lambda command, **_kwargs: events.append(command[0]))
+    transport.sync_code()
+    assert events == ["lock", "scp", "ssh", "unlock"]
+
+    def refuse(*_args, **_kwargs):
+        events.append("check")
+        raise SystemExit("refusing to sync")
+
+    events.clear()
+    monkeypatch.setattr(transport, "_refuse_conflicting_live_jobs", refuse)
+    with pytest.raises(SystemExit, match="refusing"):
+        transport.sync_code()
+    assert events == ["lock", "check", "unlock"]
+
+
+class _FakeLockProc:
+    def __init__(self, first_line, returncode=0):
+        self.stdout = io.StringIO(first_line)
+        self.stdin = io.StringIO()
+        self.returncode = returncode
+
+    def wait(self):
+        return self.returncode
+
+
+def test_remote_sync_lock_holds_flock_until_stdin_closes(monkeypatch):
+    proc = _FakeLockProc("LOCKED\n")
+    seen = {}
+
+    def popen(argv, **kwargs):
+        seen["argv"] = argv
+        return proc
+
+    monkeypatch.setattr(transport.subprocess, "Popen", popen)
+    with transport._real_remote_sync_lock():
+        assert not proc.stdin.closed
+    assert proc.stdin.closed
+    assert "flock -x -w" in seen["argv"][-1]
+    assert config.SYNC_LOCK_NAME in seen["argv"][-1]
+
+
+def test_remote_sync_lock_fails_clearly_when_held(monkeypatch):
+    proc = _FakeLockProc("", returncode=75)
+    monkeypatch.setattr(transport.subprocess, "Popen", lambda *_a, **_k: proc)
+    with pytest.raises(SystemExit, match="remote sync lock"):
+        with transport._real_remote_sync_lock():
+            pytest.fail("body must not run without the lock")
+    assert proc.stdin.closed
+
+
+def test_job_script_waits_on_shared_sync_lock_before_payload():
+    script = scripts._slurm_batch_script("j1", "echo payload", job_name="n")
+    lock = script.index(f"flock -s -w {config.SYNC_LOCK_WAIT_SECONDS}")
+    assert config.SYNC_LOCK_NAME in script
+    assert lock < script.index("echo payload")
 
 
 def test_ssh_download_streams_bytes_and_removes_partial_failure(monkeypatch, tmp_path):
