@@ -167,3 +167,56 @@ def _case_bremslib_table_records(case):
     """BremsLib tables a case reads, for run identity; empty by default."""
     tables = _case_bremslib_tables(case)
     return [] if tables is None else list(tables.values())
+
+
+def case_table_markers(case):
+    """Cross-section table markers of exactly the tables ``case`` reads.
+
+    SBETHE stopping, opt-in ELSEPA elastic and opt-in BremsLib tables, as
+    :func:`pyrite.xsgen.store.identity_markers` maps them. This is the
+    per-case ``xsgen_tables`` every producer passes to
+    :func:`pyrite.campaign.profiles.case_content_key`, so ``api.simulate`` and
+    a sweep key the same case identically; a dataset's union of markers
+    belongs to :func:`pyrite.campaign.profiles.dataset_identity` only.
+    """
+    from ...xsgen.store import identity_markers
+
+    return identity_markers(
+        [
+            *_case_stopping_table_records(case),
+            *_case_elastic_table_records(case),
+            *_case_bremslib_table_records(case),
+        ]
+    )
+
+
+_TABLE_FIELDS = (
+    "crystal",
+    "composition",
+    "abs_layers",
+    "layer_radiators",
+    "elastic_model",
+    "bremsstrahlung_model",
+)
+
+
+def cached_case_table_markers():
+    """:func:`case_table_markers` memoized on the case fields that select tables.
+
+    A sweep's cases share materials across energies, so each distinct layer
+    stack resolves its tables once. Scope one per run: the cache does not see
+    tables regenerated after it fills.
+    """
+    import json
+
+    cache = {}
+
+    def markers(case):
+        signature = json.dumps(
+            {field: case.get(field) for field in _TABLE_FIELDS}, sort_keys=True, default=repr
+        )
+        if signature not in cache:
+            cache[signature] = case_table_markers(case)
+        return cache[signature]
+
+    return markers
