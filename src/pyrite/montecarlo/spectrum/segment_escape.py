@@ -76,6 +76,47 @@ def _escape_paths_at(r, n_hat, segments, layers, groove, xp):
     )
 
 
+def segment_escape_gradient(segments, n_hat, *, groove=None, xp=np):
+    """Gradient of each affine piece's escape distance, in the sample frame.
+
+    Planar ray intersection gives ``grad L = -e/(e.n_hat)``; this is the
+    first-order Snell correction from tangential continuity. Pieces must have
+    been cut at face switches before calling. Groove rays follow the working
+    facet normal, whose no-re-entry geometry gives ``grad L = -n_hat``.
+    A z-only slab uses the same formula, independent of its thickness.
+    Validation: xray-in-medium-resonance
+    """
+    n = xp.asarray(n_hat, dtype=REAL)
+    count = int(xp.asarray(segments["L_ang"]).size)
+    if groove is not None:
+        return xp.broadcast_to(-n, (count, 3))
+    if segments.get("crystal_width_ang") is None:
+        normal = xp.broadcast_to(xp.asarray([0.0, 0.0, 1.0], dtype=REAL), (count, 3))
+    else:
+        _, face = first_prism_exit(
+            xp.asarray(segments["r_mid"], dtype=REAL),
+            n,
+            z_min_ang=0.0,
+            z_max_ang=float(segments["thickness_ang"]),
+            width_ang=segments.get("crystal_width_ang"),
+            height_ang=segments.get("crystal_height_ang"),
+            xp=xp,
+        )
+        normal = xp.eye(3, dtype=REAL)[face // 2]
+    gradient = -normal / xp.sum(normal * n, axis=1)[:, None]
+    if (
+        segments.get("crystal_width_ang") is None
+        and segments.get("r_mid") is not None
+        and segments.get("thickness_ang") is not None
+    ):
+        # L is clipped to zero outside a slab; synthetic transparent anchors
+        # also use exterior pieces. Their escape phase has zero gradient.
+        z = xp.asarray(segments["r_mid"])[:, 2]
+        exterior = (z < 0.0) | (z > float(segments["thickness_ang"]))
+        gradient = xp.where(exterior[:, None], 0.0, gradient)
+    return gradient
+
+
 def _cut_at_zero(start, end, xp):
     """Fraction where an affine quantity changes sign, or 1 if it does not."""
     denominator = start - end

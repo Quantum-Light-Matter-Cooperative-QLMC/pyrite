@@ -441,6 +441,7 @@ def _run_prologue(d, *, n_re_tab=None):
         aw_seg=aw_seg,
         v_dot_n=cp.asarray(d["v_dot_n"]) if medium else None,
         n_re_tab=cp.asarray(n_re_tab) if medium else None,
+        escape_gradient=None if d.get("gradient") is None else cp.asarray(d["gradient"]),
         config=CoherentStreamKernelConfig(32, 32, 2, 32),
     )
     cp.cuda.Stream.null.synchronize()
@@ -454,11 +455,13 @@ def _in_medium_root_reference(d, n_re_tab):
     table = np.asarray(n_re_tab, dtype=float)
     v_dot_g = (d["v"].astype(float) @ d["G"].astype(float).T).T  # (n_g, n_seg)
     v_dot_n = d["v_dot_n"].astype(float)[None, :]
+    gradient = d.get("gradient", np.broadcast_to(-d["n_hat"], d["v"].shape))
+    v_dot_grad = np.sum(d["v"].astype(float) * gradient, axis=1)[None, :]
     dnm = 1.0 - v_dot_n * np.ones_like(v_dot_g)
     for _ in range(3):
         E_it = d["hbarc"] * (v_dot_g / dnm)
         n_re = np.interp(E_it, E_tab, table)
-        dnm = 1.0 - n_re * v_dot_n
+        dnm = 1.0 - v_dot_n - (1.0 - n_re) * v_dot_grad
     E_r = d["hbarc"] * (v_dot_g / dnm)
     aw = dnm * d["t_L"].astype(float)[None, :] / (2.0 * d["hbarc"])
     return E_r.reshape(-1), aw.reshape(-1)
@@ -576,7 +579,7 @@ _DECOH_E_GRID = np.arange(700.0, 1500.0, 2.0)
 _DECOH_T0 = np.array([137.0, -412.0])  # Ang, c = 1
 _DECOH_DR = np.array([[35.0, -18.0], [-52.0, 27.0]])  # Ang, transverse entry offsets
 _DECOH_R_GEOM = np.array([[4.0, 0.0, 5.0], [1.5, -2.0, 7.5]])  # distinct S_e per electron
-_DECOH_N_HAT = np.array([1.0, 0.0, 0.01])
+_DECOH_N_HAT = np.array([1.0, 0.0, 0.1])
 _DECOH_KWARGS = {
     "crystal": "hopg",
     "hkl_list": [(0, 0, 2)],
@@ -930,3 +933,56 @@ def test_coherent_decoherence_device_suite():
     # Guard against the child silently skipping everything (e.g. the backend
     # pin failing to lift), which would exit 0 and prove nothing.
     assert " passed" in completed.stdout, completed.stdout
+
+
+@pytest.mark.parametrize("axis", [0, 2], ids=["side-face", "slab-face"])
+def test_prologue_snell_amplitudes_match_full_vector_numpy(axis):
+    """Validation: xray-in-medium-resonance. Includes nonzero internal k.e."""
+    d = _prologue_inputs()
+    d["n_hat"] = np.array([0.6, 0.0, 0.8], dtype=np.float32)
+    d["v_dot_n"] = d["v"] @ d["n_hat"]
+    d["denom"] = 1 - d["v_dot_n"]
+    grad = np.zeros(3, dtype=np.float32)
+    grad[axis] = -1 / d["n_hat"][axis]
+    d["gradient"] = np.tile(grad, (d["n_seg"], 1))
+    d["ES"][:] = [0, 1, 0]
+    d["EP"][:] = [0.8, 0, -0.6]
+    delta = float(np.float32(1) - np.float32(0.999))
+    index = np.full_like(d["n_re_tab"], 1 - delta)
+    for key in ("chi_re", "chi_im", "u_re", "u_im", "mu"):
+        d[key][:] = d[key].flat[0]
+    got = _run_prologue(d, n_re_tab=index)
+    energies, widths, cs, cp_ref = [], [], [], []
+    for row, g in enumerate(d["G"].astype(float)):
+        for seg, v in enumerate(d["v"].astype(float)):
+            h = grad.astype(float)
+            D = 1 - v @ d["n_hat"].astype(float) - delta * (v @ h)
+            omega = (v @ g) / D
+            k = omega * (d["n_hat"].astype(float) + delta * h)
+            detuning = np.sum((k + g) ** 2) - k @ k
+            scale = (
+                np.sqrt(
+                    d["alpha"] * omega / d["pref_c1"] * np.exp(-d["L_esc"][seg] * float(d["mu"][0]))
+                )
+                * d["t_L"][seg]
+            )
+            chi = complex(d["chi_re"][row, 0], d["chi_im"][row, 0])
+            u = complex(d["u_re"][row, 0], d["u_im"][row, 0])
+            values = []
+            for e in (d["ES"][row].astype(float), d["EP"][row].astype(float)):
+                pxr = chi / detuning * ((v @ (k + g)) * ((k + g) @ e) - (k @ k) * (v @ e))
+                cbs = (
+                    -u
+                    / (d["gamma"][seg] * (v @ g))
+                    * (g @ e - (v @ g) * (v @ e) + (v @ e) * (k @ g - (k @ v) * (v @ g)) / (v @ g))
+                )
+                values.append(scale * (pxr + cbs))
+            energies.append(d["hbarc"] * omega)
+            widths.append(D * d["t_L"][seg] / (2 * d["hbarc"]))
+            cs.append(values[0])
+            cp_ref.append(values[1])
+    np.testing.assert_allclose(got[0], energies, rtol=3e-6)
+    np.testing.assert_allclose(got[1], widths, rtol=3e-6)
+    refs = (np.real(cs), np.imag(cs), np.real(cp_ref), np.imag(cp_ref))
+    for actual, reference in zip(got[4:8], refs, strict=True):
+        np.testing.assert_allclose(actual, reference, rtol=5e-6, atol=1e-12)

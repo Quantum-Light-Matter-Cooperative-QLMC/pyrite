@@ -18,7 +18,7 @@ from ....materials.attenuation import _normalize_composition
 from ....materials.crystal import CRYSTALS, HBARC_EV_ANG, refractive_index
 from ...geometry import _mosaic_quadrature, _orientation_R
 from ...transport import C_ANG_PER_FS, beta_from_keV
-from ..segment_escape import segment_escape_pieces
+from ..segment_escape import segment_escape_gradient, segment_escape_pieces
 from ._bin_quadrature import BIN_MEAN_QUADRATURE, bin_axis, validate_line_quadrature
 from ._formation import expand_escape_pieces
 from ._kernels import (
@@ -38,7 +38,7 @@ from ._temporal import segment_arrival_times
 # escape since issue #181, and the phased-field routes the exact per-piece
 # formation integral under absorption since its second slice; each move
 # orphans the previous generation's line spectra once.
-LINE_ESCAPE_MODEL = "segment-mean-v2-coherent-formation"
+LINE_ESCAPE_MODEL = "segment-mean-v3-snell-resonance"
 
 
 #: Size of the most recent line setups' tabulation, for performance telemetry.
@@ -157,6 +157,8 @@ class _SpectrumSetup:
     # the start and end of every piece row, ordered along travel, for the
     # complex formation integral. Validation: coherent-formation-absorption
     escape_ends: Any = None
+    escape_gradient: Any = None
+    piece_fraction: Any = None
     # Bin-mean quadrature only: FP64 bin edges and inverse widths on the
     # accumulation routes' device (``_bin_quadrature.bin_axis``).
     bin_edges: Any = None
@@ -352,15 +354,17 @@ def _prepare_spectrum(request):
     # escape pieces into collinear rows -- each with its own length, midpoint,
     # and start age -- and carry the escape distance at both ends. The pieces
     # of a straight flight sum exactly to its field, and grouping keys are
-    # gathered with them so a flight's pieces still add coherently. Both routes
-    # refuse layers, so the single-slab (K = 1) paths suffice.
+    # gathered with them so a flight's pieces still add coherently. Incoherent
+    # pieces also need their own face root, but retain the parent duration and
+    # fraction-weighted transmission; layered attenuation is evaluated below.
     # Validation: coherent-formation-absorption
     escape_ends = None
-    if coherent or grouped:
+    if n_rows:
         segments, piece_owner, esc_start, esc_end = expand_escape_pieces(
-            segments, n_hat, groove=groove, xp=xp
+            segments, n_hat, layers=layers, groove=groove, xp=xp
         )
-        escape_ends = (esc_start, esc_end)
+        if coherent or grouped:
+            escape_ends = (esc_start, esc_end)
         if gid_all is not None:
             gid_all = gid_all[np.asarray(_to_cpu(piece_owner))]
 
@@ -465,6 +469,14 @@ def _prepare_spectrum(request):
     denom_all = 1.0 - v_dot_n_all
     gamma_all = 1.0 / xp.sqrt(1.0 - beta_all * beta_all)
     t_L_all = seg_L / beta_all
+    piece_fraction = xp.ones_like(seg_L)
+    if not (coherent or grouped):
+        t_L_all = xp.asarray(segments.get("line_parent_L_ang", seg_L), dtype=REAL) / beta_all
+        piece_fraction = xp.asarray(segments.get("line_piece_fraction", piece_fraction), dtype=REAL)
+    # On each affine piece L(r), grad L = -e/(e.n_hat). Tangential
+    # continuity then gives k_eff/omega = n_hat + delta grad L.
+    # Validation: xray-in-medium-resonance
+    escape_gradient = segment_escape_gradient(segments, n_hat, groove=groove, xp=xp)
 
     # coherent (phased) sum precompute: the per-segment retardation scalar
     # d_j = t_abs,j - n_hat.r_j [Ang, c=1] (emission-time phase minus far-field
@@ -658,6 +670,8 @@ def _prepare_spectrum(request):
         bin_inv_width=bin_inv_width,
         escape_pieces=escape_pieces,
         escape_ends=escape_ends,
+        escape_gradient=escape_gradient,
+        piece_fraction=piece_fraction,
         temporal_buf=temporal_buf,
         temporal_tau=temporal_tau,
         temporal_tau_geo=temporal_tau_geo,

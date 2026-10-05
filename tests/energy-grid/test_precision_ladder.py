@@ -83,6 +83,7 @@ def test_locate_windows_picks_the_window_holding_the_most_line_yield():
 
 
 def test_same_precision_pipeline_reports_exactly_zero_deviation(tmp_path):
+    # The azimuth keeps this plumbing fixture outside the critical-angle region.
     payload = tmp_path / "segments.pkl"
     first, second = tmp_path / "a.npz", tmp_path / "b.npz"
     report = tmp_path / "report.json"
@@ -98,7 +99,7 @@ def test_same_precision_pipeline_reports_exactly_zero_deviation(tmp_path):
                 "--tilt",
                 "5",
                 "--azimuth",
-                "95",
+                "45",
                 "--thickness",
                 "1e4",
                 "--ne",

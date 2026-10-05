@@ -128,6 +128,7 @@ def _coherent_prologue_kernel(
     v_flat,
     denom,
     v_dot_n,
+    grad_flat,
     gamma,
     t_L,
     L_esc,
@@ -208,20 +209,16 @@ def _coherent_prologue_kernel(
     dnm_vac = dnm
     v_dot_g = vx * gx + vy * gy + vz * gz
 
-    # In-medium resonance root. The Maxwell dispersion relation k = n(omega) omega
-    # makes the vacuum root implicit,
-    #     omega_res = v.g / (1 - Re n(omega_res) (v.n_hat)),
-    # solved here by the same 3-pass fixed point the CPU core uses: the map
-    # contracts at rate ~delta ~1e-5, so two passes already sit past float32
-    # rounding. Only Re n enters -- Im n is the absorption the Beer-Lambert
-    # factor below already applies. Validation: xray-in-medium-resonance
-    #
-    # Convergence is checked, not assumed -- the same guard and tolerance as the
-    # CPU twin's _in_medium_kinematics. A root that falls in the optical/UV, where
-    # Re n > 1, drives denom toward a spurious Cherenkov-like zero and turns the
-    # map into a 2-cycle; pass three then returns a keV E_res attached to a v.g
-    # four orders below the median, which the CBS 1/(gamma (v.g)^2) blows up.
+    # First-order Snell fixed point: D = 1-v.n-delta v.grad L.
+    # Retain the CPU twin's three passes and float32 convergence guard;
+    # reject critical-angle gradients before producing any amplitude.
+    # Validation: xray-in-medium-resonance
     n_re = F32_ONE
+    hx = grad_flat[vbase]
+    hy = grad_flat[vbase + U32_ONE]
+    hz = grad_flat[vbase + U32_TWO]
+    h2 = hx * hx + hy * hy + hz * hz
+    vdh = vx * hx + vy * hy + vz * hz
     if use_medium:
         vdn = v_dot_n[seg]
         dnm = F32_ONE - vdn
@@ -235,11 +232,17 @@ def _coherent_prologue_kernel(
             frac_it = (E_it - x0_it) / (E_tab[idx_it] - x0_it)
             n_re = _interp_shared(n_re_tab, idx_it, frac_it, below_it, above_it, n_tab)
             previous = dnm
-            dnm = F32_ONE - n_re * vdn
+            if vdh == -vdn:
+                dnm = F32_ONE - n_re * vdn
+            else:
+                dnm = F32_ONE - vdn - (F32_ONE - n_re) * vdh
         # `abs` is not a cupyx.jit builtin; `xp.abs` is. Written as `>` rather
         # than `not (<=)` so a NaN root falls through to the existing NaN
         # handling below instead of taking a new exit.
-        if xp.abs(dnm - previous) > root_rtol * xp.abs(dnm):
+        if (
+            xp.abs(dnm - previous) > root_rtol * xp.abs(dnm)
+            or F32_TWO * xp.abs(F32_ONE - n_re) * h2 >= F32_ONE
+        ):
             return
 
     omega = v_dot_g / dnm
@@ -262,14 +265,14 @@ def _coherent_prologue_kernel(
     u_im = _interp_row(u_im_tab, row, idx, frac, below, above, n_tab)
     mu = _interp_elemental_mu(log_mu_tab, idx, log_frac, below, above, n_mu, n_tab)
 
-    # k.v = omega (1 - denom) survives the substitution exactly (denom absorbed
-    # the index), k.g takes one power of Re n through k_mag = |k|, and the PXR
-    # numerator's k^2 takes two. |k+g|^2 - k^2 = g^2 + 2 k.g keeps its form.
+    # Scalar products of k_eff = omega(n_hat + delta grad L).
     k_mag = omega
     if use_medium:
-        k_mag = omega * n_re
+        delta = F32_ONE - n_re
+        if h2 != F32_ZERO:
+            k_mag = omega * xp.sqrt(F32_ONE - F32_TWO * delta + delta * delta * h2)
     k_dot_v = omega * (F32_ONE - dnm)
-    k_dot_g = k_mag * n_dot_g[g]
+    k_dot_g = omega * (n_dot_g[g] + (F32_ONE - n_re) * (hx * gx + hy * gy + hz * gz))
     v_dot_kg = v_dot_g + k_dot_v
     detuning = g2[g] + F32_TWO * k_dot_g
 
@@ -319,7 +322,8 @@ def _coherent_prologue_kernel(
     # coherent complex expression, preserving its phase information.
     g_dot_e = g_dot_es[g]
     v_dot_e = vx * esx + vy * esy + vz * esz
-    numerator = v_dot_kg * g_dot_e - k_mag * k_mag * v_dot_e
+    k_dot_e = omega * (F32_ONE - n_re) * (hx * esx + hy * esy + hz * esz)
+    numerator = v_dot_kg * (g_dot_e + k_dot_e) - k_mag * k_mag * v_dot_e
     braced_ge = g_dot_e - v_dot_g * v_dot_e
     braced_kg = k_dot_g - k_dot_v * v_dot_g
     bracket = braced_ge + v_dot_e * braced_kg / v_dot_g
@@ -334,7 +338,8 @@ def _coherent_prologue_kernel(
     # pi polarization.
     g_dot_e = g_dot_ep[g]
     v_dot_e = vx * epx + vy * epy + vz * epz
-    numerator = v_dot_kg * g_dot_e - k_mag * k_mag * v_dot_e
+    k_dot_e = omega * (F32_ONE - n_re) * (hx * epx + hy * epy + hz * epz)
+    numerator = v_dot_kg * (g_dot_e + k_dot_e) - k_mag * k_mag * v_dot_e
     braced_ge = g_dot_e - v_dot_g * v_dot_e
     braced_kg = k_dot_g - k_dot_v * v_dot_g
     bracket = braced_ge + v_dot_e * braced_kg / v_dot_g
@@ -823,6 +828,7 @@ def run_coherent_prologue_kernel(
     aw_seg=None,
     v_dot_n=None,
     n_re_tab=None,
+    escape_gradient=None,
     L_start=None,
     L_end=None,
     table_row=None,
@@ -955,6 +961,12 @@ def run_coherent_prologue_kernel(
     else:
         L_start = L_end = apb_out = bma_out = q_out = _dummy()
 
+    if escape_gradient is None:
+        # Compatibility for direct callers without escape geometry.
+        escape_gradient = xp.broadcast_to(-xp.asarray(n_hat, dtype=xp.float32), (n_seg, 3))
+    grad_flat = xp.ascontiguousarray(escape_gradient, dtype=xp.float32).reshape(-1)
+    if int(grad_flat.size) != 3 * n_seg:
+        raise ValueError("escape_gradient must have shape (n_seg, 3)")
     nblocks = (n_pairs + nthreads - 1) // nthreads
     _coherent_prologue_kernel(
         (nblocks,),
@@ -963,6 +975,7 @@ def run_coherent_prologue_kernel(
             v_flat,
             denom,
             v_dot_n,
+            grad_flat,
             gamma,
             t_L,
             L_esc,

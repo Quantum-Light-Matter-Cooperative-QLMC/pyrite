@@ -154,6 +154,7 @@ def resonance_populations(
     label_prefix: str = "",
     composition: Iterable[tuple[str, float]] | None = None,
     band_eV: tuple[float, float] | None = None,
+    groove=None,
 ) -> list[ResonancePopulation]:
     """Per-reflection resonance populations of the line segments.
 
@@ -164,6 +165,17 @@ def resonance_populations(
 
     Validation: line-window-seeding
     """
+    from .segment_escape import segment_escape_gradient
+
+    # Seeding is host work even when transport returned device arrays.
+    segments = {
+        key: _host(value) if hasattr(value, "shape") else value for key, value in segments.items()
+    }
+    if segments.get("r_mid") is not None and segments.get("thickness_ang") is not None:
+        from .lines._formation import expand_escape_pieces
+
+        segments, _, _, _ = expand_escape_pieces(segments, n_hat, groove=groove)
+    gradient = np.asarray(segment_escape_gradient(segments, n_hat, groove=groove), dtype=float)
     energy_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
     energy = _host(segments[energy_field]).astype(float, copy=False)
     length = _host(segments["L_ang"]).astype(float, copy=False)
@@ -171,13 +183,21 @@ def resonance_populations(
     if electron_limit is not None:
         line = _host(segments["elec_id"]) < int(electron_limit)
         energy, length, direction = energy[line], length[line], direction[line]
+        gradient = gradient[line]
     beta = beta_from_keV(energy)
     velocity = beta[:, None] * direction
     v_dot_n = velocity @ np.asarray(n_hat, dtype=float)
-    weight = (length / beta) ** 2
+    parent_length = np.asarray(segments.get("line_parent_L_ang", segments["L_ang"]), dtype=float)
+    fraction = np.asarray(segments.get("line_piece_fraction", np.ones_like(parent_length)), dtype=float)
+    if electron_limit is not None:
+        parent_length, fraction = parent_length[line], fraction[line]
+    weight = (parent_length / beta) ** 2 * fraction
     usable = np.isfinite(weight) & (weight > 0.0) & np.isfinite(v_dot_n) & (v_dot_n < 1.0)
     velocity, v_dot_n, weight = velocity[usable], v_dot_n[usable], weight[usable]
-    flight_time = np.sqrt(weight)
+    gradient = gradient[usable]
+    v_dot_grad = np.sum(velocity * gradient, axis=1)
+    grad2 = np.sum(gradient**2, axis=1)
+    flight_time = parent_length[usable] / beta[usable]
     refractive = None
     if band_eV is not None:
         from ...materials.crystal import refractive_index
@@ -215,7 +235,9 @@ def resonance_populations(
                 if refractive is None:
                     denominator = 1.0 - v_dot_n
                 else:
-                    denominator, _ = _in_medium_kinematics(v_dot_n, v_dot_g, *refractive)
+                    denominator, _ = _in_medium_kinematics(
+                        v_dot_n, v_dot_g, *refractive, v_dot_grad, grad2
+                    )
                 resonance = HBARC_EV_ANG * v_dot_g / denominator
             radiating = np.isfinite(resonance) & (resonance > _MIN_RESONANCE_EV)
             energies.append(resonance[radiating])
@@ -424,13 +446,14 @@ def kinematic_line_seeds(
     label_prefix: str = "",
     composition: Iterable[tuple[str, float]] | None = None,
     band_eV: tuple[float, float] | None = None,
+    groove=None,
 ) -> tuple[list[FeatureSeed], dict[str, Any]]:
     """One window per reflection over its weighted resonance population.
 
     Source equation: the resonance the line kernels place each segment's line
-    at, ``E_res = hbar c (v . g) / (1 - Re n(E_res) v . n_hat)`` with
-    ``v = beta v_hat`` (Zhai SI Eq. 10 with the bulk dispersion
-    ``k = Re n omega``; ledger rows ``line-energy-dispersion`` and
+    at, ``E_res = hbar c (v . g) / (1 - v . n_hat - delta(E_res) v . grad L)`` with
+    ``v = beta v_hat`` (Zhai SI Eqs. (7)–(9) with first-order Snell
+    ``k = omega (n_hat + delta grad L)``; ledger rows ``line-energy-dispersion`` and
     ``xray-in-medium-resonance``). Given ``band_eV``, the root is solved by the
     kernels' own ``lines/_kernels.py::_in_medium_kinematics`` on the table they
     build for an axis spanning ``band_eV`` (``_line_tabulation_grid`` over the
@@ -501,6 +524,7 @@ def kinematic_line_seeds(
         label_prefix=label_prefix,
         composition=composition,
         band_eV=band_eV,
+        groove=groove,
     )
     # The spacing above resolves the eps-quantile feature, not the narrowest one.
     # Measured over hopg/wse2 at 30-100 keV the two coincide to within 11% -- the
@@ -843,6 +867,7 @@ class SeedContext:
     samples_per_feature: int = DEFAULT_SAMPLES_PER_FEATURE
     aliased_weight_limit: float = 1.0e-3
     tail_widths: float = DEFAULT_TAIL_WIDTHS
+    groove: Any = None
 
 
 SeedProvider = Callable[[SeedContext], tuple[Sequence[FeatureSeed], Mapping[str, Any]]]
@@ -874,6 +899,7 @@ def _kinematic_provider(context: SeedContext):
             label_prefix=label_prefix,
             composition=composition,
             band_eV=(context.start_eV, context.stop_eV),
+            groove=context.groove,
         )
 
     compositions = _case_compositions(case)

@@ -140,7 +140,7 @@ def formation_window_half_width(a_vac, half_dL, delta_omega_max, sinc_cutoff):
     return (sinc_cutoff + abs(half_dL) * delta_omega_max) / a_vac
 
 
-def expand_escape_pieces(segments, n_hat, *, groove=None, xp=np):
+def expand_escape_pieces(segments, n_hat, *, layers=None, groove=None, xp=np):
     """Split every segment at its linear escape pieces into collinear rows.
 
     Returns ``(pieces, owner, L_start, L_end)``. ``pieces`` is a copy of
@@ -149,13 +149,16 @@ def expand_escape_pieces(segments, n_hat, *, groove=None, xp=np):
     parent's ``t_ang`` advanced by the piece offset over the parent's speed at
     the spectrum's evaluation energy, so the flight clock is unchanged.
     ``L_start``/``L_end`` are the escape distances at the piece ends, ordered
-    along travel. Single-slab only (the coherent and flight-grouped routes
-    refuse layers). The pieces of a straight flight sum exactly to its field.
+    along travel. The returned scalar endpoints are the first layer’s paths; coherent and
+    flight-grouped callers require a single slab, while incoherent callers
+    recompute per-layer attenuation on the expanded geometry. Parent length
+    and piece fraction preserve their segment-level sinc model. The pieces of
+    a straight flight sum exactly to its field.
     Validation: coherent-formation-absorption
     """
     n_rows = int(xp.asarray(segments["L_ang"]).shape[0])
     owner, fraction, path_start, path_end = segment_escape_paths(
-        segments, xp.arange(n_rows), n_hat, layers=None, groove=groove, xp=xp
+        segments, xp.arange(n_rows), n_hat, layers=layers, groove=groove, xp=xp
     )
     # ``owner`` ascends and each owner's pieces are ordered along travel, so a
     # piece's start offset is the running fraction of its owner's pieces.
@@ -165,6 +168,8 @@ def expand_escape_pieces(segments, n_hat, *, groove=None, xp=np):
     offset = cumulative - cumulative[first]
 
     pieces = dict(segments)
+    pieces["line_parent_L_ang"] = xp.asarray(segments["L_ang"], dtype=REAL)[owner]
+    pieces["line_piece_fraction"] = fraction.astype(REAL)
     for key in _SEG_ARRAYS:
         if key in pieces and pieces[key] is not None:
             pieces[key] = xp.asarray(pieces[key])[owner]

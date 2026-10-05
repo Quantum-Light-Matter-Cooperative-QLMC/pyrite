@@ -523,10 +523,18 @@ def _accumulate_reflection(
     delta_omega_grid = st.delta_omega_grid
     d_all = st.d_all
 
-    # -- 1. per-segment resonance energy (Eq. 10) ---------------------------
-    #   omega_res = v.g / (1 - v.n)   [1/Ang]   (>0 required to radiate)
+    # -- 1. per-piece Snell resonance (Zhai SI Eqs. 7-9) ---------------------
+    #   omega_res = v.g / (1 - v.n - delta v.grad L)   [1/Ang]   (>0 radiates)
     v_dot_g = _matvec3(v_all, g_vec_d)
-    denom, n_re_seg = _in_medium_kinematics(v_dot_n_all, v_dot_g, n_re_tab_g, E_tab_g)
+    grad = st.escape_gradient
+    denom, n_re_seg = _in_medium_kinematics(
+        v_dot_n_all,
+        v_dot_g,
+        n_re_tab_g,
+        E_tab_g,
+        (v_all * grad).sum(axis=1),
+        (grad**2).sum(axis=1),
+    )
     omega_res = v_dot_g / denom
     E_res = HBARC_EV_ANG * omega_res  # -> eV
 
@@ -563,16 +571,15 @@ def _accumulate_reflection(
     chi = chi_re_i + 1j * chi_im_i
     eUg_over_m = u_re_i + 1j * u_im_i
 
-    # -- 4. photon kinematics per segment ------------------------------------
-    # k = omega*n, so detuning = g^2 + 2*omega*(n.g), k.g = omega*(n.g),
-    # and v.(k+g) = v.g + k.v. The g-only scalars are precomputed once.
-    # In medium k = n omega n_hat, so k.v = omega(1 - denom) still holds
-    # exactly (denom absorbed the n), while k.g takes one power of n and
-    # |k+g|^2 - k^2 = g^2 + 2 k.g keeps its form. k_mag = |k| is what the
-    # PXR numerator's k^2 needs; it is omega in vacuum.
-    k_mag = om if n_re_seg is None else om * n_re_seg[idx]
+    # -- 4. photon kinematics on the first-order Snell vector -----------------
+    # k_eff = om * (n_hat + delta grad L); every scalar is a dot of this
+    # same vector. External polarization is transverse to n_hat, so k_eff.e
+    # is retained in the PXR numerator. Validation: xray-in-medium-resonance
+    delta = 1.0 - n_re_seg[idx]
+    grad2 = (grad[idx] ** 2).sum(axis=1)
+    k_mag = om * xp.sqrt(xp.where(grad2 == 0.0, 1.0, 1.0 - 2.0 * delta + delta**2 * grad2))
     k_dot_v = om * (1.0 - dnm)
-    k_dot_g = k_mag * n_dot_g
+    k_dot_g = om * (n_dot_g + delta * _matvec3(grad[idx], g_vec_d))
     v_dot_kg = vdg + k_dot_v
     detuning = g2 + 2.0 * k_dot_g
 
@@ -586,11 +593,12 @@ def _accumulate_reflection(
     pol_A = []  # complex A = A_PXR + A_CBS per polarization (coherent path)
     for e_d, g_dot_e in ((e_s, g_dot_es), (e_p, g_dot_ep)):
         v_dot_e = _matvec3(v, e_d)
+        k_dot_e = om * delta * _matvec3(grad[idx], e_d)
         if coherent or grouped:
             # Complex amplitudes retained verbatim -- the phased-field paths
             # (global-coherent and flight-grouped) keep the un-reassociated
             # expression and their goldens are unaffected.
-            A_PXR = chi / detuning * (v_dot_kg * g_dot_e - k_mag**2 * v_dot_e)
+            A_PXR = chi / detuning * (v_dot_kg * (g_dot_e + k_dot_e) - k_mag**2 * v_dot_e)
             braced_ge = g_dot_e - vdg * v_dot_e
             braced_kg = k_dot_g - k_dot_v * vdg
             A_CBS = -eUg_over_m / (gamma * vdg) * (braced_ge + v_dot_e * braced_kg / vdg)
@@ -613,6 +621,7 @@ def _accumulate_reflection(
             k_dot_v,
             gamma,
             detuning,
+            k_dot_e,
         )
         A2 += a2
         A2_pxr += a2_pxr
@@ -633,7 +642,7 @@ def _accumulate_reflection(
         mu_layers = [mu_i]
     else:
         mu_layers = [_mu_total_inv_ang(comp, E_r) for _, _, comp in layers]
-    if st.escape_ends is not None:
+    if coherent or grouped:
         # Coherent and flight-grouped reductions: the rows are linear escape
         # pieces (``_setup``), and each carries its exact complex formation
         # integral under absorption and the escape-path refractive slope.
@@ -646,6 +655,7 @@ def _accumulate_reflection(
         frac, path_start, path_end = (a[idx] for a in st.escape_pieces)
         mu = xp.stack([xp.asarray(m, dtype=REAL) for m in mu_layers], axis=-1)[:, None, :]
         T_abs = piece_mean_transmission(frac, path_start, path_end, mu, xp=xp)[:, 0]
+        T_abs *= st.piece_fraction[idx]
 
     # -- 7b. flight-grouped incoherent accumulation ---------------------------
     # The same complex per-row field the coherent path builds, but reduced
