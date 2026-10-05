@@ -39,6 +39,15 @@ cell edges and each endpoint cell uses its nearest half-spacing, clipped at
 zero energy. Other response adapters fail explicitly until they define native
 measured bins. Validation: `detector-timepix`.
 
+Both Timepix scoring paths integrate the incident density over overlaps between
+its midpoint cells and the fixed response-input channels. A source cell that
+crosses a channel edge contributes to both channels; no mass is assigned solely
+by its node energy. Density is assumed constant inside each source cell, and a
+positive source floor has no flux beneath it. Native scoring preserves the
+response's measured-bin mass; interpolating that output back onto source nodes
+in `Detector.score()` can introduce a separate quadrature or truncation error.
+See the [resampling verification](../../validation/detectors/detector-timepix.md).
+
 Acquisition conservatively transfers each native-bin event mass to requested
 reporting bins by interval overlap. Because the response has no information
 within one native bin, this operation assumes uniform event density inside that

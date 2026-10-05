@@ -161,6 +161,7 @@ detectors/alexs-charge-diffusion
 detectors/alexs-qe-absorption
 detectors/detector-eaglexo
 detectors/detector-line-broadening
+detectors/detector-timepix
 detectors/grazing-reflectivity
 detectors/pixel-angular-interpolation
 detectors/positioned-filter-attenuation
