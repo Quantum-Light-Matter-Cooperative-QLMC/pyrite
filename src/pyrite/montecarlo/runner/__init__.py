@@ -1215,7 +1215,9 @@ def _cpu_spectrum_backend():
         _RESOURCE_POLICY.gpu, _spectrum_mod.xp, _spectrum_mod.REAL = previous
 
 
+from .artifacts import STREAM_MAX_SEGMENTS as STREAM_MAX_SEGMENTS
 from .artifacts import spectrum_from_artifact as spectrum_from_artifact
+from .artifacts import stream_spectrum_from_artifact as stream_spectrum_from_artifact
 from .pool import _admit_cpu_fallback as _admit_cpu_fallback
 from .pool import _available_mem_mb as _available_mem_mb
 from .pool import _case_progress_label as _case_progress_label
@@ -1235,6 +1237,7 @@ for _exported in (
     runtime_plan,
     run_cases,
     spectrum_from_artifact,
+    stream_spectrum_from_artifact,
 ):
     _exported.__module__ = __name__
 

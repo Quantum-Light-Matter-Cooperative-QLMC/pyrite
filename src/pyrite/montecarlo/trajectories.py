@@ -13,7 +13,7 @@ Layout (``schema_version`` 2)::
     /                   attrs: format, schema_version, complete, created_utc,
                                pyrite_version, case_name, E0_keV, seed,
                                case_sha256, parameter_sha256, fields (JSON),
-                               segment_count
+                               segment_count, row_order ("electron")
     /case               attrs: json -- the resolved case mapping (readable)
                                case_type -- "Case" or "mapping"
     /case/payload       the same case as a typed node tree (exact round trip)
@@ -23,7 +23,10 @@ Layout (``schema_version`` 2)::
     /spectrum_inputs    optional typed tree: every non-segment input the
                         spectrum phase reads (resolved line grid, continuum
                         grid, ``n_hat``, electron counts, groove, grid record)
-    /transport/<field>  one node per returned key, insertion order kept
+    /transport_order    stored row i is transported row transport_order[i];
+                        absent when rows were already electron-major
+    /transport/<field>  one node per returned key, insertion order kept; row
+                        fields (``pyrite_row``) stored electron-major
 
 Schema 1 stored the case only as JSON (tuples became lists, NumPy scalars
 Python numbers) and had no ``/spectrum_inputs``; it stays readable, but only a
@@ -51,7 +54,7 @@ import hashlib
 import json
 import os
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -65,6 +68,8 @@ SCHEMA_VERSION = 2
 # First schema whose artifacts are sufficient spectrum-phase inputs (#186).
 SPECTRUM_SCHEMA_VERSION = 2
 PARTIAL_SUFFIX = ".partial"
+# Rows scanned per read when one electron outgrows a streamed block.
+_BOUNDARY_SCAN_ROWS = 1 << 16
 
 # Device arrays are downloaded in bounded row blocks rather than as one host
 # copy of the whole segment table.
@@ -219,8 +224,18 @@ def _pyrite_version() -> str:
         return "unknown"
 
 
-def _write_array(group, name: str, value: Any, units: str | None):
-    if is_device_array(value):
+def _write_array(
+    group,
+    name: str,
+    value: Any,
+    units: str | None,
+    *,
+    row: bool = False,
+    order: np.ndarray | None = None,
+):
+    """Write one array; ``order`` stores its rows permuted, in bounded blocks."""
+    device = is_device_array(value)
+    if device or order is not None:
         dtype = np.dtype(value.dtype)
         dataset = group.create_dataset(name, shape=value.shape, dtype=dtype)
         if value.size:
@@ -228,23 +243,42 @@ def _write_array(group, name: str, value: Any, units: str | None):
             block = max(1, _DEVICE_BLOCK_BYTES // row_bytes)
             for start in range(0, value.shape[0], block):
                 stop = min(start + block, value.shape[0])
-                dataset[start:stop] = _to_cpu(value[start:stop])
+                if order is None:
+                    rows = value[start:stop]
+                elif device:
+                    from .._backend import BACKEND
+
+                    rows = value[BACKEND.xp.asarray(order[start:stop])]
+                else:
+                    rows = value[order[start:stop]]
+                dataset[start:stop] = _to_cpu(rows) if device else rows
     else:
         dataset = group.create_dataset(name, data=value)
     dataset.attrs["pyrite_kind"] = "array"
+    if row:
+        dataset.attrs["pyrite_row"] = True
     if units is not None:
         dataset.attrs["units"] = units
     return dataset
 
 
-def _write_node(group, name: str, value: Any, links: dict[int, str], units: str | None) -> None:
+def _write_node(
+    group,
+    name: str,
+    value: Any,
+    links: dict[int, str],
+    units: str | None,
+    *,
+    row: bool = False,
+    order: np.ndarray | None = None,
+) -> None:
     if isinstance(value, np.ndarray) or is_device_array(value):
         # Aliases share one array object; link instead of duplicating rows.
         target = links.get(id(value))
         if target is not None:
             group[name] = group.file[target]
             return
-        dataset = _write_array(group, name, value, units)
+        dataset = _write_array(group, name, value, units, row=row, order=order)
         links[id(value)] = dataset.name
         return
     if isinstance(value, Mapping):
@@ -317,6 +351,28 @@ def _case_type(case: Mapping[str, Any]) -> str:
 def _segment_count(transport: Mapping[str, Any]) -> int:
     rows = transport.get("electron_id", transport.get("elec_id"))
     return 0 if rows is None else int(rows.shape[0])
+
+
+def row_fields() -> frozenset[str]:
+    """Top-level transport fields that hold one entry per segment row."""
+    from .transport.secondaries import _ALIASES, _ROW_KEYS
+
+    return frozenset((*_ROW_KEYS, *_ALIASES, "track_id", "parent_id", "generation"))
+
+
+def _electron_order(transport: Mapping[str, Any]) -> np.ndarray | None:
+    """Stable electron-major row order, or ``None`` when rows already are.
+
+    Lockstep cores emit rows step by step, interleaving electrons; storing them
+    electron-major lets a reader take whole electrons as contiguous slices.
+    """
+    ids = transport.get("electron_id", transport.get("elec_id"))
+    if ids is None:
+        return None
+    ids = np.asarray(_to_cpu(ids) if is_device_array(ids) else ids)
+    if ids.size < 2 or bool(np.all(ids[1:] >= ids[:-1])):
+        return None
+    return np.argsort(ids, kind="stable")
 
 
 def write_trajectory_artifact(
@@ -399,11 +455,32 @@ def write_trajectory_artifact(
                 _write_array(settings_group, "E_cut_by_electrons", np.asarray(cutoffs), "keV")
             if spectrum_inputs is not None:
                 _write_node(handle, "spectrum_inputs", dict(spectrum_inputs), {}, None)
+            n_rows = _segment_count(transport)
+            order = _electron_order(transport)
+            handle.attrs["row_order"] = "electron"
+            if order is not None:
+                # Stored row i is transported row order[i]; readers invert it.
+                handle.create_dataset("transport_order", data=order)
+            rows = row_fields()
             group = handle.create_group("transport", track_order=True)
             group.attrs["pyrite_kind"] = "dict"
             links: dict[int, str] = {}
             for name, value in transport.items():
-                _write_node(group, name, value, links, field_units(name))
+                row = (
+                    name in rows
+                    and (isinstance(value, np.ndarray) or is_device_array(value))
+                    and len(value.shape) > 0
+                    and value.shape[0] == n_rows
+                )
+                _write_node(
+                    group,
+                    name,
+                    value,
+                    links,
+                    field_units(name),
+                    row=row,
+                    order=order if row else None,
+                )
             handle.attrs["complete"] = True
         os.replace(partial, final)
     except BaseException:
@@ -412,10 +489,10 @@ def write_trajectory_artifact(
     return final
 
 
-def _read_node(node) -> Any:
+def _read_node(node, order: np.ndarray | None = None) -> Any:
     kind = node.attrs.get("pyrite_kind", "array")
     if kind == "dict":
-        return {key: _read_node(node[key]) for key in node}
+        return {key: _read_node(node[key], order) for key in node}
     if kind in {"list", "tuple"}:
         items = [_read_node(node[str(index)]) for index in range(int(node.attrs["length"]))]
         return tuple(items) if kind == "tuple" else items
@@ -426,7 +503,12 @@ def _read_node(node) -> Any:
 
         return GrooveSpec(**{key: _read_node(node[key]) for key in node})
     if kind == "array":
-        return node[()]
+        stored = node[()]
+        if order is None or not node.attrs.get("pyrite_row", False):
+            return stored
+        restored = np.empty_like(stored)
+        restored[order] = stored
+        return restored
     value = node[()]
     if kind == "numpy_scalar":
         return value
@@ -499,8 +581,15 @@ def read_trajectory_header(path: str | os.PathLike[str]) -> dict[str, Any]:
         return _header_attrs(handle)
 
 
-def read_trajectory_artifact(path: str | os.PathLike[str]) -> TrajectoryArtifact:
+def read_trajectory_artifact(
+    path: str | os.PathLike[str], *, load_transport: bool = True
+) -> TrajectoryArtifact:
     """Reopen a complete trajectory artifact.
+
+    Rows come back in their transported order whatever order they are stored
+    in. ``load_transport=False`` skips every ``/transport`` array (``transport``
+    is then empty), for callers that stream segments with
+    :func:`iter_electron_row_blocks`.
 
     Raises
     ------
@@ -529,13 +618,89 @@ def read_trajectory_artifact(path: str | os.PathLike[str]) -> TrajectoryArtifact
             case=_read_case(handle["case"]),
             provenance=json.loads(handle["provenance"].attrs["json"]),
             settings=settings,
-            transport=_read_node(group),
+            transport=(
+                _read_node(
+                    group,
+                    handle["transport_order"][()] if "transport_order" in handle else None,
+                )
+                if load_transport
+                else {}
+            ),
             units=units,
             attrs=_header_attrs(handle),
             spectrum_inputs=(
                 _read_node(handle["spectrum_inputs"]) if "spectrum_inputs" in handle else None
             ),
         )
+
+
+def iter_electron_row_blocks(
+    path: str | os.PathLike[str], max_rows: int
+) -> Iterator[dict[str, Any]]:
+    """Stream a schema-2 artifact's transport result in whole-electron row blocks.
+
+    Each block is the transport mapping with every row field sliced to one
+    contiguous run of stored (electron-major) rows; all other fields are read
+    once and shared. A block holds at most ``max_rows`` rows unless one
+    electron alone has more, so host memory is bounded by the block, not the
+    segment count. Blocks partition the rows and never split an electron.
+
+    Raises
+    ------
+    TrajectoryArtifactError
+        Unreadable, incomplete, or pre-schema-2 artifact, or ``max_rows < 1``.
+    """
+    import h5py
+
+    if max_rows < 1:
+        raise TrajectoryArtifactError("max_rows must be positive")
+    path = Path(path)
+    try:
+        handle = h5py.File(path, "r")
+    except OSError as error:
+        raise TrajectoryArtifactError(f"unreadable trajectory artifact {path}: {error}") from error
+    with handle:
+        _check_header(handle, path)
+        if handle.attrs.get("row_order") != "electron":
+            raise TrajectoryArtifactError(
+                f"trajectory artifact {path} does not store electron-major rows; "
+                f"only schema-{SPECTRUM_SCHEMA_VERSION} artifacts stream"
+            )
+        group = handle["transport"]
+        row_names = [key for key in group if group[key].attrs.get("pyrite_row", False)]
+        shared = {key: _read_node(group[key]) for key in group if key not in row_names}
+        ids = group["electron_id" if "electron_id" in group else "elec_id"]
+        n_rows = int(ids.shape[0])
+        start = 0
+        while True:
+            stop = min(start + max_rows, n_rows)
+            if stop < n_rows:
+                stop = _electron_boundary(ids, start, stop)
+            block = dict(shared)
+            for key in row_names:
+                block[key] = group[key][start:stop]
+            yield block
+            if stop >= n_rows:
+                return
+            start = stop
+
+
+def _electron_boundary(ids, start: int, stop: int) -> int:
+    """First row at or after an electron boundary near ``stop`` (> ``start``)."""
+    owner = ids[stop]
+    window = ids[start:stop]
+    back = int(np.searchsorted(window, owner, side="left"))
+    if back > 0:
+        return start + back
+    # One electron spans the whole window: extend to its last row.
+    n_rows = int(ids.shape[0])
+    while stop < n_rows:
+        ahead = ids[stop : min(stop + _BOUNDARY_SCAN_ROWS, n_rows)]
+        changed = np.flatnonzero(ahead != owner)
+        if changed.size:
+            return stop + int(changed[0])
+        stop += ahead.size
+    return n_rows
 
 
 def _read_case(group) -> Mapping[str, Any]:

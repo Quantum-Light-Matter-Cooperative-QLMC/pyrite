@@ -6,6 +6,7 @@ trajectory artifact's recorded spectrum-phase inputs before replaying them.
 """
 
 from collections.abc import Mapping
+from os import PathLike
 from typing import Any
 
 import numpy as np
@@ -19,7 +20,16 @@ from ..trajectories import (
     TrajectoryArtifactError,
     artifact_spectrum_inputs,
     case_digest,
+    iter_electron_row_blocks,
+    read_trajectory_artifact,
 )
+
+#: Default segment rows one streamed block holds. Measured on CPU for a 7.1 M
+#: segment hopg shell + coupled-radiative artifact (#186): peak host memory
+#: above baseline was ~1.1 GiB at 2**20 rows, ~0.7 GiB at 2**18, ~0.4 GiB at
+#: 2**16 (a ~0.3 GiB fixed cost plus the block), against ~4.9 GiB for the
+#: whole-artifact read. Smaller blocks were not slower on CPU.
+STREAM_MAX_SEGMENTS = 1 << 20
 
 
 def _case_geometry(case):
@@ -78,6 +88,126 @@ def spectrum_from_artifact(
         Schema 1, no recorded inputs, or a case, input, or segment count that
         disagrees with the artifact.
     """
+    case, inputs = _checked_case_and_inputs(artifact, case)
+    segs = artifact.transport
+    if int(segs["L_ang"].size) != int(artifact.attrs["segment_count"]):
+        raise TrajectoryArtifactError(f"trajectory artifact {artifact.path} segments are truncated")
+    from . import _spectrum_case
+
+    return _spectrum_case(case, dict(inputs, segs=segs), record_timing)
+
+
+def stream_spectrum_from_artifact(
+    path: str | PathLike[str],
+    case: Case | Mapping[str, Any] | None = None,
+    *,
+    max_segments: int = STREAM_MAX_SEGMENTS,
+) -> dict[str, Any]:
+    """Score an artifact's spectra in whole-electron segment blocks.
+
+    The bounded-memory form of :func:`spectrum_from_artifact`: never
+    transports, never holds more than about ``max_segments`` segment rows
+    (plus per-electron and scalar fields) on the host, and sums the
+    incoherent line, characteristic, and continuum estimators over disjoint
+    electron blocks. Each is a track-length sum normalized by a fixed electron
+    count, so blocks add; only the floating-point summation order differs from
+    the live run.
+
+    Raises
+    ------
+    TrajectoryArtifactError
+        As :func:`spectrum_from_artifact`, or a case that needs every segment
+        at once (coherent emission, temporal profile).
+    """
+    from . import (
+        _brem_wide_from_segments,
+        _characteristic_from_segments,
+        _lines_for_segments,
+        _segments_on_device,
+    )
+    from .line_grid import check_line_truncation, line_truncation_audit
+
+    artifact = read_trajectory_artifact(path, load_transport=False)
+    case, inputs = _checked_case_and_inputs(artifact, case)
+    for key in ("coherent_emission", "temporal_profile"):
+        if case.get(key):
+            raise TrajectoryArtifactError(
+                f"{key} needs every segment at once; score {artifact.path} with "
+                "spectrum_from_artifact instead"
+            )
+    E_grid, E_brem, n_hat = inputs["E_grid"], inputs["E_brem"], inputs["n_hat"]
+    groove, abs_layers = inputs["groove"], case.get("abs_layers")
+    Ne_lines, Ne_brem = inputs["Ne_lines"], inputs["Ne_brem"]
+    audit = line_truncation_audit(case, E_grid, n_electrons=Ne_lines)
+    table_cache: dict = {}
+    spec = spec_characteristic = brem_wide = None
+    n_segments = 0
+    segs = {}
+    for segs in iter_electron_row_blocks(path, max_segments):
+        n_segments += int(segs["L_ang"].shape[0])
+        if segs["L_ang"].shape[0] == 0:
+            continue
+        block = _segments_on_device(segs)
+        parts = (
+            _lines_for_segments(
+                block,
+                E_grid,
+                case,
+                n_hat,
+                abs_layers,
+                groove,
+                coherent=False,
+                Ne=Ne_lines,
+                table_cache=table_cache,
+                truncation_audit=audit,
+            ),
+            _characteristic_from_segments(
+                block, E_grid, case, n_hat, abs_layers, groove=groove, Ne=Ne_brem
+            ),
+            _brem_wide_from_segments(
+                block, E_brem, case, n_hat, abs_layers, groove=groove, Ne=Ne_brem
+            ),
+        )
+        if spec is None:
+            spec, spec_characteristic, brem_wide = parts
+        else:
+            spec, spec_characteristic, brem_wide = (
+                total + part
+                for total, part in zip((spec, spec_characteristic, brem_wide), parts, strict=True)
+            )
+    if n_segments != int(artifact.attrs["segment_count"]):
+        raise TrajectoryArtifactError(f"trajectory artifact {artifact.path} segments are truncated")
+    if spec is None:  # no segment at all: every estimator is zero
+        spec = np.zeros(E_grid.shape)
+        spec_characteristic = np.zeros(E_grid.shape)
+        brem_wide = np.zeros(E_brem.shape)
+    assert spec_characteristic is not None and brem_wide is not None
+    truncation = None if audit is None else check_line_truncation(case, audit)
+    out = dict(
+        E_grid=E_grid,
+        spec=spec,
+        spec_characteristic=spec_characteristic,
+        brem=np.interp(E_grid, E_brem, brem_wide),
+        E_grid_brem=E_brem,
+        brem_wide=brem_wide,
+        eta=segs["n_backscattered"] / segs["Ne"],
+        hit_frac=1.0 - segs["n_missed"] / segs["Ne"],
+        n_segments=n_segments,
+        crystal=case["crystal"],
+        E0_keV=case["E0_keV"],
+    )
+    diagnostic = inputs.get("diagnostic_grid")
+    if diagnostic is not None:
+        out["line_grid_diagnostic"] = diagnostic
+        if case.get("line_grid_policy") is not None:
+            out["line_grid_resolved"] = (
+                diagnostic if truncation is None else {**diagnostic, "truncation_audit": truncation}
+            )
+    return out
+
+
+def _checked_case_and_inputs(artifact, case):
+    """The artifact's own case and its spectrum inputs, after every identity check."""
     inputs = artifact_spectrum_inputs(artifact)
     stored = artifact.case
     if case_digest(stored) != artifact.attrs.get("case_sha256"):
@@ -103,12 +233,7 @@ def spectrum_from_artifact(
                 f"trajectory artifact {artifact.path} spectrum input {key!r} disagrees with "
                 "its case; it was written by an incompatible PyRITE version"
             )
-    segs = artifact.transport
-    if int(segs["L_ang"].size) != int(artifact.attrs["segment_count"]):
-        raise TrajectoryArtifactError(f"trajectory artifact {artifact.path} segments are truncated")
-    from . import _spectrum_case
-
-    return _spectrum_case(case, dict(inputs, segs=segs), record_timing)
+    return case, inputs
 
 
 def _same_input(actual, expected) -> bool:

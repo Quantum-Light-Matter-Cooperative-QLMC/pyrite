@@ -104,7 +104,7 @@ artifact.units["r_mid"]  # "angstrom"
 artifact.case["seed"], artifact.settings["transport_core"]
 ```
 
-The HDF5 layout is self-describing and readable with any HDF5 tool: `/transport` holds one node per field (aliases such as `E_keV` are hard links to their canonical field), and `/case`, `/settings`, and `/provenance` hold JSON attributes. Readers reject files whose `complete` flag is unset or whose `schema_version` is newer than they support.
+The HDF5 layout is self-describing and readable with any HDF5 tool: `/transport` holds one node per field (aliases such as `E_keV` are hard links to their canonical field), and `/case`, `/settings`, and `/provenance` hold JSON attributes; `/case/payload` also stores the exact typed case. Per-segment fields (marked `pyrite_row`) are stored grouped by electron; when that differs from the transported order, `/transport_order` maps each stored row to its transported index, and PyRITE's reader restores the transported order. Readers reject files whose `complete` flag is unset or whose `schema_version` is newer than they support.
 
 ### Export segments for visualization
 
