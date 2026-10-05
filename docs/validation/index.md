@@ -40,6 +40,8 @@ beam-transport/elsepa-positron-elastic-sampling
 beam-transport/bhabha-close
 beam-transport/sbethe-positron-stopping
 beam-transport/positron-brems-scaling
+beam-transport/heitler-annihilation
+beam-transport/positron-annihilation-at-rest
 beam-transport/elsepa-muffin-tin-inputs
 beam-transport/inelastic-angular-deflection
 beam-transport/penelope-shell-oscillators
