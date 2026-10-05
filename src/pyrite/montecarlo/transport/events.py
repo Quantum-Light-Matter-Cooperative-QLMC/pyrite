@@ -155,6 +155,8 @@ def check_segment_event_contract(segments, *, rtol=1e-12, atol_ang=1e-5):
     ``atol_ang`` absorbs the interface nudge transport applies after a layer
     crossing. Frozen rows have no ``event_kind``; the check requires midpoint
     rows.
+
+    Validation: bremslib-radiative-event-spectrum
     """
     missing = [k for k in _REQUIRED if segments.get(k) is None]
     if missing:

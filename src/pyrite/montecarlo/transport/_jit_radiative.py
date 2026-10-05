@@ -107,6 +107,8 @@ def radiative_moments_scalar(
 
     The caller validates ``0 < cutoff_eV <= energy_eV`` and table coverage.
     All first moments have units eV cm²; the zeroth has units cm².
+
+    Validation: bremslib-radiative-partition
     """
     row, fraction = _incident_row(incident_keV, energy_eV)
     nodes = _photon_nodes(energy_eV, cutoff_eV, row, nominal, top)
@@ -133,7 +135,10 @@ def radiative_moments_scalar(
 def sample_hard_photon_energy_scalar(
     incident_keV, nominal, top, scaled_sdcs, atomic_number, energy_eV, cutoff_eV, uniform
 ):
-    """Invert the same hard zeroth-moment CDF used by the host sampler."""
+    """Invert the same hard zeroth-moment CDF used by the host sampler.
+
+    Validation: bremslib-radiative-partition
+    """
     _, hard_rate, _ = radiative_moments_scalar(
         incident_keV, nominal, top, scaled_sdcs, atomic_number, energy_eV, cutoff_eV
     )

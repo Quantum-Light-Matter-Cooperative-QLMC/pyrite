@@ -247,6 +247,8 @@ def structure_factor(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
         inverse angstroms.
 
     Validation: structure-factor
+
+    Validation: debye-waller-catalog-provenance
     """
     info = CRYSTALS[crystal]
     hkl = np.asarray(hkl, dtype=float)
@@ -407,6 +409,8 @@ def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
         Crystal-potential Fourier component in eV.
 
     Validation: cbs-amplitude
+
+    Validation: debye-waller-catalog-provenance
     """
     info = CRYSTALS[crystal]
     hkl = np.asarray(hkl, dtype=float)

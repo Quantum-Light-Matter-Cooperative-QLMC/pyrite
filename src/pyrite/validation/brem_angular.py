@@ -38,7 +38,10 @@ QUANTILES = (0.5, 0.9)
 def schiff_density(
     atomic_number: int, incident_energy_MeV: float, kappa: float, theta_rad: np.ndarray
 ) -> np.ndarray:
-    """Unnormalized Schiff photon density per steradian (Koch-Motz 2BS)."""
+    """Unnormalized Schiff photon density per steradian (Koch-Motz 2BS).
+
+    Validation: bremslib-angular-schiff
+    """
     E0 = 1.0 + incident_energy_MeV / ELECTRON_REST_ENERGY_MEV
     k = kappa * incident_energy_MeV / ELECTRON_REST_ENERGY_MEV
     E = E0 - k
@@ -53,7 +56,10 @@ def schiff_density(
 
 
 def enclosed_angle(theta_rad: np.ndarray, density: np.ndarray, fraction: float) -> float:
-    """Angle enclosing ``fraction`` of the flux, ``dOmega = 2 pi sin(theta) dtheta``."""
+    """Angle enclosing ``fraction`` of the flux, ``dOmega = 2 pi sin(theta) dtheta``.
+
+    Validation: bremslib-angular-schiff
+    """
     weight = 2.0 * np.pi * np.sin(theta_rad) * density
     cumulative = np.concatenate(
         [[0.0], np.cumsum(0.5 * (weight[1:] + weight[:-1]) * np.diff(theta_rad))]
@@ -69,7 +75,10 @@ def angular_window_rad(incident_energy_MeV: float) -> float:
 def compare_angular_shape(
     table: BremsLibBremsstrahlungTable, incident_index: int, kappa_index: int
 ) -> dict[float, float]:
-    """BremsLib over Schiff enclosed-angle ratios at one table node."""
+    """BremsLib over Schiff enclosed-angle ratios at one table node.
+
+    Validation: bremslib-angular-schiff
+    """
     energy_MeV = float(table.incident_energy_keV[incident_index]) / 1e3
     theta = table.theta_rad
     keep = theta <= angular_window_rad(energy_MeV)

@@ -43,7 +43,10 @@ def material_request(
     projectile: str = "electron",
     source_path: str | Path | None = None,
 ) -> TableRequest:
-    """Return the exact store request for one SBETHE material table."""
+    """Return the exact store request for one SBETHE material table.
+
+    Validation: sbethe-material-inputs
+    """
     deck = SbetheDeck(
         name=name,
         composition=composition,

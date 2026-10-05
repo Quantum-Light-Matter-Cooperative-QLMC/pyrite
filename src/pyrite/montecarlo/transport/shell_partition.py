@@ -28,6 +28,8 @@ class ShellSoftHardPartition:
     Inner shells (``closure.inner``) are cut at ``W_c`` like outer shells;
     their soft losses create no explicit vacancy. Units per formula unit, as
     in :class:`~.shell_gos.ShellGOSMoments`.
+
+    Validation: penelope-shell-soft-hard-partition
     """
 
     closure: ShellRateClosure

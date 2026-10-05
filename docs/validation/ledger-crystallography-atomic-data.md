@@ -25,7 +25,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `surface-hkl-orientation`
 
 - **Claim:** reciprocal cleavage-plane normal `g_hkl = h b1 + k b2 + l b3` is mapped to sample `+z` by a proper minimal rotation, followed by the configured right-handed azimuth about `+z`
-- **Code:** `montecarlo/geometry.py::_orientation_R`; plumbing through `sweep.py`, `montecarlo/spectrum/lines/`, `montecarlo/detector.py`, and `montecarlo/runner/__init__.py`
+- **Code:** `montecarlo/geometry.py::_orientation_R`; plumbing through `campaign/sweep.py`, `montecarlo/spectrum/lines/`, `montecarlo/detector.py`, and `montecarlo/runner/__init__.py`
 - **Source:** standard reciprocal-lattice geometry and Rodrigues rotation
 - **Status:** rederived
 - **Checks:** reciprocal/direct equivalence for orthogonal one-axis cuts; nonorthogonal reciprocal-normal alignment; determinant/azimuth handedness; mutually exclusive parser/API inputs; legacy direct-axis matrix frozen bit-for-bit

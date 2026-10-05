@@ -442,6 +442,7 @@ class SpatialResult:
         return coordinates
 
     def _materialize(self, factor: SpectralFactors, coordinates: np.ndarray) -> np.ndarray:
+        """Validation: pixel-angular-interpolation"""
         from ..instrument import primary_transmission
 
         rows, columns = coordinates.T

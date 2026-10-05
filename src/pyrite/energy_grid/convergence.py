@@ -26,6 +26,8 @@ observable -- a sampled density maximum scales with the local spacing.
 Dominant-line FWHM and the line/background ratio come from
 :func:`pyrite.results.metrics.line_metrics`, whose widths are physical-energy
 half-maximum crossings (#110), not sample counts times one spacing.
+
+Validation: line-grid-sinc-convergence
 """
 
 import hashlib

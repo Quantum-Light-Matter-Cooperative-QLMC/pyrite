@@ -176,6 +176,7 @@ def _coherent_prologue_kernel(
 ):
     # g-major fixed order: pair = g*n_seg + seg.  The reduction kernel then
     # reads each g row contiguously while its threads stride over segments.
+    """Validation: xray-in-medium-resonance"""
     pair = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
     if pair >= n_pairs:
         return

@@ -340,6 +340,8 @@ def _host_bin_mean(a_width, E_res, edges, inv_width, exact_widths=None):
 
     ``exact_widths=None`` evaluates every bin exactly; a number applies the
     far-field envelope beyond that many first-zero widths, as the device route.
+
+    Validation: sinc-bin-far-envelope
     """
     a = np.asarray(a_width, dtype=np.float64)[:, None]
     x = a * (np.asarray(edges, dtype=np.float64)[None, :] - np.asarray(E_res, np.float64)[:, None])

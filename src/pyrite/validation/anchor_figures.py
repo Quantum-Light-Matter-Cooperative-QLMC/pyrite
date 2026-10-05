@@ -801,7 +801,10 @@ def figure_flux_anchor(anchor: ZhaiAnchor, model: dict):
 def figure_enhancement(anchor: ZhaiAnchor, model: dict):
     """Bulk vs 29 nm film at the top beam energy (EDS-convolved), annotated with
     the MC enhancement factor and the analytic no-transport ceiling
-    L_eff(bulk)/L_eff(film)."""
+    L_eff(bulk)/L_eff(film).
+
+    Validation: enhancement-bulk-film
+    """
     import matplotlib.pyplot as plt
 
     E0 = anchor.energies_keV[-1]
@@ -856,6 +859,8 @@ def _supplementary_detected_spectrum(
     a modeling choice, and the residual normalization gap vs Zhai SI
     Fig. S5b is tracked in docs/validation/physics-validation-ledger.md (id
     `zhai-hbn-921-detected`).
+
+    Validation: zhai-hbn-921-detected
     """
     peak_eV = float(study.E_grid[np.argmax(spectrum)])
     fwhm_eV = float(

@@ -15,6 +15,8 @@ def prepare_sbethe_stopping_table(arrays):
     CPU/device interpolation kernel.  SBETHE supplies strictly positive native
     nodes from 1 keV through 1 GeV; values outside that domain are rejected by
     the host entry point rather than extrapolated.
+
+    Validation: sbethe-corrected-stopping
     """
     energy_keV = np.asarray(arrays["stopping_energy_eV"], dtype=np.float64) * 1.0e-3
     stopping_keV_per_ang = np.asarray(arrays["stopping_eV_per_angstrom"], dtype=np.float64) * 1.0e-3
@@ -104,14 +106,20 @@ def _dEds_sbethe_scalar(log_energy_keV, log_stopping_keV_per_ang, E_keV):
 
 @njit(cache=True)
 def _dEds_sbethe_packed_scalar(log_energy_keV, log_stopping_keV_per_ang, layer, count, E_keV):
-    """Evaluate one row of padded SBETHE tables inside an exact transport core."""
+    """Evaluate one row of padded SBETHE tables inside an exact transport core.
+
+    Validation: sbethe-corrected-stopping
+    """
     return _dEds_sbethe_scalar(
         log_energy_keV[layer, :count], log_stopping_keV_per_ang[layer, :count], E_keV
     )
 
 
 def sbethe_stopping_keV_per_ang(log_energy_keV, log_stopping_keV_per_ang, E_keV):
-    """Evaluate a prepared SBETHE table without extrapolation."""
+    """Evaluate a prepared SBETHE table without extrapolation.
+
+    Validation: sbethe-corrected-stopping
+    """
     energy = np.asarray(E_keV, dtype=float)
     lower = float(np.nextafter(np.exp(log_energy_keV[0]), -np.inf))
     upper = float(np.nextafter(np.exp(log_energy_keV[-1]), np.inf))
@@ -213,6 +221,7 @@ def _dEds_bs_keV_per_ang(Z, A, J_keV, rho_g_cm3, E_keV, delta=0.0):
 
 @njit(cache=True)
 def _dEds_bs_compound_scalar(J_arr, coeff_arr, delta, E_i):
+    """Validation: relativistic-bethe-stopping"""
     tau = E_i / _MC2_KEV
     gamma = 1.0 + tau
     beta_sq = 1.0 - 1.0 / (gamma * gamma)
@@ -307,6 +316,8 @@ def _bs_joy_luo_crossover_keV(Z, A, J_keV):
     logarithm, not just a constant. The result depends only on ``Z`` and
     ``J_keV`` (density cancels in the ratio), so it is a per-element constant
     computed once at table-build time.
+
+    Validation: relativistic-bethe-stopping
     """
     Z = float(Z)
     A = float(A)
@@ -334,7 +345,10 @@ def _bs_joy_luo_crossover_keV(Z, A, J_keV):
 
 @njit(cache=True)
 def _dEds_spliced_compound_scalar(J_arr, k_arr, coeff_arr, E_cross_arr, delta, E_i):
-    """Stopping power with each element on its own side of its own crossover."""
+    """Stopping power with each element on its own side of its own crossover.
+
+    Validation: relativistic-bethe-stopping
+    """
     tau = E_i / _MC2_KEV
     gamma = 1.0 + tau
     beta_sq = 1.0 - 1.0 / (gamma * gamma)
@@ -373,6 +387,8 @@ def _dEds_spliced_packed_scalar(L_Js, L_ks, L_coeffs, L_E_cross, delta, L, n_el,
     Same arithmetic as :func:`_dEds_spliced_compound_scalar`, but indexing the
     ``(n_layers, max_elements)`` rows the per-electron and CUDA cores use. The
     padding is zero-filled and not a valid element, so ``n_el`` bounds the loop.
+
+    Validation: relativistic-bethe-stopping
     """
     tau = E_i / _MC2_KEV
     gamma = 1.0 + tau
@@ -423,6 +439,8 @@ def spliced_stopping_keV_per_ang(composition, E_keV):
     ``composition`` is the ``(element, n_i)`` sequence used everywhere else,
     with ``n_i`` in Angstrom^-3. Plain NumPy, no Numba: these are cold paths and
     should not pay a compile.
+
+    Validation: relativistic-bethe-stopping
     """
     E = np.asarray(E_keV, dtype=float)
     tau = E / _MC2_KEV

@@ -1,4 +1,7 @@
-"""Precomputed energy/depth lookup table for the LUT transport cores."""
+"""Precomputed energy/depth lookup table for the LUT transport cores.
+
+Validation: sbethe-corrected-stopping
+"""
 
 import warnings
 from dataclasses import dataclass
@@ -299,6 +302,8 @@ def build_transport_energy_lut(
     it costs an exponential per table read in the innermost loop on both
     backends, and at the resolution needed anyway the residual error is set by
     model joins, where a log transform buys nothing.
+
+    Validation: relativistic-bethe-stopping
     """
     E_min_keV = float(E_min_keV)
     E_max_keV = float(E_max_keV)

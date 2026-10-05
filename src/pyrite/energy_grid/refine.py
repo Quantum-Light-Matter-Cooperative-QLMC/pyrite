@@ -182,6 +182,8 @@ def continuum_refinement_marks(
     tuple
         ``(marks, summary)``; the summary records located, kept, and dropped
         features so a grid can report what it refined and what it did not.
+
+    Validation: continuum-node-refinement
     """
     from ..montecarlo.spectrum.line_seeds import absorption_edge_brackets
 

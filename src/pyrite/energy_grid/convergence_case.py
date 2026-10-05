@@ -20,6 +20,9 @@ Heavy ladders are remote work, submitted and pulled through the light
 job executes. It checkpoints after every
 rung; a resumed configuration re-runs its fixed-seed transport and refuses to
 continue unless the segment fingerprint is identical to the stored one.
+
+Validation: coherent-line-grid-fringe-spacing
+Validation: line-grid-sinc-convergence
 """
 
 import argparse

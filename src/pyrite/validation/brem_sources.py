@@ -77,6 +77,8 @@ def parse_seltzer_berger(text: str) -> SeltzerBergerTable:
     Header line, then the counts ``nT nK``, the ``nT`` kinetic energies in MeV,
     the ``nK`` reduced photon energies, a ``BREMX.DAT`` marker and, for
     ``Z = 1..100`` in turn, ``nK`` blocks of ``nT`` values of ``chi`` in mb.
+
+    Validation: brem-source-comparison
     """
     lines = text.splitlines()
     n_energy, n_kappa = (int(value) for value in lines[1].split())
@@ -105,7 +107,10 @@ def default_table_path() -> Path:
 
 
 def load_seltzer_berger(path: Path | None = None, *, download: bool = False) -> SeltzerBergerTable:
-    """Load the pinned table, fetching it first when ``download`` is set."""
+    """Load the pinned table, fetching it first when ``download`` is set.
+
+    Validation: brem-source-comparison
+    """
     data = read_pinned(
         default_table_path() if path is None else path,
         SELTZER_BERGER_URL,
@@ -134,7 +139,10 @@ def model_chi(
     cross_section_model: BremsstrahlungModel,
     bremslib_tables: Mapping[str, BremsLibBremsstrahlungTable] | None = None,
 ) -> np.ndarray:
-    """Scaled ``chi`` [mb] from PyRITE's production ``dsigma/dk`` evaluation."""
+    """Scaled ``chi`` [mb] from PyRITE's production ``dsigma/dk`` evaluation.
+
+    Validation: brem-source-comparison
+    """
     kappa = np.maximum(np.asarray(kappa, dtype=float), _KAPPA_FLOOR)
     photon_eV = kappa * incident_energy_MeV * 1e6
     with warnings.catch_warnings():
@@ -179,7 +187,10 @@ def compare_sources(
     bremslib_tables: Mapping[str, BremsLibBremsstrahlungTable] | None = None,
     hard_kappa_cut: float = 0.05,
 ) -> list[SourceComparison]:
-    """Compare each model with the table on its own ``kappa`` nodes."""
+    """Compare each model with the table on its own ``kappa`` nodes.
+
+    Validation: brem-source-comparison
+    """
     energies = tuple(incident_energies_MeV)
     results = []
     for element, atomic_number in elements:

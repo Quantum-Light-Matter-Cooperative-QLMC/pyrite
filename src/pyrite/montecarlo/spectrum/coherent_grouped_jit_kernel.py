@@ -243,6 +243,8 @@ def run_coherent_grouped_intensity_kernel(
     ``sinc_cutoff`` uses the same unscaled-argument window as the flat field
     accumulator so both terms of the decoherence blend have identical support,
     and the same formation mode (``half_dL``, ``apb``, ``bma``, ``q``).
+
+    Validation: coherent-formation-absorption
     """
     nthreads = int(config.reduction_nthreads)
     _validate_threads(nthreads, "reduction_nthreads")

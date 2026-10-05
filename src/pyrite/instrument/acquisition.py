@@ -233,7 +233,10 @@ def score_acquisition(
     coordinates: np.ndarray,
     component: str,
 ) -> AcquisitionBatch:
-    """Score a selected pixel batch into expected or coordinate-stable counts."""
+    """Score a selected pixel batch into expected or coordinate-stable counts.
+
+    Validation: pixel-acquisition-counting
+    """
     if not isinstance(detector, Detector):
         raise TypeError("detector must be a Detector")
     if not isinstance(acquisition, Acquisition):

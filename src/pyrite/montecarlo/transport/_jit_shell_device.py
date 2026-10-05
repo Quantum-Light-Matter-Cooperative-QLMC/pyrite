@@ -12,6 +12,9 @@ host soft sampler's advanced counter (discarded by every caller) is dropped.
 
 Like its siblings, this module imports ``cupy`` at module scope, so it must
 stay out of the package ``__init__``.
+
+Validation: shell-secondary-transport
+Validation: shell-soft-hard-transport
 """
 
 import cupy as xp

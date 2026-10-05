@@ -1,4 +1,7 @@
-"""Per-case transport-layer material resolution: SBETHE, ELSEPA and BremsLib tables, shell keys."""
+"""Per-case transport-layer material resolution: SBETHE, ELSEPA and BremsLib tables, shell keys.
+
+Validation: elsepa-elastic-sampling
+"""
 
 
 def case_shell_materials(case):
@@ -52,7 +55,10 @@ def _case_inelastic_kwargs(case):
 
 
 def _case_stopping_table_records(case):
-    """Resolve identity-matched SBETHE table records for all transport layers."""
+    """Resolve identity-matched SBETHE table records for all transport layers.
+
+    Validation: sbethe-corrected-stopping
+    """
     from ...xsgen.sbethe import resolve_composition_table
 
     layers = case.get("abs_layers")

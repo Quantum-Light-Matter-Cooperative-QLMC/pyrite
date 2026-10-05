@@ -58,7 +58,10 @@ class MaterialShellOscillators:
 
 
 def load_conduction_bands(path: str | Path | None = None) -> dict[str, ConductionBand]:
-    """Read measured conduction-band parameters keyed by catalog key."""
+    """Read measured conduction-band parameters keyed by catalog key.
+
+    Validation: penelope-shell-oscillators
+    """
     source = CONDUCTION_BAND_PATH if path is None else Path(path)
     with source.open("rb") as handle:
         table = tomllib.load(handle)

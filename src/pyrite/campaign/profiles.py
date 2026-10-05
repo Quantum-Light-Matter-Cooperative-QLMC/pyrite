@@ -5,6 +5,8 @@ exact compatibility policy: it leaves catalog grids unchanged and retains the
 production electron counts.  ``survey`` is provisional and intentionally
 smaller.  Every resolved run can be serialized into a deterministic identity,
 so differently resolved variants never silently resume into one dataset.
+
+Validation: inelastic-angular-deflection
 """
 
 import dataclasses
@@ -192,7 +194,10 @@ def _coarsen_grid(values: Any, factor: int, span_fraction: float) -> np.ndarray:
 
 @dataclass(frozen=True)
 class FidelityPreset:
-    """Independent settings and grid-reduction policy for one fidelity preset."""
+    """Independent settings and grid-reduction policy for one fidelity preset.
+
+    Validation: coherent-emission
+    """
 
     name: str
     n_electrons: int

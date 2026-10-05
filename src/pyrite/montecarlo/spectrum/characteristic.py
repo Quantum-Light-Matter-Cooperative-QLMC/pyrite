@@ -1,4 +1,7 @@
-"""Electron-impact characteristic x rays from EEDL, EADL, and xraydb data."""
+"""Electron-impact characteristic x rays from EEDL, EADL, and xraydb data.
+
+Validation: eedl-shell-ionization-comparison
+"""
 
 import re
 import warnings
@@ -497,6 +500,8 @@ def load_characteristic_cross_sections(
     Data provenance, supported ENDF sections, cascade assumptions, and
     validity limits are documented in
     ``docs/physics/radiation-physics/characteristic-radiation.md``.
+
+    Validation: characteristic-radiation
     """
     if not isinstance(element, str) or re.fullmatch(r"[A-Z][a-z]?", element) is None:
         raise ValueError("element must be a chemical symbol such as 'C' or 'Si'")
@@ -733,6 +738,8 @@ def mc_characteristic_spectrum(
         Characteristic density on ``E_grid_eV``.
 
     Validation: characteristic-radiation
+
+    Validation: segment-escape-average
     """
     if isinstance(chunk, bool) or int(chunk) <= 0:
         raise ValueError("chunk must be a positive integer")

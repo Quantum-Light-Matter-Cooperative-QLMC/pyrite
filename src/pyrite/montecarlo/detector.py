@@ -4,6 +4,8 @@ montecarlo.detector
 Detector forward model (Zhai SI S3/S4): soft-X-ray window efficiency, the EDS /
 aperture / mosaic line-broadening widths, the representative mosaic geometry
 angle, and the Gaussian detector convolution.
+
+Validation: surface-hkl-orientation
 """
 
 import numpy as np

@@ -256,3 +256,96 @@ def test_checked_in_views_are_current() -> None:
 
     ledger = Path(__file__).parents[2] / "docs/validation/physics-validation-ledger.md"
     assert write_or_check(ledger, check=True)
+
+
+@pytest.mark.parametrize("status", ["blocked", "unknown"])
+def test_parser_rejects_status_outside_methodology(status: str) -> None:
+    with pytest.raises(ValueError, match=f"invalid status {status}"):
+        parse_ledger(
+            _part("Domain", "claim").replace("- **Status:** filtered", f"- **Status:** {status}")
+        )
+
+
+def test_status_vocabulary_matches_methodology() -> None:
+    import re
+
+    from pyrite.devtools.validation_ledger import STATUS_ORDER
+
+    root = Path(__file__).parents[2]
+    methodology = (root / "docs/validation/methodology.md").read_text(encoding="utf-8")
+    statuses = set(re.findall(r"^\| `([a-z-]+)`\s*\|", methodology, re.MULTILINE))
+    assert set(STATUS_ORDER) == statuses
+
+
+def test_python_anchors_preserve_owners_and_measurement_scope() -> None:
+    from pyrite.devtools.validation_ledger import python_anchors
+
+    assert python_anchors("`module.py::{one,Two.method}`, `::three`; `pkg/{a.py,b.py}`") == (
+        ("module.py", "one"),
+        ("module.py", "Two.method"),
+        ("module.py", "three"),
+        ("pkg/a.py", ""),
+        ("pkg/b.py", ""),
+    )
+    assert python_anchors(
+        "measurement only — no production code; `checks/measure.py` against `module.py::one`"
+    ) == (("checks/measure.py", ""),)
+    for code in (
+        "`data/catalog/crystals/a.toml::B_ang2`",
+        "proposed only; no production estimator",
+        "`docs/research/physics/transition-radiation-recommendations.md` (research claim; no production implementation)",
+    ):
+        assert python_anchors(code) == ()
+
+
+def test_marker_coverage_requires_named_definition_not_neighbour(tmp_path: Path) -> None:
+    from pyrite.devtools.validation_ledger import marker_coverage_errors
+
+    source = tmp_path / "module.py"
+    source.write_text(
+        '"""Validation: claim"""\n'
+        'def neighbour():\n    """Validation: claim"""\n'
+        'def owner():\n    """No marker."""\n',
+        encoding="utf-8",
+    )
+    entries = parse_ledger(
+        _part("Domain", "claim").replace("- **Code:** code", "- **Code:** `module.py::owner`")
+    )
+    assert marker_coverage_errors(entries, tmp_path) == (
+        "claim: missing marker on module.py::owner",
+    )
+    source.write_text(
+        source.read_text().replace("No marker.", "Validation: other,\n    claim"), encoding="utf-8"
+    )
+    assert marker_coverage_errors(entries, tmp_path) == ()
+    source.write_text(source.read_text().replace("def owner", "def renamed"), encoding="utf-8")
+    assert marker_coverage_errors(entries, tmp_path) == (
+        "claim: missing definition module.py::owner",
+    )
+    source.unlink()
+    assert marker_coverage_errors(entries, tmp_path) == ("claim: missing file module.py::owner",)
+
+
+def test_marker_coverage_supports_class_fields_and_conditional_definitions(tmp_path: Path) -> None:
+    from pyrite.devtools.validation_ledger import marker_coverage_errors
+
+    (tmp_path / "module.py").write_text(
+        'class Owner:\n    """Validation: claim"""\n    field: float\n'
+        'if True:\n    def conditional():\n        """Validation: claim"""\n',
+        encoding="utf-8",
+    )
+    entries = parse_ledger(
+        _part("Domain", "claim").replace(
+            "- **Code:** code", "- **Code:** `module.py::Owner.field`, `::conditional`"
+        )
+    )
+    assert marker_coverage_errors(entries, tmp_path) == ()
+
+
+def test_ledger_python_owners_have_matching_markers() -> None:
+    from pyrite.devtools.validation_ledger import marker_coverage_errors, parse_ledger_parts
+
+    root = Path(__file__).parents[2]
+    entries = parse_ledger_parts(root / "docs/validation/physics-validation-ledger.md")
+    errors = marker_coverage_errors(entries, root)
+    assert not errors, "\n".join(errors)

@@ -7,6 +7,8 @@ parameters are unchanged. Straggling samples the shared Urban device sampler
 from the exact packed element tables, as the CPU LUT core does; shell soft/hard
 inelastic mode is not ported (it fails closed in ``simulate_trajectories``). See
 ``docs/repo-design/compute/gpu-transport-rawkernel.md``.
+
+Validation: energy-loss-straggling
 """
 
 import cupy as xp

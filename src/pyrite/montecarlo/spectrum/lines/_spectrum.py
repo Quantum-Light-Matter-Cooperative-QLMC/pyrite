@@ -164,6 +164,11 @@ def mc_spectrum(
     Validation: coherent-emission, coherent-line-spectrum,
     coherent-segment-midpoint-time, finite-footprint-longitudinal-decoherence,
     transverse-bunch-form-factor
+
+    Validation: coherent-inter-electron-decoherence
+    Validation: coherent-line-hkl-batch
+    Validation: line-hkl-batch
+    Validation: substep-radiation-invariance
     """
     request = SpectrumRequest(
         segments=segments,

@@ -94,7 +94,10 @@ def _screening_radius(Z: int) -> float:
 
 
 def _coulomb_correction(Z: int) -> float:
-    """Davies--Bethe--Maximon ``f_C(Z)``, PENELOPE-2024 Eq. 2.80."""
+    """Davies--Bethe--Maximon ``f_C(Z)``, PENELOPE-2024 Eq. 2.80.
+
+    Validation: pair-production-sampling
+    """
     a2 = (_ALPHA * Z) ** 2
     series = (
         0.202059
@@ -109,7 +112,10 @@ def _coulomb_correction(Z: int) -> float:
 
 
 def _low_energy_correction(kappa: float, Z: int) -> float:
-    """Empirical ``F_0(kappa, Z)``, PENELOPE-2024 Eq. 2.88."""
+    """Empirical ``F_0(kappa, Z)``, PENELOPE-2024 Eq. 2.88.
+
+    Validation: pair-production-sampling
+    """
     a = _ALPHA * Z
     x = 2.0 / kappa
     return (
@@ -121,7 +127,10 @@ def _low_energy_correction(kappa: float, Z: int) -> float:
 
 
 def _phi(eps, kappa: float, Z: int):
-    """``phi_1, phi_2`` of Eqs. 2.86--2.87, clipped at zero as in PENELOPE."""
+    """``phi_1, phi_2`` of Eqs. 2.86--2.87, clipped at zero as in PENELOPE.
+
+    Validation: pair-production-sampling
+    """
     radius = _screening_radius(Z)
     eps = np.asarray(eps, dtype=float)
     b = radius / (2.0 * kappa * eps * (1.0 - eps))

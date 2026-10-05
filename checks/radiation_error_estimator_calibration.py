@@ -15,6 +15,8 @@ move materially? Numbers from this script are recorded in
 chosen defaults live in ``montecarlo/spectrum/diagnostics.py``.
 
 Run:  uv run python checks/radiation_error_estimator_calibration.py
+
+Validation: radiation-error-estimators
 """
 
 import numpy as np

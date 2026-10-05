@@ -7,6 +7,10 @@ signatures can track their CPU reference cores positionally.
 Like its siblings, this module imports ``cupy`` at module scope, so it must
 stay out of the package ``__init__``; ``api.py`` and ``batching.py`` reach it
 only through deferred, function-local imports.
+
+Validation: sbethe-corrected-stopping
+Validation: shell-secondary-transport
+Validation: shell-soft-hard-transport
 """
 
 from dataclasses import dataclass
@@ -221,6 +225,8 @@ def run_transport_kernel(
     tuple the CPU radiative cores unpack, ``packed`` being
     :func:`.hard_radiative.pack_radiative_layer_tables`; its two photon row
     columns follow any hard-inelastic ones in ``segments``.
+
+    Validation: gpu-transport-core
     """
     (e_start, e_count, cap, stream_key) = run
     (max_steps, _max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control

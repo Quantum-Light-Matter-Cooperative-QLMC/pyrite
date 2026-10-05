@@ -296,6 +296,8 @@ def resolve_transport_core(requested, Ne, groove=None):
     process, which is how a run pins the historical CPU core (``=lockstep``)
     without touching call sites -- reproducing a pre-existing result, or
     bisecting a device/host difference.
+
+    Validation: gpu-transport-core
     """
 
     pinned = env_value("PYRITE_MC_TRANSPORT_CORE", "").strip().lower()

@@ -200,6 +200,8 @@ def _batched_reflection_tables(st):
     Returns the 14-tuple the caller unpacks. The cache key is an explicit
     tuple rather than a hash of the request: it keys on the identity of the
     energy grid, which no value hash reproduces.
+
+    Validation: line-reflection-coupling-tables
     """
     # NVTX sub-ranges are a no-op off the profiled GPU path. Lazy import:
     # runner imports this module, so a top-level import would be circular.
@@ -508,6 +510,8 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
     The same expression tree the per-hkl coherent path evaluates, on the
     ``(n_block, N_g)`` grid. Every operation is elementwise, so this step
     introduces no reduction of its own.
+
+    Validation: coherent-formation-absorption
     """
     seg_elec_id = st.seg_elec_id
     seg_r_geom = st.seg_r_geom
@@ -635,6 +639,8 @@ def _batched_incoherent_block(st, bt, blk, line_batch):
     ``line_batch`` queues the lines for the fused CUDA reduction kernel when
     that path is active; otherwise the CPU/compatibility sinc matmul runs
     here. Returns early when the block has no surviving line.
+
+    Validation: segment-escape-average
     """
     # NVTX sub-ranges are a no-op off the profiled GPU path. Lazy import:
     # runner imports this module, so a top-level import would be circular.

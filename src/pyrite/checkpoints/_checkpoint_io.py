@@ -156,6 +156,8 @@ def load(path: str) -> Any:
     Result records always come back in the separate emission-component
     contract. Containers written before it (no :data:`COMPONENTS_ATTR`) are
     converted by :func:`pyrite._spectral_components.separate_legacy`.
+
+    Validation: characteristic-radiation
     """
     obj, separate = _load_raw(path)
     return obj if separate else separate_legacy(obj)

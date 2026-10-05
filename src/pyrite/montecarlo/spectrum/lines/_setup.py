@@ -4,6 +4,8 @@
 :func:`_prepare_spectrum` turns it into the ``_SpectrumSetup`` every
 accumulation route consumes -- staged segment arrays, tabulation grids,
 observation geometry, and the route-independent scalars.
+
+Validation: line-tabulation-nan-ceiling
 """
 
 from dataclasses import dataclass
@@ -179,6 +181,9 @@ def _prepare_spectrum(request):
     population terms.
 
     Returns the :class:`_SpectrumSetup` the accumulation phases consume.
+
+    Validation: coherent-formation-absorption
+    Validation: sinc-bin-integration
     """
     segments = request.segments
     E_grid_eV = request.E_grid_eV

@@ -73,6 +73,8 @@ def nearest_neighbour_distance_ang(lattice, basis) -> float:
     cells. That is exact whenever the nearest-neighbour distance is at most
     twice the smallest lattice-plane spacing, which holds with at least a
     threefold margin for every elementary catalog crystal it is applied to.
+
+    Validation: elsepa-muffin-tin-inputs
     """
     a1, a2, a3 = _direct_lattice_vectors(lattice)
     cell = np.vstack([a1, a2, a3])
@@ -150,6 +152,8 @@ def elemental_solid_for_composition(
     a layer is identified by what it contains rather than by what a caller
     named it, and diamond and graphite stay distinct. Compounds, and
     one-element layers matching no catalog crystal, return ``None``.
+
+    Validation: elsepa-muffin-tin-inputs
     """
     if len(composition) != 1:
         return None
@@ -228,6 +232,8 @@ def resolve_layer_tables(
     Only a layer matching an elementary catalog crystal
     (:func:`elemental_solid_for_composition`) uses a muffin-tin table.
     Returned entries follow ``composition`` order.
+
+    Validation: elsepa-muffin-tin-inputs
     """
     solid = elemental_solid_for_composition(composition)
     out = []

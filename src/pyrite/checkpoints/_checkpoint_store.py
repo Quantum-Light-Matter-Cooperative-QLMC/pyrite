@@ -4,6 +4,8 @@ Active checkpoints live at ``<root>/<stem>/{line,brem,characteristic}.h5``. Call
 using the historical merged ``{name: {E0: record}}`` in-memory shape; this
 module splits records on write and merges them on read.  A legacy
 ``<root>/<stem>.pkl`` remains readable, so migration happens on the next save.
+
+Validation: characteristic-radiation
 """
 
 import copy

@@ -75,7 +75,10 @@ class BoteSalvatElement:
     a: np.ndarray
 
     def cross_section_cm2(self, shell: str, energy_eV: float, edge_eV: float | None = None):
-        """Ionization cross section of ``shell`` at ``energy_eV`` [cm²]."""
+        """Ionization cross section of ``shell`` at ``energy_eV`` [cm²].
+
+        Validation: eedl-shell-ionization-comparison
+        """
         index = BOTE_SALVAT_SHELLS.index(shell)
         edge = float(self.edge_eV[index]) if edge_eV is None else edge_eV
         overvoltage = energy_eV / edge
@@ -117,6 +120,8 @@ def parse_bote_salvat(text: str) -> dict[int, BoteSalvatElement]:
     Each ``BoteSalvatElementDatum(z, Be, Anlj, G, edge, A)`` holds comma
     vectors ``Be``, ``Anlj`` and ``edge`` (one value per shell) and
     semicolon-separated matrices ``G`` (four columns) and ``A`` (five).
+
+    Validation: eedl-shell-ionization-comparison
     """
     start = text.index("const BoteSalvatElectron")
     body = text[start : text.index('"""', start)]
@@ -200,6 +205,8 @@ def compare_shells(
     interpolated lin-lin as in production; ``native_node_ratio`` repeats the
     EEDL-edge comparison at EEDL's own nodes with ``1 < U <= max(overvoltages)``,
     separating tabulation from interpolation.
+
+    Validation: eedl-shell-ionization-comparison
     """
     bote = parameters[atomic_number]
     tables = {
@@ -302,6 +309,8 @@ def compare_production(
     Thick-target ratios integrate each production cross section over
     ``dE/S(E)`` from threshold to the beam energy (continuous slowing down,
     approximate Bethe stopping, no backscatter or absorption).
+
+    Validation: eedl-shell-ionization-comparison
     """
     bote = parameters[atomic_number]
     table = load_characteristic_cross_sections(element)

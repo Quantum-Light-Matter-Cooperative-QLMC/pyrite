@@ -211,13 +211,19 @@ if hasattr(xp, "fuse"):
 
 def _matvec3(m, v):
     """``m @ v`` for ``m.shape == (N, 3)`` and ``v.shape == (3,)`` without a
-    cuBLAS GEMV -- see _dot3_core."""
+    cuBLAS GEMV -- see _dot3_core.
+
+    Validation: line-gemv-elementwise
+    """
     return _dot3_core(m[:, 0], m[:, 1], m[:, 2], v[0], v[1], v[2])
 
 
 def _rowdot3(a, b):
     """``einsum('ij,ij->i', a, b)`` for ``(N, 3)`` operands without cuBLAS -- see
-    _dot3_core."""
+    _dot3_core.
+
+    Validation: line-gemv-elementwise
+    """
     return _dot3_core(a[:, 0], a[:, 1], a[:, 2], b[:, 0], b[:, 1], b[:, 2])
 
 
@@ -389,6 +395,8 @@ def _line_table_nan_onsets(crystal_info, composition, use_henke):
     Returns one onset per table, ``inf`` for a table that never turns NaN.
 
     Validation: line-tabulation-nan-ceiling
+
+    Validation: line-grid-emission-ceiling
     """
     from ....materials.atomic import _chantler_bounds
     from ....materials.crystal import _EDGE_PRONE
@@ -526,6 +534,8 @@ def _interp_gather_line_tables(
     ``idx`` and friends are ``(n_seg, N_g)``; the coupling tables hold one row
     per reflection, and ``table_row[g]`` names the row column ``g`` reads
     (default: row ``g``, one column per table row).
+
+    Validation: line-reflection-coupling-tables
     """
     n_g = idx.shape[-1]
     if table_row is None:
@@ -703,6 +713,8 @@ def _spliced_stopping_magnitude_xp(E_eval, layer_index, layer_compositions):
     ``transport.spliced_stopping_keV_per_ang``: the rows here may live on
     the GPU, so it cannot delegate to the host helper. It must stay in step
     with it -- ``test_stopping_mirrors_agree`` pins the two together.
+
+    Validation: relativistic-bethe-stopping
     """
     tau = E_eval / REAL(_MC2_KEV)
     gamma = REAL(1.0) + tau

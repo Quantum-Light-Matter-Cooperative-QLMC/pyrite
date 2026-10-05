@@ -20,6 +20,8 @@ the strongest line inside each binade rather than at a literal 10 or 20 keV,
 where a case may carry no line at all.
 
 A measurement instrument only: no kernel, default, or floor changes here.
+
+Validation: line-grid-sinc-convergence
 """
 
 import argparse

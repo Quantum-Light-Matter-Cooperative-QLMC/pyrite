@@ -85,6 +85,8 @@ def load_bremsstrahlung_tables(
         For an unknown element symbol.
     TableNotFoundError
         If a released element's table has not been fetched.
+
+    Validation: bremslib-angular-model
     """
     tables: dict[str, BremsLibBremsstrahlungTable] = {}
     for element in dict.fromkeys(elements):

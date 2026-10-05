@@ -27,7 +27,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Claim:** Si charge model, diffusion, ~1.9 keV counting threshold
 - **Code:** `detectors/timepix_response.py::TimepixResponse`
 - **Source:** Henke `f₂` convention, Chantler/FFAST tabulation via xraydb (Si)
-- **Status:** blocked
+- **Status:** unverified
 - **Checks:** native measured-bin batch application matches one-spectrum application; output bins are explicit and nonnegative; detected event mass cannot exceed incident event mass in the focused regression
 - **Anchor:** `tests/instrument/test_acquisition_core.py`
 - **Notes:** **hardware params are placeholders** — can't sign off until real quad values land. The native-bin checks cover operator bookkeeping only, not hardware accuracy.

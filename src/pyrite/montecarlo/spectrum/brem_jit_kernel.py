@@ -699,6 +699,8 @@ def run_eedl_brem_reduction_kernel(
     evaluate the retained Bethe--Heitler expression from the supplied fallback
     prefactor. All arrays must be contiguous float32 CuPy arrays except
     ``lower_panel``, which is uint32.
+
+    Validation: brem-spectrum
     """
     nthreads = int(config.nthreads)
     if nthreads not in (32, 64, 128, 256, 512, 1024):
