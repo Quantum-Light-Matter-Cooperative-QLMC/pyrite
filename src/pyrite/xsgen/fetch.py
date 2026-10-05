@@ -58,6 +58,8 @@ SBETHE_ARCHIVE_URL = (
 SBETHE_ARCHIVE_SHA256 = "d5d4879c2073ada3bd799fe0727054549cd6ec65cc699acbd0ff25fd5c3c4144"
 SBETHE_DEPOSIT = "10.17632/7zw25f428t.2"
 _CHUNK = 1 << 20
+#: Downloads of one pinned URL before a digest mismatch is reported.
+_DOWNLOAD_ATTEMPTS = 3
 #: Environment variables read for a GitHub token, in order; ``gh auth token``
 #: is the last resort.
 GITHUB_TOKEN_ENV = ("PYRITE_GITHUB_TOKEN", "GITHUB_TOKEN")
@@ -238,16 +240,23 @@ def _obtain(
     path = work / "archive.zip"
     failures = []
     for url in urls:
-        try:
-            actual = _download(url, path, label)
-        except DataFetchError as exc:
-            failures.append(str(exc))
-            continue
-        if actual == expected:
-            return path
-        failures.append(
-            f"{label} archive SHA-256 mismatch: expected {expected}, received {actual} from {url}"
-        )
+        for _attempt in range(_DOWNLOAD_ATTEMPTS):
+            try:
+                actual = _download(url, path, label)
+            except DataFetchError as exc:
+                failures.append(str(exc))
+                break
+            if actual == expected:
+                return path
+            # A CDN can serve a truncated or interstitial body once and the pinned
+            # bytes on the next request (#333); the digest is still enforced, so
+            # retrying never weakens the pin.
+            message = (
+                f"{label} archive SHA-256 mismatch: expected {expected}, "
+                f"received {actual} from {url}"
+            )
+        else:
+            failures.append(message)
     if len(failures) == 1:
         raise DataFetchError(f"{failures[0]}; nothing was installed")
     raise DataFetchError(

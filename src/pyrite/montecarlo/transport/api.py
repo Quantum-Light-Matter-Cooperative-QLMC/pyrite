@@ -8,8 +8,8 @@ import logging
 import numpy as np
 
 from ..._numerics import DEFAULT_RADIATIVE_CUTOFF_EV
-from ...materials.attenuation import _normalize_composition
 from ..geometry import beam_frame_basis, validate_transverse_dimensions
+from .arguments import resolve_cutoffs_by_electron, resolve_layers_and_elastic
 from .batching import (
     DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     _flight_diagnostic_summary,
@@ -465,27 +465,16 @@ def simulate_trajectories(
     max_segments = Ne * max_steps
     max_vac = Ne * max_steps
 
-    # Build the layer stack: explicit `layers` (film-on-substrate) overrides;
-    # else a single layer spanning the slab (bit-for-bit the old transport).
-    if layers is None:
-        layers = [
-            (
-                0.0,
-                float(thickness_ang),
-                _normalize_composition(element, n_atoms_per_ang3, composition),
-            )
-        ]
-
-    if elastic_model not in ("mott", "sr", "elsepa"):
-        raise ValueError("elastic_model must be 'mott', 'sr', or 'elsepa'")
-    if elastic_model != "elsepa" and elastic_tables is not None:
-        raise ValueError("elastic_tables is only valid with elastic_model='elsepa'")
-    if elastic_model == "elsepa" and elastic_tables is None:
-        from ...xsgen.elsepa.catalog import resolve_stack_tables
-
-        elastic_tables = resolve_stack_tables(layers)
-    if energy_model not in ("frozen", "midpoint"):
-        raise ValueError("energy_model must be 'frozen' or 'midpoint'")
+    layers, elastic_tables = resolve_layers_and_elastic(
+        layers,
+        thickness_ang=thickness_ang,
+        element=element,
+        n_atoms_per_ang3=n_atoms_per_ang3,
+        composition=composition,
+        elastic_model=elastic_model,
+        elastic_tables=elastic_tables,
+        energy_model=energy_model,
+    )
     shell_mode = validate_inelastic_args(
         inelastic_model,
         inelastic_cutoff_eV,
@@ -524,18 +513,7 @@ def simulate_trajectories(
     if max_dE_frac > 0.0 and energy_model != "midpoint":
         raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
 
-    if E_cut_by_electrons is None:
-        E_cut_by_electrons = np.full(Ne, float(E_cut_keV), dtype=np.float64)
-    else:
-        E_cut_by_electrons = np.asarray(E_cut_by_electrons, dtype=np.float64)
-
-        if E_cut_by_electrons.shape != (Ne,):
-            raise ValueError(
-                f"E_cut_by_electrons must have shape ({Ne},), got {E_cut_by_electrons.shape}"
-            )
-
-    if not np.all(np.isfinite(E_cut_by_electrons)) or not np.all(E_cut_by_electrons > 0.0):
-        raise ValueError("electron cutoff energies must be finite and strictly positive")
+    E_cut_by_electrons = resolve_cutoffs_by_electron(E_cut_by_electrons, E_cut_keV, Ne)
 
     # NVTX ranges split the host transport phase in a GPU capture; no-op off
     # the profiled path. Lazy import: runner imports this module.
