@@ -632,3 +632,159 @@ def test_run_reports_artifact_conflicts_without_a_traceback(monkeypatch):
     assert result.exit_code == 1
     assert "already exist" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+# ---- schema 2: typed case and spectrum-phase replay (#186) ------------------
+
+
+def _production_case(kind, tmp_path, monkeypatch):
+    """Small production-built typed case of one spectrum-input family."""
+    from dataclasses import replace
+
+    from pyrite import _line_grid_policy
+    from pyrite.campaign.config import material_sweep
+    from pyrite.campaign.geometry import Stack
+    from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+    from pyrite.detectors import Detector, EnergyBins
+
+    bins = Detector(
+        energy_bins=EnergyBins(
+            line=np.arange(100.0, 3500.0, 20.0), brem=np.arange(100.0, 30000.0, 500.0)
+        )
+    )
+    if kind == "flat":
+        sweep = Sweep(
+            material="hopg", thickness_ang=1e4, beam=BeamSpec(energy_keV=30.0), tilt_deg=30.0
+        )
+        sweep = replace(sweep, detector=bins)
+    elif kind == "grooved":
+        sweep = Sweep(
+            material="hopg",
+            tilt_deg=45.0,
+            tilt_azim_deg=180.0,
+            groove_spacing_ang=2.0e4,
+            thickness_ang=2.0e4,
+            beam=BeamSpec(energy_keV=30.0),
+            crystal_width_mm=None,
+            crystal_height_mm=None,
+            detector=bins,
+        )
+    elif kind == "multilayer":
+        sweep = Sweep(
+            material="mose2",
+            beam=BeamSpec(energy_keV=30.0),
+            target=Stack.on_substrate("mose2", 300.0, "silicon", 3000.0, tilt_deg=-30.0),
+            detector=bins,
+        )
+    else:  # an uncovered energy resolves its line grid from the trajectories
+        monkeypatch.setattr(_line_grid_policy, "cache_dir", lambda: tmp_path / "grid-cache")
+        sweep = material_sweep("hopg")
+        sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=77.0))
+    case = build_cases(sweep, n_electrons=24, n_electrons_brem=12)[0]
+    assert (kind == "auto-line-grid") == ("line_grid_policy" in case)
+    return case
+
+
+def _assert_same_output(actual, expected):
+    assert set(actual) == set(expected)
+    for key, value in expected.items():
+        if key.startswith("_"):
+            continue
+        if isinstance(value, np.ndarray):
+            np.testing.assert_array_equal(actual[key], value, err_msg=key)
+            assert actual[key].dtype == value.dtype, key
+        else:
+            assert actual[key] == value, key
+
+
+def test_typed_case_round_trips_exactly(tmp_path, monkeypatch):
+    from pyrite.montecarlo.case import Case
+
+    case = _production_case("multilayer", tmp_path, monkeypatch)
+    segs = simulate_trajectories(20.0, 2, 2000.0, seed=0, **_SI)
+
+    artifact = read_trajectory_artifact(
+        write_trajectory_artifact(tmp_path / "c.h5", segs, case=case)
+    )
+
+    assert type(artifact.case) is Case
+    assert artifact.case == case
+    _assert_same_tree(artifact.case.to_dict(), case.to_dict(), "case")
+    assert artifact.attrs["case_sha256"] == traj.case_digest(artifact.case)
+
+
+def test_mapping_case_keeps_tuples_numpy_scalars_and_paths(tmp_path):
+    case = {**_case(), "theta_obs_rad": np.float64(1.5), "brem_file": Path("b.npz")}
+    segs = simulate_trajectories(20.0, 2, 2000.0, seed=0, **_SI)
+
+    artifact = read_trajectory_artifact(
+        write_trajectory_artifact(tmp_path / "m.h5", segs, case=case)
+    )
+
+    _assert_same_tree(artifact.case, case, "case")
+
+
+@pytest.mark.parametrize("kind", ["flat", "grooved", "multilayer", "auto-line-grid"])
+def test_spectrum_from_artifact_is_the_live_spectrum(tmp_path, monkeypatch, kind):
+    case = _production_case(kind, tmp_path, monkeypatch)
+    capture = TrajectoryCapture(root=str(tmp_path / "traj"))
+
+    live = runner.run_case(case, transport_core="lockstep", trajectory_capture=capture)
+    artifact = read_trajectory_artifact(capture.path_for(case))
+    replayed = runner.spectrum_from_artifact(artifact)
+
+    _assert_same_output(replayed, live)
+    if kind == "auto-line-grid":
+        assert "line_grid_resolved" in replayed
+
+
+def _captured(tmp_path):
+    case = _case()
+    capture = TrajectoryCapture(root=str(tmp_path))
+    runner.run_case(case, trajectory_capture=capture)
+    return case, capture.path_for(case)
+
+
+def test_schema_1_artifacts_stay_readable_but_cannot_feed_spectra(tmp_path):
+    case, path = _captured(tmp_path)
+    with h5py.File(path, "r+") as handle:  # downgrade to the schema-1 layout
+        handle.attrs["schema_version"] = 1
+        del handle["case/payload"], handle["spectrum_inputs"]
+
+    artifact = read_trajectory_artifact(path)
+
+    assert artifact.schema_version == 1 and artifact.spectrum_inputs is None
+    assert artifact.case["E_grid"] == list(case["E_grid"])  # JSON: tuples became lists
+    with pytest.raises(TrajectoryArtifactError, match="predates spectrum-phase inputs"):
+        runner.spectrum_from_artifact(artifact)
+
+
+def test_artifact_without_spectrum_inputs_is_refused(tmp_path):
+    segs = simulate_trajectories(20.0, 2, 2000.0, seed=0, **_SI)
+    artifact = read_trajectory_artifact(
+        write_trajectory_artifact(tmp_path / "a.h5", segs, case=_case())
+    )
+
+    with pytest.raises(TrajectoryArtifactError, match="no spectrum-phase inputs"):
+        runner.spectrum_from_artifact(artifact)
+
+
+def test_mismatched_case_is_refused(tmp_path):
+    case, path = _captured(tmp_path)
+    artifact = read_trajectory_artifact(path)
+
+    with pytest.raises(TrajectoryArtifactError, match="different case"):
+        runner.spectrum_from_artifact(artifact, {**case, "seed": case["seed"] + 1})
+
+
+@pytest.mark.parametrize(
+    "node", ["spectrum_inputs/n_hat", "spectrum_inputs/E_grid", "spectrum_inputs/Ne_brem"]
+)
+def test_inputs_that_disagree_with_their_case_are_refused(tmp_path, node):
+    _case_, path = _captured(tmp_path)
+    with h5py.File(path, "r+") as handle:
+        dataset = handle[node]
+        dataset[...] = dataset[()] + 1
+
+    with pytest.raises(TrajectoryArtifactError, match="disagrees with its case"):
+        runner.spectrum_from_artifact(read_trajectory_artifact(path))

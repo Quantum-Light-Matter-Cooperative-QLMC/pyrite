@@ -8,17 +8,27 @@ consumed, and the mapping is never mutated, so spectra are identical with and
 without capture. Capture is off unless a caller passes a
 :class:`TrajectoryCapture`; ordinary runs never import :mod:`h5py` here.
 
-Layout (``schema_version`` 1)::
+Layout (``schema_version`` 2)::
 
     /                   attrs: format, schema_version, complete, created_utc,
                                pyrite_version, case_name, E0_keV, seed,
                                case_sha256, parameter_sha256, fields (JSON),
                                segment_count
-    /case               attrs: json -- the resolved case mapping
+    /case               attrs: json -- the resolved case mapping (readable)
+                               case_type -- "Case" or "mapping"
+    /case/payload       the same case as a typed node tree (exact round trip)
     /provenance         attrs: json -- run-level identity (stem, profile, ...)
     /settings           attrs: json -- resolved transport controls
                         E_cut_by_electrons  (Ne_transport,) keV
+    /spectrum_inputs    optional typed tree: every non-segment input the
+                        spectrum phase reads (resolved line grid, continuum
+                        grid, ``n_hat``, electron counts, groove, grid record)
     /transport/<field>  one node per returned key, insertion order kept
+
+Schema 1 stored the case only as JSON (tuples became lists, NumPy scalars
+Python numbers) and had no ``/spectrum_inputs``; it stays readable, but only a
+schema-2 artifact with ``/spectrum_inputs`` can feed the spectrum phase (see
+:func:`artifact_spectrum_inputs`).
 
 Each ``/transport`` node carries a ``pyrite_kind`` attribute so readback
 restores the original Python structure: ``array`` datasets keep dtype, shape,
@@ -51,7 +61,9 @@ import numpy as np
 from .._backend import _to_cpu, is_device_array
 
 FORMAT = "pyrite.transport-trajectories"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+# First schema whose artifacts are sufficient spectrum-phase inputs (#186).
+SPECTRUM_SCHEMA_VERSION = 2
 PARTIAL_SUFFIX = ".partial"
 
 # Device arrays are downloaded in bounded row blocks rather than as one host
@@ -184,6 +196,7 @@ class TrajectoryCapture:
         case: Mapping[str, Any],
         transport: Mapping[str, Any],
         settings: Mapping[str, Any] | None = None,
+        spectrum_inputs: Mapping[str, Any] | None = None,
     ) -> Path:
         """Write ``case``'s transport result atomically; return its path."""
         return write_trajectory_artifact(
@@ -193,6 +206,7 @@ class TrajectoryCapture:
             settings=settings,
             provenance=self.provenance,
             overwrite=self.overwrite,
+            spectrum_inputs=spectrum_inputs,
         )
 
 
@@ -252,6 +266,12 @@ def _write_node(group, name: str, value: Any, links: dict[int, str], units: str 
         dataset = group.create_dataset(name, data=np.zeros(0, dtype=np.uint8))
         dataset.attrs["pyrite_kind"] = "none"
         return
+    if _is_groove_spec(value):
+        sub = group.create_group(name, track_order=True)
+        sub.attrs["pyrite_kind"] = "groove_spec"
+        for key in ("spacing_ang", "depth_ang", "tilt_polar_rad"):
+            _write_node(sub, key, getattr(value, key), links, None)
+        return
     if isinstance(value, np.generic):
         dataset = group.create_dataset(name, data=value)
         dataset.attrs["pyrite_kind"] = "numpy_scalar"
@@ -267,12 +287,31 @@ def _write_node(group, name: str, value: Any, links: dict[int, str], units: str 
     elif isinstance(value, str):
         dataset = group.create_dataset(name, data=value)
         dataset.attrs["pyrite_kind"] = "str"
+    elif isinstance(value, os.PathLike):
+        dataset = group.create_dataset(name, data=os.fspath(value))
+        dataset.attrs["pyrite_kind"] = "path"
     else:
         raise TypeError(
             f"trajectory field {group.name}/{name} has unsupported type {type(value).__name__}"
         )
     if units is not None:
         dataset.attrs["units"] = units
+
+
+def _is_groove_spec(value: Any) -> bool:
+    # Imported lazily: the groove module pulls in Numba, which plain artifact
+    # readers (VTP export) never need.
+    if type(value).__name__ != "GrooveSpec":
+        return False
+    from .groove import GrooveSpec
+
+    return isinstance(value, GrooveSpec)
+
+
+def _case_type(case: Mapping[str, Any]) -> str:
+    from .case import Case
+
+    return "Case" if isinstance(case, Case) else "mapping"
 
 
 def _segment_count(transport: Mapping[str, Any]) -> int:
@@ -288,6 +327,7 @@ def write_trajectory_artifact(
     settings: Mapping[str, Any] | None = None,
     provenance: Mapping[str, Any] | None = None,
     overwrite: bool = False,
+    spectrum_inputs: Mapping[str, Any] | None = None,
 ) -> Path:
     """Write one complete transport result to ``path`` atomically.
 
@@ -308,6 +348,10 @@ def write_trajectory_artifact(
         JSON-safe run-level identity.
     overwrite
         Replace an existing complete artifact at ``path``.
+    spectrum_inputs
+        Every non-segment input the spectrum phase reads, as the runner built
+        it after resolving the line grid. Without it the artifact is still a
+        complete transport record but cannot feed the spectrum phase.
 
     Returns
     -------
@@ -343,13 +387,18 @@ def write_trajectory_artifact(
             handle.attrs["case_sha256"] = case_digest(case)
             handle.attrs["fields"] = json.dumps(list(transport))
             handle.attrs["segment_count"] = _segment_count(transport)
-            handle.create_group("case").attrs["json"] = _dumps(case)
+            case_group = handle.create_group("case")
+            case_group.attrs["json"] = _dumps(case)
+            case_group.attrs["case_type"] = _case_type(case)
+            _write_node(case_group, "payload", dict(case), {}, None)
             handle.create_group("provenance").attrs["json"] = _dumps(provenance or {})
             handle.attrs["parameter_sha256"] = str((provenance or {}).get("parameter_sha256", ""))
             settings_group = handle.create_group("settings")
             settings_group.attrs["json"] = _dumps(settings)
             if cutoffs is not None:
                 _write_array(settings_group, "E_cut_by_electrons", np.asarray(cutoffs), "keV")
+            if spectrum_inputs is not None:
+                _write_node(handle, "spectrum_inputs", dict(spectrum_inputs), {}, None)
             group = handle.create_group("transport", track_order=True)
             group.attrs["pyrite_kind"] = "dict"
             links: dict[int, str] = {}
@@ -372,6 +421,10 @@ def _read_node(node) -> Any:
         return tuple(items) if kind == "tuple" else items
     if kind == "none":
         return None
+    if kind == "groove_spec":
+        from .groove import GrooveSpec
+
+        return GrooveSpec(**{key: _read_node(node[key]) for key in node})
     if kind == "array":
         return node[()]
     value = node[()]
@@ -383,8 +436,9 @@ def _read_node(node) -> Any:
         return int(value)
     if kind == "float":
         return float(value)
-    if kind == "str":
-        return value.decode("utf-8") if isinstance(value, bytes) else str(value)
+    if kind in {"str", "path"}:
+        text = value.decode("utf-8") if isinstance(value, bytes) else str(value)
+        return Path(text) if kind == "path" else text
     raise TrajectoryArtifactError(f"unknown trajectory node kind {kind!r} at {node.name}")
 
 
@@ -407,17 +461,20 @@ class TrajectoryArtifact:
 
     ``transport`` reproduces the ``simulate_trajectories`` mapping (NumPy
     arrays on the host); ``units`` maps each top-level field to its unit where
-    known.
+    known. ``case`` is the exact typed case (a :class:`~pyrite.montecarlo.case.
+    Case` when one was written) from schema 2, and the JSON form from schema 1.
+    ``spectrum_inputs`` is ``None`` unless the writer recorded them.
     """
 
     path: Path
     schema_version: int
-    case: dict[str, Any]
+    case: Mapping[str, Any]
     provenance: dict[str, Any]
     settings: dict[str, Any]
     transport: dict[str, Any]
     units: dict[str, str]
     attrs: dict[str, Any]
+    spectrum_inputs: dict[str, Any] | None = None
 
 
 def _header_attrs(handle) -> dict[str, Any]:
@@ -469,13 +526,57 @@ def read_trajectory_artifact(path: str | os.PathLike[str]) -> TrajectoryArtifact
         return TrajectoryArtifact(
             path=path,
             schema_version=int(handle.attrs["schema_version"]),
-            case=json.loads(handle["case"].attrs["json"]),
+            case=_read_case(handle["case"]),
             provenance=json.loads(handle["provenance"].attrs["json"]),
             settings=settings,
             transport=_read_node(group),
             units=units,
             attrs=_header_attrs(handle),
+            spectrum_inputs=(
+                _read_node(handle["spectrum_inputs"]) if "spectrum_inputs" in handle else None
+            ),
         )
+
+
+def _read_case(group) -> Mapping[str, Any]:
+    if "payload" not in group:  # schema 1: JSON only
+        return json.loads(group.attrs["json"])
+    payload = _read_node(group["payload"])
+    if group.attrs.get("case_type") == "Case":
+        from .case import Case
+
+        try:
+            return Case(**payload)
+        except (TypeError, ValueError) as error:
+            raise TrajectoryArtifactError(
+                f"trajectory artifact {group.file.filename} records a case this PyRITE "
+                f"cannot rebuild: {error}"
+            ) from error
+    return payload
+
+
+def artifact_spectrum_inputs(artifact: TrajectoryArtifact) -> dict[str, Any]:
+    """Return ``artifact``'s spectrum-phase inputs, or refuse an insufficient one.
+
+    Raises
+    ------
+    TrajectoryArtifactError
+        The artifact predates schema 2 or was written without
+        ``spectrum_inputs``, so the spectrum phase cannot be replayed from it.
+    """
+    if artifact.schema_version < SPECTRUM_SCHEMA_VERSION:
+        raise TrajectoryArtifactError(
+            f"trajectory artifact {artifact.path} uses schema_version "
+            f"{artifact.schema_version}, which predates spectrum-phase inputs; "
+            "re-run the case with --trajectories to capture a "
+            f"schema-{SPECTRUM_SCHEMA_VERSION} artifact"
+        )
+    if artifact.spectrum_inputs is None:
+        raise TrajectoryArtifactError(
+            f"trajectory artifact {artifact.path} records no spectrum-phase inputs; "
+            "only artifacts captured by a run can feed the spectrum phase"
+        )
+    return artifact.spectrum_inputs
 
 
 @dataclass(frozen=True)
