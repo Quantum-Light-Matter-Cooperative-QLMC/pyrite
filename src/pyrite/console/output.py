@@ -363,6 +363,7 @@ OUTPUT_CHOICES = click.Choice(("table", "json", "wide"), case_sensitive=True)
 
 
 def _json_selected(_ctx, _param, value: str) -> bool:
+    _ctx.meta["pyrite.output_format"] = value
     return value == "json"
 
 

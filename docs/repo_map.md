@@ -307,6 +307,10 @@ Supported scalar scene API: `Beam`, `Scene`, path-addressed `Sweep`, `Numerics`,
 - Public: root-lazy `Beam`, `Scene`, `Sweep`, `Numerics`, `Convergence`, `Analysis`.
 - Deps: `campaign.geometry`, `campaign.sweep.BeamSpec`, `detectors`.
 
+### `campaign/single_scene.py` and `cli/commands/_simulation.py`
+
+The CLI singleton-profile resolver lives in `campaign/single_scene.py`, which lowers validated catalog fields without CLI dependencies or checkpoint I/O. `cli/commands/_simulation.py` shares catalog-boundary validation, simulation dispatch, JSON/presentation, and `.npz` serialization between `material simulate` and `run --ephemeral`; the latter bypasses the checkpoint sweep driver.
+
 ### `api.py`
 
 Filesystem-free simulation seam. `simulate` combines scalar beam, target, and detector components into a `Scene` and lowers exactly one typed `Case`. Scalar detectors call the unchanged `montecarlo.run_case`; physical detectors reuse one transport across coarse angular tiles, then attach exact pixel rays and finite-filter attenuation as a factorized `SpatialResult`. Source-case and observation identities remain separate. Combined line totals include atomic characteristic radiation, with the component exposed as `Result.characteristic_spectrum` and in spatial factors. The API never reads or writes campaign checkpoints. `build_case`, `build_sweep_cases`, and legacy lowering helpers are implementation/compatibility seams rather than the root supported surface.
