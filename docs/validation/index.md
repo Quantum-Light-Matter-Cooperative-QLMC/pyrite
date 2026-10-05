@@ -36,6 +36,10 @@ beam-transport/coherent-line-grid-fringe-spacing
 beam-transport/dielectric-bulk-loss
 beam-transport/eedl-material-shell-rates
 beam-transport/elsepa-elastic-sampling
+beam-transport/elsepa-positron-elastic-sampling
+beam-transport/bhabha-close
+beam-transport/sbethe-positron-stopping
+beam-transport/positron-brems-scaling
 beam-transport/elsepa-muffin-tin-inputs
 beam-transport/inelastic-angular-deflection
 beam-transport/penelope-shell-oscillators
