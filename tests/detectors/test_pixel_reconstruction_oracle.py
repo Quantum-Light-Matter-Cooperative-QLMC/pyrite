@@ -25,6 +25,15 @@ def test_reviewed_geometry_presets_are_explicit_and_distinct() -> None:
         "broken-symmetry": ORACLE.OracleGeometry(60.0, 30.0, 45.0),
         "detector-on-g": ORACLE.OracleGeometry(20.0, 20.0, 0.0),
         "near-pole-not-g-aligned": ORACLE.OracleGeometry(20.0, 30.0, 0.0),
+        "tpx-test": ORACLE.OracleGeometry(
+            90.0,
+            30.0,
+            180.0,
+            distance_mm=100.0,
+            grid_shape=(15, 15),
+            pitch_mm=(256 * 0.055 / 15, 256 * 0.055 / 15),
+            thickness_ang=10_000_000.0,
+        ),
     }
 
 

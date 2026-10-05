@@ -860,7 +860,7 @@ def test_gpu_pipeline_deadline_completes_at_most_one_case_after_expiry(monkeypat
 
 
 def test_usable_cpus_honors_the_affinity_mask(monkeypatch):
-    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner import host_cpus as runner
 
     monkeypatch.delenv("SLURM_CPUS_PER_TASK", raising=False)
     monkeypatch.setattr(runner.os, "cpu_count", lambda: 32)
@@ -870,7 +870,7 @@ def test_usable_cpus_honors_the_affinity_mask(monkeypatch):
 
 
 def test_usable_cpus_honors_slurm_and_the_cgroup_quota(monkeypatch):
-    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner import host_cpus as runner
 
     monkeypatch.setattr(runner.os, "cpu_count", lambda: 32)
     monkeypatch.setattr(runner.os, "sched_getaffinity", lambda _pid: set(range(32)))
@@ -882,7 +882,7 @@ def test_usable_cpus_honors_slurm_and_the_cgroup_quota(monkeypatch):
 
 
 def test_usable_cpus_ignores_an_unparseable_slurm_value(monkeypatch):
-    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner import host_cpus as runner
 
     monkeypatch.setattr(runner.os, "cpu_count", lambda: 4)
     monkeypatch.setattr(runner.os, "sched_getaffinity", lambda _pid: set(range(4)))
@@ -892,7 +892,7 @@ def test_usable_cpus_ignores_an_unparseable_slurm_value(monkeypatch):
 
 
 def test_cgroup_cpu_quota_reads_v2_then_v1(monkeypatch, tmp_path):
-    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner import host_cpus as runner
 
     (tmp_path / "proc").mkdir()
     (tmp_path / "proc" / "self").mkdir()
