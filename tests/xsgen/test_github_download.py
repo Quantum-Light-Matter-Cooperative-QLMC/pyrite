@@ -217,3 +217,16 @@ def test_archive_download_falls_through_to_the_next_location(no_token, monkeypat
     path = fetch_module._obtain(None, urls, tmp_path, "tables", hashlib.sha256(PAYLOAD).hexdigest())
 
     assert path.read_bytes() == PAYLOAD
+
+
+def test_a_transient_bad_body_is_retried_and_still_digest_checked(no_token, monkeypatch, tmp_path):
+    bodies = [b"interstitial", PAYLOAD]
+
+    monkeypatch.setattr(fetch_module, "urlopen", lambda request, **kwargs: _Response(bodies.pop(0)))
+
+    path = fetch_module._obtain(
+        None, ("https://a.invalid/a.zip",), tmp_path, "tables", hashlib.sha256(PAYLOAD).hexdigest()
+    )
+
+    assert path.read_bytes() == PAYLOAD
+    assert bodies == []
