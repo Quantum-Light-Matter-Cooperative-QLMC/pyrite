@@ -520,7 +520,10 @@ def fetch_bremslib(
 
 
 def fetch_elsepa(
-    archive: str | Path | None = None, *, index: ElsepaReleaseIndex | None = None
+    archive: str | Path | None = None,
+    *,
+    index: ElsepaReleaseIndex | None = None,
+    projectile: str = "electron",
 ) -> FetchResult:
     """Install the pinned ELSEPA elastic tables into the user table directory.
 
@@ -530,23 +533,30 @@ def fetch_elsepa(
     under it is an equally valid copy (it differs only in timestamp and
     compiler).
 
+    ``projectile`` selects the electron or positron pin when ``index`` is
+    omitted; the positron archive is the ``tables-elsepa-positron-1`` release.
+
     Raises
     ------
     DataFetchError
         If this build pins no release, or the archive cannot be obtained or
         does not verify.
     """
-    pinned = load_elsepa_release_index() if index is None else index
+    pinned = load_elsepa_release_index(projectile=projectile) if index is None else index
     if pinned is None:
+        species = "" if projectile == "electron" else f" --projectile {projectile}"
         raise DataFetchError(
             "this PyRITE build pins no ELSEPA table release; generate tables with "
-            "`pyrite tables generate --code elsepa --material NAME`"
+            f"`pyrite tables generate --code elsepa --material NAME{species}`"
         )
     return _install_release("elsepa", "ELSEPA", pinned, archive, exact=False)
 
 
 def fetch_sbethe_tables(
-    archive: str | Path | None = None, *, index: SbetheReleaseIndex | None = None
+    archive: str | Path | None = None,
+    *,
+    index: SbetheReleaseIndex | None = None,
+    projectile: str = "electron",
 ) -> FetchResult:
     """Install the pinned SBETHE catalogue stopping tables into the user table directory.
 
@@ -556,17 +566,21 @@ def fetch_sbethe_tables(
     installs the ``sdbase/`` reference data that generation and the shell
     model read.
 
+    ``projectile`` selects the electron or positron pin when ``index`` is
+    omitted; the positron archive is the ``tables-sbethe-positron-1`` release.
+
     Raises
     ------
     DataFetchError
         If this build pins no release, or the archive cannot be obtained or
         does not verify.
     """
-    pinned = load_sbethe_release_index() if index is None else index
+    pinned = load_sbethe_release_index(projectile=projectile) if index is None else index
     if pinned is None:
+        species = "" if projectile == "electron" else f" --projectile {projectile}"
         raise DataFetchError(
             "this PyRITE build pins no SBETHE table release; generate tables with "
-            "`pyrite tables generate --code sbethe --material NAME`"
+            f"`pyrite tables generate --code sbethe --material NAME{species}`"
         )
     return _install_release("sbethe-tables", "SBETHE", pinned, archive, exact=False)
 

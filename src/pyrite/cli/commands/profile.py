@@ -75,6 +75,7 @@ _NUMERICS_FIELD_NAMES = {
     "radiative-model": "radiative_model",
     "radiative-cutoff-ev": "radiative_cutoff_eV",
     "pair-production-model": "pair_production_model",
+    "positron-transport": "positron_transport",
     "atomic-electron-deflection": "atomic_electron_deflection",
 }
 _RANGE_OPTIONS = (
@@ -297,6 +298,8 @@ def _emit_show(payload):
         emit_result(f"  radiative model: {numerics['radiative_model']} (k_c {k_c:g} eV)")
     if "pair_production_model" in numerics:
         emit_result(f"  pair production model: {numerics['pair_production_model']}")
+    if "positron_transport" in numerics:
+        emit_result(f"  positron transport: {'on' if numerics['positron_transport'] else 'off'}")
     if "atomic_electron_deflection" in numerics:
         emit_result(f"  atomic-electron deflection: {numerics['atomic_electron_deflection']}")
     for material, labels in payload["overrides"].items():
@@ -533,7 +536,16 @@ def numerics_show_command(name, fidelity, json_output):
     help=(
         "Convert coupled hard photons above 1.022 MeV to e-/e+ pairs (opt-in). Requires "
         "--secondary-threshold-ev and coupled BremsLib transport; pair electrons are "
-        "transported as secondaries, positrons are recorded but not transported."
+        "transported as secondaries, positrons are recorded unless --positron-transport."
+    ),
+)
+@click.option(
+    "--positron-transport/--no-positron-transport",
+    default=None,
+    help=(
+        "Transport pair positrons above the secondary threshold (opt-in; requires "
+        "--pair-production-model). Positrons are not annihilated: each pair's 2 m_e c^2 "
+        "is booked as pending rest energy and no annihilation photons are emitted."
     ),
 )
 @click.option(

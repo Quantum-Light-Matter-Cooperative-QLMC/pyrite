@@ -25,15 +25,21 @@ def radiative_case_keys(
     bremsstrahlung_model,
     pair_production_model=None,
     secondary_threshold_eV=None,
+    positron_transport=False,
 ) -> dict[str, Any]:
     """Validate the coupled radiative settings; return its case keys (empty if uncoupled).
 
-    Opt-in pair conversion (#275) rides on the coupled keys, so it joins only
-    cases that resolve to coupled BremsLib transport.
+    Opt-in pair conversion (#275) and positron transport (#276) ride on the
+    coupled keys, so they join only cases that resolve to coupled BremsLib
+    transport.
     """
     validate_radiative_numerics(model, cutoff_eV, energy_model, straggling, bremsstrahlung_model)
     validate_pair_production_numerics(
-        pair_production_model, secondary_threshold_eV, model, bremsstrahlung_model
+        pair_production_model,
+        secondary_threshold_eV,
+        model,
+        bremsstrahlung_model,
+        positron_transport,
     )
     if model == "uncoupled" or (model == "auto" and bremsstrahlung_model == "eedl"):
         return {}
@@ -47,6 +53,7 @@ def radiative_case_keys(
             if pair_production_model is None
             else {"pair_production_model": pair_production_model}
         ),
+        **({"positron_transport": True} if positron_transport else {}),
     }
 
 

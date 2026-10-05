@@ -1569,7 +1569,8 @@ Usage: pyrite profile numerics reset [OPTIONS] NAME [line-electrons|bremsstrahlu
                                      ev|secondary-threshold-ev|elastic-
                                      model|bremsstrahlung-model|radiative-
                                      model|radiative-cutoff-ev|pair-production-
-                                     model|atomic-electron-deflection]...
+                                     model|positron-transport|atomic-electron-
+                                     deflection]...
 
   Reset selected FIELDs, or every explicit numeric when none are named.
 
@@ -1639,8 +1640,14 @@ Options:
                                   Convert coupled hard photons above 1.022 MeV to e-/e+
                                   pairs (opt-in). Requires --secondary-threshold-ev and
                                   coupled BremsLib transport; pair electrons are
-                                  transported as secondaries, positrons are recorded but
-                                  not transported.
+                                  transported as secondaries, positrons are recorded
+                                  unless --positron-transport.
+  --positron-transport / --no-positron-transport
+                                  Transport pair positrons above the secondary threshold
+                                  (opt-in; requires --pair-production-model). Positrons
+                                  are not annihilated: each pair's 2 m_e c^2 is booked
+                                  as pending rest energy and no annihilation photons are
+                                  emitted.
   --atomic-electron-deflection [kawrakow|none]
                                   Angular deflection by atomic electrons: kawrakow
                                   (default) scales each element's elastic rate by 1 +
@@ -2605,6 +2612,10 @@ Options:
   --archive FILE                  Install CODE from a local copy of the pinned archive
                                   (for eedl, eadl and epdl, of the pinned file itself)
                                   instead of downloading it. Needs CODE.
+  --projectile [electron|positron]
+                                  Table species. Positron requires CODE elsepa or
+                                  sbethe-tables; other data are species-independent.
+                                  [default: electron]
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
@@ -2650,7 +2661,9 @@ Options:
   --band-gap EV                   Gap energy for an insulator or semiconductor; omit for
                                   a conductor. SBETHE only.  [x>0.0]
   --projectile [alpha|antimuon|antiproton|electron|muon|positron|proton]
-                                  Projectile particle. SBETHE only.  [default: electron]
+                                  Projectile particle. ELSEPA: electron or positron.
+                                  SBETHE: any listed species. BremsLib: electron only.
+                                  [default: electron]
   --t1-max MEV                    Highest incident electron energy to include, in MeV;
                                   bounds the table size. Defaults to the library's
                                   complete range. BremsLib only.  [x>0.0]

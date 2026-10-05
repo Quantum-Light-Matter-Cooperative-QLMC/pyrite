@@ -22,6 +22,7 @@ TRANSPORT_KEYS = (
     "radiative_model",
     "radiative_cutoff_eV",
     "pair_production_model",
+    "positron_transport",
     "atomic_electron_deflection",
 )
 #: Collision-loss schemes a run may select: ``"auto"`` (the default) plus the
@@ -149,8 +150,13 @@ class Numerics:
         Opt-in pair conversion of coupled hard photons above ``2 m_e c^2``
         (``"penelope-2024"``); requires ``secondary_threshold_eV`` and coupled
         radiative transport, and applies only to cases that resolve to it.
-        Positrons are recorded, not transported. ``None`` (default) converts
-        nothing.
+        Positrons are recorded, not transported, unless
+        ``positron_transport``. ``None`` (default) converts nothing.
+    positron_transport
+        Opt-in transport of pair positrons above the secondary threshold
+        (issue #276; Bhabha, positron SBETHE/ELSEPA, ``F_p``-scaled BremsLib);
+        requires ``pair_production_model``. Positrons are not annihilated
+        (#295). ``False`` (default) records them only.
     atomic_electron_deflection
         ``"kawrakow"`` (default) adds angular deflection by atomic electrons
         to the elastic rate, ``Z^2 -> Z(Z + xi)``: ``xi = 1`` under continuous
@@ -179,6 +185,7 @@ class Numerics:
     radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "auto"
     radiative_cutoff_eV: float | None = None
     pair_production_model: Literal["penelope-2024"] | None = None
+    positron_transport: bool = False
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
     convergence: Convergence = field(default_factory=Convergence)
 
@@ -224,6 +231,7 @@ class Numerics:
             self.secondary_threshold_eV,
             self.radiative_model,
             self.bremsstrahlung_model,
+            self.positron_transport,
         )
         validate_atomic_electron_deflection(self.atomic_electron_deflection)
 
@@ -242,8 +250,16 @@ def validate_pair_production_numerics(
     secondary_threshold_eV: object,
     radiative_model: object,
     bremsstrahlung_model: object,
+    positron_transport: object = False,
 ) -> None:
-    """Validate opt-in pair conversion: it needs secondaries and coupled photons."""
+    """Validate opt-in pair conversion: it needs secondaries and coupled photons.
+
+    ``positron_transport`` (#276) needs pair conversion.
+    """
+    if not isinstance(positron_transport, bool):
+        raise TypeError("positron_transport must be a bool")
+    if positron_transport and model is None:
+        raise ValueError("positron_transport requires pair_production_model")
     if model is None:
         return
     if model not in PAIR_PRODUCTION_MODELS:

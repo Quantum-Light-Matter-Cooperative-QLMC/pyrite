@@ -214,35 +214,42 @@ def joined_arrays(
     return joined
 
 
-def _require(table: StoredTable | None, what: str) -> StoredTable:
+def _require(table: StoredTable | None, what: str, *, projectile: str = "electron") -> StoredTable:
     if table is None:
+        species = "" if projectile == "electron" else f" --projectile {projectile}"
         raise TableNotFoundError(
             f"no ELSEPA table for {what}; install the released tables with "
-            "'pyrite tables fetch elsepa', "
-            "or generate them with 'pyrite tables generate --code elsepa --material NAME'"
+            f"'pyrite tables fetch elsepa{species}', "
+            f"or generate them with 'pyrite tables generate --code elsepa --material NAME{species}'"
         )
     return table
 
 
 def resolve_layer_tables(
     composition: tuple[tuple[str, float], ...] | list[tuple[str, float]],
+    *,
+    projectile: str = "electron",
 ) -> tuple[ElementElastic, ...]:
     """Resolve the production elastic table of every element in one layer.
 
     Only a layer matching an elementary catalog crystal
     (:func:`elemental_solid_for_composition`) uses a muffin-tin table.
-    Returned entries follow ``composition`` order.
+    Returned entries follow ``composition`` order. ``projectile`` selects
+    separately keyed electron or positron tables, never substituting one
+    species for the other.
 
     Validation: elsepa-muffin-tin-inputs
+    Validation: elsepa-positron-elastic-sampling
     """
     solid = elemental_solid_for_composition(composition)
     out = []
     for element, _ in composition:
         z = int(TRANSPORT_ELEMENTS[element]["Z"])
-        request, _ = element_request(z, PRODUCTION_ENERGIES_EV)
+        request, _ = element_request(z, PRODUCTION_ENERGIES_EV, projectile=projectile)
         free = _require(
             resolve(request.key),
             f"free atom {element} (Z={z})",
+            projectile=projectile,
         )
         tables = [free]
         muffin_arrays = None
@@ -252,11 +259,13 @@ def resolve_layer_tables(
                 solid.z,
                 _muffin_tin_energies(),
                 radius_cm=solid.radius_cm,
+                projectile=projectile,
                 density_g_cm3=solid.density_g_cm3,
             )
             muffin = _require(
                 resolve(mt_request.key),
                 f"elementary solid {solid.key!r}",
+                projectile=projectile,
             )
             tables.append(muffin)
             muffin_arrays = muffin.arrays()
@@ -271,15 +280,23 @@ def resolve_layer_tables(
     return tuple(out)
 
 
-def resolve_stack_tables(layers) -> list[list[dict]]:
-    """Production ELSEPA arrays for each ``(z0, z1, composition)`` layer."""
-    return [[entry.arrays for entry in resolve_layer_tables(layer[2])] for layer in layers]
+def resolve_stack_tables(layers, *, projectile: str = "electron") -> list[list[dict]]:
+    """Production ELSEPA arrays for each ``(z0, z1, composition)`` layer.
+
+    Validation: elsepa-positron-elastic-sampling
+    """
+    return [
+        [entry.arrays for entry in resolve_layer_tables(layer[2], projectile=projectile)]
+        for layer in layers
+    ]
 
 
-def resolve_catalog_tables(key: str) -> tuple[StoredTable, ...]:
+def resolve_catalog_tables(key: str, *, projectile: str = "electron") -> tuple[StoredTable, ...]:
     """Every stored table a catalog material's elastic model reads, for identity."""
     return tuple(
-        table for entry in resolve_layer_tables(catalog_composition(key)) for table in entry.tables
+        table
+        for entry in resolve_layer_tables(catalog_composition(key), projectile=projectile)
+        for table in entry.tables
     )
 
 
@@ -295,7 +312,11 @@ def catalog_composition(key: str) -> tuple[tuple[str, float], ...]:
 
 
 def generate_catalog(
-    key: str, *, overwrite: bool = False, keep_on_failure: bool = False
+    key: str,
+    *,
+    projectile: str = "electron",
+    overwrite: bool = False,
+    keep_on_failure: bool = False,
 ) -> tuple[GenerationResult, ...]:
     """Generate every production table a catalog material's layer resolves."""
     results = []
@@ -303,7 +324,11 @@ def generate_catalog(
         z = int(TRANSPORT_ELEMENTS[element]["Z"])
         results.append(
             generate_element(
-                z, PRODUCTION_ENERGIES_EV, overwrite=overwrite, keep_on_failure=keep_on_failure
+                z,
+                PRODUCTION_ENERGIES_EV,
+                projectile=projectile,
+                overwrite=overwrite,
+                keep_on_failure=keep_on_failure,
             )
         )
     solid = elemental_solid(key)
@@ -314,6 +339,7 @@ def generate_catalog(
                 solid.z,
                 _muffin_tin_energies(),
                 radius_cm=solid.radius_cm,
+                projectile=projectile,
                 density_g_cm3=solid.density_g_cm3,
                 overwrite=overwrite,
                 keep_on_failure=keep_on_failure,

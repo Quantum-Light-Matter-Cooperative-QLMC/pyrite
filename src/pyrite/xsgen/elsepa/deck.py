@@ -39,6 +39,14 @@ DEFAULT_ABSORPTION_STRENGTH = 0.75
 class ElsepaDeck:
     """An ELSEPA ``elscata`` request for a free atom or a muffin-tin atom.
 
+    ``projectile`` selects ``electron`` (default) or ``positron``. Electron
+    defaults remain FM exchange and no correlation-polarization. Positrons
+    use no exchange and the LDA correlation-polarization potential
+    (``IELEC=+1``, ``MEXCH=0``, ``MCPOL=2`` in the vendored ELSEPA 2020
+    input contract). An explicit polarization model overrides that default.
+    Positron records include the species; electron records retain their
+    historical fields and table keys.
+
     A muffin-tin deck describes an atom in an elementary solid. Its radius
     comes from the material's nearest-neighbour distance, supplied by the
     material consumer rather than guessed here; ``elscata`` itself turns the
@@ -50,15 +58,27 @@ class ElsepaDeck:
     energies_ev: tuple[float, ...]
     nuclear_model: int = 3
     electron_density_model: int = 4
-    exchange_model: int = 1
-    polarization_model: int = 0
+    exchange_model: int | None = None
+    polarization_model: int | None = None
     absorption_model: int = 0
     high_energy_factorization: int = 2
     muffin_tin_radius_cm: float | None = None
     absorption_strength: float | None = None
     absorption_gap_eV: float | None = None
+    projectile: str = "electron"
 
     def __post_init__(self) -> None:
+        if self.projectile not in ("electron", "positron"):
+            raise ValueError("ELSEPA projectile must be electron or positron")
+        positron = self.projectile == "positron"
+        exchange = (0 if positron else 1) if self.exchange_model is None else self.exchange_model
+        polarization = (
+            (2 if positron else 0) if self.polarization_model is None else self.polarization_model
+        )
+        if positron and exchange != 0:
+            raise ValueError("ELSEPA positrons require exchange_model=0")
+        object.__setattr__(self, "exchange_model", exchange)
+        object.__setattr__(self, "polarization_model", polarization)
         atomic_number = int(self.z)
         if atomic_number != self.z or not 1 <= atomic_number <= _MAX_Z:
             raise ValueError(f"ELSEPA atomic number must be between 1 and {_MAX_Z}")
@@ -103,7 +123,7 @@ class ElsepaDeck:
 
     @classmethod
     def free_atom(cls, z: int, energies_ev: Iterable[float], **options: Any) -> ElsepaDeck:
-        """Construct a free-atom electron deck from any energy iterable."""
+        """Construct a free-atom deck from any energy iterable."""
         return cls(z=z, energies_ev=tuple(energies_ev), **options)
 
     @classmethod
@@ -113,19 +133,22 @@ class ElsepaDeck:
         energies_ev: Iterable[float],
         *,
         radius_cm: float,
+        projectile: str = "electron",
         absorption_strength: float = DEFAULT_ABSORPTION_STRENGTH,
         absorption_gap_eV: float | None = None,
     ) -> ElsepaDeck:
         """Construct an elementary-solid deck with LDA-II absorption.
 
-        ``absorption_gap_eV=None`` keeps ELSEPA's tabulated experimental
-        first-excitation energy for ``z`` as the gap.
+        ``absorption_gap_eV=None`` keeps ELSEPA's species-specific default:
+        first-excitation energy for electrons, ``max(0, E_ion - 6.8 eV)``
+        for positrons (``elscata.f``'s ``VABSD`` input branch).
 
         Validation: elsepa-muffin-tin-inputs
         """
         return cls(
             z=z,
             energies_ev=tuple(energies_ev),
+            projectile=projectile,
             absorption_model=2,
             high_energy_factorization=0,
             muffin_tin_radius_cm=radius_cm,
@@ -150,6 +173,9 @@ class ElsepaDeck:
             "absorption_model": self.absorption_model,
             "high_energy_factorization": self.high_energy_factorization,
         }
+        # Electron records retain their exact historical keys.
+        if self.projectile != "electron":
+            record["projectile"] = self.projectile
         # Free-atom records keep their historical spelling, and so their keys.
         if self.is_muffin_tin:
             record["muffin_tin_radius_cm"] = self.muffin_tin_radius_cm
@@ -174,6 +200,7 @@ class ElsepaDeck:
         digits fit, and match the precision of the ``dcs_*.dat`` names the
         same energies produce.
         """
+        assert self.exchange_model is not None and self.polarization_model is not None
         fields: list[tuple[str, int | str]] = [
             ("IZ", self.z),
             ("MNUCL", self.nuclear_model),
@@ -185,7 +212,7 @@ class ElsepaDeck:
             fields.append(("RMUF", f"{self.muffin_tin_radius_cm:.5E}"))
         fields.extend(
             [
-                ("IELEC", -1),
+                ("IELEC", 1 if self.projectile == "positron" else -1),
                 ("MEXCH", self.exchange_model),
                 ("MCPOL", self.polarization_model),
                 ("MABS", self.absorption_model),

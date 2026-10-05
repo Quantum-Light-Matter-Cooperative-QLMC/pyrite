@@ -724,6 +724,7 @@ def build_cases(
     temporal_profile=False,
     pair_production_model=None,
     atomic_electron_deflection="kawrakow",
+    positron_transport=False,
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -753,7 +754,7 @@ def build_cases(
     validate_elastic_model(elastic_model)
     validate_bremsstrahlung_model(bremsstrahlung_model)
     # Opt-in coupled radiative keys (#172) and pair conversion (#275); "auto" resolves later.
-    pair = (pair_production_model, secondary_threshold_eV)
+    pair = (pair_production_model, secondary_threshold_eV, positron_transport)
     radiative = radiative_case_keys(
         radiative_model, radiative_cutoff_eV, energy_model, straggling, bremsstrahlung_model, *pair
     )
@@ -793,7 +794,6 @@ def build_cases(
             brem_start = min(float(np.atleast_1d(grid)[0]) for grid in line_grids)
         brem_grid = np.arange(brem_start, float(energies.max()) * 1e3 + 50.0, 50.0)  # type: ignore[reportArgumentType]
 
-    assert sweep.detector is not None
     dtheta = (
         TIMEPIX3_DTHETA_OBS_DEG
         if sweep.detector.polar_acceptance_deg is None

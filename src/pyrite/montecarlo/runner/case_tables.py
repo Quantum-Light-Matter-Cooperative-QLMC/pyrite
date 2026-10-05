@@ -167,6 +167,8 @@ def _case_radiative_kwargs(case):
             if case.get("pair_production_model") is not None
             else {}
         ),
+        # Opt-in positron transport (#276); absent records positrons only.
+        **({"positron_transport": True} if case.get("positron_transport") else {}),
     )
 
 

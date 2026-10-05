@@ -16,10 +16,16 @@ exactly as a primary's derive from its own.
 With ``pair_production_model`` each generation's coupled hard photons above
 ``2 m_e c^2`` also get one first-interaction step (``pair_production.py``); a
 pair's electron above ``T_s`` joins the next generation keyed on (seed, parent
-track, photon ordinal) under a salt of its own, and its positron is recorded,
-not transported (#276).
+track, photon ordinal) under a salt of its own. Its positron is recorded and,
+only with ``positron_transport``, launched above ``T_s`` like the electron
+under a third salt (#276). Each generation then runs its electrons and its
+positrons as two transport calls, the positrons with their own SBETHE,
+ELSEPA, ``F_p``-scaled BremsLib and Bhabha shell tables, and joins them into
+one generation (electrons first). Positrons are not annihilated (#295): one
+below ``T_s`` deposits its kinetic energy locally, and every pair's
+``2 m_e c^2`` is booked as ``positron_rest_pending``.
 
-Validation: shell-secondary-transport, photon-pair-first-interaction
+Validation: shell-secondary-transport, photon-pair-first-interaction, bhabha-close
 """
 
 import warnings
@@ -51,8 +57,11 @@ __all__ = [
 _SECONDARY_STREAM_SALT = np.uint64(0x7F4A7C159E3779B9)
 _PHOTON_SEED_SALT = np.uint64(0x2545F4914F6CDD1D)
 _PAIR_ELECTRON_STREAM_SALT = np.uint64(0x9B05688C2B3E6C1F)
+_PAIR_POSITRON_STREAM_SALT = np.uint64(0xD1B54A32D192ED03)
+# Separates a generation's positron photon-direction stream from its electrons'.
+_POSITRON_PHOTON_SALT = np.uint64(0x94D049BB133111EB)
 #: ``secondary_tracks["launch_kind"]`` values.
-LAUNCH_PRIMARY, LAUNCH_SHELL, LAUNCH_PAIR = 0, 1, 2
+LAUNCH_PRIMARY, LAUNCH_SHELL, LAUNCH_PAIR, LAUNCH_POSITRON = 0, 1, 2, 3
 DEFAULT_MAX_SECONDARY_GENERATIONS = 64
 DEFAULT_SECONDARY_TRACKS_PER_PRIMARY = 1000
 # Per-row result arrays joined across generations. Aliases are re-pointed after.
@@ -122,12 +131,14 @@ class SecondaryPass:
 
     ``launch`` is None for the primaries. ``table_range_keV`` makes every
     generation build identical shell tables; ``photon_seed`` keys the host
-    completion of coupled hard-photon directions per generation.
+    completion of coupled hard-photon directions per generation;
+    ``projectile`` selects the electron or positron (Bhabha) shell tables.
     """
 
     launch: LaunchState | None
     table_range_keV: tuple[float, float]
     photon_seed: int
+    projectile: str = "electron"
 
 
 def _mix(x):
@@ -153,11 +164,11 @@ def _radiative_keys(keys):
         return _mix(np.asarray(keys, dtype=np.uint64) ^ np.uint64(_RADIATIVE_STREAM_SALT))
 
 
-def _photon_seed(seed, generation):
-    if generation == 0:
+def _photon_seed(seed, generation, *, positron=False):
+    if generation == 0 and not positron:
         return seed
     with np.errstate(over="ignore"):
-        x = np.uint64(seed) ^ _PHOTON_SEED_SALT
+        x = np.uint64(seed) ^ (_POSITRON_PHOTON_SALT if positron else _PHOTON_SEED_SALT)
         return int(_mix(x + _SM64_GOLDEN * np.uint64(generation)))
 
 
@@ -189,6 +200,8 @@ def _concat(parts):
 def _validate(kw):
     """Threshold [keV] and caps; raise on every unsupported combination."""
     threshold_eV = kw["secondary_threshold_eV"]
+    if kw.get("positron_transport") is not False and kw.get("pair_production_model") is None:
+        raise ValueError("positron_transport requires pair_production_model")
     if threshold_eV is None:  # the cascade was entered for pair_production_model
         raise ValueError("pair_production_model requires secondary_threshold_eV")
     if (
@@ -222,6 +235,13 @@ def _validate_pair_model(kw):
     from .pair_production import PAIR_PRODUCTION_MODELS
 
     model = kw.get("pair_production_model")
+    positrons = kw.get("positron_transport", False)
+    if not isinstance(positrons, bool):
+        raise ValueError("positron_transport must be a bool")
+    if positrons and model is None:
+        raise ValueError("positron_transport requires pair_production_model")
+    if positrons and kw["elastic_model"] == "mott":
+        raise ValueError("positron_transport has no Mott positron model; use 'elsepa' or 'sr'")
     if model is None:
         return
     if model not in PAIR_PRODUCTION_MODELS:
@@ -256,6 +276,73 @@ def _stack_geometry(kw):
         None if width is None else float(width) * 1.0e7,
         None if height is None else float(height) * 1.0e7,
     )
+
+
+def _positron_overrides(kw, layers):
+    """Positron SBETHE, ELSEPA and ``F_p``-scaled BremsLib tables per layer.
+
+    Resolved from the catalog keys in ``inelastic_materials`` and the layer
+    compositions, never substituted by electron tables.
+    Validation: sbethe-positron-stopping, positron-brems-scaling,
+    elsepa-positron-elastic-sampling
+    """
+    from ...xsgen.sbethe.catalog import resolve_catalog_table
+    from .hard_radiative import positron_bremslib_tables
+
+    materials = kw["inelastic_materials"]
+    if isinstance(materials, str):
+        materials = (materials,)
+    overrides = {
+        "stopping_tables": [
+            resolve_catalog_table(key, projectile="positron").arrays() for key in materials
+        ],
+        "bremslib_tables": positron_bremslib_tables(kw["bremslib_tables"]),
+    }
+    if kw["elastic_model"] == "elsepa":
+        from ...xsgen.elsepa.catalog import resolve_stack_tables
+
+        overrides["elastic_tables"] = resolve_stack_tables(layers, projectile="positron")
+    return overrides
+
+
+def _merge_inelastic(metas):
+    """Union per layer, by channel code, of each species' shell channels.
+
+    A code names the same oscillator and branch for either species, so its
+    binding and ``inner`` flag agree; only the set of active codes can differ.
+    """
+    out = dict(metas[0])
+    out.pop("projectile", None)
+    layers = []
+    for index in range(len(out["channels"])):
+        seen = {}
+        for meta in metas:
+            for channel in meta["channels"][index]:
+                seen.setdefault(channel["code"], channel)
+        layers.append([seen[code] for code in sorted(seen)])
+    out["channels"] = layers
+    return out
+
+
+def _merge_species(electron, positron, n_electron):
+    """One generation from its electron and positron transports; electrons first.
+
+    Validation: bhabha-close
+    """
+    if positron is None:
+        return electron
+    shifted = dict(positron)
+    shifted["electron_id"] = positron["electron_id"] + n_electron
+    if electron is None:
+        return shifted
+    out = dict(electron)
+    for key in _ROW_KEYS:
+        if electron.get(key) is not None:
+            out[key] = _concat([electron[key], shifted[key]])
+    for key in ("n_backscattered", "n_transmitted", "n_side_exited", "n_cutoff_stopped"):
+        out[key] = int(electron[key]) + int(positron[key])
+    out["inelastic"] = _merge_inelastic([electron["inelastic"], positron["inelastic"]])
+    return out
 
 
 def _pair_rows(result):
@@ -362,21 +449,23 @@ def transport_secondary_cascade(simulate, kw):
     """Run ``simulate`` over primaries and every launched generation; join rows.
 
     ``kw`` is the caller's full :func:`simulate_trajectories` argument mapping.
-    Validation: shell-secondary-transport, photon-pair-first-interaction
+    Validation: shell-secondary-transport, photon-pair-first-interaction, bhabha-close
     """
     threshold_keV, max_generations, max_tracks = _validate(kw)
     seed = kw["seed"]
     base = {
         k: v
         for k, v in kw.items()
-        if k not in ("_secondary", "pair_production_model")
+        if k not in ("_secondary", "pair_production_model", "positron_transport")
         and not k.startswith(("secondary_", "max_secondary_"))
     }
     pair_model = kw.get("pair_production_model")
+    positrons_on = bool(kw.get("positron_transport", False))
     if pair_model is not None:
         from .pair_production import convert_hard_photons
 
         pair_layers, pair_width, pair_height = _stack_geometry(kw)
+    positron_tables = _positron_overrides(kw, pair_layers) if positrons_on else None
     pair_events = []
     pair_counts = []
     E_cut = kw["E_cut_by_electrons"]
@@ -433,11 +522,17 @@ def transport_secondary_cascade(simulate, kw):
             events["parent_track"] = track_offset[-1] + events["parent"]
             events["electron_id"] = electron_of[events["parent"]]
             events["electron_track"] = np.full(events["row"].size, -1, dtype=np.int64)
+            if positrons_on:
+                events["positron_launched"] = events["positron_keV"] > threshold_keV
+                events["positron_track"] = np.full(events["row"].size, -1, dtype=np.int64)
             pair_events.append(events)
             pair_counts.append(photon_counts)
             harvest = _merge_pair_launches(harvest, events, seed)
+        positron = _positron_launches(pair_events[-1], seed) if positrons_on else None
         row_offset += _host(current["electron_id"]).size
-        n_new = int(harvest["parent"].size)
+        n_electron = int(harvest["parent"].size)
+        n_positron = 0 if positron is None else int(positron["parent"].size)
+        n_new = n_electron + n_positron
         if n_new == 0:
             break
         if g > max_generations:
@@ -449,32 +544,56 @@ def transport_secondary_cascade(simulate, kw):
                 f"secondary cascade exceeded max_secondary_tracks={max_tracks} "
                 f"(generation {g} would add {n_new})"
             )
-        parent_track = track_offset[-1] + harvest["parent"]
-        keys = harvest["keys"]
         if pair_model is not None:
             launched = np.flatnonzero(pair_events[-1]["electron_launched"])
             pair_events[-1]["electron_track"][launched] = n_tracks + harvest["pair_index"]
+        if n_positron:
+            launched = np.flatnonzero(pair_events[-1]["positron_launched"])
+            pair_events[-1]["positron_track"][launched] = (
+                n_tracks + n_electron + np.arange(n_positron)
+            )
+            harvest = _append_launches(harvest, positron)
+        parent_track = track_offset[-1] + harvest["parent"]
         electrons = electron_of[harvest["parent"]]
         t0 = t0_of[harvest["parent"]]
-        launch = LaunchState(
-            harvest["r_ang"],
-            harvest["v_hat"],
-            harvest["E_keV"],
-            harvest["t_ang"],
-            t0,
-            keys,
-            _radiative_keys(keys),
-        )
         step = dict(base, **_BEAM_ARGS)
-        step.update(
-            E0_keV=float(np.max(harvest["E_keV"])),
-            Ne=n_new,
-            E_cut_keV=threshold_keV,
-            transport_core=later_core,
-        )
-        current = simulate(
-            **step, _secondary=SecondaryPass(launch, table_range, _photon_seed(seed, g))
-        )
+        step.update(E_cut_keV=threshold_keV, transport_core=later_core)
+        species = []
+        for projectile, part in (
+            ("electron", slice(0, n_electron)),
+            ("positron", slice(n_electron, n_new)),
+        ):
+            if part.stop == part.start:
+                species.append(None)
+                continue
+            keys = harvest["keys"][part]
+            launch = LaunchState(
+                harvest["r_ang"][part],
+                harvest["v_hat"][part],
+                harvest["E_keV"][part],
+                harvest["t_ang"][part],
+                t0[part],
+                keys,
+                _radiative_keys(keys),
+            )
+            positron_step = projectile == "positron"
+            call = dict(step)
+            if positron_step:
+                assert positron_tables is not None  # n_positron > 0 only when on
+                call.update(positron_tables)
+            call.update(E0_keV=float(np.max(harvest["E_keV"][part])), Ne=part.stop - part.start)
+            species.append(
+                simulate(
+                    **call,
+                    _secondary=SecondaryPass(
+                        launch,
+                        table_range,
+                        _photon_seed(seed, g, positron=positron_step),
+                        projectile,
+                    ),
+                )
+            )
+        current = _merge_species(species[0], species[1], n_electron)
         tracks["track_id"].append(n_tracks + np.arange(n_new, dtype=np.int64))
         tracks["parent_id"].append(parent_track.astype(np.int64))
         tracks["generation"].append(np.full(n_new, g, dtype=np.int16))
@@ -493,8 +612,42 @@ def transport_secondary_cascade(simulate, kw):
     track_table = {k: np.concatenate(v) for k, v in tracks.items()}
     out = _join(generations, track_offset, track_table, counts, threshold_keV)
     if pair_model is not None:
-        out["pair_production"] = _pair_summary(pair_model, pair_events, pair_counts)
+        out["pair_production"] = _pair_summary(pair_model, pair_events, pair_counts, positrons_on)
     return out
+
+
+def _positron_launches(events, seed):
+    """Launch fields of one generation's pair positrons above the threshold.
+
+    Keys hash (seed, parent track, photon ordinal) under the positron salt.
+    Validation: photon-pair-first-interaction, bhabha-close
+    """
+    launched = events["positron_launched"]
+    return {
+        "parent": events["parent"][launched],
+        "ordinal": events["photon_ordinal"][launched],
+        "r_ang": events["r_ang"][launched],
+        "v_hat": events["positron_v_hat"][launched],
+        "E_keV": events["positron_keV"][launched],
+        "t_ang": events["t_ang"][launched],
+        "kind": np.full(int(np.count_nonzero(launched)), LAUNCH_POSITRON, dtype=np.int8),
+        "keys": secondary_stream_keys(
+            seed,
+            events["parent_track"][launched],
+            events["photon_ordinal"][launched],
+            salt=_PAIR_POSITRON_STREAM_SALT,
+        ),
+    }
+
+
+def _append_launches(harvest, extra):
+    """Append ``extra`` launch fields after ``harvest``'s, keeping dtypes."""
+    merged = dict(harvest)
+    for name, values in extra.items():
+        merged[name] = np.concatenate(
+            [np.asarray(harvest[name]), np.asarray(values).astype(np.asarray(harvest[name]).dtype)]
+        )
+    return merged
 
 
 def _merge_pair_launches(harvest, events, seed):
@@ -531,7 +684,7 @@ def _merge_pair_launches(harvest, events, seed):
     return merged
 
 
-def _pair_summary(model, pair_events, pair_counts):
+def _pair_summary(model, pair_events, pair_counts, positrons_on=False):
     """Joined pair events and photon outcome counts; warns on untransported e+."""
     from .pair_production import _empty_events
 
@@ -542,13 +695,23 @@ def _pair_summary(model, pair_events, pair_counts):
         "electron_id",
         "electron_track",
     ]
+    if positrons_on:
+        fields += ["positron_launched", "positron_track"]
     events = {name: np.concatenate([e[name] for e in pair_events]) for name in fields}
     events["row"] = events.pop("global_row")
     counts = {
         name: int(sum(c[name] for c in pair_counts))
         for name in ("photons", "pair", "other", "escaped")
     }
-    if counts["pair"]:
+    if counts["pair"] and positrons_on:
+        warnings.warn(
+            f"{counts['pair']} pair-production positrons are transported but not "
+            "annihilated (#295): no annihilation photons are emitted and each "
+            "pair's 2 m_e c^2 is booked as positron_rest_pending",
+            UserWarning,
+            stacklevel=3,
+        )
+    elif counts["pair"]:
         warnings.warn(
             f"{counts['pair']} pair-production positrons are recorded but not "
             "transported (#276); their kinetic energy is reported, not deposited",
@@ -557,7 +720,7 @@ def _pair_summary(model, pair_events, pair_counts):
         )
     return {
         "model": model,
-        "positrons_transported": False,
+        "positrons_transported": positrons_on,
         "photon_counts": counts,
         "events": events,
     }
@@ -573,6 +736,9 @@ def _counts(result):
 def _join(generations, offsets, track_table, counts, threshold_keV):
     """One result: gen-0 metadata and counts, rows of every generation."""
     out = dict(generations[0])
+    metas = [g["inelastic"] for g in generations]
+    if any(meta != metas[0] for meta in metas[1:]):
+        out["inelastic"] = _merge_inelastic(metas)
     parents = track_table["parent_id"]
     rows = {k: [] for k in _ROW_KEYS if generations[0].get(k) is not None}
     rows.update(track_id=[], parent_id=[], generation=[])
@@ -621,7 +787,11 @@ def secondary_energy_balance(result, *, per_history=False):
     exactly into ``pair_rest_mass`` (``2 m_e c^2``), the untransported
     ``positron`` kinetic energy, and its electron: a launched track's own rows,
     or ``pair_subthreshold`` (part of ``deposited``) at or below the threshold.
-    Validation: shell-secondary-transport, photon-pair-first-interaction
+    With transported positrons ``positron_rest_pending`` replaces
+    ``pair_rest_mass`` (annihilation is #295) and a positron's kinetic energy is
+    its launched track's rows or ``positron_subthreshold`` (part of
+    ``deposited``).
+    Validation: shell-secondary-transport, photon-pair-first-interaction, bhabha-close
     """
     from .shell_transport import hard_event_energy_accounting
 
@@ -675,8 +845,16 @@ def secondary_energy_balance(result, *, per_history=False):
         radiated[events["row"]] = 0.0
         owner = events["electron_id"].astype(np.int64)
         kept = ~events["electron_launched"]
-        terms["pair_rest_mass_keV"] = total(owner, np.full(owner.size, PAIR_THRESHOLD_EV * 1e-3))
-        terms["positron_keV"] = total(owner, events["positron_keV"])
+        rest = total(owner, np.full(owner.size, PAIR_THRESHOLD_EV * 1e-3))
+        if pair["positrons_transported"]:
+            stopped = ~events["positron_launched"]
+            terms["positron_rest_pending_keV"] = rest
+            terms["positron_subthreshold_keV"] = total(
+                owner[stopped], events["positron_keV"][stopped]
+            )
+        else:
+            terms["pair_rest_mass_keV"] = rest
+            terms["positron_keV"] = total(owner, events["positron_keV"])
         terms["pair_subthreshold_keV"] = total(owner[kept], events["electron_keV"][kept])
     terms["radiated_keV"] = total(history, radiated)
     terms["deposited_keV"] = (
@@ -684,6 +862,7 @@ def secondary_energy_balance(result, *, per_history=False):
         + terms["cutoff_residual_keV"]
         + terms["subthreshold_keV"]
         + terms.get("pair_subthreshold_keV", 0.0)
+        + terms.get("positron_subthreshold_keV", 0.0)
     )
     terms["residual_keV"] = terms["incident_keV"] - (
         terms["escaped_keV"]
@@ -691,6 +870,7 @@ def secondary_energy_balance(result, *, per_history=False):
         + terms["binding_reserved_keV"]
         + terms["radiated_keV"]
         + terms.get("pair_rest_mass_keV", 0.0)
+        + terms.get("positron_rest_pending_keV", 0.0)
         + terms.get("positron_keV", 0.0)
     )
     return terms

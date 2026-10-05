@@ -53,7 +53,9 @@ def release(tmp_path, isolated_dirs, packaged_dir, monkeypatch):
     archive, index = build_release(tmp_path / "out")
     shutil.rmtree(user_table_dir())
     index_path = tmp_path / "out" / "sbethe-tables.json"
-    monkeypatch.setattr("pyrite.xsgen.sbethe.release.release_index_path", lambda: index_path)
+    monkeypatch.setattr(
+        "pyrite.xsgen.sbethe.release.release_index_path", lambda **kwargs: index_path
+    )
     return archive, index
 
 

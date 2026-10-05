@@ -57,14 +57,19 @@ class SbetheReleaseIndex(ElsepaReleaseIndex):
     NAME: ClassVar[str] = "SBETHE"
 
 
-def release_index_path() -> Path:
+def release_index_path(*, projectile: str = "electron") -> Path:
     """Return the release index shipped inside the wheel."""
-    return data_dir() / "xsgen" / "sbethe-tables.json"
+    if projectile not in ("electron", "positron"):
+        raise ValueError("projectile must be electron or positron")
+    suffix = "" if projectile == "electron" else "-positron"
+    return data_dir() / "xsgen" / f"sbethe{suffix}-tables.json"
 
 
-def load_release_index(path: Path | None = None) -> SbetheReleaseIndex | None:
+def load_release_index(
+    path: Path | None = None, *, projectile: str = "electron"
+) -> SbetheReleaseIndex | None:
     """Return the shipped release index, or ``None`` if this build pins none."""
-    source = release_index_path() if path is None else Path(path)
+    source = release_index_path(projectile=projectile) if path is None else Path(path)
     if not source.is_file():
         return None
     return SbetheReleaseIndex.from_record(json.loads(source.read_text(encoding="utf-8")))
@@ -76,7 +81,7 @@ def catalog_keys() -> tuple[str, ...]:
 
 
 def release_tables(
-    keys: Iterable[str] | None = None, *, generate: bool = False
+    keys: Iterable[str] | None = None, *, generate: bool = False, projectile: str = "electron"
 ) -> list[tuple[str, StoredTable]]:
     """Return ``(label, table)`` for every distinct catalogue table, by key.
 
@@ -88,7 +93,7 @@ def release_tables(
     for name in catalog_keys() if keys is None else keys:
         if generate:
             try:
-                resolve_catalog_table(name)
+                resolve_catalog_table(name, projectile=projectile)
             except TableNotFoundError:
                 material = catalog_material(name)
                 generate_material(
@@ -97,8 +102,9 @@ def release_tables(
                     density_g_cm3=material.density_g_cm3,
                     mean_excitation_eV=material.mean_excitation_eV,
                     band_gap_eV=material.band_gap_eV,
+                    projectile=projectile,
                 )
-        table = resolve_catalog_table(name)
+        table = resolve_catalog_table(name, projectile=projectile)
         by_key.setdefault(table.key, ([], table))[0].append(name)
     return [(",".join(sorted(names)), table) for names, table in by_key.values()]
 
@@ -109,16 +115,25 @@ def build_release(
     urls: Iterable[str] = (),
     generate: bool = False,
     keys: Iterable[str] | None = None,
+    projectile: str = "electron",
 ) -> tuple[Path, SbetheReleaseIndex]:
     """Build the release archive and its index from stored catalogue tables.
 
     Writes ``sbethe-tables.zip`` and ``sbethe-tables.json`` into ``out_dir``;
     the JSON is committed to the wheel and the zip is published at ``urls``.
+    ``projectile="positron"`` uses ``sbethe-positron-tables`` for both files,
+    preserving the electron release. Both species use the existing table
+    schema; their request keys identify the projectile.
     """
+    if projectile not in ("electron", "positron"):
+        raise ValueError("projectile must be electron or positron")
+    suffix = "" if projectile == "electron" else "-positron"
     destination = Path(out_dir)
     destination.mkdir(parents=True, exist_ok=True)
-    labelled = sorted(release_tables(keys, generate=generate), key=lambda row: row[0])
-    archive = destination / "sbethe-tables.zip"
+    labelled = sorted(
+        release_tables(keys, generate=generate, projectile=projectile), key=lambda row: row[0]
+    )
+    archive = destination / f"sbethe{suffix}-tables.zip"
     with tempfile.TemporaryDirectory(prefix=".sbethe-release-", dir=destination) as temp:
         partial = Path(temp) / archive.name
         write_archive(partial, [table for _, table in labelled])
@@ -133,7 +148,7 @@ def build_release(
             for label, table in labelled
         ),
     )
-    (destination / "sbethe-tables.json").write_text(
+    (destination / f"sbethe{suffix}-tables.json").write_text(
         json.dumps(index.record(), indent=2) + "\n", encoding="utf-8"
     )
     return archive, index

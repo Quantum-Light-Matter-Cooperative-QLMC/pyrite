@@ -91,6 +91,7 @@ def simulate_trajectories(
     max_secondary_tracks=None,
     *,
     pair_production_model=None,
+    positron_transport=False,
     atomic_electron_deflection=None,
     transport_progress=None,
     _secondary=None,
@@ -270,8 +271,9 @@ def simulate_trajectories(
       and ``max_secondary_tracks`` (default ``1000 * Ne``), which raise. Rows
       gain ``track_id``/``parent_id``/``generation``; ``electron_id`` stays the
       primary history. None (default) is BIT-FOR-BIT primary-only transport.
-      ``pair_production_model`` adds pair conversion (``pair_production.py``).
-      Validation: shell-secondary-transport, photon-pair-first-interaction
+      ``pair_production_model`` adds pair conversion (``pair_production.py``);
+      ``positron_transport=True`` with it also transports the positrons.
+      Validation: shell-secondary-transport, photon-pair-first-interaction, bhabha-close
 
     transport_core: which ungrooved core runs the electrons. "auto" (default) --
     the CUDA core when this process has a CUDA device, the run is ungrooved,
@@ -446,7 +448,7 @@ def simulate_trajectories(
     Validation: substep-radiation-invariance
     Validation: transverse-bunch-form-factor
     """
-    if secondary_threshold_eV is not None or pair_production_model is not None:
+    if (secondary_threshold_eV, pair_production_model, positron_transport) != (None, None, False):
         arguments = dict(locals())
         from .secondaries import transport_secondary_cascade
 
@@ -655,8 +657,9 @@ def simulate_trajectories(
             lo, hi = _secondary.table_range_keV
             E_range_keV = (min(lo, E_range_keV[0]), max(hi, E_range_keV[1]))
         shell_tables = build_shell_inelastic_tables(
-            inelastic_materials, float(inelastic_cutoff_eV), prepared_stopping_tables, *E_range_keV
-        )
+            inelastic_materials, float(inelastic_cutoff_eV), prepared_stopping_tables, *E_range_keV,
+            projectile=getattr(_secondary, "projectile", "electron"),
+        )  # fmt: skip
         _nsys_pop()
         # The cores' continuous stopping is the soft share from here on.
         prepared_stopping_tables = list(shell_tables.soft_stopping_tables)

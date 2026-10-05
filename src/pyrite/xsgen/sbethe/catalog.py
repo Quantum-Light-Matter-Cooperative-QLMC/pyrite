@@ -114,8 +114,14 @@ def catalog_material(key: str) -> CatalogMaterial:
 def resolve_composition_table(
     key: str,
     composition: tuple[tuple[str, float], ...] | list[tuple[str, float]],
+    *,
+    projectile: str = "electron",
 ) -> StoredTable:
-    """Resolve the exact SBETHE table for one catalog-derived composition."""
+    """Resolve the exact SBETHE table for a composition and projectile.
+
+    The default selects the existing electron table. ``projectile="positron"``
+    selects the separately keyed SBETHE positron output for the same material.
+    """
     from .generate import material_request
 
     material = material_inputs_from_composition(key, composition)
@@ -125,18 +131,24 @@ def resolve_composition_table(
         density_g_cm3=material.density_g_cm3,
         mean_excitation_eV=material.mean_excitation_eV,
         band_gap_eV=material.band_gap_eV,
+        projectile=projectile,
     )
     table = resolve(request.key)
     if table is None:
+        species = "" if projectile == "electron" else f" --projectile {projectile}"
         raise TableNotFoundError(
             f"no SBETHE table for material {key!r}; generate the catalog table with "
-            f"'pyrite tables generate --code sbethe --material {key}'"
+            f"'pyrite tables generate --code sbethe --material {key}{species}'"
         )
     return table
 
 
-def resolve_catalog_table(key: str) -> StoredTable:
-    """Resolve the stored SBETHE table matching a catalog key's current identity."""
+def resolve_catalog_table(key: str, *, projectile: str = "electron") -> StoredTable:
+    """Resolve the stored SBETHE table matching a catalog key's current identity.
+
+    ``projectile="positron"`` resolves the separately keyed positron table.
+    Validation: sbethe-positron-stopping
+    """
     resolved_key = str(key)
     if resolved_key in CATALOG.materials:
         resolved_key = CATALOG.material(resolved_key).crystal_key
@@ -147,7 +159,7 @@ def resolve_catalog_table(key: str) -> StoredTable:
     else:
         choices = sorted(set(CATALOG.materials) | set(CATALOG.crystals) | set(CATALOG.media))
         raise ValueError(f"unknown catalog material {key!r}; choose one of: {', '.join(choices)}")
-    return resolve_composition_table(str(key), composition)
+    return resolve_composition_table(str(key), composition, projectile=projectile)
 
 
 __all__ = [

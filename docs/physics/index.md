@@ -52,6 +52,7 @@ beam-transport/atomic-electron-deflection
 beam-transport/stopping-power
 beam-transport/inelastic-scattering-events
 beam-transport/shell-soft-hard-transport
+beam-transport/positron-transport
 ```
 
 ```{toctree}

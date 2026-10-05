@@ -1,5 +1,8 @@
 """Build the ELSEPA elastic table release and, optionally, pin it in the wheel.
 
+With ``--projectile positron``, the archive and index names include
+``-positron`` and ``--pin`` writes the separate positron index.
+
 Maintainer-only: needs gfortran for any table not already in the user table
 store. Writes ``elsepa-tables.zip`` and ``elsepa-tables.json`` into
 ``--out``. Publish the zip at ``--url`` and commit the JSON as the shipped
@@ -38,16 +41,24 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         help="where the archive will be published (repeatable, in fetch order)",
     )
+    parser.add_argument(
+        "--projectile",
+        choices=("electron", "positron"),
+        default="electron",
+        help="table species (default: electron); positrons use separate archive/index names",
+    )
     parser.add_argument("--generate", action="store_true", help="generate absent tables")
     parser.add_argument("--pin", action="store_true", help="copy the index into the package")
     args = parser.parse_args(argv)
 
-    archive, index = build_release(args.out, urls=args.url, generate=args.generate)
+    archive, index = build_release(
+        args.out, urls=args.url, generate=args.generate, projectile=args.projectile
+    )
     print(f"archive: {archive} ({index.archive_bytes / 1e6:.1f} MB)")
     print(f"sha256:  {index.archive_sha256}")
     print(f"tables:  {len(index.tables)} ({', '.join(e.label for e in index.tables)})")
     if args.pin:
-        pinned = release_index_path()
+        pinned = release_index_path(projectile=args.projectile)
         if not pinned.resolve().is_relative_to(_REPO):
             print(f"refusing to pin outside the checkout: {pinned}", file=sys.stderr)
             return 1

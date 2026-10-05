@@ -125,6 +125,7 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
         radiative_model=getattr(settings, "radiative_model", "uncoupled"),
         radiative_cutoff_eV=getattr(settings, "radiative_cutoff_eV", None),
         pair_production_model=getattr(settings, "pair_production_model", None),
+        positron_transport=getattr(settings, "positron_transport", False),
         atomic_electron_deflection=getattr(settings, "atomic_electron_deflection", "kawrakow"),
         convergence=Convergence(
             n_families=old_sweep.n_families,

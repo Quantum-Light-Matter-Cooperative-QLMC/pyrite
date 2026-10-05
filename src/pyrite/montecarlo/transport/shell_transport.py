@@ -21,7 +21,7 @@ from functools import cache
 
 import numpy as np
 
-from .hard_inelastic import INELASTIC_MODELS
+from .hard_inelastic import INELASTIC_MODELS, POSITRON_BRANCH_OFFSET
 from .shell_gos import ShellGOSMoments
 from .shell_partition import catalog_shell_partition
 from .shell_rates import catalog_shell_oscillators
@@ -77,6 +77,7 @@ class ShellInelasticTables:
     channel_branch: np.ndarray
     channel_code: np.ndarray
     channels: tuple[tuple[HardChannel, ...], ...]
+    projectile: str = "electron"
 
     def core_args(self, hard_keys: np.ndarray) -> tuple:
         """The ``inelastic`` argument tuple the CPU cores unpack."""
@@ -110,8 +111,10 @@ class ShellInelasticTables:
 
     def metadata(self) -> dict:
         """JSON-safe description carried on the transport result."""
+        species = {} if self.projectile == "electron" else {"projectile": self.projectile}
         return {
             "model": "shell-soft-hard",
+            **species,
             "cutoff_eV": float(self.cutoff_eV),
             "materials": list(self.materials),
             "channels": [
@@ -165,9 +168,9 @@ def validate_shell_cutoff(materials: Sequence[str], cutoff_eV: float) -> None:
 
 
 @cache
-def _node_moments(key: str, energy_eV: float, cutoff_eV: float):
+def _node_moments(key: str, energy_eV: float, cutoff_eV: float, projectile: str = "electron"):
     """Soft/hard partition summary at one stopping node, cached per process."""
-    part = catalog_shell_partition(key, energy_eV, cutoff_eV)
+    part = catalog_shell_partition(key, energy_eV, cutoff_eV, projectile=projectile)
     hard: ShellGOSMoments = part.hard
     channels = np.stack([hard.distant_longitudinal, hard.distant_transverse, hard.close], axis=1)[
         :, :, 0
@@ -196,6 +199,8 @@ def build_shell_inelastic_tables(
     stopping_tables: Sequence[tuple[np.ndarray, np.ndarray]],
     E_min_keV: float,
     E_max_keV: float,
+    *,
+    projectile: str = "electron",
 ) -> ShellInelasticTables:
     """Tabulate the shell soft/hard partition on each layer's stopping nodes.
 
@@ -212,7 +217,12 @@ def build_shell_inelastic_tables(
     channel endpoint gives ``f_s = 1`` exactly, i.e. the unchanged continuous
     table and no hard events.
 
-    Validation: shell-soft-hard-transport
+    ``projectile="positron"`` closes the Bhabha partition on the positron
+    SBETHE nodes (``stopping_tables`` must be the positron tables) and tags
+    ``channel_branch`` with ``POSITRON_BRANCH_OFFSET`` for the kernels;
+    ``channel_code`` keeps the species-independent ``3*oscillator + branch``.
+
+    Validation: shell-soft-hard-transport, bhabha-close
     """
     from ...xsgen.sbethe.catalog import resolve_catalog_table
 
@@ -227,7 +237,10 @@ def build_shell_inelastic_tables(
     soft_tables = []
     layer_rows = []
     for key, (log_e, log_s) in zip(materials, stopping_tables, strict=True):
-        energy_eV = np.asarray(resolve_catalog_table(key).arrays()["stopping_energy_eV"], float)
+        energy_eV = np.asarray(
+            resolve_catalog_table(key, projectile=projectile).arrays()["stopping_energy_eV"],
+            float,
+        )
         if energy_eV.shape != log_e.shape or not np.allclose(
             np.log(energy_eV * 1e-3), log_e, rtol=0.0, atol=1e-12
         ):
@@ -236,7 +249,7 @@ def build_shell_inelastic_tables(
             )
         lo, hi = _node_range(log_e, E_min_keV, E_max_keV)
         nodes = range(lo, hi + 1)
-        summary = [_node_moments(key, float(energy_eV[i]), cutoff_eV) for i in nodes]
+        summary = [_node_moments(key, float(energy_eV[i]), cutoff_eV, projectile) for i in nodes]
         soft1 = np.array([s[0] for s in summary])
         soft2 = np.array([s[1] for s in summary])
         hard1 = np.array([s[2] for s in summary])
@@ -302,7 +315,9 @@ def build_shell_inelastic_tables(
         for k, ch in enumerate(layer_channels):
             ionization[layer, k] = ch.ionization_eV
             resonance[layer, k] = ch.resonance_eV
-            branch[layer, k] = BRANCH_NAMES.index(ch.branch)
+            branch[layer, k] = BRANCH_NAMES.index(ch.branch) + (
+                POSITRON_BRANCH_OFFSET if projectile == "positron" else 0
+            )
             code[layer, k] = codes[k]
     return ShellInelasticTables(
         cutoff_eV,
@@ -319,6 +334,7 @@ def build_shell_inelastic_tables(
         branch,
         code,
         tuple(row[3] for row in layer_rows),
+        projectile,
     )
 
 

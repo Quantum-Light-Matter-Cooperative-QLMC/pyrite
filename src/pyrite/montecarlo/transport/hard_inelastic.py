@@ -43,6 +43,10 @@ _HARD_STREAM_SALT = np.uint64(0x3C6EF372FE94F82B)
 # Gaussian truncated at three standard deviations.
 _TRUNCATED_GAUSSIAN_WIDTH = 1.015387
 _BISECTION_STEPS = 200
+#: Added to a channel's branch (0 distant longitudinal, 1 distant transverse,
+#: 2 close) in positron tables (#276): branches 3-5 select the Bhabha close
+#: DCS and the largest loss ``E``. Electron tables keep 0-2 unchanged.
+POSITRON_BRANCH_OFFSET = 3
 
 
 def validate_inelastic_args(
@@ -131,23 +135,55 @@ def _moller_j0(energy_eV, prime_eV, w):
 
 
 @njit(cache=True)
+def _bhabha_j0(energy_eV, w):
+    """``J_0^(+)`` antiderivative of ``F^(+)(E, W)/W^2`` (shell_gos twin, Eq. 3.112).
+
+    Validation: bhabha-close
+    """
+    gamma = 1.0 + energy_eV / _MC2_EV
+    g = ((gamma - 1.0) / gamma) ** 2
+    gp1 = gamma + 1.0
+    b1 = (gamma - 1.0) / (gamma * gamma * gp1) * (2.0 * gp1 * gp1 - 1.0)
+    b2 = g * (3.0 * gp1 * gp1 + 1.0) / (gp1 * gp1)
+    b3 = g * 2.0 * gamma * (gamma - 1.0) / (gp1 * gp1)
+    b4 = g * (gamma - 1.0) ** 2 / (gp1 * gp1)
+    x = w / energy_eV
+    return -1.0 / w + (-b1 * np.log(w) + b2 * x - b3 * x * x / 2.0 + b4 * x**3 / 3.0) / energy_eV
+
+
+@njit(cache=True)
+def _split_branch(branch):
+    """``(branch in 0..2, positron)`` from a possibly positron-tagged branch code.
+
+    Validation: bhabha-close
+    """
+    if branch >= POSITRON_BRANCH_OFFSET:
+        return branch - POSITRON_BRANCH_OFFSET, True
+    return branch, False
+
+
+@njit(cache=True)
 def _hard_loss_bounds(energy_eV, ionization_eV, resonance_eV, branch, cutoff_eV):
     """``(lower, upper, peak_end)`` of one channel's hard loss interval [eV].
 
     Matches ``shell_sampling._loss_bounds``: close losses run from
-    ``max(U or W_cb, W_c)`` to ``(E+U)/2``; bound distant losses from
-    ``max(U, W_c)`` to ``min(W_dis, (E+U)/2)`` with the near-threshold
-    ``W_dis = E`` of PENELOPE Eqs. 3.77-3.80.
+    ``max(U or W_cb, W_c)`` to ``W_max``; bound distant losses from
+    ``max(U, W_c)`` to ``min(W_dis, W_max)`` with the near-threshold
+    ``W_dis = E`` of PENELOPE Eqs. 3.77-3.80. ``W_max = (E+U)/2`` for
+    electrons and ``E`` for positron-tagged branches (Eq. 3.88, #276).
+    Validation: penelope-shell-hard-loss-sampling, bhabha-close
     """
+    branch, positron = _split_branch(branch)
+    w_max = energy_eV if positron else 0.5 * (energy_eV + ionization_eV)
     if branch == 2:
         base = ionization_eV if ionization_eV > 0.0 else resonance_eV
-        return max(base, cutoff_eV), 0.5 * (energy_eV + ionization_eV), 0.0
+        return max(base, cutoff_eV), w_max, 0.0
     if ionization_eV == 0.0:
         return resonance_eV, resonance_eV, 0.0
     peak_end = 3.0 * resonance_eV - 2.0 * ionization_eV
     if energy_eV <= peak_end:
         peak_end = energy_eV
-    upper = min(peak_end, 0.5 * (energy_eV + ionization_eV))
+    upper = min(peak_end, w_max)
     return max(ionization_eV, cutoff_eV), upper, peak_end
 
 
@@ -158,25 +194,30 @@ def _sample_hard_transfer_eV(energy_eV, ionization_eV, resonance_eV, branch, cut
     Source: PENELOPE-2024 Eqs. 3.76, 3.87, 3.94, 3.96 and 3.104, restricted
     to ``W > W_c`` as in Eq. 3.124: bound distant losses have density
     ``p_dis(W)/W`` (the adopted convention of ``shell_sampling``); close
-    losses ``F^(-)(E+U, W)/W^2``; a conduction-band distant loss is a delta at
+    losses ``F^(-)(E+U, W)/W^2``, or Bhabha ``F^(+)(E, W)/W^2`` (Eq. 3.92) for
+    a positron-tagged branch; a conduction-band distant loss is a delta at
     ``W_cb``. Bisection to the float64 resolution of the loss interval
     replaces the host sampler's ``brentq``; both invert the same CDF.
 
     Limits: ``u = 0`` returns the lower bound; a degenerate interval (only
     reachable where an interpolated rate straddles a channel threshold)
-    returns its lower bound. Validation: penelope-shell-hard-loss-sampling
+    returns its lower bound. Validation: penelope-shell-hard-loss-sampling, bhabha-close
 
     Validation: shell-soft-hard-transport
     """
     lower, upper, peak_end = _hard_loss_bounds(
         energy_eV, ionization_eV, resonance_eV, branch, cutoff_eV
     )
+    branch, positron = _split_branch(branch)
     if branch != 2 and ionization_eV == 0.0:
         return resonance_eV
     if not upper > lower:
         return lower
     prime = energy_eV + ionization_eV
-    if branch == 2:
+    if branch == 2 and positron:
+        base = _bhabha_j0(energy_eV, lower)
+        target = u * (_bhabha_j0(energy_eV, upper) - base)
+    elif branch == 2:
         base = _moller_j0(energy_eV, prime, lower)
         target = u * (_moller_j0(energy_eV, prime, upper) - base)
     else:
@@ -186,7 +227,9 @@ def _sample_hard_transfer_eV(energy_eV, ionization_eV, resonance_eV, branch, cut
         mid = 0.5 * (lo + hi)
         if mid <= lo or mid >= hi:
             break
-        if branch == 2:
+        if branch == 2 and positron:
+            value = _bhabha_j0(energy_eV, mid) - base
+        elif branch == 2:
             value = _moller_j0(energy_eV, prime, mid) - base
         else:
             value = _triangle_cdf(peak_end, lower, mid)
@@ -216,6 +259,9 @@ def _hard_primary_cosine(energy_eV, ionization_eV, resonance_eV, branch, transfe
     Eq. 3.134 (close, ``Q = W``); transverse events do not deflect. Scalar
     twin of ``shell_sampling.sample_shell_hard_collision``.
 
+    Binary-collision kinematics are charge-independent, so a positron-tagged
+    branch uses the same cosines.
+
     Limit: ``u = 0`` gives the minimum longitudinal ``Q`` and no deflection.
     An empty recoil interval (interpolation-edge only) returns 1.
     Validation: penelope-shell-hard-recoil
@@ -223,6 +269,7 @@ def _hard_primary_cosine(energy_eV, ionization_eV, resonance_eV, branch, transfe
     Validation: shell-soft-hard-transport
     """
     two_mc2 = 2.0 * _MC2_EV
+    branch, _ = _split_branch(branch)
     if branch == 1:
         return 1.0
     if branch == 2:
@@ -269,6 +316,7 @@ def _hard_secondary_cosine(energy_eV, ionization_eV, resonance_eV, branch, trans
     shell-secondary-transport
     """
     two_mc2 = 2.0 * _MC2_EV
+    branch, _ = _split_branch(branch)
     if branch == 1:
         return 0.5
     if branch == 2:

@@ -360,7 +360,10 @@ def show_command(key: str, json_output: bool) -> None:
     type=click.Choice(sorted(_PROJECTILES), case_sensitive=False),
     default="electron",
     show_default=True,
-    help="Projectile particle. SBETHE only.",
+    help=(
+        "Projectile particle. ELSEPA: electron or positron. SBETHE: any listed "
+        "species. BremsLib: electron only."
+    ),
 )
 @click.option(
     "--t1-max",
@@ -413,6 +416,17 @@ def generate_command(
     from ...xsgen import XsgenError
 
     selected = code.lower()
+    projectile = projectile.lower()
+    if selected == "elsepa" and projectile not in ("electron", "positron"):
+        raise click.BadParameter(
+            f"{projectile!r} is unsupported by ELSEPA; choose electron or positron",
+            param_hint="--projectile",
+        )
+    if selected == "bremslib" and projectile != "electron":
+        raise click.BadParameter(
+            f"{projectile!r} is unsupported by BremsLib; choose electron",
+            param_hint="--projectile",
+        )
     try:
         if selected == "elsepa" and material is not None:
             from ...xsgen.elsepa.catalog import generate_catalog
@@ -429,7 +443,10 @@ def generate_command(
                 t1_max=t1_max_MeV,
             )
             results = generate_catalog(
-                material, overwrite=overwrite, keep_on_failure=keep_on_failure
+                material,
+                projectile=projectile,
+                overwrite=overwrite,
+                keep_on_failure=keep_on_failure,
             )
             _emit_material_tables(selected, material, results, json_output=json_output)
             return
@@ -449,6 +466,7 @@ def generate_command(
             result = generate_element(
                 atomic_number,
                 energies,
+                projectile=projectile,
                 overwrite=overwrite,
                 keep_on_failure=keep_on_failure,
             )
@@ -563,7 +581,7 @@ FETCH_CODES = ("eedl", "eadl", "epdl", "sbethe", "sbethe-tables", "elsepa", "bre
 _DATASET_FETCH_CODES = ("eedl", "eadl", "epdl")
 
 
-def _fetch_one(code: str, archive: str | None) -> dict:
+def _fetch_one(code: str, archive: str | None, *, projectile: str = "electron") -> dict:
     """Install one code and return its machine-readable outcome."""
     if code in _DATASET_FETCH_CODES:
         from ...datasets import fetch_dataset
@@ -578,13 +596,17 @@ def _fetch_one(code: str, archive: str | None) -> dict:
         }
     from ...xsgen.fetch import fetch_bremslib, fetch_elsepa, fetch_sbethe, fetch_sbethe_tables
 
-    fetch = {
-        "bremslib": fetch_bremslib,
-        "elsepa": fetch_elsepa,
-        "sbethe": fetch_sbethe,
-        "sbethe-tables": fetch_sbethe_tables,
-    }[code]
-    result = fetch(archive)
+    if projectile != "electron":
+        fetch_tables = {"elsepa": fetch_elsepa, "sbethe-tables": fetch_sbethe_tables}[code]
+        result = fetch_tables(archive, projectile=projectile)
+    else:
+        fetch = {
+            "bremslib": fetch_bremslib,
+            "elsepa": fetch_elsepa,
+            "sbethe": fetch_sbethe,
+            "sbethe-tables": fetch_sbethe_tables,
+        }[code]
+        result = fetch(archive)
     return {
         "code": code,
         "path": str(result.path),
@@ -617,8 +639,17 @@ def _fetch_line(payload: dict) -> str:
         "epdl, of the pinned file itself) instead of downloading it. Needs CODE."
     ),
 )
+@click.option(
+    "--projectile",
+    type=click.Choice(("electron", "positron"), case_sensitive=False),
+    default="electron",
+    show_default=True,
+    help="Table species. Positron requires CODE elsepa or sbethe-tables; other data are species-independent.",
+)
 @output_option
-def fetch_command(code: str | None, archive: str | None, json_output: bool) -> None:
+def fetch_command(
+    code: str | None, archive: str | None, projectile: str, json_output: bool
+) -> None:
     """Fetch pinned data into your user data directory; without CODE, all of it.
 
     \b
@@ -656,6 +687,11 @@ def fetch_command(code: str | None, archive: str | None, json_output: bool) -> N
     """
     from ...xsgen import DataFetchError
 
+    projectile = projectile.lower()
+    if projectile == "positron" and (
+        code is None or code.lower() not in ("elsepa", "sbethe-tables")
+    ):
+        raise click.UsageError("--projectile positron requires CODE elsepa or sbethe-tables")
     if code is None:
         if archive is not None:
             raise click.UsageError("--archive installs one CODE; name it, e.g. `fetch elsepa`")
@@ -688,7 +724,13 @@ def fetch_command(code: str | None, archive: str | None, json_output: bool) -> N
 
     selected = code.lower()
     try:
-        payload = _fetch_one(selected, archive)
+        payload = (
+            _fetch_one(selected, archive, projectile=projectile)
+            if projectile != "electron"
+            else _fetch_one(selected, archive)
+        )
+        if projectile != "electron":
+            payload["projectile"] = projectile
     except DataFetchError as exc:
         raise CLIError(str(exc)) from exc
 

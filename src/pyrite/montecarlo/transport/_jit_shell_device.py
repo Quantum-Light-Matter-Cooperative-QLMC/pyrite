@@ -33,7 +33,12 @@ from ._jit_device import (
     U64_ONE,
     _stream_uniform,
 )
-from .hard_inelastic import _BISECTION_STEPS, _MC2_EV, _TRUNCATED_GAUSSIAN_WIDTH
+from .hard_inelastic import (
+    _BISECTION_STEPS,
+    _MC2_EV,
+    _TRUNCATED_GAUSSIAN_WIDTH,
+    POSITRON_BRANCH_OFFSET,
+)
 
 F64_MC2_EV = np.float64(_MC2_EV)
 F64_TWO_MC2_EV = np.float64(2.0 * _MC2_EV)
@@ -42,6 +47,7 @@ F64_NINE = np.float64(9.0)
 F64_SQRT3 = np.float64(np.sqrt(3.0))
 F64_GAUSS_WIDTH = np.float64(_TRUNCATED_GAUSSIAN_WIDTH)
 I32_BISECTION_STEPS = np.int32(_BISECTION_STEPS)
+I32_POSITRON_BRANCH = np.int32(POSITRON_BRANCH_OFFSET)
 # ``hard_channel`` of a row without a hard collision.
 I16_NO_CHANNEL = np.int16(-1)
 
@@ -96,31 +102,63 @@ def _moller_j0(energy_eV, prime_eV, w):
 
 
 @jit.rawkernel(device=True)
+def _bhabha_j0(energy_eV, w):
+    """``J_0^(+)`` antiderivative of ``F^(+)(E, W)/W^2``; host ``_bhabha_j0``.
+
+    Validation: bhabha-close
+    """
+    gamma = F64_ONE + energy_eV / F64_MC2_EV
+    ratio = (gamma - F64_ONE) / gamma
+    g = ratio * ratio
+    gp1 = gamma + F64_ONE
+    b1 = (gamma - F64_ONE) / (gamma * gamma * gp1) * (F64_TWO * gp1 * gp1 - F64_ONE)
+    b2 = g * (F64_THREE * gp1 * gp1 + F64_ONE) / (gp1 * gp1)
+    b3 = g * F64_TWO * gamma * (gamma - F64_ONE) / (gp1 * gp1)
+    b4 = g * (gamma - F64_ONE) * (gamma - F64_ONE) / (gp1 * gp1)
+    x = w / energy_eV
+    return (
+        -F64_ONE / w
+        + (-b1 * xp.log(w) + b2 * x - b3 * x * x / F64_TWO + b4 * x * x * x / F64_THREE) / energy_eV
+    )
+
+
+@jit.rawkernel(device=True)
 def _sample_hard_transfer_eV(energy_eV, ionization_eV, resonance_eV, branch, cutoff_eV, u):
     """Invert one channel's restricted hard loss CDF; host ``_sample_hard_transfer_eV``.
 
-    ``_hard_loss_bounds`` is inlined. Validation: penelope-shell-hard-loss-sampling
+    ``_hard_loss_bounds`` and ``_split_branch`` are inlined: a positron-tagged
+    branch takes ``W_max = E`` and the Bhabha close CDF (#276).
+    Validation: penelope-shell-hard-loss-sampling, bhabha-close
     """
+    positron = branch >= I32_POSITRON_BRANCH
+    if positron:
+        branch = branch - I32_POSITRON_BRANCH
+    w_max = F64_HALF * (energy_eV + ionization_eV)
+    if positron:
+        w_max = energy_eV
     peak_end = F64_ZERO
     if branch == I32_TWO:
         base = ionization_eV
         if not ionization_eV > F64_ZERO:
             base = resonance_eV
         lower = xp.maximum(base, cutoff_eV)
-        upper = F64_HALF * (energy_eV + ionization_eV)
+        upper = w_max
     elif ionization_eV == F64_ZERO:
         return resonance_eV
     else:
         peak_end = F64_THREE * resonance_eV - F64_TWO * ionization_eV
         if energy_eV <= peak_end:
             peak_end = energy_eV
-        upper = xp.minimum(peak_end, F64_HALF * (energy_eV + ionization_eV))
+        upper = xp.minimum(peak_end, w_max)
         lower = xp.maximum(ionization_eV, cutoff_eV)
     if not upper > lower:
         return lower
     prime = energy_eV + ionization_eV
     base_j = F64_ZERO
-    if branch == I32_TWO:
+    if branch == I32_TWO and positron:
+        base_j = _bhabha_j0(energy_eV, lower)
+        target = u * (_bhabha_j0(energy_eV, upper) - base_j)
+    elif branch == I32_TWO:
         base_j = _moller_j0(energy_eV, prime, lower)
         target = u * (_moller_j0(energy_eV, prime, upper) - base_j)
     else:
@@ -133,7 +171,9 @@ def _sample_hard_transfer_eV(energy_eV, ionization_eV, resonance_eV, branch, cut
         mid = F64_HALF * (lo + hi)
         if mid <= lo or mid >= hi:
             break
-        if branch == I32_TWO:
+        if branch == I32_TWO and positron:
+            value = _bhabha_j0(energy_eV, mid) - base_j
+        elif branch == I32_TWO:
             value = _moller_j0(energy_eV, prime, mid) - base_j
         else:
             value = _triangle_cdf(peak_end, lower, mid)
@@ -161,6 +201,8 @@ def _hard_primary_cosine(energy_eV, ionization_eV, resonance_eV, branch, transfe
     Validation: penelope-shell-hard-recoil
     """
     two_mc2 = F64_TWO_MC2_EV
+    if branch >= I32_POSITRON_BRANCH:
+        branch = branch - I32_POSITRON_BRANCH
     if branch == I32_ONE:
         return F64_ONE
     if branch == I32_TWO:
@@ -200,6 +242,8 @@ def _hard_secondary_cosine(energy_eV, ionization_eV, resonance_eV, branch, trans
     Validation: penelope-shell-secondary-direction, shell-secondary-transport
     """
     two_mc2 = F64_TWO_MC2_EV
+    if branch >= I32_POSITRON_BRANCH:
+        branch = branch - I32_POSITRON_BRANCH
     if branch == I32_ONE:
         return F64_HALF
     if branch == I32_TWO:

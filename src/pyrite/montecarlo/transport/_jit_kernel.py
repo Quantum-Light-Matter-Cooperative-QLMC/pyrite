@@ -98,6 +98,7 @@ from ._jit_radiative_device import (
 )
 from ._jit_shell_device import (
     I16_NO_CHANNEL,
+    I32_POSITRON_BRANCH,
     _hard_primary_cosine,
     _hard_secondary_cosine,
     _log_grid_fraction,
@@ -790,6 +791,9 @@ def _transport_kernel(
             W_eV = _sample_hard_transfer_eV(
                 E_eV, il_ch_U[c_row], il_ch_W[c_row], il_ch_branch[c_row], il_cutoff_eV, u_w
             )
+            if il_ch_branch[c_row] >= I32_POSITRON_BRANCH:
+                # Positron W_max = E can exceed the row-end energy; host twin in cores.py.
+                W_eV = xp.minimum(W_eV, E_end_j * np.float64(1.0e3))
             hard_W_keV = W_eV * np.float64(1.0e-3)
             hard_code = il_ch_code[c_row]
             if sec_on == I32_ONE:
