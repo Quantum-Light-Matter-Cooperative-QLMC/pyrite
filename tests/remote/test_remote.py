@@ -762,7 +762,7 @@ def test_queue_script_cpu_flag_adds_cprofile_after_primary():
         cpu=True,
     )
     # Serial NumPy pass under cProfile, after the primary performance run.
-    assert "-m cProfile -o " in script
+    assert "-m pyrite._entry.profile_module " in script
     assert "env -u PYRITE_MC_NSYS PYRITE_MC_BACKEND=cpu" in script
     # Always the tiny --quick grid (representative call distribution in minutes,
     # not a >1h full-fidelity serial pass) with a hard --max-minutes backstop.
@@ -780,6 +780,45 @@ def test_queue_script_cpu_flag_adds_cprofile_after_primary():
     bash = shutil.which("bash")
     if bash is not None:
         assert subprocess.run([bash, "-n"], input=script, text=True).returncode == 0
+
+
+@pytest.mark.parametrize("cpu_only", [False, True])
+def test_queue_script_cpu_profile_passes_only_known_scan_options(cpu_only):
+    from pyrite.cli.commands.scan import _command
+
+    script = remote._queue_script(
+        "j",
+        ["mos2"],
+        quick=False,
+        workers=6,
+        catalog_profile="sub_100keV",
+        performance_profile="sub_100keV",
+        cpu=not cpu_only,
+        cpu_only=cpu_only,
+    )
+    cpu_call = script.split("pyrite._entry.profile_module", 1)[1].split(">>", 1)[0]
+    scan_args = cpu_call.split("pyrite._entry.scan", 1)[1].replace("\\\n", " ").split()
+    known = {opt for param in _command.params for opt in (*param.opts, *param.secondary_opts)}
+
+    assert {arg for arg in scan_args if arg.startswith("-")} <= known
+
+
+def test_profile_module_writes_stats_and_keeps_inner_exit_code(tmp_path):
+    (tmp_path / "exits_two.py").write_text(
+        "import sys\nsum(range(1000))\nsys.exit(2)\n", encoding="utf-8"
+    )
+    prof = tmp_path / "out.prof"
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join([str(tmp_path), *sys.path])}
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pyrite._entry.profile_module", str(prof), "exits_two"],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert prof.stat().st_size > 0
 
 
 def test_queue_script_nsys_alone_does_not_add_cpu_cprofile():
@@ -807,7 +846,7 @@ def test_queue_script_cpu_only_has_no_primary_gpu_or_sampler_phase():
         cpu_only=True,
     )
 
-    assert "-m cProfile -o " in script
+    assert "-m pyrite._entry.profile_module " in script
     assert "PYRITE_MC_BACKEND=cpu" in script
     assert "--progress-phase cpu" in script
     assert "cpu_only_enabled=1" in script
@@ -847,7 +886,7 @@ def test_queue_script_cpu_failure_is_terminal_and_keeps_primary_artifacts(
 ):
     fake_uv = tmp_path / "fake-uv"
     fake_uv.write_text(
-        '#!/usr/bin/env bash\ncase " $* " in *" -m cProfile "*) exit 9 ;; esac\nexit 0\n',
+        '#!/usr/bin/env bash\ncase " $* " in *" pyrite._entry.profile_module "*) exit 9 ;; esac\nexit 0\n',
         encoding="utf-8",
     )
     fake_uv.chmod(0o755)
