@@ -172,11 +172,6 @@ def test_timepix_response_accepts_a_log_grid_and_uses_local_input_widths():
     response = timepix_response.TimepixResponse(LOG_GRID, n_mc=8)
     _, widths = node_bin_edges_and_widths(LOG_GRID)
     assert np.array_equal(response.dE_fine, widths)
-    rebinned = np.bincount(
-        response.idx_in,
-        weights=np.ones_like(LOG_GRID) * response.dE_fine,
-        minlength=response.n_in,
-    )
     # fine_edges carries the detector's explicit 0 eV channel below the source
     # floor (#100); it holds no source mass, so the density pads with a zero.
     unit_density = np.ones_like(LOG_GRID)
@@ -188,7 +183,6 @@ def test_timepix_response_accepts_a_log_grid_and_uses_local_input_widths():
     )
     assert np.sum(conservative) == pytest.approx(np.sum(widths), rel=1e-14)
     assert outside == (0.0, 0.0)
-    assert np.sum(rebinned) == pytest.approx(np.sum(conservative), rel=1e-14)
     detected = response.apply(np.ones_like(LOG_GRID))
     assert detected.shape == LOG_GRID.shape
     assert np.all(np.isfinite(detected))

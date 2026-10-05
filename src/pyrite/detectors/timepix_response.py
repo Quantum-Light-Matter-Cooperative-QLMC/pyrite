@@ -430,10 +430,6 @@ class TimepixResponse:
         self.in_edges = in_edges
         self.E_in = 0.5 * (in_edges[:-1] + in_edges[1:])  # coarse bin centres
         self.n_in = self.E_in.size
-        # precompute which coarse-input bin each fine bin maps to, so .apply()
-        # can re-bin any spectrum with a single bincount (flux-conserving)
-        self.idx_in = np.clip(((E - in_edges[0]) / dE_mc).astype(int), 0, self.n_in - 1)
-        self._occupied_input_bins, self._input_starts = np.unique(self.idx_in, return_index=True)
 
         # --- coarse OUTPUT grid --------------------------------------------
         # recorded energy can sit below E_in (charge loss) or above it (ToT
@@ -459,8 +455,28 @@ class TimepixResponse:
         self.fwhm_rec = resp["fwhm_rec"]
         self.sigma_diff_um = resp["sigma_diff_um"]
 
+    def _input_channel_masses(self, spec):
+        """Integrate constant source-cell density over input-channel overlaps.
+
+        Source: histogram interval-overlap integral (energy-grid semantics).
+        Assumes constant density inside midpoint cells; a positive source floor
+        has no flux beneath it. Zero density gives exactly zero channel mass.
+
+        Validation: detector-timepix
+        """
+        if self.zero_channel:
+            # The detector's [0, first source edge) channel has no source mass.
+            spec = np.concatenate(([0.0], spec))
+        masses, outside = rebin_piecewise_constant_density(self.fine_edges, spec, self.in_edges)
+        if outside != (0.0, 0.0):
+            raise RuntimeError("Timepix input-channel edges failed to cover the source grid")
+        return masses
+
     def apply_native(self, spec):
         """Return detected event mass on ``out_edges_eV`` for one spectrum or a batch.
+
+        Uses the same constant-density source-cell overlap integral as ``apply``
+        before applying the response matrix. No output interpolation is needed.
 
         Validation: detector-timepix
         """
@@ -475,11 +491,8 @@ class TimepixResponse:
             raise ValueError("native Timepix incident density must be nonnegative")
         flattened = values.reshape(-1, self.E.size)
         coarse_input = np.zeros((flattened.shape[0], self.n_in), dtype=float)
-        coarse_input[:, self._occupied_input_bins] = np.add.reduceat(
-            flattened * self.dE_fine,
-            self._input_starts,
-            axis=1,
-        )
+        for index, spectrum in enumerate(flattened):
+            coarse_input[index] = self._input_channel_masses(spectrum)
         native = coarse_input @ self.R.T
         return native.reshape((*values.shape[:-1], self.R.shape[0]))
 
@@ -510,13 +523,7 @@ class TimepixResponse:
             Detected density on the same fine grid and in the same flux units.
         """
         spec = _si_sensor.prep_spectrum(spec, self.E, "timepix_response")
-        if self.zero_channel:
-            # The explicit [0, first source edge) detector channel carries no
-            # source mass: the continuum model has no support below its floor.
-            spec = np.concatenate(([0.0], spec))
-        n_in, outside = rebin_piecewise_constant_density(self.fine_edges, spec, self.in_edges)
-        if outside != (0.0, 0.0):
-            raise RuntimeError("Timepix input-channel edges failed to cover the source grid")
+        n_in = self._input_channel_masses(spec)
         S_out_coarse = (self.R @ n_in) / self.dE_out  # detected density / eV
         return np.interp(self.E, self.E_out, S_out_coarse, left=0.0, right=0.0)
 

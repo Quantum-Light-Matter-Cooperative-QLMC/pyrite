@@ -28,9 +28,9 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Code:** `detectors/timepix_response.py::TimepixResponse`
 - **Source:** Henke `f₂` convention, Chantler/FFAST tabulation via xraydb (Si)
 - **Status:** unverified
-- **Checks:** native measured-bin batch application matches one-spectrum application; output bins are explicit and nonnegative; detected event mass cannot exceed incident event mass in the focused regression
-- **Anchor:** `tests/instrument/test_acquisition_core.py`
-- **Notes:** **hardware params are placeholders** — can't sign off until real quad values land. The native-bin checks cover operator bookkeeping only, not hardware accuracy.
+- **Checks:** native measured-bin batch application matches one-spectrum application; output bins are explicit and nonnegative; detected event mass cannot exceed incident event mass in the focused regression; source cells split by overlap onto the same fixed input channels in both scoring paths; an exactly represented line has partition-independent native mass, and Gaussian native counts on uniform and resonance-local axes agree within 1e-5
+- **Anchor:** `tests/instrument/test_acquisition_core.py`; `tests/detectors/test_timepix_native_rebin.py`
+- **Notes:** **hardware params are placeholders** — can't sign off until real quad values land. The native-bin checks cover operator bookkeeping only, not hardware accuracy. Issue #219 replaces native node assignment with the same piecewise-constant overlap integral as `apply`; interpolation of measured density back onto source nodes has its own quadrature/truncation error. Transport/checkpoint and observation identity payloads are unchanged: stored observations contain true-spatial factors and rescore native counts at read time, so rescoring updates expected counts and fixed-seed Poisson draws without rerunning transport. No native-count golden is stored. Fresh-context overlap derivation and independent numeric references match; the bookkeeping subclaim is rederived, while the full hardware claim remains unverified. [Resampling verification](detectors/detector-timepix.md).
 
 ## `pixel-acquisition-counting`
 
