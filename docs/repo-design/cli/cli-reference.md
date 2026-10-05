@@ -986,7 +986,7 @@ Options:
                             NAME.
   --min-age-minutes NUMBER  Only release reservations at least this old.  [default: 5.0]
   -y, --yes                 Reclaim exactly what was previewed.
-  -v, --verbose             Print raw ssh/scp commands instead of a status line.
+  -v, --verbose             Print raw ssh/scp/rsync commands instead of a status line.
   -h, --help                Show this message and exit.
 ```
 
@@ -1025,7 +1025,7 @@ Usage: pyrite remote performance pull [OPTIONS] PERFORMANCE_PROFILE
   Fetch one profile's NDJSON, Nsight, CPU-profile, and py-spy artifacts.
 
 Options:
-  -v, --verbose  Print raw ssh/scp commands instead of a status line.
+  -v, --verbose  Print raw ssh/scp/rsync commands instead of a status line.
   -h, --help     Show this message and exit.
 ```
 
@@ -1039,7 +1039,7 @@ Usage: pyrite remote performance rm [OPTIONS] [PROFILE]...
 Options:
   --all          Select every remote profile.
   -y, --yes      Delete exact previewed directories.
-  -v, --verbose  Print raw ssh/scp commands instead of a status line.
+  -v, --verbose  Print raw ssh/scp/rsync commands instead of a status line.
   -h, --help     Show this message and exit.
 ```
 
@@ -1055,7 +1055,7 @@ Options:
   --all           Prune every terminal job directory.
   --profile NAME  Prune the NAME / NAME-N job-directory family only.
   -y, --yes       Delete exact previewed directories.
-  -v, --verbose   Print raw ssh/scp commands instead of a status line.
+  -v, --verbose   Print raw ssh/scp/rsync commands instead of a status line.
   -h, --help      Show this message and exit.
 ```
 
@@ -1096,7 +1096,8 @@ Options:
   --force                         With partial merge, insert records absent locally.
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
-  -v, --verbose                   Print raw ssh/scp commands instead of a status line.
+  -v, --verbose                   Print raw ssh/scp/rsync commands instead of a status
+                                  line.
   -h, --help                      Show this message and exit.
 ```
 
@@ -1111,7 +1112,7 @@ Options:
   --all           Empty remote checkpoints directory; takes no material arguments.
   --profile NAME  Delete checkpoints belonging to catalog profile NAME.
   -y, --yes       Delete exact previewed targets; otherwise preview.
-  -v, --verbose   Print raw ssh/scp commands instead of a status line.
+  -v, --verbose   Print raw ssh/scp/rsync commands instead of a status line.
   -h, --help      Show this message and exit.
 ```
 
@@ -1124,7 +1125,7 @@ Usage: pyrite remote sync [OPTIONS]
 
 Options:
   --force        Sync even while a live job is running different code.
-  -v, --verbose  Print raw ssh/scp commands instead of a status line.
+  -v, --verbose  Print raw ssh/scp/rsync commands instead of a status line.
   -h, --help     Show this message and exit.
 ```
 

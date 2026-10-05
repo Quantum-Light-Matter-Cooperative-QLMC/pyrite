@@ -61,7 +61,7 @@ def _verbose_option(function):
         "--verbose",
         "ssh_verbose",
         is_flag=True,
-        help="Print raw ssh/scp commands instead of a status line.",
+        help="Print raw ssh/scp/rsync commands instead of a status line.",
     )(function)
 
 

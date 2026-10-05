@@ -215,6 +215,15 @@ def scp_argv(*args: str) -> list[str]:
     return ["scp", *ssh_mux_options(), *args]
 
 
+def rsync_argv(*args: str) -> list[str]:
+    """Return an ``rsync`` command line whose ssh shares the control master.
+
+    ``-s`` sends paths through the rsync protocol rather than the remote shell,
+    so remote paths are passed raw (see ``rsync_remote_path``), never quoted.
+    """
+    return ["rsync", "-s", "-e", shlex.join(["ssh", *ssh_mux_options()]), *args]
+
+
 @cache
 def _remote_home(host: str) -> str:
     """Return the absolute login home of ``host`` (one ssh round trip, cached)."""
@@ -403,6 +412,14 @@ def sbatch_remote_path(*parts: str) -> str:
             "whitespace or '#'; choose a checkout path safe for #SBATCH directives"
         )
     return value
+
+
+def rsync_remote_path(path: str) -> str:
+    """Render validated host plus one raw absolute remote path for ``rsync -s``."""
+    _reject_controls("remote rsync path", path)
+    if not PurePosixPath(path).is_absolute():
+        raise SystemExit(f"invalid remote rsync path={path!r}: expected absolute POSIX path")
+    return f"{remote_host()}:{path}"
 
 
 def scp_remote_path(path: str) -> str:

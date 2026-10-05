@@ -73,6 +73,7 @@ output.
 |---|---|---|---|
 | `PYRITE_REMOTE_DIR` | Absolute POSIX path to the remote checkout, or `~/...` (expanded to the remote login home over one cached ssh call); unset is `~/pyrite`. | `remote.config` | remote destination |
 | `PYRITE_REMOTE_UV` | Executable name, absolute POSIX path, or `~/...` path for `uv` on the remote host; unset is `~/.local/bin/uv`. | `remote.config` | remote execution |
+| `PYRITE_SYNC_TRANSPORT` | `auto`, `rsync`, or `tar`; unset is `auto`. `auto` uses rsync when both ends have it and the tree is LF-clean, else tar+scp; `rsync` fails instead of falling back. | `remote.transport` | remote transfer |
 | `PYRITE_REMOTE_GPU_VENDOR` | `nvidia`, `amd`, or `intel`; unset is `nvidia`. Selects the batch-script prelude and `uv sync --extra`; `intel` fails before batch-script generation. | Environment > config store (`remote.gpu_vendor`); `console.config`, `remote.config`. | remote resources |
 | `PYRITE_REMOTE_PARTITION` | SLURM partition name for new jobs; unset is `gpu`. | Environment > config store (`remote.partition`); `console.config`, `remote.config`. | remote resources |
 | `PYRITE_REMOTE_NODELIST` | SLURM node list for `#SBATCH --nodelist`, or `any`; unset is `any`. | Environment > config store (`remote.nodelist`); `console.config`, `remote.config`. | remote resources |

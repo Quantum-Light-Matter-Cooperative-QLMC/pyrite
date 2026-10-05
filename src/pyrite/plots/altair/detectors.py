@@ -86,12 +86,17 @@ def _chart_frame(df, *, value_column, max_rows=_CHART_MAX_ROWS):
     sampled = []
     for _, group in groups:
         if "kind" in group:
-            curves = [part.sort_values("energy_eV") for _, part in group.groupby("kind", sort=False)]
+            curves = [
+                part.sort_values("energy_eV") for _, part in group.groupby("kind", sort=False)
+            ]
             energy = curves[0]["energy_eV"].to_numpy()
-            if any(not np.array_equal(curve["energy_eV"].to_numpy(), energy) for curve in curves[1:]):
+            if any(
+                not np.array_equal(curve["energy_eV"].to_numpy(), energy) for curve in curves[1:]
+            ):
                 raise ValueError("detector curves must share one energy grid")
             normalized = [
-                np.abs(curve[value_column].to_numpy()) / max(np.nanmax(np.abs(curve[value_column])), 1e-300)
+                np.abs(curve[value_column].to_numpy())
+                / max(np.nanmax(np.abs(curve[value_column])), 1e-300)
                 for curve in curves
             ]
             basis = np.maximum.reduce(normalized)

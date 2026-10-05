@@ -4,6 +4,7 @@ import hashlib
 import io
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -13,8 +14,9 @@ import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
+from .._env import env_value
 from ..console import dashboard as presentation
 from . import config
 
@@ -219,6 +221,7 @@ def _remote_energy_grid_artifacts() -> frozenset[str]:
 _XSGEN_TABLE_DIR = "xsgen/tables"
 _XSGEN_NAME_RE = re.compile(r"[0-9a-f]{64}\.(?:npz|json)")
 _XSGEN_SECTION_MARK = "---pyrite-xsgen-inventory---"
+_RSYNC_PROBE_MARK = "---pyrite-rsync-probe---"
 
 
 def _local_xsgen_tables() -> dict[str, Path]:
@@ -295,12 +298,18 @@ def _parse_xsgen_inventory(output: str) -> dict[str, str]:
 
 
 def _remote_inventories(
-    *, artifacts: bool, tables: bool, datasets: bool = False, sdbase: bool = False
-) -> tuple[frozenset[str], dict[str, str], dict[str, str], dict[str, str]]:
+    *,
+    artifacts: bool,
+    tables: bool,
+    datasets: bool = False,
+    sdbase: bool = False,
+    rsync: bool = False,
+) -> tuple[frozenset[str], dict[str, str], dict[str, str], dict[str, str], bool]:
     """Inventory artifacts, xsgen tables, datasets and sdbase in one SSH round trip.
 
     Each section runs in its own subshell, so one section's ``cd`` cannot
-    move the next.
+    move the next. ``rsync`` appends a probe for the box's ``rsync``; the last
+    element reports it, and a missing probe section reads as absent.
     """
     commands: list[str] = []
     remote_root = ""
@@ -316,9 +325,14 @@ def _remote_inventories(
     if sdbase:
         commands.append(f"echo {_SDBASE_SECTION_MARK}")
         commands.append(f"( {_sdbase_inventory_command()} )")
+    if rsync:
+        commands.append(f"echo {_RSYNC_PROBE_MARK}")
+        commands.append("command -v rsync >/dev/null 2>&1 && echo rsync")
     if not commands:
-        return frozenset(), {}, {}, {}
+        return frozenset(), {}, {}, {}, False
     output = _ssh_capture("; ".join(commands))
+    output, _, probe_part = output.partition(_RSYNC_PROBE_MARK + "\n")
+    remote_rsync = rsync and probe_part.strip() == "rsync"
     if sdbase and _SDBASE_SECTION_MARK not in output:
         raise SystemExit("invalid remote sdbase inventory")
     output, _, sdbase_part = output.partition(_SDBASE_SECTION_MARK + "\n")
@@ -336,6 +350,7 @@ def _remote_inventories(
         _parse_xsgen_inventory(table_part) if tables else {},
         _parse_dataset_inventory(dataset_part) if datasets else {},
         _parse_sdbase_inventory(sdbase_part) if sdbase else {},
+        remote_rsync,
     )
 
 
@@ -761,9 +776,161 @@ def _remote_sync_lock():
         proc.wait()
 
 
+# --- code-sync transport ------------------------------------------------------
+#
+# rsync sends only changed files and mirrors deletions; tar+scp re-ships the
+# whole tree. rsync is optional: ``auto`` uses it when both ends have it and the
+# tree is safe for it, else tar. Both transports ship the same entries, so the
+# payload digest -- and the stamp -- do not depend on which one ran.
+
+_SYNC_TRANSPORTS = ("auto", "rsync", "tar")
+# Copy semantics shared by every rsync call. --checksum: judge by content, not
+# mtime. --delay-updates: rename every updated file into place at the end, so a
+# failed transfer leaves the live tree as it was.
+_RSYNC_FLAGS = ("-a", "--checksum", "--delay-updates")
+# rsync glob metacharacters: an external-catalog file named with one could not
+# be matched literally by the include filter.
+_RSYNC_PATTERN_CHARS = frozenset("*?[\\\n")
+
+
+def _sync_transport_mode() -> str:
+    """Return ``PYRITE_SYNC_TRANSPORT`` (``auto`` by default), validated."""
+    mode = env_value("PYRITE_SYNC_TRANSPORT", "auto").strip().lower() or "auto"
+    if mode not in _SYNC_TRANSPORTS:
+        raise SystemExit(
+            f"invalid PYRITE_SYNC_TRANSPORT={mode!r}: expected one of {', '.join(_SYNC_TRANSPORTS)}"
+        )
+    return mode
+
+
+def _local_rsync_blocker(entries: list[tuple[str, Path]]) -> str | None:
+    """Return why this machine/tree cannot use rsync, or ``None`` if it can.
+
+    rsync copies bytes verbatim, so a CRLF text file -- which the tar path
+    normalizes to LF -- would land on the box with CRLF; such a tree uses tar.
+    """
+    if os.name != "posix":
+        return "not a POSIX client"
+    if shutil.which("rsync") is None:
+        return "rsync not found locally"
+    for arcname, local in entries:
+        if arcname.startswith("external-catalog/") and _RSYNC_PATTERN_CHARS & set(arcname):
+            return f"catalog file name not rsync-safe: {arcname}"
+        if local.suffix.lower() in config.TEXT_EXTS and b"\r\n" in local.read_bytes():
+            return f"CRLF line endings in {arcname}"
+    return None
+
+
+def _rsync_protected(sync_path: str) -> list[str]:
+    """Anchored rsync excludes for paths below ``sync_path`` it must not touch.
+
+    The energy-grid artifact store ships as a content delta, and a pre-#263 box
+    keeps its only dataset copy at the legacy path; neither is in the rsync file
+    list, so without an exclude ``--delete`` would remove them.
+    """
+    from ..datasets import DATASETS
+
+    protected = [f"{_ENERGY_GRID_ARTIFACT_ROOT.as_posix()}/"]
+    protected += [f"{_LEGACY_DATASET_DIR}/{d.filename}" for d in DATASETS.values()]
+    prefix = f"{sync_path}/"
+    return [
+        f"--exclude=/{path.removeprefix(prefix)}" for path in protected if path.startswith(prefix)
+    ]
+
+
+def _rsync_cache_filters() -> list[str]:
+    """Perishable excludes for generated caches.
+
+    Never shipped, and never deleted from a live directory on the box, but
+    ignored when deciding whether a stale directory can be removed -- so a
+    deleted package does not linger as an importable ``__pycache__`` husk.
+    """
+    return [f"--filter=-p {name}/" for name in sorted(_SYNC_EXCLUDED_DIRS)] + [
+        f"--filter=-p *{suffix}" for suffix in sorted(_SYNC_EXCLUDED_SUFFIXES)
+    ]
+
+
+def _rsync_code(entries: list[tuple[str, Path]], workdir: str) -> None:
+    """Mirror each SYNC_PATHS entry, then the selected external catalog.
+
+    ``--delete`` only ever targets one sync path (or ``external-catalog/``),
+    never the checkout root, so ``checkpoints/``, ``jobs/``, ``.venv``, the
+    stamp and the xsgen tables are outside every transfer.
+    """
+    label = "Syncing code to remote box (rsync)..."
+    stats = ("--stats",) if _VERBOSE else ()
+    files: list[str] = []
+    for sync_path in config.SYNC_PATHS:
+        local = config.LOCAL_ROOT / sync_path
+        if not local.exists():
+            continue
+        if not local.is_dir():
+            # ``/./`` marks where -R starts the path kept below the remote root.
+            files.append(f"{config.LOCAL_ROOT}/./{sync_path}")
+            continue
+        dest = config.rsync_remote_path(config.remote_path(sync_path))
+        argv = config.rsync_argv(
+            *_RSYNC_FLAGS,
+            *stats,
+            "--delete",
+            *_rsync_cache_filters(),
+            *_rsync_protected(sync_path),
+            f"{local}/",
+            f"{dest}/",
+        )
+        _run(argv, label=label)
+        label = None
+    if files:
+        # Plain files share one call (each call pays an ssh/rsync startup); no
+        # --delete, so the checkout root as destination is safe.
+        root = config.rsync_remote_path(config.remote_dir().rstrip("/") or "/")
+        _run(config.rsync_argv(*_RSYNC_FLAGS, *stats, "-R", *files, f"{root}/"), label=label)
+        label = None
+    catalog = [arc for arc, _ in entries if arc.startswith("external-catalog/")]
+    if catalog:
+        from .._catalog_layout import selected_catalog
+
+        rules: dict[str, None] = {}
+        for arcname in catalog:
+            parts = PurePosixPath(arcname).parts[1:]
+            for depth in range(1, len(parts)):
+                rules["+ /" + "/".join(parts[:depth]) + "/"] = None
+            rules["+ /" + "/".join(parts)] = None
+        rule_file = Path(workdir) / "external-catalog.rules"
+        rule_file.write_text("".join(f"{rule}\n" for rule in rules) + "- *\n")
+        _run(
+            config.rsync_argv(
+                *_RSYNC_FLAGS,
+                *stats,
+                "--delete",
+                "--delete-excluded",
+                f"--filter=merge {rule_file}",
+                f"{selected_catalog()}/",
+                f"{config.rsync_remote_path(config.remote_path('external-catalog'))}/",
+            ),
+            label=label,
+        )
+    elif any(arc == "external-catalog.toml" for arc, _ in entries):
+        from .._catalog_layout import selected_catalog
+
+        _run(
+            config.rsync_argv(
+                *_RSYNC_FLAGS,
+                *stats,
+                str(selected_catalog()),
+                config.rsync_remote_path(config.remote_path("external-catalog.toml")),
+            ),
+            label=label,
+        )
+
+
 def sync_code(*, force: bool = False):
-    """Tar SYNC_PATHS up (CRLF->LF normalized for text, via _add_to_tar) and
-    extract them over the repo on the box. Stale Python sources are removed
+    """Ship SYNC_PATHS to the box: by rsync when both ends have it (see
+    ``_rsync_code``), else by the tar path below. Both ship the same entries
+    under the same payload digest.
+
+    Tar path: tar SYNC_PATHS up (CRLF->LF normalized for text, via _add_to_tar)
+    and extract them over the repo on the box. Stale Python sources are removed
     immediately before extraction so deleted or relocated modules cannot affect
     imports or source-keyed caches. Generated interpreter/tool caches are
     excluded: they are host-specific, unnecessary, and expensive to gzip.
@@ -797,21 +964,45 @@ def _sync_code_locked(entries, digest, *, force):
     local_dataset_digests = {arc: _local_sha256(path) or "" for arc, path in local_datasets.items()}
     local_sdbase = _local_sdbase()
     local_sdbase_digests = {arc: _local_sha256(path) or "" for arc, path in local_sdbase.items()}
-    remote_artifacts, remote_tables, remote_datasets, remote_sdbase = _remote_inventories(
-        artifacts=bool(local_artifacts),
-        tables=bool(local_tables),
-        datasets=bool(local_datasets),
-        sdbase=bool(local_sdbase),
+    mode = _sync_transport_mode()
+    blocker = "PYRITE_SYNC_TRANSPORT=tar" if mode == "tar" else _local_rsync_blocker(entries)
+    remote_artifacts, remote_tables, remote_datasets, remote_sdbase, remote_rsync = (
+        _remote_inventories(
+            artifacts=bool(local_artifacts),
+            tables=bool(local_tables),
+            datasets=bool(local_datasets),
+            sdbase=bool(local_sdbase),
+            rsync=blocker is None,
+        )
     )
+    if blocker is None and not remote_rsync:
+        blocker = "rsync not found on the remote box"
+    if mode == "rsync" and blocker is not None:
+        raise SystemExit(
+            f"PYRITE_SYNC_TRANSPORT=rsync, but rsync cannot be used: {blocker}. "
+            "Unset it (or set it to auto) to fall back to tar."
+        )
+    use_rsync = blocker is None
+    if _VERBOSE:
+        chosen = "rsync" if use_rsync else f"tar ({blocker})"
+        print(f"sync transport: {chosen}", flush=True, file=sys.stderr)
     table_files = _xsgen_to_ship(local_tables, local_table_digests, remote_tables)
     dataset_files = _datasets_to_ship(local_datasets, local_dataset_digests, remote_datasets)
     sdbase_files = _datasets_to_ship(local_sdbase, local_sdbase_digests, remote_sdbase)
+    # rsync carries everything but the energy-grid artifacts, which keep their
+    # content-delta path through the (then usually empty) tar.
+    tar_entries = (
+        [(arc, f) for arc, f in entries if Path(arc).is_relative_to(_ENERGY_GRID_ARTIFACT_ROOT)]
+        if use_rsync
+        else entries
+    )
+    shipped_any = False
     with tempfile.TemporaryDirectory() as td:
         # Unique per sync: nothing else on the box shares, extracts or removes it.
         remote_tar = f"/tmp/pyrite_code.{digest[:12]}.{uuid.uuid4().hex}.tgz"
         tarpath = os.path.join(td, "pyrite_code.tgz")
         with tarfile.open(tarpath, "w:gz") as t:
-            for arc, f in entries:
+            for arc, f in tar_entries:
                 artifact_digest = (
                     f.stem if Path(arc).is_relative_to(_ENERGY_GRID_ARTIFACT_ROOT) else None
                 )
@@ -823,6 +1014,7 @@ def _sync_code_locked(entries, digest, *, force):
             # Verbatim, never CRLF-normalized: the pins cover the CRLF bytes.
             for arc, f in (*dataset_files, *sdbase_files):
                 t.add(f, arcname=arc)
+            shipped_any = bool(t.getmembers())
         if local_datasets:
             shipped = sum(f.stat().st_size for _, f in dataset_files)
             print(
@@ -847,10 +1039,13 @@ def _sync_code_locked(entries, digest, *, force):
                 flush=True,
                 file=sys.stderr,
             )
-        _run(
-            config.scp_argv(tarpath, config.scp_remote_path(remote_tar)),
-            label="Syncing code to remote box...",
-        )
+        if use_rsync:
+            _rsync_code(entries, td)
+        if shipped_any or not use_rsync:
+            _run(
+                config.scp_argv(tarpath, config.scp_remote_path(remote_tar)),
+                label=None if use_rsync else "Syncing code to remote box...",
+            )
     # -n: redirect ssh's stdin from null. Without it, ssh.exe inherits the
     # interactive console stdin and its stdin-forwarding thread never sees EOF,
     # so the client hangs after the remote command (tar) has already exited.
@@ -867,6 +1062,19 @@ def _sync_code_locked(entries, digest, *, force):
     )
     stage = f".pyrite-stage.{uuid.uuid4().hex}"
     tar_word = config.shell_single_word(remote_tar)
+    stamp_write = (
+        f"printf %s {config.shell_arg(stamp.render())} "
+        f"> {config.shell_single_word(config.remote_sync_stamp_path())}"
+    )
+    if use_rsync:
+        _run(
+            config.ssh_argv(
+                "-n",
+                config.remote_host(),
+                _rsync_finish_command(stage if shipped_any else None, tar_word, stamp_write),
+            )
+        )
+        return
     _run(
         config.ssh_argv(
             "-n",
@@ -878,8 +1086,29 @@ def _sync_code_locked(entries, digest, *, force):
             f'&& {clear_catalog}for p in src/pyrite checks; do if [ -d "$p" ]; then '
             "find \"$p\" -type f -name '*.py' -delete; fi; done "
             f"&& cp -a {stage}/. . "
-            f"&& printf %s {config.shell_arg(stamp.render())} "
-            f"> {config.shell_single_word(config.remote_sync_stamp_path())}; }}; "
+            f"&& {stamp_write}; }}; "
             f"rc=$?; rm -rf {stage} {tar_word}; exit $rc",
         )
+    )
+
+
+def _rsync_finish_command(stage: str | None, tar_word: str, stamp_write: str) -> str:
+    """Remote shell run after every rsync call succeeded: unpack the delta tar
+    (when one shipped) through a staging dir, drop the catalog kind not
+    selected, then write the stamp -- last, and only if all of that worked."""
+    if config.external_catalog_selected():
+        from .._catalog_layout import selected_catalog
+
+        other = "external-catalog.toml" if selected_catalog().is_dir() else "external-catalog"
+        clear_catalog = f"rm -rf {other} && "
+    else:
+        clear_catalog = ""
+    root = config.shell_remote_dir()
+    if stage is None:
+        return f"cd {root} && {clear_catalog}{stamp_write}"
+    return (
+        f"cd {root} || exit $?; "
+        f"{{ mkdir {stage} && tar xzf {tar_word} -C {stage} && cp -a {stage}/. . "
+        f"&& {clear_catalog}{stamp_write}; }}; "
+        f"rc=$?; rm -rf {stage} {tar_word}; exit $rc"
     )

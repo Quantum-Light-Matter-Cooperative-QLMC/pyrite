@@ -2,6 +2,8 @@ from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 ScaleType = Literal["linear", "log"]
+
+
 @dataclass(frozen=True)
 class AxisSpec:
     """Scale configuration passed to plotting functions."""

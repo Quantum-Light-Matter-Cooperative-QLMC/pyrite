@@ -53,14 +53,16 @@ def test_one_round_trip_carries_both_inventories(monkeypatch):
 
     monkeypatch.setattr(transport, "_ssh_capture", capture)
 
-    artifacts, tables, datasets, sdbase = transport._remote_inventories(artifacts=True, tables=True)
+    artifacts, tables, datasets, sdbase, rsync = transport._remote_inventories(
+        artifacts=True, tables=True
+    )
 
     assert len(commands) == 1
     assert "energy-grid-artifacts" in commands[0] and "/remote/xsgen/tables" in commands[0]
     assert ".local/share}/pyrite/xsgen/tables" in commands[0]  # legacy migration
     assert artifacts == frozenset({digest})
     assert tables == {f"{KEY_A}.npz": "c" * 64}
-    assert datasets == {} and sdbase == {}
+    assert datasets == {} and sdbase == {} and rsync is False
 
 
 def test_missing_section_marker_fails_closed(monkeypatch):
