@@ -42,7 +42,7 @@ import click
 
 from .._catalog_keys import material_keys
 from .._env import GENERATED_INVOCATION_ENV, set_canonical_env
-from .._progress import _ProgressTimer, _write_progress_record
+from .._progress import _electron_progress_fields, _ProgressTimer, _write_progress_record
 from ..console import dashboard as _dashboard
 from ..console import json as cli_json
 from ..console import output as _cli_core
@@ -878,11 +878,8 @@ def _run_material(args, material, max_seconds=None):
             pass
     latest_case = {}
     last_completed_case = {}
-    # Compute-weighted progress (item 6): cost is a pure function of a case dict
-    # (sweep.case_cost), so the exact cached vs. done split run_sweep already
-    # tracks (identity, not just a count) lets `attach` render a percent that
-    # tracks relative matmul work instead of a flat case count -- see
-    # src/pyrite/apps/scan_app.py for the same cost-weighted meter run locally.
+    # Cost weighting uses sweep.case_cost and run_sweep's cached/done split to
+    # track relative matmul work; scan_app.py uses the same meter locally.
     latest_cost = {}
     initial_done_cost = None
     progress_timer = _ProgressTimer(progress_file) if progress_file is not None else None
@@ -945,6 +942,7 @@ def _run_material(args, material, max_seconds=None):
             progress_snapshot = dict(latest_progress)
             cost_snapshot = dict(latest_cost)
             case_snapshot = dict(latest_case) or None
+            electron_snapshot = _electron_progress_fields(activity_info) if case_snapshot else {}
 
         computed_cost = (
             None
@@ -968,6 +966,7 @@ def _run_material(args, material, max_seconds=None):
             if "done_cost" in cost_snapshot and "total_cost" in cost_snapshot:
                 rec["done_cost"] = cost_snapshot["done_cost"]
                 rec["total_cost"] = cost_snapshot["total_cost"]
+            rec.update(electron_snapshot)
             if progress_timer:
                 rec.update(
                     progress_timer.snapshot(
@@ -989,6 +988,7 @@ def _run_material(args, material, max_seconds=None):
                 last_completed=dict(last_completed_case) or None,
                 **progress_snapshot,
                 **cost_snapshot,
+                **electron_snapshot,
                 **progress_timer.snapshot(
                     completed_new_cases=progress_snapshot["completed_new_cases"],
                     computed_cost=computed_cost,

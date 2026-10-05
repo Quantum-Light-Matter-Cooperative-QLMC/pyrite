@@ -78,6 +78,18 @@ def _as_tracks(result):
     return dict(result, electron_id=result["track_id"])
 
 
+def test_batch_progress_covers_every_secondary_generation_without_changing_rows():
+    reports = []
+    kwargs = dict(Ne=8, per_electron_config=PerElectronTransportConfig(max_batch=2, seg_capacity=8))
+    off = _run(**kwargs)
+    on = _run(**kwargs, transport_progress=lambda done, total: reports.append((done, total)))
+    totals = on["secondaries"]["tracks_per_generation"]
+    assert len(totals) >= 2
+    assert [total for done, total in reports if done == total] == list(totals)
+    for field in (*ROW_KEYS, "track_id", "parent_id", "generation", "electron_id"):
+        np.testing.assert_array_equal(off[field], on[field])
+
+
 @pytest.mark.parametrize("key", ("silicon", "mos2"))
 @pytest.mark.parametrize("energy_eV", (6.0e3, 3.0e4))
 def test_in_kernel_secondary_direction_matches_host_sampler(key, energy_eV):

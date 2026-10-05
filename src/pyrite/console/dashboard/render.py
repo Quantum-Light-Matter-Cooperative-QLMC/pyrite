@@ -420,6 +420,15 @@ def _format_now_testing(current):
         return ""
 
 
+def _format_electron_progress(record):
+    """Within-case transport electron progress of the active case, or ""."""
+    done = record.get("transport_electrons_done")
+    total = record.get("transport_electrons_total")
+    if not isinstance(done, int) or not isinstance(total, int) or total <= 0:
+        return ""
+    return f"electrons {done:,}/{total:,} ({round(100 * done / total)}%)"
+
+
 def _format_case_progress(records, materials=()):
     """Render the latest validated atomic case snapshots."""
     if not records:
@@ -449,11 +458,11 @@ def _format_case_progress(records, materials=()):
         track = _progress_track(completed, total)
         accent = paint(f"{glyph} {track}", _progress_group(state))
         activity = record.get("activity")
-        now = (
-            _format_now_testing(record.get("current"))
-            if state == "running" and activity == "computing"
-            else ""
-        )
+        computing = state == "running" and activity == "computing"
+        now = _format_now_testing(record.get("current")) if computing else ""
+        electrons = _format_electron_progress(record) if computing else ""
+        if electrons:
+            now = f"{now} · {electrons}" if now else electrons
         activity_label = {
             "loading": "loading checkpoint",
             "saving": "saving checkpoint",

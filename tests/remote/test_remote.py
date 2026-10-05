@@ -3469,6 +3469,57 @@ def test_parse_progress_records_accepts_paused_state():
     assert records["hopg"]["state"] == "paused"
 
 
+@pytest.mark.parametrize("done,total", [(0, 1000), (250, 1000), (1000, 1000)])
+def test_progress_records_render_valid_electron_counts(done, total):
+    snapshot = {
+        "material": "hopg",
+        "total_cases": 1,
+        "cached_cases": 0,
+        "completed_new_cases": 0,
+        "state": "running",
+        "activity": "computing",
+        "transport_electrons_done": done,
+        "transport_electrons_total": total,
+    }
+    records = presentation.parse_progress_records(json.dumps(snapshot))
+    assert records["hopg"] == snapshot
+    output = dashboard_render._format_case_progress(records, ["hopg"])
+    assert f"electrons {done:,}/{total:,} ({round(100 * done / total)}%)" in output
+    records["hopg"].update(activity="saving")
+    assert "electrons" not in dashboard_render._format_case_progress(records, ["hopg"])
+    records["hopg"].update(activity="computing", state="done")
+    assert "electrons" not in dashboard_render._format_case_progress(records, ["hopg"])
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {},
+        {"transport_electrons_done": 1},
+        {"transport_electrons_total": 10},
+        {"transport_electrons_done": -1, "transport_electrons_total": 10},
+        {"transport_electrons_done": 11, "transport_electrons_total": 10},
+        {"transport_electrons_done": 0, "transport_electrons_total": 0},
+        {"transport_electrons_done": True, "transport_electrons_total": 10},
+        {"transport_electrons_done": 0, "transport_electrons_total": True},
+        {"transport_electrons_done": 1.0, "transport_electrons_total": 10},
+        {"transport_electrons_done": 1, "transport_electrons_total": "10"},
+        {"transport_electrons_done": None, "transport_electrons_total": 10},
+    ],
+)
+def test_progress_records_drop_invalid_electron_counts_and_keep_legacy_records(fields):
+    legacy = {
+        "material": "hopg",
+        "total_cases": 1,
+        "cached_cases": 0,
+        "completed_new_cases": 0,
+        "state": "running",
+    }
+    records = presentation.parse_progress_records(json.dumps({**legacy, **fields}))
+    assert records == {"hopg": legacy}
+    assert "electrons" not in dashboard_render._format_case_progress(records, ["hopg"])
+
+
 def test_parse_progress_records_preserves_primary_and_cpu_phases_for_one_material():
     records = presentation.parse_progress_records(
         "\n".join(

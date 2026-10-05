@@ -53,6 +53,14 @@ class _ProgressTimer:
         return fields
 
 
+def _electron_progress_fields(activity):
+    """Copy a complete electron-progress pair, omitting partial updates."""
+    keys = ("transport_electrons_done", "transport_electrons_total")
+    if all(activity.get(key) is not None for key in keys):
+        return {key: activity[key] for key in keys}
+    return {}
+
+
 def _write_progress_record(
     path,
     *,
@@ -70,6 +78,8 @@ def _write_progress_record(
     active_compute_seconds=None,
     measured_new_cases=None,
     measured_new_cost=None,
+    transport_electrons_done=None,
+    transport_electrons_total=None,
 ):
     """Atomically replace one scan's compact JSON progress record.
 
@@ -82,6 +92,9 @@ def _write_progress_record(
     (``sweep.case_cost``) enabling a compute-aware progress bar; omitted when
     either is None -- callers that don't cost-weight (rebrem, reline, blaze)
     keep writing the same record shape as before.
+    ``transport_electrons_done``/``transport_electrons_total`` (optional) are
+    the active case's within-case electron-batch progress for its current
+    transport pass; omitted unless both are given.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -109,6 +122,9 @@ def _write_progress_record(
         record["measured_new_cases"] = measured_new_cases
     if measured_new_cost is not None:
         record["measured_new_cost"] = measured_new_cost
+    if transport_electrons_done is not None and transport_electrons_total is not None:
+        record["transport_electrons_done"] = transport_electrons_done
+        record["transport_electrons_total"] = transport_electrons_total
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(record, separators=(",", ":")) + "\n", encoding="utf-8")
     os.replace(tmp, path)

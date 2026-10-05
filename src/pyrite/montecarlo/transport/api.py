@@ -92,6 +92,7 @@ def simulate_trajectories(
     *,
     pair_production_model=None,
     atomic_electron_deflection=None,
+    transport_progress=None,
     _secondary=None,
 ):
     """
@@ -102,8 +103,7 @@ def simulate_trajectories(
 
     Full derivations, sources, and limiting-case checks for the physics below
     live in ``docs/physics/beam-transport/*.md``; validation status is recorded
-    in ``docs/validation/``. This docstring states only the
-    parameter contract and the BIT-FOR-BIT
+    in ``docs/validation/``. This docstring states the parameter contract and BIT-FOR-BIT
     limiting case each one must preserve.
 
     elastic_model: "elsepa" (default; tabulated ELSEPA total cross sections
@@ -291,6 +291,11 @@ def simulate_trajectories(
     per_electron_config: batching policy for the two new cores
     (:class:`PerElectronTransportConfig`). Segment capacity and scratch
     budget only bound memory and replay behavior; neither changes results.
+
+    transport_progress: optional ``callable(electrons_done, Ne)`` per completed
+    per-electron/CUDA batch, excluding capacity replays; lockstep reports nothing.
+    Each cascade generation reports its own ``Ne``. Host counters only: no extra
+    device sync or draws; results stay BIT-FOR-BIT identical. None reports nothing.
 
     energy_model: how a physical flight's energy and clock advance along it.
       "frozen" -- the historical left-endpoint rule: stopping power
@@ -520,16 +525,9 @@ def simulate_trajectories(
         raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
 
     if E_cut_by_electrons is None:
-        E_cut_by_electrons = np.full(
-            Ne,
-            float(E_cut_keV),
-            dtype=np.float64,
-        )
+        E_cut_by_electrons = np.full(Ne, float(E_cut_keV), dtype=np.float64)
     else:
-        E_cut_by_electrons = np.asarray(
-            E_cut_by_electrons,
-            dtype=np.float64,
-        )
+        E_cut_by_electrons = np.asarray(E_cut_by_electrons, dtype=np.float64)
 
         if E_cut_by_electrons.shape != (Ne,):
             raise ValueError(
@@ -960,6 +958,7 @@ def simulate_trajectories(
                     else None
                 ),
                 keys=None if launch is None else launch.stream_keys,
+                on_batch=transport_progress,
             )
         )
     elif groove is None and transport_lut is not None:
@@ -1063,6 +1062,7 @@ def simulate_trajectories(
                     else None
                 ),
                 keys=None if launch is None else launch.stream_keys,
+                on_batch=transport_progress,
                 radiative=((radiative_args, seg_rad_k, seg_rad_Z) if radiative_mode else None),
             )
         )
