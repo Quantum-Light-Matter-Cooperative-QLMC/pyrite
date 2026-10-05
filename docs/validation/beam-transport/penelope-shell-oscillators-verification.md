@@ -304,3 +304,321 @@ equations and code are unchanged. The SiO₂ factor becomes $a=3.4701$, and
 22 eV lies 0.25% below Eq. 3.62 at catalog density. The status stays
 `rederived` because only a verified input value changed; a fresh check can
 confirm the new $a$.
+
+## Addendum: WSe2 (issue #218)
+
+Scope: only the new `wse2` entry in `src/pyrite/data/conduction_band.toml`,
+with its rows in `penelope-shell-oscillators.md`, the test pin and the
+ledger row (commit `be71f4ac`). The equations and code are unchanged and
+were verified above.
+
+- **Claim**: `penelope-shell-oscillators`, WSe₂ input. Code:
+  `data/conduction_band.toml::wse2` used by
+  `montecarlo/transport/shell_oscillators.py::build_shell_oscillators`.
+  Source: Ahmad et al., J. Phys.: Condens. Matter 29, 165502 (2017),
+  with PENELOPE-2024 Eqs. 3.62 and 3.64.
+- **Filters**: units pass; limits pass ($f_{cb}+\sum_k f_k=142=Z$, and
+  every bound $W_k>U_k$); signs and conventions pass.
+- **Re-derivation**: `matches` ($a=2.03826$ against the pinned 2.0383).
+- **Verdict**: `rederived`, with three wording fixes (see below). None of
+  them changes a number.
+- **Write-up**: `docs/validation/beam-transport/penelope-shell-oscillators-verification.md`
+  (this addendum).
+
+### Source
+
+I fetched and read the arXiv preprint 1701.06293 (pdftotext, plus a render
+of Fig. 1). I did not read the published JPCM version, which is paywalled.
+`doi:10.1088/1361-648X/aa63a7` resolves to the IOP article page.
+
+- Sample: "high quality thin films of a thickness of about 100 nm were
+  prepared via mechanical exfoliation from single crystals". The authors
+  "verified the pure hexagonal phase of WSe2 by measuring the electron
+  diffraction profile". The material is 2H-WSe₂. They measured at 20 K
+  with a 172 keV beam, $\Delta E=82$ meV and $\Delta q=0.04$ Å⁻¹.
+- Geometry: the spectra run "along the ΓM direction of the Brillouin zone.
+  The momentum transfer is 0.1 Å⁻¹, which corresponds to the optical
+  limit". ΓM lies in the basal plane, and the exfoliated films are
+  c-normal, so $q$ is in-plane.
+- Value: "dominated by a strong feature at about 22 eV which can be
+  associated with the volume plasmon, a collective excitation of all
+  valence electrons." In Fig. 1, the undoped peak sits just above the
+  20 eV tick, consistent with 22 eV. Fig. 1 plots the measured loss
+  spectrum, not a tabulated KK loss function. That supports the doc's
+  "read from text" and its ±0.5 eV reading-uncertainty caveat. The ±0.5 eV
+  bound is the author's judgement; I did not derive it.
+- Other features: a broad feature "around 44 eV" from "multiple scattering
+  and shallow core level excitations from the W 5p levels", and excitons at
+  1.8 and about 2.3 eV.
+
+The TOML `basis`, `source` and `doi` fields, the table row and the WSe₂
+caveat bullet all match the source.
+
+### $f_{cb}=18$ and shell consumption
+
+The chemical valence is W $5d^46s^2$ (6) plus $2\times$ Se $4s^24p^4$ (12),
+giving 18. I recomputed the SHA-256 of the pinned `pdatconf.p14`
+(`cd239554…62d2`), and it matches the record. My own parse gives
+$\sum f=74$ for W and 34 for Se.
+
+I sorted every shell in the formula unit by $U$ and weighted each shell's
+occupation by stoichiometry:
+
+| shells | $U$ (eV) | electrons | running total |
+| --- | ---: | ---: | ---: |
+| W O4 ($5d_{3/2}$, 4) + W P1 ($6s$, 2) | 8.667 | 6 | 6 |
+| Se N2 + N3 ($4p$), $\times2$ | 9.75 | 8 | 14 |
+| Se N1 ($4s$), $\times2$ | 20.15 | 4 | 18 |
+| next: W N7 ($4f_{7/2}$) | 36.0 | — | — |
+
+The count reaches 18 exactly at a shell boundary. No shell is split, and
+each equal-$U$ group (W O4/P1, Se N2/N3) is consumed whole. The pdatconf W
+configuration is O4 = 4 plus P1 = 2, which matches $5d^46s^2$. W N7, N6, O3
+and O2 sit at 36, 38, 41 and 51 eV, which confirms "W 4f and 5p at
+36–51 eV".
+
+### Numbers
+
+I computed these with my own script; no repository helper went into them.
+
+- Density from the packaged CIF: $a=3.282$ Å, $c=12.96$ Å, $\gamma=120^\circ$,
+  $V=120.896$ Å³, two formula units per cell, $M=341.78$ g/mol. That gives
+  $\rho=9.3889$ g/cm³, the same as the catalog's 9.388917.
+- All-electron plasma energy with $Z=142$:
+  $\Omega_p=\hbar\sqrt{n_e e^2/(\varepsilon_0 m_e)}=56.9128$ eV. The
+  repository `plasma_energy_eV("wse2")` gives 56.91282.
+- Eq. 3.62: $\sqrt{18/142}\,\Omega_p=20.263$ eV. So 22.0 eV is $+8.57\%$
+  above it (doc: 20.26 eV, 8.6%). It is under the 9% test tolerance.
+- $I$: the Bragg-additive value from ICRU 37 elemental values (W 727 eV,
+  Se 348 eV) is $\exp[(74\ln727+68\ln348)/142]=510.877$ eV. This equals the
+  catalog `mean_excitation_eV`.
+- Eq. 3.64, solved for $a$ by Brent root-finding over the 21 remaining
+  bound shells, with $f_k$ = stoichiometry × occupation:
+  $a=2.038262$, which rounds to 2.0383. The other convention, one
+  oscillator per atom, gives 2.03917, so the 1e-4 pin tells the two apart.
+  The pin matches the per-formula grouping that the earlier MoS₂ entry
+  already uses. The smallest bound $W_k$ is 74.2 eV, above its $U_k$.
+- Cutoff: $W_{cb}=22<50$ eV. `validate_shell_cutoff` requires
+  cutoff $>W_{cb}$, so it passes.
+- `uv run pyrite-dev test tests/montecarlo/test_shell_oscillators.py`
+  gave 20 passed, 0 skipped. The pinned data were present.
+
+### Doc and ledger findings
+
+These are wording issues, not discrepancies. I have not applied them.
+
+1. `penelope-shell-oscillators.md`, h-BN caveat: "Its 6.9% excess over
+   Eq. 3.62 is the largest in the table" is now stale. WSe₂ (8.6%) is
+   larger, and the WSe₂ bullet says so. Drop the h-BN sentence or reword it
+   to "second largest".
+2. Same file, consumption paragraph: "Unlike the 15 eV default, this
+   includes O 2s (28.5 eV) and S 3s (20.2 eV)" should also list Se 4s
+   (20.15 eV). That shell lies above the 15 eV default and is consumed by
+   the WSe₂ band.
+3. Ledger `penelope-shell-oscillators` Notes: replace "its fresh-context
+   verification is pending" with a pointer to this addendum. The other
+   ledger text (Source, Checks with "within 9%", pinned 2.0383, and the
+   WSe₂ shell assignment) is accurate.
+
+### Suggested ledger change
+
+Keep the status at `rederived`, since the WSe₂ input is rederived. In
+Notes, replace "its fresh-context verification is pending" with "verified
+in the WSe₂ addendum of the verification record". Never mark the row
+`signed-off`; only a human may do that (#277).
+
+## Addendum: Bell & Liang dichalcogenides (issue #218)
+
+Scope: only the eight new `src/pyrite/data/conduction_band.toml` entries
+(`mose2`, `ws2`, `mote2`, `nbs2`, `nbse2`, `2h_tas2`, `2h_tase2`,
+`zrse2`), the claim that `hfs2` and `hfse2` cannot be represented, and the
+matching rows, caveats, test pins and ledger text (commit `0457e5e9`). The
+equations and code are unchanged and were verified above.
+
+- **Claim**: `penelope-shell-oscillators`, Bell & Liang MX₂ inputs. Code:
+  `data/conduction_band.toml::{mose2,ws2,mote2,nbs2,nbse2,2h_tas2,2h_tase2,zrse2}`
+  used by `montecarlo/transport/shell_oscillators.py::build_shell_oscillators`.
+  Source: M. G. Bell and W. Y. Liang, Adv. Phys. 25, 53 (1976), Table 4,
+  with PENELOPE-2024 Eqs. 3.62 and 3.64.
+- **Filters**: units pass; limits pass (for each material
+  $f_{cb}+\sum_k f_k=Z$, every bound $W_k>U_k$ with a margin of at least
+  25 eV, and $W_{cb}<I$); signs and conventions pass.
+- **Re-derivation**: `matches`. All eight $W_{cb}$, $f_{cb}$, shell sets,
+  deviations and $a$ values agree with the pins; the HfS₂/HfSe₂ failure
+  holds.
+- **Verdict**: `rederived`, with one provenance correction (the NbS₂ and
+  NbSe₂ polytype labels are swapped relative to the source) and two
+  wording fixes. None of them changes a number.
+- **Write-up**: `docs/validation/beam-transport/penelope-shell-oscillators-verification.md`
+  (this addendum).
+
+### Source
+
+I read the local PDF of the published article. The `pdftotext` layer
+garbles chemical formulas (NbSe₂ comes out as "NbS%"), so I rendered and
+read journal pp. 60–61, 66 (Table 1) and 82 (Table 4) as images.
+
+- Geometry (abstract and §3.2): "a beam of 50 keV electrons is incident
+  along the c-axis of the crystals and electrons inelastically scattered
+  through an angle of 1 m radian are selected". Specimens were mounted
+  "with the basal plane normal to the incident electron beam", and the
+  aperture accepted $1.0\pm0.1$ mrad. For losses below 25 eV the momentum
+  transfer makes $75^\circ<\theta<90^\circ$ with $c$, so $q$ is almost in
+  the basal plane. This matches the c-normal catalog crystals.
+- Specimens (§3.1): 50–100 nm thick, peeled or tape-cleaved from bulk
+  crystals "grown from the synthesized compound by the vapour transport
+  technique, except in the case of MoS₂ where natural molybdenite was
+  used". The caveat bullet states this correctly.
+- Table 4, main (largest-$n$) plasmon rows:
+
+| key | Table 4 row | $\omega_L$ (eV) | $\omega_p$ (eV) | $n$ | TOML `resonance_eV` / `electrons_per_formula` |
+| --- | --- | ---: | ---: | ---: | --- |
+| `mose2` | MoSe₂ | 22.1 | 20.3 | 18 | 22.1 / 18 |
+| `ws2` | WS₂ | 23.3 | 21.6 | 18 | 23.3 / 18 |
+| `mote2` | α-MoTe₂ | 19.4 | 18.2 | 18 | 19.4 / 18 |
+| `nbs2` | NbS₂ | 22.5 | 20.2 | 17 | 22.5 / 17 |
+| `nbse2` | NbSe₂ | 21.0 | 19.0 | 17 | 21.0 / 17 |
+| `2h_tas2` | 2H-TaS₂ | 22.0 | 20.2 | 17 | 22.0 / 17 |
+| `2h_tase2` | 2H-TaSe₂ | 21.0 | 19.0 | 17 | 21.0 / 17 |
+| `zrse2` | ZrSe₂ | 19.1 | 17.1 | 16 | 19.1 / 16 |
+
+The key mapping is right: the S row goes to `2h_tas2` and the Se row to
+`2h_tase2`. Each value is the largest-$n$ row. The lower rows match the
+caveat and `basis` strings: partial plasmons at 8.1 (MoSe₂),
+7.1 (MoTe₂), 8.5 (NbS₂) and 7.5 eV (NbSe₂), and carrier plasmons at 1.0
+(NbS₂), 0.95 (NbSe₂), 1.2 (2H-TaS₂) and 1.0 eV (2H-TaSe₂). Table 4 also
+gives MoS₂ 23.1 eV and WSe₂ 22.2 eV, which supports the corroboration
+sentence. HfS₂ is 20.6 eV and HfSe₂ 19.5 eV, both with $n=16$.
+
+- Eq. 19 of the paper is $\omega_L^2=\omega_p^2/\epsilon_c+\omega_T^2$.
+  The tabulated $\epsilon_c(\omega_L)$ is 1.0–1.1 for every main plasmon,
+  so the caveat's $\omega_L^2\approx\omega_p^2+\omega_T^2$ is a fair
+  reduction. The text gives "a probable error of 10%" on $\omega_T$ and
+  allows "an error of about 10%" on $\epsilon_c$. I found no stated error
+  on the main-plasmon $\omega_L$. The caveat is accurate.
+- Polytypes. Table 1 gives MoSe₂ 2H, WS₂ 3R and ZrSe₂ 1T. Table 4 names
+  α-MoTe₂ (the 2H form), 2H-TaS₂ and 2H-TaSe₂. The Table 1 caption says
+  "For the two metallic compounds investigated in detail, 2H-NbSe₂ and
+  2H-TaS₂". The paper therefore states **2H for NbSe₂**. I found no
+  polytype for **NbS₂** anywhere. Its only other label is "NbS₂ (hyp.)",
+  the hypothetical octahedral form in the band-scheme figure, which is not
+  the measured sample. The catalog phases are `mose2` 2H, `ws2` 2H,
+  `mote2` 2H, `nbs2` 2H, `nbse2` 2H, `2h_tas2` 2H, `2h_tase2` 2H and
+  `zrse2` 1T. So WS₂ (3R measured, 2H catalog) is the only stated
+  mismatch, and the doc records it.
+
+### Shell consumption
+
+I parsed `pdatconf.p14` myself (SHA-256 `cd239554…62d2`, which matches the
+record) and sorted the shells of each formula unit by $U$, with $f$ =
+stoichiometry × occupation:
+
+| key | shells consumed (ascending $U$) | $U$ range (eV) | total | next shell |
+| --- | --- | --- | ---: | --- |
+| `mose2` | Mo N4+O1 (6), Se N2+N3 (8), Se N1 (4) | 8.32–20.15 | 18 | Mo N3, 42 |
+| `ws2` | W O4+P1 (6), S M2+M3 (8), S M1 (4) | 8.67–20.2 | 18 | W N7, 36 |
+| `mote2` | Mo N4+O1 (6), Te O2+O3 (8), Te O1 (4) | 8.32–17.84 | 18 | Mo N3, 42 |
+| `nbs2` | Nb O1 (2), Nb N4 (3), S M2+M3 (8), S M1 (4) | 7.07–20.2 | 17 | Nb N3, 38 |
+| `nbse2` | Nb O1 (2), Nb N4 (3), Se N2+N3 (8), Se N1 (4) | 7.07–20.15 | 17 | Nb N3, 38 |
+| `2h_tas2` | Ta O4+P1 (5), S M2+M3 (8), S M1 (4) | 8.14–20.2 | 17 | Ta N7, 28 |
+| `2h_tase2` | Ta O4+P1 (5), Se N2+N3 (8), Se N1 (4) | 8.14–20.15 | 17 | Ta N7, 28 |
+| `zrse2` | Zr N4+O1 (4), Se N2+N3 (8), Se N1 (4) | 7.73–20.15 | 16 | Zr N3, 33 |
+
+Every count lands on a whole-shell boundary and consumes each equal-$U$
+group whole. The sets equal the test parametrization in
+`tests/montecarlo/test_shell_oscillators.py`. The metal valences in
+pdatconf are Mo 6, W 6, Nb 5, Ta 5 and Zr 4; with $2\times6$ chalcogen
+electrons they give Bell & Liang's 18, 17 and 16. The consumption
+paragraph's list (metal outer $d$+$s$, chalcogen outer $s$+$p$, Te 5s at
+17.8 eV) is correct.
+
+HfS₂ and HfSe₂: Hf O4+P1 (4 electrons, 7.25 eV) plus the chalcogen $p$
+(8, 9.75 or 10.36 eV) gives 12. The next shell is Hf N7 ($4f_{7/2}$,
+8 electrons, 20.0 eV), below S M1 (20.2 eV) and Se N1 (20.15 eV). The
+count therefore jumps from 12 to 20, and $n=16$, which needs the chalcogen
+$s$ without the 4f, cannot end on a boundary. Hf N6 (21.0 eV) lies above
+the chalcogen $s$, so only N7 sits strictly "between" the $p$ and $s$
+shells. The conclusion holds either way. Had a band been buildable, both
+would also have exceeded the 12% check: Eq. 3.62 gives 18.31 and
+17.16 eV, which puts the measured values 12.5% and 13.6% above it.
+
+### Numbers
+
+I used my own script: densities from the packaged CIF cells and site
+counts with IUPAC atomic weights, $\Omega_p=\hbar c\sqrt{4\pi r_e n_e}$
+with all $Z$ electrons, $I$ from ICRU 37 elemental values, and Eq. 3.64
+solved by Brent's method. No repository helper went into these numbers.
+I compared the results with the catalog density, `mean_excitation_eV` and
+`plasma_energy_eV` afterwards; all agree to the printed digits.
+
+| key | $Z$ | $\rho$ (g/cm³) | $\Omega_p$ (eV) | $I$ (eV) | Eq. 3.62 (eV) | B&L $\omega_p$ | excess | $a$ | pin |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `mose2` | 110 | 6.9626 | 50.048 | 375.26 | 20.246 | 20.3 | +9.16% | 1.900831 | 1.9008 |
+| `ws2` | 106 | 7.7619 | 52.490 | 476.99 | 21.630 | 21.6 | +7.72% | 2.003276 | 2.0033 |
+| `mote2` | 146 | 7.7985 | 51.888 | 466.60 | 18.219 | 18.2 | +6.48% | 1.592179 | 1.5922 |
+| `nbs2` | 73 | 4.5641 | 41.974 | 288.53 | 20.256 | 20.2 | +11.08% | 1.779153 | 1.7792 |
+| `nbse2` | 109 | 6.4497 | 48.240 | 372.50 | 19.051 | 19.0 | +10.23% | 1.910086 | 1.9101 |
+| `2h_tas2` | 105 | 7.0738 | 50.166 | 470.99 | 20.186 | 20.2 | +8.99% | 2.066772 | 2.0668 |
+| `2h_tase2` | 141 | 8.6911 | 54.796 | 506.32 | 19.027 | 19.0 | +10.37% | 2.080046 | 2.0800 |
+| `zrse2` | 108 | 5.4773 | 44.400 | 364.03 | 17.090 | 17.1 | +11.76% | 1.905555 | 1.9056 |
+
+- The doc's deviations (9.2, 7.7, 6.5, 11.1, 10.2, 9.0, 10.4, 11.8%) and
+  its Eq. 3.62 column are reproduced.
+- Bell & Liang's own $\omega_p$ agrees with Eq. 3.62 at catalog density
+  within 0.06 eV for all eight, which confirms "to 0.1 eV". Their
+  $\omega_p$ is the free-electron value for $n$ electrons per formula unit,
+  the same quantity as $\sqrt{f_{cb}/Z}\,\Omega_p$.
+- All eight $a$ round to the pins at $10^{-4}$.
+- $W_{cb}\le23.3$ eV $<50$ eV for all eight, so `validate_shell_cutoff`
+  passes. $W_{cb}<I$ and every bound $W_k-U_k\ge25$ eV.
+- The test tolerance went from 9% to 12%; ZrSe₂ (11.76%) leaves 0.24%
+  margin. This is acceptable for literature inputs, but any re-read of a
+  catalog density for `zrse2` could trip it.
+- `env -u PYRITE_ONLINE_TESTS uv run pyrite-dev test tests/montecarlo/test_shell_oscillators.py`
+  gave 30 passed, 0 skipped. The pinned data were present, so the
+  hafnium test ran.
+
+### Doc and ledger findings
+
+These are not numerical discrepancies, and I have not applied them.
+
+1. **Polytype labels swapped (provenance).** The source states 2H for
+   NbSe₂ (Table 1 caption) and gives no polytype for NbS₂.
+   - `conduction_band.toml::nbs2` `basis` says "2H-NbS2". Change it to
+     "NbS2 (trigonal-prismatic metal; polytype not stated)".
+   - `conduction_band.toml::nbse2` `basis` says "NbSe2". Change it to
+     "2H-NbSe2".
+   - In the `penelope-shell-oscillators.md` table, change the nbs2 row
+     from "2H, metal" to "metal" and the nbse2 row from "metal" to
+     "2H, metal".
+   - In the Bell & Liang caveat, replace "the polytype of their NbSe₂ was
+     not checked" with "they name 2H-NbSe₂ but give no polytype for NbS₂
+     (vapour-grown NbS₂ is often 3R; like WS₂, the layers are the same)".
+   - The catalog `nbs2` 2H phase is unaffected; this is the same kind of
+     polytype caveat already recorded for WS₂.
+2. **Stale superlative.** `penelope-shell-oscillators.md`, WSe₂ caveat:
+   "Its 8.6% excess over Eq. 3.62 is the largest in the table" is now
+   false, because ZrSe₂ (11.8%), NbS₂ (11.1%), TaSe₂ (10.4%), NbSe₂
+   (10.2%) and MoSe₂ (9.2%) exceed it. Drop the sentence. The h-BN
+   caveat's 6.9% sentence carries no superlative and is fine.
+3. **Hf 4f wording (minor).** "places Hf N6/N7 (4f) at 20–21 eV, between
+   the chalcogen $p$ … and $s$ (20.2 eV) shells" is true for N7 (20.0 eV)
+   only; N6 (21.0 eV) lies above the chalcogen $s$. Suggested wording:
+   "places Hf N7 ($4f_{7/2}$, 20.0 eV) below the chalcogen $s$ shell
+   (20.15–20.2 eV), so the count jumps from 12 to 20 and 16 electrons do
+   not end on a whole-shell boundary".
+4. **Ledger Notes**: replace "fresh-context verification pending" with
+   "verified in the Bell & Liang addendum of the verification record".
+   The rest of the row (Source, the Checks wording "within 12%", "pinned
+   $a$ for all 14 bands", "HfS₂/HfSe₂ whole-shell failure pinned", and
+   the Notes text "6.5–11.8%", "3R measured, 2H catalog", "Hf 4f splits
+   the $n=16$ valence") is accurate.
+
+### Suggested ledger change
+
+Keep the status at `rederived`, since the eight inputs are rederived. In
+Notes, replace "fresh-context verification pending" with "verified in the
+Bell & Liang addendum of the verification record". Apply finding 1 to
+the TOML `basis` strings and the doc before relying on the polytype
+provenance. Never mark the row `signed-off`; only a human may do that
+(#277).

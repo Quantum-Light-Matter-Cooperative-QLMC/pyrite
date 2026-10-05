@@ -680,9 +680,11 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # again for issue #89's default ELSEPA elastic model, and for issue #181's
     # line-escape marker. Re-minted again for issue #256: the per-material
     # uniform override was dropped, so the hashed sweep grid is the profile
-    # default (the resolved case grids are unchanged).
+    # default (the resolved case grids are unchanged). Re-minted again for
+    # issue #218: mose2 gained conduction-band data, so the default "auto"
+    # inelastic model now resolves to shell-soft-hard (50 eV cutoff).
     assert survey_incoherent["parameter_sha256"] == (
-        "6938b622c1a713b73eb1b3f78465640be7a3e3b2c4305b9c09acac30de1c33b9"
+        "9766ccd265f51635384998ad9b647042bd5bda114feed269813db17d3ffbc6c0"
     )
 
 

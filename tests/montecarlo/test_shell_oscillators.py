@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from pyrite.materials import load_material_catalog
 from pyrite.materials.attenuation import plasma_energy_eV
 from pyrite.montecarlo import shell_configuration as config
 from pyrite.montecarlo.transport import shell_oscillators as so
@@ -76,8 +77,29 @@ def test_rejects_formula_mismatch_and_unreachable_mean_excitation():
 
 def test_packaged_conduction_bands_are_sourced():
     bands = so.load_conduction_bands()
-    assert set(bands) == {"silicon", "sio2", "mos2", "hopg", "hbn"}
+    assert set(bands) == {
+        "silicon",
+        "sio2",
+        "mos2",
+        "hopg",
+        "hbn",
+        "wse2",
+        "mose2",
+        "ws2",
+        "mote2",
+        "nbs2",
+        "nbse2",
+        "2h_tas2",
+        "2h_tase2",
+        "zrse2",
+    }
     assert all("doi:10." in band.source for band in bands.values())
+
+
+def test_packaged_conduction_band_keys_resolve_to_bundled_crystals_or_media():
+    catalog = load_material_catalog()
+    for key in so.load_conduction_bands():
+        assert key in catalog.crystals or key in catalog.media, key
 
 
 def test_fetched_packaged_conduction_bands_pass_default_shell_cutoff():
@@ -94,6 +116,19 @@ def test_fetched_packaged_conduction_bands_pass_default_shell_cutoff():
         ("mos2", {(42, "N4"), (42, "O1"), (16, "M1"), (16, "M2"), (16, "M3")}, 1.7797),
         ("hopg", {(6, "L1"), (6, "L2")}, 2.6359),
         ("hbn", {(5, "L1"), (5, "L2"), (7, "L1"), (7, "L2"), (7, "L3")}, 2.5860),
+        (
+            "wse2",
+            {(74, "O4"), (74, "P1"), (34, "N1"), (34, "N2"), (34, "N3")},
+            2.0383,
+        ),
+        ("mose2", {(42, "N4"), (42, "O1"), (34, "N1"), (34, "N2"), (34, "N3")}, 1.9008),
+        ("ws2", {(74, "O4"), (74, "P1"), (16, "M1"), (16, "M2"), (16, "M3")}, 2.0033),
+        ("mote2", {(42, "N4"), (42, "O1"), (52, "O1"), (52, "O2"), (52, "O3")}, 1.5922),
+        ("nbs2", {(41, "N4"), (41, "O1"), (16, "M1"), (16, "M2"), (16, "M3")}, 1.7792),
+        ("nbse2", {(41, "N4"), (41, "O1"), (34, "N1"), (34, "N2"), (34, "N3")}, 1.9101),
+        ("2h_tas2", {(73, "O4"), (73, "P1"), (16, "M1"), (16, "M2"), (16, "M3")}, 2.0668),
+        ("2h_tase2", {(73, "O4"), (73, "P1"), (34, "N1"), (34, "N2"), (34, "N3")}, 2.0800),
+        ("zrse2", {(40, "N4"), (40, "O1"), (34, "N1"), (34, "N2"), (34, "N3")}, 1.9056),
     ],
 )
 def test_fetched_catalog_materials_close_mean_excitation(key, conduction_shells, sternheimer):
@@ -115,7 +150,25 @@ def test_fetched_catalog_materials_close_mean_excitation(key, conduction_shells,
     assert _closure(result) == pytest.approx(z * np.log(material.mean_excitation_eV), rel=1e-12)
     assert result.sternheimer_factor == pytest.approx(sternheimer, abs=1e-4)
     free_electron = np.sqrt(band.electrons_per_formula / z) * omega
-    assert band.resonance_eV == pytest.approx(free_electron, rel=0.07)
+    assert band.resonance_eV == pytest.approx(free_electron, rel=0.12)
+
+
+@pytest.mark.parametrize("key", ["hfs2", "hfse2"])
+def test_fetched_hafnium_dichalcogenide_valence_splits_at_hf_4f(key):
+    # Bell & Liang's n = 16 plasmon excludes Hf 4f, but pdatconf places 4f
+    # (20.0 eV) between the chalcogen p and s shells, so no measured band fits.
+    if not config._default_path().is_file():
+        pytest.skip("pinned SBETHE reference data have not been fetched")
+    material = catalog_material(key)
+    band = so.ConductionBand(16.0, 20.0, "fixture", dict(material.composition))
+    with pytest.raises(ValueError, match="whole-shell"):
+        so.build_shell_oscillators(
+            material.composition,
+            material.mean_excitation_eV,
+            plasma_energy_eV(key),
+            config.load_atomic_shells(),
+            band,
+        )
 
 
 def test_fetched_silicon_default_matches_free_electron_plasmon():
