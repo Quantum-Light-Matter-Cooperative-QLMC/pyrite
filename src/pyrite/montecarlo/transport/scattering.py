@@ -237,7 +237,7 @@ def _sample_cos_theta_from_alpha(alpha, R):
 
 @njit(cache=True)
 def _interp_mott_log_alpha_scalar(logE_eV, logE_flat, logA_flat, start, length):
-    """Linear interpolation with the same endpoint clamping as ``np.interp``."""
+    """Linear interpolation; endpoint clamps safeguard coverage-checked transport."""
     if length <= 0:
         raise ValueError("Mott interpolation table must contain at least one point")
 
@@ -434,6 +434,28 @@ def check_elsepa_coverage(elastic_tables, E_min_keV, E_max_keV):
                 raise ValueError(
                     f"transport energy range must be within ELSEPA table [{lower:g}, {upper:g}] keV"
                 )
+
+
+def check_mott_coverage(layers, E_min_keV, E_max_keV):
+    """Reject transport outside each element's configured SRD 64 energy range.
+
+    Bounds use the parsed energies in eV, converted to transport's keV;
+    both endpoints are inclusive. Validation: electron-transport.
+    """
+    checked = set()
+    for _, _, composition in layers:
+        for element, _ in composition:
+            if element in checked:
+                continue
+            energy_eV, _ = _load_mott_transport(element)
+            lower, upper = float(energy_eV[0]) / 1e3, float(energy_eV[-1]) / 1e3
+            if E_min_keV < lower or E_max_keV > upper:
+                raise ValueError(
+                    f"transport energy range [{E_min_keV:g}, {E_max_keV:g}] keV must be "
+                    f"within the Mott SRD 64 table for {element} [{lower:g}, {upper:g}] keV; "
+                    'use elastic_model="elsepa"'
+                )
+            checked.add(element)
 
 
 @njit(cache=True)
