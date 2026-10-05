@@ -262,3 +262,33 @@ def test_case_key_reaches_the_transport_kwargs():
     }
     assert _case_elastic_kwargs({}) == {"elastic_model": "mott"}
     assert "atomic_electron_deflection" in Case.__dataclass_fields__
+
+
+@pytest.mark.hardware
+def test_cuda_reads_the_scaled_rates_like_the_cpu_core():
+    """CUDA consumes the same host-scaled coefficients: first flights agree with CPU."""
+    cupy = pytest.importorskip("cupy")
+    try:
+        has_cuda = cupy.cuda.runtime.getDeviceCount() > 0
+    except Exception:
+        has_cuda = False
+    if not has_cuda:
+        pytest.skip("no CUDA device")
+    kwargs = dict(atomic_electron_deflection="kawrakow")
+    cpu = _run(**kwargs)
+    gpu = simulate_trajectories(
+        30.0,
+        3000,
+        2.0e5,
+        composition=_SI,
+        E_cut_keV=5.0,
+        seed=11,
+        transport_core="cuda",
+        elastic_model="sr",
+        **kwargs,
+    )
+    first_cpu = np.flatnonzero(np.r_[True, np.diff(cpu["electron_id"]) != 0])
+    first_gpu = np.flatnonzero(np.r_[True, np.diff(gpu["electron_id"]) != 0])
+    np.testing.assert_allclose(
+        gpu["L_ang"][first_gpu], cpu["L_ang"][first_cpu], rtol=1e-12, atol=0.0
+    )
