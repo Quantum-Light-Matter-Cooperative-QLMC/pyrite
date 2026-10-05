@@ -1,78 +1,206 @@
-# line-absorption-tabulation
+# Line absorption tabulation
 
-## Source behavior and derivation
+Validation: `line-absorption-tabulation`.
 
-PyRITE pins xraydb 4.5.8 as the Chantler/FFAST source. For every column except `f1`, `xraydb.xraydb.XrayDB._from_chantler` evaluates
+## Independent derivation (2026-10-05)
 
-```{math}
-:label: eq-line-absorption-xraydb-interpolant
+This section was written before inspecting implementation bodies or the earlier
+Chantler derivation. Inputs were the ledger claim, owner signatures/docstrings,
+and the EPDL2025 MF=23 native lin-lin convention. The source is
+[Cullen's EPDL2025 ENDF data](https://nuclear.llnl.gov/EPICS/ENDF2025/EPDL2025.ALL)
+{cite:p}`epdl2025`; MF=23 alone does not imply a universal interpolation law:
+the TAB1 interpolation declaration of the selected data supplies that law.
 
-y(E)=\exp\!\left[(1-t)\log y_0+t\log y_1\right],
+For element $i$, let $n_i$ be its atomic number density in
+$\mathrm{\mathring A}^{-3}$ and $\sigma_i(E)$ its narrow-beam removal cross
+section in barn. Photoelectric, coherent, incoherent, and both pair channels
+contribute. On a native smooth interval each channel is linear in energy.
+Their sum, on the union of all channel knots, is therefore also linear:
+
+$$
+\mu_i(E)=10^{-8} n_i\sigma_i(E)=a_i+b_iE,
+\qquad \mu(E)=\sum_i\mu_i(E).
+$$
+
+Here $1\,\mathrm{barn}=10^{-8}\,\mathrm{\mathring A}^{2}$, so
+$\mu_i$ has units $\mathrm{\mathring A}^{-1}$. Composition entries represent
+number-density contributions, not an additional weighting to apply after this
+conversion. Assume finite positive elemental totals, positive photon energies,
+a homogeneous passive medium, and narrow-beam removal without scattered-photon
+build-up or secondary return. Layered/grooved geometric integration is outside
+this table claim.
+
+For a table interval $[E_0,E_1]$ and $E_0\le E\le E_1$, define
+
+$$
+x=\ln E,\qquad h=\ln(E_1/E_0),\qquad
+f=\frac{\ln(E/E_0)}{\ln(E_1/E_0)}.
+$$
+
+Tabulating the elemental logarithms gives the positive approximation
+
+$$
+\boxed{\widehat\mu(E)=\sum_i
+\exp\big[(1-f)\ln\mu_i(E_0)+f\ln\mu_i(E_1)\big]}.
+$$
+
+The logarithm implicitly uses $1\,\mathrm{\mathring A}^{-1}$ as its reference
+unit. That reference cancels on exponentiation. Interpolation of the logarithm
+of the compound sum instead defines a different approximation. Elemental
+interpolation followed by summation preserves elemental node values and
+bounds compound relative error by the largest elemental relative error.
+
+To derive the smooth-interval error, write $g_i(x)=\ln(a_i+b_ie^x)$ and
+$p_i=b_iE/\mu_i(E)$. Then
+
+$$
+g_i''(x)=\frac{a_ib_iE}{(a_i+b_iE)^2}=p_i(1-p_i),
 \qquad
-t=\frac{\log E-\log E_0}{\log E_1-\log E_0}.
-```
+\ln\frac{\widehat\mu_i(E)}{\mu_i(E)}
+=\frac{g_i''(\xi)}{2}(x-x_0)(x_1-x),
+$$
 
-For element $i$, the Beer--Lambert coefficient used by PyRITE is
+for some $\xi$ inside the interval. Consequently
 
-```{math}
-:label: eq-line-elemental-mu
+$$
+\left|\ln\frac{\widehat\mu_i}{\mu_i}\right|
+\le\frac{h^2}{8}\sup|p_i(1-p_i)|,
+\qquad
+\left|\frac{\widehat\mu_i}{\mu_i}-1\right|
+\le\exp\left(\frac{h^2}{8}\sup|p_i(1-p_i)|\right)-1.
+$$
 
-\mu_i(E)=2r_e\lambda(E)n_i f_{2,i}(E)
-=2r_e hc\,n_i\frac{f_{2,i}(E)}{E}.
-```
+Thus the error is second order in relative energy spacing on a positive smooth
+native segment, not exactly zero. The bound requires every native channel knot
+in the shared mesh; it cannot be applied across a discontinuity. It is not a
+global tolerance guarantee without a bound on curvature. A positive decreasing
+segment with positive intercept has negative curvature in log coordinates and
+is underestimated by the log-log chord. Constant coefficients are exact.
 
-Because both $\log f_{2,i}$ and $\log E$ are affine in $t$, $\log\mu_i$ is affine on the same native interval:
+For path length $L$ in angstroms, the independent attenuation result is
 
-```{math}
-:label: eq-line-elemental-log-interpolation
+$$
+\tau=L\widehat\mu(E),\qquad T=\exp(-\tau),\qquad
+\frac{\widehat T}{T}=\exp[-L(\widehat\mu-\mu)].
+$$
 
-\log\mu_i(E)=(1-t)\log\mu_i(E_0)+t\log\mu_i(E_1).
-```
+Units and signs pass: optical depth is dimensionless; $0<T\le1$ for
+nonnegative $L$; $L=0$ gives exactly $T=1$; increasing positive $L$ decreases
+transmission; the infinite-path limit is zero. Coherent fields use
+$\exp(-\tau/2)$ so their intensity uses the same attenuation. Small coefficient
+error need not imply small relative transmission error at large optical depth.
 
-The compound coefficient must then be formed after interpolation,
+At an exact table node the mathematical interpolation returns that node's
+coefficient; finite arithmetic may introduce log/exp rounding. Outside the
+table interval, endpoint clamping is a numerical policy, not EPDL
+extrapolation, and must be stated explicitly.
 
-```{math}
-:label: eq-line-compound-mu
+At a right-continuous photoionization threshold $E_b$, select adjacent float32
+values $E_-<E_b\le E_+$ and sample the native source separately at both.
+No float32 query lies strictly between these values, so a float32 table cannot
+smooth the jump at another representable query. Float64 queries can lie inside:
+interpolation deliberately smooths the discontinuity over that one float32-ulp
+interval, so exact native right-continuity is not recovered there. An exact
+threshold node added separately would recover the right-hand value but would
+change this policy. Evaluate the fraction as
 
-\boxed{\mu(E)=\sum_i
-\exp\!\left[(1-t)\log\mu_i(E_0)+t\log\mu_i(E_1)\right]}.
-```
+$$
+f=\frac{\ln(1+(E-E_0)/E_0)}{\ln(1+(E_1-E_0)/E_0)}
+$$
 
-Interpolating either $\sum_i\mu_i$ or $\log(\sum_i\mu_i)$ is not equivalent to {eq}`eq-line-compound-mu`, because different elements have different slopes between their native nodes.
+using `log1p` to retain the separation of adjacent float32 nodes. This preserves
+small differences in the fraction; it does not remove float32 rounding of
+stored logarithmic coefficients.
 
-The implementation evaluates the fraction without subtracting close logarithms:
+## Implementation comparison and evidence
 
-```{math}
-:label: eq-line-stable-log-fraction
+The implementation matches the boxed elemental interpolation and the stable
+fraction. `_elemental_log_mu_table` samples EPDL totals per composition entry;
+`_interp_elemental_mu` exponentiates each blended row before summing.
+`_line_tabulation_grid` unions the 1 eV mesh, basis/absorber Chantler energies,
+and absorber EPDL knots. `_epdl_mesh_nodes` adds adjacent float32 values around
+each repeated-energy photoelectric edge. The repeated energy itself survives
+`np.unique`, so exact float64 edge nodes retain the right-hand value, while the
+interval immediately below that node smooths the jump. The discontinuous
+interval has width at most one float32 ulp, not one float64 ulp.
 
-t=\frac{\log1p[(E-E_0)/E_0]}
-        {\log1p[(E_1-E_0)/E_0]}.
-```
+`mc_spectrum` delegates setup and evaluation to `_setup.py`, `_batched.py`, and
+`_per_hkl.py`. Setup builds coefficients on the host once and casts the mesh and
+log rows to `REAL`. The batched gather and per-reflection route use a common
+bracket and the log fraction. The streaming CUDA prologue computes the same
+`log1p` fraction; its scalar elemental gather performs the same exponential
+and sum with endpoint branches. Attenuation enters the incoherent segment-mean
+transmission or coherent formation optical depths, using the same coefficient.
+This is source-flow agreement, not hardware numerical parity. No GPU runtime
+or spectrum-level exact-versus-tabulated A/B was executed.
 
-The shared table grid is the 1 eV mesh unioned with native Chantler energies for both the crystal basis and the explicit absorber composition. Adding a node from another element only subdivides an interval on which {eq}`eq-line-elemental-log-interpolation` is already exact.
+A stale comment in `_setup.py` still describes exact reproduction of the
+retired Chantler rule. The current attenuation table is EPDL and the smooth
+submesh interpolation is approximate. Likewise `_interp_elemental_mu`'s
+phrase “no mesh interval straddles ... a jump” needs the explicit one-ulp edge
+exception stated in the ledger. These are documentation findings, not divergent
+arithmetic in the declared approximation.
 
-## Units, assumptions, and limits
+## Independent numerical evidence
 
-- $E,E_0,E_1$ are positive energies in eV, so $t$ is dimensionless.
-- $r_e$, $\lambda$, and $n_i$ carry Å, Å, and $\AA^{-3}$, respectively; therefore each $\mu_i$ and their sum carry $\AA^{-1}$.
-- The material is homogeneous along the selected single-slab escape path and attenuation is passive. Layered and grooved paths continue to evaluate their piecewise coefficients exactly per resonance energy.
-- At a native or inserted table node, the interpolated coefficient is the tabulated coefficient. Queries beyond the shared table retain endpoint clamping. As $L_{\rm esc}\to0$, $\exp[-L_{\rm esc}\mu(E)]\to1$. As an elemental number density or $f_2$ tends to zero from above, that element's contribution tends to zero.
-- Every positive elemental contribution remains positive; their compound sum is positive. The correction changes only numerical evaluation of $\mu(E)$, not the sign in $\tau=L_{\rm esc}\mu$ or $T=\exp(-\tau)$.
+The upstream EPDL2025 tape was downloaded directly and SHA-256 verified as
+`59bbd8c559685dda0bf0de2762bc43126f599cd154d635940f17b6a59c1c43fd`.
+An independent fixed-column reader extracted MF=23 MT=522, 502, 504, 517,
+and 515 for C, Mo, S, and Se; every extracted TAB1 interpolation declaration
+was law 2 (lin-lin). The reference interpolated native channel arrays with
+right-hand edge selection, summed cross sections, and multiplied number
+densities by the independent barn-to-square-angstrom conversion. It did not
+call PyRITE's EPDL interpolation or attenuation helpers. Shared-grid geometric
+midpoints were compared in the production bands below; the implementation
+under test supplied only the table/grid and final gathered result.
 
-## Implementation comparison
+| Material / band [eV] | Maximum smooth relative difference from native tape | Energy [eV] |
+| --- | --- | --- |
+| HOPG / 100–1500 | $4.8798246\times10^{-4}$ | 919.499864 |
+| MoS2 / 350–3500 | $4.8600929\times10^{-4}$ | 2020.499938 |
+| MoSe2 / 350–3500 | $4.7493922\times10^{-4}$ | 1848.499932 |
 
-The old line table stored one compound $\mu(E)$ row and blended it linearly in energy. At the HOPG C K edge this overestimated $\mu$ by 27.2% at 283.7351 eV; for a 10000 Å escape path the transmission changed from 0.06593 (exact) to 0.03148 (old table), a 52.3% relative error.
+These differences include EPDL dataset knot thinning, whose separate stored
+relative tolerance is $5\times10^{-4}$, and float32 storage of native cross
+sections. Therefore the existing $2\times10^{-4}$ anchor tolerance against
+`_mu_total_inv_ang` validates the additional line-table interpolation error
+against the processed dataset; it is not a bound against the unthinned tape.
+The “every EPDL knot” argument refers to every retained runtime knot. The
+second-order derivation applies to those processed linear segments, while
+thinning has its own error budget.
 
-`montecarlo/spectrum/lines.py` now stores one `log(mu_i)` row per composition entry and applies {eq}`eq-line-compound-mu` in the per-reflection, batched incoherent, and batched coherent routes. The fused float32 gather and `coherent_stream_jit_kernel.py` implement the same operation on device without a resonance-energy transfer to the host. Single-slab and finite-footprint paths consume the result. `_stack_tau` and grooved escape still call the exact per-point xraydb-backed coefficient.
+Edge-containing intervals were deliberately measured separately. At the C K
+edge, the interval is $[287.9999694824219,288.0]$ eV, width
+$3.0517578125\times10^{-5}$ eV. At its geometric midpoint
+$287.99998474121054$ eV, native attenuation is
+$5.594189026881321\times10^{-5}\,\mathrm{\mathring A}^{-1}$ and tabulated
+attenuation is $2.5879007724789396\times10^{-4}\,\mathrm{\mathring A}^{-1}$:
+relative error $3.6260517$ (362.6%). MoS2 and MoSe2 maximum edge-midpoint
+relative errors are 43.45% and 39.70%; their maximum discontinuous-interval
+width is $2.44140625\times10^{-4}$ eV. These large local errors are the declared
+one-float32-ulp smoothing policy, not failures of the smooth-interval bound.
+At $L=10000\,\mathrm{\mathring A}$ the carbon example gives approximately
+$T=0.572$ natively and $\widehat T=0.0752$; coefficient errors can be amplified
+in transmission even over a very narrow energy interval.
 
-The CPU regression samples geometric midpoints of every adjacent shared-grid pair in HOPG, MoS2, and MoSe2 production windows. Maximum relative errors against direct xraydb are `1.25e-12`, `1.94e-13`, and `1.27e-13` in float64; the corresponding float32 maxima are `9.01e-5`, `5.26e-5`, and `2.19e-5`. The float64 HOPG residual is FITPACK evaluation rounding at an inserted node. The regression also checks native Si absorber nodes absent from the HOPG basis, endpoint clamps, positivity, and zero-path transmission.
+Focused checks, using the canonical runner and isolated environment:
 
-## Performance evidence
-
-An identical whole-route CPU benchmark used NumPy float64, MoS2, 4000 deterministic segments, two reflections, and 315 energy bins. After two warm-up runs, seven measured runs gave `27.202--27.865 ms` (median `27.597 ms`) on the old method and `28.616--29.044 ms` (median `28.708 ms`) on the corrected method: `+4.03%`. Tracemalloc peak memory changed from 43,108,750 to 43,165,968 bytes (`+0.13%`). No RNG is used by this workload.
-
-An interpolation-only MoS2 microbenchmark used 400,000 seeded (`1729`) queries, 3423 grid points, two elements, three warm-ups, and 15 repeats. Its median rose from `1.474 ms` to `23.550 ms` (`15.98x`) because log/exp/sum now dominate the isolated operation; the elemental table doubled from 27,384 to 54,768 bytes. The representative whole route above bounds the observed CPU impact. Both implementations remain fully on-device in CUDA routes, with no per-segment host transfer. CUDA timing and numerical checks were unavailable locally (`nvidia-smi` absent), and no remote job was authorized.
+- `pyrite-dev test tests/montecarlo/test_line_absorption_tabulation.py`: 10 passed.
+  Covers processed-EPDL midpoint tolerance, float32 host arithmetic, node
+  identity, positivity, explicit Si absorbers, endpoint clamps, zero-path
+  transmission, and neighboring table-ceiling behavior.
+- `pyrite-dev test tests/dev/test_docs.py`: 6 passed.
+- Sphinx build and positive rendered-math inspection are performed by the task
+  owner after integration; host float32 checks do not establish CUDA parity.
 
 ## Validation state
 
-This document began as an implementation-context derivation. A fresh-context independent verifier subsequently rederived the pinned-source behavior, checked the source-to-code mapping, units, signs, and limiting cases, and found no physics divergence; the ledger is therefore `rederived`. CUDA runtime/numerical/ performance evidence and a spectrum-level exact-vs-tabulated A/B remain open. Only a human may mark the claim `signed-off`.
+Fresh-context re-derivation: **matches** the declared EPDL log-log submesh
+approximation, elemental summation, attenuation units/sign, exact-node and
+endpoint policies, and the explicit one-float32-ulp edge exception. Verdict:
+**rederived**. The native-data comparison above independently quantifies
+thinning plus interpolation and the narrow edge exception. Suggested ledger
+update: advance to `rederived`, replace retired Chantler verification notes
+with this evidence, distinguish processed-table and native-tape tolerances,
+and retain GPU runtime and whole-spectrum comparison as untested. Only a
+human may mark `signed-off`.
