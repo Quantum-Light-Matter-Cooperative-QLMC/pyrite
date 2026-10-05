@@ -81,3 +81,89 @@ def command(artifacts, out_dir, no_vacuum, overwrite):
         except TrajectoryArtifactError as error:
             raise _cli_core.CLIError(str(error)) from error
         click.echo(f"{target}  {summary['cells']} cells ({summary['vacuum_legs']} vacuum)")
+
+
+@click.command(
+    "score-trajectories",
+    help=(
+        "Score checkpoint records from captured trajectories without re-transporting.\n\n"
+        "ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, or a "
+        "directory searched recursively for them. Each artifact's spectrum phase "
+        "(line, characteristic, and bremsstrahlung spectra) is replayed from its "
+        "stored segments and saved as a record of the checkpoint stem and run "
+        "identity it was captured under, in DIR/<stem>. Records already present "
+        "are kept unless --overwrite; records of cases without an artifact are "
+        "never touched. Each new record stores its artifact's path and SHA-256. "
+        "The shared per-case cache is neither read nor written.\n\n"
+        "Every artifact is checked before anything is written: schema-1, "
+        "incomplete, foreign, or mismatched artifacts, and a checkpoint written "
+        "by a different run, are refused. Cases needing every segment at once "
+        "(coherent emission, temporal profile) are refused; score those with "
+        "`spectrum_from_artifact` from Python."
+    ),
+)
+@click.argument(
+    "artifacts",
+    nargs=-1,
+    required=True,
+    metavar="ARTIFACT...",
+    type=click.Path(exists=True, path_type=Path),
+)
+@click.option(
+    "--checkpoint-dir",
+    default="checkpoints",
+    show_default=True,
+    metavar="DIR",
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Root containing component checkpoint directories to write.",
+)
+@click.option(
+    "--max-segments",
+    type=_cli_core.POSITIVE_INT,
+    default=None,
+    metavar="N",
+    help=(
+        "Segment rows read per block; bounds host memory (whole electrons stay "
+        "together, so one long history may exceed it). [default: 1048576]"
+    ),
+)
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    help="Re-score cases that already have a record in the target checkpoint.",
+)
+def score_command(artifacts, checkpoint_dir, max_segments, overwrite):
+    from ...checkpoints.trajectory_scoring import (
+        check_targets,
+        discover_artifacts,
+        plan_stems,
+        score_stem,
+    )
+    from ...montecarlo.runner.artifacts import STREAM_MAX_SEGMENTS
+    from ...montecarlo.trajectories import TrajectoryArtifactError
+
+    paths = discover_artifacts(artifacts)
+    if not paths:
+        raise _cli_core.CLIError("no trajectory artifacts (*.h5) found")
+
+    def _scored(artifact, out):
+        click.echo(
+            f"{artifact.provenance['checkpoint_stem']}  {artifact.case['name']}  "
+            f"E0={float(artifact.case['E0_keV']):g} keV  {out['n_segments']} segments"
+        )
+
+    try:
+        plans = plan_stems(paths)
+        check_targets(plans.values(), checkpoint_dir)
+        for plan in plans.values():
+            summary = score_stem(
+                plan,
+                checkpoint_dir,
+                max_segments=max_segments or STREAM_MAX_SEGMENTS,
+                overwrite=overwrite,
+                on_case=_scored,
+            )
+            kept = f"; {summary.kept} already scored (--overwrite to redo)" if summary.kept else ""
+            click.echo(f"{summary.checkpoint_path}: scored {summary.scored}{kept}")
+    except TrajectoryArtifactError as error:
+        raise _cli_core.CLIError(str(error)) from error

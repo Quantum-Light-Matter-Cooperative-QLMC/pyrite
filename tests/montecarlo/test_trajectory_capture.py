@@ -537,8 +537,14 @@ def test_vtp_export_keeps_geometry_and_electron_association(tmp_path, monkeypatc
     import pyrite.montecarlo.trajectory_export as export
 
     monkeypatch.setattr(export, "_BLOCK_ROWS", 7)  # force blocks straddling the vacuum rows
-    segs = _grooved_transport()
-    path = write_trajectory_artifact(tmp_path / "g.h5", segs, case=_case())
+    transported = _grooved_transport()
+    path = write_trajectory_artifact(tmp_path / "g.h5", transported, case=_case())
+    # Export follows the stored electron-major row order.
+    stored = np.argsort(transported["electron_id"], kind="stable")
+    segs = {
+        key: value[stored] if key in traj.row_fields() else value
+        for key, value in transported.items()
+    }
     n_seg, n_vac = segs["L_ang"].size, segs["vacuum_start_ang"].shape[0]
 
     summary = export_segments_vtp(path, tmp_path / "g.vtp")
@@ -632,3 +638,263 @@ def test_run_reports_artifact_conflicts_without_a_traceback(monkeypatch):
     assert result.exit_code == 1
     assert "already exist" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+# ---- schema 2: typed case and spectrum-phase replay (#186) ------------------
+
+
+def _production_case(kind, tmp_path, monkeypatch):
+    """Small production-built typed case of one spectrum-input family."""
+    from dataclasses import replace
+
+    from pyrite import _line_grid_policy
+    from pyrite.campaign.config import material_sweep
+    from pyrite.campaign.geometry import Stack
+    from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+    from pyrite.detectors import Detector, EnergyBins
+
+    bins = Detector(
+        energy_bins=EnergyBins(
+            line=np.arange(100.0, 3500.0, 20.0), brem=np.arange(100.0, 30000.0, 500.0)
+        )
+    )
+    if kind == "flat":
+        sweep = Sweep(
+            material="hopg", thickness_ang=1e4, beam=BeamSpec(energy_keV=30.0), tilt_deg=30.0
+        )
+        sweep = replace(sweep, detector=bins)
+    elif kind == "grooved":
+        sweep = Sweep(
+            material="hopg",
+            tilt_deg=45.0,
+            tilt_azim_deg=180.0,
+            groove_spacing_ang=2.0e4,
+            thickness_ang=2.0e4,
+            beam=BeamSpec(energy_keV=30.0),
+            crystal_width_mm=None,
+            crystal_height_mm=None,
+            detector=bins,
+        )
+    elif kind == "multilayer":
+        sweep = Sweep(
+            material="mose2",
+            beam=BeamSpec(energy_keV=30.0),
+            target=Stack.on_substrate("mose2", 300.0, "silicon", 3000.0, tilt_deg=-30.0),
+            detector=bins,
+        )
+    elif kind == "secondaries":
+        sweep = Sweep(
+            material="silicon",
+            thickness_ang=2e4,
+            beam=BeamSpec(energy_keV=30.0),
+            tilt_deg=30.0,
+            detector=bins,
+        )
+        build = dict(
+            inelastic_model="shell-soft-hard",
+            inelastic_cutoff_eV=50.0,
+            secondary_threshold_eV=1000.0,
+            radiative_model="uncoupled",
+        )
+        case = build_cases(sweep, n_electrons=24, n_electrons_brem=12, **build)[0]
+        assert "secondary_threshold_eV" in case
+        return case
+    else:  # an uncovered energy resolves its line grid from the trajectories
+        monkeypatch.setattr(_line_grid_policy, "cache_dir", lambda: tmp_path / "grid-cache")
+        sweep = material_sweep("hopg")
+        sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=77.0))
+    case = build_cases(sweep, n_electrons=24, n_electrons_brem=12)[0]
+    assert (kind == "auto-line-grid") == ("line_grid_policy" in case)
+    return case
+
+
+def _assert_same_output(actual, expected):
+    assert set(actual) == set(expected)
+    for key, value in expected.items():
+        if key.startswith("_"):
+            continue
+        if isinstance(value, np.ndarray):
+            np.testing.assert_array_equal(actual[key], value, err_msg=key)
+            assert actual[key].dtype == value.dtype, key
+        else:
+            assert actual[key] == value, key
+
+
+def test_typed_case_round_trips_exactly(tmp_path, monkeypatch):
+    from pyrite.montecarlo.case import Case
+
+    case = _production_case("multilayer", tmp_path, monkeypatch)
+    segs = simulate_trajectories(20.0, 2, 2000.0, seed=0, **_SI)
+
+    artifact = read_trajectory_artifact(
+        write_trajectory_artifact(tmp_path / "c.h5", segs, case=case)
+    )
+
+    assert type(artifact.case) is Case
+    assert artifact.case == case
+    _assert_same_tree(artifact.case.to_dict(), case.to_dict(), "case")
+    assert artifact.attrs["case_sha256"] == traj.case_digest(artifact.case)
+
+
+def test_mapping_case_keeps_tuples_numpy_scalars_and_paths(tmp_path):
+    case = {**_case(), "theta_obs_rad": np.float64(1.5), "brem_file": Path("b.npz")}
+    segs = simulate_trajectories(20.0, 2, 2000.0, seed=0, **_SI)
+
+    artifact = read_trajectory_artifact(
+        write_trajectory_artifact(tmp_path / "m.h5", segs, case=case)
+    )
+
+    _assert_same_tree(artifact.case, case, "case")
+
+
+@pytest.mark.parametrize("kind", ["flat", "grooved", "multilayer", "secondaries", "auto-line-grid"])
+def test_spectrum_from_artifact_is_the_live_spectrum(tmp_path, monkeypatch, kind):
+    case = _production_case(kind, tmp_path, monkeypatch)
+    capture = TrajectoryCapture(root=str(tmp_path / "traj"))
+
+    live = runner.run_case(case, transport_core="lockstep", trajectory_capture=capture)
+    artifact = read_trajectory_artifact(capture.path_for(case))
+    replayed = runner.spectrum_from_artifact(artifact)
+
+    _assert_same_output(replayed, live)
+    if kind == "auto-line-grid":
+        assert "line_grid_resolved" in replayed
+
+
+def _captured(tmp_path):
+    case = _case()
+    capture = TrajectoryCapture(root=str(tmp_path))
+    runner.run_case(case, trajectory_capture=capture)
+    return case, capture.path_for(case)
+
+
+def test_schema_1_artifacts_stay_readable_but_cannot_feed_spectra(tmp_path):
+    case, path = _captured(tmp_path)
+    with h5py.File(path, "r+") as handle:  # downgrade to the schema-1 layout
+        handle.attrs["schema_version"] = 1
+        del handle["case/payload"], handle["spectrum_inputs"]
+
+    artifact = read_trajectory_artifact(path)
+
+    assert artifact.schema_version == 1 and artifact.spectrum_inputs is None
+    assert artifact.case["E_grid"] == list(case["E_grid"])  # JSON: tuples became lists
+    with pytest.raises(TrajectoryArtifactError, match="predates spectrum-phase inputs"):
+        runner.spectrum_from_artifact(artifact)
+
+
+def test_artifact_without_spectrum_inputs_is_refused(tmp_path):
+    segs = simulate_trajectories(20.0, 2, 2000.0, seed=0, **_SI)
+    artifact = read_trajectory_artifact(
+        write_trajectory_artifact(tmp_path / "a.h5", segs, case=_case())
+    )
+
+    with pytest.raises(TrajectoryArtifactError, match="no spectrum-phase inputs"):
+        runner.spectrum_from_artifact(artifact)
+
+
+def test_mismatched_case_is_refused(tmp_path):
+    case, path = _captured(tmp_path)
+    artifact = read_trajectory_artifact(path)
+
+    with pytest.raises(TrajectoryArtifactError, match="different case"):
+        runner.spectrum_from_artifact(artifact, {**case, "seed": case["seed"] + 1})
+
+
+@pytest.mark.parametrize(
+    "node", ["spectrum_inputs/n_hat", "spectrum_inputs/E_grid", "spectrum_inputs/Ne_brem"]
+)
+def test_inputs_that_disagree_with_their_case_are_refused(tmp_path, node):
+    _case_, path = _captured(tmp_path)
+    with h5py.File(path, "r+") as handle:
+        dataset = handle[node]
+        dataset[...] = dataset[()] + 1
+
+    with pytest.raises(TrajectoryArtifactError, match="disagrees with its case"):
+        runner.spectrum_from_artifact(read_trajectory_artifact(path))
+
+
+# ---- electron-major storage and streamed spectra (#186) ---------------------
+
+
+def _interleaved_transport():
+    segs = simulate_trajectories(
+        20.0, 30, 2000.0, seed=5, transport_core="lockstep", energy_model="midpoint", **_SI
+    )
+    ids = segs["electron_id"]
+    assert not np.all(ids[1:] >= ids[:-1])  # lockstep interleaves electrons
+    return segs
+
+
+def test_rows_are_stored_electron_major_and_read_back_in_transport_order(tmp_path):
+    segs = _interleaved_transport()
+    path = write_trajectory_artifact(tmp_path / "o.h5", segs, case=_case())
+
+    with h5py.File(path) as handle:
+        stored = handle["transport/electron_id"][()]
+        order = handle["transport_order"][()]
+        assert handle.attrs["row_order"] == "electron"
+        assert not handle["transport/initial_E_keV"].attrs.get("pyrite_row", False)
+    np.testing.assert_array_equal(stored, segs["electron_id"][order])
+    assert np.all(stored[1:] >= stored[:-1])
+    _assert_same_tree(read_trajectory_artifact(path).transport, segs)
+
+
+@pytest.mark.parametrize("max_rows", [1, 7, 40, 10**9])
+def test_streamed_blocks_partition_rows_into_whole_electrons(tmp_path, max_rows):
+    segs = _interleaved_transport()
+    path = write_trajectory_artifact(tmp_path / "b.h5", segs, case=_case())
+    order = np.argsort(segs["electron_id"], kind="stable")
+
+    blocks = list(traj.iter_electron_row_blocks(path, max_rows))
+
+    seen = set()
+    for block in blocks:
+        ids = block["electron_id"]
+        assert ids.size <= max_rows or np.unique(ids).size == 1
+        assert seen.isdisjoint(np.unique(ids))
+        seen.update(np.unique(ids).tolist())
+        assert block["Ne"] == segs["Ne"]
+        np.testing.assert_array_equal(block["initial_E_keV"], segs["initial_E_keV"])
+    for key in ("L_ang", "r_mid", "E_end_keV", "event_kind"):
+        np.testing.assert_array_equal(
+            np.concatenate([block[key] for block in blocks]), segs[key][order]
+        )
+
+
+@pytest.mark.parametrize("kind", ["flat", "grooved", "multilayer", "secondaries", "auto-line-grid"])
+def test_streamed_spectrum_matches_the_live_spectrum(tmp_path, monkeypatch, kind):
+    case = _production_case(kind, tmp_path, monkeypatch)
+    capture = TrajectoryCapture(root=str(tmp_path / "traj"))
+    live = runner.run_case(case, transport_core="lockstep", trajectory_capture=capture)
+    path = capture.path_for(case)
+    block = max(1, traj.read_trajectory_header(path)["segment_count"] // 5)
+    assert len(list(traj.iter_electron_row_blocks(path, block))) > 2
+
+    streamed = runner.stream_spectrum_from_artifact(path, max_segments=block)
+
+    assert set(streamed) == {key for key in live if not key.startswith("_")}
+    for key, value in live.items():
+        if isinstance(value, np.ndarray):
+            # Only the summation order across blocks differs from the live run.
+            np.testing.assert_allclose(streamed[key], value, rtol=1e-12, atol=0, err_msg=key)
+        elif not key.startswith("_"):
+            assert streamed[key] == value, key
+
+
+def test_stream_refuses_cases_that_need_every_segment(tmp_path):
+    case = {**_case(), "coherent_emission": True}
+    capture = TrajectoryCapture(root=str(tmp_path))
+    runner.run_case(case, trajectory_capture=capture)
+
+    with pytest.raises(TrajectoryArtifactError, match="coherent_emission needs every segment"):
+        runner.stream_spectrum_from_artifact(capture.path_for(case))
+
+
+def test_stream_refuses_schema_1(tmp_path):
+    _case_, path = _captured(tmp_path)
+    with h5py.File(path, "r+") as handle:
+        handle.attrs["schema_version"] = 1
+        del handle.attrs["row_order"], handle["case/payload"], handle["spectrum_inputs"]
+
+    with pytest.raises(TrajectoryArtifactError, match="predates spectrum-phase inputs"):
+        runner.stream_spectrum_from_artifact(path)

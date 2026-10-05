@@ -20,12 +20,12 @@ from typing import Any
 import numpy as np
 
 from ..._backend import BACKEND
-from ..._energy_grid_encoding import decode_energy_grid
+from ..._energy_grid_encoding import decode_energy_grid as decode_energy_grid
 from ..._env import env_value, set_canonical_env
 from .. import spectrum as _spectrum_mod
 from ..case import Case
-from ..geometry import tilted_geometry
-from ..groove import blazed_groove_spec
+from ..geometry import tilted_geometry as tilted_geometry
+from ..groove import blazed_groove_spec as blazed_groove_spec
 from ..spectrum import (
     _segments_in_layer,
     _segments_on_device,
@@ -111,6 +111,7 @@ def _usable_cpus():
     return min(known) if known else None
 
 
+from .artifacts import _case_geometry
 from .case_tables import (
     _case_bremslib_table_records as _case_bremslib_table_records,
 )
@@ -370,29 +371,13 @@ def _transport_case(
     in whichever process transported it, before the spectrum phase sees it."""
     timed = _TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
-    if "E_grid_line" in case:
-        E_grid = decode_energy_grid(case["E_grid_line"])
-        E_brem = decode_energy_grid(case["E_grid_brem"])
-    else:
-        E_grid = decode_energy_grid(case["E_grid"])
-        step_b = case.get("brem_step_eV", 10.0)
-        E_brem = np.arange(E_grid[0], E_grid[-1] + step_b, step_b)
+    E_grid, E_brem, beam, n_hat, groove = _case_geometry(case)
     tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
     tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))
-    beam, n_hat = tilted_geometry(case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad)
     # film-on-substrate stack drives multilayer transport too (substrate
     # backscatter / substrate brem); None -> single-material slab (unchanged).
     layers = case.get("abs_layers")
     beam_kw = _beam_kwargs(case)
-    # blazed sawtooth entrance-face grooves (docs/superpowers/plans/
-    # 2026-07-23-blazed-groove-geometry.md): built once per case, then threaded
-    # into both electron-entry transport calls and the line-spectrum escape
-    # model. None -> a strict no-op (the flat-face slab, unchanged).
-    groove = None
-    if case.get("groove_spacing_ang") is not None:
-        groove = blazed_groove_spec(
-            case["groove_spacing_ang"], case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad
-        )
 
     Ne = case["Ne"]
     Ne_brem = case["Ne_brem"]
@@ -489,9 +474,25 @@ def _transport_case(
     else:
         segs_all = _transport(False)
 
+    # Line resolution needs the transport distribution, so it is chosen after
+    # the case's own trajectories exist and before the spectrum phase. No second
+    # Monte Carlo job is started for either path; see runner/line_grid.py.
+    E_grid, diagnostic_grid_result = resolve_line_grid(
+        case, segs_all, n_hat, Ne, E_grid, layers, groove
+    )
+
+    spectrum_inputs: dict[str, Any] = dict(
+        E_grid=E_grid,
+        E_brem=E_brem,
+        n_hat=n_hat,
+        Ne_lines=Ne,
+        Ne_brem=Ne_brem,
+        groove=groove,
+        diagnostic_grid=diagnostic_grid_result,
+    )
     if trajectory_capture is not None:
-        # Read-only snapshot of what the spectrum phase consumes; the case JSON
-        # the artifact stores already holds every unresolved setting.
+        # Read-only snapshot of exactly what the spectrum phase consumes, so a
+        # later spectrum_from_artifact replays it without re-transporting.
         trajectory_capture.write(
             case,
             segs_all,
@@ -504,25 +505,10 @@ def _transport_case(
                 "n_hat": n_hat,
                 "stopping_tables": stopping_tables is not None,
             },
+            spectrum_inputs=spectrum_inputs,
         )
 
-    # Line resolution needs the transport distribution, so it is chosen after
-    # the case's own trajectories exist and before the spectrum phase. No second
-    # Monte Carlo job is started for either path; see runner/line_grid.py.
-    E_grid, diagnostic_grid_result = resolve_line_grid(
-        case, segs_all, n_hat, Ne, E_grid, layers, groove
-    )
-
-    tp: dict[str, Any] = dict(
-        E_grid=E_grid,
-        E_brem=E_brem,
-        n_hat=n_hat,
-        segs=segs_all,
-        Ne_lines=Ne,
-        Ne_brem=Ne_brem,
-        groove=groove,
-        diagnostic_grid=diagnostic_grid_result,
-    )
+    tp: dict[str, Any] = dict(spectrum_inputs, segs=segs_all)
     if timed:
         tp["_t_transport"] = perf_counter() - t0
         tp["_t_worker_return"] = perf_counter()
@@ -1229,6 +1215,9 @@ def _cpu_spectrum_backend():
         _RESOURCE_POLICY.gpu, _spectrum_mod.xp, _spectrum_mod.REAL = previous
 
 
+from .artifacts import STREAM_MAX_SEGMENTS as STREAM_MAX_SEGMENTS
+from .artifacts import spectrum_from_artifact as spectrum_from_artifact
+from .artifacts import stream_spectrum_from_artifact as stream_spectrum_from_artifact
 from .pool import _admit_cpu_fallback as _admit_cpu_fallback
 from .pool import _available_mem_mb as _available_mem_mb
 from .pool import _case_progress_label as _case_progress_label
@@ -1242,7 +1231,14 @@ from .scheduling import case_runtime_plan as case_runtime_plan
 from .scheduling import run_cases as run_cases
 from .scheduling import runtime_plan as runtime_plan
 
-for _exported in (case_runtime_plan, _cuda_transport_run, runtime_plan, run_cases):
+for _exported in (
+    case_runtime_plan,
+    _cuda_transport_run,
+    runtime_plan,
+    run_cases,
+    spectrum_from_artifact,
+    stream_spectrum_from_artifact,
+):
     _exported.__module__ = __name__
 
 del _exported

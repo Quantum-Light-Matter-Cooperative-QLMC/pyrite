@@ -493,6 +493,7 @@ Commands:
   gc                   Reclaim records obsolete under current scan profiles.
   rm                   Delete local datasets and newly unreachable shared cases.
   export-trajectories  Export captured trajectories to VTK PolyData.
+  score-trajectories   Score records from captured trajectories.
 ```
 
 ## `pyrite checkpoint slim`
@@ -731,6 +732,37 @@ Options:
   --no-vacuum    Omit grooved runs' vacuum legs.
   --overwrite    Replace existing .vtp outputs.
   -h, --help     Show this message and exit.
+```
+
+## `pyrite checkpoint score-trajectories`
+
+```text
+Usage: pyrite checkpoint score-trajectories [OPTIONS] ARTIFACT...
+
+  Score checkpoint records from captured trajectories without re-transporting.
+
+  ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, or a directory
+  searched recursively for them. Each artifact's spectrum phase (line, characteristic,
+  and bremsstrahlung spectra) is replayed from its stored segments and saved as a record
+  of the checkpoint stem and run identity it was captured under, in DIR/<stem>. Records
+  already present are kept unless --overwrite; records of cases without an artifact are
+  never touched. Each new record stores its artifact's path and SHA-256. The shared per-
+  case cache is neither read nor written.
+
+  Every artifact is checked before anything is written: schema-1, incomplete, foreign,
+  or mismatched artifacts, and a checkpoint written by a different run, are refused.
+  Cases needing every segment at once (coherent emission, temporal profile) are refused;
+  score those with `spectrum_from_artifact` from Python.
+
+Options:
+  --checkpoint-dir DIR  Root containing component checkpoint directories to write.
+                        [default: checkpoints]
+  --max-segments N      Segment rows read per block; bounds host memory (whole electrons
+                        stay together, so one long history may exceed it). [default:
+                        1048576]
+  --overwrite           Re-score cases that already have a record in the target
+                        checkpoint.
+  -h, --help            Show this message and exit.
 ```
 
 ## `pyrite config`

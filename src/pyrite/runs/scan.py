@@ -1114,6 +1114,7 @@ def _run_material(args, material, max_seconds=None):
                 "catalog_profile": identity.get("catalog_profile", "standard"),
                 "fidelity": fidelity,
                 "parameter_sha256": identity["parameter_sha256"],
+                "dataset_identity": identity,
             },
         )
     from ..api import source_content_key_fn
