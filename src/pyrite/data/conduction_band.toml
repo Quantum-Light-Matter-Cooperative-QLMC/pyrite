@@ -81,7 +81,7 @@ doi = "10.1080/00018737600101362"
 formula = { Nb = 1, S = 2 }
 electrons_per_formula = 17
 resonance_eV = 22.5
-basis = "main (all-valence, n = 17) plasmon of 2H-NbS2 (metal; the 1.0 eV carrier and 8.5 eV partial plasmons are not represented): Table 4 w_L from transmission EELS, 50 keV beam along c, 1 mrad scattering, so q lies in the basal plane"
+basis = "main (all-valence, n = 17) plasmon of NbS2 (trigonal-prismatic metal, polytype not stated; the 1.0 eV carrier and 8.5 eV partial plasmons are not represented): Table 4 w_L from transmission EELS, 50 keV beam along c, 1 mrad scattering, so q lies in the basal plane"
 source = "M. G. Bell and W. Y. Liang, Adv. Phys. 25, 53 (1976)"
 doi = "10.1080/00018737600101362"
 
@@ -89,7 +89,7 @@ doi = "10.1080/00018737600101362"
 formula = { Nb = 1, Se = 2 }
 electrons_per_formula = 17
 resonance_eV = 21.0
-basis = "main (all-valence, n = 17) plasmon of NbSe2 (metal; the 0.95 eV carrier and 7.5 eV partial plasmons are not represented): Table 4 w_L from transmission EELS, 50 keV beam along c, 1 mrad scattering, so q lies in the basal plane"
+basis = "main (all-valence, n = 17) plasmon of 2H-NbSe2 (metal; the 0.95 eV carrier and 7.5 eV partial plasmons are not represented): Table 4 w_L from transmission EELS, 50 keV beam along c, 1 mrad scattering, so q lies in the basal plane"
 source = "M. G. Bell and W. Y. Liang, Adv. Phys. 25, 53 (1976)"
 doi = "10.1080/00018737600101362"
 

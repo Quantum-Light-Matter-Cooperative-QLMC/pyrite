@@ -51,8 +51,8 @@ supplies measured $W_{cb}$ and the chemical-valence $f_{cb}$ per formula unit:
 | mose2 | 18 | 22.1 | in-plane ($q\perp c$) transmission-EELS main plasmon, 2H, [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 20.25 | 1.9008 |
 | ws2 | 18 | 23.3 | in-plane ($q\perp c$) transmission-EELS main plasmon, 3R, [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 21.63 | 2.0033 |
 | mote2 | 18 | 19.4 | in-plane ($q\perp c$) transmission-EELS main plasmon, α (2H), [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 18.22 | 1.5922 |
-| nbs2 | 17 | 22.5 | in-plane ($q\perp c$) transmission-EELS main plasmon, 2H, metal, [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 20.26 | 1.7792 |
-| nbse2 | 17 | 21.0 | in-plane ($q\perp c$) transmission-EELS main plasmon, metal, [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 19.05 | 1.9101 |
+| nbs2 | 17 | 22.5 | in-plane ($q\perp c$) transmission-EELS main plasmon, metal, [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 20.26 | 1.7792 |
+| nbse2 | 17 | 21.0 | in-plane ($q\perp c$) transmission-EELS main plasmon, 2H, metal, [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 19.05 | 1.9101 |
 | 2h_tas2 | 17 | 22.0 | in-plane ($q\perp c$) transmission-EELS main plasmon, 2H, metal, [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 20.19 | 2.0668 |
 | 2h_tase2 | 17 | 21.0 | in-plane ($q\perp c$) transmission-EELS main plasmon, 2H, metal, [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 19.03 | 2.0800 |
 | zrse2 | 16 | 19.1 | in-plane ($q\perp c$) transmission-EELS main plasmon, 1T, [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 17.09 | 1.9056 |
@@ -112,7 +112,7 @@ Caveats on these inputs:
   optical limit. That in-plane $q$ matches the c-normal catalog geometry, as
   for HOPG and h-BN. The value is read from their text ("about 22 eV"), not
   from a tabulated loss function, so it carries roughly ±0.5 eV reading
-  uncertainty. Its 8.6% excess over Eq. 3.62 is the largest in the table.
+  uncertainty.
   The same spectrum has a broad 44 eV feature that the authors assign to
   multiple scattering and W 5p levels; pdatconf places W 4f
   and 5p at 36–51 eV, and these stay bound shells. The loss function's
@@ -131,12 +131,13 @@ Caveats on these inputs:
   carrier plasmons of the metals NbS₂, NbSe₂, TaS₂ and TaSe₂ have no
   oscillator. The metals' $f_{cb}=17$ includes the one $d$ carrier, as in
   Bell & Liang's $n$. They state a 10% error on $\omega_T$, not on
-  $\omega_L$; the polytype of their NbSe₂ was not checked.
+  $\omega_L$. They name 2H-NbSe₂ but give no polytype for NbS₂
+  (vapour-grown NbS₂ is often 3R; the layers are the same).
 - **Hafnium dichalcogenides unsupported.** Bell & Liang give HfS₂ 20.6 eV
   and HfSe₂ 19.5 eV with $n=16$, which excludes Hf 4f. `pdatconf.p14`
-  places Hf N6/N7 (4f) at 20–21 eV, between the chalcogen $p$ (9.8–10.4 eV)
-  and $s$ (20.2 eV) shells, so 16 electrons do not end on a whole-shell
-  boundary and no measured band can be built. `hfs2` and `hfse2` stay
+  places Hf N7 (4f7/2, 20.0 eV) below the chalcogen $s$ shell
+  (20.15–20.2 eV), so the count jumps from 12 to 20 and 16 electrons do not
+  end on a whole-shell boundary and no measured band can be built. `hfs2` and `hfse2` stay
   unsupported; a test pins the failure.
 - **Effective electron count.** $f_{cb}$ is the chemical valence, which the
   manual permits (it cites Sternheimer) but does not prescribe. A partial
