@@ -155,7 +155,9 @@ def run_sweep(
     on_timing : optional callback(dict) receiving rolling per-case transport,
         spectrum, GPU feed-wait, retry, CuPy-pool, and checkpoint timings.
     on_activity : optional callback(dict) receiving current driver phase,
-        case index, and in-flight work counts.
+        case index, and in-flight work counts. A multi-batch in-process
+        transport also reports ``transport_electrons_done``/
+        ``transport_electrons_total`` for the active case (see ``run_cases``).
     max_seconds : optional soft wall-clock budget, measured from just before
         ``run_cases`` starts. None (default) means unbounded. When set, a
         deadline of ``time_fn() + max_seconds`` is checked (via ``run_cases``'s

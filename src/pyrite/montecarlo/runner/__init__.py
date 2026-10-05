@@ -15,6 +15,7 @@ import os
 import sys
 from collections.abc import Mapping
 from contextlib import contextmanager, nullcontext
+from contextvars import ContextVar
 from functools import partial
 from pathlib import Path
 from time import perf_counter
@@ -58,6 +59,12 @@ from ..transport import (
 # timing never leaks into the pickle. The flag is read at import so it applies in
 # every spawned transport worker too (env is inherited on spawn/forkserver).
 _TIMING = env_value("PYRITE_MC_TIMING", "") not in ("", "0")
+# Per-batch transport progress sink (#272): ``callable(electrons_done, Ne)``
+# set by ``run_cases`` around a case it transports in THIS process and read by
+# ``_transport_case``. A context variable keeps ``run_case``/``_transport_case``
+# call shapes unchanged and never reaches pool workers, whose transports report
+# only per case.
+_TRANSPORT_PROGRESS: ContextVar[Any] = ContextVar("pyrite_transport_progress", default=None)
 
 
 def _cgroup_cpu_quota():
@@ -425,6 +432,10 @@ def _transport_case(
     def _transport(keep):
         return retry_step_budget(_simulate, keep)
 
+    # Passed only when a caller asked, so progress-free calls keep their shape.
+    transport_progress = _TRANSPORT_PROGRESS.get()
+    progress_kw = {} if transport_progress is None else {"transport_progress": transport_progress}
+
     def _simulate(keep, max_steps):
         return simulate_trajectories(
             case["E0_keV"],
@@ -456,6 +467,7 @@ def _transport_case(
                 if transport_lut_config is not None
                 else {}
             ),
+            **progress_kw,
         )
 
     if resident:

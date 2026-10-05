@@ -192,6 +192,7 @@ def parse_progress_records(payload):
             continue
         _sanitize_cost_fields(record)
         _sanitize_timing_fields(record)
+        _sanitize_electron_fields(record)
         key = material if phase in (None, "primary") else f"{material}:cpu"
         records[key] = record
     return records
@@ -237,3 +238,27 @@ def _sanitize_timing_fields(record):
         and cost >= 0
     ):
         record.pop("measured_new_cost", None)
+
+
+def _sanitize_electron_fields(record):
+    """Drop invalid optional within-case electron progress fields in place.
+
+    Both or neither: integer ``0 <= transport_electrons_done <=
+    transport_electrons_total`` with a positive total.
+    """
+    keys = ("transport_electrons_done", "transport_electrons_total")
+    if not any(key in record for key in keys):
+        return
+    done = record.get(keys[0])
+    total = record.get(keys[1])
+    valid = (
+        isinstance(done, int)
+        and not isinstance(done, bool)
+        and isinstance(total, int)
+        and not isinstance(total, bool)
+        and 0 <= done <= total
+        and total > 0
+    )
+    if not valid:
+        for key in keys:
+            record.pop(key, None)

@@ -368,6 +368,7 @@ def _drive_per_electron_batches(
     inelastic_args=None,
     radiative_args=None,
     secondaries=False,
+    on_batch=None,
 ):
     """Run capacity-replayed batches for either exact or LUT transport.
 
@@ -378,6 +379,13 @@ def _drive_per_electron_batches(
     hard-photon row columns after any hard-inelastic ones. ``secondaries``
     gives the shell mode's secondary-direction column rows (#94); off, that
     column is allocated empty and the core never writes it.
+
+    ``on_batch`` (optional) is called as ``on_batch(electrons_done, Ne)`` once
+    per *completed* batch, after its segments are compacted -- a capacity replay
+    re-runs a batch without reporting it twice, so ``electrons_done`` strictly
+    increases and ends at ``Ne``. It receives host integers the driver already
+    holds (no extra device read) and must not touch transport state; its return
+    value is ignored. ``None`` reports nothing.
     """
     from ..runner import _nsys_pop, _nsys_push
 
@@ -476,6 +484,8 @@ def _drive_per_electron_batches(
         e += m
         if seen_max > 0:
             cap = _capacity_for(seen_max, config)
+        if on_batch is not None:
+            on_batch(e, Ne)
 
     joined = None
     if keep_on_device:
@@ -539,6 +549,7 @@ def _run_per_electron_transport_lut(
     keep_on_device=False,
     inelastic=None,
     keys=None,
+    on_batch=None,
 ):
     """Drive the CPU/CUDA LUT per-electron core with capacity replay.
 
@@ -633,6 +644,7 @@ def _run_per_electron_transport_lut(
         keep_on_device,
         inelastic_args,
         secondaries=None if inelastic is None else bool(inelastic[4]),
+        on_batch=on_batch,
     )
 
 
@@ -681,6 +693,7 @@ def _run_per_electron_transport(
     inelastic=None,
     radiative=None,
     keys=None,
+    on_batch=None,
 ):
     """Drive ``core`` over electron batches and compact the result.
 
@@ -715,6 +728,9 @@ def _run_per_electron_transport(
     Returns ``(nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined,
     stragg_dE)``, where ``joined`` is ``None`` unless ``keep_on_device`` and
     ``stragg_dE`` is all-zero unless ``straggle_on``.
+
+    ``on_batch``: optional per-completed-batch progress hook; see
+    :func:`_drive_per_electron_batches`.
     """
     on_device = xp is not np
     to_dev = xp.asarray if on_device else (lambda a: a)
@@ -796,6 +812,7 @@ def _run_per_electron_transport(
         inelastic_args,
         radiative_args,
         secondaries=None if inelastic is None else bool(inelastic[4]),
+        on_batch=on_batch,
     )
 
 

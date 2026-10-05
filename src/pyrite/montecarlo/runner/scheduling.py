@@ -2,7 +2,7 @@
 
 import os
 import warnings
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from functools import partial
 from time import perf_counter
 from typing import Any
@@ -14,6 +14,7 @@ from . import (
     _EEDL_BREM_DENSE_INTERMEDIATES,
     _RESOURCE_POLICY,
     _TIMING,
+    _TRANSPORT_PROGRESS,
     _adaptive_chunk,
     _admit_chunk,
     _admit_cpu_fallback,
@@ -158,6 +159,84 @@ def runtime_plan(cases, max_workers=None, engine="auto"):
     }
 
 
+# Minimum seconds between within-case ``on_activity`` electron updates; the
+# first and final batch of every transport pass are always reported.
+_TRANSPORT_ACTIVITY_INTERVAL_S = 1.0
+
+
+def _progress_bar(**kwargs):
+    """A tqdm bar, or None when tqdm is unavailable."""
+    try:
+        from tqdm.auto import tqdm
+
+        return tqdm(**kwargs)
+    except ImportError:
+        # tqdm.auto picks the widget bar inside Jupyter, and that bar raises
+        # ImportError AT CONSTRUCTION if ipywidgets is missing -- fall back to
+        # the plain-text console bar before giving up.
+        try:
+            from tqdm import tqdm
+
+            return tqdm(**kwargs)
+        except ImportError:
+            return None
+
+
+class _TransportProgress:
+    """Within-case electron-batch progress for one in-process transport.
+
+    Called as ``(electrons_done, Ne)`` once per completed transport batch (see
+    ``transport.batching._drive_per_electron_batches``). Drives a nested
+    ``leave=False`` bar, created only once a pass is seen to need a second batch
+    (its first report falls short of ``Ne``), and throttled ``on_activity``
+    updates. A report below the previous count, or with a different ``Ne``,
+    starts a new pass (a secondary-cascade generation or a transport retry).
+    Host-side bookkeeping only; nothing here touches transport state.
+    """
+
+    def __init__(self, show_bar, report, *, interval=_TRANSPORT_ACTIVITY_INTERVAL_S):
+        self._show_bar = show_bar
+        self._report = report
+        self._interval = interval
+        self._bar = None
+        self._done = 0
+        self._total = None
+        self._last_report = None
+
+    def __call__(self, done, total):
+        done, total = int(done), int(total)
+        new_pass = done < self._done or total != self._total
+        self._done, self._total = done, total
+        if self._show_bar:
+            if self._bar is None and done < total:
+                self._bar = _progress_bar(
+                    total=total, desc="electrons", unit="e", unit_scale=True, leave=False
+                )
+                if self._bar is None:
+                    self._show_bar = False
+            elif self._bar is not None and new_pass:
+                self._bar.reset(total=total)
+            if self._bar is not None:
+                self._bar.update(done - self._bar.n)
+                if done >= total:
+                    self.close()
+        if self._report is not None:
+            now = perf_counter()
+            if (
+                new_pass
+                or done >= total
+                or self._last_report is None
+                or now - self._last_report >= self._interval
+            ):
+                self._last_report = now
+                self._report(done, total)
+
+    def close(self):
+        if self._bar is not None:
+            self._bar.close()
+            self._bar = None
+
+
 def run_cases(
     cases,
     max_workers=None,
@@ -184,7 +263,10 @@ def run_cases(
         Worker count. ``None`` selects a resource-aware count; zero forces
         serial execution.
     progress
-        Display a tqdm progress bar when available.
+        Display a tqdm progress bar when available. A case transported in this
+        process whose per-electron/CUDA transport needs two or more electron
+        batches also gets a nested ``leave=False`` electron bar. Both are
+        suppressed under ``PYRITE_LOCAL_DASHBOARD=1``.
     callback
         Optional ``callback(index, case, output)`` invoked in the driver process.
     should_stop
@@ -197,7 +279,10 @@ def run_cases(
     on_timing
         Optional callback receiving one timing-metrics mapping per case.
     on_activity
-        Optional callback receiving driver phase-transition mappings.
+        Optional callback receiving driver phase-transition mappings. While a
+        case is transported in this process, throttled ``serial_case`` updates
+        also carry ``transport_electrons_done``/``transport_electrons_total``
+        for the current transport pass.
     transport_only
         Run transport without spectrum calculation; output slots are ``None``.
     trajectory_capture
@@ -299,25 +384,13 @@ def run_cases(
     # Passed only when requested so capture-free calls keep their exact shape.
     capture_kw = {} if trajectory_capture is None else {"trajectory_capture": trajectory_capture}
 
+    show_bars = progress and env_value("PYRITE_LOCAL_DASHBOARD") != "1"
+
     def _maybe_bar(iterable):
-        if not progress:
+        if not show_bars:
             return iterable
-        if env_value("PYRITE_LOCAL_DASHBOARD") == "1":
-            return iterable
-        try:
-            from tqdm.auto import tqdm
-
-            return tqdm(iterable, total=len(cases), desc=progress_label)
-        except ImportError:
-            # tqdm.auto picks the widget bar inside Jupyter, and that bar
-            # raises ImportError AT CONSTRUCTION if ipywidgets is missing --
-            # fall back to the plain-text console bar before giving up.
-            try:
-                from tqdm import tqdm
-
-                return tqdm(iterable, total=len(cases), desc=progress_label)
-            except ImportError:
-                return iterable
+        bar = _progress_bar(iterable=iterable, total=len(cases), desc=progress_label)
+        return iterable if bar is None else bar
 
     n = len(cases)
     results: list[Any] = [None] * n
@@ -386,6 +459,31 @@ def run_cases(
                 }
             )
 
+    @contextmanager
+    def _transport_progress(i):
+        # In-process transports only: the sink is a context variable, so pool
+        # workers never see it. Nothing is installed when nobody would listen.
+        if not show_bars and on_activity is None:
+            yield
+            return
+
+        def _report(done, total):
+            _activity(
+                "serial_case",
+                i,
+                in_flight_case_count=1,
+                transport_electrons_done=done,
+                transport_electrons_total=total,
+            )
+
+        sink = _TransportProgress(show_bars, _report if on_activity is not None else None)
+        token = _TRANSPORT_PROGRESS.set(sink)
+        try:
+            yield
+        finally:
+            _TRANSPORT_PROGRESS.reset(token)
+            sink.close()
+
     def _serial(keep_segments_on_device=False):
         force_cpu = not use_gpu and _RESOURCE_POLICY.gpu
         with _cpu_spectrum_backend() if force_cpu else nullcontext():
@@ -395,27 +493,8 @@ def run_cases(
 
                 _activity("serial_case", i, in_flight_case_count=1)
 
-                if transport_only:
-                    _transport_case(
-                        cases[i],
-                        record_timing=on_timing is not None,
-                        **capture_kw,
-                    )
-                    out = None
-                elif keep_segments_on_device:
-                    out = run_case(
-                        cases[i],
-                        on_timing is not None,
-                        keep_segments_on_device=True,
-                        **capture_kw,
-                        **_direction_kwargs(i),
-                    )
-                else:
-                    out = (
-                        run_case(cases[i], True, **capture_kw, **_direction_kwargs(i))
-                        if on_timing is not None
-                        else run_case(cases[i], **capture_kw, **_direction_kwargs(i))
-                    )
+                with _transport_progress(i):
+                    out = _serial_case(i, keep_segments_on_device)
 
                 # Both run_case routes report timing; the device-resident one
                 # (CUDA transport) used to skip this and emitted none.
@@ -438,6 +517,28 @@ def run_cases(
             timing.report("serial", nw=1)
 
         return results
+
+    def _serial_case(i, keep_segments_on_device):
+        if transport_only:
+            _transport_case(
+                cases[i],
+                record_timing=on_timing is not None,
+                **capture_kw,
+            )
+            return None
+        if keep_segments_on_device:
+            return run_case(
+                cases[i],
+                on_timing is not None,
+                keep_segments_on_device=True,
+                **capture_kw,
+                **_direction_kwargs(i),
+            )
+        return (
+            run_case(cases[i], True, **capture_kw, **_direction_kwargs(i))
+            if on_timing is not None
+            else run_case(cases[i], **capture_kw, **_direction_kwargs(i))
+        )
 
     def _single_thread_blas():
         for var in (

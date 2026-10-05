@@ -108,6 +108,52 @@ def test_scan_progress_omits_cost_fields_without_progress_file(monkeypatch, tmp_
     assert result.exit_code == 0
 
 
+def test_scan_progress_tracks_electron_batches_and_clears_on_transition(monkeypatch, tmp_path):
+    from pyrite.montecarlo import runner
+
+    monkeypatch.setattr(runner, "case_runtime_plan", lambda _case: {})
+    progress = tmp_path / "hopg.json"
+    snapshots = []
+    job_records = {}
+    real_run_material = scan._run_material
+
+    def dashboard_run(args, material, **kwargs):
+        args._job_records = job_records
+        return real_run_material(args, material, **kwargs)
+
+    monkeypatch.setattr(scan, "_run_material", dashboard_run)
+
+    def fake_run_sweep(cases, _results, **kwargs):
+        case = {**cases[0], "tilt_azim_deg": 0.0}
+        for done in (2, 4, 6):
+            kwargs["on_activity"](
+                {
+                    "phase": "serial_case",
+                    "case": case,
+                    "transport_electrons_done": done,
+                    "transport_electrons_total": 6,
+                }
+            )
+            snapshots.append(json.loads(progress.read_text()))
+            for key in ("transport_electrons_done", "transport_electrons_total"):
+                assert job_records["hopg"][key] == snapshots[-1][key]
+        kwargs["on_activity"]({"phase": "saving", "case": None})
+        snapshots.append(json.loads(progress.read_text()))
+        assert "transport_electrons_done" not in job_records["hopg"]
+        return True
+
+    monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
+    _stub_cases(monkeypatch)
+    result = _invoke("hopg", None, progress, "--checkpoint-dir", str(tmp_path))
+    assert result.exit_code == 0
+    assert [r["transport_electrons_done"] for r in snapshots[:-1]] == [2, 4, 6]
+    assert all(r["transport_electrons_total"] == 6 for r in snapshots[:-1])
+    assert all(r["activity"] == "computing" and r["current"] for r in snapshots[:-1])
+    assert "transport_electrons_done" not in snapshots[-1]
+    assert "transport_electrons_total" not in snapshots[-1]
+    assert "transport_electrons_done" not in json.loads(progress.read_text())
+
+
 def test_write_progress_record_omits_cost_fields_when_either_is_none(tmp_path):
     path = tmp_path / "hopg.json"
     scan._write_progress_record(
