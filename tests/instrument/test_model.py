@@ -316,3 +316,31 @@ def test_acquisition_enabled_simulation_exposes_layered_identity(monkeypatch) ->
         renormalized.acquire(pixels=[(0, 0)]).expected,
         2.0 * selected.expected,
     )
+
+
+def _box(z: float, *, x: float = 0.0, thickness: float = 0.1, **pose) -> pr.FilterPlate:
+    return pr.FilterPlate(
+        "silicon",
+        thickness_mm=thickness,
+        size_mm=(2.0, 2.0),
+        pose=pr.PlanarPose((x, 0.0, z), **pose),
+    )
+
+
+@pytest.mark.parametrize(
+    "second",
+    [
+        _box(50.05),  # axially overlapping, coaxial
+        _box(50.0, x=1.0),  # lateral partial overlap
+        _box(50.0, x=0.5, normal=(0.0, 0.6, 0.8), x_axis=(1.0, 0.0, 0.0)),  # tilted
+    ],
+)
+def test_overlapping_filter_volumes_are_rejected(second: pr.FilterPlate) -> None:
+    with pytest.raises(ValueError, match="must not overlap"):
+        _scene(filters=(_box(50.0), second))
+
+
+@pytest.mark.parametrize("second", [_box(50.1), _box(50.0, x=2.0), _box(60.0)])
+def test_touching_or_separated_filter_volumes_are_accepted(second: pr.FilterPlate) -> None:
+    first = _box(50.0)
+    assert _scene(filters=(first, second)).filters == (first, second)

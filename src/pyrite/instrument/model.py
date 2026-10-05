@@ -450,6 +450,31 @@ class PixelScorer:
             )
 
 
+def _plates_overlap(first: FilterPlate, second: FilterPlate) -> bool:
+    """Return whether two plate interiors intersect (face contact is allowed).
+
+    Separating-axis test for two oriented boxes: the 3 + 3 face normals and the
+    9 edge-edge cross products. Overlap needs positive projected overlap on
+    every axis; touching faces project to zero overlap and so do not count.
+    """
+    axes_a = (first.pose.x_axis, first.pose.y_axis, first.pose.normal)
+    axes_b = (second.pose.x_axis, second.pose.y_axis, second.pose.normal)
+    corners_a, corners_b = first.corners_mm(), second.corners_mm()
+    candidates = [np.asarray(a, dtype=float) for a in (*axes_a, *axes_b)]
+    candidates += [np.cross(a, b) for a in axes_a for b in axes_b]
+    scale = max(float(np.ptp(corners_a)), float(np.ptp(corners_b)), 1.0)
+    for axis in candidates:
+        norm = float(np.linalg.norm(axis))
+        if norm < 1.0e-9:  # parallel edges: no new separating direction
+            continue
+        axis = axis / norm
+        proj_a, proj_b = corners_a @ axis, corners_b @ axis
+        overlap = min(proj_a.max(), proj_b.max()) - max(proj_a.min(), proj_b.min())
+        if overlap <= 1.0e-12 * scale:
+            return False
+    return True
+
+
 def validate_downstream_scene(filters: tuple[FilterPlate, ...], detector: PlanarDetector) -> None:
     """Validate finite downstream volumes without requiring central-ray hits."""
     detector_center = np.asarray(detector.pose.center_mm)
@@ -471,6 +496,13 @@ def validate_downstream_scene(filters: tuple[FilterPlate, ...], detector: Planar
             raise ValueError("the full FilterPlate volume must lie downstream of the source")
         if float(np.max(projections)) >= detector_projection - tolerance:
             raise ValueError("the full FilterPlate volume must lie before the detector plane")
+    for i, first in enumerate(filters):
+        for second in filters[i + 1 :]:
+            if _plates_overlap(first, second):
+                raise ValueError(
+                    "FilterPlate volumes must not overlap: the optical depth sums per-plate "
+                    f"chords, so shared volume would be counted twice ({first.name!r}, {second.name!r})"
+                )
 
 
 __all__ = [

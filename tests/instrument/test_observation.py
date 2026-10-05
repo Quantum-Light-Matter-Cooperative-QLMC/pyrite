@@ -201,7 +201,8 @@ def test_identity_requires_canonical_source_digest(digest) -> None:
 def test_true_identity_preserves_filter_order_but_ignores_display_names() -> None:
     pose = pr.PlanarPose.from_observation(50.0, 60.0)
     first = pr.FilterPlate("silicon", 0.1, (2.0, 2.0), pose, name="first")
-    second = pr.FilterPlate("sio2", 0.2, (3.0, 3.0), pose, name="second")
+    second_pose = pr.PlanarPose.from_observation(51.0, 60.0)
+    second = pr.FilterPlate("sio2", 0.2, (3.0, 3.0), second_pose, name="second")
     base = _identity(_observation(filters=(first, second)))
     renamed = _identity(_observation(filters=(replace(first, name="operator label"), second)))
     reordered = _identity(_observation(filters=(second, first)))

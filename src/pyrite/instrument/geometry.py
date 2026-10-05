@@ -79,6 +79,8 @@ class PixelRays:
             raise ValueError("PixelRays.directions_lab must match centers_mm")
         if distance.shape != centers.shape[:2] or solid_angle.shape != distance.shape:
             raise ValueError("PixelRays scalar fields must have shape (ny, nx)")
+        if not np.allclose(np.linalg.norm(directions, axis=-1), 1.0, rtol=0.0, atol=1.0e-9):
+            raise ValueError("PixelRays.directions_lab must be unit vectors")
         object.__setattr__(self, "centers_mm", centers)
         object.__setattr__(self, "directions_lab", directions)
         object.__setattr__(self, "distance_mm", distance)

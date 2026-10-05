@@ -283,3 +283,16 @@ def test_tile_weights_reject_mismatched_directions_and_unpixelated_detectors() -
     unpixelated = PlanarDetector(pose=detector.pose, size_mm=(5.0, 5.0))
     with pytest.raises(ValueError, match="pixelated"):
         angular_tile_weights(unpixelated, directions[:1], (1, 1))
+
+
+def test_pixel_rays_reject_non_unit_directions() -> None:
+    from pyrite.instrument.geometry import PixelRays
+
+    ones = np.ones((2, 2))
+    with pytest.raises(ValueError, match="unit vectors"):
+        PixelRays(
+            centers_mm=np.zeros((2, 2, 3)),
+            directions_lab=np.full((2, 2, 3), 2.0),
+            distance_mm=ones,
+            solid_angle_sr=ones,
+        )
