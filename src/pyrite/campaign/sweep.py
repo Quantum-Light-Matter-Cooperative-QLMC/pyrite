@@ -1092,4 +1092,8 @@ def build_cases(
     cases = resolve_atomic_electron_deflection(cases, atomic_electron_deflection)
     if bremsstrahlung_model == "auto":
         cases = resolve_auto_bremsstrahlung(cases, radiative)
+    from .kinematic_validity import warn_kinematic_validity
+
+    for case in cases:
+        warn_kinematic_validity(case)
     return cases

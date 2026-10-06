@@ -73,6 +73,8 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
     assert seen["transport_core"] == "auto"
     assert result.provenance["scene"].target == target
     assert len(result.provenance["identity_digest"]) == 64
+    assert result.provenance["kinematic_validity"]["reflections"]
+    assert "kinematic_validity" not in result.case
     assert result.provenance["xsgen_tables"]
     assert result.provenance["identity_digest"] == api.case_content_key(
         result.case,

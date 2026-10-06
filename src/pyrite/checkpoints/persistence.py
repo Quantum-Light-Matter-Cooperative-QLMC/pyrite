@@ -264,6 +264,17 @@ def cached_material_analysis(material, analyze, key, checkpoint_dir=DEFAULT_CHEC
     return value
 
 
+def _validity_manifest_entry(name, energy, case):
+    # Incomplete legacy records have no reconstructible audit. Do not imply
+    # that they passed; leave their entry absent until a resolved case exists.
+    required = {"crystal", "hkl_list", "B_ang2", "E0_keV", "thickness_ang", "theta_obs_rad"}
+    if not required <= case.keys():
+        return None
+    from ..campaign.kinematic_validity import case_kinematic_validity
+
+    return {"name": str(name), "E0_keV": float(energy), "audit": case_kinematic_validity(case)}
+
+
 def _manifest_for(results, dataset_identity=None):
     """Build the sidecar manifest dict for a ``results`` store: distinct beam
     energies, total record count, and the swept case fields (see
@@ -285,6 +296,12 @@ def _manifest_for(results, dataset_identity=None):
         "n_records": len(records(results)),
         "sweep": sweep_json,
         "completed_case_set": _case_set_proof_from_results(results),
+        "kinematic_validity": [
+            entry
+            for name, by_energy in results.items()
+            for energy, record in by_energy.items()
+            if (entry := _validity_manifest_entry(name, energy, record["case"])) is not None
+        ],
     }
     if dataset_identity is not None:
         from ..campaign.profiles import normalize_dataset_identity
@@ -310,6 +327,7 @@ class _IncrementalManifest:
         self._keys = set()
         self._values = defaultdict(set)
         self._identity = dataset_identity
+        self._validity = []
 
     def add(self, results):
         for name, by_energy in results.items():
@@ -319,6 +337,9 @@ class _IncrementalManifest:
                     continue
                 self._keys.add(key)
                 case = record["case"]
+                entry = _validity_manifest_entry(name, energy, case)
+                if entry is not None:
+                    self._validity.append(entry)
                 for field in self._FIELDS:
                     if field in case:
                         self._values[field].add(case[field])
@@ -332,6 +353,7 @@ class _IncrementalManifest:
             "schema": "cxr.checkpoint-manifest.v2",
             "energies_keV": sorted(float(value) for value in sweep.get("E0_keV", [])),
             "n_records": len(self._keys),
+            "kinematic_validity": list(self._validity),
             "sweep": sweep,
         }
         if self._identity is not None:

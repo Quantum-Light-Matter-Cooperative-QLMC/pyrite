@@ -183,3 +183,22 @@ The default `incoherent` policy sums intensities over flights and electrons unde
 Ledger rows: `coherent-line-spectrum` (how $|A|^2$ is used, summed, and normalized), `pxr-amplitude` and `cbs-amplitude` (the couplings themselves), `finite-time-lineshape`, `line-energy-dispersion` (**open discrepancy** on the harmonic sign), `line-absorption-tabulation`, `self-absorption`, `mosaic-mc`, and — for the representative energy and flight grouping — `substep-radiation-invariance`. The evaluation-order rows `line-hkl-batch`, `coherent-line-hkl-batch`, `line-amplitude-fusion`, and `line-gemv-elementwise` cover the batched and fused arithmetic paths, which are algebraically identical to the reference loop up to float reassociation. `closed-form-flux` is `anchored`: the reference includes the exit-angle factor in its escape length. The corrected escape term still awaits an independent derivation check and human sign-off; this status does not settle all absolute comparisons with literature.
 
 Follow those rows in the [validation ledger](../../validation/physics-validation-ledger.md) before scientific use; no row in this section is human `signed-off` yet. Implementation owners: `pyrite.materials.crystal.chi_g`, `pyrite.materials.crystal.U_g`, and `pyrite.montecarlo.spectrum.lines.mc_spectrum`.
+
+
+## Runtime kinematic screen
+
+Case lowering evaluates selected reflections for each crystalline layer at
+its central incident-ray vacuum resonance. `KinematicValidityWarning` reports
+photon mixing at $D=\omega^2\lvert\chi_g\rvert/\lvert\Delta\rvert\ge0.01$
+and a reachable extinction scale $L_{\rm ext}/\min(t,L_{\rm abs})\le1$, with
+$L_{\rm ext}=2/(\omega\lvert\chi_g\rvert)$ and $\omega=E/(\hbar c)$.
+These thresholds are conservative audit policy. The extinction flag does not
+assert Bragg matching; the screen does not certify scattered trajectories,
+mosaic domain coherence, the detector acceptance or refracted directions.
+The spectrum calculation continues with its existing first-order treatment.
+
+`Result.provenance["kinematic_validity"]` and checkpoint `meta.json` carry
+per-reflection values and decisions, including explicit optical-data misses
+and reflections without a positive resonance. Infinite diagnostics use JSON
+`null`; decision flags retain their meaning. Metadata is outside transport
+identity. Validation: [kinematic-validity-envelope](../../validation/radiation-physics/kinematic-validity-envelope.md).

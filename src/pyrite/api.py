@@ -11,6 +11,7 @@ import numpy as np
 
 from . import __version__
 from ._backend import BACKEND
+from .campaign.kinematic_validity import case_kinematic_validity
 from .campaign.lowering import build_case, build_sweep_cases
 from .campaign.model import (
     BremSource,
@@ -140,6 +141,7 @@ def run_provenance(case: Case | Mapping[str, Any], xsgen_tables: Mapping[str, st
     producer records the same keys.
     """
     return {
+        "kinematic_validity": case_kinematic_validity(case),
         "xsgen_tables": xsgen_tables,
         "stopping_model": STOPPING_MODEL,
         "characteristic_model": CHARACTERISTIC_MODEL,
