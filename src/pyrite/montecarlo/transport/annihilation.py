@@ -32,6 +32,9 @@ history ends. They never re-enter pair conversion.
 RNG. A positron is identified by its pair event, so its streams hash (seed,
 parent track, photon ordinal) like the positron's launch key, under one salt
 for the in-flight budget and another for emission and photon scoring.
+Host emission retains Philox; CUDA emission uses the counter-based
+SplitMix64 stream in :mod:`._jit_annihilation`, with device-resident inputs
+and outputs until this module's EPDL photon-scoring boundary.
 
 Validation: heitler-annihilation, positron-annihilation-at-rest
 """
@@ -359,6 +362,7 @@ def score_annihilation_photons(
     *,
     width_ang=None,
     height_ang=None,
+    device=False,
 ):
     """Emit and score each annihilation's two photons.
 
@@ -370,6 +374,9 @@ def score_annihilation_photons(
     per-photon arrays, two rows per event in event order: ``event``, ``k_keV``,
     ``direction``, ``origin``, ``distance_ang`` (``inf`` on escape), ``layer``
     (-1 on escape) and ``absorbed``.
+    ``device=True`` samples emission on CUDA with per-event SplitMix64
+    streams, then transfers at this host EPDL scoring boundary. The default
+    retains the original host Philox stream and draw order.
     Validation: heitler-annihilation, positron-annihilation-at-rest
     """
     from .pair_production import photon_first_interactions
@@ -379,14 +386,28 @@ def score_annihilation_photons(
     energies = np.empty((n, 2))
     photon_dirs = np.empty((n, 2, 3))
     uniforms = np.empty((n, 2, 2))
-    for i in range(n):
-        rng = _rng(keys[i])
-        if kinds[i] == ANNIHILATION_IN_FLIGHT:
-            energies[i], photon_dirs[i] = sample_heitler(kinetic_keV[i], directions[i], rng)
-        else:
-            energies[i] = ELECTRON_REST_KEV
-            photon_dirs[i] = sample_at_rest_directions(rng)
-        uniforms[i] = rng.random((2, 2))
+    if device and n:
+        import cupy as cp
+
+        from ._jit_annihilation import sample_annihilation_device
+
+        sample = sample_annihilation_device(
+            cp.asarray(kinds), cp.asarray(kinetic_keV), cp.asarray(directions), cp.asarray(keys)
+        )
+        if not sample["valid"].get().all():
+            raise RuntimeError("device annihilation sampling failed")
+        energies = sample["k_keV"].get()
+        photon_dirs = sample["direction"].get()
+        uniforms = sample["uniforms"].get()
+    else:
+        for i in range(n):
+            rng = _rng(keys[i])
+            if kinds[i] == ANNIHILATION_IN_FLIGHT:
+                energies[i], photon_dirs[i] = sample_heitler(kinetic_keV[i], directions[i], rng)
+            else:
+                energies[i] = ELECTRON_REST_KEV
+                photon_dirs[i] = sample_at_rest_directions(rng)
+            uniforms[i] = rng.random((2, 2))
     origin = np.repeat(np.asarray(origins, dtype=float).reshape(-1, 3), 2, axis=0)
     k = energies.reshape(-1)
     direction = photon_dirs.reshape(-1, 3)

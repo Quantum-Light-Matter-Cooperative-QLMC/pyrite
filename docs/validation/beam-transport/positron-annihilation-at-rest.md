@@ -98,3 +98,31 @@ broadening of the 511 keV line. These are declared assumptions.
 
 `rederived`. The photon energies, back-to-back isotropic directions, fate
 partition and per-history energy closure match the independent derivation.
+
+## Independent device-port verification (2026-10-06)
+
+A fresh verifier derived this claim before inspecting the new device
+implementation. With both incident particles at rest, zero total momentum
+requires equal photon momenta in opposite directions; energy conservation
+then fixes both energies at $m_ec^2$. Rotational symmetry gives measure
+$d\Omega=d\phi\,d(\cos\theta)$, so independent uniform azimuth and polar
+cosine produce an isotropic axis. Units, zero-momentum limit, and signs pass.
+
+The at-rest branch of `_jit_annihilation.py::_sample` uses exactly this
+axis construction, stores the second vector as the componentwise negative
+of the first, and assigns the shared `ELECTRON_REST_KEV` constant twice.
+The nominal 511 keV line therefore uses the repository's actual
+$m_ec^2=510.99895$ keV convention. Incoming kinetic energy and direction
+are ignored for this branch, as the signature declares; deposition of
+residual kinetic energy belongs to the existing cascade fate accounting.
+
+Counters 0 and 1 select polar cosine and azimuth; counters 2–5 supply the
+two photons' four first-interaction uniforms. Keys are per event and the
+counter is local to each event, so event permutation and batch subdivision
+preserve its stream. The CUDA integration checks validity before the
+declared host photon-scoring boundary. It preserves the existing terminal
+fate partition and adds no energy-balance term.
+
+Verdict for this device branch: `rederived` from source symmetry and
+conservation, with symbolic source-to-code agreement. This subsection
+does not claim local CUDA execution or human sign-off.

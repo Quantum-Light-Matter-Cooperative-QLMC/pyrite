@@ -58,7 +58,7 @@ is in Å⁻³ and $E$ in keV with $m_ec^2=510.99895$ keV.
   $H(\zeta)=-(\gamma+1)^2\zeta+(\gamma^2+4\gamma+1)\ln\zeta+1/\zeta$. The
   integral is $\int_{\zeta_{\min}}^{1/2}[S(\zeta)+S(1-\zeta)]\,d\zeta=[H(\tfrac12)-H(\zeta_{\min})]-[H(\tfrac12)-H(1-\zeta_{\min})]$.
   SymPy evaluates the difference from the closed form as exactly zero at
-  $\gamma=3$ and $\gamma=1.01$. With $\zeta_{\min}(1-\zeta_{\min})^{-1}=(\gamma+\sqrt{\gamma^2-1})^{-2}$,
+  $\gamma=3$ and $\gamma=1.01$. With $\zeta_{\min}(1-\zeta_{\min})^{-1}=(\gamma+\sqrt{\gamma^2-1})^{-1}$,
   the log term is $(\gamma^2+4\gamma+1)\ln(\gamma+\sqrt{\gamma^2-1})$. A
   30-digit mpmath quadrature of Eq. 3.187 agrees with Eq. 3.189 to
   $8\times10^{-30}$ (relative) from 1 keV to 100 MeV.
@@ -235,3 +235,65 @@ derivation, both limits hold, and the corrected envelope is right. Thinning
 is equivalent to a competing channel, with the stated within-row
 approximation, and the truncated-row bookkeeping and energy closure are
 exact. No blocking discrepancy.
+
+## Independent device-port verification (2026-10-06)
+
+A fresh verifier derived the equations and rejection envelope before reading
+`_jit_annihilation.py` or the integration diff. Primary-source §3.4 excerpts
+were available through indexed searches of the [PENELOPE-2024 manual](https://www.oecd-nea.org/upload/docs/application/pdf/2025-07/nea_mbdav_r_2024_1_penelope-2024_2025-07-10_15-48-34_125.pdf);
+direct retrieval of the full PDF failed. This review used those excerpts,
+the transcribed equations above, and independent conservation algebra.
+
+Writing $p=\sqrt{\gamma^2-1}$, energy and longitudinal/transverse momentum
+conservation yield Eqs. 3.184–3.186. Integrating $S$ over the full unfolded
+support with its antiderivative $H$ gives Eq. 3.189. The identity needed for
+the logarithm is
+
+$$
+\frac{1-\zeta_{\min}}{\zeta_{\min}}=\gamma+p,
+\qquad
+g'(\upsilon)=-(\gamma+1)^2+\upsilon^{-2},
+\qquad
+\max g=\gamma^2+2\gamma-1.
+$$
+
+`_heitler_cross_section_ang2` implements Eq. 3.189 in Å² per free electron,
+using the shared rest energy and classical-radius constants. `_sample`
+draws the logarithmic proposal, applies the true maximum above, folds
+the accepted fraction, and rotates the Eq. 3.184–3.185 photon pair with
+opposite transverse azimuths. Units, signs, both asymptotic limits, and
+the photon-exchange convention agree. The shared rotation helper constructs
+an orthonormal basis about the normalized positron direction.
+
+Each event starts its keyed SplitMix64 counter at zero: two uniforms per
+rejection attempt, one azimuth uniform after acceptance, then four scoring
+uniforms. Reordering or chunking changes neither the event key nor its
+counter sequence. This establishes the stated stream contract; it does not
+assert bitwise equality with the legacy host Philox sampler.
+
+The integration diff selects device emission for a CUDA cascade, checks
+the validity flags, and transfers the photon payload at the existing host
+EPDL first-interaction scoring boundary. The default host branch is
+unchanged. Hazard integration and fate accounting remain the existing
+host implementation; this port introduces no second annihilation hazard.
+
+An independent 70-digit mpmath evaluation of Eq. 3.189 compared with the
+device expression evaluated in host float64 gives relative errors
+$1.05\times10^{-13}$, $1.08\times10^{-15}$, $2.82\times10^{-16}$ and
+$6.36\times10^{-17}$ at 0.1, 10, 1000 and 100000 keV. These are arithmetic
+checks of the expression, not execution of compiled CUDA kernels.
+
+The final device kernels reject a Lorentz factor rounded to one or an
+overflowed $\gamma^2-1$: the cross section returns NaN, while emission
+retains its initial NaN payload and false validity flag. This resolves the
+initial zero-denominator finding at $10^{-14}$ keV. Float64 conditioning
+still limits accuracy near rest: evaluating the direct formula at
+$10^{-12}$ keV differs from the high-precision reference by about 1.04%,
+well below the tracking regime. This verification covers the stated
+physical model and ordinary tracking energies, not uniform numerical
+accuracy across every representable positive float64 value.
+
+Device-port verdict: `rederived`; no remaining source equation, unit,
+sign, or rejection-envelope discrepancy. Compiled-device distribution,
+momentum and stream checks require the task owner's CUDA test execution;
+this verifier ran no GPU workload and makes no human-sign-off claim.

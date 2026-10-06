@@ -106,6 +106,17 @@ with azimuths $\phi$ uniform and $\phi+\pi$.
 
 **Streams.** Each positron is identified by its pair event, so its streams hash (seed, parent track, photon ordinal), as its launch key does, under one salt for the budget $\tau$ and another for the photon emission and scoring.
 
+CPU emission retains its Philox generator. CUDA transport uses the batched
+`transport._jit_annihilation` emitter: two SplitMix64 counter draws per
+Heitler rejection attempt, one for the accepted azimuth, then four for the
+two photons' first interactions. At rest it uses two axis draws followed by
+the four interaction draws. Keys stay tied to pair events, so changing batch
+order or chunk size leaves each sample unchanged. Given the same uniform
+draws, the device emitter agrees with the host sampler to float64 rounding;
+the two generators do not promise identical photons from a key alone.
+Device emission inputs and outputs stay on CUDA until the existing host
+EPDL scoring boundary. In-flight track thinning remains shared host logic.
+
 ## Requirements and limits
 
 Positron transport needs `pair_production_model` (hence the secondary cascade, shell-soft-hard transport with catalog keys, and coupled BremsLib), the installed `sbethe-positron-tables` and, with `elastic_model="elsepa"`, `elsepa-positron-tables` (`pyrite tables fetch sbethe-tables --projectile positron` and `pyrite tables fetch elsepa --projectile positron`). The deprecated Mott model has no positron counterpart and is refused. `atomic_electron_deflection="kawrakow"` applies its electron $\xi$ unchanged to positrons: the subtracted hard share is the Møller rather than the Bhabha $\sin^2\theta$ moment. Positronium, channeling and general photon transport are out of scope.

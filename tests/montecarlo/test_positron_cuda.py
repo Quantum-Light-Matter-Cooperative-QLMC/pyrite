@@ -4,8 +4,8 @@ The device-free half lives in ``test_positron_shell_transport.py`` and
 ``test_positron_cascade.py``. These tests need a CUDA device and run through
 the lab GPU partition. The device Bhabha twins are compared with the Numba
 kernels from identical inputs; the cascade, whose positrons start from CUDA
-generation-0 rows, is compared in aggregate. Annihilation runs on the host
-from the transported rows, so it is compared the same way.
+generation-0 rows, is compared in aggregate. The annihilation cut and photon
+scoring use the host rows; emission uses the device sampler.
 
 Validation: bhabha-close, heitler-annihilation
 """
@@ -167,3 +167,22 @@ def test_cuda_annihilation_fates_agree_with_the_cpu_core():
     assert a[2] > 0
     for x, y in zip(a, b, strict=True):
         assert abs(int(x) - int(y)) <= 5.0 * np.sqrt(x + y + 1.0), (a, b)
+
+
+@pytest.mark.usefixtures("_thick_annihilating")
+def test_cuda_cascade_uses_device_emission(monkeypatch):
+    from pyrite.montecarlo.transport import _jit_annihilation
+
+    sample = _jit_annihilation.sample_annihilation_device
+    calls = []
+
+    def record(*args, **kwargs):
+        assert all(isinstance(value, cupy.ndarray) for value in args)
+        result = sample(*args, **kwargs)
+        calls.append(args[0].size)
+        return result
+
+    monkeypatch.setattr(_jit_annihilation, "sample_annihilation_device", record)
+    result = _positrons(**CUDA)
+    assert sum(calls) * 2 == result["pair_production"]["annihilation_photons"]["k_keV"].size
+    assert sum(calls) > 0

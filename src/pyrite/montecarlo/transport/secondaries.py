@@ -636,7 +636,12 @@ def transport_secondary_cascade(simulate, kw):
         out["pair_production"] = _pair_summary(pair_model, pair_events, pair_counts, positrons_on)
         if positrons_on:
             out["pair_production"]["annihilation_photons"] = _annihilation_photons(
-                out["pair_production"]["events"], seed, pair_layers, pair_width, pair_height
+                out["pair_production"]["events"],
+                seed,
+                pair_layers,
+                pair_width,
+                pair_height,
+                device=first_core == "cuda",
             )
     return out
 
@@ -734,7 +739,7 @@ def _track_ends(rows, n_tracks):
     }
 
 
-def _annihilation_photons(events, seed, layers, width_ang, height_ang):
+def _annihilation_photons(events, seed, layers, width_ang, height_ang, *, device=False):
     """Both photons of every annihilating pair positron, scored in the stack.
 
     ``event`` indexes the joined pair events.
@@ -762,6 +767,7 @@ def _annihilation_photons(events, seed, layers, width_ang, height_ang):
         layers,
         width_ang=width_ang,
         height_ang=height_ang,
+        device=device,
     )
     photons["event"] = index[photons["event"]]
     return photons
