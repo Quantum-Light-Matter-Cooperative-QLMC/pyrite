@@ -102,6 +102,27 @@ def test_packaged_conduction_band_keys_resolve_to_bundled_crystals_or_media():
         assert key in catalog.crystals or key in catalog.media, key
 
 
+def test_conduction_band_cache_keeps_caller_mutations_and_file_edits_isolated(tmp_path):
+    path = tmp_path / "bands.toml"
+    contents = """[fixture]
+formula = { C = 1 }
+electrons_per_formula = 2
+resonance_eV = 20
+source = "fixture"
+doi = "10.fixture"
+"""
+    path.write_text(contents)
+    bands = so.load_conduction_bands(path)
+    bands["fixture"].formula.clear()
+    bands.clear()
+    assert so.load_conduction_bands(path)["fixture"].formula == {6: 1.0}
+    path.write_text(contents.replace("resonance_eV = 20", "resonance_eV = 25"))
+    assert so.load_conduction_bands(path)["fixture"].resonance_eV == 25.0
+    path.write_text(contents.replace("resonance_eV = 20", "resonance_eV = -1"))
+    with pytest.raises(ValueError, match="finite positive"):
+        so.load_conduction_bands(path)
+
+
 def test_fetched_packaged_conduction_bands_pass_default_shell_cutoff():
     if not config._default_path().is_file():
         pytest.skip("pinned SBETHE reference data have not been fetched")

@@ -498,7 +498,9 @@ def test_dispersive_formation_integral_has_the_derivative_jacobian(inverse_term)
 
 
 @_needs_fp64_grid
-@pytest.mark.parametrize("side_face", [False, True, None], ids=["entrance-face", "side-face", "exterior"])
+@pytest.mark.parametrize(
+    "side_face", [False, True, None], ids=["entrance-face", "side-face", "exterior"]
+)
 def test_snell_block_and_fused_amplitudes_match_full_vectors(side_face):
     """Validation: xray-in-medium-resonance. Independent vector dot products."""
     from pyrite._backend import _to_cpu

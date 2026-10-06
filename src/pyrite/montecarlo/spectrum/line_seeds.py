@@ -188,7 +188,9 @@ def resonance_populations(
     velocity = beta[:, None] * direction
     v_dot_n = velocity @ np.asarray(n_hat, dtype=float)
     parent_length = np.asarray(segments.get("line_parent_L_ang", segments["L_ang"]), dtype=float)
-    fraction = np.asarray(segments.get("line_piece_fraction", np.ones_like(parent_length)), dtype=float)
+    fraction = np.asarray(
+        segments.get("line_piece_fraction", np.ones_like(parent_length)), dtype=float
+    )
     if electron_limit is not None:
         parent_length, fraction = parent_length[line], fraction[line]
     weight = (parent_length / beta) ** 2 * fraction

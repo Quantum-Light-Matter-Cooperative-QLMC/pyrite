@@ -28,6 +28,31 @@ def test_atomic_shells_preserve_occupation_and_energy(tmp_path):
     assert shells[3][1].label == "L1"
 
 
+def test_atomic_shell_cache_preserves_fresh_mappings_and_changed_bytes(tmp_path):
+    path = _fixture(tmp_path, "2 1 K 1s1/2 2 24.59 0.535 0 0\n")
+    shells = config.load_atomic_shells(path)
+    original = shells[2][0]
+    shells.clear()
+    assert config.load_atomic_shells(path)[2][0] == original
+    path.write_text("2 1 K 1s1/2 2 25.00 0.535 0 0\n", encoding="ascii")
+    assert config.load_atomic_shells(path)[2][0].ionization_energy_eV == 25.0
+    path.write_text("2 1 K 1s1/2 1 25.00 0.535 0 0\n", encoding="ascii")
+    with pytest.raises(ValueError, match="occupations"):
+        config.load_atomic_shells(path)
+
+
+def test_cached_default_shells_still_verify_checksum(tmp_path, monkeypatch):
+    import hashlib
+
+    path = _fixture(tmp_path, "2 1 K 1s1/2 2 24.59 0.535 0 0\n")
+    monkeypatch.setattr(config, "_default_path", lambda: path)
+    monkeypatch.setattr(config, "PDATCONF_SHA256", hashlib.sha256(path.read_bytes()).hexdigest())
+    assert config.load_atomic_shells()[2][0].ionization_energy_eV == 24.59
+    path.write_text("2 1 K 1s1/2 2 25.00 0.535 0 0\n", encoding="ascii")
+    with pytest.raises(ValueError, match="checksum mismatch"):
+        config.load_atomic_shells()
+
+
 @pytest.mark.parametrize(
     "rows, error",
     [

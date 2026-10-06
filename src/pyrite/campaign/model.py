@@ -15,7 +15,6 @@ from ..detectors import Detector
 from ..instrument import Acquisition, FilterPlate, PixelScorer, PlanarDetector
 from ..instrument.model import validate_downstream_scene
 from .geometry import Slab, Stack, Target
-from .lowering import build_sweep_cases
 from .sweep import BeamSpec
 
 EmissionMode = Literal["incoherent", "coherent", "both"]
@@ -383,6 +382,8 @@ class Sweep:
         list of pyrite.montecarlo.Case
             Cases in the same order as :meth:`expand`.
         """
+        from .lowering import build_sweep_cases
+
         return build_sweep_cases(self, numerics)
 
     @classmethod

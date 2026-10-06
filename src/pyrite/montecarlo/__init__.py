@@ -51,90 +51,94 @@ backward compatibility. The submodules are:
   runner    -- per-case driver and the pipelined run_cases sweep
 """
 
-from .._backend import _GPU, REAL, _to_cpu, cp, xp
-from ..materials.attenuation import (
-    _layer_dz,
-    _layer_path_length,
-    _mu_total_inv_ang,
-    _normalize_composition,
-    _stack_tau,
-)
-from .case import Case
-from .detector import aperture_fwhm_eV, eds_fwhm_eV, mosaic_fwhm_eV, mosaic_psi_rad
-from .geometry import (
-    X_MAX,
-    X_MIN,
-    Y_MAX,
-    Y_MIN,
-    Z_MAX,
-    Z_MIN,
-    _mosaic_quadrature,
-    _orientation_R,
-    _small_tilt_R,
-    detector_directions,
-    first_prism_exit,
-    tilted_geometry,
-    validate_transverse_dimensions,
-)
-from .groove import GrooveSpec, blazed_groove_spec
-from .runner import (
-    _brem_for_case,
-    _lines_for_case,
-    _spectrum_case,
-    _transport_case,
-    _worker_init,
-    run_case,
-    run_cases,
-)
-from .spectrum import (
-    _SEG_ARRAYS,
-    BREM_ENDF_PARSERPY_VERSION,
-    BREMSSTRAHLUNG_EEDL_FILENAME,
-    BREMSSTRAHLUNG_EEDL_SHA256,
-    BREMSSTRAHLUNG_MODEL,
-    CHARACTERISTIC_EEDL_FILENAME,
-    CHARACTERISTIC_EEDL_SHA256,
-    CHARACTERISTIC_MODEL,
-    CHARACTERISTIC_XRAYDB_VERSION,
-    R_E_CM2,
-    BremsstrahlungCrossSectionTable,
-    CharacteristicCrossSectionTable,
-    _brem_dsigma_dk,
-    _bremsstrahlung_dsigma_dk,
-    _eedl_brem_dsigma_dk,
-    _escape_length,
-    _observation_direction,
-    _polarization_pair,
-    _segments_in_layer,
-    load_bremsstrahlung_cross_sections,
-    load_characteristic_cross_sections,
-    load_external_brem,
-    mc_brem_spectrum,
-    mc_characteristic_spectrum,
-    mc_spectrum,
-    mc_spectrum_solid_angle,
-)
-from .transport import (
-    A0_SQ_CM2,
-    TRANSPORT_ELEMENTS,
-    MottTableUnavailableError,
-    _alpha_from_first_moment,
-    _alpha_sr_joy,
-    _dEds_bs_compound,
-    _dEds_bs_compound_scalar,
-    _dEds_bs_keV_per_ang,
-    _dEds_bs_packed_scalar,
-    _dEds_compound,
-    _dEds_keV_per_ang,
-    _load_mott_transport,
-    _mott_alpha_table,
-    _rotate_directions,
-    _sample_cos_theta,
-    _sigma_browning_cm2,
-    beta_from_keV,
-    mott_tables_dir,
-    simulate_trajectories,
-)
+from importlib import import_module
+from typing import Any
+
+# Resolve legacy bindings on demand; schema imports must not initialize kernels.
+_EXPORT_MODULES = {
+    "_GPU": ".._backend",
+    "REAL": ".._backend",
+    "_to_cpu": ".._backend",
+    "cp": ".._backend",
+    "xp": ".._backend",
+    "_layer_dz": "..materials.attenuation",
+    "_layer_path_length": "..materials.attenuation",
+    "_mu_total_inv_ang": "..materials.attenuation",
+    "_normalize_composition": "..materials.attenuation",
+    "_stack_tau": "..materials.attenuation",
+    "Case": ".case",
+    "aperture_fwhm_eV": ".detector",
+    "eds_fwhm_eV": ".detector",
+    "mosaic_fwhm_eV": ".detector",
+    "mosaic_psi_rad": ".detector",
+    "X_MAX": ".geometry",
+    "X_MIN": ".geometry",
+    "Y_MAX": ".geometry",
+    "Y_MIN": ".geometry",
+    "Z_MAX": ".geometry",
+    "Z_MIN": ".geometry",
+    "_mosaic_quadrature": ".geometry",
+    "_orientation_R": ".geometry",
+    "_small_tilt_R": ".geometry",
+    "detector_directions": ".geometry",
+    "first_prism_exit": ".geometry",
+    "tilted_geometry": ".geometry",
+    "validate_transverse_dimensions": ".geometry",
+    "GrooveSpec": ".groove",
+    "blazed_groove_spec": ".groove",
+    "_brem_for_case": ".runner",
+    "_lines_for_case": ".runner",
+    "_spectrum_case": ".runner",
+    "_transport_case": ".runner",
+    "_worker_init": ".runner",
+    "run_case": ".runner",
+    "run_cases": ".runner",
+    "_SEG_ARRAYS": ".spectrum",
+    "BREM_ENDF_PARSERPY_VERSION": ".spectrum",
+    "BREMSSTRAHLUNG_EEDL_FILENAME": ".spectrum",
+    "BREMSSTRAHLUNG_EEDL_SHA256": ".spectrum",
+    "BREMSSTRAHLUNG_MODEL": ".spectrum",
+    "CHARACTERISTIC_EEDL_FILENAME": ".spectrum",
+    "CHARACTERISTIC_EEDL_SHA256": ".spectrum",
+    "CHARACTERISTIC_MODEL": ".spectrum",
+    "CHARACTERISTIC_XRAYDB_VERSION": ".spectrum",
+    "R_E_CM2": ".spectrum",
+    "BremsstrahlungCrossSectionTable": ".spectrum",
+    "CharacteristicCrossSectionTable": ".spectrum",
+    "_brem_dsigma_dk": ".spectrum",
+    "_bremsstrahlung_dsigma_dk": ".spectrum",
+    "_eedl_brem_dsigma_dk": ".spectrum",
+    "_escape_length": ".spectrum",
+    "_observation_direction": ".spectrum",
+    "_polarization_pair": ".spectrum",
+    "_segments_in_layer": ".spectrum",
+    "load_bremsstrahlung_cross_sections": ".spectrum",
+    "load_characteristic_cross_sections": ".spectrum",
+    "load_external_brem": ".spectrum",
+    "mc_brem_spectrum": ".spectrum",
+    "mc_characteristic_spectrum": ".spectrum",
+    "mc_spectrum": ".spectrum",
+    "mc_spectrum_solid_angle": ".spectrum",
+    "A0_SQ_CM2": ".transport",
+    "TRANSPORT_ELEMENTS": ".transport",
+    "MottTableUnavailableError": ".transport",
+    "_alpha_from_first_moment": ".transport",
+    "_alpha_sr_joy": ".transport",
+    "_dEds_bs_compound": ".transport",
+    "_dEds_bs_compound_scalar": ".transport",
+    "_dEds_bs_keV_per_ang": ".transport",
+    "_dEds_bs_packed_scalar": ".transport",
+    "_dEds_compound": ".transport",
+    "_dEds_keV_per_ang": ".transport",
+    "_load_mott_transport": ".transport",
+    "_mott_alpha_table": ".transport",
+    "_rotate_directions": ".transport",
+    "_sample_cos_theta": ".transport",
+    "_sigma_browning_cm2": ".transport",
+    "beta_from_keV": ".transport",
+    "mott_tables_dir": ".transport",
+    "simulate_trajectories": ".transport",
+}
 
 __all__ = [
     # backend
@@ -236,15 +240,21 @@ __all__ = [
 _DEPRECATED_RESPONSE_EXPORTS = frozenset({"convolve_detector", "detector_efficiency"})
 
 
-def __getattr__(name: str):
-    """Resolve relocated detector response operators through their old API."""
-    if name not in _DEPRECATED_RESPONSE_EXPORTS:
+def __getattr__(name: str) -> Any:
+    """Resolve the historical Monte Carlo exports only when requested."""
+    if name in _DEPRECATED_RESPONSE_EXPORTS:
+        from .._module_deprecations import warn_public_export_deprecation
+
+        value = getattr(import_module("pyrite.detectors.response"), name)
+        warn_public_export_deprecation(__name__, name)
+    elif name in _EXPORT_MODULES:
+        value = getattr(import_module(_EXPORT_MODULES[name], __name__), name)
+    else:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from importlib import import_module
-
-    from .._module_deprecations import warn_public_export_deprecation
-
-    value = getattr(import_module("pyrite.detectors.response"), name)
-    warn_public_export_deprecation(__name__, name)
     globals()[name] = value
     return value
+
+
+def __dir__() -> list[str]:
+    """Include unloaded exports in interactive discovery."""
+    return sorted(set(globals()) | set(__all__))

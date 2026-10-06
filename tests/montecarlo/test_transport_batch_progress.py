@@ -162,9 +162,7 @@ def _fake_transport(batches):
 def _run(monkeypatch, batches, **kwargs):
     monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
     monkeypatch.setattr(scheduling, "_transport_case", _fake_transport(batches))
-    return runner.run_cases(
-        [{"name": "c0", "Ne": 6}], max_workers=0, transport_only=True, **kwargs
-    )
+    return runner.run_cases([{"name": "c0", "Ne": 6}], max_workers=0, transport_only=True, **kwargs)
 
 
 def test_multi_batch_case_shows_a_nested_electron_bar(monkeypatch, capsys):

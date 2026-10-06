@@ -609,7 +609,7 @@ Optional SSH/SLURM orchestration for a configured remote host: sync, bounded and
 Lightweight package root: expose `DATA_DIR`, `__version__`, and lazy supported scene/result objects plus `simulate`, without importing plotting or accelerator stacks during `import pyrite`.
 
 ### `devtools/`
-Importable repository maintenance implementations behind `pyrite-dev`: package smoke, plot smoke, CLI reference/deprecation generation, and repository-map dependency generation. Root `scripts/` files are thin compatibility wrappers or standalone checkout utilities; `checks/` contains developer-only physics anchors mapped to validation ids in `checks/README.md`.
+Importable repository maintenance implementations behind `pyrite-dev`: package smoke, plot smoke, CLI reference/deprecation generation, and repository-map dependency generation. `startup.py` owns the fresh-process CPU import/README-simulation benchmark, with isolated cold Numba caches and a separate profile process; see [CPU startup latency](repo-design/compute/startup-latency.md). Root `scripts/` files are thin compatibility wrappers or standalone checkout utilities; `checks/` contains developer-only physics anchors mapped to validation ids in `checks/README.md`.
 
 ### `apps/_compile_nb.py`
 Internal notebook-compile helper; not public API.
