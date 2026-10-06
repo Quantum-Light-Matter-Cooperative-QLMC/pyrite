@@ -591,14 +591,14 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
         "_characteristic_from_segments",
         lambda *a, **k: np.zeros_like(E_GRID),
     )
-    real_tables = line_kernels.reflection_coupling_tables
+    real_tables = line_kernels.emission_coupling_tables
     tabulated = []
 
     def counted_tables(crystal, hkl_list, *args, **kwargs):
         tabulated.append(len(hkl_list))
         return real_tables(crystal, hkl_list, *args, **kwargs)
 
-    monkeypatch.setattr(line_kernels, "reflection_coupling_tables", counted_tables)
+    monkeypatch.setattr(line_kernels, "emission_coupling_tables", counted_tables)
     segs = _segments(2)
     tp = _runner_tp(segs, ne_lines=2, ne_brem=2)
 

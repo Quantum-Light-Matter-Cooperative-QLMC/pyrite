@@ -320,9 +320,13 @@ def amplitudes_PXR_CBS_both(
 
     #                                    dimensionless CBS strength of Eq. (14)
 
-    chi = chi_g(crystal, hkl, photon_E_eV, B_ang2, use_henke)
+    # The line resonant on +g transfers -g: the kernels' conjugate-phase
+    # coupling is conj(chi(-hkl)) / conj(U(-hkl)) (crystal.emission_coupling_tables).
+    mate = -np.asarray(hkl, dtype=float)
 
-    eUg = U_g(crystal, hkl, photon_E_eV, B_ang2, use_henke)
+    chi = np.conj(chi_g(crystal, mate, photon_E_eV, B_ang2, use_henke))
+
+    eUg = np.conj(U_g(crystal, mate, photon_E_eV, B_ang2, use_henke))
 
     detuning = kg2 - omega**2  # PXR denominator; ~g^2(1-beta...) > 0
 
@@ -522,9 +526,12 @@ def amplitudes_PXR_CBS_sweep(
 
     # couplings: chi_g / U_g already broadcast over array photon energies
 
-    chi = chi_g(crystal, hkl, E, B_ang2, use_henke)
+    # Friedel-mate pairing as above: conj(chi(-hkl)), conj(U(-hkl)).
+    mate = -np.asarray(hkl, dtype=float)
 
-    eUg = U_g(crystal, hkl, E, B_ang2, use_henke)  # e*U_g/V [eV]
+    chi = np.conj(chi_g(crystal, mate, E, B_ang2, use_henke))
+
+    eUg = np.conj(U_g(crystal, mate, E, B_ang2, use_henke))  # e*U_g/V [eV]
 
     detuning = kg2 - omega**2
 

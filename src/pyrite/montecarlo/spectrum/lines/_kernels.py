@@ -11,7 +11,7 @@ import numpy as np
 
 from ...._backend import REAL, _to_cpu, array_namespace, xp
 from ....materials.attenuation import _mu_total_inv_ang
-from ....materials.crystal import HBARC_EV_ANG, reflection_coupling_tables
+from ....materials.crystal import HBARC_EV_ANG, emission_coupling_tables
 from ...geometry import first_prism_exit
 from ...groove import _THETA_TOL
 from ...transport import (
@@ -983,6 +983,11 @@ def _flight_blocks(bounds, chunk):
 def _reflection_tables(crystal, hkl_list, E_tab, B_ang2, use_henke):
     """Tabulate every reflection's susceptibility and ``U_g/m_e`` on ``xp``.
 
+    Row ``i`` is the coupling of the line resonant on ``g(hkl_list[i])``:
+    ``conj(chi(-hkl))`` and ``U(hkl)`` (see
+    :func:`~pyrite.materials.crystal.emission_coupling_tables`), not the
+    crystallographic ``chi(hkl)``, which differs for Bijvoet pairs.
+
     Returns ``(N_hkl, N_tab)`` REAL arrays ``(chi_re, chi_im, u_re, u_im)``,
     one row per reflection. Mosaic orientations share their reflection's row
     (the couplings depend on ``|g|``, not its direction), so callers index rows
@@ -993,6 +998,7 @@ def _reflection_tables(crystal, hkl_list, E_tab, B_ang2, use_henke):
     emission tests patch it here and see both routes.
 
     Validation: line-reflection-coupling-tables
+    Validation: line-energy-dispersion
     """
-    tables = reflection_coupling_tables(crystal, hkl_list, E_tab, B_ang2, use_henke, xp=xp)
+    tables = emission_coupling_tables(crystal, hkl_list, E_tab, B_ang2, use_henke, xp=xp)
     return tuple(xp.ascontiguousarray(table, dtype=REAL) for table in tables)

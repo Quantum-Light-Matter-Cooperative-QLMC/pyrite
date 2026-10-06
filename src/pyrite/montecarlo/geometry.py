@@ -278,8 +278,8 @@ def tilted_geometry(theta_obs_rad, tilt_polar_rad, tilt_azim_rad=0.0):
     zero-scattering scalar causes the observed full-model opposite-tilt
     intensity asymmetry; that can arise from direction-sensitive transport,
     escape, polarization/amplitude, or non-aligned reciprocal-vector effects.
-    The reciprocal-harmonic sign mapping in the production numerator remains
-    unresolved; this statement does not adjudicate it.
+    The positive numerator labels the line by its momentum transfer ``-g``
+    (reconciled under ``line-energy-dispersion``, #338).
 
     Returns (beam_dir, n_hat) to pass to simulate_trajectories(beam_dir=...)
     and mc_spectrum(n_hat=...). For ta = 0 the detector's sample-frame polar

@@ -13,6 +13,7 @@ from pyrite.materials.crystal import (
     chi_g,
     debye_waller,
     dominant_reflections,
+    emission_coupling_tables,
     optical_constants,
     reciprocal_g_vector,
     reflection_coupling_tables,
@@ -754,3 +755,38 @@ def test_reflection_coupling_tables_match_per_atom_couplings(crystal, hkl_list, 
             err = np.abs(got[finite] - want[finite])
             tol = 1e-12 * np.abs(want[finite]) + 1e-12 * np.max(np.abs(want[finite]))
             np.testing.assert_array_less(err, tol)
+
+
+def test_emission_coupling_tables_are_the_conjugate_friedel_mate():
+    """Line resonant on g(hkl) couples to conj(chi(-hkl)) and U(hkl).
+
+    Validation: line-energy-dispersion
+    """
+    hkl_list = [(1, 0, 2), (1, 0, 3), (0, 0, 4)]
+    E = np.geomspace(2.0e3, 3.0e4, 301)
+    chi_re, chi_im, u_re, u_im = emission_coupling_tables("4h_sic", hkl_list, E, 0.5, True)
+    for row, hkl in enumerate(hkl_list):
+        mate = tuple(-h for h in hkl)
+        want_chi = np.conj(chi_g("4h_sic", mate, E, 0.5, True))
+        want_u = np.asarray(U_g("4h_sic", hkl, E, 0.5, True)) / crystal_module.M_E_EV
+        for got, want in (
+            (chi_re[row] + 1j * chi_im[row], want_chi),
+            (u_re[row] + 1j * u_im[row], want_u),
+        ):
+            np.testing.assert_allclose(got, want, rtol=1e-12, atol=1e-12 * np.max(np.abs(want)))
+    # Noncentrosymmetric with f'': the pairing is not the crystallographic chi(+hkl).
+    chi_plus = np.asarray(chi_g("4h_sic", (1, 0, 2), E, 0.5, True))
+    assert np.max(np.abs(np.abs(chi_re[0] + 1j * chi_im[0]) / np.abs(chi_plus) - 1.0)) > 0.1
+
+
+@pytest.mark.parametrize(
+    ("crystal", "use_henke"), [("hopg", False), ("hbn", False), ("lif", False)]
+)
+def test_emission_coupling_tables_reduce_to_crystallographic_without_fpp(crystal, use_henke):
+    """With f'' = 0 the Friedel-mate pairing is chi(hkl) bit-for-bit."""
+    hkl_list = [(0, 0, 2), (1, 0, 1), (1, 0, 3)]
+    E = np.geomspace(3.0e3, 1.0e5, 101)
+    want = reflection_coupling_tables(crystal, hkl_list, E, 0.4, use_henke)
+    got = emission_coupling_tables(crystal, hkl_list, E, 0.4, use_henke)
+    for g_tab, w_tab in zip(got, want, strict=True):
+        np.testing.assert_array_equal(g_tab, w_tab)

@@ -516,6 +516,36 @@ def reflection_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_h
     return tuple(xp.stack(row) for row in rows)
 
 
+def emission_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_henke=False, xp=np):
+    """Couplings for the line resonant on ``g(hkl)``, in the kernels' phase convention.
+
+    The line ``omega = v.g / (1 - n_hat.v)`` emits ``k = k0 - g`` from a
+    virtual photon ``k0`` with ``omega = k0.v``: its momentum transfer is
+    ``-g``. In this module's ``exp(+i omega t)`` convention, where
+    ``f' + i f''`` (``f'' > 0``) and ``S(q) = sum F exp(+i q.R)`` is the
+    amplitude for transfer ``q``, that line couples to ``chi(-hkl)`` and
+    ``U(-hkl)``. The spectrum kernels sum the conjugate field,
+    ``exp{i[omega t - (k + g).r]}``, so the coefficients they need are
+
+        conj(chi(-hkl)),  conj(U(-hkl)) = U(hkl).
+
+    ``U`` carries no ``f''`` and is unchanged. ``conj(chi(-hkl))`` equals
+    ``chi(hkl)`` with ``f''`` negated: it differs from ``chi(hkl)`` in modulus
+    only for a noncentrosymmetric crystal with ``f'' != 0`` (Bijvoet pairs).
+    With ``f'' = 0`` the returned tables equal :func:`reflection_coupling_tables`
+    at ``+hkl`` exactly.
+
+    Returns ``(chi_re, chi_im, u_re, u_im)`` as :func:`reflection_coupling_tables`.
+
+    Validation: line-energy-dispersion
+    """
+    mates = [-np.asarray(hkl, dtype=float) for hkl in hkl_list]
+    chi_re, chi_im, u_re, u_im = reflection_coupling_tables(
+        crystal, mates, photon_E_eV, B_ang2, use_henke, xp=xp
+    )
+    return chi_re, -chi_im, u_re, -u_im
+
+
 # ---- absorption length ------------------------------------------------------
 def absorption_length_ang(element, photon_E_eV, number_density_per_ang3):
     """
