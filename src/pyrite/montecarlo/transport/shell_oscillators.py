@@ -6,7 +6,8 @@ selects no transport mode.
 
 import tomllib
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -63,8 +64,18 @@ def load_conduction_bands(path: str | Path | None = None) -> dict[str, Conductio
     Validation: penelope-shell-oscillators
     """
     source = CONDUCTION_BAND_PATH if path is None else Path(path)
-    with source.open("rb") as handle:
-        table = tomllib.load(handle)
+    bands = _parse_conduction_bands(source.read_bytes(), str(source))
+    # Records are frozen, but formula mappings historically belong to the caller.
+    return {
+        key: replace(band, formula=dict(band.formula) if band.formula is not None else None)
+        for key, band in bands.items()
+    }
+
+
+@lru_cache(maxsize=8)
+def _parse_conduction_bands(data: bytes, source: str) -> dict[str, ConductionBand]:
+    """Reuse validated records by exact contents and source-specific diagnostics."""
+    table = tomllib.loads(data.decode("utf-8"))
     bands = {}
     for key, entry in table.items():
         try:

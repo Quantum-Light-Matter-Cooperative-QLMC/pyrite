@@ -25,6 +25,7 @@ core-architecture-rfc
 ../guides/performance-profile-analysis
 compute/coherent-streaming-rawkernel.md
 compute/compute-performance-optimization.md
+compute/startup-latency.md
 compute/gpu-transport-rawkernel.md
 compute/jit-spectrum-kernel-walkthrough.md
 compute/straggled-transport-integration.md

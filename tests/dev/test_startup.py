@@ -79,6 +79,37 @@ def test_startup_rejects_invalid_repeats(value, capsys):
     assert "--repeats" in capsys.readouterr().err
 
 
+def test_startup_rejects_inconsistent_results(monkeypatch):
+    identities = iter(["prime", "same", "different"])
+
+    def child(command, **kwargs):
+        return SimpleNamespace(
+            stderr="",
+            stdout=json.dumps({"identity_digest": next(identities), "array_sha256": {}}),
+        )
+
+    monkeypatch.setattr(startup.subprocess, "run", child)
+    with pytest.raises(RuntimeError, match="different identities or spectra"):
+        startup.benchmark(repeats=2)
+
+
+@pytest.mark.parametrize(
+    "error, code", [(RuntimeError("different spectra"), 1), (KeyboardInterrupt(), 130)]
+)
+def test_startup_runtime_failure_and_interrupt(monkeypatch, capsys, error, code):
+    def fail(**kwargs):
+        raise error
+
+    monkeypatch.setattr(startup, "benchmark", fail)
+    with pytest.raises(SystemExit) as caught:
+        startup.run(Namespace(repeats=1, cache="warm", json=True, profile=None))
+    assert caught.value.code == code
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    if code == 1:
+        assert "different spectra" in captured.err
+
+
 def test_startup_help_keeps_execution_unloaded(capsys):
     with pytest.raises(SystemExit) as error:
         dev_cli.main(["startup", "--help"])

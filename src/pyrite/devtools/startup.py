@@ -15,7 +15,12 @@ import tempfile
 from pathlib import Path
 
 _WORKER = r"""
+import cProfile
+import os
 import time
+profiler = cProfile.Profile() if os.environ.get("PYRITE_STARTUP_PROFILE") else None
+if profiler:
+    profiler.enable()
 start = time.perf_counter()
 import pyrite as pr
 pr.Beam
@@ -26,11 +31,6 @@ target = pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0)
 detector = pr.Detector()
 numerics = pr.Numerics(n_electrons=450, n_electrons_brem=100)
 setup_s = time.perf_counter() - start
-import cProfile
-import os
-profiler = cProfile.Profile() if os.environ.get("PYRITE_STARTUP_PROFILE") else None
-if profiler:
-    profiler.enable()
 start = time.perf_counter()
 result = pr.simulate(beam, target, detector, numerics=numerics)
 first_s = time.perf_counter() - start
@@ -132,6 +132,11 @@ def run(args) -> None:
         if exc.stderr:
             print(exc.stderr, end="", file=sys.stderr)
         raise SystemExit(exc.returncode) from exc
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"startup benchmark failed: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+    except KeyboardInterrupt:
+        raise SystemExit(130) from None
     if args.json:
         print(json.dumps(report))
         return

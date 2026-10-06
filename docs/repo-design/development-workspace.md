@@ -28,6 +28,9 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite packaging
 # One focused test module or selection.
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test path/to/test.py -k test_name
 
+# Fresh-process CPU imports and README simulation; see the startup reference.
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev startup --cache warm --repeats 3
+
 # Static and formatting checks.
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev lint
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev format
@@ -45,6 +48,9 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev package-smoke
 ```
 
 Use the project runner rather than bare `pytest` or an environment-specific Python path. If the project environment is not writable, add `UV_PROJECT_ENVIRONMENT=/tmp/pyrite-venv` instead of switching interpreters.
+
+See [CPU startup latency](compute/startup-latency.md) for benchmark cache policies,
+profiling, and the recorded baseline.
 
 Suite ownership uses deterministic filename rules in `pyrite._dev`. A regression test requires the four domain suites to cover every test module exactly once, so a new test cannot silently disappear from focused coverage. The integration suite intentionally overlaps domain suites; it exercises public imports/data, exports, CLI contract, remote, sweep/run, and a headless app path. `pyrite-dev docs` performs the clean offline warnings-as-errors Sphinx build; `verify` includes that documentation gate along with skills, imports, generated repository structure, lint, types, and tests. CI runs the four domain suites once each with adaptive workers (and slow-test timings for core), then uses `verify --skip-tests` for the remaining checks; local `verify` still runs everything.
 
