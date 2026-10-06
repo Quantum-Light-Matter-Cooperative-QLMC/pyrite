@@ -9,8 +9,6 @@ from typing import Protocol
 
 import numpy as np
 
-from .response import convolve_detector, detector_efficiency
-
 
 def _number(name: str, value: object, *, minimum: float, maximum: float | None = None) -> float:
     if isinstance(value, bool) or not isinstance(value, Real):
@@ -278,10 +276,14 @@ class LegacyEDS:
     def score(self, energy_eV, intrinsic_density, *, fwhm_eV, scale):
         scored = np.asarray(intrinsic_density)
         if self.apply_qe:
+            from .response import detector_efficiency
+
             scored = scored * detector_efficiency(energy_eV)
         if self.convolve:
             if fwhm_eV is None:
                 raise ValueError("LegacyEDS convolution requires fwhm_eV")
+            from .response import convolve_detector
+
             scored = convolve_detector(energy_eV, scored, fwhm_eV)
         return scored * scale
 

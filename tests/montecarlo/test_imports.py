@@ -9,6 +9,29 @@ import warnings
 import pytest
 
 
+def test_public_scene_construction_does_not_initialize_execution() -> None:
+    script = textwrap.dedent(
+        """
+        import sys
+        import pyrite as pr
+        scene = pr.Scene(pr.Beam(energy_keV=30.0), pr.Slab("hopg"), pr.Detector())
+        assert scene.beam.energy_keV == 30.0
+        assert {
+            "numba", "pyrite._backend", "pyrite.campaign.lowering",
+            "pyrite.montecarlo.runner", "pyrite.montecarlo.transport",
+            "pyrite.instrument.acquisition",
+        }.isdisjoint(sys.modules)
+        import pyrite.montecarlo as mc
+        assert "run_case" in dir(mc)
+        assert mc.Case.__module__ == "pyrite.montecarlo.case"
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0, result.stderr
+
+
 @pytest.mark.parametrize(
     "module",
     [

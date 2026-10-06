@@ -2,6 +2,7 @@
 
 import hashlib
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -79,6 +80,12 @@ def load_atomic_shells(path: str | Path | None = None) -> dict[int, tuple[Atomic
     data = source.read_bytes()
     if path is None and hashlib.sha256(data).hexdigest() != PDATCONF_SHA256:
         raise ValueError(f"{source}: pdatconf.p14 checksum mismatch")
+    return dict(_parse_atomic_shells(data, str(source)))
+
+
+@lru_cache(maxsize=8)
+def _parse_atomic_shells(data: bytes, source: str) -> dict[int, tuple[AtomicShell, ...]]:
+    """Reuse validated records by exact bytes, preserving source-specific errors."""
     grouped: dict[int, list[AtomicShell]] = {}
     for line_number, line in enumerate(data.decode("ascii").splitlines(), 1):
         if not line.strip() or line.lstrip().startswith("#"):

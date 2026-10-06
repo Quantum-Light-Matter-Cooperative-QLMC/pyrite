@@ -6,7 +6,6 @@ Split from ``sweep.py``; ``pyrite.campaign.sweep`` re-exports every public name.
 import numpy as np
 
 from .._energy_grid_encoding import decode_energy_grid
-from ..montecarlo.transport import spliced_stopping_keV_per_ang
 
 # ---- compute-cost proxy (progress weighting; instrumentation, not physics) ----
 # The flat "N of M cases" progress readout misrepresents reality because per-case
@@ -33,6 +32,8 @@ def _dEds_magnitude_keV_per_ang(composition, E_keV):
     already imports ``montecarlo.case``, so this adds no import cost.
     Additive over elements with number densities ``n_i`` [1/Angstrom^3];
     ``E_keV`` may be a scalar or an array."""
+    from ..montecarlo.transport import spliced_stopping_keV_per_ang
+
     # magnitude only (transport uses the negative)
     return -spliced_stopping_keV_per_ang(composition, E_keV)
 

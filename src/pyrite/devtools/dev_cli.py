@@ -26,6 +26,7 @@ Commands:
     package-smoke build and install clean wheel/editable environments
     smoke      exercise checkpoint loading and plotting
     perf       measure MC sweeps with compute-performance telemetry
+    startup    benchmark fresh-process CPU imports and the README simulation
     performance list, analyze, or delete compute-performance artifacts
     energy-grid maintain derived detector energy-grid artifacts
     sync-skills mirror .agents/skills into .claude/skills
@@ -655,6 +656,19 @@ def cmd_perf(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_startup(args: argparse.Namespace) -> None:
+    from pyrite.devtools.startup import run
+
+    run(args)
+
+
+def _positive_repeats(value: str) -> int:
+    count = int(value)
+    if count < 1:
+        raise argparse.ArgumentTypeError("--repeats must be a positive integer")
+    return count
+
+
 def cmd_energy_grid(args: argparse.Namespace) -> None:
     from pyrite.devtools.cli_commands import energy_grid_command
 
@@ -755,6 +769,28 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     )
     perf.add_argument("command_args", nargs=argparse.REMAINDER)
     perf.set_defaults(func=cmd_perf)
+    startup = sub.add_parser(
+        "startup", help="benchmark fresh-process CPU imports and the README simulation"
+    )
+    startup.add_argument(
+        "--repeats",
+        type=_positive_repeats,
+        default=3,
+        help="fresh processes (positive integer; default: 3)",
+    )
+    startup.add_argument(
+        "--cache",
+        choices=("warm", "cold"),
+        default="warm",
+        help="Numba cache: prime first, or use an empty temporary cache per sample (default: warm)",
+    )
+    startup.add_argument("--json", action="store_true", help="emit one JSON benchmark report")
+    startup.add_argument(
+        "--profile",
+        type=Path,
+        help="write cProfile data from a separate fresh-process first call",
+    )
+    startup.set_defaults(func=cmd_startup)
     energy_grid = sub.add_parser(
         "energy-grid",
         add_help=False,
