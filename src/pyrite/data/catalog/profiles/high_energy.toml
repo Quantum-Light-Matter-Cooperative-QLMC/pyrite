@@ -1,8 +1,8 @@
 materials = ["hbn", "hopg", "mose2"]
 thickness_ang = {values = [10000.0, 1000000.0, 10000000.0, 100000000.0]}
-energy_keV = {values = [100.0, 500.0, 1000.0]}
+energy_keV = {values = [100.0, 500.0, 1000.0, 5000.0]}
 tilt_deg = {values = [10.0, 30.0, 50.0, 70.0]}
-tilt_azim_deg = {values = [140.0, 180.0]}
+tilt_azim_deg = {values = [180.0]}
 E_grid_brem = { arange = { start = 0.0, stop = 30000.0, step = 25.0 } }
 
 # Measured line bandwidth with local spacing (#192): the kinematic ceiling at
@@ -10,6 +10,10 @@ E_grid_brem = { arange = { start = 0.0, stop = 30000.0, step = 25.0 } }
 # yield exact across local-spacing joins, which point sampling does not. Cases
 # whose line yield is carried by a few electrons run with a
 # LineYieldStatisticsWarning (#201).
+n_electrons = {values = [5000]}
+n_electrons_brem = {values = [1000]}
+straggling = true
+
 [line_grid_policy]
 bandwidth = "resonance-population"
 resolution = "resonance-local"
