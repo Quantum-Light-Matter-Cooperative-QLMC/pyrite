@@ -74,10 +74,6 @@ ROCm functionality remains provisional until exercised on AMD hardware.
 [execution and acceleration](docs/computation/execution-and-acceleration.md) for
 backend, precision, transport-core, and memory-policy controls.
 
-> **Distribution warning:** locked `crystals` 1.7.0 dependency is GPLv3. Review
-> licensing before distributing source, wheels, binaries, or containers that
-> include it.
-
 ## Run
 
 Use `pyrite run` for resumable profile campaigns that write checkpoints:
@@ -221,8 +217,10 @@ before scientific use.
 
 ## Status and license
 
-Academic research code under active development. No project license currently
-attached; contact author regarding reuse.
+Academic research code under active development, distributed under the
+[UCLA Academic Software License](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE.txt) for educational or academic
+research use by academic or nonprofit researchers. For commercial licensing,
+contact the author listed in the license.
 
 Native GPT `.gdf` electron-beam snapshots are supported as a local beam source;
 see [GDF beam import](docs/guides/gpt-gdf-beams.md) for configuration and CLI examples.

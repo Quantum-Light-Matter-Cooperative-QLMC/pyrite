@@ -6,18 +6,18 @@ import sys
 import pytest
 
 
-def test_missing_crystals_dependency_is_one_actionable_cli_error() -> None:
+def test_missing_gemmi_dependency_is_one_actionable_cli_error() -> None:
     script = r"""
 import builtins
 
 real_import = builtins.__import__
 
-def import_without_crystals(name, *args, **kwargs):
-    if name == "crystals":
-        raise ModuleNotFoundError("No module named 'crystals'", name="crystals")
+def import_without_gemmi(name, *args, **kwargs):
+    if name == "gemmi":
+        raise ModuleNotFoundError("No module named 'gemmi'", name="gemmi")
     return real_import(name, *args, **kwargs)
 
-builtins.__import__ = import_without_crystals
+builtins.__import__ = import_without_gemmi
 from pyrite import cli
 cli.main(["run", "standard", "-m", "hopg", "--quick"])
 """
@@ -31,14 +31,14 @@ cli.main(["run", "standard", "-m", "hopg", "--quick"])
     )
 
     assert result.returncode != 0
-    assert "required dependency 'crystals' is not installed" in result.stderr
+    assert "required dependency 'gemmi' is not installed" in result.stderr
     assert "uv sync" in result.stderr
-    assert result.stderr.count("required dependency 'crystals'") == 1
+    assert result.stderr.count("required dependency 'gemmi'") == 1
     assert "materials." not in result.stderr
     assert "Traceback" not in result.stderr
 
 
-def test_scan_entry_shim_reports_missing_crystals_without_traceback() -> None:
+def test_scan_entry_shim_reports_missing_gemmi_without_traceback() -> None:
     script = r"""
 import builtins
 import runpy
@@ -46,12 +46,12 @@ import sys
 
 real_import = builtins.__import__
 
-def import_without_crystals(name, *args, **kwargs):
-    if name == "crystals":
-        raise ModuleNotFoundError("No module named 'crystals'", name="crystals")
+def import_without_gemmi(name, *args, **kwargs):
+    if name == "gemmi":
+        raise ModuleNotFoundError("No module named 'gemmi'", name="gemmi")
     return real_import(name, *args, **kwargs)
 
-builtins.__import__ = import_without_crystals
+builtins.__import__ = import_without_gemmi
 sys.argv = ["pyrite._entry.scan", "standard", "-m", "hopg", "--quick"]
 runpy.run_module("pyrite._entry.scan", run_name="__main__")
 """
@@ -65,9 +65,9 @@ runpy.run_module("pyrite._entry.scan", run_name="__main__")
     )
 
     assert result.returncode != 0
-    assert "required dependency 'crystals' is not installed" in result.stderr
+    assert "required dependency 'gemmi' is not installed" in result.stderr
     assert "uv sync" in result.stderr
-    assert result.stderr.count("required dependency 'crystals'") == 1
+    assert result.stderr.count("required dependency 'gemmi'") == 1
     assert "materials." not in result.stderr
     assert "Traceback" not in result.stderr
 

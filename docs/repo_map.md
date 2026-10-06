@@ -228,9 +228,9 @@ Primitive decoders for schema-version-1 catalog grids and descriptors: number/ne
 - Deps: NumPy.
 
 ### `materials/_cif.py`
-Structural adapter around `crystals` 1.7: CIF parsing, symmetry expansion, cell parameters, fractional sites, volume only. PyRITE retains ownership of form factors, structure factors, reflection selection, attenuation, transport.
-- Internal: `crystals_crystal_to_crystal_info`, `load_crystal_from_cif`.
-- Deps: external `crystals`, NumPy.
+Structural adapter around Gemmi 0.7: CIF parsing, symmetry expansion, cell parameters, fractional sites, volume only. PyRITE retains ownership of form factors, structure factors, reflection selection, attenuation, transport.
+- Internal: `gemmi_structure_to_crystal_info`, `load_crystal_from_cif`; `crystals_crystal_to_crystal_info` remains a dependency-free compatibility adapter for already expanded objects.
+- Deps: external Gemmi, NumPy.
 
 ### `materials/crystal.py`
 Catalog-backed crystal compatibility projection, structure factors, X-ray optical constants — physics data layer under Monte Carlo.
