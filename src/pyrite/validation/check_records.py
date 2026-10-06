@@ -56,6 +56,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/sinc_bin_integration.py": ("sinc-bin-integration",),
     "checks/substep_invariance.py": ("substep-radiation-invariance",),
     "checks/transport_core_goldens.py": ("electron-transport",),
+    # Model sensitivity evidence (#339), without a measured-data pass/fail gate.
+    "checks/zhai_hbn_energy_trend.py": (),
 }
 """Maintained standalone-check to detailed-ledger claim mappings."""
 
