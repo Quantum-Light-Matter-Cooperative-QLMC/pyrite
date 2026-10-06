@@ -355,10 +355,9 @@ def line_energy_eV(anchor: ZhaiAnchor, E0_keV: float) -> float:
 
         E = hbar c beta g_z / (1 - beta cos theta_obs),
 
-    for beam parallel to the HOPG c-axis and ``g_z = |g|``. Under an
-    ``exp(+i g.r)`` reconstruction, this positive numerator would correspond
-    to the opposite reciprocal harmonic. Production does not document that
-    mapping, so the sign discrepancy remains. In the nonrelativistic limit
+    for beam parallel to the HOPG c-axis and ``g_z = |g|``. The line on
+    ``+g`` is the one whose photon takes momentum transfer ``-g``; the positive
+    numerator is the reconciled convention (#338). In the nonrelativistic limit
     ``beta -> 0``, the line energy tends to zero.
 
     Validation: line-energy-dispersion

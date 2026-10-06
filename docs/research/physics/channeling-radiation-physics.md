@@ -153,7 +153,7 @@ The recoil correction is bounded by $\hbar\omega / E \lesssim 2.5 \times 10^{-3}
 
 Two consistency points with existing code:
 
-- The Doppler denominator $1 - \beta\cos\theta \equiv 1 - \mathbf{v} \cdot \hat{\mathbf{n}} / c$ is the *same object* as in the ledgered `line-energy-dispersion` row, which currently carries an unresolved numerator-sign discrepancy. The channeling implementation must adopt one convention for $\hat{\mathbf{n}}$, the tilt sign (`docs/physics/geometry/tilt-convention.md`), and the frequency sign, and add a cross-check test that the two modules agree on the denominator for the same geometry.
+- The Doppler denominator $1 - \beta\cos\theta \equiv 1 - \mathbf{v} \cdot \hat{\mathbf{n}} / c$ is the *same object* as in the ledgered `line-energy-dispersion` row, whose numerator sign was reconciled in #338 as a relabelling: the repository $\mathbf g$ is the photon's momentum transfer with its sign reversed. The channeling implementation must adopt one convention for $\hat{\mathbf{n}}$, the tilt sign (`docs/physics/geometry/tilt-convention.md`), and the frequency sign, and add a cross-check test that the two modules agree on the denominator for the same geometry.
 - $\beta$ here is the *longitudinal* velocity. It differs from the total $\beta$ by $O(E_\perp / pv) \lesssim 10^{-5}$ — ignorable, but say so in the derivation docstring.
 
 ## 5. Step 5 — Depth evolution
@@ -278,7 +278,7 @@ Inventory of effects checked for this walkthrough, with include/exclude decision
 4. **Temperature model behind `crystal_temperature_K`** — §1.3; Debye $B(T)$ anchored to catalog values; placeholder $B = 0.6$ Å² materials are ineligible for validated channeling profiles.
 5. **Beam energy spread** doubles into line width via $\gamma^2$ — §6.3.
 6. **Surface refraction** by the mean inner potential — §3; small reweighting near exact alignment.
-7. **Doppler-denominator convention coupling** to the open `line-energy-dispersion` sign discrepancy — §4; add the cross-module consistency test *before* anchoring line positions, or the same ambiguity infects two subsystems.
+7. **Doppler-denominator convention coupling** to the `line-energy-dispersion` convention (reconciled in #338) — §4; add the cross-module consistency test *before* anchoring line positions, or the same ambiguity infects two subsystems.
 8. **Planar validity requires axis avoidance.** A "planar" run aligned near a low-index axis is silently axial; validate that the beam direction keeps all major axes outside a few times $\psi_c^{axial}$, else refuse/warn.
 9. **Spin and quantum-recoil corrections**: spin-flip rates suppressed by $(\hbar\omega/E)^2 \lesssim 10^{-5}$; recoil handled at first order — both documented as dropped with bounds, satisfying the derivation-docstring assumption rule.
 10. **PXR/CBS from *channeled* electrons.** Channeled states sample the unit cell non-uniformly, which in principle modulates their PXR emission. Out of scope v1 (channeled fraction of path is µm-scale); recorded so the coherent and channeling modules don't silently claim inconsistent electron ensembles.

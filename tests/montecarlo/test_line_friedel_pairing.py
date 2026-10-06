@@ -108,3 +108,42 @@ def test_line_couples_to_the_friedel_mate_of_its_resonant_harmonic(tilt_deg, mon
     expected = abs(chi_plus) ** 2 / abs(chi_minus) ** 2
     assert abs(expected - 1.0) > 0.2  # the case actually discriminates
     np.testing.assert_allclose(pxr_m.sum() / pxr_p.sum(), expected, rtol=2e-3)
+
+
+def test_total_yield_matches_the_unconjugated_native_pairing(monkeypatch):
+    """PXR x CBS interference: conjugating BOTH native couplings leaves |A|^2.
+
+    The native (exp(+i omega t)) amplitude couples to chi(-hkl) and U(-hkl)
+    with real kinematics, so feeding the kernel the unconjugated pair must give
+    the production total. A mixed pairing such as {conj chi(-hkl), U(-hkl)}
+    keeps both components but changes the interference, and fails here.
+    """
+    from pyrite.materials.crystal import reflection_coupling_tables
+    from pyrite.montecarlo.spectrum.lines import _kernels, _setup
+
+    monkeypatch.setattr(
+        _setup,
+        "refractive_index",
+        lambda crystal, energy, *args: np.ones_like(energy, dtype=complex),
+    )
+    g_mag, g_hat, v_hat, n_hat = _geometry(-12.0)
+    beta = float(beta_from_Ee(E_KEV * 1e3))
+    E_line = HBARC_EV_ANG * beta * g_mag * (g_hat @ v_hat) / (1.0 - beta * (n_hat @ v_hat))
+    grid = np.linspace(0.9 * E_line, 1.1 * E_line, 2001)
+    kwargs = {
+        "crystal": CRYSTAL,
+        "hkl_list": [tuple(int(h) for h in HKL)],
+        "n_hat": n_hat,
+        "B_ang2": 0.5,
+        "use_henke": True,
+    }
+    production = mc_spectrum(_segment(v_hat), grid, **kwargs)
+
+    def native(crystal, hkl_list, *args, **kw):
+        mates = [-np.asarray(hkl, dtype=float) for hkl in hkl_list]
+        return reflection_coupling_tables(crystal, mates, *args, **kw)
+
+    monkeypatch.setattr(_kernels, "emission_coupling_tables", native)
+    unconjugated = mc_spectrum(_segment(v_hat), grid, **kwargs)
+    assert production.max() > 0.0
+    np.testing.assert_allclose(unconjugated, production, rtol=1e-9, atol=1e-9 * production.max())

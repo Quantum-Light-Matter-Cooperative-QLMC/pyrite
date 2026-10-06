@@ -12,6 +12,8 @@ For the task-approved positive reciprocal-harmonic branch, a catalog-pinned basa
 
 This result is conditional on the positive-harmonic convention. It does not resolve the separate `line-energy-dispersion` discrepancy concerning the mapping between reciprocal-harmonic sign and the spatial Fourier convention.
 
+**2026-10-05 (#338) reconciliation.** That convention is now settled. The line on $+\mathbf g$ takes momentum transfer $-\mathbf g$, so the positive member $\mathbf v\cdot\mathbf g>0$ radiates at $+\mathbf v\cdot\mathbf g/(1-\hat{\mathbf n}\cdot\mathbf v)$. That is the branch used here, so this result no longer rests on an open sign. The Friedel-mate coupling fix in `line-energy-dispersion` changes amplitudes, not line energies, and does not enter this timing.
+
 ## Sources and provenance
 
 - Line dispersion: Zhai 2025 Eq. (10), $E_\gamma=\hbar\,\mathbf v\cdot\mathbf g/ (1-\mathbf v\cdot\hat{\mathbf n}/c)$, using the task-approved positive branch.
