@@ -48,6 +48,7 @@ In other words:
 0013-automatic-line-grids-by-default
 0014-packaged-data-layout
 0015-xraydb-atomic-scattering-data
+0016-photon-transport-source-and-scoring
 ```
 
 | ADR                                                 | Title                               | Status                                 |
@@ -66,3 +67,4 @@ In other words:
 | [0013](0013-automatic-line-grids-by-default.md)     | Automatic line grids by default      | Accepted                               |
 | [0014](0014-packaged-data-layout.md)                | Packaged data layout                 | Accepted                               |
 | [0015](0015-xraydb-atomic-scattering-data.md)       | xraydb as the atomic scattering data source | Accepted                         |
+| [0016](0016-photon-transport-source-and-scoring.md) | Photon transport source and scoring | Accepted |

@@ -23,6 +23,7 @@ physics/superradiant-pxr
 physics/phase-retention
 physics/channeling-radiation-physics
 physics/transition-radiation-recommendations
+physics/photon-transport
 ```
 
 ```{toctree}
