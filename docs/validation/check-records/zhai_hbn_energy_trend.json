@@ -1,0 +1,1432 @@
+{
+  "evidence_kind": "model sensitivity diagnostic; no measured-data pass/fail gate",
+  "model_revision": "f3b44c1e",
+  "source": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41467-025-66063-6/MediaObjects/41467_2025_66063_MOESM1_ESM.pdf",
+  "source_panel": "Supplementary Fig.5b, approximate921nm hBN",
+  "paper_peak_provenance": "historical approximate visual readings; not digitized measurements",
+  "paper_peaks_photons_per_eV_s_nA": [
+    0.85,
+    0.8,
+    0.75,
+    0.7
+  ],
+  "compute": {
+    "host": "DESKTOP-QNIHO3D",
+    "partition": "cpu",
+    "backend": "cpu",
+    "dtype": "float64",
+    "recorded_at": "2026-10-06T04:42:40Z",
+    "jobs": {
+      "ne200": 1021,
+      "ne2000": 1022,
+      "thickness736p8nm": 1023,
+      "thickness1105p2nm": 1024
+    }
+  },
+  "baseline": {
+    "ne": 2000,
+    "thickness_nm": 921.0,
+    "seeds": [
+      92100,
+      92101,
+      92102,
+      92103
+    ],
+    "backend": "cpu",
+    "dtype": "float64",
+    "model": "post-338, segment-mean-v3-snell-resonance",
+    "paper_peak_provenance": "historical approximate visual readings, not digitized data",
+    "paper_peaks": [
+      0.85,
+      0.8,
+      0.75,
+      0.7
+    ],
+    "rows": [
+      {
+        "beam_energy_keV": 17.5,
+        "segments": 120862,
+        "hkl_list": [
+          [
+            0,
+            0,
+            2
+          ],
+          [
+            0,
+            0,
+            -2
+          ],
+          [
+            0,
+            0,
+            4
+          ],
+          [
+            0,
+            0,
+            -4
+          ]
+        ],
+        "variants": {
+          "baseline": {
+            "source_peak_eV": 806.0,
+            "eds_fwhm_eV": 54.94651945300994,
+            "aperture_fwhm_eV": 36.40850400286371,
+            "qe_at_source_peak": 0.6199351001020892,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.110619836548933,
+                "in_window_photons_per_s_nA": 207.22163939603405,
+                "peak_eV": 806.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.8268122344123592,
+                "in_window_photons_per_s_nA": 205.5671593797212,
+                "peak_eV": 793.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6717675284294395,
+                "in_window_photons_per_s_nA": 205.15350340563975,
+                "peak_eV": 790.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.0233048039506947,
+                "in_window_photons_per_s_nA": 123.02101581670267,
+                "peak_eV": 791.0
+              }
+            }
+          },
+          "pre_338_pairing": {
+            "source_peak_eV": 806.0,
+            "eds_fwhm_eV": 54.94651945300994,
+            "aperture_fwhm_eV": 36.40850400286371,
+            "qe_at_source_peak": 0.6199351001020892,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.110619836548933,
+                "in_window_photons_per_s_nA": 207.22163939603408,
+                "peak_eV": 806.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.8268122344123596,
+                "in_window_photons_per_s_nA": 205.5671593797212,
+                "peak_eV": 793.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6717675284294395,
+                "in_window_photons_per_s_nA": 205.15350340563975,
+                "peak_eV": 790.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.0233048039506947,
+                "in_window_photons_per_s_nA": 123.02101581670267,
+                "peak_eV": 791.0
+              }
+            }
+          },
+          "no_escape_loss": {
+            "source_peak_eV": 806.0,
+            "eds_fwhm_eV": 54.94651945300994,
+            "aperture_fwhm_eV": 36.40850400286371,
+            "qe_at_source_peak": 0.6199351001020892,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 5.011751995058646,
+                "in_window_photons_per_s_nA": 441.0798197191506,
+                "peak_eV": 806.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.996314848701188,
+                "in_window_photons_per_s_nA": 432.75990703052827,
+                "peak_eV": 782.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.830316095860551,
+                "in_window_photons_per_s_nA": 430.9009346221798,
+                "peak_eV": 779.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.7158885345020802,
+                "in_window_photons_per_s_nA": 252.60979166263763,
+                "peak_eV": 780.0
+              }
+            }
+          },
+          "002_only": {
+            "source_peak_eV": 806.0,
+            "eds_fwhm_eV": 54.94651945300994,
+            "aperture_fwhm_eV": 36.40850400286371,
+            "qe_at_source_peak": 0.6199351001020892,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.10180994835538,
+                "in_window_photons_per_s_nA": 200.6362617790851,
+                "peak_eV": 806.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.817699619483071,
+                "in_window_photons_per_s_nA": 199.18545537898638,
+                "peak_eV": 793.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6627560392695633,
+                "in_window_photons_per_s_nA": 198.8133404210746,
+                "peak_eV": 790.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.0177687351603084,
+                "in_window_photons_per_s_nA": 118.85312720583163,
+                "peak_eV": 791.0
+              }
+            }
+          },
+          "004_only": {
+            "source_peak_eV": 1191.0,
+            "eds_fwhm_eV": 63.161063955573134,
+            "aperture_fwhm_eV": 53.7996628627924,
+            "qe_at_source_peak": 0.7199537874349382,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 0.01940925049789323,
+                "in_window_photons_per_s_nA": 6.585377616948895,
+                "peak_eV": 1191.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 0.015367769862585676,
+                "in_window_photons_per_s_nA": 6.350573039957656,
+                "peak_eV": 1140.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 0.014877317138773428,
+                "in_window_photons_per_s_nA": 6.275914114132244,
+                "peak_eV": 1128.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 0.01057179137656587,
+                "in_window_photons_per_s_nA": 4.125606777735579,
+                "peak_eV": 1130.0
+              }
+            }
+          },
+          "retired_B_0p6": {
+            "source_peak_eV": 806.0,
+            "eds_fwhm_eV": 54.94651945300994,
+            "aperture_fwhm_eV": 36.40850400286371,
+            "qe_at_source_peak": 0.6199351001020892,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.678836082597816,
+                "in_window_photons_per_s_nA": 239.1496893337633,
+                "peak_eV": 806.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.0821137084773667,
+                "in_window_photons_per_s_nA": 237.15950646102667,
+                "peak_eV": 793.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.9057605714857175,
+                "in_window_photons_per_s_nA": 236.66693363439634,
+                "peak_eV": 790.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.1665448914647054,
+                "in_window_photons_per_s_nA": 142.11383650962614,
+                "peak_eV": 791.0
+              }
+            }
+          },
+          "zero_B": {
+            "source_peak_eV": 806.0,
+            "eds_fwhm_eV": 54.94651945300994,
+            "aperture_fwhm_eV": 36.40850400286371,
+            "qe_at_source_peak": 0.6199351001020892,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.808385408599925,
+                "in_window_photons_per_s_nA": 246.66198868141427,
+                "peak_eV": 806.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.140517785218883,
+                "in_window_photons_per_s_nA": 244.5876774047787,
+                "peak_eV": 793.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.959315242882311,
+                "in_window_photons_per_s_nA": 244.0755701337647,
+                "peak_eV": 790.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.1993294198339028,
+                "in_window_photons_per_s_nA": 146.61494672106792,
+                "peak_eV": 791.0
+              }
+            }
+          },
+          "bin_mean": {
+            "source_peak_eV": 806.0,
+            "eds_fwhm_eV": 54.94651945300994,
+            "aperture_fwhm_eV": 36.40850400286371,
+            "qe_at_source_peak": 0.6199351001020892,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.090930882859247,
+                "in_window_photons_per_s_nA": 207.22141954943075,
+                "peak_eV": 806.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.8267464281815267,
+                "in_window_photons_per_s_nA": 205.56693306488708,
+                "peak_eV": 793.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6717224409393803,
+                "in_window_photons_per_s_nA": 205.15327803916057,
+                "peak_eV": 790.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.0232763990644673,
+                "in_window_photons_per_s_nA": 123.02087255540519,
+                "peak_eV": 791.0
+              }
+            }
+          }
+        },
+        "basal_fraction_at_detected_peak": {
+          "002_only": 0.9945900099667146,
+          "004_only": 0.005409990033284512
+        },
+        "pre_338_max_relative_difference": 1.6578908675756126e-16
+      },
+      {
+        "beam_energy_keV": 20.0,
+        "segments": 99795,
+        "hkl_list": [
+          [
+            0,
+            0,
+            2
+          ],
+          [
+            0,
+            0,
+            -2
+          ],
+          [
+            0,
+            0,
+            4
+          ],
+          [
+            0,
+            0,
+            -4
+          ]
+        ],
+        "variants": {
+          "baseline": {
+            "source_peak_eV": 853.0,
+            "eds_fwhm_eV": 56.013926839670866,
+            "aperture_fwhm_eV": 40.75435751835568,
+            "qe_at_source_peak": 0.6400838718139603,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.375793201131192,
+                "in_window_photons_per_s_nA": 210.6130499038263,
+                "peak_eV": 853.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.884143513919216,
+                "in_window_photons_per_s_nA": 209.56732873341406,
+                "peak_eV": 840.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6856814610181532,
+                "in_window_photons_per_s_nA": 209.27098018197466,
+                "peak_eV": 837.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.0677361231309948,
+                "in_window_photons_per_s_nA": 129.73658829586196,
+                "peak_eV": 838.0
+              }
+            }
+          },
+          "pre_338_pairing": {
+            "source_peak_eV": 853.0,
+            "eds_fwhm_eV": 56.013926839670866,
+            "aperture_fwhm_eV": 40.75435751835568,
+            "qe_at_source_peak": 0.6400838718139603,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.375793201131192,
+                "in_window_photons_per_s_nA": 210.6130499038263,
+                "peak_eV": 853.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.884143513919216,
+                "in_window_photons_per_s_nA": 209.56732873341406,
+                "peak_eV": 840.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6856814610181532,
+                "in_window_photons_per_s_nA": 209.27098018197466,
+                "peak_eV": 837.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.067736123130995,
+                "in_window_photons_per_s_nA": 129.73658829586196,
+                "peak_eV": 838.0
+              }
+            }
+          },
+          "no_escape_loss": {
+            "source_peak_eV": 853.0,
+            "eds_fwhm_eV": 56.013926839670866,
+            "aperture_fwhm_eV": 40.75435751835568,
+            "qe_at_source_peak": 0.6400838718139603,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 5.338585134887549,
+                "in_window_photons_per_s_nA": 422.1389572433123,
+                "peak_eV": 853.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.9833630271045144,
+                "in_window_photons_per_s_nA": 417.0292538346985,
+                "peak_eV": 833.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.7347475222188504,
+                "in_window_photons_per_s_nA": 415.6801641138647,
+                "peak_eV": 829.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.723003490667062,
+                "in_window_photons_per_s_nA": 252.5143086038525,
+                "peak_eV": 830.0
+              }
+            }
+          },
+          "002_only": {
+            "source_peak_eV": 853.0,
+            "eds_fwhm_eV": 56.013926839670866,
+            "aperture_fwhm_eV": 40.75435751835568,
+            "qe_at_source_peak": 0.6400838718139603,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.369935751657176,
+                "in_window_photons_per_s_nA": 206.4042788064359,
+                "peak_eV": 853.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.8774367906495353,
+                "in_window_photons_per_s_nA": 205.49578123174894,
+                "peak_eV": 840.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.678978058702962,
+                "in_window_photons_per_s_nA": 205.23188410803476,
+                "peak_eV": 837.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.0634941652743948,
+                "in_window_photons_per_s_nA": 127.09866635723137,
+                "peak_eV": 838.0
+              }
+            }
+          },
+          "004_only": {
+            "source_peak_eV": 1193.0,
+            "eds_fwhm_eV": 63.200949359958194,
+            "aperture_fwhm_eV": 56.99876731465221,
+            "qe_at_source_peak": 0.720214797058067,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 0.011231266705470679,
+                "in_window_photons_per_s_nA": 4.2087710973903,
+                "peak_eV": 1193.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 0.009162101238873602,
+                "in_window_photons_per_s_nA": 4.053908424746024,
+                "peak_eV": 1145.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 0.008841513101149948,
+                "in_window_photons_per_s_nA": 4.000787578838446,
+                "peak_eV": 1129.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 0.006284057807191283,
+                "in_window_photons_per_s_nA": 2.6130108176214786,
+                "peak_eV": 1131.0
+              }
+            }
+          },
+          "retired_B_0p6": {
+            "source_peak_eV": 853.0,
+            "eds_fwhm_eV": 56.013926839670866,
+            "aperture_fwhm_eV": 40.75435751835568,
+            "qe_at_source_peak": 0.6400838718139603,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.978782262785946,
+                "in_window_photons_per_s_nA": 241.7353163466032,
+                "peak_eV": 853.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.1460179140292714,
+                "in_window_photons_per_s_nA": 240.4728729796866,
+                "peak_eV": 840.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.9203478398071254,
+                "in_window_photons_per_s_nA": 240.1185486234412,
+                "peak_eV": 837.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.2163751747089566,
+                "in_window_photons_per_s_nA": 148.93199102831517,
+                "peak_eV": 838.0
+              }
+            }
+          },
+          "zero_B": {
+            "source_peak_eV": 853.0,
+            "eds_fwhm_eV": 56.013926839670866,
+            "aperture_fwhm_eV": 40.75435751835568,
+            "qe_at_source_peak": 0.6400838718139603,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 5.116126010936292,
+                "in_window_photons_per_s_nA": 248.97348639340055,
+                "peak_eV": 853.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.205824660187897,
+                "in_window_photons_per_s_nA": 247.6565122310137,
+                "peak_eV": 840.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.9739673542109792,
+                "in_window_photons_per_s_nA": 247.28776305953554,
+                "peak_eV": 837.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.250337933937536,
+                "in_window_photons_per_s_nA": 153.39791430960202,
+                "peak_eV": 838.0
+              }
+            }
+          },
+          "bin_mean": {
+            "source_peak_eV": 853.0,
+            "eds_fwhm_eV": 56.013926839670866,
+            "aperture_fwhm_eV": 40.75435751835568,
+            "qe_at_source_peak": 0.6400838718139603,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.357461093333319,
+                "in_window_photons_per_s_nA": 210.60177054990353,
+                "peak_eV": 853.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.8838902805445943,
+                "in_window_photons_per_s_nA": 209.55599181839307,
+                "peak_eV": 840.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6854958401059457,
+                "in_window_photons_per_s_nA": 209.25964426171709,
+                "peak_eV": 837.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.0676148247018582,
+                "in_window_photons_per_s_nA": 129.72930772611562,
+                "peak_eV": 838.0
+              }
+            }
+          }
+        },
+        "basal_fraction_at_detected_peak": {
+          "002_only": 0.996027147752423,
+          "004_only": 0.00397285224757624
+        },
+        "pre_338_max_relative_difference": 1.557422568627761e-16
+      },
+      {
+        "beam_energy_keV": 22.5,
+        "segments": 81487,
+        "hkl_list": [
+          [
+            0,
+            0,
+            2
+          ],
+          [
+            0,
+            0,
+            -2
+          ],
+          [
+            0,
+            0,
+            4
+          ],
+          [
+            0,
+            0,
+            -4
+          ]
+        ],
+        "variants": {
+          "baseline": {
+            "source_peak_eV": 896.0,
+            "eds_fwhm_eV": 56.97297605005377,
+            "aperture_fwhm_eV": 44.948862862012696,
+            "qe_at_source_peak": 0.6557550688792175,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.4926320093996805,
+                "in_window_photons_per_s_nA": 207.16804327342055,
+                "peak_eV": 896.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.893013102748669,
+                "in_window_photons_per_s_nA": 206.5276971528866,
+                "peak_eV": 884.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6567580352988154,
+                "in_window_photons_per_s_nA": 206.32882745446298,
+                "peak_eV": 881.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.077712564811839,
+                "in_window_photons_per_s_nA": 131.6635844836178,
+                "peak_eV": 882.0
+              }
+            }
+          },
+          "pre_338_pairing": {
+            "source_peak_eV": 896.0,
+            "eds_fwhm_eV": 56.97297605005377,
+            "aperture_fwhm_eV": 44.948862862012696,
+            "qe_at_source_peak": 0.6557550688792175,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.4926320093996805,
+                "in_window_photons_per_s_nA": 207.16804327342055,
+                "peak_eV": 896.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.893013102748669,
+                "in_window_photons_per_s_nA": 206.5276971528866,
+                "peak_eV": 884.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6567580352988154,
+                "in_window_photons_per_s_nA": 206.32882745446298,
+                "peak_eV": 881.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.077712564811839,
+                "in_window_photons_per_s_nA": 131.6635844836178,
+                "peak_eV": 882.0
+              }
+            }
+          },
+          "no_escape_loss": {
+            "source_peak_eV": 895.0,
+            "eds_fwhm_eV": 56.95085600761414,
+            "aperture_fwhm_eV": 44.898696720425626,
+            "qe_at_source_peak": 0.655412415533183,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 5.585013799432856,
+                "in_window_photons_per_s_nA": 388.71507920326184,
+                "peak_eV": 895.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.883734635294104,
+                "in_window_photons_per_s_nA": 385.47473072548297,
+                "peak_eV": 879.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.58074489893669,
+                "in_window_photons_per_s_nA": 384.55705685673144,
+                "peak_eV": 875.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.6729463481183955,
+                "in_window_photons_per_s_nA": 241.11005529496694,
+                "peak_eV": 876.0
+              }
+            }
+          },
+          "002_only": {
+            "source_peak_eV": 896.0,
+            "eds_fwhm_eV": 56.97297605005377,
+            "aperture_fwhm_eV": 44.948862862012696,
+            "qe_at_source_peak": 0.6557550688792175,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.488879037635602,
+                "in_window_photons_per_s_nA": 204.6894819458505,
+                "peak_eV": 896.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.8891443180027325,
+                "in_window_photons_per_s_nA": 204.13161110921055,
+                "peak_eV": 884.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6528860829406204,
+                "in_window_photons_per_s_nA": 203.9558155566138,
+                "peak_eV": 881.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.075195806882933,
+                "in_window_photons_per_s_nA": 130.10855382701214,
+                "peak_eV": 882.0
+              }
+            }
+          },
+          "004_only": {
+            "source_peak_eV": 1106.0,
+            "eds_fwhm_eV": 61.44200517561256,
+            "aperture_fwhm_eV": 55.48375259529692,
+            "qe_at_source_peak": 0.7070599419219774,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 0.007490325582035447,
+                "in_window_photons_per_s_nA": 2.4785613275701777,
+                "peak_eV": 1106.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 0.005891742573113564,
+                "in_window_photons_per_s_nA": 2.3894513768284606,
+                "peak_eV": 1141.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 0.005723490289630603,
+                "in_window_photons_per_s_nA": 2.358003095902974,
+                "peak_eV": 1127.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 0.004066309267398242,
+                "in_window_photons_per_s_nA": 1.5451866526342586,
+                "peak_eV": 1129.0
+              }
+            }
+          },
+          "retired_B_0p6": {
+            "source_peak_eV": 896.0,
+            "eds_fwhm_eV": 56.97297605005377,
+            "aperture_fwhm_eV": 44.948862862012696,
+            "qe_at_source_peak": 0.6557550688792175,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 5.110512765724424,
+                "in_window_photons_per_s_nA": 236.8929612722033,
+                "peak_eV": 896.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.1545860378924395,
+                "in_window_photons_per_s_nA": 236.1207361370773,
+                "peak_eV": 884.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.885945548635,
+                "in_window_photons_per_s_nA": 235.88226729519616,
+                "peak_eV": 881.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.2267968308764727,
+                "in_window_photons_per_s_nA": 150.54416252223473,
+                "peak_eV": 882.0
+              }
+            }
+          },
+          "zero_B": {
+            "source_peak_eV": 896.0,
+            "eds_fwhm_eV": 56.97297605005377,
+            "aperture_fwhm_eV": 44.948862862012696,
+            "qe_at_source_peak": 0.6557550688792175,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 5.251162399167437,
+                "in_window_photons_per_s_nA": 243.74720179412668,
+                "peak_eV": 896.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.2142156929992765,
+                "in_window_photons_per_s_nA": 242.9418330728154,
+                "peak_eV": 884.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.9382108791415311,
+                "in_window_photons_per_s_nA": 242.6934769062533,
+                "peak_eV": 881.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.2607948510407934,
+                "in_window_photons_per_s_nA": 154.89707911979002,
+                "peak_eV": 882.0
+              }
+            }
+          },
+          "bin_mean": {
+            "source_peak_eV": 896.0,
+            "eds_fwhm_eV": 56.97297605005377,
+            "aperture_fwhm_eV": 44.948862862012696,
+            "qe_at_source_peak": 0.6557550688792175,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.481928556183174,
+                "in_window_photons_per_s_nA": 207.1701634170317,
+                "peak_eV": 896.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.893017915211103,
+                "in_window_photons_per_s_nA": 206.52996860288806,
+                "peak_eV": 884.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6567757766566487,
+                "in_window_photons_per_s_nA": 206.33122569624715,
+                "peak_eV": 881.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.0777233129505064,
+                "in_window_photons_per_s_nA": 131.66540686291623,
+                "peak_eV": 882.0
+              }
+            }
+          }
+        },
+        "basal_fraction_at_detected_peak": {
+          "002_only": 0.997664722476957,
+          "004_only": 0.002335277523043298
+        },
+        "pre_338_max_relative_difference": 2.275378577467867e-16
+      },
+      {
+        "beam_energy_keV": 25.0,
+        "segments": 70013,
+        "hkl_list": [
+          [
+            0,
+            0,
+            2
+          ],
+          [
+            0,
+            0,
+            -2
+          ],
+          [
+            0,
+            0,
+            4
+          ],
+          [
+            0,
+            0,
+            -4
+          ]
+        ],
+        "variants": {
+          "baseline": {
+            "source_peak_eV": 936.0,
+            "eds_fwhm_eV": 57.850842690491554,
+            "aperture_fwhm_eV": 49.02122918936404,
+            "qe_at_source_peak": 0.6685012642105947,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.767882753721452,
+                "in_window_photons_per_s_nA": 203.02665789119453,
+                "peak_eV": 936.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.8942038309378926,
+                "in_window_photons_per_s_nA": 202.61897596609757,
+                "peak_eV": 925.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6197012575141234,
+                "in_window_photons_per_s_nA": 202.47454274255932,
+                "peak_eV": 922.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.0756110183367615,
+                "in_window_photons_per_s_nA": 132.2174895864946,
+                "peak_eV": 923.0
+              }
+            }
+          },
+          "pre_338_pairing": {
+            "source_peak_eV": 936.0,
+            "eds_fwhm_eV": 57.850842690491554,
+            "aperture_fwhm_eV": 49.02122918936404,
+            "qe_at_source_peak": 0.6685012642105947,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.767882753721452,
+                "in_window_photons_per_s_nA": 203.02665789119453,
+                "peak_eV": 936.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.8942038309378926,
+                "in_window_photons_per_s_nA": 202.61897596609757,
+                "peak_eV": 925.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6197012575141236,
+                "in_window_photons_per_s_nA": 202.47454274255932,
+                "peak_eV": 922.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.0756110183367615,
+                "in_window_photons_per_s_nA": 132.21748958649457,
+                "peak_eV": 923.0
+              }
+            }
+          },
+          "no_escape_loss": {
+            "source_peak_eV": 935.0,
+            "eds_fwhm_eV": 57.829058439507726,
+            "aperture_fwhm_eV": 48.968856081255744,
+            "qe_at_source_peak": 0.6681974642408202,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 5.966441074994488,
+                "in_window_photons_per_s_nA": 355.6562525816643,
+                "peak_eV": 935.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.7925486409200873,
+                "in_window_photons_per_s_nA": 353.7854758200905,
+                "peak_eV": 921.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.4361842081002565,
+                "in_window_photons_per_s_nA": 353.17903093584926,
+                "peak_eV": 918.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.6143093065978495,
+                "in_window_photons_per_s_nA": 227.44226377783698,
+                "peak_eV": 918.0
+              }
+            }
+          },
+          "002_only": {
+            "source_peak_eV": 936.0,
+            "eds_fwhm_eV": 57.850842690491554,
+            "aperture_fwhm_eV": 49.02122918936404,
+            "qe_at_source_peak": 0.6685012642105947,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.765459235271612,
+                "in_window_photons_per_s_nA": 201.32321078432315,
+                "peak_eV": 936.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.891359409632963,
+                "in_window_photons_per_s_nA": 200.9662200700925,
+                "peak_eV": 925.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.6168282270180105,
+                "in_window_photons_per_s_nA": 200.83889051352665,
+                "peak_eV": 922.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.0737034929182223,
+                "in_window_photons_per_s_nA": 131.15253691356466,
+                "peak_eV": 923.0
+              }
+            }
+          },
+          "004_only": {
+            "source_peak_eV": 1157.0,
+            "eds_fwhm_eV": 62.47911651103911,
+            "aperture_fwhm_eV": 60.595686081297224,
+            "qe_at_source_peak": 0.7151747133094211,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 0.0060956967503394055,
+                "in_window_photons_per_s_nA": 1.7034471068714256,
+                "peak_eV": 1157.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 0.0035799699215765418,
+                "in_window_photons_per_s_nA": 1.6483763053997158,
+                "peak_eV": 1143.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 0.0034577852036130154,
+                "in_window_photons_per_s_nA": 1.6249163460048301,
+                "peak_eV": 1122.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 0.0024537607468057207,
+                "in_window_photons_per_s_nA": 1.0580050410767416,
+                "peak_eV": 1125.0
+              }
+            }
+          },
+          "retired_B_0p6": {
+            "source_peak_eV": 936.0,
+            "eds_fwhm_eV": 57.850842690491554,
+            "aperture_fwhm_eV": 49.02122918936404,
+            "qe_at_source_peak": 0.6685012642105947,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 5.422785546002242,
+                "in_window_photons_per_s_nA": 231.76942346345606,
+                "peak_eV": 936.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.1553923027945587,
+                "in_window_photons_per_s_nA": 231.27875132106684,
+                "peak_eV": 925.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.8432747365232702,
+                "in_window_photons_per_s_nA": 231.10537362493977,
+                "peak_eV": 922.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.2240814557648383,
+                "in_window_photons_per_s_nA": 150.9119707284961,
+                "peak_eV": 923.0
+              }
+            }
+          },
+          "zero_B": {
+            "source_peak_eV": 936.0,
+            "eds_fwhm_eV": 57.850842690491554,
+            "aperture_fwhm_eV": 49.02122918936404,
+            "qe_at_source_peak": 0.6685012642105947,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 5.571803145979872,
+                "in_window_photons_per_s_nA": 238.37067799512664,
+                "peak_eV": 936.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 2.214895353816688,
+                "in_window_photons_per_s_nA": 237.85919517284162,
+                "peak_eV": 925.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.8942252313786825,
+                "in_window_photons_per_s_nA": 237.67858136742782,
+                "peak_eV": 922.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.2579165909798098,
+                "in_window_photons_per_s_nA": 155.20382569013609,
+                "peak_eV": 923.0
+              }
+            }
+          },
+          "bin_mean": {
+            "source_peak_eV": 936.0,
+            "eds_fwhm_eV": 57.850842690491554,
+            "aperture_fwhm_eV": 49.02122918936404,
+            "qe_at_source_peak": 0.6685012642105947,
+            "solid_angle_sr": 0.066,
+            "stages": {
+              "source": {
+                "peak_photons_per_eV_s_nA": 4.744690353392233,
+                "in_window_photons_per_s_nA": 203.02587595392743,
+                "peak_eV": 936.0
+              },
+              "eds_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.8941328158620192,
+                "in_window_photons_per_s_nA": 202.61818863014426,
+                "peak_eV": 925.0
+              },
+              "eds_aperture_unit_qe": {
+                "peak_photons_per_eV_s_nA": 1.619660059543282,
+                "in_window_photons_per_s_nA": 202.4737580893743,
+                "peak_eV": 922.0
+              },
+              "detected": {
+                "peak_photons_per_eV_s_nA": 1.075583329825597,
+                "in_window_photons_per_s_nA": 132.21697205165114,
+                "peak_eV": 923.0
+              }
+            }
+          }
+        },
+        "basal_fraction_at_detected_peak": {
+          "002_only": 0.9982265657509821,
+          "004_only": 0.0017734342490185353
+        },
+        "pre_338_max_relative_difference": 1.4293470370617624e-16
+      }
+    ]
+  },
+  "low_count_detected_peaks": [
+    1.036120691310084,
+    1.0999217771565388,
+    1.1117761101123003,
+    1.054569521317719
+  ],
+  "thickness_sensitivity": {
+    "hbn339-thin": {
+      "ne": 2000,
+      "thickness_nm": 736.8,
+      "seeds": [
+        73680,
+        73681,
+        73682,
+        73683
+      ],
+      "backend": "cpu",
+      "dtype": "float64",
+      "model": "post-338, segment-mean-v3-snell-resonance",
+      "paper_peak_provenance": "historical approximate visual readings, not digitized data",
+      "paper_peaks": [
+        0.85,
+        0.8,
+        0.75,
+        0.7
+      ],
+      "rows": [
+        {
+          "beam_energy_keV": 17.5,
+          "variants": {
+            "baseline": {
+              "source_peak_eV": 806.0,
+              "eds_fwhm_eV": 54.94651945300994,
+              "aperture_fwhm_eV": 36.40850400286371,
+              "qe_at_source_peak": 0.6199351001020892,
+              "solid_angle_sr": 0.066,
+              "stages": {
+                "source": {
+                  "peak_photons_per_eV_s_nA": 4.141591901278342,
+                  "in_window_photons_per_s_nA": 192.95070686748775,
+                  "peak_eV": 806.0
+                },
+                "eds_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.7823661148125072,
+                  "in_window_photons_per_s_nA": 191.54696485014767,
+                  "peak_eV": 793.0
+                },
+                "eds_aperture_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.6222701118094491,
+                  "in_window_photons_per_s_nA": 191.19822314493288,
+                  "peak_eV": 791.0
+                },
+                "detected": {
+                  "peak_photons_per_eV_s_nA": 0.9936527602947784,
+                  "in_window_photons_per_s_nA": 114.79240509042396,
+                  "peak_eV": 792.0
+                }
+              }
+            }
+          }
+        },
+        {
+          "beam_energy_keV": 20.0,
+          "variants": {
+            "baseline": {
+              "source_peak_eV": 853.0,
+              "eds_fwhm_eV": 56.013926839670866,
+              "aperture_fwhm_eV": 40.75435751835568,
+              "qe_at_source_peak": 0.6400838718139603,
+              "solid_angle_sr": 0.066,
+              "stages": {
+                "source": {
+                  "peak_photons_per_eV_s_nA": 4.481038422314191,
+                  "in_window_photons_per_s_nA": 191.61284244415828,
+                  "peak_eV": 853.0
+                },
+                "eds_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.801925017749171,
+                  "in_window_photons_per_s_nA": 190.740083250697,
+                  "peak_eV": 842.0
+                },
+                "eds_aperture_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.6009345768379981,
+                  "in_window_photons_per_s_nA": 190.50746111508704,
+                  "peak_eV": 840.0
+                },
+                "detected": {
+                  "peak_photons_per_eV_s_nA": 1.0157517437523937,
+                  "in_window_photons_per_s_nA": 118.46723482408954,
+                  "peak_eV": 840.0
+                }
+              }
+            }
+          }
+        },
+        {
+          "beam_energy_keV": 22.5,
+          "variants": {
+            "baseline": {
+              "source_peak_eV": 896.0,
+              "eds_fwhm_eV": 56.97297605005377,
+              "aperture_fwhm_eV": 44.948862862012696,
+              "qe_at_source_peak": 0.6557550688792175,
+              "solid_angle_sr": 0.066,
+              "stages": {
+                "source": {
+                  "peak_photons_per_eV_s_nA": 4.569822889610248,
+                  "in_window_photons_per_s_nA": 185.95749338941624,
+                  "peak_eV": 896.0
+                },
+                "eds_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.7644382881569336,
+                  "in_window_photons_per_s_nA": 185.48561044706994,
+                  "peak_eV": 886.0
+                },
+                "eds_aperture_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.5327092657996126,
+                  "in_window_photons_per_s_nA": 185.32438896606988,
+                  "peak_eV": 883.0
+                },
+                "detected": {
+                  "peak_photons_per_eV_s_nA": 0.9979838557169477,
+                  "in_window_photons_per_s_nA": 118.46795682931139,
+                  "peak_eV": 884.0
+                }
+              }
+            }
+          }
+        },
+        {
+          "beam_energy_keV": 25.0,
+          "variants": {
+            "baseline": {
+              "source_peak_eV": 935.0,
+              "eds_fwhm_eV": 57.829058439507726,
+              "aperture_fwhm_eV": 48.968856081255744,
+              "qe_at_source_peak": 0.6681974642408202,
+              "solid_angle_sr": 0.066,
+              "stages": {
+                "source": {
+                  "peak_photons_per_eV_s_nA": 4.689971769557517,
+                  "in_window_photons_per_s_nA": 179.30545193033163,
+                  "peak_eV": 935.0
+                },
+                "eds_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.76331107307928,
+                  "in_window_photons_per_s_nA": 179.0502597922074,
+                  "peak_eV": 926.0
+                },
+                "eds_aperture_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.497608436654124,
+                  "in_window_photons_per_s_nA": 178.94554515542785,
+                  "peak_eV": 924.0
+                },
+                "detected": {
+                  "peak_photons_per_eV_s_nA": 0.9953721620818821,
+                  "in_window_photons_per_s_nA": 117.17967472828087,
+                  "peak_eV": 924.0
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "hbn339-thick": {
+      "ne": 2000,
+      "thickness_nm": 1105.2,
+      "seeds": [
+        110520,
+        110521,
+        110522,
+        110523
+      ],
+      "backend": "cpu",
+      "dtype": "float64",
+      "model": "post-338, segment-mean-v3-snell-resonance",
+      "paper_peak_provenance": "historical approximate visual readings, not digitized data",
+      "paper_peaks": [
+        0.85,
+        0.8,
+        0.75,
+        0.7
+      ],
+      "rows": [
+        {
+          "beam_energy_keV": 17.5,
+          "variants": {
+            "baseline": {
+              "source_peak_eV": 806.0,
+              "eds_fwhm_eV": 54.94651945300994,
+              "aperture_fwhm_eV": 36.40850400286371,
+              "qe_at_source_peak": 0.6199351001020892,
+              "solid_angle_sr": 0.066,
+              "stages": {
+                "source": {
+                  "peak_photons_per_eV_s_nA": 4.2313582536357774,
+                  "in_window_photons_per_s_nA": 217.7627540081081,
+                  "peak_eV": 806.0
+                },
+                "eds_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.8267355218670587,
+                  "in_window_photons_per_s_nA": 215.62851462854437,
+                  "peak_eV": 792.0
+                },
+                "eds_aperture_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.676569297663473,
+                  "in_window_photons_per_s_nA": 215.1193816526472,
+                  "peak_eV": 789.0
+                },
+                "detected": {
+                  "peak_photons_per_eV_s_nA": 1.0255848415644946,
+                  "in_window_photons_per_s_nA": 128.71669734244207,
+                  "peak_eV": 790.0
+                }
+              }
+            }
+          }
+        },
+        {
+          "beam_energy_keV": 20.0,
+          "variants": {
+            "baseline": {
+              "source_peak_eV": 853.0,
+              "eds_fwhm_eV": 56.013926839670866,
+              "aperture_fwhm_eV": 40.75435751835568,
+              "qe_at_source_peak": 0.6400838718139603,
+              "solid_angle_sr": 0.066,
+              "stages": {
+                "source": {
+                  "peak_photons_per_eV_s_nA": 4.561511265244945,
+                  "in_window_photons_per_s_nA": 222.72119303347756,
+                  "peak_eV": 853.0
+                },
+                "eds_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.9015585296029913,
+                  "in_window_photons_per_s_nA": 221.52518824734537,
+                  "peak_eV": 840.0
+                },
+                "eds_aperture_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.7099247956439598,
+                  "in_window_photons_per_s_nA": 221.18856151194672,
+                  "peak_eV": 837.0
+                },
+                "detected": {
+                  "peak_photons_per_eV_s_nA": 1.0832217645898263,
+                  "in_window_photons_per_s_nA": 136.9246167965795,
+                  "peak_eV": 838.0
+                }
+              }
+            }
+          }
+        },
+        {
+          "beam_energy_keV": 22.5,
+          "variants": {
+            "baseline": {
+              "source_peak_eV": 896.0,
+              "eds_fwhm_eV": 56.97297605005377,
+              "aperture_fwhm_eV": 44.948862862012696,
+              "qe_at_source_peak": 0.6557550688792175,
+              "solid_angle_sr": 0.066,
+              "stages": {
+                "source": {
+                  "peak_photons_per_eV_s_nA": 4.580236427183588,
+                  "in_window_photons_per_s_nA": 223.83161074872368,
+                  "peak_eV": 896.0
+                },
+                "eds_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.9836120304517846,
+                  "in_window_photons_per_s_nA": 223.06980370930012,
+                  "peak_eV": 883.0
+                },
+                "eds_aperture_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.7425751851956603,
+                  "in_window_photons_per_s_nA": 222.83403617022492,
+                  "peak_eV": 881.0
+                },
+                "detected": {
+                  "peak_photons_per_eV_s_nA": 1.1330395935027746,
+                  "in_window_photons_per_s_nA": 141.98143604669173,
+                  "peak_eV": 881.0
+                }
+              }
+            }
+          }
+        },
+        {
+          "beam_energy_keV": 25.0,
+          "variants": {
+            "baseline": {
+              "source_peak_eV": 936.0,
+              "eds_fwhm_eV": 57.850842690491554,
+              "aperture_fwhm_eV": 49.02122918936404,
+              "qe_at_source_peak": 0.6685012642105947,
+              "solid_angle_sr": 0.066,
+              "stages": {
+                "source": {
+                  "peak_photons_per_eV_s_nA": 5.039376084377839,
+                  "in_window_photons_per_s_nA": 222.22050784100216,
+                  "peak_eV": 936.0
+                },
+                "eds_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 2.0208223588933176,
+                  "in_window_photons_per_s_nA": 221.77573504760105,
+                  "peak_eV": 924.0
+                },
+                "eds_aperture_unit_qe": {
+                  "peak_photons_per_eV_s_nA": 1.7342776540697777,
+                  "in_window_photons_per_s_nA": 221.60224750304647,
+                  "peak_eV": 921.0
+                },
+                "detected": {
+                  "peak_photons_per_eV_s_nA": 1.1512510791979975,
+                  "in_window_photons_per_s_nA": 144.5096398031937,
+                  "peak_eV": 922.0
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

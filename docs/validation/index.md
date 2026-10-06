@@ -125,6 +125,7 @@ radiation-physics/xray-chi-zero
 radiation-physics/xray-in-medium-propagation-phase
 radiation-physics/xray-in-medium-resonance
 radiation-physics/xray-refractive-index
+radiation-physics/zhai-hbn-921-detected
 ```
 
 ```{toctree}
