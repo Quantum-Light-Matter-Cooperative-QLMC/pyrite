@@ -10,8 +10,8 @@ prose keep required format.
 - Read `docs/repo_map.md` before source exploration.
 - Use Serena for symbol-level navigation: definitions, references, callers, and
   call sites across the CLI/domain boundary. Use `rg` or direct reads for exact
-  text, non-code, generated files, and anything faster to grep — `src/` is ~52k
-  LOC, so grep is competitive for most questions.
+  text, non-code, generated files, and targeted searches. `src/` is ~128k LOC;
+  prefer Serena for cross-file symbol relationships and avoid broad source dumps.
 - `README.md`: science/install/primary workflow. Classify maintained pages under
   `docs/guides/`, `docs/physics/`, `docs/validation/`, `docs/research/`,
   `docs/repo-design/`, or `docs/adr/`; see

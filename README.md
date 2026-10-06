@@ -193,7 +193,7 @@ stacks, one TOML file per object.
 Phase-specific CIFs live under `src/pyrite/data/cifs/`; production loading is
 offline. `uv run pyrite material validate` checks the bundled catalog.
 
-Active checkpoints use `checkpoints/<stem>/{line,brem}.h5`
+Active checkpoints use `checkpoints/<stem>/{line,brem,characteristic}.h5`
 plus a `checkpoints/<stem>/meta.json` manifest.
 Stored source spectra exclude downstream detector response unless a detector view
 applies it explicitly.
