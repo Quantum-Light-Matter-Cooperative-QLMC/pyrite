@@ -21,11 +21,16 @@ only with ``positron_transport``, launched above ``T_s`` like the electron
 under a third salt (#276). Each generation then runs its electrons and its
 positrons as two transport calls, the positrons with their own SBETHE,
 ELSEPA, ``F_p``-scaled BremsLib and Bhabha shell tables, and joins them into
-one generation (electrons first). Positrons are not annihilated (#295): one
-below ``T_s`` deposits its kinetic energy locally, and every pair's
-``2 m_e c^2`` is booked as ``positron_rest_pending``.
+one generation (electrons first). Each positron annihilates (#295,
+``annihilation.py``): a transported one is cut where its in-flight optical
+depth reaches its budget, before the generation's secondaries are harvested;
+one that reaches the cutoff, or is born at or below ``T_s``, deposits its
+kinetic energy locally and annihilates at rest. The annihilation photons get
+one first-interaction step after the cascade; an escaping positron keeps its
+pair's ``2 m_e c^2``.
 
-Validation: shell-secondary-transport, photon-pair-first-interaction, bhabha-close
+Validation: shell-secondary-transport, photon-pair-first-interaction, bhabha-close,
+heitler-annihilation, positron-annihilation-at-rest
 """
 
 import warnings
@@ -62,6 +67,13 @@ _PAIR_POSITRON_STREAM_SALT = np.uint64(0xD1B54A32D192ED03)
 _POSITRON_PHOTON_SALT = np.uint64(0x94D049BB133111EB)
 #: ``secondary_tracks["launch_kind"]`` values.
 LAUNCH_PRIMARY, LAUNCH_SHELL, LAUNCH_PAIR, LAUNCH_POSITRON = 0, 1, 2, 3
+#: ``pair_production["events"]["positron_fate"]`` values (with ``positron_transport``).
+FATE_SUBTHRESHOLD, FATE_AT_REST, FATE_IN_FLIGHT, FATE_ESCAPED = 0, 1, 2, 3
+_EXIT_COUNTS = {
+    int(EVENT_EXIT_TOP): "n_backscattered",
+    int(EVENT_EXIT_BOTTOM): "n_transmitted",
+    int(EVENT_EXIT_SIDE): "n_side_exited",
+}
 DEFAULT_MAX_SECONDARY_GENERATIONS = 64
 DEFAULT_SECONDARY_TRACKS_PER_PRIMARY = 1000
 # Per-row result arrays joined across generations. Aliases are re-pointed after.
@@ -341,6 +353,8 @@ def _merge_species(electron, positron, n_electron):
             out[key] = _concat([electron[key], shifted[key]])
     for key in ("n_backscattered", "n_transmitted", "n_side_exited", "n_cutoff_stopped"):
         out[key] = int(electron[key]) + int(positron[key])
+    if "n_annihilated" in positron:
+        out["n_annihilated"] = int(positron["n_annihilated"])
     out["inelastic"] = _merge_inelastic([electron["inelastic"], positron["inelastic"]])
     return out
 
@@ -449,7 +463,8 @@ def transport_secondary_cascade(simulate, kw):
     """Run ``simulate`` over primaries and every launched generation; join rows.
 
     ``kw`` is the caller's full :func:`simulate_trajectories` argument mapping.
-    Validation: shell-secondary-transport, photon-pair-first-interaction, bhabha-close
+    Validation: shell-secondary-transport, photon-pair-first-interaction, bhabha-close,
+    heitler-annihilation
     """
     threshold_keV, max_generations, max_tracks = _validate(kw)
     seed = kw["seed"]
@@ -466,6 +481,10 @@ def transport_secondary_cascade(simulate, kw):
 
         pair_layers, pair_width, pair_height = _stack_geometry(kw)
     positron_tables = _positron_overrides(kw, pair_layers) if positrons_on else None
+    if positrons_on:
+        from .annihilation import electron_density_per_ang3
+
+        electron_density = electron_density_per_ang3(pair_layers)
     pair_events = []
     pair_counts = []
     E_cut = kw["E_cut_by_electrons"]
@@ -523,8 +542,7 @@ def transport_secondary_cascade(simulate, kw):
             events["electron_id"] = electron_of[events["parent"]]
             events["electron_track"] = np.full(events["row"].size, -1, dtype=np.int64)
             if positrons_on:
-                events["positron_launched"] = events["positron_keV"] > threshold_keV
-                events["positron_track"] = np.full(events["row"].size, -1, dtype=np.int64)
+                _init_positron_fates(events, threshold_keV)
             pair_events.append(events)
             pair_counts.append(photon_counts)
             harvest = _merge_pair_launches(harvest, events, seed)
@@ -582,17 +600,20 @@ def transport_secondary_cascade(simulate, kw):
                 assert positron_tables is not None  # n_positron > 0 only when on
                 call.update(positron_tables)
             call.update(E0_keV=float(np.max(harvest["E_keV"][part])), Ne=part.stop - part.start)
-            species.append(
-                simulate(
-                    **call,
-                    _secondary=SecondaryPass(
-                        launch,
-                        table_range,
-                        _photon_seed(seed, g, positron=positron_step),
-                        projectile,
-                    ),
-                )
+            species_result = simulate(
+                **call,
+                _secondary=SecondaryPass(
+                    launch,
+                    table_range,
+                    _photon_seed(seed, g, positron=positron_step),
+                    projectile,
+                ),
             )
+            if positron_step:
+                species_result = _annihilate_positrons(
+                    species_result, pair_events[-1], seed, electron_density
+                )
+            species.append(species_result)
         current = _merge_species(species[0], species[1], n_electron)
         tracks["track_id"].append(n_tracks + np.arange(n_new, dtype=np.int64))
         tracks["parent_id"].append(parent_track.astype(np.int64))
@@ -613,7 +634,143 @@ def transport_secondary_cascade(simulate, kw):
     out = _join(generations, track_offset, track_table, counts, threshold_keV)
     if pair_model is not None:
         out["pair_production"] = _pair_summary(pair_model, pair_events, pair_counts, positrons_on)
+        if positrons_on:
+            out["pair_production"]["annihilation_photons"] = _annihilation_photons(
+                out["pair_production"]["events"],
+                seed,
+                pair_layers,
+                pair_width,
+                pair_height,
+                device=first_core == "cuda",
+            )
     return out
+
+
+def _init_positron_fates(events, threshold_keV):
+    """Launch flags and annihilation fields of one generation's pair positrons.
+
+    A positron at or below the threshold annihilates at rest where it is born;
+    the transported ones are resolved by :func:`_annihilate_positrons`.
+    Validation: positron-annihilation-at-rest
+    """
+    n = events["row"].size
+    launched = events["positron_keV"] > threshold_keV
+    events["positron_launched"] = launched
+    events["positron_track"] = np.full(n, -1, dtype=np.int64)
+    events["positron_fate"] = np.where(launched, -1, FATE_SUBTHRESHOLD).astype(np.int8)
+    events["annihilation_keV"] = np.where(launched, np.nan, 0.0)
+    events["annihilation_r_ang"] = np.where(launched[:, None], np.nan, events["r_ang"])
+    events["annihilation_t_ang"] = np.where(launched, np.nan, events["t_ang"])
+    events["annihilation_v_hat"] = np.full((n, 3), np.nan)
+
+
+def _annihilate_positrons(result, events, seed, electron_density):
+    """Cut one generation's positron tracks at their in-flight annihilation.
+
+    Local track ``j`` is the ``j``-th launched pair positron of ``events``,
+    whose fate and annihilation fields this fills: in flight where the track
+    was cut, at rest at the end of a track that reached the cutoff, escaped
+    otherwise. Row arrays come back on the host; exit and cutoff counts move to
+    ``n_annihilated`` for cut tracks.
+    Validation: heitler-annihilation, positron-annihilation-at-rest
+    """
+    from .annihilation import annihilation_stream_keys, truncate_in_flight
+
+    launched = np.flatnonzero(events["positron_launched"])
+    keys = annihilation_stream_keys(
+        seed,
+        events["parent_track"][launched],
+        events["photon_ordinal"][launched],
+        in_flight=True,
+    )
+    tau = np.array(
+        [-np.log1p(-np.random.Generator(np.random.Philox(key=int(k))).random()) for k in keys]
+    )
+    rows = {k: _host(result[k]) for k in _ROW_KEYS if result.get(k) is not None}
+    original_end = _track_ends(rows, launched.size)
+    truncated, hit = truncate_in_flight(rows, tau, electron_density, _ROW_KEYS)
+    out = dict(result)
+    out.update(truncated)
+    for alias, key in _ALIASES.items():
+        out[alias] = out[key]
+
+    cut = hit["row"] >= 0
+    out["n_annihilated"] = int(np.count_nonzero(cut))
+    for kind in original_end["kind"][cut]:
+        if int(kind) == int(EVENT_CUTOFF):
+            out["n_cutoff_stopped"] = int(out["n_cutoff_stopped"]) - 1
+            out["n_stopped"] = int(out["n_stopped"]) - 1
+        else:
+            name = _EXIT_COUNTS[int(kind)]
+            out[name] = int(out[name]) - 1
+
+    end = _track_ends(truncated, launched.size)
+    fate = np.full(launched.size, FATE_ESCAPED, dtype=np.int8)
+    rest = end["kind"] == int(EVENT_CUTOFF)
+    fate[rest] = FATE_AT_REST
+    fate[cut] = FATE_IN_FLIGHT
+    if np.any(~np.isin(end["kind"][~cut & ~rest], list(_EXIT_COUNTS))):
+        raise RuntimeError("a positron track ended without escaping, stopping or annihilating")
+    events["positron_fate"][launched] = fate
+    events["annihilation_keV"][launched] = np.where(cut, hit["E_keV"], np.where(rest, 0.0, np.nan))
+    r = np.where(cut[:, None], hit["r_ang"], end["r_ang"])
+    t = np.where(cut, hit["t_ang"], end["t_ang"])
+    escaped = fate == FATE_ESCAPED
+    events["annihilation_r_ang"][launched] = np.where(escaped[:, None], np.nan, r)
+    events["annihilation_t_ang"][launched] = np.where(escaped, np.nan, t)
+    events["annihilation_v_hat"][launched] = hit["v_hat"]
+    return out
+
+
+def _track_ends(rows, n_tracks):
+    """Last row's event kind, end point and end clock of each local track."""
+    track = np.asarray(rows["electron_id"], dtype=np.int64)
+    order = np.lexsort((rows["substep_id"], rows["flight_id"], track))
+    last = np.ones(order.size, dtype=bool)
+    last[:-1] = track[order][1:] != track[order][:-1]
+    end = order[last]
+    if not np.array_equal(track[end], np.arange(n_tracks)):
+        raise RuntimeError("every launched positron track must have rows")
+    L = np.asarray(rows["L_ang"], dtype=float)[end]
+    return {
+        "kind": np.asarray(rows["event_kind"])[end],
+        "r_ang": np.asarray(rows["r_mid"])[end] + 0.5 * L[:, None] * np.asarray(rows["v_hat"])[end],
+        "t_ang": np.asarray(rows["t_end_ang"], dtype=float)[end],
+    }
+
+
+def _annihilation_photons(events, seed, layers, width_ang, height_ang, *, device=False):
+    """Both photons of every annihilating pair positron, scored in the stack.
+
+    ``event`` indexes the joined pair events.
+    Validation: heitler-annihilation, positron-annihilation-at-rest
+    """
+    from .annihilation import (
+        ANNIHILATION_AT_REST,
+        ANNIHILATION_IN_FLIGHT,
+        annihilation_stream_keys,
+        score_annihilation_photons,
+    )
+
+    fate = events["positron_fate"]
+    index = np.flatnonzero(fate != FATE_ESCAPED)
+    kinds = np.where(fate[index] == FATE_IN_FLIGHT, ANNIHILATION_IN_FLIGHT, ANNIHILATION_AT_REST)
+    keys = annihilation_stream_keys(
+        seed, events["parent_track"][index], events["photon_ordinal"][index], in_flight=False
+    )
+    photons = score_annihilation_photons(
+        kinds,
+        events["annihilation_keV"][index],
+        events["annihilation_v_hat"][index],
+        events["annihilation_r_ang"][index],
+        keys,
+        layers,
+        width_ang=width_ang,
+        height_ang=height_ang,
+        device=device,
+    )
+    photons["event"] = index[photons["event"]]
+    return photons
 
 
 def _positron_launches(events, seed):
@@ -696,22 +853,22 @@ def _pair_summary(model, pair_events, pair_counts, positrons_on=False):
         "electron_track",
     ]
     if positrons_on:
-        fields += ["positron_launched", "positron_track"]
+        fields += [
+            "positron_launched",
+            "positron_track",
+            "positron_fate",
+            "annihilation_keV",
+            "annihilation_r_ang",
+            "annihilation_t_ang",
+            "annihilation_v_hat",
+        ]
     events = {name: np.concatenate([e[name] for e in pair_events]) for name in fields}
     events["row"] = events.pop("global_row")
     counts = {
         name: int(sum(c[name] for c in pair_counts))
         for name in ("photons", "pair", "other", "escaped")
     }
-    if counts["pair"] and positrons_on:
-        warnings.warn(
-            f"{counts['pair']} pair-production positrons are transported but not "
-            "annihilated (#295): no annihilation photons are emitted and each "
-            "pair's 2 m_e c^2 is booked as positron_rest_pending",
-            UserWarning,
-            stacklevel=3,
-        )
-    elif counts["pair"]:
+    if counts["pair"] and not positrons_on:
         warnings.warn(
             f"{counts['pair']} pair-production positrons are recorded but not "
             "transported (#276); their kinetic energy is reported, not deposited",
@@ -727,10 +884,10 @@ def _pair_summary(model, pair_events, pair_counts, positrons_on=False):
 
 
 def _counts(result):
-    return {
-        k: int(result[k])
-        for k in ("n_backscattered", "n_transmitted", "n_side_exited", "n_cutoff_stopped")
-    }
+    keys = ("n_backscattered", "n_transmitted", "n_side_exited", "n_cutoff_stopped")
+    if "n_annihilated" in result:
+        keys += ("n_annihilated",)
+    return {k: int(result[k]) for k in keys}
 
 
 def _join(generations, offsets, track_table, counts, threshold_keV):
@@ -787,11 +944,14 @@ def secondary_energy_balance(result, *, per_history=False):
     exactly into ``pair_rest_mass`` (``2 m_e c^2``), the untransported
     ``positron`` kinetic energy, and its electron: a launched track's own rows,
     or ``pair_subthreshold`` (part of ``deposited``) at or below the threshold.
-    With transported positrons ``positron_rest_pending`` replaces
-    ``pair_rest_mass`` (annihilation is #295) and a positron's kinetic energy is
-    its launched track's rows or ``positron_subthreshold`` (part of
-    ``deposited``).
-    Validation: shell-secondary-transport, photon-pair-first-interaction, bhabha-close
+    With transported positrons a positron's kinetic energy is its launched
+    track's rows or ``positron_subthreshold`` (part of ``deposited``), and
+    ``pair_rest_mass`` is replaced by where the annihilation photons go,
+    ``annihilation_escaped`` or ``annihilation_absorbed`` (first interaction in
+    the stack; their sum is ``2 m_e c^2`` plus the in-flight kinetic energy),
+    or by ``positron_escaped_rest`` (``2 m_e c^2``) for a positron that escapes.
+    Validation: shell-secondary-transport, photon-pair-first-interaction, bhabha-close,
+    heitler-annihilation, positron-annihilation-at-rest
     """
     from .shell_transport import hard_event_energy_accounting
 
@@ -845,15 +1005,28 @@ def secondary_energy_balance(result, *, per_history=False):
         radiated[events["row"]] = 0.0
         owner = events["electron_id"].astype(np.int64)
         kept = ~events["electron_launched"]
-        rest = total(owner, np.full(owner.size, PAIR_THRESHOLD_EV * 1e-3))
         if pair["positrons_transported"]:
             stopped = ~events["positron_launched"]
-            terms["positron_rest_pending_keV"] = rest
             terms["positron_subthreshold_keV"] = total(
                 owner[stopped], events["positron_keV"][stopped]
             )
+            escaped = events["positron_fate"] == FATE_ESCAPED
+            terms["positron_escaped_rest_keV"] = total(
+                owner[escaped], np.full(int(np.count_nonzero(escaped)), PAIR_THRESHOLD_EV * 1e-3)
+            )
+            photons = pair["annihilation_photons"]
+            photon_owner = owner[photons["event"]]
+            absorbed = photons["absorbed"]
+            terms["annihilation_escaped_keV"] = total(
+                photon_owner[~absorbed], photons["k_keV"][~absorbed]
+            )
+            terms["annihilation_absorbed_keV"] = total(
+                photon_owner[absorbed], photons["k_keV"][absorbed]
+            )
         else:
-            terms["pair_rest_mass_keV"] = rest
+            terms["pair_rest_mass_keV"] = total(
+                owner, np.full(owner.size, PAIR_THRESHOLD_EV * 1e-3)
+            )
             terms["positron_keV"] = total(owner, events["positron_keV"])
         terms["pair_subthreshold_keV"] = total(owner[kept], events["electron_keV"][kept])
     terms["radiated_keV"] = total(history, radiated)
@@ -870,7 +1043,9 @@ def secondary_energy_balance(result, *, per_history=False):
         + terms["binding_reserved_keV"]
         + terms["radiated_keV"]
         + terms.get("pair_rest_mass_keV", 0.0)
-        + terms.get("positron_rest_pending_keV", 0.0)
+        + terms.get("positron_escaped_rest_keV", 0.0)
+        + terms.get("annihilation_escaped_keV", 0.0)
+        + terms.get("annihilation_absorbed_keV", 0.0)
         + terms.get("positron_keV", 0.0)
     )
     return terms

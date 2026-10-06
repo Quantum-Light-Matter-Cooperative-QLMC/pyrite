@@ -544,8 +544,8 @@ def numerics_show_command(name, fidelity, json_output):
     default=None,
     help=(
         "Transport pair positrons above the secondary threshold (opt-in; requires "
-        "--pair-production-model). Positrons are not annihilated: each pair's 2 m_e c^2 "
-        "is booked as pending rest energy and no annihilation photons are emitted."
+        "--pair-production-model). Positrons annihilate in flight and at rest; each "
+        "annihilation photon escapes or is absorbed at its first interaction."
     ),
 )
 @click.option(

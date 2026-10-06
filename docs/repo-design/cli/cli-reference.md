@@ -1649,9 +1649,9 @@ Options:
   --positron-transport / --no-positron-transport
                                   Transport pair positrons above the secondary threshold
                                   (opt-in; requires --pair-production-model). Positrons
-                                  are not annihilated: each pair's 2 m_e c^2 is booked
-                                  as pending rest energy and no annihilation photons are
-                                  emitted.
+                                  annihilate in flight and at rest; each annihilation
+                                  photon escapes or is absorbed at its first
+                                  interaction.
   --atomic-electron-deflection [kawrakow|none]
                                   Angular deflection by atomic electrons: kawrakow
                                   (default) scales each element's elastic rate by 1 +

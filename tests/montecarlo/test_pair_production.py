@@ -385,7 +385,9 @@ def test_no_photon_above_threshold_converts_nothing():
     assert events["row"].size == 0 and events["r_ang"].shape == (0, 3)
 
 
-def _cascade(monkeypatch, *, pair_scale, model="penelope-2024", seed=11, **extra):
+def _cascade(
+    monkeypatch, *, pair_scale, model="penelope-2024", seed=11, thickness_ang=1.0e5, **extra
+):
     """Thin silicon, 3 MeV, synthetic BremsLib boosted to emit many MeV photons.
 
     ``pair_scale`` multiplies EPDL's nuclear pair cross section seen by the
@@ -420,7 +422,7 @@ def _cascade(monkeypatch, *, pair_scale, model="penelope-2024", seed=11, **extra
     return simulate_trajectories(
         3000.0,
         6,
-        1.0e5,
+        thickness_ang,
         composition=CATALOG.crystal("silicon").composition,
         E_cut_keV=100.0,
         seed=seed,
