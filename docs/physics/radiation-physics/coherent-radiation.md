@@ -36,7 +36,17 @@ For a segment with velocity $\mathbf v$ (in units of $c$) and a reflection $\mat
 \qquad E_{\rm res}=\hbar c\,\omega_{\rm res},
 ```
 
-with $\omega$ carried in inverse Ångström ($c=1$, lengths and times both in Å). Only positive roots radiate, so of the $\pm\mathbf g$ pair exactly one member satisfies the condition for a given flight; expanding families to both directions is what makes the harmonic-selection sign self-resolving rather than a hidden convention. The overall numerator sign depends jointly on the lattice harmonic convention $\exp(+i\mathbf g\cdot\mathbf r)$ and the outgoing-wave convention, and the independent derivation and the implementation currently disagree on it — this is the open `line-energy-dispersion` row. It fixes **where** each line sits, not how the amplitude is squared or summed.
+with $\omega$ carried in inverse Ångström ($c=1$, lengths and times both in Å). Only positive roots radiate, so of the $\pm\mathbf g$ pair exactly one member satisfies the condition for a given flight; expanding families to both directions is what makes the harmonic-selection sign self-resolving rather than a hidden convention. The numerator sign is a label, not physics: an $\exp(+i\mathbf g_{\rm Z}\cdot\mathbf r)$ harmonic gives $-\mathbf v\cdot\mathbf g_{\rm Z}$, and the repository's $\mathbf g=-\mathbf g_{\rm Z}$ gives the same line. What the label does fix is the coupling. Energy–momentum matching $\omega=\mathbf v\cdot(\mathbf k+\mathbf g)$ means the photon leaves with $\mathbf k=\mathbf k_0-\mathbf g$ from a virtual photon $\mathbf k_0$, $\omega=\mathbf k_0\cdot\mathbf v$: the momentum transfer is $-\mathbf g$. In the module's $\exp(+i\omega t)$ convention, where $f'+if''$ has $f''>0$ and $S(\mathbf q)=\sum f\,e^{+i\mathbf q\cdot\mathbf R}$ is the amplitude for transfer $\mathbf q$, the line resonant on $\mathbf g$ couples to $\chi_{-\mathbf g}$ and $U_{-\mathbf g}$. The kernels sum the conjugate field (phase $\exp\{i[\omega t-(\mathbf k+\mathbf g)\cdot\mathbf r]\}$), so they use
+
+```{math}
+:label: eq-coherent-radiation-friedel-pairing
+
+\chi^{\rm line}_{\mathbf g}=\chi_{-\mathbf g}^{*},
+\qquad
+U^{\rm line}_{\mathbf g}=U_{-\mathbf g}^{*}=U_{\mathbf g}.
+```
+
+$U$ carries no $f''$, so only $\chi$ changes: $\chi_{-\mathbf g}^{*}$ is $\chi_{\mathbf g}$ with $f''$ negated. The two differ in modulus only for a noncentrosymmetric crystal with $f''\neq0$ (a Bijvoet pair). In the catalog that means 4H/6H-SiC, PtBi₂ and WTe₂, by tens of per cent near absorption edges. Centrosymmetric crystals keep the same $|A|^2$, and so do crystals without $f''$. Implementation: `materials.crystal.emission_coupling_tables`, behind `lines._kernels._reflection_tables`; `Validation: line-energy-dispersion`.
 
 The vacuum relation $k=\omega$ is replaced throughout by the bulk Maxwell relation $k=n(\omega)\,\omega$, which makes the resonance implicit; see [Photon escape and in-medium dispersion](photon-escape-and-dispersion.md).
 
