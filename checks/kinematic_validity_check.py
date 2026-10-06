@@ -66,27 +66,22 @@ Zhai setup) -- four independent validity parameters are printed:
 
 
 
-Run: python kinematic_validity_check.py
+Run: uv run python checks/kinematic_validity_check.py
 
 """
 
-# the core modules now live in ../src; put it on the path regardless of CWD
-import os
-import sys
-
 import numpy as np
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
-
 
 from pyrite.materials.crystal import (
     CRYSTALS,
     HBARC_EV_ANG,
+    KINEMATIC_DYN_LIMIT,
     M_E_EV,
     Z_TABLE,
     U_g,
     absorption_length_ang,
     chi_g,
+    kinematic_validity,
     reciprocal_g_vector,
 )
 from pyrite.montecarlo import _sigma_browning_cm2, beta_from_keV
@@ -106,7 +101,7 @@ CASES = [
 ENERGIES_KEV = (25.0, 120.0)
 
 
-DYN_OK = 1e-2  # photon dynamical parameter
+DYN_OK = KINEMATIC_DYN_LIMIT
 
 KE_OK = 0.1  # Feranchuk Eq. (6)
 
@@ -188,11 +183,10 @@ for crystal, hkl in CASES:
 
         detune = abs(g**2 + 2.0 * omega * g * np.cos(THETA_OBS))
 
-        dyn = omega**2 * chi / detune
-
-        L_ext = 2.0 / (omega * chi)  # Ang
-
         L_abs = absorption_length_total_ang(comp, E_p)
+        validity = kinematic_validity(E_p, chi, detune, L_abs, L_abs)
+        dyn = validity["dyn"]
+        L_ext = validity["extinction_length_ang"]
 
         # electron side (Eq. 6)
 

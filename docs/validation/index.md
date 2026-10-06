@@ -111,6 +111,7 @@ radiation-physics/external-brem-subtraction
 radiation-physics/finite-footprint-longitudinal-decoherence
 radiation-physics/finite-time-lineshape
 radiation-physics/line-absorption-tabulation
+radiation-physics/kinematic-validity-envelope
 radiation-physics/line-energy-dispersion
 radiation-physics/narrow-beam-total-attenuation
 radiation-physics/pxr-amplitude

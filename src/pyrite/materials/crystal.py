@@ -790,3 +790,64 @@ def dominant_reflections(
         ordered = sorted(members)
         out.extend([ordered[-1]] if representatives_only else ordered)
     return out
+
+
+KINEMATIC_DYN_LIMIT = 1e-2
+KINEMATIC_EXTINCTION_RATIO_LIMIT = 1.0
+
+
+def kinematic_validity(
+    photon_E_eV: float,
+    chi_abs: float,
+    detuning_inv_ang2: float,
+    thickness_ang: float,
+    absorption_length_ang: float,
+) -> dict[str, float | bool]:
+    """Photon-side Born screening parameters, with lengths in angstroms.
+
+    Source: Feranchuk et al. (2000), photon eigenmode reproduced in
+    Zhai et al. (2025), SI Eq. (3),
+    coupling ``omega**2 |chi_g| / |k_g**2 - omega**2|``; two-beam exchange
+    scale from the resonant coupled-wave rate ``omega |chi_g| / 2``.
+    Here ``omega = E / (hbar c)`` is an inverse length, not a frequency.
+    Assumes a homogeneous crystal, scalar unit-polarization coupling and
+    vacuum photon detuning. This ports the offline audit; it is a screening
+    diagnostic, not a dynamical-diffraction solver or an error bound.
+
+    ``dyn >= 0.01`` flags photon mixing; ``extinction_ratio <= 1`` flags a
+    thickness/absorption path long enough for Bragg exchange. These are
+    separate diagnostics; a runtime warning requires both. The latter does
+    not establish that a reflection is on Bragg. Mosaic domain sizes, electron channeling,
+    recoil, scattered trajectories and refracted photon directions are
+    outside this envelope. Thresholds are audit policy, not paper constants.
+
+    Limits: zero coupling gives dyn=0 and infinite extinction length;
+    zero thickness gives infinite extinction ratio; exact zero detuning
+    with nonzero coupling gives infinite dyn. Positive infinity is allowed
+    for absorption length (no absorption); all other inputs must be finite.
+
+    Validation: kinematic-validity-envelope
+    """
+    values = (photon_E_eV, chi_abs, detuning_inv_ang2, thickness_ang)
+    if not all(np.isfinite(v) for v in values):
+        raise ValueError("kinematic validity inputs must be finite")
+    if photon_E_eV <= 0 or chi_abs < 0 or thickness_ang < 0:
+        raise ValueError("energy must be positive; coupling and thickness nonnegative")
+    if np.isnan(absorption_length_ang) or absorption_length_ang <= 0:
+        raise ValueError("absorption length must be positive")
+    omega = photon_E_eV / HBARC_EV_ANG
+    detuning = abs(detuning_inv_ang2)
+    dyn = (
+        0.0 if chi_abs == 0 else (float("inf") if detuning == 0 else omega**2 * chi_abs / detuning)
+    )
+    extinction = float("inf") if chi_abs == 0 else 2.0 / (omega * chi_abs)
+    effective = min(thickness_ang, absorption_length_ang)
+    ratio = float("inf") if effective == 0 else extinction / effective
+    return {
+        "dyn": float(dyn),
+        "extinction_length_ang": float(extinction),
+        "absorption_length_ang": float(absorption_length_ang),
+        "extinction_ratio": float(ratio),
+        "photon_mixing": bool(dyn >= KINEMATIC_DYN_LIMIT),
+        "extinction_reachable": bool(ratio <= KINEMATIC_EXTINCTION_RATIO_LIMIT),
+    }

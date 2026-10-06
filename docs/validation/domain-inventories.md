@@ -45,6 +45,7 @@ Generated browsing views of every claim in the [detailed validation ledger] (phy
 | [`spxr-physical-population`](ledger-core-coherent-physics.md#spxr-physical-population) | for a fixed physical population of independent, identically distributed electron fields, the ensemble spectral yield separates into `N <\|E\|²> + N(N-1) \|<E>\|²`, with physical `N = Q/\|e\|` independent of numerical sample count | `unverified` |
 | [`zhai-material-screen-reconstruction`](ledger-core-coherent-physics.md#zhai-material-screen-reconstruction) | material/plane mapping and 30/100/150 keV coherent-to-bremsstrahlung ratios reconstructed from the deposited Zhai Figure 2a arrays | `unverified` |
 | [`zhai-hbn-921-detected`](ledger-core-coherent-physics.md#zhai-hbn-921-detected) | end-to-end detected-spectrum anchor vs Zhai SI Fig. S5b (h-BN 921 nm, 17.5–25 keV, tilt 17°/130°) | `discrepancy` |
+| [`kinematic-validity-envelope`](ledger-core-coherent-physics.md#kinematic-validity-envelope) | Photon Born screen: $D = \omega^2\lvert\chi_g\rvert/\lvert\Delta\rvert$, $L_{\rm ext}=2/(\omega\lvert\chi_g\rvert)$ and $R=L_{\rm ext}/\min(t,L_{\rm abs})$, using $\omega=E/(\hbar c)$ and vacuum $\Delta=g^2+2\omega\hat{\mathbf n}\cdot\mathbf g$. Runtime warning requires both $D\ge0.01$ and $R\le1$; conservative screening policy, not a dynamical solution or quantified error bound. | `anchored` |
 
 ## Crystallography & atomic data
 
