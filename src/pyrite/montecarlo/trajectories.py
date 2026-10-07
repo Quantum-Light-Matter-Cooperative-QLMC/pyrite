@@ -225,7 +225,7 @@ def _pyrite_version() -> str:
     try:
         from importlib.metadata import version
 
-        return version("pyrite-xray")
+        return version("pyrite-mc")
     except Exception:
         return "unknown"
 

@@ -57,7 +57,7 @@ exec "$SHELL"
 See the [shell-completion guide](docs/guides/shell-completion.md) for zsh setup,
 generated-file locations, removal, and troubleshooting.
 
-Base `pyrite-xray` is CPU-only. Install exactly one GPU accelerator extra if applicable:
+Base `pyrite-mc` is CPU-only. Install exactly one GPU accelerator extra if applicable:
 
 | Hardware | Install                                      | Backend                 |
 | -------- | -------------------------------------------- | ----------------------- |

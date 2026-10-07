@@ -164,7 +164,7 @@ marker.
    login-node:...` block in `running-on-a-cluster.md` (rsync to a login
    node, not a `pyrite`/`pyrite-dev` command); and the `uv tool install`,
    `uv tool update-shell` + `exec "$SHELL"`, and `uv tool uninstall
-   pyrite-xray` blocks in `shell-completion.md` (uv tool environment
+   pyrite-mc` blocks in `shell-completion.md` (uv tool environment
    setup/teardown, not `pyrite`/`pyrite-dev` commands). The checker enforces
    "no silent skips": every other bash block in `docs/guides/*.md` is either
    checked (has at least one recognized invocation, each option validated)

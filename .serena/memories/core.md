@@ -1,6 +1,6 @@
 # PyRITE core
 
-- The `pyrite-xray` distribution owns `src/pyrite/`, packaged data, `pyrite`,
+- The `pyrite-mc` distribution owns `src/pyrite/`, packaged data, `pyrite`,
   `pyrite-dev`, compatibility executables `cxr`/`cxr-dev`, apps, and tests.
 - Read `docs/repo_map.md` before source exploration. Use Serena for definitions/references/call sites; use `rg` or direct reads for exact text and non-code.
 - Package data resolve through `pyrite.DATA_DIR`; imports must work from any cwd.

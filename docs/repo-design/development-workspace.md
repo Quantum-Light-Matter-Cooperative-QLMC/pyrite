@@ -1,6 +1,6 @@
 # Development environment and focused verification
 
-The repository has one uv project and one publishable distribution. The root project owns the `pyrite-xray` distribution, `src/pyrite/`, packaged data, `pyrite`, `pyrite-dev`, and the test suite. Contributor tools are dependency groups in the root `pyproject.toml`; there is no uv workspace split or separate test-tools package.
+The repository has one uv project and one publishable distribution. The root project owns the `pyrite-mc` distribution, `src/pyrite/`, packaged data, `pyrite`, `pyrite-dev`, and the test suite. Contributor tools are dependency groups in the root `pyproject.toml`; there is no uv workspace split or separate test-tools package.
 
 ## Why source was not split across distributions
 

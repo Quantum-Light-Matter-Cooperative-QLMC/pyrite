@@ -7,7 +7,7 @@ is kept so they can be re-measured.
 
 ## Wheel baseline
 
-`uv build --wheel` at 135105de produces `pyrite_xray-0.4.0-py3-none-any.whl`:
+`uv build --wheel` at 135105de produces `pyrite_mc-0.4.0-py3-none-any.whl`:
 **18.5 MB (17.65 MiB)** on disk, 922 files, **50.6 MiB** installed.
 After #263 moved the generator sources to `vendor/` and deleted
 `atomic_scattering_factors/`, the wheel is 16.8 MB (16.06 MiB), 693 files,

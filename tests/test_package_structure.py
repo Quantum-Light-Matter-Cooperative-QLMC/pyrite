@@ -37,13 +37,13 @@ _COMPAT_MODULES = {
 
 
 def test_distribution_identity_exposes_only_canonical_namespace() -> None:
-    installed = distribution("pyrite-xray")
+    installed = distribution("pyrite-mc")
 
-    assert installed.metadata["Name"] == "pyrite-xray"
+    assert installed.metadata["Name"] == "pyrite-mc"
     assert installed.version == pyrite.__version__
     assert util.find_spec("pyrite") is not None
     assert util.find_spec("cxr_mc") is None
-    assert util.find_spec("pyrite_xray") is None
+    assert util.find_spec("pyrite_mc") is None
 
 
 def test_root_exports_stay_frozen() -> None:

@@ -113,7 +113,7 @@ class CuPyBackend(ArrayBackend):
         if expected is not None and self.name != expected:
             raise BackendUnavailableError(
                 f"PYRITE_MC_BACKEND={expected} requested, but installed CuPy targets {self.name}; "
-                f"install pyrite-xray[{('amd' if expected == 'rocm' else 'nvidia')}] "
+                f"install pyrite-mc[{('amd' if expected == 'rocm' else 'nvidia')}] "
                 "in a clean environment"
             )
         if module.cuda.runtime.getDeviceCount() < 1:

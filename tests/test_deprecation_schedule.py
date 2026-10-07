@@ -44,7 +44,7 @@ def test_no_deprecated_command_spelling_is_past_its_removal_target() -> None:
     overdue = _overdue({path: entry.remove_in for path, entry in DEPRECATIONS.items()})
 
     assert not overdue, (
-        f"pyrite-xray {__version__} still ships {len(overdue)} command spelling(s) "
+        f"pyrite-mc {__version__} still ships {len(overdue)} command spelling(s) "
         f"at or past their removal target: {sorted(overdue)}. Remove the alias and "
         f"its row together, then regenerate docs/repo-design/cli/cli-deprecations.md."
     )
@@ -59,7 +59,7 @@ def test_no_deprecated_option_spelling_is_past_its_removal_target() -> None:
     )
 
     assert not overdue, (
-        f"pyrite-xray {__version__} still ships {len(overdue)} option spelling(s) "
+        f"pyrite-mc {__version__} still ships {len(overdue)} option spelling(s) "
         f"at or past their removal target: {sorted(overdue)}."
     )
 
@@ -69,7 +69,7 @@ def test_no_implicit_default_is_past_its_removal_target() -> None:
     overdue = _overdue({key: entry.remove_in for key, entry in IMPLICIT_DEFAULTS.items()})
 
     assert not overdue, (
-        f"pyrite-xray {__version__} still resolves {len(overdue)} implicit default(s) "
+        f"pyrite-mc {__version__} still resolves {len(overdue)} implicit default(s) "
         f"at or past their removal target: {sorted(overdue)}."
     )
 
@@ -78,7 +78,7 @@ def test_no_compatibility_module_path_is_past_its_removal_target() -> None:
     overdue = _overdue({name: entry.remove_in for name, entry in MODULE_DEPRECATIONS.items()})
 
     assert not overdue, (
-        f"pyrite-xray {__version__} still ships {len(overdue)} compatibility import "
+        f"pyrite-mc {__version__} still ships {len(overdue)} compatibility import "
         f"path(s) at or past their removal target: {sorted(overdue)}."
     )
 
@@ -118,7 +118,7 @@ def test_legacy_table_tier_is_not_past_its_removal_target() -> None:
     from pyrite.xsgen.store import LEGACY_TABLE_TIER_REMOVE_IN
 
     assert not _overdue({"xsgen legacy table tier": LEGACY_TABLE_TIER_REMOVE_IN}), (
-        f"pyrite-xray {__version__} still searches the legacy "
+        f"pyrite-mc {__version__} still searches the legacy "
         "~/.local/share/pyrite/xsgen/tables tier; remove it from "
         "pyrite.xsgen.store.search_dirs together with `pyrite tables migrate`."
     )

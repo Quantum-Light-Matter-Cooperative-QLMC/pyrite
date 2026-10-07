@@ -5,7 +5,7 @@ Worktree: `${HOME}/dev/wt/pyrite/shim-lifecycle-enforcement`
 
 ## Problem
 
-Audited at `0bb4a075`, `pyrite-xray` 0.3.0. Three deprecation registries, 178
+Audited at `0bb4a075`, `pyrite-mc` 0.3.0. Three deprecation registries, 178
 rows, and **142 of them carry `remove_in == "0.3.0"` while the package is at
 0.3.0**. Nothing failed, because the support-window tests assert only internal
 arithmetic:

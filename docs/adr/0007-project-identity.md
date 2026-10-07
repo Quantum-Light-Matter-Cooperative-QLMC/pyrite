@@ -11,7 +11,7 @@ The `cxr-mc` name no longer reflects the project's broader scope across radiatio
 
 The visible project identity is **PyRITE**, expanded as **a Python toolkit for Radiation from Interactions and Transport of Electrons**, with the tagline **Coherent X-ray radiation and electron transport in crystals.**
 
-Use `pyrite` for the repository, user command, and Python import and implementation namespace; use `pyrite-dev` for contributor tooling and `pyrite-xray` for the Python distribution. The implementation lives under `src/pyrite/`.
+Use `pyrite` for the repository, user command, and Python import and implementation namespace; use `pyrite-dev` for contributor tooling and `pyrite-mc` for the Python distribution. The implementation lives under `src/pyrite/`.
 
 New pickles identify their `pyrite.*` module owners. Version 0.3.0 removes the transitional `cxr_mc` import namespace; legacy pickles naming that package require migration with an earlier release.
 

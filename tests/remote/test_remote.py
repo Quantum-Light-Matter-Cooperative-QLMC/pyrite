@@ -151,7 +151,7 @@ def test_amd_uv_sync_builds_cupy_against_hip(monkeypatch):
     block = scripts._uv_sync_block()
 
     assert (
-        'CUPY_INSTALL_USE_HIP=1 "uv" sync --package pyrite-xray --no-default-groups --extra amd'
+        'CUPY_INSTALL_USE_HIP=1 "uv" sync --package pyrite-mc --no-default-groups --extra amd'
         in block
     )
 
@@ -505,7 +505,7 @@ def test_every_generated_bash_payload_quotes_hostile_remote_dir(monkeypatch, bui
     expected_jobdir = config.shell_word(config.remote_path(config.JOBS_SUBDIR, "j"))
     assert f"JOBDIR={expected_jobdir}" in script
     assert "timing: uv sync %d.%03d s" in script
-    assert "sync --package pyrite-xray --no-default-groups --extra" in script
+    assert "sync --package pyrite-mc --no-default-groups --extra" in script
     syntax = subprocess.run(["bash", "-n"], input=script, capture_output=True, text=True)
     assert syntax.returncode == 0, syntax.stderr
 
@@ -654,7 +654,7 @@ def test_queue_script_records_uv_sync_timing_and_preserves_failure_state(monkeyp
 def test_queue_script_syncs_runtime_member_without_test_tools():
     script = remote._queue_script("j", ["hopg"], quick=False, workers=None)
 
-    assert "sync --package pyrite-xray --no-default-groups --extra" in script
+    assert "sync --package pyrite-mc --no-default-groups --extra" in script
 
 
 def test_queue_script_no_flags_when_unset():

@@ -69,7 +69,7 @@ def render_reveal_animation(
         raise RuntimeError(
             "render_reveal_animation requires the optional 'viz-render' extra "
             "(kaleido, imageio, imageio-ffmpeg). Install with "
-            '`uv sync --extra viz-render` or `pip install "pyrite-xray[viz-render]"`.'
+            '`uv sync --extra viz-render` or `pip install "pyrite-mc[viz-render]"`.'
         ) from exc
     try:
         import kaleido  # noqa: F401  (import-only availability check)
@@ -77,7 +77,7 @@ def render_reveal_animation(
         raise RuntimeError(
             "render_reveal_animation requires the optional 'viz-render' extra "
             "(kaleido, imageio, imageio-ffmpeg). Install with "
-            '`uv sync --extra viz-render` or `pip install "pyrite-xray[viz-render]"`.'
+            '`uv sync --extra viz-render` or `pip install "pyrite-mc[viz-render]"`.'
         ) from exc
 
     out_path = Path(out_path)

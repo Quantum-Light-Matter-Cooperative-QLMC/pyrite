@@ -4,7 +4,7 @@ Navigation aid for `src/pyrite/` — importable package. Read before exploring s
 
 ## Workspace ownership
 
-- Root `pyrite-xray`: sole publishable distribution and owner of `src/pyrite/`, packaged data, `pyrite`, `pyrite-dev`, and the test suite. No `uv` workspace split; `uv run pyrite-dev ...` needs no `--package` flag.
+- Root `pyrite-mc`: sole publishable distribution and owner of `src/pyrite/`, packaged data, `pyrite`, `pyrite-dev`, and the test suite. No `uv` workspace split; `uv run pyrite-dev ...` needs no `--package` flag.
 - Stable `pyrite-dev test-suite {core,cli,apps,packaging}` selectors partition all test modules; `integration` overlaps deliberately; `verify` remains full gate.
 - Runtime paths resolve through `pyrite.paths` and `console.config`: packaged read-only data stays package-relative; a complete selected catalog uses per-call `--catalog` > `PYRITE_CATALOG` > `catalog.path` > bundled; workspace artifacts use explicit path > `PYRITE_HOME` > `workspace.root` config > cwd; mutable user state uses Click's platform app directory. An explicit workspace also owns generated `xsgen/` tables and fetched reference data. Marimo apps ship under `pyrite.apps`; validation figure builders and their reference data ship under `pyrite.validation`; standalone `checks/` scripts remain developer-only.
 - `vendor/xsgen/{elsepa,sbethe}/`: generator inputs (ELSEPA 2020 Fortran and `database/`, `sbethe.f`), not in the wheel. `xsgen.sources` resolves them as the vendored tier from a checkout, and `pyrite remote sync` ships `vendor/`. Their data classes are set by [ADR-0014](adr/0014-packaged-data-layout.md). ELSEPA's published test-run output is a test fixture under `tests/data/xsgen/elsepa/`.

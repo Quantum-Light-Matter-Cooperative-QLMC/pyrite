@@ -1,4 +1,4 @@
-"""Build and install pyrite-xray from wheel and editable source in clean uv venvs."""
+"""Build and install pyrite-mc from wheel and editable source in clean uv venvs."""
 
 import os
 import shutil
@@ -44,8 +44,8 @@ def _inspect_wheel(wheel: Path) -> None:
         metadata = archive.read(metadata_name).decode()
         entry_points = archive.read(entry_points_name).decode()
 
-    assert metadata_name.startswith("pyrite_xray-")
-    assert "Name: pyrite-xray" in metadata.splitlines()
+    assert metadata_name.startswith("pyrite_mc-")
+    assert "Name: pyrite-mc" in metadata.splitlines()
     assert f"Version: {PROJECT_VERSION}" in metadata.splitlines()
     assert "pyrite/__init__.py" in names
     assert "pyrite/data/catalog/catalog.toml" in names
@@ -68,7 +68,7 @@ def _inspect_wheel(wheel: Path) -> None:
         if line.startswith("Provides-Extra: ")
     }
     assert extras == EXPECTED_EXTRAS
-    assert all(name.startswith(("pyrite/", "pyrite_xray-")) for name in names)
+    assert all(name.startswith(("pyrite/", "pyrite_mc-")) for name in names)
 
 
 def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
@@ -81,8 +81,8 @@ def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
         (
             "from importlib import util; from importlib.metadata import distribution; "
             "from pathlib import Path; "
-            "import pyrite; dist = distribution('pyrite-xray'); "
-            "assert dist.metadata['Name'] == 'pyrite-xray'; "
+            "import pyrite; dist = distribution('pyrite-mc'); "
+            "assert dist.metadata['Name'] == 'pyrite-mc'; "
             "assert dist.version == pyrite.__version__; "
             "assert (pyrite.DATA_DIR / 'catalog' / 'catalog.toml').is_file(); "
             "from pyrite.materials import CATALOG; "
@@ -92,7 +92,7 @@ def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
             "assert resolve_profile_materials('standard') == list(standard); "
             "assert not (Path.cwd() / 'mats_to_sim.toml').exists(); "
             "assert util.find_spec('cxr_mc') is None; "
-            "assert util.find_spec('pyrite_xray') is None"
+            "assert util.find_spec('pyrite_mc') is None"
         ),
         cwd=root,
     )
@@ -142,15 +142,15 @@ def main() -> None:
     uv = shutil.which("uv")
     if uv is None:
         raise SystemExit("uv executable not found")
-    with tempfile.TemporaryDirectory(prefix="pyrite-xray-package-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="pyrite-mc-package-") as tmp:
         work = Path(tmp)
         dist = work / "dist"
         _run(uv, "build", "--wheel", "--out-dir", str(dist), cwd=ROOT)
-        wheel = next(dist.glob("pyrite_xray-*.whl"))
+        wheel = next(dist.glob("pyrite_mc-*.whl"))
         _inspect_wheel(wheel)
         _probe_install(uv, wheel, work, "wheel-venv")
         _probe_install(uv, ROOT, work, "editable-venv")
-    print("pyrite-xray wheel and editable installs expose only canonical PyRITE identities")
+    print("pyrite-mc wheel and editable installs expose only canonical PyRITE identities")
 
 
 if __name__ == "__main__":

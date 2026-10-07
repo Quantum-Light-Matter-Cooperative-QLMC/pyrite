@@ -377,7 +377,7 @@ def run_cases(
     if engine == "gpu" and not _RESOURCE_POLICY.gpu:
         raise BackendUnavailableError(
             "run_cases(engine='gpu') requested but no supported accelerator is available; "
-            "install pyrite-xray[nvidia], pyrite-xray[amd], or pyrite-xray[intel], or use engine='auto'"
+            "install pyrite-mc[nvidia], pyrite-mc[amd], or pyrite-mc[intel], or use engine='auto'"
         )
 
     progress_label = _case_progress_label(cases)

@@ -75,7 +75,7 @@ This does not uninstall PyRITE. To remove the persistent uv tool afterward:
 
 <!-- verify: skip (uv tool environment teardown, not a pyrite/pyrite-dev command) -->
 ```bash
-uv tool uninstall pyrite-xray
+uv tool uninstall pyrite-mc
 ```
 
 ## Troubleshooting

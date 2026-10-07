@@ -1,0 +1,4 @@
+sphinx>=8.2
+myst-parser[linkify]>=4.0
+pydata-sphinx-theme>=0.20.0
+sphinxcontrib-bibtex>=2.6
