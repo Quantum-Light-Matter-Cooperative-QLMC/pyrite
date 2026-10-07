@@ -1,6 +1,8 @@
 name: Documentation
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -40,16 +42,14 @@ jobs:
           docs/_build/html
 
       - name: Upload Pages artifact
-        # GitHub Pages is unavailable on the current plan (free tier, private
-        # repo). Re-enable by setting repo variable ENABLE_PAGES_DEPLOY=true.
-        if: github.event_name == 'push' && vars.ENABLE_PAGES_DEPLOY == 'true'
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-pages-artifact@v5
         with:
           path: docs/_build/html
 
   deploy:
     name: Deploy documentation
-    if: github.event_name == 'push' && vars.ENABLE_PAGES_DEPLOY == 'true'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
 
     needs: build
     runs-on: ubuntu-latest
