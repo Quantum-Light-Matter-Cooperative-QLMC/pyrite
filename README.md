@@ -17,8 +17,8 @@ PyRITE is intended to eventually become a more general-purpose electron transpor
 simulation toolkit for electron transport in the 1 keV - 100 MeV range, with native support for
 low-level GPU acceleration, arbitrary source, target, and detector geometries, and extensible physics. Thus, PyRITE is Python-based, fast, and an accessible alternative to the more traditional, well-validated,
 but higher barrier-to-entry toolkits such as the FORTRAN-based PENELOPE or the C++-based Geant4. Critically, it also implements physics engines not natively supported by those tools; in particular,
-Parametric X-ray radiation (PXR), coherent bremsstrahlung (CBS), and support for electron-channeling
-effects in crystals below 100 MeV is under active investigation.
+Parametric X-ray radiation (PXR), coherent bremsstrahlung (CBS). We are actively investigating support for electron-channeling
+effects in crystals below 100 MeV.
 
 PyRITE is developed in a public GitHub repository. See the
 [source repository](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite)
