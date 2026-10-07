@@ -681,9 +681,8 @@ def fetch_command(
     network access.
 
     PyRITE's own archives (epdl, sbethe-tables, elsepa, bremslib, and the eedl
-    and eadl mirrors) are on private GitHub Releases; downloading them needs a
-    token with read access to the repository, from PYRITE_GITHUB_TOKEN,
-    GITHUB_TOKEN, or a logged-in `gh`.
+    and eadl mirrors) are on public GitHub Releases; downloading them needs no
+    GitHub token.
     """
     from ...xsgen import DataFetchError
 

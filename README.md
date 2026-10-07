@@ -20,12 +20,16 @@ but higher barrier-to-entry toolkits such as the FORTRAN-based PENELOPE or the C
 Parametric X-ray radiation (PXR), coherent bremsstrahlung (CBS), and support for electron-channeling
 effects in crystals below 100 MeV is under active investigation.
 
+PyRITE is developed in a public GitHub repository. See the
+[source repository](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite)
+or the [published documentation](https://quantum-light-matter-cooperative-qlmc.github.io/pyrite/).
+
 ## Install
 
 Requires Python ≥3.14 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone <repository-url> pyrite
+git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git pyrite
 cd pyrite
 uv sync
 uv run pyrite tables fetch   # every pinned dataset and table (about 100 MB): EEDL, EADL, EPDL, SBETHE, ELSEPA, BremsLib
@@ -33,11 +37,10 @@ uv run pyrite config setup   # optional first-run backend detection
 uv run pyrite --help
 ```
 
-PyRITE's own table archives are hosted on private GitHub Releases: `fetch`
-needs a token with read access to this repository, taken from
-`PYRITE_GITHUB_TOKEN`, `GITHUB_TOKEN`, or a logged-in `gh`. Without one,
-install a code from a local copy with `pyrite tables fetch CODE --archive PATH`.
-`pyrite tables fetch --help` lists the codes.
+PyRITE's table archives are hosted on public GitHub Releases, so `fetch` needs
+no GitHub token. To install a code from a local copy instead, use
+`pyrite tables fetch CODE --archive PATH`. `pyrite tables fetch --help` lists
+the codes.
 
 Focused contributor and CI commands are documented in
 [development workspace guide](docs/repo-design/development-workspace.md).

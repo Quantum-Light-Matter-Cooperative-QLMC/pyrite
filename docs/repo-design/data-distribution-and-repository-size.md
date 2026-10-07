@@ -96,9 +96,8 @@ by up to 67% across single steep intervals, so it was rejected. It is classed
 ## Hosted table releases
 
 PyRITE's own pinned table archives are published as GitHub Release assets of
-this repository, one release per dataset (issues #284, #282). While the
-repository is private, downloading one needs a GitHub token with read access;
-the move to public Zenodo records (#167) swaps the URL and drops the token.
+this repository, one release per dataset (issues #284, #282). The repository
+and release assets are public, so downloads need no GitHub token.
 
 ```{list-table}
 :header-rows: 1
@@ -135,14 +134,12 @@ stays upstream-only (its redistribution terms are unconfirmed), and NIST SRD 64
 Mott tables are never hosted. `pyrite tables fetch` without a code installs
 everything.
 
-`pyrite tables fetch` resolves a `github.com/.../releases/download/<tag>/<asset>`
-URL through the GitHub API with the first token found in `PYRITE_GITHUB_TOKEN`,
-`GITHUB_TOKEN`, or `gh auth token`. The token goes only to `api.github.com`;
-it is not forwarded on the redirect to the asset store and never appears in
-output or manifests. Without a token the plain URL is tried, which fails with a
-message naming the token variables and `--archive PATH`. CI passes the job's
-`GITHUB_TOKEN`. The remote box has no token; `pyrite remote sync` ships the
-installed tables instead.
+`pyrite tables fetch` downloads public release URLs directly without a token.
+If `PYRITE_GITHUB_TOKEN`, `GITHUB_TOKEN`, or `gh auth token` is available, the
+GitHub API route is used; the token goes only to `api.github.com`, is not
+forwarded on the redirect to the asset store, and never appears in output or
+manifests. CI also fetches without a token. The remote box needs no network;
+`pyrite remote sync` ships the installed tables instead.
 
 To cut or refresh a release (maintainer):
 
@@ -339,8 +336,8 @@ Every commit SHA from the first touched commit onward changes. Costs:
   garbage collection. GitHub documents this in
   [Removing sensitive data from a repository](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).
   Clones do not fetch `refs/pull/*` by default, so clone size still falls.
-- The repository is private with no forks, so there are no third-party forks
-  to chase.
+- At the time this option was assessed, the repository was private and had no
+  third-party forks to chase.
 
 **C. Git LFS for future large files.** History is unchanged. New large files
 are stored as roughly 130-byte pointers, and the content lives in LFS storage

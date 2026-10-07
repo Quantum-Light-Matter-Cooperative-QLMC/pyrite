@@ -12,13 +12,12 @@ Either archive may come from a local copy rather than the network, which is
 how a cluster without outbound access is provisioned; the pinned digest is
 checked the same way.
 
-PyRITE's own table archives are pinned at GitHub Release download URLs. While
-the repository is private those need a token, so :func:`_download` resolves
-such a URL through the GitHub API with the first of ``PYRITE_GITHUB_TOKEN``,
-``GITHUB_TOKEN``, or ``gh auth token``. The token is sent only to
-``api.github.com``, never across the redirect to the asset store, and never
-appears in a message or manifest. Without a token the plain URL is tried, so
-the same pin keeps working once the release is public.
+PyRITE's own table archives are pinned at public GitHub Release download URLs,
+which work without a GitHub token. If a token is available,
+:func:`_download` resolves a release URL through the GitHub API with the first
+of ``PYRITE_GITHUB_TOKEN``, ``GITHUB_TOKEN``, or ``gh auth token``. The token
+is sent only to ``api.github.com``, never across the redirect to the asset
+store, and never appears in a message or manifest.
 """
 
 import hashlib
@@ -67,10 +66,9 @@ _GITHUB_API = "https://api.github.com"
 _RELEASE_ASSET_URL = re.compile(
     r"https://github\.com/(?P<repo>[^/]+/[^/]+)/releases/download/(?P<tag>[^/]+)/(?P<name>[^/]+)"
 )
-_PRIVATE_RELEASE_HINT = (
-    "; the archive is on a private GitHub Release: set PYRITE_GITHUB_TOKEN or "
-    "GITHUB_TOKEN to a token with read access to the repository (or run `gh auth "
-    "login`), or install from a local copy with --archive PATH"
+_PUBLIC_RELEASE_HINT = (
+    "; this is a public GitHub Release: check network access, or install from a "
+    "local copy with --archive PATH"
 )
 _USER_AGENT = "PyRITE xsgen (+https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite)"
 # The shared (non per-element) sdbase files. `atparams.tab` and `exp-param.tab`
@@ -206,7 +204,7 @@ def _download(url: str, destination: Path, label: str) -> str:
             Request(url, headers={"User-Agent": _USER_AGENT}),
             destination,
             label,
-            _PRIVATE_RELEASE_HINT,
+            _PUBLIC_RELEASE_HINT,
         )
     api_url = _release_asset_api_url(asset["repo"], asset["tag"], asset["name"], token, label)
     request = _authorized(api_url, token[0], "application/octet-stream")

@@ -2609,8 +2609,7 @@ Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|sbethe|sbethe-
   network access.
 
   PyRITE's own archives (epdl, sbethe-tables, elsepa, bremslib, and the eedl and eadl
-  mirrors) are on private GitHub Releases; downloading them needs a token with read
-  access to the repository, from PYRITE_GITHUB_TOKEN, GITHUB_TOKEN, or a logged-in `gh`.
+  mirrors) are on public GitHub Releases; downloading them needs no GitHub token.
 
 Options:
   --archive FILE                  Install CODE from a local copy of the pinned archive

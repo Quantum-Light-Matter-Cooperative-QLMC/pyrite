@@ -159,7 +159,7 @@ def test_without_a_token_the_plain_url_is_tried_and_failure_names_the_fixes(
         fetch_module._download(URL, tmp_path / "a.zip", "ELSEPA tables")
 
     message = str(caught.value)
-    for fix in ("PYRITE_GITHUB_TOKEN", "GITHUB_TOKEN", "--archive PATH"):
+    for fix in ("public GitHub Release", "network access", "--archive PATH"):
         assert fix in message
     (request,) = seen
     assert request.full_url == URL

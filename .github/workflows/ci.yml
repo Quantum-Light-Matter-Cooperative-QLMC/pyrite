@@ -28,8 +28,8 @@ jobs:
       # EADL, EPDL, SBETHE sdbase/ and catalogue tables, ELSEPA, BremsLib
       # (#263, #282, #284). The key follows the pins, so a repin refetches; a
       # cache hit needs no network. `fetch` re-verifies a cached copy and
-      # exits 0. PyRITE's own archives are private release assets, read with
-      # this job's GITHUB_TOKEN (fork PRs may lack access).
+      # exits 0. PyRITE's own archives are public release assets and can be
+      # fetched without a token.
       - name: Cache pinned data
         uses: actions/cache@v4
         with:
@@ -40,8 +40,6 @@ jobs:
           key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
 
       - name: Fetch pinned data
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run pyrite tables fetch
 
       - name: Test ${{ matrix.suite }} suite

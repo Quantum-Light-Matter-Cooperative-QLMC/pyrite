@@ -28,5 +28,5 @@ Nested TODO.md checklists (e.g. per-anchor validation-app failures, a sub-scoped
 
 - `gh issue list`/`gh issue view` replace reading `TODO.md`; `gh issue create`/`edit`/`close` replace editing it.
 - No merge-driver setup step remains in onboarding (`README.md`, `docs/repo-design/development-workspace.md`) or `pyrite-dev verify`.
-- Backlog items are now only visible to accounts with repository access (the repository is private), same as before.
+- Backlog issues are public with the repository; GitHub access is still required to create or update them.
 - A local clone with no network/`gh` access cannot read or update the backlog; `TODO.md` no longer serves as an offline mirror.
