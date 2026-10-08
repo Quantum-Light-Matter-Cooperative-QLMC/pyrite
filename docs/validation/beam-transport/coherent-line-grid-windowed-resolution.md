@@ -2849,3 +2849,606 @@ form factors, automatic full-axis policy integration, centroid/FWHM,
 GPU execution and corrected remote refinement ladders. The owner may append
 this scoped `rederived` result and evidence to ledger Notes; no full-claim
 status promotion or human `signed-off` is implied.
+
+## Owner continuation: full finite-axis production yield integration
+
+`audit_full_axis_spectrum_yield` now compares the complete resolved finite
+axis with the weighted captured-field integral. The energy coordinates must
+be strictly increasing, finite, and have endpoints exactly equal to those of
+the supplied `CoherentDispersionLaw`. Source samples must be finite,
+nonnegative and have the same shape. The audit uses every adjacent interval,
+including the coarse backbone between line windows; it cannot select only
+the narrow bands that previously passed the audit. The material-law axis
+stays fixed throughout refinement.
+
+For stored binary64 coordinates $E_i$ and source samples $s_i$, the numerical
+quantity being checked is the exact piecewise-linear integral
+
+$$
+Q=\sum_{i=0}^{n-1}
+\frac{(E_{i+1}-E_i)(s_i+s_{i+1})}{2}.
+$$
+
+Each elementary operation is enclosed by its adjacent binary64 values,
+retaining positive underflow. Summation of the nonnegative lower and upper
+terms is enclosed using the generic sequential-addition bound, which also
+covers a pairwise tree with no more than $n$ additions along a path. With
+unit roundoff $u=2^{-53}$ and the smallest positive binary64 number $\eta$,
+
+$$
+\gamma_n=\frac{nu}{1-nu},\qquad
+a_n=\frac{n\eta}{1-nu},\qquad
+|\operatorname{fl}(S)-S|\leq\gamma_n S+a_n.
+$$
+
+The absolute term conservatively covers gradual underflow propagated through
+the additions. Provided $nu<1/2$, the resulting sum enclosures are
+
+$$
+S\geq\max\left(0,\frac{\operatorname{fl}(S)-a_n}{1+\gamma_n}\right),
+\qquad
+S\leq\frac{\operatorname{fl}(S)+a_n}{1-\gamma_n}.
+$$
+
+Directed interval arithmetic and outward conversion produce
+$[Q_-,Q_+]$. An exactly zero sample array has exactly zero quadrature.
+Nonfinite intermediate sums refuse rather than claiming an enclosure.
+
+The existing weighted spectrum helper bounds the same complete finite-axis
+stored field by $[L,U]$, with half the requested relative share reserved for
+enclosure width. Even constant form-factor bounds are passed as callbacks,
+so refinement can subdivide locally instead of repeatedly sampling the whole
+axis. Material knots remain mandatory boundaries; all contributing rows must
+finish within the cumulative evaluation budget. The final comparison is
+
+$$
+\epsilon_Q=
+\max_{q\in\{Q_-,Q_+\}}
+\sup_{Y\in[L,U]}\frac{|q-Y|}{Y}.
+$$
+
+Convexity in $q$ makes the endpoint maximum sufficient for every quadrature
+value in the enclosure. Existing zero-power and no-positive-floor conventions
+apply. The audit passes only when $\epsilon_Q$ meets the requested share;
+enclosure convergence alone does not accept the production grid.
+
+The runner enables this developer check through the private case mapping
+`_coherent_yield_audit`, with optional `relative_tolerance`, `initial_samples`
+and `max_evaluations`. Its hook captures rows from the actual coherent
+production call, after the automatic grid has resolved, rather than from a
+second transport or a separate sub-range evaluation. It reads the production
+setup's active coherence sector: inactive decoherence uses $F=1$, an active
+finite footprint uses the analytic Gaussian enclosure with the same stored
+RMS-duration conversion, and an infinite slab retains the conservative
+$0\leq F\leq1$. A loose empirical enclosure may exhaust its budget; it is
+never replaced with $F=0$. Multiple radiators and `sinc_cutoff` are refused.
+Capture weights and the incident population retain their existing meanings.
+
+Before characteristic and bremsstrahlung evaluation, a failed yield check
+raises `LineGridToleranceError` with its relative error, requested share,
+axis endpoints and coordinate count. An exhausted integral budget raises
+`SpectrumPowerBudgetError`; no partial acceptance is returned. A passing
+result carries scalar `line_grid_coherent_yield_audit` provenance: integral
+and quadrature bounds, tolerance, evaluations, row and coordinate counts,
+axis endpoints and audit wall time. Default production runs do not enable
+this instrumentation.
+
+Owner regression checks enclose independent exact-rational nonuniform
+quadratures, including subnormal powers; reject truncated axes, invalid
+samples, exhausted budgets and a deliberately 10% excessive spectrum; and
+cover exact zero power. A one-electron, 1 Ang HOPG track at 30 keV and 5 deg
+tilt exercises the full automatic 10--3700 eV axis through the real spectrum
+runner. The yield comparison passes the $10^{-3}$ share and capture leaves
+the coherent source bit-identical on the same trajectory and coordinates.
+This thin-track check is an integration anchor, not the issue's thick-target
+or line-shape acceptance.
+
+Scope remains conditional on the row-integral primitives and exact stored
+capture/material/F inputs. The quadrature enclosure bounds arithmetic on the
+supplied samples, not how production computed those samples, upstream capture
+or material uncertainty, power outside the chosen finite axis, centroid or
+FWHM. This owner extension requires fresh-context verification before a
+scoped `rederived` verdict. The full ledger claim stays `discrepancy` pending
+the remaining envelope, production/shape and corrected remote validations.
+
+## Independent full-axis verification (2026-10-07)
+
+Verification target: checkpoint `de828003`, the full finite-axis quadrature,
+weighted-integral comparison and opt-in production-runner hook. This context
+did not implement the extension. The issue, owner continuation, docstrings,
+ledger Notes and selected maintained tests were visible before this derivation;
+implementation bodies were not. Thus this is fresh-context verification with
+prior exposure to the claimed proof, rather than a blind source-only derivation.
+The previously verified row-integral and weighted-composition primitives are
+assumed valid only within their recorded stored-input scope.
+
+### Derivation before implementation inspection
+
+Integrating the affine interpolant on each adjacent coordinate interval gives
+
+$$
+Q_i=\frac{(E_{i+1}-E_i)(s_i+s_{i+1})}{2},\qquad Q=\sum_i Q_i.
+$$
+
+For increasing finite coordinates and nonnegative samples, every term is
+nonnegative. Units are photons per steradian per incident electron when the
+samples are spectral densities per eV. Constant density recovers density times
+axis length; zero density gives zero yield. Windows confer no permission to
+omit the intervals connecting them.
+
+Let $u=2^{-53}$ and $\eta$ be the least positive binary64 subnormal. Model an
+addition by relative error at most $u$ plus absolute error at most $\eta$.
+Propagating through at most $n$ additions gives a conservative positive-sum
+bound
+
+$$
+|\widehat S-S|\leq\gamma_n S+a_n,\qquad
+\gamma_n=\frac{nu}{1-nu},\quad a_n=\frac{n\eta}{1-nu}.
+$$
+
+For $nu<1/2$, inversion yields
+
+$$
+\max\left(0,\frac{\widehat S-a_n}{1+\gamma_n}\right)
+\leq S\leq\frac{\widehat S+a_n}{1-\gamma_n}.
+$$
+
+This requires outward arithmetic on the bound constants and inverted endpoints,
+not merely outward rounding of the final sum. Neighbor expansion of each
+finite elementary operation encloses its exact real result, including positive
+underflow; overflow must refuse. Positive products preserve interval ordering.
+An exact-zero shortcut is valid only when all samples vanish.
+
+For nonnegative row weights $w_r$ and incident population $N_e>0$, complete
+row certificates compose as
+
+$$
+L\leq Y=\frac{1}{N_e}\sum_r w_r Y_r\leq U.
+$$
+
+Both integral and quadrature must use the same complete finite axis, material
+law, captures, weights, population and coherence sector. Exhaustion for any
+positive-weight row prevents a complete certificate. For $L>0$, the exact
+worst-case relative error for quadrature interval $[Q_-,Q_+]$ is
+
+$$
+\epsilon=\max\left(
+\left|\frac{Q_-}{L}-1\right|,
+\left|\frac{Q_-}{U}-1\right|,
+\left|\frac{Q_+}{L}-1\right|,
+\left|\frac{Q_+}{U}-1\right|\right).
+$$
+
+For fixed positive $Y$, absolute error is convex in $Q$; for fixed nonnegative
+$Q$, $Q/Y$ is monotone in $Y$. These properties prove endpoint sufficiency.
+When $L=0<U$, a positive quadrature admits no finite relative-error guarantee;
+zero quadrature has relative error one for positive yield. Exact zero yield
+and quadrature agree; positive quadrature against zero yield does not.
+Enclosure convergence is separate from the final error test.
+
+The runner must capture the very call whose samples it audits and reject
+before subsequent components run. Inactive decoherence requires $F=1$;
+finite-footprint active decoherence permits its analytic Gaussian upper bound;
+an unconstrained empirical factor needs the full $[0,1]$ interval. Neither
+missing capture nor exhausted work can imply acceptance. These checks concern
+finite-axis yield of exact stored inputs, not source-sample construction,
+outside-axis power, centroid or FWHM.
+
+### Implementation comparison and independent checks
+
+`_trapezoid_bounds` expands coordinate differences, adjacent sample sums,
+products and halving in the correct monotone directions. Its interval context
+computes the summation constants and inverted endpoints outward; lower
+conversion rounds down and upper conversion rounds up. Positive subnormal
+samples are retained. Overflow refuses conservatively even when a rearranged
+formula could yield a finite result. This is a supported-scope limitation,
+not a false enclosure.
+
+`audit_full_axis_spectrum_yield` requires exact material-law endpoints and
+increasing finite coordinates, uses every sample interval, and passes no
+restricted bands to the weighted primitive. It reserves half the share for
+integral convergence and tests both quadrature endpoints with the independently
+derived relative-error expression. Passing the enclosure's lower endpoint as
+the primitive's numerical estimate does not license acceptance: the final
+full-axis result uses the larger of both endpoint errors.
+
+The runner forwards the capture hook only into the actual coherent call on
+the already resolved axis. Coherent spectra are not divided into independent
+electron blocks. The same incident count reaches production and the audit;
+mosaic weights retain the collector's previously verified convention.
+Production and the reconstructed law both use the default dispersive material
+convention. The audit's Gaussian duration conversion matches the production
+conversion. Active infinite-slab decoherence retains $[0,1]$; inactive
+coherence uses $F=1$. Unsupported radiators and `sinc_cutoff` refuse. The
+check precedes characteristic/bremsstrahlung work and returns scalar provenance
+only after acceptance; budget exceptions propagate without a success record.
+
+Independent temporary checks, run with the project test runner, cover:
+
+- 900 exact-rational nonuniform trapezoid integrals, including adjacent
+  representable coordinates, exponents from $-1074$ through $500$, mixed zero
+  samples and positive subnormal samples. Every exact integral lies within
+  the returned enclosure.
+- 1,000 exact-rational scalar relative-error extrema, including very small
+  positive yields; every returned upper bound dominates the exact error.
+- 100 full-axis composition checks against exact-rational four-endpoint
+  extrema, verifying complete-band forwarding, the half-share reservation,
+  refinement callbacks and final acceptance comparison.
+- Direct coherence-sector probes for inactive, finite-footprint and empirical
+  infinite-slab captures; direct failed-yield and exhausted-budget probes,
+  both refusing rather than returning scalar provenance.
+
+All five independent checks pass. The maintained spectrum-audit module passes
+35 tests. The real automatic-axis HOPG integration anchor passes separately
+(1 test, 57 deselected, 48.20 s), including its bit-identical same-trajectory
+capture-neutrality comparison. This rerun establishes the thin-track test's
+acceptance; it does not independently reproduce the owner's previously
+reported numerical bounds or wall time.
+
+### Scoped verdict
+
+- **Claim**: `coherent-line-grid-windowed-resolution` —
+  `coherent_spectrum_audit.py::{_trapezoid_bounds,audit_full_axis_spectrum_yield}`
+  and `runner/coherent_audit.py::CoherentGridAudit` — affine interpolation,
+  positive weighted composition and endpoint relative-error extrema.
+- **Filters**: units pass; zero/constant-density limits pass;
+  signs/conventions pass.
+- **Re-derivation**: matches within the complete finite-axis stored-input
+  scope, conditional on the previously verified row-integral primitives.
+- **Verdict**: scoped `rederived` for this extension at `de828003`, with
+  prior owner-proof exposure explicitly recorded above.
+- **Suggested ledger change**: the task owner may add this scoped verdict
+  and evidence to Notes. Keep the full row's Status `discrepancy`: the
+  general window-envelope claim, upstream construction and production sample
+  arithmetic, outside-axis power, centroid/FWHM, scalable reference/thick
+  certificates and corrected remote ladders remain outside this verification.
+  No `signed-off` transition is proposed.
+
+## Owner continuation: finite-axis centroid enclosure
+
+The full-axis audit now supports a first-moment comparison through
+`audit_full_axis_spectrum_centroid`. This is an owner extension awaiting
+fresh-context verification. The earlier scoped verification applies to the
+frozen yield-only checkpoint `de828003`; it does not certify this new moment
+composition or the integration-partition option.
+
+For a positive stored-input spectrum $P(E)$, define
+
+$$
+Y=\int_A^B P(E)\,dE,\qquad
+M=\int_A^B E P(E)\,dE,\qquad \mu=\frac{M}{Y}.
+$$
+
+The energy axis remains positive and fixed. On every latest complete
+row-certificate interval $[a_i,b_i]$, positivity implies
+
+$$
+a_i L_i\leq\int_{a_i}^{b_i} E P_r(E)\,dE\leq b_i U_i.
+$$
+
+With nonnegative captured mosaic weights $w_r$ and the same incident
+population $N_e$ as production, outward composition gives
+
+$$
+M_- =\frac{1}{N_e}\sum_{r,i}w_r a_i L_{r,i},\qquad
+M_+ =\frac{1}{N_e}\sum_{r,i}w_r b_i U_{r,i}.
+$$
+
+Whole-axis retained yield intersections may tighten $[L,U]$, but moment
+composition uses every interval in the latest complete row partition. For
+$L>0$, the centroid enclosure is
+
+$$
+[\mu_-,\mu_+]
+=\left[\frac{M_-}{U},\frac{M_+}{L}\right]\cap[A,B].
+$$
+
+All arithmetic and binary64 endpoint conversions are outward. Units of the
+moment are eV times photons per steradian per incident electron; centroid
+units are eV. Population normalization cancels in the exact ratio, but it
+is retained consistently in both certificates. A zero or uncertified positive
+power floor refuses: an empty source has no physical centroid.
+
+The numerical comparison follows `spectrum_observables`, namely the ratio
+of the trapezoid of the node values $E_i s_i$ to the trapezoid of $s_i$.
+It is not the exact first moment of the affine density interpolant. Each
+stored node product is expanded outward before applying the already used
+nonuniform trapezoid enclosure. Exact zero samples keep exact zero products;
+positive underflow is retained. If the quadrature denominator is enclosed
+by $[Q_-,Q_+]$ with $Q_->0$ and its moment by $[R_-,R_+]$, then
+
+$$
+[q_-,q_+]
+=\left[\frac{R_-}{Q_+},\frac{R_+}{Q_-}\right]\cap[A,B].
+$$
+
+Using the same endpoint-extremum argument as for yield, the error charge is
+
+$$
+\epsilon_\mu
+=\max_{q\in\{q_-,q_+\},\,m\in\{\mu_-,\mu_+\}}
+\left|\frac{q}{m}-1\right|.
+$$
+
+A result passes only when both yield and centroid comparisons pass their
+respective shares. A converged yield cannot substitute for a centroid bound.
+A constant or symmetric source recovers its expected centroid as the moment
+partition contracts; an unresolved energy partition can still fail even when
+the power integral has converged.
+
+`integration_bins` creates a complete uniform integration partition before
+splitting at material knots and adaptive refinement. It changes neither the
+production coordinates nor the material-law endpoints. A conservative
+initialization-budget check occurs before allocating the partition; every
+positive-weight row and all knot-induced work remain charged by the existing
+cumulative budget. Duplicate, unrepresentable boundaries refuse. This option
+is explicit: moment bounds reuse the resulting row certificates without extra
+field evaluations, but obtaining a finer partition still costs evaluations.
+Scalability to the reference/thick transport is not established here.
+
+The private runner audit enables centroid checking when
+`centroid_relative_tolerance` is present in `_coherent_yield_audit`; its
+optional `integration_bins` controls the partition. Failed yield, centroid,
+or budget checks refuse before characteristic/bremsstrahlung evaluation.
+Successful scalar provenance additionally records model and quadrature
+centroid bounds, centroid error share and tolerance. Yield-only calls retain
+their previous provenance scope and default integration partition.
+
+Owner regressions cover a symmetric sinc source, unequal weighted rows
+against an independent 70-digit first-moment integral, positive subnormal
+source power, zero-power refusal, unresolved moments, invalid/oversized
+partitions and runner refusal. The adversarial source with endpoint samples
+$0,1,2$ over 990--1010 eV passes the yield check but has a numerical centroid
+of 1005 eV, so the centroid check refuses against the nearly flat symmetric
+source centered at 1000 eV. The nine initial centroid cases failed before
+this API existed and pass after implementation.
+
+The real thin-track HOPG anchor uses the same 30 keV, 5 degree, one-electron,
+1 Ang trajectory and automatic production axis as the previous yield anchor.
+With 2048 integration bins and a 16000-evaluation budget, both requested
+$10^{-3}$ shares pass, and the unaudited coherent spectrum remains
+bit-identical. The focused physical test completes in 72.38 s; this is test
+wall time, not the separately recorded audit timer. It is a thin-track
+integration anchor, not reference/thick or FWHM acceptance.
+
+The full ledger Status remains `discrepancy`. This owner extension needs a
+fresh-context check of moment composition, the numerical-centroid convention,
+outward rounding and runner gating. General window-envelope validity,
+upstream/sample arithmetic uncertainty, outside-axis power, FWHM and corrected
+remote ladders remain outside its scope. A fresh remote job inventory probe
+still fails to resolve the configured `qlmc` home with SSH exit 255; no heavy
+local ladder or remote job was started.
+
+## Independent centroid-enclosure verification (2026-10-07)
+
+Verification target: commit `35fc0c3c` (parent `de828003`, already scoped
+`rederived` for the full-axis yield), namely
+`coherent_spectrum_audit.py::audit_full_axis_spectrum_centroid` with
+`FullAxisCentroidAudit` and `_lower_float`, the `integration_bins` partition
+option of `audit_full_axis_spectrum_yield`, and the centroid gating in
+`runner/coherent_audit.py::CoherentGridAudit`. This context did not implement
+the extension. Before deriving, it saw the methodology, the ledger row
+(including Notes that name centroid/FWHM as open) and the task request. That
+request already outlined the moment inequality and the four-endpoint
+charge. The owner section, implementation bodies and maintained tests were
+read only after the derivation below and after the independent scripts
+`scratch/verify_centroid/ref.py` and `pre_checks.py` were written and run.
+This is a fresh-context verification with prior exposure to the outline of
+the claimed proof, not a blind source-only derivation. The row-integral
+primitives, weighted yield composition and `_trapezoid_bounds` are assumed
+valid only within the stored-input scope recorded by earlier verifications.
+
+### Derivation before implementation inspection
+
+Let $P(E)\geq0$ be the weighted stored-input spectrum on a fixed finite axis
+$[A,B]$ with $0<A<B$:
+
+$$
+P(E)=\frac{1}{N_e}\sum_r w_r P_r(E),\qquad w_r\geq0,\quad N_e>0,
+$$
+
+$$
+Y=\int_A^B P\,dE,\qquad M=\int_A^B E\,P\,dE,\qquad \mu=\frac{M}{Y}.
+$$
+
+Let row $r$ carry a complete partition $A=x_{r,0}<\dots<x_{r,n_r}=B$ with
+certificates $L_{r,i}\leq Y_{r,i}=\int_{x_{r,i-1}}^{x_{r,i}}P_r\,dE\leq U_{r,i}$.
+Positivity of $P_r$ and $0<x_{r,i-1}\leq E\leq x_{r,i}$ on each interval give
+
+$$
+x_{r,i-1}\,Y_{r,i}\leq\int_{x_{r,i-1}}^{x_{r,i}}E\,P_r\,dE\leq x_{r,i}\,Y_{r,i},
+$$
+
+hence $x_{r,i-1}L_{r,i}\leq\cdot\leq x_{r,i}U_{r,i}$. A negative $L_{r,i}$
+only loosens the lower bound because $x_{r,i-1}>0$. Positive weights and
+$1/N_e$ preserve order, and additivity over a complete partition gives
+
+$$
+M_-=\frac{1}{N_e}\sum_{r,i}w_r x_{r,i-1}L_{r,i}\leq M\leq
+M_+=\frac{1}{N_e}\sum_{r,i}w_r x_{r,i}U_{r,i}.
+$$
+
+Completeness matters only for $M_+$: an omitted interval keeps $M_-$ valid
+but invalidates $M_+$. Rows need not share a partition.
+
+For any valid $Y\in[L,U]$ with $L>0$, positivity of $M$ and $Y$ gives
+$M_-/U\leq M/Y\leq M_+/L$. This uses no correlation between the numerator
+and denominator, so any valid enclosure of the same $Y$ may be used,
+including a whole-axis intersection retained across refinements that is
+tighter than the sum of the current interval bounds. The certificates must
+describe the same rows, weights, $N_e$, law and axis. Because $\mu$ is a
+$P$-weighted mean of $E\in[A,B]$, intersecting with $[A,B]$ is valid. The
+enclosure cannot be narrower than about $\mu(U-L)/L$ plus a weighted mean
+interval width, so a converged yield does not imply a resolved centroid.
+
+**Numerical centroid.** On increasing nodes $E_0=A<\dots<E_m=B$ with
+stored samples $s_j\geq0$, the `spectrum_observables` convention is
+
+$$
+\hat\mu=\frac{R}{Q},\qquad
+R=\sum_{j=1}^{m}\frac{h_j}{2}\left(E_{j-1}s_{j-1}+E_js_j\right),\qquad
+Q=\sum_{j=1}^{m}\frac{h_j}{2}\left(s_{j-1}+s_j\right),
+$$
+
+with $h_j=E_j-E_{j-1}$. In exact arithmetic,
+$\hat\mu=\sum_j c_jE_js_j/\sum_jc_js_j$ with positive node weights
+$c_j=(h_j+h_{j+1})/2$, so $\hat\mu\in[E_0,E_m]$. Under round-to-nearest,
+the exact product $E_js_j$ lies within one binary64 neighbour of
+$\mathrm{fl}(E_js_j)$, including subnormal results and products that
+underflow to zero. An exact zero sample gives an exact zero product. The
+nonuniform trapezoid is monotone in its samples. Directed trapezoid bounds
+of the lower and upper product arrays, $R\in[R_-,R_+]$, and of $s$,
+$Q\in[Q_-,Q_+]$ with $Q_->0$, therefore give
+$\hat\mu\in[R_-/Q_+,R_+/Q_-]\cap[A,B]$.
+
+**Error charge.** For $\mu\in[\mu_-,\mu_+]\subset(0,\infty)$ and
+$\hat\mu\in[q_-,q_+]$, the function $f=\lvert\hat\mu/\mu-1\rvert$ is
+convex in $\hat\mu$ for fixed $\mu$. For fixed $\hat\mu$ it is convex in
+$t=1/\mu$, and $t$ ranges over an interval. A convex function on an interval
+attains its maximum at an endpoint. Taking the maximum first over $\hat\mu$
+and then over $t$ gives
+
+$$
+\epsilon_\mu=\max_{q\in\{q_-,q_+\},\,m\in\{\mu_-,\mu_+\}}
+\left\lvert\frac{q}{m}-1\right\rvert,
+$$
+
+which is a rigorous upper bound on the relative error. It must be rounded
+upward.
+
+**Refusals and limits.** $L=0$ or $Q_-=0$ gives no centroid enclosure and
+must refuse. If $P$ is constant and the certificates are exact,
+$[\mu_-,\mu_+]=(A+B)/2\mp\sum_ih_i^2/(2(B-A))$, which contains $(A+B)/2$
+and contracts to it. The trapezoid is exact for $E\,s$ affine, so
+$\hat\mu=(A+B)/2$ exactly. A symmetric source has a centroid at its centre.
+For a delta-like line at $E_0$ inside interval $k$, the enclosure is
+$[x_{k-1},x_k]$ and contracts with the partition. On the numerical side,
+the trapezoid on a single nonzero node returns that node energy exactly.
+
+Units: $M$ is in eV times $Y$-units; $\mu$, $\hat\mu$ and the bounds are in
+eV. $\epsilon_\mu$ is dimensionless.
+
+### Implementation comparison and independent checks
+
+| Item | Implementation | Agreement |
+| --- | --- | --- |
+| Moment composition | `coherent_spectrum_audit.py:297-301`: for each active row, in the yield certificates' active order, each latest interval adds `start_eV*lower` and `stop_eV*upper`, scaled by $w_r/N_e$ in the 50-digit interval context | matches $M_\pm$; the rows use the same complete partitions as the yield certificates |
+| Denominator | `:302-303` divides by `audit.spectrum.upper/lower` (retained whole-axis intersection, also scaled by $w_r/N_e$) | valid, because no correlation is needed; normalization is consistent |
+| Directed conversion and $[A,B]$ | `_lower_float` (round-floor, clipped at 0) and `_upper_float` (round-ceiling plus one ulp); `max/min` with `law.start/stop`, and `law.start == energy[0]` is enforced | matches; $\mu\geq A>0$ keeps the round-floor in the normal range |
+| Node products | `:305-311`: `nextafter` bracket of `fl(E*s)`, lower bound clipped at 0, exact zero kept for `values == 0`, non-finite upper bound refused; negative samples are refused upstream | matches, including subnormal and underflow-to-zero cases |
+| Quadrature ratio | `:312-317`: `_trapezoid_bounds` on the low/high products, divided by the yield audit's $[Q_-,Q_+]$, intersected with $[A,B]$ | matches |
+| Error charge | `:320-321`: `BandPowerCertificate(clo,chi).relative_error_upper` at $q_\pm$, which takes the maximum over both $\mu$ endpoints of `abs(Q/m-1).b` and rounds up | matches the four-corner $\epsilon_\mu$ |
+| Refusal | `:292` refuses `spectrum.lower <= 0` or `quadrature_lower <= 0`; an uncertified positive floor exhausts refinement and raises `SpectrumPowerBudgetError` | matches |
+| Acceptance | `FullAxisCentroidAudit.within_tolerance` requires both the yield and centroid checks | matches |
+
+`integration_bins` (`:148-169`) is checked as a positive integer. Before
+`np.linspace` allocates, `bins*initial_samples*active` is charged against
+`max_evaluations`. The `linspace` endpoints are exactly `law.start/stop`, so
+the bands are contiguous and complete. Non-increasing edges are refused.
+`_smooth_band_spans` then splits at material knots. At `:436`,
+`audit_captured_spectrum_yield` charges `initial_samples*len(spans)*active`
+(knots included) before any evaluation. The bands enter only the audit
+call, so production coordinates are unchanged. With `integration_bins=1`
+(the yield default), `bands=None` reproduces the `de828003` partition. The
+new precheck is never stricter than the existing downstream check.
+
+Runner: `coherent_audit.py:74-104` selects the centroid audit only when
+`centroid_relative_tolerance` is present. It raises
+`LineGridToleranceError` if the yield fails, then if the centroid fails.
+Refusals propagate as `ValueError`. Provenance is returned only after both
+checks pass. The call site `runner/__init__.py:1011-1013` (unchanged since
+`de828003`) runs before characteristic and bremsstrahlung evaluation, on
+the actual captured rows, `E_grid`, `spec_coherent` and `Ne_lines`. The
+yield-only path calls the same function with the same options as before.
+One difference: when the centroid check is enabled and no partition is
+given, the default is `integration_bins=256`. That can refuse on budget
+for many active rows; it fails safe.
+
+Independent numerical evidence (scripts in `scratch/verify_centroid/`, with
+exact `Fraction` arithmetic unless noted):
+
+- `pre_checks.py` (written before reading the implementation). Corner
+  sufficiency: no interior point of a $9\times9$ grid exceeds the corner
+  maximum in 2000 random boxes. Constant density: the exact enclosures
+  contain $(A+B)/2$ for 1, 3 and 17 random knots. Random positive densities:
+  40 of 40 mpmath (60-digit) centroids lie inside the exact enclosures on
+  random nonuniform partitions.
+- `check_composition.py`: 300 randomized cases run through the
+  implementation, with its yield audit replaced by synthetic certificates.
+  Each case has 1–4 rows on independent nonuniform partitions, weights that
+  include $0$, $10^{-300}$ and $5\times10^{-324}$, interval powers down to
+  $10^{-310}$, exact-zero lower bounds and $N_e$ up to 99. Axes include
+  near-degenerate widths. Sources include random values, dynamic ranges of
+  $10^{\pm300}$ with positive subnormals, half-zero samples, and a single
+  nonzero node. Outcomes:
+  - The model enclosure contains the exact rational $[M_-/U,M_+/L]\cap[A,B]$
+    in 300 of 300 cases. The maximum outward slack is $1.2\times10^{-12}A$.
+  - The quadrature enclosure contains the exact trapezoid ratio $R/Q$ in
+    300 of 300 cases. The maximum width is $8\times10^{-11}A$.
+  - The returned $\epsilon_\mu$ is at least the exact four-corner maximum
+    in 300 of 300 cases.
+- `check_end_to_end.py`: 12 cases with real `CoherentRowField` sinc rows.
+  Each has 1–3 rows (including zero weight), random line centres and
+  durations, $N_e\leq5$, random nonuniform axes of 200–800 nodes on
+  990–1010 eV, 64 bins, and 60-digit mpmath $Y$ and $\mu$. In 12 of 12
+  cases the yield enclosure contains $Y$ and the centroid enclosure
+  contains $\mu$; widths are 0.48–0.92 eV and $\epsilon_\mu$ is
+  $2.4$–$4.6\times10^{-4}$. All 12 pass at $10^{-3}$.
+- `check_delta.py` (delta-like line through the composition code, line at
+  995.3, 1000 and 1009.99 eV, 4, 64 and 1024 uniform intervals): every
+  enclosure contains $E_0$ and equals its containing interval. The
+  quadrature ratio equals $E_0$. $\epsilon_\mu$ contracts from $5\times10^{-3}$
+  to $10^{-5}$. Real-field sinc lines with $d=2\times10^3$ and
+  $5\times10^3$ Å exhausted an 8000-evaluation budget in the yield
+  primitive and were refused (`SpectrumPowerBudgetError`). That is fail-safe
+  behaviour of the previously verified primitive, not an acceptance.
+- `check_bins.py` (HOPG with the Henke law, 250–320 eV, 37 interior knots,
+  three rows, one with zero weight):
+  - Every final row partition is complete and contiguous and contains every
+    knot.
+  - Counted primitive samples equal the reported evaluations (330).
+  - $10^{12}$ bins are refused in 1 ms with a 4 kB peak allocation.
+  - A budget that fits `bins*init*active` but not the knot-split spans is
+    refused before any primitive call.
+  - On a 2-ulp axis, 3 bins are refused as non-increasing boundaries and
+    2 bins are refused for having no interior sample set.
+
+Maintained tests:
+- `tests/energy-grid/test_coherent_spectrum_audit.py`: 49 passed in 9.7 s.
+- `tests/energy-grid/test_coherent_windowed_line_grid.py -k "full_axis or centroid or audit"`:
+  5 passed in 66.5 s. This includes the physical HOPG thin-track anchor
+  `test_automatic_full_axis_yield_audit_uses_the_production_capture` with
+  centroid and 2048 bins, run once.
+
+Not reproduced: the owner's recorded anchor bounds and wall time. The
+physical anchor shows only that the test passes. Limitations that remain
+recorded: the centroid enclosure is conditional on valid row primitives,
+complete matching capture and exact stored inputs. Outside-axis power,
+sample arithmetic upstream of storage and the window envelope are outside
+its scope.
+
+### Scoped verdict
+
+- **Claim**: `coherent-line-grid-windowed-resolution` —
+  `coherent_spectrum_audit.py::{audit_full_axis_spectrum_centroid,FullAxisCentroidAudit,_lower_float}`,
+  the `integration_bins` option of `::audit_full_axis_spectrum_yield`, and
+  `runner/coherent_audit.py::CoherentGridAudit` centroid gating. The basis
+  is the positivity moment bound $a_iY_i\leq\int E P\leq b_iY_i$, the
+  outward ratio of independent enclosures, the convex-combination
+  intersection, and the four-corner relative-error extremum.
+- **Filters**: units pass; the constant-density, symmetric, delta-like and
+  zero-power limits pass; signs and conventions pass (the
+  `spectrum_observables` trapezoid ratio, relative to the model centroid).
+- **Re-derivation**: `matches`. No divergent term was found. The
+  whole-axis tightened denominator combined with a per-interval moment
+  composition is valid. The node-product brackets, directed division,
+  $[A,B]$ intersection, exact-zero and subnormal handling and refusals all
+  agree.
+- **Verdict**: scoped `rederived` for this extension at `35fc0c3c`, with
+  the prior exposure to the proof outline recorded above.
+- **Suggested ledger change**: the task owner may add this scoped verdict
+  and its evidence to Notes. The full row's Status stays `discrepancy`:
+  the general window envelope and row-primitive validity, upstream
+  construction and sample arithmetic, outside-axis power, FWHM, scalable
+  reference/thick certificates and corrected remote ladders remain open.
+  No `signed-off` transition is proposed.

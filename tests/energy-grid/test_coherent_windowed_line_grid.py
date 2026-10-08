@@ -730,6 +730,48 @@ def test_weighted_spectrum_audit_checks_a_same_trajectory_production_band(tiny):
     assert result.relative_error_upper <= INTRINSIC_RTOL
 
 
+def test_automatic_full_axis_yield_audit_uses_the_production_capture():
+    """One short physical track exercises the full automatic axis and runner."""
+    from pyrite.montecarlo import runner
+
+    case = dict(
+        cc.build_ladder_case("hopg", 30.0, 5.0, 45.0, thickness_ang=1.0, n_electrons=1, seed=0)
+    )
+    case.update(
+        coherent_emission=True,
+        hkl_list=[(0, 0, 2)],
+        mosaic_mc_fwhm_rad=None,
+        mosaic_mc_nodes=1,
+        bunch_length_fs=100.0,
+        _coherent_yield_audit={
+            "max_evaluations": 16000,
+            "centroid_relative_tolerance": INTRINSIC_RTOL,
+            "integration_bins": 2048,
+        },
+    )
+    case["line_grid_policy"] = _policy(case, windows=True)
+    tp = runner._transport_case(case, transport_core="lockstep")
+    out = runner._spectrum_case(case, tp)
+    record = out["line_grid_coherent_yield_audit"]
+    assert record["scope"] == "stored-input full finite-axis yield and centroid"
+    assert record["relative_error_upper"] <= INTRINSIC_RTOL
+    assert record["centroid_relative_error_upper"] <= INTRINSIC_RTOL
+    assert record["centroid_lower_eV"] > 0
+    assert record["centroid_lower_eV"] <= record["centroid_upper_eV"]
+    assert record["start_eV"] == out["E_grid"][0]
+    assert record["stop_eV"] == out["E_grid"][-1]
+    assert record["points"] == out["E_grid"].size
+    assert record["rows"] == 1
+    assert record["yield_lower"] > 0
+    assert record["evaluations"] <= 16000
+    # Same trajectory and coordinates, no second transport: capture is neutral.
+    unaudited = runner._spectrum_case(
+        {k: v for k, v in case.items() if k != "_coherent_yield_audit"}, tp
+    )
+    np.testing.assert_array_equal(out["spec_coherent"], unaudited["spec_coherent"])
+    assert "line_grid_coherent_yield_audit" not in unaudited
+
+
 @pytest.mark.parametrize("method", ["cone", "curvature", "field"])
 def test_directed_band_enclosure_covers_the_same_trajectory_production_source(tiny, method):
     from pyrite.montecarlo.runner import _lines_for_segments
