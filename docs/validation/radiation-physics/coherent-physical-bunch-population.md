@@ -307,3 +307,26 @@ resampled or accepted by this diagnostic. The historical short-bunch record abov
 has no separate counts; this addition does not infer its cause or certify sampling
 convergence. Synthetic CPU regressions cover mixed failures, all-nonfinite power,
 energy/population context, unchanged arrays, strict JSON persistence and retry.
+
+The remote harness can replay a trusted prior record with `--transport-record`
+and a distinct `--out`. It verifies the paired transport snapshot's original
+code/table identity against that record, requires matching current tables, and
+checks input configuration, segment fingerprint, incident population and axis
+endpoints/count. The new result stores current code provenance alongside source
+provenance and SHA-256 hashes of both original files. Source files are preserved;
+resumption refuses a changed source or omission of the source argument. Replay
+uses the saved transport directly and does not regenerate its trajectories.
+
+### Replay preflight (2026-10-08)
+
+The [preflight record](../check-records/coherent-physical-population/replay-preflight.json)
+uses clean checkpoint `ef39e5a7` exported to the isolated remote checkout
+`/home/aamador/pyrite-issue350-replay-20261008`. It refuses the historical
+short-bunch replay before spectrum evaluation: the original record guarantees
+xsgen table-set digest `f77edf9549ccb9c1c3866118970db0f7f29e17c204da7ce806fee09aef2ac3da`,
+whereas the current sync guarantees
+`e2ac3e02df0309aa624c4497460da98bd926db9d9e10904c95edb4bbada7106c`.
+These identify guaranteed sets, not a measured difference in the sampled paths or
+line spectrum. The retained files did not reconstruct the original guaranteed
+set from the current set plus retained extras. No GPU replay was submitted, no
+new spectrum was measured, and sampling/window acceptance remains unresolved.

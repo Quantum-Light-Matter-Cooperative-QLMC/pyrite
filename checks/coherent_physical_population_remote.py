@@ -5,6 +5,7 @@ These are numerical comparisons, not production window or sampling certificates.
 """
 
 import argparse
+import hashlib
 import json
 import pickle
 import resource
@@ -127,6 +128,60 @@ def _case(args):
     return case
 
 
+def _replay_transport(record_path, config, stamp):
+    """Import trusted prior-run inputs, validating them against their evidence."""
+    from pyrite.energy_grid.convergence import require_identical_segments, segment_fingerprint
+
+    record_path = Path(record_path)
+    snapshot = record_path.with_suffix(".transport.pkl")
+    record_bytes = record_path.read_bytes()
+    record = json.loads(record_bytes)
+    with snapshot.open("rb") as stream:
+        snapshot_digest = hashlib.file_digest(stream, "sha256").hexdigest()
+        stream.seek(0)
+        saved = pickle.load(stream)
+    source_stamp = record["stamp"]
+    if not source_stamp.get("code_digest") or not source_stamp.get("code_tables_digest"):
+        raise RuntimeError("source record lacks code/table provenance")
+    if saved["config"] != config or record["config"] != config:
+        raise RuntimeError("replay inputs differ from the source record/snapshot")
+    if (
+        saved["digest"] != source_stamp["code_digest"]
+        or saved.get("tables_digest") != source_stamp["code_tables_digest"]
+    ):
+        raise RuntimeError("source snapshot belongs to different code/tables")
+    if source_stamp["code_tables_digest"] != stamp.get("code_tables_digest"):
+        raise RuntimeError("replay requires the original table digest")
+    case, transport = saved["case"], saved["transport"]
+    require_identical_segments(record["fingerprint"], segment_fingerprint(transport["segs"]))
+    if (
+        case["Ne"] != record["incident_samples"]
+        or transport["Ne_lines"] != record["incident_samples"]
+        or case["bunch_charge_pc"] != config["charge_pc"]
+    ):
+        raise RuntimeError("replay population differs from its source evidence")
+    energy = np.asarray(transport["E_grid"], dtype=float)
+    axis = record["auto_record"]
+    if (
+        energy.ndim != 1
+        or energy.size < 2
+        or np.any(~np.isfinite(energy))
+        or np.any(np.diff(energy) <= 0)
+        or energy.size != axis["num"]
+        or energy[0] != axis["start_eV"]
+        or energy[-1] != axis["stop_eV"]
+    ):
+        raise RuntimeError("replay axis differs from its source evidence")
+    provenance = {
+        "record": str(record_path.resolve()),
+        "record_sha256": hashlib.sha256(record_bytes).hexdigest(),
+        "snapshot_sha256": snapshot_digest,
+        "stamp": source_stamp,
+        "fingerprint": record["fingerprint"],
+    }
+    return case, transport, provenance
+
+
 def run(args):
     from pyrite._backend import BACKEND, REAL, _to_cpu
     from pyrite._line_windows import FeatureSeed, build_window_plan
@@ -141,7 +196,11 @@ def run(args):
     started = time.perf_counter()
     output = Path(args.out)
     snapshot = output.with_suffix(".transport.pkl")
-    config = {key: value for key, value in vars(args).items() if key not in {"out", "max_minutes"}}
+    config = {
+        key: value
+        for key, value in vars(args).items()
+        if key not in {"out", "max_minutes", "transport_record"}
+    }
     stamp = _stamp()
     result = (
         json.loads(output.read_text())
@@ -157,6 +216,20 @@ def run(args):
         result["stamp"].get(key) != stamp.get(key) for key in ("code_digest", "code_tables_digest")
     ):
         raise RuntimeError("refusing to resume with changed inputs, code or table digest")
+    replay = None
+    if getattr(args, "transport_record", None):
+        source_path = Path(args.transport_record)
+        if (
+            source_path.resolve() == output.resolve()
+            or source_path.with_suffix(".transport.pkl").resolve() == snapshot.resolve()
+        ):
+            raise RuntimeError("replay output must differ from its source record and snapshot")
+        replay = _replay_transport(source_path, config, stamp)
+        if "transport_source" in result and result["transport_source"] != replay[2]:
+            raise RuntimeError("replay source changed since the previous slice")
+        result["transport_source"] = replay[2]
+    elif "transport_source" in result:
+        raise RuntimeError("resuming an imported transport requires --transport-record")
     if result["state"] == "done":
         return 0
     _atomic(output, result)
@@ -178,6 +251,20 @@ def run(args):
                     raise RuntimeError("transport snapshot belongs to different inputs/code")
                 case, transport = saved["case"], saved["transport"]
                 ladder = CaseLadder(case, transport=transport, coherent=True)
+            elif replay is not None:
+                case, transport, _ = replay
+                ladder = CaseLadder(case, transport=transport, coherent=True)
+                _atomic(
+                    snapshot,
+                    {
+                        "config": config,
+                        "digest": stamp["code_digest"],
+                        "tables_digest": stamp.get("code_tables_digest"),
+                        "case": case,
+                        "transport": transport,
+                    },
+                    binary=True,
+                )
             else:
                 case = _case(args)
                 t0 = time.perf_counter()
@@ -365,6 +452,10 @@ def main():
     parser.add_argument("--reference-points", type=int, default=40000000)
     parser.add_argument("--reference-divisor", type=float, default=3.0)
     parser.add_argument("--max-minutes", type=float, default=10.0)
+    parser.add_argument(
+        "--transport-record",
+        help="Replay a trusted prior JSON record and adjacent .transport.pkl without new transport",
+    )
     parser.add_argument("--out", required=True)
     return run(parser.parse_args())
 

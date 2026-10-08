@@ -1,5 +1,6 @@
 """Remote #350 checks preserve incident counts and one transport across slices."""
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -154,3 +155,142 @@ def test_unfinished_slice_checks_backend_before_using_cached_gpu_limits(tmp_path
     with pytest.raises(RuntimeError, match="requires CUDA float64"):
         check.run(args)
     assert json.loads(output.read_text())["state"] == "failed"
+
+
+@pytest.fixture
+def replay_source(tmp_path):
+    from pyrite.energy_grid.convergence import segment_fingerprint
+
+    path = tmp_path / "prior.json"
+    config = {"charge_pc": 1.0}
+    stamp = {"code_digest": "old-code", "code_tables_digest": "same-tables"}
+    case = {"Ne": 2, "bunch_charge_pc": 1.0}
+    transport = {
+        "Ne_lines": 2,
+        "E_grid": np.array([900.0, 901.0, 902.0]),
+        "segs": {"L_ang": np.array([1.0])},
+    }
+    record = {
+        "config": config,
+        "stamp": stamp,
+        "state": "failed",
+        "incident_samples": 2,
+        "fingerprint": segment_fingerprint(transport["segs"]),
+        "auto_record": {"num": 3, "start_eV": 900.0, "stop_eV": 902.0},
+    }
+    saved = {
+        "config": config,
+        "digest": "old-code",
+        "tables_digest": "same-tables",
+        "case": case,
+        "transport": transport,
+    }
+    check._atomic(path, record)
+    check._atomic(path.with_suffix(".transport.pkl"), saved, binary=True)
+    return path, record, saved
+
+
+def test_replay_import_preserves_source_and_records_both_code_generations(replay_source):
+    path, record, saved = replay_source
+    original = path.read_bytes(), path.with_suffix(".transport.pkl").read_bytes()
+    case, transport, provenance = check._replay_transport(
+        path, record["config"], {"code_digest": "new-code", "code_tables_digest": "same-tables"}
+    )
+    assert case == saved["case"]
+    np.testing.assert_array_equal(transport["E_grid"], saved["transport"]["E_grid"])
+    assert provenance["stamp"]["code_digest"] == "old-code"
+    assert len(provenance["snapshot_sha256"]) == len(provenance["record_sha256"]) == 64
+    assert original == (path.read_bytes(), path.with_suffix(".transport.pkl").read_bytes())
+
+
+@pytest.mark.parametrize("change", ["inputs", "tables", "code", "segments", "population", "axis"])
+def test_replay_refuses_mismatched_source_evidence(replay_source, change):
+    path, record, saved = replay_source
+    config = dict(record["config"])
+    stamp = {"code_digest": "new-code", "code_tables_digest": "same-tables"}
+    if change == "inputs":
+        config["charge_pc"] = 2.0
+    elif change == "tables":
+        stamp["code_tables_digest"] = "other-tables"
+    elif change == "code":
+        saved["digest"] = "unrecorded-code"
+    elif change == "segments":
+        saved["transport"]["segs"]["L_ang"][0] = 2.0
+    elif change == "population":
+        saved["transport"]["Ne_lines"] = 3
+    else:
+        saved["transport"]["E_grid"][0] = 899.0
+    check._atomic(path.with_suffix(".transport.pkl"), saved, binary=True)
+    with pytest.raises((RuntimeError, ValueError)):
+        check._replay_transport(path, config, stamp)
+
+
+def test_smoke_replay_never_generates_transport_and_retains_source_on_resume(
+    replay_source, monkeypatch
+):
+    import json
+
+    from pyrite.energy_grid import convergence_case
+    from pyrite.montecarlo import runner
+
+    path, record, saved = replay_source
+    args = SimpleNamespace(
+        mode="smoke",
+        charge_pc=1.0,
+        max_minutes=10.0,
+        out=str(path.with_name("replayed.json")),
+        transport_record=str(path),
+    )
+    record["config"]["mode"] = saved["config"]["mode"] = "smoke"
+    check._atomic(path, record)
+    check._atomic(path.with_suffix(".transport.pkl"), saved, binary=True)
+    monkeypatch.setattr(
+        check,
+        "_stamp",
+        lambda: {
+            "code_digest": "new-code",
+            "code_tables_digest": "same-tables",
+        },
+    )
+    monkeypatch.setattr(check, "_require_gpu", lambda: None)
+    monkeypatch.setattr(check, "_gpu_limits", lambda: {})
+
+    def reject_new_transport(*args, **kwargs):
+        raise AssertionError("replay must never generate new transport")
+
+    monkeypatch.setattr(runner, "_transport_case", reject_new_transport)
+    monkeypatch.setattr(check, "_case", reject_new_transport)
+    monkeypatch.setattr(
+        convergence_case,
+        "CaseLadder",
+        lambda *args, **kwargs: SimpleNamespace(
+            fingerprint=record["fingerprint"],
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_spectrum_case",
+        lambda case, transport: {
+            "E_grid": transport["E_grid"],
+            "spec": np.ones(3),
+            "spec_coherent": np.ones(3),
+        },
+    )
+    assert check.run(args) == 0
+    result = json.loads(Path(args.out).read_text())
+    assert result["stamp"]["code_digest"] == "new-code"
+    assert result["transport_source"]["stamp"]["code_digest"] == "old-code"
+    assert check.run(args) == 0
+    args.transport_record = None
+    with pytest.raises(RuntimeError, match="requires --transport-record"):
+        check.run(args)
+    args.transport_record = str(path)
+    # The same stem with another suffix would overwrite the source snapshot.
+    args.out = str(path.with_suffix(".txt"))
+    with pytest.raises(RuntimeError, match="source record and snapshot"):
+        check.run(args)
+    args.out = str(path.with_name("replayed.json"))
+    record["extra"] = "changed source"
+    check._atomic(path, record)
+    with pytest.raises(RuntimeError, match="source changed"):
+        check.run(args)

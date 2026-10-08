@@ -1,0 +1,22 @@
+{
+  "current_stamp": {
+    "code_digest": "28617e30d70c67aaa49a8e455f1c07835faa9faf4e8407e672a8fa2f056850da",
+    "code_revision": "ef39e5a7fdc328a8d5c14697427ef76e88752a18",
+    "code_dirty": "False",
+    "code_synced_at": "2026-10-08T22:35:50+00:00",
+    "code_source": "alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-350-coherent-windowed-line-grid",
+    "code_tables_digest": "e2ac3e02df0309aa624c4497460da98bd926db9d9e10904c95edb4bbada7106c"
+  },
+  "source_stamp": {
+    "code_digest": "775d7674ba6d77c9211c6dbd3dfe285e671a8a7f70d14fab75aee87a5d355a17",
+    "code_revision": "d8a1c07e4ca9d35d46d540a0cedaa7be4fb41f32",
+    "code_dirty": "False",
+    "code_synced_at": "2026-10-08T17:10:09+00:00",
+    "code_source": "steamlink:/home/steamlink/dev/pyrite/.worktrees/issue-350-coherent-windowed-line-grid",
+    "code_tables_digest": "f77edf9549ccb9c1c3866118970db0f7f29e17c204da7ce806fee09aef2ac3da"
+  },
+  "source_record": "/home/aamador/pyrite/coh350_charge-smoke_20261008_d8a1c07e.json",
+  "spectrum_evaluated": false,
+  "state": "refused",
+  "error": "replay requires the original table digest"
+}

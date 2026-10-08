@@ -73,3 +73,13 @@ Run commands are documented in each check. Heavy Monte Carlo or GPU work must
 use `pyrite remote`; do not launch it locally from this directory.
 
 Optional viewer evaluation probes: `trajectory_paraview_probe.py` (pvpython), `trajectory_trame_probe.py` (live server smoke without a client). Raw repeated results: `trajectory_viewer_results.json`; interpretation and limitations: [trajectory scenes](../docs/repo-design/storage/trajectory-scenes.md).
+
+To diagnose an earlier physical-population run with updated code, pass
+`--transport-record OLD.json --out NEW.json` to
+`coherent_physical_population_remote.py`. The adjacent `OLD.transport.pkl`
+must be a trusted artifact from that run. Replay checks the original code/table
+provenance, inputs, segment fingerprint, population and axis against the JSON
+record. Current tables must match the original digest. It records hashes of both
+source files, preserves their contents, and evaluates the saved trajectories
+without generating a new transport. Use a distinct output and retain the source
+argument on every resumed slice. Run through the remote GPU workflow.
