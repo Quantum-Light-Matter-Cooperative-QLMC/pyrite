@@ -18,6 +18,3 @@ straggling = true
 bandwidth = "resonance-population"
 resolution = "resonance-local"
 quadrature = "bin-mean"
-
-[overrides.hbn]
-energy_keV = {values = [100.0, 500.0, 1000.0, 5000.0]}

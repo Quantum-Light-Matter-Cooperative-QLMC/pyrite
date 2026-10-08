@@ -6,8 +6,11 @@ import pytest
 
 from pyrite._catalog_layout import bundled_catalog
 from pyrite.cli import _catalog_io
+from pyrite.cli._deprecations import message
 from pyrite.cli.commands import beam, material
 from tests.helpers.cli import assert_clean_result, invoke
+
+_SET_WARNING = message("material set") + "\n"
 
 
 @pytest.fixture
@@ -49,7 +52,7 @@ def test_material_override_rewrites_only_the_profile_file(catalog):
 
     result = invoke(material.command, ["set", "hopg", "--thickness", "3000", "--yes"])
 
-    assert_clean_result(result)
+    assert_clean_result(result, stderr=_SET_WARNING)
     after = _snapshot(catalog)
     changed = {name for name in after if after[name] != before.get(name)}
     assert changed == {"profiles/standard.toml"}
@@ -61,6 +64,6 @@ def test_dry_run_leaves_directory_untouched(catalog):
 
     result = invoke(material.command, ["set", "hopg", "--thickness", "3000", "--dry-run"])
 
-    assert_clean_result(result)
+    assert_clean_result(result, stderr=_SET_WARNING)
     assert "+thickness_ang" in result.stdout.replace(" ", "")
     assert _snapshot(catalog) == before

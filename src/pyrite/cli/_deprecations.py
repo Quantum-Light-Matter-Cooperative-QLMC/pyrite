@@ -58,7 +58,22 @@ def _entry(path: str, replacement: str, *, since: str = "0.1.0", note: str = "")
 #: `canonical_option`, `hidden_alias` -- is deliberately retained: ADR-0002
 #: requires it for the next rename, and `tests/cli/test_deprecations.py`
 #: still exercises it against a locally declared command.
-DEPRECATIONS: dict[str, Deprecation] = {}
+DEPRECATIONS: dict[str, Deprecation] = {
+    # Per-material overrides quietly diverge one material from its profile
+    # (issue #359). `--reset` keeps working through the window so existing
+    # rows can be removed; schema-level overrides remain readable.
+    "material set": _entry(
+        "material set",
+        "pyrite profile set",
+        since="0.4.0",
+        note=(
+            "per-material range overrides are retired (issue #359): set shared ranges with "
+            "'pyrite profile set', or give one material its own profile with 'pyrite profile "
+            "create NAME --from PROFILE --material MATERIAL'; 'pyrite material set MATERIAL "
+            "--reset all' still removes existing overrides during the window."
+        ),
+    ),
+}
 
 
 #: Paths whose canonical replacement depends on the arguments given, so the

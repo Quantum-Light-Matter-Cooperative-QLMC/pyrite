@@ -1290,11 +1290,20 @@ Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...
   --material``; ``set --all-materials`` restores implicit membership. Per-material range
   overrides and derived energy grids are managed by ``pyrite material``.
 
+  Where settings live: ranges, membership, beam/detector references and emission use
+  ``set|add|remove``; calculation controls (electron counts, reflections, mosaic,
+  transport models) use ``numerics``; the line-grid selectors use ``line-grid``; filters
+  and the pixel detector use ``filter`` and ``physical-detector``; reusable beams and
+  detectors are named objects edited with ``pyrite beam`` and ``pyrite detector``. The
+  full map is docs/repo-design/profile-settings.md.
+
   Examples:
     pyrite profile list
     pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
     pyrite profile create sub_100keV --energy 30:100:10
-    pyrite profile set sub_100keV --observation-angle 119
+    pyrite profile set sub_100keV --detector eds
+    pyrite profile numerics set sub_100keV --line-electrons 2000
+    pyrite profile line-grid show sub_100keV
     pyrite profile add sub_100keV --energy 75
     pyrite profile set sub_100keV --material hopg,mose2
     pyrite profile rename sub_100keV sub100
@@ -1308,6 +1317,7 @@ Commands:
   create             Create a profile from packaged sweep...
   delete             Delete a profile; irreversible.
   filter             Manage finite FilterPlate objects on a...
+  line-grid          Inspect and edit PROFILE's line-grid...
   list               List catalog profiles with membership,...
   numerics           Inspect and edit result-affecting...
   physical-detector  Manage a profile's physical pixel detector...
@@ -1368,16 +1378,17 @@ Usage: pyrite profile create [OPTIONS] NAME
   Create a profile from packaged sweep defaults, or explicitly clone --from.
 
   Range options replace individual grids. ``--material`` replaces membership. Without
-  --from, packaged standard per-material overrides are copied only for member materials.
-  An explicit --from clones instrument and physics sections, plus ranges and membership;
-  per-material overrides are not cloned. Beam phase space and detector geometry are set
-  only through named objects: build them with ``pyrite beam create`` / ``pyrite detector
-  create`` and attach them here with --beam NAME / --detector NAME.
+  --from, packaged standard per-material overrides are copied only for member materials;
+  no line-grid policy or numerics are copied. An explicit --from clones instrument and
+  physics sections (including numerics and the line-grid policy), plus ranges and
+  membership; per-material overrides are not cloned. Beam phase space and detector
+  geometry are set only through named objects: build them with ``pyrite beam create`` /
+  ``pyrite detector create`` and attach them here with --beam NAME / --detector NAME.
 
 Options:
   --from SOURCE                   Explicitly clone SOURCE, including beam, detector,
-                                  filters, emission, and transport numerics; material
-                                  overrides stay local.
+                                  filters, emission, transport numerics, and line-grid
+                                  policy; material overrides stay local.
   --thickness ANGSTROM,... | START:STOP:STEP
                                   Crystal thicknesses in angstrom. Comma-separated,
                                   mixable with start:stop:step ranges; repeat to
@@ -1526,6 +1537,109 @@ Options:
 Usage: pyrite profile filter show [OPTIONS] PROFILE_NAME IDENTIFIER
 
   Show one PROFILE filter by its name or one-based list index.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile line-grid`
+
+```text
+Usage: pyrite profile line-grid [OPTIONS] COMMAND [ARGS]...
+
+  Inspect and edit PROFILE's line-grid policy (``[profiles.NAME.line_grid_policy]``).
+
+  Three selectors, each defaulting to the first value listed:
+
+    bandwidth   kinematic-ceiling | resonance-population
+                closed-form kinematic bound (no simulation), or the case's
+                measured resonance population capped by that bound
+    resolution  sinc-nyquist | resonance-local
+                uniform measured sinc spacing, or spacing refined locally
+                around measured resonances (3 eV backbone)
+    quadrature  node | bin-mean
+                point samples of the sinc^2 line profile, or bin means that
+                keep integrated line yield exact but smooth peak height/width
+
+  resonance-local requires bandwidth resonance-population and quadrature bin-mean. Any
+  stored selector, even one equal to its default, makes every case of the profile
+  resolve its line grid automatically from its own trajectories, ahead of explicit
+  E_grid_line and stored energy-grid rows; automatic resolution does not support
+  coherent emission (#117), and bin-mean does not support a positive max_dE_frac. The
+  table joins the case and dataset identity: editing it gives new checkpoints, and
+  earlier results stay under their old identity.
+
+  Tolerances, maximum spacing (3 eV), the point budget (600000) and backend ULPs are not
+  profile keys: set them per call (API) or with PYRITE_ENERGY_GRID_* environment
+  variables.
+
+  Examples:
+    pyrite profile line-grid show high_energy
+    pyrite profile line-grid set my_profile --quadrature bin-mean
+    pyrite profile line-grid set my_profile --bandwidth resonance-population \
+        --resolution resonance-local --quadrature bin-mean
+    pyrite profile line-grid reset my_profile resolution
+    pyrite profile line-grid reset my_profile
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  reset  Remove selected FIELDs, or the whole policy when none are named.
+  set    Set one or more line-grid selectors on PROFILE.
+  show   Show explicit and effective PROFILE line-grid selectors and the grid source.
+```
+
+## `pyrite profile line-grid reset`
+
+```text
+Usage: pyrite profile line-grid reset [OPTIONS] NAME
+                                      [bandwidth|resolution|quadrature]...
+
+  Remove selected FIELDs, or the whole policy when none are named.
+
+  Removing the whole policy returns PROFILE to explicit, stored or built-in line grids.
+  A partial reset that leaves an impossible combination is a usage error.
+
+Options:
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile line-grid set`
+
+```text
+Usage: pyrite profile line-grid set [OPTIONS] NAME
+
+  Set one or more line-grid selectors on PROFILE.
+
+  The merged policy is validated before anything is written; an impossible combination
+  is a usage error.
+
+Options:
+  --bandwidth [kinematic-ceiling|resonance-population]
+                                  Line-axis upper edge policy. Default kinematic-
+                                  ceiling.
+  --resolution [sinc-nyquist|resonance-local]
+                                  Line-axis spacing policy; resonance-local needs
+                                  resonance-population and bin-mean. Default sinc-
+                                  nyquist.
+  --quadrature [node|bin-mean]    sinc^2 line-profile evaluation on the axis. Default
+                                  node.
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile line-grid show`
+
+```text
+Usage: pyrite profile line-grid show [OPTIONS] NAME
+
+  Show explicit and effective PROFILE line-grid selectors and the grid source.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
@@ -1972,53 +2086,22 @@ Options:
 ```text
 Usage: pyrite material [OPTIONS] COMMAND [ARGS]...
 
-  Inspect, validate, edit, and blaze individual materials.
+  Inspect, validate, simulate, and blaze individual materials.
 
-  Profile membership remains under ``pyrite profile members``. ``validate`` checks the
-  complete catalog; ``blaze`` writes a face-specific checkpoint.
+  Profile membership and ranges live under ``pyrite profile``. ``show`` reports
+  effective ranges and any per-material override that diverges from the profile;
+  ``validate`` checks the complete catalog; ``blaze`` writes a face-specific checkpoint.
+  The deprecated ``set`` (removal in 0.6.0) only remains to reset existing overrides.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  set          Set or reset MATERIAL overrides without...
   show         Show MATERIAL's effective ranges and...
   simulate     Simulate one material/profile scene on a...
   blaze        Run a grooved-crystal sweep and write a checkpoint.
   energy-grid  Derive and inspect detector energy-grid inputs.
   validate     Validate a material catalog without starting simulation.
-```
-
-## `pyrite material set`
-
-```text
-Usage: pyrite material set [OPTIONS] MATERIAL
-
-  Set or reset MATERIAL overrides without changing profile membership.
-
-Options:
-  --profile TEXT                  Edit overrides under profile NAME.  [default:
-                                  standard]
-  --thickness ANGSTROM,... | START:STOP:STEP
-                                  Crystal thicknesses in angstrom. Comma-separated,
-                                  mixable with start:stop:step ranges; repeat to
-                                  combine.
-  --energy KEV,... | START:STOP:STEP
-                                  Beam energies in keV. Comma-separated, mixable with
-                                  start:stop:step ranges; repeat to combine.
-  --polar DEG,... | START:STOP:STEP
-                                  Polar tilts in degrees [0, 90). Comma-separated,
-                                  mixable with start:stop:step ranges; repeat to
-                                  combine.
-  --azimuth DEG,... | START:STOP:STEP
-                                  Azimuth tilts in degrees [0, 360]. Comma-separated,
-                                  mixable with start:stop:step ranges; repeat to
-                                  combine.
-  --reset [thickness|energy|polar|azimuth|all]
-                                  Remove one override; repeat, or use --reset all.
-  -y, --yes                       Skip overwrite confirmation.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite material show`

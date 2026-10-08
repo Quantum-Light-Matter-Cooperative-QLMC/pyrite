@@ -13,7 +13,7 @@ import numpy as np
 from .. import DATA_DIR
 from .._catalog_layout import ARTIFACT_DIR, catalog_root
 from .._energy_grid_artifacts import ArtifactError, load_artifact
-from .._line_grid_policy import BANDWIDTH_POLICIES, LINE_QUADRATURES, RESOLUTION_POLICIES
+from .._line_grid_policy import PROFILE_LINE_GRID_SELECTORS
 from .._numerics import validate_profile_numerics
 from ._beam_detector_parse import (
     _parse_detector_entry,
@@ -445,11 +445,7 @@ def _parse_profile_overrides(raw: object, path: str, errors: _Errors) -> None:
 
 
 #: Allowed values of ``[profiles.NAME.line_grid_policy]`` keys.
-_PROFILE_LINE_GRID_POLICY_VALUES = {
-    "bandwidth": BANDWIDTH_POLICIES,
-    "resolution": RESOLUTION_POLICIES,
-    "quadrature": LINE_QUADRATURES,
-}
+_PROFILE_LINE_GRID_POLICY_VALUES = PROFILE_LINE_GRID_SELECTORS
 
 
 def _parse_profile_line_grid_policy(raw: object, path: str, errors: _Errors) -> None:
