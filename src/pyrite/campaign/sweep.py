@@ -193,7 +193,6 @@ class BeamSpec:
     gdf_screen_position_m: float | None = None
     gdf_screen_tolerance_m: float = 1e-9
     gdf_normalization: str = "pyrite_current"
-    gdf_repetition_rate_hz: float | None = None
     gdf_z_origin_m: float | None = None
 
     def gdf_beam(self) -> GDFBeam | None:
@@ -210,7 +209,6 @@ class BeamSpec:
                 or self.gdf_screen_position_m is not None
                 or self.gdf_screen_tolerance_m != 1e-9
                 or self.gdf_z_origin_m is not None
-                or self.gdf_repetition_rate_hz is not None
                 or self.gdf_normalization != "pyrite_current"
                 or self.gdf_time_tolerance_s != 1e-15
             ):
@@ -236,12 +234,10 @@ class BeamSpec:
             raise ValueError(
                 "gpt_gdf is incompatible with analytic phase-space fields; clear both spot FWHMs"
             )
-        rate = self.gdf_repetition_rate_hz
+        rate = self.rep_rate_hz
         if self.gdf_normalization == "gdf_charge":
             if rate is None or not np.isfinite(rate) or rate <= 0:
-                raise ValueError("gdf_charge requires finite positive gdf_repetition_rate_hz")
-        elif rate is not None:
-            raise ValueError("gdf_repetition_rate_hz requires gdf_normalization='gdf_charge'")
+                raise ValueError("gdf_charge requires finite positive rep_rate_hz")
         from ..montecarlo.gdf import load_gdf_beam
 
         return load_gdf_beam(
@@ -840,7 +836,7 @@ def build_cases(
     if gdf is not None and b.gdf_normalization == "gdf_charge":
         assert gdf.absolute_charge_c is not None
         beam_case["bunch_charge_pc"] = gdf.absolute_charge_c * 1e12
-        beam_case["rep_rate_hz"] = b.gdf_repetition_rate_hz
+        beam_case["rep_rate_hz"] = float(b.rep_rate_hz)
     if fwhm_y != fwhm_x:
         beam_case["beam_fwhm_y_mm"] = fwhm_y
     if b.energy_spread_frac is not None:

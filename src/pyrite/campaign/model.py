@@ -72,10 +72,11 @@ class Beam(BeamSpec):
     gdf_shape_only
         Preserve imported positions/directions/weights, assign each sweep energy,
         and discard imported crossing times. Default False imports energies.
-    gdf_normalization, gdf_repetition_rate_hz
+    gdf_normalization
         ``pyrite_current`` retains configured source normalization;
         ``gdf_charge`` derives current from absolute bunch charge and the
-        required positive repetition rate in Hz.
+        resolved shared ``rep_rate_hz`` (finite and positive). File-derived
+        charge replaces configured ``bunch_charge_pc`` in this mode.
     gdf_z_origin_m
         Required explicit target-origin lab z coordinate in meters. GPT axes
         are PyRITE lab axes; individual rays project onto the tilted entrance.

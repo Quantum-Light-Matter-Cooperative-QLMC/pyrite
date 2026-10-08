@@ -197,7 +197,7 @@ def test_normalization_and_cpu_transport(tmp_path, screen):
         n_electrons_brem=8,
     )[0]
     charge = build_cases(
-        gdf_sweep(path, gdf_normalization="gdf_charge", gdf_repetition_rate_hz=1e6, **selection),
+        gdf_sweep(path, gdf_normalization="gdf_charge", rep_rate_hz=1e6, **selection),
         n_electrons=8,
         n_electrons_brem=8,
     )[0]
@@ -243,10 +243,15 @@ def test_analytic_compatibility_and_conflicts(tmp_path):
     with pytest.raises(ValueError, match="require source"):
         build_cases(replace(sweep, beam=replace(sweep.beam, gdf_path="wrong.gdf")))
     path = write_gdf(tmp_path / "beam.gdf")
-    with pytest.raises(ValueError, match="repetition"):
-        build_cases(gdf_sweep(path, gdf_normalization="gdf_charge"))
+    assert build_cases(gdf_sweep(path, gdf_normalization="gdf_charge"))[0]["rep_rate_hz"] == 5000
+    for rate in (0, -1, float("nan"), float("inf")):
+        with pytest.raises(ValueError, match="rep_rate_hz"):
+            build_cases(gdf_sweep(path, gdf_normalization="gdf_charge", rep_rate_hz=rate))
     with pytest.raises(ValueError, match="analytic"):
         build_cases(gdf_sweep(path, energy_spread_frac=0.1))
+    for spot in ("beam_fwhm_mm", "transverse_fwhm_mm", "transverse_fwhm_x_mm"):
+        with pytest.raises(ValueError, match="analytic"):
+            build_cases(gdf_sweep(path, **{spot: 1.0}))
     with pytest.raises(ValueError, match="incoherent"):
         build_cases(gdf_sweep(path), coherent_emission=True)
 
@@ -311,7 +316,7 @@ def test_absolute_weight_scale_and_identity(tmp_path):
 
     path = write_gdf(tmp_path / "beam.gdf")
     beam = load_gdf_beam(path)
-    sweep = gdf_sweep(path, gdf_normalization="gdf_charge", gdf_repetition_rate_hz=1e6)
+    sweep = gdf_sweep(path, gdf_normalization="gdf_charge", rep_rate_hz=1e6)
     before = build_cases(sweep)[0]
     identity_before = dataset_identity("hopg", "full", default_settings(), sweep)
     shape = replace(sweep, beam=replace(sweep.beam, gdf_shape_only=True))
@@ -446,3 +451,64 @@ def test_shape_only_sweep_and_cpu_clock(tmp_path):
     for invalid in (0, -1, np.nan, np.inf):
         with pytest.raises(MaterialConfigError, match="finite and positive"):
             beam.sample(2, 42, 0.1, energy_keV=invalid)
+
+
+@pytest.mark.parametrize("normalization", ["gdf_charge", "pyrite_current"])
+def test_shared_rate_saved_normalization_and_phase_space(tmp_path, normalization):
+    from pyrite.campaign.config import default_settings
+    from pyrite.campaign.profiles import case_content_key, dataset_identity
+    from pyrite.results import line_metrics
+    from pyrite.results.store import Settings, beam_current_na, store_result
+
+    path = write_gdf(tmp_path / "beam.gdf")
+    sweep = gdf_sweep(path, gdf_normalization=normalization, rep_rate_hz=1000)
+    faster = replace(sweep, beam=replace(sweep.beam, rep_rate_hz=4000))
+    cases = [build_cases(candidate)[0] for candidate in (sweep, faster)]
+    assert cases[0]["gdf_source"] == cases[1]["gdf_source"]
+    assert cases[0]["seed"] == cases[1]["seed"]
+    for left, right in zip(
+        sweep.beam.gdf_beam().sample(64, cases[0]["seed"], 0.1),
+        faster.beam.gdf_beam().sample(64, cases[1]["seed"], 0.1),
+        strict=True,
+    ):
+        np.testing.assert_array_equal(left, right)
+    # Per-electron source arrays can be reused, but normalized dataset identity changes.
+    assert case_content_key(cases[0]) == case_content_key(cases[1])
+    identities = [
+        dataset_identity("hopg", "full", default_settings(), candidate)
+        for candidate in (sweep, faster)
+    ]
+    assert identities[0]["parameter_sha256"] != identities[1]["parameter_sha256"]
+    charge = 10 * elementary_charge if normalization == "gdf_charge" else 1e-12
+    records = []
+    grid = np.arange(50.0, 151.0)
+    for case in cases:
+        out = dict(
+            E_grid=grid,
+            spec=np.exp(-0.5 * ((grid - 100) / 3) ** 2),
+            brem=np.full_like(grid, 0.1),
+            eta=1.0,
+        )
+        results = {}
+        store_result(results, case, out)
+        record = results[case["name"]][case["E0_keV"]]
+        assert record["source_current_na"] == pytest.approx(charge * case["rep_rate_hz"] * 1e9)
+        assert beam_current_na(record, Settings(beam_current_na=999)) == record["source_current_na"]
+        assert record["case"]["rep_rate_hz"] == case["rep_rate_hz"]
+        records.append(record)
+    metrics = [line_metrics(record, Settings(beam_current_na=999)) for record in records]
+    assert metrics[1]["total_flux"] == pytest.approx(4 * metrics[0]["total_flux"])
+    assert metrics[1]["total_flux_per_na"] == metrics[0]["total_flux_per_na"]
+
+
+def test_gdf_charge_ignores_configured_charge_in_identity(tmp_path):
+    from pyrite.campaign.config import default_settings
+    from pyrite.campaign.profiles import dataset_identity
+
+    sweep = gdf_sweep(write_gdf(tmp_path / "beam.gdf"), gdf_normalization="gdf_charge")
+    other = replace(sweep, beam=replace(sweep.beam, bunch_charge_pc=100))
+    assert build_cases(sweep)[0] == build_cases(other)[0]
+    assert (
+        dataset_identity("hopg", "full", default_settings(), sweep)["parameter_sha256"]
+        == dataset_identity("hopg", "full", default_settings(), other)["parameter_sha256"]
+    )

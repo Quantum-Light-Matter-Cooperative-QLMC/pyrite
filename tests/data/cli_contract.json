@@ -367,87 +367,6 @@
             "required": false
           },
           {
-            "dest": "source",
-            "help": "Override beam source; gpt_gdf replaces analytic phase space (local runs).",
-            "option_strings": [
-              "--source"
-            ],
-            "required": false
-          },
-          {
-            "dest": "gdf_shape_only",
-            "help": "Use profile sweep energies with GDF positions/directions/weights; discard crossing times. Default: import energies.",
-            "option_strings": [
-              "--gdf-shape-only",
-              "--no-gdf-shape-only"
-            ],
-            "required": false
-          },
-          {
-            "dest": "gdf_path",
-            "help": "GPT time-output file; relative to current directory.",
-            "option_strings": [
-              "--gdf-path"
-            ],
-            "required": false
-          },
-          {
-            "dest": "gdf_time_s",
-            "help": "Select time in seconds; required for multiple time blocks.",
-            "option_strings": [
-              "--gdf-time-s"
-            ],
-            "required": false
-          },
-          {
-            "dest": "gdf_time_tolerance_s",
-            "help": "Absolute time tolerance in seconds [default: 1e-15].",
-            "option_strings": [
-              "--gdf-time-tolerance-s"
-            ],
-            "required": false
-          },
-          {
-            "dest": "gdf_normalization",
-            "help": "Configured current or GDF bunch charge times repetition rate.",
-            "option_strings": [
-              "--gdf-normalization"
-            ],
-            "required": false
-          },
-          {
-            "dest": "gdf_repetition_rate_hz",
-            "help": "Required positive repetition rate for gdf_charge normalization.",
-            "option_strings": [
-              "--gdf-repetition-rate-hz"
-            ],
-            "required": false
-          },
-          {
-            "dest": "gdf_z_origin_m",
-            "help": "Explicit target origin along GPT lab z in meters; required for GDF.",
-            "option_strings": [
-              "--gdf-z-origin-m"
-            ],
-            "required": false
-          },
-          {
-            "dest": "gdf_screen_position_m",
-            "help": "Select GPT screen coordinate in meters; excludes --gdf-time-s.",
-            "option_strings": [
-              "--gdf-screen-position-m"
-            ],
-            "required": false
-          },
-          {
-            "dest": "gdf_screen_tolerance_m",
-            "help": "Absolute screen-coordinate tolerance in meters [default: 1e-9].",
-            "option_strings": [
-              "--gdf-screen-tolerance-m"
-            ],
-            "required": false
-          },
-          {
             "dest": "fidelity",
             "help": "Deprecated (removal in 0.6.0; issue #215). Named settings/grid-reduction policy; survey is retired.",
             "option_strings": [
@@ -465,7 +384,7 @@
             "required": false
           }
         ],
-        "help": "Usage: pyrite run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps or one ephemeral pixel scene.\n\n  PROFILE defaults to the current configured profile (standard built-in; the\n  built-in fallback warns and is deprecated) and owns material membership,\n  campaign ranges, and workload settings. Use -m/--material to run one profile\n  member instead of the full resolved membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes component data\n  beneath <material>/; variants use identity-qualified stems. With --ephemeral,\n  require -m and singleton scene/workload grids, run one pixel detector without\n  checkpoint, cache, or observation-store I/O, and optionally export factorized\n  arrays.\n\nOptions:\n  -m, --material MATERIAL         Run one member of PROFILE instead of its full\n                                  membership.\n  --ephemeral                     Run one local pixel scene without\n                                  checkpoint/cache/observation I/O; requires -m\n                                  and singleton grids.\n  --detector ID                   Pixel detector ID for --ephemeral; required\n                                  when several pixel detectors exist.\n  --output-file FILE              With --ephemeral, write full factorized arrays\n                                  as a new compressed .npz file; never\n                                  overwrite.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use a tiny smoke-test grid and write the\n                                  <material>_quick/ component directory.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --checkpoint-dir DIR            Read and write component checkpoints in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  --no-cache                      Neither read nor write the shared per-case\n                                  checkpoint cache: a run that recomputes every\n                                  case but still writes campaign checkpoints.\n                                  Use --ephemeral for no checkpoint or\n                                  observation-store I/O.\n  --recompute                     Ignore cached cases and recompute fresh, but\n                                  repopulate the shared per-case cache with the\n                                  results.\n  --trajectories DIR              Opt in to saving each transported case's full\n                                  electron-transport result as HDF5 under\n                                  DIR/<stem>/. Files can be much larger than\n                                  checkpoints; cached cases are not re-\n                                  transported (use --recompute to capture them).\n  --overwrite-trajectories        Replace existing trajectory files for cases\n                                  this run transports; requires --trajectories.\n  --no-progress                   Disable progress bars/dashboard.\n  -v, --verbose                   Increase dashboard detail.\n  --preset [zhai]                 Run a named reproduction workflow; zhai runs\n                                  here unless -R/--remote.\n  --ne NUMBER                     With --preset zhai, Fig. 1c line electrons per\n                                  energy.  [default: 20000]\n  --ne-brem NUMBER                With --preset zhai, Fig. 1c bremsstrahlung\n                                  electrons per energy.  [default: 200]\n  --ne-supp NUMBER                With --preset zhai, supplementary electrons\n                                  per polar-tilt spectrum.  [default: 200]\n  --tmd-azimuth DEGREES           With --preset zhai, exploratory TMD azimuth.\n                                  [default: 0.0]\n  --refresh                       With --preset zhai, recompute matching cache.\n  --no-sync                       With -R/--remote, skip code upload.\n  --dry-run                       With -R/--remote, print submission preview\n                                  only.\n  -R, --remote [TARGET]           Run remotely; bare uses the configured target,\n                                  =TARGET overrides it.\n  --wait                          Wait for remote completion and pull results.\n  --detach                        Return after remote submission.\n  --chunk-minutes MINUTES         With -R/--remote, self-resubmitting SLURM\n                                  slice length; defaults to 10, or 0 (one\n                                  unchunked allocation) for profiling captures.\n  --source [analytic|gpt_gdf]     Override beam source; gpt_gdf replaces\n                                  analytic phase space (local runs).\n  --gdf-shape-only / --no-gdf-shape-only\n                                  Use profile sweep energies with GDF\n                                  positions/directions/weights; discard crossing\n                                  times. Default: import energies.\n  --gdf-path PATH                 GPT time-output file; relative to current\n                                  directory.\n  --gdf-time-s NUMBER             Select time in seconds; required for multiple\n                                  time blocks.\n  --gdf-time-tolerance-s NUMBER   Absolute time tolerance in seconds [default:\n                                  1e-15].\n  --gdf-normalization [pyrite_current|gdf_charge]\n                                  Configured current or GDF bunch charge times\n                                  repetition rate.\n  --gdf-repetition-rate-hz NUMBER\n                                  Required positive repetition rate for\n                                  gdf_charge normalization.\n  --gdf-z-origin-m NUMBER         Explicit target origin along GPT lab z in\n                                  meters; required for GDF.\n  --gdf-screen-position-m NUMBER  Select GPT screen coordinate in meters;\n                                  excludes --gdf-time-s.\n  --gdf-screen-tolerance-m NUMBER\n                                  Absolute screen-coordinate tolerance in meters\n                                  [default: 1e-9].\n  --fidelity [full|survey]        Deprecated (removal in 0.6.0; issue #215).\n                                  Named settings/grid-reduction policy; survey\n                                  is retired.  [default: full]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+        "help": "Usage: pyrite run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps or one ephemeral pixel scene.\n\n  PROFILE defaults to the current configured profile (standard built-in; the\n  built-in fallback warns and is deprecated) and owns material membership,\n  campaign ranges, and workload settings. Use -m/--material to run one profile\n  member instead of the full resolved membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes component data\n  beneath <material>/; variants use identity-qualified stems. With --ephemeral,\n  require -m and singleton scene/workload grids, run one pixel detector without\n  checkpoint, cache, or observation-store I/O, and optionally export factorized\n  arrays.\n\nOptions:\n  -m, --material MATERIAL         Run one member of PROFILE instead of its full\n                                  membership.\n  --ephemeral                     Run one local pixel scene without\n                                  checkpoint/cache/observation I/O; requires -m\n                                  and singleton grids.\n  --detector ID                   Pixel detector ID for --ephemeral; required\n                                  when several pixel detectors exist.\n  --output-file FILE              With --ephemeral, write full factorized arrays\n                                  as a new compressed .npz file; never\n                                  overwrite.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use a tiny smoke-test grid and write the\n                                  <material>_quick/ component directory.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --checkpoint-dir DIR            Read and write component checkpoints in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  --no-cache                      Neither read nor write the shared per-case\n                                  checkpoint cache: a run that recomputes every\n                                  case but still writes campaign checkpoints.\n                                  Use --ephemeral for no checkpoint or\n                                  observation-store I/O.\n  --recompute                     Ignore cached cases and recompute fresh, but\n                                  repopulate the shared per-case cache with the\n                                  results.\n  --trajectories DIR              Opt in to saving each transported case's full\n                                  electron-transport result as HDF5 under\n                                  DIR/<stem>/. Files can be much larger than\n                                  checkpoints; cached cases are not re-\n                                  transported (use --recompute to capture them).\n  --overwrite-trajectories        Replace existing trajectory files for cases\n                                  this run transports; requires --trajectories.\n  --no-progress                   Disable progress bars/dashboard.\n  -v, --verbose                   Increase dashboard detail.\n  --preset [zhai]                 Run a named reproduction workflow; zhai runs\n                                  here unless -R/--remote.\n  --ne NUMBER                     With --preset zhai, Fig. 1c line electrons per\n                                  energy.  [default: 20000]\n  --ne-brem NUMBER                With --preset zhai, Fig. 1c bremsstrahlung\n                                  electrons per energy.  [default: 200]\n  --ne-supp NUMBER                With --preset zhai, supplementary electrons\n                                  per polar-tilt spectrum.  [default: 200]\n  --tmd-azimuth DEGREES           With --preset zhai, exploratory TMD azimuth.\n                                  [default: 0.0]\n  --refresh                       With --preset zhai, recompute matching cache.\n  --no-sync                       With -R/--remote, skip code upload.\n  --dry-run                       With -R/--remote, print submission preview\n                                  only.\n  -R, --remote [TARGET]           Run remotely; bare uses the configured target,\n                                  =TARGET overrides it.\n  --wait                          Wait for remote completion and pull results.\n  --detach                        Return after remote submission.\n  --chunk-minutes MINUTES         With -R/--remote, self-resubmitting SLURM\n                                  slice length; defaults to 10, or 0 (one\n                                  unchunked allocation) for profiling captures.\n  --fidelity [full|survey]        Deprecated (removal in 0.6.0; issue #215).\n                                  Named settings/grid-reduction policy; survey\n                                  is retired.  [default: full]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
         "hidden": false,
         "path": "run",
         "subcommands": []
@@ -7390,7 +7309,7 @@
               },
               {
                 "dest": "rep_rate_hz",
-                "help": "Bunch repetition rate in Hz.",
+                "help": "Shared bunch repetition rate in Hz [default: 5000]; also used by gdf_charge.",
                 "option_strings": [
                   "--rep-rate-hz"
                 ],
@@ -7421,6 +7340,79 @@
                 "required": false
               },
               {
+                "dest": "gdf_shape_only",
+                "help": "Use profile sweep energies and discard imported crossing times; default imports energies and times.",
+                "option_strings": [
+                  "--gdf-shape-only",
+                  "--no-gdf-shape-only"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_normalization",
+                "help": "pyrite_current uses configured charge/current; gdf_charge derives charge from the file instead of bunch_charge_pc and uses shared rep_rate_hz.",
+                "option_strings": [
+                  "--gdf-normalization"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_z_origin_m",
+                "help": "Required explicit physical target origin along GPT lab z in meters.",
+                "option_strings": [
+                  "--gdf-z-origin-m"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_screen_tolerance_m",
+                "help": "Absolute screen selection tolerance in meters [default: 1e-9].",
+                "option_strings": [
+                  "--gdf-screen-tolerance-m"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_screen_position_m",
+                "help": "GPT screen coordinate in meters; excludes --gdf-time-s.",
+                "option_strings": [
+                  "--gdf-screen-position-m"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_time_tolerance_s",
+                "help": "Absolute time selection tolerance in seconds [default: 1e-15].",
+                "option_strings": [
+                  "--gdf-time-tolerance-s"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_time_s",
+                "help": "Time output in seconds; required for multiple outputs. Excludes --gdf-screen-position-m.",
+                "option_strings": [
+                  "--gdf-time-s"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_path",
+                "help": "Native GPT file; relative to cwd, saved as an absolute path.",
+                "option_strings": [
+                  "--gdf-path"
+                ],
+                "required": false
+              },
+              {
+                "dest": "source",
+                "help": "Beam source [default: analytic]. GDF imports correlated particle records.",
+                "option_strings": [
+                  "--source"
+                ],
+                "required": false
+              },
+              {
                 "dest": "dry_run",
                 "help": "Print proposed TOML diff; write nothing.",
                 "option_strings": [
@@ -7429,7 +7421,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite beam create [OPTIONS] NAME\n\n  Create a new named beam NAME.\n\n  Requires at least one beam-field option; --label alone does not define a beam.\n  Attach the result to a profile with ``pyrite profile set PROFILE --beam\n  NAME``.\n\nOptions:\n  --label TEXT                    Display-only description; never affects\n                                  parameter_sha256.\n  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad;\n                                  replaces the spot FWHM.  [x>0.0]\n  --twiss-beta M                  Courant-Snyder beta in m. Requires\n                                  --emittance.  [x>0.0]\n  --twiss-alpha A                 Courant-Snyder alpha; negative diverges.\n                                  Requires --emittance.\n  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.\n                                  [x>0.0]\n  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.\n                                  [x>0.0]\n  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]\n  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]\n  --longitudinal [gaussian|microtrain|compressed]\n                                  Replace the complete declarative longitudinal\n                                  policy.\n  --envelope-rms-fs FS            RMS duration for gaussian or microtrain\n                                  longitudinal policy.  [x>0.0]\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: pyrite beam create [OPTIONS] NAME\n\n  Create a new named beam NAME.\n\n  Requires at least one beam-field option; --label alone does not define a beam.\n  Attach the result to a profile with ``pyrite profile set PROFILE --beam\n  NAME``.\n\nOptions:\n  --label TEXT                    Display-only description; never affects\n                                  parameter_sha256.\n  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad;\n                                  replaces the spot FWHM.  [x>0.0]\n  --twiss-beta M                  Courant-Snyder beta in m. Requires\n                                  --emittance.  [x>0.0]\n  --twiss-alpha A                 Courant-Snyder alpha; negative diverges.\n                                  Requires --emittance.\n  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.\n                                  [x>0.0]\n  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.\n                                  [x>0.0]\n  --rep-rate-hz HZ                Shared bunch repetition rate in Hz [default:\n                                  5000]; also used by gdf_charge.\n  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]\n  --longitudinal [gaussian|microtrain|compressed]\n                                  Replace the complete declarative longitudinal\n                                  policy.\n  --envelope-rms-fs FS            RMS duration for gaussian or microtrain\n                                  longitudinal policy.  [x>0.0]\n  --gdf-shape-only / --no-gdf-shape-only\n                                  Use profile sweep energies and discard\n                                  imported crossing times; default imports\n                                  energies and times.\n  --gdf-normalization [pyrite_current|gdf_charge]\n                                  pyrite_current uses configured charge/current;\n                                  gdf_charge derives charge from the file\n                                  instead of bunch_charge_pc and uses shared\n                                  rep_rate_hz.\n  --gdf-z-origin-m NUMBER         Required explicit physical target origin along\n                                  GPT lab z in meters.\n  --gdf-screen-tolerance-m NUMBER\n                                  Absolute screen selection tolerance in meters\n                                  [default: 1e-9].\n  --gdf-screen-position-m NUMBER  GPT screen coordinate in meters; excludes\n                                  --gdf-time-s.\n  --gdf-time-tolerance-s NUMBER   Absolute time selection tolerance in seconds\n                                  [default: 1e-15].\n  --gdf-time-s NUMBER             Time output in seconds; required for multiple\n                                  outputs. Excludes --gdf-screen-position-m.\n  --gdf-path PATH                 Native GPT file; relative to cwd, saved as an\n                                  absolute path.\n  --source [analytic|gpt_gdf]     Beam source [default: analytic]. GDF imports\n                                  correlated particle records.\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "beam create",
             "subcommands": []
@@ -7593,7 +7585,7 @@
               },
               {
                 "dest": "rep_rate_hz",
-                "help": "Bunch repetition rate in Hz.",
+                "help": "Shared bunch repetition rate in Hz [default: 5000]; also used by gdf_charge.",
                 "option_strings": [
                   "--rep-rate-hz"
                 ],
@@ -7624,6 +7616,79 @@
                 "required": false
               },
               {
+                "dest": "gdf_shape_only",
+                "help": "Use profile sweep energies and discard imported crossing times; default imports energies and times.",
+                "option_strings": [
+                  "--gdf-shape-only",
+                  "--no-gdf-shape-only"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_normalization",
+                "help": "pyrite_current uses configured charge/current; gdf_charge derives charge from the file instead of bunch_charge_pc and uses shared rep_rate_hz.",
+                "option_strings": [
+                  "--gdf-normalization"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_z_origin_m",
+                "help": "Required explicit physical target origin along GPT lab z in meters.",
+                "option_strings": [
+                  "--gdf-z-origin-m"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_screen_tolerance_m",
+                "help": "Absolute screen selection tolerance in meters [default: 1e-9].",
+                "option_strings": [
+                  "--gdf-screen-tolerance-m"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_screen_position_m",
+                "help": "GPT screen coordinate in meters; excludes --gdf-time-s.",
+                "option_strings": [
+                  "--gdf-screen-position-m"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_time_tolerance_s",
+                "help": "Absolute time selection tolerance in seconds [default: 1e-15].",
+                "option_strings": [
+                  "--gdf-time-tolerance-s"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_time_s",
+                "help": "Time output in seconds; required for multiple outputs. Excludes --gdf-screen-position-m.",
+                "option_strings": [
+                  "--gdf-time-s"
+                ],
+                "required": false
+              },
+              {
+                "dest": "gdf_path",
+                "help": "Native GPT file; relative to cwd, saved as an absolute path.",
+                "option_strings": [
+                  "--gdf-path"
+                ],
+                "required": false
+              },
+              {
+                "dest": "source",
+                "help": "Beam source [default: analytic]. GDF imports correlated particle records.",
+                "option_strings": [
+                  "--source"
+                ],
+                "required": false
+              },
+              {
                 "dest": "yes",
                 "help": "Skip overwrite confirmation.",
                 "option_strings": [
@@ -7641,7 +7706,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite beam set [OPTIONS] NAME\n\n  Update fields on an existing named beam NAME.\n\n  NAME must already exist (create it with ``pyrite beam create``); unknown names\n  error with suggestions.\n\nOptions:\n  --label TEXT                    Display-only description; never affects\n                                  parameter_sha256.\n  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad;\n                                  replaces the spot FWHM.  [x>0.0]\n  --twiss-beta M                  Courant-Snyder beta in m. Requires\n                                  --emittance.  [x>0.0]\n  --twiss-alpha A                 Courant-Snyder alpha; negative diverges.\n                                  Requires --emittance.\n  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.\n                                  [x>0.0]\n  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.\n                                  [x>0.0]\n  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]\n  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]\n  --longitudinal [gaussian|microtrain|compressed]\n                                  Replace the complete declarative longitudinal\n                                  policy.\n  --envelope-rms-fs FS            RMS duration for gaussian or microtrain\n                                  longitudinal policy.  [x>0.0]\n  -y, --yes                       Skip overwrite confirmation.\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: pyrite beam set [OPTIONS] NAME\n\n  Update fields on an existing named beam NAME.\n\n  NAME must already exist (create it with ``pyrite beam create``); unknown names\n  error with suggestions.\n\nOptions:\n  --label TEXT                    Display-only description; never affects\n                                  parameter_sha256.\n  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad;\n                                  replaces the spot FWHM.  [x>0.0]\n  --twiss-beta M                  Courant-Snyder beta in m. Requires\n                                  --emittance.  [x>0.0]\n  --twiss-alpha A                 Courant-Snyder alpha; negative diverges.\n                                  Requires --emittance.\n  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.\n                                  [x>0.0]\n  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.\n                                  [x>0.0]\n  --rep-rate-hz HZ                Shared bunch repetition rate in Hz [default:\n                                  5000]; also used by gdf_charge.\n  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]\n  --longitudinal [gaussian|microtrain|compressed]\n                                  Replace the complete declarative longitudinal\n                                  policy.\n  --envelope-rms-fs FS            RMS duration for gaussian or microtrain\n                                  longitudinal policy.  [x>0.0]\n  --gdf-shape-only / --no-gdf-shape-only\n                                  Use profile sweep energies and discard\n                                  imported crossing times; default imports\n                                  energies and times.\n  --gdf-normalization [pyrite_current|gdf_charge]\n                                  pyrite_current uses configured charge/current;\n                                  gdf_charge derives charge from the file\n                                  instead of bunch_charge_pc and uses shared\n                                  rep_rate_hz.\n  --gdf-z-origin-m NUMBER         Required explicit physical target origin along\n                                  GPT lab z in meters.\n  --gdf-screen-tolerance-m NUMBER\n                                  Absolute screen selection tolerance in meters\n                                  [default: 1e-9].\n  --gdf-screen-position-m NUMBER  GPT screen coordinate in meters; excludes\n                                  --gdf-time-s.\n  --gdf-time-tolerance-s NUMBER   Absolute time selection tolerance in seconds\n                                  [default: 1e-15].\n  --gdf-time-s NUMBER             Time output in seconds; required for multiple\n                                  outputs. Excludes --gdf-screen-position-m.\n  --gdf-path PATH                 Native GPT file; relative to cwd, saved as an\n                                  absolute path.\n  --source [analytic|gpt_gdf]     Beam source [default: analytic]. GDF imports\n                                  correlated particle records.\n  -y, --yes                       Skip overwrite confirmation.\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "beam set",
             "subcommands": []
