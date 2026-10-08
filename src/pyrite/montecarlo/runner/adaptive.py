@@ -22,7 +22,8 @@ count, bit for bit, so the stop changes how many electrons run, never how
 they run.
 
 Estimator, rule, guards and their limiting cases are derived in
-``docs/computation/statistical-methods.md``.
+``docs/validation/beam-transport/adaptive-sample-size-stopping.md``; the user
+description is ``docs/computation/statistical-methods.md``.
 
 Validation: adaptive-sample-size-stopping
 """

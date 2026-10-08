@@ -86,7 +86,7 @@ The target $r_n\le\varepsilon$ therefore implies $\mathrm{ESS}_n\ge 1/(\varepsil
 - `test_gaussian_population_has_near_nominal_coverage` covers the Gaussian limit above.
 - `test_light_case_meets_its_target_over_20_seeds` runs hopg at 30 keV, 1 µm, watching line mass (skewness about 8, CV about 1). It uses $\varepsilon=10\,\%$, $n_{\min}=200$, $B=20$ and seeds 1–20. Stops fall at 200–440 electrons. All 20 lie within $1.96\varepsilon$ of the pooled 16 000-electron mean, against a threshold of $\ge 17$. The paired stopping bias against each seed's own 800-electron mean is $+0.06\,\%\pm1.5\,\%$, below the smallest reported error.
 - `test_stop_inside_transport_equals_the_rule_on_the_population` shows that the live monitor and the rule on the precomputed prefix give the same record.
-- `test_guards_turn_a_false_early_stop_into_statistics_limited` and `test_guards_suppress_false_stops_across_seeds` cover heavy tails. On the constructed population, the bare rule stops at 200 electrons 44 % low with a reported 7 %, while the guarded run ends `statistics_limited` at $n_{\max}$. Across 40 random seeds, false stops fall from $\ge 20$ to $\le 1$.
+- `test_guards_turn_a_false_early_stop_into_statistics_limited` and `test_guards_suppress_false_stops_across_seeds` cover heavy tails. On the constructed population, the bare rule stops at 200 electrons 37 % low (mean 1.13 against 1.8; the expected deficit from never meeting the heavy class is 44 %) with a reported 6.5 %. With an ESS floor $E_{\min}=1000$ the run ends `statistics_limited` at $n_{\max}$; the shipped defaults also end it there. Across 40 random seeds, false stops fall from 24 to 1 with $E_{\min}=1000$, and only from 24 to 12 with the default guards ($E_{\min}=100$).
 - `test_stability_guard_waits_out_a_late_heavy_electron` and `test_pilot_projection_skips_checks_until_the_projected_count` cover the stability guard and the pilot.
 - `test_same_seed_and_target_replay_the_same_count_and_output`, `test_coherent_route_rejects_auto` and `test_lockstep_core_is_rejected_and_auto_avoids_it` cover replay and the refusals.
 - `test_energy_range_replay_rechecks_statistics_before_accepting_stop` pins the energy-spread replay: if the realized-range tables change the contributions enough to fail a guard, the count grows and statistics are recomputed before accepting the result. `test_environment_pinned_lockstep_is_rejected` covers the process-wide core pin.
@@ -95,8 +95,95 @@ The target $r_n\le\varepsilon$ therefore implies $\mathrm{ESS}_n\ge 1/(\varepsil
 
 ## Known limits
 
-- **Wald undercoverage on skewed populations.** The light case's interval $\pm1.96\,r_N$ covered 17 of 20 seeds. An 80-seed study at $\varepsilon=5\,\%$ found 86–89 % for every $n_{\min}$, including $n_{\min}=n_{\max}$ (fixed $N$). This is a property of the sample-SD interval for a skewness-8 population at a few hundred electrons, not of the stop. Treat $r_N$ as a scale, not a calibrated 95 % interval, for such observables.
-- **Small $n_{\min}$ on skewed populations.** The same study found a negative stopping bias of $0.3$–$0.4\varepsilon$ at $n_{\min}\le200$, gone by $n_{\min}\approx400$. When the sample mean and SD are low together, the rule stops early. Set $n_{\min}$ near the count the target implies.
+- **Wald undercoverage on skewed populations.** The light case's interval $\pm1.96\,r_N$ covered 17 of 20 seeds. At fixed $N=400$ two 80-seed sets cover 86–88 %: a property of the sample-SD interval for a skewness-8 population at a few hundred electrons. The stop adds to it at small $n_{\min}$: pooled over 160 seeds at $\varepsilon=5\,\%$, coverage is 0.819, 0.838 and 0.875 at $n_{\min}=100$, 200 and 400, against 0.875 at fixed $N=400$. Treat $r_N$ as a scale, not a calibrated 95 % interval, for such observables.
+- **Small $n_{\min}$ on skewed populations.** The same study found a negative stopping bias of $0.3$–$0.4\varepsilon$ at $n_{\min}\le200$, reduced to $0.13$–$0.15\varepsilon$ at $n_{\min}=400$. When the sample mean and SD are low together, the rule stops early. Set $n_{\min}$ near the count the target implies.
 - **Unsampled tails.** No guard sees a class that has not appeared. Only $n_{\min}$ and the ESS floor raise the chance of drawing it. The 5 MeV h-BN detector-cone case (#201) is the motivating instance; its remote measurement is outstanding in #361.
+
+## Independent verification (2026-10-08)
+
+Fresh-context verifier; did not write the implementation. I read the ledger row and this record's claim, sources, assumptions and limiting cases first, rederived the results below, and only then read `montecarlo/runner/adaptive.py`, `montecarlo/runner/block_transport.py::transport_case_blocks`, `montecarlo/spectrum/brem.py::mc_brem_spectrum` (`electron_band_weights`), `montecarlo/spectrum/lines/_kernels.py::_accumulate_edge_truncation` and `_precision.py::Precision`. The numeric checks use a separate NumPy implementation of {eq}`eq-adaptive-stop-rule`, written from the equations and not from `run_stopping_rule`. The only implementation code reused is `case_measure`, to obtain the hopg per-electron populations.
+
+### Rederivation
+
+**Chan merge.** Take sets $a$ and $b$ with $n=n_a+n_b$ and $\delta=\bar x_b-\bar x_a$. The union mean is $\bar x=(n_a\bar x_a+n_b\bar x_b)/n=\bar x_a+\delta n_b/n$. Then $\bar x_a-\bar x=-\delta n_b/n$ and $\bar x_b-\bar x=\delta n_a/n$. Each part's centred sum about $\bar x$ is its own $M_2$ plus $n_\cdot(\bar x_\cdot-\bar x)^2$, so
+
+$$
+M_2=M_{2,a}+M_{2,b}+\delta^2\frac{n_a n_b^2+n_b n_a^2}{n^2}=M_{2,a}+M_{2,b}+\delta^2\frac{n_a n_b}{n}.
+$$
+
+This matches {eq}`eq-adaptive-chan-merge`.
+
+**ESS identity.** Use $(n-1)s^2=S_2-S_1^2/n$ and $\bar m=S_1/n$:
+
+$$
+r_n^2=\frac{s^2}{n\bar m^2}=\frac{n\,(S_2-S_1^2/n)}{(n-1)\,S_1^2}=\frac{n}{n-1}\left(\frac{S_2}{S_1^2}-\frac1n\right),
+\qquad \frac{S_2}{S_1^2}=\frac{1}{\mathrm{ESS}_n}.
+$$
+
+This matches {eq}`eq-adaptive-ess-identity`. The identity holds for any $S_1\ne0$; only reading ESS as a count needs $m_i\ge0$. Solving $r_n\le\varepsilon$ gives $\mathrm{ESS}_n\ge[\varepsilon^2(n-1)/n+1/n]^{-1}$, as stated. For a light population, $S_2/n\to\mu^2(1+\mathrm{CV}^2)$, so $\mathrm{ESS}_n\approx n/(1+\mathrm{CV}^2)$, which reaches the floor at $n\approx E_{\min}(1+\mathrm{CV}^2)$. That matches.
+
+**Single dominant electron.** Add one value $h$ to $n$ light values with mean $a$, $S_1=na$, and let the share be $\sigma=h/(S_1+h)$. The mean then moves by exactly $(h-a)/(n+1)$. Relative to the new mean, the move is $(h-a)/(S_1+h)\approx\sigma$, which is the normalization `_stability` uses. Also $1/\mathrm{ESS}\ge\sigma^2$ always, and
+
+$$
+r^2\approx\sigma^2+\frac{(1-\sigma)^2\,\mathrm{CV}_{\rm light}^2}{n}+O(\sigma/n),
+$$
+
+so $r\gtrsim\sigma$ whether or not $h^2$ dominates $S_2$. The record's conclusion holds: a share in $(c,\varepsilon]$ passes the $r$ test, but the cap refuses it when $c<\varepsilon$, and a jump above $f\varepsilon$ is refused for $k$ block ends. Two points are worth stating. The record's justification "$S_2\approx h^2$ dominates" is stronger than needed and fails at a few hundred electrons when $\sigma\sim\varepsilon$; the lower bound above is the robust form. And with the default $c=0.05$, the cap adds protection only for targets $\varepsilon>0.05$. At tighter targets the $r$ test already implies it, and only the stability window and the ESS floor act.
+
+**Pilot projection.** With $r_n\propto n^{-1/2}$, $N=n_p(r_{n_p}/\varepsilon)^2$. Checks resume at every block end from $N$ on, so the decision is still a function of the prefix, and $N$ is still a stopping time. This matches.
+
+**Batch means.** Let $S=n^{-1}\sum_i S_i$, where $S_i$ is electron $i$'s spectrum and the reduction is linear in electrons. With $K=n/B$ equal batches, $S=\sum_b (B/n)\bar S_b=K^{-1}\sum_b\bar S_b$, and $\operatorname{Var}S=\operatorname{Var}\bar S_b/K$, which $s(\{\bar S_b\})^2/K$ estimates. This matches. It needs equal batches. `Precision` makes $n_{\min}$, $n_{\max}$ and the pilot multiples of $B$, and every stop, including replay growth, falls on a block end, so $B\mid n$ always holds.
+
+**Sources.** Welford (1962), *Technometrics* **4**, 419–420, and Chan, Golub and LeVeque (1983), *Amer. Statist.* **37**, 242–247, are correct for the one-pass and pairwise moments. Chow and Robbins (1965), *Ann. Math. Statist.* **36**, 457–462, prove asymptotic consistency and efficiency of the absolute fixed-width rule for any finite-variance i.i.d. population. Their rule carries an $n^{-1}$ term in the variance that the code omits. Here $n_{\min}\ge2$ plays that term's practical role: it prevents a stop on a zero sample variance. The relative-width rule is covered by Glynn and Whitt (1992), *Ann. Appl. Probab.* **2**, 180–198, which treats relative-precision stopping and batch means, as cited. Kish's $(\sum w)^2/\sum w^2$ is used here as a concentration measure on the contributions, not on sampling weights; the record says so ("applied here to the contributions").
+
+### Code against equations
+
+| Item | Equation | Code | Result |
+| --- | --- | --- | --- |
+| Chan merge | $\bar x\mathrel{+}=\delta n_b/n$; $M_2\mathrel{+}=M_{2,b}+\delta^2n_an_b/n$ | `RunningMoments.add_block`, lines 83–87 | matches |
+| Bessel and RSE | $\sqrt{M_2/(n-1)/n}/\lvert\bar m\rvert$; `None` for $n<2$ or $\bar m=0$ | `relative_se`, lines 94–96 | matches |
+| Share and ESS | $\max m/S_1$; $S_1^2/S_2$ | lines 98–102 | matches |
+| Stability window | $\max_{1\le j\le k}$ over $\bar m_{n-jB}$, excluding $\bar m_n$ itself | `history[-k-1:-1]`, line 152; needs $k+1$ entries | matches; the stop at 320 in `test_stability_guard_waits_out_a_late_heavy_electron` pins it |
+| Pilot rounding | $\lceil n_pN'/B\rceil B$, clipped to $[n_p,n_{\max}]$ | `_project`, line 187 | matches; an undefined RSE projects to $n_{\max}$ |
+| $n_{\min}$, $n_{\max}$ | no check below $n_{\min}$; stop at $n_{\max}$ | `should_stop`, lines 192–214 | matches; converging exactly at $n_{\max}$ reports `converged` |
+| `statistics_limited` | set exactly when not converged | line 237 | matches |
+| Shared count | $N_e=N_{e,\rm brem}$ | lines 439, 472, 235; `realized_case` | matches |
+| Band weights | exact integral of a linear density on $[\max(l,g_0),\min(r,g_1)]$: $w_{\rm up}=w\,[(l-g_0)+(r-g_0)]/(2h)$ | `band_weights`, lines 283–289 | matches, including bands with no interior node and edges off the grid |
+| Brem scalar | $m_i=\sum_E q_E\,\mathrm{d}N_i/\mathrm{d}E\,\mathrm{d}\Omega$, mean equal to $q\cdot S$ | `brem.py` lines 1060–1075 and 1209–1210, `electron_sum/(4π)`, not divided by $N_e$ | matches |
+| Line scalar | $\sum_\ell w_\ell\pi/a_\ell$ per electron | `_kernels.py` lines 106–123, `bincount` of `weight*pi/a_width` | matches |
+| Refusals | coherent, lockstep, GDF | `Precision.validate_case`; `adaptive_transport_core` | matches; the code also refuses grooves, secondaries, pair production, positron transport, observation directions and trajectory capture |
+
+### Numeric reproduction
+
+The anchor file `tests/montecarlo/test_adaptive_stopping.py` passed: 45 tests in 33 s. The tests assert bounds, not the quoted numbers, so I reproduced the numbers with the independent rule:
+
+| Quoted | Reproduced |
+| --- | --- |
+| Gaussian coverage 0.934 rule-only / 0.943 defaults | 0.934 / 0.943 (seeds 0–999). The stopping index $N$ equals the implementation's in 1000/1000 seeds. |
+| Gaussian bias $(+5.4\pm1.6)$ and $(+1.3\pm1.4)\times10^{-3}$, at most $0.11\varepsilon$ | $(5.38\pm1.62)$ and $(1.27\pm1.39)\times10^{-3}$, i.e. $0.108\varepsilon$ and $0.025\varepsilon$ |
+| hopg skewness about 8, CV about 1 | 8.12 and 1.04. The test docstring at line 182 says "skewness ~ 9". |
+| hopg stops at 200–440; 20/20 within $1.96\varepsilon$; 17/20 within $1.96\,r_N$ | 200–440; 20/20; 17/20. $N$ equals the implementation's in 20/20 seeds. |
+| paired bias $+0.06\,\%\pm1.5\,\%$, below the smallest reported error | $+0.06\,\%\pm1.53\,\%$; smallest reported error 3.0 % |
+| constructed population: bare rule stops at 200, **44 % low**, 7 % reported | stops at 200 with mean 1.129 against 1.8, i.e. **37.3 % low**, 6.5 % reported. 44 % is the heavy class's share of the true mean, which is the expected deficit, not the realized one. |
+| guarded run ends `statistics_limited` at $n_{\max}$ | yes at $E_{\min}=1000$, as the test uses, and also with the default guards |
+| 40 seeds: false stops $\ge20\to\le1$ | rule-only 24, then 1 **at $E_{\min}=1000$**. With the **default** guards ($E_{\min}=100$), 12 of 40, confirmed through `run_stopping_rule`. |
+| 80-seed hopg study at $\varepsilon=5\,\%$: 86–89 % for every $n_{\min}$, stop not responsible | Seeds 1–80, $n_{\max}=1600$, $B=20$: 0.863, 0.863, 0.887 and 0.875 at $n_{\min}=100,200,400,800$; fixed $N$ gives 0.863–0.887. That reproduces the claim. Disjoint seeds 101–180: 0.775, 0.812, 0.863 and 0.925, against 0.863 at fixed $N=400$. Pooled over 160 seeds: 0.819, 0.838 and 0.875 at $n_{\min}=100,200,400$, against 0.875 at fixed $N=400$. |
+| negative bias $0.3$–$0.4\varepsilon$ at $n_{\min}\le200$, gone by about 400 | seeds 1–80: $-0.41$, $-0.35$, $-0.13\pm0.10$ and $+0.01$ (in units of $\varepsilon$); seeds 101–180: $-0.45$, $-0.37$, $-0.15\pm0.09$ and $+0.03$. At $n_{\min}=400$ the bias is reduced, not gone. |
+
+### Findings
+
+1. **Misquoted constructed-case error.** The record's Anchors bullet (line 89), the ledger `Checks`, `docs/computation/statistical-methods.md` line 198, and the test docstring at line 256 say "44 % low". The realized error is $-37.3\,\%$; 44 % is the expected deficit $1-1/1.8$. The test asserts only an error $>5\,r$, so it is unaffected.
+2. **Guard settings not stated.** The heavy-tail suppression results ("false stops $\ge20\to\le1$", "the guarded run") use $E_{\min}=1000$, not the default 100. The record (line 89) and the ledger `Checks` do not say so. With the shipped defaults, false stops on that population fall only from 24 to 12 of 40.
+3. **Coverage attribution overstated.** The Known limits text says "86–89 % for every $n_{\min}$ ... a property of the sample-SD interval, not of the stop", and the ledger `Notes` say "independently of the stop". This holds on seeds 1–80. On a disjoint 80 seeds, and pooled, $n_{\min}\le200$ loses 4–9 points of coverage relative to fixed $N$. That is consistent with the $-0.4\varepsilon$ stopping bias the record already reports. At $n_{\min}\approx400$, coverage equals fixed $N$.
+4. Minor; none changes the claim:
+   - The single-dominant argument should use $r^2\gtrsim\sigma^2$, and note that the default cap acts only when $\varepsilon>c$.
+   - Prefix stability in the Derivation is exact only without an energy spread. With one, the transport tables span the drawn energy range, so $m_i$ depend on $n$ at interpolation level. The replay-and-recheck path in `transport_case_blocks` handles this, and the result is still the fixed-$N$ run at the realized count, but the Derivation paragraph should say so.
+   - The Assumptions list of refusals omits grooves, secondaries, pair production, positrons, observation directions and trajectory capture.
+   - The test docstring at line 182 says "skewness ~ 9"; the measured value is 8.1.
+   - The module docstring of `adaptive.py` points to `statistical-methods.md` for the derivations; they are in this record.
+
+### Verdict
+
+The estimator, the merge, the ESS identity, the guards, the pilot, batch means and band weights rederive and match the code. The anchor tests are green. The Gaussian and hopg acceptance numbers reproduce exactly, and the issue #361 acceptance holds: 20/20 light-case seeds lie within $1.96\varepsilon$, and the paired stopping bias of 0.06 % is below the 3.0 % smallest reported error. This supports `anchored`. Findings 1–3 are errors in quoted evidence and limit statements, not in the implementation. Correct the ledger `Checks` and `Notes` text before applying the status, so the row does not certify a wrong number or an overstated default guard. Human sign-off remains pending (#277).
 
 Human sign-off pending (#277).

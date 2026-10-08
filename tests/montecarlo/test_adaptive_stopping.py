@@ -179,7 +179,7 @@ def light_line_masses():
 
 
 def test_light_case_meets_its_target_over_20_seeds(light_line_masses):
-    """Target 10 % on the per-electron line mass (skewness ~ 9).
+    """Target 10 % on the per-electron line mass (skewness ~ 8).
 
     Truth is the pooled mean of all 16000 electrons (relative SE ~ 0.8 %).
     The achieved error must lie within 1.96 x target in at least 17 of 20
@@ -252,9 +252,9 @@ def _heavy_population(rng, n, *, every=None, rate=None, heavy=400.0):
 def test_guards_turn_a_false_early_stop_into_statistics_limited():
     """One heavy electron in 500 carries 44 % of the true mean (1.8).
 
-    Without guards the first 200 electrons hold none: the RSE (~7 %) passes and
-    the run stops 44 % low. The ESS floor (1000) forces enough electrons to
-    meet the heavy ones, the share cap then refuses to stop on a handful of
+    Without guards the first 200 electrons hold none: the RSE (~6.5 %) passes
+    and the run stops about 37 % low (44 % expected deficit). The ESS floor
+    (1000) forces enough electrons to meet the heavy ones, the share cap then refuses to stop on a handful of
     them, and the run ends statistics_limited at max_electrons.
     """
     population = _heavy_population(np.random.default_rng(0), 4000, every=500)
