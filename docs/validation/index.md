@@ -29,6 +29,7 @@ atomic-physics/crystals-cif-adapter
 :maxdepth: 1
 :caption: Beam physics and electron transport
 
+beam-transport/adaptive-sample-size-stopping
 beam-transport/beam-energy-spread-injection
 beam-transport/beam-phase-space-injection
 beam-transport/beam-phase-space-metrics

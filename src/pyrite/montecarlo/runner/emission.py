@@ -16,6 +16,7 @@ def _brem_wide_from_segments(
     abs_layers,
     groove=None,
     Ne=None,
+    electron_band_weights=None,
 ):
     """Bremsstrahlung background on ``E_brem`` from already-transported brem
     segments ``segs_b``. EVERY layer radiates with its OWN composition (each
@@ -28,7 +29,10 @@ def _brem_wide_from_segments(
 
     A coupled radiative case (``radiative_model``) scores its coupled tracks
     with the BremsLib expected-value estimator; see
-    :func:`_coupled_brem_from_segments`."""
+    :func:`_coupled_brem_from_segments`.
+
+    ``electron_band_weights`` (internal, #361) returns each brem electron's
+    in-band integral instead, summed over layers; see ``mc_brem_spectrum``."""
     from .. import runner
 
     brem_chunk = runner._admit_chunk(
@@ -48,6 +52,7 @@ def _brem_wide_from_segments(
             abs_layers,
             Ne=Ne,
             brem_chunk=brem_chunk,
+            electron_band_weights=electron_band_weights,
         )
     # The case records the resolved continuum: BremsLib gets one table set for
     # the whole stack (angular weighting per segment from ``v_hat``), and
@@ -59,6 +64,8 @@ def _brem_wide_from_segments(
         if bremslib_tables is None
         else dict(cross_section_model="bremslib", bremslib_tables=bremslib_tables)
     )
+    if electron_band_weights is not None:
+        model_kwargs["electron_band_weights"] = electron_band_weights
 
     if n_lay == 1:
         return runner.mc_brem_spectrum(
@@ -73,7 +80,8 @@ def _brem_wide_from_segments(
             E_cut_keV=case.get("E_cut_brem_keV", 1.0),
             **model_kwargs,
         )
-    brem_wide = np.zeros(E_brem.shape, dtype=float)
+    shape = E_brem.shape if electron_band_weights is None else int(segs_b["Ne"] if Ne is None else Ne)
+    brem_wide = np.zeros(shape, dtype=float)
     for L in range(n_lay):
         sL = runner._segments_in_layer(segs_b, L)
         if sL["L_ang"].size == 0:
@@ -93,7 +101,9 @@ def _brem_wide_from_segments(
     return brem_wide
 
 
-def _coupled_brem_from_segments(segs_b, E_brem, case, n_hat, abs_layers, *, Ne, brem_chunk):
+def _coupled_brem_from_segments(
+    segs_b, E_brem, case, n_hat, abs_layers, *, Ne, brem_chunk, electron_band_weights=None
+):
     """Coupled-mode continuum: BremsLib track length on the coupled tracks.
 
     Each layer radiates with its own composition, like the uncoupled
@@ -123,7 +133,10 @@ def _coupled_brem_from_segments(segs_b, E_brem, case, n_hat, abs_layers, *, Ne, 
             for index in range(n_lay)
         ]
     )
-    brem_wide = np.zeros(E_brem.shape, dtype=float)
+    per_electron = (
+        {} if electron_band_weights is None else {"electron_band_weights": electron_band_weights}
+    )
+    brem_wide = np.zeros(E_brem.shape if electron_band_weights is None else int(Ne), dtype=float)
     for segments, composition in layer_views:
         if segments["L_ang"].size == 0:
             continue
@@ -137,6 +150,7 @@ def _coupled_brem_from_segments(segs_b, E_brem, case, n_hat, abs_layers, *, Ne, 
             electron_limit=Ne,
             cutoff_eV=cutoff_eV,
             bremslib_tables=tables,
+            **per_electron,
         )
     return brem_wide
 

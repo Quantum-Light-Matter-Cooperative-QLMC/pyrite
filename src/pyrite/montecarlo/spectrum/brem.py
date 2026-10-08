@@ -867,6 +867,7 @@ def mc_brem_spectrum(
     E_cut_keV=None,
     cross_section_model: BremsstrahlungModel | Literal["auto"] = "auto",
     bremslib_tables: Mapping[str, BremsLibBremsstrahlungTable] | None = None,
+    electron_band_weights=None,
 ):
     """Return the incoherent bremsstrahlung density from transport segments.
 
@@ -920,11 +921,20 @@ def mc_brem_spectrum(
     bremslib_tables
         Required with ``"bremslib"``: staged tables keyed by element symbol,
         from :func:`pyrite.xsgen.bremslib.tables.load_bremsstrahlung_tables`.
+    electron_band_weights
+        Internal (#361). Quadrature weights in eV over ``E_grid_eV``; when
+        given, the call instead returns each of the ``Ne`` electrons' own
+        in-band integral ``sum_E q_E dN_e/dE dOmega`` (photons per sr), whose
+        mean over electrons is the band integral of the returned density. It
+        always takes the chunked path, so on a device the reduction order
+        differs from the fused kernels; it feeds stopping statistics only.
 
     Returns
     -------
     numpy.ndarray
-        Continuum density in photons per incident electron per eV per sr.
+        Continuum density in photons per incident electron per eV per sr, or
+        with ``electron_band_weights`` the ``(Ne,)`` per-electron band
+        integrals.
 
     Raises
     ------
@@ -936,6 +946,7 @@ def mc_brem_spectrum(
 
     Validation: segment-escape-average
     Validation: substep-radiation-invariance
+    Validation: adaptive-sample-size-stopping
     """
     if segments.get("radiative", {}).get("model") == "bremslib-soft-hard":
         raise ValueError(
@@ -1046,7 +1057,24 @@ def mc_brem_spectrum(
         and BACKEND.name == "cuda"
         and np.dtype(REAL) == np.dtype(np.float32)
     )
-    if _use_bethe_heitler_jit or _use_eedl_jit or _use_bremslib_jit:
+    per_electron = electron_band_weights is not None
+    band_q = row_electron = None
+    if per_electron:
+        band_q = xp.asarray(electron_band_weights, dtype=REAL)
+        if band_q.shape != E_grid.shape:
+            raise ValueError("electron_band_weights must match E_grid_eV")
+        row_electron = seg_elec_id[brem_idx][owner]
+    electron_sum = xp.zeros(int(Ne) if per_electron else 0, dtype=xp.float64)
+
+    def _accumulate(row_weight, density, rows):
+        nonlocal spec, electron_sum
+        if band_q is None or row_electron is None:
+            spec += row_weight @ density
+            return
+        contribution = (row_weight * (density @ band_q)).astype(xp.float64)
+        electron_sum += xp.bincount(row_electron[rows], weights=contribution, minlength=int(Ne))
+
+    if not per_electron and (_use_bethe_heitler_jit or _use_eedl_jit or _use_bremslib_jit):
         from .brem_jit_kernel import (
             DEFAULT_BREM_KERNEL_CONFIG,
             run_brem_reduction_kernel,
@@ -1157,7 +1185,7 @@ def mc_brem_spectrum(
                 # leaves the direction-resolved density per steradian.
                 dsig = REAL(4.0 * np.pi) * evaluate_bremslib(staged, bremslib_state, E_grid)
                 if bremslib_covers[el_i]:
-                    spec += (n_i * 1e24 * path_cm) @ (dsig * T_abs)
+                    _accumulate(n_i * 1e24 * path_cm, dsig * T_abs, sl)
                     continue
                 directional = dsig
             if context is not None:
@@ -1178,7 +1206,9 @@ def mc_brem_spectrum(
                 )
             if bremslib_state is not None:
                 dsig = xp.where(bremslib_state.available[:, None], directional, dsig)
-            spec += (n_i * 1e24 * path_cm) @ (dsig * T_abs)
+            _accumulate(n_i * 1e24 * path_cm, dsig * T_abs, sl)
+    if per_electron:
+        return _to_cpu(electron_sum / (4.0 * np.pi))
     return _to_cpu(spec / (4.0 * xp.pi) / Ne)
 
 

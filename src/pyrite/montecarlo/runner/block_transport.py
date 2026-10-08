@@ -23,6 +23,7 @@ electron count build on it.
 """
 
 from collections.abc import Callable, Mapping
+from functools import partial
 from typing import Any
 
 import numpy as np
@@ -160,24 +161,30 @@ def transport_electron_blocks(
     bunch: Mapping[str, Any],
     bremslib_tables=None,
     on_block: Callable[[int, int, dict[str, Any]], None] | None = None,
+    should_stop: Callable[[int], bool] | None = None,
 ) -> dict[str, Any]:
     """Transport ``[0, n_electrons)`` block by block and join the blocks.
 
     ``simulate_block(start, stop)`` must run ``simulate_trajectories`` for
     ``stop - start`` electrons with ``_electron_start=start``, the matching
     slice of any per-electron cutoffs, and no bunch arguments. ``on_block``
-    (optional) sees each block's globalized result as ``on_block(start, stop,
-    block)`` before the join -- the hook later accumulators attach to; it must
-    not mutate the block.
+    (optional) sees each block's result as ``on_block(start, stop, block)``
+    before the join, with block-local electron indices ``[0, stop - start)``
+    exactly as ``simulate_block`` returned it -- the hook accumulators attach
+    to; it must not mutate the block. ``should_stop(stop)`` (optional) is asked
+    after each block's hook; ``True`` ends the run at ``stop`` electrons.
 
-    Returns the result a single ``[0, n_electrons)`` call returns, bit for bit.
+    Returns the result a single ``[0, n)`` call returns, bit for bit, where
+    ``n`` is ``n_electrons`` or the earlier stop.
     """
     blocks = []
     for start, stop in electron_blocks(n_electrons, block_electrons):
-        block = _globalize(simulate_block(start, stop), start)
+        block = simulate_block(start, stop)
         if on_block is not None:
             on_block(start, stop, block)
-        blocks.append(block)
+        blocks.append(_globalize(block, start))
+        if should_stop is not None and should_stop(stop):
+            break
     merged = merge_electron_blocks(blocks)
     return finalize_population_fields(
         merged, seed=seed, bunch=bunch, bremslib_tables=bremslib_tables
@@ -193,6 +200,7 @@ def transport_case_blocks(
     block_electrons,
     beam_kw,
     progress=None,
+    monitor=None,
 ):
     """The runner's block path: ``_transport_case``'s transport in electron blocks.
 
@@ -200,6 +208,18 @@ def transport_case_blocks(
     ``simulate_trajectories`` closure; each block runs under the step-budget
     retry, without bunch arguments, and over the population's table energy
     range, so the joined result equals the single-call transport bit for bit.
+
+    ``monitor`` (optional) supplies ``on_block`` and ``should_stop`` hooks
+    (:class:`.adaptive.StoppingMonitor`). The blocks then run over the table
+    energy range of all ``E_cut_by_electrons.size`` electrons, the most the
+    run may transport. When that range differs from the range of the realized
+    population (an energy spread whose largest draw lies past the stop), the
+    realized ``[0, n)`` is replayed over its own range -- the streams are
+    counter-addressed, so the replay is the fixed-``n`` transport -- and the
+    monitor recomputes its statistics. If the replay fails the stopping rule,
+    grow by one block and replay again until convergence or the maximum.
+
+    Validation: adaptive-sample-size-stopping
     """
     n_electrons = int(E_cut_by_electrons.size)
     no_bunch = {"bunch_length_fs": None, "long_shape": "gaussian"}
@@ -207,7 +227,11 @@ def transport_case_blocks(
     energies = initial_energies_keV(
         case["E0_keV"], n_electrons, case["seed"], beam_kw.get("energy_spread_frac")
     )
-    energy_range = (float(np.min(E_cut_by_electrons)), float(np.max(energies)))
+
+    def energy_range_of(n):
+        return (float(np.min(E_cut_by_electrons[:n])), float(np.max(energies[:n])))
+
+    energy_range = energy_range_of(n_electrons)
 
     def simulate_block(start, stop):
         block_kw: dict[str, Any] = {"_electron_start": start, "_energy_range_keV": energy_range}
@@ -220,11 +244,27 @@ def transport_case_blocks(
             block_kw["transport_progress"] = block_progress
         return retry_step_budget(simulate, keep, start=start, stop=stop, block_kw=block_kw)
 
-    return transport_electron_blocks(
+    run = partial(
+        transport_electron_blocks,
         simulate_block,
-        n_electrons,
-        block_electrons,
+        block_electrons=block_electrons,
         seed=case["seed"],
         bunch={k: beam_kw[k] for k in BUNCH_KWARGS},
         bremslib_tables=_case_radiative_kwargs(case).get("bremslib_tables"),
     )
+    if monitor is None:
+        return run(n_electrons)
+    result = run(n_electrons, on_block=monitor.on_block, should_stop=monitor.should_stop)
+    realized = int(result["Ne"])
+    if energy_range_of(realized) != energy_range:
+        monitor.replayed_transport = True
+        while True:
+            energy_range = energy_range_of(realized)
+            # Replay changes interpolation tables and hence the measured
+            # contributions. Recompute the moments and guards from the exact
+            # transport we return; a stale pre-replay decision is insufficient.
+            result = run(realized, on_block=monitor.on_block)
+            if monitor.should_stop(realized):
+                break
+            realized = min(realized + block_electrons, n_electrons)
+    return result

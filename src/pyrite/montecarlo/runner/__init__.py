@@ -314,6 +314,7 @@ def _transport_case(
     keep_segments_on_device=False,
     trajectory_capture=None,
     block_electrons=None,
+    block_monitor=None,
 ):
     """Transport phase of run_case: the line + brem trajectories. Returns the
     segments + geometry + grids the spectrum phase consumes.
@@ -336,6 +337,11 @@ def _transport_case(
     segments equal the single-call run bit for bit (see
     :mod:`.block_transport`). ``None`` keeps the single call. The lockstep
     core is rejected.
+
+    block_monitor: internal (#361), with ``block_electrons`` and
+    ``Ne == Ne_brem``. Its hooks see every block and may stop transport early
+    (:mod:`.adaptive`); the case then continues as the fixed-N case at the
+    realized count -- cutoffs, line grid and spectrum inputs alike.
 
     Validation: grazing-beam-projection
     """
@@ -399,6 +405,8 @@ def _transport_case(
         )
     if block_electrons is not None and "gdf_source" in case:
         raise ValueError("electron blocks do not support GDF beams")
+    if block_monitor is not None and (block_electrons is None or Ne != Ne_brem):
+        raise ValueError("a block monitor needs electron blocks and Ne == Ne_brem")
 
     def _simulate(keep, max_steps, start=0, stop=Ne_transport, block_kw=None):
         # A block overrides progress and withholds the bunch (see below).
@@ -445,6 +453,7 @@ def _transport_case(
             block_electrons=block_electrons,
             beam_kw=beam_kw,
             progress=transport_progress,
+            monitor=block_monitor,
         )
     if resident:
         try:
@@ -458,6 +467,12 @@ def _transport_case(
             segs_all = transport(False)
     else:
         segs_all = transport(False)
+    if block_monitor is not None and int(segs_all["Ne"]) != Ne_transport:
+        # Stopped early: from here on this is the fixed-N case at the realized
+        # count, whose cutoffs are the leading slice (Ne == Ne_brem).
+        Ne = Ne_brem = Ne_transport = int(segs_all["Ne"])
+        case = {**case, "Ne": Ne, "Ne_brem": Ne_brem}
+        E_cut_by_electrons = E_cut_by_electrons[:Ne_transport]
 
     # Line resolution needs the transport distribution, so it is chosen after
     # the case's own trajectories exist and before the spectrum phase. No second
