@@ -466,37 +466,37 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "8a6a22f543e769b55f38aa4165b128f4ab4adb9f360f2c3928a3419f3ad4cdc4",
+            "f2199600d9fac69d4d854101240def063cfa45e41946df82ee03ae35783724f1",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "93f11911a4e6a3fc3206be75d4c33a012ea66dff3fd21823c6a5b7c1b0dc7517",
+            "d3a34ac54eaaa0f8a46989232cfaa305f47d3f25aad67eb864603c047f27dddf",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "2da09f3ffacb6873fd8b629a482889d9aa291fbaf84142b5f037fc8c25c18a1c",
+            "fa48a534685f8310e0c2f1ee58bde83b4834ed41d17efb488b6689891bb3d793",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "5f550be17a446ab0c329e21cbb15587344591fe0b3265aa12105c1c5060295f2",
+            "1d89c7f765cb3233127459ceda4fe725f3349fe8baf4ff96cf3de49df2de7a64",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "681cc3c82316773f9706ba427e953c07f77a4ab58a1c44fe4f78ba9e17e6e4d3",
+            "17da47fda4a12622c95e91f635876ce3c996998d49a036255e4348c6623c0191",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "e81f559f0f1d8555d1c175997d10c912a654c38c030f1c1cdced9204b5e9d66b",
+            "770e176bf417a11a89dd1a58c39344107cf22b28c7c79bb9acef29e33b3e5c19",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "e6c377ab871aa4897244bef51d8081952b4ba2d991202cb67a2972549fd8b22d",
+            "b4bb7a1917f97ca132d649c29c947a873ff152e1a67faa75709bd2edb466c2ec",
         ),
         (
             "promising_low_ne",
@@ -524,6 +524,8 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     ``promising_low_ne`` alone moved for #361, when predicted identities began
     applying the profile's own run settings: its ``emission = "both"`` is in
     every identity the runner writes, and the earlier pin omitted it.
+    The profiles without fixed electron counts moved again for #361's
+    adaptive default: their identities now carry the default precision policy.
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in
@@ -610,9 +612,12 @@ def test_catalog_profile_changes_hash_and_stem_when_not_standard():
     assert variant_stem(other).startswith("hopg@sub_100keV-")
 
 
-def test_named_profile_stem_default_catalog_profile_stays_canonical():
-    assert named_profile_stem("hopg", "full") == "hopg"
-    assert named_profile_stem("hopg", "full", catalog_profile="standard") == "hopg"
+def test_named_profile_stem_default_catalog_profile_is_adaptive_and_hashed():
+    """standard runs adaptive counts by default (#361): its stem is a variant."""
+    assert named_profile_stem("hopg", "full").startswith("hopg@full-")
+    assert named_profile_stem("hopg", "full", catalog_profile="standard") == named_profile_stem(
+        "hopg", "full"
+    )
 
 
 def test_named_profiles_default_to_incoherent_emission():

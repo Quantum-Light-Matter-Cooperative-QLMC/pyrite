@@ -690,6 +690,14 @@ def _resolved_run(args, material):
         overrides["energy_keV"] = kept
         sweep = replace(sweep, beam=beam_replace(sweep.beam, energy_keV=kept))
 
+    from ..campaign.profiles import profile_precision_source
+
+    # The electron-count policy also depends on the material's sweep (count
+    # overrides, a GDF beam, a grooved face), so it settles once the sweep does.
+    settings = replace(
+        settings,
+        precision=profile_precision_source(settings, catalog_profile, CATALOG, sweep=sweep)[0],
+    )
     from ..campaign.geometry import Stack
     from ..campaign.profiles import (
         canonical_settings,

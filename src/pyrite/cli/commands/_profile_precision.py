@@ -3,7 +3,7 @@
 import click
 from tomlkit.exceptions import ParseError
 
-from pyrite._precision import OBSERVABLES, REQUIRED_FIELDS, Precision
+from pyrite._precision import OBSERVABLES, REQUIRED_FIELDS
 from pyrite.campaign import profile_edit as _profile_edit
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
@@ -42,15 +42,29 @@ def _energy_band(_ctx, param, value):
     return band
 
 
+def show_line(precision):
+    """Return the `profile show` summary line for a resolved precision payload."""
+    effective = precision["effective"]
+    if effective is None:
+        return f"  electron counts: fixed ({precision['fixed_reason']})"
+    default = " (default)" if precision["source"] == "default" else ""
+    return (
+        f"  electron counts: adaptive{default}, target RSE {effective['target_rse']:g}, "
+        f"{effective['min_electrons']}-{effective['max_electrons']} electrons"
+    )
+
+
 @click.group("precision")
 def command():
     """Inspect and edit PROFILE's adaptive electron-count policy.
 
-    With a policy, each incoherent case stops when the relative standard error
+    Profiles without fixed electron counts or a policy run adaptive by default
+    (target RSE 0.05, 200-20000 electrons, blocks of 100, line and
+    bremsstrahlung). Each incoherent case stops when the relative standard error
     of its line (and optionally bremsstrahlung) yield meets the target and its
     heavy-tail guards pass, or at the maximum count flagged statistics-limited.
-    One count serves line and bremsstrahlung transport. Coherent emission and
-    fixed electron counts cannot be combined with a policy.
+    One count serves line and bremsstrahlung transport. Coherent emission,
+    cascades, GDF beams, grooves and fixed electron counts keep fixed counts.
     """
 
 
@@ -58,13 +72,12 @@ def command():
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @output_option
 def precision_show_command(name, json_output):
-    """Show PROFILE's adaptive policy, or report fixed electron counts."""
+    """Show PROFILE's effective electron-count mode: adaptive (profile or default) or fixed."""
     try:
         _text, document = _catalog_io.catalog_text()
-        explicit = _profile_edit.profile_precision_values(
+        explicit, effective, source, fixed_reason = _profile_edit.precision_resolution(
             _profile_edit.existing_profile(document, name)
         )
-        effective = None if explicit is None else Precision.from_dict(explicit).to_dict()
     except (OSError, TypeError, ValueError, ParseError) as exc:
         if json_output:
             emit_json_result(cli_json.failure("cxr.profile.precision.show", {}, str(exc)))
@@ -74,27 +87,32 @@ def precision_show_command(name, json_output):
         payload = {
             "profile": name,
             "mode": "fixed" if effective is None else "adaptive",
+            "source": source,
+            "fixed_reason": fixed_reason,
             "explicit": explicit,
             "effective": effective,
         }
         emit_json_result(cli_json.JsonResult("cxr.profile.precision.show", payload))
         return 0
     if effective is None:
-        emit_result(f"[{name} precision] fixed electron counts (no adaptive policy)")
+        emit_result(f"[{name} precision] fixed electron counts: {fixed_reason}")
         return 0
-    emit_result(f"[{name} precision] adaptive")
-    assert explicit is not None
+    emit_result(f"[{name} precision] adaptive ({source} policy)")
     for flag, key in _PRECISION_FIELD_NAMES.items():
         value = effective[key]
         if value is None:
             display = "none"
-        elif isinstance(value, tuple):
+        elif isinstance(value, (tuple, list)):
             display = ",".join(
                 f"{item:g}" if isinstance(item, float) else str(item) for item in value
             )
         else:
             display = f"{value:g}" if isinstance(value, float) else str(value)
-        emit_result(f"  {flag}: {display}{'' if key in explicit else ' (default)'}")
+        marker = "" if explicit is not None and key in explicit else " (default)"
+        emit_result(f"  {flag}: {display}{marker}")
+    emit_result(
+        "  per material, fixed counts, GDF beams and grooved faces keep fixed electron counts"
+    )
     return 0
 
 
@@ -220,7 +238,8 @@ def precision_set_command(name, yes, dry_run, **values):
 def precision_reset_command(name, fields, yes, dry_run):
     """Reset optional FIELDs to defaults, or remove the policy when none are named.
 
-    Removing the policy returns PROFILE to fixed electron counts.
+    Removing the policy returns PROFILE to the default adaptive policy; set fixed
+    counts with 'pyrite profile numerics set --line-electrons' to opt out.
     """
     keys = tuple(_PRECISION_FIELD_NAMES[field] for field in fields)
     try:

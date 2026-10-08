@@ -92,13 +92,13 @@ def _current_case_keys(target: _Target) -> dict[tuple[str, float], str]:
     from ..campaign.config import default_settings, material_sweep
     from ..campaign.profiles import profile_run_settings
 
-    settings = profile_run_settings(
-        default_settings(target.fidelity), target.catalog_profile, target.fidelity
-    )
     sweep = material_sweep(
         target.material,
         fidelity=target.fidelity,
         catalog_profile=target.catalog_profile,
+    )
+    settings = profile_run_settings(
+        default_settings(target.fidelity), target.catalog_profile, target.fidelity, sweep=sweep
     )
     return {
         (case["name"], float(case["E0_keV"])): _case_key(case)

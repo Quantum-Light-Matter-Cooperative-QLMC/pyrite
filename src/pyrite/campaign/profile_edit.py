@@ -19,7 +19,12 @@ from pyrite._numerics import (
     TRANSPORT_KEYS,
     validate_profile_numerics,
 )
-from pyrite._precision import REQUIRED_FIELDS, Precision
+from pyrite._precision import (
+    DEFAULT_PRECISION,
+    REQUIRED_FIELDS,
+    Precision,
+    default_precision_fallback,
+)
 from pyrite.detectors.spec import Detector
 
 RANGES = {
@@ -310,6 +315,29 @@ def profile_precision_values(profile):
     return dict(table.unwrap() if hasattr(table, "unwrap") else table)
 
 
+def precision_resolution(profile):
+    """Resolve a profile row's electron-count mode for display.
+
+    Returns ``(explicit, effective, source, fixed_reason)``: ``source`` is
+    ``"profile"``, ``"default"`` or ``"fixed"``. Per-material count overrides,
+    GDF beams and grooved faces also keep fixed counts; they are resolved per
+    run, not here.
+    """
+    explicit = profile_precision_values(profile)
+    if explicit is not None:
+        return explicit, Precision.from_dict(explicit).to_dict(), "profile", None
+    reason = default_precision_fallback(
+        fixed_counts=any(key in profile for key in SAMPLING_KEYS),
+        emission=profile.get("emission"),
+        secondary_threshold_eV=profile.get("secondary_threshold_eV"),
+        pair_production_model=profile.get("pair_production_model"),
+        positron_transport=bool(profile.get("positron_transport", False)),
+    )
+    if reason is not None:
+        return None, None, "fixed", reason
+    return None, DEFAULT_PRECISION.to_dict(), "default", None
+
+
 def _precision_table(values):
     table = tomlkit.table()
     for key in Precision.__dataclass_fields__:
@@ -509,7 +537,13 @@ def profile_payload(document, name):
         "emission": profile.get("emission"),
         "temporal_profile": profile.get("temporal_profile") is True,
         "line_grid_policy": profile_line_grid_values(profile),
-        "precision": profile_precision_values(profile),
+        "precision": dict(
+            zip(
+                ("explicit", "effective", "source", "fixed_reason"),
+                precision_resolution(profile),
+                strict=True,
+            )
+        ),
         "transport_numerics": {key: profile[key] for key in TRANSPORT_KEYS if key in profile},
         "overrides": {
             material: sorted(row)

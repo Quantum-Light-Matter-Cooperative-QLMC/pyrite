@@ -912,15 +912,23 @@ def detector_variant(
 
 
 def profile_run_settings(
-    settings: Settings, catalog_profile: str, fidelity: str, catalog: Any = None
+    settings: Settings,
+    catalog_profile: str,
+    fidelity: str,
+    catalog: Any = None,
+    *,
+    sweep: Sweep | None = None,
 ) -> Settings:
     """Apply a catalog profile's run-owned settings to fidelity ``settings``.
 
-    The emission policy, ``I(t)`` opt-in, adaptive precision policy and
-    transport numerics belong to the profile. ``pyrite run`` and every stem
-    predictor (:func:`named_profile_identity`, remote queue reservations,
-    checkpoint gc) resolve them here so a predicted checkpoint stem names the
-    stem the runner writes.
+    The emission policy, ``I(t)`` opt-in, transport numerics and electron-count
+    policy belong to the profile. ``pyrite run`` and every stem predictor
+    (:func:`named_profile_identity`, remote queue reservations, checkpoint gc)
+    resolve them here so a predicted checkpoint stem names the stem the runner
+    writes. A profile's ``precision`` table applies as written; without one,
+    :data:`~pyrite._precision.DEFAULT_PRECISION` applies unless
+    :func:`profile_precision_source` names a reason to keep fixed counts.
+    ``sweep`` adds the per-material checks (count overrides, GDF beam, grooves).
     """
     if catalog is None:
         from ..materials import CATALOG as catalog
@@ -929,11 +937,46 @@ def profile_run_settings(
         settings = replace(settings, emission=emission)
     if catalog.profile_temporal_profile(catalog_profile):  # opt-in; absent keeps the preset
         settings = replace(settings, temporal_profile=True)
-    precision = catalog.profile_precision(catalog_profile)
-    if precision is not None:  # opt-in; absent keeps fixed counts and identities
-        settings = replace(settings, precision=precision)
     numerics = resolve_numerics(catalog.profile_numerics(catalog_profile), fidelity=fidelity)
-    return replace(settings, **{key: numerics.effective[key] for key in TRANSPORT_KEYS})
+    settings = replace(settings, **{key: numerics.effective[key] for key in TRANSPORT_KEYS})
+    precision, _source = profile_precision_source(settings, catalog_profile, catalog, sweep=sweep)
+    return replace(settings, precision=precision)
+
+
+def profile_precision_source(
+    settings: Settings, catalog_profile: str, catalog: Any = None, *, sweep: Sweep | None = None
+) -> tuple[Any, str]:
+    """Return ``(precision or None, source)`` for a profile-applied run.
+
+    ``source`` is ``"profile"`` for an explicit table, ``"default"`` for
+    :data:`~pyrite._precision.DEFAULT_PRECISION`, or ``"fixed: <reason>"``.
+    """
+    from .._precision import DEFAULT_PRECISION, default_precision_fallback
+
+    if catalog is None:
+        from ..materials import CATALOG as catalog
+    explicit = catalog.profile_precision(catalog_profile)
+    if explicit is not None:
+        return explicit, "profile"
+    profile_numerics = catalog.profile_numerics(catalog_profile) or {}
+    fixed_counts = any(key in profile_numerics for key in SAMPLING_KEYS)
+    gdf_beam = grooved = False
+    if sweep is not None:
+        fixed_counts = fixed_counts or (
+            sweep.n_electrons is not None or sweep.n_electrons_brem is not None
+        )
+        gdf_beam = sweep.beam.gdf_beam() is not None
+        grooved = getattr(sweep.target, "entrance_face", None) is not None
+    reason = default_precision_fallback(
+        fixed_counts=fixed_counts,
+        emission=settings.emission,
+        secondary_threshold_eV=settings.secondary_threshold_eV,
+        pair_production_model=settings.pair_production_model,
+        positron_transport=settings.positron_transport,
+        gdf_beam=gdf_beam,
+        grooved=grooved,
+    )
+    return (DEFAULT_PRECISION, "default") if reason is None else (None, f"fixed: {reason}")
 
 
 def canonical_settings(settings: Settings, *, resolved_bremsstrahlung: bool = True) -> bool:
@@ -986,16 +1029,17 @@ def named_profile_identity(
     # Local import avoids config -> profiles -> config import cycle.
     from .config import default_settings, material_sweep
 
+    sweep = material_sweep(
+        material,
+        fidelity=fidelity,
+        catalog_profile=catalog_profile,
+        detector_id=detector_id,
+    )
     return dataset_identity(
         material,
         fidelity,
-        profile_run_settings(default_settings(fidelity), catalog_profile, fidelity),
-        material_sweep(
-            material,
-            fidelity=fidelity,
-            catalog_profile=catalog_profile,
-            detector_id=detector_id,
-        ),
+        profile_run_settings(default_settings(fidelity), catalog_profile, fidelity, sweep=sweep),
+        sweep,
         catalog_profile=catalog_profile,
         variant=detector_variant(catalog_profile, detector_id),
     )
@@ -1046,7 +1090,7 @@ def high_energy_floor_identity(
     return dataset_identity(
         material,
         fidelity,
-        profile_run_settings(default_settings(fidelity), catalog_profile, fidelity),
+        profile_run_settings(default_settings(fidelity), catalog_profile, fidelity, sweep=sweep),
         sweep,
         catalog_profile=catalog_profile,
         variant=detector_variant(catalog_profile, detector_id),

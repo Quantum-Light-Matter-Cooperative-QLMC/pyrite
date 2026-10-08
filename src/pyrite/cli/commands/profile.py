@@ -283,13 +283,7 @@ def _emit_show(payload):
         + ", ".join(f"{key}={value}" for key, value in policy.items())
         + " (automatic for every case)"
     )
-    precision = payload["precision"]
-    emit_result(
-        "  electron counts: fixed (default)"
-        if precision is None
-        else f"  electron counts: adaptive, target RSE {precision['target_rse']:g}, "
-        f"{precision['min_electrons']}-{precision['max_electrons']} electrons"
-    )
+    emit_result(_profile_precision.show_line(payload["precision"]))
     numerics = payload["transport_numerics"]
     for key, label, default in (
         ("straggling", "straggling", False),

@@ -97,7 +97,7 @@ The target $r_n\le\varepsilon$ therefore implies $\mathrm{ESS}_n\ge 1/(\varepsil
 
 - **Wald undercoverage on skewed populations.** The light case's interval $\pm1.96\,r_N$ covered 17 of 20 seeds. At fixed $N=400$ two 80-seed sets cover 86–88 %: a property of the sample-SD interval for a skewness-8 population at a few hundred electrons. The stop adds to it at small $n_{\min}$: pooled over 160 seeds at $\varepsilon=5\,\%$, coverage is 0.819, 0.838 and 0.875 at $n_{\min}=100$, 200 and 400, against 0.875 at fixed $N=400$. Treat $r_N$ as a scale, not a calibrated 95 % interval, for such observables.
 - **Small $n_{\min}$ on skewed populations.** The same study found a negative stopping bias of $0.3$–$0.4\varepsilon$ at $n_{\min}\le200$, reduced to $0.13$–$0.15\varepsilon$ at $n_{\min}=400$. When the sample mean and SD are low together, the rule stops early. Set $n_{\min}$ near the count the target implies.
-- **Unsampled tails.** No guard sees a class that has not appeared. Only $n_{\min}$ and the ESS floor raise the chance of drawing it. The 5 MeV h-BN detector-cone case (#201) is the motivating instance; its remote measurement is outstanding in #361.
+- **Unsampled tails.** No guard sees a class that has not appeared. Only $n_{\min}$ and the ESS floor raise the chance of drawing it. The 5 MeV h-BN detector-cone case (#201) is the motivating instance. In the remote measurement (2026-10-08, qlmc) it reached $n_{\max}=16\,000$ with a line relative SE of 0.39 and ended `statistics_limited`, so the guards did not let it stop early; it needs variance reduction (#203) to converge.
 
 ## Independent verification (2026-10-08)
 

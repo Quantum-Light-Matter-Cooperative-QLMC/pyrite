@@ -1,4 +1,8 @@
-"""Queue stem prediction agrees with the runner on canonical versus hashed (#361)."""
+"""Queue stem prediction agrees with the runner on canonical versus hashed (#361).
+
+An unmodified ``standard`` runs adaptive counts by default and is hashed; only a
+fixed-count ``standard`` with default numerics keeps the bare ``<material>`` stem.
+"""
 
 import argparse
 import warnings
@@ -19,7 +23,45 @@ def _runner_stem(material):
         return scan._resolved_run(args, material)[3]
 
 
-def test_unmodified_standard_profile_keeps_the_bare_canonical_stem():
+def _fixed_standard(monkeypatch):
+    catalog = materials.CATALOG
+    numerics = {
+        **(catalog.profile_transport_numerics.get("standard") or {}),
+        "n_electrons": (300,),
+        "n_electrons_brem": (150,),
+    }
+    monkeypatch.setattr(
+        materials,
+        "CATALOG",
+        replace(
+            catalog,
+            profile_transport_numerics={**catalog.profile_transport_numerics, "standard": numerics},
+        ),
+    )
+
+
+def test_unmodified_standard_profile_runs_the_default_adaptive_policy():
+    from pyrite._precision import DEFAULT_PRECISION
+
+    args = argparse.Namespace(fidelity="full", catalog_profile="standard")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        settings, _sweep, _identity, stem = scan._resolved_run(args, "hopg")
+
+    assert settings.precision == DEFAULT_PRECISION
+    assert canonical_profile_run("standard", "full") is False
+    assert scripts._stems(["hopg"], False) == [named_profile_stem("hopg")]
+    assert stem.startswith("hopg@full-")
+
+
+def test_fixed_count_standard_profile_keeps_the_bare_canonical_stem(monkeypatch):
+    _fixed_standard(monkeypatch)
+    args = argparse.Namespace(fidelity="full", catalog_profile="standard")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        settings, _sweep, _identity, stem = scan._resolved_run(args, "hopg")
+
+    assert settings.precision is None
     assert canonical_profile_run("standard", "full") is True
     assert scripts._stems(["hopg"], False) == ["hopg"]
 
@@ -38,6 +80,7 @@ def test_unmodified_standard_profile_keeps_the_bare_canonical_stem():
     ],
 )
 def test_modified_standard_profile_never_predicts_the_canonical_stem(monkeypatch, field, value):
+    _fixed_standard(monkeypatch)
     catalog = materials.CATALOG
     monkeypatch.setattr(
         materials,

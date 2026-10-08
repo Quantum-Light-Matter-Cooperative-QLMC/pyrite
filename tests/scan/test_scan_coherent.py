@@ -42,14 +42,17 @@ def _resolved_run(monkeypatch, argv, emission=None):
     return captured["run"]
 
 
-def test_default_run_is_incoherent_canonical_stem(monkeypatch):
+def test_default_run_is_incoherent_and_adaptive_with_a_hashed_stem(monkeypatch):
+    from pyrite._precision import DEFAULT_PRECISION
+
     settings, _sweep, identity, stem = _resolved_run(monkeypatch, [])
 
     assert settings.emission == "incoherent"
     assert settings.coherent_emission is False
-    # incoherent keeps its historical bare <material> stem and adds no key
     assert "emission" not in identity["resolved_parameters"]
-    assert stem == "hopg"
+    # standard runs adaptive counts by default (#361), so it is a hashed variant.
+    assert settings.precision == DEFAULT_PRECISION
+    assert stem.startswith("hopg@full-")
 
 
 def test_coherent_profile_gets_qualified_stem_and_divergent_digest(monkeypatch):
@@ -124,7 +127,10 @@ def test_three_emission_modes_never_collide(monkeypatch):
     }
     assert len(stems) == 3
     assert len(digests) == 3
-    assert stem_i == "hopg"  # incoherent stays canonical
+    assert stem_i.startswith("hopg@full-")  # adaptive by default (#361)
+    # Coherent and both keep fixed counts; only the incoherent run is adaptive.
+    assert _s_i.precision is not None
+    assert _s_c.precision is None and _s_b.precision is None
 
 
 def test_coherent_incoherent_flags_are_removed():

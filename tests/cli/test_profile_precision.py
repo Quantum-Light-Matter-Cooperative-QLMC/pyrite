@@ -23,23 +23,47 @@ def _precision(catalog):
     return tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"].get("precision")
 
 
-def test_precision_show_reports_fixed_counts_without_a_policy(tmp_path, monkeypatch):
+def test_precision_show_reports_the_default_policy_without_a_table(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
     shown = invoke(profile.command, ["precision", "show", "sub_100keV"])
-    assert_clean_result(
-        shown, stdout="[sub_100keV precision] fixed electron counts (no adaptive policy)\n"
-    )
+    assert_clean_result(shown)
+    assert shown.stdout.startswith("[sub_100keV precision] adaptive (default policy)\n")
+    assert "  target-rse: 0.05 (default)\n" in shown.stdout
+    assert "  max-electrons: 20000 (default)\n" in shown.stdout
     machine = invoke(root_command, ["profile", "precision", "show", "sub_100keV", "-o", "json"])
     assert_clean_result(machine)
     envelope = json.loads(machine.stdout)
     assert envelope["schema"] == "cxr.profile.precision.show"
-    assert envelope["payload"] == {
-        "profile": "sub_100keV",
-        "mode": "fixed",
-        "explicit": None,
-        "effective": None,
-    }
+    payload = envelope["payload"]
+    assert (payload["mode"], payload["source"], payload["explicit"]) == (
+        "adaptive",
+        "default",
+        None,
+    )
+    assert payload["effective"]["min_electrons"] == 200
+    summary = invoke(profile.command, ["show", "sub_100keV"])
+    assert "electron counts: adaptive (default), target RSE 0.05, 200-20000 electrons" in (
+        summary.stdout
+    )
+
+
+def test_precision_show_names_why_a_profile_keeps_fixed_counts(tmp_path, monkeypatch):
+    for extra, reason in (
+        ("n_electrons = { values = [450] }\n", "the profile sets fixed electron counts"),
+        ('emission = "both"\n', "emission is 'both'"),
+    ):
+        text = _CATALOG.replace("[profiles.sub_100keV]\n", f"[profiles.sub_100keV]\n{extra}")
+        _catalog(tmp_path, monkeypatch, text)
+        shown = invoke(profile.command, ["precision", "show", "sub_100keV"])
+        assert_clean_result(shown)
+        assert shown.stdout.startswith("[sub_100keV precision] fixed electron counts: ")
+        assert reason in shown.stdout
+        machine = json.loads(
+            invoke(profile.command, ["precision", "show", "sub_100keV", "-o", "json"]).stdout
+        )
+        assert machine["payload"]["mode"] == "fixed"
+        assert reason in machine["payload"]["fixed_reason"]
 
 
 def test_precision_set_show_and_reset_round_trip(tmp_path, monkeypatch):
@@ -81,6 +105,7 @@ def test_precision_set_show_and_reset_round_trip(tmp_path, monkeypatch):
     assert_clean_result(updated)
     shown = invoke(profile.command, ["precision", "show", "sub_100keV"])
     assert_clean_result(shown)
+    assert shown.stdout.startswith("[sub_100keV precision] adaptive (profile policy)\n")
     assert "  target-rse: 0.1\n" in shown.stdout
     assert "  observable: line,brem\n" in shown.stdout
     assert "  max-electron-share: 0.02\n" in shown.stdout

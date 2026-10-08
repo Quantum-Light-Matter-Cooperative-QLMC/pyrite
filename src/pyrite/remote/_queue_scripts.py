@@ -103,7 +103,10 @@ def _material_stems(
         return [
             (
                 material,
-                named_profile_stem(
+                # A preset pseudo-material (e.g. ``zhai``) names its own bare stem.
+                material
+                if material not in catalog.materials
+                else named_profile_stem(
                     material, fidelity, catalog_profile=catalog_profile, detector_id=detector_id
                 ),
             )
@@ -123,7 +126,7 @@ def _material_stems(
                     catalog_profile=catalog_profile,
                     detector_id=detector_id,
                 )
-            elif canonical:
+            elif canonical or material not in catalog.materials:
                 stem = material
             else:
                 stem = named_profile_stem(

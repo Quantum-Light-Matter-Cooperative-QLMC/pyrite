@@ -133,7 +133,7 @@ The phase-sensitive straggling checks and their scope are recorded under `energy
 
 ## Adaptive electron counts
 
-An adaptive case chooses its own electron count from a target relative standard error instead of a fixed `Ne`. Select it with `Numerics(precision=Precision(...))` in the [Python API](../api.md), or with `pyrite profile precision set` on a catalog profile ([sweep profiles](../guides/sweep-profiles.md#adaptive-electron-counts)). `run_case` and both phases of `run_cases` retain the policy and report realized statistics under `adaptive_sampling`. The implementation is ledgered as `adaptive-sample-size-stopping`.
+An adaptive case chooses its own electron count from a target relative standard error instead of a fixed `Ne`. Catalog profiles that set no fixed counts run it by default (target 0.05, 200–20,000 electrons; see [sweep profiles](../guides/sweep-profiles.md#adaptive-electron-counts)). Select it with `Numerics(precision=Precision(...))` in the [Python API](../api.md), or with `pyrite profile precision set` on a catalog profile ([sweep profiles](../guides/sweep-profiles.md#adaptive-electron-counts)). `run_case` and both phases of `run_cases` retain the policy and report realized statistics under `adaptive_sampling`. The implementation is ledgered as `adaptive-sample-size-stopping`.
 
 **What is watched.** Transport runs in equal electron blocks $[kB, (k+1)B)$ (`montecarlo/runner/block_transport.py`). After each block, the runner folds a per-electron scalar $m_i$ into running moments for each watched observable:
 

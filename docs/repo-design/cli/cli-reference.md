@@ -1890,11 +1890,13 @@ Usage: pyrite profile precision [OPTIONS] COMMAND [ARGS]...
 
   Inspect and edit PROFILE's adaptive electron-count policy.
 
-  With a policy, each incoherent case stops when the relative standard error of its line
-  (and optionally bremsstrahlung) yield meets the target and its heavy-tail guards pass,
-  or at the maximum count flagged statistics-limited. One count serves line and
-  bremsstrahlung transport. Coherent emission and fixed electron counts cannot be
-  combined with a policy.
+  Profiles without fixed electron counts or a policy run adaptive by default (target RSE
+  0.05, 200-20000 electrons, blocks of 100, line and bremsstrahlung). Each incoherent
+  case stops when the relative standard error of its line (and optionally
+  bremsstrahlung) yield meets the target and its heavy-tail guards pass, or at the
+  maximum count flagged statistics-limited. One count serves line and bremsstrahlung
+  transport. Coherent emission, cascades, GDF beams, grooves and fixed electron counts
+  keep fixed counts.
 
 Options:
   -h, --help  Show this message and exit.
@@ -1902,7 +1904,7 @@ Options:
 Commands:
   reset  Reset optional FIELDs to defaults, or remove the policy when none are named.
   set    Create or update PROFILE's adaptive policy.
-  show   Show PROFILE's adaptive policy, or report fixed electron counts.
+  show   Show PROFILE's effective electron-count mode: adaptive (profile or...
 ```
 
 ## `pyrite profile precision reset`
@@ -1916,7 +1918,8 @@ Usage: pyrite profile precision reset [OPTIONS] NAME [target-rse|min-electrons|m
 
   Reset optional FIELDs to defaults, or remove the policy when none are named.
 
-  Removing the policy returns PROFILE to fixed electron counts.
+  Removing the policy returns PROFILE to the default adaptive policy; set fixed counts
+  with 'pyrite profile numerics set --line-electrons' to opt out.
 
 Options:
   -y, --yes   Skip the 'standard' confirmation prompt.
@@ -1970,7 +1973,7 @@ Options:
 ```text
 Usage: pyrite profile precision show [OPTIONS] NAME
 
-  Show PROFILE's adaptive policy, or report fixed electron counts.
+  Show PROFILE's effective electron-count mode: adaptive (profile or default) or fixed.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation

@@ -31,9 +31,10 @@ def _refuse_if_busy(materials, quick):
 
 
 def clear_remote(materials, yes=False, catalog_profile="standard"):
-    """Delete one or more materials' accumulated checkpoints on the box: both
-    ``checkpoints/<material>/`` and ``checkpoints/<material>_quick/`` for
-    each standard-profile material, or every manifest-confirmed identity
+    """Delete one or more materials' accumulated checkpoints on the box: the
+    legacy ``checkpoints/<material>/`` and ``checkpoints/<material>_quick/``
+    plus the current full/survey stems for each standard-profile material, or
+    every manifest-confirmed identity
     generation owned by ``catalog_profile``. Accepts a single crystal key or a list.
 
     Refuses (before touching anything) if a live job or a pre-submission
@@ -57,7 +58,20 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
         ]
         stems = _profile_checkpoint_stems(catalog_profile, current_stems=current_stems)
     else:
-        stems = [stem for m in materials for stem in (m, f"{m}_quick")]
+        # Legacy bare stems plus the stems current standard runs write, which
+        # are hashed once a profile runs adaptive counts (the #361 default).
+        stems = list(
+            dict.fromkeys(
+                [
+                    *(stem for m in materials for stem in (m, f"{m}_quick")),
+                    *(
+                        stem
+                        for fidelity in ("full", "survey")
+                        for stem in scripts._stems(materials, False, fidelity)
+                    ),
+                ]
+            )
+        )
     wanted = set(stems)
     live_jobs = state._live_jobs()
     live_profiles = (

@@ -157,3 +157,44 @@ class Precision:
         ):
             if case.get(key) is not None and case.get(key) is not False:
                 raise ValueError(f"adaptive precision does not support {key}; use fixed counts")
+
+
+#: Policy for a profile that sets neither fixed electron counts nor a
+#: ``precision`` table (#361 user decision, 2026-10-08).
+DEFAULT_PRECISION = Precision(
+    target_rse=0.05,
+    min_electrons=200,
+    max_electrons=20_000,
+    block_electrons=100,
+    observables=("line", "brem"),
+)
+
+
+def default_precision_fallback(
+    *,
+    fixed_counts: bool,
+    emission: str | None,
+    secondary_threshold_eV: float | None = None,
+    pair_production_model: str | None = None,
+    positron_transport: bool = False,
+    gdf_beam: bool = False,
+    grooved: bool = False,
+) -> str | None:
+    """Why a profile without a ``precision`` table keeps fixed counts, or ``None``.
+
+    ``None`` means :data:`DEFAULT_PRECISION` applies. The reasons mirror the
+    routes :meth:`Precision.validate_case` refuses, plus an explicit count.
+    """
+    if fixed_counts:
+        return "the profile sets fixed electron counts"
+    if emission in ("coherent", "both"):
+        return f"emission is {emission!r} (adaptive is incoherent-only)"
+    if secondary_threshold_eV is not None or pair_production_model is not None:
+        return "particle cascades (secondaries or pair production) are enabled"
+    if positron_transport:
+        return "positron transport is enabled"
+    if gdf_beam:
+        return "the beam is a GDF particle file"
+    if grooved:
+        return "the target has a grooved entrance face"
+    return None
