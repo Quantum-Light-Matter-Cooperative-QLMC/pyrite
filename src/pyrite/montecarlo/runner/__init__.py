@@ -1003,6 +1003,11 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # complex coherent grid too.
     want_coherent = bool(case.get("coherent_emission", False))
     spec_coherent = None
+    coherent_audit = None
+    if case.get("_coherent_yield_audit") is not None:
+        from .coherent_audit import CoherentGridAudit
+
+        coherent_audit = CoherentGridAudit(case)
     line_table_cache = {}
     # Opt-in temporal profile (#292): one accumulator per emission policy.
     temporal, temporal_coherent = case_temporal_profiles(case, tp, want_coherent)
@@ -1035,6 +1040,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                     Ne=Ne_lines,
                     table_cache=line_table_cache,
                     temporal=temporal_coherent,
+                    coefficient_capture=None if coherent_audit is None else coherent_audit.capture,
                 )
         except Exception as error:
             if not _is_gpu_oom(error):
@@ -1043,6 +1049,9 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # Refuse a truncating measured bandwidth before the other components run.
     truncation_record = (
         None if truncation_audit is None else check_line_truncation(case, truncation_audit)
+    )
+    coherent_yield_record = (
+        None if coherent_audit is None else coherent_audit.check(E_grid, spec_coherent, Ne_lines)
     )
 
     # CHARACTERISTIC: EEDL shell-ionization track-length estimator on the
@@ -1142,6 +1151,8 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 }
     if spec_coherent is not None:
         out["spec_coherent"] = spec_coherent
+    if coherent_yield_record is not None:
+        out["line_grid_coherent_yield_audit"] = coherent_yield_record
     out.update(temporal_outputs(temporal, temporal_coherent))
     if timed:
         # Ride the phase deltas back to the driver on the result dict; run_cases'
