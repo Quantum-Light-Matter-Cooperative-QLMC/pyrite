@@ -30,7 +30,7 @@ so that $|A|^2$ carries the autocorrelation of $e(\tau) = \sum_j e_j(\tau)$. The
 
 ### Step: band limit and contributing set
 
-$|A(E)|^2$ is the Fourier transform of the autocorrelation of $e(\tau)$, whose support is $[-D, D]$ with $D = \max_j(d_j + \Delta d_j/2) - \min_j(d_j - \Delta d_j/2)$. Uniform sampling at $h \le \pi\hbar c/D$ therefore reconstructs $|A|^2$ (Nyquist), and by Poisson summation the trapezoid sum of $|A|^2$ and of $E^k|A|^2$ is exact for $h \le 2\pi\hbar c/D$, the time-domain aliases at lags $2\pi\hbar c/h$ falling outside the autocorrelation support. Yield and centroid are thus exact at half the density the Nyquist step gives; the FWHM is read by linear interpolation at the half maximum, whose error falls as $h^2$. The current factor-four oversampling is numerical policy pinned by the anchor below. This argument describes the fixed-carrier field; the nonlinear production sampling charge remains unresolved.
+$|A(E)|^2$ is the Fourier transform of the autocorrelation of $e(\tau)$, whose support is $[-D, D]$ with $D = \max_j(d_j + \Delta d_j/2) - \min_j(d_j - \Delta d_j/2)$. Uniform sampling at $h \le \pi\hbar c/D$ therefore reconstructs $|A|^2$ (Nyquist), and by Poisson summation the trapezoid sum of $|A|^2$ and of $E^k|A|^2$ is exact for $h \le 2\pi\hbar c/D$, the time-domain aliases at lags $2\pi\hbar c/h$ falling outside the autocorrelation support. Yield and centroid are thus exact at half the density the Nyquist step gives; the FWHM is read by linear interpolation at the half maximum, whose error falls as $h^2$. The current factor-eight oversampling is numerical policy informed by the corrected remote ladders below. This argument describes the fixed-carrier field; the nonlinear production sampling charge remains unresolved.
 
 The span is taken over every radiating piece of the row, not only those resonating inside a bin. A cross term between the in-window field and the tail of a piece resonating elsewhere is bounded only by Cauchy–Schwarz, $2\|A_\mathrm{in}\|\,\|A_\mathrm{tail}\|$, i.e. by the *square root* of the tail's power share; holding it to $10^{-4}$ would need tail shares of $10^{-8}$, reach far beyond any bin. Distinct rows do not interfere (`cross-reflection-coherence`), so the span is per row.
 
@@ -119,7 +119,7 @@ Post-fix at `c2690a35` (reducer coefficients, cluster bound; windows $[10, 2001]
 | uniform ÷16 | 328 902 | $4.5\times10^{-9}$ | $-4.8\times10^{-6}$ | $2.2\times10^{-5}$ |
 | uniform ÷32 | 657 803 | reference | reference | reference |
 
-This earlier ladder found yield and centroid converged inside the windows; the wider post-fix windows removed the $1.9\times10^{-6}$ yield offset the pre-fix backbone carried. FWHM converged as $h^2$ — $2.6\times10^{-3}$, $6.2\times10^{-4}$, $1.4\times10^{-4}$ at two, four and eight nodes per Nyquist step — because the dominant 0.97 eV line's half-maximum crossing is read by linear interpolation. The former two-node default met the harness's $10^{-2}$ shape share but missed issue #350's stricter $10^{-3}$ acceptance. The current default is four nodes, and the regression now gates yield, centroid and FWHM at $10^{-3}$. The earlier pre-fix plan measured $6.8\times10^{-4}$ at two nodes; that was node placement, not convergence.
+This earlier ladder found yield and centroid converged inside the windows; the wider post-fix windows removed the $1.9\times10^{-6}$ yield offset the pre-fix backbone carried. FWHM converged as $h^2$ — $2.6\times10^{-3}$, $6.2\times10^{-4}$, $1.4\times10^{-4}$ at two, four and eight nodes per Nyquist step — because the dominant 0.97 eV line's half-maximum crossing is read by linear interpolation. The former two-node default met the harness's $10^{-2}$ shape share but missed issue #350's stricter $10^{-3}$ acceptance. This first refinement adopted four nodes; the corrected remote ladders below motivate the current eight-node default. The regression gates yield, centroid and FWHM at $10^{-3}$. The earlier pre-fix plan measured $6.8\times10^{-4}$ at two nodes; that was node placement, not convergence.
 
 Pre-fix (proxy envelope, windows $[254, 1610]$ and $[589, 2760]$ eV), against uniform ÷16: windowed ÷2 at 28 484 coordinates gave yield $1.8\times10^{-6}$, centroid $-1.2\times10^{-3}$ eV, FWHM $6.8\times10^{-4}$.
 
@@ -161,6 +161,80 @@ Hopg, tilt 5°, azimuth 0°, 1 mm, $N_e = 40$, seed 7, `bunch_length_fs = 100`, 
 | 60 keV | reference | 4 852 584 | 230 | — | — | — | — | — |
 
 At 60 keV the global FWHM is that of a 0.014 eV feature, read at two nodes per Nyquist step: inside the $10^{-2}$ shape share, outside $10^{-3}$, and converged at four nodes, the $h^2$ behaviour of the anchor. Where an upper bound exceeds $10^{-4}$ the window reaches the 6000 eV axis stop (bandwidth truncation, reported). The 60 keV ladder first ran out of GPU memory in the per-electron grouped reduction: one electron's dense `(pieces, E_grid)` block at $1.5\times10^6$ coordinates is 11 GB, and `_flight_blocks` never splits a group; energy slicing (`lines/_kernels.py::_energy_slices`, exact because the reduction runs along rows) fixed it.
+
+### Corrected remote ladders (2026-10-07)
+
+The corrected capture/dispersion implementation was rerun on the same workload:
+HOPG, tilt 5°, azimuth 0°, 1 mm, 40 sampled incident electrons, seed 7,
+100 fs bunch, CUDA float64. Each ladder uses one `CaseLadder` transport for
+every grid. These are numerical convergence comparisons, not directed
+production certificates or an independent envelope validation.
+
+SLURM jobs 1116 (`20261007-203238-3c85cda9`, 30 keV) and 1117
+(`20261007-203242-5ed8e13d`, 60 keV) both completed. Their metadata records
+revision `35fc0c3c0148d667389923dfda4d3cf86ff814f5` with `code_dirty: True`
+and the same code digest
+`7ec14e92e1121793e137f1e50aae31cba1c3f7e123cf4ca78f783d1e66c08bd2`.
+The digest identifies the exported working tree; the revision alone does not.
+Results are `coh350_ladder30_1007b.json` and
+`coh350_ladder60_1007b.json` in the remote workspace. Local retrieved copies
+were checked byte-for-byte against the existing ladder records.
+
+Oversampling below means nodes per frozen-carrier Nyquist step. The automatic
+policy used four for these runs; finer window grids divide each coherent seed's spacing by
+two, three or four. The explicit uniform references use the finest default
+row step divided by eight (30 keV) or six (60 keV). Wall times cover spectrum
+evaluation only, with one evaluation per grid; transport took 2.24 s and
+2.29 s respectively. No repeated-run timing uncertainty was measured.
+
+| case | grid | coordinates | wall [s] | yield rel. | centroid rel. | FWHM rel. |
+|---|---|---|---|---|---|---|
+| 30 keV | automatic, oversampling 4 | 1 092 085 | 19.15 | 3.29e-8 | 9.28e-10 | 5.97e-6 |
+| 30 keV | oversampling 8 | 2 184 166 | 38.49 | 7.83e-9 | 2.23e-9 | 1.86e-6 |
+| 30 keV | oversampling 12 | 3 276 249 | 59.98 | 3.13e-9 | 2.46e-9 | 6.27e-7 |
+| 30 keV | oversampling 16 | 4 368 330 | 80.90 | 1.52e-9 | 2.54e-9 | 1.64e-7 |
+| 30 keV | uniform reference | 8 736 652 | 164.26 | — | — | — |
+| 60 keV | automatic, oversampling 4 | 4 852 588 | 222.08 | 1.22e-7 | 3.72e-7 | **1.18e-3** |
+| 60 keV | oversampling 8 | 9 705 171 | 463.94 | 4.02e-8 | 1.62e-8 | 2.00e-4 |
+| 60 keV | oversampling 12 | 14 557 754 | 869.44 | 1.24e-8 | 6.94e-9 | 2.41e-4 |
+| 60 keV | oversampling 16 | 19 410 336 | 1242.40 | 6.54e-9 | 3.43e-9 | 1.57e-5 |
+| 60 keV | uniform reference | 29 115 499 | 2356.43 | — | — | — |
+
+The stronger reference changes the earlier conclusion for the 60 keV
+default grid: its global FWHM error exceeds the 1e-3 acceptance threshold.
+Yield and centroid pass, and the finer window grids pass all three measured
+global observables. FWHM error is not monotone across these node placements.
+Above 200 eV, the default-grid yield/FWHM relative errors are
+9.62e-6/3.34e-7 at 30 keV and 5.30e-6/8.90e-5 at 60 keV; restricting that
+band does not satisfy the failed global FWHM criterion. The policy now uses
+oversampling eight (2026-10-08), the first measured rung that passes all
+three global gates in both cases. These measurements do not establish a
+general shape-error bound or license full acceptance of the thick case.
+
+### Default refinement (2026-10-08)
+
+`COHERENT_NYQUIST_OVERSAMPLING` is now eight. Both the all-electron and
+grouped coherent window steps are halved; the window envelope and
+decoherence switch are unchanged. Coherent cache revision 6 and the
+oversampling cache input prevent reuse of four-node axes. Point budgets
+still refuse an oversized plan with its coordinate count, without coarsening.
+
+An independent analytic straight-track test catches the interpolation
+failure without transport or reference tables. Its retardation duration is
+`2*pi*hbar*c`, giving the normalized density `sinc(E-E0)**2` with the
+half-maximum root obtained independently of the sampled axis. On a symmetric
+980--1020 eV window about 1000 eV, the former default gives FWHM
+0.8870855282052617 eV against the exact 0.8858929413789048 eV, a relative
+error 1.346197e-3. Eight nodes pass the issue's 1e-3 gate. This regression
+covers that fixed-carrier example, not every line or node placement.
+
+The recorded eight-node remote rungs cost 2,184,166 coordinates / 38.49 s
+at 30 keV and 9,705,171 coordinates / 463.94 s at 60 keV. These are the
+2026-10-07 refinement measurements, not new production runs. The latter
+requires an explicit budget above the old smoke's 8,000,000-point allowance;
+the default 600,000-point limit remains. Physical bunch weighting, production
+sampling/envelope certification and the full 81-case profile remain open;
+the ledger status stays `discrepancy`.
 
 ### `hopg_short`-class
 
@@ -964,7 +1038,7 @@ interval. The audit reports absolute excluded-power bounds, their ratio to
 the **frozen** reference, residual charges and fallback counts. Its phase
 slope diagnostic uses the conservative span $D+HM_1\Delta L$, so the
 reported step is $\pi H/[O(D+HM_1\Delta L)]$ with the policy oversampling $O$
-(currently four).
+(currently eight).
 This is a phase-slope diagnostic, not an exact band-limit or sampling proof
 for a nonlinear law.
 

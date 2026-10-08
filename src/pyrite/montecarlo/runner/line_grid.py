@@ -140,7 +140,7 @@ _WEIGHT_INPUT_KEYS = ("B_ang2",)
 
 #: Bumped whenever the same inputs would seed different coherent windows; it
 #: keys the speed cache of coherent cases only.
-COHERENT_WINDOW_REVISION = 5
+COHERENT_WINDOW_REVISION = 6
 
 
 def _cached_grid(cached):

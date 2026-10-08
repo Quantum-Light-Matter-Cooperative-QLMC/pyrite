@@ -146,6 +146,27 @@ def test_a_collinear_split_leaks_exactly_what_the_whole_flight_leaks():
     assert split_summary["rows"][0]["joints"] == 1
 
 
+def test_default_coherent_step_resolves_a_straight_track_half_maximum():
+    """An analytic sinc line catches the four-node FWHM interpolation error.
+
+    One constant-energy undamped track has density sinc(E-E0)**2 when
+    its retardation duration is 2*pi*hbar*c. Its half-maximum root is
+    independent of the grid; the intrinsic tolerance is the issue's 1e-3.
+    """
+    from scipy.optimize import brentq
+
+    from pyrite._line_windows import build_window_plan
+
+    centre = 1000.0
+    field = _field([2 * np.pi * HBARC_EV_ANG], centre, 1.0)
+    seeds, _ = _seeds([field], start=980.0, stop=1020.0)
+    grid = build_window_plan(980.0, 1020.0, 1.0, seeds).coordinates()
+    density = np.sinc(grid - centre) ** 2
+    actual = spectrum_observables(grid, density, np.zeros_like(grid), detectors={})
+    exact_fwhm = 2 * brentq(lambda x: np.sinc(x) ** 2 - 0.5, 0.0, 1.0, xtol=1e-14)
+    assert abs(actual["fwhm_eV"] / exact_fwhm - 1) <= INTRINSIC_RTOL
+
+
 @pytest.mark.parametrize("origin_ang", [0.0, 1.0e7])
 def test_real_gaps_do_not_cancel_under_retardation_translation(origin_ang):
     """Fresh verifier's separated-interval tail, independent of time origin.
@@ -907,6 +928,32 @@ def test_coherent_cache_tracks_the_frozen_coupling_weight(tiny):
     assert first["cache_key"] != changed["cache_key"]
 
 
+def test_coherent_refinement_does_not_reuse_the_four_node_cache(tiny, monkeypatch):
+    from pyrite.montecarlo.runner import line_grid
+
+    case, ladder = tiny
+    policy = _policy(case, windows=True)
+    with monkeypatch.context() as old_policy:
+        old_policy.setattr(line_grid, "COHERENT_NYQUIST_OVERSAMPLING", 4.0)
+        old_policy.setattr(line_grid, "COHERENT_WINDOW_REVISION", 5)
+        old_policy.setattr(
+            cw.coherent_window_seeds,
+            "__kwdefaults__",
+            {**cw.coherent_window_seeds.__kwdefaults__, "oversampling": 4.0},
+        )
+        _, old = _resolve(case, ladder, policy)
+    grid, refined = _resolve(case, ladder, policy)
+    assert refined["cache"] == "miss"
+    assert refined["cache_key"] != old["cache_key"]
+    assert refined["num"] > old["num"]
+    warm_grid, warm = _resolve(case, ladder, policy)
+    assert warm["cache"] == "hit"
+    np.testing.assert_array_equal(warm_grid, grid)
+    # A budget that admitted the previous axis must refuse the refined one.
+    with pytest.raises(LineGridToleranceError, match=r"above the .*point budget"):
+        _resolve(case, ladder, _policy(case, windows=True, max_points=old["num"]))
+
+
 def test_a_plan_above_the_budget_is_refused_with_its_count(tiny):
     case, ladder = tiny
     payload = _policy(case, windows=True, max_points=200)
@@ -939,8 +986,8 @@ def test_windowed_auto_matches_a_fine_explicit_grid_on_identical_trajectories(ti
     window step, so it resolves every row's fringes everywhere; both grids are
     evaluated on the one transport. Peak height is excluded (#110). The
     dominant-line FWHM reads its half-maximum crossing by linear interpolation.
-    Four samples per Nyquist step are the numerical policy; the former two
-    samples fail this issue's stricter FWHM gate on these same trajectories.
+    Eight samples per Nyquist step are the numerical policy, informed by
+    the remote 60 keV ladder; this tiny anchor also checks all three gates.
     """
     case, ladder = tiny
     grid, record = _resolve(case, ladder, _policy(case, windows=True))
