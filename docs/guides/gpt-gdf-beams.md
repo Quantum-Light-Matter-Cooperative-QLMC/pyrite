@@ -133,7 +133,10 @@ Q_{\mathrm{signed}}=\sum_i q_i n_i,\qquad
 |Q|=\sum_i |q_i|n_i,\qquad I=|Q|f_{\mathrm{rep}}.
 $$
 
-It requires positive `nmacro` and `gdf_repetition_rate_hz`. Charge alone cannot
+It requires positive `nmacro` and a finite, strictly positive resolved shared
+`rep_rate_hz`. The existing default is 5000 Hz; an inherited profile beam rate
+also applies. `bunch_charge_pc` is derived as `|Q| × 1e12`, replacing any
+configured charge in this mode. Charge alone cannot
 determine an average current: identical bunches delivered at different rates
 produce different rates of photons. A 1 pC bunch at 1 MHz gives 1 µA.
 
@@ -159,7 +162,7 @@ gdf_time_s = 1.0e-9
 gdf_time_tolerance_s = 1.0e-15
 gdf_z_origin_m = 0.09844470106002952
 gdf_normalization = "gdf_charge"
-gdf_repetition_rate_hz = 1.0e6
+rep_rate_hz = 1.0e6
 
 [profiles.gpt_import]
 materials = ["hopg"]
@@ -167,7 +170,7 @@ beam = "gpt_import"
 emission = "incoherent"
 ```
 
-The example origin matches the fixture above; choose an origin appropriate to
+The example origin is an explicit placement choice; choose an origin appropriate to
 **your** beam and target. Catalog GDF paths resolve
 relative to the catalog file. Inline `[profiles.NAME.beam]` tables accept the
 same fields. Run this profile with `uv run pyrite run gpt_import -m hopg`.
@@ -181,29 +184,54 @@ bunch_charge_pc = 1.0
 rep_rate_hz = 5000.0
 ```
 
-Omit `gdf_repetition_rate_hz` in that mode. Do not combine the GDF source with
+The removed legacy `gdf_repetition_rate_hz` field is rejected: replace it
+with `rep_rate_hz`. Do not combine the GDF source with
 analytic spot, energy-spread, Twiss, or longitudinal-distribution settings.
 
 ## CLI example
 
-Equivalent overrides on an existing profile:
+Create a reusable beam, attach it, and run the profile:
 
 ```bash
-uv run pyrite run standard -m hopg \
-  --source gpt_gdf \
-  --gdf-path beam.gdf \
+uv run pyrite beam gdf-inspect beam.gdf --time-s 1e-9
+uv run pyrite beam create gpt_beam \
+  --source gpt_gdf --gdf-path beam.gdf \
   --gdf-time-s 1e-9 --gdf-time-tolerance-s 1e-15 \
   --gdf-z-origin-m 0.1 \
-  --gdf-normalization gdf_charge --gdf-repetition-rate-hz 1e6
+  --gdf-normalization gdf_charge --rep-rate-hz 5000
+uv run pyrite profile set standard --beam gpt_beam
+uv run pyrite run standard -m hopg
 ```
 
-Use `--gdf-normalization pyrite_current` and omit the repetition-rate override
-for configured current. CLI paths resolve relative to the working directory.
-GDF overrides are local-run options; remote file staging is not implemented.
-They cannot accompany `--preset` or developer `--nsys` re-execution.
-File-content hashes join case and dataset identities; mutation after case
-construction is rejected before transport. PyRITE does not ship a sample GDF;
-automated tests generate small fixtures with EasyGDF.
+The time, physical target origin, and repetition rate are examples. Creating or
+editing the beam validates the selected particle block before the atomic catalog
+write. CLI paths resolve relative to the working directory and are saved as
+absolute paths. `beam show gpt_beam` displays its source and GDF fields;
+`beam set ... --dry-run` validates and prints a diff without saving.
+
+For configured-current normalization:
+
+```bash
+uv run pyrite beam create gpt_current \
+  --source gpt_gdf --gdf-path beam.gdf --gdf-time-s 1e-9 \
+  --gdf-z-origin-m 0.1 --gdf-normalization pyrite_current \
+  --bunch-charge-pc 1 --rep-rate-hz 5000
+uv run pyrite profile set standard --beam gpt_current
+uv run pyrite run standard -m hopg
+```
+
+GDF settings belong to named beams; `run` accepts no source/GDF overrides.
+GDF beams require local execution; remote file staging and developer `--nsys`
+re-execution remain unsupported. File-content hashes join case and dataset
+identities; mutation after case construction is rejected before transport.
+Changing the shared repetition rate changes normalization and dataset identity,
+while sampled particle records remain identical for the same seed. Beam names
+and labels do not affect physical parameter hashes.
+
+Switching to `--source analytic` removes GDF fields. Switching an analytic beam
+to `gpt_gdf` removes its old analytic distribution fields; explicitly combining
+analytic distribution options with the GDF source is an error. Setting a time
+selector retires a previous screen selector, and conversely.
 
 For the Python API, set `Beam(source="gpt_gdf", energy_keV=30,
 transverse_fwhm_x_mm=None, transverse_fwhm_y_mm=None, gdf_path="beam.gdf",
@@ -223,8 +251,9 @@ have the same names as the catalog fields.
 - Invalid beta, gamma mismatch, non-electron mass/charge, or bad weights:
   correct the upstream particle output; the error identifies the field and
   reports the maximum gamma discrepancy when applicable.
-- Missing origin/rate or conflicting analytic settings: supply the explicit
-  origin and charge-mode repetition rate; remove analytic distribution fields.
+- Missing origin, invalid shared rate, or conflicting analytic settings: supply
+  the explicit origin, use a finite positive `rep_rate_hz`, and remove analytic
+  distribution fields. The shared default rate already satisfies charge mode.
 - Outward/grazing sample-frame rays: correct the coordinate alignment or target
   tilt. Directions are never flipped or discarded.
 
@@ -255,7 +284,12 @@ x/y ranges with the finite target footprint.
 For a target placed at lab z = 1.05 m, import that screen with:
 
 ```bash
-uv run pyrite run standard -m hopg --source gpt_gdf --gdf-path screen.gdf --gdf-screen-position-m 1.05 --gdf-z-origin-m 1.05
+uv run pyrite beam create gpt_screen --source gpt_gdf \
+  --gdf-path screen.gdf --gdf-screen-position-m 1.05 \
+  --gdf-screen-tolerance-m 1e-9 --gdf-z-origin-m 1.05 \
+  --gdf-normalization gdf_charge --rep-rate-hz 5000
+uv run pyrite profile set standard --beam gpt_screen
+uv run pyrite run standard -m hopg
 ```
 
 `gdf_screen_position_m` and `gdf_time_s` are mutually exclusive. The screen
@@ -278,11 +312,13 @@ and the selected target origin retain their usual meanings.
 For the generated time snapshot and the standard profile energies:
 
 ```bash
-uv run pyrite run standard -m hopg --source gpt_gdf --gdf-path beam.gdf --gdf-time-s 1e-9 --gdf-z-origin-m 0.1 --gdf-shape-only
+uv run pyrite beam set gpt_beam --gdf-shape-only
+uv run pyrite profile set standard --beam gpt_beam
+uv run pyrite run standard -m hopg
 ```
 
 Catalog/Python field: `gdf_shape_only = true` / `gdf_shape_only=True`.
-The default is false; `--no-gdf-shape-only` overrides a profile back to imported
+The default is false; `beam set gpt_beam --no-gdf-shape-only` switches back to imported
 energies and crossing times. Native electron records are still validated.
 This mode preserves angular divergence, not momentum, and does not model
 acceleration or beam evolution through accelerating fields.

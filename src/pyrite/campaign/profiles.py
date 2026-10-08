@@ -518,6 +518,9 @@ def _identity_v1(
 
         sweep_payload["gdf_source"] = {key: beam_payload[key] for key in GDF_FIELDS}
         sweep_payload["gdf_source"]["sha256"] = gdf.sha256
+        if sweep.beam.gdf_normalization == "gdf_charge":
+            assert gdf.absolute_charge_c is not None
+            beam_payload["bunch_charge_pc"] = gdf.absolute_charge_c * 1e12
     sweep_payload["energy_keV"] = beam_payload["energy_keV"]
     fwhm_x = beam_payload["transverse_fwhm_x_mm"]
     fwhm_y = beam_payload["transverse_fwhm_y_mm"]

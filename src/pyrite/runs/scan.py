@@ -644,7 +644,7 @@ def _resolved_run(args, material):
         settings,
         **{key: numerics.effective[key] for key in TRANSPORT_KEYS},
     )
-    overrides = dict(getattr(args, "gdf_overrides", None) or {})
+    overrides = {}
     if getattr(args, "quick", False):
         # Resolve quick beam energies from the effective profile/material line
         # grids instead of forcing a fixed [30, 50]: a named profile may own an
@@ -670,8 +670,7 @@ def _resolved_run(args, material):
         overrides["n_families"] = args.n_families
     if getattr(args, "beam_uvw", None) is not None:
         overrides["beam_uvw"] = tuple(args.beam_uvw)
-    # Analytic beam settings remain profile-owned. Explicit GDF overrides
-    # participate in dataset identity and force a variant checkpoint stem.
+    # Beam source and distribution settings are profile-owned.
     sweep = material_sweep(
         material,
         fidelity=fidelity,

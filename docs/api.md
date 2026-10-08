@@ -7,6 +7,10 @@ Names beginning with `_`, CLI command callbacks, app launchers, remote-job orche
 For a task-oriented walkthrough, including detector scoring and the boundary between in-memory results and checkpoint campaigns, see the [Python API workflow](guides/python-api-workflow.md).
 
 For native GPT time-output and screen beams, see [GDF beam import](guides/gpt-gdf-beams.md).
+Use `gdf_normalization="gdf_charge"` with the shared `rep_rate_hz` to derive
+charge from selected records; this replaces configured `bunch_charge_pc`.
+The default rate is 5000 Hz. Clear both analytic spot FWHMs for a GDF `Beam`.
+Named catalog beams clear those inherited defaults during profile resolution.
 
 ## Scene simulation
 

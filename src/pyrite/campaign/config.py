@@ -337,7 +337,11 @@ def material_sweep(
     target_over = {k: overrides.pop(k) for k in list(overrides) if k in _TARGET_OVERRIDE_KEYS}
     if overrides:
         sweep = replace(sweep, **overrides)
-    if beam_over.get("source") == "gpt_gdf":
+    if beam_over.get("source") == "gpt_gdf" and not (
+        {"beam_fwhm_mm", "transverse_fwhm_mm"} & beam_over.keys()
+    ):
+        # Clear inherited spot defaults, but let explicit isotropic aliases
+        # reach BeamSpec so GDF validation rejects the conflicting distribution.
         beam_over.setdefault("transverse_fwhm_x_mm", None)
         beam_over.setdefault("transverse_fwhm_y_mm", None)
     if beam_over:

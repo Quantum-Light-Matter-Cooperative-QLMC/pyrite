@@ -595,8 +595,6 @@ def test_ephemeral_artifact_parity_and_existing_file_preflight(tmp_path, monkeyp
         ["--detach"],
         ["--dry-run"],
         ["--no-sync"],
-        ["--source", "analytic"],
-        ["--gdf-path", "beam.gdf"],
         ["--n-families", "3"],
         ["--chunk-minutes", "0"],
         ["--fidelity", "full"],
@@ -818,3 +816,27 @@ def test_ephemeral_and_simulate_real_api_have_identical_cases_and_spatial_output
     assert legacy.exit_code == ephemeral.exit_code == 0, (legacy.output, ephemeral.output)
     assert legacy.stdout == ephemeral.stdout
     assert cases[0] == cases[1]
+
+
+def test_single_scene_named_gdf_clears_default_spot(tmp_path, monkeypatch):
+    import tomlkit
+
+    from tests.montecarlo.test_gdf import write_gdf
+
+    document = _single_scene_catalog(tmp_path, monkeypatch)
+    path = write_gdf(tmp_path / "beam.gdf")
+    document["beams"]["gpt_import"] = {
+        "source": "gpt_gdf",
+        "gdf_path": str(path),
+        "gdf_z_origin_m": 0.1,
+        "gdf_normalization": "gdf_charge",
+        "rep_rate_hz": 3000,
+    }
+    document["profiles"]["single"]["beam"] = "gpt_import"
+    _catalog_io.atomic_write(_catalog_io.active_catalog_path(), tomlkit.dumps(document))
+    beam, *_ = material._simulation_scene(document, "hopg", "single")
+    assert beam.source == "gpt_gdf"
+    assert beam.transverse_fwhm_x_mm is None
+    assert beam.transverse_fwhm_y_mm is None
+    assert beam.rep_rate_hz == 3000
+    assert beam.gdf_beam().absolute_charge_c > 0

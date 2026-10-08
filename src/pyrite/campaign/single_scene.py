@@ -52,6 +52,9 @@ def resolve_pixel_scene(
             changes["transverse"] = TransverseDistribution(**cast(dict[str, Any], dict(transverse)))
             changes.setdefault("transverse_fwhm_x_mm", None)
             changes.setdefault("transverse_fwhm_y_mm", None)
+        if changes.get("source") == "gpt_gdf":
+            changes.setdefault("transverse_fwhm_x_mm", None)
+            changes.setdefault("transverse_fwhm_y_mm", None)
         beam = beam_replace(beam, **changes)
     target = target_from_flat(
         spec.crystal_key,

@@ -2,6 +2,7 @@
 
 import difflib
 import re
+from copy import deepcopy
 from pathlib import Path
 
 import click
@@ -13,6 +14,7 @@ from pyrite.cli import _completion as _cli_completion
 from pyrite.cli.commands._beam_shared import (
     beam_cli_options,
     collect_beam_updates,
+    validate_gdf_fields,
     write_beam_fields,
 )
 from pyrite.console import json as cli_json
@@ -107,6 +109,10 @@ def _emit_show(payload):
     emit_result(f"[{payload['name']}]")
     if payload.get("label"):
         emit_result(f"  label: {payload['label']}")
+    emit_result(f"  source: {payload.get('source', 'analytic')}")
+    for key, value in payload.items():
+        if key.startswith("gdf_"):
+            emit_result(f"  {key}: {value}")
     for key in _DISPLAY_SCALARS:
         if key in payload:
             emit_result(f"  {key}: {payload[key]:g}")
@@ -207,6 +213,7 @@ def create_command(
     alpha_twiss,
     energy_spread_frac,
     dry_run,
+    **source_options,
 ):
     """Create a new named beam NAME.
 
@@ -225,6 +232,7 @@ def create_command(
         beta_twiss_m,
         alpha_twiss,
         energy_spread_frac,
+        **source_options,
     )
     if not updates:
         raise click.UsageError("provide at least one beam-field option")
@@ -237,6 +245,7 @@ def create_command(
         if label is not None:
             target["label"] = label
         write_beam_fields(target, updates)
+        validate_gdf_fields(target)
         _catalog_io.beams_table(document)[name] = target
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
@@ -263,6 +272,7 @@ def set_command(
     energy_spread_frac,
     yes,
     dry_run,
+    **source_options,
 ):
     """Update fields on an existing named beam NAME.
 
@@ -279,13 +289,19 @@ def set_command(
         beta_twiss_m,
         alpha_twiss,
         energy_spread_frac,
+        **source_options,
     )
     if not updates and label is None:
         raise click.UsageError("provide --label or a beam-field option")
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_beam(document, name)
+        proposed_target = deepcopy(target)
+        write_beam_fields(proposed_target, updates)
+        validate_gdf_fields(proposed_target)
         overwriting = [key for key in updates if key in target]
+        if "source" in updates or "gdf_time_s" in updates or "gdf_screen_position_m" in updates:
+            overwriting.extend(key for key in target if key not in proposed_target)
         if label is not None and "label" in target:
             overwriting.append("label")
     except (OSError, ValueError, ParseError) as exc:
@@ -297,8 +313,8 @@ def set_command(
             abort=True,
         )
     if label is not None:
-        target["label"] = label
-    write_beam_fields(target, updates)
+        proposed_target["label"] = label
+    _catalog_io.beams_table(document)[name] = proposed_target
     return _write(document, original, dry_run, f"updated beam {name}")
 
 

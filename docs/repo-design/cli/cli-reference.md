@@ -166,29 +166,6 @@ Options:
   --chunk-minutes MINUTES         With -R/--remote, self-resubmitting SLURM slice
                                   length; defaults to 10, or 0 (one unchunked
                                   allocation) for profiling captures.
-  --source [analytic|gpt_gdf]     Override beam source; gpt_gdf replaces analytic phase
-                                  space (local runs).
-  --gdf-shape-only / --no-gdf-shape-only
-                                  Use profile sweep energies with GDF
-                                  positions/directions/weights; discard crossing times.
-                                  Default: import energies.
-  --gdf-path PATH                 GPT time-output file; relative to current directory.
-  --gdf-time-s NUMBER             Select time in seconds; required for multiple time
-                                  blocks.
-  --gdf-time-tolerance-s NUMBER   Absolute time tolerance in seconds [default: 1e-15].
-  --gdf-normalization [pyrite_current|gdf_charge]
-                                  Configured current or GDF bunch charge times
-                                  repetition rate.
-  --gdf-repetition-rate-hz NUMBER
-                                  Required positive repetition rate for gdf_charge
-                                  normalization.
-  --gdf-z-origin-m NUMBER         Explicit target origin along GPT lab z in meters;
-                                  required for GDF.
-  --gdf-screen-position-m NUMBER  Select GPT screen coordinate in meters; excludes
-                                  --gdf-time-s.
-  --gdf-screen-tolerance-m NUMBER
-                                  Absolute screen-coordinate tolerance in meters
-                                  [default: 1e-9].
   --fidelity [full|survey]        Deprecated (removal in 0.6.0; issue #215). Named
                                   settings/grid-reduction policy; survey is retired.
                                   [default: full]
@@ -2361,12 +2338,35 @@ Options:
                                   --emittance.
   --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.  [x>0.0]
   --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.  [x>0.0]
-  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]
+  --rep-rate-hz HZ                Shared bunch repetition rate in Hz [default: 5000];
+                                  also used by gdf_charge.
   --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]
   --longitudinal [gaussian|microtrain|compressed]
                                   Replace the complete declarative longitudinal policy.
   --envelope-rms-fs FS            RMS duration for gaussian or microtrain longitudinal
                                   policy.  [x>0.0]
+  --gdf-shape-only / --no-gdf-shape-only
+                                  Use profile sweep energies and discard imported
+                                  crossing times; default imports energies and times.
+  --gdf-normalization [pyrite_current|gdf_charge]
+                                  pyrite_current uses configured charge/current;
+                                  gdf_charge derives charge from the file instead of
+                                  bunch_charge_pc and uses shared rep_rate_hz.
+  --gdf-z-origin-m NUMBER         Required explicit physical target origin along GPT lab
+                                  z in meters.
+  --gdf-screen-tolerance-m NUMBER
+                                  Absolute screen selection tolerance in meters
+                                  [default: 1e-9].
+  --gdf-screen-position-m NUMBER  GPT screen coordinate in meters; excludes --gdf-
+                                  time-s.
+  --gdf-time-tolerance-s NUMBER   Absolute time selection tolerance in seconds [default:
+                                  1e-15].
+  --gdf-time-s NUMBER             Time output in seconds; required for multiple outputs.
+                                  Excludes --gdf-screen-position-m.
+  --gdf-path PATH                 Native GPT file; relative to cwd, saved as an absolute
+                                  path.
+  --source [analytic|gpt_gdf]     Beam source [default: analytic]. GDF imports
+                                  correlated particle records.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
 ```
@@ -2470,12 +2470,35 @@ Options:
                                   --emittance.
   --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.  [x>0.0]
   --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.  [x>0.0]
-  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]
+  --rep-rate-hz HZ                Shared bunch repetition rate in Hz [default: 5000];
+                                  also used by gdf_charge.
   --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]
   --longitudinal [gaussian|microtrain|compressed]
                                   Replace the complete declarative longitudinal policy.
   --envelope-rms-fs FS            RMS duration for gaussian or microtrain longitudinal
                                   policy.  [x>0.0]
+  --gdf-shape-only / --no-gdf-shape-only
+                                  Use profile sweep energies and discard imported
+                                  crossing times; default imports energies and times.
+  --gdf-normalization [pyrite_current|gdf_charge]
+                                  pyrite_current uses configured charge/current;
+                                  gdf_charge derives charge from the file instead of
+                                  bunch_charge_pc and uses shared rep_rate_hz.
+  --gdf-z-origin-m NUMBER         Required explicit physical target origin along GPT lab
+                                  z in meters.
+  --gdf-screen-tolerance-m NUMBER
+                                  Absolute screen selection tolerance in meters
+                                  [default: 1e-9].
+  --gdf-screen-position-m NUMBER  GPT screen coordinate in meters; excludes --gdf-
+                                  time-s.
+  --gdf-time-tolerance-s NUMBER   Absolute time selection tolerance in seconds [default:
+                                  1e-15].
+  --gdf-time-s NUMBER             Time output in seconds; required for multiple outputs.
+                                  Excludes --gdf-screen-position-m.
+  --gdf-path PATH                 Native GPT file; relative to cwd, saved as an absolute
+                                  path.
+  --source [analytic|gpt_gdf]     Beam source [default: analytic]. GDF imports
+                                  correlated particle records.
   -y, --yes                       Skip overwrite confirmation.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.

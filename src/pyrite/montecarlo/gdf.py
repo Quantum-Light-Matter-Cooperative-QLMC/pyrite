@@ -21,7 +21,6 @@ GDF_FIELDS = (
     "gdf_screen_position_m",
     "gdf_screen_tolerance_m",
     "gdf_normalization",
-    "gdf_repetition_rate_hz",
     "gdf_z_origin_m",
 )
 _REQUIRED = ("x", "y", "z", "Bx", "By", "Bz", "m", "q")

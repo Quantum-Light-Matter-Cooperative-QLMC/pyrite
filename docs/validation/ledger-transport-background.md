@@ -739,7 +739,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Equation:** $\gamma=(1-|\boldsymbol\beta|^2)^{-1/2}$, $K=(\gamma-1)mc^2$, $Q=\sum_i q_i n_i$, $I=|Q|f$, $p_i=n_i/\sum_j n_j$, $s_i=-r_{iz}/d_{iz}$, screen clock $c(t_i-\min_j t_j)+s_i/|\boldsymbol\beta_i|$ (meters before conversion); shape-only $\beta=\sqrt{[k/(1+k)][1+1/(1+k)]}$ with $k=K/(m_ec^2)$, clock $s_i/\beta$
 - **Assumptions:** electrons; SI input; field-free signed extrapolation to a flat entrance; explicit lab-z origin; existing sample tilt rotation; incoherent emission; independent draws of complete records
 - **Limiting cases:** low-speed energy approaches $mv^2/2$; equal weights give uniform sampling; records on the untilted entrance retain transverse coordinates and directions
-- **Status:** rederived
+- **Status:** anchored
 - **Checks:** purpose-built GDF fixtures test malformed input, selection, energy/charge anchors, weighted seeded correlations, projection, screen crossing-time correlations, shape-only sweep energy assignment and flight clocks, normalization, and CPU transport
-- **Anchor:** `tests/montecarlo/test_gdf.py`
-- **Notes:** [Independent validation](beam-transport/gpt-gdf-injection.md). No human sign-off or GPU validation claimed.
+- **Anchor:** `tests/montecarlo/test_gdf.py`; `tests/cli/test_gdf.py::test_profile_run_persists_imported_normalization`
+- **Notes:** [Independent validation](beam-transport/gpt-gdf-injection.md). The existing independent derivations are pinned by CPU energy/charge, correlated-sampling, projection, screen-clock, and shape-only anchors. Shared `rep_rate_hz` normalization is additionally pinned against selected charge and saved current; fourfold frequency produces fourfold normalized flux without changing seeded phase space. No new equation, human sign-off, or GPU validation claimed.

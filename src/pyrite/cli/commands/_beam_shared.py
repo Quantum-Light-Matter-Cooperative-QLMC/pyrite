@@ -6,11 +6,94 @@ name (``--beam NAME``) and never writes distribution fields itself (issue #54).
 ``create`` and ``set`` share this module so the two verbs validate identically.
 """
 
+from pathlib import Path
+from typing import Any
+
 import click
 import tomlkit
 
+from pyrite.console.output import FINITE_FLOAT, NONNEGATIVE_FLOAT, POSITIVE_FLOAT
+
+_ANALYTIC_FIELDS = {
+    "transverse_fwhm_mm",
+    "beam_fwhm_mm",
+    "transverse_fwhm_x_mm",
+    "transverse_fwhm_y_mm",
+    "transverse",
+    "longitudinal",
+    "bunch_length_fs",
+    "long_shape",
+    "long_offsets_fs",
+    "energy_spread_frac",
+    "divergence_mrad",
+}
+
 
 def beam_cli_options(function):
+    source_options: tuple[tuple[tuple[str, ...], dict[str, Any]], ...] = (
+        (
+            ("--source",),
+            dict(
+                type=click.Choice(("analytic", "gpt_gdf")),
+                help="Beam source [default: analytic]. GDF imports correlated particle records.",
+            ),
+        ),
+        (
+            ("--gdf-path",),
+            dict(
+                type=click.Path(path_type=Path),
+                help="Native GPT file; relative to cwd, saved as an absolute path.",
+            ),
+        ),
+        (
+            ("--gdf-time-s",),
+            dict(
+                type=NONNEGATIVE_FLOAT,
+                help="Time output in seconds; required for multiple outputs. Excludes --gdf-screen-position-m.",
+            ),
+        ),
+        (
+            ("--gdf-time-tolerance-s",),
+            dict(
+                type=NONNEGATIVE_FLOAT,
+                help="Absolute time selection tolerance in seconds [default: 1e-15].",
+            ),
+        ),
+        (
+            ("--gdf-screen-position-m",),
+            dict(type=FINITE_FLOAT, help="GPT screen coordinate in meters; excludes --gdf-time-s."),
+        ),
+        (
+            ("--gdf-screen-tolerance-m",),
+            dict(
+                type=NONNEGATIVE_FLOAT,
+                help="Absolute screen selection tolerance in meters [default: 1e-9].",
+            ),
+        ),
+        (
+            ("--gdf-z-origin-m",),
+            dict(
+                type=FINITE_FLOAT,
+                help="Required explicit physical target origin along GPT lab z in meters.",
+            ),
+        ),
+        (
+            ("--gdf-normalization",),
+            dict(
+                type=click.Choice(("pyrite_current", "gdf_charge")),
+                help="pyrite_current uses configured charge/current; gdf_charge derives charge from the file instead of bunch_charge_pc and uses shared rep_rate_hz.",
+            ),
+        ),
+        (
+            ("--gdf-shape-only/--no-gdf-shape-only",),
+            dict(
+                default=None,
+                help="Use profile sweep energies and discard imported crossing times; default imports energies and times.",
+            ),
+        ),
+    )
+    for names, options in source_options:
+        function = click.option(*names, **options)(function)
     function = click.option(
         "--envelope-rms-fs",
         type=click.FloatRange(min=0.0, min_open=True),
@@ -31,9 +114,9 @@ def beam_cli_options(function):
     )(function)
     function = click.option(
         "--rep-rate-hz",
-        type=click.FloatRange(min=0.0, min_open=True),
+        type=POSITIVE_FLOAT,
         metavar="HZ",
-        help="Bunch repetition rate in Hz.",
+        help="Shared bunch repetition rate in Hz [default: 5000]; also used by gdf_charge.",
     )(function)
     function = click.option(
         "--transverse-fwhm-mm",
@@ -84,6 +167,7 @@ def collect_beam_updates(
     beta_twiss_m=None,
     alpha_twiss=None,
     energy_spread_frac=None,
+    **source_options,
 ):
     if longitudinal_kind is None and envelope_rms_fs is not None:
         raise click.UsageError("--envelope-rms-fs requires --longitudinal")
@@ -128,6 +212,13 @@ def collect_beam_updates(
         if alpha_twiss is not None:
             transverse["alpha_twiss_x"] = alpha_twiss
         updates["transverse"] = transverse
+    updates.update({key: value for key, value in source_options.items() if value is not None})
+    if "gdf_path" in updates:
+        updates["gdf_path"] = str(Path(updates["gdf_path"]).expanduser().resolve())
+    if "gdf_time_s" in updates and "gdf_screen_position_m" in updates:
+        raise click.UsageError("--gdf-time-s and --gdf-screen-position-m are mutually exclusive")
+    if updates.get("source") == "gpt_gdf" and updates.keys() & _ANALYTIC_FIELDS:
+        raise click.UsageError("gpt_gdf is incompatible with analytic distribution options")
     return updates
 
 
@@ -137,6 +228,23 @@ def write_beam_fields(table, updates):
     that still decodes."""
     if not updates:
         return
+    source = updates.get("source", table.get("source", "analytic"))
+    if source == "gpt_gdf":
+        if updates.keys() & _ANALYTIC_FIELDS:
+            raise click.UsageError("gpt_gdf is incompatible with analytic distribution options")
+        if table.get("source", "analytic") != source:
+            for key in _ANALYTIC_FIELDS:
+                table.pop(key, None)
+        if "gdf_time_s" in updates:
+            table.pop("gdf_screen_position_m", None)
+        elif "gdf_screen_position_m" in updates:
+            table.pop("gdf_time_s", None)
+    elif updates.get("source") == "analytic":
+        if any(key.startswith("gdf_") for key in updates):
+            raise click.UsageError("GDF settings require --source gpt_gdf")
+        for key in list(table):
+            if key.startswith("gdf_"):
+                table.pop(key)
     for key, value in updates.items():
         if key in ("longitudinal", "transverse"):
             policy = tomlkit.table()
@@ -153,3 +261,17 @@ def write_beam_fields(table, updates):
             table.pop(legacy, None)
     elif "transverse_fwhm_mm" in updates:
         table.pop("transverse", None)
+
+
+def validate_gdf_fields(table):
+    """Validate external particle data before saving an edited named beam."""
+    if "gdf_repetition_rate_hz" in table:
+        raise ValueError("removed; replace gdf_repetition_rate_hz with rep_rate_hz")
+    if table.get("source", "analytic") != "gpt_gdf":
+        return
+    from pyrite.campaign.sweep import BeamSpec, beam_replace
+
+    fields = {key: value for key, value in table.items() if key != "label"}
+    fields.setdefault("transverse_fwhm_x_mm", None)
+    fields.setdefault("transverse_fwhm_y_mm", None)
+    beam_replace(BeamSpec(), **fields).gdf_beam()

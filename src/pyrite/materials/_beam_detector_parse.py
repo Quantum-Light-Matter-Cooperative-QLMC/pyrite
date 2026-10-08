@@ -39,7 +39,6 @@ _GDF_KEYS = {
     "gdf_screen_position_m",
     "gdf_screen_tolerance_m",
     "gdf_normalization",
-    "gdf_repetition_rate_hz",
     "gdf_z_origin_m",
 }
 _BEAM_KEYS = (
@@ -275,7 +274,12 @@ def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, ob
     table = _table(raw, path, errors)
     if table is None:
         return None
-    errors.keys(table, path, set(_BEAM_KEYS))
+    if "gdf_repetition_rate_hz" in table:
+        errors.add(
+            f"{path}.gdf_repetition_rate_hz",
+            "removed; replace gdf_repetition_rate_hz with rep_rate_hz",
+        )
+    errors.keys(table, path, set(_BEAM_KEYS) | {"gdf_repetition_rate_hz"})
     out: dict[str, object] = {}
     source = table.get("source", "analytic")
     if not isinstance(source, str) or source not in {"analytic", "gpt_gdf"}:
@@ -293,11 +297,6 @@ def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, ob
         for required in ("gdf_path", "gdf_z_origin_m"):
             if required not in table:
                 errors.add(path, f"gpt_gdf requires {required}")
-        if table.get("gdf_normalization", "pyrite_current") == "gdf_charge":
-            if "gdf_repetition_rate_hz" not in table:
-                errors.add(path, "gdf_charge requires gdf_repetition_rate_hz")
-        elif "gdf_repetition_rate_hz" in table:
-            errors.add(path, "gdf_repetition_rate_hz requires gdf_charge")
     for key, value in table.items():
         if key in {"source", "gdf_path", "gdf_normalization"}:
             if not isinstance(value, str) or not value.strip():
@@ -313,14 +312,12 @@ def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, ob
                 out[key] = value
         elif key in _GDF_KEYS:
             number = _number(value)
-            if (
-                number is None
-                or (key not in {"gdf_z_origin_m", "gdf_screen_position_m"} and number < 0)
-                or (key == "gdf_repetition_rate_hz" and number == 0)
+            if number is None or (
+                key not in {"gdf_z_origin_m", "gdf_screen_position_m"} and number < 0
             ):
                 errors.add(
                     f"{path}.{key}",
-                    "must be finite, non-negative (repetition rate strictly positive)",
+                    "must be finite and non-negative (origin/screen coordinates may be signed)",
                 )
             else:
                 out[key] = number
