@@ -37,6 +37,10 @@ from ..materials.photon_cross_sections import ATTENUATION_MODEL
 from ..montecarlo.case import Case
 from ..montecarlo.spectrum import BREMSSTRAHLUNG_MODEL, CHARACTERISTIC_MODEL, LINE_ESCAPE_MODEL
 from ..montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
+from ..montecarlo.spectrum.coherent_population import (
+    COHERENT_POPULATION_MODEL,
+    physical_bunch_electrons,
+)
 from ..montecarlo.transport import STOPPING_MODEL
 from ..results import EmissionMode, Settings
 from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
@@ -137,8 +141,8 @@ class NumericsResolution:
 #     untouched. Recomputed per requester on reuse, so a reused blob's arrays are
 #     correct for any solid angle.
 #   - ``rep_rate_hz`` / ``bunch_charge_pc``: pulse cadence/charge. ``store_result``
-#     folds them into the derived ``source_current_na`` scalar only; never into
-#     the arrays.
+#     folds them into ``source_current_na``. Coherent content keys also carry
+#     the resolved physical bunch population, since charge changes their arrays.
 #   - ``beam_current_na``: legacy reporting fallback, never a kernel input.
 #   - ``mosaic_fwhm_rad``: analytic post-processing broadening in
 #     ``store_result``. The MC route remains keyed by ``mosaic_mc_fwhm_rad``.
@@ -672,6 +676,8 @@ def _identity_v1(
     # The PXR/CBS line route's escape model is unconditional physics too
     # (segment-mean escape since issue #181); same constant-marker rule.
     resolved["line_escape_model"] = LINE_ESCAPE_MODEL
+    if emission != "incoherent":
+        resolved["coherent_population_model"] = COHERENT_POPULATION_MODEL
     # Every photon-escape factor reads the narrow-beam mu, sourced from EPDL2025
     # since issue #274 (was Chantler f2 + Elam); same constant-marker rule.
     resolved["attenuation_model"] = ATTENUATION_MODEL
@@ -835,6 +841,9 @@ def case_content_key(
             {key: value for key, value in case.items() if key not in _CONTENT_KEY_DENYLIST}
         ),
     }
+    if case.get("coherent_emission", False):
+        payload["coherent_population_model"] = COHERENT_POPULATION_MODEL
+        payload["physical_bunch_electrons"] = physical_bunch_electrons(case)
     if xsgen_tables:
         payload["xsgen_tables"] = {str(key): str(value) for key, value in xsgen_tables.items()}
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()

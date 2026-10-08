@@ -608,7 +608,11 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
     assert tabulated == [len(KWARGS["hkl_list"])]
 
     direct_incoherent = mc_spectrum(segs, E_GRID, coherent=False, **KWARGS)
-    direct_coherent = mc_spectrum(segs, E_GRID, coherent=True, **KWARGS)
+    from scipy.constants import elementary_charge
+
+    direct_coherent = mc_spectrum(
+        segs, E_GRID, coherent=True, physical_electrons=1e-12 / elementary_charge, **KWARGS
+    )
 
     np.testing.assert_allclose(out["spec"], direct_incoherent, rtol=RTOL)
     np.testing.assert_allclose(out["spec_coherent"], direct_coherent, rtol=RTOL)

@@ -3526,3 +3526,16 @@ its scope.
   construction and sample arithmetic, outside-axis power, FWHM, scalable
   reference/thick certificates and corrected remote ladders remain open.
   No `signed-off` transition is proposed.
+
+
+## Physical population continuation (2026-10-08)
+
+Production coherent reduction now uses physical bunch charge and distinct incident
+Monte Carlo pairs; see [coherent-physical-bunch-population](../radiation-physics/coherent-physical-bunch-population.md).
+Window tail multipliers use the same physical pair scale and include missed
+entries in the incident normalization. Infinite-slab capture includes the complete
+sampled offsets. Coherent cache revision 7 includes physical charge; coherent
+spectrum identities carry their own operator generation. Existing remote ladders
+and smoke runs predate this operator and require fresh charge-weighted confirmation.
+The full claim remains **discrepancy**. New population verification is pending;
+convex audits refuse signed weights outside their supported enclosure.

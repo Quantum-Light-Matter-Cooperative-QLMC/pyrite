@@ -13,6 +13,7 @@ import numpy as np
 from ...._backend import REAL, _to_cpu, xp
 from ....materials.attenuation import _mu_total_inv_ang
 from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
+from ..coherent_population import mixed_row_power, pair_scale
 from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._bin_quadrature import sincsq_bin_lineshape
@@ -151,6 +152,14 @@ def _row_decoherence_factor(st, g_vec_d):
     decoherence_A_pop = st.decoherence_A_pop
     xy0_pop = st.xy0_pop
 
+    if req.physical_electrons is not None:
+        # Physical pairs use complete sampled fields on infinite slabs; no
+        # second empirical F estimator or offset/field independence is needed.
+        return (
+            finite_footprint_F
+            if decoherence_active and finite_footprint_now
+            else xp.ones(E_grid.size, dtype=REAL)
+        )
     if not decoherence_active:
         return None
     if finite_footprint_now:
@@ -299,6 +308,9 @@ def _temporal_coherent_row(st, g_vec_d, wm, idx, coefs, good, lines, L_esc):
         wm,
         delta_omega=delta_omega_on_profile(st, profile),
         chi=coherent_offset_chi(st, profile, g_vec_d),
+        cross_pair_scale=None
+        if st.request.physical_electrons is None
+        else pair_scale(st.request.physical_electrons, st.Ne),
     )
 
 
@@ -327,7 +339,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
     delta_omega_grid = st.delta_omega_grid
     seg_r_geom = st.seg_r_geom
     d_all_geom = st.d_all_geom
-    decoherence_active = st.decoherence_active
+    decoherence_active = st.decoherence_active or req.physical_electrons is not None
 
     # The attenuation lives in the formation factor, not the amplitude.
     amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG))
@@ -425,7 +437,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
                     xp.zeros(E_grid.size, dtype=REAL),
                 )
                 F_row = _row_decoherence_factor(st, g_vec_d)
-                spec[:] += ((1.0 - F_row) * grouped_total + F_row * out_flat) * wm
+                spec[:] += mixed_row_power(st, grouped_total, out_flat, F_row) * wm
         return
 
     fields = [xp.zeros(E_grid.size, dtype=cdtype) for _ in coefs]
@@ -480,7 +492,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
             [c[sel_full] for c in coefs],
         )
         F_row = _row_decoherence_factor(st, g_vec_d)
-        spec[:] += ((1.0 - F_row) * grouped_total + F_row * flat_total) * wm
+        spec[:] += mixed_row_power(st, grouped_total, flat_total, F_row) * wm
     else:
         spec[:] += flat_total * wm
     return

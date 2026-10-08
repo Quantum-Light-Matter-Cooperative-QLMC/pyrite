@@ -13,6 +13,7 @@ from ..._backend import _to_cpu
 from ..._line_grid_policy import LineGridToleranceError
 from ..spectrum.coherent_dispersion import CoherentDispersionLaw
 from ..spectrum.coherent_form_factor import gaussian_form_factor_bounds
+from ..spectrum.coherent_population import pair_scale, physical_bunch_electrons
 from ..spectrum.coherent_spectrum_audit import (
     FullAxisCentroidAudit,
     audit_full_axis_spectrum_centroid,
@@ -57,15 +58,36 @@ class CoherentGridAudit:
 
     def capture(self, st, idx, coefs, good, lines):
         """Use the production setup's actual coherence sector, then capture rows."""
-        if not st.decoherence_active:
-            self.factor_bounds = (1.0, 1.0)
+        scale = pair_scale(st.request.physical_electrons, st.Ne)
+        if scale == 0:
+            self.factor_bounds = (0.0, 0.0)
+            self.collector(st, idx, coefs, good, lines)
+            return
+        if not st.decoherence_active or not st.finite_footprint_now:
+            if scale > 1:
+                raise ValueError(
+                    "full-axis coherent audit cannot certify signed physical pair weights"
+                )
+            self.factor_bounds = (scale, scale)
         elif st.finite_footprint_now:
-            self.factor_bounds = partial(
+            bounds = partial(
                 gaussian_form_factor_bounds,
                 sigma_z_ang=longitudinal_rms_fs(self.case) * C_ANG_PER_FS,
             )
-        # An infinite slab's row-dependent empirical factor remains [0,1].
-        # A budget can refuse that loose enclosure; it cannot license F=0.
+            upper = bounds(float(_to_cpu(st.E_grid[0])), float(_to_cpu(st.E_grid[-1])))[1]
+            if np.nextafter(scale * upper, np.inf) > 1:
+                raise ValueError(
+                    "full-axis coherent audit cannot certify signed physical pair weights"
+                )
+
+            def scaled_bounds(lo, hi):
+                lower, upper = bounds(lo, hi)
+                return (
+                    max(0.0, float(np.nextafter(scale * lower, -np.inf))),
+                    min(1.0, float(np.nextafter(scale * upper, np.inf))),
+                )
+
+            self.factor_bounds = scaled_bounds
         self.collector(st, idx, coefs, good, lines)
 
     def check(self, energy_eV, source, electron_count):
@@ -102,6 +124,9 @@ class CoherentGridAudit:
             )
         record = {
             "scope": "stored-input full finite-axis yield",
+            "physical_electrons": physical_bunch_electrons(self.case),
+            "incident_samples": electron_count,
+            "cross_pair_scale": pair_scale(physical_bunch_electrons(self.case), electron_count),
             "start_eV": audit.start_eV,
             "stop_eV": audit.stop_eV,
             "points": audit.points,

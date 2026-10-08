@@ -426,3 +426,14 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** units; zero coupling and thickness; exact Bragg detuning; no absorption; sign symmetry. Case adapter retains the offline audit's positive-g resonance and plus-g detuning; tests cover orientation and crystalline layers.
 - **Anchor:** `tests/materials/test_kinematic_validity.py::test_reference_parameters`, `::test_thick_silicon_and_thin_hopg`; `tests/scan/test_kinematic_validity.py`
 - **Notes:** Issue #342. Fresh-context verifier rederived the scalar parameters and source-to-code agreement; analytic and Si/HOPG anchors pass. Central incident ray and scalar detector direction, vacuum optical kinematics. No certification over scattering, mosaic domains, energy spread or detector acceptance; the extinction flag only says that a Bragg exchange length is reachable. Optical-data misses are recorded explicitly. Thresholds are project policy. [Independent derivation](radiation-physics/kinematic-validity-envelope.md). Human sign-off belongs to #277.
+
+
+## `coherent-physical-bunch-population`
+
+- **Claim:** Per-physical-electron coherent source power estimated with distinct incident Monte Carlo pairs; physical bunch charge weights the cross-electron excess, sample count normalizes the estimator
+- **Code:** `montecarlo/spectrum/coherent_population.py::{physical_bunch_electrons,pair_scale,mixed_row_power,require_resolved_power}`; `montecarlo/spectrum/lines/_temporal.py::add_coherent_row`
+- **Source:** Independent-electron field expansion; Su et al., Nuclear Science and Techniques 29, 30 (2018), Eq. (2), identical-emitter `N[1+(N-1)F]` limit; SI elementary charge
+- **Status:** filtered
+- **Checks:** Implementation-context units, distinct-pair normalization, identical aligned fields, zero-mean iid fields, missed entries, Gaussian longitudinal limit, negative-estimate refusal, temporal and detector normalization; fresh-context verification pending
+- **Anchor:** `tests/montecarlo/test_coherent_physical_population.py`; `tests/montecarlo/test_temporal_profile.py`
+- **Notes:** [Derivation, assumptions and integration limits](radiation-physics/coherent-physical-bunch-population.md). Production supplies physical charge; low-level callers without it retain historical semantics. Nonnegative output is not a sampling certificate. Convex full-axis audits refuse signed weights they cannot enclose. Earlier remote evidence must be repeated under this operator. Does not promote the full windowed-resolution claim; human sign-off pending.

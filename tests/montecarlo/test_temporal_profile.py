@@ -165,7 +165,10 @@ def _stub_continuum(monkeypatch, runner):
 
 def _runner_inputs(*, coherent, temporal):
     segments = _segments([0.0, 500.0])
+    from scipy.constants import elementary_charge
+
     case = {
+        "bunch_charge_pc": elementary_charge * 1e12,
         "crystal": "hopg",
         "hkl_list": KWARGS["hkl_list"],
         "B_ang2": KWARGS["B_ang2"],
