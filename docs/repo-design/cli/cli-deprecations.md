@@ -8,7 +8,9 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 
 ## Commands
 
-No command spelling is currently deprecated. Every spelling the CLI accepts is canonical; anything else exits as an unknown command.
+| Deprecated spelling | Replacement | Deprecated in | Remove in | Note |
+| --- | --- | --- | --- | --- |
+| `pyrite material set` | `pyrite profile set` | 0.4.0 | 0.6.0 | per-material range overrides are retired (issue #359): set shared ranges with 'pyrite profile set', or give one material its own profile with 'pyrite profile create NAME --from PROFILE --material MATERIAL'; 'pyrite material set MATERIAL --reset all' still removes existing overrides during the window. |
 
 ## Options
 

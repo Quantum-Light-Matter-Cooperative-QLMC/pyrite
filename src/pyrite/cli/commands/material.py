@@ -251,12 +251,16 @@ def _set(
     lazy_commands=_COMMANDS,
     lazy_help=_COMMAND_HELP,
     no_args_is_help=True,
+    deprecation_prefix="material",
 )
 def command():
-    """Inspect, validate, edit, and blaze individual materials.
+    """Inspect, validate, simulate, and blaze individual materials.
 
-    Profile membership remains under ``pyrite profile members``. ``validate``
-    checks the complete catalog; ``blaze`` writes a face-specific checkpoint.
+    Profile membership and ranges live under ``pyrite profile``. ``show``
+    reports effective ranges and any per-material override that diverges from
+    the profile; ``validate`` checks the complete catalog; ``blaze`` writes a
+    face-specific checkpoint. The deprecated ``set`` (removal in 0.6.0) only
+    remains to reset existing overrides.
     """
 
 
@@ -322,7 +326,7 @@ def show_command(material, profile_name, json_output):
     return _show(material, profile_name, json_output)
 
 
-@command.command("set")
+@command.command("set", hidden=True)
 @click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
     "--profile",
@@ -345,7 +349,14 @@ def show_command(material, profile_name, json_output):
 def set_command(
     material, profile_name, thickness, energy, polar, azimuth, reset_keys, yes, dry_run
 ):
-    """Set or reset MATERIAL overrides without changing profile membership."""
+    """Deprecated: set or reset MATERIAL overrides under one profile.
+
+    Per-material overrides quietly diverge one material from its profile and
+    are retired in 0.6.0 (issue #359). Set shared ranges with ``pyrite profile
+    set``, or give a material its own profile with ``pyrite profile create NAME
+    --from PROFILE --material MATERIAL``. ``--reset all`` removes the four
+    range overrides this command wrote.
+    """
     return _set(
         material,
         profile_name,

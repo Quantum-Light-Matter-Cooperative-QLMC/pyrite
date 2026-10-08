@@ -29,7 +29,7 @@ pyrite profile show my-survey
 pyrite material show hopg --profile my-survey
 ```
 
-Set shared ranges on the profile, then use `pyrite material set MATERIAL --profile NAME` for one-material overrides. Inspect the effective material after every edit; the displayed result, not the TOML fragment alone, is what a run hashes.
+Set ranges on the profile. When one material needs different ranges, give it its own profile (`pyrite profile create NAME --from PROFILE --material MATERIAL`) rather than a per-material override: overrides silently diverge one material from the profile it appears to follow. `pyrite material set` is deprecated (removal in 0.6.0, issue #359); during the window, `pyrite material set MATERIAL --profile NAME --reset all` removes the range overrides it wrote. Inspect the effective material after every edit; `pyrite material show` marks each range `inherited` or `overridden`, and the displayed result, not the TOML fragment alone, is what a run hashes.
 
 ## Reuse a named beam
 
@@ -45,8 +45,9 @@ Renaming a beam updates profile references and leaves identities unchanged becau
 
 ```bash
 pyrite material show hopg --profile my-survey
-pyrite material set hopg --profile my-survey --help
-pyrite material show hopg --profile my-survey
+pyrite profile create hopg-thick --from my-survey --material hopg
+pyrite profile set hopg-thick --thickness 50000 --dry-run
+pyrite material show hopg --profile hopg-thick
 ```
 
 After changing a profile or material, existing variant checkpoints are not silently reused as the new dataset. Preview stale data with:

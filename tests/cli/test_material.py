@@ -9,8 +9,11 @@ import pytest
 from pyrite import cli
 from pyrite._catalog_layout import read_text
 from pyrite.cli import _catalog_io
+from pyrite.cli._deprecations import message
 from pyrite.cli.commands import material
 from tests.helpers.cli import assert_clean_result, invoke
+
+_SET_WARNING = message("material set") + "\n"
 
 _CATALOG = """[profiles.standard]
 thickness_ang = { values = [1000.0] }
@@ -82,7 +85,9 @@ def test_set_nonstandard_profile_override(tmp_path, monkeypatch):
         ["set", "mose2", "--profile", "survey", "--energy", "70"],
     )
 
-    assert_clean_result(result, stdout="updated profile survey, material mose2\n")
+    assert_clean_result(
+        result, stdout="updated profile survey, material mose2\n", stderr=_SET_WARNING
+    )
     text = catalog.read_text()
     assert "[profiles.survey.overrides.mose2]" in text
     assert "energy_keV = {values = [70.0]}" in text
@@ -105,7 +110,9 @@ def test_material_set_concatenates_repeated_range_options(tmp_path, monkeypatch)
         ],
     )
 
-    assert_clean_result(result, stdout="updated profile survey, material mose2\n")
+    assert_clean_result(
+        result, stdout="updated profile survey, material mose2\n", stderr=_SET_WARNING
+    )
     assert "energy_keV = {values = [40.0, 50.0, 70.0]}" in catalog.read_text()
 
 
@@ -121,7 +128,9 @@ def test_reset_preserves_non_range_override_siblings(tmp_path, monkeypatch):
 
     result = invoke(material.command, ["set", "hopg", "--reset", "thickness"])
 
-    assert_clean_result(result, stdout="updated profile standard, material hopg\n")
+    assert_clean_result(
+        result, stdout="updated profile standard, material hopg\n", stderr=_SET_WARNING
+    )
     section = (
         catalog.read_text().split("[profiles.standard.overrides.hopg]", 1)[1].split("\n[", 1)[0]
     )
@@ -142,7 +151,7 @@ def test_overwrite_confirmation_and_dry_run(tmp_path, monkeypatch):
         material.command,
         ["set", "hopg", "--thickness", "3000", "--dry-run"],
     )
-    assert_clean_result(dry_run)
+    assert_clean_result(dry_run, stderr=_SET_WARNING)
     assert "+thickness_ang={values=[3000.0]}" in dry_run.stdout.replace(" ", "")
     assert catalog.read_text() == original
 

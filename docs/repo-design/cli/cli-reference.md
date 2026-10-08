@@ -2086,53 +2086,22 @@ Options:
 ```text
 Usage: pyrite material [OPTIONS] COMMAND [ARGS]...
 
-  Inspect, validate, edit, and blaze individual materials.
+  Inspect, validate, simulate, and blaze individual materials.
 
-  Profile membership remains under ``pyrite profile members``. ``validate`` checks the
-  complete catalog; ``blaze`` writes a face-specific checkpoint.
+  Profile membership and ranges live under ``pyrite profile``. ``show`` reports
+  effective ranges and any per-material override that diverges from the profile;
+  ``validate`` checks the complete catalog; ``blaze`` writes a face-specific checkpoint.
+  The deprecated ``set`` (removal in 0.6.0) only remains to reset existing overrides.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  set          Set or reset MATERIAL overrides without...
   show         Show MATERIAL's effective ranges and...
   simulate     Simulate one material/profile scene on a...
   blaze        Run a grooved-crystal sweep and write a checkpoint.
   energy-grid  Derive and inspect detector energy-grid inputs.
   validate     Validate a material catalog without starting simulation.
-```
-
-## `pyrite material set`
-
-```text
-Usage: pyrite material set [OPTIONS] MATERIAL
-
-  Set or reset MATERIAL overrides without changing profile membership.
-
-Options:
-  --profile TEXT                  Edit overrides under profile NAME.  [default:
-                                  standard]
-  --thickness ANGSTROM,... | START:STOP:STEP
-                                  Crystal thicknesses in angstrom. Comma-separated,
-                                  mixable with start:stop:step ranges; repeat to
-                                  combine.
-  --energy KEV,... | START:STOP:STEP
-                                  Beam energies in keV. Comma-separated, mixable with
-                                  start:stop:step ranges; repeat to combine.
-  --polar DEG,... | START:STOP:STEP
-                                  Polar tilts in degrees [0, 90). Comma-separated,
-                                  mixable with start:stop:step ranges; repeat to
-                                  combine.
-  --azimuth DEG,... | START:STOP:STEP
-                                  Azimuth tilts in degrees [0, 360]. Comma-separated,
-                                  mixable with start:stop:step ranges; repeat to
-                                  combine.
-  --reset [thickness|energy|polar|azimuth|all]
-                                  Remove one override; repeat, or use --reset all.
-  -y, --yes                       Skip overwrite confirmation.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite material show`

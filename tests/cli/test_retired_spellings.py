@@ -12,6 +12,7 @@ import click
 import pytest
 
 from pyrite.cli import command
+from pyrite.cli._deprecations import DEPRECATIONS
 from pyrite.devtools.cli_commands import energy_grid_command
 from tests.helpers.cli import invoke
 
@@ -231,8 +232,8 @@ def test_every_retired_dev_option_spelling_is_refused(path: str, option: str) ->
     assert "No such option" in result.stderr
 
 
-def test_no_command_in_the_live_tree_is_hidden() -> None:
-    """Hidden commands existed only to host retired spellings."""
+def test_only_registered_deprecations_are_hidden() -> None:
+    """Hidden commands exist only to host spellings in their deprecation window."""
 
     def walk(group: click.Group, ctx: click.Context, prefix: tuple[str, ...] = ()):
         for name in group.list_commands(ctx):
@@ -246,4 +247,4 @@ def test_no_command_in_the_live_tree_is_hidden() -> None:
     root = click.Context(command, info_name="pyrite")
     hidden = [" ".join(path) for path, child in walk(command, root) if child.hidden]
 
-    assert hidden == []
+    assert sorted(hidden) == sorted(DEPRECATIONS)
