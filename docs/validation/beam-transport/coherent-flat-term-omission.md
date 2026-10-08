@@ -319,8 +319,10 @@ empirical factor, and preservation of the refusal for unresolved signed
 physical-pair power.
 
 The same physical fixtures select streaming, eager CuPy, and reduction-JIT
-routes when run with the CUDA test backend. That current CUDA check remains
-pending lab GPU availability; no revised physical-population GPU result or
-speedup is claimed here. The paired timing harness accepts
+routes when run with the CUDA test backend. SLURM job 1162 in the isolated
+`~/pyrite-362-port-350` checkout passed all 39 selected CUDA checks in
+22.37 seconds (26 other cases deselected). This validates the physical-population
+omission fixtures across the three CUDA reducer routes; it does not establish
+a production-workload speedup. The paired timing harness accepts
 `--physical-electrons N` for future physical-charge measurements; omitting
 that argument reproduces historical sampled-population measurements.
