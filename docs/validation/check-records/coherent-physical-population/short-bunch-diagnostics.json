@@ -1,0 +1,289 @@
+{
+  "config": {
+    "mode": "smoke",
+    "energy": 30.0,
+    "charge_pc": 1.0,
+    "max_points": 20000000,
+    "reference_points": 40000000,
+    "reference_divisor": 3.0
+  },
+  "stamp": {
+    "code_digest": "509ce0f05bffd15b8672167b9a21e77ae4f80437f2354658501164e7daf0da2e",
+    "code_revision": "d079e98b84ef8963efd8f1492f258063dad4c172",
+    "code_dirty": "False",
+    "code_synced_at": "2026-10-08T23:27:13+00:00",
+    "code_source": "alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-350-coherent-windowed-line-grid",
+    "code_tables_digest": "e2ac3e02df0309aa624c4497460da98bd926db9d9e10904c95edb4bbada7106c"
+  },
+  "evals": {},
+  "state": "failed",
+  "gpu_limits": {
+    "aligned_samples": [
+      2,
+      3,
+      7
+    ],
+    "physical_electrons": 12,
+    "negative_refusal": true
+  },
+  "physical_electrons": 6241509.074460763,
+  "incident_samples": 200,
+  "transport_and_grid_wall_s": 12.325506626002607,
+  "fingerprint": {
+    "n_segments": 39187,
+    "digest": "f9d5bae2d8e6254ae1912c56ebe2bfd2"
+  },
+  "dtype": "float64",
+  "case": {
+    "crystal": "hopg",
+    "hkl_list": [
+      [
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        -2
+      ],
+      [
+        0,
+        0,
+        4
+      ],
+      [
+        0,
+        0,
+        -4
+      ]
+    ],
+    "E0_keV": 60.0,
+    "thickness_ang": 100000.0,
+    "seed": 1,
+    "bunch_charge_pc": 1.0,
+    "bunch_length_fs": null,
+    "longitudinal_distribution": {
+      "kind": "gaussian",
+      "envelope_rms_fs": 0.001,
+      "rms_duration_fs": 0.001,
+      "microbunch_rms_fs": null,
+      "retained_coherence": null,
+      "spacing_fs": null,
+      "modulation_depth": 1.0,
+      "timing_jitter_fs": 0.0,
+      "target_material": null,
+      "target_crystal": null,
+      "target_reflection": null,
+      "target_energy_eV": null,
+      "target_wavelength_ang": null,
+      "target_period_fs": null,
+      "provenance": "explicit Gaussian RMS duration"
+    },
+    "beam_fwhm_mm": 0.1,
+    "crystal_width_mm": 5.0,
+    "crystal_height_mm": 5.0
+  },
+  "auto_record": {
+    "num": 11936606,
+    "start_eV": 10.0,
+    "stop_eV": 6000.0,
+    "coherent_windows": {
+      "bin_eV": 100.0,
+      "cluster_separation": 64.0,
+      "decoherence_bound": "analytic F_z",
+      "decoherence_limit": 0.0001,
+      "dispersion": {
+        "intervals": 658,
+        "material_fingerprint": "6b2bd60ea9978172532014926af0f2f3a0d477a710cda89cc9e5183f719e6837",
+        "normalization": "integral of float64 row intensity dE with E in eV; frozen reference is diagnostic",
+        "relative_production_bound": false,
+        "rows": [
+          {
+            "affine_residual_power_bound_eV": 0.0993875988152764,
+            "excluded_power_bound_eV": 11.638262777046496,
+            "frozen_reference_fraction": 45828.63585665805,
+            "intervals": 659,
+            "l1_fallback_intervals": 91,
+            "phase_slope_step_all_eV": 1.536511354241961e-05,
+            "row": "row 0"
+          },
+          {
+            "affine_residual_power_bound_eV": 0.011607492594393866,
+            "excluded_power_bound_eV": 1.5437794777987548,
+            "frozen_reference_fraction": 26721.883496821894,
+            "intervals": 659,
+            "l1_fallback_intervals": 87,
+            "phase_slope_step_all_eV": 1.5503683704176086e-05,
+            "row": "row 1"
+          },
+          {
+            "affine_residual_power_bound_eV": 0.07913865522869137,
+            "excluded_power_bound_eV": 5.353414671763363,
+            "frozen_reference_fraction": 74435.8737844187,
+            "intervals": 659,
+            "l1_fallback_intervals": 75,
+            "phase_slope_step_all_eV": 1.536511354241961e-05,
+            "row": "row 2"
+          },
+          {
+            "affine_residual_power_bound_eV": 0.009529236350746992,
+            "excluded_power_bound_eV": 0.5341220527751585,
+            "frozen_reference_fraction": 23722.148245341494,
+            "intervals": 659,
+            "l1_fallback_intervals": 43,
+            "phase_slope_step_all_eV": 1.5501261088428674e-05,
+            "row": "row 3"
+          }
+        ],
+        "scope": "float64 material phase and endpoint reconstruction convention"
+      },
+      "electron_count": 6241509.074460763,
+      "emitting_samples": 200,
+      "incident_samples": 200,
+      "leak_limit": 0.0001,
+      "oversampling": 8.0,
+      "physical_electrons": 6241509.074460763,
+      "rows": [
+        {
+          "at_axis": {
+            "lower": true,
+            "upper": false
+          },
+          "band_eV": [
+            51.0450760201103,
+            1425.7587369551024
+          ],
+          "electron_step_from_eV": null,
+          "joints": 28353,
+          "jumps": 29939,
+          "leak_bound": {
+            "lower": 816.3752146159165,
+            "upper": 9.999999992737902e-05
+          },
+          "nyquist_all_eV": 0.0023279100303415894,
+          "nyquist_electron_eV": 0.005531121427964348,
+          "pieces": 29146,
+          "points": 8412732,
+          "row": "row 0",
+          "span_all_ang": 2662993.7751019187,
+          "span_electron_ang": 1120787.167762199,
+          "step_all_eV": 0.00029098875379269867,
+          "step_electron_eV": 0.0006913901784955435,
+          "window_eV": [
+            10.0,
+            2458.0101817098334
+          ]
+        },
+        {
+          "at_axis": {
+            "lower": true,
+            "upper": false
+          },
+          "band_eV": [
+            51.219188007691656,
+            1949.5097942233515
+          ],
+          "electron_step_from_eV": null,
+          "joints": 7308,
+          "jumps": 8166,
+          "leak_bound": {
+            "lower": 6912.446794732673,
+            "upper": 9.999999954342327e-05
+          },
+          "nyquist_all_eV": 0.0027129991111472496,
+          "nyquist_electron_eV": 0.006495085578723866,
+          "pieces": 7737,
+          "points": 7538093,
+          "row": "row 1",
+          "span_all_ang": 2285002.5620448887,
+          "span_electron_ang": 954446.2262520292,
+          "step_all_eV": 0.0003391248888934062,
+          "step_electron_eV": 0.0008118856973404832,
+          "window_eV": [
+            10.0,
+            2566.3548721410616
+          ]
+        },
+        {
+          "at_axis": {
+            "lower": true,
+            "upper": false
+          },
+          "band_eV": [
+            51.18354214328177,
+            2851.517473910205
+          ],
+          "electron_step_from_eV": null,
+          "joints": 28634,
+          "jumps": 30194,
+          "leak_bound": {
+            "lower": 475.83281078597713,
+            "upper": 9.999999956464206e-05
+          },
+          "nyquist_all_eV": 0.0023279100303415894,
+          "nyquist_electron_eV": 0.005531121427964348,
+          "pieces": 29414,
+          "points": 9847746,
+          "row": "row 2",
+          "span_all_ang": 2662993.7751019187,
+          "span_electron_ang": 1120787.167762199,
+          "step_all_eV": 0.00029098875379269867,
+          "step_electron_eV": 0.0006913901784955435,
+          "window_eV": [
+            10.0,
+            2875.5831680132014
+          ]
+        },
+        {
+          "at_axis": {
+            "lower": true,
+            "upper": false
+          },
+          "band_eV": [
+            51.3671283963609,
+            3899.019588446703
+          ],
+          "electron_step_from_eV": 3310.0,
+          "joints": 7583,
+          "jumps": 8455,
+          "leak_bound": {
+            "lower": 3682.016064424948,
+            "upper": 9.999999933603042e-05
+          },
+          "nyquist_all_eV": 0.002703756178370674,
+          "nyquist_electron_eV": 0.006449687011865918,
+          "pieces": 8019,
+          "points": 10566997,
+          "row": "row 3",
+          "span_all_ang": 2292813.9635478198,
+          "span_electron_ang": 961164.457808863,
+          "step_all_eV": 0.00033796952229633425,
+          "step_electron_eV": 0.0008062108764832397,
+          "window_eV": [
+            10.0,
+            3957.227510041741
+          ]
+        }
+      ],
+      "seeds": 5,
+      "tail_population_bound": 6241509.074460763
+    },
+    "min_spacing_eV": 0.0002860344827553263
+  },
+  "error": "CoherentSamplingError: physical coherent power is unresolved: negative or nonfinite pair estimate; spectral_power: 4060352 finite negative, 0 nonfinite of 11936606; first invalid index 18; increase --ne-line and check sampling convergence; no clipping is applied",
+  "sampling_diagnostics": {
+    "quantity": "spectral_power",
+    "total_count": 11936606,
+    "negative_count": 4060352,
+    "nonfinite_count": 0,
+    "minimum_finite_raw_power": -0.018439669672906615,
+    "first_invalid_index": 18,
+    "incident_samples": 200,
+    "physical_electrons": 6241509.074460763,
+    "first_invalid_energy_eV": 10.005237662584554
+  },
+  "warnings": [
+    "coherent window dispersion remains uncertified: the finite-axis excluded-power upper bound is 7.444e+04 times the frozen reference for row 2; the material phase-slope step is 1.537e-05 eV. This upper bound is not a measured grid error. Production normalization and sampling error still need a certificate; use a refined explicit E_grid_line for controlled coherent convergence"
+  ]
+}

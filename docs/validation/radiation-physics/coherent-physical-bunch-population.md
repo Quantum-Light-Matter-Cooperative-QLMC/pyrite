@@ -336,6 +336,32 @@ remains unresolved. Subsequent issue work uses its dedicated remote directory
 `/home/aamador/pyrite/issues/issue-350` with the current synced data.
 
 
+### Short-bunch diagnostics rerun (2026-10-08)
+
+The [diagnostics record](../check-records/coherent-physical-population/short-bunch-diagnostics.json)
+from SLURM 1163 reruns the reduced short-bunch smoke at clean revision
+`d079e98b` (code digest `509ce0f0…`; content precedes the later rebase onto
+`main`) in the dedicated remote directory. Inputs, 1 pC charge and 200
+incident histories match the earlier record. Transport regenerated with the
+same segment fingerprint `f9d5bae2d8e6254ae1912c56ebe2bfd2` (39,187 segments)
+and the same 11,936,606-coordinate axis.
+
+The guard again raises `CoherentSamplingError`, now with separate counts:
+**4,060,352 finite negative and 0 nonfinite** of 11,936,606 spectral values
+(34%). The first invalid value is at 10.005 eV and the most negative finite raw
+power is $-1.84\times10^{-2}$. The failure is therefore statistical, not
+arithmetic. It is consistent with
+the distinct-pair estimate of the cross-electron term being dominated by its
+sampling noise: on the finite-footprint path each electron keeps its sampled
+transverse position, so the sampled transverse phases are effectively random
+and the true pair mean is close to zero while the estimator's spread is of order
+the self power divided by the sample count, multiplied by the physical pair
+scale. This record does not test that interpretation separately; issue #370
+replaces the sampled transverse phase by an analytic transverse form factor
+(including the tilted-face arrival delay). The dispersion warning recurs with
+the same 7.444e4 excluded-power upper bound. No spectrum, yield or timing is
+accepted from this run.
+
 The owner [signed yield extension](../beam-transport/coherent-line-grid-windowed-resolution.md#signed-physical-pair-weight-yield-enclosure)
 now supports pair coefficients above one by separately enclosing the grouped
 and complete coherent sector integrals with signed interval arithmetic. It

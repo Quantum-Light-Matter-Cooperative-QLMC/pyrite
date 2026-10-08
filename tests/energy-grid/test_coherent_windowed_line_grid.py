@@ -982,6 +982,14 @@ def test_a_float32_reducer_warns_that_the_bound_needs_float64_phases(tiny, monke
         _resolve(case, ladder, _policy(case, windows=True))
 
 
+def _finest_used_step(row):
+    """Finest step a row's bins actually take; all-electron bins lie below the switch."""
+    switch = row.get("electron_step_from_eV")
+    if switch is None or switch > row["window_eV"][0]:
+        return min(row["step_electron_eV"], row["step_all_eV"])
+    return row["step_electron_eV"]
+
+
 def test_windowed_auto_matches_a_fine_explicit_grid_on_identical_trajectories(tiny):
     """Anchor: yield, centroid and FWHM within the 1e-3 intrinsic-source share.
 
@@ -997,7 +1005,7 @@ def test_windowed_auto_matches_a_fine_explicit_grid_on_identical_trajectories(ti
     coherent_case = {**case, "coherent_emission": True}
     coherent = cc.CaseLadder(coherent_case, transport=ladder.transport, coherent=True)
     finest = min(
-        row["step_electron_eV"] for row in record["coherent_windows"]["rows"] if row.get("points")
+        _finest_used_step(row) for row in record["coherent_windows"]["rows"] if row.get("points")
     )
     reference_grid = np.arange(float(grid[0]), float(grid[-1]) + 1e-9, 0.25 * finest)
     zeros = np.zeros_like

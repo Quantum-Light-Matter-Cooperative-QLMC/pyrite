@@ -118,6 +118,60 @@ def test_empirical_form_factor_excludes_self_pairs():
     np.testing.assert_allclose(_direct(segments, 2), expected, rtol=1e-10)
 
 
+def _offset_bunch(samples, rms_fs, seed=3):
+    """Identical straight tracks on a finite footprint, random Gaussian arrivals."""
+    from pyrite.montecarlo.transport import C_ANG_PER_FS
+
+    segments = _straight_bunch(samples)
+    t0 = np.random.default_rng(seed).normal(0.0, rms_fs * C_ANG_PER_FS, samples)
+    segments.update(
+        t0_ang=t0,
+        initial_t0_ang=t0.copy(),
+        initial_r_ang=np.zeros((samples, 3)),
+        crystal_width_ang=100.0,
+        crystal_height_ang=100.0,
+    )
+    return segments
+
+
+def _footprint_single():
+    segments = _straight_bunch(1)
+    segments.update(crystal_width_ang=100.0, crystal_height_ang=100.0)
+    return _direct(segments, 1)
+
+
+@pytest.mark.parametrize("samples", [2, 5])
+@pytest.mark.parametrize("rms_fs", [1.0e-4, 3.0e-4])
+def test_gaussian_arrival_spread_blends_by_the_longitudinal_form_factor(samples, rms_fs):
+    """Identical tracks, Gaussian arrivals: per-electron power is S[1+(N-1)F_z]."""
+    from pyrite.materials.crystal import HBARC_EV_ANG
+    from pyrite.montecarlo.transport import C_ANG_PER_FS
+
+    physical_electrons = 12
+    energy = np.arange(700.0, 1500.0, 2.0)
+    form_factor = np.exp(-((energy / HBARC_EV_ANG * rms_fs * C_ANG_PER_FS) ** 2))
+    assert 1e-3 < form_factor.min() < form_factor.max() < 1 - 1e-3
+    source = _direct(_offset_bunch(samples, rms_fs), physical_electrons, longitudinal_rms_fs=rms_fs)
+    expected = _footprint_single() * (1 + (physical_electrons - 1) * form_factor)
+    np.testing.assert_allclose(source, expected, rtol=1e-10)
+
+
+@pytest.mark.parametrize("samples", [2, 5, 9])
+def test_long_bunch_reduces_to_the_incoherent_sum(samples):
+    """sigma_z >> emitted wavelength: no cross-electron excess at any charge.
+
+    sigma_z = 10 fs * c ~ 3e4 Ang against lambda ~ 8-18 Ang, so F_z underflows
+    to zero and each physical electron radiates its own (self) power.
+    """
+    rms_fs = 10.0
+    single = _footprint_single()
+    for physical_electrons in (12, 6.0e6):
+        source = _direct(
+            _offset_bunch(samples, rms_fs), physical_electrons, longitudinal_rms_fs=rms_fs
+        )
+        np.testing.assert_allclose(source, single, rtol=1e-11)
+
+
 def test_one_physical_electron_keeps_self_power_with_many_samples():
     np.testing.assert_allclose(_source(7, 1), _source(1, 1), rtol=1e-11)
 

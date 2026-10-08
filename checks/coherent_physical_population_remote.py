@@ -344,10 +344,12 @@ def run(args):
             else:
                 plan = record["window_plan"]
                 rows = [row for row in record["coherent_windows"]["rows"] if row.get("points")]
+                # Rows take the all-electron step only below their switch energy.
                 finest = min(
-                    row["step_electron_eV"]
-                    if row.get("electron_step_from_eV") is not None
-                    else min(row["step_electron_eV"], row["step_all_eV"])
+                    min(row["step_electron_eV"], row["step_all_eV"])
+                    if row.get("electron_step_from_eV") is None
+                    or row["electron_step_from_eV"] > row["window_eV"][0]
+                    else row["step_electron_eV"]
                     for row in rows
                 )
                 reference_step = finest / args.reference_divisor
