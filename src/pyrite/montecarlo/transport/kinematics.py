@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 from numba import float64, int64, njit, uint64
+from scipy.special import ndtri
 
 # Speed of light in transport-clock units: the electron clock sum(L/beta) is in
 # Angstrom (c=1), so a longitudinal bunch length in fs converts via
@@ -36,10 +37,15 @@ def _sample_bunch_offsets(
 
     ``long_offsets_fs`` supplies explicit per-particle offsets (measured /
     arbitrary / microbunched profiles) and OVERRIDES ``long_shape`` /
-    ``bunch_length_fs``. The draw uses an independent RNG child stream
-    (``SeedSequence(seed).spawn(4)[3]`` -- the next index after ``beam_rng``'s
-    ``spawn(2)[1]`` and ``phase_rng``'s ``spawn(3)[2]``), so enabling the bunch
-    NEVER perturbs the main free-path / scattering draws.
+    ``bunch_length_fs``. The draw uses an independent child namespace
+    (``SeedSequence(seed).spawn(4)[3]`` -- the next index after the spot's
+    ``spawn(2)[1]`` and the groove phase's ``spawn(3)[2]``), so enabling the
+    bunch NEVER perturbs the main free-path / scattering draws. Inside it each
+    electron's draws are counter-addressed by ``(seed, e, c)``
+    (:func:`counter_normals`; ``c`` = 0 Gaussian/centre, 1 microbunch,
+    2 jitter, 3 envelope, 4 mixture uniform), so electron ``e``'s raw offset
+    never depends on the electron count. Only the centroid subtraction does:
+    it is a property of the realized population.
 
     Limiting case: ``bunch_length_fs=None`` and ``long_offsets_fs=None`` ->
     all-zero (the legacy point bunch, bit-for-bit); ``bunch_length_fs -> 0``
@@ -51,12 +57,12 @@ def _sample_bunch_offsets(
         if bunch_length_fs is not None or long_offsets_fs is not None or long_shape != "gaussian":
             raise ValueError("longitudinal_distribution is incompatible with legacy bunch fields")
         kind = longitudinal_distribution.get("kind")
-        bunch_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(4)[3])
+        root = child_stream_root(seed, 4, 3)
         if kind in ("gaussian", "compressed"):
             sigma_fs = longitudinal_distribution.get("rms_duration_fs")
             if sigma_fs is None:
                 raise ValueError(f"{kind} resolution requires rms_duration_fs")
-            dt = bunch_rng.normal(0.0, float(sigma_fs), size=Ne)
+            dt = float(sigma_fs) * counter_normals(root, Ne, 1)[:, 0]
         elif kind == "microtrain":
             envelope_fs = float(longitudinal_distribution["envelope_rms_fs"])
             microbunch_fs = float(longitudinal_distribution["microbunch_rms_fs"])
@@ -80,19 +86,16 @@ def _sample_bunch_offsets(
                     "microtrain envelope RMS must exceed combined microbunch width and jitter"
                 )
             center_sigma_fs = np.sqrt(center_variance)
-            centers = np.rint(bunch_rng.normal(0.0, center_sigma_fs / spacing_fs, size=Ne))
-            train = (
-                centers * spacing_fs
-                + bunch_rng.normal(0.0, microbunch_fs, size=Ne)
-                + bunch_rng.normal(0.0, jitter_fs, size=Ne)
-            )
+            z = counter_normals(root, Ne, 4)
+            centers = np.rint((center_sigma_fs / spacing_fs) * z[:, 0])
+            train = centers * spacing_fs + microbunch_fs * z[:, 1] + jitter_fs * z[:, 2]
+            unmodulated = envelope_fs * z[:, 3]
             if depth == 1.0:
                 dt = train
             elif depth == 0.0:
-                dt = bunch_rng.normal(0.0, envelope_fs, size=Ne)
+                dt = unmodulated
             else:
-                unmodulated = bunch_rng.normal(0.0, envelope_fs, size=Ne)
-                mask = bunch_rng.random(Ne) < depth
+                mask = counter_uniforms(root, Ne, 5)[:, 4] < depth
                 dt = np.where(mask, train, unmodulated)
         else:
             raise ValueError(f"unknown resolved longitudinal kind {kind!r}")
@@ -114,12 +117,12 @@ def _sample_bunch_offsets(
         if not np.isfinite(sigma_fs) or sigma_fs < 0.0:
             raise ValueError("bunch_length_fs must be finite and non-negative")
         sigma_ang = sigma_fs * C_ANG_PER_FS
-        bunch_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(4)[3])
+        root = child_stream_root(seed, 4, 3)
         if long_shape == "gaussian":
-            dt = bunch_rng.normal(0.0, sigma_ang, size=Ne)
+            dt = sigma_ang * counter_normals(root, Ne, 1)[:, 0]
         elif long_shape == "uniform":
             half_width = np.sqrt(3.0) * sigma_ang  # flat-top of the same RMS
-            dt = bunch_rng.uniform(-half_width, half_width, size=Ne)
+            dt = half_width * (2.0 * counter_uniforms(root, Ne, 1)[:, 0] - 1.0)
         else:
             raise ValueError(
                 f"long_shape must be 'gaussian' or 'uniform' (or supply "
@@ -199,14 +202,69 @@ def _stream_uniform_scalar(key, counter):
     return np.float64(z >> _SM64_S11) * _U53_SCALE
 
 
-def stream_keys(seed, Ne):
-    """Per-electron stream keys for ``[0, Ne)``, as consumed by both cores.
+def stream_keys(seed, Ne, *, start=0):
+    """Per-electron stream keys for electrons ``[start, start + Ne)``.
 
-    Keys are built on the host so the CUDA kernel needs no 64-bit integer casts
-    in device code, and so both cores provably address the same streams.
+    The key of electron ``e`` is a pure function of ``(seed, e)``, so the keys
+    for ``[start, stop)`` equal ``stream_keys(seed, stop)[start:]`` exactly: a
+    block of electrons addresses the same streams as the matching slice of one
+    larger run. Keys are built on the host so the CUDA kernel needs no 64-bit
+    integer casts in device code, and so both cores provably address the same
+    streams.
     """
-    e = np.arange(Ne, dtype=np.uint64)
+    start = int(start)
+    if start < 0 or Ne < 0:
+        raise ValueError("stream_keys needs a non-negative start and count")
+    e = np.arange(start, start + Ne, dtype=np.uint64)
     x = np.uint64(seed) + _SM64_GOLDEN * (e + _SM64_ONE)
     x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
     x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
     return x ^ (x >> _SM64_S31)
+
+
+# 2**-52: counter uniforms keep 52 bits so ``(m + 0.5) * 2**-52`` is exact and
+# lies strictly inside (0, 1), which the normal quantile below requires.
+_U52_SCALE = 1.0 / 4503599627370496.0
+_SM64_S12 = np.uint64(12)
+
+
+def child_stream_root(seed, n_children, index):
+    """Root key of the ``SeedSequence(seed).spawn(n_children)[index]`` namespace.
+
+    Host-side beam and bunch inputs keep their historical child-stream
+    assignment (see ``docs/computation/random-streams.md``); the child's first
+    64-bit state word roots a counter-addressed per-electron stream inside it,
+    so the namespaces stay disjoint from transport and from each other.
+    """
+    child = np.random.SeedSequence(seed).spawn(n_children)[index]
+    return int(child.generate_state(1, np.uint64)[0])
+
+
+def counter_uniforms(root, n_electrons, n_draws, *, start=0):
+    """Open-interval uniforms ``u[e - start, c]`` for electrons ``[start, start+n)``.
+
+    Draw ``c`` of electron ``e`` is
+    ``((splitmix64(k_e + PHI*(c+1)) >> 12) + 1/2) * 2**-52`` with
+    ``k_e = stream_keys(root, ...)[e]`` -- the transport counter construction
+    with a 52-bit mantissa so the half-offset is exact. It depends only on
+    ``(root, e, c)``: never on the electron count, the block, or other draws.
+    """
+    keys = stream_keys(root, n_electrons, start=start)[:, None]
+    counters = np.arange(n_draws, dtype=np.uint64)[None, :]
+    x = keys + _SM64_GOLDEN * (counters + _SM64_ONE)
+    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
+    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
+    x = x ^ (x >> _SM64_S31)
+    return ((x >> _SM64_S12).astype(np.float64) + 0.5) * _U52_SCALE
+
+
+def counter_normals(root, n_electrons, n_draws, *, start=0):
+    """Standard normals by inverse CDF of :func:`counter_uniforms`.
+
+    One uniform per normal keeps the address one-to-one: draw ``c`` of
+    electron ``e`` is ``Phi^-1(u(e, c))``. The tails are truncated at
+    ``|z| <= 8.2095``, the quantile of the smallest representable ``u``.
+
+    Validation: beam-phase-space-injection, longitudinal-bunch-sampling
+    """
+    return ndtri(counter_uniforms(root, n_electrons, n_draws, start=start))

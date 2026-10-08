@@ -100,7 +100,7 @@ drawn **independently and uncorrelated** with the longitudinal offsets, for ever
 
 ### RNG placement
 
-Transverse and energy draws take their own RNG children, following the `_sample_bunch_offsets` / `spawn` precedent. That makes the zero-spread limit bit-for-bit rather than statistically identical: when the distribution is inert, no draw is taken and the transport stream is untouched.
+Transverse and energy draws take their own RNG children, following the `_sample_bunch_offsets` / `spawn` precedent, and are counter-addressed per electron inside them ([random streams](../../computation/random-streams.md)). That makes the zero-spread limit bit-for-bit rather than statistically identical: when the distribution is inert, no draw is taken and the transport stream is untouched.
 
 ## What stays inert
 

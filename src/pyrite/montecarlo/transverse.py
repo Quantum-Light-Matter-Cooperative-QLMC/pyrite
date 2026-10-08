@@ -168,11 +168,9 @@ def resolve_transverse_distribution(
 
 def _sample_plane(
     plane: ResolvedTransversePlane,
-    n_electrons: int,
-    rng: np.random.Generator,
+    u1: np.ndarray,
+    u2: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    u1 = rng.standard_normal(n_electrons)
-    u2 = rng.standard_normal(n_electrons)
     emittance = plane.geometric_emittance_mm_rad
     beta_twiss = plane.beta_twiss_mm_per_rad
     position = np.sqrt(emittance * beta_twiss) * u1
@@ -199,9 +197,11 @@ def resolved_from_mapping(payload: Mapping[str, Any]) -> ResolvedTransverseDistr
 def sample_transverse(
     resolved: ResolvedTransverseDistribution,
     n_electrons: int,
-    rng: np.random.Generator,
+    seed: int,
+    *,
+    start: int = 0,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Draw ``(x_mm, x', y_mm, y')`` reproducing the resolved second moments.
+    """Draw ``(x_mm, x', y_mm, y')`` for electrons ``[start, start + n_electrons)``.
 
     With ``u1, u2`` independent standard normals, ``x = sqrt(eps*beta) u1`` and
     ``x' = sqrt(eps/beta) (u2 - alpha u1)`` give ``<x^2> = eps*beta``,
@@ -209,8 +209,17 @@ def sample_transverse(
     sample's emittance is ``eps`` up to Monte Carlo error. Each plane consumes
     its own two draws; the planes are independent.
 
+    Draws live in the ``SeedSequence(seed).spawn(5)[4]`` child namespace and are
+    counter-addressed per electron: electron ``e`` uses draws ``c = 0, 1``
+    (x plane) and ``c = 2, 3`` (y plane) of its own stream, so its phase-space
+    point depends on ``(seed, e)`` alone -- never on ``n_electrons`` or
+    ``start``. A block ``[start, stop)`` equals that slice of one larger draw.
+
     Validation: beam-phase-space-injection
     """
-    x_mm, x_prime = _sample_plane(resolved.x, n_electrons, rng)
-    y_mm, y_prime = _sample_plane(resolved.y, n_electrons, rng)
+    from .transport.kinematics import child_stream_root, counter_normals
+
+    z = counter_normals(child_stream_root(seed, 5, 4), n_electrons, 4, start=start)
+    x_mm, x_prime = _sample_plane(resolved.x, z[:, 0], z[:, 1])
+    y_mm, y_prime = _sample_plane(resolved.y, z[:, 2], z[:, 3])
     return x_mm, x_prime, y_mm, y_prime

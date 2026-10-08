@@ -151,6 +151,7 @@ def _process_pool_kwargs():
     return {"mp_context": multiprocessing.get_context("spawn")}
 
 
+from .block_transport import transport_case_blocks
 from .electron_blocks import (
     MAX_ELECTRON_BLOCKS,
     device_headroom_bytes,
@@ -312,6 +313,7 @@ def _transport_case(
     transport_core="auto",
     keep_segments_on_device=False,
     trajectory_capture=None,
+    block_electrons=None,
 ):
     """Transport phase of run_case: the line + brem trajectories. Returns the
     segments + geometry + grids the spectrum phase consumes.
@@ -328,6 +330,12 @@ def _transport_case(
 
     trajectory_capture: optional ``TrajectoryCapture``; writes the result here,
     in whichever process transported it, before the spectrum phase sees it.
+
+    block_electrons: internal (#361). Transport ``[0, max(Ne, Ne_brem))`` in
+    electron blocks of this size on the per-electron/CUDA core; the joined
+    segments equal the single-call run bit for bit (see
+    :mod:`.block_transport`). ``None`` keeps the single call. The lockstep
+    core is rejected.
 
     Validation: grazing-beam-projection
     """
@@ -384,17 +392,26 @@ def _transport_case(
     transport_progress = _TRANSPORT_PROGRESS.get()
     progress_kw = {} if transport_progress is None else {"transport_progress": transport_progress}
 
-    def _simulate(keep, max_steps):
+    if block_electrons is not None and core == "lockstep":
+        raise ValueError(
+            "electron blocks need the per-electron or CUDA transport core; "
+            f"{transport_core!r} resolved to 'lockstep'"
+        )
+    if block_electrons is not None and "gdf_source" in case:
+        raise ValueError("electron blocks do not support GDF beams")
+
+    def _simulate(keep, max_steps, start=0, stop=Ne_transport, block_kw=None):
+        # A block overrides progress and withholds the bunch (see below).
+        call_kw = {**beam_kw, **progress_kw, **({} if block_kw is None else block_kw)}
         return simulate_trajectories(
             case["E0_keV"],
-            Ne_transport,
+            stop - start,
             case["thickness_ang"],
-            E_cut_by_electrons=E_cut_by_electrons,
+            E_cut_by_electrons=E_cut_by_electrons[start:stop],
             composition=case["composition"],
             seed=case["seed"],
             beam_dir=beam,
             layers=layers,
-            **beam_kw,
             crystal_width_mm=case.get("crystal_width_mm"),
             crystal_height_mm=case.get("crystal_height_mm"),
             tilt_polar_rad=tilt_polar_rad,
@@ -415,21 +432,32 @@ def _transport_case(
                 if transport_lut_config is not None
                 else {}
             ),
-            **progress_kw,
+            **call_kw,
         )
 
+    transport = _transport
+    if block_electrons is not None:
+        transport = partial(
+            transport_case_blocks,
+            simulate=_simulate,
+            case=case,
+            E_cut_by_electrons=E_cut_by_electrons,
+            block_electrons=block_electrons,
+            beam_kw=beam_kw,
+            progress=transport_progress,
+        )
     if resident:
         try:
-            segs_all = _transport(True)
+            segs_all = transport(True)
         except _RESOURCE_POLICY.gpu_oom:
             # Residency holds the whole payload plus the join's second copy. The
             # streams are counter-addressed, so replaying the same seed with the
             # segments downloaded reproduces this run exactly -- the retry costs
             # the bus, not the result.
             BACKEND.release_memory()
-            segs_all = _transport(False)
+            segs_all = transport(False)
     else:
-        segs_all = _transport(False)
+        segs_all = transport(False)
 
     # Line resolution needs the transport distribution, so it is chosen after
     # the case's own trajectories exist and before the spectrum phase. No second

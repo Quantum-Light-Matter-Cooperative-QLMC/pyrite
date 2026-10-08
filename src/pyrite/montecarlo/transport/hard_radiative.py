@@ -478,7 +478,7 @@ def validate_radiative_args(
 
 
 def radiative_core_args(
-    compositions, tables, cutoff_eV, electron_cutoffs_keV, energies_keV, seed, n_electrons
+    compositions, tables, cutoff_eV, electron_cutoffs_keV, energies_keV, seed, n_electrons, start=0
 ) -> tuple:
     """The exact cores' ``radiative_args``: stream keys, cutoff, packed tables."""
     from ._jit_radiative import radiative_stream_keys
@@ -489,7 +489,8 @@ def radiative_core_args(
     packed = pack_radiative_layer_tables(
         compositions, tables, min_cutoff_eV, float(np.max(energies_keV)) * 1e3
     )
-    return (radiative_stream_keys(seed, n_electrons), float(cutoff_eV)) + packed
+    keys = radiative_stream_keys(seed, n_electrons, start=start)
+    return (keys, float(cutoff_eV)) + packed
 
 
 def add_radiative_result_fields(result, photon_k_eV, photon_Z, tables, cutoff_eV, seed) -> None:

@@ -19,16 +19,19 @@ The package uses two stream mechanisms:
   - Beam and bunch sampling, host side
   - Keeping each optional physical input's draws off every other input's stream
 * - Counter-addressed SplitMix64
-  - Per-electron transport cores and the Urban straggling sampler
-  - Letting a thread or row compute its own draws with no shared generator or
-    draw-order coupling
+  - Per-electron transport cores, the Urban straggling sampler, and the
+    per-electron draws inside each beam and bunch child
+  - Letting a thread, row, or electron block compute its own draws with no
+    shared generator or draw-order coupling
 ```
 
-They compose: the child tree partitions fixed-shape host-side input sampling, while counter addressing partitions in-core randomness across electrons and, for straggling, across physical flights and numerical substeps. The straggling namespace is derived from the counter-addressed electron key; it is not a `SeedSequence` child and never advances the run generator.
+They compose: the child tree partitions host-side input sampling by physical input, while counter addressing partitions randomness across electrons — inside each beam and bunch child as well as in the cores — and, for straggling, across physical flights and numerical substeps. The straggling namespace is derived from the counter-addressed electron key; it is not a `SeedSequence` child and never advances the run generator.
 
 ## The `SeedSequence` child tree
 
 Each optional beam or bunch distribution draws from its own child of the run seed, obtained by spawning a fixed number of children and taking the last. The index assignment is fixed and documented in the code, because it is part of the reproducibility contract rather than an implementation detail.
+
+Inside a beam or bunch child, draws are counter-addressed per electron (`child_stream_root`, `counter_normals` in `montecarlo/transport/kinematics.py`). The child's first 64-bit state word roots the stream, and draw $c$ of electron $e$ is the counter construction {eq}`eq-streams-counter-address` with a 52-bit mantissa, $u = (\lfloor z/2^{12} \rfloor + \tfrac12)\,2^{-52} \in (0, 1)$. Gaussian draws are $\Phi^{-1}(u)$, one uniform per normal; the representable range truncates the tails at $|z| \approx 8.2$. A per-electron draw therefore depends on $(\text{seed}, e, c)$ only, never on the electron count. The groove phase, which only the lockstep core consumes, stays on a sequential generator.
 
 ```{list-table} Child-stream assignment by physical input.
 :name: tbl-streams-children
@@ -39,19 +42,21 @@ Each optional beam or bunch distribution draws from its own child of the run see
   - Draws
 * - `spawn(2)[1]`
   - Transverse beam spot
-  - Gaussian entry offsets, per plane
+  - Gaussian entry offsets: counter draws 0 (x) and 1 (y)
 * - `spawn(3)[2]`
   - Groove lateral phase
-  - Uniform phase over one groove period
+  - Uniform phase over one groove period (sequential; lockstep only)
 * - `spawn(4)[3]`
   - Longitudinal bunch
-  - Arrival-time offsets
+  - Arrival-time offsets: counter draws 0 (Gaussian or train centre),
+    1 microbunch, 2 jitter, 3 envelope, 4 mixture uniform
 * - `spawn(5)[4]`
   - Courant–Snyder transverse distribution
-  - Correlated positions and slopes
+  - Correlated positions and slopes: counter draws 0, 1 (x plane) and 2, 3
+    (y plane)
 * - `spawn(6)[5]`
   - Relative energy spread
-  - Per-electron energy deviation
+  - Per-electron energy deviation: counter draw 0
 ```
 
 The main free-path and scattering-angle draws use the run generator directly and are never spawned from, which is what makes the children disjoint from transport rather than merely different.
@@ -69,7 +74,9 @@ The same argument gives every optional distribution a clean zero limit:
 * zero emittance gives zero slopes, so every direction is the shared beam direction *exactly*, which is what makes the collimated limit bit-for-bit rather than merely close;
 * an unset energy spread leaves the monoenergetic beam untouched.
 
-For an elliptical spot, the sampler draws a standard normal array of shape $(N_e, 2)$ and then scales each column. Equal widths therefore consume the same draws as the scalar-width case and produce bit-for-bit identical offsets.
+For an elliptical spot, both widths scale the same per-electron standard normals (draw 0 for $x$, draw 1 for $y$). Equal widths therefore use the same draws as the scalar-width case and produce bit-for-bit identical offsets.
+
+The counter-addressed beam and bunch streams replaced sequential `Generator` draws in #361, a one-time change to the seed realizations of finite-spot, Twiss, energy-spread, and bunched runs. The sampling laws and limits are unchanged, and point-beam runs are unaffected.
 
 ### Where inertness stops
 
@@ -93,7 +100,7 @@ u(e, c) = \bigl(\operatorname{splitmix64}(k_e + \Phi\,(c+1)) \gg 11\bigr)\,2^{-5
 
 with $\Phi = \texttt{0x9E3779B97F4A7C15}$ and SplitMix64's finalizer, which is a bijection on 64 bits and passes BigCrush in counter mode{cite:p}`steele2014`.
 
-Keys are built on the host so both cores address the same streams. The construction uses integer arithmetic and one exact `uint64 → double` conversion: the shifted value is below $2^{53}$, so the conversion is lossless.
+Keys are built on the host so both cores address the same streams. `stream_keys(seed, Ne, start=s)` returns the keys of electrons $[s, s + N_e)$, which equal `stream_keys(seed, s + Ne)[s:]` exactly; the hard-collision and radiative key domains take the same offset. The construction uses integer arithmetic and one exact `uint64 → double` conversion: the shifted value is below $2^{53}$, so the conversion is lossless.
 
 The generator is therefore **bit-for-bit identical on host and device**, and it is asserted against an independent pure-Python SplitMix64 rather than against itself.
 
@@ -106,6 +113,19 @@ Because a draw is a pure function of $(\text{seed}, e, c)$ and nothing else, a r
 * **capacity replay** — an overflowing batch replayed at larger capacity reproduces itself exactly.
 
 Exact replay supports the [capacity policy](execution-and-acceleration.md#output-addressing-and-capacity-replay) and device out-of-memory recovery: a batch can be rerun with more capacity or with downloaded segments without changing its result.
+
+### Electron blocks and prefix stability
+
+Adaptive electron counts (#361) extend a run block by block, so a run over $[0, N)$ must equal the same run assembled from blocks $[kB, (k+1)B)$. Every input the per-electron and CUDA cores consume is prefix-stable:
+
+* transport, hard-collision, radiative, and straggling keys take the block's start offset;
+* spot, Twiss, and energy-spread draws are counter-addressed inside their children;
+* the cores emit rows electron-major, so concatenating blocks reproduces the single call's row order;
+* every block builds its shell, radiative, and lookup tables over the population's energy range (`_energy_range_keV`), not its own, so interpolation is identical.
+
+Two population-wide steps are redone once after the join (`montecarlo/runner/block_transport.py`). Bunch offsets are centred on the realized population's centroid, which no block knows; each raw offset is still a pure function of $(\text{seed}, e)$. Hard-photon directions come from one sequential generator over photon rows.
+
+The lockstep core shares one generator across electrons and is not supported. Grooves, GDF beams, and secondary cascades are rejected in blocks.
 
 ### The straggling namespace
 
@@ -163,4 +183,4 @@ Correlated quantities from one distribution must share a stream. The Courant–S
 
 The claims on this page are pinned by the ledger rows `gpu-transport-core` (counter addressing, host/device generator identity, invariance to launch geometry and batching), `beam-phase-space-injection` (the transverse child streams and their zero limits), `longitudinal-bunch-sampling` (the bunch child stream and its point-bunch limit), and `energy-loss-straggling` (the salted per-row namespace, disabled-path inertness, and offline replay).
 
-The generator's own properties, the three invariances, and the pure-Python cross-check live in `tests/montecarlo/test_transport_per_electron.py`; straggling replay and inertness live in `tests/montecarlo/test_straggling_rng_plumbing.py` and the remaining-core replay tests.
+The generator's own properties, the three invariances, and the pure-Python cross-check live in `tests/montecarlo/test_transport_per_electron.py`; straggling replay and inertness live in `tests/montecarlo/test_straggling_rng_plumbing.py` and the remaining-core replay tests. Offset keys, the beam and bunch counter streams, and bit-for-bit block invariance live in `tests/montecarlo/test_block_transport.py`.

@@ -18,7 +18,12 @@ from .batching import (
     pack_layer_tables,
     resolve_transport_core,
 )
-from .beam_entry import initial_beam_positions
+from .beam_entry import (
+    check_electron_block,
+    initial_beam_positions,
+    initial_energies_keV,
+    table_energy_range,
+)
 from .cores import (
     _transport_core_grooved,
     _transport_core_ungrooved_lut,
@@ -28,7 +33,7 @@ from .cores import (
     exact_ungrooved_core,
 )
 from .events import TransportStepLimitError
-from .hard_inelastic import hard_keys_from_stream_keys, hard_stream_keys, validate_inelastic_args
+from .hard_inelastic import hard_keys_from_stream_keys, validate_inelastic_args
 from .hard_radiative import validate_radiative_args
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .layer_tables import build_layer_tables
@@ -95,6 +100,8 @@ def simulate_trajectories(
     atomic_electron_deflection=None,
     transport_progress=None,
     _secondary=None,
+    _electron_start=0,
+    _energy_range_keV=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -427,6 +434,11 @@ def simulate_trajectories(
         Internal validated GPT source descriptor produced by case construction;
         CPU-loaded records replace analytic initial phase space before numeric
         arrays enter the existing CPU/CUDA transport boundary.
+    _electron_start, _energy_range_keV
+        Internal electron-block offset and population table range (#361): every
+        stream takes global indices ``[start, start + Ne)``; ``electron_id``
+        stays block-local. See ``runner/block_transport.py`` and
+        :func:`.beam_entry.check_electron_block`.
 
     Returns
     -------
@@ -448,13 +460,23 @@ def simulate_trajectories(
     Validation: substep-radiation-invariance
     Validation: transverse-bunch-form-factor
     """
+    # No new locals before the cascade hand-off below: it forwards ``locals()``.
+    check_electron_block(
+        _electron_start,
+        (secondary_threshold_eV, pair_production_model, positron_transport, _secondary, groove),
+        (gdf_source, bunch_length_fs, long_offsets_fs, longitudinal_distribution),
+    )
     if (secondary_threshold_eV, pair_production_model, positron_transport) != (None, None, False):
         arguments = dict(locals())
         from .secondaries import transport_secondary_cascade
 
         return transport_secondary_cascade(simulate_trajectories, arguments)
+    electron_start = int(_electron_start)
     # ``_secondary`` is the cascade's per-generation pass (secondaries.py).
     launch = None if _secondary is None else _secondary.launch
+    block_keys = stream_keys(seed, Ne, start=electron_start)
+    # Per-electron/CUDA keys: a block or cascade generation supplies its own.
+    transport_keys = launch.stream_keys if launch is not None else block_keys
     if not np.isfinite(E0_keV) or E0_keV <= 0.0:
         raise ValueError("E0_keV must be finite and strictly positive")
 
@@ -501,6 +523,8 @@ def simulate_trajectories(
         transport_core = resolve_transport_core(transport_core, Ne, groove)
     if transport_core != "lockstep" and groove is not None:
         raise ValueError("grooved transport is only implemented for the lockstep core")
+    if electron_start and transport_core == "lockstep":
+        raise ValueError("electron blocks need counter-addressed streams, not the lockstep core")
     if keep_segments_on_device and transport_core != "cuda":
         raise ValueError(
             "keep_segments_on_device requires transport_core='cuda'; "
@@ -558,6 +582,7 @@ def simulate_trajectories(
         tilt_polar_rad=tilt_polar_rad,
         tilt_azim_rad=tilt_azim_rad,
         groove=groove,
+        start=electron_start,
     )
     if beam_dir is None:
         beam_dir = np.array([0.0, 0.0, 1.0])
@@ -581,18 +606,7 @@ def simulate_trajectories(
         basis = beam_frame_basis(beam_dir)
         dirs = x_prime[:, None] * basis[:, 0] + y_prime[:, None] * basis[:, 1] + beam_dir
         dirs /= np.linalg.norm(dirs, axis=1, keepdims=True)
-    E_keV = np.full(Ne, float(E0_keV))
-    if energy_spread_frac:
-        # RMS *relative* deviation, uncorrelated with arrival time (decision 3:
-        # no chirp model). Its own child stream, spawn(6)[5], for the same
-        # reason as the transverse draw above.
-        spread_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(6)[5])
-        E_keV = E_keV * (1.0 + float(energy_spread_frac) * spread_rng.standard_normal(Ne))
-        if not np.all(np.isfinite(E_keV)) or not np.all(E_keV > 0.0):
-            raise ValueError(
-                f"energy_spread_frac={energy_spread_frac} drew a non-finite or non-positive "
-                "electron energy; the Gaussian spread model needs spread << 1"
-            )
+    E_keV = initial_energies_keV(E0_keV, Ne, seed, energy_spread_frac, start=electron_start)
     gdf_t0 = None
     if gdf_source is not None:
         from ..gdf import load_gdf_beam
@@ -632,6 +646,7 @@ def simulate_trajectories(
         pos, dirs, E_keV = launch.r_ang.copy(), launch.v_hat.copy(), launch.E_keV.copy()
     if not np.all(E_cut_by_electrons < E_keV):
         raise ValueError("each electron cutoff energy must be below its initial energy")
+    table_lo, table_hi = table_energy_range(E_cut_by_electrons, E_keV, _energy_range_keV)
     if prepared_stopping_tables is not None:
         for prepared in prepared_stopping_tables:
             lower = float(np.nextafter(np.exp(prepared[0][0]), -np.inf))
@@ -652,7 +667,7 @@ def simulate_trajectories(
         assert inelastic_materials is not None and inelastic_cutoff_eV is not None
         assert prepared_stopping_tables is not None
         _nsys_push("cxr.transport.inelastic")
-        E_range_keV = (float(np.min(E_cut_by_electrons)), float(np.max(E_keV)))
+        E_range_keV = (table_lo, table_hi)
         if _secondary is not None:  # one table set for every generation
             lo, hi = _secondary.table_range_keV
             E_range_keV = (min(lo, E_range_keV[0]), max(hi, E_range_keV[1]))
@@ -671,10 +686,11 @@ def simulate_trajectories(
             [layer[2] for layer in layers],
             bremslib_tables,
             radiative_cutoff_eV,
-            E_cut_by_electrons,
-            E_keV,
+            np.array([table_lo]),
+            np.array([table_hi]),
             seed,
             Ne,
+            electron_start,
         )
         if launch is not None:
             radiative_args = (launch.radiative_keys,) + radiative_args[1:]
@@ -729,8 +745,8 @@ def simulate_trajectories(
     ):
         _nsys_push("cxr.transport.lut")
         transport_lut = build_transport_energy_lut(
-            float(np.min(E_cut_by_electrons)),
-            float(np.max(E_keV)),
+            table_lo,
+            table_hi,
             elastic_model_code,
             L_Js,
             L_Zs,
@@ -781,11 +797,7 @@ def simulate_trajectories(
     seg_rad_Z = np.empty(seg_rad_k.size, dtype=np.int16)
     inelastic_args = None
     if shell_tables is not None:
-        inelastic_args = shell_tables.core_args(
-            hard_stream_keys(seed, Ne)
-            if launch is None
-            else hard_keys_from_stream_keys(launch.stream_keys)
-        )
+        inelastic_args = shell_tables.core_args(hard_keys_from_stream_keys(transport_keys))
     _nsys_pop()
 
     # Where the segments end up living, and so which array module assembles the
@@ -814,7 +826,7 @@ def simulate_trajectories(
     )
     straggle_on = bool(straggling)
     stragg_dE = np.zeros(Ne) if straggle_on else np.zeros(0)
-    stragg_stream_keys = stream_keys(seed, Ne) if straggle_on else np.zeros(1, dtype=np.uint64)
+    stragg_stream_keys = block_keys if straggle_on else np.zeros(1, dtype=np.uint64)
     if straggle_on:
         _stragg_packed = pack_layer_tables(*layer_arrays)
         stragg_layer_tables = _stragg_packed[:5] + sbethe_group
@@ -938,7 +950,7 @@ def simulate_trajectories(
                     if shell_mode
                     else None
                 ),
-                keys=None if launch is None else launch.stream_keys,
+                keys=transport_keys,
                 on_batch=transport_progress,
             )
         )
@@ -1042,7 +1054,7 @@ def simulate_trajectories(
                     if shell_mode
                     else None
                 ),
-                keys=None if launch is None else launch.stream_keys,
+                keys=transport_keys,
                 on_batch=transport_progress,
                 radiative=((radiative_args, seg_rad_k, seg_rad_Z) if radiative_mode else None),
             )

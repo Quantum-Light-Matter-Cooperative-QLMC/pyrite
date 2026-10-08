@@ -73,3 +73,49 @@ All structured-policy draws use the same dedicated `SeedSequence(seed).spawn(4)[
 ## Result
 
 Independent derivation and numeric probes match implementation. Verdict: `rederived`. Current radiation sums electrons incoherently, so arrival offsets are diagnostic inputs for future coherent form factors and do not change current spectral yield.
+
+## Counter-addressed draws (#361 re-verification, 2026-10-07)
+
+Fresh-context check of commit `df221caf`. The uniform and normal construction and their independence are derived in [beam-phase-space-injection §6](beam-phase-space-injection.md). Here $u_{e,c}$ and $Z_{e,c}=\Phi^{-1}(u_{e,c})$ are draws of electron $e$ in the `spawn(4)[3]` child namespace.
+
+### Draw roles and sampling laws
+
+Using the documented role table ($c=0$ Gaussian or centre, $1$ microbunch, $2$ jitter, $3$ envelope, $4$ mixture uniform), the raw offsets before centring are the following.
+
+- Legacy Gaussian: $\Delta t_e=\sigma\,Z_{e,0}$.
+- Legacy uniform: $\Delta t_e=\sqrt3\,\sigma\,(2u_{e,0}-1)$, uniform on $(-\sqrt3\sigma,\sqrt3\sigma)$ with RMS $\sigma$.
+- `gaussian` and `compressed`: $\Delta t_e=\sigma_{\rm rms}\,Z_{e,0}$.
+- `microtrain`:
+
+$$
+\Delta t_e^{\rm train}=\operatorname{round}\!\Bigl(\tfrac{\sigma_{\rm c}}{T}Z_{e,0}\Bigr)T+\sigma_{\rm micro}Z_{e,1}+\sigma_{\rm jitter}Z_{e,2},
+\qquad
+\Delta t_e^{\rm env}=\sigma_{\rm env}Z_{e,3},
+$$
+
+  with $\sigma_{\rm c}^2=\sigma_{\rm env}^2-\sigma_{\rm micro}^2-\sigma_{\rm jitter}^2$, and $\Delta t_e=\Delta t_e^{\rm train}$ if $u_{e,4}<D$, else $\Delta t_e^{\rm env}$.
+
+Because $Z_{e,0..3}$ and $u_{e,4}$ are independent with the stated laws, every distribution of the earlier sections is unchanged. That covers the RMS normalizations, the $T^2/12$ rounding term, the target bunching $\eta\,e^{-\Omega^2\sigma_{\rm jitter}^2}$, and the $D^2\eta$ mixture. The final offset is $\Delta t_e-\overline{\Delta t}$. Only that centroid depends on $N$, so the raw draws are prefix-stable, and the block driver redoes the centring once over the joined population.
+
+### Implementation diff
+
+`_sample_bunch_offsets` uses `child_stream_root(seed, 4, 3)` with `counter_normals(root, Ne, 1)[:, 0]` for the Gaussian, compressed and legacy-Gaussian draws, and `half_width * (2 * counter_uniforms(root, Ne, 1)[:, 0] - 1)` for the legacy uniform. The microtrain uses `z = counter_normals(root, Ne, 4)` in roles 0–3 and `counter_uniforms(root, Ne, 5)[:, 4] < depth` for the mixture. Centring is `dt - dt.mean()`. The no-bunch branch returns zeros without touching a stream. `block_transport.py::finalize_population_fields` calls the same sampler over `result["Ne"]` and gathers it onto rows by `electron_id` and `vacuum_elec_id`. This matches the role table and laws term for term.
+
+### Numeric evidence (independent, CPU)
+
+- Role reconstruction from an independent pure-Python SplitMix64 reference ($e<3000$, centred) matches the sampler output within $1.1\times10^{-13}$ fs for microtrain $D=1$, $0$ and $0.37$. It matches within $10^{-9}$ Å for legacy Gaussian and uniform ($e<200$).
+- Laws at $N=2\times10^6$, seed $314159$: legacy Gaussian RMS$/\sigma=1.00039$; legacy uniform RMS$/\sigma=1.00030$ with $\max\lvert t\rvert/(\sqrt3\sigma)=1.00025$, where the excess is the centroid shift; compressed RMS$/\sigma=1.00039$; centred means $\sim10^{-16}$.
+- Microtrain with $\sigma_{\rm env}=200$, $\sigma_{\rm micro}=0.05$, $T=0.6$ and $\sigma_{\rm jitter}=0.02$ fs, at $\Omega=2\pi/T$:
+
+  | $D$ | RMS$/\sigma_{\rm env}$ | measured $\lvert F\rvert^2$ | predicted $D^2\eta\,e^{-\Omega^2\sigma_{\rm jitter}^2}$ |
+  | --- | --- | --- | --- |
+  | 1 | 1.00039 | 0.7277 | 0.7276 |
+  | 0.37 | 0.99993 | 0.0997 | 0.0996 |
+  | 0 | 0.99975 | $\sim0$ | 0 |
+
+- No-bunch and $\sigma=0$ give exact zeros. $\rho(\delta, t)=5.6\times10^{-4}$ at $N=10^6$, consistent with zero, so energy spread and arrival time remain uncorrelated. Bunch counters for $[900,1000)$ equal the slice of $[0,1000)$.
+- The ledger anchors pass, including `test_block_transport_equals_one_fixed_n_call` with a microtrain bunch.
+
+### Result (#361)
+
+No discrepancy. Verdict for the stream change: `rederived`; the anchored status is supported.
