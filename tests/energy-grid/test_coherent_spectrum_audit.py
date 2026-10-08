@@ -453,6 +453,8 @@ def test_centroid_preserves_positive_subnormal_source():
 
 
 def test_runner_requires_centroid_acceptance_before_returning_provenance(monkeypatch):
+    from scipy.constants import elementary_charge
+
     from pyrite._line_grid_policy import LineGridToleranceError
     from pyrite.montecarlo.runner.coherent_audit import CoherentGridAudit
 
@@ -468,6 +470,8 @@ def test_runner_requires_centroid_acceptance_before_returning_provenance(monkeyp
             },
             "coherent_emission": True,
             "crystal": "hopg",
+            # This synthetic one-sample provenance fixture has no pair excess.
+            "bunch_charge_pc": elementary_charge * 1e12,
         }
     )
     audit.collector.rows.append(_row())
@@ -477,7 +481,12 @@ def test_runner_requires_centroid_acceptance_before_returning_provenance(monkeyp
     assert record["scope"] == "stored-input full finite-axis yield and centroid"
     assert record["centroid_relative_error_upper"] <= 1e-3
     yield_only = CoherentGridAudit(
-        {"_coherent_yield_audit": {}, "coherent_emission": True, "crystal": "hopg"}
+        {
+            "_coherent_yield_audit": {},
+            "coherent_emission": True,
+            "crystal": "hopg",
+            "bunch_charge_pc": elementary_charge * 1e12,
+        }
     )
     yield_only.collector.rows.append(_row())
     record = yield_only.check(np.array([990.0, 1000.0, 1010.0]), np.ones(3), 1)

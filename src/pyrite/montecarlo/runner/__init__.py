@@ -112,6 +112,7 @@ from .line_grid import (
     line_truncation_audit,
     resolve_line_grid,
 )
+from .line_grid import coherent_flat_omission_limit as _coherent_flat_omission_limit
 from .line_grid import longitudinal_rms_fs as _longitudinal_rms_fs
 
 _RESOURCE_POLICY.n_cpus = _usable_cpus()
@@ -605,6 +606,11 @@ def _lines_for_segments_once(
     # Divergence-only case key (#116); mc_spectrum refuses it on coherent calls.
     line_quadrature = case.get("line_quadrature", "node")
     longitudinal_rms_fs = _longitudinal_rms_fs(case)
+    # A coefficient capture (full-axis audit, window seeding) reads the full
+    # blend, so its call never omits the all-electron term.
+    flat_omission_limit = (
+        0.0 if coefficient_capture is not None else _coherent_flat_omission_limit(case)
+    )
     if radiators is None:
         return mc_spectrum(
             segs,
@@ -625,6 +631,7 @@ def _lines_for_segments_once(
             coherent=coherent,
             longitudinal_rms_fs=longitudinal_rms_fs,
             physical_electrons=physical_bunch_electrons(case) if coherent else None,
+            coherent_flat_omission_limit=flat_omission_limit,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             _table_cache=table_cache,
@@ -662,6 +669,7 @@ def _lines_for_segments_once(
             coherent=coherent,
             longitudinal_rms_fs=longitudinal_rms_fs,
             physical_electrons=physical_bunch_electrons(case) if coherent else None,
+            coherent_flat_omission_limit=flat_omission_limit,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             _table_cache=table_cache,
