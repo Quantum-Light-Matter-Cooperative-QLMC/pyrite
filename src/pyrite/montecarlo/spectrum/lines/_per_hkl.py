@@ -23,6 +23,7 @@ from ._formation import (
 )
 from ._kernels import (
     _accumulate_edge_truncation,
+    _energy_slices,
     _flight_blocks,
     _in_medium_kinematics,
     _interp_elemental_mu,
@@ -195,13 +196,15 @@ def _coherent_electron_grouped_row(
     coefs_p = [c[perm_xp] for c in coefs_sel]
     for ka, kb in _flight_blocks(bounds, chunk):
         rows = slice(bounds[ka], bounds[kb])
-        arg = d_p[rows][:, None] * omega_grid[None, :] - gp_p[rows][:, None]
-        arg = arg - Lesc_p[rows][:, None] * delta_omega_grid[None, :]
-        SP = _formation_SP(st, lines_p.take(rows), sinc_cutoff=sinc_cutoff) * xp.exp(1j * arg)
+        block_lines = lines_p.take(rows)
         offsets = bounds[ka:kb] - bounds[ka]
-        for c in coefs_p:
-            field = xp.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
-            row_total += (xp.abs(field) ** 2).sum(axis=0)
+        for e_sl in _energy_slices(bounds[kb] - bounds[ka], chunk, E_grid.size):
+            arg = d_p[rows][:, None] * omega_grid[None, e_sl] - gp_p[rows][:, None]
+            arg = arg - Lesc_p[rows][:, None] * delta_omega_grid[None, e_sl]
+            SP = _formation_SP(st, block_lines, e_sl, sinc_cutoff=sinc_cutoff) * xp.exp(1j * arg)
+            for c in coefs_p:
+                field = xp.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
+                row_total[e_sl] += (xp.abs(field) ** 2).sum(axis=0)
     return row_total
 
 
@@ -339,6 +342,12 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
     E_vac, a_vac, half_dL, apb, bma, q = lines
     if st.temporal_buf is not None:
         _temporal_coherent_row(st, g_vec_d, wm, idx, coefs, good, lines, L_esc)
+    if req.coefficient_capture is not None:
+        # Read-only: coherent window seeding reads the row's own couplings.
+        # Validation: coherent-line-grid-windowed-resolution
+        st.capture_phase_rad = g_phase
+        st.capture_mosaic_weight = float(wm)
+        req.coefficient_capture(st, idx, coefs, good, lines)
 
     # GPU float32 fast path: reduce the two complex polarization fields
     # directly in a raw kernel. This avoids materializing the dense
@@ -699,15 +708,17 @@ def _accumulate_reflection(
         bounds = np.append(starts, sel.size)
         for ka, kb in _flight_blocks(bounds, chunk):
             rows = sel[bounds[ka] : bounds[kb]]
-            arg = d[rows][:, None] * omega_grid[None, :] - g_phase[rows][:, None]
-            arg = arg - L_esc[rows][:, None] * delta_omega_grid[None, :]
-            SP = _formation_SP(st, lines.take(rows)) * xp.exp(1j * arg)
+            block_lines = lines.take(rows)
             # Blocks break only on flight boundaries, so no flight is split
             # across two reductions and squared twice.
             offsets = bounds[ka:kb] - bounds[ka]
-            for c in coefs:
-                field = np.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
-                spec[:] += (xp.abs(field) ** 2).sum(axis=0) * wm
+            for e_sl in _energy_slices(rows.size, chunk, omega_grid.size):
+                arg = d[rows][:, None] * omega_grid[None, e_sl] - g_phase[rows][:, None]
+                arg = arg - L_esc[rows][:, None] * delta_omega_grid[None, e_sl]
+                SP = _formation_SP(st, block_lines, e_sl) * xp.exp(1j * arg)
+                for c in coefs:
+                    field = np.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
+                    spec[e_sl] += (xp.abs(field) ** 2).sum(axis=0) * wm
         return
 
     # -- 7c. coherent (phased) accumulation -----------------------------------

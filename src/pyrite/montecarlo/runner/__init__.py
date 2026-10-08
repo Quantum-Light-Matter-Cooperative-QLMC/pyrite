@@ -106,7 +106,12 @@ from .chunking import (
 from .directions import directional_outputs, validated_directions
 from .host_cpus import _cgroup_cpu_quota as _cgroup_cpu_quota
 from .host_cpus import _usable_cpus
-from .line_grid import check_line_truncation, line_truncation_audit, resolve_line_grid
+from .line_grid import (
+    check_line_truncation,
+    line_truncation_audit,
+    resolve_line_grid,
+)
+from .line_grid import longitudinal_rms_fs as _longitudinal_rms_fs
 
 _RESOURCE_POLICY.n_cpus = _usable_cpus()
 
@@ -531,6 +536,7 @@ def _lines_for_segments(
     table_cache=None,
     truncation_audit=None,
     temporal=None,
+    coefficient_capture=None,
 ):
     """:func:`_lines_for_segments_once` in electron-aligned device blocks (#192).
 
@@ -553,6 +559,7 @@ def _lines_for_segments(
         table_cache=table_cache,
         truncation_audit=truncation_audit,
         temporal=temporal,
+        coefficient_capture=coefficient_capture,
     )
     wants_coherent = case.get("coherent_emission", False) if coherent is None else coherent
     # An in-place temporal profile (#292) cannot be split and retried.
@@ -600,6 +607,7 @@ def _lines_for_segments_once(
     table_cache=None,
     truncation_audit=None,
     temporal=None,
+    coefficient_capture=None,
 ):
     """Coherent line spectrum on ``E_grid`` from already-transported line
     segments ``segs``. Single slab (``layer_radiators`` absent) radiates from
@@ -635,14 +643,7 @@ def _lines_for_segments_once(
         coherent = bool(coherent)
     # Divergence-only case key (#116); mc_spectrum refuses it on coherent calls.
     line_quadrature = case.get("line_quadrature", "node")
-    longitudinal = case.get("longitudinal_distribution") or {}
-    longitudinal_kind = longitudinal.get("kind")
-    if longitudinal_kind in {"gaussian", "compressed"}:
-        longitudinal_rms_fs = longitudinal.get("rms_duration_fs")
-    elif longitudinal_kind is None and case.get("long_shape", "gaussian") == "gaussian":
-        longitudinal_rms_fs = case.get("bunch_length_fs")
-    else:
-        longitudinal_rms_fs = None
+    longitudinal_rms_fs = _longitudinal_rms_fs(case)
     if radiators is None:
         return mc_spectrum(
             segs,
@@ -668,8 +669,11 @@ def _lines_for_segments_once(
             line_quadrature=line_quadrature,
             truncation_audit=truncation_audit,
             temporal=temporal,
+            coefficient_capture=coefficient_capture,
             **mosaic_kw,
         )
+    if coefficient_capture is not None:
+        raise ValueError("coefficient_capture supports single-radiator cases only")
     assert case.get("groove_spacing_ang") is None
     spec = np.zeros(E_grid.shape, dtype=float)
     for L, rad in enumerate(radiators):
@@ -999,6 +1003,11 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # complex coherent grid too.
     want_coherent = bool(case.get("coherent_emission", False))
     spec_coherent = None
+    coherent_audit = None
+    if case.get("_coherent_yield_audit") is not None:
+        from .coherent_audit import CoherentGridAudit
+
+        coherent_audit = CoherentGridAudit(case)
     line_table_cache = {}
     # Opt-in temporal profile (#292): one accumulator per emission policy.
     temporal, temporal_coherent = case_temporal_profiles(case, tp, want_coherent)
@@ -1031,6 +1040,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                     Ne=Ne_lines,
                     table_cache=line_table_cache,
                     temporal=temporal_coherent,
+                    coefficient_capture=None if coherent_audit is None else coherent_audit.capture,
                 )
         except Exception as error:
             if not _is_gpu_oom(error):
@@ -1039,6 +1049,9 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # Refuse a truncating measured bandwidth before the other components run.
     truncation_record = (
         None if truncation_audit is None else check_line_truncation(case, truncation_audit)
+    )
+    coherent_yield_record = (
+        None if coherent_audit is None else coherent_audit.check(E_grid, spec_coherent, Ne_lines)
     )
 
     # CHARACTERISTIC: EEDL shell-ionization track-length estimator on the
@@ -1138,6 +1151,8 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 }
     if spec_coherent is not None:
         out["spec_coherent"] = spec_coherent
+    if coherent_yield_record is not None:
+        out["line_grid_coherent_yield_audit"] = coherent_yield_record
     out.update(temporal_outputs(temporal, temporal_coherent))
     if timed:
         # Ride the phase deltas back to the driver on the result dict; run_cases'
