@@ -1,0 +1,2851 @@
+# `coherent-line-grid-windowed-resolution`
+
+Ledger row: [`coherent-line-grid-windowed-resolution`](../ledger-core-coherent-physics.md#coherent-line-grid-windowed-resolution). Instrument: `montecarlo/spectrum/coherent_windows.py::coherent_window_seeds` (envelope, step, decoherence switch), `montecarlo/spectrum/coherent_windows.py::decoherence_bound`, `montecarlo/runner/line_grid.py::_windowed_line_grid` and `::_check_coherent_budget` (policy), `montecarlo/spectrum/diagnostics.py::coherent_retardation` (reducer geometry), `montecarlo/spectrum/coherent_windows.py::CoherentRowCollector` with `mc_spectrum(coefficient_capture=...)` (the reducer's own per-piece coefficients, read-only). Issue #350. No change to the spectrum: this row is grid policy derived from the coherent reducer's own phase, which [`coherent-line-grid-fringe-spacing`](coherent-line-grid-fringe-spacing.md) analyses.
+
+## Claim
+
+Current independent verdict: **`discrepancy`**. The owner correction below
+retains attenuation slopes and removes cancellation-prone tail subtraction;
+fresh-context re-verification and a dispersion error budget remain pending.
+
+Automatic line-grid resolution serves `coherent_emission` when the policy carries feature windows. Per `(reflection, orientation)` row and observation direction:
+
+1. **Envelope.** The row's coherent window is its resonance band $[\min_j E_j, \max_j E_j]$ over its radiating pieces, widened on each side to the smallest edge where the bound on the row's power beyond that edge is at most $\eta_\mathrm{leak} = 10^{-4}$ of the row's per-electron power. The bound is built from the reducer's own per-piece coefficients and holds for clustered jumps (revised after the 2026-10-05 and 2026-10-06 verifications). It covers the float64 reducer with `sinc_cutoff = None`: a `sinc_cutoff` is refused on this path, and a float32 reducer resolves with a `LineShapePrecisionWarning`. A halo that would leave the axis stops at the axis edge; the bound there is the tail beyond the axis, bandwidth truncation rather than window leakage, and is reported.
+2. **Step.** Inside the window the Nyquist step is $h = \pi\hbar c / D$, with $D$ the span of the time support of *every* radiating piece of the row: the per-electron span $D_e$ for the $\sum_e |S_e|^2$ floor, the all-electron span for the $|\sum_e S_e|^2$ term. Nodes are placed at $h/2$ (`COHERENT_NYQUIST_OVERSAMPLING = 2`).
+3. **Decoherence switch.** A 100 eV window bin takes the per-electron step when $F_\mathrm{max} N_e \le \eta_F = 10^{-4}$ over the bin, and the all-electron step otherwise. $F$ is bounded only on a finite footprint, by the analytic $F_z = e^{-(\omega\sigma_z)^2}$ the reducer applies; with no offsets ($F \equiv 1$) or an infinite slab (empirical characteristic function, no closed-form bound) every bin takes the all-electron step.
+4. **Budget.** The plan is refused, with its coordinate count, above the policy point budget `max_points` (`DEFAULT_MAX_POINTS = 600000`, `PYRITE_ENERGY_GRID_MAX_POINTS`). It is never coarsened. A policy without windows still refuses coherent emission (#117).
+
+## Derivation
+
+### Time-domain field of one row
+
+The coherent reducer builds, per row, $A(E) = \sum_j c_j t_{L,j}\,\mathrm{sinc}(a_j(E - E_j)/\pi)\, e^{i\phi_j(E)}$ with $\phi_j = d_j\omega - \mathbf g\cdot\mathbf r_j$ (the in-medium $L_\mathrm{esc}\,\delta\omega$ slope is $\sim10^{-5}$ of it and is neglected, as in `coherent-line-grid-fringe-spacing`). Each term is the Fourier transform, in the retardation time $\tau = t - \hat n\cdot\mathbf r$, of a constant-amplitude carrier on the piece's support,
+
+$$
+e_j(\tau) = a_j\, e^{-i\omega_j \tau + i\psi_j}, \qquad |\tau - d_j| \le \tfrac12 \Delta d_j,
+\qquad a_j = \frac{c_j}{1 - \beta\,\hat v_j\cdot\hat n},\quad \Delta d_j = (1 - \beta\,\hat v_j\cdot\hat n)\,t_{L,j},
+$$
+
+so that $|A|^2$ carries the autocorrelation of $e(\tau) = \sum_j e_j(\tau)$. The denominators are the in-medium ones the kernels use (`line_seeds.reflection_rows`). Within one electron the supports are disjoint and contiguous, and the phase $\omega\tau - \mathbf g\cdot\mathbf r(t)$ is continuous along the trajectory, so consecutive pieces join without a phase jump. By Parseval the per-electron power is $P_e = 2\pi\sum_{j\in e} a_j^2\,\Delta d_j$.
+
+### Step: band limit and contributing set
+
+$|A(E)|^2$ is the Fourier transform of the autocorrelation of $e(\tau)$, whose support is $[-D, D]$ with $D = \max_j(d_j + \Delta d_j/2) - \min_j(d_j - \Delta d_j/2)$. Uniform sampling at $h \le \pi\hbar c/D$ therefore reconstructs $|A|^2$ (Nyquist), and by Poisson summation the trapezoid sum of $|A|^2$ and of $E^k|A|^2$ is exact for $h \le 2\pi\hbar c/D$, the time-domain aliases at lags $2\pi\hbar c/h$ falling outside the autocorrelation support. Yield and centroid are thus exact at half the density the Nyquist step gives; the FWHM is read by linear interpolation at the half maximum, whose error falls as $h^2$. The current factor-four oversampling is numerical policy pinned by the anchor below. This argument describes the fixed-carrier field; the nonlinear production sampling charge remains unresolved.
+
+The span is taken over every radiating piece of the row, not only those resonating inside a bin. A cross term between the in-window field and the tail of a piece resonating elsewhere is bounded only by Cauchy–Schwarz, $2\|A_\mathrm{in}\|\,\|A_\mathrm{tail}\|$, i.e. by the *square root* of the tail's power share; holding it to $10^{-4}$ would need tail shares of $10^{-8}$, reach far beyond any bin. Distinct rows do not interfere (`cross-reflection-coherence`), so the span is per row.
+
+For the $\sum_e |S_e|^2$ floor only one electron's pieces interfere, and $D_e = \max_e D$ over electrons bounds it. The all-electron span uses the reducer's own geometry, `diagnostics.coherent_retardation`: the offset-free transverse position on an infinite slab with active decoherence, the sampled position on a finite footprint.
+
+### Decoherence switch
+
+The reducer evaluates $(1-F)\sum_e|S_e|^2 + F|\sum_e S_e|^2$ (`coherent-inter-electron-decoherence`). By Cauchy–Schwarz $|\sum_e S_e|^2 \le N_e \sum_e |S_e|^2$ pointwise, so the inter-electron term is at most $F N_e$ times the floor at every energy. Where $F_\mathrm{max} N_e \le \eta_F$ over a bin, leaving that term's fringes unresolved can misplace at most that share of the floor there, and the per-electron step suffices. $F_z$ decreases with $\omega$, so its maximum over a bin is at the bin's lower edge. The empirical characteristic function of an infinite slab fluctuates around $1/N_e$ with no closed-form bound, so no bound below one is claimed and $F N_e$ is never small: those cases take the all-electron step, which in the offset-free geometry is close to the per-electron one.
+
+### Envelope: the coherent tail is the jump spectrum
+
+For undamped pieces, integrating each piece's transform gives, at a distance from every carrier,
+
+$$
+A(\omega) = \sum_j a_j\, \frac{e^{i(\omega-\omega_j)\tau_j^+} - e^{i(\omega-\omega_j)\tau_j^-}}{i(\omega - \omega_j)}\, e^{i\psi_j}.
+$$
+
+At a joint between consecutive pieces of one electron the two end terms share $\tau$ and phase, so they combine into one jump term $\big[a_{k}/(\omega-\omega_{k}) - a_{j}/(\omega-\omega_{j})\big]e^{i\omega\tau}$; a track end, or a gap where a piece is filtered out, contributes its own $a_j/(\omega - \omega_j)$. Beyond an upper edge $X$, with $u_i = X - E_i > 0$, each jump's tail integrates in closed form,
+
+$$
+\int_X^\infty \left|\frac{a_k}{E - E_k} - \frac{a_j}{E - E_j}\right|^2 dE
+= \frac{a_k^2}{u_k} + \frac{a_j^2}{u_j} - 2 a_j a_k\,\frac{\ln(u_j/u_k)}{u_j - u_k},
+$$
+
+with limit $(a_k - a_j)^2/u$ for one carrier (the lower edge is the mirror image). Every amplitude here is the reducer's own: the coherent reduction of the case itself runs once on a two-node axis spanning the bandwidth, with a read-only `coefficient_capture` hook that records, per row, each kept piece's complex coefficient $c_{j,p} = \sqrt{\alpha\omega_j/(4\pi^2\hbar c)}\,t_{L,j}(A_\mathrm{PXR}+A_\mathrm{CBS})_p$ per polarization $p$, its vacuum centre and width ($\Delta d_j = 2\hbar c\,a_{\mathrm{vac},j}$), its formation constants, electron and reducer-geometry $d_j$. The time-domain amplitude is $a_{j,p} = c_{j,p}/\Delta d_j$, damped along the piece by $e^{-\tau_\mathrm{abs}/2}$; a jump's left value is the left piece's amplitude at its end, its right value the right piece's at its start, so absorption, continuous across a joint, adds no zeroth-order field discontinuity; different attenuation slopes still require complex denominators, as corrected below. Complex amplitudes enter the two-carrier integral as $|a_j|^2/u_j + |a_k|^2/u_k - 2\,\mathrm{Re}(a_j a_k^*)\ln(u_j/u_k)/(u_j-u_k)$, summed over polarizations, which add incoherently. The per-electron power is $2\pi\sum_{j,p}|a_{j,p}|^2\Delta d_j\langle e^{-\tau_\mathrm{abs}}\rangle_j$ by Parseval.
+
+The real-denominator expressions above are exact only for undamped pieces.
+For exponentially attenuated pieces the current implementation uses the
+complex denominators and positive majorants derived in "Owner correction:
+attenuation slopes and stable tail norms" below. Continuous endpoint fields
+can still produce a joint term when their attenuation slopes differ.
+
+**Clusters.** Let $T_J$ be a positive upper bound on the tail integral of jump term $J$ alone. Jumps of one electron closer than $\theta = M\hbar c/u_\mathrm{min}$ ($M$ = `COHERENT_JUMP_CLUSTER_SEPARATION` = 64, $u_\mathrm{min}$ the edge's distance to the nearest carrier) form a cluster, bounded by the triangle inequality in $L^2$ of the tail, $T_C \le (\sum_{J\in C}\sqrt{T_J})^2$, with no assumption on their phases.
+
+Across clusters, write each jump term as two pieces whose moduli decrease over the tail,
+
+$$
+\mathcal J = \frac{a_1}{u_1} - \frac{a_2}{u_2} = \frac{a_1 - a_2}{u_1} + a_2\,\frac{u_2 - u_1}{u_1 u_2},
+\qquad
+B_J = \left[\sum_p\left(\frac{\lvert a_{1,p} - a_{2,p}\rvert}{u_1} + \frac{\lvert a_{2,p}\rvert\,\lvert u_2 - u_1\rvert}{u_1 u_2}\right)^2\right]^{1/2},
+$$
+
+with $u_i$ the carrier distances at the edge and $B_J$ the summed modulus there (`_RowJumps.edge_moduli`). The cross term of jumps $J, K$ at $\Delta\tau$ apart, $\int_X^\infty \mathcal J\mathcal K^* e^{iE\Delta\tau/\hbar c}\,dE$, is per polarization a sum of products $g(E)$ of those pieces with coefficients bounded in modulus by $B$'s; each $g$ is positive and decreasing to zero, so integrating by parts, $\lvert\int_X^\infty g\,e^{iE\Delta\tau/\hbar c}dE\rvert \le 2\hbar c\,g(X)/\lvert\Delta\tau\rvert$, and summing (Cauchy–Schwarz over polarizations) gives $\lvert\text{cross}_{JK}\rvert \le 2\hbar c\,B_J B_K/\lvert\Delta\tau\rvert$. This does not need $\lvert\mathcal J\rvert^2$ itself to be monotone, which fails for a joint whose two carriers cancel at an energy inside the tail; and for a near-cancelling joint $B_J$ stays of the order of $\lvert\mathcal J(X)\rvert$, where an envelope adding the two carriers in modulus would not. Jumps in clusters $k$ ranks apart are at least $k\theta$ apart, so the pair is at most $2u_\mathrm{min}B_JB_K/(kM)$; with $B_C = \sum_{J\in C}B_J$, $2B_CB_{C'} \le B_C^2 + B_{C'}^2$ and $\sum_{k=1}^{n_C-1}2/k \le 2(1+\ln n_C)$ per side, the cross terms sum to at most $4(1+\ln n_C)\,u_\mathrm{min}/M\cdot\sum_C B_C^2$. Jumps of different electrons do not interfere in the per-electron power. The bound is
+
+$$
+\ell(X) = \frac{\hbar c\left[\sum_C \big(\sum_{J\in C}\sqrt{T_J}\big)^2 + \Big[\frac{4(1+\ln n_C)\,u_\mathrm{min}}{M}\sum_C B_C^2\Big]_{n_C>1}\right]}{2\pi\sum_{j,p}|a_{j,p}|^2\Delta d_j\langle e^{-\tau_\mathrm{abs}}\rangle_j}.
+$$
+
+For a single-carrier end $u_\mathrm{min}B_J^2 \le T_J$, so on free ends the allowance is at most the earlier $4(1+\ln n_C)/M$ of the diagonal.
+
+The inter-electron term adds at most $F(N_e - 1)$ times the floor's tail by the Cauchy–Schwarz step of the decoherence switch, with $F$ at the edge for the upper tail and at the axis start for the lower one. The window edge is the smallest $X$ with $[1 + F(N_e - 1)]\,\ell(X) \le \eta_\mathrm{leak}$, found by bisection.
+
+This is where coherent and incoherent windows differ. The incoherent route leaks every piece's own two edges; the coherent per-electron field leaks only the amplitude *changes* along the track and its ends. The pre-verification rule took the $t_L^2$ proxy $a_j = 1/(1-\beta\hat v_j\cdot\hat n)$ and a fixed $\kappa = 2$ on the diagonal jump sum; the verifier showed that the coupling $c_j$ changes at first order across a deflection (through $\hat v\cdot\mathbf g$ in $A_\mathrm{PXR}$ and $A_\mathrm{CBS}$) and that clustered joints break the diagonal estimate (below). Both are what the reducer coefficients and the cluster bound now carry.
+
+### Assumptions
+
+- Each piece has a frozen carrier and coefficient, and an affine optical depth. Signed attenuation slopes are included exactly in the endpoint denominators. The reducer's energy-dependent in-medium phase is still omitted: no rigorous dispersion error charge has been established, so this is not yet a proved tolerance guarantee for the full production spectrum.
+- Leakage is measured against diagonal per-electron Parseval power, not against the blended spectrum. In general $I \ge (1-F)\sum_e|S_e|^2$, and destructive inter-electron interference can make $I$ smaller than that diagonal power. A relative-to-spectrum tolerance therefore needs a separate lower bound.
+- The cluster separation $M = 64$ and the bin width are numerical policy. The cross-term coefficient $4(1+\ln n_C)/M$ stays below one for $n_C \le 10^6$ clusters.
+- The reducer's retardation phases are float64. In float32 (`_backend.py` default on CUDA) $d/\hbar c$ is rounded at $\lvert d\rvert \sim 10^7$ Å to about 1 Å, up to 0.7 rad per piece at keV energies; joints lose phase continuity and the tail is no longer the jump spectrum. `_coherent_rows` warns (`LineShapePrecisionWarning`, "float64 phases only") and resolution proceeds; `PYRITE_FP64=1` is the supported setting.
+- No `sinc_cutoff`: the cutoff truncates each line's support after the captured coefficients and adds tails the jump spectrum does not carry; `_coherent_rows` refuses it.
+- Leakage shares are policy shares: $2\eta_\mathrm{leak} + \eta_F = 3\times10^{-4}$ is charged to the feature-window row of `tbl-line-budget-allocation` ($5\times10^{-4}$). On the anchor the production reducer's tails are $\le 5.3\times10^{-5}$ per side to the axis stop and the independent model's $\le 8.0\times10^{-5}$ untruncated under the revised bound, inside that charge.
+
+### Limiting cases
+
+- **Single segment.** One undamped piece has two free ends of amplitude $a$, $\Delta d$ apart. Within $u < M\hbar c/\Delta d$ of its edge they form one cluster, $(2\sqrt{a^2/u})^2 = 4a^2/u$, and the bound returns exactly `sincsq_upper_tail_bound`, $w/(\pi^2 u)$ with $w = 2\pi\hbar c/\Delta d$ — the incoherent `sinc²` tail bound. Farther out the two ends decorrelate and the bound falls to $(1+4(1+\ln 2)/M)/2$ of it, still above the exact tail. Its span is $\Delta d$, so the Nyquist step is $\pi\hbar c/\Delta d = w/2$: two nodes per first-zero width of the incoherent `sinc²` (the incoherent policy's integration-exact step $w$ carries the same factor two between integration and reconstruction). Pinned by `test_single_segment_leak_is_the_incoherent_sinc_tail_bound`.
+- **Collinear split.** A straight flight cut into pieces has equal amplitudes and carriers at its joint, which cancel; window and spans equal the unsplit flight's (`test_a_collinear_split_leaks_exactly_what_the_whole_flight_leaks`).
+- **Clustered joints.** The verification's amplitude ramps (20 pieces within $\hbar c/u$, twice) and scattered tracks with moving carriers stay inside the bound against an independent quadrature of the time-domain field (`test_clustered_joints_stay_inside_the_bound`, `test_a_scattered_track_with_moving_carriers_stays_inside_the_bound`); exact/bound is 0.17–0.30 for the ramps and 0.06–0.10 for the scattered tracks. The 2026-10-06 counterexample to the earlier lemma (101 at 1000 eV joined to 100 at 1003 eV, a zero of $\lvert\mathcal J\rvert^2$ at 1303 eV beyond an 1100 eV edge) repeated at cluster separations: exact/bound 0.45 (`test_near_cancelling_joints_far_apart_stay_inside_the_bound`).
+- **$F \to 0$.** Every bin takes the per-electron step (`test_vanishing_decoherence_takes_the_per_electron_step_everywhere`); $F \equiv 1$ takes the all-electron step everywhere (`test_unbounded_decoherence_takes_the_all_electron_step`).
+
+## Measurements
+
+### Anchor: windowed-auto against a fine explicit grid, identical trajectories
+
+`tests/energy-grid/test_coherent_windowed_line_grid.py::test_windowed_auto_matches_a_fine_explicit_grid_on_identical_trajectories`: hopg, 30 keV, tilt 5°, azimuth 45°, 1 µm, $N_e = 3$, seed 0, `bunch_length_fs = 100` on the 5 mm footprint ($F_z = 0$, per-electron step throughout; two forward rows radiate). The window plan refined on its coherent seeds, and uniform axes over the whole bandwidth at fractions of the finest Nyquist step, all on one transport, against uniform ÷32.
+
+Post-fix at `c2690a35` (reducer coefficients, cluster bound; windows $[10, 2001]$ eV for $(0\,0\,2)$ and $[605, 2718]$ eV for $(0\,0\,4)$). The 2026-10-06 cross-term allowance moves them to $[10, 1930]$ and $[596, 2718]$ eV at 30 649 coordinates; the test's yield, centroid and FWHM gates pass there, and the table is not re-measured:
+
+| axis (Nyquist step ÷) | coordinates | yield rel. | centroid shift [eV] | FWHM rel. |
+|---|---|---|---|---|
+| windowed ÷2 (shipped) | 30 649 | $-5.7\times10^{-8}$ | $-3.6\times10^{-6}$ | $2.6\times10^{-3}$ |
+| windowed ÷4 | 60 795 | $-3.6\times10^{-8}$ | $-2.8\times10^{-5}$ | $6.2\times10^{-4}$ |
+| windowed ÷8 | 121 088 | $-3.4\times10^{-8}$ | $-2.9\times10^{-5}$ | $1.4\times10^{-4}$ |
+| windowed ÷16 | 241 679 | $-4.1\times10^{-8}$ | $-2.1\times10^{-5}$ | $1.5\times10^{-5}$ |
+| uniform ÷8 | 164 451 | $4.6\times10^{-9}$ | $-5.2\times10^{-6}$ | $1.3\times10^{-4}$ |
+| uniform ÷16 | 328 902 | $4.5\times10^{-9}$ | $-4.8\times10^{-6}$ | $2.2\times10^{-5}$ |
+| uniform ÷32 | 657 803 | reference | reference | reference |
+
+This earlier ladder found yield and centroid converged inside the windows; the wider post-fix windows removed the $1.9\times10^{-6}$ yield offset the pre-fix backbone carried. FWHM converged as $h^2$ — $2.6\times10^{-3}$, $6.2\times10^{-4}$, $1.4\times10^{-4}$ at two, four and eight nodes per Nyquist step — because the dominant 0.97 eV line's half-maximum crossing is read by linear interpolation. The former two-node default met the harness's $10^{-2}$ shape share but missed issue #350's stricter $10^{-3}$ acceptance. The current default is four nodes, and the regression now gates yield, centroid and FWHM at $10^{-3}$. The earlier pre-fix plan measured $6.8\times10^{-4}$ at two nodes; that was node placement, not convergence.
+
+Pre-fix (proxy envelope, windows $[254, 1610]$ and $[589, 2760]$ eV), against uniform ÷16: windowed ÷2 at 28 484 coordinates gave yield $1.8\times10^{-6}$, centroid $-1.2\times10^{-3}$ eV, FWHM $6.8\times10^{-4}$.
+
+**Production-reducer tails** (`test_the_production_reducer_leaks_less_than_the_window_bound`; one reflection, full axis at half the window step, power beyond the edge over the axis power; tails beyond the axis stop are not sampled):
+
+| row | window edge [eV] | bound at edge | reducer tail |
+|---|---|---|---|
+| $(0\,0\,2)$ upper, post-fix | 2001.3 | $1.00\times10^{-4}$ | $4.7\times10^{-5}$ |
+| $(0\,0\,4)$ upper, post-fix | 2717.7 | $0.98\times10^{-4}$ | $4.5\times10^{-5}$ |
+| $(0\,0\,4)$ lower, post-fix | 605.2 | $1.00\times10^{-4}$ | $1.5\times10^{-5}$ |
+| $(0\,0\,2)$ upper, pre-fix | 1609.9 | $1.00\times10^{-4}$ | $9.9\times10^{-5}$ |
+| $(0\,0\,4)$ upper, pre-fix | 2760.5 | $1.00\times10^{-4}$ | $3.6\times10^{-5}$ |
+| $(0\,0\,2)$ lower, pre-fix | 254.0 | — | $4.4\times10^{-5}$ |
+
+Revised allowance (2026-10-06), CPU float64, with the re-verification's independent time-domain model (untruncated: to $X + 60u$):
+
+| row | window edge [eV] | bound at edge | reducer tail to axis stop | model tail, untruncated |
+|---|---|---|---|---|
+| $(0\,0\,2)$ upper | 1930.2 | $1.00\times10^{-4}$ | $5.3\times10^{-5}$ | $8.0\times10^{-5}$ |
+| $(0\,0\,4)$ upper | 2717.7 | $0.92\times10^{-4}$ | $4.5\times10^{-5}$ | $5.8\times10^{-5}$ |
+| $(0\,0\,4)$ lower | 596.4 | $0.88\times10^{-4}$ | $1.5\times10^{-5}$ | $1.4\times10^{-5}$ |
+
+This evaluation runs the reducer over the whole axis, as production does. Truncated at the axis stop the bound sits 1.9–2.0× above the reducer's upper tails; untruncated, 1.25× for $(0\,0\,2)$ and 1.6× for $(0\,0\,4)$, and 6× on the lower edge. The 2026-10-05 verification's $1.08\times10^{-4}$ and $1.36\times10^{-4}$ are not reproduced on CPU by either full-axis or sub-range calls; the shell exported `PYRITE_MC_BACKEND=cuda`, and the same anchor resolved on the float32 CUDA reducer puts the untruncated model tail at $1.8\times10^{-4}$ beyond the 1930 eV edge, so they were most plausibly float32 evaluations — the scope now carried by the precision assumption.
+
+### Reference case: hopg 30 keV, tilt 5°, 1 mm, $N_e = 40$
+
+`build_ladder_case("hopg", 30, 5, 0, n_electrons=40, seed=7)`, `bunch_length_fs = 100` — the `coherent-line-grid-fringe-spacing` reference transport. Windows per row (per-electron Nyquist 0.0122 eV for $(0\,0\,\pm2)$ and $(0\,0\,\pm4)$-family rows of the forward reflections, 0.018 eV for the backward ones): bands reach the axis start at 10 eV and the upper halo is 1.5–62 eV, with 97% of pieces joined to a neighbour. At the Nyquist step the plan holds 216 335 coordinates; at the shipped oversampling it holds about twice that, inside the budget.
+
+### Remote ladders on identical trajectories (`pyrite remote`, GPU, `PYRITE_FP64=1`)
+
+Hopg, tilt 5°, azimuth 0°, 1 mm, $N_e = 40$, seed 7, `bunch_length_fs = 100`, one transport per ladder; windowed-auto against a uniform reference at half the finest window step, plus windowed at half the shipped step (`auto_half`). Global observables are over the whole axis (dominated by a narrow low-energy feature near 17 eV); "band" observables over the line band from 200 eV.
+
+| case | axis | coordinates | wall [s] | yield rel. | centroid rel. | FWHM rel. | band yield rel. | band FWHM rel. |
+|---|---|---|---|---|---|---|---|---|
+| 30 keV (`c2690a35`) | windowed | 546 045 | 43 | $1.0\times10^{-7}$ | $1.4\times10^{-8}$ | $1.5\times10^{-5}$ | $3.3\times10^{-5}$ | $5.6\times10^{-7}$ |
+| 30 keV | reference | 1 092 082 | 140 | — | — | — | — | — |
+| 60 keV (`f8821d07`) | windowed | 2 426 296 | 107 | $3.9\times10^{-7}$ | $5.7\times10^{-7}$ | $8.6\times10^{-3}$ | $5.6\times10^{-6}$ | $4.1\times10^{-4}$ |
+| 60 keV | windowed, half step | 4 852 588 | 223 | $3.9\times10^{-8}$ | $2.9\times10^{-7}$ | $1.3\times10^{-6}$ | $5.9\times10^{-6}$ | $2.4\times10^{-5}$ |
+| 60 keV | reference | 4 852 584 | 230 | — | — | — | — | — |
+
+At 60 keV the global FWHM is that of a 0.014 eV feature, read at two nodes per Nyquist step: inside the $10^{-2}$ shape share, outside $10^{-3}$, and converged at four nodes, the $h^2$ behaviour of the anchor. Where an upper bound exceeds $10^{-4}$ the window reaches the 6000 eV axis stop (bandwidth truncation, reported). The 60 keV ladder first ran out of GPU memory in the per-electron grouped reduction: one electron's dense `(pieces, E_grid)` block at $1.5\times10^6$ coordinates is 11 GB, and `_flight_blocks` never splits a group; energy slicing (`lines/_kernels.py::_energy_slices`, exact because the reduction runs along rows) fixed it.
+
+### `hopg_short`-class
+
+Reduced `hopg_short` (hopg, 60 keV, 10 µm, tilt 45°, azimuth 135°, beam `1_atto` with `transverse_fwhm_mm = 0.1`, 5 mm footprint, $N_e = 200$): the 1 as bunch gives $F_z N_e > 10^{-4}$ below ~2.5–2.9 keV, so most of every window takes the all-electron Nyquist step (1.16–1.36 × 10⁻³ eV shipped, against 2.8–3.2 × 10⁻³ eV per-electron). Under the default 600 000 budget the plan is refused with its count (4 600 923 on a CPU transport of $4.1\times10^6$ segments). With `PYRITE_ENERGY_GRID_MAX_POINTS=5000000` on the GPU host (`PYRITE_FP64=1`, `f8821d07`) it completes: 39 187 segments, 2 607 240 coordinates, transport plus resolution 3.8 s, spectrum 637 s, finite incoherent and coherent spectra (coherent yield $2.03\times10^{-6}$). The full 81-case profile is not run.
+
+## Open
+
+- **Re-verification.** The 2026-10-06 re-verification (below) returned a narrowed `discrepancy`; its three items are addressed in "Resolution (task owner, 2026-10-06)". A fresh context re-checks them before the row moves.
+- **Inter-electron term without a closed-form bound.** For a sub-femtosecond bunch the Cauchy–Schwarz switch is conservative by roughly $N_e$: random transverse positions make $|\sum_e S_e|^2 \approx \sum_e|S_e|^2$ on average, so the unresolved term is $\sim F$ of the floor, not $F N_e$. Using that statistical estimate, or the empirical $F$ of infinite slabs, would bring `hopg_short`-class cases under the budget but is a modelling decision outside #350.
+- **Budget.** `hopg_short`-class plans need a `max_points` near $3\times10^6$–$5\times10^6$; the shipped default stays 600 000, so they run on a GPU host with `PYRITE_ENERGY_GRID_MAX_POINTS` raised.
+
+## Fresh-context verification (2026-10-05)
+
+Independent verifier, working from the ledger row, the docstrings and the parent rows (`coherent-line-grid-fringe-spacing`, `coherent-inter-electron-decoherence`) before reading the implementation bodies. Verdict: **`discrepancy`** on the envelope rule (item 1); the step, decoherence switch, limiting cases and reducer geometry (items 2–5) re-derive and match.
+
+### Independent derivation
+
+**Time-domain row field.** A straight piece of duration $t_L$ with velocity $\beta\hat{\mathbf v}$ contributes $\int e^{i(\omega t - \omega\hat{\mathbf n}\cdot\mathbf r(t) - \mathbf g\cdot\mathbf r(t))}\,dt$. With $\tau = t - \hat{\mathbf n}\cdot\mathbf r$, $d\tau = (1-\beta\hat{\mathbf v}\cdot\hat{\mathbf n})\,dt$ and $\mathbf g\cdot\mathbf r$ affine in $\tau$ with slope $\omega_j = \beta\mathbf g\cdot\hat{\mathbf v}/(1-\beta\hat{\mathbf v}\cdot\hat{\mathbf n})$, the piece is the transform $\int f(\tau)e^{i\omega\tau}d\tau$ of
+
+$$
+f_j(\tau) = a_j\,e^{-i\psi(\tau)},\qquad a_j = \frac{c_j}{1-\beta\hat{\mathbf v}_j\cdot\hat{\mathbf n}},\qquad \lvert\tau - d_j\rvert\le\tfrac12\Delta d_j,\qquad \Delta d_j = (1-\beta\hat{\mathbf v}_j\cdot\hat{\mathbf n})\,t_{L,j},
+$$
+
+with $\psi(\tau) = \mathbf g\cdot\mathbf r(\tau)$ continuous along one track. This reproduces the write-up's representation. Parseval gives $\int\lvert A\rvert^2 d\omega = 2\pi\sum_j a_j^2\Delta d_j$ per electron; in energy, $\int\lvert A\rvert^2 dE = \hbar c\int\lvert A\rvert^2 d\omega$.
+
+**Jump spectrum.** Integrating every piece exactly (not asymptotically),
+
+$$
+A(\omega) = \frac{1}{i}\sum_{J} e^{i\omega\tau_J - i\psi(\tau_J)}\,\mathcal J_J(\omega),\qquad
+\mathcal J_J = \frac{a_{\rm left}}{\omega-\omega_{\rm left}} - \frac{a_{\rm right}}{\omega-\omega_{\rm right}},
+$$
+
+with $a_{\rm left}=0$ at a track start and $a_{\rm right}=0$ at a track end. Phase continuity of $\psi$ is what lets the two end terms of a joint merge into one $\mathcal J_J$. Beyond an edge $X$, with $u_i = X - E_i > 0$,
+
+$$
+\int_X^\infty\left\lvert\frac{a_2}{E-E_2}-\frac{a_1}{E-E_1}\right\rvert^2 dE = \frac{a_1^2}{u_1}+\frac{a_2^2}{u_2}-2a_1a_2\,\frac{\ln(u_1/u_2)}{u_1-u_2},
+$$
+
+since $\int_0^\infty ds/[(u_1+s)(u_2+s)] = \ln(u_1/u_2)/(u_1-u_2)$; the one-carrier limit is $(a_2-a_1)^2/u$. This matches `_joint_tail` (`coherent_windows.py:105-115`) and the free-end weight `free * a**2 / u` (`:132-142`). The fraction is
+
+$$
+\ell(X) = \kappa\,\frac{\hbar c\,\sum_J\int_X^\infty\lvert\mathcal J_J\rvert^2 dE}{2\pi\sum_j a_j^2\Delta d_j},
+$$
+
+which matches `coherent_edge_leak` (`:160`) in factors and units: $\hbar c$ [eV Å] times $a^2/\mathrm{eV}$ over $a^2$ Å.
+
+**Single segment.** Two free ends give $\lvert A\rvert^2 = 4a^2\sin^2(\Delta d\,x/2)/x^2 \le 4a^2/x^2 = \kappa\times$ the diagonal sum with $\kappa = 2$. Then $\ell = 2\hbar c/(\pi u\,\Delta d) = w/(\pi^2 u)$ with $w = 2\pi\hbar c/\Delta d$, which is `sincsq_upper_tail_bound`. **Matches.**
+
+**Does $\kappa = 2$ bound $\lvert\sum_J\cdot\rvert^2$?** The pointwise inequality the request names, $\lvert\sum_J A_J\rvert^2 \le (\sum_J\lvert A_J\rvert)^2 \le M\sum_J\lvert A_J\rvert^2$ for $M$ jumps, is **not** what the code applies. The code applies the diagonal sum times $\kappa = 2$. That is exact for one piece (two jumps). For more jumps it holds only after integration, and only when each pair's cross term $\int e^{i\omega(\tau_m-\tau_n)}\mathcal J_m\mathcal J_n^*$ is suppressed, which needs $u\,\lvert\tau_m-\tau_n\rvert \gg \hbar c$. When $k\ge3$ jumps fall within $\hbar c/u$ of one another in $\tau$, their end terms add coherently, and the integrated tail can reach $k/2$ times the $\kappa = 2$ estimate. The code does not check that condition.
+
+### Numeric checks (independent of implementation helpers except `_RowJumps`/`coherent_edge_leak`, which are the objects under test)
+
+Here "exact" means the numerically integrated $\int\lvert A\rvert^2$ of the time-domain proxy, or of the production reducer, beyond the window edge.
+
+| case | exact / $\kappa$-bound |
+|---|---|
+| synthetic single segment, $u\Delta d = 25, 100$ | 0.50, 0.50 |
+| synthetic 20-piece random-walk and monotone tracks (end-dominated) | 0.49–0.52 |
+| synthetic amplitude ramp, 20 pieces inside $\hbar c/u$ (×2 ramps) | **7.5, 10.8** |
+| synthetic $\beta = 0.9$ random walk through near-$\hat{\mathbf n}$ directions, 40 tracks | median 0.52, **max 4.6** |
+| anchor transport (hopg 30 keV, 1 µm, $N_e=3$), ideal proxy (contiguous $\tau$, continuous phase), rows (0 0 2), (0 0 4) | 0.50, 0.50 |
+| same, proxy amplitude also carrying $\sqrt{\omega_j}$ | 0.44, 0.52 |
+
+**Production reducer on the anchor transport.** `CaseLadder(..., coherent=True).lines` was run with a single reflection, and $F_z = 0$, so the output is the per-electron floor. It was integrated at a quarter of the window step. The upper-tail power fraction from the window edge to the axis stop is:
+
+| row | window upper edge [eV] | code bound at edge | reducer tail to axis stop (lower bound on full tail) |
+|---|---|---|---|
+| (0 0 2) | 1609.9 | $1.00\times10^{-4}$ | $\mathbf{1.08\times10^{-4}}$ |
+| (0 0 4) | 2760.5 | $1.00\times10^{-4}$ | $\mathbf{1.36\times10^{-4}}$ |
+
+The (0 0 4) lower tail is $1.6\times10^{-5}$, inside its bound. The ideal proxy carries about 0.5 of the bound on the same pieces, so the reducer's tail is 2.2–2.7× the proxy's. Both values are truncated at the axis stop, so the true leak is larger still.
+
+### Diff against the implementation
+
+1. **Envelope — first divergent term: the per-piece coupling $c_j$.** The rule takes $a_j = 1/(1-\beta\hat{\mathbf v}_j\cdot\hat{\mathbf n})$ with $c_j$ fixed along a track (`coherent_windows.py:274`, assumption at write-up §Assumptions line 67). The reducer's coherent amplitude is $c_j = \sqrt{\alpha\,\omega_j/(4\pi^2\hbar c)}\,(A_{\rm PXR}+A_{\rm CBS})_{\rm pol}$ (`lines/_per_hkl.py:330`, `:601`, `:604`). Here $A_{\rm PXR}\propto\chi_{\mathbf g}/\text{detuning}$ and $A_{\rm CBS}\propto 1/(\gamma\,\hat{\mathbf v}\cdot\mathbf g)$. Both change at **first** order in a deflection through $\hat{\mathbf v}\cdot\mathbf g$, which the anchor tracks show halving across one scatter: $E_{\rm res}$ 1210 → 598 eV while $a_j$ moves only 1.178 → 1.199. The write-up's statement that a polarization change "enters the jump at second order in the deflection" does not hold for these factors. The consequence is that the envelope is a bound on the $t_L^2$ proxy, not on the reducer's leaked power: it is exceeded on the ledger's own anchor case.
+2. **Envelope — $\kappa = 2$ is an estimate, not a bound,** for clustered joints ($u\,\Delta\tau \lesssim \hbar c$). The write-up states the suppression condition (line 61). The code neither enforces it nor falls back to the triangle-inequality form there.
+3. **Step** $h = \pi\hbar c/D$ over the union support of every kept radiating piece (`:276-283`). This matches the band-limit argument: $\lvert A\rvert^2$ is the transform of an autocorrelation supported on $[-D,D]$. It also matches the Poisson statement (trapezoid exact for $h < 2\pi\hbar c/D$). The factor-two oversampling is labelled as measured numerical policy in `_line_grid_policy.py` (`COHERENT_NYQUIST_OVERSAMPLING` comment) and in the write-up. **Matches.** The span uses the in-medium $\Delta d_j$ where the reducer's formation factor uses the vacuum width with an escape-phase slope. The difference is $O(\delta\,\lvert\nabla L\rvert)$ and immaterial for $D$.
+4. **Decoherence switch.** $(1-F)\sum_e\lvert S_e\rvert^2 + F\lvert\sum_e S_e\rvert^2 \le [1+F(N_e-1)]\sum_e\lvert S_e\rvert^2$ by Cauchy–Schwarz, so $F\lvert\sum_e S_e\rvert^2 \le F N_e\sum_e\lvert S_e\rvert^2$ pointwise. $F_z$ is evaluated at each bin's lower edge (`:327`), which is the maximum because $F_z$ decreases in $E$. The upper-tail factor is taken at the edge and the lower-tail factor at the axis start (`:286-298`). Both are conservative. $N_e$ counts every line electron with pieces, which is at least the number of nonzero $S_e$ in a row, so it is conservative too. Infinite slab and no-offset cases return no bound, so they take the all-electron step. **Matches; conservative.** The "share of the floor" meaning of $10^{-4}$ is an order-of-magnitude aliasing charge, not a strict quadrature-error bound (an undersampled term's quadrature error can reach about twice its size).
+5. **`coherent_retardation`.** $d = t_{\rm mid} - \hat{\mathbf n}\cdot\mathbf r_{\rm mid} + \hat{\mathbf n}_\perp\cdot\mathbf r_{0\perp,e}$ on an infinite slab with active decoherence (`diagnostics.py:140-151`). This equals the reducer's $t_{\rm mid} - \hat{\mathbf n}\cdot(\mathbf r - (x_0,y_0,0))$ (`lines/_setup.py:575-578`), and the sign is right. A finite footprint keeps the sampled positions and has no $t_0$ (`:573`). $t_L = L/\beta$ on the piece length matches `_setup.py:471`. **Matches.**
+6. **Limits.** A single segment gives the incoherent `sinc²` bound and the step $w/2$. $F\to0$ gives the per-electron step. A collinear split gives zero joint jump. **Pass** (focused test, 10 passed).
+7. **Budget.** $2\times10^{-4} + 10^{-4} = 3\times10^{-4}$ of the $5\times10^{-4}$ feature-window row is arithmetically right. Measured on the anchor, the per-side leak is at least $1.36\times10^{-4}$, so the charge is understated. A charge of at least $3.7\times10^{-4}$ would still sit inside $5\times10^{-4}$. The effect on observables is small: the anchor's yield offset is $1.9\times10^{-6}$, because leaked power is backbone-sampled rather than lost.
+
+### Suggested resolution (task owner)
+
+Either put the reducer's per-piece coupling into the jump amplitudes ($a_j \to \lvert c_j\rvert/(1-\beta\hat{\mathbf v}_j\cdot\hat{\mathbf n})$ per polarization), or state and measure the proxy-to-reducer factor as policy and widen $\kappa$ to cover it. Either way, add a guard (or a triangle-inequality fallback) for joints closer than $\hbar c/u$. Then re-verify against the production-reducer tail on the anchor.
+
+## Fresh-context re-verification (2026-10-06)
+
+Independent verifier, at `c2690a35`. It re-derived the cluster bound and the cross-term allowance from the jump representation before reading `coherent_windows.py`. The reducer-tail numbers were then reproduced on the CPU float64 backend (`PYRITE_MC_BACKEND=cpu`), on the anchor transport of `test_the_production_reducer_leaks_less_than_the_window_bound`. Verdict: **`discrepancy`, narrowed.** The envelope dominates the float64 reducer's tail on the anchor, and the step, the decoherence switch and the limits still hold. Three gaps remain: the stated pairwise lemma is wrong by up to a factor of 2, the claim is not scoped to the float64 reducer, and it is not scoped to `sinc_cutoff = None`.
+
+### Independent checks
+
+**Time-domain model from the captured coefficients.** The verifier built its own time-domain field from the `CoherentRowCollector` rows, without using `_RowJumps` or `coherent_edge_leak`. Each piece is an exponentially damped carrier between its captured end transmissions, and the phase is chained to be continuous across joints. The model was transformed in closed form and integrated numerically beyond the edge. Truncated at the 3700 eV axis stop, it reproduces the production reducer's tail to within 0.7%. The reducer itself was evaluated over the full axis at a quarter and at a half of the window step, with identical results.
+
+| row, side | edge [eV] | bound | reducer tail to axis edge | model tail to axis edge | model tail, untruncated |
+|---|---|---|---|---|---|
+| $(0\,0\,2)$ upper | 2001.27 | $1.000\times10^{-4}$ | $4.727\times10^{-5}$ | $4.745\times10^{-5}$ | $7.6\times10^{-5}$ |
+| $(0\,0\,4)$ upper | 2717.71 | $0.983\times10^{-4}$ | $4.513\times10^{-5}$ | $4.544\times10^{-5}$ | $6.1\times10^{-5}$ |
+| $(0\,0\,4)$ lower | 605.16 | $1.000\times10^{-4}$ | $1.546\times10^{-5}$ | $1.541\times10^{-5}$ | (to 0 eV) $1.54\times10^{-5}$ |
+
+The untruncated figure is the integral to $X + 240u$, plus the $1/R$ remainder fitted between the $60u$ and $240u$ reaches. The model's Parseval power equals `CoherentRowField.power` to rounding. So on the float64 reducer the bound dominates the whole tail beyond the edge, both polarizations summed, for both radiating rows. The margin is $1.3\times$ for $(0\,0\,2)$ upper, $1.6\times$ for $(0\,0\,4)$ upper and $6.5\times$ for the lower edge. The write-up's "2.1–2.2×", and the ledger's "each about 2.1x", hold only for the upper tails truncated at the axis stop.
+
+**Capture hook (item c).** For both rows, the spectrum with `coefficient_capture` (which forces the per-hkl route) is bit-identical to three other evaluations: the default route without capture, the per-hkl route without capture, and a repeat with capture. The rows captured on the two-node `[start, stop]` axis are bit-identical to those captured on a 0.05 eV production-range axis: amplitudes, centres and energies all agree. The keep pad of `0.2 (E[-1] - E[0])` depends only on the axis end nodes, so it matches as long as the production grid ends at `start` and `stop`. The hook is called after `good` is formed and only reads its arguments (`lines/_per_hkl.py:342-345`).
+
+**Normalization of the 2026-10-05 figures (item d).** At the pre-fix edges, the full-axis float64 tails are $9.89\times10^{-5}$ ($(0\,0\,2)$, 1609.9 eV) and $3.56\times10^{-5}$ ($(0\,0\,4)$, 2760.5 eV). Sub-range reducer calls on $[X, 3700]$ eV give $4.65\times10^{-5}$ and $3.60\times10^{-5}$, normalized either by the full-axis total or by the sum of the two sub-ranges. The sub-range keep mask drops pieces, which changes the set of gaps. Neither normalization reproduces $1.08\times10^{-4}$ or $1.36\times10^{-4}$ on CPU. The CUDA float32 route does give larger, grid-dependent tails (below). The ambient shell here exports `PYRITE_MC_BACKEND=cuda`, so the earlier figures were most plausibly float32 GPU evaluations. That attribution is not confirmed.
+
+**Cluster allowance (item b).** At leading order in $1/(u\,s)$, the cross term of two separated jump terms is $\mathcal J_m(X)\mathcal J_n^*(X)\,e^{iXs}/(-is)$, with $s = \Delta\tau/\hbar c$. The ratio $u\lvert\mathcal J(X)\rvert^2/T_J$ is 1 for a single-carrier end, 3 for a near-cancelling joint (a $1/E^2$ dipole), and 4 for a joint whose $\lvert\mathcal J\rvert^2$ vanishes inside the tail. An example of the last is $a = 101$ at 1000 eV against $a = 100$ at 1003 eV, with a zero at 1303 eV for an edge at 1100 eV. Measured pair constants $\lvert\text{cross}\rvert\,u\,s/\sqrt{T_mT_n}$ at $s \in [1, 1.2]\,M/u$ are 1.00, 2.99 and 3.93. So the write-up's lemma fails as stated: "$\lvert\mathcal J\rvert^2$ decreases monotonically beyond the edge, so the cross term is at most $2\hbar c/(u\lvert\tau_m-\tau_n\rvert)\sqrt{T_mT_n}$". The monotonicity is false for two-carrier jumps, and the constant is up to 4. A rigorous integration-by-parts bound gives $\lvert f(X)\rvert + \mathrm{TV}(f)$, which is up to 8.
+
+The coded allowance $4(1+\ln n_C)/M$ (`coherent_windows.py:269`) nevertheless covers the leading-order sum for point-like clusters. The ordered-pair sum is a Hilbert form, bounded by Montgomery–Vaughan by $\pi/M$ per unit power. So $4\pi/M = 12.6/M$ is the bound for $n_C \ge 9$. For $n_C \le 8$, the lattice eigenvalues give $4\lambda_{\max} = 4.0, 6.0, 7.2, 9.4$ against $M$ times the allowance, $6.8, 8.4, 9.5, 12.3$ (at $n_C = 2, 3, 4, 8$). For extended clusters (chains spanning many $\theta$) no proof was found. An adversarial scan reached at most 0.90 of the bound. It used isolated jumps spaced just over $\theta$, dipole and alternating carriers, swept phases, and $n \le 25$; the realized cross terms were at most 1.5% of the diagonal against an allowance of at least 13%.
+
+**Limits (item f) and the step.** The single-segment limit is $(2\sqrt{a^2/u})^2\hbar c/(2\pi a^2\Delta d) = w/(\pi^2 u)$. Beyond $M\hbar c/\Delta d$, the bound $(1 + 4(1+\ln 2)/M)/2$ times that stays above the exact tail, whose oscillating excess is at most $1/(u\Delta d/\hbar c) \le 1/M$. The collinear split cancels exactly. For the step, the span now comes from the captured `d_all_geom` and the vacuum width $2\hbar c\,a_\mathrm{vac}$ of the `good` pieces, the same phase and support the reducer uses for both terms. The decoherence switch is unchanged. Focused suite: 17 passed.
+
+**Budget (item e).** $2\eta_\mathrm{leak} + \eta_F = 3\times10^{-4}$ fits the $5\times10^{-4}$ feature-window row whenever the per-side bound holds, which it does on the float64 reducer. `line-spectrum-error-budget.md:54` reads "`DEFAULT_COHERENT_LEAK_LIMIT` (per side, $2\times10^{-4}$)". The per-side value is $10^{-4}$ (`_line_grid_policy.py:199`); $2\times10^{-4}$ is the two-sided total.
+
+### Discrepancies
+
+1. **Pairwise lemma.** The divergent factor is the "2" in the $2\hbar c/(u\lvert\Delta\tau\rvert)$ pair bound: the write-up §Clusters, the `coherent_edge_leak` docstring (`coherent_windows.py:255-256`) and the `_line_grid_policy.py:214-216` comment. The measured constant is up to 3.93, and the monotonicity premise is false. The coded allowance is supported only at leading order and for point-like clusters, by the Hilbert-form argument above. Either restate the derivation that way, or raise the allowance to a provable constant.
+2. **Float32 reducer not covered.** On CUDA float32, the default GPU precision (`_backend.py:361`), the reducer casts $d/\hbar c$ to `REAL` (`lines/_per_hkl.py:385`, `lines/_batched.py:603`). On the anchor's finite footprint $\lvert d\rvert$ reaches $1.49\times10^7$ Å, where one float32 ulp is 1 Å. That is up to 0.68 rad of phase per piece at 2.7 keV. Joint phase continuity, which the envelope derivation assumes, is then lost. An inadvertent float32 GPU evaluation of the same transport, the only GPU run, gave tails of $1.29\times10^{-4}$ for $(0\,0\,2)$ and $3.79\times10^{-4}$ for $(0\,0\,4)$ beyond the post-fix edges. These are $1.3\times$ and $3.9\times$ the bound. On CPU, the model with each $d_j$ rounded to float32 gives $1.60\times10^{-4}$ and $2.43\times10^{-4}$ untruncated, which confirms the mechanism. The fix belongs to the reducer (subtract a per-row or per-electron reference from $d$ before the cast), or else the claim should be scoped to float64.
+3. **`sinc_cutoff` not covered.** `sinc_cutoff` is not refused on the coherent windowed path (`runner/line_grid.py::_coherent_rows`), and the hook captures the coefficients before the cutoff. A truncated reducer no longer has the jump spectrum. On CPU float64, `sinc_cutoff = 200` gives a $(0\,0\,4)$ upper tail of $1.80\times10^{-4}$, $1.8\times$ the bound, and `sinc_cutoff = 50` gives $9.5\times10^{-5}$. Either refuse the combination or scope the claim to `sinc_cutoff = None`.
+
+Minimal reproduction for item 3 (CPU): take the anchor case and transport from the test fixture, set `{**case, "hkl_list": [(0, 0, 4)], "coherent_emission": True, "sinc_cutoff": 200.0}`, and call `runner._lines_for_segments(..., coherent=True)` on `np.arange(10, 3700, 0.5 * step_electron_eV)`. The trapezoid fraction above 2717.7 eV is $1.80\times10^{-4}$.
+
+Suggested ledger change: status stays `discrepancy`. Add to Notes that the envelope dominates the float64, `sinc_cutoff = None` reducer on the anchor (untruncated tails $7.6\times10^{-5}$ and $6.1\times10^{-5}$ against $1.0\times10^{-4}$ and $0.98\times10^{-4}$). Record the three open items above, and replace "each about 2.1x" with the truncated and untruncated margins.
+
+## Resolution (task owner, 2026-10-06)
+
+1. **Pairwise lemma.** Restated through the decreasing-piece decomposition in §Clusters: each carrier product is positive and decreasing, so integration by parts holds with constant 2 against the edge moduli $B$, not $\sqrt{T}$, and needs no monotonicity of $\lvert\mathcal J\rvert^2$. The allowance is now $4(1+\ln n_C)\,u_\mathrm{min}/M\cdot\sum_C B_C^2$ (`coherent_edge_leak`, `_RowJumps.edge_moduli`). On the verifier's pair cases the measured constant against $B$ is far below 2 (the exact-$T$ constants 2.99 and 3.93 come from $T \ll B^2u$ there). The anchor's $(0\,0\,2)$ upper edge moves from 2001 to 1930 eV; the bound still dominates the untruncated tail (table above).
+2. **Float32.** Scoped to float64: `_coherent_rows` warns under a float32 `REAL` (`test_a_float32_reducer_warns_that_the_bound_needs_float64_phases`). Making the reducer's phases float32-safe is a reducer change (#298 territory), not grid policy; a per-row reference subtraction alone does not suffice, since the per-row span reaches $2\times10^7$ Å.
+3. **`sinc_cutoff`.** Refused on the coherent windowed path (`test_a_windowed_policy_refuses_a_sinc_cutoff`).
+
+The budget-note wording (`line-spectrum-error-budget.md`, per side $10^{-4}$) is corrected.
+
+## Fresh-context verification of rebased tip (2026-10-06)
+
+This verification starts from the ledger claim and owner docstrings at
+`a16efe252c8618641d26f85cdfe6b2bc04080bc7`, before reading implementation
+bodies or this document's earlier derivation. Source: the reducer's stated
+finite-piece coherent formation field and decoherence blend; no new external
+physical law is asserted. The verifier did not implement this claim.
+
+### Independent expression and filters (recorded before implementation inspection)
+
+Let $H=\hbar c$, let $\tau$ be the observation retardation coordinate in
+angstroms, and let $k_j=E_j/H$ be a piece's carrier. The field of electron
+$e$ in polarization $p$ is
+
+$$
+f_{e,p}(\tau)=\sum_{j\in e}a_{j,p}b_j(\tau)
+\exp(-i k_j\tau+i\psi_j)\mathbf 1_{[l_j,r_j]}(\tau),
+\qquad S_{e,p}(E)=\int f_{e,p}(\tau)\exp(i E\tau/H)\,d\tau .
+$$
+
+Here $a_{j,p}=c_{j,p}/d\!d_j$, $d\!d_j=r_j-l_j$, and
+$b_j=\exp(-\tau_{\rm abs}/2)$. The captured coefficient has units of the
+square root of photon density; division by the angstrom support length
+makes the Fourier integral restore those units. Nonoverlapping pieces of
+one track and Parseval imply
+
+$$
+\int_{-\infty}^{\infty}\sum_{e,p}|S_{e,p}(E)|^2\,dE
+=2\pi H\sum_{j,p}|a_{j,p}|^2d\!d_j\langle b_j^2\rangle .
+$$
+
+For constant transmission, integration by parts produces endpoint/joint
+terms $H\exp(iE\tau_J/H)J_J(E)/i$, with each joint difference
+$J_J=v_1/(E-E_1)-v_2/(E-E_2)$ and the complex endpoint fields $v_s$.
+Phase continuity is needed to identify the joint's numerator as a field
+difference; matching magnitudes alone is insufficient.
+
+On either tail, put $u_s=|E-E_s|>0$. The diagonal tail of one joint is
+
+$$
+T_J=\sum_p\left[
+\frac{|v_{1,p}|^2}{u_1}+\frac{|v_{2,p}|^2}{u_2}
+-2\operatorname{Re}(v_{1,p}v_{2,p}^*)
+\frac{\ln(u_2/u_1)}{u_2-u_1}\right],
+$$
+
+with the quotient replaced by $1/u_1$ when the carriers coincide. This is
+positive by its definition as an integrated squared modulus. For a common
+carrier, $T_J=\sum_p|v_{1,p}-v_{2,p}|^2/u_1$.
+
+A safe decreasing-piece envelope for a joint follows by decomposing its
+rational amplitude before taking absolute values:
+
+$$
+B_J(E)=\left\{\sum_p\left[
+\frac{|v_{1,p}-v_{2,p}|}{u_1}
++\frac{|v_{2,p}|\,|E_2-E_1|}{u_1u_2}\right]^2\right\}^{1/2}.
+$$
+
+This does not require $|J_J|^2$ itself to decrease. Every positive scalar
+piece in the product of two such envelopes decreases to zero. Integration
+by parts therefore bounds a separated pair's oscillatory integral by
+$2H B_J B_K/|\tau_J-\tau_K|$ before the factor two for the real cross term.
+Inside a cluster, the $L^2$ triangle inequality gives
+$(\sum_J\sqrt{T_J})^2$. Between ordered clusters separated by
+$M H/u_{\min}$, rank distance supplies the harmonic sum bound
+
+$$
+\int_{\rm tail}\sum_{e,p}|S_{e,p}|^2\,dE
+\le H^2\left[
+\sum_C\left(\sum_{J\in C}\sqrt{T_J}\right)^2
++\frac{4(1+\ln n_C)u_{\min}}{M}
+\sum_C\left(\sum_{J\in C}B_J\right)^2\right].
+$$
+
+Dividing by Parseval power gives a dimensionless fraction. For an undamped
+single segment of length $L$, the two endpoints clustered together give
+$2H/(\pi L u)=w/(\pi^2u)$, with $w=2\pi H/L$.
+
+The intensity Fourier support is contained in the difference of field
+supports. Span $D$ therefore implies Nyquist spacing $\pi H/D$; selecting
+two nodes per Nyquist step is an additional numerical policy. All nonzero
+radiating pieces enter $D$, regardless of their amplitude rank. The blend
+
+$$
+I=(1-F)\sum_{e,p}|S_{e,p}|^2+F\sum_p\left|\sum_eS_{e,p}\right|^2
+$$
+
+obeys Cauchy--Schwarz: its inter-electron term is at most
+$FN_e\sum_{e,p}|S_{e,p}|^2$. Thus discarding inter-electron frequency support
+has an integrated error at most $F_{\max}N_e$ times the diagonal power;
+it does not prove a relative error against arbitrarily cancelled coherent
+intensity. The total tail multiplier is $1+F(N_e-1)$. Analytic Gaussian
+$F=\exp[-(E\sigma_t/\hbar)^2]$ decreases for positive energy; lower-tail
+bounds must use the axis start, not its high-energy edge.
+
+Units, the undamped single-piece limit, coincident-carrier cancellation,
+zero field, and $F\to0$ all pass these filters. Two scope checks remain
+explicitly open before reading code: linear attenuation creates complex
+carrier denominators and a continuous derivative contribution, so an
+endpoint-only real-denominator estimate needs a proof; energy-dependent
+coefficients or dispersive phase slopes must be distinguished from a truly
+band-limited frozen-carrier field. Float64 coordinates do not themselves
+prove float64 phase evaluation.
+
+### Comparison with implementation
+
+The revised **undamped** two-carrier and cluster argument matches exactly:
+`_RowJumps.edge_moduli` decomposes the rational jump into the two decreasing
+pieces above; `coherent_edge_leak` uses the within-cluster triangle bound and
+$4(1+\ln n_C)u_{\min}\sum_C B_C^2/M$. Polarization Cauchy--Schwarz and ordered
+cluster spacing supply the stated constants. No monotonicity assumption on
+an individual jump's squared modulus is needed. Taking more clusters across
+different electrons only enlarges this bound; those electrons do not
+interfere in the diagonal power. The previous pairwise-lemma discrepancy is
+resolved for this undamped representation.
+
+`CoherentRowCollector` captures the actual reducer coefficients after the
+formation-valid mask and divides by $2H a_{\rm vac}$. Its endpoint
+transmissions are $(a_{\rm pb}-b_{\rm ma})/2$ and
+$(a_{\rm pb}+b_{\rm ma})/2$. The mean transmission
+$(b_{\rm start}^2-b_{\rm end}^2)/(4q)$, with the zero-slope limit, matches
+Parseval for each exponentially damped piece. `CoherentRowField.power`
+correctly omits $2\pi H$; `coherent_edge_leak` restores the remaining factor
+$H/(2\pi)$ when dividing its energy-denominator tail integral by that power.
+There is no missing normalization factor in this comparison.
+
+The capture hook is read-only in the collector. An independent CPU check
+used the documented HOPG 30 keV, three-electron anchor transport with a
+100 fs bunch: default batched spectrum, capture-forced per-reflection
+spectrum, and repeated capture were bit-identical on a 1001-node
+10--3700 eV axis. Both captured rows' coefficients, energies, durations,
+centres, electron IDs, and three transmission arrays were bit-identical
+between that axis and the two-node seeding axis. This establishes neutrality
+and axis independence on this anchor, not every material or GPU route.
+
+The reducer's actual phase is $Ed/H-\mathbf g\cdot\mathbf r-L_{\rm esc}\delta\omega(E)$, and its formation argument is
+$a_{\rm vac}(E-E_j)-(\Delta L/2)\delta\omega(E)$. For zero dispersion,
+the vacuum carrier and geometry phases meet at a true track joint; the
+common energy-independent joint phase cancels in the joint's squared
+modulus. Capture retains the same $d$ used by the reducer, including its
+finite-footprint or offset-free convention. A dispersive field is an
+approximation to this frozen-carrier representation: the captured row does
+not retain $\Delta L$ or $L_{\rm esc}$, and the neglected slope has no error
+charge proved here. Float64 removes the previously identified phase
+rounding issue; it does not remove dispersion or absorption-slope terms.
+
+The span calculation includes every valid piece and reproduces the
+per-electron and all-electron support spans. `decoherence_bound` uses only
+the analytic finite-footprint Gaussian; bins test their lower edge for
+$F_{\max}N_e$. Lower-tail multiplication uses the axis start. These match
+the independent Cauchy--Schwarz derivation, as an absolute share of diagonal
+power. Relative-to-spectrum budgeting still needs care under destructive
+inter-electron interference: in general $I\ge(1-F)\sum_e|S_e|^2$, not
+$I\ge\sum_e|S_e|^2$. The implementation's stated per-electron denominator
+is correct; the earlier write-up's stronger floor assumption is not a
+universal theorem.
+
+Budget refusal, float32 warning and `sinc_cutoff` refusal match their stated
+contracts. Inspection against rebased main `52675cfb` found the grouped
+energy-slice integration preserves complete groups and all phase/formation
+terms; it slices only independent photon energies. Focused chunk-invariance
+checks pass. The attenuation issue below is already present in the physical
+formation law on main, rather than a merge-conflict convention change.
+
+### Remaining discrepancy: attenuation slope at a joint
+
+For a linear optical-depth piece, write
+$b_j(\tau)=b_j(l_j)\exp[-\lambda_j(\tau-l_j)]$. Its exact transform has
+endpoint denominators
+
+$$
+\lambda_j-i(E-E_j)/H,
+$$
+
+or equivalently $(E-E_j)+iH\lambda_j$, up to the common factor $iH$.
+Consequently a continuous attenuated joint has the exact difference
+
+$$
+\frac{v_1}{E-E_1+iH\lambda_1}
+-\frac{v_2}{E-E_2+iH\lambda_2}.
+$$
+
+`_RowJumps.terms` and `edge_moduli` instead use real denominators and erase
+this joint when the carriers and endpoint fields agree, even if
+$\lambda_1\ne\lambda_2$. That is the first exact divergent term. Continuous
+attenuation adds no zeroth-order field jump, but its derivative contributes
+a nonzero spectrum. A single-piece inequality $|F|\le1/|v|$ does not justify
+cancelling endpoint bounds across pieces with different complex
+denominators.
+
+An independent adversarial field admitted by the collector's representation
+makes the failure explicit. One electron, one polarization, two contiguous
+pieces with equal unit amplitudes and carrier $E_0=1000$ eV occupy
+$[-L,0]$ and $[0,L]$, with $L=1000$ Å. Let $Q=8$,
+$s=Q/L$, and $\epsilon=\exp(-Q)$. The transmission is continuous,
+$b(\tau)=\exp(-s|\tau|)$: endpoint transmissions are $(\epsilon,1)$ and
+$(1,\epsilon)$, with mean intensity transmission
+$(1-\epsilon^2)/(2Q)$ for each piece. This is two linear, nonnegative
+optical-depth pieces, with slopes of opposite sign. Its carrier phase is
+continuous; there is no rounding, cutoff, gap or dispersion in this example.
+
+For $x=E-E_0$, the exact transform and diagonal power are
+
+$$
+S(E)=2\operatorname{Re}\frac{1-\exp[(-s+ix/H)L]}{s-ix/H},
+\qquad P=2\pi H\frac{L(1-\epsilon^2)}{Q}.
+$$
+
+The implementation cancels the central joint, retaining only the tiny
+outer endpoint fields. At upper edge $E_0+100=1100$ eV it reports a
+full-tail fraction $1.13095394158\times10^{-8}$. Independent integration
+of the exact expression on only $[1100,2000]$ eV gives
+$8.09864494379\times10^{-4}$: **over 71,600 times the asserted full-tail
+bound**, and already above the $10^{-4}$ policy share. The finite interval
+is sufficient to refute the bound without estimating an infinite remainder.
+The exact expression was also compared pointwise to the production
+`formation_factor`, using $q=(-Q/2,Q/2)$ and the two corresponding endpoint
+sums/differences; they agree at relative tolerance $10^{-10}$ and absolute
+tolerance $10^{-11}$ on 100001 energy nodes. No full material/trajectory
+reproduction of this adversarial attenuation profile was performed. The
+failure is to the asserted general bound on the very piece-field class it
+claims to cover; a narrower physical restriction would need its own proof.
+
+Minimal reproduction of the bound (the reference integral above uses no
+jump helpers):
+
+```python
+import numpy as np
+from pyrite.materials.crystal import HBARC_EV_ANG as H
+from pyrite.montecarlo.spectrum.coherent_windows import (
+    CoherentRowField,
+    _RowJumps,
+    coherent_edge_leak,
+)
+
+L, Q, E0 = 1000.0, 8.0, 1000.0
+s, eps = Q / L, np.exp(-Q)
+row = CoherentRowField(
+    label="continuous attenuation cusp",
+    energy_eV=np.array([E0, E0]),
+    amplitude=np.ones((1, 2), complex),
+    duration_ang=np.array([L, L]),
+    centre_ang=np.array([-L / 2, L / 2]),
+    electron=np.array([0, 0]),
+    start_transmission=np.array([eps, 1.0]),
+    end_transmission=np.array([1.0, eps]),
+    mean_transmission=np.full(2, (1 - eps**2) / (2 * Q)),
+)
+bound = coherent_edge_leak(_RowJumps(row), row.power, E0 + 100, upper=True)
+x = np.linspace(100.0, 1000.0, 100001)
+reference = 2 * np.real((1 - np.exp((-s + 1j * x / H) * L)) / (s - 1j * x / H))
+finite_tail = np.trapezoid(reference**2, x) / (2 * np.pi * H * row.power)
+print(bound, finite_tail)
+```
+
+A second numerical caution, subordinate to this analytic failure:
+`_RowJumps.terms` subtracts nearly equal floating-point numbers when a joint
+almost cancels. For $u_1=100$, $u_2=100(1+10^{-8})$, $v_1=1$,
+$v_2=u_2/u_1$, independent quadrature gives
+$T_J=3.33333325612\times10^{-19}$, while the implementation returns
+$-3.46944695195\times10^{-18}$ and `coherent_edge_leak` clips it to zero.
+At $10^{-7}$ separation it overestimates the term by about a factor of
+three. A strict numerical bound needs a stable small-carrier-separation
+formula or a rounding allowance; these tiny terms did not explain the
+anchor's macroscopic tails.
+
+### Current verdict and validation evidence
+
+**Verdict: `discrepancy`.** The revised decreasing-piece cross-term bound
+resolves the previous undamped pairwise issue; float64 scoping and cutoff
+refusal are implemented. The complete exponentially damped-field envelope
+still differs by the missing $iH\lambda_j$ term at a joint. Retain the
+ledger's `discrepancy` status and record this attenuation-slope example in
+Notes. A correction or an explicit narrower scope must be independently
+re-verified before suggesting `rederived`; human sign-off remains separate.
+
+Checks on CPU, using the canonical project runner:
+
+- `test_coherent_windowed_line_grid.py` plus `test_chunk_invariance.py`:
+  38 passed, five existing batched divide/square-root warnings.
+- Independent scratch checks: exact damped formation-transform comparison
+  passed; coefficient capture neutrality/axis independence passed; numerical
+  near-cancellation comparison recorded. The original infinite-interval
+  quadrature hit its subdivision limit; the reported counterexample uses
+  the independently sufficient finite integral instead.
+- No remote compute, heavy sweeps, code edits, commits, issue edits or ledger
+  changes were performed by this verifier.
+
+
+## Owner correction: attenuation slopes and stable tail norms (2026-10-06)
+
+This corrects the attenuation and near-cancellation examples above. It is
+implementation-context work, not independent verification. Historical
+measurements above use older windows and are not measurements of this revision.
+
+Write a piece's amplitude transmission as
+$b_j(t)=b_j(l_j)\exp[-\lambda_j(t-l_j)]$, with signed slope
+$\lambda_j=(\tau_{\rm end}-\tau_{\rm start})/(2\Delta d_j)$ [Å$^{-1}$].
+The collector retains $\lambda_j=2q_j/\Delta d_j$ directly from the reducer's
+formation constants, even if an endpoint transmission underflows. Endpoints
+are recovered from $a_{\rm pb}=b_{\rm start}+b_{\rm end}$ and the ratio
+$\exp(-2|q|)$ without subtracting nearly equal endpoint sums/differences.
+
+At a continuous-phase joint the exact damped endpoint difference is
+
+$$
+\mathcal J_p(E)=\frac{v_{1,p}}{z_1(E)}-\frac{v_{2,p}}{z_2(E)},
+\qquad z_i(E)=E-E_i+iH\lambda_i,\qquad H=\hbar c.
+$$
+
+For either tail let $E=X+\sigma s$, $s\ge0$, $\sigma=+1$ above the
+carriers and $-1$ below them, and $u_i=\sigma(X-E_i)>0$.
+Then $|z_i(E)|\ge u_i+s$, and the constant denominator difference has norm
+
+$$
+\Delta_z=|z_2-z_1|=\sqrt{(E_1-E_2)^2+H^2(\lambda_2-\lambda_1)^2}.
+$$
+
+The exact algebraic decomposition
+
+$$
+\mathcal J_p=\frac{v_{1,p}-v_{2,p}}{z_1}
++\frac{v_{2,p}(z_2-z_1)}{z_1z_2}
+$$
+
+therefore has the decreasing positive envelope
+
+$$
+b_p(s)=\frac{|v_{1,p}-v_{2,p}|}{u_1+s}
++\frac{|v_{2,p}|\Delta_z}{(u_1+s)(u_2+s)}.
+$$
+
+Minkowski and $m=\min(u_1,u_2)$ give an upper bound on the squared tail norm
+without subtracting nearly equal integrals:
+
+$$
+T_J\le\sum_p\left[
+\frac{|v_{1,p}-v_{2,p}|}{\sqrt{u_1}}
++\frac{|v_{2,p}|\Delta_z}{\sqrt{3}\,m^{3/2}}
+\right]^2,
+\qquad
+\int_0^\infty\frac{ds}{(u_1+s)^2(u_2+s)^2}\le\frac{1}{3m^3}.
+$$
+
+Swapping indices supplies a second valid decomposition. The implementation
+chooses the smaller bound per polarization. At a free end both denominators
+are assigned the same carrier and slope, leaving $|v|^2/u$ exactly as a
+conservative single-denominator bound. When carriers and slopes match, a
+joint becomes $|v_1-v_2|^2/u$; a collinear split still cancels exactly.
+Equal fields with different slopes no longer cancel.
+
+For cross terms use $B_J=(\sum_p b_p(0)^2)^{1/2}$, again choosing either
+index ordering at the edge and keeping that decomposition fixed for the
+proof. Complex denominator phases mean the product is not a positive real
+function. Instead $|(1/z_i)'|\le1/(u_i+s)^2$, so each rational piece's
+derivative norm is bounded by the negative derivative of its real envelope.
+For a product of two pieces, $|g|\le G$ and $|g'|\le-G'$. Integration by
+parts then yields
+
+$$
+\left|\int_0^\infty g(s)e^{i\sigma s\Delta t/H}ds\right|
+\le\frac{H}{|\Delta t|}\left[G(0)+\int_0^\infty(-G')ds\right]
+=\frac{2H G(0)}{|\Delta t|}.
+$$
+
+Thus the existing cluster allowance $4(1+\ln n_C)u_{\min}\sum_C B_C^2/M$
+remains valid for signed attenuation slopes. The diagonal norm and edge
+moduli are both formed from positive quantities. This removes the reported
+negative tail integral; it does not claim a universal machine-rounding
+certificate for arbitrarily ill-conditioned inputs.
+
+Regression anchors integrate the independent attenuation-cusp transform on
+a finite interval in both tails, and the near-cancelling joint directly with
+a common numerator. All three fail against the previous implementation.
+The cusp's finite tail is $8.09865\times10^{-4}$; its previous asserted
+infinite-tail bound was $1.13095\times10^{-8}$.
+
+Remaining scope: the frozen-carrier representation omits
+$-L_{\rm esc}\delta\omega(E)$ and its intra-piece slope. Neither this fix nor
+the earlier measurements prove that approximation's error fits the policy
+share. The ledger remains `discrepancy` pending independent re-verification
+and resolution of that production-spectrum gap. Coherent coordinate-cache
+revision is incremented so earlier windows cannot be reused.
+
+## Fresh-context review of attenuation correction (2026-10-06)
+
+The verifier derived the transform of a piecewise field with signed affine
+optical depth before reading implementation bodies. Units, attenuation signs,
+the undamped single-piece limit, collinear splitting and $F\to0$ passed.
+The signed complex denominators, positive Minkowski tail norms, stable
+endpoint capture and derivative-majorant cross-term allowance match that
+fixed-carrier field. The full production verdict remains **`discrepancy`**.
+
+Independence boundary: an initial ledger extraction inadvertently displayed
+implementation-specific Notes alongside Claim and Source. Implementation
+bodies and this existing derivation were read only after the scratch
+derivation. The reviewer did not implement the correction, but the input was
+not perfectly blind to the owner's earlier account.
+
+### Independent attenuation anchor
+
+For $f(t)=\exp(-s|t|)$ on $[-L,L]$, the transform at frequency detuning $x$
+is independently
+
+$$
+S(x)=\frac{2\left[s+e^{-sL}\left(-s\cos(xL)+x\sin(xL)\right)\right]}{s^2+x^2}.
+$$
+
+With $s=0.03$ Å$^{-1}$, $L=1000$ Å and carrier 1000 eV, integration over
+$x\in[0.3,30]$ Å$^{-1}$ gives a finite-tail fraction
+$2.0968692556\times10^{-4}$. The corrected infinite-tail bound at either
+mirrored edge is $2.9570772063\times10^{-4}$. This independently confirms
+the signed attenuation correction for this field, not the complete material
+transport spectrum.
+
+### Genuine gaps must retain both endpoints
+
+Ten unit-amplitude pieces of length 1 Å, separated by 1 Å gaps, with one
+electron and common carrier 1000 eV, have centres
+$10^7+2j+0.5$ Å for $j=0,\ldots,9$. A common translation of the time origin
+changes only the overall spectral phase. Removing that phase, their exact
+transform is
+
+$$
+S(x)=\frac{2\sin(x/2)}{x}\sum_{j=0}^{9}e^{2ijx},
+\qquad x=(E-1000\,\mathrm{eV})/H.
+$$
+
+The prior join tolerance, $10^{-3}\min(\Delta d_j,\Delta d_{j-1})+
+4\times10^{-7}|l_j|$, merged all nine real gaps at this translated origin.
+It replaced the separated endpoint terms by a cancelling joint. Integration
+on $x\in[100,1000]$ Å$^{-1}$ gives a finite-tail fraction
+$2.8471605140\times10^{-3}$, exceeding the previous asserted infinite-tail
+bound $3.8590886478\times10^{-4}$ by 7.38 times. This counterexample needs
+neither attenuation nor dispersion.
+
+The owner replaced the physical relative tolerance with an allowance for
+float64 endpoint reconstruction only,
+
+$$
+8\epsilon_{64}\left(|d_j|+|d_{j-1}|+
+\tfrac12(\Delta d_j+\Delta d_{j-1})\right).
+$$
+
+`test_real_gaps_do_not_cancel_under_retardation_translation` pins the
+independent finite integral at origins zero and $10^7$ Å. It fails on the
+translated origin before the correction and passes afterward, retaining
+all twenty free endpoints. Coherent cache revision 4 invalidates earlier
+plans. The verifier independently rechecked this correction: zero merged
+joints, finite-tail fraction $2.8471605140\times10^{-3}$ below the corrected
+bound $3.9780245401\times10^{-3}$. The collinear-split and both production
+reflection-tail anchors also passed in that context. A sub-roundoff gap
+still cannot be distinguished from a reconstructed
+joint by this allowance; no universal exact snapping-error certificate is
+claimed.
+
+### Remaining exact discrepancy: dispersive endpoint denominator
+
+The production formation profile contains the escape-path phase slope. Its
+endpoint denominator is
+
+$$
+z_j(E)=E-E_{\rm vac,j}
+-H\frac{\Delta L_j}{\Delta d_j}\delta\omega(E)+iH\lambda_j,
+$$
+
+and the external midpoint phase contains $-L_{\rm mid,j}\delta\omega(E)$.
+The collector discards the escape-distance change and does not capture the
+midpoint escape distance. Its tail bound and support span therefore describe
+a different fixed-carrier field unless these terms vanish or are separately
+bounded. A small refractive decrement alone does not control the error: the
+ratio of escape-path slope to retardation slope can amplify it.
+
+An independent lossless affine-escape example uses constant
+$\delta=10^{-5}$, $\Delta d=100$ Å, $\Delta L=10^6$ Å and
+$E_{\rm vac}=1000$ eV. The exact detuning becomes $0.9E-1000$ eV. Its
+finite upper-tail fraction on $[1100,1200]$ eV is 0.5098803723, against the
+captured field's asserted infinite-tail bound 0.1256222573. The independent
+sinc expression agrees with production `formation_profile` pointwise, with
+maximum absolute difference $8.24\times10^{-13}$. This is an artificial
+affine-escape field, not a material-specific transport reproduction.
+
+For constant $\delta$, the physical Fourier coordinate is
+$y=t-\delta L(t)$: piece duration becomes
+$\Delta d-\delta\Delta L$ and carrier becomes
+$E_{\rm vac}/(1-\delta\Delta L/\Delta d)$. Thus the captured Parseval
+normalization and support-based spacing also need re-analysis; padding
+window centres alone does not resolve the production claim. The ledger
+retains `discrepancy`; no acceptance status is promoted.
+
+## Owner building blocks for dispersive windows (2026-10-06)
+
+The collector now retains $L_{\rm mid,j}$ and signed $\Delta L_j$ alongside
+the existing attenuation data. These are the same escape endpoints used by
+the production formation integral. The following owner derivation supplies
+two building blocks; it is **not independent verification** and does not
+yet replace the production seeder's frozen-carrier bound.
+
+### Exact affine phase law
+
+Write $H=\hbar c$ and define an affine surrogate
+$\delta\omega(E)=sE+b$, continued over the real energy axis for Parseval.
+It equals the material field only where that law is exact; a finite-band
+normalization must account separately for its out-of-band power. On a piece,
+the change of variable $y=d-HsL(d)$ has Jacobian
+
+$$
+k_j=1-Hs\frac{\Delta L_j}{\Delta d_j}>0.
+$$
+
+The complete field, including its midpoint phase and its formation slope,
+is then a Fourier transform on the new coordinate. The mapped quantities are
+
+$$
+\Delta y_j=k_j\Delta d_j,\qquad
+y_{\rm mid,j}=d_j-HsL_{\rm mid,j},\qquad
+E'_j=\frac{E_{\rm vac,j}+Hb\Delta L_j/\Delta d_j}{k_j},
+\qquad a'_{j,p}=\frac{a_{j,p}}{k_j},\qquad
+\lambda'_j=\frac{\lambda_j}{k_j}.
+$$
+
+The energy-independent midpoint phase also contains $-bL_{\rm mid,j}$;
+it remains continuous across a true joint together with the original
+susceptibility phase. Endpoint transmissions are unchanged. For disjoint
+mapped supports within each electron, Parseval therefore gives
+
+$$
+P'=\sum_{j,p}\frac{|a_{j,p}|^2}{k_j}\Delta d_j
+\langle e^{-\tau_{\rm abs}}\rangle_j,\qquad
+\int\sum_{e,p}|S'_{e,p}(E)|^2dE=2\pi H P'.
+$$
+
+The endpoint envelope and support step can now use the mapped row. The
+private `_affine_dispersion_row` helper refuses nonpositive Jacobians,
+overlapping or reordered mapped supports, and closing a genuine gap into a
+joint whose phases have not been shown to agree. Its support check uses the
+existing float64
+endpoint reconstruction convention, whose sub-roundoff scope remains open.
+The vacuum limit $s=b=0$ recovers every original quantity. Constant
+$\delta$ is $s=\delta/H$, $b=0$: the counterexample's 100 Å piece becomes
+90 Å with carrier $1000/0.9=1111.111\ldots$ eV, amplitude $a/0.9$,
+power $P/0.9$, and Nyquist step $\pi H/90$.
+
+### Uniform residual charge on a finite energy band
+
+For a nonlinear law, let $r(E)=\delta\omega(E)-(sE+b)$ and require a
+**certified uniform** bound $|r(E)|\le R$ throughout a band of width $W$.
+An endpoint sample or fitted residual is insufficient. Inside a piece,
+the actual and affine integrands differ by $e^{-ir(E)L(d)}-1$, so
+
+$$
+|e^{-ir(E)L(d)}-1|\le\min(2,R L_{\max,j}),\qquad
+L_{\max,j}=|L_{\rm mid,j}|+\tfrac12|\Delta L_j|.
+$$
+
+Let $m_j=\langle e^{-\tau_{\rm abs}/2}\rangle_j$ be the mean amplitude
+transmission. If $q_j=(\tau_{\rm end}-\tau_{\rm start})/4$ and $B_j$ is
+the brighter endpoint's amplitude transmission, its stable integral is
+$m_j=B_j[-\operatorname{expm1}(-2|q_j|)]/(2|q_j|)$, with limit $B_j$ at
+$q_j=0$. Triangle inequality inside an electron and an independent sum
+over electrons give the absolute finite-band error bound
+
+$$
+\int_{\rm band}\sum_{e,p}|S_{e,p}-S'_{e,p}|^2dE
+\le W\sum_{e,p}\left[
+\sum_{j\in e}|a_{j,p}|\Delta d_jm_j\min(2,R L_{\max,j})
+\right]^2=\mathcal E.
+$$
+
+`_dispersion_residual_power_bound` evaluates this positive bound using the
+original row. It includes both the midpoint phase and the escape slope
+inside the formation integral. It handles signed attenuation and endpoint
+underflow, and reduces to zero when $R=0$ or $W=0$. Its units are squared
+field times eV; dividing by $2\pi H P'$ gives the affine Parseval charge.
+For any sub-band with affine power $Y'$, the actual power lies between
+$\max(0,\sqrt{Y'}-\sqrt{\mathcal E})^2$ and
+$(\sqrt{Y'}+\sqrt{\mathcal E})^2$. Thus residual power must be combined
+with the affine tail bound at the **amplitude** level; adding the two power
+fractions directly omits their cross term. A physical finite-band relative
+claim also needs a positive lower bound on its actual normalization.
+
+Fast anchors compare the transformed damped exponential against production
+formation for both signs of the slope and intercept, reproduce the original
+constant-$\delta$ counterexample, and check the nonlinear residual bound
+against direct finite integration. They do not supply a material-table
+certificate. Remaining work: certify $R$ across Henke interpolation and
+absorption edges, combine the charge with envelope and sampling budgets,
+establish physical finite-band normalization, and obtain fresh-context
+validation before changing the production policy or ledger status.
+
+## Owner material-law enclosure and runtime audit (2026-10-06)
+
+`coherent_dispersion.CoherentDispersionLaw` reconstructs the interpolation
+used by the full output axis. Its source is the installed xraydb 4.5.8
+`XrayDB._from_chantler`: the real anomalous factor uses an interpolating
+cubic spline on the native table truncated three nodes beyond the query's
+minimum and maximum; the imaginary factor uses linear interpolation in
+log-energy and log-factor. The raw `Chantler` table has energy, f1 and f2
+columns ([upstream schema](https://github.com/xraypy/XrayDB/blob/master/xraydb.schema)).
+The adapter adds $Z$ to anomalous f1 exactly as `chi_0` does, uses the same
+unit-cell volume and constants, and refuses unsupported table domains.
+
+The full-axis extrema are part of the model. Independent local calls to
+`refractive_index` can select a different spline: on HOPG, the batch
+$[284.8,285.0,285.2]$ eV differs by about $10^{-5}$ Å$^{-1}$ from the
+same nodes in an axis spanning $[100,6000]$ eV. The regression pins this
+difference and the reconstructed law's agreement with the full-axis call.
+The adapter retains the full selection when evaluated on a local subarray.
+
+### Smooth-interval bounds
+
+Every f1 spline knot and every f2 native knot is an interval boundary.
+On each interval, translating a cubic to Bernstein form encloses its entire
+range by the minimum and maximum Bernstein coefficients, including interior
+extrema. The same construction bounds its first two derivatives. For f2,
+log-linear interpolation is a positive power law $f_2(E)=cE^p$; hence the
+imaginary susceptibility is proportional to $E^{p-2}$ and both derivatives
+are bounded analytically with endpoint values and the exponent. Combining
+the atom multiplicities gives bounds $C_0,C_1,C_2$ on
+$|\chi_0|,|\chi'_0|,|\chi''_0|$ throughout the interval.
+
+Let $m$ be a positive lower bound on $|n|$, obtained by separately enclosing
+the real and imaginary parts of $1+\chi_0$ and using
+$|n|^2=|1+\chi_0|$. An interval that cannot exclude a square-root zero is
+refused. Differentiating $n^2=1+\chi_0$ gives
+
+$$
+n'=\frac{\chi'_0}{2n},\qquad
+n''=\frac{\chi''_0}{2n}-\frac{(\chi'_0)^2}{4n^3}.
+$$
+
+With $w(E)=\delta\omega(E)=E[1-\operatorname{Re}n(E)]/H$,
+$|1-n|=|\chi_0|/|1+n|\le C_0$ on the principal square-root branch.
+For an interval ending at $E_+$ this supplies
+
+$$
+\sup|w'|\le\frac{C_0+E_+C_1/(2m)}{H}=M_1,\qquad
+\sup|w''|\le\frac{C_1/m+E_+C_2/(2m)+E_+C_1^2/(4m^3)}{H}=M_2.
+$$
+
+The secant $sE+b$ of this **same full-axis law** therefore has uniform
+residual $R\le M_2(E_+-E_-)^2/8$. This is a derivative enclosure, not a
+sampled-residual estimate. The implementation adds outward float64
+allowances for polynomial translation and phase evaluation. These are an
+explicit numerical convention; they do not constitute a universal
+interval-arithmetic proof for arbitrarily ill-conditioned spline solves.
+Nonfinite certificates are refused. The non-Henke Thomson limit
+$w(E)=[E-\sqrt{E^2-K}]/H$ above the plasma root supplies a separate analytic
+derivative check. Vacuum gives $w=0$ in real arithmetic.
+
+### Absolute excluded-power audit
+
+The runner applies these interval certificates to each captured row and
+splits again at its current window edges. Outside the fine window, the
+affine row's tail bound supplies an absolute per-electron power upper bound
+$Y'$. The finite-band residual charge $\mathcal E$ derived above then gives
+$Y\le(\sqrt{Y'}+\sqrt{\mathcal E})^2$. If the affine coordinate map has
+nonpositive durations, overlapping support, or closes a genuine gap, the
+audit uses the finite-band L1 majorant
+
+$$
+Y'\le W\sum_{e,p}\left(\sum_{j\in e}|a_{j,p}|\Delta d_jm_j\right)^2,
+$$
+
+which requires no Fourier-map monotonicity or joint cancellation. The
+inter-electron term is included through $1+F_{\max}(N_e-1)$ on each
+interval. The audit reports absolute excluded-power bounds, their ratio to
+the **frozen** reference, residual charges and fallback counts. Its phase
+slope diagnostic uses the conservative span $D+HM_1\Delta L$, so the
+reported step is $\pi H/[O(D+HM_1\Delta L)]$ with the policy oversampling $O$
+(currently four).
+This is a phase-slope diagnostic, not an exact band-limit or sampling proof
+for a nonlinear law.
+
+These diagnostics are stored under `coherent_windows.dispersion` and
+explicitly mark `relative_production_bound = false`. For the small HOPG
+anchor, one row's conservative excluded-power bound is about 183.7 times
+the frozen reference; this is **not an observed error**. A warning reports
+the bound and phase-slope step on both cold and warm cache paths when the
+frozen-reference fraction exceeds the existing two-side share. Coordinate
+cache revision 5 includes a fingerprint of the actual trimmed material
+tables, cell volume, atom multiplicities, interpolation model/version and
+full-axis extrema; coherent coupling weight `B_ang2` is also keyed.
+
+Owner checks cover HOPG and WSe₂ across absorption knots, full/local query
+agreement, the analytic Thomson derivative, shifted resonances, a nonlinear
+residual, and the nonmonotone-map L1 fallback. The ledger remains
+`discrepancy`. A positive physical finite-band normalization and a sampling
+error charge are still needed before these absolute bounds can govern the
+automatic windows. Fresh-context verification and corrected remote ladders
+remain required; current grid coordinates and the point budget are unchanged.
+
+## Independent checkpoint verification (2026-10-06)
+
+This fresh verifier reviewed checkpoint `20c857318bdc949444b003bfc035e7ee6dcddfe2`
+only: the material-law enclosure, affine-map parameters, nonlinear residual
+charge, and absolute finite-axis excluded-power audit. The source packet
+supplied the physical laws, quantities, signatures, units, and limits. The
+verifier inspected installed xraydb 4.5.8 `XrayDB._from_chantler` and recorded
+a blind derivation in `/tmp/issue350-blind-derivation.md` before reading the
+implementation, tests, ledger Notes, or owner derivation. The newer
+normalization work is outside this review.
+
+### Independent material derivative chain
+
+With $C=r_e(hc)^2/(\pi V)$ and
+$A(E)=\sum_j[Z_j+f'_j(E)+if''_j(E)]$, the supplied physical source gives
+
+$$
+\chi=-CA/E^2,\qquad
+\chi'=-C(A'/E^2-2A/E^3),\qquad
+\chi''=-C(A''/E^2-4A'/E^3+6A/E^4).
+$$
+
+Differentiating the principal square root and $w=E(1-\operatorname{Re}n)/H$
+gives
+
+$$
+n'=\frac{\chi'}{2n},\qquad
+n''=\frac{\chi''}{2n}-\frac{(\chi')^2}{4n^3},\qquad
+w'=\frac{1-\operatorname{Re}n-E\operatorname{Re}n'}{H},\qquad
+w''=-\frac{2\operatorname{Re}n'+E\operatorname{Re}n''}{H}.
+$$
+
+The xraydb source selects a table subsection from the full query extrema,
+then uses a zero-smoothing cubic spline for anomalous f1 and a positive
+power law for f2 between native log-interpolation knots. The implementation
+matches that selection, adds $Z$ only to f1's constant term, and splits at
+both sets of knots. Its Bernstein convex-hull bounds provide valid
+real-arithmetic polynomial enclosures. Its direct differentiation of the
+imaginary susceptibility uses powers $p-2$ and $p-3$, matching the chain
+above. The positive lower bound on $|n|$, principal-branch inequality
+$|1-n|\le|\chi|$, and resulting derivative bounds match independently.
+The residual bound $M_2W^2/8$ is the endpoint-secant remainder on each smooth
+interval. Units are $w$ in Å$^{-1}$, $w'$ in Å$^{-1}$ eV$^{-1}$, and
+$w''$ in Å$^{-1}$ eV$^{-2}$. The explicit float64 padding remains a numerical
+convention, not a proof of all interpolation-solve rounding errors.
+
+### Independent affine and residual comparison
+
+For $L=L_m+q\xi$ and $w=sE+b$, substitution into the original integrand gives
+
+$$
+\frac{E}{H}(d_m-HsL_m+(1-Hsq)\xi)
+-\left(\frac{E_{\rm vac}}{H}+bq\right)\xi-bL_m
+-\mathbf g\cdot\mathbf r_m.
+$$
+
+Thus $k=1-Hsq$, duration $k\Delta d$, center $d_m-HsL_m$, carrier
+$(E_{\rm vac}+Hbq)/k$, amplitude modulus $|a|/k$, and signed attenuation
+slope $\lambda/k$ agree with `_affine_dispersion_row` on its positive,
+ordered, disjoint-support scope. Vacuum recovers the original row.
+Continuous collinear splitting preserves the complete physical integral.
+
+A terminology limitation matters: the returned row alone does **not**
+encode the complete complex field. Its `amplitude` omits the factor
+$\exp[-i(bL_m+\mathbf g\cdot\mathbf r_m)]$. The one-piece affine test supplies
+$\exp(-ibL_m)$ externally. For this checkpoint's power/tail audit, the
+energy-independent phase has unit modulus, and its complete endpoint value
+is common at a true continuous physical joint; cancellation therefore
+remains valid. This argument does not license treating arbitrary touching
+rows with discontinuous escape or midpoint phase as continuous physical
+joints. Such rows need explicit endpoint phases or the L1 fallback. No
+new phase factor is needed in the independently scoped Parseval norm.
+
+Writing $\rho=w-(sE+b)$ with $|\rho|\le R$ gives
+$|\exp(-i\rho L)-1|\le\min(2,R|L|)$. Triangle inequality within each electron
+and integration over bandwidth $W$ give
+
+$$
+\mathcal E\le W\sum_{e,p}\left[
+\sum_{j\in e}|a_{j,p}|\int_j e^{-\tau/2}\,d\xi\;
+\min(2,R L_{\max,j})\right]^2.
+$$
+
+The implementation matches this expression. The audit's looser cap
+$W\min(2\sqrt{Q},R\sqrt{Q_L})^2$ also follows, where $Q$ and $Q_L$ are the
+squared electronwise L1 totals without and with $L_{\max,j}$ respectively.
+The brighter-endpoint transmission integral stays positive and stable for
+either absorption slope, including underflow of the darker endpoint.
+
+### Independent absolute audit comparison and adjudication
+
+For each omitted interval, Hilbert-space triangle inequality and Cauchy
+inequality across electrons give
+
+$$
+Y_{\rm production}\le
+[1+(N_e-1)F_{\max}]
+\left(\sqrt{Y_{\rm affine}}+\sqrt{\mathcal E}\right)^2.
+$$
+
+The audit includes this cross term and uses a finite-band L1 majorant when
+the affine map is unsupported. Its use of `decoherence(lo)` is valid for the
+production `decoherence_bound`: positive-energy Gaussian longitudinal
+suppression is nonincreasing, so the lower endpoint bounds the interval;
+`None` supplies $F_{\max}=1$. The private audit docstring should state that
+restriction explicitly. An arbitrary nonmonotone callback is outside this
+verified contract. The limits $F=0$ and $F=1$ give factors $1$ and $N_e$.
+
+Focused canonical tests selected for dispersion and endpoint capture passed:
+32 passed, 30 deselected. Independent scratch calculations additionally
+formed the material derivative directly from the interpolants, checked
+interior residuals against the certificates, and compared signed-absorption
+L1 integrals with numerical quadrature. Across 1306 HOPG/WSe₂ smooth
+intervals, the largest sampled derivative-to-bound ratio was 0.973416 and
+the largest residual-to-bound ratio was 0.989030. Five absorption slopes,
+including both signs and darker-endpoint underflow, matched independent
+quadrature. These numeric checks supplement the
+symbolic argument; interior sampling is not the certificate itself.
+
+**Narrow verdict:** `rederived`, for the absolute float64 material-phase
+power audit under continuous physical joint phases, production monotone
+decoherence bounds, and the stated numerical/endpoint reconstruction
+conventions. No divergent factor, sign, or exponent was found in that
+scoped bound. The affine helper's exact-field terminology and the private
+callback's monotonicity restriction should be clarified.
+
+**Full claim verdict:** remains `discrepancy`. The exact unresolved
+normalization convention is division by frozen-source $2\pi H P$ in place
+of a proved positive finite-axis production-power lower bound. The
+phase-slope step is a diagnostic, not a certified nonlinear sampling-error
+charge. This report does not promote the complete claim or confer human
+sign-off. Suggested ledger edit: retain `discrepancy`; add the independently
+rederived scope and its two explicit interface restrictions to Notes.
+
+## Independent conditional normalization review (2026-10-06)
+
+This extension reviews the working normalization building blocks following
+checkpoint `20c85731`: `coherent_normalization` and additive midpoint-phase
+capture in `coherent_windows`, `lines/_setup`, and `lines/_per_hkl`. The
+verifier first recorded `/tmp/issue350-blind-normalization-derivation.md`
+from the same physical formation integral and proposed signature, before
+reading these implementation bodies or tests. It verifies a **conditional
+building block**, with externally certified sample norm uncertainties;
+it does not verify a production normalization certificate.
+
+### Sample floor and derivative envelope
+
+Let $G(E)$ have polarization/electron components $S_{e,p}(E)$, and let
+$C_p(E)=\sum_e S_{e,p}(E)$. A common phase may be removed from the entire row
+without changing either norm. For the grouped norm only, a separate common
+phase may also be removed within each electron. Electron-specific gauges
+must not be used for the coherent vector $C$.
+
+The physical phase derivative is $d/H-w'(E)L$. Removing the common phase
+$Ed_0/H-w(E)L_0$ gives
+
+$$
+\partial_E\widetilde\Phi=(d-d_0)/H-w'(E)(L-L_0).
+$$
+
+With $|w'|\le M_1$, the affine piece's endpoint maxima give
+
+$$
+B_{e,p}=\sum_{j\in e}|a_{j,p}|\int_j e^{-\tau/2}\,d\xi
+\left[\frac{\max_j|d-d_0|}{H}+M_1\max_j|L-L_0|\right].
+$$
+
+Triangle inequality yields a grouped derivative bound
+$K_G=(\sum_{e,p}B_{e,p}^2)^{1/2}$, with electron-specific references allowed.
+The coherent derivative bound instead uses row-wide references and
+$K_C=[\sum_p(\sum_e B_{e,p})^2]^{1/2}$. The implementation uses midpoint
+references of the relevant endpoint ranges, matching this derivation and
+preserving common time-origin translation. Signed attenuation enters only
+the stable positive L1 piece weights already reviewed above.
+
+At an in-band sample $E_0$, externally certified absolute norm errors
+$\epsilon_G,\epsilon_C$ establish
+$A_G=\max(0,\|G_{\rm nominal}(E_0)\|-\epsilon_G)$ and the analogous $A_C$.
+Reverse triangle inequality gives the squared amplitude floor
+$[A-K|E-E_0|]_+^2$. On a side of length $t$, its exact integral is
+
+$$
+J(A,K,t)=A^2r\left[1-u+\frac{u^2}{3}\right],\qquad
+r=\min(t,A/K),\quad u=Kr/A,
+$$
+
+for positive $A,K$. The limits are $J(0,K,t)=0$ and $J(A,0,t)=A^2t$.
+Adding the left and right sides gives the interval power floor. The code
+uses this stable expression, avoiding subtraction of nearly equal cubes.
+The units are squared field times eV.
+
+### Convex production blend
+
+For arbitrary energy-dependent $F(E)\in[F_{\min},F_{\max}]$, let $I_G,I_C$
+be the independently integrated grouped and coherent tents. The bound
+
+$$
+Y\ge(1-F_{\max})I_G+F_{\min}I_C
+$$
+
+is valid pointwise before integration. A second valid floor uses the shared
+tent with $A_*=\min(A_G,A_C)$ and $K_*=\max(K_G,K_C)$: it lies below both
+vector norms, and hence below every convex blend. Taking the larger of
+these two integrated floors remains valid. `_physical_row_power_lower`
+implements exactly this construction. It avoids the generally invalid
+operation of taking the minimum of two integrated endpoint blends when
+$F$ varies with energy. The limits $F=0$ and $F=1$ select the corresponding
+individual norm; unknown $F\in[0,1]$ uses the shared tent. A zero individual
+sample floor or an uncertainty covering that nominal norm gives no positive
+power floor for that individual vector.
+
+### Phase capture and independent checks
+
+`capture_phase_rad` records the same geometric midpoint susceptibility
+phase used by the production row, aligned with the row's `idx`/coefficients;
+the collector applies the same formation-valid mask. The nominal helper
+retains the complete phase $Ed/H-\mathbf g\cdot\mathbf r_m-wL_m$. Its common
+reference subtraction preserves both grouped and coherent intensities.
+For the affine surrogate, `phase_rad += intercept * escape_mid_ang` has the
+required sign: the Fourier integrand contains $-bL_m$. This supplies the
+midpoint phase metadata missing from the earlier standalone affine-row
+representation. The production tail audit's monotone-callback restriction
+is now explicit in its docstring.
+
+Independent scratch calculations integrated the physical exponential
+directly, without `formation_factor`: three energies, two polarizations,
+four pieces, both absorption signs, and endpoint underflow matched the
+nominal complex samples. Direct mixed-power integrals exceeded the returned
+lower bound for $F=0$, $F=1$, varying $F\in[0.2,0.8]$, and varying unknown
+$F\in[0,1]$. Lower-to-direct-power ratios were 0.169763, 0.137533, 0.079505,
+and 0.079596 respectively. Four independently quadrature-integrated tents
+covered zero amplitude, zero derivative, compact support, and a small
+sample floor. Focused canonical tests passed: 20 passed, 39 deselected.
+The scratch numerical allowances are comparison tolerances; they do not
+supply production sample-uncertainty certificates.
+
+**Conditional verdict:** `rederived`; no divergent sign, factor, gauge, or
+convex-blend convention found. This assumes a matching certified material
+derivative bound, correct captured geometry/amplitudes, and certified
+absolute errors for the nominal sample norms, including interpolation,
+formation, phase, and summation uncertainty. Float64 derivative/envelope
+arithmetic retains the previously stated numerical convention.
+
+**Full claim:** remains `discrepancy`. Supplying guessed or zero sample
+errors does not certify the nominal physical sample; production sample
+uncertainty and the nonlinear sampling-error charge remain unresolved.
+Suggested ledger Notes may record this conditional normalization building
+block as independently rederived, without promoting the complete claim.
+
+## Owner integration and stricter FWHM gate (2026-10-06)
+
+The nominal field reconstruction now has a real-source regression: the
+captured HOPG rows reproduce the production coherent source, including its
+grouped/flat blend and electron normalization, on the same trajectories.
+The comparison uses an absolute guard from the L1 field, interpolation drift,
+argument scales and summation count. Its largest guard stays below the
+$10^{-3}$ intrinsic share of the largest source node. A fixed relative
+comparison at a nearly cancelling node instead failed at $1.61\times10^{-8}$;
+that numerical difference must be accounted for when certifying sample
+uncertainty. The regression guard is not a universal production sample
+certificate, and `_physical_row_power_lower` still requires supplied
+certified absolute norm errors. It does not yet govern the automatic grid.
+
+Issue #350 requests $10^{-3}$ for FWHM as well as yield and centroid. The
+previous regression allowed the harness's $10^{-2}$ shape share. Tightening
+that assertion on the same-trajectory anchor fails the former two-sample
+default: $0.9667565728500449$ eV versus the explicit reference
+$0.9654851669308755$ eV, a relative error $1.317\times10^{-3}$.
+Changing the numerical policy to four samples per Nyquist step passes the
+stricter gate. Peak height remains excluded. Point budgets remain enforced,
+so affected large cases may require a larger explicit remote budget; no
+coherent grid is silently coarsened to fit it. These checks do not remove
+the outstanding production sample-uncertainty and nonlinear sampling charge.
+
+## Owner conditional sampling interval (2026-10-06)
+
+The following extends the conditional normalization construction. This is
+an owner derivation with analytic regression evidence; fresh-context
+verification of this extension is still required. It does not promote the
+full claim or certify automatic grids.
+
+For increasing samples $E_i$ on one smooth material interval $[a,b]$,
+partition the whole interval at adjacent sample midpoints. Cell $i$ includes
+the nearer band edge when its sample is first or last; samples need not
+include $a$ or $b$. Let $A_{X,i}^-=\max(0,\widehat A_{X,i}-\epsilon_{X,i})$
+and $A_{X,i}^+=\widehat A_{X,i}+\epsilon_{X,i}$ for $X=G,C$, where the
+externally certified absolute errors enclose the nominal grouped and
+coherent norms. With the previously derived uniform derivative bounds $K_X$,
+triangle and reverse-triangle inequalities give, on each cell,
+
+$$
+[A_{X,i}^- - K_X|E-E_i|]_+^2
+\le \|X(E)\|^2
+\le [A_{X,i}^+ + K_X|E-E_i|]^2.
+$$
+
+The lower envelope integrates by $J$ above. For a side of length $t$ the
+upper envelope has the positive integral
+
+$$
+U(A,K,t)=t\left[A^2+A(Kt)+\frac{(Kt)^2}{3}\right].
+$$
+
+Denote the two-sided cell integrals by $L_G,L_C,U_G,U_C$. If
+$f_i^-\le F(E)\le f_i^+$ throughout the cell, valid mixed bounds are
+
+$$
+L_i=\max\left\{L_*,(1-f_i^+)L_G+f_i^-L_C\right\},\qquad
+U_i=\min\left\{U_*,(1-f_i^-)U_G+f_i^+U_C\right\}.
+$$
+
+Here $L_*$ integrates the shared lower tent from
+$\min(A_G^-,A_C^-),\max(K_G,K_C)$; $U_*$ integrates the shared upper
+envelope from $\max(A_G^+,A_C^+),\max(K_G,K_C)$. These shared envelopes
+lie below or above both norms pointwise, so they remain valid for any
+convex blend. Summing over disjoint cells gives $L\le Y\le U$ for the
+physical finite-band row power in squared-field times eV. Any quadrature
+estimate $Q$ consequently has the absolute sampling-error charge
+
+$$
+|Q-Y|\le\max\{|Q-L|,|Q-U|\}.
+$$
+
+This charge does not assume an affine dispersive phase, monotone $F$, or
+constant electron interference. It uses bounds on $F$ across each whole
+cell, not merely at the endpoints. Separate smooth material intervals
+must be handled separately; one derivative certificate cannot span an
+uncertified interpolation discontinuity. For production units, apply the
+same positive electron normalization to both bounds and the estimate.
+
+`coherent_normalization::_sampled_power_bounds` implements these envelopes;
+`::_physical_row_power_bounds` reconstructs nominal physical fields and
+uses the material derivative certificate. In the zero-derivative,
+zero-uncertainty constant-field limit both bounds coincide when $F$ is
+known or the two norms agree. Decreasing maximum cell radii reduces derivative
+drift, but adding samples need not monotonically tighten nearest-sample
+intervals. Uncertainty in sample norms or cell form-factor bounds remains. Unknown
+global $F\in[0,1]$ can leave a nonzero interval width even on a fine grid.
+
+Analytic anchors integrate the two-electron fields
+$S_1(E)=1$, $S_2(E)=0.6\exp(i\pi E^2)$ on $[0,1]$, independently of
+the production sampler. The grouped norm is constant after electron-specific
+gauges and the row-wide coherent derivative is bounded by $1.2\pi$.
+Constant $F=0,0.4,1$ and varying $F=0.5+0.4\sin(7E)$ are enclosed;
+the varying case uses cell enclosures from $|F'|\le2.8$ rather than an
+endpoint monotonicity assumption. Refinement from 9 to 129 samples
+contracts the nonconstant integral intervals by more than a factor of 8.
+The physical two-piece sinc anchor also checks the complete captured-row
+wrapper against a separate analytic formation/phase expression. Additional
+limits retain nonzero sample uncertainty and unsampled endpoint strips;
+invalid partitions and nonfinite certificate inputs are refused.
+
+As with the conditional floor, envelope arithmetic follows the stated
+float64 convention rather than directed interval arithmetic. Certified
+production norm uncertainties, rounding charges, automatic-policy
+integration, observable-specific centroid/FWHM error control, fresh-context
+verification and corrected remote ladders remain required. The complete
+ledger claim stays `discrepancy`.
+
+## Independent conditional sampling verification (2026-10-06)
+
+This fresh context derived the norm envelopes from the supplied triangle and
+reverse-triangle inequalities and input signature before inspecting the
+implementation bodies, tests, owner sampling section, or implementation-specific
+ledger Notes. The independent derivation was recorded first in an external
+scratch document. The comparison covers checkpoint `6c664de4` and the owner's
+subsequent docstring qualifications, which change no executable expression.
+The quantity is the finite-band mixed power
+
+$$
+Y=\int_a^b\left[(1-F(E))\|G(E)\|^2+F(E)\|C(E)\|^2\right]\,dE.
+$$
+
+For either field $X$, its intensity-preserving gauge and certified uniform
+derivative bound imply
+
+$$
+\left|\|X(E)\|-\|X(E_i)\|\right|
+\le \|X(E)-X(E_i)\|\le K_X|E-E_i|.
+$$
+
+If the nominal norm is $s_{X,i}$ with certified absolute uncertainty
+$\epsilon_{X,i}$, the independently obtained pointwise envelopes are
+
+$$
+\ell_{X,i}(E)=\left[s_{X,i}-\epsilon_{X,i}-K_X|E-E_i|\right]_+,
+\qquad
+u_{X,i}(E)=s_{X,i}+\epsilon_{X,i}+K_X|E-E_i|.
+$$
+
+Their squared integrals over nearest-sample cells bound the component power.
+The cells reach both band endpoints; an unsampled endpoint strip must not be
+dropped. On a side of length $t$, direct integration gives
+
+$$
+\int_0^t(A+Kr)^2\,dr=A^2t+AKt^2+\frac{K^2t^3}{3},
+\qquad
+\int_0^t[A-Kr]_+^2\,dr
+=A^2q-AKq^2+\frac{K^2q^3}{3},
+$$
+
+where $q=\min(t,A/K)$ for $K>0$ and $q=t$ for $K=0$.
+The implementation's positive lower-integral polynomial is algebraically
+identical. Clipping the lower nominal norm before subtracting drift is also
+identical after the positive-part operation.
+
+For cell-wide bounds $f_i^-\le F\le f_i^+$, positivity proves separately
+that the mixed integral lies above $(1-f_i^+)L_G+f_i^-L_C$ and below
+$(1-f_i^-)U_G+f_i^+U_C$. The common lower tent formed from the smaller
+lower sample norm and larger derivative bound lies below both component
+norms pointwise; its square therefore bounds every convex mixture below.
+The analogous common upper envelope bounds every mixture above. Taking the
+maximum of the two integrated lower bounds and the minimum of the two upper
+bounds matches `_sampled_power_bounds`. This remains valid for rapidly varying
+$F$; it does not interchange a pointwise minimum with integration.
+
+The wrapper's polarization/electron norm is $\|G\|$, while summing electron
+fields before the polarization norm gives $\|C\|$. Its common phase removal
+preserves both. Electron-specific derivative gauges preserve grouped power;
+the coherent derivative gauge must remain common across electrons. No relative
+electron phase is removed before coherent summation. The existing derivative
+envelopes and a matching certificate remain prerequisites, not certificates
+manufactured by the new wrapper.
+
+Units, positivity, and limiting cases pass: derivative drift has field units;
+integrated squares have squared-field eV units; zero amplitude with zero errors
+and derivative bounds gives zero; zero derivative with nonzero certified norm
+uncertainty retains a nonzero interval. Pure grouped or coherent weights,
+unknown form factors, near cancellation, and nonlinear relative phases retain
+valid bounds. For any estimate $Q$, the independently obtained error bound is
+$|Q-Y|\le\max(|Q-L|,|Q-U|)$.
+
+### Refinement qualification and numerical evidence
+
+Monotonic contraction under arbitrary inserted samples is false. On $[0,1]$,
+take $G(E)=C(E)=1-E$, $K_G=K_C=1$, zero sample errors, and $F=1$.
+A single sample at zero has lower bound $1/3$, equal to the exact integral.
+After adding the exact zero-norm sample at one, the second cell contributes
+zero to the lower bound and the result falls to $7/24$. Both remain valid.
+Nearest-sample selection does not intersect all available sample cones.
+Decreasing maximum cell radii controls derivative drift asymptotically;
+convergence to a sharp mixed-power interval additionally requires vanishing
+norm uncertainty and sufficiently tight cell-wide form-factor enclosures.
+The owner narrowed the docstring accordingly; no bound formula changed.
+
+Independent scratch checks used analytic fields with two electron amplitudes
+$1$ and $-0.999\exp(2iE^2)$, comparing against adaptive integration of their
+explicit power for $F=0$, $F=1$, $F=0.37$, and
+$F=0.5+0.49\sin(31E)$. Interior-only samples exercised both endpoint strips.
+A separate physical-row check evaluated an explicit two-piece sinc field with
+nonlinear dispersion $\delta\omega(E)=10^{-9}E^2$ and varying form factor,
+independently of the production sampler and envelope helpers. Additional exact
+checks covered constant fields with zero and small uncertainties, zero power,
+the refinement counterexample, and a band one float64 spacing wide whose
+rounded midpoint creates a zero-width cell. All eight independent checks and
+all 21 maintained normalization checks passed.
+
+Finite arithmetic is conditional on the documented float64 envelope convention.
+The midpoint expression avoids summing large same-sign endpoints. Degenerate
+zero-width cells are accepted and contribute zero for finite envelope arithmetic;
+nonfinite accumulated envelopes are rejected. This is not outward-rounded
+interval arithmetic: underflow, rounded sample-cell geometry, and ordinary
+polynomial/summation roundoff are not independently charged. No exact real-number
+enclosure is certified at arbitrary floating-point scales.
+
+**Verdict:** the conditional finite-band sampling inequalities and wrapper match
+the independent derivation, `rederived` within their stated arithmetic and
+external-certificate assumptions. The full automatic-grid claim remains
+`discrepancy`: production norm-error certificates, rounding charges, automatic
+policy integration, centroid/FWHM control, and corrected remote ladders remain
+outside this verification. Suggested ledger Notes should record this conditional
+verification and refinement qualification without promoting the complete claim.
+
+## Independent captured-row SAMPLE verification (2026-10-06)
+
+This verifier derived the piece integral and norm certificate before inspecting
+`coherent_sample_certificates.py`. A subsequent scope extension supplied the
+stored material-law expression; its pointwise enclosure was also derived before
+inspection of `sample_dispersion_bounds`. The initial handoff left the sign of
+the attenuation exponent implicit. Before implementation inspection, the owner
+clarified that positive attenuation slope means decreasing transmission toward
+increasing piece coordinate. The derivation below uses that explicit convention.
+
+### Captured piece and stable integral
+
+The source is the captured affine-escape piece field, with captured binary64
+inputs treated as exact under the reconstruction convention. Let $h_j>0$ be the
+piece duration, $H=\hbar c$, $q_j=\lambda_jh_j/2$, and
+
+$$
+v_j(E)=\frac{h_j(E-E_j)}{2H}-\frac{\Delta L_j w(E)}2.
+$$
+
+With $B_j$ the brighter captured endpoint transmission, the reconstructed
+amplitude transmission is $T_j(x)=B_j\exp(-|q_j|-2q_jx)$ for
+$-1/2\le x\le1/2$. For $s_j=\operatorname{sign}(q_j)$, taking $s_j=1$ at zero,
+the substitution $x=s_j(t-1/2)$ gives
+
+$$
+\begin{aligned}
+J_j(E)&=\int_{-1/2}^{1/2}T_j(x)\exp(2iv_jx)\,dx\\
+&=B_j\exp(-is_jv_j)\operatorname{exprel}(-2|q_j|+2is_jv_j),\\
+a_{pj}(E)&=c_{pj}h_jJ_j(E)
+\exp\!\left(i\left[Ed_j/H-\phi_j-L_jw(E)\right]\right).
+\end{aligned}
+$$
+
+Here $\operatorname{exprel}(z)=(\exp z-1)/z$, continuously extended to one at
+zero. Its real argument is nonpositive, so the implementation avoids forming
+$\exp(|q_j|)$ even when the dimmer endpoint underflows. The equivalent midpoint
+form is $B_j\exp(-|q_j|)\sinh(-q_j+iv_j)/(-q_j+iv_j)$.
+Units pass: $q_j$, $v_j$ and both phases are dimensionless, and $w$ has
+inverse-length units. Signs pass: positive $q_j$ places the brighter endpoint at
+$x=-1/2$. Limits pass: zero attenuation gives $B_j\operatorname{sinc}(v_j)$;
+zero detuning gives $B_j(1-\exp(-2|q_j|))/(2|q_j|)$, tending to $B_j$;
+strong damping decays instead of growing exponentially.
+
+### Directed field and norm enclosure
+
+For $|z|\le\rho\le1/2$, the independently derived series remainder is
+
+$$
+\left|\operatorname{exprel}(z)-\sum_{k=0}^{N}\frac{z^k}{(k+1)!}\right|
+\le\frac{\rho^{N+1}}{(N+2)!}
+\frac{1}{1-\rho/(N+3)}.
+$$
+
+The successive tail-term ratios are bounded by $\rho/(N+3)$. The code uses
+$N=40$, $\rho=1/2$, and adds the remainder independently to both rectangular
+components. Away from zero the interval quotient is valid. For a broad
+zero-containing argument, the fallback rectangle follows from
+$|J_j|\le\int T_j(x)\,dx\le B_j$; it may be loose but never divides by a
+zero-containing interval.
+
+Embedding the original floats before subtracting the first piece's $d_0$,
+$\phi_0$, and $L_0$ removes the same unit-modulus gauge from every field.
+Consequently both norms remain invariant. Interval substitution of the supplied
+pointwise $w(E)$ enclosure includes material-phase uncertainty and all relative
+phase and formation effects. Piece sums give $A_{pe}=\sum_{j:e_j=e}a_{pj}$,
+and the physical norms are
+
+$$
+N_G=\sqrt{\sum_{p,e}|A_{pe}|^2},\qquad
+N_C=\sqrt{\sum_p\left|\sum_e A_{pe}\right|^2}.
+$$
+
+Directed complex modulus, summation and square root enclose these norms.
+For arbitrary finite nominal tensors, the returned binary64 nominal norms
+$n_G,n_C$ need not come from any particular field evaluator. Embedding those
+returned floats exactly and subtracting them from the independently enclosed
+physical norms gives
+
+$$
+\epsilon_t\ge\sup_{N\in[L_t,U_t]}|N-n_t|,\qquad t\in\{G,C\}.
+$$
+
+This comparison charges nominal formation, phase, field summation and norm
+rounding without separately proving those floating operations. Nonfinite
+nominal norms and nonfinite error enclosures are refused.
+
+### Stored-law pointwise dispersion
+
+For the same full-axis-selected material data, the supplied source is
+
+$$
+\chi(E)=-\frac{P}{E^2}
+\left(F_0+\sum_a n_a[f_{1a}(E)+if_{2a}(E)]\right),\qquad
+w(E)=\frac E H\left(1-\Re\sqrt{1+\chi(E)}\right).
+$$
+
+The exact stored cubic is evaluated by interval Horner arithmetic after selecting
+the same PPoly piece, including the right-sided knot convention. The imaginary
+factor uses the native positive table ordinates:
+
+$$
+f_2(E)=\exp\!\left[(1-r)\log f_{2a}+r\log f_{2b}\right],\qquad
+r=\frac{\log E-\log E_a}{\log E_b-\log E_a}.
+$$
+
+The selected table brackets contain the full query axis. For
+$x=1+\Re\chi$, $y=\Im\chi$, the principal root obeys
+
+$$
+\Re\sqrt{x+iy}
+=\sqrt{\frac{\sqrt{x^2+y^2}+x}{2}}.
+$$
+
+The radicand is analytically nonnegative; intersecting its computed interval
+with the nonnegative half-line is therefore justified. The resulting phase
+interval encloses the exact real evaluation of the **stored** coefficients,
+prefactor and table values. It need not contain the independently rounded
+NumPy `law(E)` value; that nominal discrepancy is charged by the norm comparison.
+It certifies neither spline construction nor physical interpolation uncertainty.
+The zero-susceptibility limit gives zero phase; to first order,
+$w=-E\Re\chi/(2H)$, with positive phase for negative real susceptibility.
+
+### Findings, corrections and independent evidence
+
+The first implementation inspection exposed a complex interval constructor
+failure for nonreal coefficients. The owner replaced the ambiguous one-argument
+constructor with separate real and imaginary inputs. An independent subnormal
+case then refuted the initial outward-conversion assumption: a physical coherent
+norm of $4.2425934545755737990\times10^{-318}$ received an error rounded inward by
+$2.3471722055995\times10^{-324}$ despite `round_ceiling`. The owner added one
+outward binary64 successor for positive errors, retaining exact zero, and outward
+successors/predecessors for phase endpoints. The corrected subnormal errors
+exceed the independent norms. These corrections change interval conversion, not
+the physical expression.
+
+Independent direct quadrature first confirmed the piece integral at zero,
+both attenuation signs, and $q=1200$. A separate 90-digit integral reference
+passed 160 norm comparisons across signed slopes, dim-endpoint underflow,
+broad dispersion intervals, large common gauges, zero fields, near cancellation,
+subnormal amplitudes and arbitrary biased nominal tensors. A deliberately
+rounded-away coherent residual of $10^{-23}$ remained enclosed. Both global
+mpmath contexts retained their precision. The stored-law check independently
+used polynomial power sums, ratio-form imaginary interpolation and the complex
+principal square root: all 55 points passed across HOPG, WSe2, and the HOPG
+constant-forward-factor mode, including knots and axis endpoints.
+
+**Scoped verdict:** `rederived` for `_formation_interval`,
+`sample_row_norm_certificate`, and `sample_dispersion_bounds` under the stated
+exact-captured-input and exact-stored-interpolant conventions. The complete
+`coherent-line-grid-windowed-resolution` claim remains `discrepancy`. This
+verification does not certify upstream capture/coefficient/geometry uncertainty,
+physical material-data error, spline construction, derivative or power-envelope
+rounding, GPU reduction arithmetic, automatic policy integration, centroid/FWHM
+acceptance, or remote convergence ladders. Suggested ledger Notes should record
+this scoped SAMPLE verification without promoting the complete claim. The task
+owner performs the final documentation build and rendered-math check.
+
+The subsequent composition review of
+`_certified_physical_row_power_bounds` found no API, gauge, or form-factor
+mismatch: nominal samples and directed pointwise bounds use the same law and
+energy nodes; norms and errors retain grouped/coherent column order; derivative
+norms use the same reconstructed brighter-endpoint attenuation law. Different
+per-electron or row-wide derivative gauges are permissible because the
+corresponding norm is gauge invariant. The mixed-power convention remains
+$(1-F)N_G^2+FN_C^2$, and supplied form-factor intervals must cover whole
+nearest-sample cells. Strictly interior samples on a knot-free material band
+avoid applying a derivative cone across an infinitesimal stored-PPoly joint
+mismatch; unsampled endpoint strips are covered by the same open-branch limits,
+and isolated endpoint values have zero integral measure. The reviewed regression
+compares the composed interval against an independent constant-forward-factor
+band integral with $F=0.4$. This composition matches the previously verified
+conditional inequalities and needs no guessed norm errors. Its derivative and
+power-envelope arithmetic retain their documented float64 qualification;
+composition does not extend the scoped verdict to an outward-rounded band
+integral or automatic-grid acceptance.
+
+## Independent directed derivative and band-power verification
+
+A fresh verifier derived this continuation from the intended quantity and stored
+input conventions before reading its implementation or owner write-up. The
+pre-inspection record is `/tmp/issue350-directed-blind.md`. The reviewed owners
+are `dispersion_derivative_bound`, `row_derivative_bounds`, and
+`_directed_power_bounds` in `coherent_sample_certificates.py`, the optional
+`directed=True` path of `_sampled_power_bounds`, and their composition in
+`_certified_physical_row_power_bounds`. The target remains
+
+$$
+Y=\int_a^b\left[(1-F(E))\|G(E)\|^2+F(E)\|C(E)\|^2\right]\,dE.
+$$
+
+Captured binary64 fields, real stored PPoly coefficients, the material
+prefactor, and native positive log-linear imaginary-factor tables denote exact
+real inputs. Sample norms carry independently certified absolute errors. This
+scope excludes physical material-data uncertainty and upstream capture errors.
+
+### Independent expressions and cheap filters
+
+On one knot-free positive-energy band, put $H=\hbar c$,
+$\chi=-P(f_1+if_2)/E^2$, and $n=\sqrt{1+\chi}$. Direct differentiation gives
+
+$$
+\begin{aligned}
+f_1'&=3c_0x^2+2c_1x+c_2,\qquad x=E-E_{\rm knot},\\
+f_2'&=\frac{f_2}{E}\frac{\ln(f_{2,b}/f_{2,a})}{\ln(E_b/E_a)},\\
+\chi'&=-P\left[\frac{f_1'+if_2'}{E^2}
+                  -\frac{2(f_1+if_2)}{E^3}\right],\\
+w'&=\frac{1-\Re n-E\Re\{\chi'/(2n)\}}{H}.
+\end{aligned}
+$$
+
+The implementation differentiates the original coefficients, then uses the
+equivalent real-root expression. For $x+iy=1+\chi$,
+$R=\sqrt{x^2+y^2}$ and $r=\sqrt{(R+x)/2}$,
+$r'=[(xx'+yy')/R+x']/(4r)$. Intervals that cannot exclude $R=0$ or $r=0$
+are refused. Units of $w'$ are inverse energy per length. Vacuum gives zero;
+constant $f_1$ and weak susceptibility give
+$w'=-Pf_1/(2HE^2)$ to leading order, checking the sign and energy power.
+
+For a captured piece with duration $\Delta d$, signed
+$q=\lambda\Delta d/2$, and brighter endpoint amplitude $B$, its absolute
+integral weight and residual phase-slope majorant are
+
+$$
+\begin{aligned}
+W_{pj}&=|c_{pj}|\Delta d_j B_j
+          \frac{1-e^{-2|q_j|}}{2|q_j|},\\
+D_j&=\frac{\max_{\rm endpoints}|d-d_r|}{H}
+       +M_1\max_{\rm endpoints}|L-L_r|,\\
+B_{pe}&=\sum_{j\in e}W_{pj}D_j,\\
+K_G&=\sqrt{\sum_{p,e}B_{pe}^2},\qquad
+K_C=\sqrt{\sum_p\left(\sum_e B_{pe}\right)^2}.
+\end{aligned}
+$$
+
+The ratio has limit one at $q=0$ and is valid for both attenuation signs.
+Affine geometry makes endpoint maxima sufficient. Grouped norms permit one
+reference gauge per electron; coherent sums require a common row reference.
+Subtracting the common captured origin before forming endpoints preserves
+short flights at large clocks. The references themselves may be any fixed
+real values; all subsequent distances enclose rounding. Zero coupling gives
+zero derivative norm, whose units are field amplitude per energy.
+
+Let $S_i$ be a nominal norm, $\epsilon_i$ its certified error,
+$A_-=[S_i-\epsilon_i]_+$, and $A_+=S_i+\epsilon_i$. Triangle inequalities give
+$[A_--K|E-E_i|]_+^2$ and $(A_++K|E-E_i|)^2$ as power envelopes. For one side
+of a cell of width $r$, their integrals are
+
+$$
+\begin{aligned}
+I_-&=A_-^2t-A_-Kt^2+K^2t^3/3,
+       \qquad t=\min(r,A_-/K),\\
+I_+&=A_+^2r+A_+Kr^2+K^2r^3/3.
+\end{aligned}
+$$
+
+For $K=0$, $I_-=A_-^2r$. Interval minimum endpoints enclose $t$ even when
+uncertainty straddles the clipping transition. The implementation evaluates
+the equivalent factored lower primitive; its interval enclosure includes all
+correlations conservatively. A zero lower-amplitude endpoint may safely return
+zero. Actual stored midpoint floats define the exact cell partition; cell
+width subtraction, sample errors, integration, blending, and totals are
+directed. Abstract cone samples may be band endpoints; the composed physical
+helper requires strictly interior samples to avoid stored-PPoly joint values.
+
+On a cell where $F\in[F_-,F_+]\subseteq[0,1]$, separate nonnegative coefficient
+bounds justify
+
+$$
+\begin{aligned}
+Y_{\rm cell,-}&=\max\{I_{\rm common,-},
+                      (1-F_+)I_{G,-}+F_-I_{C,-}\},\\
+Y_{\rm cell,+}&=\min\{I_{\rm common,+},
+                      (1-F_-)I_{G,+}+F_+I_{C,+}\}.
+\end{aligned}
+$$
+
+The common lower cone uses the smaller lower amplitude and larger derivative
+bound; the common upper uses the larger upper amplitude and larger derivative
+bound. These inequalities hold pointwise before integration, including where
+sector envelopes cross. Choosing one constant extreme form factor after
+integrating each sector would require an additional ordering argument. Outward
+binary64 extraction includes a successor/predecessor correction for subnormal
+conversion, while exact zero upper power remains zero.
+
+### Implementation comparison, corrections, and verdict
+
+The initial review found that a rounded band midpoint could select the next
+native interpolation segment when the upper endpoint was a knot. The owner
+changed selection to the segment immediately right of the lower endpoint.
+The owner also added finite aligned-array, positive-duration, nonnegative
+transmission, and integer-electron checks before the row's empty return. Both
+corrections were inspected; the resulting formulas match the independent
+expressions above. The composed helper passes the same law and sample nodes
+to the directed sample, derivative, and power paths, preserving grouped and
+coherent column order.
+
+Independent 100-digit polynomial power sums, ratio-form imaginary interpolation,
+and differentiation of the complex principal square root checked 27 material
+derivatives across HOPG, WSe2, and constant-forward-factor HOPG. All lay below
+their uniform derivative bounds. Separate 100-digit exact cone primitives
+checked 123 cases: one or several samples, endpoint samples, clipping and
+adjacent cutoff floats, zero derivatives, norm errors exceeding nominal norms,
+fixed or unrestricted form factors, and normal through subnormal powers.
+Every returned lower/upper float enclosed the corresponding reference bound.
+
+**Scoped verdict:** `rederived` for the directed stored-law derivative,
+captured-row derivative norms, optional directed power-envelope path, and their
+composed stored-input band enclosure. Units, limiting cases, and
+signs/conventions pass. Suggested ledger Notes should record this scope and
+the two corrected findings. The full `coherent-line-grid-windowed-resolution`
+claim remains `discrepancy`: automatic policy integration, upstream uncertainty,
+production reduction arithmetic, centroid/FWHM acceptance, and remote
+convergence ladders are outside this verification. The default float64 cone
+path retains its documented qualification. Only a human may mark the complete
+claim `signed-off`; the task owner performs the final documentation build and
+rendered-math check.
+
+## Owner production-band probe after directed arithmetic
+
+The same-trajectory regression now exercises the composed directed helper
+against the production coherent reducer on the small HOPG transport: 30 keV,
+tilt 5 degrees, azimuth 45 degrees, 1 micrometre, three electrons, seed zero,
+100 fs bunch, one mosaic node. The band is a half-eV neighbourhood of the
+first captured row's median vacuum carrier, clipped to one material interval.
+At these keV energies the numerical production form factor underflows to zero,
+so this comparison isolates its grouped branch. Full-axis endpoints accompany
+the fine band query, preserving production's material-spline selection. The
+sum of the row enclosures, divided by the production electron count, contains
+the 257-node trapezoid result and has a positive lower bound. This comparison
+does not prove the production reducer's floating arithmetic or quadrature
+error separately.
+
+A separate bounded CPU probe used the same case construction and retained one
+transport for both certificate rungs. It captured two rows and 110 pieces;
+its selected band was [1167.3158857288324, 1167.8158857288324] eV. The
+production fine-band yield was 6.901490066476968e-10 in source units.
+
+| Interior certificate nodes per row | Lower yield | Upper yield | Interval width / fine-band yield | Certificate wall time |
+| --- | --- | --- | --- | --- |
+| 9 | 1.0440063433516951e-10 | 4.45723912945707e-9 | 6.30710 | 0.521 s |
+| 33 | 3.6211737247642883e-10 | 1.2447140735833333e-9 | 1.27885 | 1.543 s |
+
+These are single-run diagnostic timings. The selected band is not a
+whole-spectrum normalization or a dominant-line shape benchmark. The
+first-derivative norm cones remain conservative: these two rungs do not meet
+the intrinsic 1e-3 share for this band. Consequently this helper cannot simply
+replace the automatic policy's warning with a passing tolerance certificate.
+Automatic use still needs an efficient complete-band error budget, tighter
+integration bounds or validated refinement, centroid/FWHM control, and
+corrected remote ladders. No coordinate grid is coarsened or acceptance
+promoted by this probe.
+
+## Owner curvature enclosure (2026-10-07)
+
+This continuation addresses the slow contraction of the first-derivative
+cones. It is an implementation-context derivation, awaiting fresh-context
+verification; the complete claim remains `discrepancy`.
+
+### Stored material and captured-field second derivatives
+
+On one open, knot-free stored-law interval, differentiate the same original
+cubic and native log-linear imaginary factor. With the notation above,
+
+$$
+\begin{aligned}
+f_1''&=6c_0(E-E_{\rm knot})+2c_1,\\
+f_2''&=f_2\nu(\nu-1)/E^2,
+\qquad \nu=\frac{\ln(f_{2,b}/f_{2,a})}{\ln(E_b/E_a)},\\
+\chi''&=-P\left[f''/E^2-4f'/E^3+6f/E^4\right].
+\end{aligned}
+$$
+
+For $x+iy=1+\chi$, $R=\sqrt{x^2+y^2}$ and
+$r=\sqrt{(R+x)/2}$, the exact real derivatives are
+
+$$
+\begin{aligned}
+R''&=\frac{x'^2+y'^2+xx''+yy''}{R}
+       -\frac{(xx'+yy')^2}{R^3},\\
+r''&=\frac{R''+x''}{4r}-\frac{r'^2}{r},\\
+w''&=-\frac{2r'+Er''}{H}.
+\end{aligned}
+$$
+
+`dispersion_derivative_bound(order=2)` substitutes directed intervals into
+these expressions, including original-coefficient differentiation. Selection
+uses the branch immediately right of the lower band endpoint. Intervals that
+cannot exclude zero refractive roots are refused as on the first-order path.
+The bound has units of inverse length per energy squared. Vacuum gives zero.
+For constant real forward factor with $A=P f_1$, the independent expression
+is $w=(E-\sqrt{E^2-A})/H$ and
+$w''=A/[H(E^2-A)^{3/2}]$.
+
+For the gauge-transformed captured piece, write its energy-dependent phase as
+$\theta(E,d,L)=E(d-d_r)/H-w(E)(L-L_r)$ plus energy-independent terms.
+The first-order endpoint majorant $D_j$ above bounds $|\theta'|$, and
+$M_2\max_{\rm endpoints}|L-L_r|$ bounds $|\theta''|$. Thus
+
+$$
+\left|\frac{d^2}{dE^2}e^{i\theta}\right|
+\le D_j^2+M_2\max_{\rm endpoints}|L-L_r|.
+$$
+
+`row_derivative_bounds(order=2)` multiplies this quantity by the same
+positive signed-attenuation piece weights and combines polarization/electron
+majorants exactly as in the first-order bound. Both orders use identical
+fixed references. Separate grouped gauges and a common coherent gauge
+preserve the corresponding power and its derivatives. The result bounds the
+second derivative of the **field vector**, rather than the second derivative
+of its norm. At a zero-attenuation single-piece resonance, the gauge-removed
+field is $\Delta d\operatorname{sinc}[\Delta d(E-E_j)/(2H)]$; its second
+derivative magnitude is $\Delta d^3/(12H^2)$, covered by the endpoint majorant.
+
+### Directed trapezoid charge and composition
+
+For either sector, let $K_1$ and $K_2$ bound the field-vector first and second
+derivative norms. Product differentiation and Cauchy--Schwarz give
+
+$$
+P=\|A\|^2,\qquad |P''|\le2(K_1^2+K_0K_2).
+$$
+
+On two consecutive sampled energies with exact stored-float distance $h$,
+take $K_0=\min(A_{+,i},A_{+,i+1})+K_1h$. The Lipschitz bound from either
+endpoint proves this uniform norm upper bound. Certified endpoint norm
+intervals provide lower and upper endpoint powers. The classical trapezoid
+remainder then yields
+
+$$
+\begin{aligned}
+J_-&=\max\left(0,\frac h2[A_{-,i}^2+A_{-,i+1}^2]
+                      -\frac{h^3}{6}(K_1^2+K_0K_2)\right),\\
+J_+&=\frac h2[A_{+,i}^2+A_{+,i+1}^2]
+                      +\frac{h^3}{6}(K_1^2+K_0K_2).
+\end{aligned}
+$$
+
+For global $F\in[F_-,F_+]$, separate nonnegative coefficient bounds give
+the same valid mixed-sector lower and upper blends used above. No derivative
+of $F$ or constant-$F$ approximation enters. Unsampled endpoint strips use
+the directed first-order cones. All power, remainder, strip summation, and
+binary64 extraction arithmetic is outward. `_curvature_power_bounds`
+intersects this whole-band interval with the original cone interval; hence
+it cannot widen the result. `_certified_physical_row_power_bounds(curvature=True)`
+composes the stored-law, field, sample, and integral bounds, requiring at
+least two strictly interior samples and global form-factor bounds. Its
+default path is unchanged. Interior truncation contracts quadratically for
+fixed finite derivative bounds; shrinking endpoint strips is also necessary
+for full-band quadratic contraction. Sample uncertainty and form-factor
+slack remain.
+
+### Owner evidence and practical limit
+
+Analytic regression checks cover affine vector power with a second-order
+error charge, nonlinear two-electron phase interference with both endpoint
+strips, the physical single-piece sinc limit, common clock translation,
+exact zero and subnormal positive powers. Independent high-precision
+constant-forward formulas and complex-root differentiation of the stored
+HOPG/WSe2 laws are enclosed. These are owner checks, not a fresh-context
+verdict.
+
+The same CPU transport and band as the previous probe give:
+
+| Samples per row | Cone interval width / fine yield | Curvature interval width / fine yield | Cone / curvature wall time |
+| --- | --- | --- | --- |
+| 9 | 6.30710 | 6.30710 | 0.518 / 0.626 s |
+| 33 | 1.27885 | 0.670595 | 1.543 / 1.659 s |
+| 129 | 0.319699 | 0.0598001 | 5.527 / 5.746 s |
+
+The 129-sample curvature interval is
+$[6.731722688933507\times10^{-10},\;7.144432499317292\times10^{-10}]$
+and contains the production fine-band yield
+$6.901490066476968\times10^{-10}$. The fixed endpoint margin is one percent
+of the band on each side; it is included in the interval. Timings are
+single-run diagnostics on the three-electron CPU anchor. This rung improves
+the width by about a factor of 5.35 but still exceeds the intrinsic $10^{-3}$
+share. Complete-band budgeting, tighter bounds/refinement, centroid/FWHM
+control, fresh-context verification and corrected remote ladders remain
+required before automatic-policy acceptance. No acceptance item or ledger
+status is promoted.
+
+## Owner complex-field interpolation enclosure (2026-10-07)
+
+The curvature power charge above contains a squared first-derivative term,
+which can remain large when a field's direction rotates even though its norm
+changes little. This extension interpolates the complex field vector and
+charges its second derivative directly. The derivation and evidence here are
+owner checks, awaiting fresh-context verification. The full claim remains
+`discrepancy`.
+
+### Exact interpolation integral and remainder
+
+In one fixed sector gauge, let $A_0,A_1$ be the physical field vectors at
+energies $a,b$, with $h=b-a$. Their linear interpolant is
+$L(x)=(1-x/h)A_0+(x/h)A_1$ for $0\le x\le h$. Direct integration gives
+
+$$
+\begin{aligned}
+J_L&=\int_0^h\|L(x)\|^2\,dx\\
+&=\frac h3\left[\|A_0\|^2+\Re\langle A_0,A_1\rangle+\|A_1\|^2\right]\\
+&=\frac h6\left[\|A_0+A_1\|^2+\|A_0\|^2+\|A_1\|^2\right].
+\end{aligned}
+$$
+
+The last positive sum avoids cancellation for nearly opposite endpoint
+fields and is the implemented form. Directed complex endpoint enclosures
+bound every term, including sample/material uncertainty and arithmetic.
+
+For a twice differentiable vector field with $\|A''\|\le K_2$, the linear
+interpolation Green kernel gives the same vector remainder bound as the
+scalar interpolation theorem, because its kernel has one sign. In particular,
+
+$$
+\|A(x)-L(x)\|\le\frac{K_2}2x(h-x),\qquad
+\|A-L\|_{L^2(a,b)}\le K_2\sqrt{\frac{h^5}{120}}=R.
+$$
+
+The second result follows from
+$\int_0^h x^2(h-x)^2\,dx=h^5/30$. Minkowski and reverse Minkowski then give
+
+$$
+\boxed{
+\left[\sqrt{J_{L,-}}-R\right]_+^2
+\le\int_a^b\|A(E)\|^2\,dE
+\le\left[\sqrt{J_{L,+}}+R\right]^2.
+}
+$$
+
+`_interpolated_power_bounds` evaluates this enclosure with directed
+arithmetic and outward binary64 extraction, retaining exact zero and
+subnormal positive powers. The derivative charge has amplitude times
+square-root energy units, matching $\sqrt{J_L}$; the resulting power integral
+has field-squared times energy units. An affine complex field has zero
+remainder and the exact integral above. Opposite endpoint fields give a
+positive integral rather than cancelling it. Global form-factor bounds mix
+nonnegative grouped/coherent sector integrals as above, including varying
+$F(E)$ without a constant-$F$ approximation.
+
+### Matching sector gauges
+
+Complex field interpolation is sensitive to energy-dependent phase gauges,
+although each individual sample norm is invariant. A derivative bound in one
+gauge cannot be paired with samples in another. `row_phase_gauges` therefore
+chooses fixed binary64 $d,L$ offsets relative to the first captured piece.
+Its grouped sector has a reference for each electron; its coherent sector
+uses one common reference, with electron-dependent coherent references
+explicitly refused. Midpoints of relative endpoint ranges are a numerical
+choice to reduce phase radii; their exact geometric optimality is unnecessary.
+Each chosen stored float is an exact fixed reference for the enclosure.
+
+`sample_row_norm_certificate(field_capture=...)` now optionally exposes its
+directed polarization/electron fields and material phase interval **before**
+norm reduction, in the same first-piece gauge used by the existing certificate.
+The captured nested tuples are immutable; the hook does not alter the default
+norm/error computation. For sector references $d_r,L_r$, the composed helper
+rotates the captured samples by
+
+$$
+\exp\left(-i[Ed_r/H-w(E)L_r]\right).
+$$
+
+The grouped sector applies its references before flattening polarization and
+electron coordinates. The coherent sector sums electron fields first and
+applies the common reference. `row_derivative_bounds(phase_gauges=...)` uses
+those same exact offsets for the endpoint slope/curvature majorants, retaining
+directed origin subtraction. Thus the second-derivative certificate bounds
+the exact field that is interpolated. The material phase interval and its
+uncertainty participate in the rotation as well as formation/midpoint capture.
+
+`_certified_interpolated_row_power_bounds` composes these pieces on one open,
+knot-free stored-law band with at least two strictly interior samples. Endpoint
+strips retain directed norm cones; the whole-band result intersects the
+first-order cone interval. This certifies the reconstructed stored-input
+field, with the same upstream capture/interpolant exclusions as the existing
+helpers. It does not certify the floating production reduction or a spectral
+centroid/FWHM.
+
+### Owner regression and production-band probe
+
+Analytic tests pin affine and quadratic field integrals, nonlinear
+interpolation contraction, signed absorption with real material dispersion,
+grouped and coherent blends, near-opposite/subnormal endpoint fields, and
+variable form factors. Independent high-precision piece integrals lie inside
+the composed intervals and their relative width is below $10^{-3}$ on the
+small synthetic captured-row cases. Tests also pin unchanged norm/error
+outputs when the capture hook is used, clock translation invariance, and
+refusal of non-common coherent references. The production same-trajectory
+regression covers the HOPG band with all three methods and confirms that the
+field interpolation enclosure is narrower than the original cones.
+
+The probe reuses the preceding three-electron CPU transport, two captured
+rows, 110 pieces, band $[1167.3158857288324,1167.8158857288324]$ eV, and fine
+production-band yield $6.901490066476968\times10^{-10}$. Here the endpoint
+margin is $h_{\rm band}/(2N)$ for $N$ samples, so its strips shrink with
+refinement. Both methods use the same sample coordinates at each rung.
+
+| Samples per row | Curvature width / fine yield | Field interpolation width / fine yield | Curvature / interpolation time |
+| --- | --- | --- | --- |
+| 33 | 0.671743 | 0.0819596 | 1.668 / 1.777 s |
+| 129 | 0.0474996 | 0.00533220 | 5.939 / 6.283 s |
+| 513 | 0.00346960 | 0.000337573 | 22.285 / 23.030 s |
+
+The 513-sample field interval is
+$[6.900278558067526\times10^{-10},6.902608313285128\times10^{-10}]$.
+Its width divided by its positive lower endpoint is about $3.38\times10^{-4}$,
+below the intrinsic $10^{-3}$ integration share. It contains the fine
+production-band quadrature. The 257-node numerical production quadrature is
+a comparison value; the enclosure itself follows from the stored-field
+certificate rather than an assumed accuracy of that quadrature. Timings are
+single-run CPU diagnostics; this finite three-electron probe is not a remote
+thick-target ladder.
+
+This achieves the desired integration precision on the selected band. It
+does not establish a full-spectrum normalization or full-axis sampling
+budget. Efficient subdivision over material knots and line windows,
+form-factor enclosures, centroid/FWHM error control, upstream uncertainties,
+fresh-context verification, and corrected remote ladders remain open.
+Automatic grid behavior and acceptance/status are unchanged.
+
+## Independent scoped verification of curvature and field interpolation
+
+Fresh verifier, 2026-10-07; checkpoints `447fb5bd` and `bddc6634`, evaluated
+at `bddc66345ecb69c72ee05030319680f62a01e10c`. This review covers the optional
+second-derivative, curvature, field-capture, gauge, and field-interpolation
+building blocks in `coherent_sample_certificates.py` and
+`coherent_normalization.py`. It does not promote the full validation claim.
+
+### Independence and source convention
+
+The verifier did not implement either checkpoint. After reading the repository
+map, physics-validation skill and methodology, the verifier recorded the blind
+source derivation in `/tmp/350-verifier-blind.md` before reading implementation
+bodies, maintained tests, this owner write-up, or implementation-specific ledger
+Notes. The source was the supplied exact stored-input attenuated piece integral,
+principal-root material law, and grouped/coherent power definition. The
+comparison then inspected the named definition owners and reconstructed the
+source separately in `/tmp/test_350_independent.py`.
+
+The initial blind notes interpreted “log-linear” as an affine logarithm versus
+energy. The stored-law docstring clarified that the native convention is affine
+logarithm versus **log energy**. The corresponding independent correction is
+$f_2(E)=f_{2,a}(E/E_a)^\alpha$,
+$\alpha=\ln(f_{2,b}/f_{2,a})/\ln(E_b/E_a)$, hence
+$f_2'=\alpha f_2/E$ and $f_2''=\alpha(\alpha-1)f_2/E^2$.
+All source-to-code and numerical comparisons below use that stored convention;
+this is a clarification of the source convention, not an implementation
+ discrepancy.
+
+Captured binary64 coefficients, geometry, constants, phases, damping slopes,
+carrier energies, sample energies, and returned gauge offsets are exact inputs.
+The scope excludes the physical accuracy of upstream data, interpolant
+construction, capture construction, and production floating reduction.
+
+### Independent derivative and curvature derivation
+
+With $S=F_0+\sum_a N_a(f_{1,a}+if_{2,a})$ and
+$\chi=-PS/E^2$, differentiate the original stored cubic and native power-law
+interpolants:
+
+$$
+\begin{aligned}
+\chi'&=-P\left(S'/E^2-2S/E^3\right),\\
+\chi''&=-P\left(S''/E^2-4S'/E^3+6S/E^4\right),\\
+n'&=\frac{\chi'}{2n},\qquad
+n''=\frac{\chi''}{2n}-\frac{(\chi')^2}{4n^3},\qquad n=\sqrt{1+\chi},\\
+w''&=-\frac{2\operatorname{Re}n'+E\operatorname{Re}n''}{H}.
+\end{aligned}
+$$
+
+The owner's real-root/radius differentiation is algebraically equivalent.
+Rejecting bands where its real root cannot be separated from zero is
+conservative; the accepted bands exclude interpolation knots and root
+singularities. Vacuum gives zero material derivatives. The derivative units
+are inverse length per energy and inverse length per energy squared.
+
+In a fixed reference gauge $(d_r,L_r)$, the piece phase derivative is
+
+$$
+\theta_j'(E,x)=\frac{d_j-d_r+\Delta d_j x}{H}
+ -(L_{\mathrm{mid},j}-L_r+\Delta L_jx)w'(E),\qquad
+\theta_j''=-(L_{\mathrm{mid},j}-L_r+\Delta L_jx)w''(E).
+$$
+
+Let $D_j$ bound the absolute first expression and $Q_j$ bound the absolute
+second expression uniformly on the cell and $x\in[-1/2,1/2]$. The attenuation
+mass is nonnegative and even in signed damping:
+
+$$
+m_{pj}=|c_{pj}|\Delta d_j B_j
+\frac{1-\exp(-2|q_j|)}{2|q_j|},\qquad
+m_{pj}\big|_{q_j=0}=|c_{pj}|\Delta d_jB_j.
+$$
+
+The piece first- and second-derivative majorants are $m_{pj}D_j$ and
+$m_{pj}(D_j^2+Q_j)$, respectively. Summing pieces within each electron and
+then taking the appropriate grouped or coherent vector norm gives $K_1,K_2$.
+The owner implements these triangle majorants with directed relative
+endpoint geometry. Cancellation can only make them looser. A separate fixed
+reference for each electron preserves grouped power; coherent power requires
+one common reference. The sampled fields and derivative majorants use the
+same exact stored references.
+
+For either sector $P=\|A\|^2$,
+
+$$
+|P''|\le 2\left(K_1^2+K_0K_2\right),\qquad
+K_0\le\min(\|A(a)\|_+,\|A(b)\|_+)+K_1h.
+$$
+
+The trapezoid charge is therefore
+$h^3(K_1^2+K_0K_2)/6$, matching `_curvature_power_bounds`.
+Endpoint norm uncertainty is charged before squaring; lower amplitudes are
+clipped at zero. The optional curvature composition retains the first-order
+cones on the endpoint strips and intersects two enclosing whole-band
+intervals. The default path continues to use the pre-existing cones.
+
+### Independent interpolation derivation
+
+For the linear interpolant $L$ of a fixed-gauge vector field,
+
+$$
+\begin{aligned}
+J_L&=\int_0^h\|L\|^2\,dx
+=\frac h3\left(\|A_0\|^2+
+\operatorname{Re}\langle A_0,A_1\rangle+\|A_1\|^2\right)\\
+&=\frac h6\left(\|A_0+A_1\|^2+\|A_0\|^2+\|A_1\|^2\right),\\
+\|A-L\|&\le\frac{K_2x(h-x)}2,\qquad
+\|A-L\|_{L^2}\le K_2\sqrt{h^5/120}=R,\\
+\left[\sqrt{J_{L,-}}-R\right]_+^2
+&\le\int_0^h\|A\|^2\,dx
+\le\left(\sqrt{J_{L,+}}+R\right)^2.
+\end{aligned}
+$$
+
+The $1/120$ follows from integrating $x^2(h-x)^2/4$.
+The positive sum-of-squares form avoids subtractive cancellation for opposite
+endpoints. The owner evaluates endpoint fields as directed complex rectangles,
+so endpoint uncertainty is included directly in the interval for $J_L$; no
+additional nominal-sample error charge is needed in this interpolation step.
+The immutable nested tuple capture precedes norm reduction. The composed
+helper rotates those intervals in the matching grouped/common gauges, adds
+endpoint-strip cones, and intersects the original whole-band cone result.
+
+For arbitrary $F(E)\in[F_-,F_+]$, nonnegative sector integrals $I_G,I_C$
+permit the conservative combination
+
+$$
+(1-F_+)I_{G,-}+F_-I_{C,-}
+\le I_{\mathrm{physical}}
+\le(1-F_-)I_{G,+}+F_+I_{C,+}.
+$$
+
+Both new bounds use this combination. They require neither constant $F$ nor
+$F'$ or $F''$; taking only the minimum and maximum convex combinations of the
+sector integrals would not suffice when $F$ varies and the sector power
+difference changes sign. Broad $F$ bounds can prevent either method from
+tightening. Directed interval arithmetic, outward extraction plus a successor
+for positive upper bounds, and lower clipping preserve zero and subnormal
+positive power.
+
+### Independent numerical evidence and verdict
+
+Nine scratch comparisons passed using the canonical project test runner with
+`PYRITE_MC_BACKEND=cpu`. References used 75–85 decimal digits, stored-coefficient
+power sums, the direct principal complex square root, and an exponential
+antiderivative of the attenuated piece integral. They did not call owner
+formation, sample-certificate, derivative, or normalization helpers to build
+the reference quantity.
+
+- HOPG and WSe2 native interpolants on $[1099.8,1100.2]$ eV: first- and
+  second-derivative bounds enclosed independent high-precision differentiation
+  at eleven points. Bound/maximum-observed ratios were $1.0014313,1.0033700$
+  for HOPG and $1.0018924,1.0197774$ for WSe2. These samples support the
+  symbolic interval proof; they are not a substitute for a uniform bound.
+- A four-piece, two-polarization, two-electron WSe2 row used signed damping,
+  unequal carriers, affine escape, a common $10^{10}$ Angstrom clock,
+  and opposing coefficients within one electron. Independent differentiated
+  grouped/common-gauge field vectors lay below the supplied second-derivative
+  majorants at both band endpoints and its midpoint.
+- With seventeen strictly interior samples and $F=0.65$, independent
+  power integration gave $15443.1354709906397$. Curvature returned
+  $[15443.099404983044,15443.164701808297]$; interpolation returned
+  $[15443.109694252631,15443.149608376929]$. Both include endpoint strips.
+- With $F(E)=0.5+0.3\sin(11(E-1100))$, independent integration gave
+  $14760.2622876937329$, enclosed by
+  $[12549.291938827117,17013.536547618798]$ from both compositions with
+  global bounds $[0.2,0.8]$. Form-factor uncertainty dominates this case.
+- Opposite affine complex endpoints reproduced the exact integrated power
+  $2s^2/3$ for $s=1$, a binary64 subnormal $s=10^{-320}$, and $s=0$.
+  Positive underflow retained a positive upper bound; zero retained zero.
+
+The maintained five-module scoped suite also passed: **120 tests**, with
+12 production/warning diagnostics. Its capture-hook comparison confirms
+bitwise identical default norm/error outputs; its directed rectangles exercise
+endpoint uncertainty and its coherent-gauge rejection protects the sector
+invariance requirement.
+
+**Scoped verdict: rederived.** Units, vacuum/zero/affine limits,
+signed-damping symmetry, curvature factors, interpolation constant, gauge
+convention, varying-form-factor treatment, and outward extraction agree.
+No divergent factor, sign, exponent, unit, or convention was found in the
+requested checkpoints. This is independent verification of these stored-input
+building blocks. The full claim remains **discrepancy**: automatic integration,
+upstream uncertainty, full-axis normalization/sampling, centroid/FWHM, and
+corrected remote ladders remain outside this review. The task owner retains
+the final documentation build and rendered-math check.
+
+## Owner disjoint-band composition and work budget
+
+`coherent_band_audit.certify_row_band_power` composes the verified smooth-band
+field-interpolation primitive over a requested union of disjoint energy bands.
+Omitting `bands` requests the material law's complete axis; explicitly supplied
+gaps stay omitted. This owner construction does not change the automatic
+grid or certify a grid's numerical yield by itself.
+
+Let the requested bands be partitioned at every stored material knot into
+intervals $I_i$. For the same captured row, material law and physical form
+factor throughout the audit, let $L_i,U_i$ enclose the nonnegative integrated
+power on $I_i$. Additivity gives
+
+$$
+\sum_i L_i\le Y_B=\sum_i\int_{I_i}P(E)\,dE\le\sum_i U_i.
+$$
+
+The implemented sums use directed arithmetic and outward binary64 extraction.
+Isolated one-sided spline-knot values have zero integral measure; strictly
+interior samples and the primitive's endpoint strips cover each interval.
+Overlapping input bands are refused to prevent double counting; touching
+bands are allowed. No region between supplied bands enters the integral.
+An empty requested set has exact zero power and no evaluations.
+
+With aggregate enclosure $[L,U]$, the audit uses the outward relative width
+
+$$
+\eta=\frac{U-L}{L}\quad(L>0)
+$$
+
+as its uncertainty charge. For a supplied finite nonnegative numerical yield
+$Q$, monotonicity of $Q/Y$ gives the distinct quadrature-error charge
+
+$$
+\epsilon_Q=\max\left(\left|\frac QL-1\right|,
+                         \left|\frac QU-1\right|\right)
+\ge\sup_{Y\in[L,U]}\frac{|Q-Y|}{Y}.
+$$
+
+Thus a narrow integration enclosure is insufficient if the production-grid
+yield lies far from it. With $L=0<U$, the width charge is infinite; positive
+$Q$ has unbounded relative error, while $Q=0$ has upper error one. Certified
+zero uses width zero, zero error for $Q=0$ by convention, and unbounded relative
+error for positive $Q$. Units of $L,U,Q$ are row-field squared times eV; both
+charges are dimensionless. Ratios and their extraction are directed,
+including subnormal inputs and near cancellation in the width numerator.
+
+### Refinement and refusal
+
+Initialization evaluates every smooth interval using `initial_samples`
+strictly interior midpoint nodes. Every call counts its complete sample set;
+no cached or reused sample work is assumed. If the initial sample requirement
+exceeds `max_evaluations`, refusal occurs before any partial integral is
+claimed. The exception then carries no certificate because full requested
+coverage has not been established.
+
+After complete initialization, the largest interval uncertainty is selected
+for a larger sample rung. Old and new enclosures of the same unchanged
+integral are intersected:
+
+$$
+L_i\gets\max(L_{i,\rm old},L_{i,\rm new}),\qquad
+U_i\gets\min(U_{i,\rm old},U_{i,\rm new}).
+$$
+
+This preserves validity and retains progress even if changed sample locations
+produce a looser primitive enclosure. Inconsistent intersections are refused.
+The audit returns successfully only when its directed global width charge
+meets `relative_tolerance` or the requested integral is certified zero.
+Exhausted work budgets raise `BandPowerBudgetError` with the complete but
+possibly loose current enclosure, cumulative evaluation count and measured
+relative width. No representable interior sample set means refusal rather
+than silently treating a positive-width band as empty. The evaluation budget
+is separate from an automatic coordinate-grid point budget.
+
+Form-factor bounds may be fixed or supplied by a callback for each whole
+smooth interval. Such bounds must enclose the actual form factor everywhere
+on that interval. More field samples cannot necessarily reduce this
+uncertainty. In particular, the conservative default $F\in[0,1]$ may exhaust
+a work budget that suffices for an exactly specified sector; this is a
+certificate limit, not permission to assume a constant physical form factor.
+
+### Owner checks and scope
+
+Maintained analytic sinc checks enclose the integral on the full requested
+axis and on gapped bands split at synthetic material knots. Their selected
+grouped-sector form factor is exact, and their uncertainty and separately
+checked numerical-yield error meet the intrinsic $10^{-3}$ share. Small
+budgets refuse with work counts; insufficient initial coverage carries no
+quantitative certificate. Additional checks cover empty-band zero,
+adjacent-float refusal, invalid/overlapping bands, invalid numerical yields,
+and directed relative errors on subnormal power intervals. These are owner
+checks; fresh-context composition verification is recorded separately.
+
+The helper certifies only its requested stored-input row integral under the
+existing primitive assumptions and supplied form-factor enclosures. Full
+production normalization requires every relevant row and band to be covered;
+omitted spectral regions and a production quadrature need their own charges.
+Automatic-policy integration, upstream capture/interpolant uncertainties,
+centroid/FWHM control and corrected remote ladders remain open. The full
+`coherent-line-grid-windowed-resolution` status stays `discrepancy`.
+
+### Independent verification: disjoint-band assembly and relative bounds
+
+The fresh verifier recorded the blind derivation in
+`/tmp/350-band-composition-blind.md` before reading `coherent_band_audit.py`,
+its maintained tests, or the owner derivation. This review certifies only the
+composition of already valid stored-input interval enclosures. It introduces
+no transport law and does not change the full claim's `discrepancy` status.
+
+Let $B$ be the requested finite union of disjoint energy bands and let
+$P(E)\geq0$ be the unchanged stored-input row power. Splitting every band at
+all native material interpolation knots gives smooth intervals $I_i$.
+Their shared endpoints have zero integration measure. Positivity and integral
+additivity therefore give
+
+$$
+Y=\int_B P(E)\,dE=\sum_i Y_i,
+\qquad
+L_i\leq Y_i\leq U_i
+\quad\Longrightarrow\quad
+\sum_i L_i\leq Y\leq\sum_i U_i.
+$$
+
+All bounds use the primitive's matching field gauges and physical units.
+Endpoint strips remain included by that primitive. Overlapping bands must
+be refused or converted into a union before addition; this API refuses them.
+Requested gaps remain omitted, so this result is not full-axis power.
+
+For a second valid enclosure of the same unchanged interval, intersection
+preserves validity:
+
+$$
+[L_i,U_i]\cap[\ell_i,u_i]
+=[\max(L_i,\ell_i),\min(U_i,u_i)].
+$$
+
+An empty intersection is a contradiction and must refuse. Calls count every
+sample evaluation, including samples on earlier refinement rungs. A budget
+that cannot initialize every smooth interval supplies no whole-band
+certificate; exhaustion after initialization can report a complete loose
+certificate. Strictly increasing representable interior samples are required;
+an adjacent-float interval that cannot provide them must refuse.
+
+Writing the outward total bounds as $[L,U]$, positivity gives the conservative
+relative interval uncertainty
+
+$$
+\frac{U-L}{Y}\leq\frac{U-L}{L}\quad(L>0).
+$$
+
+For an independently supplied finite nonnegative numerical yield $Q$, the
+monotonicity of $Q/Y$ gives a separate error certificate:
+
+$$
+\sup_{Y\in[L,U]}\frac{|Q-Y|}{Y}
+=\max\left(\left|\frac{Q}{L}-1\right|,
+           \left|\frac{Q}{U}-1\right|\right)
+=\max\left(0,\frac{Q}{L}-1,1-\frac{Q}{U}\right)
+\quad(L>0).
+$$
+
+Both expressions require outward arithmetic, including subtraction and float
+conversion; positive underflow must never become certified zero. For $L=0<U$,
+the width bound is infinite; the error bound is infinite for $Q>0$ and one for
+$Q=0$ over positive admissible integrals. At certified zero $L=U=0$, the API
+uses the explicit convention of zero error for $Q=0$, infinity for $Q>0$, and
+zero width. Relative error at a zero true integral otherwise has no ordinary
+definition. A passing width certificate alone places no restriction on an
+arbitrary production-grid yield $Q$.
+
+**Implementation comparison.** `certify_row_band_power` splits the unchanged
+requested bands at every stored knot, calls the certified primitive on each
+whole interval, intersects refinements, and counts all samples.
+`_sum_intervals` accumulates directed interval sums and converts outward.
+`BandPowerCertificate.relative_width_upper` and `relative_error_upper` match
+the expressions and zero conventions above. Overflow and unrepresentable
+sample sets refuse. No factor, sign, exponent, unit, or convention discrepancy
+was found within this scoped composition review.
+
+**Independent numerical evidence.** Scratch checks used `Fraction` exact
+rational arithmetic on 105 enclosures and six supplied yields per enclosure,
+including zero, binary64 subnormals, adjacent normal floats, and extreme
+dynamic range; 100 additional outward sums enclosed their exact sums.
+A separate analytic constant-power oracle checked disjoint gaps, knot splits,
+refinement, evaluation accounting, overlap refusal, incomplete-initialization
+refusal, complete partial certificates, and adjacent-float sample refusal.
+These checks ran independently of maintained tests through the canonical
+project runner, with CPU backend selected for the scratch file.
+
+For a single unattenuated support of duration $d=100$ angstrom, unit amplitude,
+zero centre and escape distances, and resonance $E_0=1000$ eV, the independent
+reference was
+
+$$
+P(E)=d^2\operatorname{sinc}^2\!\left(
+\frac{(E-E_0)d}{2\hbar c}\right),
+\qquad \operatorname{sinc}(x)=\frac{\sin x}{x}.
+$$
+
+Using the exact stored float for `HBARC_EV_ANG`, 70-digit independent
+quadrature over $[990,994]\cup[997,1003]\cup[1007,1010]$ eV gave
+$Y=128939.9108259816345758916$ in row-field-squared times eV units.
+With exact grouped-sector form factor bounds, the API returned
+$[128672.32481866598,129212.25211307115]$ after 28 sample evaluations,
+with relative width upper $0.004196141595841069$, below the requested $0.005$.
+The reference is enclosed; the separately checked numerical-yield error bound
+is conservative. Three independent scratch tests passed. The latest maintained
+band suite passed 13 tests.
+
+**Scoped verdict:** units pass; limiting cases pass; signs and conventions pass;
+independent derivation matches; `rederived` for band composition and relative
+bounds only. The full windowed-grid claim remains `discrepancy`: this review
+does not certify automatic-grid acceptance, omitted bands, production-grid
+quadrature, or upstream stored-input exclusions. Only a human may sign off.
+
+## Reduced thick-target remote execution smoke (2026-10-07)
+
+A reduced copy of `hopg_short` completed under automatic windowed resolution
+on the lab host through `pyrite remote`: job `issue350_smoke-3`, SLURM 1099,
+one uncached case, started 10:23:47 and completed 10:48:01 PDT. The runner
+reported **1,447 seconds** for the case. The job requested one GPU and float64
+through a task-local `PYRITE_FP64=1` wrapper; this is execution evidence, not
+a measured GPU performance comparison.
+
+The isolated catalog selected HOPG at 60 keV, thickness 100,000 angstrom,
+polar/azimuth angles 45/135 degrees, a 5 by 5 mm finite footprint, 0.1 mm
+beam FWHM, and a Gaussian longitudinal RMS duration of 0.001 fs. Line
+transport used 200 electrons, bremsstrahlung one electron, seed 1, four
+reflections `(0 0 ±2)` and `(0 0 ±4)`, and `emission="both"`. Windowing was
+enabled with an explicit 8,000,000-coordinate budget. Earlier task-local
+attempts refused 33,098,177 coordinates for a 1 mm beam and 5,141,939
+coordinates for the 0.1 mm beam against a 5,000,000 budget; neither refusal
+silently coarsened the grid.
+
+The saved checkpoint `hopg@issue350_smoke-dfda0b618cad` contains one record.
+Reading that record on the remote host confirmed **5,141,939 coordinates**
+over 10–6,000 eV, below the stated budget, with minimum stored and cast
+spacing 0.0005720689655142053 eV. `E_grid`, `spec`, and `spec_coherent` are
+matching finite float64 arrays; saved bremsstrahlung and characteristic
+arrays are finite as well. Resolved metadata retains the window pieces,
+coherent row diagnostics, material fingerprint, and `backend_dtype=float64`.
+The complete parameter SHA-256 is
+`dfda0b618cad75b51ec1277d53ecaeed8883ed85a0bc9d383b93ca7851be7a80`.
+
+The exported source snapshot was clean revision
+`3ab2811ed94eb320e9bbbaf4265dac1e1b3e6fb8`, payload digest
+`fee14e7c7fd615433600249dab5d7541125724aea95d5d94de0eea2cad3aab2f`,
+synced at 16:54 UTC. This predates the branch rebase and the new disjoint-band
+audit; the smoke does not exercise that audit. No separate Monte Carlo runs
+were compared to estimate grid error.
+
+**Accuracy remains uncertified.** The stored dispersion audit explicitly
+reports `relative_production_bound=False`. Its largest finite-axis
+excluded-power bound is 74,534.30595852331 times the frozen reference, for
+row 2, and its all-electron material phase-slope step is
+0.000030716735157461954 eV. The runner emitted the corresponding precision
+warning. These are conservative diagnostics, not measured grid errors.
+This smoke demonstrates that a reduced thick-target case runs and persists
+both spectra; it does not establish the intrinsic-source tolerance,
+centroid/FWHM convergence, or the full envelope claim. Ledger status remains
+`discrepancy`.
+
+## Owner continuation: varying Gaussian form-factor bounds
+
+The band audit previously refined only field samples inside each fixed smooth
+material interval. A whole-interval form-factor enclosure consequently did
+not contract. Even constant sector powers could exhaust the evaluation budget
+with a smooth, exactly specified varying form factor. The polynomial-sector
+regression reproduced a relative width of 0.0172903 after 500 evaluations
+against a requested 0.002 share before correction.
+
+For an active finite-footprint Gaussian longitudinal sector, the unchanged
+production law in `lines/_setup.py::_prepare_spectrum` is
+
+$$
+F(E)=\exp\!\left[-\left(\frac{E\sigma_z}{H}\right)^2\right],
+\qquad H=\hbar c.
+$$
+
+On a nonnegative band $[a,b]$, its derivative is nonpositive, so
+
+$$
+F(b)\leq F(E)\leq F(a),\qquad a\leq E\leq b.
+$$
+
+`coherent_form_factor.py::gaussian_form_factor_bounds` evaluates these endpoint
+bounds with directed interval arithmetic and outward binary64 conversion.
+The energy endpoints, the stored RMS length in angstrom and the stored
+`HBARC_EV_ANG` are exact inputs. The exponent is dimensionless; $\sigma_z=0$
+gives exactly one. For an exponent at least 1000, a zero lower bound and the
+smallest positive binary64 upper bound safely enclose the positive Gaussian,
+including extreme finite inputs. Positive underflow is never certified zero.
+This helper does not apply to an empirical infinite-slab form factor or an
+inactive decoherence sector. It does not charge construction of the stored
+RMS length, evaluation rounding in the production reducer or device casts.
+
+The band audit now bisects its widest uncertain interval when the caller
+supplies a form-factor-bound callback. Each child gets its own whole-interval
+form-factor enclosure and the initial number of field samples. Material knots
+and requested gaps remain boundaries of the partition. Fixed bound pairs
+retain sample-count refinement. Both child evaluations must fit the remaining
+cumulative budget before a parent is replaced; otherwise the complete current
+certificate is returned in `BandPowerBudgetError`. Unrepresentable interior
+samples or splits still refuse.
+
+Each partition gives a valid total-power interval $[L_k,U_k]$ for the same
+unchanged requested field. Their intersection is also valid:
+
+$$
+\max_k L_k\leq Y\leq\min_k U_k.
+$$
+
+The audit retains this whole-band intersection across subdivisions. Thus
+looser child bounds do not erase a valid parent bound, and inconsistent
+intersections refuse. The returned leaf intervals describe the latest
+partition; their sum may be wider than the retained total certificate.
+Evaluation counts include discarded parents and previous sample rungs.
+
+Owner regressions cover the fixed-interval failure, exact polynomial-sector
+integration, budget exhaustion before a complete split, retained parent bounds,
+Gaussian endpoint/subnormal bounds and invalid inputs. A physical analytic
+two-electron row with opposite fields has coherent sector zero and power
+
+$$
+P(E)=2\operatorname{sinc}^2\!\left(\frac{E-1000\,{\rm eV}}{2H}
+\,1\,{\rm \mathring A}\right)[1-F(E)].
+$$
+
+The subdivided certificate encloses its independent 70-digit integral over
+990--1010 eV and separately bounds numerical-yield error within $10^{-3}$.
+These implementation-owner checks are complemented by the independent scoped
+review below; the full claim stays `discrepancy`. Automatic-policy
+integration, actual production-grid comparison, centroid/FWHM and corrected
+remote ladders remain open.
+
+## Owner continuation: weighted spectrum-yield audit
+
+Captured row fields previously retained the polarization coefficients,
+formation law and phases, but omitted the production mosaic intensity weight.
+That is sufficient for a relative bound on an isolated row, but it cannot
+reconstruct a spectrum that averages several crystal orientations. Production
+adds reflection/orientation powers incoherently and divides by the incident
+macro-electron population:
+
+$$
+Y=\frac{1}{N_e}\sum_r w_r Y_r,
+\qquad w_r\geq0.
+$$
+
+The weights multiply intensities, not complex field amplitudes. They are not
+renormalized over captured rows, and the incident population is not replaced
+by the number of surviving electron identifiers in a row. The coherent
+coefficient hook now exposes the current `capture_mosaic_weight` alongside
+`capture_phase_rad`; its existing five-argument signature is unchanged.
+`CoherentRowCollector` stores that weight in `CoherentRowField.mosaic_weight`,
+with a unit default for synthetic or historical single-orientation captures.
+No production field arithmetic changes.
+
+`coherent_spectrum_audit.py::audit_captured_spectrum_yield` applies the row
+band certificate to every positive-weight row. Directed arithmetic encloses
+the weighted sum and division:
+
+$$
+\frac{1}{N_e}\sum_r w_r L_r
+\leq Y\leq
+\frac{1}{N_e}\sum_r w_r U_r.
+$$
+
+Zero-weight rows contribute exactly zero. Positive weighted power below
+binary64's subnormal range retains a positive upper bound and does not become
+certified zero. Extracted Gaussian endpoints and the weighted lower bound are
+checked against their original directed endpoints: the underlying float
+conversion can round inward at subnormal values despite its requested
+rounding mode. The failing Gaussian cases at exponents near 744, 746 and 750,
+and the weighted sinc lower-bound case, are now regression anchors. A shared
+form-factor enclosure must cover the physical factor
+for every supplied row on the whole interval; the analytic Gaussian callback
+is applicable to the active finite-footprint sector. The caller must supply
+the complete row capture, matching material law and incident population.
+These are unchanged exact stored inputs, including each weight.
+
+The cumulative work budget reserves enough initial sample evaluations for
+every remaining contributing row. A row that cannot certify its interval
+within the remaining budget raises `SpectrumPowerBudgetError`, with its
+original row index, total evaluations used and optional **row-only** loose
+certificate. No incomplete spectrum certificate is returned. Requested bands
+are materialized once, so a generator cannot silently omit bands on later
+rows. Material knots and requested gaps retain the row helper's semantics.
+
+The supplied numerical yield $Q$ must integrate exactly those requested bands
+and carry the same photons per steradian per incident electron units. The
+audit separately evaluates the directed relative error bound
+
+$$
+\sup_{Y\in[L,U]}\frac{|Q-Y|}{Y}
+=\max\!\left(0,\frac{Q}{L}-1,1-\frac{Q}{U}\right),
+\qquad L>0.
+$$
+
+`within_tolerance` tests this bound, not just the interval width. Thus an
+accurate integral enclosure rejects an inaccurate production-grid yield.
+The existing explicit zero conventions apply: certified zero accepts zero
+yield, while a positive-power interval without a positive lower floor cannot
+certify a zero yield to a subunit relative tolerance.
+
+Owner checks enclose an independent 70-digit weighted sinc integral with two
+unequal row weights and three incident electrons, including disjoint bands
+provided as a generator; the same enclosure rejects a 10% excess yield.
+Budget tests cover initialization refusal and exhaustion on the first and a
+later row without mislabelling a row certificate as a spectrum certificate.
+Invalid weights/populations and positive weighted underflow are pinned.
+
+On the existing three-electron 30 keV HOPG transport, a two-by-two mosaic
+quadrature reconstructs the production spectrum from the weighted captured
+fields within the intrinsic $10^{-3}$ share. Separately, one reflection's
+0.001 eV band around its median carrier passes the weighted audit against a
+257-node production quadrature on those same trajectories. The material-law
+axis remains 10--5000 eV during the production evaluation and audit; only
+the requested integration band is narrow. This is a band comparison, not
+full-axis or automatic-grid acceptance.
+
+These implementation-owner checks are complemented by the independent scoped
+validation of the Gaussian/subdivision and weighted-composition extensions
+below. Capture reconstruction and material construction uncertainty,
+full-axis policy integration, centroid/FWHM acceptance and corrected remote
+ladders remain open; the full ledger claim stays `discrepancy`.
+
+## Independent scoped verification of Gaussian and weighted-yield extensions
+
+A fresh verifier reviewed frozen HEAD `59d8d26509103c7607739e92d5a21cf103d2b74d`,
+restricted to checkpoints `89e8ebdd` and `59d8d265`. The blind derivation was
+recorded in `/tmp/350-weighted-review-blind.md` before inspecting implementation
+bodies, this owner write-up, ledger Notes, or maintained tests. The verifier
+read the complete validation methodology and changed only this document.
+The following verdict concerns the Gaussian endpoint bounds, subdivision and
+composition extensions conditional on valid row integral primitives. It does
+not promote the full window-envelope claim.
+
+### Source derivation and cheap filters
+
+The supplied source identity is the existing
+`coherent-inter-electron-decoherence` Gaussian law. Treat the captured binary64
+energy endpoints, RMS length, `HBARC_EV_ANG`, row weights and material
+coefficients as exact stored inputs. For $E\geq0$ and $\sigma_z\geq0$,
+
+$$
+F(E)=\exp[-(E\sigma_z/H)^2],\qquad H=\hbar c,
+\qquad F(b)\leq F(E)\leq F(a)\quad(a\leq E\leq b).
+$$
+
+The exponent is dimensionless with energy in eV and length in angstrom.
+The zero-length or zero-energy limit gives one; nonzero Gaussian values remain
+mathematically positive even when binary64 exponential evaluation underflows.
+Therefore a positive upper bound must survive underflow. Since
+$\exp(-1000)<2^{-1074}$, a certified exponent of at least 1000 admits the
+safe enclosure $[0,2^{-1074}]$. Monotonicity selects the stop endpoint for the
+lower bound and the start endpoint for the upper bound.
+
+Integral additivity and positivity give a complete-domain bound by summing
+bounds over a disjoint partition. Both children of every subdivision must
+cover the unchanged parent before replacing it. If every complete partition
+certifies the same integral $I$, intersections remain valid:
+
+$$
+\max_k L_k\leq I\leq\min_k U_k.
+$$
+
+The retained interval need not equal the sum of the latest leaf intervals.
+This is a conditional composition theorem: it does not independently prove
+the physical-row interpolation primitive used to construct those intervals.
+
+Production adds reflection/orientation powers incoherently. For exact stored
+nonnegative intensity weights and positive incident integer population,
+
+$$
+Y=\frac{1}{N_e}\sum_r w_r I_r,\qquad
+\frac{1}{N_e}\sum_r w_r L_r\leq Y\leq
+\frac{1}{N_e}\sum_r w_r U_r.
+$$
+
+Weights multiply intensity, and neither captured row count nor surviving
+row electron identifiers replace the incident population. Units are photons
+per steradian per incident electron after integrating energy. No additional
+weight normalization is permitted. Zero-weight rows contribute exactly zero.
+
+For a separate finite nonnegative numerical yield $Q$ and positive floor,
+monotonicity of $Q/Y$ gives
+
+$$
+\sup_{Y\in[L,U]}\frac{\lvert Q-Y\rvert}{Y}
+=\max\left(\left\lvert\frac{Q}{L}-1\right\rvert,
+           \left\lvert\frac{Q}{U}-1\right\rvert\right),\qquad L>0.
+$$
+
+With $L=0$ and $Q>0$, the upper bound is infinite. With $Q=0<U$, it is one;
+with certified zero and zero numerical yield, it is zero by convention.
+An interval-width bound alone cannot accept the supplied numerical yield.
+Evaluation work includes every sampled point on every rung and every row.
+A loose certificate may describe a complete row domain; it cannot imply
+complete spectrum coverage after another row fails.
+
+Units, zero/underflow limits, positivity, incoherent weight placement and
+incident-population conventions pass these filters.
+
+### Implementation comparison
+
+`gaussian_form_factor_bounds` uses directed interval arithmetic before
+selecting monotone endpoint bounds. Its conversion checks compare the
+converted binary64 endpoints with the original directed endpoints and move
+outward, including subnormal conversions. The exponent-threshold branch
+preserves the smallest positive upper float. This matches the blind result.
+
+`certify_row_band_power` checks that both child evaluations fit before replacing
+the parent, counts discarded parents and sample rungs, preserves requested
+gaps and material-knot boundaries, and retains intersections of complete-domain
+bounds. Exhaustion returns only the last complete row certificate through an
+exception. `audit_captured_spectrum_yield` reserves initialization work for all
+remaining positive-weight rows; exhaustion returns no partial-spectrum
+acceptance. Its directed weighted sum and incident division, including the
+lower-endpoint subnormal correction, match the derived composition.
+
+The production path assigns `capture_mosaic_weight` from the same `wm` used
+in the CPU coherent power accumulation and the existing GPU intensity
+accumulation branches. The five-argument coefficient-hook call is unchanged.
+The collector copies this weight without changing amplitudes. The setup
+obtains `Ne` from the incident segment population or the explicit electron
+limit; `_spectrum.py::_finalize_spectrum` divides accumulated powers by that
+same setup population. The checkpoint diff changes only capture metadata and
+its description in these production owners, preserving field arithmetic.
+The Gaussian helper requires the exact stored RMS length used in setup;
+reconstructing it with a different unit-conversion rounding is outside this
+agreement.
+
+### Independent numerical evidence
+
+Scratch test `/tmp/test_350_independent.py` supplies seven fresh-context checks;
+it is transient evidence, not a maintained regression anchor.
+
+- 262 Gaussian bands: 524 endpoint comparisons against independent
+  180-digit Decimal exponentials or the analytic extreme-underflow bound.
+  Cases include neighboring floats near exponents 708--750 and 1000,
+  zero energy/length, smallest subnormals, maximum-scale finite products,
+  and deterministic logarithmic input sampling over 600 decades.
+- 2000 scalar error bounds compared with exact rational arithmetic on the
+  stored floats, plus five explicit positive/zero-floor conventions.
+- 303 positive weighted aggregations checked against exact rational
+  multiplication, addition and incident division, including positive results
+  below the smallest subnormal, zero weights and populations unrelated to row
+  identifiers. Evaluation counts agree with all active-row samples.
+- Five subdivision budgets verify retained parent bounds, exact rational
+  partition width, both-child coverage and counted samples. Two spectrum
+  budget checks verify initial refusal and later-row refusal with cumulative
+  counts and a row-only certificate.
+- Three physical weighted-yield comparisons use an independent 90-digit sinc
+  integral for complex two-polarization rows, unequal weights, 17 incident
+  electrons and two disjoint bands. The matched yield passes; yields reduced
+  or increased by 20 percent fail against the same valid enclosure.
+- A separate four-weight collector check preserves identical captured complex
+  fields, phases and electron identifiers, including zero intensity weight,
+  and confirms unchanged hook arity.
+
+Maintained same-trajectory production anchors additionally exercise mosaic
+capture reconstruction and a production-band weighted-yield comparison.
+They are distinguished from the fresh-context Decimal, exact-rational and
+analytic-integral evidence above.
+
+### Scoped verdict and exclusions
+
+The independent result is **rederived for these extensions**, conditional on
+valid underlying row integral enclosures, complete capture, matching bands and
+material law, and the exact stored form-factor inputs. No divergent factor,
+exponent, normalization or budget-coverage convention was found in this scope.
+
+The full `coherent-line-grid-windowed-resolution` claim remains **discrepancy**.
+Excluded here: validity of the production window envelope and underlying row
+primitive, omitted rows or bands, upstream capture/material construction
+uncertainty, production floating-point rounding, empirical infinite-slab
+form factors, automatic full-axis policy integration, centroid/FWHM,
+GPU execution and corrected remote refinement ladders. The owner may append
+this scoped `rederived` result and evidence to ledger Notes; no full-claim
+status promotion or human `signed-off` is implied.

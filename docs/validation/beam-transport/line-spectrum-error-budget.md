@@ -51,7 +51,7 @@ The sum is linear, not in quadrature. Only $\varepsilon_\mathrm{stat}$ is random
   - $5\times10^{-4}$
   - $5\times10^{-3}$
   - $5\times10^{-3}$
-  - `samples_per_feature`, `tail_widths`; `DEFAULT_BANDWIDTH_TRUNCATION` for measured-bandwidth cases, plus `DEFAULT_LOCAL_HALO_LIMIT` under `resonance-local`
+  - `samples_per_feature`, `tail_widths`; `DEFAULT_BANDWIDTH_TRUNCATION` for measured-bandwidth cases, plus `DEFAULT_LOCAL_HALO_LIMIT` under `resonance-local`; `DEFAULT_COHERENT_LEAK_LIMIT` ($10^{-4}$ per side) and `DEFAULT_COHERENT_DECOHERENCE_LIMIT` ($10^{-4}$) for coherent windows, a $3\times10^{-4}$ charge whose envelope bound sits 1.25–1.6× above the float64 production reducer's untruncated tails on the anchor case (`coherent-line-grid-windowed-resolution`)
 * - interpolation
   - $2\times10^{-4}$
   - $2\times10^{-3}$

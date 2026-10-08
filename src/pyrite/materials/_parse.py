@@ -449,18 +449,23 @@ _PROFILE_LINE_GRID_POLICY_VALUES = PROFILE_LINE_GRID_SELECTORS
 
 
 def _parse_profile_line_grid_policy(raw: object, path: str, errors: _Errors) -> None:
-    """Validate ``[profiles.NAME.line_grid_policy]``: named line-grid policies and quadrature.
+    """Validate named grid policies, window opt-in and the coordinate budget.
 
     The table becomes each case's ``Sweep.line_grid_policy``, so it joins the
-    profile's case identity (#192).
+    profile's case identity (#192). Catalog windows are a boolean request for
+    the resolver defaults; API callers may also supply detailed window maps.
     """
     table = _table(raw, path, errors)
     if table is None:
         return
-    errors.keys(table, path, set(_PROFILE_LINE_GRID_POLICY_VALUES))
+    errors.keys(table, path, set(_PROFILE_LINE_GRID_POLICY_VALUES) | {"windows", "max_points"})
     for key, allowed in _PROFILE_LINE_GRID_POLICY_VALUES.items():
         if key in table and table[key] not in allowed:
             errors.add(f"{path}.{key}", f"must be one of {allowed}")
+    if "windows" in table and type(table["windows"]) is not bool:
+        errors.add(f"{path}.windows", "must be a boolean")
+    if "max_points" in table and (type(table["max_points"]) is not int or table["max_points"] < 2):
+        errors.add(f"{path}.max_points", "must be an integer >= 2")
 
 
 def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:

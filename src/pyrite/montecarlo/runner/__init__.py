@@ -106,7 +106,12 @@ from .chunking import (
 from .directions import directional_outputs, validated_directions
 from .host_cpus import _cgroup_cpu_quota as _cgroup_cpu_quota
 from .host_cpus import _usable_cpus
-from .line_grid import check_line_truncation, line_truncation_audit, resolve_line_grid
+from .line_grid import (
+    check_line_truncation,
+    line_truncation_audit,
+    resolve_line_grid,
+)
+from .line_grid import longitudinal_rms_fs as _longitudinal_rms_fs
 
 _RESOURCE_POLICY.n_cpus = _usable_cpus()
 
@@ -491,6 +496,7 @@ def _lines_for_segments(
     table_cache=None,
     truncation_audit=None,
     temporal=None,
+    coefficient_capture=None,
 ):
     """:func:`_lines_for_segments_once` in electron-aligned device blocks (#192).
 
@@ -513,6 +519,7 @@ def _lines_for_segments(
         table_cache=table_cache,
         truncation_audit=truncation_audit,
         temporal=temporal,
+        coefficient_capture=coefficient_capture,
     )
     wants_coherent = case.get("coherent_emission", False) if coherent is None else coherent
     # An in-place temporal profile (#292) cannot be split and retried.
@@ -560,6 +567,7 @@ def _lines_for_segments_once(
     table_cache=None,
     truncation_audit=None,
     temporal=None,
+    coefficient_capture=None,
 ):
     """Coherent line spectrum on ``E_grid`` from already-transported line
     segments ``segs``. Single slab (``layer_radiators`` absent) radiates from
@@ -595,14 +603,7 @@ def _lines_for_segments_once(
         coherent = bool(coherent)
     # Divergence-only case key (#116); mc_spectrum refuses it on coherent calls.
     line_quadrature = case.get("line_quadrature", "node")
-    longitudinal = case.get("longitudinal_distribution") or {}
-    longitudinal_kind = longitudinal.get("kind")
-    if longitudinal_kind in {"gaussian", "compressed"}:
-        longitudinal_rms_fs = longitudinal.get("rms_duration_fs")
-    elif longitudinal_kind is None and case.get("long_shape", "gaussian") == "gaussian":
-        longitudinal_rms_fs = case.get("bunch_length_fs")
-    else:
-        longitudinal_rms_fs = None
+    longitudinal_rms_fs = _longitudinal_rms_fs(case)
     if radiators is None:
         return mc_spectrum(
             segs,
@@ -628,8 +629,11 @@ def _lines_for_segments_once(
             line_quadrature=line_quadrature,
             truncation_audit=truncation_audit,
             temporal=temporal,
+            coefficient_capture=coefficient_capture,
             **mosaic_kw,
         )
+    if coefficient_capture is not None:
+        raise ValueError("coefficient_capture supports single-radiator cases only")
     assert case.get("groove_spacing_ang") is None
     spec = np.zeros(E_grid.shape, dtype=float)
     for L, rad in enumerate(radiators):

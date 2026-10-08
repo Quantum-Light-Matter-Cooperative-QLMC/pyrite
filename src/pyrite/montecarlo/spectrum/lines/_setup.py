@@ -92,6 +92,7 @@ class SpectrumRequest:
     line_quadrature: Any = "node"
     truncation_audit: Any = None
     temporal: Any = None
+    coefficient_capture: Any = None
 
 
 @dataclass
@@ -169,6 +170,11 @@ class _SpectrumSetup:
     temporal_buf: Any = None
     temporal_tau: Any = None
     temporal_tau_geo: Any = None
+    # Read-only coefficient observers receive the current row's midpoint
+    # susceptibility phase, aligned with idx/coefs (not all segment rows).
+    capture_phase_rad: Any = None
+    # Production intensity weight for the captured (reflection, orientation).
+    capture_mosaic_weight: float = 1.0
 
 
 def _prepare_spectrum(request):

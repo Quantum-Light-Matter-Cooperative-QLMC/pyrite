@@ -45,6 +45,7 @@ def mc_spectrum(
     line_quadrature="node",
     truncation_audit=None,
     temporal=None,
+    coefficient_capture=None,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron] on
@@ -146,6 +147,16 @@ def mc_spectrum(
         its per-electron ``I(t)`` for ``n_hat`` into the profile, from the
         same lines and emission policy as the spectrum. Forces the per-hkl
         route. Validation: temporal-intensity-profile
+    coefficient_capture
+        Optional callable (coherent route only). Called once per
+        ``(reflection, orientation)`` row with ``(st, idx, coefs, good,
+        lines)``: the row's segment indices, per-polarization complex
+        coefficients, formation-valid mask and formation constants, exactly
+        as the reducer uses them. Read-only diagnostic hook for coherent
+        line-grid windows; forces the per-hkl route and leaves the spectrum
+        unchanged. The setup exposes ``capture_phase_rad`` and
+        ``capture_mosaic_weight`` for the current row's midpoint phase and
+        production intensity weight. Validation: coherent-line-grid-windowed-resolution
 
     Returns
     -------
@@ -200,6 +211,7 @@ def mc_spectrum(
         line_quadrature=line_quadrature,
         truncation_audit=truncation_audit,
         temporal=temporal,
+        coefficient_capture=coefficient_capture,
     )
     return _mc_spectrum(request)
 
@@ -255,6 +267,7 @@ def _needs_per_hkl_route(st):
         or req.layers is not None
         or st.grouped
         or req.temporal is not None
+        or req.coefficient_capture is not None
     )
 
 

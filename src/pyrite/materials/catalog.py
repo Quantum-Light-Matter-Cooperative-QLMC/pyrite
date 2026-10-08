@@ -187,7 +187,7 @@ def _load_material_catalog_cached(
         name: True for name, row in profiles.items() if row.get("temporal_profile") is True
     }
     profile_line_grid_policies = {
-        name: MappingProxyType(dict(cast("Mapping[str, str]", row["line_grid_policy"])))
+        name: MappingProxyType(dict(cast("Mapping[str, object]", row["line_grid_policy"])))
         for name, row in profiles.items()
         if isinstance(row.get("line_grid_policy"), Mapping)
     }
