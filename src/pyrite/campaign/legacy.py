@@ -112,6 +112,7 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
         n_electrons_brem=int(
             getattr(settings, "n_electrons_brem", 100) if brem is None else _values(brem)[0]
         ),
+        precision=getattr(settings, "precision", None),
         spec_chunk=old_sweep.spec_chunk,
         brem_chunk=old_sweep.brem_chunk,
         straggling=getattr(settings, "straggling", False),

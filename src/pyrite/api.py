@@ -271,6 +271,11 @@ def simulate(
             # identity hashes, the resolved record is what the run actually
             # sampled. Both absent for an explicit or stored grid.
             **_line_grid_provenance(case, output),
+            **(
+                {"adaptive_sampling": output["adaptive_sampling"]}
+                if "adaptive_sampling" in output
+                else {}
+            ),
             **run_provenance(case, xsgen_tables),
         },
         coherent_spectrum=(None if coherent is None else np.asarray(coherent)),

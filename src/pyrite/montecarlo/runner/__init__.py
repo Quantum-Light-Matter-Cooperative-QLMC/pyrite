@@ -45,7 +45,6 @@ from ..spectrum.lines._temporal import case_temporal_profiles, temporal_outputs
 from ..trajectories import TrajectoryCapture
 from ..transport import (
     TransportLUTConfig,
-    resolve_transport_core,
     simulate_trajectories,
 )
 
@@ -58,6 +57,7 @@ from ..transport import (
 # timing never leaks into the pickle. The flag is read at import so it applies in
 # every spawned transport worker too (env is inherited on spawn/forkserver).
 _TIMING = env_value("PYRITE_MC_TIMING", "") not in ("", "0")
+_WORKER_INHERITED_CORE: str | None = None
 # Per-batch transport progress sink (#272): ``callable(electrons_done, Ne)``
 # set by ``run_cases`` around a case it transports in THIS process and read by
 # ``_transport_case``. A context variable keeps ``run_case``/``_transport_case``
@@ -227,6 +227,7 @@ def run_case(
         Line and bremsstrahlung arrays and grids, transport fractions, segment
         count, resolved crystal, incident energy, and optional timing metrics.
     """
+    _adaptive.validate_directions(case, observation_directions)
     transport = _transport_case(
         case,
         record_timing,
@@ -261,6 +262,7 @@ def run_case_directions(
     transported electron segments; this function never places downstream
     photon geometry in the electron navigator.
     """
+    _adaptive.validate_directions(case, n_hats)
     directions = validated_directions(n_hats)
     transport = _transport_case(
         case,
@@ -289,21 +291,6 @@ def _beam_kwargs(case):
         transverse_distribution=case.get("transverse_distribution"),
         energy_spread_frac=case.get("energy_spread_frac"),
         **({"gdf_source": case["gdf_source"]} if "gdf_source" in case else {}),
-    )
-
-
-def _case_transport_core(case, requested="auto"):
-    """Resolve which transport core a case dict runs on.
-
-    Mirrors what ``simulate_trajectories`` will decide for this case: transport
-    covers both electron populations, so the count that matters is
-    ``max(Ne, Ne_brem)``, and a grooved entrance face stays on the lockstep core.
-    """
-
-    return resolve_transport_core(
-        requested,
-        max(case.get("Ne") or 0, case.get("Ne_brem") or 0),
-        groove=case.get("groove_spacing_ang"),
     )
 
 
@@ -345,6 +332,16 @@ def _transport_case(
 
     Validation: grazing-beam-projection
     """
+    if case.get("adaptive_precision") is not None:
+        return _adaptive.transport_requested_precision(
+            case,
+            record_timing,
+            transport_core=transport_core,
+            keep_segments_on_device=keep_segments_on_device,
+            trajectory_capture=trajectory_capture,
+            block_electrons=block_electrons,
+            block_monitor=block_monitor,
+        )
     timed = _TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
     E_grid, E_brem, beam, n_hat, groove = _case_geometry(case)
@@ -953,6 +950,7 @@ def _spectrum_case(case, tp, record_timing=False):
     """GPU phase of run_case: line spectrum + brem from the already-transported
     segments ``tp`` (from _transport_case). Runs in the main process, so only one
     CUDA context ever touches the device."""
+    case = _adaptive.realized_case(case, tp)
     timed = _TIMING or record_timing
     if timed:
         _line_setup.SETUP_STATS.clear()
@@ -960,6 +958,7 @@ def _spectrum_case(case, tp, record_timing=False):
         out = _spectrum_case_impl(case, tp, record_timing)
     if timed:
         out.update(_stage_counters(tp))
+    _adaptive.attach_sampling(case, tp, out)
     return out
 
 
@@ -1180,8 +1179,9 @@ def _worker_init(force_cpu=False):
     the box. A no-op fork/spawn-local mutation: it never touches the driver
     process's globals. Harmless when _RESOURCE_POLICY.gpu is already False.
     """
-    inherited = env_value("PYRITE_MC_TRANSPORT_CORE", "").strip().lower()
-    if inherited in ("", "auto", "cuda"):
+    global _WORKER_INHERITED_CORE
+    _WORKER_INHERITED_CORE = env_value("PYRITE_MC_TRANSPORT_CORE", "").strip().lower()
+    if _WORKER_INHERITED_CORE in ("", "auto", "cuda"):
         set_canonical_env("PYRITE_MC_TRANSPORT_CORE", "lockstep")
     if force_cpu:
         _RESOURCE_POLICY.gpu = False
@@ -1218,6 +1218,8 @@ def _cpu_spectrum_backend():
         _RESOURCE_POLICY.gpu, _spectrum_mod.xp, _spectrum_mod.REAL = previous
 
 
+from . import adaptive as _adaptive
+from .adaptive import case_transport_core as _case_transport_core
 from .artifacts import STREAM_MAX_SEGMENTS as STREAM_MAX_SEGMENTS
 from .artifacts import spectrum_from_artifact as spectrum_from_artifact
 from .artifacts import stream_spectrum_from_artifact as stream_spectrum_from_artifact

@@ -90,8 +90,13 @@ def _material_stems(
             for material in materials
             for detector_id in detector_ids
         ]
+    from ..campaign.profiles import canonical_profile_run
+
+    # Bare <material> only when the runner would write it: a standard profile
+    # with precision, coherent emission or non-default numerics is hashed.
+    canonical = not multiple and canonical_profile_run(catalog_profile, fidelity)
     if high_energy_min_kev is None:
-        if fidelity == "full" and catalog_profile == "standard" and not multiple:
+        if canonical:
             return [(material, material) for material in materials]
         from ..campaign.profiles import named_profile_stem
 
@@ -118,7 +123,7 @@ def _material_stems(
                     catalog_profile=catalog_profile,
                     detector_id=detector_id,
                 )
-            elif fidelity == "full" and catalog_profile == "standard" and not multiple:
+            elif canonical:
                 stem = material
             else:
                 stem = named_profile_stem(

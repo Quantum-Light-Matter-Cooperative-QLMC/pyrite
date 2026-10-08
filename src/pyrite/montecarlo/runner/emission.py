@@ -80,7 +80,9 @@ def _brem_wide_from_segments(
             E_cut_keV=case.get("E_cut_brem_keV", 1.0),
             **model_kwargs,
         )
-    shape = E_brem.shape if electron_band_weights is None else int(segs_b["Ne"] if Ne is None else Ne)
+    shape = (
+        E_brem.shape if electron_band_weights is None else int(segs_b["Ne"] if Ne is None else Ne)
+    )
     brem_wide = np.zeros(shape, dtype=float)
     for L in range(n_lay):
         sL = runner._segments_in_layer(segs_b, L)

@@ -630,20 +630,9 @@ def _resolved_run(args, material):
 
     detector_id = getattr(args, "detector_id", None)
 
-    catalog_emission = CATALOG.profile_emission(catalog_profile)
-    if catalog_emission is not None:
-        settings = replace(settings, emission=catalog_emission)
-    if CATALOG.profile_temporal_profile(catalog_profile):  # opt-in; absent keeps the preset
-        settings = replace(settings, temporal_profile=True)
-    catalog_numerics = CATALOG.profile_numerics(catalog_profile)
-    from .._numerics import TRANSPORT_KEYS
-    from ..campaign.profiles import resolve_numerics
+    from ..campaign.profiles import profile_run_settings
 
-    numerics = resolve_numerics(catalog_numerics, fidelity=fidelity)
-    settings = replace(
-        settings,
-        **{key: numerics.effective[key] for key in TRANSPORT_KEYS},
-    )
+    settings = profile_run_settings(settings, catalog_profile, fidelity, CATALOG)
     overrides = {}
     if getattr(args, "quick", False):
         # Resolve quick beam energies from the effective profile/material line
@@ -702,7 +691,12 @@ def _resolved_run(args, material):
         sweep = replace(sweep, beam=beam_replace(sweep.beam, energy_keV=kept))
 
     from ..campaign.geometry import Stack
-    from ..campaign.profiles import dataset_identity, detector_variant, variant_stem
+    from ..campaign.profiles import (
+        canonical_settings,
+        dataset_identity,
+        detector_variant,
+        variant_stem,
+    )
     from ..xsgen.sbethe import resolve_catalog_table
     from ..xsgen.store import identity_markers
 
@@ -757,16 +751,7 @@ def _resolved_run(args, material):
         and not getattr(args, "quick", False)
         and not named_variant
         and catalog_profile == "standard"
-        and settings.emission == "incoherent"
-        and not (settings.temporal_profile or settings.straggling)
-        and settings.energy_model == "midpoint"
-        and settings.max_dE_frac == 0.0
-        and settings.inelastic_model == "auto"
-        and settings.inelastic_cutoff_eV is None
-        and settings.elastic_model == "elsepa"
-        and settings.bremsstrahlung_model == "bremslib"
-        and settings.radiative_model == "auto"
-        and settings.radiative_cutoff_eV is None
+        and canonical_settings(settings)
     )
     stem = variant_stem(identity, canonical_full=canonical_full)
     if getattr(args, "quick", False) and named_variant:

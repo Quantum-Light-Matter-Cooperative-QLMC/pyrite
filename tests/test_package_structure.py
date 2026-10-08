@@ -63,6 +63,7 @@ def test_root_exports_stay_frozen() -> None:
         "IdealPhotonCounter",
         "Layer",
         "Numerics",
+        "Precision",
         "PixelGrid",
         "PixelScorer",
         "PlanarDetector",

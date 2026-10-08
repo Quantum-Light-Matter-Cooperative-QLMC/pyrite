@@ -197,3 +197,31 @@ def test_temporal_profile_opt_in_is_divergence_only(monkeypatch):
     cases = build_configured_cases(_sweep, settings)
     assert all(case["temporal_profile"] is True for case in cases)
     assert all("temporal_profile" not in case for case in build_configured_cases(sweep_def, _s_def))
+
+
+def test_catalog_profile_precision_reaches_run_settings_identity_and_cases(monkeypatch):
+    from pyrite import Precision
+    from pyrite.api import build_configured_cases
+
+    _s, _sw, id_fixed, _stem = _resolved_run(monkeypatch, [])
+    policy = Precision(target_rse=0.1, min_electrons=20, max_electrons=60, block_electrons=20)
+    catalog = materials.CATALOG
+    monkeypatch.setattr(
+        materials,
+        "CATALOG",
+        replace(
+            catalog,
+            profile_precisions={**catalog.profile_precisions, "standard": policy.to_dict()},
+        ),
+    )
+
+    settings, sweep, identity, stem = _resolved_run(monkeypatch, [])
+
+    assert settings.precision == policy
+    assert Precision.from_dict(identity["resolved_parameters"]["adaptive_precision"]) == policy
+    assert identity["parameter_sha256"] != id_fixed["parameter_sha256"]
+    assert stem != "hopg"
+    cases = build_configured_cases(sweep, settings)
+    assert cases
+    assert all(Precision.from_dict(case["adaptive_precision"]) == policy for case in cases)
+    assert all(case["Ne"] == case["Ne_brem"] == 60 for case in cases)

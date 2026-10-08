@@ -13,6 +13,8 @@ from .sweep import build_cases
 def build_case(scene: Scene, numerics: Numerics) -> Case:
     """Lower one resolved scene to the existing typed transport input."""
     convergence = numerics.convergence
+    if numerics.precision is not None and isinstance(scene.detector, PlanarDetector):
+        raise ValueError("adaptive precision does not support physical detectors; use fixed counts")
     scalar_detector = (
         scene.detector.scalar_detector()
         if isinstance(scene.detector, PlanarDetector)
@@ -48,6 +50,7 @@ def build_case(scene: Scene, numerics: Numerics) -> Case:
         pair_production_model=numerics.pair_production_model,
         positron_transport=numerics.positron_transport,
         atomic_electron_deflection=numerics.atomic_electron_deflection,
+        precision=numerics.precision,
     )
     if len(cases) != 1:  # Scene rejects every implicit multi-value field.
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
@@ -77,6 +80,7 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             pair_production_model=getattr(settings, "pair_production_model", None),
             positron_transport=getattr(settings, "positron_transport", False),
             atomic_electron_deflection=getattr(settings, "atomic_electron_deflection", "kawrakow"),
+            precision=getattr(settings, "precision", None),
         )
     resolved = Numerics() if numerics is None else numerics
     cases = []

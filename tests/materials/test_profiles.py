@@ -501,7 +501,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "promising_low_ne",
             "hopg",
-            "6da80232947876ce4fdf572cb3e4725587b93787f544781fbb85b28531f83ea0",
+            "3ad6abfadb504d9f7fe8c4296e0d823e867bb78ee6b03df4dfbd6576c03be449",
         ),
     ],
 )
@@ -521,6 +521,9 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     issue #89's ELSEPA elastic model becoming the default, for issue
     #181's segment-mean line-escape marker, and for issue #317's default
     atomic-electron deflection, and for #187’s Snell resonance marker.
+    ``promising_low_ne`` alone moved for #361, when predicted identities began
+    applying the profile's own run settings: its ``emission = "both"`` is in
+    every identity the runner writes, and the earlier pin omitted it.
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in

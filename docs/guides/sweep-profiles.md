@@ -48,7 +48,28 @@ Existing `profile create|set --ne-line/--ne-brem`, `--straggling`, `--energy-mod
 
 `pyrite profile create NAME` starts from the packaged `standard` sweep's ranges, inline bremsstrahlung grid, and membership. It uses only materials present in the selected catalog. Packaged per-material overrides, such as stack layer counts, are copied only for the new profile's member materials. A non-member resolves against `standard`, so its row would never be read. It does not copy the selected catalog's mutable `standard` profile or attach a beam, scalar detector, physical detector, filters, emission policy, transport numerics, or line-grid policy. Absent emission resolves to incoherent and absent straggling resolves to off. `pyrite profile show NAME` marks code defaults with `(default)` and shows an absent detector as `none`.
 
-`pyrite profile create NAME --from SOURCE` explicitly clones SOURCE's ranges, membership, beam, scalar and physical detectors, filters, emission, transport numerics, and line-grid policy. Its output lists any inherited instrument and physics sections. Per-material overrides remain local to SOURCE and are not cloned. Review the cloned profile before running it, especially if SOURCE is a modified `standard`.
+`pyrite profile create NAME --from SOURCE` explicitly clones SOURCE's ranges, membership, beam, scalar and physical detectors, filters, emission, transport numerics, line-grid policy, and adaptive precision policy. Its output lists any inherited instrument and physics sections. Per-material overrides remain local to SOURCE and are not cloned. Review the cloned profile before running it, especially if SOURCE is a modified `standard`.
+
+## Adaptive electron counts
+
+A profile can replace fixed electron counts with an adaptive policy. Each incoherent case then transports electrons in blocks and stops once the relative standard error of each watched yield meets the target and the heavy-tail guards pass. If the target is not met by the maximum count, the run stops there and is flagged statistics-limited. One count serves both line and bremsstrahlung transport.
+
+```bash
+pyrite profile numerics reset hopg_scan line-electrons bremsstrahlung-electrons
+pyrite profile precision set hopg_scan --target-rse 0.05 \
+  --min-electrons 400 --max-electrons 20000 --block-electrons 100
+pyrite profile precision set hopg_scan --observable line --observable brem
+pyrite profile precision show hopg_scan
+pyrite profile precision reset hopg_scan            # back to fixed counts
+```
+
+The policy is stored as `[profiles.NAME.precision]`. A new policy needs `--target-rse`, `--min-electrons`, `--max-electrons` and `--block-electrons`. The minimum, maximum and optional `--pilot-electrons` must be multiples of the block size. Optional guards default to `--max-electron-share 0.05`, `--min-effective-electrons 100`, `--stability-blocks 3` and `--stability-fraction 0.5`. `--band-ev START,STOP` fixes the monitor band; it defaults to the case's line band. `--batch-means-band-ev` adds reported per-bin errors and is never used to stop.
+
+A profile with a policy cannot also set `n_electrons`/`n_electrons_brem` grids or coherent emission; the catalog loader rejects either combination. Adaptive runs also refuse physical detectors, GDF beams, grooves, and particle cascades (secondaries, pair production, positrons), and run only on the per-electron or CUDA transport cores. An adaptive run never uses the canonical `<material>` checkpoint stem.
+
+The Python API takes the same policy as `Numerics(precision=Precision(...))`; see the [API example](../api.md#scene-simulation). Configured `Settings`/`Sweep` campaigns can set `Settings(precision=policy)` and lower it with `api.build_configured_cases`.
+
+The dataset and case identities include the requested policy. Realized counts and statistics are stored separately as `adaptive_sampling` in the result and in every checkpoint component, so a realized count never changes the identity used for resume or CAS reuse. Omitting the policy keeps the existing fixed-N identities. Electron-count sweep grids cannot be combined with adaptive precision. Use [statistical methods](../computation/statistical-methods.md#adaptive-electron-counts) to choose a minimum that accounts for skewed contributions and rare electrons.
 
 ## Bremsstrahlung grid
 

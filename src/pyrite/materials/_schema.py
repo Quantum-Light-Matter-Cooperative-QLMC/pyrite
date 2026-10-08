@@ -9,6 +9,7 @@ from typing import Literal, cast
 import numpy as np
 
 from .._numerics import CONVERGENCE_KEYS, TRANSPORT_KEYS
+from .._precision import Precision
 from ._catalog_decode import LineGridByEnergy, _number
 from ._identity import CutFrame, MaterialIdentity, hexagonal_setting, reduce_indices
 
@@ -421,6 +422,8 @@ class MaterialCatalog:
         Resolved per-profile beam, scalar-detector, and emission overrides.
     profile_temporal_profiles
         Profiles that opt in to the line temporal intensity profile ``I(t)``.
+    profile_precisions
+        Per-profile adaptive electron-count policies.
     profile_transport_numerics
         Per-profile result-affecting scalar numerical controls.
     profile_line_grid_policies
@@ -468,6 +471,9 @@ class MaterialCatalog:
     profile_emissions: Mapping[str, str] = MappingProxyType({})
     #: ``profiles.NAME.temporal_profile = true`` opt-ins (#292); absent is off.
     profile_temporal_profiles: Mapping[str, bool] = MappingProxyType({})
+    #: Validated ``[profiles.NAME.precision]`` adaptive-sampling policies, as
+    #: plain field mappings; absent means fixed electron counts.
+    profile_precisions: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Explicit scalar result-affecting numerics, keyed by profile. Electron
     #: count grids remain on each resolved :class:`ScanSpec`.
     profile_transport_numerics: Mapping[str, Mapping[str, object]] = MappingProxyType({})
@@ -518,6 +524,11 @@ class MaterialCatalog:
     def profile_temporal_profile(self, name: str) -> bool:
         """Whether ``profiles.NAME`` opts in to the line ``I(t)`` profile (#292)."""
         return bool(self.profile_temporal_profiles.get(name, False))
+
+    def profile_precision(self, name: str) -> Precision | None:
+        """Adaptive electron-count policy for ``name``, or ``None`` for fixed counts."""
+        payload = self.profile_precisions.get(name)
+        return None if payload is None else Precision.from_dict(payload)
 
     def profile_numerics(self, name: str) -> Mapping[str, object] | None:
         """Explicit result-affecting transport numerics for ``name``."""

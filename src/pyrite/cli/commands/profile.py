@@ -14,7 +14,12 @@ from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli._deprecations import DeprecatedOption, canonical_option
 from pyrite.cli._groups import LazyGroup
-from pyrite.cli.commands import _physical_detector, _profile_filters, _profile_line_grid
+from pyrite.cli.commands import (
+    _physical_detector,
+    _profile_filters,
+    _profile_line_grid,
+    _profile_precision,
+)
 from pyrite.cli.commands._profile_members import (
     add_membership as _add_membership,
 )
@@ -277,6 +282,13 @@ def _emit_show(payload):
         else "  line-grid policy: "
         + ", ".join(f"{key}={value}" for key, value in policy.items())
         + " (automatic for every case)"
+    )
+    precision = payload["precision"]
+    emit_result(
+        "  electron counts: fixed (default)"
+        if precision is None
+        else f"  electron counts: adaptive, target RSE {precision['target_rse']:g}, "
+        f"{precision['min_electrons']}-{precision['max_electrons']} electrons"
     )
     numerics = payload["transport_numerics"]
     for key, label, default in (
@@ -614,6 +626,7 @@ def numerics_reset_command(name, fields, yes, dry_run):
 
 
 command.add_command(_profile_line_grid.command)
+command.add_command(_profile_precision.command)
 command.add_command(_physical_detector.command)
 
 

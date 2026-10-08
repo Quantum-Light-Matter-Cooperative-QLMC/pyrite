@@ -15,6 +15,7 @@ from .._catalog_layout import ARTIFACT_DIR, catalog_root
 from .._energy_grid_artifacts import ArtifactError, load_artifact
 from .._line_grid_policy import PROFILE_LINE_GRID_SELECTORS
 from .._numerics import validate_profile_numerics
+from .._precision import Precision
 from ._beam_detector_parse import (
     _parse_detector_entry,
     _parse_filter_rows,
@@ -416,6 +417,25 @@ def _scan(
 _OVERRIDABLE_KEYS = frozenset(_SCAN_KEYS)
 
 
+def _parse_profile_precision(row, path, errors) -> None:
+    """Validate ``profiles.NAME.precision`` and its incompatible profile keys."""
+    table = _table(row["precision"], f"{path}.precision", errors)
+    if table is None:
+        return
+    try:
+        Precision.from_dict(table)
+    except (TypeError, ValueError) as exc:
+        errors.add(f"{path}.precision", str(exc))
+    for key in ("n_electrons", "n_electrons_brem"):
+        if key in row:
+            errors.add(
+                f"{path}.{key}",
+                "cannot be combined with precision; the adaptive policy owns the count",
+            )
+    if row.get("emission") in ("coherent", "both"):
+        errors.add(f"{path}.precision", "does not support coherent emission; use fixed counts")
+
+
 def _parse_profile_overrides(raw: object, path: str, errors: _Errors) -> None:
     """Structurally validate ``[profiles.NAME.overrides.MATERIAL]`` tables.
 
@@ -494,6 +514,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 "physical_detector",
                 "emission",
                 "temporal_profile",
+                "precision",
                 "line_grid_policy",
                 *_PROFILE_SCALAR_NUMERICS_KEYS,
                 "energy_grid_refs",
@@ -532,6 +553,8 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
             field = message.split(maxsplit=1)[0]
             detail = message.removeprefix(field).strip()
             errors.add(f"{path}.{field}", detail)
+        if "precision" in row:
+            _parse_profile_precision(row, path, errors)
         if "overrides" in row:
             _parse_profile_overrides(row["overrides"], f"{path}.overrides", errors)
         if "line_grid_policy" in row:

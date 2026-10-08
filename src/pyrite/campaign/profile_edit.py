@@ -19,6 +19,7 @@ from pyrite._numerics import (
     TRANSPORT_KEYS,
     validate_profile_numerics,
 )
+from pyrite._precision import REQUIRED_FIELDS, Precision
 from pyrite.detectors.spec import Detector
 
 RANGES = {
@@ -299,6 +300,68 @@ def line_grid_sources(document, profile):
     }
 
 
+def profile_precision_values(profile):
+    """Return the explicit ``precision`` table as plain values, or ``None``."""
+    table = profile.get("precision")
+    if table is None:
+        return None
+    if not isinstance(table, dict):
+        raise ValueError("precision must be a table")
+    return dict(table.unwrap() if hasattr(table, "unwrap") else table)
+
+
+def _precision_table(values):
+    table = tomlkit.table()
+    for key in Precision.__dataclass_fields__:
+        if key in values and values[key] is not None:
+            table[key] = _toml_value(values[key])
+    return table
+
+
+def set_precision(document, name, updates):
+    """Validate and stage an adaptive precision policy; return overwritten fields."""
+    target = existing_profile(document, name)
+    current = profile_precision_values(target) or {}
+    merged = {**current, **updates}
+    Precision.from_dict(merged)
+    sampling = [key for key in SAMPLING_KEYS if key in target]
+    if sampling:
+        raise ValueError(
+            f"profile {name!r} sets fixed electron counts ({', '.join(sampling)}); "
+            f"remove them first with: pyrite profile numerics reset {name} "
+            "line-electrons bremsstrahlung-electrons"
+        )
+    if target.get("emission") in ("coherent", "both"):
+        raise ValueError(
+            f"profile {name!r} has coherent emission; adaptive precision supports "
+            "incoherent emission only"
+        )
+    target["precision"] = _precision_table(merged)
+    return tuple(key for key in updates if key in current and current[key] != updates[key])
+
+
+def reset_precision(document, name, fields=()):
+    """Remove selected optional precision fields, or the whole policy when empty."""
+    target = existing_profile(document, name)
+    current = profile_precision_values(target)
+    if current is None:
+        return ()
+    if not fields:
+        target.pop("precision")
+        return tuple(current)
+    required = [field for field in fields if field in REQUIRED_FIELDS]
+    if required:
+        raise ValueError(
+            f"{', '.join(required)} is required by the policy; reset without fields to "
+            f"return {name!r} to fixed electron counts"
+        )
+    removed = tuple(field for field in fields if field in current)
+    remaining = {key: value for key, value in current.items() if key not in fields}
+    Precision.from_dict(remaining)
+    target["precision"] = _precision_table(remaining)
+    return removed
+
+
 def display(values):
     return ", ".join(f"{value:g}" for value in values)
 
@@ -446,6 +509,7 @@ def profile_payload(document, name):
         "emission": profile.get("emission"),
         "temporal_profile": profile.get("temporal_profile") is True,
         "line_grid_policy": profile_line_grid_values(profile),
+        "precision": profile_precision_values(profile),
         "transport_numerics": {key: profile[key] for key in TRANSPORT_KEYS if key in profile},
         "overrides": {
             material: sorted(row)

@@ -35,6 +35,7 @@ from . import (
     _worker_init,
     run_case,
 )
+from .adaptive import _run_adaptive_case_worker, _transport_adaptive_case_worker
 
 
 def case_runtime_plan(case):
@@ -398,6 +399,17 @@ def run_cases(
         return results
     if observation_directions is not None and len(observation_directions) != n:
         raise ValueError("observation_directions must align with cases")
+    for index, case in enumerate(cases):
+        if case.get("adaptive_precision") is None:
+            continue
+        if trajectory_capture is not None or transport_only:
+            raise ValueError(
+                "adaptive precision does not support trajectory capture; use fixed counts"
+            )
+        if observation_directions is not None and observation_directions[index] is not None:
+            raise ValueError(
+                "adaptive precision does not support observation directions; use fixed counts"
+            )
 
     def _directions(index):
         return None if observation_directions is None else observation_directions[index]
@@ -590,10 +602,15 @@ def run_cases(
                 # Worker processes are pinned to the CPU core by _worker_init;
                 # none of them may open a CUDA context on the device this
                 # process is driving.
+                transport_worker = (
+                    _transport_adaptive_case_worker
+                    if cases[i].get("adaptive_precision") is not None
+                    else _transport_case
+                )
                 fut = (
-                    ex.submit(_transport_case, cases[i], True, **capture_kw)
+                    ex.submit(transport_worker, cases[i], True, **capture_kw)
                     if on_timing is not None
-                    else ex.submit(_transport_case, cases[i], **capture_kw)
+                    else ex.submit(transport_worker, cases[i], **capture_kw)
                 )
 
                 if timing is not None:
@@ -735,9 +752,24 @@ def run_cases(
             # core (_worker_init) -- a pool of CUDA contexts is what this pool
             # exists to avoid.
             (
-                ex.submit(run_case, c, True, **capture_kw, **_direction_kwargs(i))
+                ex.submit(
+                    _run_adaptive_case_worker
+                    if c.get("adaptive_precision") is not None
+                    else run_case,
+                    c,
+                    True,
+                    **capture_kw,
+                    **_direction_kwargs(i),
+                )
                 if on_timing is not None
-                else ex.submit(run_case, c, **capture_kw, **_direction_kwargs(i))
+                else ex.submit(
+                    _run_adaptive_case_worker
+                    if c.get("adaptive_precision") is not None
+                    else run_case,
+                    c,
+                    **capture_kw,
+                    **_direction_kwargs(i),
+                )
             ): i
             for i, c in enumerate(cases)
         }

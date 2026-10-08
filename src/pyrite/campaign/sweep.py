@@ -56,6 +56,7 @@ from .._numerics import (
     validate_inelastic_numerics,
 )
 from .._photon_continuum_floor import floored_lattice_start_eV
+from .._precision import Precision
 from ..detectors import Detector
 from ..materials import CATALOG, LayerSpec
 from ..materials.crystal import reciprocal_g_vector
@@ -721,6 +722,7 @@ def build_cases(
     pair_production_model=None,
     atomic_electron_deflection="kawrakow",
     positron_transport=False,
+    precision: Precision | None = None,
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -744,6 +746,14 @@ def build_cases(
     Validation: inelastic-angular-deflection
     """
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
+    if precision is not None:
+        if not isinstance(precision, Precision):
+            raise TypeError("precision must be a Precision or None")
+        if sweep.n_electrons is not None or sweep.n_electrons_brem is not None:
+            raise ValueError(
+                "adaptive precision cannot be combined with electron-count sweep grids"
+            )
+        n_electrons = n_electrons_brem = precision.max_electrons
     validate_inelastic_numerics(
         inelastic_model, inelastic_cutoff_eV, energy_model, secondary_threshold_eV
     )
@@ -1069,6 +1079,11 @@ def build_cases(
                         brem_file=None,
                         Ne=ne_line,
                         Ne_brem=ne_brem,
+                        **(
+                            {"adaptive_precision": precision.to_dict()}
+                            if precision is not None
+                            else {}
+                        ),
                         seed=1000 * i_c + 10 * i_e + 1 + 100_000_000 * i_n,
                         spec_chunk=sweep.spec_chunk,  # GPU rows/matmul (None -> run_case default)
                         brem_chunk=sweep.brem_chunk,

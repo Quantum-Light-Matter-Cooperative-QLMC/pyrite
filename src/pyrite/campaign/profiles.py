@@ -26,6 +26,7 @@ from .._numerics import (
     DEFAULT_RADIATIVE_CUTOFF_EV,
     PROFILE_NUMERICS_KEYS,
     SAMPLING_KEYS,
+    TRANSPORT_KEYS,
     Convergence,
     Numerics,
     electron_counts,
@@ -576,6 +577,14 @@ def _identity_v1(
     # coherent checkpoints are intentionally orphaned (rev-and-re-run). The bunch
     # fields (bunch_length_fs etc.) keep their own divergence rule above.
     settings_payload = resolved["settings"]
+    # Fixed-N payloads retain their exact historical bytes. In adaptive mode
+    # the requested policy owns the budget; the unused fixed defaults and the
+    # realized count do not participate in dataset identity.
+    precision_payload = settings_payload.pop("precision", None)
+    if precision_payload is not None:
+        resolved["adaptive_precision"] = precision_payload
+        settings_payload.pop("n_electrons", None)
+        settings_payload.pop("n_electrons_brem", None)
     if isinstance(settings_payload, Mapping):
         emission = str(settings_payload.pop("emission", "incoherent"))
         temporal_profile = bool(settings_payload.pop("temporal_profile", False))
@@ -902,6 +911,70 @@ def detector_variant(
     return "quick" if quick else None
 
 
+def profile_run_settings(
+    settings: Settings, catalog_profile: str, fidelity: str, catalog: Any = None
+) -> Settings:
+    """Apply a catalog profile's run-owned settings to fidelity ``settings``.
+
+    The emission policy, ``I(t)`` opt-in, adaptive precision policy and
+    transport numerics belong to the profile. ``pyrite run`` and every stem
+    predictor (:func:`named_profile_identity`, remote queue reservations,
+    checkpoint gc) resolve them here so a predicted checkpoint stem names the
+    stem the runner writes.
+    """
+    if catalog is None:
+        from ..materials import CATALOG as catalog
+    emission = catalog.profile_emission(catalog_profile)
+    if emission is not None:
+        settings = replace(settings, emission=emission)
+    if catalog.profile_temporal_profile(catalog_profile):  # opt-in; absent keeps the preset
+        settings = replace(settings, temporal_profile=True)
+    precision = catalog.profile_precision(catalog_profile)
+    if precision is not None:  # opt-in; absent keeps fixed counts and identities
+        settings = replace(settings, precision=precision)
+    numerics = resolve_numerics(catalog.profile_numerics(catalog_profile), fidelity=fidelity)
+    return replace(settings, **{key: numerics.effective[key] for key in TRANSPORT_KEYS})
+
+
+def canonical_settings(settings: Settings, *, resolved_bremsstrahlung: bool = True) -> bool:
+    """Whether profile-applied ``settings`` keep the bare ``<material>`` stem.
+
+    The runner checks the resolved ``bremsstrahlung_model`` (``"bremslib"``).
+    Predictors that cannot load tables pass ``resolved_bremsstrahlung=False``,
+    which accepts ``"auto"`` as the production install's BremsLib resolution.
+    """
+    bremsstrahlung = ("bremslib",) if resolved_bremsstrahlung else ("bremslib", "auto")
+    return (
+        settings.emission == "incoherent"
+        and not (settings.temporal_profile or settings.straggling)
+        and settings.precision is None
+        and settings.energy_model == "midpoint"
+        and settings.max_dE_frac == 0.0
+        and settings.inelastic_model == "auto"
+        and settings.inelastic_cutoff_eV is None
+        and settings.elastic_model == "elsepa"
+        and settings.bremsstrahlung_model in bremsstrahlung
+        and settings.radiative_model == "auto"
+        and settings.radiative_cutoff_eV is None
+    )
+
+
+def canonical_profile_run(
+    catalog_profile: str, fidelity: str, detector_id: str | None = None
+) -> bool:
+    """Whether an unmodified profile run writes the bare ``<material>`` stem."""
+    if fidelity != "full" or catalog_profile != "standard":
+        return False
+    if detector_variant(catalog_profile, detector_id) is not None:
+        return False
+    from .config import default_settings
+
+    return canonical_settings(
+        profile_run_settings(default_settings(fidelity), catalog_profile, fidelity),
+        resolved_bremsstrahlung=False,
+    )
+
+
 def named_profile_identity(
     material: str,
     fidelity: str = "full",
@@ -916,7 +989,7 @@ def named_profile_identity(
     return dataset_identity(
         material,
         fidelity,
-        default_settings(fidelity),
+        profile_run_settings(default_settings(fidelity), catalog_profile, fidelity),
         material_sweep(
             material,
             fidelity=fidelity,
@@ -940,11 +1013,7 @@ def named_profile_stem(
         named_profile_identity(
             material, fidelity, catalog_profile=catalog_profile, detector_id=detector_id
         ),
-        canonical_full=(
-            fidelity == "full"
-            and catalog_profile == "standard"
-            and detector_variant(catalog_profile, detector_id) is None
-        ),
+        canonical_full=canonical_profile_run(catalog_profile, fidelity, detector_id),
     )
 
 
@@ -977,7 +1046,7 @@ def high_energy_floor_identity(
     return dataset_identity(
         material,
         fidelity,
-        default_settings(fidelity),
+        profile_run_settings(default_settings(fidelity), catalog_profile, fidelity),
         sweep,
         catalog_profile=catalog_profile,
         variant=detector_variant(catalog_profile, detector_id),

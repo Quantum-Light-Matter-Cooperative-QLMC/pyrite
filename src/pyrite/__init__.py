@@ -52,6 +52,7 @@ _PUBLIC_OBJECTS = {
     "IdealPhotonCounter": ("pyrite.detectors", "IdealPhotonCounter"),
     "Layer": ("pyrite.campaign.geometry", "Layer"),
     "Numerics": ("pyrite.campaign.model", "Numerics"),
+    "Precision": ("pyrite._precision", "Precision"),
     "PixelGrid": ("pyrite.instrument", "PixelGrid"),
     "PixelScorer": ("pyrite.instrument", "PixelScorer"),
     "PlanarDetector": ("pyrite.instrument", "PlanarDetector"),

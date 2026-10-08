@@ -1,6 +1,8 @@
 """Adaptive electron counts: sequential block-wise stopping on a target error (#361).
 
-Internal API. :func:`run_case_adaptive` transports electron blocks
+``Numerics.precision`` selects this path through the public runner.
+:func:`run_case_adaptive` retains the internal compatibility interface. Both
+transport electron blocks
 ``[kB, (k+1)B)`` through :mod:`.block_transport` and, after each block, folds
 grid-independent per-electron scalars into running moments:
 
@@ -28,129 +30,25 @@ Validation: adaptive-sample-size-stopping
 import math
 import warnings
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 
 from ..._backend import _to_cpu
 from ..._line_grid_policy import LineYieldStatisticsWarning
+from ..._precision import OBSERVABLES as OBSERVABLES
+from ..._precision import Precision
 from ..spectrum.lines._kernels import _SEG_ARRAYS
 from .artifacts import _case_geometry
 from .block_transport import electron_blocks
 from .electron_blocks import _take
 
-#: Observables the stopping rule can watch.
-OBSERVABLES = ("line", "brem")
-
 #: ``measure(start, stop, block) -> {observable: per-electron values}``.
 Measure = Callable[[int, int, Mapping[str, Any]], Mapping[str, Any]]
 
 
-@dataclass(frozen=True)
-class AdaptiveSettings:
-    """Stopping-rule settings for one adaptive case.
-
-    ``min_electrons``, ``max_electrons`` and ``pilot_electrons`` are multiples
-    of ``block_electrons``, so every realized count is a whole number of equal
-    blocks (the batch-means estimator needs equal batches).
-
-    Parameters
-    ----------
-    target_rse
-        Target relative standard error of each observable's mean.
-    min_electrons, max_electrons
-        Smallest count at which the rule may stop, and the count at which it
-        stops regardless, flagged ``statistics_limited``.
-    block_electrons
-        Electrons per transport block; the rule is checked at block ends.
-    observables
-        Subset of :data:`OBSERVABLES` that must all converge.
-    max_electron_share
-        Guard: the largest single-electron value may hold at most this share
-        of the observable's sum.
-    min_effective_electrons
-        Guard: the effective sample size ``(sum m)**2 / sum m**2`` must reach
-        this floor.
-    stability_blocks, stability_fraction
-        Guard: the running mean at each of the last ``k`` block ends must lie
-        within ``stability_fraction * target_rse`` (relative) of the current
-        mean, so a run does not stop on the block a rare heavy electron just
-        moved; ``k = 0`` disables.
-    pilot_electrons
-        Optional pilot count. At the pilot the run projects
-        ``N = N_pilot * max(rse / target)**2`` (rounded up to a block) and
-        skips the checks until it gets there.
-    band_eV
-        Monitor band ``(start, stop)`` in eV; ``None`` takes the case's line
-        band (its policy bandwidth, else its line-grid end points).
-    batch_means_band_eV
-        Optional band for per-bin batch-means errors of the final ``spec`` and
-        ``brem_wide``; reported only, never used to stop. Costs one extra
-        line and brem reduction over the realized segments.
-    """
-
-    target_rse: float
-    min_electrons: int
-    max_electrons: int
-    block_electrons: int
-    observables: tuple[str, ...] = ("line",)
-    max_electron_share: float = 0.05
-    min_effective_electrons: float = 100.0
-    stability_blocks: int = 3
-    stability_fraction: float = 0.5
-    pilot_electrons: int | None = None
-    band_eV: tuple[float, float] | None = None
-    batch_means_band_eV: tuple[float, float] | None = None
-
-    def __post_init__(self):
-        if isinstance(self.target_rse, bool) or not (
-            math.isfinite(self.target_rse) and self.target_rse > 0.0
-        ):
-            raise ValueError("target_rse must be a positive finite number")
-        for name in ("block_electrons", "min_electrons", "max_electrons", "pilot_electrons"):
-            value = getattr(self, name)
-            if name == "pilot_electrons" and value is None:
-                continue
-            if type(value) is not int or value < 1:
-                raise ValueError(f"{name} must be a positive integer")
-        block = self.block_electrons
-        if not 2 <= self.min_electrons <= self.max_electrons:
-            raise ValueError("need 2 <= min_electrons <= max_electrons")
-        counts = [self.min_electrons, self.max_electrons]
-        if self.pilot_electrons is not None:
-            counts.append(self.pilot_electrons)
-        if any(count % block for count in counts):
-            raise ValueError(
-                "min_electrons, max_electrons and pilot_electrons must be multiples "
-                "of block_electrons"
-            )
-        if (
-            not self.observables
-            or not set(self.observables) <= set(OBSERVABLES)
-            or len(set(self.observables)) != len(self.observables)
-        ):
-            raise ValueError(f"observables must be a non-empty subset of {OBSERVABLES}")
-        if isinstance(self.max_electron_share, bool) or not 0.0 < self.max_electron_share <= 1.0:
-            raise ValueError("max_electron_share must lie in (0, 1]")
-        for name in ("min_effective_electrons", "stability_fraction"):
-            value = getattr(self, name)
-            if isinstance(value, bool) or not math.isfinite(value) or value < 0.0:
-                raise ValueError(f"{name} must be finite and non-negative")
-        if type(self.stability_blocks) is not int or self.stability_blocks < 0:
-            raise ValueError("stability_blocks must be a non-negative integer")
-        if self.pilot_electrons is not None and not (
-            self.min_electrons <= self.pilot_electrons <= self.max_electrons
-        ):
-            raise ValueError("pilot_electrons must lie between min_electrons and max_electrons")
-        for name in ("band_eV", "batch_means_band_eV"):
-            band = getattr(self, name)
-            if band is not None and (
-                len(band) != 2
-                or any(isinstance(value, bool) or not math.isfinite(value) for value in band)
-                or not 0.0 < band[0] < band[1]
-            ):
-                raise ValueError(f"{name} must contain two positive finite increasing energies")
+# Internal compatibility name; the public policy lives below the domain packages.
+AdaptiveSettings = Precision
 
 
 class RunningMoments:
@@ -320,6 +218,7 @@ class StoppingMonitor:
         s = self.settings
         return {
             "mode": "adaptive",
+            "precision": s.to_dict(),
             "target_rse": s.target_rse,
             "min_electrons": s.min_electrons,
             "max_electrons": s.max_electrons,
@@ -333,6 +232,7 @@ class StoppingMonitor:
             },
             "band_eV": None if s.band_eV is None else list(s.band_eV),
             "realized_electrons": self.realized,
+            "realized_electrons_brem": self.realized,
             "stop_reason": self.stop_reason,
             "statistics_limited": self.stop_reason != "converged",
             "checks": self.checks,
@@ -535,7 +435,8 @@ def adaptive_transport_core(case, settings: AdaptiveSettings, requested: str = "
     """
     from .. import runner
 
-    loop_case = {**case, "Ne": settings.max_electrons, "Ne_brem": settings.max_electrons}
+    loop_case = {key: value for key, value in case.items() if key != "adaptive_precision"}
+    loop_case.update(Ne=settings.max_electrons, Ne_brem=settings.max_electrons)
     core = runner._case_transport_core(loop_case, requested)
     if core == "lockstep" and requested == "auto":
         core = runner._case_transport_core(loop_case, "per-electron")
@@ -547,52 +448,41 @@ def adaptive_transport_core(case, settings: AdaptiveSettings, requested: str = "
     return core
 
 
-def run_case_adaptive(
-    case,
-    settings: AdaptiveSettings,
+def transport_case_adaptive(
+    case: Mapping[str, Any],
+    settings: Precision,
     *,
     transport_core: str = "auto",
     record_timing: bool = False,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Run one case with its electron count chosen by the stopping rule.
+    keep_segments_on_device: bool = False,
+) -> dict[str, Any]:
+    """Transport an adaptive case and retain its realized sampling provenance.
 
-    Returns ``(result, statistics)``: ``result`` is :func:`run_case`'s output
-    for the case at the realized count ``Ne == Ne_brem == n`` (bit for bit the
-    fixed-N run on the same core), and ``statistics`` the
-    :meth:`StoppingMonitor.record` plus, when requested, ``"batch_means"``. A
-    run that reaches ``max_electrons`` unconverged completes and warns
-    :class:`LineYieldStatisticsWarning`. The coherent route is refused: its
-    line sum couples electrons, so a per-electron error does not describe it.
+    The requested case remains the identity input. Returned segments, grids,
+    counts, and statistics describe the realized population. Both serial and
+    split transport/spectrum scheduling use this seam.
 
     Validation: adaptive-sample-size-stopping
     """
     from .. import runner
 
-    if case.get("coherent_emission"):
-        raise ValueError(
-            "adaptive electron counts ('auto') are not supported on the coherent "
-            "route: the coherent line sum couples electrons, so per-electron "
-            "statistics do not bound its error; use a fixed electron count"
-        )
-    if "gdf_source" in case:
-        raise ValueError("adaptive electron counts do not support GDF beams")
+    settings.validate_case(case)
     core = adaptive_transport_core(case, settings, transport_core)
-    loop_case = {**case, "Ne": settings.max_electrons, "Ne_brem": settings.max_electrons}
+    loop_case = {key: value for key, value in case.items() if key != "adaptive_precision"}
+    loop_case.update(Ne=settings.max_electrons, Ne_brem=settings.max_electrons)
     monitor = StoppingMonitor(settings, case_measure(loop_case, settings))
     transport = runner._transport_case(
         loop_case,
         record_timing,
         transport_core=core,
+        keep_segments_on_device=keep_segments_on_device,
         block_electrons=settings.block_electrons,
         block_monitor=monitor,
     )
-    n = int(transport["segs"]["Ne"])
-    realized_case = {**case, "Ne": n, "Ne_brem": n}
-    result = runner._spectrum_case(realized_case, transport, record_timing)
     statistics = monitor.record()
     statistics["transport_core"] = core
-    if settings.batch_means_band_eV is not None:
-        statistics["batch_means"] = batch_means(realized_case, transport, settings)
+    transport["adaptive_sampling"] = statistics
+    transport["_adaptive_precision"] = settings.to_dict()
     if statistics["statistics_limited"]:
         worst = {name: status["relative_se"] for name, status in statistics["statistics"].items()}
         warnings.warn(
@@ -603,4 +493,124 @@ def run_case_adaptive(
             LineYieldStatisticsWarning,
             stacklevel=2,
         )
+    return transport
+
+
+def run_case_adaptive(
+    case: Mapping[str, Any],
+    settings: Precision,
+    *,
+    transport_core: str = "auto",
+    record_timing: bool = False,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Compatibility helper returning the realized fixed-N result and statistics.
+
+    Public callers select a :class:`~pyrite.Precision` on ``Numerics`` and use
+    ``simulate`` or ``run_case``; their output carries ``adaptive_sampling``.
+    This helper retains the internal two-value return convention.
+
+    Validation: adaptive-sample-size-stopping
+    """
+    from .. import runner
+
+    transport = transport_case_adaptive(
+        case, settings, transport_core=transport_core, record_timing=record_timing
+    )
+    result = runner._spectrum_case(case, transport, record_timing)
+    statistics = result.pop("adaptive_sampling")
     return result, statistics
+
+
+def case_transport_core(case, requested="auto"):
+    """Resolve which transport core a case dict runs on.
+
+    Mirrors what ``simulate_trajectories`` will decide for this case: transport
+    covers both electron populations, so the count that matters is
+    ``max(Ne, Ne_brem)``, and a grooved entrance face stays on the lockstep core.
+    """
+
+    from ..transport import resolve_transport_core
+
+    if case.get("adaptive_precision") is not None:
+        return adaptive_transport_core(
+            case, Precision.from_dict(case["adaptive_precision"]), requested
+        )
+    return resolve_transport_core(
+        requested,
+        max(case.get("Ne") or 0, case.get("Ne_brem") or 0),
+        groove=case.get("groove_spacing_ang"),
+    )
+
+
+def _adaptive_worker_call(function, case, *args, **kwargs):
+    """Replace only the pool's automatic lockstep pin for one adaptive case.
+
+    Explicit inherited CPU-core choices remain authoritative. Restore the pool
+    default afterwards, so a fixed case in a mixed batch keeps its old draws.
+    """
+    from ..._env import env_value, set_canonical_env
+    from .. import runner
+
+    if runner._WORKER_INHERITED_CORE not in ("", "auto", "cuda"):
+        return function(case, *args, **kwargs)
+    original = env_value("PYRITE_MC_TRANSPORT_CORE", "")
+    set_canonical_env("PYRITE_MC_TRANSPORT_CORE", "per-electron")
+    try:
+        return function(case, *args, **kwargs)
+    finally:
+        set_canonical_env("PYRITE_MC_TRANSPORT_CORE", original)
+
+
+def _run_adaptive_case_worker(case, *args, **kwargs):
+    from .. import runner
+
+    return _adaptive_worker_call(runner.run_case, case, *args, **kwargs)
+
+
+def _transport_adaptive_case_worker(case, *args, **kwargs):
+    from .. import runner
+
+    return _adaptive_worker_call(runner._transport_case, case, *args, **kwargs)
+
+
+def transport_requested_precision(case, record_timing=False, **options):
+    """Validate runner-only options and dispatch a serialized precision policy."""
+    if options.pop("trajectory_capture", None) is not None:
+        raise ValueError("adaptive precision does not support trajectory capture; use fixed counts")
+    if (
+        options.pop("block_electrons", None) is not None
+        or options.pop("block_monitor", None) is not None
+    ):
+        raise ValueError("adaptive precision owns block_electrons and the stopping monitor")
+    return transport_case_adaptive(
+        case,
+        Precision.from_dict(case["adaptive_precision"]),
+        record_timing=record_timing,
+        **options,
+    )
+
+
+def attach_sampling(case, transport, output) -> None:
+    """Attach realized statistics and optional final-grid batch means to output."""
+    if "adaptive_sampling" not in transport:
+        return
+    sampling = dict(transport["adaptive_sampling"])
+    precision = Precision.from_dict(transport["_adaptive_precision"])
+    if precision.batch_means_band_eV is not None:
+        sampling["batch_means"] = batch_means(case, transport, precision)
+    output["adaptive_sampling"] = sampling
+
+
+def realized_case(case, transport):
+    """Use realized counts for reduction while retaining the requested identity."""
+    if "adaptive_sampling" not in transport:
+        return case
+    return {**case, "Ne": transport["Ne_lines"], "Ne_brem": transport["Ne_brem"]}
+
+
+def validate_directions(case, directions) -> None:
+    """Reject directional scoring before starting an adaptive transport."""
+    if case.get("adaptive_precision") is not None and directions is not None:
+        raise ValueError(
+            "adaptive precision does not support observation directions; use fixed counts"
+        )

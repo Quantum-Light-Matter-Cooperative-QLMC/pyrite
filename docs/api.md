@@ -51,6 +51,28 @@ cases = sweep.cases(pr.Numerics())
 
 For a `Stack`, paths such as `target.layers[1].thickness_ang` address a particular layer. A misspelled field or out-of-range index raises at `Sweep` construction.
 
+Adaptive sampling replaces both fixed counts with one shared count chosen from a precision policy:
+
+```python
+numerics = pr.Numerics(
+    precision=pr.Precision(
+        target_rse=0.1,
+        min_electrons=400,
+        max_electrons=10_000,
+        block_electrons=100,
+        observables=("line", "brem"),
+    ),
+)
+result = pr.simulate(beam, target, detector, numerics=numerics)
+sampling = result.provenance["adaptive_sampling"]
+sampling["realized_electrons"]
+sampling["statistics_limited"]
+```
+
+All four budget fields are required; the example is an explicit budget, not a default recommendation. Counts must be multiples of the block size. The policy overrides `Numerics.n_electrons` and `n_electrons_brem`; omitting `precision` retains fixed sampling. The requested policy stays in `Result.case["adaptive_precision"]` and its identity, while realized counts, achieved errors, guards, and stop reason stay in `adaptive_sampling`. A run reaching its maximum without convergence completes with `statistics_limited=True` and a `LineYieldStatisticsWarning`.
+
+This mode supports incoherent scalar-detector scenes on the per-electron or CUDA core. It rejects coherent emission, physical detectors and observation directions, trajectory capture, GDF beams, grooves, and particle cascades. The two populations share one target and count in this implementation. The [statistical methods](computation/statistical-methods.md#adaptive-electron-counts) describe the observables, guards, and limits of the error estimate.
+
 `Sweep.expand()` returns ordered `(label, Scene)` pairs; `Sweep.cases()` lowers them to typed cases but does not execute or persist them. `simulate` accepts the separate beam, target, and detector components, not a `Scene` argument. Helpers exported from `pyrite.api` but not listed on this page are provisional lowering or compatibility seams.
 
 ```{eval-rst}
@@ -80,6 +102,7 @@ For a `Stack`, paths such as `target.layers[1].thickness_ang` address a particul
    pyrite.Sweep
    pyrite.Convergence
    pyrite.Numerics
+   pyrite.Precision
    pyrite.Analysis
    pyrite.Result
    pyrite.simulate
