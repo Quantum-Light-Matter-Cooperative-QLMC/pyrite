@@ -46,9 +46,9 @@ pyrite profile numerics reset standard --yes
 
 Existing `profile create|set --ne-line/--ne-brem`, `--straggling`, `--energy-model`, and `--max-de-frac` spellings remain compatible. Worker, chunk, backend, core, and other execution-only tuning are intentionally absent: they affect runtime, not calculation results or checkpoint identity.
 
-`pyrite profile create NAME` starts from the packaged `standard` sweep's ranges, inline bremsstrahlung grid, and membership. It uses only materials present in the selected catalog. Packaged per-material overrides, such as stack layer counts, are copied only for the new profile's member materials. A non-member resolves against `standard`, so its row would never be read. It does not copy the selected catalog's mutable `standard` profile or attach a beam, scalar detector, physical detector, filters, emission policy, or transport numerics. Absent emission resolves to incoherent and absent straggling resolves to off. `pyrite profile show NAME` marks code defaults with `(default)` and shows an absent detector as `none`.
+`pyrite profile create NAME` starts from the packaged `standard` sweep's ranges, inline bremsstrahlung grid, and membership. It uses only materials present in the selected catalog. Packaged per-material overrides, such as stack layer counts, are copied only for the new profile's member materials. A non-member resolves against `standard`, so its row would never be read. It does not copy the selected catalog's mutable `standard` profile or attach a beam, scalar detector, physical detector, filters, emission policy, transport numerics, or line-grid policy. Absent emission resolves to incoherent and absent straggling resolves to off. `pyrite profile show NAME` marks code defaults with `(default)` and shows an absent detector as `none`.
 
-`pyrite profile create NAME --from SOURCE` explicitly clones SOURCE's ranges, membership, beam, scalar and physical detectors, filters, emission, and transport numerics. Its output lists any inherited instrument and physics sections. Per-material overrides remain local to SOURCE and are not cloned. Review the cloned profile before running it, especially if SOURCE is a modified `standard`.
+`pyrite profile create NAME --from SOURCE` explicitly clones SOURCE's ranges, membership, beam, scalar and physical detectors, filters, emission, transport numerics, and line-grid policy. Its output lists any inherited instrument and physics sections. Per-material overrides remain local to SOURCE and are not cloned. Review the cloned profile before running it, especially if SOURCE is a modified `standard`.
 
 ## Bremsstrahlung grid
 
@@ -58,16 +58,41 @@ Earlier releases stored a derived uniform `E_grid_brem` override for each materi
 
 ## Line-grid policy
 
-By default each case's line axis spans a closed-form kinematic bandwidth at the measured sinc spacing. That bandwidth is capped at the beam's kinetic energy and at the end of the Chantler coupling data (about 966 keV for every element), above which no line can emit in this model. At MeV beam energies that axis needs millions of nodes. A profile can instead name measured policies:
+By default each case's line axis spans a closed-form kinematic bandwidth at the measured sinc spacing. That bandwidth is capped at the beam's kinetic energy and at the end of the Chantler coupling data (about 966 keV for every element), above which no line can emit in this model. At MeV beam energies that axis needs millions of nodes. A profile can instead name measured policies in `[profiles.NAME.line_grid_policy]`:
 
-```text
-[line_grid_policy]
-bandwidth = "resonance-population"  # stop from the case's own line population
-resolution = "resonance-local"      # fine spacing only where narrow lines resonate
-quadrature = "bin-mean"             # exact integrated yield across spacing changes
+| Selector | Values (default first) | Meaning |
+|---|---|---|
+| `bandwidth` | `kinematic-ceiling`, `resonance-population` | closed-form upper edge, or the edge measured from the case's own resonance population (capped by the closed form) |
+| `resolution` | `sinc-nyquist`, `resonance-local` | uniform measured sinc spacing, or fine spacing only where narrow lines resonate on a 3 eV backbone |
+| `quadrature` | `node`, `bin-mean` | point samples of the line profile, or bin means: exact integrated yield, smoothed peak height and width |
+
+`resonance-local` requires `resonance-population` and `bin-mean`. Edit the table with the `line-grid` group rather than TOML; impossible combinations are usage errors (exit 2) and nothing is written:
+
+```bash
+pyrite profile line-grid show high_energy
+pyrite profile line-grid show high_energy -o json
+pyrite profile line-grid set my_profile --bandwidth resonance-population \
+  --resolution resonance-local --quadrature bin-mean --dry-run
+pyrite profile line-grid set my_profile --bandwidth resonance-population \
+  --resolution resonance-local --quadrature bin-mean
+pyrite profile line-grid reset my_profile resolution quadrature
+pyrite profile line-grid reset my_profile
 ```
 
-The table applies to every case of the profile and joins its dataset identity. `high_energy` uses it. A measured-bandwidth case records its upper-edge truncation audit and the line yield's per-electron relative standard error in `line_grid_resolved`. When a few electrons carry the yield (relative standard error above 0.1, typical at 5 MeV where rare electrons scatter into the detector's radiation cone), the case still runs, is flagged `statistics_limited`, and raises `LineYieldStatisticsWarning`.
+`show` lists each selector's explicit value, effective value and source, and which grid source the profile's cases use. `pyrite profile show NAME` prints a one-line summary, and its JSON payload carries `line_grid_policy` (`null` when unset). Editing `standard` prompts unless `--yes`.
+
+Grid-source precedence per case, highest first:
+
+1. A profile policy. Any stored selector, even one equal to its default, makes every case resolve its line grid automatically from its own trajectories. Explicit `E_grid_line`, `energy_grid_refs` and stored rows are then ignored.
+2. Without a policy: an explicit `E_grid_line` (profile or material override).
+3. A stored per-energy row from `energy_grid_refs` or the legacy `[energy_grids.MATERIAL]` store. `PYRITE_ENERGY_GRID_*` environment values outrank this layer, not layer 2.
+4. Automatic resolution with the default selectors for energies a stored mapping does not cover; the crystal's built-in `E_grid` where no mapping exists.
+
+Automatic resolution does not support coherent emission (#117), so the editor refuses a policy on a `coherent` or `both` profile. `bin-mean` also refuses a positive `max_dE_frac`. Coherent feature windows are #350.
+
+The table applies to every case of the profile and joins its dataset identity: editing it gives new checkpoints, and earlier results stay under their old identity. `profile create --from SOURCE` clones it; a fresh `profile create` does not set one. `high_energy` uses the full measured policy. A measured-bandwidth case records its upper-edge truncation audit and the line yield's per-electron relative standard error in `line_grid_resolved`. When a few electrons carry the yield (relative standard error above 0.1, typical at 5 MeV where rare electrons scatter into the detector's radiation cone), the case still runs, is flagged `statistics_limited`, and raises `LineYieldStatisticsWarning`.
+
+Tolerances, maximum spacing, point budget, backend ULPs and feature windows are not profile keys. Set them per call through `Sweep.line_grid_policy` or with `PYRITE_ENERGY_GRID_*`; see the [profile settings reference](../repo-design/profile-settings.md) for names and built-in values.
 
 ## Identity and storage
 

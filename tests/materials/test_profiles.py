@@ -132,11 +132,13 @@ def test_high_energy_profile_range_is_part_of_dataset_identity():
     np.testing.assert_array_equal(sweep.beam.energy_keV, energies)
     assert identity["catalog_profile"] == "high_energy"
     assert identity["resolved_parameters"]["sweep"]["energy_keV"] == energies
-    # 5 MeV is h-BN only (#192); the other members keep the shared range.
+    # 5 MeV is shared by every member since e7713682; #358 removed h-BN's
+    # now-equal override row, which left its resolved range unchanged.
     np.testing.assert_array_equal(
-        material_sweep("mose2", catalog_profile="high_energy").beam.energy_keV,
-        [100.0, 500.0, 1000.0],
+        material_sweep("mose2", catalog_profile="high_energy").beam.energy_keV, energies
     )
+    bundled = tomllib.loads((DATA_DIR / "catalog/profiles/high_energy.toml").read_text())
+    assert "overrides" not in bundled
 
 
 def test_high_energy_profile_selects_the_measured_line_grid():

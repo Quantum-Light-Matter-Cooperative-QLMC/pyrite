@@ -14,7 +14,7 @@ from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli._deprecations import DeprecatedOption, canonical_option
 from pyrite.cli._groups import LazyGroup
-from pyrite.cli.commands import _physical_detector, _profile_filters
+from pyrite.cli.commands import _physical_detector, _profile_filters, _profile_line_grid
 from pyrite.cli.commands._profile_members import (
     add_membership as _add_membership,
 )
@@ -270,6 +270,14 @@ def _emit_show(payload):
             )
     emit_result(f"  emission: {payload['emission'] or 'incoherent (default)'}")
     emit_result("  temporal profile: " + ("on" if payload["temporal_profile"] else "off (default)"))
+    policy = payload["line_grid_policy"]
+    emit_result(
+        "  line-grid policy: none (explicit, stored or built-in grids)"
+        if not policy
+        else "  line-grid policy: "
+        + ", ".join(f"{key}={value}" for key, value in policy.items())
+        + " (automatic for every case)"
+    )
     numerics = payload["transport_numerics"]
     for key, label, default in (
         ("straggling", "straggling", False),
@@ -344,12 +352,22 @@ def command():
     restores implicit membership. Per-material
     range overrides and derived energy grids are managed by ``pyrite material``.
 
+    Where settings live: ranges, membership, beam/detector references and
+    emission use ``set|add|remove``; calculation controls (electron counts,
+    reflections, mosaic, transport models) use ``numerics``; the line-grid
+    selectors use ``line-grid``; filters and the pixel detector use ``filter``
+    and ``physical-detector``; reusable beams and detectors are named objects
+    edited with ``pyrite beam`` and ``pyrite detector``. The full map is
+    docs/repo-design/profile-settings.md.
+
     \b
     Examples:
       pyrite profile list
       pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
       pyrite profile create sub_100keV --energy 30:100:10
-      pyrite profile set sub_100keV --observation-angle 119
+      pyrite profile set sub_100keV --detector eds
+      pyrite profile numerics set sub_100keV --line-electrons 2000
+      pyrite profile line-grid show sub_100keV
       pyrite profile add sub_100keV --energy 75
       pyrite profile set sub_100keV --material hopg,mose2
       pyrite profile rename sub_100keV sub100
@@ -595,6 +613,7 @@ def numerics_reset_command(name, fields, yes, dry_run):
     return _write(document, original, dry_run, f"reset numerics for profile {name}")
 
 
+command.add_command(_profile_line_grid.command)
 command.add_command(_physical_detector.command)
 
 
@@ -673,7 +692,10 @@ def show_command(name, json_output):
     "source",
     metavar="SOURCE",
     shell_complete=_cli_completion.complete_profile,
-    help="Explicitly clone SOURCE, including beam, detector, filters, emission, and transport numerics; material overrides stay local.",
+    help=(
+        "Explicitly clone SOURCE, including beam, detector, filters, emission, transport "
+        "numerics, and line-grid policy; material overrides stay local."
+    ),
 )
 @_range_cli_options
 @_ne_cli_options
@@ -721,12 +743,13 @@ def create_command(
 
     Range options replace individual grids. ``--material`` replaces membership.
     Without --from, packaged standard per-material overrides are copied only
-    for member materials. An explicit --from clones instrument and physics
-    sections, plus ranges and membership; per-material overrides are not
-    cloned. Beam
-    phase space and detector geometry are set only through named objects: build
-    them with ``pyrite beam create`` / ``pyrite detector create`` and attach them
-    here with --beam NAME / --detector NAME.
+    for member materials; no line-grid policy or numerics are copied. An
+    explicit --from clones instrument and physics sections (including numerics
+    and the line-grid policy), plus ranges and membership; per-material
+    overrides are not cloned. Beam phase space and detector geometry are set
+    only through named objects: build them with ``pyrite beam create`` /
+    ``pyrite detector create`` and attach them here with --beam NAME /
+    --detector NAME.
     """
     _check_name(name)
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
@@ -759,6 +782,8 @@ def create_command(
             ]
             if any(key in source_row for key in _profile_edit.TRANSPORT_KEYS):
                 inherited.append("transport numerics")
+            if "line_grid_policy" in source_row:
+                inherited.append("line-grid policy")
         _profile_edit.create_profile(
             document,
             name,

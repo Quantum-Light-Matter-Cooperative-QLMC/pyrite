@@ -87,6 +87,7 @@ __all__ = [
     "RESONANCE_BANDWIDTH_POLICY",
     "RESONANCE_LINE_GRID_POLICY_SCHEMA",
     "OBSERVABLE_CLASSES",
+    "PROFILE_LINE_GRID_SELECTORS",
     "WINDOWED_LINE_GRID_POLICY_SCHEMA",
     "WINDOW_POLICY",
     "LineGridPolicy",
@@ -94,6 +95,7 @@ __all__ = [
     "LineGridTruncationWarning",
     "LineYieldStatisticsWarning",
     "cached_coordinates",
+    "check_selector_combination",
     "coordinate_cache_key",
     "environment_overrides_present",
     "line_quadrature_from_payload",
@@ -182,6 +184,15 @@ RESOLUTION_POLICIES = (AUTOMATIC_RESOLUTION_POLICY, LOCAL_RESOLUTION_POLICY)
 #: feature-window row of ``tbl-line-budget-allocation``, which measured-bandwidth
 #: cases do not otherwise spend.
 DEFAULT_LOCAL_HALO_LIMIT = 1.0e-4
+
+#: Selectors a ``[profiles.NAME.line_grid_policy]`` table may set, each with
+#: its accepted values, default first. The other resolver inputs (tolerances,
+#: spacing, point budget, ULPs, windows) are per-call/environment controls.
+PROFILE_LINE_GRID_SELECTORS: Mapping[str, tuple[str, ...]] = {
+    "bandwidth": BANDWIDTH_POLICIES,
+    "resolution": RESOLUTION_POLICIES,
+    "quadrature": LINE_QUADRATURES,
+}
 
 #: Coarsest automatic spacing. Matches the catalog's historical 3 eV line-grid
 #: convention, so automatic resolution is never worse than the legacy grids.
@@ -488,6 +499,37 @@ def line_quadrature_from_payload(payload: Mapping[str, Any] | None) -> str:
     return _quadrature(payload.get("quadrature", DEFAULT_LINE_QUADRATURE), "policy payload")
 
 
+def check_selector_combination(
+    *, bandwidth: str, resolution: str, quadrature: str, windows: bool = False
+) -> None:
+    """Refuse selector combinations the resolver cannot honor.
+
+    Shared by :func:`resolve_line_grid_policy` and the profile editor, so a
+    stored policy fails before it is written rather than when a case resolves.
+
+    Validation: line-grid-resonance-local-spacing
+    """
+    if resolution == LOCAL_RESOLUTION_POLICY:
+        if bandwidth != RESONANCE_BANDWIDTH_POLICY:
+            raise ValueError(
+                "the resonance-local resolution reads the measured resonance population "
+                "and needs the resonance-population bandwidth"
+            )
+        # Node quadrature on a piecewise axis loses up to ~(h/w)**2 of a line's
+        # mass at every spacing join, unbounded by the halo or core rule; the
+        # bin means telescope to the exact integral at any spacing (#192).
+        if quadrature != "bin-mean":
+            raise ValueError(
+                "the resonance-local resolution needs bin-mean quadrature: node "
+                "quadrature loses unbounded yield at its spacing joins"
+            )
+    if bandwidth == RESONANCE_BANDWIDTH_POLICY and windows:
+        raise ValueError(
+            "the resonance-population bandwidth takes its budget share from the "
+            "feature-window row and cannot be combined with windows"
+        )
+
+
 def resolve_line_grid_policy(
     *,
     start_eV: float,
@@ -651,30 +693,17 @@ def resolve_line_grid_policy(
                 sources["resolution"] = label
             resolution_policy = chosen
             break
+    check_selector_combination(
+        bandwidth=bandwidth_policy,
+        resolution=resolution_policy,
+        quadrature=quadrature,
+        windows=windows is not None,
+    )
     halo_limit = None
     if resolution_policy == LOCAL_RESOLUTION_POLICY:
-        if bandwidth_policy != RESONANCE_BANDWIDTH_POLICY:
-            raise ValueError(
-                "the resonance-local resolution reads the measured resonance population "
-                "and needs the resonance-population bandwidth"
-            )
-        # Node quadrature on a piecewise axis loses up to ~(h/w)**2 of a line's
-        # mass at every spacing join, unbounded by the halo or core rule; the
-        # bin means telescope to the exact integral at any spacing (#192).
-        # Validation: line-grid-resonance-local-spacing
-        if quadrature != "bin-mean":
-            raise ValueError(
-                "the resonance-local resolution needs bin-mean quadrature: node "
-                "quadrature loses unbounded yield at its spacing joins"
-            )
         halo_limit = DEFAULT_LOCAL_HALO_LIMIT
     truncation = None
     if bandwidth_policy == RESONANCE_BANDWIDTH_POLICY:
-        if windows is not None:
-            raise ValueError(
-                "the resonance-population bandwidth takes its budget share from the "
-                "feature-window row and cannot be combined with windows"
-            )
         truncation = DEFAULT_BANDWIDTH_TRUNCATION
 
     return LineGridPolicy(
