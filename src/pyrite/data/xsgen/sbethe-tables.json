@@ -2,10 +2,10 @@
   "schema": "pyrite.xsgen.sbethe-release.v1",
   "upstream": "SBETHE, Mendeley Data doi:10.17632/7zw25f428t.2",
   "archive": {
-    "sha256": "7f690120e71bcbede4602845e4e171665d3767f8906823c1459dc7861987df89",
+    "sha256": "0b04d157808a8e2fd6452fd9d46ac74682fd02d4b8c197e101dd1c908aeb18c9",
     "bytes": 2982571,
     "urls": [
-      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-sbethe-1/sbethe-tables.zip"
+      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-sbethe-2/sbethe-tables.zip"
     ]
   },
   "tables": [
@@ -21,8 +21,8 @@
     },
     {
       "label": "4h_sic",
-      "key": "779fb5c411ab42bf10ff43cb8cd574b382545e1967f488c83ffbbb46a6da98f5",
-      "manifest_sha256": "a8636d5f8e4f323cbfa4794e393f0026981cf64c760c6280447e480c0a3a5b33"
+      "key": "fed9bc8b9205bd01c67f6dcda1b7fac98d18c7d5c0b85cc3be687dae03740098",
+      "manifest_sha256": "1b2070b93f10b85ddd44385cdd81d40a27416ae6d8ca561911a0695fee977d1b"
     },
     {
       "label": "6h_sic",
@@ -31,8 +31,8 @@
     },
     {
       "label": "black_phosphorus",
-      "key": "38ea38f0202a9ef9a2eed6cbcab2926acf3d4c2e2910f20afaf3d8958133b5bd",
-      "manifest_sha256": "fc099788b3c6653a0814ab5d14d70ecf80f046004bb116180496b644c659c97d"
+      "key": "cb46432993f44402f0fb951533fbef3bf8e7ed9b914548a3caf2304645764823",
+      "manifest_sha256": "05ea78fccb1a6a1ce3c9862be2d18e734504698fb48424d1fd20a8836ec8a57b"
     },
     {
       "label": "diamond",
@@ -46,13 +46,13 @@
     },
     {
       "label": "fete",
-      "key": "ccd8a88545883054aa1268d73c76823af725914a80d14ed6e83b673e2ad084e9",
-      "manifest_sha256": "c79ce5dd3e1f3f36d0f09fa226a0a892e6648c986f5b0800f3987195b1b51b21"
+      "key": "86cd0ed4fc5fd50395db20491cb00e200f693b8ea409dbc22caa7539fc1599ee",
+      "manifest_sha256": "4012a9428caef050d5a27efce5950081af7ed04c672e4db140419f7378cb81e9"
     },
     {
       "label": "gep",
-      "key": "ccef320714afc6d7a24d117a0d89090687ace8f80221f1d1e8c7cbc039518cd5",
-      "manifest_sha256": "451bd92f2a80494908e6eeabbd5401da8ab8a9eaf52b8c659d3239ef879dde24"
+      "key": "0da79e924cea83dbbac20fbe2cfea5b8206b6c94b5504c922300606d20c20a13",
+      "manifest_sha256": "4db30f8d9994d66762a3113517fd86e02f11cce6964a5b6cc32a8cff99040bb1"
     },
     {
       "label": "ges",
@@ -76,33 +76,33 @@
     },
     {
       "label": "hfs2",
-      "key": "0c1dc4dbc642b032f593dfaf7a04f2e2ea71da3cdfe9bb842d4e171a451e3cc5",
-      "manifest_sha256": "ff827290389edb40553d068f67077ec66dd602f09321e3d53d3ec4f6e000d3a9"
+      "key": "cc5032733204e4153add4de5327fccb5c6efb0526ab8584bfee1e73098f397a4",
+      "manifest_sha256": "c543e8fbd38de62b3ff8f9634994c6d5b36b73ab40310944f7bddd638ec3b808"
     },
     {
       "label": "hfse2",
-      "key": "2bc33b29d3455e65c96b970f5232fe55ef08bf2ebba305ea8313b86cdce53a0c",
-      "manifest_sha256": "eafc3c6cabb5e107ae1c3338305f636aea522c02740f383cd522d0848cf05502"
+      "key": "80c4db598563eea13382d0f3d84a48651fc745f013989299ea7b42f350b166e5",
+      "manifest_sha256": "00953210029928b2dbb215a653070c7abe0c9eaa9f7d1acbfceee65d927607aa"
     },
     {
       "label": "hfte2",
-      "key": "8cd156c737bdc4df7de9fd6178cb552f10beb9b8ed0e0bf08939d3155244ecb3",
-      "manifest_sha256": "70cb277d3e4d50e6f2586dbe14b96324ce9ebbd865a08637355d6ef444bf3f28"
+      "key": "5380e48eace96177e37f158232b18facd9862e258e8d5cae1fc3ad578a27d701",
+      "manifest_sha256": "0e9245a04d2f15356c4b2ea8df6adae47953fc3cc5455971d0463af543e62a13"
     },
     {
       "label": "hopg",
-      "key": "db8a7c4f7fe4ba517a542f2bb3006dbb44420f22eb96fba13654299350de2c50",
-      "manifest_sha256": "af68522bc98dbef7de7f2dfd981de322c96624763fd7d681ae6227777ed2bb24"
+      "key": "94514c9a863bbbdf9c31721bc57b605daa1f8733c0639b19d8dfa932c3c22fe6",
+      "manifest_sha256": "e5c200c8115521715dc9b05a7b5294fd204461b8d1c9816328e93c695fe55e7d"
     },
     {
       "label": "mos2,mos2-on-sapphire,mos2-on-sio2-si",
-      "key": "b90654259595c2259ecd12b5a2ba9f589fbf1c6300a055e14cbd33a4d3bbd6fa",
-      "manifest_sha256": "a43bf8bf978ab9bb832d41d2081f55ddddf1cfa542da9ee397472daeb2ec1a27"
+      "key": "966df81c1a125aca5ad489c9eff31e5d29665904b9713070f7301e6a2abf613f",
+      "manifest_sha256": "15d5c05520986ed393a5baba8c25e8a08bdfc7e8362d67b9d511246750428fb0"
     },
     {
       "label": "mose2",
-      "key": "0bbc0c6d3960cac0f2617cf2a2b1901e9ef736f3b2e6b67d618b305fcf3ad106",
-      "manifest_sha256": "30dc6d16a442f6778f213dc9fe3712cb3f2420d1b24a292835c1f43ab77431f1"
+      "key": "461efca49b8638b6580b36a94449954fa5fea4baae860c0a25a5ed7f2f75c689",
+      "manifest_sha256": "b800b050d1fd7c24fd424c87479e0d558f191b0b01b8c66d5a1a8c538e8f5fe5"
     },
     {
       "label": "mote2",
@@ -146,13 +146,13 @@
     },
     {
       "label": "ptbi2",
-      "key": "5694af23550c86b3e584fd7223fbb69457d39fb45a09ed5d653eb2b0aba6c658",
-      "manifest_sha256": "914055316633c79240df3c61095eb64ec65009bf9ffe5bc99637cdc25c6ea04c"
+      "key": "865d88e827460c4d4eb8531f05645c474e6e189f92bdded86ee22ef7935307a8",
+      "manifest_sha256": "5348663dbd273b1b0acb47df6bd73e6093f04bdd3e898b907879cf681c238b60"
     },
     {
       "label": "pts2",
-      "key": "76f72306a52b2d5508409e312ad297ec5ee18fa4b21b4b1fff8a2ab0b953fd9d",
-      "manifest_sha256": "cd65d9b053ae3cdcb3049d7d2e686f26f6b3e67f038144a401798cb602e0baa3"
+      "key": "9f4f777d279f21a26321e3b11c34af5dc97446a0c04017c4c608ea9789307ef5",
+      "manifest_sha256": "81f917089fe99b342ff12e8f75498b6b738331f19f6530315d2b71dd01191eaa"
     },
     {
       "label": "ptse2",
@@ -166,8 +166,8 @@
     },
     {
       "label": "res2",
-      "key": "4af0cde890764532521c5954e784cf7c59f9e33de614897fbe4fb60851a398e3",
-      "manifest_sha256": "3f44234e2b14400723299143aafbb2aa320f67532468e98a2a8dd32cd51ceea1"
+      "key": "cd04f06428ad6ca2fa0ddc63ec43913604ad6d7cce66659425fde78635f8855d",
+      "manifest_sha256": "11d562932b6ed5d4c21a5ccaa6ead4ac854a26dcc7515fc93aac88276c89a9da"
     },
     {
       "label": "rese2",
@@ -176,8 +176,8 @@
     },
     {
       "label": "sapphire",
-      "key": "fcfea9a30aa8b65e0b6ad15bb5cfa4be7fc99b778a7655a5f475e0e99baa8a8c",
-      "manifest_sha256": "615f1cc9ab0525bc872ab30f5b8ade97af97ae4b1c0c33c7b24705eb05a2faeb"
+      "key": "a152f1fc5379ec11adbcd44c8b9f8769493684ca238f5092b51fce2e34fe58df",
+      "manifest_sha256": "4d39afe544f72d218422d669e4574da52e6d14ffdf966a5ce8eab68b6e0e3ef7"
     },
     {
       "label": "silicon",
@@ -201,8 +201,8 @@
     },
     {
       "label": "tise2",
-      "key": "99bfc310c18cb317c9d6234b0ff6a849be74d459e6665d87a07958091bcda257",
-      "manifest_sha256": "38ed52178297f0b815b0081083755677a2afb6051522ff3fd5fc63840ebd2b0d"
+      "key": "3d1e7a14f5a5c36f89445b1f009cf8220b229f1d9712c047fab18539ec078afb",
+      "manifest_sha256": "2fda03ee1a31eed4cd6a4c5d727bd2e417f68a895ced96f2199d64ec35b0bfc1"
     },
     {
       "label": "tite2",
@@ -216,8 +216,8 @@
     },
     {
       "label": "vse2",
-      "key": "39a823d632d78cc4c7969d2b736673db7f36824b6536ce2b5f6b07c450de1a22",
-      "manifest_sha256": "bb5757f82c9fb0793135a62e0f8628427ee2d246dceaedc5de97ed0d1a0e4b42"
+      "key": "ce70b82975197969a962f02adffea148ad47bd1304eea7338dbd4911f87cafff",
+      "manifest_sha256": "6ab456d32dbccc8d8b0bcce6a98c7c01c6996f823fcea03b06381fecd1f85d4c"
     },
     {
       "label": "vte2",
@@ -241,8 +241,8 @@
     },
     {
       "label": "zrse2",
-      "key": "ef2c1527f01bbe56df26a5b7c362491578542bb0965f3843c9e427070609eb4c",
-      "manifest_sha256": "0d1dde40d7829f8d6d7a37877501f025d710ac0008c70ed819e4e4ecc0baed5b"
+      "key": "4fc2e1f307d6f116dbd329b71f41dead23bb4fe26cb346c158c0ef277892370b",
+      "manifest_sha256": "bedc6b74d2dacb8ac326763c170ad0175cf2c3e9ae43be2b3d25d0b63e508b6d"
     },
     {
       "label": "zrte3",
@@ -251,8 +251,8 @@
     },
     {
       "label": "zrte5",
-      "key": "18f2d0ff046e525f0ca607ab78809554591c0e9ca7742349b0c6539991759807",
-      "manifest_sha256": "b21242f4a2d8d2a2503236070c40e6e0e3e5ed375dd79645780c935eb1280333"
+      "key": "6a10585567461574d41f14b0afc88d2f71e20f05c0c04f5ba6dbfc23f6f5282f",
+      "manifest_sha256": "00267b19ef819c4161937054c73895b72f40b0a0c838fc30f202c6275b78b7b1"
     }
   ]
 }

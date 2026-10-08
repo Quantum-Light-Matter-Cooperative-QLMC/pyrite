@@ -2,6 +2,16 @@
 
 The bundled `pyrite/data/catalog/` directory is the canonical schema-version-1 catalog for crystals, media, runnable materials, beams, detectors, and campaign profiles. `load_material_catalog()` validates the entire document and returns deeply immutable typed records. Invalid or unknown fields fail closed with grouped, location-qualified errors.
 
+CIF structures are parsed with Gemmi under its MPL-2.0 license option. Explicit
+CIF symmetry operations take precedence over the named space group; affine
+operations expand the asymmetric unit modulo integer translations, with
+special-position images deduplicated at a fractional tolerance of `1e-12`.
+Partial occupancy is rejected. Cell parameters retain their literal CIF values.
+The migration from `crystals` (#340) changes only floating-point rounding in the
+bundled catalog (within `2e-15` relative / `1e-12` absolute), but exact content
+hashes can change: affected checkpoint records are recomputed and generated
+SBETHE/ELSEPA tables must be regenerated for the new material identity.
+
 ## Catalog layout
 
 A catalog is either a catalog directory with one TOML file per object, or a single TOML file holding every table. Both load, validate, and accept CLI edits identically; the bundled catalog is a directory.

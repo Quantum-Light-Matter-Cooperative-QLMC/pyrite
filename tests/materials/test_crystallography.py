@@ -646,13 +646,56 @@ C1 C 0.1 0.2 0.3
     first = load_crystal_from_cif(cif)
     second = load_crystal_from_cif(cif)
 
-    assert [(element, pos.tolist()) for element, pos in first["basis"]] == [
-        ("C", [0.1, 0.2, 0.3]),
-        ("C", [0.9, 0.8, 0.7]),
-    ]
+    assert [element for element, _ in first["basis"]] == ["C", "C"]
+    np.testing.assert_allclose(
+        [position for _, position in first["basis"]],
+        [[0.1, 0.2, 0.3], [0.9, 0.8, 0.7]],
+        rtol=0.0,
+        atol=1e-12,
+    )
     assert [(element, pos.tolist()) for element, pos in second["basis"]] == [
         (element, pos.tolist()) for element, pos in first["basis"]
     ]
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+@pytest.mark.parametrize(
+    ("x", "expected"),
+    [(0.0, [[0.0, 0.0, 0.0]]), (0.01, [[0.01, 0.0, 0.0], [0.99, 0.0, 0.0]])],
+)
+def test_cif_special_positions_and_nearby_distinct_sites(tmp_path, explicit, x, expected):
+    """Inversion fixes the origin; nearby sites remain distinct even below 0.4 A."""
+    from pyrite.materials.crystal import load_crystal_from_cif
+
+    symmetry = (
+        "loop_\n_space_group_symop_operation_xyz\n'x,y,z'\n'-x,-y,-z'"
+        if explicit
+        else "_symmetry_space_group_name_H-M 'P -1'"
+    )
+    cif = tmp_path / "special.cif"
+    cif.write_text(
+        f"""data_special
+{symmetry}
+_cell_length_a 4
+_cell_length_b 4
+_cell_length_c 4
+_cell_angle_alpha 90
+_cell_angle_beta 90
+_cell_angle_gamma 90
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+C1 C {x} 0 0
+""",
+        encoding="utf-8",
+    )
+    info = load_crystal_from_cif(cif)
+    assert [element for element, _ in info["basis"]] == ["C"] * len(expected)
+    np.testing.assert_allclose([position for _, position in info["basis"]], expected, atol=1e-12)
+    assert info["V_cell"] == pytest.approx(64.0)
 
 
 def test_load_crystal_from_cif_rejects_partial_occupancy(tmp_path):

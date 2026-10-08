@@ -90,10 +90,10 @@ def _parse_info(
         composition = tuple((element, count / volume) for element, count in counts.items())
         return CrystalInfo(lattice, basis, volume, composition, mosaic)
     except ModuleNotFoundError as exc:
-        if exc.name == "crystals":
+        if exc.name == "gemmi":
             raise MaterialConfigError(
                 (
-                    "required dependency 'crystals' is not installed; "
+                    "required dependency 'gemmi' is not installed; "
                     "install the project environment with `uv sync`",
                 )
             ) from None

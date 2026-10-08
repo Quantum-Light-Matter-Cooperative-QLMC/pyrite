@@ -2,7 +2,7 @@
 
 ## Goal
 
-Guard the local crystal catalog against silent drift and transcription error by diffing each entry's **lattice geometry** against an authoritative external structure database. COD records use the already-vendored [`crystals`](https://pypi.org/project/crystals/) library (v1.7); Materials Project records use its supported [`mp-api`](https://docs.materialsproject.org/downloading-data/using-the-api/) client through the opt-in `external-db` extra.
+Guard the local crystal catalog against silent drift and transcription error by diffing each entry's **lattice geometry** against an authoritative external structure database. COD CIF records are fetched directly and parsed with [Gemmi](https://gemmi.readthedocs.io/en/stable/chemistry.html); Materials Project records use its supported [`mp-api`](https://docs.materialsproject.org/downloading-data/using-the-api/) client through the opt-in `external-db` extra.
 
 ## What is and isn't comparable
 

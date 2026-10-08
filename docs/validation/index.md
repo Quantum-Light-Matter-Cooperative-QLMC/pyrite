@@ -22,6 +22,7 @@ methodology
 
 atomic-physics/atomic-form-factor
 atomic-physics/structure-factor
+atomic-physics/crystals-cif-adapter
 ```
 
 ```{toctree}

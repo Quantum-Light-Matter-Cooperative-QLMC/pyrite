@@ -34,13 +34,13 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 
 ## `crystals-cif-adapter`
 
-- **Claim:** `crystals.Crystal`/CIF lattice + symmetry-expanded fractional basis conversion into the internal `CRYSTALS` entry shape
-- **Code:** `materials/_cif.py::crystals_crystal_to_crystal_info`, `::load_crystal_from_cif`
-- **Source:** crystals 1.7.0 API / CIF parser
+- **Claim:** Gemmi/CIF lattice + symmetry-expanded fractional basis conversion into the internal `CRYSTALS` entry shape
+- **Code:** `materials/_cif.py::gemmi_structure_to_crystal_info`, `::crystals_crystal_to_crystal_info`, `::load_crystal_from_cif`
+- **Source:** [Gemmi 0.7.5 small-structure API / CIF parser](https://gemmi.readthedocs.io/en/stable/chemistry.html)
 - **Status:** anchored
 - **Checks:** lattice lengths/angles + basis + volume round trip; non-P1 symmetry expansion; partial-occupancy rejection
-- **Anchor:** `tests/materials/test_crystallography.py::test_load_crystal_from_cif_returns_compatible_deterministic_info`, `::test_load_crystal_from_cif_expands_non_p1_symmetry`, `::test_load_crystal_from_cif_rejects_partial_occupancy`
-- **Notes:** structural-data importer only; X-ray form factors, structure factors, reflection selection, attenuation, and transport remain in PyRITE
+- **Anchor:** `tests/materials/test_crystallography.py::test_load_crystal_from_cif_returns_compatible_deterministic_info`, `::test_load_crystal_from_cif_expands_non_p1_symmetry`, `::test_load_crystal_from_cif_rejects_partial_occupancy`, `::test_cif_special_positions_and_nearby_distinct_sites`
+- **Notes:** structural-data importer only; X-ray form factors, structure factors, reflection selection, attenuation, and transport remain in PyRITE. **2026-10-06 (#340):** fresh-context Gemmi/IUCr re-derivation matches; affine operations avoid Gemmi’s 0.4 Å special-position merge. [Validation write-up](atomic-physics/crystals-cif-adapter.md). Catalog golden changes are floating-point rounding (within 2e-15 relative / 1e-12 absolute); site counts, element order, and grid fingerprints are unchanged. Literal CIF parameters replace the old reconstructed parameters, changing exact checkpoint and material-table identities; existing SBETHE/ELSEPA tables may need regeneration.
 
 ## `cod-lattice-catalog-geometry`
 

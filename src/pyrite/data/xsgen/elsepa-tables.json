@@ -2,10 +2,10 @@
   "schema": "pyrite.xsgen.elsepa-release.v1",
   "upstream": "ELSEPA 2020, Mendeley Data doi:10.17632/w4hm5vymym.1",
   "archive": {
-    "sha256": "5f588621dc35216aac4ecfa17fa7fe986e0c309fee06245d08ba5c4465b2840a",
+    "sha256": "0f918395bebc14583a8daf134eeba9fdcbde876eecc51f3a3e775481e5be3804",
     "bytes": 25178906,
     "urls": [
-      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-1/elsepa-tables.zip"
+      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-2/elsepa-tables.zip"
     ]
   },
   "tables": [
@@ -131,8 +131,8 @@
     },
     {
       "label": "black_phosphorus",
-      "key": "57af60116072996d69b99fdf050b9187b57820faef70ac390cb43ac646597baf",
-      "manifest_sha256": "522c36eae9bdc40c7431b829318a01f00f61f7461649a53ab6416fb543007f34"
+      "key": "7fa3167275173792dcad8c27b8052cdcc382a4aa68c952e5ef98ea0c5653ccff",
+      "manifest_sha256": "84581e51b89b9004f3afae196426e6ea7193832bd3241d19def9a3f70a997f2f"
     },
     {
       "label": "diamond",
@@ -141,8 +141,8 @@
     },
     {
       "label": "hopg",
-      "key": "36629eae3be742a48e5ab45fb18797b2fe38a117925c065d34d20a609d03e579",
-      "manifest_sha256": "78ee505e5149114f870dca9e1368fe768fea119a9ef01f2169acc498ee79a7a8"
+      "key": "44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3",
+      "manifest_sha256": "3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2"
     },
     {
       "label": "silicon",

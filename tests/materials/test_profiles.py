@@ -106,8 +106,9 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # changes. Re-minted again for issue #317: the default
     # atomic_electron_deflection="kawrakow" adds its key and rescales every
     # elastic rate. Re-minted for #187’s first-order Snell line marker.
+    # #340: literal CIF parameters from Gemmi change rounding and the content key.
     assert case_content_key(case) == (
-        "f367b17714d46228c71b5b39840e926c46ff75a1275e52382621eee221a8f377"
+        "c7155b2df315d09e74a66ff253313538fee96c035edb83a75be1de4ce4af97f3"
     )
 
 
@@ -903,7 +904,7 @@ def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
     )[0]
     assert "atomic_electron_deflection" not in case
     assert case_content_key(case) == (
-        "e2e8c1b30838339dedbcd99294ee5f8b445245185a469c52cd5b2a5bacc718f2"
+        "a7b0084e6c97acad62bfbc37f45249cdaa699b2f9311c2a0ebb6c52072b99f48"
     )
     with pytest.raises(ValueError, match="atomic_electron_deflection"):
         build_cases(sweep, 4, 4, atomic_electron_deflection="z1")

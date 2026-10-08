@@ -13,6 +13,23 @@ file exists to satisfy the attribution obligations that follow from
 redistributing or downloading these codes and data, from invoking them, and from redistributing
 tables derived or resampled from their output.
 
+## Gemmi (CIF structural importer)
+
+- **Authors**: Marcin Wojdyr and Gemmi contributors.
+- **License**: Mozilla Public License 2.0 (MPL-2.0), the MPL option of
+  Gemmi's MPL-2.0 / LGPL-3.0 dual license. PyRITE uses the MPL option.
+- **Source and license**: [upstream Gemmi repository](https://github.com/project-gemmi/gemmi),
+  [0.7.5 source](https://github.com/project-gemmi/gemmi/tree/v0.7.5),
+  [MPL-2.0 text](https://github.com/project-gemmi/gemmi/blob/v0.7.5/LICENSE.txt).
+  `uv.lock` identifies the installed release; upstream provides its source.
+- **Nature of PyRITE's use**: an unmodified runtime dependency for CIF parsing,
+  crystallographic symmetry expansion, lattice parameters, and cell volume.
+  PyRITE's scattering and transport implementations remain in PyRITE.
+  Gemmi replaces the GPLv3 `crystals` dependency. Its focused structural API
+  avoids the larger dependency stack of a general materials-analysis library.
+  When redistributing Gemmi binaries, retain its notices and provide access
+  to the corresponding Gemmi source under MPL-2.0.
+
 ## EPICS2025 EADL atomic relaxation data
 
 - **Author**: D. E. Cullen, Livermore Evaluated Atomic Data Library (EADL),

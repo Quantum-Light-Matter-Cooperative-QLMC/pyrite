@@ -4,14 +4,13 @@ Backs both the offline regression test (``test_crystal_external_db.py``) and the
 regeneration script (``scripts/refresh_external_cif.py``). See
 ``docs/validation/materials/crystal-db-comparison.md`` for the design: this guards local crystal
 *lattice geometry* against silent drift by diffing each catalog entry against a
-pinned external record fetched once through COD's vendored ``crystals`` adapter
+pinned external record fetched once from COD and parsed with Gemmi
 or Materials Project's optional supported ``mp-api`` client.
 
 The cached fixture stores the external **lattice parameters** only
 (``tests/data/external_crystal_lattices.json``), not a full CIF: the comparison
-is lattice-geometry-only, and ``crystals.Crystal.to_cif`` requires an spglib
-symmetry pass that fails on several low-symmetry layered cells here. Storing the
-six comparable numbers is deterministic and offline by construction.
+is lattice-geometry-only. Storing the six comparable numbers is deterministic
+and offline by construction.
 
 It deliberately does NOT touch Debye-Waller / thermal parameters -- external
 databases do not carry a reliable isotropic B, so ``issue_notes.md`` item #1
@@ -27,7 +26,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from crystals import Crystal
+    from gemmi import SmallStructure
 
 Lattice = tuple[float, float, float, float, float, float]
 
@@ -174,11 +173,11 @@ def iter_specs_sorted() -> Iterator[tuple[str, int | None, str | None]]:
     yield from sorted(external_specs())
 
 
-def lattice_tuple(crystal: Crystal | Lattice) -> Lattice:
+def lattice_tuple(crystal: SmallStructure | Lattice) -> Lattice:
     """(a, b, c, alpha, beta, gamma) in Angstrom / degrees as plain floats."""
     if isinstance(crystal, tuple):
         return crystal
-    a, b, c, alpha, beta, gamma = crystal.lattice_parameters
+    a, b, c, alpha, beta, gamma = crystal.cell.parameters
     return (float(a), float(b), float(c), float(alpha), float(beta), float(gamma))
 
 
@@ -202,17 +201,21 @@ def local_lattice_tuple(key: str) -> Lattice:
     return (a, b, c, alpha, beta, gamma)
 
 
-def fetch_external(cod_id: int | None, mp_id: str | None) -> Crystal | Lattice | None:
+def fetch_external(cod_id: int | None, mp_id: str | None) -> SmallStructure | Lattice | None:
     """Live-fetch lattice data from COD (preferred) or Materials Project.
 
     Returns ``None`` when only an ``mp_id`` is available and no API key is set,
     so callers can skip rather than fail. A configured MP query failure raises
     :class:`MPQueryError` rather than silently skipping. Requires network access.
     """
-    from crystals import Crystal
-
     if cod_id is not None:
-        return Crystal.from_cod(cod_id)
+        from urllib.request import urlopen
+
+        import gemmi
+
+        with urlopen(f"https://www.crystallography.net/cod/{cod_id}.cif", timeout=30) as response:
+            document = gemmi.cif.read_string(response.read().decode("utf-8"))
+        return gemmi.make_small_structure_from_block(document.sole_block())
     if mp_id is not None:
         api_key = resolve_mp_api_key()
         if not api_key:
