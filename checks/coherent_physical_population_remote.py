@@ -133,7 +133,10 @@ def run(args):
     from pyrite.energy_grid.convergence import require_identical_segments, spectrum_observables
     from pyrite.energy_grid.convergence_case import CaseLadder
     from pyrite.montecarlo import runner
-    from pyrite.montecarlo.spectrum.coherent_population import physical_bunch_electrons
+    from pyrite.montecarlo.spectrum.coherent_population import (
+        CoherentSamplingError,
+        physical_bunch_electrons,
+    )
 
     started = time.perf_counter()
     output = Path(args.out)
@@ -338,12 +341,16 @@ def run(args):
         result["warnings"] = result.get("warnings", []) + [str(item.message) for item in caught]
         result["peak_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         result.pop("error", None)
+        result.pop("sampling_diagnostics", None)
         result["state"] = "done"
         _atomic(output, result)
         print("done", output, flush=True)
         return 0
     except Exception as error:
         result.update(state="failed", error=f"{type(error).__name__}: {error}")
+        result.pop("sampling_diagnostics", None)
+        if isinstance(error, CoherentSamplingError) and error.diagnostics is not None:
+            result["sampling_diagnostics"] = error.diagnostics
         result["warnings"] = result.get("warnings", []) + [str(item.message) for item in caught]
         _atomic(output, result)
         raise

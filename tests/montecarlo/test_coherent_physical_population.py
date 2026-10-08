@@ -240,3 +240,94 @@ def test_population_model_revision_invalidates_coherent_dataset_identity(monkeyp
     monkeypatch.setattr(profiles, "COHERENT_POPULATION_MODEL", "next-physical-pair-model")
     assert identity(plain)["parameter_sha256"] == old_plain["parameter_sha256"]
     assert identity(coherent)["parameter_sha256"] != old_coherent["parameter_sha256"]
+
+
+@pytest.mark.parametrize(
+    "values, negative, nonfinite, minimum",
+    [
+        ([-2.0, 0.0, 3.0], 1, 0, -2.0),
+        ([np.nan, np.inf, -np.inf], 0, 3, None),
+        ([1.0, np.nan, -4.0, -np.inf], 1, 2, -4.0),
+    ],
+)
+def test_unresolved_power_reports_separate_scalar_diagnostics(values, negative, nonfinite, minimum):
+    from pyrite._backend import _to_cpu, xp
+    from pyrite.montecarlo.spectrum.coherent_population import require_resolved_power
+
+    power = xp.asarray(values)
+    with pytest.raises(CoherentSamplingError) as caught:
+        require_resolved_power(power)
+    diagnostic = caught.value.diagnostics
+    assert diagnostic["negative_count"] == negative
+    assert diagnostic["nonfinite_count"] == nonfinite
+    assert diagnostic["minimum_finite_raw_power"] == minimum
+    assert diagnostic["total_count"] == len(values)
+    np.testing.assert_array_equal(_to_cpu(power), values)
+
+
+def test_production_refusal_reports_energy_and_population_before_normalizing():
+    from types import SimpleNamespace
+
+    from pyrite._backend import _to_cpu, xp
+    from pyrite.montecarlo.spectrum.lines._spectrum import _finalize_spectrum
+
+    state = SimpleNamespace(
+        request=SimpleNamespace(components=False, coherent=True, physical_electrons=12.0),
+        Ne=3,
+        spec=xp.asarray([1.0, -2.0, 4.0]),
+        spec_pxr=None,
+        spec_cbs=None,
+        E_grid=xp.asarray([700.0, 702.0, 704.0]),
+        temporal_buf=None,
+    )
+    with pytest.raises(CoherentSamplingError) as caught:
+        _finalize_spectrum(state)
+    diagnostic = caught.value.diagnostics
+    assert diagnostic["first_invalid_index"] == 1
+    assert diagnostic["first_invalid_energy_eV"] == 702.0
+    assert diagnostic["incident_samples"] == 3
+    assert diagnostic["physical_electrons"] == 12.0
+    assert diagnostic["quantity"] == "spectral_power"
+    assert diagnostic["minimum_finite_raw_power"] == -2.0
+    np.testing.assert_array_equal(_to_cpu(state.spec), [1.0, -2.0, 4.0])
+
+
+def test_resolved_zero_and_positive_power_remain_unchanged():
+    from pyrite._backend import _to_cpu, xp
+    from pyrite.montecarlo.spectrum.coherent_population import require_resolved_power
+
+    power = xp.asarray([0.0, 1.0, 2.0])
+    require_resolved_power(power)
+    np.testing.assert_array_equal(_to_cpu(power), [0.0, 1.0, 2.0])
+
+
+def test_temporal_refusal_reports_flat_index_without_committing_buffer():
+    from types import SimpleNamespace
+
+    from pyrite._backend import _to_cpu, xp
+    from pyrite.montecarlo.spectrum.lines._spectrum import _finalize_spectrum
+
+    committed = []
+    state = SimpleNamespace(
+        request=SimpleNamespace(
+            components=False,
+            coherent=True,
+            physical_electrons=12.0,
+            temporal=SimpleNamespace(commit=lambda *args: committed.append(args)),
+        ),
+        Ne=3,
+        spec=xp.asarray([1.0, 2.0]),
+        spec_pxr=None,
+        spec_cbs=None,
+        E_grid=xp.asarray([700.0, 702.0]),
+        temporal_buf=xp.asarray([[0.0, 1.0], [-2.0, np.nan]]),
+    )
+    with pytest.raises(CoherentSamplingError) as caught:
+        _finalize_spectrum(state)
+    diagnostic = caught.value.diagnostics
+    assert diagnostic["quantity"] == "temporal_power"
+    assert diagnostic["first_invalid_index"] == 2
+    assert diagnostic["negative_count"] == diagnostic["nonfinite_count"] == 1
+    assert "first_invalid_energy_eV" not in diagnostic
+    assert not committed
+    np.testing.assert_array_equal(_to_cpu(state.temporal_buf), [[0.0, 1.0], [-2.0, np.nan]])

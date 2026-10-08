@@ -19,9 +19,13 @@ def test_remote_case_overrides_profile_sample_counts(mode, samples):
 def test_scheduler_slice_reuses_persisted_transport(tmp_path, monkeypatch):
     import json
 
-    from pyrite._backend import BACKEND
+    from pyrite._backend import BACKEND, xp
     from pyrite.energy_grid import convergence, convergence_case
     from pyrite.montecarlo import runner
+    from pyrite.montecarlo.spectrum.coherent_population import (
+        CoherentSamplingError,
+        require_resolved_power,
+    )
 
     args = SimpleNamespace(
         mode="ladder",
@@ -61,11 +65,15 @@ def test_scheduler_slice_reuses_persisted_transport(tmp_path, monkeypatch):
     evaluated_grids = []
 
     class Ladder:
+        fail_sampling = False
+
         def __init__(self, case, *, transport, coherent):
             np.testing.assert_array_equal(transport["segs"]["L_ang"], [1.0])
             self.fingerprint = {"n_segments": 1, "digest": "one-transport"}
 
         def lines(self, energy):
+            if self.fail_sampling:
+                require_resolved_power(xp.asarray([-1.0, np.nan, -np.inf]))
             evaluated_grids.append(energy.copy())
             return np.ones_like(energy)
 
@@ -97,6 +105,16 @@ def test_scheduler_slice_reuses_persisted_transport(tmp_path, monkeypatch):
         "spectrum_observables",
         lambda *args, **kwargs: {"yield": 2.0, "centroid_eV": 901.0, "fwhm_eV": 1.0},
     )
+    Ladder.fail_sampling = True
+    with pytest.raises(CoherentSamplingError):
+        check.run(args)
+    sampling_failure = json.loads((tmp_path / "result.json").read_text())
+    assert sampling_failure["state"] == "failed"
+    assert sampling_failure["sampling_diagnostics"]["negative_count"] == 1
+    assert sampling_failure["sampling_diagnostics"]["nonfinite_count"] == 2
+    assert sampling_failure["sampling_diagnostics"]["minimum_finite_raw_power"] == -1.0
+    assert set(sampling_failure["evals"]) == {"auto"}
+    Ladder.fail_sampling = False
     assert check.run(args) == 0
     after = json.loads((tmp_path / "result.json").read_text())
     assert set(after["evals"]) == {"auto", "finer", "reference"}
@@ -107,6 +125,7 @@ def test_scheduler_slice_reuses_persisted_transport(tmp_path, monkeypatch):
         assert grid[0] == 900.0 and grid[-1] == 902.0
     assert np.max(np.diff(evaluated_grids[-1])) <= 0.7 / args.reference_divisor
     assert after["state"] == "done"
+    assert "sampling_diagnostics" not in after and "error" not in after
     monkeypatch.setattr(check, "_stamp", lambda: {"code_digest": "changed-code"})
     with pytest.raises(RuntimeError, match="changed inputs, code or table digest"):
         check.run(args)

@@ -288,3 +288,22 @@ reference for row 2, with a material phase-slope step of 1.537e-5 eV.
 This upper bound is not a measured grid error. This run does not resolve
 sampling or production-window certification, and does not establish the
 full 81-case profile's acceptance.
+
+### Failure diagnostics
+
+The production guard reports finite negative estimates separately from nonfinite
+values. `CoherentSamplingError.diagnostics` contains scalar counts, the minimum
+finite **raw** power before incident normalization (or `null` if none is finite),
+and the first invalid flattened index. Spectrum failures also identify its energy
+in eV; both spectrum and temporal failures identify the incident sample count and
+physical population. Negative infinity counts as nonfinite, not finite negative.
+A nonfinite failure calls for checking numerical inputs and arithmetic; finite
+negative pair power calls for sample refinement and convergence checks.
+
+The remote harness persists these values as `sampling_diagnostics` in its failed
+JSON record and clears them after a successful retry. Reductions run on the active
+backend and transfer only scalars to the host. No power is clipped, normalized,
+resampled or accepted by this diagnostic. The historical short-bunch record above
+has no separate counts; this addition does not infer its cause or certify sampling
+convergence. Synthetic CPU regressions cover mixed failures, all-nonfinite power,
+energy/population context, unchanged arrays, strict JSON persistence and retry.

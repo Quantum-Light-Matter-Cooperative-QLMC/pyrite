@@ -239,9 +239,20 @@ def _finalize_spectrum(st):
     spec_pxr = st.spec_pxr
     spec_cbs = st.spec_cbs
     if st.request.coherent and st.request.physical_electrons is not None:
-        require_resolved_power(spec)
+        require_resolved_power(
+            spec,
+            energy_eV=st.E_grid,
+            incident_samples=Ne,
+            physical_electrons=st.request.physical_electrons,
+            quantity="spectral_power",
+        )
         if st.temporal_buf is not None:
-            require_resolved_power(st.temporal_buf)
+            require_resolved_power(
+                st.temporal_buf,
+                incident_samples=Ne,
+                physical_electrons=st.request.physical_electrons,
+                quantity="temporal_power",
+            )
     if st.temporal_buf is not None:
         st.request.temporal.commit(st.temporal_buf, 1.0 / Ne)
 
