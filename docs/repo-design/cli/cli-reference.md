@@ -2804,13 +2804,14 @@ Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|sbethe|sbethe-
                  catalogue material may contain, so no BremsLib checkout is
                  needed for them.
 
-  Without CODE every one is fetched in the order above; one that fails is reported and
-  the rest still run, and the command exits 1 if any failed. Data lands in the user data
-  directory, or in the selected workspace when PYRITE_HOME or workspace.root is set.
-  Each archive or file is SHA-256 verified before anything is installed, whether it was
-  downloaded or given with --archive. Download locations are tried in order (upstream,
-  then PyRITE's mirror). A complete existing install returns successfully without
-  network access.
+  Without CODE every one is fetched in the order above, sbethe-tables and elsepa for
+  both electrons and positrons (the positron pins are what `--projectile positron`
+  installs); one that fails is reported and the rest still run, and the command exits 1
+  if any failed. Data lands in the user data directory, or in the selected workspace
+  when PYRITE_HOME or workspace.root is set. Each archive or file is SHA-256 verified
+  before anything is installed, whether it was downloaded or given with --archive.
+  Download locations are tried in order (upstream, then PyRITE's mirror). A complete
+  existing install returns successfully without network access.
 
   PyRITE's own archives (epdl, sbethe-tables, elsepa, bremslib, and the eedl and eadl
   mirrors) are on public GitHub Releases; downloading them needs no GitHub token.

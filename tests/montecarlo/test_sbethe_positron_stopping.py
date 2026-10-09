@@ -11,6 +11,7 @@ from pyrite.montecarlo.transport.shell_rates import (
     adopted_stopping_cs,
     catalog_shell_oscillators,
 )
+from tests.helpers.positron_tables import require_positron_sbethe_tables
 
 KEYS = ("silicon", "mos2", "ws2")
 HIGH_ENERGIES_EV = (1.0e6, 3.0e6, 1.0e7, 3.0e7, 1.0e8)
@@ -18,14 +19,9 @@ HIGH_ENERGIES_EV = (1.0e6, 3.0e6, 1.0e7, 3.0e7, 1.0e8)
 
 @pytest.fixture(autouse=True)
 def _require_tables():
-    from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
-
     if not config._default_path().is_file():
         pytest.skip("pinned SBETHE reference data have not been fetched")
-    try:
-        resolve_catalog_table("silicon", projectile="positron")
-    except Exception as error:  # pragma: no cover - depends on fetched tables
-        pytest.skip(f"positron SBETHE tables are not installed: {error}")
+    require_positron_sbethe_tables()
 
 
 @pytest.mark.parametrize("key", KEYS)

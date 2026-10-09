@@ -20,6 +20,7 @@ from pyrite.montecarlo.transport.hard_inelastic import (
     _sample_hard_transfer_eV,
 )
 from pyrite.montecarlo.transport.secondaries import LAUNCH_POSITRON, secondary_energy_balance
+from tests.helpers.positron_tables import require_positron_tables
 
 from .test_pair_production_cuda import CUDA, HOST, _boost_pairs  # noqa: F401
 from .test_pair_production_cuda import _cascade as _pair_cascade
@@ -39,12 +40,7 @@ pytestmark = [
 
 @pytest.fixture(autouse=True)
 def _require_positron_tables(_boost_pairs):  # noqa: F811 - the boosted pair fixture
-    from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
-
-    try:
-        resolve_catalog_table("silicon", projectile="positron")
-    except Exception as error:
-        pytest.skip(f"positron tables are not installed: {error}")
+    require_positron_tables()
 
 
 def _inputs():

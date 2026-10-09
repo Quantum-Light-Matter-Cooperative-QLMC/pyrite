@@ -7,17 +7,14 @@ import numpy as np
 import pytest
 
 from pyrite.montecarlo.transport.pair_production import PAIR_THRESHOLD_EV
-from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
+from tests.helpers.positron_tables import require_positron_tables
 
 from .test_pair_production import _cascade
 
 
 @pytest.fixture(autouse=True)
 def _require_positron_tables():
-    try:
-        resolve_catalog_table("silicon", projectile="positron")
-    except Exception as error:  # pragma: no cover - depends on fetched tables
-        pytest.skip(f"positron tables are not installed: {error}")
+    require_positron_tables()
 
 
 def _positrons(monkeypatch, **kw):

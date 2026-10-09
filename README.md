@@ -32,7 +32,7 @@ Requires Python ≥3.14 and [uv](https://docs.astral.sh/uv/).
 git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git pyrite
 cd pyrite
 uv sync
-uv run pyrite tables fetch   # every pinned dataset and table (about 100 MB): EEDL, EADL, EPDL, SBETHE, ELSEPA, BremsLib
+uv run pyrite tables fetch   # every pinned dataset and table (about 140 MB): EEDL, EADL, EPDL, SBETHE, ELSEPA, BremsLib, positron SBETHE/ELSEPA
 uv run pyrite config setup   # optional first-run backend detection
 uv run pyrite --help
 ```

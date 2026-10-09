@@ -695,10 +695,10 @@ def _fake_fetches(monkeypatch, tmp_path, failing=()):
     calls = []
 
     def table_fetch(code):
-        def fetch(archive=None):
-            calls.append(code)
-            if code in failing:
-                raise DataFetchError(f"{code} unreachable")
+        def fetch(archive=None, *, projectile="electron"):
+            calls.append(code if projectile == "electron" else f"{code}:{projectile}")
+            if calls[-1] in failing:
+                raise DataFetchError(f"{calls[-1]} unreachable")
             return FetchResult(code, tmp_path / code, "a" * 64, 3, True)
 
         return fetch
@@ -720,14 +720,40 @@ def _fake_fetches(monkeypatch, tmp_path, failing=()):
     return calls
 
 
-def test_bare_fetch_installs_every_code_in_order(isolated, monkeypatch, tmp_path):
+_BARE_ORDER = [
+    "eedl",
+    "eadl",
+    "epdl",
+    "sbethe",
+    "sbethe-tables",
+    "sbethe-tables:positron",
+    "elsepa",
+    "elsepa:positron",
+    "bremslib",
+]
+
+
+def test_bare_fetch_installs_every_code_and_positron_pin_in_order(isolated, monkeypatch, tmp_path):
     calls = _fake_fetches(monkeypatch, tmp_path)
 
     result = invoke(tables_command.command, ["fetch"])
 
     assert result.exit_code == 0
-    assert calls == list(tables_command.FETCH_CODES)
-    assert result.stdout.count("installed: ") == len(tables_command.FETCH_CODES)
+    assert calls == _BARE_ORDER
+    assert result.stdout.count("installed: ") == len(_BARE_ORDER)
+    assert result.stdout.count("(3 positron tables)") == 2
+
+
+def test_bare_fetch_reports_a_failed_positron_pin_separately(isolated, monkeypatch, tmp_path):
+    calls = _fake_fetches(monkeypatch, tmp_path, failing=("elsepa:positron",))
+
+    result = invoke(tables_command.command, ["fetch"])
+
+    assert result.exit_code == 1
+    assert calls == _BARE_ORDER
+    assert "failed: elsepa (positron): elsepa:positron unreachable" in result.stderr
+    assert "1 of 9 failed: elsepa (positron)" in result.stderr
+    assert "(3 positron tables)" in result.stdout
 
 
 def test_bare_fetch_reports_a_failure_runs_the_rest_and_exits_1(isolated, monkeypatch, tmp_path):
@@ -736,9 +762,9 @@ def test_bare_fetch_reports_a_failure_runs_the_rest_and_exits_1(isolated, monkey
     result = invoke(tables_command.command, ["fetch"])
 
     assert result.exit_code == 1
-    assert calls == list(tables_command.FETCH_CODES)
+    assert calls == _BARE_ORDER
     assert "failed: epdl: epdl unreachable" in result.stderr
-    assert "1 of 7 failed: epdl" in result.stderr
+    assert "1 of 9 failed: epdl" in result.stderr
     assert "epdl" not in result.stdout
 
 
@@ -750,12 +776,29 @@ def test_bare_fetch_json_lists_results_and_failures(isolated, monkeypatch, tmp_p
     assert result.exit_code == 1
     envelope = json.loads(result.stdout)
     assert envelope["schema"] == "pyrite.tables.fetch-all.v1"
-    assert [row["code"] for row in envelope["payload"]["results"]] == [
-        code for code in tables_command.FETCH_CODES if code != "bremslib"
-    ]
+    assert [
+        (row["code"], row.get("projectile", "electron")) for row in envelope["payload"]["results"]
+    ] == [step for step in tables_command.BARE_FETCH_STEPS if step[0] != "bremslib"]
     assert envelope["payload"]["failed"] == [
         {"code": "bremslib", "message": "bremslib unreachable"}
     ]
+
+
+def test_bare_fetch_json_tags_positron_failures(isolated, monkeypatch, tmp_path):
+    _fake_fetches(monkeypatch, tmp_path, failing=("sbethe-tables:positron",))
+
+    result = invoke(tables_command.command, ["fetch", "-o", "json"])
+
+    assert result.exit_code == 1
+    envelope = json.loads(result.stdout)
+    assert envelope["payload"]["failed"] == [
+        {
+            "code": "sbethe-tables",
+            "projectile": "positron",
+            "message": "sbethe-tables:positron unreachable",
+        }
+    ]
+    assert envelope["errors"][0]["message"] == "sbethe-tables (positron)"
 
 
 def test_archive_without_a_code_is_a_usage_error(isolated, tmp_path):
