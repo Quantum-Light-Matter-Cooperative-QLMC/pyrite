@@ -63,6 +63,8 @@ _PAIR_PRODUCTION_MODEL_VALUES = ("penelope-2024",)
 _ATOMIC_ELECTRON_DEFLECTION_VALUES = ("kawrakow", "none")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
+    "line-trials": "n_electrons",
+    "brem-trials": "n_electrons_brem",
     "line-electrons": "n_electrons",
     "bremsstrahlung-electrons": "n_electrons_brem",
     "reflection-families": "n_families",
@@ -90,8 +92,8 @@ _RANGE_OPTIONS = (
     ("azimuth", "--azimuth", AZIMUTH_CSV_RANGE, "DEG,..."),
 )
 _PROFILE_UPDATE_LABELS = {
-    "ne_line": "line electrons",
-    "ne_brem": "bremsstrahlung electrons",
+    "ne_line": "line trials",
+    "ne_brem": "bremsstrahlung trials",
 }
 
 #: Electron-count profile settings (plan P2.4): single-value grids, sweepable.
@@ -105,19 +107,21 @@ def _catalog_key(label):
 def _ne_cli_options(function):
     function = click.option(
         "-b",
+        "--brem-trials",
         "--ne-brem",
         "ne_brem",
         type=COUNT_CSV,
         metavar="N,...",
-        help="Bremsstrahlung transport electron counts; positive integers.",
+        help="Monte Carlo electron histories used to estimate bremsstrahlung; positive integers.",
     )(function)
     function = click.option(
         "-l",
+        "--line-trials",
         "--ne-line",
         "ne_line",
         type=COUNT_CSV,
         metavar="N,...",
-        help="Line-spectrum transport electron counts; positive integers.",
+        help="Monte Carlo electron histories used to estimate the line spectrum; positive integers.",
     )(function)
     return function
 
@@ -372,7 +376,7 @@ def command():
       pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
       pyrite profile create sub_100keV --energy 30:100:10
       pyrite profile set sub_100keV --detector eds
-      pyrite profile numerics set sub_100keV --line-electrons 2000
+      pyrite profile numerics set sub_100keV --line-trials 2000
       pyrite profile line-grid show sub_100keV
       pyrite profile add sub_100keV --energy 75
       pyrite profile set sub_100keV --material hopg,mose2
@@ -444,13 +448,20 @@ def numerics_show_command(name, fidelity, json_output):
 @numerics_command.command("set")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @click.option(
-    "--line-electrons", type=click.IntRange(min=1), metavar="N", help="Line-spectrum samples."
-)
-@click.option(
-    "--bremsstrahlung-electrons",
+    "--line-trials",
+    "--line-electrons",
+    "line_electrons",
     type=click.IntRange(min=1),
     metavar="N",
-    help="Bremsstrahlung samples.",
+    help="Monte Carlo electron histories used to estimate the line spectrum.",
+)
+@click.option(
+    "--brem-trials",
+    "--bremsstrahlung-electrons",
+    "bremsstrahlung_electrons",
+    type=click.IntRange(min=1),
+    metavar="N",
+    help="Monte Carlo electron histories used to estimate bremsstrahlung.",
 )
 @click.option(
     "--reflection-families",

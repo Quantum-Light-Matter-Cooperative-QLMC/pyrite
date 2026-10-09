@@ -212,11 +212,13 @@ def _reject_remote_local_options(ctx: click.Context, json_output: bool) -> None:
     help="Catalog profile for legacy data; otherwise must match checkpoint metadata.",
 )
 @click.option(
+    "--brem-trials",
     "--ne-brem",
+    "ne_brem",
     type=_cli_core.POSITIVE_INT,
     default=None,
     metavar="N",
-    help="Bremsstrahlung electron count; overrides profile default.",
+    help="Monte Carlo electron histories used to estimate bremsstrahlung; overrides profile default.",
 )
 @click.option(
     "--start",

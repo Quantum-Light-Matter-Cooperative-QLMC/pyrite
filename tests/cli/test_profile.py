@@ -1,5 +1,6 @@
 import json
 
+import pytest
 import tomlkit
 
 from pyrite import _energy_grid_artifacts as artifacts
@@ -570,8 +571,64 @@ def test_set_reports_a_new_profile_parameter(tmp_path, monkeypatch):
 
     assert_clean_result(
         result,
-        stdout="updated profile sub_100keV: line electrons set to 100, 200\n",
+        stdout="updated profile sub_100keV: line trials set to 100, 200\n",
     )
+
+
+@pytest.mark.parametrize("verb", ["create", "set", "add"])
+@pytest.mark.parametrize(
+    ("line_flag", "brem_flag"),
+    [("--line-trials", "--brem-trials"), ("-l", "-b"), ("--ne-line", "--ne-brem")],
+)
+def test_profile_trial_grids_keep_catalog_keys(tmp_path, monkeypatch, verb, line_flag, brem_flag):
+    catalog = _catalog(tmp_path, monkeypatch)
+    name = "trial_scan" if verb == "create" else "sub_100keV"
+
+    result = invoke(profile.command, [verb, name, line_flag, "100,200", brem_flag, "50,75"])
+
+    assert_clean_result(result)
+    row = tomlkit.parse(catalog.read_text())["profiles"][name]
+    assert row["n_electrons"]["values"] == [100, 200]
+    assert row["n_electrons_brem"]["values"] == [50, 75]
+    assert "line_trials" not in row
+    assert "brem_trials" not in row
+
+
+@pytest.mark.parametrize("flag", ["--line-trials", "--brem-trials"])
+@pytest.mark.parametrize("value", ["0", "-1", "10,0"])
+def test_profile_trial_grids_reject_nonpositive_counts(tmp_path, monkeypatch, flag, value):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["set", "sub_100keV", flag, value])
+
+    assert result.exit_code == 2
+    assert flag in result.stderr
+    assert catalog.read_text() == _CATALOG
+
+
+@pytest.mark.parametrize(
+    ("line_field", "brem_field"),
+    [("line-trials", "brem-trials"), ("line-electrons", "bremsstrahlung-electrons")],
+)
+def test_numerics_trial_aliases_set_and_reset(tmp_path, monkeypatch, line_field, brem_field):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    result = invoke(
+        profile.command,
+        ["numerics", "set", "sub_100keV", f"--{line_field}", "100", f"--{brem_field}", "50"],
+    )
+
+    assert_clean_result(result)
+    row = tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]
+    assert row["n_electrons"]["values"] == [100]
+    assert row["n_electrons_brem"]["values"] == [50]
+
+    reset = invoke(profile.command, ["numerics", "reset", "sub_100keV", line_field, brem_field])
+
+    assert_clean_result(reset)
+    row = tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]
+    assert "n_electrons" not in row
+    assert "n_electrons_brem" not in row
 
 
 def test_set_unknown_material_in_membership_errors(tmp_path, monkeypatch):

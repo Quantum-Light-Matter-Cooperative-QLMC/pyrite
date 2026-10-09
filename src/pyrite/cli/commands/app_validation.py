@@ -122,11 +122,13 @@ def _cli(args):
     help="With --export, Fig. 1c line electrons per energy.",
 )
 @click.option(
+    "--brem-trials",
     "--ne-brem",
+    "ne_brem",
     type=_cli_core.POSITIVE_INT,
     default=200,
     show_default=True,
-    help="With --export, Fig. 1c bremsstrahlung electrons per energy.",
+    help="With --export, Monte Carlo electron histories for Fig. 1c bremsstrahlung per energy.",
 )
 @click.option(
     "--ne-supp",

@@ -239,7 +239,7 @@ def precision_reset_command(name, fields, yes, dry_run):
     """Reset optional FIELDs to defaults, or remove the policy when none are named.
 
     Removing the policy returns PROFILE to the default adaptive policy; set fixed
-    counts with 'pyrite profile numerics set --line-electrons' to opt out.
+    counts with 'pyrite profile numerics set --line-trials' to opt out.
     """
     keys = tuple(_PRECISION_FIELD_NAMES[field] for field in fields)
     try:
