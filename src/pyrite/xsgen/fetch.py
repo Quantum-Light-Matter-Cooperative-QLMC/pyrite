@@ -532,7 +532,8 @@ def fetch_elsepa(
     compiler).
 
     ``projectile`` selects the electron or positron pin when ``index`` is
-    omitted; the positron archive is the ``tables-elsepa-positron-1`` release.
+    omitted; the positron archive is the ``tables-elsepa-positron-*`` release
+    pinned in ``elsepa-positron-tables.json``.
 
     Raises
     ------
@@ -565,7 +566,8 @@ def fetch_sbethe_tables(
     model read.
 
     ``projectile`` selects the electron or positron pin when ``index`` is
-    omitted; the positron archive is the ``tables-sbethe-positron-1`` release.
+    omitted; the positron archive is the ``tables-sbethe-positron-*`` release
+    pinned in ``sbethe-positron-tables.json``.
 
     Raises
     ------
