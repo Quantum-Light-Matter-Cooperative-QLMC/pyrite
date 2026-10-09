@@ -1,4 +1,6 @@
 scratch/
+trajectories/
+traj-vtk/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
