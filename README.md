@@ -22,7 +22,7 @@ effects in crystals below 100 MeV.
 
 PyRITE is developed in a public GitHub repository. See the
 [source repository](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite)
-or the [published documentation](https://quantum-light-matter-cooperative-qlmc.github.io/pyrite/).
+or the [published documentation](https://pyrite.readthedocs.io/en/latest/).
 
 ## Install
 
