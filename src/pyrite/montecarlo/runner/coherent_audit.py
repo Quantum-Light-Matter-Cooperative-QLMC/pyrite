@@ -82,8 +82,15 @@ class CoherentGridAudit:
                 sigma_z_ang=longitudinal_rms_fs(self.case) * C_ANG_PER_FS,
             )
 
+            # A recorded spot multiplies F_z by a row-dependent 0 <= F_perp <= 1:
+            # keep the F_z upper bound and relax the lower bound to zero.
+            # Validation: transverse-bunch-form-factor
+            transverse = getattr(st, "transverse", None) is not None
+
             def scaled_bounds(lo, hi):
                 lower, upper = bounds(lo, hi)
+                if transverse:
+                    lower = 0.0
                 return (
                     max(0.0, float(np.nextafter(scale * lower, -np.inf))),
                     float(np.nextafter(scale * upper, np.inf)),

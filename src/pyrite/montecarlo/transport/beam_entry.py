@@ -8,10 +8,10 @@ counter-addressed per electron inside that namespace (#361).
 
 import numpy as np
 
-from ..geometry import project_beam_entry
+from ..geometry import face_arrival_path_ang, project_beam_entry
 from ..groove import entry_points
 from ..transverse import resolved_from_mapping, sample_transverse
-from .kinematics import child_stream_root, counter_normals
+from .kinematics import beta_from_keV, child_stream_root, counter_normals
 
 
 def initial_beam_positions(
@@ -90,6 +90,80 @@ def initial_beam_positions(
         pos[:, 0] = x_e
         pos[:, 2] = z_e
     return pos, transverse_slopes
+
+
+def beam_entry_record(
+    *,
+    transverse_distribution,
+    beam_fwhm_mm,
+    beam_fwhm_y_mm,
+    tilt_polar_rad,
+    tilt_azim_rad,
+    E0_keV,
+    energy_spread_frac,
+    groove,
+):
+    """Plain-data description of the analytic incident spot, for coherent averages.
+
+    ``spot_covariance_ang2`` is the lab ``(u, v)`` position covariance [Ang^2]
+    of the sampled Gaussian spot (``diag(sigma_x^2, sigma_y^2)``; Twiss
+    ``sigma^2 = eps beta``), or ``None`` without an analytic spot.
+    ``face_arrival_delay`` marks that each electron's ``t0`` includes its
+    vacuum flight ``s*/beta`` to the tilted face (:func:`face_arrival_delay_ang`).
+    Tuples and scalars only: electron-block joins take metadata from the first
+    block, and trajectory artifacts store it as JSON.
+
+    Validation: transverse-bunch-form-factor
+    """
+    MM2_TO_ANG2 = 1.0e14
+    covariance = None
+    correlated = False
+    if transverse_distribution is not None:
+        resolved = resolved_from_mapping(transverse_distribution)
+        covariance = (
+            (resolved.x.sigma_position_mm**2 * MM2_TO_ANG2, 0.0),
+            (0.0, resolved.y.sigma_position_mm**2 * MM2_TO_ANG2),
+        )
+        correlated = bool(resolved.x.alpha_twiss or resolved.y.alpha_twiss)
+    elif beam_fwhm_mm or beam_fwhm_y_mm:
+        fwhm_to_sigma = 1.0 / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+        fwhm_y = beam_fwhm_mm if beam_fwhm_y_mm is None else beam_fwhm_y_mm
+        sigma_x = float(beam_fwhm_mm or 0.0) * fwhm_to_sigma
+        sigma_y = float(fwhm_y or 0.0) * fwhm_to_sigma
+        covariance = ((sigma_x**2 * MM2_TO_ANG2, 0.0), (0.0, sigma_y**2 * MM2_TO_ANG2))
+    return {
+        "tilt_polar_rad": float(tilt_polar_rad or 0.0),
+        "tilt_azim_rad": float(tilt_azim_rad or 0.0),
+        "E0_keV": float(E0_keV),
+        "energy_spread": bool(energy_spread_frac),
+        "spot_covariance_ang2": covariance,
+        "position_slope_correlated": correlated,
+        "face_arrival_delay": covariance is not None and groove is None,
+    }
+
+
+def face_arrival_delay_ang(record, initial_r_ang, initial_E_keV):
+    """Per-electron vacuum flight time ``s*/beta`` [Ang, c=1] to the entry face.
+
+    ``t0`` is the bunch time at the lab plane through the sample origin
+    perpendicular to the beam; electron ``e`` reaches its tilted-face point
+    ``s*_e / beta_e`` later (:func:`~pyrite.montecarlo.geometry.face_arrival_path_ang`).
+    The pulse front is then perpendicular to the beam, not parallel to the
+    face. Zero tilt, no analytic spot, or a groove give zeros, so those
+    inputs keep their historical ``t0`` bit for bit. GDF beams already carry
+    their own drift time.
+
+    Source: ray-plane intersection plus constant-velocity vacuum flight.
+    Validation: grazing-beam-projection, transverse-bunch-form-factor
+    """
+    initial_r_ang = np.asarray(initial_r_ang, dtype=float)
+    n_electrons = initial_r_ang.shape[0]
+    if not record or not record["face_arrival_delay"] or not record["tilt_polar_rad"]:
+        return np.zeros(n_electrons)
+    path = face_arrival_path_ang(
+        initial_r_ang[:, :2], record["tilt_polar_rad"], record["tilt_azim_rad"]
+    )
+    return path / beta_from_keV(np.asarray(initial_E_keV, dtype=float))
 
 
 def initial_energies_keV(E0_keV, Ne, seed, energy_spread_frac, *, start=0):

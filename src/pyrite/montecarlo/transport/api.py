@@ -19,7 +19,9 @@ from .batching import (
     resolve_transport_core,
 )
 from .beam_entry import (
+    beam_entry_record,
     check_electron_block,
+    face_arrival_delay_ang,
     initial_beam_positions,
     initial_energies_keV,
     table_energy_range,
@@ -720,10 +722,27 @@ def simulate_trajectories(
         seed,
         longitudinal_distribution,
     )
+    beam_entry = None
     if gdf_t0 is not None:
         t0_electron = gdf_t0
     elif launch is not None:
         clock, t0_electron = launch.t_ang.copy(), launch.t0_ang.copy()
+    else:
+        # A tilted face meets the analytic spot's pulse front obliquely: each
+        # electron arrives s*/beta after its bunch time (GDF beams already
+        # carry this drift). Zero tilt adds exact zeros.
+        # Validation: transverse-bunch-form-factor
+        beam_entry = beam_entry_record(
+            transverse_distribution=transverse_distribution,
+            beam_fwhm_mm=beam_fwhm_mm,
+            beam_fwhm_y_mm=beam_fwhm_y_mm,
+            tilt_polar_rad=tilt_polar_rad,
+            tilt_azim_rad=tilt_azim_rad,
+            E0_keV=E0_keV,
+            energy_spread_frac=energy_spread_frac,
+            groove=groove,
+        )
+        t0_electron = t0_electron + face_arrival_delay_ang(beam_entry, pos, E_keV)
     # Snapshot before transport mutates ``pos``, ``dirs``, and ``E``. These
     # arrays describe incident phase space, including particles that miss a
     # finite footprint.
@@ -1191,6 +1210,8 @@ def simulate_trajectories(
         "crystal_width_ang": width_ang,
         "crystal_height_ang": height_ang,
         "n_layers": n_layers,
+        # Plain-data analytic spot and face-arrival convention (or None).
+        "beam_entry": beam_entry,
     }
     if prepared_stopping_tables is not None:
         # Prepared (log-transformed) per-layer SBETHE tables, so post-transport

@@ -106,3 +106,14 @@ Probe script (fresh formulas `M_ref` and own Rodrigues `R`, not implementation h
 - Filters: units pass; limits pass; signs/conventions pass.
 - Re-derivation: **matches** — closed form `M = I + (1/cosθ − 1) â âᵀ`, ray–plane intersection, Rodrigues rotation, and `n_missed`/`Ne` wiring all agree symbolically and numerically.
 - Suggested status: `unverified → rederived` (human applies; `signed-off` reserved for human adjudication).
+
+## Face-arrival delay (2026-10-08, #370)
+
+The same intersection gives each electron's vacuum path to the face,
+$s^*=-o_z/b_z=\mathbf p_0\cdot\mathbf b$, since $\mathbf o\perp\mathbf b$.
+Analytic-spot transport now adds $s^*/\beta$ to $t_0$, so the bunch's pulse front
+is perpendicular to the beam rather than parallel to the tilted face; zero tilt
+adds exact zeros, and electron blocks restore it after resampling bunch offsets.
+GDF beams already included their drift; grooved entries are unchanged. The
+projection Jacobian $J=\partial\mathbf p_{0,xy}/\partial(u,v)$ feeds the coherent
+transverse form factor ([`transverse-bunch-form-factor`](../radiation-physics/transverse-bunch-form-factor.md)).

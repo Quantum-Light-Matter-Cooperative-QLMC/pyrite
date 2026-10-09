@@ -16,6 +16,7 @@ from ...._backend import REAL, _to_cpu, xp
 from ....materials.attenuation import _mu_total_inv_ang
 from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
 from ..coherent_population import mixed_row_power, pair_scale
+from ..coherent_transverse import transverse_envelope, transverse_form_factor
 from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._bin_quadrature import sincsq_bin_lineshape
@@ -140,8 +141,11 @@ def _row_decoherence_factor(st, g_vec_d):
     """Inter-electron factor for one row.
 
     Infinite slabs use the empirical joint longitudinal/transverse
-    characteristic function. Finite footprints retain their coupled
-    sampled transverse fields and use only analytic Gaussian ``F_z``.
+    characteristic function. Finite footprints pair offset-free fields with
+    analytic Gaussian ``F_z`` times, for a recorded spot, the row's
+    ``F_perp = exp(-K^T Sigma_f K)``.
+
+    Validation: transverse-bunch-form-factor
     """
     req = st.request
     chunk = req.chunk
@@ -154,18 +158,18 @@ def _row_decoherence_factor(st, g_vec_d):
     decoherence_A_pop = st.decoherence_A_pop
     xy0_pop = st.xy0_pop
 
+    if decoherence_active and finite_footprint_now:
+        if st.transverse is None:
+            return finite_footprint_F
+        omega64 = xp.asarray(omega_grid, dtype=np.float64)
+        F_perp = transverse_form_factor(st.transverse, omega64, st.n_hat, g_vec_d, xp=xp)
+        return (finite_footprint_F * F_perp.astype(REAL)).astype(REAL)
     if req.physical_electrons is not None:
         # Physical pairs use complete sampled fields on infinite slabs; no
         # second empirical F estimator or offset/field independence is needed.
-        return (
-            finite_footprint_F
-            if decoherence_active and finite_footprint_now
-            else xp.ones(E_grid.size, dtype=REAL)
-        )
+        return xp.ones(E_grid.size, dtype=REAL)
     if not decoherence_active:
         return None
-    if finite_footprint_now:
-        return finite_footprint_F
     B_pop = xy0_pop @ g_vec_d[:2]
     chi_sum = xp.zeros(E_grid.size, dtype=cdtype)
     for j0 in range(0, decoherence_A_pop.size, chunk):
@@ -479,6 +483,9 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
         # Validation: coherent-line-grid-windowed-resolution
         st.capture_phase_rad = g_phase
         st.capture_mosaic_weight = float(wm)
+        st.capture_transverse_envelope = (
+            None if st.transverse is None else transverse_envelope(st.transverse, st.n_hat, g_vec_d)
+        )
         req.coefficient_capture(st, idx, coefs, good, lines)
 
     # GPU float32 fast path: reduce the two complex polarization fields

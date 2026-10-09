@@ -163,9 +163,10 @@ def mc_spectrum(
         coefficients, formation-valid mask and formation constants, exactly
         as the reducer uses them. Read-only diagnostic hook for coherent
         line-grid windows; forces the per-hkl route and leaves the spectrum
-        unchanged. The setup exposes ``capture_phase_rad`` and
-        ``capture_mosaic_weight`` for the current row's midpoint phase and
-        production intensity weight. Validation: coherent-line-grid-windowed-resolution
+        unchanged. The setup exposes ``capture_phase_rad``,
+        ``capture_mosaic_weight`` and ``capture_transverse_envelope`` for the
+        current row's midpoint phase, production intensity weight and
+        nonincreasing transverse form-factor bound (or ``None``). Validation: coherent-line-grid-windowed-resolution
     coherent_flat_omission_limit
         Nonnegative share of a row's per-electron floor ``sum_e |S_e|^2`` that
         the inter-electron estimator may omit. Where ``F (N - 1)`` is at most

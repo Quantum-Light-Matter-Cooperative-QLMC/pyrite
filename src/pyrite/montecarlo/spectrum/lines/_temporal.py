@@ -56,6 +56,7 @@ from ...._backend import _to_cpu, xp
 from ....materials.crystal import HBARC_EV_ANG
 from ...transport import beta_from_keV
 from ...transport.kinematics import C_ANG_PER_FS
+from ..coherent_transverse import transverse_form_factor
 
 #: Upper bound on the FFT length (time samples). One coherent row materializes
 #: ``block x n`` complex fields, so the bound keeps opt-in runs from silently
@@ -404,7 +405,10 @@ def coherent_offset_chi(st, profile, g_vec_d):
     Mirrors ``_row_decoherence_factor``: the empirical
     ``mean_e exp[i(omega A_e - B_e)]`` for an infinite slab, the analytic
     Gaussian longitudinal ``exp[-(omega sigma_z)^2 / 2]`` for a finite
-    footprint. Returns ``None`` without offsets.
+    footprint, times the row's transverse ``exp(-K^T Sigma_f K / 2)`` with a
+    recorded spot. Returns ``None`` without offsets.
+
+    Validation: transverse-bunch-form-factor
     """
     if st.request.physical_electrons is not None and not st.finite_footprint_now:
         return None
@@ -413,7 +417,12 @@ def coherent_offset_chi(st, profile, g_vec_d):
     omega = profile.energy_grid() / HBARC_EV_ANG
     if st.finite_footprint_now:
         sigma_z = float(st.request.longitudinal_rms_fs) * C_ANG_PER_FS
-        return xp.exp(-0.5 * (omega * sigma_z) ** 2).astype(np.complex128)
+        chi = xp.exp(-0.5 * (omega * sigma_z) ** 2)
+        if st.transverse is not None:
+            chi = chi * transverse_form_factor(
+                st.transverse, omega, st.n_hat, g_vec_d, xp=xp, amplitude=True
+            )
+        return chi.astype(np.complex128)
     A = xp.asarray(st.decoherence_A_pop, dtype=np.float64)
     B = xp.asarray(st.xy0_pop, dtype=np.float64) @ xp.asarray(g_vec_d, dtype=np.float64)[:2]
     chi = xp.zeros(profile.n, dtype=np.complex128)

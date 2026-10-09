@@ -229,6 +229,8 @@ def test_zero_emittance_transport_converges_to_the_collimated_run():
     # The three geometry arrays inherit the vanishing offset; everything else,
     # including every energy, length, clock and exit tally, is exact.
     vanishing = ("initial_r_ang", "initial_v_hat", "r_mid", "v_hat")
+    # ``beam_entry`` describes the requested beam (a Twiss spot), not transport.
+    baseline = {key: value for key, value in baseline.items() if key != "beam_entry"}
     for key in vanishing:
         assert np.abs(collimated[key] - baseline[key]).max() < 1e-100, key
     for key, expected in baseline.items():

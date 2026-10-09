@@ -327,9 +327,8 @@ def test_long_gaussian_bunch_supports_finite_footprint():
 
 
 def test_finite_footprint_partially_coherent_longitudinal_blend():
-    """Arrival-time averaging remains exact when transverse position affects
-    amplitude: retain each sampled finite-footprint field and blend only its
-    independent longitudinal cross terms.
+    """Arrival-time averaging of distinct finite-footprint fields: blend only
+    the independent longitudinal cross terms of the offset-free fields.
 
     Validation: finite-footprint-longitudinal-decoherence
     """
@@ -341,7 +340,7 @@ def test_finite_footprint_partially_coherent_longitudinal_blend():
         r_mid=positions,
         t0_ang=np.array([137.0, -412.0]),
         initial_t0_ang=np.array([137.0, -412.0]),
-        initial_r_ang=np.array([[1.0, 0.0, 0.0], [-2.0, 0.0, 0.0]]),
+        initial_r_ang=np.zeros((2, 3)),
     )
     actual = mc_spectrum(
         segments,
@@ -380,6 +379,21 @@ def test_finite_footprint_partially_coherent_longitudinal_blend():
     # F_z <= 1 bounding the rest.
     sensitivity = 2.0 * (float(np.max(energy_grid)) / HBARC_EV_ANG * sigma_z_ang) ** 2
     np.testing.assert_allclose(actual, expected, rtol=_blend_rtol(sensitivity), atol=peak * 1e-12)
+
+
+def test_finite_footprint_transverse_offsets_need_a_recorded_spot():
+    """Surviving cross terms need the analytic transverse average, hence a spot.
+
+    Validation: transverse-bunch-form-factor
+    """
+    segments = _segments(2)
+    segments.update(
+        t0_ang=np.array([137.0, -412.0]),
+        initial_t0_ang=np.array([137.0, -412.0]),
+        initial_r_ang=np.array([[1.0, 0.0, 0.0], [-2.0, 0.0, 0.0]]),
+    )
+    with pytest.raises(ValueError, match="recorded Gaussian beam spot"):
+        mc_spectrum(segments, E_GRID, coherent=True, longitudinal_rms_fs=1.0e-3, **KWARGS)
 
 
 def test_identical_in_phase_electrons_reach_n_squared_limit():

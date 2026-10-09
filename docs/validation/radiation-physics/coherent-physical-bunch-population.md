@@ -44,8 +44,9 @@ are iid and equally weighted and the analytic $F$ is independent of those fields
 Infinite slabs use complete fields, including sampled offsets, with $F=1$.
 They use no empirical characteristic-function multiplier, so correlated offsets
 and trajectory fields do not require a phase/field independence assumption.
-Finite footprints use only the supported independent Gaussian longitudinal
-average, with sampled transverse offsets retained in the fields. This does not
+Finite footprints pair offset-free fields with the analytic Gaussian
+longitudinal and tilted-face transverse averages, $F=F_zF_\perp$
+([`transverse-bunch-form-factor`](transverse-bunch-form-factor.md), #370). This does not
 prove iid/equal weighting for an arbitrary imported or structured source.
 
 The positive alternative $G/M+(N-1)F|\overline S|^2$ has bias
@@ -103,8 +104,8 @@ composition extension. Existing stored-input audit evidence remains scoped to
 its original operator; it does not validate this new estimator automatically.
 Temporal output scales its cross-electron difference by the same pair weight.
 
-Coherent grid cache revision is 7 and includes the physical population. Dataset
-and content identities carry `physical-distinct-pairs-v1` only for coherent
+Coherent grid cache revision is 8 (7 before #370) and includes the physical population. Dataset
+and content identities carry `physical-distinct-pairs-v2` (v1 before #370) only for coherent
 emission, preventing reuse of sampled-population spectra. Previous remote ladders
 remain evidence for their recorded operator; charge-weighted default-policy
 reference/thick runs must be repeated before production acceptance.

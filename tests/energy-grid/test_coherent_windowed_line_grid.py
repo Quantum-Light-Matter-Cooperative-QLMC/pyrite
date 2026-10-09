@@ -194,6 +194,26 @@ def test_real_gaps_do_not_cancel_under_retardation_translation(origin_ang):
     assert jumps.joints == 0
 
 
+def test_offset_free_centres_keep_the_transport_roundoff_budget():
+    """Subtracting a per-electron offset must not shrink the joint tolerance.
+
+    Abutting pieces whose transport coordinates were ~4e6 Ang carry ~1e-9 Ang
+    endpoint residuals. After an offset-free translation to ~1 Ang centres the
+    absolute-operand scale still joins them; a real 1 Ang gap stays a gap.
+    Validation: coherent-line-grid-windowed-resolution
+    """
+    from dataclasses import replace
+
+    field = _field(np.ones(4), 1000.0, 1.0)
+    residual = np.array([0.0, 1e-9, -1e-9, 1e-9])
+    shifted = replace(field, centre_ang=field.centre_ang + residual)
+    assert cw._RowJumps(shifted).joints < 3
+    scaled = replace(shifted, centre_scale_ang=np.full(4, 4.0e6))
+    assert cw._RowJumps(scaled).joints == 3
+    gapped = _field(np.ones(4), 1000.0, 1.0, gaps=np.ones(4))
+    assert cw._RowJumps(replace(gapped, centre_scale_ang=np.full(4, 4.0e6))).joints == 0
+
+
 @pytest.mark.parametrize("upper", [False, True])
 @pytest.mark.parametrize("copies", [1, 3])
 def test_continuous_attenuation_cusp_stays_inside_the_tail_bound(upper, copies):
