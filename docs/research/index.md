@@ -12,6 +12,7 @@ beam-transport/electron-transport-physics-recommendations
 beam-transport/energy-grid-recommendations
 beam-transport/stochastic-sampling-recommendations
 beam-transport/equal-precision-comparators
+beam-transport/detector-cone-line-variance
 ```
 
 ```{toctree}

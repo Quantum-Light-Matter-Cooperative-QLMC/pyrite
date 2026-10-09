@@ -70,6 +70,7 @@ def simulate_trajectories(
     _electron_start=0,
     _energy_range_keV=None,
     bunch_front_tilt=None,
+    _cone_split=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -476,7 +477,14 @@ def simulate_trajectories(
         _electron_start=_electron_start,
         _energy_range_keV=_energy_range_keV,
         bunch_front_tilt=bunch_front_tilt,
+        _cone_split=_cone_split,
     )
+    from .cone_split import ConeSplit
+
+    if isinstance(_cone_split, ConeSplit):
+        from .cone_split import transport_cone_split
+
+        return transport_cone_split(simulate_trajectories, inputs.as_kwargs())
     if (secondary_threshold_eV, pair_production_model, positron_transport) != (None, None, False):
         from .secondaries import transport_secondary_cascade
 

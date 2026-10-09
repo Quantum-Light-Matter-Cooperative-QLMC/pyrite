@@ -72,6 +72,7 @@ class TransportInputs:
     _secondary: Any
     _electron_start: Any
     _energy_range_keV: Any
+    _cone_split: Any
     bunch_front_tilt: Any
 
     def as_kwargs(self):

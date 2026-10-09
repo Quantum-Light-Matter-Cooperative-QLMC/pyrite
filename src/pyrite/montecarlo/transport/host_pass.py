@@ -38,6 +38,7 @@ from .cores import (
     _transport_core_ungrooved_lut_inelastic,
     _transport_core_ungrooved_perelectron_lut,
     _transport_core_ungrooved_perelectron_lut_inelastic,
+    cone_split_core,
     exact_ungrooved_core,
 )
 from .events import TransportStepLimitError
@@ -177,6 +178,7 @@ class _CoreOutcome:
     stragg_dE: Any
     seg_xp: Any
     vacuum: tuple
+    cone_split: Any = None
 
 
 _NO_VACUUM = (
@@ -345,6 +347,13 @@ def _checked_core(p, launch, electron_start):
         transport_core = resolve_transport_core(transport_core, p.Ne, p.groove)
     if transport_core != "lockstep" and p.groove is not None:
         raise ValueError("grooved transport is only implemented for the lockstep core")
+    if p._cone_split is not None and (
+        transport_core != "per-electron" or p.groove is not None or p.elastic_model != "elsepa"
+    ):
+        raise ValueError(
+            "detector-cone splitting runs only on the ungrooved per-electron CPU core "
+            "with elastic_model='elsepa'"
+        )
     if electron_start and transport_core == "lockstep":
         raise ValueError("electron blocks need counter-addressed streams, not the lockstep core")
     if p.keep_segments_on_device and transport_core != "cuda":
@@ -632,6 +641,8 @@ def _per_electron_core(t, lut):
     """Per-electron core and its array module; CUDA imports stay lazy."""
     shell_mode = t.controls.shell_mode
     cuda = t.controls.transport_core == "cuda"
+    if t.inputs._cone_split is not None:
+        return cone_split_core(inelastic=shell_mode, radiative=t.controls.radiative_mode), np
     if lut and cuda:
         if shell_mode:
             raise NotImplementedError(
@@ -659,6 +670,7 @@ def _run_per_electron(t, *, lut):
     """Batched per-electron CPU/CUDA transport, LUT or exact."""
     p, c, s, e, b = t.inputs, t.controls, t.stack, t.entry, t.buffers
     core, core_xp = _per_electron_core(t, lut)
+    split_args = None if p._cone_split is None else p._cone_split.core_args(t.transport_keys, p.Ne)
     common = (
         core,
         core_xp,
@@ -706,10 +718,13 @@ def _run_per_electron(t, *, lut):
         radiative = (t.radiative_args, b["seg_rad_k"], b["seg_rad_Z"])
         counts = _run_per_electron_transport(
             *common, *tables, *rows, t.straggle_on, t.stragg_dE, **options,
-            radiative=radiative if c.radiative_mode else None,
+            radiative=radiative if c.radiative_mode else None, split_args=split_args,
         )  # fmt: skip
     seg_xp = core_xp if p.keep_segments_on_device else np
-    return _CoreOutcome(*counts, seg_xp, _NO_VACUUM)
+    split_record = (
+        None if split_args is None else p._cone_split.collect(split_args, t.transport_keys, p.Ne)
+    )
+    return _CoreOutcome(*counts, seg_xp, _NO_VACUUM, split_record)
 
 
 def _energy_model_code(p):
@@ -928,6 +943,12 @@ def _assemble_result(t, o):
         "beam_entry": e.beam_entry,  # plain-data analytic spot, or None
     }
     _add_optional_fields(t, o, rows, result)
+    if p._cone_split is not None:
+        result["cone_split"] = o.cone_split
+        result["initial_E_cut_keV"] = np.asarray(c.E_cut, dtype=float).copy()
+        result["table_range_keV"] = table_energy_range(
+            c.E_cut, e.initial_E_keV, p._energy_range_keV
+        )
     return result
 
 

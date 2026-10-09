@@ -608,12 +608,12 @@
     {
       "path": "src/pyrite/montecarlo/transport/batching.py",
       "name": "_drive_per_electron_batches",
-      "cc": 27
+      "cc": 29
     },
     {
       "path": "src/pyrite/montecarlo/transport/cores.py",
       "name": "make_cpu_transport_core.body",
-      "cc": 227,
+      "cc": 237,
       "exception": "Numerical transport kernel: a split or rewrite needs RNG-stream, event-order, CPU/GPU parity and performance evidence (#567, #344); never refactor for the metric alone."
     },
     {
