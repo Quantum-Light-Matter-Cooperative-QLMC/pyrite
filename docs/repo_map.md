@@ -39,12 +39,11 @@ Components (a + b denotes a static import cycle):
   p15: remote
   p16: results
   p17: runs
-  p18: trajectory_viewer
-  p19: validation
-  p20: xsgen
+  p18: validation
+  p19: xsgen
 Edges (importer -> imported):
   p0 -> p10
-  p0 -> p19
+  p0 -> p18
   p0 -> p4
   p0 -> p5
   p1 -> p10
@@ -54,12 +53,12 @@ Edges (importer -> imported):
   p1 -> p15
   p1 -> p16
   p1 -> p17
-  p1 -> p19
+  p1 -> p18
   p1 -> p2
   p1 -> p3
   p1 -> p5
   p11 -> p10
-  p11 -> p20
+  p11 -> p19
   p11 -> p5
   p12 -> p11
   p12 -> p16
@@ -76,9 +75,9 @@ Edges (importer -> imported):
   p15 -> p13
   p15 -> p16
   p15 -> p17
+  p15 -> p18
   p15 -> p19
   p15 -> p2
-  p15 -> p20
   p15 -> p3
   p15 -> p5
   p16 -> p10
@@ -90,26 +89,25 @@ Edges (importer -> imported):
   p17 -> p12
   p17 -> p13
   p17 -> p16
+  p17 -> p19
   p17 -> p2
-  p17 -> p20
   p17 -> p3
   p17 -> p5
   p17 -> p9
+  p18 -> p10
   p18 -> p11
+  p18 -> p2
+  p18 -> p3
+  p18 -> p5
+  p18 -> p6
   p19 -> p10
-  p19 -> p11
-  p19 -> p2
-  p19 -> p3
   p19 -> p5
-  p19 -> p6
   p2 -> p10
   p2 -> p11
   p2 -> p16
-  p2 -> p20
+  p2 -> p19
   p2 -> p6
   p2 -> p9
-  p20 -> p10
-  p20 -> p5
   p3 -> p10
   p3 -> p11
   p3 -> p16
@@ -120,9 +118,8 @@ Edges (importer -> imported):
   p4 -> p13
   p4 -> p15
   p4 -> p17
-  p4 -> p18
+  p4 -> p19
   p4 -> p2
-  p4 -> p20
   p4 -> p3
   p4 -> p5
   p4 -> p8
@@ -132,7 +129,7 @@ Edges (importer -> imported):
   p7 -> p14
   p7 -> p16
   p7 -> p17
-  p7 -> p19
+  p7 -> p18
   p7 -> p2
   p7 -> p4
   p7 -> p5
@@ -178,9 +175,8 @@ Edges (importer -> imported):
 - **`pyrite app validation launch`** → `check:_cli`: launch the validation app; `pyrite app validation export` writes cached literature-validation figures. The same explicit `launch|export` shape applies to `pyrite app viewer`.
 - **`pyrite remote ...`** → `remote:*`: optional SSH/SLURM resources for lab GPU box. Canonical profile and Zhai reproduction submissions are `pyrite run --remote` and `pyrite run --preset zhai --remote`; hidden warning aliases preserve `remote run`, `remote validate`, and `remote check`. Resource commands remain here, while retired `jobs`, `status`, `logs`, and `stop` paths are hidden aliases of the canonical top-level job lifecycle. `remote pull --preset zhai` retrieves an existing reproduction cache; `remote gc` applies profile-aware checkpoint pruning under remote stem reservations and releases orphaned reservations, replacing the hidden `remote prune` and `remote reap` aliases; `remote rm` deletes remote checkpoints (hidden alias `remote clear`); `check` remains a hidden alias.
 - **`pyrite job list|status|logs|attach|stop`** → `cli.commands.job`: one lifecycle for run, grid, recompute, and validation jobs. `list --kind` normalizes legacy submitter metadata to `run|grid|recompute|validate`; destructive stop targets exactly one job ID, profile, or all live jobs.
-- **`pyrite run ... --trajectories DIR [--overwrite-trajectories]`** → `runs.scan._run_material` builds a `montecarlo.trajectories.TrajectoryCapture` rooted at `DIR/<stem>/`; off by default, local only. **`pyrite checkpoint export-trajectories ARTIFACT...`** → `cli.commands.trajectories` → `montecarlo.trajectory_export.export_segments_vtp`. **`pyrite checkpoint score-trajectories ARTIFACT...`** → `cli.commands.trajectories.score_command` → `checkpoints.trajectory_scoring` (plan/check every artifact and target, then `runner.stream_spectrum_from_artifact` per case into `<checkpoint-dir>/<stem>`; no transport, no shared cache) (#186).
+- **`pyrite run ... --trajectories DIR [--overwrite-trajectories]`** → `runs.scan._run_material` builds a `montecarlo.trajectories.TrajectoryCapture` rooted at `DIR/<stem>/`; off by default, local only. **`pyrite checkpoint export-trajectories ARTIFACT... [--history|--track|--first|--sample]`** → `cli.commands.trajectories` → `montecarlo.trajectory_selection.select_trajectories` (whole-history/track stored-row runs) → `montecarlo.trajectory_export.export_segments_vtp` (streams only the selected runs). `--paraview-script` prints the bundled ParaView preset `data/paraview/pyrite_trajectories.py` (runs under `pvpython`/`pvbatch`, never imported by PyRITE). **`pyrite checkpoint score-trajectories ARTIFACT...`** → `cli.commands.trajectories.score_command` → `checkpoints.trajectory_scoring` (plan/check every artifact and target, then `runner.stream_spectrum_from_artifact` per case into `<checkpoint-dir>/<stem>`; no transport, no shared cache) (#186).
 - **Trajectory scenes**: `instrument.scene` snapshots downstream geometry separately from the transport case. `montecarlo.trajectory_scene` adds opt-in, independently viewable close-up/instrument VTK manifests through `export-trajectories --scene`. Numeric meshes, groove ribbons and transforms live in `_scene_geometry`, shared with `plots.plotly.trajectories`; see [scene design](repo-design/storage/trajectory-scenes.md).
-- **`pyrite app trajectories inspect|launch|export`** → `cli.commands.app_trajectories`: saved-capture selection/cost admission in `trajectory_viewer.selection`, optional lazy PyVista rendering/inspection/export in `render`, native controls in `native`, and image-streaming trame controls in `server`. Geometry-only scene exports reuse `montecarlo.trajectory_scene`; no transport is run. See the [saved viewer guide](guides/saved-trajectory-viewer.md).
 - **`pyrite checkpoint slim <checkpoint-dir> [--grid]`** → `slim:slim_checkpoint` → `results.slim_results`: shrink a checkpoint HDF5 artifact for transfer (drop wide-brem / float32 / filter configs; `--grid` keep only material's current-grid configs).
 - **`pyrite checkpoint archive|restore|list|merge`** → `archive:*`: local checkpoint shelf — copy active slot `checkpoints/<stem>/` to/from long-term `checkpoints/archive/<label>/`; `merge` combines a shelved checkpoint back into the active slot for the same material. Retired top-level spellings are hidden compatibility aliases.
 - **Sweep worker**: `montecarlo.run_case` (module-level so it pickles into `run_cases` process pool).
@@ -320,7 +316,7 @@ Simulation core: electron transport, segment-sum PXR+CBS and EEDL characteristic
 - `detector` — `detector_efficiency`, `eds_fwhm_eV`, `aperture_fwhm_eV`, `mosaic_fwhm_eV`, `mosaic_psi_rad`, `convolve_detector`. Deps: `materials.attenuation`, `geometry`, `transport`, `materials.crystal`.
 - `montecarlo/groove.py` — blazed sawtooth entrance-face grooves (escape-path engineering): closed-form entry/escape, `Sweep.groove_spacing_ang` knob.
 - `montecarlo/transverse.py` — transverse phase-space policy on the input side of `BeamSpec`: a Courant-Snyder triplet `(eps_n, beta, alpha)` per plane, resolved per case (normalized emittance is the stored input, geometric is derived as `eps_n / (beta*gamma)`) and sampled into per-electron offsets and slopes. The `y` plane mirrors `x` unless set. Zero first-party imports, so it is the destination `transport/api.py` samples from directly (`resolved_from_mapping`, `sample_transverse`) rather than reaching up into `campaign` (issue #69). See `docs/physics/beam-transport/beam-phase-space.md`. Public: `TransverseDistribution`, `ResolvedTransversePlane`, `ResolvedTransverseDistribution`, `resolve_transverse_distribution`, `sample_transverse`. Deps: NumPy, SciPy constants.
-- `trajectories` — opt-in per-case transport artifacts (#159): `TrajectoryCapture` (picklable, crosses into transport workers), versioned HDF5 writer/reader (`write_trajectory_artifact`, `read_trajectory_artifact`; atomic `.partial` rename, alias hard links, bounded device-array download; schema 2 adds the typed case and `/spectrum_inputs` and stores row fields electron-major with a restoring `/transport_order`; schema 1 stays readable), `iter_electron_row_blocks` (bounded whole-electron row streaming), deterministic `artifact_relpath`, and `preflight_capture` overwrite/stale checks. `trajectory_export` streams an artifact's segments to VTK XML PolyData (`.vtp`). `runner._transport_case` writes when handed a capture; `run_cases`/`run_sweep` pass it only when set. Deps: `_backend`, `h5py` (lazy).
+- `trajectories` — opt-in per-case transport artifacts (#159): `TrajectoryCapture` (picklable, crosses into transport workers), versioned HDF5 writer/reader (`write_trajectory_artifact`, `read_trajectory_artifact`; atomic `.partial` rename, alias hard links, bounded device-array download; schema 2 adds the typed case and `/spectrum_inputs` and stores row fields electron-major with a restoring `/transport_order`; schema 1 stays readable), `iter_electron_row_blocks` (bounded whole-electron row streaming), deterministic `artifact_relpath`, and `preflight_capture` overwrite/stale checks. `trajectory_selection` resolves whole histories (bisection over electron-major rows) or tracks to stored-row runs and reads them back in transported order with units (`select_trajectories`, `read_selection`). `trajectory_export` streams an artifact's segments, or a selection's, to VTK XML PolyData (`.vtp`). `runner._transport_case` writes when handed a capture; `run_cases`/`run_sweep` pass it only when set. Deps: `_backend`, `h5py` (lazy).
 - `runner/` — compatibility package for the former flat module. `__init__.py` owns per-case transport/spectrum phases and `_worker_init`; `scheduling.py` owns `run_cases` and runtime-plan selection; `chunking.py` owns spectrum chunk admission, including the larger portable EEDL working-set budget; `pool.py` owns host-memory and worker-pool sizing; `oom.py` owns accelerator OOM tags, release cadence, and pool limits. `step_budget.py` owns the per-electron transport step budget and `retry_step_budget`, the doubling retry after `TransportStepLimitError` shared by `_transport_case` and the penetration gate (#192, #315). `block_transport.py` owns the internal electron-block transport driver (`_transport_case(block_electrons=...)`): per-electron/CUDA transport over `[kB, (k+1)B)` joined bit-for-bit into the fixed-N result, the base for adaptive electron counts (#361). `adaptive.py` owns the adaptive electron count (`transport_case_adaptive` and the compatibility `run_case_adaptive`, #361): the sequential block-wise stopping rule on grid-independent per-electron line mass and brem band integrals, its heavy-tail guards, the realized fixed-N case, and optional per-bin batch means. `timing.py` owns the driver-side `PYRITE_MC_TIMING` phase aggregator and report. `case_tables.py` resolves each transport layer's SBETHE table and shell-mode catalog key. `artifacts.py` owns `_case_geometry` (case-determined grids, `n_hat`, groove) `spectrum_from_artifact`, which replays only the spectrum phase from a schema-2 trajectory artifact after checking its recorded inputs against the case, and `stream_spectrum_from_artifact`, its bounded-host-memory form over electron blocks (`STREAM_MAX_SEGMENTS`) (#186). `directions.py` evaluates physical-detector observation directions on the same transport as the scalar spectra (`run_case(observation_directions=...)`, `run_cases(observation_directions=...)`, `run_case_directions`) on a line grid that `line_grid.resolve_observation_line_grid` resolves jointly over every direction, separate from the scalar case grid. The backend classifier also recognizes delayed CUDA/ROCm runtime allocation failures. `_spectrum_case` always stores incoherent `spec` and, when requested, `spec_coherent` from the same transport, plus the shared characteristic component as the separate `spec_characteristic` (no array includes another; `_spectral_components` combines them); characteristic emission is evaluated directly on the fine line grid. `_line_pair_for_case` mirrors this for `pyrite reline`. Deps: `_backend`, `transport`, `geometry`, `spectrum`.
 - Deps: `materials.crystal`, `materials.attenuation`, `DATA_DIR`.
 

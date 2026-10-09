@@ -29,14 +29,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-trajectory-viewer = [
-    "pyvista>=0.49,<0.50",
-    "trame>=3.12,<4",
-    "trame-vtk>=2.11,<3",
-    "trame-vuetify>=3.2,<4",
-    "imageio>=2.37,<3",
-    "pillow>=12,<13",
-]
 external-db = [
     "mp-api>=0.46",
 ]
@@ -207,12 +199,9 @@ include = [
 allowed-unresolved-imports = [
     "cupy*",
     "cupy*.*",
-    # Optional `trajectory-viewer` extra; CI type-checks without it.
-    "pyvista*",
-    "trame*",
-    "trame.**",
-    "vtkmodules*",
-    "vtkmodules.**",
+    # Bundled ParaView preset runs under pvpython, never PyRITE's interpreter.
+    "paraview*",
+    "paraview.**",
 ]
 
 [tool.ty.overrides.rules]
@@ -229,13 +218,6 @@ include = [
 invalid-argument-type = "ignore"
 invalid-return-type = "ignore"
 no-matching-overload = "ignore"
-
-# PyVista typing suppressions apply only when the optional extra is installed.
-[[tool.ty.overrides]]
-include = ["src/pyrite/trajectory_viewer/**/*.py"]
-
-[tool.ty.overrides.rules]
-unused-ignore-comment = "ignore"
 
 [tool.importlinter]
 root_packages = ["pyrite"]

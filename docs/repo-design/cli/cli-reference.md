@@ -176,105 +176,17 @@ Options:
 ```text
 Usage: pyrite app [OPTIONS] COMMAND [ARGS]...
 
-  Launch, inspect or export analysis applications.
+  Launch or export interactive analysis notebooks.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  trajectories  Inspect or render saved trajectory captures (optional PyVista/trame).
-  analysis      Launch or export the analysis app.
-  pixels        Launch or export the pixel-detector observation app.
-  compare       Launch or export the case and cross-material comparison app.
-  viewer        Launch or export the 3D trajectory viewer.
-  validation    Launch or export cached validation figures.
-```
-
-## `pyrite app trajectories`
-
-```text
-Usage: pyrite app trajectories [OPTIONS] COMMAND [ARGS]...
-
-  Inspect saved HDF5 showers with optional PyVista/trame; capture stays read-only.
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  export   Write PNG or bounded orbit GIF plus <output>.json; no browser required.
-  inspect  Report bounded selection size/cost without loading rendering libraries.
-  launch   Launch reactive server rendering, or a native desktop window.
-```
-
-## `pyrite app trajectories export`
-
-```text
-Usage: pyrite app trajectories export [OPTIONS] ARTIFACT OUTPUT
-
-  Write PNG or bounded orbit GIF plus <output>.json; no browser required.
-
-Options:
-  --memory-mib INTEGER RANGE    Estimated selection-memory budget (not a hard RSS
-                                limit).  [default: 2048; x>=1]
-  --max-segments INTEGER RANGE  Admission limit; never truncates a track.  [default:
-                                1000000; x>=1]
-  --attribute TEXT              Additional numeric segment field; identity/control
-                                fields always included.
-  --track INTEGER RANGE         Complete captured track ID; repeatable.  [x>=0]
-  --history INTEGER RANGE       Complete history ID; repeatable. Intersects --track.
-                                [x>=0]
-  --scale [closeup|instrument]  [default: closeup]
-  --frames INTEGER RANGE        GIF orbit frame bound; ignored for PNG.  [default: 30;
-                                2<=x<=120]
-  --fps INTEGER RANGE           GIF frame rate.  [default: 10; 1<=x<=30]
-  --overwrite                   Replace the selected output and its provenance sidecar.
-  -h, --help                    Show this message and exit.
-```
-
-## `pyrite app trajectories inspect`
-
-```text
-Usage: pyrite app trajectories inspect [OPTIONS] ARTIFACT
-
-  Report bounded selection size/cost without loading rendering libraries.
-
-Options:
-  --memory-mib INTEGER RANGE    Estimated selection-memory budget (not a hard RSS
-                                limit).  [default: 2048; x>=1]
-  --max-segments INTEGER RANGE  Admission limit; never truncates a track.  [default:
-                                1000000; x>=1]
-  --attribute TEXT              Additional numeric segment field; identity/control
-                                fields always included.
-  --track INTEGER RANGE         Complete captured track ID; repeatable.  [x>=0]
-  --history INTEGER RANGE       Complete history ID; repeatable. Intersects --track.
-                                [x>=0]
-  -h, --help                    Show this message and exit.
-```
-
-## `pyrite app trajectories launch`
-
-```text
-Usage: pyrite app trajectories launch [OPTIONS] ARTIFACT
-
-  Launch reactive server rendering, or a native desktop window.
-
-Options:
-  --memory-mib INTEGER RANGE    Estimated selection-memory budget (not a hard RSS
-                                limit).  [default: 2048; x>=1]
-  --max-segments INTEGER RANGE  Admission limit; never truncates a track.  [default:
-                                1000000; x>=1]
-  --attribute TEXT              Additional numeric segment field; identity/control
-                                fields always included.
-  --track INTEGER RANGE         Complete captured track ID; repeatable.  [x>=0]
-  --history INTEGER RANGE       Complete history ID; repeatable. Intersects --track.
-                                [x>=0]
-  --native                      Use native desktop controls instead of the image-
-                                streaming browser server.
-  --port INTEGER RANGE          Browser server port on 127.0.0.1; use an SSH tunnel
-                                remotely.  [default: 2722; 1<=x<=65535]
-  --output-dir DIRECTORY        Browser exports are unique PNG/GIF files on the server.
-                                [default: trajectory-exports]
-  -h, --help                    Show this message and exit.
+  analysis    Launch or export the analysis app.
+  pixels      Launch or export the pixel-detector observation app.
+  compare     Launch or export the case and cross-material comparison app.
+  viewer      Launch or export the 3D trajectory viewer.
+  validation  Launch or export cached validation figures.
 ```
 
 ## `pyrite app analysis`
@@ -794,15 +706,38 @@ Usage: pyrite checkpoint export-trajectories [OPTIONS] ARTIFACT...
   HDF5 artifact. Opens in ParaView, VisIt, and PyVista. --scene also exports lab-frame
   geometry as separate close-up and instrument scenes.
 
+  --history, --track, --first, or --sample export only whole selected histories (primary
+  electron_id with every secondary of its shower) or tracks, reading only their rows;
+  the .vtp then adds a segment_id cell array and a FieldData record of the selection.
+  Vacuum legs follow selected histories and are omitted from track selections.
+
+  Examples:
+
+    pyrite checkpoint export-trajectories trajectories/hopg/ --first 20
+
+    pyrite checkpoint export-trajectories case.h5 --sample 100 --seed 1 --scene
+
+  ParaView preset (colouring, thresholds, scene views, headless PNG): `pvbatch "$(pyrite
+  checkpoint export-trajectories --paraview-script)" case.vtp --screenshot case.png`, or
+  import the script as a ParaView macro.
+
 Options:
-  --out-dir DIR  Write .vtp files under DIR, mirroring each ARTIFACT directory (default:
-                 beside each artifact).
-  --no-vacuum    Omit grooved runs' vacuum legs.
-  --overwrite    Replace existing .vtp outputs and, with --scene, scene manifests.
-  --scene        Also write separate .vtm close-up [angstrom] and .instrument.vtm [mm]
-                 scenes with private sidecar files; missing recorded geometry is
-                 omitted.
-  -h, --help     Show this message and exit.
+  --paraview-script  Print the path of the bundled ParaView preset script and exit.
+  --out-dir DIR      Write .vtp files under DIR, mirroring each ARTIFACT directory
+                     (default: beside each artifact).
+  --no-vacuum        Omit grooved runs' vacuum legs.
+  --overwrite        Replace existing .vtp outputs and, with --scene, scene manifests.
+  --scene            Also write separate .vtm close-up [angstrom] and .instrument.vtm
+                     [mm] scenes with private sidecar files; missing recorded geometry
+                     is omitted.
+  --history ID       Export this whole history (electron_id); repeatable.  [x>=0]
+  --track ID         Export this whole track (track_id); repeatable; intersects history
+                     selection.  [x>=0]
+  --first N          Export the first N histories that have segments.
+  --sample N         Export N histories drawn at random from those with segments (all if
+                     fewer).
+  --seed S           Random seed of --sample. [default: 0]  [x>=0]
+  -h, --help         Show this message and exit.
 ```
 
 ## `pyrite checkpoint score-trajectories`

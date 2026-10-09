@@ -159,8 +159,8 @@ def strip_line_prefixes(tokens: list[str]) -> list[str]:
         tokens = tokens[1:]
     if len(tokens) >= 2 and tokens[0] == "uv" and tokens[1] == "run":
         tokens = tokens[2:]
-        while tokens and (_ENV_ASSIGNMENT_RE.match(tokens[0]) or tokens[0].startswith("--extra")):
-            tokens = tokens[2:] if tokens[0] == "--extra" else tokens[1:]
+        while tokens and _ENV_ASSIGNMENT_RE.match(tokens[0]):
+            tokens = tokens[1:]
     return tokens
 
 

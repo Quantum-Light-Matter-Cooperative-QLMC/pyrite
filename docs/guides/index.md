@@ -15,7 +15,6 @@ python-api-workflow
 shell-completion
 configuration-cookbook
 working-with-results
-saved-trajectory-viewer
 analysis-tutorial
 running-on-a-cluster
 sweep-profiles

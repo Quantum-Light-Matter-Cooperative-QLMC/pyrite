@@ -36,7 +36,6 @@ run through the collector.
 | `coherent_flat_omission.py` | Paired spectrum timing of the coherent Flat-term omission on one immutable transport realization; thin anchors run locally, thick/GPU cases through `pyrite remote` (#362). |
 | `coherent_physical_population_remote.py` | Charge-weighted CUDA float64 limits, same-trajectory 30/60 keV grid ladders, and reduced short-bunch smoke; persists transport across scheduler slices. |
 | `coherent_transverse_coherence.py` | Tests whether a single coherent transverse-direction draw is representative of the observable spectrum. |
-| `coherent_flat_omission.py` | Compares the physical-pair-weighted Flat-term omission against the full coherent estimator (`coherent-flat-term-omission`). |
 | `collision_statistics_refinement.py` | Measures collision-statistics changes under transport substep refinement. |
 | `cross_reflection_coherence.py` | Bounds the coherent-spectrum effect of omitted cross-reflection terms. |
 | `dans_diffraction_oracle.py` | Pinned external lattice, reciprocal-geometry, and structure-factor comparison. |
@@ -74,13 +73,7 @@ run through the collector.
 Run commands are documented in each check. Heavy Monte Carlo or GPU work must
 use `pyrite remote`; do not launch it locally from this directory.
 
-Optional viewer evaluation probes: `trajectory_paraview_probe.py` (pvpython), `trajectory_trame_probe.py` (automatic no-client smoke; `--serve` for manual connected-browser inspection and report export). Raw repeated results: `trajectory_viewer_results.json`; interpretation, commands and limitations: [trajectory scenes](../docs/repo-design/storage/trajectory-scenes.md).
-
-- `saved_trajectory_viewer_probe.py`: actual optional saved-viewer selection/build/native-offscreen image/filter/picking costs, sampled complete process-tree RSS, and explicit whole-shower synthetic capture replication. Raw trials: `saved_trajectory_viewer_results.json`; deployment/limits: [saved viewer guide](../docs/guides/saved-trajectory-viewer.md).
-- `saved_trajectory_server_probe.py`: running trame server control/clip/image smoke with **no browser client**; it calls the pick handler directly, so it does not establish browser event delivery, latency or resource costs.
-- `saved_trajectory_browser_probe.py`: connected headless-Chrome regression and timing probe (Playwright) that drives every control, picking, export download and image delivery through real input. `--fixture-secondary` provides a reproducible parent-navigation regression, rendered PNG/GIF checks, and failed-export/no-download coverage. Raw trials: `saved_trajectory_browser_results.json`.
-- `saved_trajectory_browser_worker.py`: instruments the real CLI launch's selection, array loading, scene/UI construction and filter submission, without adding runtime probe hooks to the application.
-- `saved_trajectory_remote_worker.py` / `saved_trajectory_remote_trials.py`: isolated remote process supervision and repeated real-browser SSH trials, including sampled server/Chrome trees, verified OpenGL adapter, device-wide NVIDIA VRAM and download/provenance checks. Follow-up raw evidence: `saved_trajectory_measurement_results.json`. Stage an isolated checkout and the same saved captures first; never replace a busy shared checkout. `--adapter NVIDIA` selects the WSLg rendering adapter and fails if the recorded renderer disagrees. `--native-probe` on the supervisor measures a bounded native capture with the same resource sampler.
+Optional viewer evaluation probes: `trajectory_paraview_probe.py` (pvpython), `trajectory_trame_probe.py` (live server smoke without a client). Raw repeated results: `trajectory_viewer_results.json`; interpretation and limitations: [trajectory scenes](../docs/repo-design/storage/trajectory-scenes.md).
 
 To diagnose an earlier physical-population run with updated code, pass
 `--transport-record OLD.json --out NEW.json` to

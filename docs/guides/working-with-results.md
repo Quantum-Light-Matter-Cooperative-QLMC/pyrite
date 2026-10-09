@@ -87,7 +87,7 @@ Capture never changes a result. The file is written after transport and before t
 
 Things to know before enabling it:
 
-- **Size.** A file holds every segment of every electron: roughly 100 bytes per segment for the default frozen fields, more with midpoint or shell fields. That is usually far larger than the spectra; start with `-m` and `--quick` to gauge it.
+- **Size.** A file holds every segment of every electron: about 100 to 220 bytes per segment depending on the fields the transport mode records (a 30 keV silicon capture with the default midpoint fields measured 140). That is usually far larger than the spectra; start with `-m` and `--quick` to gauge it.
 - **Cached cases are not captured.** Only cases this run transports get a file. Cases resumed from a checkpoint or replayed from the shared cache are never re-transported just to write one; the run reports how many and `--recompute` transports them again.
 - **Existing files.** Before any transport the run checks the directory. A case that already has a file stops the run unless `--overwrite-trajectories` is given. A cached case whose file records different physics also stops the run: remove the file or pick another directory.
 - **Interrupted runs.** Files are written as `<name>.partial` and renamed only once complete, so a crash or budget stop cannot leave a truncated file under the final name. A resumed run discards stale `.partial` files of the cases it transports.
@@ -132,9 +132,6 @@ Prefer artifact reuse when you redo only the spectrum phase of the same transpor
 
 ### Export scene geometry
 
-For bounded saved-shower inspection with optional native PyVista or a reactive
-trame server, see the [saved trajectory viewer](saved-trajectory-viewer.md).
-
 ```bash
 uv run pyrite checkpoint export-trajectories trajectories/hopg/ --scene
 ```
@@ -158,7 +155,40 @@ New capture-enabled profile runs snapshot downstream geometry in the HDF5 artifa
 4. To inspect groove-gap flights, threshold cell `is_vacuum` to `1`; threshold to `0` for material segments. The array is present when vacuum diagnostics are included; `--no-vacuum` omits those cells.
 5. Threshold `electron_id` to select a complete primary history/shower, or `track_id` to select one electron trajectory. Use **Spreadsheet View** to inspect track, parent, energy and event attributes. Use **Clip** to inspect a depth range without changing the original artifact.
 
-Large showers may require substantial reader and rendering memory even though export itself streams in bounded blocks. A standalone PyVista viewer is under evaluation; marimo embedding constraints do not rule it out. See [trajectory scene design and viewer evaluation](../repo-design/storage/trajectory-scenes.md).
+ParaView reads a whole `.vtp` into memory, so export only the histories you need from a large capture:
+
+```bash
+uv run pyrite checkpoint export-trajectories trajectories/hopg/ --first 20
+uv run pyrite checkpoint export-trajectories case.h5 --sample 200 --seed 1 --scene
+uv run pyrite checkpoint export-trajectories case.h5 --history 7 --history 12
+uv run pyrite checkpoint export-trajectories case.h5 --track 4031
+```
+
+Selections take complete histories (a primary `electron_id` with every secondary of its shower) or complete tracks; `--track` intersects a history selection. `--first N` takes the first N histories that have segments, `--sample N` draws N at random (reproducibly from `--seed`, default 0). Only the selected rows are read, so export memory and the output size follow the selection, not the capture. A subset `.vtp` adds the cell array `segment_id`, each cell's row index in the full transported result, and a `selection` FieldData record of the request and the resolved history IDs. Grooved vacuum legs follow selected histories and are left out of track selections, whose ancestry they cannot express. An empty selection exports nothing and reports which history IDs have segments.
+
+The same selection is available from Python:
+
+```python
+from pyrite.montecarlo.trajectory_selection import read_selection, select_trajectories
+
+selection = select_trajectories("trajectories/hopg/.../E0_30keV.h5", sample=50, seed=1)
+segs = read_selection(selection, ["r_mid", "E_start_keV", "electron_id"])
+segs.transport["segment_id"], segs.units["E_start_keV"]
+```
+
+#### ParaView preset
+
+A ParaView script ships with PyRITE. It colours tracks by a cell array (`E_start_keV` by default), adds ready-to-enable Threshold filters for secondaries, material segments and one history, shows scene geometry as translucent context, and opens the instrument manifest in its own view. It needs ParaView's Python, not PyRITE's:
+
+```bash
+uv run pyrite checkpoint export-trajectories --paraview-script   # prints the script path
+pvbatch "$SCRIPT" case.vtp --screenshot case.png
+pvbatch "$SCRIPT" case.vtm --color generation --threshold electron_id 0 9 --screenshot closeup.png
+```
+
+Here `$SCRIPT` is the printed path.
+
+`--color` takes any cell array (`generation`, `layer`, `event_kind`, `t_start_ang`, ...); an unknown name lists the available ones. `--threshold FIELD LOW HIGH` repeats. Headless hosts need `pvbatch --force-offscreen-rendering` or an OSMesa/EGL ParaView build. In the GUI, use **Macros > Import new macro...** with the same file, select an opened export in the Pipeline Browser, and run the macro. For a remote capture, export a subset there and copy the `.vtp`, or connect the ParaView client to a `pvserver` on that host.
 
 ## Preserve or reduce data
 

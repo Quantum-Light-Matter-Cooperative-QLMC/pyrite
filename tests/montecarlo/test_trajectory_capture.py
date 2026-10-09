@@ -590,7 +590,7 @@ def test_vtp_opens_in_vtk(tmp_path):
 
     assert mesh.n_cells == segs["L_ang"].size
     # Schema 2 stores whole histories contiguously; VTP preserves that storage
-    # order, while the saved viewer restores original transport order.
+    # order (subset exports add segment_id, the transported row index).
     order = np.argsort(segs["electron_id"], kind="stable")
     np.testing.assert_array_equal(mesh.cell_data["electron_id"], segs["electron_id"][order])
     np.testing.assert_array_equal(mesh.cell_data["event_kind"], segs["event_kind"][order])
