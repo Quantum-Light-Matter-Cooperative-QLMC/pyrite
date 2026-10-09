@@ -6,6 +6,8 @@ from typing import Any, Literal, cast
 
 import numpy as np
 
+from ._precision import Precision
+
 MosaicRoute = Literal["analytic", "mc"]
 
 SAMPLING_KEYS = ("n_electrons", "n_electrons_brem")
@@ -101,6 +103,10 @@ class Numerics:
         Macro-electron count for line transport.
     n_electrons_brem
         Macro-electron count for bremsstrahlung transport.
+    precision
+        Optional :class:`~pyrite.Precision` for adaptive sampling. It replaces
+        both fixed counts with one shared realized count. Coherent emission,
+        physical detectors, GDF, grooves, and particle cascades are unsupported.
     spec_chunk, brem_chunk
         Optional spectrum-kernel chunk sizes; ``None`` lets runtime choose.
     transport_core
@@ -188,8 +194,14 @@ class Numerics:
     positron_transport: bool = False
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
     convergence: Convergence = field(default_factory=Convergence)
+    precision: Precision | None = None
 
     def __post_init__(self) -> None:
+        if self.precision is not None:
+            if not isinstance(self.precision, Precision):
+                raise TypeError("precision must be a Precision or None")
+            if self.transport_core == "lockstep":
+                raise ValueError("adaptive precision requires the per-electron or CUDA core")
         for name in ("n_electrons", "n_electrons_brem"):
             value = getattr(self, name)
             if type(value) is not int or value <= 0:

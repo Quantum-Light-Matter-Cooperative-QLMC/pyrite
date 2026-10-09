@@ -42,14 +42,17 @@ def _resolved_run(monkeypatch, argv, emission=None):
     return captured["run"]
 
 
-def test_default_run_is_incoherent_canonical_stem(monkeypatch):
+def test_default_run_is_incoherent_and_adaptive_with_a_hashed_stem(monkeypatch):
+    from pyrite._precision import DEFAULT_PRECISION
+
     settings, _sweep, identity, stem = _resolved_run(monkeypatch, [])
 
     assert settings.emission == "incoherent"
     assert settings.coherent_emission is False
-    # incoherent keeps its historical bare <material> stem and adds no key
     assert "emission" not in identity["resolved_parameters"]
-    assert stem == "hopg"
+    # standard runs adaptive counts by default (#361), so it is a hashed variant.
+    assert settings.precision == DEFAULT_PRECISION
+    assert stem.startswith("hopg@full-")
 
 
 def test_coherent_profile_gets_qualified_stem_and_divergent_digest(monkeypatch):
@@ -124,7 +127,10 @@ def test_three_emission_modes_never_collide(monkeypatch):
     }
     assert len(stems) == 3
     assert len(digests) == 3
-    assert stem_i == "hopg"  # incoherent stays canonical
+    assert stem_i.startswith("hopg@full-")  # adaptive by default (#361)
+    # Coherent and both keep fixed counts; only the incoherent run is adaptive.
+    assert _s_i.precision is not None
+    assert _s_c.precision is None and _s_b.precision is None
 
 
 def test_coherent_incoherent_flags_are_removed():
@@ -197,3 +203,31 @@ def test_temporal_profile_opt_in_is_divergence_only(monkeypatch):
     cases = build_configured_cases(_sweep, settings)
     assert all(case["temporal_profile"] is True for case in cases)
     assert all("temporal_profile" not in case for case in build_configured_cases(sweep_def, _s_def))
+
+
+def test_catalog_profile_precision_reaches_run_settings_identity_and_cases(monkeypatch):
+    from pyrite import Precision
+    from pyrite.api import build_configured_cases
+
+    _s, _sw, id_fixed, _stem = _resolved_run(monkeypatch, [])
+    policy = Precision(target_rse=0.1, min_electrons=20, max_electrons=60, block_electrons=20)
+    catalog = materials.CATALOG
+    monkeypatch.setattr(
+        materials,
+        "CATALOG",
+        replace(
+            catalog,
+            profile_precisions={**catalog.profile_precisions, "standard": policy.to_dict()},
+        ),
+    )
+
+    settings, sweep, identity, stem = _resolved_run(monkeypatch, [])
+
+    assert settings.precision == policy
+    assert Precision.from_dict(identity["resolved_parameters"]["adaptive_precision"]) == policy
+    assert identity["parameter_sha256"] != id_fixed["parameter_sha256"]
+    assert stem != "hopg"
+    cases = build_configured_cases(sweep, settings)
+    assert cases
+    assert all(Precision.from_dict(case["adaptive_precision"]) == policy for case in cases)
+    assert all(case["Ne"] == case["Ne_brem"] == 60 for case in cases)

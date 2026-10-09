@@ -2,7 +2,7 @@
 
 import math
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import MISSING, dataclass, fields
 from os import PathLike
 from typing import Any, Literal, cast
 
@@ -89,6 +89,7 @@ _CASE_KEY_ORDER = (
     "brem_file",
     "Ne",
     "Ne_brem",
+    "adaptive_precision",
     "seed",
     "spec_chunk",
     "brem_chunk",
@@ -282,6 +283,19 @@ class Case(Mapping[str, Any]):
     E_cut_brem_keV: float | _Absent = _ABSENT
     sinc_cutoff: float | None | _Absent = _ABSENT
     brem_step_eV: float | _Absent = _ABSENT
+    # Append slots to preserve the positional state of older Case pickles.
+    adaptive_precision: dict[str, object] | _Absent = _ABSENT
+
+    def __setstate__(self, state: list[Any]) -> None:
+        """Restore frozen-slot pickles, filling newly appended optional fields."""
+        declared = fields(self)
+        if len(state) > len(declared):
+            raise ValueError("Case pickle contains unsupported fields")
+        for index, field in enumerate(declared):
+            value = state[index] if index < len(state) else field.default
+            if value is MISSING:
+                raise ValueError(f"Case pickle is missing required field {field.name}")
+            object.__setattr__(self, field.name, value)
 
     def __post_init__(self) -> None:
         """Reject malformed values before they reach transport or identity."""
@@ -309,6 +323,13 @@ class Case(Mapping[str, Any]):
         _positive_int("mosaic_mc_nodes", self.mosaic_mc_nodes)
         _positive_int("Ne", self.Ne)
         _positive_int("Ne_brem", self.Ne_brem)
+        if not isinstance(self.adaptive_precision, _Absent):
+            from .._precision import Precision
+
+            precision = Precision.from_dict(self.adaptive_precision)
+            precision.validate_case(self)
+            if self.Ne != precision.max_electrons or self.Ne_brem != precision.max_electrons:
+                raise ValueError("adaptive case Ne and Ne_brem must equal precision.max_electrons")
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
             raise ValueError("seed must be an integer")
         for name in ("spec_chunk", "brem_chunk"):

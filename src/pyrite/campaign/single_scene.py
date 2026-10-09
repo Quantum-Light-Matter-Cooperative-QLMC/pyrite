@@ -161,6 +161,7 @@ def resolve_pixel_scene(
                 Literal["kawrakow", "none"],
                 transport.get("atomic_electron_deflection", "kawrakow"),
             ),
+            precision=catalog.profile_precision(profile_name),
         ),
         catalog.profile_emission(profile_name) or "incoherent",
         detector_id,

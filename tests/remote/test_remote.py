@@ -1173,7 +1173,8 @@ def test_status_formats_latest_performance_profile():
 def test_stems_predicts_qualified_stem_for_non_standard_catalog_profile(monkeypatch):
     import pyrite.campaign.profiles as profiles_module
 
-    assert scripts._stems(["mos2"], False) == ["mos2"]
+    # standard runs adaptive counts by default (#361), so its stem is hashed too.
+    assert scripts._stems(["mos2"], False) == [profiles_module.named_profile_stem("mos2")]
 
     calls = []
 
@@ -1619,10 +1620,12 @@ def test_start_standard_submit_suggests_stem_pull(monkeypatch, capsys):
     monkeypatch.setattr(transport, "_run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "48291\n")
 
+    from pyrite.campaign.profiles import named_profile_stem
+
     remote.start_queue(["hopg"], no_sync=True)
 
     output = capsys.readouterr().out
-    assert "pyrite remote pull hopg " in output
+    assert f"pyrite remote pull {named_profile_stem('hopg')} " in output
 
 
 def test_run_profile_uses_shipped_membership_without_material_option(capsys):
@@ -1880,9 +1883,11 @@ def test_run_pulls_cached_remote_checkpoint_missing_locally(monkeypatch):
     monkeypatch.setattr(_checkpoint_store, "checkpoint_exists", lambda *_args: False)
     monkeypatch.setattr(lifecycle, "pull", lambda stems, **_kwargs: pulls.append(list(stems)))
 
+    from pyrite.campaign.profiles import named_profile_stem
+
     _remote_main(["run", "standard", "-m", "hopg", "--no-sync"])
 
-    assert pulls == [["hopg"]]
+    assert pulls == [[named_profile_stem("hopg")]]
 
 
 def test_materials_needing_pull_skips_only_valid_zero_new_case_records(monkeypatch):
@@ -2136,9 +2141,11 @@ def test_successful_performance_run_auto_pulls_artifacts(monkeypatch):
         lambda stems, **_kwargs: pulled.append(("checkpoint", stems)),
     )
 
+    from pyrite.campaign.profiles import named_profile_stem
+
     _remote_main(["run", "standard", "-m", "hopg", "--perf", "--no-sync"])
 
-    assert pulled == [("performance", "standard"), ("checkpoint", ["hopg"])]
+    assert pulled == [("performance", "standard"), ("checkpoint", [named_profile_stem("hopg")])]
 
 
 def test_failed_performance_run_skips_artifact_pull(monkeypatch, capsys):
@@ -2288,12 +2295,14 @@ def test_interrupted_job_upload_releases_its_checkpoint_reservations(monkeypatch
     )
     monkeypatch.setattr(transport, "_ssh_capture", lambda _command: pytest.fail("must not submit"))
 
+    from pyrite.campaign.profiles import named_profile_stem
+
     with pytest.raises(KeyboardInterrupt):
         remote.start_queue(["hopg"], no_sync=True)
 
     assert len(commands) == 2
     assert 'J="' in commands[-1][-1]
-    assert 'if [ "$(cat "$R/hopg/jobid"' in commands[-1][-1]
+    assert f'if [ "$(cat "$R/{named_profile_stem("hopg")}/jobid"' in commands[-1][-1]
 
 
 def test_ambiguous_submit_failure_inspects_queued_state_and_keeps_reservations(monkeypatch):
@@ -4155,7 +4164,9 @@ def test_follow_logs_status_propagates_through_remote_cli(monkeypatch, status):
 
 def test_stems_quick_suffix():
     assert remote._stems(["mose2", "wse2"], True) == ["mose2_quick", "wse2_quick"]
-    assert remote._stems(["mose2"], False) == ["mose2"]
+    from pyrite.campaign.profiles import named_profile_stem
+
+    assert remote._stems(["mose2"], False) == [named_profile_stem("mose2")]
 
 
 def test_stop_materials_resolve_unique_live_jobs(monkeypatch):

@@ -11,6 +11,7 @@ import numpy as np
 
 from .._numerics import Convergence, Numerics
 from .._numerics import MosaicRoute as MosaicRoute
+from .._precision import Precision
 from ..detectors import Detector
 from ..instrument import Acquisition, FilterPlate, PixelScorer, PlanarDetector
 from ..instrument.model import validate_downstream_scene
@@ -403,4 +404,4 @@ class Sweep:
         return adapt_configured_sweep(old_sweep, settings)
 
 
-__all__ = ["Analysis", "Beam", "Convergence", "Numerics", "Scene", "Sweep"]
+__all__ = ["Analysis", "Beam", "Convergence", "Numerics", "Precision", "Scene", "Sweep"]

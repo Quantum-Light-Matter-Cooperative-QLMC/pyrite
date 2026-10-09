@@ -2237,3 +2237,40 @@ def test_profile_temporal_profile_opt_in_parses_and_validates(tmp_path):
     assert on.profile_temporal_profile("standard") is True
     with pytest.raises(MaterialConfigError, match="temporal_profile"):
         load_material_catalog(_write_catalog(tmp_path, catalog('temporal_profile = "yes"\n')))
+
+
+def test_profile_precision_parses_and_rejects_incompatible_profiles(tmp_path):
+    """#361: ``profiles.NAME.precision`` is a validated adaptive policy."""
+    from pyrite import Precision
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    policy = (
+        "precision = { target_rse = 0.1, min_electrons = 200, max_electrons = 2000, "
+        'block_electrons = 20, observables = ["line", "brem"], band_eV = [100.0, 900.0] }\n'
+    )
+
+    def catalog(extra: str) -> str:
+        return _catalog_with_per_beam_line_grids().replace(
+            "[profiles.standard]\n", f"[profiles.standard]\n{extra}", 1
+        )
+
+    fixed = load_material_catalog(_write_catalog(tmp_path, catalog("")))
+    assert fixed.profile_precision("standard") is None
+    adaptive = load_material_catalog(_write_catalog(tmp_path, catalog(policy)))
+    assert adaptive.profile_precision("standard") == Precision(
+        target_rse=0.1,
+        min_electrons=200,
+        max_electrons=2000,
+        block_electrons=20,
+        observables=("line", "brem"),
+        band_eV=(100.0, 900.0),
+    )
+    for extra, match in (
+        ("precision = { target_rse = 0.1 }\n", "requires min_electrons"),
+        (policy.replace("block_electrons = 20", "block_electrons = 30"), "multiples"),
+        (policy.replace("target_rse = 0.1,", "target_rse = 0.1, spare = 1,"), "unknown"),
+        (policy + "n_electrons = { values = [450] }\n", "n_electrons"),
+        (policy + 'emission = "both"\n', "coherent emission"),
+    ):
+        with pytest.raises(MaterialConfigError, match=match):
+            load_material_catalog(_write_catalog(tmp_path, catalog(extra)))

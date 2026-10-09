@@ -96,7 +96,7 @@ def _component_store(results: dict, component: str) -> dict:
                 selected[energy] = {
                     key: value
                     for key, value in record.items()
-                    if key in _BREM_KEYS or key in {"case", "E_grid", "scale"}
+                    if key in _BREM_KEYS or key in {"case", "E_grid", "scale", "adaptive_sampling"}
                 }
             else:
                 characteristic = record.get("spec_characteristic")
@@ -105,7 +105,8 @@ def _component_store(results: dict, component: str) -> dict:
                 selected[energy] = {
                     key: value
                     for key, value in record.items()
-                    if key in _CHARACTERISTIC_KEYS or key in {"case", "E_grid", "scale"}
+                    if key in _CHARACTERISTIC_KEYS
+                    or key in {"case", "E_grid", "scale", "adaptive_sampling"}
                 }
             selected[energy]["case"] = copy.deepcopy(record["case"])
         if selected:

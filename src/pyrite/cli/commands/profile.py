@@ -14,7 +14,12 @@ from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli._deprecations import DeprecatedOption, canonical_option
 from pyrite.cli._groups import LazyGroup
-from pyrite.cli.commands import _physical_detector, _profile_filters, _profile_line_grid
+from pyrite.cli.commands import (
+    _physical_detector,
+    _profile_filters,
+    _profile_line_grid,
+    _profile_precision,
+)
 from pyrite.cli.commands._profile_members import (
     add_membership as _add_membership,
 )
@@ -278,6 +283,7 @@ def _emit_show(payload):
         + ", ".join(f"{key}={value}" for key, value in policy.items())
         + " (automatic for every case)"
     )
+    emit_result(_profile_precision.show_line(payload["precision"]))
     numerics = payload["transport_numerics"]
     for key, label, default in (
         ("straggling", "straggling", False),
@@ -614,6 +620,7 @@ def numerics_reset_command(name, fields, yes, dry_run):
 
 
 command.add_command(_profile_line_grid.command)
+command.add_command(_profile_precision.command)
 command.add_command(_physical_detector.command)
 
 

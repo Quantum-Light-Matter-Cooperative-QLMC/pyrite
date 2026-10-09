@@ -120,3 +120,7 @@ No divergent term, sign, exponent, or convention found between the independent d
 - **Verdict**: `filtered` (re-derivation corroborates; ledger status unchanged pending anchoring/human sign-off — this write-up does not itself flip the ledger).
 - **Write-up**: `docs/validation/beam-transport/beam-energy-spread-injection.md`.
 - **Suggested ledger change**: none required by this re-derivation; existing `filtered` status and cited anchor tests (`tests/montecarlo/test_transverse.py`, `tests/energy-grid/test_bounds.py`, `tests/montecarlo/test_beam_energy_spread_grid.py`, all green locally) are consistent with promotion to `anchored` if a human wants to formalize that the cited tests already pin the reference values used above (`S(30 keV, cos θ_obs=0) ≈ 0.4588`, `γ→1 ⇒ S→0.5`). Sign-off remains a human action.
+
+## Counter-addressed energy draws (#361 re-verification, 2026-10-07)
+
+`beam_entry.py::initial_energies_keV` sets $E_e=E_0(1+f\,Z_{e,0})$, with $Z_{e,0}=\Phi^{-1}(u_{e,0})$ in the `spawn(6)[5]` child. The construction is derived in [beam-phase-space-injection §6](beam-phase-space-injection.md). Independent checks at $E_0=100$ keV, $f=0.01$ and $N=10^6$ gave mean $\delta=6.5\times10^{-6}$ and $\sigma_\delta/f=0.99987$. Row $e=5$ equals the reference exactly, the block `start=500` equals the slice, and $f\in\{0,\texttt{None}\}$ gives exactly $E_0$. $\rho(\delta, t_{\rm bunch})=5.6\times10^{-4}$, consistent with zero, from disjoint children. The non-positive-energy guard is unchanged. No discrepancy.

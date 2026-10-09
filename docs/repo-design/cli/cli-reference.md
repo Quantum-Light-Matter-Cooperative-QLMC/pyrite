@@ -1298,6 +1298,7 @@ Commands:
   list               List catalog profiles with membership,...
   numerics           Inspect and edit result-affecting...
   physical-detector  Manage a profile's physical pixel detector...
+  precision          Inspect and edit PROFILE's adaptive...
   remove             Remove values from an existing profile's...
   rename             Rename profile NAME to NEW_NAME.
   set                Replace range grids, the beam reference,...
@@ -1875,6 +1876,104 @@ Options:
 Usage: pyrite profile physical-detector show [OPTIONS] NAME
 
   Show NAME's effective physical detector and derived scalar projection.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile precision`
+
+```text
+Usage: pyrite profile precision [OPTIONS] COMMAND [ARGS]...
+
+  Inspect and edit PROFILE's adaptive electron-count policy.
+
+  Profiles without fixed electron counts or a policy run adaptive by default (target RSE
+  0.05, 200-20000 electrons, blocks of 100, line and bremsstrahlung). Each incoherent
+  case stops when the relative standard error of its line (and optionally
+  bremsstrahlung) yield meets the target and its heavy-tail guards pass, or at the
+  maximum count flagged statistics-limited. One count serves line and bremsstrahlung
+  transport. Coherent emission, cascades, GDF beams, grooves and fixed electron counts
+  keep fixed counts.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  reset  Reset optional FIELDs to defaults, or remove the policy when none are named.
+  set    Create or update PROFILE's adaptive policy.
+  show   Show PROFILE's effective electron-count mode: adaptive (profile or...
+```
+
+## `pyrite profile precision reset`
+
+```text
+Usage: pyrite profile precision reset [OPTIONS] NAME [target-rse|min-electrons|max-
+                                      electrons|block-electrons|observable|max-electron-
+                                      share|min-effective-electrons|stability-
+                                      blocks|stability-fraction|pilot-electrons|band-
+                                      ev|batch-means-band-ev]...
+
+  Reset optional FIELDs to defaults, or remove the policy when none are named.
+
+  Removing the policy returns PROFILE to the default adaptive policy; set fixed counts
+  with 'pyrite profile numerics set --line-electrons' to opt out.
+
+Options:
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile precision set`
+
+```text
+Usage: pyrite profile precision set [OPTIONS] NAME
+
+  Create or update PROFILE's adaptive policy.
+
+  A new policy needs --target-rse, --min-electrons, --max-electrons and --block-
+  electrons. Remove fixed line/bremsstrahlung electron counts first with 'pyrite profile
+  numerics reset'.
+
+Options:
+  --target-rse FRACTION           Target relative standard error of each watched yield
+                                  (0.05 = 5%).  [x>0.0]
+  --min-electrons N               Smallest count at which the run may stop; a multiple
+                                  of --block-electrons.  [x>=2]
+  --max-electrons N               Count at which the run stops regardless, flagged
+                                  statistics-limited.  [x>=2]
+  --block-electrons N             Electrons per transport block; the rule is checked at
+                                  block ends.  [x>=1]
+  --observable [line|brem]        Yield that must converge; repeat for both (default
+                                  line).
+  --max-electron-share FRACTION   Guard: largest share of a yield one electron may hold
+                                  (default 0.05).  [0.0<x<=1.0]
+  --min-effective-electrons N     Guard: effective sample size floor (sum m)^2 / sum m^2
+                                  (default 100).  [x>=0.0]
+  --stability-blocks K            Guard: block ends whose running mean must agree; 0
+                                  disables (default 3).  [x>=0]
+  --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
+                                  the target (default 0.5).  [x>=0.0]
+  --pilot-electrons N             Pilot count that projects the stopping count and skips
+                                  checks until it.  [x>=1]
+  --band-ev START,STOP            Monitor band in eV (default: the case's line band).
+  --batch-means-band-ev START,STOP
+                                  Band in eV for reported per-bin batch-means errors;
+                                  costs one extra reduction.
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile precision show`
+
+```text
+Usage: pyrite profile precision show [OPTIONS] NAME
+
+  Show PROFILE's effective electron-count mode: adaptive (profile or default) or fixed.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation

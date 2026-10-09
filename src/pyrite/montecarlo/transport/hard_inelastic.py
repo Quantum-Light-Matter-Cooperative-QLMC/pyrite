@@ -86,9 +86,9 @@ def _hard_stream_key_scalar(stream_key):
     return _splitmix64(stream_key ^ _HARD_STREAM_SALT)
 
 
-def hard_stream_keys(seed, Ne):
-    """Host twin of :func:`_hard_stream_key_scalar` over electrons ``[0, Ne)``."""
-    return hard_keys_from_stream_keys(stream_keys(seed, Ne))
+def hard_stream_keys(seed, Ne, *, start=0):
+    """Host twin of :func:`_hard_stream_key_scalar` over ``[start, start + Ne)``."""
+    return hard_keys_from_stream_keys(stream_keys(seed, Ne, start=start))
 
 
 def hard_keys_from_stream_keys(keys):

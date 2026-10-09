@@ -72,8 +72,7 @@ def test_sampled_moments_round_trip_through_beam_metrics():
     """
     for energy_keV in (30.0, 3000.0):
         resolved = resolve_transverse_distribution(_POLICY, energy_keV=energy_keV)
-        rng = np.random.default_rng(20260806)
-        x, xp, y, yp = sample_transverse(resolved, 400_000, rng)
+        x, xp, y, yp = sample_transverse(resolved, 400_000, 20260806)
         zeros = np.zeros_like(x)
         metrics = sampled_beam_metrics(
             x,
@@ -95,7 +94,7 @@ def test_sampled_moments_round_trip_through_beam_metrics():
 def test_sampled_correlation_sign_follows_alpha():
     """alpha = -<x x'>/eps, so a negative alpha gives a positive correlation."""
     resolved = resolve_transverse_distribution(_POLICY, energy_keV=30.0)
-    x, xp, _, _ = sample_transverse(resolved, 200_000, np.random.default_rng(7))
+    x, xp, _, _ = sample_transverse(resolved, 200_000, 7)
     covariance = float(np.mean((x - x.mean()) * (xp - xp.mean())))
     assert covariance > 0.0
 
@@ -142,11 +141,11 @@ def test_charge_and_rep_rate_stay_inert_on_the_sampler():
     it just has to be a deliberate, ledgered decision instead of drift.
     """
     resolved = resolve_transverse_distribution(_POLICY, energy_keV=30.0)
-    baseline = sample_transverse(resolved, 5_000, np.random.default_rng(3))
+    baseline = sample_transverse(resolved, 5_000, 3)
     beam = BeamSpec.with_transverse(_POLICY, bunch_charge_pc=250.0, rep_rate_hz=1.0)
     charged = resolve_transverse_distribution(beam.transverse, energy_keV=30.0)
     assert charged == resolved
-    repeat = sample_transverse(charged, 5_000, np.random.default_rng(3))
+    repeat = sample_transverse(charged, 5_000, 3)
     for lhs, rhs in zip(baseline, repeat, strict=True):
         assert np.array_equal(lhs, rhs)
 

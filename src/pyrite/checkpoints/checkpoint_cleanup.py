@@ -86,23 +86,23 @@ def _case_key(case: dict[str, Any]) -> str:
 
 
 def _current_case_keys(target: _Target) -> dict[tuple[str, float], str]:
+    # The runner's own lowering, under the profile's run settings (emission,
+    # transport numerics, adaptive precision), so current records match.
+    from ..api import build_configured_cases
     from ..campaign.config import default_settings, material_sweep
-    from ..campaign.sweep import build_cases
+    from ..campaign.profiles import profile_run_settings
 
-    settings = default_settings(target.fidelity)
     sweep = material_sweep(
         target.material,
         fidelity=target.fidelity,
         catalog_profile=target.catalog_profile,
     )
+    settings = profile_run_settings(
+        default_settings(target.fidelity), target.catalog_profile, target.fidelity, sweep=sweep
+    )
     return {
         (case["name"], float(case["E0_keV"])): _case_key(case)
-        for case in build_cases(
-            sweep,
-            settings.n_electrons,
-            settings.n_electrons_brem,
-            coherent_emission=settings.coherent_emission,
-        )
+        for case in build_configured_cases(sweep, settings)
     }
 
 

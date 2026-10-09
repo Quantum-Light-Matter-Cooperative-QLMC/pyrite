@@ -26,6 +26,7 @@ from .._numerics import (
     validate_pair_production_numerics,
     validate_radiative_numerics,
 )
+from .._precision import Precision
 from .._spectral_components import line_spectrum
 from ..detectors import Detector, LegacyEDS
 from ..montecarlo import (
@@ -161,8 +162,11 @@ class Settings:
     emission: EmissionMode = "incoherent"
     # Opt-in line I(t) (#292). Divergence-only in dataset_identity, like emission.
     temporal_profile: bool = False
+    precision: Precision | None = None
 
     def __post_init__(self) -> None:
+        if self.precision is not None and not isinstance(self.precision, Precision):
+            raise TypeError("precision must be a Precision or None")
         if not isinstance(self.temporal_profile, bool):
             raise TypeError("temporal_profile must be a bool")
         if not isinstance(self.straggling, bool):
@@ -279,6 +283,8 @@ def store_result(results, case, out):
     # than only log warnings (#192). Absent for fixed-grid cases.
     if out.get("line_grid_resolved") is not None:
         results[name][E0]["line_grid_resolved"] = out["line_grid_resolved"]
+    if out.get("adaptive_sampling") is not None:
+        results[name][E0]["adaptive_sampling"] = out["adaptive_sampling"]
     # Artifact-scored records name the trajectory file they replayed (#186).
     if out.get("source_trajectory") is not None:
         results[name][E0]["source_trajectory"] = out["source_trajectory"]

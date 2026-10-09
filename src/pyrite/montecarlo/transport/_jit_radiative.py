@@ -16,9 +16,9 @@ _MB_CM2 = 1.0e-27
 _RADIATIVE_STREAM_SALT = 0xA54FF53A5F1D36F1
 
 
-def radiative_stream_keys(seed, n_electrons):
+def radiative_stream_keys(seed, n_electrons, *, start=0):
     """A per-electron key domain separate from transport and shell collisions."""
-    return stream_keys(int(seed) ^ _RADIATIVE_STREAM_SALT, n_electrons)
+    return stream_keys(int(seed) ^ _RADIATIVE_STREAM_SALT, n_electrons, start=start)
 
 
 @njit(cache=True)

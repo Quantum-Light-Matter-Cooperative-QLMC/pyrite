@@ -123,7 +123,7 @@ Subtracting the widths that {eq}`eq-longitudinal-microtrain` adds back keeps the
 
 ## Sampling and reproducibility
 
-The bunch draw takes its own RNG child stream (`SeedSequence(seed).spawn(4)[3]`), disjoint from the free-path and scattering streams and from the transverse and energy-spread streams. Enabling or changing a bunch policy therefore never perturbs the trajectories themselves: the same electrons are transported, and only their $t_0$ labels change. The degenerate case (no policy, no legacy field) returns all-zero offsets bit-for-bit, the pure-geometry coherent limit.
+The bunch draw takes its own RNG child namespace (`SeedSequence(seed).spawn(4)[3]`), disjoint from the free-path and scattering streams and from the transverse and energy-spread streams. Inside it each electron's draws are counter-addressed, so an electron's raw offset does not depend on the electron count; only the centroid subtraction does ([random streams](../../computation/random-streams.md)). Enabling or changing a bunch policy therefore never perturbs the trajectories themselves: the same electrons are transported, and only their $t_0$ labels change. The degenerate case (no policy, no legacy field) returns all-zero offsets bit-for-bit, the pure-geometry coherent limit.
 
 ## Limiting cases
 
