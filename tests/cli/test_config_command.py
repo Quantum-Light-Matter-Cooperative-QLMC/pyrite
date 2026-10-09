@@ -1,3 +1,5 @@
+import json
+
 from pyrite.cli.commands import config as config_command
 from pyrite.cli.commands import scan
 from pyrite.console import config as _config
@@ -194,18 +196,27 @@ def test_config_rejects_unknown_profile_and_unsafe_remote(monkeypatch, tmp_path)
     assert "expected host alias" in remote.stderr
 
 
-def test_run_warns_when_profile_falls_back_to_builtin_standard(monkeypatch, tmp_path):
+def test_run_rejects_profile_falling_back_to_builtin_standard(monkeypatch, tmp_path):
     _isolated_store(monkeypatch, tmp_path)
     seen = {}
     monkeypatch.setattr(scan._scan, "run", lambda args: seen.update(vars(args)))
 
     result = invoke(scan.command)
 
-    assert result.exit_code == 0
-    assert seen["catalog_profile"] == "standard"
-    assert result.stderr.startswith("warning: this run names no profile; using the 'standard'")
-    assert "will be an error in 0.6.0" in result.stderr
+    assert result.exit_code == 2
+    assert seen == {}
+    assert "Error: this run names no profile; pass PROFILE, set PYRITE_PROFILE" in result.stderr
     assert "pyrite config set profile.current NAME" in result.stderr
+
+
+def test_ephemeral_run_rejects_implicit_profile_with_json_envelope(monkeypatch, tmp_path):
+    _isolated_store(monkeypatch, tmp_path)
+
+    result = invoke(scan.command, ["--ephemeral", "-m", "hopg", "-o", "json"])
+
+    assert result.exit_code == 2
+    assert json.loads(result.stdout)["schema"] == "cxr.material.simulate"
+    assert "this run names no profile" in result.stdout
 
 
 def test_run_is_silent_for_an_explicitly_named_standard_profile(monkeypatch, tmp_path):

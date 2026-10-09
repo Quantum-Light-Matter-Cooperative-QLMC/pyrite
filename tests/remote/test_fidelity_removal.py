@@ -1,4 +1,4 @@
-"""`--fidelity` deprecation window (issue #215): generated argv stays quiet and unchanged."""
+"""`--fidelity` was removed at 0.6.0 (issue #387): generated argv no longer carries it."""
 
 import pytest
 
@@ -16,11 +16,16 @@ def test_slurm_wrapper_marks_payload_as_generated_invocation():
 
 
 @pytest.mark.parametrize("builder", [_queue_scripts._rebrem_flags, _queue_scripts._reline_flags])
-def test_remote_recompute_still_forwards_explicit_fidelity(builder):
-    # An explicit --fidelity retunes the box-side recompute, so the window keeps
-    # forwarding it byte-for-byte; the wrapper export silences the warning.
-    assert builder(None, None, False).startswith(" --fidelity full")
-    assert builder(None, None, False, "survey").startswith(" --fidelity survey")
+def test_remote_recompute_no_longer_forwards_fidelity(builder):
+    # The box-side recompute reads fidelity from checkpoint metadata.
+    assert "--fidelity" not in builder(None, None, False)
+    assert builder(None, None, True) == " --redo-all"
+
+
+def test_queue_script_no_longer_forwards_fidelity():
+    script = _queue_scripts._queue_script("j", ["mos2"], quick=False, workers=None)
+
+    assert "--fidelity" not in script
 
 
 def test_nsys_reexec_marks_child_as_generated_invocation(monkeypatch, tmp_path):
@@ -43,11 +48,10 @@ def test_nsys_reexec_marks_child_as_generated_invocation(monkeypatch, tmp_path):
             performance_dir=tmp_path,
             performance_interval=5.0,
             workers=0,
-            fidelity="survey",
             quick=False,
             n_families=None,
         )
 
     argv = execd.value.args[0]
-    assert argv[argv.index("--fidelity") + 1] == "survey"
+    assert "--fidelity" not in argv
     assert scan.os.environ[GENERATED_INVOCATION_ENV] == "1"

@@ -304,7 +304,7 @@ def test_profile_and_material_commands_wire_catalog_completion():
         assert _callback(member_command, "name") is _cli_completion.complete_profile
         assert _callback(member_command, "materials") is _cli_completion.complete_material_csv
 
-    for name in ("show", "set"):
+    for name in ("show",):
         material_command = material.command.commands[name]
         assert _callback(material_command, "material") is _cli_completion.complete_material
         assert _callback(material_command, "profile_name") is _cli_completion.complete_profile

@@ -88,7 +88,7 @@ def test_trial_spellings_conflict_before_work(command_path, canonical, retired, 
 
 
 @pytest.mark.parametrize(
-    "entry", [row for row in DEPRECATED_FLAGS.values() if row.deprecated_in == "0.5.1"]
+    "entry", [row for row in DEPRECATED_FLAGS.values() if row.replacement.endswith("-trials")]
 )
 def test_retired_trial_flags_warn_once_and_preserve_parameter_source(entry, capsys):
     import click

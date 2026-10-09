@@ -125,4 +125,5 @@ def test_the_comparison_actually_fails_on_an_overdue_row() -> None:
     """
     assert _overdue({"retired-in-0.3.0": "0.3.0"}) == {"retired-in-0.3.0": "0.3.0"}
     assert _overdue({"older": "0.1.0"}) == {"older": "0.1.0"}
-    assert _overdue({"future": "0.6.0"}) == {}
+    next_minor = f"{SHIPPING[0]}.{SHIPPING[1] + 1}.0"
+    assert _overdue({"future": next_minor}) == {}

@@ -26,6 +26,12 @@ _EMPTY_OPTIONS = (
     "canonical; anything else exits as a usage error."
 )
 
+_EMPTY_IMPLICIT = (
+    "No implicit default is currently deprecated. A run that leaves its profile "
+    "unnamed, or a user-catalog profile that names no beam or detector, exits as a "
+    "usage error."
+)
+
 
 def build_deprecations() -> str:
     lines = [
@@ -89,26 +95,27 @@ def build_deprecations() -> str:
             )
     else:
         lines.append(_EMPTY_OPTIONS)
-    lines.extend(
-        (
-            "",
-            "## Implicit defaults",
-            "",
+    lines.extend(("", "## Implicit defaults", ""))
+    if IMPLICIT_DEFAULTS:
+        lines.extend(
             (
-                "A run that leaves one of these unnamed still resolves the fallback, "
-                "warns on stderr, and must name it explicitly from the removal release."
-            ),
-            "",
-            "| Unnamed | Current fallback | Name it explicitly | Deprecated in | Remove in | Note |",
-            "| --- | --- | --- | --- | --- | --- |",
+                (
+                    "A run that leaves one of these unnamed still resolves the fallback, "
+                    "warns on stderr, and must name it explicitly from the removal release."
+                ),
+                "",
+                "| Unnamed | Current fallback | Name it explicitly | Deprecated in | Remove in | Note |",
+                "| --- | --- | --- | --- | --- | --- |",
+            )
         )
-    )
-    for key in sorted(IMPLICIT_DEFAULTS):
-        implicit = IMPLICIT_DEFAULTS[key]
-        lines.append(
-            f"| {implicit.key} | {implicit.fallback} | {implicit.replacement} "
-            f"| {implicit.deprecated_in} | {implicit.remove_in} | {implicit.note} |"
-        )
+        for key in sorted(IMPLICIT_DEFAULTS):
+            implicit = IMPLICIT_DEFAULTS[key]
+            lines.append(
+                f"| {implicit.key} | {implicit.fallback} | {implicit.replacement} "
+                f"| {implicit.deprecated_in} | {implicit.remove_in} | {implicit.note} |"
+            )
+    else:
+        lines.append(_EMPTY_IMPLICIT)
     lines.append("")
     return "\n".join(lines)
 

@@ -9,11 +9,8 @@ import pytest
 from pyrite import cli
 from pyrite._catalog_layout import read_text
 from pyrite.cli import _catalog_io
-from pyrite.cli._deprecations import message
 from pyrite.cli.commands import material
 from tests.helpers.cli import assert_clean_result, invoke
-
-_SET_WARNING = message("material set") + "\n"
 
 _CATALOG = """[profiles.standard]
 thickness_ang = { values = [1000.0] }
@@ -77,83 +74,11 @@ def test_show_nonstandard_profile_json(tmp_path, monkeypatch):
     assert rows["thickness"]["source"] == "inherited"
 
 
-def test_set_nonstandard_profile_override(tmp_path, monkeypatch):
-    catalog = _catalog(tmp_path, monkeypatch)
+def test_retired_material_set_is_unknown_command():
+    result = invoke(material.command, ["set", "hopg", "--reset", "all"])
 
-    result = invoke(
-        material.command,
-        ["set", "mose2", "--profile", "survey", "--energy", "70"],
-    )
-
-    assert_clean_result(
-        result, stdout="updated profile survey, material mose2\n", stderr=_SET_WARNING
-    )
-    text = catalog.read_text()
-    assert "[profiles.survey.overrides.mose2]" in text
-    assert "energy_keV = {values = [70.0]}" in text
-
-
-def test_material_set_concatenates_repeated_range_options(tmp_path, monkeypatch):
-    catalog = _catalog(tmp_path, monkeypatch)
-
-    result = invoke(
-        material.command,
-        [
-            "set",
-            "mose2",
-            "--profile",
-            "survey",
-            "--energy",
-            "40",
-            "--energy",
-            "50:70:20",
-        ],
-    )
-
-    assert_clean_result(
-        result, stdout="updated profile survey, material mose2\n", stderr=_SET_WARNING
-    )
-    assert "energy_keV = {values = [40.0, 50.0, 70.0]}" in catalog.read_text()
-
-
-def test_material_range_help_documents_repeatability() -> None:
-    result = invoke(material.command, ["set", "--help"])
-
-    assert_clean_result(result)
-    assert " ".join(result.stdout.split()).count("repeat to combine") == 4
-
-
-def test_reset_preserves_non_range_override_siblings(tmp_path, monkeypatch):
-    catalog = _catalog(tmp_path, monkeypatch)
-
-    result = invoke(material.command, ["set", "hopg", "--reset", "thickness"])
-
-    assert_clean_result(
-        result, stdout="updated profile standard, material hopg\n", stderr=_SET_WARNING
-    )
-    section = (
-        catalog.read_text().split("[profiles.standard.overrides.hopg]", 1)[1].split("\n[", 1)[0]
-    )
-    assert "thickness_ang" not in section
-    assert "E_grid_brem" in section
-
-
-def test_overwrite_confirmation_and_dry_run(tmp_path, monkeypatch):
-    catalog = _catalog(tmp_path, monkeypatch)
-    original = catalog.read_text()
-
-    declined = invoke(material.command, ["set", "hopg", "--thickness", "3000"], input="n\n")
-    assert declined.exit_code == 1
-    assert "profile standard, material hopg" in declined.stderr
-    assert catalog.read_text() == original
-
-    dry_run = invoke(
-        material.command,
-        ["set", "hopg", "--thickness", "3000", "--dry-run"],
-    )
-    assert_clean_result(dry_run, stderr=_SET_WARNING)
-    assert "+thickness_ang={values=[3000.0]}" in dry_run.stdout.replace(" ", "")
-    assert catalog.read_text() == original
+    assert result.exit_code == 2
+    assert "No such command 'set'" in result.stderr
 
 
 def test_unknown_names_report_actionable_errors(tmp_path, monkeypatch):
@@ -184,7 +109,7 @@ def test_root_and_group_help_expose_new_ownership_only():
     assert "remove-material" not in profile_help.stdout
     assert_clean_result(material_help)
     assert "show" in material_help.stdout
-    assert "set" in material_help.stdout
+    assert "\n  set " not in material_help.stdout
     assert "validate" in material_help.stdout
     assert "blaze" in material_help.stdout
     assert "list" not in material_help.stdout
@@ -597,7 +522,6 @@ def test_ephemeral_artifact_parity_and_existing_file_preflight(tmp_path, monkeyp
         ["--no-sync"],
         ["--n-families", "3"],
         ["--chunk-minutes", "0"],
-        ["--fidelity", "full"],
     ],
 )
 def test_ephemeral_rejects_explicit_sweep_options_before_resolution(monkeypatch, options):

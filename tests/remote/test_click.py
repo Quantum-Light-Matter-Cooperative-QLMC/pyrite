@@ -100,7 +100,6 @@ def test_run_click_defaults_and_zero_meanings(monkeypatch):
             ["hopg"],
             {
                 "quick": False,
-                "fidelity": "full",
                 "workers": 0,
                 "parallel_materials": None,
                 "chunk_minutes": 10.0,
@@ -357,45 +356,6 @@ def test_remote_gc_runs_both_reclamations_with_standard_defaults(monkeypatch):
         ("prune", {"all_profiles": False, "catalog_profile": None, "yes": False}),
         ("reap", {"min_age_minutes": 5.0, "yes": False}),
     ]
-
-
-@pytest.mark.parametrize("command_name", ["start", "rebrem", "reline"])
-def test_fidelity_dispatches_cleanly(monkeypatch, command_name):
-    calls = []
-    monkeypatch.setattr(
-        lifecycle,
-        "start_queue",
-        lambda materials, **kwargs: calls.append(kwargs) or "job",
-    )
-    monkeypatch.setattr(
-        lifecycle,
-        "start_rebrem_queue",
-        lambda materials, **kwargs: calls.append(kwargs) or "job",
-    )
-    monkeypatch.setattr(
-        lifecycle,
-        "start_reline_queue",
-        lambda materials, **kwargs: calls.append(kwargs) or "job",
-    )
-    monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
-
-    if command_name in ("rebrem", "reline"):
-        argv = ["hopg", "--fidelity", "survey", "--no-sync", "--dry-run"]
-    else:
-        argv = [
-            "standard",
-            "-m",
-            "hopg",
-            "--fidelity",
-            "survey",
-            "--no-sync",
-            "--headless",
-        ]
-
-    result = invoke(getattr(remote_cli, f"{command_name}_command"), argv)
-
-    assert_clean_result(result)
-    assert calls[0]["fidelity"] == "survey"
 
 
 @pytest.mark.parametrize(

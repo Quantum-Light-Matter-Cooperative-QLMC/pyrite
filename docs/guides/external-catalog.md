@@ -41,9 +41,9 @@ fails instead of falling back to bundled definitions. Remote submissions stage
 the selected catalog in the remote checkout and run against that copy.
 
 The bundled `default` beam and detector are examples. Give each lab profile its
-own with `pyrite profile set NAME --beam BEAM --detector DETECTOR`: a run from a
-selected catalog whose profile names neither falls back to the bundled examples
-and warns, and that fallback is scheduled for removal (see
+own with `pyrite profile set NAME --beam BEAM --detector DETECTOR`: since 0.6.0 a
+run from a selected catalog whose profile names no beam or no detector is a
+usage error (see
 [Bundled examples and implicit defaults](sweep-profiles.md#bundled-examples-and-implicit-defaults)).
 
 Keep generated output separate from the catalog. Set an external workspace for

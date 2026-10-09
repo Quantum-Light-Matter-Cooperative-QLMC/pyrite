@@ -23,7 +23,7 @@ new checkpoint stems and earlier results stay under their old identity.
 | `E_grid_brem` | grid, eV | TOML (`pyrite-dev energy-grid brem set` stores per-material artifacts instead) | uniform grids keep only `step` |
 | `E_grid_line` | grid, eV | TOML (`pyrite-dev energy-grid line` maintains artifacts) | ignored while a line-grid policy is set |
 | `energy_grid_refs` | material -> artifact digest | `pyrite material energy-grid derive`, `pyrite-dev energy-grid add` | ignored while a line-grid policy is set |
-| `overrides.MATERIAL.*` | any range/grid key above, plus counts | none for new edits: `pyrite material set` is deprecated (removal 0.6.0, #359); use a single-material profile | `material set --reset all` removes the four range keys it wrote during the window; other override keys are TOML. Bundled stack rows (`thickness_layers`, sapphire thickness) stay until materials and physical objects are separated |
+| `overrides.MATERIAL.*` | any range/grid key above, plus counts | none: `pyrite material set` was removed in 0.6.0 (#359); use a single-material profile | Remove existing override keys by editing the TOML. Bundled stack rows (`thickness_layers`, sapphire thickness) stay until materials and physical objects are separated |
 
 ## Calculation numerics
 
@@ -32,7 +32,7 @@ explicit value, effective value and source (`profile`, `fidelity`, `built-in`).
 
 | TOML key | Setter flag | Notes |
 |---|---|---|
-| `n_electrons`, `n_electrons_brem` | `--line-trials`, `--brem-trials` | single-value grids; `profile set\|add -l/-b` edit them as sweepable grids; old electron options warn and are scheduled for removal in 0.7.0 |
+| `n_electrons`, `n_electrons_brem` | `--line-trials`, `--brem-trials` | single-value grids; `profile set\|add -l/-b` edit them as sweepable grids; old electron options warn and are scheduled for removal in 0.8.0 |
 | `n_families`, `max_reflections` | `--reflection-families`, `--maximum-reflections` | |
 | `mosaic_nodes`, `mosaic_route` | `--mosaic-nodes`, `--mosaic-route` | |
 | `straggling`, `energy_model`, `max_dE_frac` | `--straggling`, `--energy-model`, `--maximum-fractional-energy-loss` | also accepted by `profile create\|set` for compatibility |

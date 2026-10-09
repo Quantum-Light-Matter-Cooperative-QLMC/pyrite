@@ -777,8 +777,7 @@ def defaults_command(
     bounds; ``brem-step`` controls only applied bremsstrahlung spacing.
 
     Empty ``polar`` or ``azimuth`` mean inherit each material's catalog-profile
-    angles. These are not physical scan defaults and do not select scan
-    ``--fidelity full|survey``.
+    angles. These are not physical scan defaults.
     """
     supplied = [
         flag

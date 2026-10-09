@@ -14,7 +14,6 @@ PROFILE = "standard"
 DEFAULT_FLAGS = {
     "catalog_profile": None,
     "material": None,
-    "fidelity": "full",
     "quick": False,
     "workers": None,
     "parallel_materials": None,
@@ -152,7 +151,6 @@ def test_explicit_chunk_minutes_is_never_overridden():
             {"parallel_materials": 2, "chunk_minutes": 1.0},
             "--parallel-materials requires --chunk-minutes 0",
         ),
-        ({"quick": True, "fidelity": "survey"}, "--quick cannot be combined with --fidelity"),
         ({"quick": True, "grid": True}, "quick checkpoints aren't grid-filterable"),
         ({"headless": True, "no_pull": True}, "--headless cannot be combined with --no-pull"),
     ],

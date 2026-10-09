@@ -4,7 +4,7 @@ PyRITE has three distinct configuration layers. Keeping them separate prevents s
 
 1. **CLI context** selects the current campaign profile, remote target, and workspace root.
 2. **Catalog profiles** select campaign grids, membership, beam, detector, and emission policy from the material catalog (`data/catalog/profiles/`).
-3. **Fidelity presets** (`full` or `survey`) set workload and reduce resolved grids. Fidelity is not a catalog profile. `--fidelity` is deprecated for removal in 0.6.0; `survey` is retired (issue #215).
+3. **Fidelity presets** (`full` or `survey`) set workload and reduce resolved grids. Fidelity is not a catalog profile. The `--fidelity` option was removed in 0.6.0 (issues #215, #387); every CLI run resolves `full`, and `survey` is retired.
 
 ## CLI context precedence
 

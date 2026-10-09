@@ -6,10 +6,9 @@ non-interactively -- in particular over SSH on the GPU box; see pyrite.remote,
 which drives this and pulls the checkpoint back so interactive analysis and
 static-HTML export can stay on the laptop.
 
-    pyrite run                        # standard profile membership
+    pyrite run standard               # standard profile membership
     pyrite run sub_100keV             # named profile membership
     pyrite run standard -m mose2      # one standard-profile member
-    pyrite run standard -m mose2 --fidelity survey
     pyrite run standard -m mose2 --quick
     pyrite run standard -m mose2 --workers 0
 
@@ -199,7 +198,6 @@ def _profiled_child_command(
     performance_dir,
     performance_interval,
     workers,
-    fidelity,
     quick,
     n_families,
     max_minutes=None,
@@ -236,8 +234,6 @@ def _profiled_child_command(
         child += ["--perf-interval", f"{performance_interval:g}"]
     if workers is not None:
         child += ["--workers", str(workers)]
-    if fidelity != "full":
-        child += ["--fidelity", fidelity]
     if quick:
         child += ["--quick"]
     if n_families is not None:
@@ -260,7 +256,6 @@ def _nsys_reexec_command(
     performance_dir,
     performance_interval,
     workers,
-    fidelity,
     quick,
     n_families,
     max_minutes=None,
@@ -280,7 +275,6 @@ def _nsys_reexec_command(
         performance_dir=performance_dir,
         performance_interval=performance_interval,
         workers=workers,
-        fidelity=fidelity,
         quick=quick,
         n_families=n_families,
         max_minutes=max_minutes,

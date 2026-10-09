@@ -61,6 +61,20 @@ def _retired(path: tuple[str, ...]) -> bool:
     return any(not _resolves(path[: n + 1]) for n in range(len(path)))
 
 
+#: Frozen options removed on their published schedule rather than whole paths.
+#: The `--fidelity` cohort (deprecated 0.4.0, issue #215) was removed at 0.6.0
+#: (issue #387).
+_REMOVED_OPTIONS = {
+    (path, "--fidelity")
+    for path in (
+        ("run",),
+        ("checkpoint", "recompute", "brem"),
+        ("checkpoint", "recompute", "line"),
+        ("profile", "numerics", "show"),
+    )
+}
+
+
 class _EntryPoint:
     """Adapts ``cli.main``'s argv contract to ``CliRunner.invoke``."""
 
@@ -141,6 +155,9 @@ def test_click_tree_preserves_frozen_command_and_option_names():
             param.retired_flag for param in current.params if isinstance(param, RetiredOption)
         }
         for option in _node_options(node):
+            if (path, option) in _REMOVED_OPTIONS:
+                assert option not in completed.stdout
+                continue
             assert option in completed.stdout or option in relocated or option in retired
         for child in node["subcommands"]:
             if child["path"].startswith("line-grid"):
@@ -165,6 +182,14 @@ def test_every_frozen_path_retired_at_0_3_0_is_now_refused(path):
     completed = _run(*path)
 
     assert completed.exit_code != 0
+
+
+@pytest.mark.parametrize(("path", "option"), sorted(_REMOVED_OPTIONS))
+def test_every_frozen_option_removed_at_0_6_0_is_now_refused(path, option):
+    completed = _run(*path, option, "full")
+
+    assert completed.exit_code == 2
+    assert f"No such option '{option}'" in completed.stderr
 
 
 @pytest.mark.parametrize(

@@ -1190,11 +1190,9 @@ def test_stems_predicts_qualified_stem_for_non_standard_catalog_profile(monkeypa
     assert calls == [("mos2", "full", "sub_100keV", "default")]
 
 
-def test_queue_script_and_stem_resolve_survey_profile():
+def test_stem_resolves_survey_profile():
     from pyrite.campaign.profiles import named_profile_stem
 
-    script = remote._queue_script("j", ["mos2"], quick=False, workers=None, fidelity="survey")
-    assert "--fidelity survey" in script
     assert remote._stems(["mos2"], False, "survey") == [named_profile_stem("mos2", "survey")]
 
 
@@ -1966,7 +1964,7 @@ def test_successful_profile_run_resolves_remote_stem_before_real_pull(monkeypatc
 
 @pytest.fixture
 def multi_detector_standard(tmp_path, monkeypatch):
-    """Bundled catalog whose ``standard`` profile also declares a physical
+    """Bundled-catalog copy whose ``standard`` profile also declares a physical
     detector, so it resolves the two detector IDs ``physical`` and ``default``."""
     from pyrite import DATA_DIR, materials
     from pyrite.campaign import config as campaign_config
@@ -1974,7 +1972,10 @@ def multi_detector_standard(tmp_path, monkeypatch):
 
     root = tmp_path / "catalog"
     shutil.copytree(DATA_DIR / "catalog", root)
-    with (root / "profiles" / "standard.toml").open("a") as handle:
+    # A copied catalog is user-selected, so its profiles must name their beam.
+    profile = root / "profiles" / "standard.toml"
+    profile.write_text('beam = "default"\n' + profile.read_text())
+    with profile.open("a") as handle:
         handle.write("\n[physical_detector]\ndistance_mm = 300.0\nshape = [2, 3]\n")
         handle.write("pitch_mm = [0.1, 0.2]\n")
     catalog = load_material_catalog(root)
@@ -6170,7 +6171,6 @@ def test_cli_rebrem_pulls_brem_dataset(monkeypatch):
     cli._cli_rebrem(
         material=["mos2"],
         all_=False,
-        fidelity="full",
         ne_brem=None,
         start=None,
         stop=None,

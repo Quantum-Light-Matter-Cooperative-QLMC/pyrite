@@ -9,10 +9,10 @@ from tomlkit.exceptions import ParseError
 
 from pyrite._numerics import DEFAULT_RADIATIVE_CUTOFF_EV
 from pyrite.campaign import profile_edit as _profile_edit
-from pyrite.campaign.profiles import FIDELITY_NAMES, resolve_numerics
+from pyrite.campaign.profiles import resolve_numerics
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
-from pyrite.cli._deprecations import DeprecatedOption, canonical_option
+from pyrite.cli._deprecations import canonical_option
 from pyrite.cli._groups import LazyGroup
 from pyrite.cli.commands import (
     _physical_detector,
@@ -39,7 +39,6 @@ from pyrite.console.output import (
     AZIMUTH_CSV_RANGE,
     COUNT_CSV,
     ENERGY_CSV_RANGE,
-    FIDELITY_DEPRECATED_HELP,
     THICKNESS_CSV_RANGE,
     TILT_CSV_RANGE,
     CLIError,
@@ -392,17 +391,10 @@ def numerics_command():
 
 @numerics_command.command("show")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
-@click.option(
-    "--fidelity",
-    cls=DeprecatedOption,
-    type=click.Choice(FIDELITY_NAMES),
-    default="full",
-    show_default=True,
-    help=f"{FIDELITY_DEPRECATED_HELP} Resolve profile values against this fidelity preset.",
-)
 @output_option
-def numerics_show_command(name, fidelity, json_output):
+def numerics_show_command(name, json_output):
     """Show explicit and effective PROFILE numerics with value sources."""
+    fidelity = "full"
     try:
         _text, document = _catalog_io.catalog_text()
         target = _profile_edit.existing_profile(document, name)

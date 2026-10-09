@@ -291,8 +291,6 @@ def _queue_script(
     flags = ""
     if quick:
         flags += " --quick"
-    if fidelity != "full":
-        flags += f" --fidelity {fidelity}"
     if workers is not None:
         flags += f" --workers {workers}"
     if no_cache:
@@ -652,8 +650,6 @@ def _chunked_queue_script(
     flags = ""
     if quick:
         flags += " --quick"
-    if fidelity != "full":
-        flags += f" --fidelity {fidelity}"
     if workers is not None:
         flags += f" --workers {workers}"
     if no_cache and recompute:
@@ -759,11 +755,10 @@ def _rebrem_flags(
     ne_brem,
     brem_step_eV,
     redo_all,
-    fidelity="full",
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
-    flags = f" --fidelity {fidelity}"
+    flags = ""
     if ne_brem is not None:
         flags += f" --ne-brem {int(ne_brem)}"
     if brem_step_eV is not None:
@@ -795,7 +790,7 @@ def _rebrem_queue_script(
     ``status``/``attach`` render the shared case-progress dashboard. The
     ``completed:``/``failed:`` log markers match the scan queue's so
     ``state._completed_materials`` drives the post-attach pull unchanged."""
-    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all, fidelity, brem_start_eV, brem_stop_eV)
+    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all, brem_start_eV, brem_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     return f"""JOBDIR={config.shell_word(jobdir)}
@@ -853,7 +848,7 @@ def _rebrem_chunked_queue_script(
     contract per material: ``rc==0`` -> ``completed:``, ``rc==75`` -> leave
     unresolved (a later slice finishes it), else -> ``failed:``.
     """
-    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all, fidelity, brem_start_eV, brem_stop_eV)
+    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all, brem_start_eV, brem_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
@@ -941,11 +936,10 @@ def _reline_flags(
     line_ne,
     line_step_eV,
     redo_all,
-    fidelity="full",
     line_start_eV=None,
     line_stop_eV=None,
 ):
-    flags = f" --fidelity {fidelity}"
+    flags = ""
     if line_ne is not None:
         flags += f" --line-ne {int(line_ne)}"
     if line_step_eV is not None:
@@ -974,7 +968,7 @@ def _reline_queue_script(
     material; each writes the same per-material JSON progress record a scan or
     brem recompute does, and the ``completed:``/``failed:`` markers match so
     ``state._completed_materials`` drives the post-attach pull unchanged."""
-    flags = _reline_flags(line_ne, line_step_eV, redo_all, fidelity, line_start_eV, line_stop_eV)
+    flags = _reline_flags(line_ne, line_step_eV, redo_all, line_start_eV, line_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     return f"""JOBDIR={config.shell_word(jobdir)}
@@ -1032,7 +1026,7 @@ def _reline_chunked_queue_script(
     contract per material: ``rc==0`` -> ``completed:``, ``rc==75`` -> leave
     unresolved (a later slice finishes it), else -> ``failed:``.
     """
-    flags = _reline_flags(line_ne, line_step_eV, redo_all, fidelity, line_start_eV, line_stop_eV)
+    flags = _reline_flags(line_ne, line_step_eV, redo_all, line_start_eV, line_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))

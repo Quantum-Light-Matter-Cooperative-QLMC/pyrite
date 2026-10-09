@@ -13,8 +13,10 @@ without a row and a row cannot outlive the alias it describes, and
 `tests/test_deprecation_schedule.py` holds every row to the shipping
 `__version__` so a removal target cannot pass unnoticed again.
 
-The 0.1.0 cohort reached its target and was removed at 0.3.0. Current option
-rows cover `--fidelity` and the electron-count spellings replaced by trial names.
+The 0.1.0 cohort reached its target and was removed at 0.3.0; the 0.4.0 cohort
+(`material set`, `--fidelity`, implicit profile/beam/detector) at 0.6.0
+(issue #387). Current option rows cover the electron-count spellings replaced by
+trial names.
 """
 
 import re
@@ -51,29 +53,14 @@ def _entry(path: str, replacement: str, *, since: str = "0.1.0", note: str = "")
 
 #: Keyed by full command path as the user types it, minus the ``pyrite`` prefix.
 #:
-#: Empty as of 0.3.0. Every row carried `deprecated_in="0.1.0"`, and a two-minor
-#: window closes at 0.3.0, so the 68 command spellings and the aliases behind
-#: them were removed together rather than drifting past their own schedule
-#: (issue #68). The machinery below -- `DeprecatingGroup`, `RetiredOption`,
-#: `canonical_option`, `hidden_alias` -- is deliberately retained: ADR-0002
-#: requires it for the next rename, and `tests/cli/test_deprecations.py`
-#: still exercises it against a locally declared command.
-DEPRECATIONS: dict[str, Deprecation] = {
-    # Per-material overrides quietly diverge one material from its profile
-    # (issue #359). `--reset` keeps working through the window so existing
-    # rows can be removed; schema-level overrides remain readable.
-    "material set": _entry(
-        "material set",
-        "pyrite profile set",
-        since="0.4.0",
-        note=(
-            "per-material range overrides are retired (issue #359): set shared ranges with "
-            "'pyrite profile set', or give one material its own profile with 'pyrite profile "
-            "create NAME --from PROFILE --material MATERIAL'; 'pyrite material set MATERIAL "
-            "--reset all' still removes existing overrides during the window."
-        ),
-    ),
-}
+#: Empty as of 0.6.0. The 0.1.0 cohort of 68 command spellings was removed at
+#: 0.3.0 (issue #68), and `material set` (deprecated 0.4.0, issue #359) at
+#: 0.6.0 (issue #387). The machinery below -- `DeprecatingGroup`,
+#: `RetiredOption`, `canonical_option`, `hidden_alias` -- is deliberately
+#: retained: ADR-0002 requires it for the next rename, and
+#: `tests/cli/test_deprecations.py` still exercises it against a locally
+#: declared command.
+DEPRECATIONS: dict[str, Deprecation] = {}
 
 
 #: Paths whose canonical replacement depends on the arguments given, so the
@@ -217,59 +204,29 @@ def _flag(
 # attached with `--beam NAME` / `--detector NAME`, so the old spellings are plain
 # "no such option" usage errors with no registry row.
 
-_FIDELITY_RUN = "omit it for full; for reduced runs use --quick or a user-defined catalog profile"
-_FIDELITY_RECOMPUTE = "omit it; recompute reads fidelity from checkpoint metadata"
-_FIDELITY_NOTE = (
-    "`survey` is retired with no built-in replacement (issue #215); existing "
-    "`--survey` checkpoints stay readable and pullable."
-)
-
 #: Keyed by ``(command path, deprecated flag)``. `tests/cli/test_deprecations.py`
 #: holds this registry to the live command tree in both directions, exactly as
 #: it does for `DEPRECATIONS`: every `RetiredOption` and `DeprecatedOption` needs
 #: a row, and every row needs one of them.
 #:
-#: The D5 spellings (deprecated in 0.1.0) were removed at 0.3.0; `RetiredOption`
-#: and `canonical_option` below stay as the substrate ADR-0002 requires for the
-#: next rename. `--fidelity` is a whole option being retired rather than a
-#: spelling being renamed, so it rides `DeprecatedOption` instead.
+#: The D5 spellings (deprecated in 0.1.0) were removed at 0.3.0, and the
+#: `--fidelity` cohort (deprecated in 0.4.0, issue #215) at 0.6.0 (issue #387).
+#: `RetiredOption` and `canonical_option` (renamed spellings) and
+#: `DeprecatedOption` (whole options) stay as the substrate ADR-0002 requires.
 DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
     row.key: row
     for row in (
         *(
-            _flag(command, old, replacement, since="0.5.1")
+            _flag(command, old, replacement, since="0.6.0")
             for command in ("profile create", "profile set", "profile add")
             for old, replacement in (("--ne-line", "--line-trials"), ("--ne-brem", "--brem-trials"))
         ),
         *(
-            _flag(command, "--ne-brem", "--brem-trials", since="0.5.1")
+            _flag(command, "--ne-brem", "--brem-trials", since="0.6.0")
             for command in ("run", "app validation export", "checkpoint recompute brem")
         ),
-        _flag("profile numerics set", "--line-electrons", "--line-trials", since="0.5.1"),
-        _flag("profile numerics set", "--bremsstrahlung-electrons", "--brem-trials", since="0.5.1"),
-        _flag("run", "--fidelity", _FIDELITY_RUN, since="0.4.0", note=_FIDELITY_NOTE),
-        _flag("pyrite-dev perf", "--fidelity", _FIDELITY_RUN, since="0.4.0", note=_FIDELITY_NOTE),
-        _flag(
-            "checkpoint recompute brem",
-            "--fidelity",
-            _FIDELITY_RECOMPUTE,
-            since="0.4.0",
-            note=_FIDELITY_NOTE,
-        ),
-        _flag(
-            "checkpoint recompute line",
-            "--fidelity",
-            _FIDELITY_RECOMPUTE,
-            since="0.4.0",
-            note=_FIDELITY_NOTE,
-        ),
-        _flag(
-            "profile numerics show",
-            "--fidelity",
-            "omit it; numerics resolve against full",
-            since="0.4.0",
-            note=_FIDELITY_NOTE,
-        ),
+        _flag("profile numerics set", "--line-electrons", "--line-trials", since="0.6.0"),
+        _flag("profile numerics set", "--bremsstrahlung-electrons", "--brem-trials", since="0.6.0"),
     )
 }
 
@@ -424,11 +381,12 @@ def _implied_dest(param_decls: Sequence[str]) -> str:
 # Implicit defaults (issue #214)
 # --------------------------------------------------------------------------- #
 #
-# Not a spelling: a value the CLI fills in when the user names none. The
-# bundled `standard` profile and the bundled `default` beam and detector are
-# examples, not anyone's hardware, so resolving them silently is on the same
-# support window as a retired spelling. Stage 1 warns; at `remove_in` the value
-# must be named. Nothing about the `standard` profile itself is deprecated.
+# Not a spelling: a value the CLI fills in when the user names none. Resolving
+# one silently rides the same support window as a retired spelling: warn first,
+# then require the value at `remove_in`. The 0.4.0 cohort -- the `standard`
+# profile and the bundled `default` beam and detector (issue #214) -- became
+# errors at 0.6.0 (issue #387; see `_implicit_defaults`). Nothing about the
+# `standard` profile itself is deprecated.
 
 
 @dataclass(frozen=True)
@@ -443,47 +401,5 @@ class ImplicitDefault:
     note: str = ""
 
 
-def _implicit(
-    key: str, fallback: str, replacement: str, *, since: str = "0.4.0", note: str = ""
-) -> ImplicitDefault:
-    return ImplicitDefault(key, fallback, replacement, since, _window(since), note)
-
-
 #: Keyed by what the user left unnamed. Rendered into the deprecation reference.
-IMPLICIT_DEFAULTS: dict[str, ImplicitDefault] = {
-    "profile": _implicit(
-        "profile",
-        "the `standard` profile",
-        "pass PROFILE, set PYRITE_PROFILE, or run 'pyrite config set profile.current NAME'",
-        note="`pyrite run` and `pyrite remote start`; `standard` stays a named profile.",
-    ),
-    "beam": _implicit(
-        "beam",
-        "the built-in example beam (5 kHz, 1 pC, as bundled `default`)",
-        "set the profile's `beam` with 'pyrite profile set NAME --beam BEAM'",
-        note="Profiles in a user-selected catalog; bundled example profiles are exempt.",
-    ),
-    "detector": _implicit(
-        "detector",
-        "the code-default scalar detector (90-degree example geometry)",
-        "declare `[profiles.NAME.detectors.ID]` or set the legacy `detector` reference",
-        note="Profiles in a user-selected catalog; bundled example profiles are exempt.",
-    ),
-}
-
-
-def implicit_default_message(key: str, subject: str) -> str:
-    """Render the stderr warning for *subject* resolving *key* implicitly."""
-    entry = IMPLICIT_DEFAULTS[key]
-    fallback = entry.fallback.replace("`", "'")
-    replacement = entry.replacement.replace("`", "'")
-    return (
-        f"warning: {subject} names no {entry.key}; using {fallback}. Implicit "
-        f"{entry.key} selection is deprecated and will be an error in "
-        f"{entry.remove_in}; {replacement}"
-    )
-
-
-def warn_implicit_default(key: str, subject: str) -> None:
-    """Emit the implicit-default warning for *key* on stderr."""
-    click.echo(implicit_default_message(key, subject), err=True)
+IMPLICIT_DEFAULTS: dict[str, ImplicitDefault] = {}

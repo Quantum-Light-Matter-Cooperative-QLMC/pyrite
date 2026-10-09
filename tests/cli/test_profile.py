@@ -6,7 +6,7 @@ import tomlkit
 from pyrite import _energy_grid_artifacts as artifacts
 from pyrite.cli import _catalog_io
 from pyrite.cli import command as root_command
-from pyrite.cli._deprecations import flag_message, option_message
+from pyrite.cli._deprecations import flag_message
 from pyrite.cli.commands import profile
 from pyrite.console import output as _core
 from tests.helpers.cli import assert_clean_result, invoke
@@ -873,22 +873,20 @@ def test_set_transport_numerics_round_trips_and_validates_coupling(tmp_path, mon
 def test_numerics_show_reports_effective_values_and_sources(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    shown = invoke(
-        root_command, ["profile", "numerics", "show", "sub_100keV", "--fidelity", "survey"]
-    )
-    fidelity_warning = option_message("profile numerics show", "--fidelity") + "\n"
-    assert_clean_result(shown, stderr=fidelity_warning)
+    shown = invoke(root_command, ["profile", "numerics", "show", "sub_100keV"])
+    assert_clean_result(shown)
+    assert shown.stdout.startswith("[sub_100keV numerics; fidelity=full]")
     assert "sampling:" in shown.stdout
-    assert "line electrons: 60 (fidelity)" in shown.stdout
-    assert "reflection families: 2 (fidelity)" in shown.stdout
+    assert "line electrons: 300 (fidelity)" in shown.stdout
+    assert "reflection families: 4 (built-in)" in shown.stdout
     assert "mosaic nodes: 5 (built-in)" in shown.stdout
     assert "energy model: midpoint (built-in)" in shown.stdout
 
     machine = invoke(
         root_command,
-        ["profile", "numerics", "show", "sub_100keV", "--fidelity", "survey", "-o", "json"],
+        ["profile", "numerics", "show", "sub_100keV", "-o", "json"],
     )
-    assert_clean_result(machine, stderr=fidelity_warning)
+    assert_clean_result(machine)
     envelope = json.loads(machine.stdout)
     assert envelope["schema"] == "cxr.profile.numerics.show"
     assert envelope["payload"]["profile"] == "sub_100keV"
@@ -897,11 +895,11 @@ def test_numerics_show_reports_effective_values_and_sources(tmp_path, monkeypatc
         "key": "n_electrons",
         "label": "line electrons",
         "explicit": None,
-        "effective": 60,
+        "effective": 300,
         "source": "fidelity",
     }
-    assert fields["max_reflections"]["effective"] == 4
-    assert fields["max_reflections"]["source"] == "fidelity"
+    assert fields["max_reflections"]["effective"] is None
+    assert fields["max_reflections"]["source"] == "built-in"
 
 
 def test_numerics_help_exposes_scientific_controls_not_execution_tuning():

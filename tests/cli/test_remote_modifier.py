@@ -86,10 +86,10 @@ def test_remote_cache_modes_are_mutually_exclusive_before_submission(monkeypatch
 
 
 def test_remote_wait_detach_and_local_only_options_are_rejected():
-    conflict = invoke(scan.command, ["--remote", "--wait", "--detach"])
-    local_only = invoke(scan.command, ["--remote", "--checkpoint-dir", "elsewhere"])
-    local_wait = invoke(scan.command, ["--wait"])
-    local_capture = invoke(scan.command, ["--remote", "--trajectories", "traj"])
+    conflict = invoke(scan.command, ["standard", "--remote", "--wait", "--detach"])
+    local_only = invoke(scan.command, ["standard", "--remote", "--checkpoint-dir", "elsewhere"])
+    local_wait = invoke(scan.command, ["standard", "--wait"])
+    local_capture = invoke(scan.command, ["standard", "--remote", "--trajectories", "traj"])
 
     assert conflict.exit_code == 2
     assert "--wait and --detach are mutually exclusive" in conflict.stderr
