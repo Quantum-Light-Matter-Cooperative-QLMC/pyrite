@@ -45,5 +45,6 @@ _remote_meta_json = pulling._remote_meta_json
 _profile_pull_candidates = pulling._profile_pull_candidates
 resolve_profile_stem = pulling.resolve_profile_stem
 resolve_profile_stems = pulling.resolve_profile_stems
+resolve_job_stems = pulling.resolve_job_stems
 pull = pulling.pull
 pull_zhai_cache = pulling.pull_zhai_cache

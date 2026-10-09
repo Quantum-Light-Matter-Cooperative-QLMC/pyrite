@@ -417,17 +417,15 @@ def _pull_attached_progress(jobid, sections):
     )
     if not materials:
         raise SystemExit("no partial checkpoints have reported progress yet")
-    stems = scripts._stems(
-        materials,
-        fields.get("quick") == "True",
-        fields.get("fidelity", "full"),
-        high_energy_min_kev=(
-            float(fields["high_energy_min_kev"])
-            if fields.get("high_energy_min_kev") not in (None, "None")
-            else None
-        ),
-        catalog_profile=fields.get("catalog_profile", "standard"),
-    )
+    stems, unwritten = lifecycle.resolve_job_stems(jobid, materials)
+    if not stems:
+        pending = f" (reserved but not yet written: {', '.join(unwritten)})" if unwritten else ""
+        raise SystemExit(
+            f"job {jobid} has no written checkpoints for {', '.join(materials)} yet{pending}; "
+            "retry after a case completes"
+        )
+    if unwritten:
+        print(f"\nnot yet written, skipped: {', '.join(unwritten)}")
     lifecycle.pull(stems, no_sync=True)
     print(f"\nPARTIAL PULL COMPLETE · job {jobid} · {len(stems)} checkpoint(s)")
 
