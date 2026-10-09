@@ -141,7 +141,14 @@ def _recompute_options(function):
 )
 @_recompute_options
 @fidelity_option(help="Fidelity preset supplying omitted grid and electron defaults.")
-@click.option("--ne-brem", type=POSITIVE_INT, default=None, help="New brem electron count.")
+@click.option(
+    "--brem-trials",
+    "--ne-brem",
+    "ne_brem",
+    type=POSITIVE_INT,
+    default=None,
+    help="Monte Carlo electron histories used to estimate bremsstrahlung.",
+)
 @click.option("--start", type=NONNEGATIVE_FLOAT, default=None, help="Brem lower bound in eV.")
 @click.option("--stop", type=POSITIVE_FLOAT, default=None, help="Brem exclusive upper bound in eV.")
 @click.option("--step", type=POSITIVE_FLOAT, default=None, help="Wide-brem grid spacing in eV.")
@@ -1000,11 +1007,13 @@ def sync_command(force, ssh_verbose):
     help="Fig. 1c line electrons per energy.",
 )
 @click.option(
+    "--brem-trials",
     "--ne-brem",
+    "ne_brem",
     type=POSITIVE_INT,
     default=200,
     show_default=True,
-    help="Fig. 1c bremsstrahlung electrons per energy.",
+    help="Monte Carlo electron histories for Fig. 1c bremsstrahlung per energy.",
 )
 @click.option(
     "--ne-supp",

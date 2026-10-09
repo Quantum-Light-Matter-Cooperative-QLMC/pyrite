@@ -150,7 +150,7 @@ pyrite config set catalog.path ~/pyrite-lab/catalog
 # Clone a profile, then replace its energy (keV) and thickness (Å) grids.
 pyrite profile create my_scan --from hopg_short --energy 30:60:10 --thickness 5000,20000
 pyrite profile set my_scan --material hopg,hbn
-pyrite profile numerics set my_scan --line-electrons 2000
+pyrite profile numerics set my_scan --line-trials 2000
 pyrite profile show my_scan
 pyrite run my_scan -m hopg
 ```

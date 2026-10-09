@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+
+from pyrite.cli._deprecations import flag_message
 from pyrite.cli.commands import recompute as recompute_cli
 from pyrite.cli.commands import remote as remote_cli
 from pyrite.cli.commands import scan
@@ -165,7 +168,8 @@ def test_invalid_remote_target_is_usage_error_and_restores_host(monkeypatch):
     assert remote_config.remote_host() == "configured-box"
 
 
-def test_zhai_preset_waits_pulls_and_restores_explicit_target(monkeypatch):
+@pytest.mark.parametrize("brem_flag", ["--brem-trials", "--ne-brem"])
+def test_zhai_preset_waits_pulls_and_restores_explicit_target(monkeypatch, brem_flag):
     seen = {}
     monkeypatch.setattr(remote_config, "HOST", "configured-box")
 
@@ -183,7 +187,7 @@ def test_zhai_preset_waits_pulls_and_restores_explicit_target(monkeypatch):
             "--wait",
             "--ne",
             "11",
-            "--ne-brem",
+            brem_flag,
             "3",
             "--ne-supp",
             "5",
@@ -194,7 +198,10 @@ def test_zhai_preset_waits_pulls_and_restores_explicit_target(monkeypatch):
         ],
     )
 
-    assert_clean_result(result)
+    warning = (
+        flag_message("", brem_flag, "--brem-trials") + "\n" if brem_flag == "--ne-brem" else ""
+    )
+    assert_clean_result(result, stderr=warning)
     assert seen == {
         "ne": 11,
         "ne_brem": 3,
@@ -257,7 +264,7 @@ def test_zhai_preset_runs_locally_without_remote(monkeypatch):
 
     result = invoke(
         scan.command,
-        ["--preset", "zhai", "--ne", "11", "--ne-brem", "3", "--ne-supp", "5", "--refresh"],
+        ["--preset", "zhai", "--ne", "11", "--brem-trials", "3", "--ne-supp", "5", "--refresh"],
     )
 
     assert_clean_result(result)
@@ -296,7 +303,8 @@ def test_remote_optional_value_parses_around_profile(monkeypatch):
     assert seen == [("standard", "box-a"), ("standard", "box-b")]
 
 
-def test_recompute_remote_modifier_delegates_and_restores_target(monkeypatch):
+@pytest.mark.parametrize("brem_flag", ["--brem-trials", "--ne-brem"])
+def test_recompute_remote_modifier_delegates_and_restores_target(monkeypatch, brem_flag):
     seen = {}
     monkeypatch.setattr(remote_config, "HOST", "configured-box")
     monkeypatch.setattr(
@@ -307,10 +315,13 @@ def test_recompute_remote_modifier_delegates_and_restores_target(monkeypatch):
 
     result = invoke(
         recompute_cli.brem_command,
-        ["hopg", "--remote=box-a", "--detach", "--ne-brem", "25"],
+        ["hopg", "--remote=box-a", "--detach", brem_flag, "25"],
     )
 
-    assert_clean_result(result)
+    warning = (
+        flag_message("", brem_flag, "--brem-trials") + "\n" if brem_flag == "--ne-brem" else ""
+    )
+    assert_clean_result(result, stderr=warning)
     assert seen["material"] == ["hopg"]
     assert seen["ne_brem"] == 25
     assert seen["detach"] is True

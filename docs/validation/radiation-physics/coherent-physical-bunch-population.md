@@ -4,7 +4,7 @@
 
 The production coherent line spectrum uses the physical bunch population
 $N=Q/e$, where $Q$ is `bunch_charge_pc` converted to coulombs and $e$ is the
-SI elementary charge. `--ne-line` supplies $M$ equally weighted incident Monte
+SI elementary charge. `--line-trials` supplies $M$ equally weighted incident Monte
 Carlo samples, including missed entries. It controls estimation and normalization,
 not the physical enhancement.
 

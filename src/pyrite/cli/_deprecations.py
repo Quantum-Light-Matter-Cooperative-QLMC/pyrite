@@ -13,8 +13,8 @@ without a row and a row cannot outlive the alias it describes, and
 `tests/test_deprecation_schedule.py` holds every row to the shipping
 `__version__` so a removal target cannot pass unnoticed again.
 
-The 0.1.0 cohort reached its target and was removed at 0.3.0; the only option rows
-now are the 0.4.0 `--fidelity` deprecations (issue #215).
+The 0.1.0 cohort reached its target and was removed at 0.3.0. Current option
+rows cover `--fidelity` and the electron-count spellings replaced by trial names.
 """
 
 import re
@@ -236,6 +236,17 @@ _FIDELITY_NOTE = (
 DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
     row.key: row
     for row in (
+        *(
+            _flag(command, old, replacement, since="0.5.1")
+            for command in ("profile create", "profile set", "profile add")
+            for old, replacement in (("--ne-line", "--line-trials"), ("--ne-brem", "--brem-trials"))
+        ),
+        *(
+            _flag(command, "--ne-brem", "--brem-trials", since="0.5.1")
+            for command in ("run", "app validation export", "checkpoint recompute brem")
+        ),
+        _flag("profile numerics set", "--line-electrons", "--line-trials", since="0.5.1"),
+        _flag("profile numerics set", "--bremsstrahlung-electrons", "--brem-trials", since="0.5.1"),
         _flag("run", "--fidelity", _FIDELITY_RUN, since="0.4.0", note=_FIDELITY_NOTE),
         _flag("pyrite-dev perf", "--fidelity", _FIDELITY_RUN, since="0.4.0", note=_FIDELITY_NOTE),
         _flag(
@@ -285,10 +296,9 @@ class RetiredOption(click.Option):
     The retired spelling keeps its own ``dest`` so the callback can tell it
     apart from the canonical one -- sharing a ``dest`` makes Click store both
     under the same parser key, which would warn even when only the canonical
-    spelling was given. The value is written straight into the canonical slot,
-    which the canonical option then leaves alone: Click only overwrites a slot
-    it has a recorded parameter source for, and writes from a callback have
-    none.
+    spelling was given. The canonical option is processed first because it is
+    eager; the alias then writes its value and command-line source into that
+    slot. Boundary validation can therefore recognize explicit retired inputs.
 
     Supplying both spellings is a `UsageError` rather than a silent
     last-one-wins, which is why `canonical_option` forces the canonical option
@@ -322,6 +332,7 @@ class RetiredOption(click.Option):
             )
         warn_flag(ctx, self.retired_flag, self.replacement)
         ctx.params[self.canonical_dest] = value
+        ctx.set_parameter_source(self.canonical_dest, ParameterSource.COMMANDLINE)
         return None
 
 

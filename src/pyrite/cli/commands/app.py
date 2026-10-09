@@ -5,6 +5,7 @@ from importlib import import_module
 
 import click
 
+from .._deprecations import canonical_option
 from .._groups import LazyGroup
 
 _LEAVES = {
@@ -135,7 +136,15 @@ def _launch_validation(
 @click.command("export", help="Write cached validation figures; never starts marimo.")
 @click.option("--outdir", type=click.Path(file_okay=False), default="figures", show_default=True)
 @click.option("--ne", type=int, default=20_000, show_default=True)
-@click.option("--ne-brem", type=int, default=200, show_default=True)
+@canonical_option(
+    "--brem-trials",
+    "ne_brem",
+    retired=("--ne-brem",),
+    type=int,
+    default=200,
+    show_default=True,
+    help="Monte Carlo electron histories for Fig. 1c bremsstrahlung per energy.",
+)
 @click.option("--ne-supp", type=int, default=200, show_default=True)
 @click.pass_context
 def validation_export_command(

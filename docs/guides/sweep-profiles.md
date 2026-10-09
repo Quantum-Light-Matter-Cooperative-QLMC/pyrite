@@ -29,7 +29,7 @@ Set controls without editing TOML directly:
 
 ```bash
 pyrite profile numerics set standard \
-  --line-electrons 500 --bremsstrahlung-electrons 200 \
+  --line-trials 500 --brem-trials 200 \
   --reflection-families 6 --maximum-reflections 12 \
   --mosaic-route mc --mosaic-nodes 7 --yes
 
@@ -44,7 +44,9 @@ pyrite profile numerics reset standard reflection-families mosaic-route --yes
 pyrite profile numerics reset standard --yes
 ```
 
-Existing `profile create|set --ne-line/--ne-brem`, `--straggling`, `--energy-model`, and `--max-de-frac` spellings remain compatible. Worker, chunk, backend, core, and other execution-only tuning are intentionally absent: they affect runtime, not calculation results or checkpoint identity.
+`profile create|set|add` accepts `-l/--line-trials` and `-b/--brem-trials`, including comma-separated trial-count grids. A trial is one Monte Carlo electron history used to estimate the corresponding spectrum, rather than one electron in the physical beam. These counts select histories from shared transport, so they are not added together to determine the transport count.
+
+The old `--ne-line`/`--ne-brem` options and `profile numerics set --line-electrons`/`--bremsstrahlung-electrons` are deprecated in 0.5.1 and will be removed in 0.7.0. They still work during the support window, warn on stderr with their replacement, and are hidden from help. Supplying an old option and its replacement together is a usage error. `profile numerics reset` accepts both trial and electron field names. Existing `--straggling`, `--energy-model`, and `--max-de-frac` spellings remain compatible. Worker, chunk, backend, core, and other execution-only tuning are intentionally absent: they affect runtime, not calculation results or checkpoint identity.
 
 `pyrite profile create NAME` starts from the packaged `standard` sweep's ranges, inline bremsstrahlung grid, and membership. It uses only materials present in the selected catalog. Packaged per-material overrides, such as stack layer counts, are copied only for the new profile's member materials. A non-member resolves against `standard`, so its row would never be read. It does not copy the selected catalog's mutable `standard` profile or attach a beam, scalar detector, physical detector, filters, emission policy, transport numerics, or line-grid policy. Absent emission resolves to incoherent and absent straggling resolves to off. `pyrite profile show NAME` marks code defaults with `(default)` and shows an absent detector as `none`.
 
@@ -54,14 +56,14 @@ Existing `profile create|set --ne-line/--ne-brem`, `--straggling`, `--energy-mod
 
 Profiles run adaptive electron counts by default. Each incoherent case transports electrons in blocks and stops once the relative standard error of each watched yield meets the target and the heavy-tail guards pass. If the target is not met by the maximum count, the run stops there and is flagged statistics-limited. One count serves both line and bremsstrahlung transport.
 
-A profile with neither fixed counts nor a `precision` table uses the default policy: target relative standard error 0.05 on line and bremsstrahlung yields, 200 to 20,000 electrons, blocks of 100, and the default guards. A profile keeps fixed counts, and `pyrite profile show` and `pyrite profile precision show` say why, when it sets `n_electrons`/`n_electrons_brem` (directly or in a material override) or when it cannot run adaptive: coherent or `both` emission, particle cascades (secondaries, pair production, positrons), a GDF beam, or a grooved entrance face. To opt a profile out, give it fixed counts with `pyrite profile numerics set NAME --line-electrons N --bremsstrahlung-electrons N`.
+A profile with neither fixed counts nor a `precision` table uses the default policy: target relative standard error 0.05 on line and bremsstrahlung yields, 200 to 20,000 electrons, blocks of 100, and the default guards. A profile keeps fixed counts, and `pyrite profile show` and `pyrite profile precision show` say why, when it sets `n_electrons`/`n_electrons_brem` (directly or in a material override) or when it cannot run adaptive: coherent or `both` emission, particle cascades (secondaries, pair production, positrons), a GDF beam, or a grooved entrance face. To opt a profile out, give it fixed counts with `pyrite profile numerics set NAME --line-trials N --brem-trials N`.
 
 The default (#361) changed every affected dataset identity once, including `standard`'s, so runs from before it do not resume; their checkpoints stay on disk under the old stems. On a subset of the `standard` sweep (hopg and MoS2, 48 cases, 30–300 keV, 100 nm–1 mm), the default converged every case at 400–2,100 electrons. A fixed count of 300 left about half the cases above 5 %, and a single fixed count that met 5 % everywhere needed 1,500–2,000 electrons per case.
 
 To set an explicit policy:
 
 ```bash
-pyrite profile numerics reset hopg_scan line-electrons bremsstrahlung-electrons
+pyrite profile numerics reset hopg_scan line-trials brem-trials
 pyrite profile precision set hopg_scan --target-rse 0.05 \
   --min-electrons 400 --max-electrons 20000 --block-electrons 100
 pyrite profile precision set hopg_scan --observable line --observable brem
