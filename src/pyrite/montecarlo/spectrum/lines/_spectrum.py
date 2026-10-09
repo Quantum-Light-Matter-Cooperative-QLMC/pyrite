@@ -48,6 +48,7 @@ def mc_spectrum(
     temporal=None,
     coefficient_capture=None,
     physical_electrons=None,
+    coherent_flat_omission_limit=0.0,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron] on
@@ -165,6 +166,14 @@ def mc_spectrum(
         unchanged. The setup exposes ``capture_phase_rad`` and
         ``capture_mosaic_weight`` for the current row's midpoint phase and
         production intensity weight. Validation: coherent-line-grid-windowed-resolution
+    coherent_flat_omission_limit
+        Nonnegative share of a row's per-electron floor ``sum_e |S_e|^2`` that
+        the inter-electron estimator may omit. Where ``F (N - 1)`` is at most
+        this value the all-electron ``|sum_e S_e|^2`` term is not evaluated and
+        the row keeps its floor. N is physical_electrons when supplied, else
+        the sampled electron count. Physical slabs use F=1; finite footprints
+        use the certified Gaussian F_z. ``0`` (default) evaluates the full
+        estimator bit-identically. Validation: coherent-flat-term-omission
 
     Returns
     -------
@@ -221,6 +230,7 @@ def mc_spectrum(
         temporal=temporal,
         coefficient_capture=coefficient_capture,
         physical_electrons=physical_electrons,
+        coherent_flat_omission_limit=coherent_flat_omission_limit,
     )
     return _mc_spectrum(request)
 
