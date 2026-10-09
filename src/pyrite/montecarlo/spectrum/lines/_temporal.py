@@ -327,8 +327,13 @@ def _block_rows(n):
     return max(1, _FIELD_BLOCK_ELEMENTS // max(n, 1))
 
 
-def add_coherent_row(profile, buf, row, wm, *, delta_omega, chi=None):
+def add_coherent_row(profile, buf, row, wm, *, delta_omega, chi=None, cross_pair_scale=None):
     """Add one coherent row's ``I(t)`` (times mosaic weight ``wm``) into ``buf``.
+
+    Physical pairs multiply the cross-electron difference by (N-1)/(M-1).
+    With N=M this recovers the historical blend; identical fields give N
+    times the one-electron profile after final normalization.
+    Validation: coherent-physical-bunch-population
 
     ``chi`` is ``None`` without bunch offsets (one fully coherent sum), else
     the offsets' complex characteristic function on the profile's energy grid.
@@ -339,6 +344,8 @@ def add_coherent_row(profile, buf, row, wm, *, delta_omega, chi=None):
     if n_seg == 0:
         return
     block = _block_rows(n)
+    if chi is None and cross_pair_scale is not None:
+        chi = xp.ones(n, dtype=np.complex128)
     if chi is None:
         totals = [xp.zeros(n, dtype=np.complex128) for _ in row.coefs]
         for j0 in range(0, n_seg, block):
@@ -387,7 +394,8 @@ def add_coherent_row(profile, buf, row, wm, *, delta_omega, chi=None):
             cross_self += _field_ifft_power(profile, per_e * chi[None, :])
         k0 = k1
     cross = _field_ifft_power(profile, xp.stack(flat_geo) * chi[None, :])
-    buf += (self_term + cross - cross_self) * wm
+    scale = 1.0 if cross_pair_scale is None else cross_pair_scale
+    buf += (self_term + scale * (cross - cross_self)) * wm
 
 
 def coherent_offset_chi(st, profile, g_vec_d):
@@ -398,6 +406,8 @@ def coherent_offset_chi(st, profile, g_vec_d):
     Gaussian longitudinal ``exp[-(omega sigma_z)^2 / 2]`` for a finite
     footprint. Returns ``None`` without offsets.
     """
+    if st.request.physical_electrons is not None and not st.finite_footprint_now:
+        return None
     if not st.decoherence_active:
         return None
     omega = profile.energy_grid() / HBARC_EV_ANG

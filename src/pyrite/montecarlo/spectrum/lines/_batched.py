@@ -14,6 +14,7 @@ import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
 from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
+from ..coherent_population import mixed_row_power
 from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._attribution import record_line_attribution
@@ -787,7 +788,7 @@ def _batched_coherent_finalize(
     seg_elec_id = st.seg_elec_id
     cdtype = st.cdtype
     delta_omega_grid = st.delta_omega_grid
-    decoherence_active = st.decoherence_active
+    decoherence_active = st.decoherence_active or st.request.physical_electrons is not None
     N_g = bt.N_g
     seg_block = bt.seg_block
     G = bt.G
@@ -855,7 +856,7 @@ def _batched_coherent_finalize(
                     group0 = group1
             # F PER ROW, before the incoherent row sum.
             F_rows = xp.stack([_row_decoherence_factor(st, G[i_row]) for i_row in range(N_g)])
-            blended = (1.0 - F_rows) * grouped_mag2 + F_rows * flat_mag2
+            blended = mixed_row_power(st, grouped_mag2, flat_mag2, F_rows)
             spec[:] += (WM.reshape(-1)[:, None] * blended).sum(axis=0)
         else:
             finalize_coherent_fields(
@@ -927,7 +928,7 @@ def _batched_coherent_finalize(
                         xp.zeros(E_grid.size, dtype=REAL),
                     )
                     F_row = _row_decoherence_factor(st, G[i_row])
-                    spec[:] += ((1.0 - F_row) * grouped_total + F_row * out_flat) * wm_i
+                    spec[:] += mixed_row_power(st, grouped_total, out_flat, F_row) * wm_i
                 continue
             f_s = xp.zeros(E_grid.size, dtype=cdtype)
             f_p = xp.zeros(E_grid.size, dtype=cdtype)
@@ -963,7 +964,7 @@ def _batched_coherent_finalize(
                     [csr + 1j * csi, cpr + 1j * cpi],
                 )
                 F_row = _row_decoherence_factor(st, G[i_row])
-                spec[:] += ((1.0 - F_row) * grouped_total + F_row * flat_total) * wm_i
+                spec[:] += mixed_row_power(st, grouped_total, flat_total, F_row) * wm_i
             else:
                 spec[:] += flat_total * wm_i
         _nsys_pop()

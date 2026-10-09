@@ -1,13 +1,13 @@
 # `coherent-line-grid-fringe-spacing`
 
-Ledger row: [`coherent-line-grid-fringe-spacing`](../ledger-core-coherent-physics.md). Instrument: `montecarlo/spectrum/diagnostics.py::coherent_fringe_spacing` (estimator), `montecarlo/runner/line_grid.py::_refuse_coherent_resolution` (policy), `energy_grid/convergence_case.py` (ladder, now route-switchable). No kernel change: this row records the band limit of the existing coherent reducer and the evidence for refusing automatic resolution on that route (issue #117).
+Ledger row: [`coherent-line-grid-fringe-spacing`](../ledger-core-coherent-physics.md). Instrument: `montecarlo/spectrum/diagnostics.py::coherent_fringe_spacing` (estimator), `montecarlo/runner/line_grid.py::_refuse_coherent_resolution` (policy, non-windowed), `energy_grid/convergence_case.py` (ladder, now route-switchable). No kernel change: this row records the band limit of the existing coherent reducer and the evidence for refusing automatic resolution on that route (issue #117).
 
 ## Claim
 
 1. **Band limit.** On the coherent route the line-grid Nyquist step is $h_\mathrm{coh} = \pi \hbar c / D$, where $D$ is the span of the per-segment retardation scalar $d_j = t_{\mathrm{mid},j} - \hat n \cdot \mathbf r_j$, not the per-segment sinc width of `sinc_feature_spacing`.
 2. **Separation of principle.** Along one segment $d$ increments by exactly $(1 - \beta\, \hat v \cdot \hat n)\, t_L$, the quantity setting the incoherent first zero. The incoherent step therefore follows the *per-segment* increment and the coherent step the *total* span, so the incoherent estimator cannot bound the coherent route at any calibration.
 3. **Measured.** At the spacing where the incoherent yield is converged to $3.1\times10^{-8}$, the coherent yield is still $5.0\times10^{-2}$ from convergence.
-4. **Policy.** Automatic resolution refuses `coherent_emission` rather than silently aliasing. An explicit `E_grid_line` is unaffected.
+4. **Policy.** Automatic resolution without feature windows refuses `coherent_emission` rather than silently aliasing. A windowed policy resolves the fringes inside per-row coherent windows instead ([`coherent-line-grid-windowed-resolution`](coherent-line-grid-windowed-resolution.md), #350). An explicit `E_grid_line` is unaffected.
 
 ## Derivation
 
@@ -22,7 +22,7 @@ e^{i \phi_j(E)},
           - L_{\mathrm{esc},j}\, \Delta\omega(E),
 $$
 
-with $\omega(E) = E / \hbar c$ and $d_j = t_{\mathrm{mid},j} - \hat n \cdot \mathbf r_j$ in ångström at $c=1$ (`lines/_setup.py`). The spectrum is $|A(E)|^2$, so it carries cross terms $j,k$ whose phase runs over the output grid at the **difference of per-segment phase slopes**
+with $\omega(E) = E / \hbar c$ and $d_j = t_{\mathrm{mid},j} - \hat n \cdot \mathbf r_j$ in ångström at $c=1$ (`lines/_setup.py`). The estimator reads $d_j$ through `diagnostics.coherent_retardation`, in the reducer's own geometry: on an infinite slab with active decoherence each electron sits at its offset-free transverse position, as `lines/_setup.py` evaluates it; a finite footprint keeps the sampled positions. Every measurement below is on a finite footprint. The spectrum is $|A(E)|^2$, so it carries cross terms $j,k$ whose phase runs over the output grid at the **difference of per-segment phase slopes**
 
 $$
 s_j = \frac{\mathrm d \phi_j}{\mathrm d E}
@@ -87,7 +87,7 @@ The incoherent route locks in at the sinc estimate, reproducing `line-grid-sinc-
 
 ## Policy consequence
 
-Resolving the all-electron fringes over a keV band costs $\sim1.5\times10^{7}$ points against 2453 at the incoherent estimate; the grouped floor alone costs $\sim2.5\times10^{5}$. Neither is an affordable default, and silently spending either would misrepresent an unconverged spectrum as a converged one. `_refuse_coherent_resolution` therefore raises for `coherent_emission` on the automatic path, reporting both derived steps and their spans, and directs the caller to an explicit `E_grid_line`. Explicit grids, stored catalog rows, and the whole incoherent route are unaffected.
+Resolving the all-electron fringes uniformly over a keV band costs $\sim1.5\times10^{7}$ points against 2453 at the incoherent estimate; the grouped floor alone costs $\sim2.5\times10^{5}$. Neither is an affordable default, and silently spending either would misrepresent an unconverged spectrum as a converged one. `_refuse_coherent_resolution` therefore raises for `coherent_emission` on an automatic policy **without feature windows**, reporting both derived steps and their spans, and directs the caller to windows or an explicit `E_grid_line`. Since #350 a windowed policy spends the fine step only inside per-row coherent windows, under the envelope, step, and decoherence rules of [`coherent-line-grid-windowed-resolution`](coherent-line-grid-windowed-resolution.md), and refuses with its coordinate count only above the point budget. Explicit grids, stored catalog rows, and the whole incoherent route are unaffected.
 
 ## Reproduction
 

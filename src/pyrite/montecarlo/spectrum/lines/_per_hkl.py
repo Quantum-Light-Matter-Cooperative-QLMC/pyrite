@@ -13,6 +13,7 @@ import numpy as np
 from ...._backend import REAL, _to_cpu, xp
 from ....materials.attenuation import _mu_total_inv_ang
 from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
+from ..coherent_population import mixed_row_power, pair_scale
 from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._bin_quadrature import sincsq_bin_lineshape
@@ -23,6 +24,7 @@ from ._formation import (
 )
 from ._kernels import (
     _accumulate_edge_truncation,
+    _energy_slices,
     _flight_blocks,
     _in_medium_kinematics,
     _interp_elemental_mu,
@@ -150,6 +152,14 @@ def _row_decoherence_factor(st, g_vec_d):
     decoherence_A_pop = st.decoherence_A_pop
     xy0_pop = st.xy0_pop
 
+    if req.physical_electrons is not None:
+        # Physical pairs use complete sampled fields on infinite slabs; no
+        # second empirical F estimator or offset/field independence is needed.
+        return (
+            finite_footprint_F
+            if decoherence_active and finite_footprint_now
+            else xp.ones(E_grid.size, dtype=REAL)
+        )
     if not decoherence_active:
         return None
     if finite_footprint_now:
@@ -195,13 +205,15 @@ def _coherent_electron_grouped_row(
     coefs_p = [c[perm_xp] for c in coefs_sel]
     for ka, kb in _flight_blocks(bounds, chunk):
         rows = slice(bounds[ka], bounds[kb])
-        arg = d_p[rows][:, None] * omega_grid[None, :] - gp_p[rows][:, None]
-        arg = arg - Lesc_p[rows][:, None] * delta_omega_grid[None, :]
-        SP = _formation_SP(st, lines_p.take(rows), sinc_cutoff=sinc_cutoff) * xp.exp(1j * arg)
+        block_lines = lines_p.take(rows)
         offsets = bounds[ka:kb] - bounds[ka]
-        for c in coefs_p:
-            field = xp.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
-            row_total += (xp.abs(field) ** 2).sum(axis=0)
+        for e_sl in _energy_slices(bounds[kb] - bounds[ka], chunk, E_grid.size):
+            arg = d_p[rows][:, None] * omega_grid[None, e_sl] - gp_p[rows][:, None]
+            arg = arg - Lesc_p[rows][:, None] * delta_omega_grid[None, e_sl]
+            SP = _formation_SP(st, block_lines, e_sl, sinc_cutoff=sinc_cutoff) * xp.exp(1j * arg)
+            for c in coefs_p:
+                field = xp.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
+                row_total[e_sl] += (xp.abs(field) ** 2).sum(axis=0)
     return row_total
 
 
@@ -296,6 +308,9 @@ def _temporal_coherent_row(st, g_vec_d, wm, idx, coefs, good, lines, L_esc):
         wm,
         delta_omega=delta_omega_on_profile(st, profile),
         chi=coherent_offset_chi(st, profile, g_vec_d),
+        cross_pair_scale=None
+        if st.request.physical_electrons is None
+        else pair_scale(st.request.physical_electrons, st.Ne),
     )
 
 
@@ -324,7 +339,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
     delta_omega_grid = st.delta_omega_grid
     seg_r_geom = st.seg_r_geom
     d_all_geom = st.d_all_geom
-    decoherence_active = st.decoherence_active
+    decoherence_active = st.decoherence_active or req.physical_electrons is not None
 
     # The attenuation lives in the formation factor, not the amplitude.
     amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG))
@@ -339,6 +354,12 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
     E_vac, a_vac, half_dL, apb, bma, q = lines
     if st.temporal_buf is not None:
         _temporal_coherent_row(st, g_vec_d, wm, idx, coefs, good, lines, L_esc)
+    if req.coefficient_capture is not None:
+        # Read-only: coherent window seeding reads the row's own couplings.
+        # Validation: coherent-line-grid-windowed-resolution
+        st.capture_phase_rad = g_phase
+        st.capture_mosaic_weight = float(wm)
+        req.coefficient_capture(st, idx, coefs, good, lines)
 
     # GPU float32 fast path: reduce the two complex polarization fields
     # directly in a raw kernel. This avoids materializing the dense
@@ -416,7 +437,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
                     xp.zeros(E_grid.size, dtype=REAL),
                 )
                 F_row = _row_decoherence_factor(st, g_vec_d)
-                spec[:] += ((1.0 - F_row) * grouped_total + F_row * out_flat) * wm
+                spec[:] += mixed_row_power(st, grouped_total, out_flat, F_row) * wm
         return
 
     fields = [xp.zeros(E_grid.size, dtype=cdtype) for _ in coefs]
@@ -471,7 +492,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
             [c[sel_full] for c in coefs],
         )
         F_row = _row_decoherence_factor(st, g_vec_d)
-        spec[:] += ((1.0 - F_row) * grouped_total + F_row * flat_total) * wm
+        spec[:] += mixed_row_power(st, grouped_total, flat_total, F_row) * wm
     else:
         spec[:] += flat_total * wm
     return
@@ -699,15 +720,17 @@ def _accumulate_reflection(
         bounds = np.append(starts, sel.size)
         for ka, kb in _flight_blocks(bounds, chunk):
             rows = sel[bounds[ka] : bounds[kb]]
-            arg = d[rows][:, None] * omega_grid[None, :] - g_phase[rows][:, None]
-            arg = arg - L_esc[rows][:, None] * delta_omega_grid[None, :]
-            SP = _formation_SP(st, lines.take(rows)) * xp.exp(1j * arg)
+            block_lines = lines.take(rows)
             # Blocks break only on flight boundaries, so no flight is split
             # across two reductions and squared twice.
             offsets = bounds[ka:kb] - bounds[ka]
-            for c in coefs:
-                field = np.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
-                spec[:] += (xp.abs(field) ** 2).sum(axis=0) * wm
+            for e_sl in _energy_slices(rows.size, chunk, omega_grid.size):
+                arg = d[rows][:, None] * omega_grid[None, e_sl] - g_phase[rows][:, None]
+                arg = arg - L_esc[rows][:, None] * delta_omega_grid[None, e_sl]
+                SP = _formation_SP(st, block_lines, e_sl) * xp.exp(1j * arg)
+                for c in coefs:
+                    field = np.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
+                    spec[e_sl] += (xp.abs(field) ** 2).sum(axis=0) * wm
         return
 
     # -- 7c. coherent (phased) accumulation -----------------------------------

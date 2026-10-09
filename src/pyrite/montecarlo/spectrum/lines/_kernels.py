@@ -980,6 +980,19 @@ def _flight_blocks(bounds, chunk):
         yield ka, n_groups
 
 
+def _energy_slices(n_rows, chunk, n_energy):
+    """Energy slices keeping a ``(n_rows, slice)`` block within ``chunk`` full rows.
+
+    :func:`_flight_blocks` never splits a group, so one long group can exceed
+    ``chunk`` rows and its dense ``(rows, E)`` block the memory ``chunk`` was
+    sized for. Group reductions run along rows only, so slicing the energy axis
+    is exact: each slice's per-energy result is the full block's.
+    """
+    width = n_energy if n_rows <= chunk else max(1, (chunk * n_energy) // n_rows)
+    for e0 in range(0, n_energy, width):
+        yield slice(e0, min(e0 + width, n_energy))
+
+
 def _reflection_tables(crystal, hkl_list, E_tab, B_ang2, use_henke):
     """Tabulate every reflection's susceptibility and ``U_g/m_e`` on ``xp``.
 

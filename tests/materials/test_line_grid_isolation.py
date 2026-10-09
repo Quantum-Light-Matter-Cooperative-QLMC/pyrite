@@ -39,6 +39,68 @@ def _install_legacy_hopg_row(catalog_path):
     catalog_path.write_text(tomlkit.dumps(document))
 
 
+@pytest.mark.parametrize("enabled", [False, True])
+def test_profile_coherent_window_opt_in_and_budget_reach_the_case(
+    catalog_path, monkeypatch, enabled
+):
+    document = tomlkit.parse(catalog_path.read_text())
+    policy = {"windows": enabled, "max_points": 5000000}
+    document["profiles"]["hopg_short"]["line_grid_policy"] = policy
+    document["profiles"]["hopg_short"]["n_electrons"] = {"values": [200]}
+    catalog_path.write_text(tomlkit.dumps(document))
+    catalog = load_material_catalog(catalog_path)
+    monkeypatch.setattr(
+        config,
+        "_catalog",
+        lambda catalog_profile="standard": load_material_catalog(
+            catalog_path, profile=catalog_profile
+        ),
+    )
+    sweep = config.material_sweep(
+        "hopg",
+        catalog_profile="hopg_short",
+        energy_keV=60,
+        thickness_ang=100000,
+        tilt_deg=45,
+        tilt_azim_deg=135,
+    )
+    case = build_cases(sweep, n_electrons=200, n_electrons_brem=1)[0]
+    assert catalog.profile_emission("hopg_short") == "both"
+    assert case["line_grid_policy"]["resolution"]["max_points"] == 5000000
+    assert ("windows" in case["line_grid_policy"]) == enabled
+    assert dict(catalog.profile_line_grid_policy("hopg_short")) == policy
+    plain = config.material_sweep(
+        "hopg", catalog_profile="hopg_short", line_grid_policy={"windows": False}
+    )
+    plain_case = build_cases(plain, n_electrons=200, n_electrons_brem=1)[0]
+    assert "windows" not in plain_case["line_grid_policy"]
+    if enabled:
+        assert case_content_key(case) != case_content_key(
+            {**case, "line_grid_policy": plain_case["line_grid_policy"]}
+        )
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("windows", "on"),
+        ("windows", 1),
+        ("windows", {}),
+        ("max_points", True),
+        ("max_points", 1),
+        ("max_points", 2.5),
+    ],
+)
+def test_profile_window_options_reject_malformed_catalog_values(catalog_path, field, value):
+    from pyrite.materials import MaterialConfigError
+
+    document = tomlkit.parse(catalog_path.read_text())
+    document["profiles"]["hopg_short"]["line_grid_policy"] = {field: value}
+    catalog_path.write_text(tomlkit.dumps(document))
+    with pytest.raises(MaterialConfigError, match=rf"line_grid_policy\.{field}"):
+        load_material_catalog(catalog_path)
+
+
 def _install_hopg_artifact(catalog_path):
     from pyrite import _energy_grid_artifacts as artifacts
 

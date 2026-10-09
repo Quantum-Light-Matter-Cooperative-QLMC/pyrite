@@ -14,6 +14,11 @@ from ..._backend import BACKEND, REAL, _to_cpu
 from ..._grid_semantics import resolution_num, validate_backend_spacing
 from ..._line_grid_policy import (
     BANDWIDTH_PROXY_SAFETY,
+    COHERENT_JUMP_CLUSTER_SEPARATION,
+    COHERENT_NYQUIST_OVERSAMPLING,
+    COHERENT_WINDOW_BIN_EV,
+    DEFAULT_COHERENT_DECOHERENCE_LIMIT,
+    DEFAULT_COHERENT_LEAK_LIMIT,
     LOCAL_RESOLUTION_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
     LineGridToleranceError,
@@ -28,6 +33,7 @@ from ..._line_grid_policy import (
     windowed_coordinates,
 )
 from ..._line_windows import build_window_plan, window_plan_from_payload
+from ..spectrum.coherent_population import physical_bunch_electrons
 from ..spectrum.diagnostics import coherent_fringe_spacing, sinc_feature_spacing
 from ..spectrum.line_seeds import (
     SEEDING_REVISION,
@@ -133,6 +139,11 @@ _WINDOW_INPUT_KEYS = (
 _WEIGHT_INPUT_KEYS = ("B_ang2",)
 
 
+#: Bumped whenever the same inputs would seed different coherent windows; it
+#: keys the speed cache of coherent cases only.
+COHERENT_WINDOW_REVISION = 7
+
+
 def _cached_grid(cached):
     """Coordinates of a cache record, or ``None`` when its plan is stale."""
     plan_payload = cached.get("window_plan")
@@ -144,7 +155,68 @@ def _cached_grid(cached):
         return None
 
 
-def _windowed_line_grid(payload, case, segments, n_hats, Ne, feature_widths_eV, groove=None):
+def _coherent_rows(case, segments, n_hat, Ne, start, stop, abs_layers, groove):
+    """The case's coherent rows as its own reducer phases them.
+
+    One coherent reduction on a two-node axis spanning the bandwidth -- the
+    same tables, couplings, pieces and kept-line filters as the spectrum
+    phase -- with a capture hook that records each row's coefficients.
+    Multilayer stacks are refused by the hook's runner path.
+
+    Validation: coherent-line-grid-windowed-resolution
+    """
+    from ..spectrum.coherent_windows import CoherentRowCollector
+    from . import _lines_for_segments
+
+    if case.get("layer_radiators") is not None:
+        raise ValueError(
+            "coherent windowed line-grid resolution supports single-radiator cases only; "
+            "supply an explicit E_grid_line for a multilayer coherent case"
+        )
+    if case.get("sinc_cutoff") is not None:
+        # The cutoff truncates each line's support after the captured
+        # coefficients, adding tails the jump bound does not cover.
+        raise ValueError(
+            "coherent windowed line-grid resolution does not support sinc_cutoff; "
+            "drop sinc_cutoff or supply an explicit E_grid_line"
+        )
+    if np.dtype(REAL) == np.dtype(np.float32):
+        # float32 retardation phases lose joint continuity at the spans
+        # these windows resolve (1 Ang ulp at 1e7 Ang), which the bound assumes.
+        warnings.warn(
+            "coherent windowed line-grid resolution is bounded for float64 phases only; "
+            "the float32 reducer's retardation rounding can leak power past the windows "
+            "(set PYRITE_FP64=1)",
+            LineShapePrecisionWarning,
+            stacklevel=3,
+        )
+    collector = CoherentRowCollector()
+    _lines_for_segments(
+        segments,
+        np.array([start, stop]),
+        case,
+        np.asarray(n_hat, dtype=float),
+        abs_layers,
+        groove,
+        coherent=True,
+        Ne=Ne,
+        coefficient_capture=collector,
+    )
+    return collector.rows
+
+
+def _windowed_line_grid(
+    payload,
+    case,
+    segments,
+    n_hats,
+    Ne,
+    feature_widths_eV,
+    groove=None,
+    abs_layers=None,
+    *,
+    dispersion_law=None,
+):
     """Seed, plan and validate a piecewise line axis from this run's segments.
 
     The backbone is the policy's maximum spacing. Every provider the policy
@@ -153,12 +225,24 @@ def _windowed_line_grid(payload, case, segments, n_hats, Ne, feature_widths_eV, 
     width measured on these same segments along that direction. The plan
     depends only on the union of seeds, so one direction reproduces the
     single-direction plan exactly.
+
+    A ``coherent_emission`` case adds coherent windows per direction
+    (:func:`~pyrite.montecarlo.spectrum.coherent_windows.coherent_case_seeds`)
+    and is refused, with the count, when its plan exceeds the point budget.
+
+    Validation: coherent-line-grid-windowed-resolution
     """
     windows = payload["windows"]
     start = float(payload["bandwidth"]["start_eV"])
     stop = float(payload["bandwidth"]["stop_eV"])
+    coherent = bool(case.get("coherent_emission", False))
+    if coherent and dispersion_law is None:
+        from ..spectrum.coherent_dispersion import CoherentDispersionLaw
+
+        dispersion_law = CoherentDispersionLaw(case["crystal"], start, stop)
     seeds = []
     summaries = []
+    coherent_summaries = []
     for n_hat, feature_width_eV in zip(n_hats, feature_widths_eV, strict=True):
         context = SeedContext(
             case=case,
@@ -176,11 +260,98 @@ def _windowed_line_grid(payload, case, segments, n_hats, Ne, feature_widths_eV, 
         direction_seeds, direction_summary = collect_feature_seeds(context, windows["providers"])
         seeds.extend(direction_seeds)
         summaries.append(direction_summary)
+        if coherent:
+            from ..spectrum.coherent_windows import coherent_case_seeds
+
+            coherent_seeds, coherent_summary = coherent_case_seeds(
+                _coherent_rows(case, segments, n_hat, Ne, start, stop, abs_layers, groove),
+                segments,
+                electron_limit=Ne,
+                start_eV=start,
+                stop_eV=stop,
+                longitudinal_rms_fs=longitudinal_rms_fs(case),
+                dispersion_law=dispersion_law,
+                physical_electrons=physical_bunch_electrons(case),
+            )
+            seeds.extend(coherent_seeds)
+            coherent_summaries.append(coherent_summary)
     plan = build_window_plan(start, stop, float(payload["resolution"]["max_spacing_eV"]), seeds)
+    if coherent:
+        _check_coherent_budget(payload, plan, coherent_summaries)
     grid, record = windowed_coordinates(payload, plan, dtype=REAL)
     record["feature_width_eV"] = float(min(feature_widths_eV))
     record["window_seeds"] = summaries[0] if len(summaries) == 1 else summaries
+    if coherent:
+        record["coherent_windows"] = (
+            coherent_summaries[0] if len(coherent_summaries) == 1 else coherent_summaries
+        )
     return grid, record
+
+
+def _warn_coherent_dispersion(record):
+    """Report a material-law audit gap on cold and warm coordinate-cache paths."""
+    summaries = record.get("coherent_windows", [])
+    if isinstance(summaries, dict):
+        summaries = [summaries]
+    rows = [row for summary in summaries for row in summary.get("dispersion", {}).get("rows", [])]
+    if not rows:
+        return
+    worst = max(rows, key=lambda row: row["frozen_reference_fraction"])
+    if worst["frozen_reference_fraction"] <= 2.0 * DEFAULT_COHERENT_LEAK_LIMIT:
+        return
+    step = worst["phase_slope_step_all_eV"]
+    step_text = "unavailable" if step is None else f"{step:.4g} eV"
+    warnings.warn(
+        "coherent window dispersion remains uncertified: the finite-axis excluded-power "
+        f"upper bound is {worst['frozen_reference_fraction']:.4g} times the frozen reference "
+        f"for {worst['row']}; the material phase-slope step is {step_text}. "
+        "This upper bound is not a measured grid error. Production normalization and "
+        "sampling error still need a certificate; use a refined explicit E_grid_line "
+        "for controlled coherent convergence",
+        LineShapePrecisionWarning,
+        stacklevel=3,
+    )
+
+
+def _check_coherent_budget(payload, plan, summaries):
+    """Refuse a coherent window plan above the policy point budget, with its count.
+
+    The budget is the policy's ``max_points`` (``DEFAULT_MAX_POINTS``,
+    ``PYRITE_ENERGY_GRID_MAX_POINTS``): one line axis serves both routes of an
+    ``emission = "both"`` run, so the coherent windows may not spend more than
+    any automatic axis. The plan is never coarsened to fit.
+
+    Validation: coherent-line-grid-windowed-resolution
+    """
+    budget = int(payload["resolution"]["max_points"])
+    if plan.num <= budget:
+        return
+    rows = [row for summary in summaries for row in summary["rows"] if row.get("points")]
+    finest = min((row["step_all_eV"] for row in rows), default=float("nan"))
+    widest = max((row["window_eV"][1] - row["window_eV"][0] for row in rows), default=float("nan"))
+    raise LineGridToleranceError(
+        f"coherent windowed line-grid resolution needs {plan.num} coordinates over "
+        f"[{plan.start_eV:g}, {plan.stop_eV:g}] eV, above the {budget}-point budget: "
+        f"{len(rows)} coherent row window(s), the widest {widest:.4g} eV, the finest "
+        f"all-electron fringe step {finest:.3e} eV. Raise the budget with "
+        "PYRITE_ENERGY_GRID_MAX_POINTS, supply an explicit E_grid_line, or run with "
+        "coherent_emission disabled. The grid is not coarsened automatically."
+    )
+
+
+def longitudinal_rms_fs(case):
+    """Gaussian RMS bunch duration [fs] the coherent reducer averages with, or ``None``.
+
+    Shared by the spectrum phase and coherent window seeding so both read the
+    same analytic ``F_z``.
+    """
+    longitudinal = case.get("longitudinal_distribution") or {}
+    kind = longitudinal.get("kind")
+    if kind in {"gaussian", "compressed"}:
+        return longitudinal.get("rms_duration_fs")
+    if kind is None and case.get("long_shape", "gaussian") == "gaussian":
+        return case.get("bunch_length_fs")
+    return None
 
 
 def _direction_populations(case, segments, n_hat, Ne, abs_layers, groove, start, ceiling, profile):
@@ -327,8 +498,8 @@ def _measured_line_grid(payload, case, segments, n_hats, Ne, target_step, abs_la
     return grid, record, bandwidth_record
 
 
-def _refuse_coherent_resolution(case, segments, n_hat, Ne):
-    """Refuse automatic resolution on the coherent route (issue #117).
+def _refuse_coherent_resolution(case, segments, n_hat, Ne, payload):
+    """Refuse non-windowed automatic resolution on the coherent route (#117).
 
     The automatic policy derives its spacing from ``sinc_feature_spacing``,
     whose band limit is the per-segment retardation increment. The coherent
@@ -338,26 +509,32 @@ def _refuse_coherent_resolution(case, segments, n_hat, Ne):
     trajectories, the coherent yield is still ~5e-2 from convergence at the
     spacing where the incoherent yield reaches 3e-8.
 
-    Resolving those fringes is not affordable (order 1e7 points over a keV
-    band), so this refuses rather than silently aliasing or silently
-    refining. An explicit ``E_grid_line`` is unaffected.
+    Resolving those fringes uniformly is not affordable (order 1e7 points over
+    a keV band), so a policy without windows refuses rather than silently
+    aliasing or silently refining. A windowed policy resolves them inside
+    per-row coherent windows instead (#350), and an explicit ``E_grid_line``
+    is unaffected.
 
     Validation: coherent-line-grid-fringe-spacing.
+    Validation: coherent-line-grid-windowed-resolution
     """
     if not bool(case.get("coherent_emission", False)):
+        return
+    if payload.get("windows") is not None:
         return
     step, span, _ = coherent_fringe_spacing(segments, n_hat, electron_limit=Ne)
     grouped_step, grouped_span, _ = coherent_fringe_spacing(
         segments, n_hat, electron_limit=Ne, grouped=True
     )
     raise ValueError(
-        "automatic line-grid resolution does not support coherent_emission: the "
-        "sinc feature width bounds the incoherent route only, and the coherent "
-        "route's fringe spacing is derived from the retardation span. This case "
-        f"needs {step:.3e} eV (span {span:.4g} Ang) to resolve the inter-electron "
+        "automatic line-grid resolution does not support coherent_emission without "
+        "feature windows: the sinc feature width bounds the incoherent route only, and "
+        "the coherent route's fringe spacing is derived from the retardation span. This "
+        f"case needs {step:.3e} eV (span {span:.4g} Ang) to resolve the inter-electron "
         f"term and {grouped_step:.3e} eV (span {grouped_span:.4g} Ang) for the "
-        "decoherence-grouped floor. Supply an explicit E_grid_line, or run with "
-        "coherent_emission disabled. See issue #117."
+        "decoherence-grouped floor. Enable line-grid windows (windows = true) to resolve "
+        "them inside per-line coherent windows, supply an explicit E_grid_line, or run "
+        "with coherent_emission disabled. See issues #117 and #350."
     )
 
 
@@ -390,7 +567,7 @@ def _resolve_policy_grid(payload, case, segments, n_hats, Ne, abs_layers, groove
     profile_started = perf_counter() if profile_enabled else 0.0
     profile_rss_before = _resident_mib() if profile_enabled else None
     for n_hat in n_hats:
-        _refuse_coherent_resolution(case, segments, n_hat, Ne)
+        _refuse_coherent_resolution(case, segments, n_hat, Ne, payload)
     windowed = payload.get("windows") is not None
     measured = payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
     keys = (
@@ -400,16 +577,46 @@ def _resolve_policy_grid(payload, case, segments, n_hats, Ne, abs_layers, groove
     )
     inputs = {key: case[key] for key in keys if case.get(key, None) is not None}
     inputs["backend_dtype"] = np.dtype(REAL).name
+    dispersion_law = None
     if windowed or measured:
         inputs["seeding_revision"] = SEEDING_REVISION
     if observation:
         inputs["observation_directions"] = np.asarray(n_hats, dtype=float).tolist()
+    if bool(case.get("coherent_emission", False)):
+        # Coherent windows also read the bunch duration and the coherent
+        # window rules; an incoherent key carries none of these, so the two
+        # routes never share a cache entry.
+        inputs["coherent_emission"] = True
+        inputs["physical_bunch_electrons"] = physical_bunch_electrons(case)
+        # The jump envelope reads the reducer's complex PXR/CBS couplings,
+        # including their Debye-Waller weight, even on a windowed fixed band.
+        if case.get("B_ang2") is not None:
+            inputs["B_ang2"] = case["B_ang2"]
+        inputs["longitudinal_rms_fs"] = longitudinal_rms_fs(case)
+        inputs["coherent_window_revision"] = COHERENT_WINDOW_REVISION
+        if windowed:
+            from ..spectrum.coherent_dispersion import CoherentDispersionLaw
+
+            dispersion_law = CoherentDispersionLaw(
+                case["crystal"],
+                float(payload["bandwidth"]["start_eV"]),
+                float(payload["bandwidth"]["stop_eV"]),
+            )
+            inputs["coherent_dispersion_fingerprint"] = dispersion_law.fingerprint
+        inputs["coherent_window_rules"] = {
+            "leak_limit": DEFAULT_COHERENT_LEAK_LIMIT,
+            "decoherence_limit": DEFAULT_COHERENT_DECOHERENCE_LIMIT,
+            "bin_eV": COHERENT_WINDOW_BIN_EV,
+            "cluster_separation": COHERENT_JUMP_CLUSTER_SEPARATION,
+            "oversampling": COHERENT_NYQUIST_OVERSAMPLING,
+        }
     key = coordinate_cache_key(payload, inputs)
     cached = cached_coordinates(key)
     if cached is not None:
         grid = _cached_grid(cached)
         if grid is not None:
             _warn_lineshape_precision(cached)
+            _warn_coherent_dispersion(cached)
             record = {**cached, "cache": "hit", "cache_key": key}
             if profile_enabled:
                 record["line_grid_profile"] = {
@@ -431,7 +638,15 @@ def _resolve_policy_grid(payload, case, segments, n_hats, Ne, abs_layers, groove
     try:
         if windowed:
             grid, record = _windowed_line_grid(
-                payload, case, segments, n_hats, Ne, steps, groove=groove
+                payload,
+                case,
+                segments,
+                n_hats,
+                Ne,
+                steps,
+                groove=groove,
+                abs_layers=abs_layers,
+                dispersion_law=dispersion_law,
             )
         elif measured:
             grid, record, bandwidth_record = _measured_line_grid(
@@ -460,6 +675,7 @@ def _resolve_policy_grid(payload, case, segments, n_hats, Ne, abs_layers, groove
     line_grid_profile = record.pop("line_grid_profile", None)
     store_coordinates(key, record)
     _warn_lineshape_precision(record)
+    _warn_coherent_dispersion(record)
     result = {**record, "cache": "miss", "cache_key": key}
     if profile_enabled:
         result["line_grid_profile"] = {

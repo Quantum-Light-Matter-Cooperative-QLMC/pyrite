@@ -35,6 +35,7 @@ beam-transport/beam-phase-space-injection
 beam-transport/beam-phase-space-metrics
 beam-transport/gpt-gdf-injection
 beam-transport/coherent-line-grid-fringe-spacing
+beam-transport/coherent-line-grid-windowed-resolution
 beam-transport/dielectric-bulk-loss
 beam-transport/eedl-material-shell-rates
 beam-transport/elsepa-elastic-sampling
@@ -107,6 +108,7 @@ radiation-physics/pair-production-sampling
 radiation-physics/photon-pair-first-interaction
 radiation-physics/coherent-formation-absorption
 radiation-physics/coherent-inter-electron-decoherence
+radiation-physics/coherent-physical-bunch-population
 radiation-physics/coherent-line-spectrum
 radiation-physics/coherent-segment-midpoint-time
 radiation-physics/temporal-intensity-profile
