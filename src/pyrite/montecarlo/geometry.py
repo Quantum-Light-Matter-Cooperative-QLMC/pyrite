@@ -360,10 +360,7 @@ def project_beam_entry(offsets_uv, tilt_polar_rad, tilt_azim_rad=0.0):
     if not tilt_polar_rad:
         # R = I: the lab transverse plane IS the sample z=0 face; no projection.
         return offsets_uv.copy()
-    st, ct = np.sin(tilt_polar_rad), np.cos(tilt_polar_rad)
-    normal_lab = np.array([st * np.cos(tilt_azim_rad), st * np.sin(tilt_azim_rad), ct])
-    Rt = _rotation_between(np.array([0.0, 0.0, 1.0]), normal_lab).T
-    e_x, e_y, beam_dir = Rt[:, 0], Rt[:, 1], Rt[:, 2]
+    e_x, e_y, beam_dir = beam_entry_basis(tilt_polar_rad, tilt_azim_rad)
     # sample-frame origin of each lab ray = its transverse offset carried into
     # the sample frame (the ray then continues along beam_dir).
     o = offsets_uv[:, 0:1] * e_x + offsets_uv[:, 1:2] * e_y  # (N, 3)
@@ -372,6 +369,60 @@ def project_beam_entry(offsets_uv, tilt_polar_rad, tilt_azim_rad=0.0):
     # entrance face ``z = 0`` and return the (N, 2) sample-frame (x, y) entry
     # points. Solve for s* that zeroes the z-component, form p0, drop z.
     return p0[:, :2]
+
+
+def beam_entry_basis(tilt_polar_rad, tilt_azim_rad=0.0):
+    """Sample-frame lab spot axes and nominal beam axis ``(e_x, e_y, b)``.
+
+    The columns of ``R.T`` with ``R = _rotation_between(+z, normal_lab)``, the
+    rotation :func:`project_beam_entry` and :func:`tilted_geometry` share: a lab
+    spot offset ``(u, v)`` is the sample-frame vector ``u e_x + v e_y`` and the
+    collimated beam travels along ``b``. ``tilt_polar_rad = 0`` gives the
+    identity columns exactly.
+
+    Validation: grazing-beam-projection
+    """
+    if not tilt_polar_rad:
+        eye = np.eye(3)
+        return eye[:, 0], eye[:, 1], eye[:, 2]
+    st, ct = np.sin(tilt_polar_rad), np.cos(tilt_polar_rad)
+    normal_lab = np.array([st * np.cos(tilt_azim_rad), st * np.sin(tilt_azim_rad), ct])
+    Rt = _rotation_between(np.array([0.0, 0.0, 1.0]), normal_lab).T
+    return Rt[:, 0], Rt[:, 1], Rt[:, 2]
+
+
+def beam_entry_jacobian(tilt_polar_rad, tilt_azim_rad=0.0):
+    """``J = d p0_xy / d(u, v)`` of :func:`project_beam_entry` (2 x 2).
+
+    The projection is linear, ``p0 = o + s* b`` with ``s* = -o_z / b_z``, so
+    column ``i`` is ``(e_i - (e_i,z / b_z) b)_xy``. The face covariance of a
+    lab spot ``Sigma`` is ``J Sigma J^T``. Zero tilt gives ``I``.
+
+    Validation: grazing-beam-projection
+    """
+    e_x, e_y, b = beam_entry_basis(tilt_polar_rad, tilt_azim_rad)
+    columns = [(e - (e[2] / b[2]) * b)[:2] for e in (e_x, e_y)]
+    return np.stack(columns, axis=1)
+
+
+def face_arrival_path_ang(entry_xy, tilt_polar_rad, tilt_azim_rad=0.0):
+    """Vacuum path ``s*`` [Ang] from the lab reference plane to the entry face.
+
+    A collimated electron crosses the lab plane through the sample origin
+    perpendicular to ``b`` at its bunch time ``t0`` and reaches its face point
+    ``p0`` after a further flight ``s*``. With ``p0 = o + s* b`` and ``o . b = 0``,
+    ``s* = p0 . b = p0_xy . b_xy`` (``p0_z = 0``); its flight time is
+    ``s* / beta`` [Ang, c=1]. Positive ``s*`` arrives later. Zero tilt gives
+    ``s* = 0`` exactly (pulse front parallel to the untilted face).
+
+    Source: ray-plane intersection, as in :func:`project_beam_entry`.
+    Validation: grazing-beam-projection
+    """
+    entry_xy = np.asarray(entry_xy, dtype=float)
+    if not tilt_polar_rad:
+        return np.zeros(entry_xy.shape[0])
+    _, _, b = beam_entry_basis(tilt_polar_rad, tilt_azim_rad)
+    return entry_xy[:, :2] @ b[:2]
 
 
 def detector_directions(

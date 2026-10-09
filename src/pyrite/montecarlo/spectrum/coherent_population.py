@@ -8,7 +8,9 @@ from scipy.constants import elementary_charge
 
 from ..._backend import _to_cpu, xp
 
-COHERENT_POPULATION_MODEL = "physical-distinct-pairs-v1"
+# v2 (#370): finite footprints pair offset-free fields with F_z F_perp, and
+# tilted analytic spots carry the face-arrival delay in t0.
+COHERENT_POPULATION_MODEL = "physical-distinct-pairs-v2"
 
 
 class CoherentSamplingError(ValueError):
@@ -43,8 +45,8 @@ def pair_scale(physical_electrons, incident_samples):
     |E S|² by (P-G)/(M(M-1)), where G=sum|S_e|², P=|sum S_e|².
     Assumptions: equally weighted iid incident trajectories, missed entries
     have zero field. Infinite slabs pair complete fields (F=1). A finite
-    footprint averages independent Gaussian arrival times analytically with
-    F=F_z; its sampled transverse geometry stays in each electron field.
+    footprint pairs offset-free fields and averages independent Gaussian
+    arrival times and a recorded Gaussian spot analytically, F=F_z F_perp.
     Limits: N=1 gives the self term; identical aligned fields give N|S|²;
     M=N with no offsets recovers the historical coherent sum. No self pairs
     enter the excess.

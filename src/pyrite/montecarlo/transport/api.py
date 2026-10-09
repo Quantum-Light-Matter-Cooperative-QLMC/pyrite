@@ -22,6 +22,7 @@ from .beam_entry import (
     check_electron_block,
     initial_beam_positions,
     initial_energies_keV,
+    resolve_bunch_times,
     table_energy_range,
 )
 from .cores import (
@@ -573,7 +574,7 @@ def simulate_trajectories(
 
     _nsys_push("cxr.transport.sample")
     rng = np.random.default_rng(seed)
-    pos, transverse_slopes = initial_beam_positions(
+    pos, transverse_slopes, beam_entry = initial_beam_positions(
         seed,
         Ne,
         transverse_distribution=transverse_distribution,
@@ -583,6 +584,8 @@ def simulate_trajectories(
         tilt_azim_rad=tilt_azim_rad,
         groove=groove,
         start=electron_start,
+        E0_keV=E0_keV,
+        energy_spread_frac=energy_spread_frac,
     )
     if beam_dir is None:
         beam_dir = np.array([0.0, 0.0, 1.0])
@@ -708,10 +711,8 @@ def simulate_trajectories(
     # penetration / electron-lifetime plots (-> fs via c = 2997.92 Ang/fs).
 
     clock = np.zeros(Ne)
-    # per-electron longitudinal bunch offset [Ang, c=1], kept SEPARATE from the
-    # relative-age clock: the coherent sum later reads absolute time
-    # t_abs = t_ang + t0_ang. None/None -> all-zero (point bunch, bit-for-bit),
-    # and nothing reads it in the incoherent spectrum today.
+    # per-electron bunch arrival [Ang, c=1], SEPARATE from the relative-age clock
+    # (t_abs = t_ang + t0_ang); None/None -> all-zero point bunch, bit-for-bit.
     t0_electron = _sample_bunch_offsets(
         Ne,
         bunch_length_fs,
@@ -720,10 +721,9 @@ def simulate_trajectories(
         seed,
         longitudinal_distribution,
     )
-    if gdf_t0 is not None:
-        t0_electron = gdf_t0
-    elif launch is not None:
-        clock, t0_electron = launch.t_ang.copy(), launch.t0_ang.copy()
+    t0_electron, clock, beam_entry = resolve_bunch_times(
+        t0_electron, clock, beam_entry, pos, E_keV, gdf_t0=gdf_t0, launch=launch
+    )
     # Snapshot before transport mutates ``pos``, ``dirs``, and ``E``. These
     # arrays describe incident phase space, including particles that miss a
     # finite footprint.
@@ -1191,6 +1191,7 @@ def simulate_trajectories(
         "crystal_width_ang": width_ang,
         "crystal_height_ang": height_ang,
         "n_layers": n_layers,
+        "beam_entry": beam_entry,  # plain-data analytic spot, or None
     }
     if prepared_stopping_tables is not None:
         # Prepared (log-transformed) per-layer SBETHE tables, so post-transport

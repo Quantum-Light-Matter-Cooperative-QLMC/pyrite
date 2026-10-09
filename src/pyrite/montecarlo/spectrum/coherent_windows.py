@@ -51,6 +51,7 @@ Validation: coherent-line-grid-windowed-resolution
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
+from functools import partial
 from typing import Any
 
 import numpy as np
@@ -135,6 +136,13 @@ class CoherentRowField:
     but cannot reproduce an absolute complex row field.
     ``mosaic_weight`` is the nonnegative production intensity weight for
     this orientation; it is not absorbed into the captured field amplitudes.
+    ``transverse_envelope`` is the row's nonincreasing bound on the analytic
+    transverse form factor (finite footprint with a recorded spot), or
+    ``None`` (factor one). ``centre_scale_ang`` is each piece's roundoff
+    scale: the magnitude of the absolute transport time and position that
+    ``centre_ang`` was derived from (``None`` uses ``|centre_ang|``). Joint
+    tests scale float64 roundoff by it, so subtracting a per-electron offset
+    cannot shrink the tolerance below the error already in the operands.
 
     Validation: coherent-line-grid-windowed-resolution
     """
@@ -153,6 +161,8 @@ class CoherentRowField:
     escape_change_ang: np.ndarray | None = None
     phase_rad: np.ndarray | None = None
     mosaic_weight: float = 1.0
+    transverse_envelope: Callable[[np.ndarray], np.ndarray] | None = None
+    centre_scale_ang: np.ndarray | None = None
 
     @property
     def slope_ang(self) -> np.ndarray:
@@ -218,8 +228,39 @@ class CoherentRowCollector:
                 escape_change_ang=2.0 * half_dL,
                 phase_rad=None if phase is None else np.asarray(_host(phase), dtype=float)[sel],
                 mosaic_weight=float(getattr(st, "capture_mosaic_weight", 1.0)),
+                transverse_envelope=getattr(st, "capture_transverse_envelope", None),
+                centre_scale_ang=_centre_scale(st, rows),
             )
         )
+
+
+def _centre_scale(st, rows):
+    """``|d| + 2 |r|`` of the complete transport phase, bounding ``|t| + |n_hat . r|``.
+
+    ``d = t - n_hat . r`` (with ``|n_hat| = 1``) gives ``|t| <= |d| + |r|``.
+    Validation: coherent-line-grid-windowed-resolution
+    """
+    d_all = getattr(st, "d_all", None)
+    if d_all is None:
+        return None
+    d = np.abs(np.asarray(_host(d_all), dtype=float)[rows])
+    r = np.linalg.norm(np.asarray(_host(st.seg_r), dtype=float)[rows], axis=1)
+    return d + 2.0 * r
+
+
+def _joint_scale(field):
+    if field.centre_scale_ang is None:
+        return np.abs(field.centre_ang)
+    return np.maximum(field.centre_scale_ang, np.abs(field.centre_ang))
+
+
+def _joint_tolerance(field, order):
+    """Float64 roundoff allowed between abutting pieces sorted by ``order``."""
+    scale = _joint_scale(field)[order]
+    duration = field.duration_ang[order]
+    return (
+        8.0 * np.finfo(float).eps * (scale[1:] + scale[:-1] + 0.5 * (duration[1:] + duration[:-1]))
+    )
 
 
 def _affine_dispersion_row(
@@ -251,6 +292,9 @@ def _affine_dispersion_row(
         amplitude=field.amplitude / jacobian,
         duration_ang=field.duration_ang * jacobian,
         centre_ang=field.centre_ang - HBARC_EV_ANG * slope * field.escape_mid_ang,
+        centre_scale_ang=None
+        if field.centre_scale_ang is None
+        else field.centre_scale_ang + np.abs(HBARC_EV_ANG * slope * field.escape_mid_ang),
         attenuation_slope_ang=field.slope_ang / jacobian,
         phase_rad=None
         if field.phase_rad is None
@@ -262,26 +306,10 @@ def _affine_dispersion_row(
     original_hi = field.centre_ang + 0.5 * field.duration_ang
     order = np.lexsort((original_lo, field.electron))
     same = mapped.electron[order][1:] == mapped.electron[order][:-1]
-    tolerance = (
-        8.0
-        * np.finfo(float).eps
-        * (
-            np.abs(mapped.centre_ang[order][1:])
-            + np.abs(mapped.centre_ang[order][:-1])
-            + 0.5 * (mapped.duration_ang[order][1:] + mapped.duration_ang[order][:-1])
-        )
-    )
+    tolerance = _joint_tolerance(mapped, order)
     if np.any(same & (lo[order][1:] < hi[order][:-1] - tolerance)):
         raise ValueError("affine dispersion maps one electron's pieces onto overlapping support")
-    original_tolerance = (
-        8.0
-        * np.finfo(float).eps
-        * (
-            np.abs(field.centre_ang[order][1:])
-            + np.abs(field.centre_ang[order][:-1])
-            + 0.5 * (field.duration_ang[order][1:] + field.duration_ang[order][:-1])
-        )
-    )
+    original_tolerance = _joint_tolerance(field, order)
     gap = original_lo[order][1:] > original_hi[order][:-1] + original_tolerance
     if np.any(same & gap & (lo[order][1:] <= hi[order][:-1] + tolerance)):
         raise ValueError("affine dispersion must not close a genuine gap into a cancelling joint")
@@ -359,19 +387,16 @@ class _RowJumps:
         order = np.lexsort((lo, row.electron))
         energy, electron = row.energy_eV[order], row.electron[order]
         slope = HBARC_EV_ANG * row.slope_ang[order]
-        lo, hi, duration = lo[order], hi[order], row.duration_ang[order]
+        lo, hi = lo[order], hi[order]
         start = row.amplitude[:, order] * row.start_transmission[order]
         end = row.amplitude[:, order] * row.end_transmission[order]
         same = electron[1:] == electron[:-1]
         # Only allow float64 roundoff when reconstructing the two endpoints.
         # A relative physical-length tolerance can erase real gaps after a
         # common time translation, falsely cancelling their endpoint fields.
-        centre = row.centre_ang[order]
-        tolerance = (
-            8.0
-            * np.finfo(float).eps
-            * (np.abs(centre[1:]) + np.abs(centre[:-1]) + 0.5 * (duration[1:] + duration[:-1]))
-        )
+        # The roundoff scale is that of the absolute transport operands, so an
+        # offset-free (translated) centre keeps the operands' own error budget.
+        tolerance = _joint_tolerance(row, order)
         joint = same & (np.abs(lo[1:] - hi[:-1]) <= tolerance)
         n, n_pol = energy.size, row.amplitude.shape[0]
         # Jump k sits before piece k (its start) or, where piece k-1 joins it,
@@ -579,8 +604,9 @@ def _dispersion_window_audit(rows, summary, law, decoherence, electron_count):
             if hi > lower and lo < upper:
                 min_step = min(min_step, np.pi * HBARC_EV_ANG / span / summary["oversampling"])
                 continue
+            row_decoherence = _row_decoherence(decoherence, field)
             factor = 1.0 + (electron_count - 1) * (
-                1.0 if decoherence is None else float(decoherence(np.asarray(lo)))
+                1.0 if row_decoherence is None else float(row_decoherence(np.asarray(lo)))
             )
             try:
                 affine = _affine_dispersion_row(field, certificate.slope, certificate.intercept)
@@ -612,6 +638,29 @@ def _dispersion_window_audit(rows, summary, law, decoherence, electron_count):
             }
         )
     return output
+
+
+def _row_decoherence(decoherence, field):
+    """Row bound ``F_z(E) sup_{E' >= E} F_perp(E')``: nonincreasing, >= the reducer's F.
+
+    Validation: transverse-bunch-form-factor
+    """
+    envelope = getattr(field, "transverse_envelope", None)
+    if decoherence is None or envelope is None:
+        return decoherence
+
+    def bound(energy_eV):
+        return decoherence(energy_eV) * envelope(energy_eV)
+
+    return bound
+
+
+def _decoherence_label(decoherence, rows):
+    if decoherence is None:
+        return "none (F = 1)"
+    if any(getattr(row, "transverse_envelope", None) is not None for row in rows):
+        return "analytic F_z x transverse envelope"
+    return "analytic F_z"
 
 
 def coherent_window_seeds(
@@ -657,7 +706,7 @@ def coherent_window_seeds(
     start, stop = float(start_eV), float(stop_eV)
     count = max(float(electron_count), 1.0)
 
-    def factor_at(energy):
+    def factor_at(energy, decoherence):
         if decoherence is None:
             return float(count)
         return 1.0 + float(decoherence(np.asarray(energy, dtype=float))) * (count - 1)
@@ -670,7 +719,7 @@ def coherent_window_seeds(
         "oversampling": float(oversampling),
         "cluster_separation": COHERENT_JUMP_CLUSTER_SEPARATION,
         "electron_count": count,
-        "decoherence_bound": "none (F = 1)" if decoherence is None else "analytic F_z",
+        "decoherence_bound": _decoherence_label(decoherence, rows),
         "rows": [],
     }
     for field in rows:
@@ -699,7 +748,12 @@ def coherent_window_seeds(
             if field.escape_change_ang is None
             else field.escape_change_ang[keep],
             phase_rad=None if field.phase_rad is None else field.phase_rad[keep],
+            transverse_envelope=field.transverse_envelope,
+            centre_scale_ang=None
+            if field.centre_scale_ang is None
+            else field.centre_scale_ang[keep],
         )
+        row_decoherence = _row_decoherence(decoherence, field)
         power = field.power
         lo_t = field.centre_ang - 0.5 * field.duration_ang
         hi_t = field.centre_ang + 0.5 * field.duration_ang
@@ -726,9 +780,15 @@ def coherent_window_seeds(
             summary["rows"].append(row)
             continue
         jumps = _RowJumps(field)
-        lower_factor = factor_at(start)
+        lower_factor = factor_at(start, row_decoherence)
         upper, upper_leak = _edge(
-            jumps, power, band_hi, stop, factor_at, float(leak_limit), upper=True
+            jumps,
+            power,
+            band_hi,
+            stop,
+            partial(factor_at, decoherence=row_decoherence),
+            float(leak_limit),
+            upper=True,
         )
         lower, lower_leak = _edge(
             jumps,
@@ -757,10 +817,10 @@ def coherent_window_seeds(
         edges = np.arange(lower, upper, float(bin_eV))
         edges = np.append(edges, upper)
         bins_lo, bins_hi = edges[:-1], edges[1:]
-        if decoherence is None:
+        if row_decoherence is None:
             grouped = np.zeros(bins_lo.size, dtype=bool)
         else:
-            grouped = decoherence(bins_lo) * count <= float(decoherence_limit)
+            grouped = row_decoherence(bins_lo) * count <= float(decoherence_limit)
         steps = np.where(grouped, step_electron, step_all)
         row["electron_step_from_eV"] = float(bins_lo[grouped].min()) if grouped.any() else None
         index = 0

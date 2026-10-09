@@ -3857,3 +3857,20 @@ Two fixes are possible. Either drop jumps with $\lVert a_1-a_2\rVert=0$ and $\lv
 **`rederived`** for the frozen-carrier, float64, `sinc_cutoff = None` scope of items 1–4: envelope validity, Parseval normalization, signed attenuation, clusters and cross terms, exact gaps, population factor, step, switch, oversampling, guards and budget. Item 5 is factually accurate, subject to the qualifications above.
 
 Wording corrections are needed. In the ledger $B_J$, use $\lvert z_2-z_1\rvert=\sqrt{\Delta E^2+(\hbar c\,\Delta\lambda)^2}$, not $\lvert u_2-u_1\rvert$. "Exact two-carrier tail" should read "Minkowski upper bound on each jump's tail". "Smallest edge" should read "a bisected edge meeting the limit". The collinear-split limit holds exactly only when the whole flight's endpoints share a cluster; elsewhere the split bound is larger (up to $1.81\times$ here) but still valid. If that limit equality is treated as load-bearing, the divergent term is the cluster partition, which counts zero-weight joints. Sign-off remains a human decision.
+
+## Joint roundoff scale and transverse envelope (2026-10-08, #370)
+
+Finite-footprint coherent rows are now captured with offset-free centres
+(`transverse-bunch-form-factor`). The joint test previously scaled float64
+roundoff by the captured centre `|d|`. Mm-scale transverse delays had kept
+`|d|` near $4\times10^6$ Å, masking ~$10^{-10}$ Å residuals of the upstream
+transport coordinates. With offset-free centres near $10^4$ Å, the `tiny`
+fixture lost 31 of 49 joints and its windows grew from 86,118 to 164,451
+points. Each piece now carries `centre_scale_ang = |d| + 2|r|` of its
+complete transport phase ($|t|\le|d|+|r|$ for $d=t-\hat{\mathbf n}\cdot\mathbf r$),
+and the tolerance is $8\epsilon$ times the larger of that scale and `|centre|`.
+The tolerance still follows the operands' roundoff, not a physical
+length: real 1 Å gaps at a $10^7$ Å origin stay gaps, and the fixture
+returns to 49 joints and its previous windows. Captured rows also carry the
+nonincreasing transverse envelope $F_z(E)\sup_{E'\ge E}F_\perp(E')$ used in
+place of $F_z$.

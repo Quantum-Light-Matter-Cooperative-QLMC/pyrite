@@ -391,3 +391,37 @@ def test_omission_cannot_hide_unresolved_physical_pair_power():
             coherent_flat_omission_limit=0.05,
             **KWARGS,
         )
+
+
+def test_gaussian_certification_bisects_instead_of_scanning(monkeypatch):
+    """A vanishing row factor makes every energy a candidate; certify by bisection.
+
+    Validation: coherent-flat-term-omission
+    """
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.spectrum import coherent_form_factor
+    from pyrite.montecarlo.spectrum.lines import _per_hkl
+
+    calls = []
+    original = coherent_form_factor.gaussian_form_factor_bounds
+
+    def counting(*args, **kwargs):
+        calls.append(args)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(coherent_form_factor, "gaussian_form_factor_bounds", counting)
+    energy = np.linspace(10.0, 6000.0, 200_000)
+    st = SimpleNamespace(
+        request=SimpleNamespace(
+            coherent_flat_omission_limit=1e-4, physical_electrons=50.0, longitudinal_rms_fs=1e-3
+        ),
+        Ne=10,
+        E_grid=energy,
+        finite_footprint_now=True,
+    )
+    keep = _per_hkl._flat_energy_keep(st, np.zeros(energy.size))
+    assert len(calls) <= 20
+    assert 0 < keep.size < energy.size
+    # Everything kept lies below everything omitted (monotone Gaussian bound).
+    assert np.array_equal(keep, np.arange(keep.size))

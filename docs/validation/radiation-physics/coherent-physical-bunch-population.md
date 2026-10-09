@@ -44,8 +44,9 @@ are iid and equally weighted and the analytic $F$ is independent of those fields
 Infinite slabs use complete fields, including sampled offsets, with $F=1$.
 They use no empirical characteristic-function multiplier, so correlated offsets
 and trajectory fields do not require a phase/field independence assumption.
-Finite footprints use only the supported independent Gaussian longitudinal
-average, with sampled transverse offsets retained in the fields. This does not
+Finite footprints pair offset-free fields with the analytic Gaussian
+longitudinal and tilted-face transverse averages, $F=F_zF_\perp$
+([`transverse-bunch-form-factor`](transverse-bunch-form-factor.md), #370). This does not
 prove iid/equal weighting for an arbitrary imported or structured source.
 
 The positive alternative $G/M+(N-1)F|\overline S|^2$ has bias
@@ -103,8 +104,8 @@ composition extension. Existing stored-input audit evidence remains scoped to
 its original operator; it does not validate this new estimator automatically.
 Temporal output scales its cross-electron difference by the same pair weight.
 
-Coherent grid cache revision is 7 and includes the physical population. Dataset
-and content identities carry `physical-distinct-pairs-v1` only for coherent
+Coherent grid cache revision is 8 (7 before #370) and includes the physical population. Dataset
+and content identities carry `physical-distinct-pairs-v2` (v1 before #370) only for coherent
 emission, preventing reuse of sampled-population spectra. Previous remote ladders
 remain evidence for their recorded operator; charge-weighted default-policy
 reference/thick runs must be repeated before production acceptance.
@@ -288,6 +289,31 @@ reference for row 2, with a material phase-slope step of 1.537e-5 eV.
 This upper bound is not a measured grid error. This run does not resolve
 sampling or production-window certification, and does not establish the
 full 81-case profile's acceptance.
+
+### Reduced short-bunch rerun after #370 (2026-10-09)
+
+The [rerun record](../check-records/coherent-physical-population/short-bunch-370.json)
+from SLURM 1169 uses clean revision `73ccbfe0` (code digest
+`8aa0fe845d4ad0d899074201c04a11d662de577ba0962aaac785416d43a93bdd`) with the
+same inputs as the refused run above: HOPG, 60 keV, 10 µm, 45° tilt, 135°
+azimuth, 0.1 mm beam FWHM, 5 mm footprint, 1 as Gaussian RMS duration, seed 1,
+1 pC and 200 incident histories, CUDA float64. Transport now carries the
+face-arrival delay, and finite-footprint fields pair with
+$F_zF_\perp$ ([`transverse-bunch-form-factor`](transverse-bunch-form-factor.md)).
+
+The spectrum completes without `CoherentSamplingError`. The automatic axis from
+10 to 6000 eV has 5,482,423 coordinates (11,936,606 before; the transverse
+envelope lets rows take the per-electron step). Transport and grid took 2.0 s;
+the spectrum took 14,367 s; total wall clock 3 h 59 m 33 s; peak RSS
+2,033,584 KiB. The coherent yield is $2.03050\times10^{-6}$ against the
+incoherent $2.03025\times10^{-6}$ (ratio 1.00012): at a 0.1 mm spot
+$F_\perp$ removes the physical-charge cross term, leaving the per-electron
+floor. Nonnegativity is a necessary check, not a sampling certificate.
+
+The run time is dominated by the float64 generic CuPy per-electron reduction
+(the CUDA-JIT reducers are float32-only), about 2 h per (002) row. An earlier
+attempt stalled in the flat-omission certificate's per-candidate interval
+scan, now bisected (`coherent-flat-term-omission`).
 
 ### Failure diagnostics
 

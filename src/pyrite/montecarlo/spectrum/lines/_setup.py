@@ -19,6 +19,7 @@ from ....materials.crystal import CRYSTALS, HBARC_EV_ANG, refractive_index
 from ...geometry import _mosaic_quadrature, _orientation_R
 from ...transport import C_ANG_PER_FS, beta_from_keV
 from ..coherent_population import pair_scale
+from ..coherent_transverse import require_footprint_support, transverse_spot
 from ..segment_escape import segment_escape_gradient, segment_escape_pieces
 from ._bin_quadrature import BIN_MEAN_QUADRATURE, bin_axis, validate_line_quadrature
 from ._formation import expand_escape_pieces
@@ -151,6 +152,7 @@ class _SpectrumSetup:
     decoherence_active: Any
     finite_footprint_now: Any
     finite_footprint_F: Any
+    transverse: Any
     decoherence_A_pop: Any
     xy0_pop: Any
     # Incoherent routes only: padded linear escape pieces per segment
@@ -178,6 +180,8 @@ class _SpectrumSetup:
     capture_phase_rad: Any = None
     # Production intensity weight for the captured (reflection, orientation).
     capture_mosaic_weight: float = 1.0
+    # Nonincreasing transverse bound sup F_perp for the row, or None.
+    capture_transverse_envelope: Any = None
 
 
 def _prepare_spectrum(request):
@@ -195,6 +199,7 @@ def _prepare_spectrum(request):
 
     Validation: coherent-formation-absorption
     Validation: sinc-bin-integration
+    Validation: transverse-bunch-form-factor
     """
     segments = request.segments
     E_grid_eV = request.E_grid_eV
@@ -252,6 +257,7 @@ def _prepare_spectrum(request):
     cdtype = omega_grid = delta_omega_grid = d_all = None
     seg_r_geom = d_all_geom = xy0_pop = None
     finite_footprint_now = finite_footprint_F = decoherence_A_pop = None
+    transverse = None
 
     info = CRYSTALS[crystal]
     n_atoms = len(info["basis"]) / info["V_cell"]
@@ -578,14 +584,44 @@ def _prepare_spectrum(request):
                 omega_host = np.asarray(_to_cpu(omega_grid), dtype=float)
                 finite_footprint_F_host = np.exp(-((omega_host * sigma_z_ang) ** 2))
                 finite_footprint_F = xp.asarray(finite_footprint_F_host, dtype=REAL)
-                # Average only the independent longitudinal arrival time. Keep
-                # each electron at its sampled transverse position in BOTH the
-                # flat and grouped terms: its phase, hit/miss history, and
-                # finite-prism attenuation are coupled and must stay together.
-                # F_z then blends those terms exactly, conditional on this
-                # transverse/transport realization. The CUDA-JIT grouped
-                # reductions consume these same arrays.
-                d_all_geom = seg_t_mid - _matvec3(seg_r, n_hat_d)
+                # Offset-free fields: remove each electron's face point and
+                # full arrival time (bunch offset plus face-arrival delay).
+                # Amplitudes and escape keep the sampled positions. Any
+                # surviving cross term then needs translation invariance: a
+                # recorded Gaussian spot well inside the footprint, averaged
+                # analytically per row as F_z * F_perp. F_z = 0 everywhere
+                # leaves only phase-free self terms, so no spot is needed.
+                # Validation: transverse-bunch-form-factor
+                seg_r_geom = seg_r.copy()
+                seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
+                seg_r_geom[:, :2] = seg_r_geom[:, :2] - xy0_pop[seg_elec_id_clamped]
+                d_all_geom = seg_t_mid - _matvec3(seg_r_geom, n_hat_d)
+                if (
+                    xy0_pop.size
+                    and bool(xp.any(xy0_pop != 0.0))
+                    and bool(np.any(finite_footprint_F_host > 0.0))
+                ):
+                    transverse = transverse_spot(segments.get("beam_entry"))
+                    if transverse is None:
+                        raise ValueError(
+                            "coherent emission with a finite crystal footprint and "
+                            "transverse offsets requires a recorded Gaussian beam "
+                            "spot (transport beam_entry) unless F_z vanishes"
+                        )
+                    if int(segments.get("n_missed", 0) or 0):
+                        raise ValueError(
+                            "finite-footprint coherent transverse average needs every "
+                            "incident electron to hit the footprint"
+                        )
+                    require_footprint_support(
+                        transverse,
+                        seg_r_geom,
+                        n_hat,
+                        segments["thickness_ang"],
+                        segments["crystal_width_ang"],
+                        segments["crystal_height_ang"],
+                        xp=xp,
+                    )
             else:
                 seg_r_geom = seg_r.copy()
                 seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
@@ -641,11 +677,10 @@ def _prepare_spectrum(request):
                 dtype=np.float64,
             )
             temporal_tau_geo = temporal_tau - t0_seg
-            if not finite_footprint_now:
-                seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
-                xy0 = xp.asarray(xy0_pop, dtype=np.float64)[seg_elec_id_clamped]
-                n64 = xp.asarray(n_hat_d, dtype=np.float64)
-                temporal_tau_geo = temporal_tau_geo + xy0 @ n64[:2]
+            seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
+            xy0 = xp.asarray(xy0_pop, dtype=np.float64)[seg_elec_id_clamped]
+            n64 = xp.asarray(n_hat_d, dtype=np.float64)
+            temporal_tau_geo = temporal_tau_geo + xy0 @ n64[:2]
 
     return _SpectrumSetup(
         request=request,
@@ -686,6 +721,7 @@ def _prepare_spectrum(request):
         decoherence_active=decoherence_active,
         finite_footprint_now=finite_footprint_now,
         finite_footprint_F=finite_footprint_F,
+        transverse=transverse,
         decoherence_A_pop=decoherence_A_pop,
         xy0_pop=xy0_pop,
         bin_edges=bin_edges,
