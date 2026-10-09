@@ -758,7 +758,10 @@ def test_automatic_full_axis_yield_audit_uses_the_production_capture():
     case = dict(
         cc.build_ladder_case("hopg", 30.0, 5.0, 45.0, thickness_ang=1.0, n_electrons=1, seed=0)
     )
+    from scipy.constants import elementary_charge
+
     case.update(
+        bunch_charge_pc=elementary_charge * 1e12,
         coherent_emission=True,
         hkl_list=[(0, 0, 2)],
         mosaic_mc_fwhm_rad=None,
@@ -1041,3 +1044,36 @@ def test_the_production_reducer_leaks_less_than_the_window_bound(tiny, hkl):
     if not row["at_axis"]["lower"]:
         below = energy <= lower
         assert np.trapezoid(lines[below], energy[below]) <= limit * total
+
+
+def test_physical_charge_widens_windows_and_keeps_incident_misses_in_bound():
+    rows = [_field([800000.0, 800000.0], 1000.0, 1.0, electrons=[0, 1], gaps=[0.0, 10000000.0])]
+    segments = {"Ne": 4}
+    summaries = []
+    for population in (4.0, 40.0):
+        _, summary = cw.coherent_case_seeds(
+            rows,
+            segments,
+            electron_limit=4,
+            start_eV=10.0,
+            stop_eV=5000.0,
+            longitudinal_rms_fs=None,
+            physical_electrons=population,
+        )
+        summaries.append(summary)
+        assert summary["incident_samples"] == 4
+        assert summary["emitting_samples"] == 2
+        assert summary["physical_electrons"] == population
+    low, high = [summary["rows"][0]["window_eV"] for summary in summaries]
+    assert high[0] < low[0] and high[1] > low[1]
+
+
+def test_charge_changes_the_coherent_grid_cache_key(tiny):
+    case, ladder = tiny
+    policy = _policy(case, windows=True)
+    _, first = _resolve({**case, "bunch_charge_pc": 1.0}, ladder, policy)
+    _, changed = _resolve({**case, "bunch_charge_pc": 2.0}, ladder, policy)
+    assert changed["cache"] == "miss"
+    assert first["cache_key"] != changed["cache_key"]
+    _, warm = _resolve({**case, "bunch_charge_pc": 2.0}, ladder, policy)
+    assert warm["cache"] == "hit"

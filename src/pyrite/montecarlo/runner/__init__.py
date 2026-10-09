@@ -40,6 +40,7 @@ from ..spectrum import (
 from ..spectrum import (
     mc_characteristic_spectrum as mc_characteristic_spectrum,
 )
+from ..spectrum.coherent_population import physical_bunch_electrons
 from ..spectrum.lines import _setup as _line_setup
 from ..spectrum.lines._temporal import case_temporal_profiles, temporal_outputs
 from ..trajectories import TrajectoryCapture
@@ -663,6 +664,7 @@ def _lines_for_segments_once(
             groove=groove,
             coherent=coherent,
             longitudinal_rms_fs=longitudinal_rms_fs,
+            physical_electrons=physical_bunch_electrons(case) if coherent else None,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             _table_cache=table_cache,
@@ -699,6 +701,7 @@ def _lines_for_segments_once(
             layers=abs_layers,
             coherent=coherent,
             longitudinal_rms_fs=longitudinal_rms_fs,
+            physical_electrons=physical_bunch_electrons(case) if coherent else None,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             _table_cache=table_cache,

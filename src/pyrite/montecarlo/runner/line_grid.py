@@ -33,6 +33,7 @@ from ..._line_grid_policy import (
     windowed_coordinates,
 )
 from ..._line_windows import build_window_plan, window_plan_from_payload
+from ..spectrum.coherent_population import physical_bunch_electrons
 from ..spectrum.diagnostics import coherent_fringe_spacing, sinc_feature_spacing
 from ..spectrum.line_seeds import (
     SEEDING_REVISION,
@@ -140,7 +141,7 @@ _WEIGHT_INPUT_KEYS = ("B_ang2",)
 
 #: Bumped whenever the same inputs would seed different coherent windows; it
 #: keys the speed cache of coherent cases only.
-COHERENT_WINDOW_REVISION = 6
+COHERENT_WINDOW_REVISION = 7
 
 
 def _cached_grid(cached):
@@ -270,6 +271,7 @@ def _windowed_line_grid(
                 stop_eV=stop,
                 longitudinal_rms_fs=longitudinal_rms_fs(case),
                 dispersion_law=dispersion_law,
+                physical_electrons=physical_bunch_electrons(case),
             )
             seeds.extend(coherent_seeds)
             coherent_summaries.append(coherent_summary)
@@ -585,6 +587,7 @@ def _resolve_policy_grid(payload, case, segments, n_hats, Ne, abs_layers, groove
         # window rules; an incoherent key carries none of these, so the two
         # routes never share a cache entry.
         inputs["coherent_emission"] = True
+        inputs["physical_bunch_electrons"] = physical_bunch_electrons(case)
         # The jump envelope reads the reducer's complex PXR/CBS couplings,
         # including their Debye-Waller weight, even on a windowed fixed band.
         if case.get("B_ang2") is not None:

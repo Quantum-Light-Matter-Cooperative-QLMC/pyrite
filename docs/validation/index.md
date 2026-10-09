@@ -108,6 +108,7 @@ radiation-physics/pair-production-sampling
 radiation-physics/photon-pair-first-interaction
 radiation-physics/coherent-formation-absorption
 radiation-physics/coherent-inter-electron-decoherence
+radiation-physics/coherent-physical-bunch-population
 radiation-physics/coherent-line-spectrum
 radiation-physics/coherent-segment-midpoint-time
 radiation-physics/temporal-intensity-profile
