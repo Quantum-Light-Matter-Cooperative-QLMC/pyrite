@@ -192,6 +192,14 @@ exponent by 12.0 (45°/135°, 60 keV) and 1.67 (5°/0°, 30 keV). At the
 `hopg_short` 0.1 mm spot the exponent is $2.2\times10^{9}$ at 100 eV, so
 $F_\perp$ removes the physical-charge cross term across the 10–6000 eV axis.
 
+### Remote smoke (2026-10-09)
+
+The reduced `hopg_short`-class case that #350 refused (SLURM 1150) now
+completes on CUDA float64 (SLURM 1169, revision `73ccbfe0`): 5,482,423
+coordinates, spectrum 14,367 s, coherent/incoherent yield ratio 1.00012, no
+`CoherentSamplingError`. Details in
+[`coherent-physical-bunch-population`](coherent-physical-bunch-population.md).
+
 ### Checks
 
 `tests/montecarlo/test_coherent_transverse_tilt.py`: the closed form equals an
