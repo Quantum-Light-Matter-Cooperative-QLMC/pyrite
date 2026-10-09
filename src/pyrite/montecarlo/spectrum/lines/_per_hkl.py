@@ -252,20 +252,33 @@ def _flat_energy_keep(st, F):
 
         energy = np.asarray(_to_cpu(st.E_grid), dtype=np.float64)
         sigma = float(st.request.longitudinal_rms_fs) * C_ANG_PER_FS
-        # Gaussian F decreases on a nonnegative axis. Certify the first
-        # candidate, which bounds every later coordinate, without evaluating
-        # an interval exponential at every energy or transferring row fields.
-        for index in np.flatnonzero(~keep):
-            try:
-                _, upper = gaussian_form_factor_bounds(
-                    energy[index], energy[index], sigma_z_ang=sigma
-                )
-            except ValueError:
-                keep[:] = True
-                break
-            if np.nextafter(upper * weight, np.inf) <= limit:
-                break
-            keep[index] = True
+        # Gaussian F decreases on a nonnegative axis, so certification is
+        # monotone over ascending candidates: bisect for the first certified
+        # one, which bounds every later coordinate, and keep those before it.
+        # A transverse factor can make low-energy coordinates candidates, so
+        # a per-candidate interval exponential would be millions of calls.
+        candidates = np.flatnonzero(~keep)
+
+        def certified(position):
+            index = candidates[position]
+            point = float(energy[index])
+            _, upper = gaussian_form_factor_bounds(point, point, sigma_z_ang=sigma)
+            return np.nextafter(upper * weight, np.inf) <= limit
+
+        # A non-ascending grid voids the ordering: keep everything instead.
+        ascending = not np.any(np.diff(energy[candidates]) < 0.0)
+        lo, hi = (0, candidates.size) if ascending else (candidates.size, candidates.size)
+        try:
+            while lo < hi:
+                middle = (lo + hi) // 2
+                if certified(middle):
+                    hi = middle
+                else:
+                    lo = middle + 1
+        except ValueError:
+            keep[:] = True
+        else:
+            keep[candidates[:lo]] = True
     return np.flatnonzero(keep)
 
 
