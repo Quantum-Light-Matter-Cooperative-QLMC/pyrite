@@ -752,10 +752,12 @@ def _hopg_spectrum(groove=None, thickness_ang=2.0e5):
     )
 
 
+@pytest.mark.slow
 def test_spectrum_groove_none_bitwise():
     np.testing.assert_array_equal(_hopg_spectrum(), _hopg_spectrum(groove=None))
 
 
+@pytest.mark.slow
 def test_spectrum_groove_transport_is_deterministic():
     flat = _hopg_spectrum()
     grooved = _hopg_spectrum(groove=SPEC)

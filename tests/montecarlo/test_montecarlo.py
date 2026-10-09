@@ -129,6 +129,7 @@ def test_new_element_transport_parameters(element, expected):
     assert TRANSPORT_ELEMENTS[element] == expected
 
 
+@pytest.mark.slow
 def test_hbn_composition_runs_transport():
     cp = crystal_params("hbn")
 
@@ -589,6 +590,7 @@ def test_run_cases_engine_gpu_errors_when_accelerator_unavailable(monkeypatch):
         runner.run_cases(cases, max_workers=2, progress=False, engine="gpu")
 
 
+@pytest.mark.slow
 def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
     """A real (1-worker) engine="cpu" run: proves _worker_init(force_cpu=True)
     doesn't break the worker, and that mc_spectrum/mc_brem_spectrum's xp/REAL

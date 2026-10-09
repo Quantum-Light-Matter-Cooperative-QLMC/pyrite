@@ -309,6 +309,7 @@ def test_no_profile_declares_a_start_that_differs_per_profile(profile_name):
         assert float(grid["arange"]["start"]) == floored_lattice_start_eV(material, step)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("material", ["hopg", "silicon", "mose2", "wse2"])
 def test_built_cases_start_inside_the_modelled_band_in_every_profile(material):
     """The grid a case actually carries, which is the one that matters."""

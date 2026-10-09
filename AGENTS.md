@@ -33,6 +33,7 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite cli
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite apps
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite packaging
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test path/to/test.py -k test_name
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow   # include slow tier
 PYRITE_ONLINE_TESTS=1 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --cov
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --numba --cov
@@ -63,6 +64,8 @@ If `uv run` cannot write project environment, add
   relevant `*_MODEL` marker or `tables-*-N` tag in that PR.
 - Heavy sweeps/GPU work use `pyrite remote`; never run locally.
 - Add imports with first use. Verify with smallest useful command.
+- New tests >5 s wall or with large peak RSS get `@pytest.mark.slow`
+  (default runs skip them; CI runs them). Check with `--durations=0`.
 
 ## Task dispatch
 

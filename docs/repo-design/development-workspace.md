@@ -28,6 +28,10 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite packaging
 # One focused test module or selection.
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test path/to/test.py -k test_name
 
+# Include the opt-in slow tier (CI always does).
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite core --slow
+
 # Fresh-process CPU imports and README simulation; see the startup reference.
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev startup --cache warm --repeats 3
 
@@ -52,11 +56,13 @@ Use the project runner rather than bare `pytest` or an environment-specific Pyth
 See [CPU startup latency](compute/startup-latency.md) for benchmark cache policies,
 profiling, and the recorded baseline.
 
-Suite ownership uses deterministic filename rules in `pyrite._dev`. A regression test requires the four domain suites to cover every test module exactly once, so a new test cannot silently disappear from focused coverage. The integration suite intentionally overlaps domain suites; it exercises public imports/data, exports, CLI contract, remote, sweep/run, and a headless app path. `pyrite-dev docs` performs the clean offline warnings-as-errors Sphinx build; `verify` includes that documentation gate along with skills, imports, generated repository structure, lint, types, and tests. CI runs the four domain suites once each with adaptive workers (and slow-test timings for core), then uses `verify --skip-tests` for the remaining checks; local `verify` still runs everything.
+Suite ownership uses deterministic filename rules in `pyrite._dev`. A regression test requires the four domain suites to cover every test module exactly once, so a new test cannot silently disappear from focused coverage. The integration suite intentionally overlaps domain suites; it exercises public imports/data, exports, CLI contract, remote, sweep/run, and a headless app path. `pyrite-dev docs` performs the clean offline warnings-as-errors Sphinx build; `verify` includes that documentation gate along with skills, imports, generated repository structure, lint, types, and tests. CI runs the four domain suites once each, including the `slow` tier, with adaptive workers (and slow-test timings for core), then uses `verify --skip-tests` for the remaining checks; local `verify` still runs everything.
 
 The suites read hash-pinned fetched data rather than packaged data (ADR-0014): the EPICS2025 EEDL and EADL files, the derived EPDL photon table, SBETHE's `sdbase/` and catalogue stopping tables, and the ELSEPA and BremsLib tables. Install all of it once per machine with `uv run pyrite tables fetch` (about 100 MB; one code with `pyrite tables fetch CODE`, or `--archive PATH` from a local copy); a test that needs one fails naming the command. Tests never see a developer's `PYRITE_HOME` or config store, so they read the default user-data location, `~/.local/share/pyrite/datasets/` on Linux; fetch without `PYRITE_HOME` set. PyRITE's own archives (EPDL, SBETHE tables, ELSEPA, BremsLib, and the EEDL/EADL mirrors) are public GitHub Release assets, so fetching them needs no GitHub token. CI caches the datasets, `xsgen/tables` and `xsgen/reference-data` directories under a key derived from `src/pyrite/datasets.py`, `src/pyrite/xsgen/fetch.py` (the `sdbase/` pin) and `src/pyrite/data/xsgen/*-tables.json`, and runs `pyrite tables fetch`; they verify a cached copy and need no network on a hit. The `elastic_model="mott"` tests read the synthetic SRD 64-format tables in `tests/data/mott_srd64_synthetic/` (regenerate with `uv run python -m tests.helpers.mott_synthetic`).
 
 `pyrite-dev test`, `test-suite`, and the test step of `verify` use `pytest-xdist` workers by default: `min(CPUs, available memory / 2 GiB, 6)`, since a worker peaks at roughly 1.2–1.8 GiB. Set `PYRITE_TEST_WORKERS=N` to choose the count (`1` runs serially). `test` runs that name test paths remain serial by default; all commands honor explicit `-n`/`--numprocesses` or `-p no:xdist`. Pytest keeps `tmp_path` directories only for failed tests.
+
+Tests marked `slow` are skipped by default. The marker covers tests that take more than 5 s wall time or have a large peak RSS, plus rarely-needed exhaustive cases. The skip reason and a closing summary line say how to enable them. Pass `--slow` to `test`, `test-suite`, or `verify` (before forwarded pytest arguments), or set `PYRITE_SLOW_TESTS=1`. A slow test named by node id (`path::test_name`), or selected by any `-m` expression that names `slow`, runs without the flag. CI sets `PYRITE_SLOW_TESTS=1` on every PR, so physics anchors may carry the marker. Tag a whole heavy module with `pytestmark = pytest.mark.slow`.
 
 ## Coverage
 

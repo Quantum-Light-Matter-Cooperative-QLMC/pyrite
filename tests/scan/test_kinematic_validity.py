@@ -93,6 +93,7 @@ def test_case_lowering_warns_for_thick_silicon():
     assert "kinematic_validity" not in cases[0].to_dict()
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("material", MATERIALS)
 def test_standard_profile_passes_screen(material):
     # Resolve all configured energies/orientations/thicknesses, no transport,

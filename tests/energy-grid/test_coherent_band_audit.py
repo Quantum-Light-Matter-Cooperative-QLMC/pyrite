@@ -283,6 +283,7 @@ def test_signed_pair_initialization_budgets_both_sector_evaluations():
     assert caught.value.certificate is None
 
 
+@pytest.mark.slow
 def test_varying_pair_weight_across_one_keeps_signed_contributions():
     from mpmath import mp
 

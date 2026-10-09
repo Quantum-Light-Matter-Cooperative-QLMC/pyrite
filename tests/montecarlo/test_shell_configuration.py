@@ -145,6 +145,7 @@ def test_eedl_shell_without_sbethe_nl_fails(tmp_path, monkeypatch):
         config.match_eedl_shells("He", 2, shell)
 
 
+@pytest.mark.slow
 def test_fetched_source_joins_every_eedl_element():
     if not config._default_path().is_file():
         pytest.skip("pinned SBETHE reference data have not been fetched")

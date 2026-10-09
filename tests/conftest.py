@@ -48,6 +48,12 @@ from pyrite.console import config as _config  # noqa: E402
 
 _config.CONFIG_PATH = Path(tempfile.gettempdir()) / "pyrite-tests-absent-store" / "config.toml"
 
+# Opt-in ``slow`` tier (#381): pytest finds the hooks by name in this namespace.
+from tests.helpers.slow_marker import (  # noqa: E402, F401
+    pytest_collection_modifyitems,
+    pytest_terminal_summary,
+)
+
 
 @pytest.fixture(autouse=True)
 def _isolate_config_store(monkeypatch, tmp_path):

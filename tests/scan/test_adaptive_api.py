@@ -123,6 +123,7 @@ def adaptive_output(scene, numerics):
     return case, output
 
 
+@pytest.mark.slow
 def test_public_runner_equals_fixed_n_and_records_statistics(adaptive_output):
     case, output = adaptive_output
     statistics = output["adaptive_sampling"]
@@ -205,6 +206,7 @@ def test_simulate_carries_requested_identity_and_realized_provenance(scene, nume
     assert result.case.Ne == numerics.precision.max_electrons
 
 
+@pytest.mark.slow
 def test_checkpoint_components_and_cas_roundtrip_realized_provenance(tmp_path, adaptive_output):
     case, output = adaptive_output
     results = {}
@@ -298,6 +300,7 @@ def test_physical_detector_is_rejected_at_lowering(scene, numerics):
         api.build_case(replace(scene, detector=detector), numerics)
 
 
+@pytest.mark.slow
 def test_mixed_cpu_pool_preserves_fixed_case_and_adaptive_provenance(scene, monkeypatch):
     monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
     precision = pr.Precision(

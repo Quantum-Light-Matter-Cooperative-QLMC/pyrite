@@ -113,6 +113,7 @@ def test_layer_interfaces_close_the_flight_without_turning_the_electron(core):
     assert SegmentEvent.LAYER_BOUNDARY in _kinds(result)
 
 
+@pytest.mark.slow
 def test_groove_facets_are_geometry_events_with_a_vacuum_leg():
     tilt = np.deg2rad(45.0)
     beam, _ = tilted_geometry(np.pi / 2, tilt, np.pi)

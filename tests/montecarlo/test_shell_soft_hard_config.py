@@ -48,6 +48,7 @@ def _case(**kw):
     return case
 
 
+@pytest.mark.slow
 def test_case_schema_and_runner_kwargs():
     legacy = _case(inelastic_model="continuous")
     assert runner._case_inelastic_kwargs(legacy) == {}

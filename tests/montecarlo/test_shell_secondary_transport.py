@@ -78,6 +78,7 @@ def _as_tracks(result):
     return dict(result, electron_id=result["track_id"])
 
 
+@pytest.mark.slow
 def test_batch_progress_covers_every_secondary_generation_without_changing_rows():
     reports = []
     kwargs = dict(Ne=8, per_electron_config=PerElectronTransportConfig(max_batch=2, seg_capacity=8))

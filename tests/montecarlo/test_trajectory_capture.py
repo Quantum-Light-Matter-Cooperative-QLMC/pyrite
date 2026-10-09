@@ -450,6 +450,7 @@ def test_run_without_capture_never_passes_the_option(monkeypatch):
     ]
 
 
+@pytest.mark.slow
 def test_cpu_worker_pool_writes_one_artifact_per_case(tmp_path):
     cases = [_case("a"), _case("b", E0_keV=20.0)]
     capture = TrajectoryCapture(root=str(tmp_path))
@@ -747,6 +748,7 @@ def test_mapping_case_keeps_tuples_numpy_scalars_and_paths(tmp_path):
     _assert_same_tree(artifact.case, case, "case")
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("kind", ["flat", "grooved", "multilayer", "secondaries", "auto-line-grid"])
 def test_spectrum_from_artifact_is_the_live_spectrum(tmp_path, monkeypatch, kind):
     case = _production_case(kind, tmp_path, monkeypatch)

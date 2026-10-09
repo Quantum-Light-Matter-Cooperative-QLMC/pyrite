@@ -147,6 +147,7 @@ def test_tables_close_to_the_transport_stopping_at_every_node():
     assert np.exp(log_e[0]) <= 5.0 and np.exp(log_e[-1]) >= 30.0
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize(
     ("core", "lut"), [("lockstep", True), ("lockstep", False), ("per-electron", True)]
 )

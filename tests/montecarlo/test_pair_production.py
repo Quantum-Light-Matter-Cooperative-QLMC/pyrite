@@ -441,6 +441,7 @@ def _cascade(
     )
 
 
+@pytest.mark.slow
 def test_cascade_launches_pair_electrons_and_closes_energy(monkeypatch):
     from pyrite.montecarlo.transport.events import check_segment_event_contract
     from pyrite.montecarlo.transport.secondaries import LAUNCH_PAIR, secondary_energy_balance

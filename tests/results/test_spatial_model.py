@@ -233,6 +233,7 @@ def test_filter_coverage_and_transmission_image_use_stored_nodes() -> None:
         spatial.transmission_image(3.5)
 
 
+@pytest.mark.slow
 def test_512_square_detector_images_and_selections_stay_bounded() -> None:
     """No request allocates the (512, 512, n_energy) pixel-energy cube."""
     import tracemalloc
