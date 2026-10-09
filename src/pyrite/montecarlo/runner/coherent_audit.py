@@ -31,7 +31,10 @@ class CoherentGridAudit:
     containing relative_tolerance, initial_samples and/or max_evaluations.
     centroid_relative_tolerance enables the first-moment check; integration_bins
     controls its complete-axis partition without changing production samples.
-    It refuses unsupported capture scopes and a failed or exhausted audit.
+    It refuses unsupported capture scopes and a failed or exhausted audit. The
+    audited call evaluates the full inter-electron blend: the runner disables
+    the coherent flat-term omission under a capture, and a capture that still
+    sees it active is refused.
     No default runtime certificate is asserted by this opt-in check.
 
     Validation: coherent-line-grid-windowed-resolution
@@ -58,6 +61,14 @@ class CoherentGridAudit:
 
     def capture(self, st, idx, coefs, good, lines):
         """Use the production setup's actual coherence sector, then capture rows."""
+        if (
+            st.decoherence_active or st.request.physical_electrons is not None
+        ) and st.request.coherent_flat_omission_limit > 0.0:
+            # The audit encloses the full blend; an omitted term is not in it.
+            raise ValueError(
+                "coherent yield audit certifies the full inter-electron blend; set "
+                "coherent_flat_omission_limit=0 to audit a run with bunch offsets"
+            )
         scale = pair_scale(st.request.physical_electrons, st.Ne)
         if scale == 0:
             self.factor_bounds = (0.0, 0.0)

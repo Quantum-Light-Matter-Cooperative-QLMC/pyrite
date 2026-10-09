@@ -470,6 +470,7 @@ def test_runner_requires_centroid_acceptance_before_returning_provenance(monkeyp
             },
             "coherent_emission": True,
             "crystal": "hopg",
+            # This synthetic one-sample provenance fixture has no pair excess.
             "bunch_charge_pc": elementary_charge * 1e12,
         }
     )

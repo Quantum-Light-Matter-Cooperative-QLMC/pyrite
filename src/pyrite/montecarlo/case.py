@@ -103,6 +103,7 @@ _CASE_KEY_ORDER = (
     "E_cut_brem_keV",
     "sinc_cutoff",
     "brem_step_eV",
+    "coherent_flat_omission_limit",
 )
 
 
@@ -200,6 +201,10 @@ class Case(Mapping[str, Any]):
         valid. Shell soft/hard transport needs ``elastic_model``.
     E_cut_lines_keV, E_cut_brem_keV, sinc_cutoff, brem_step_eV
         Legacy/manual cutoff, truncation, and grid controls.
+    coherent_flat_omission_limit
+        Manual coherent-reducer control: the share of a row's per-electron
+        floor the inter-electron blend may omit; absent is the policy default
+        and ``0`` the full blend. Validation: coherent-flat-term-omission
     """
 
     # Producer-required fields. Their declaration order need not match the
@@ -285,6 +290,7 @@ class Case(Mapping[str, Any]):
     brem_step_eV: float | _Absent = _ABSENT
     # Append slots to preserve the positional state of older Case pickles.
     adaptive_precision: dict[str, object] | _Absent = _ABSENT
+    coherent_flat_omission_limit: float | _Absent = _ABSENT
 
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
@@ -396,6 +402,10 @@ class Case(Mapping[str, Any]):
                     "the resonance-local line grid needs line_quadrature='bin-mean': node "
                     "quadrature loses unbounded yield at its spacing joins (#192)"
                 )
+        if self.coherent_flat_omission_limit is not _ABSENT:
+            _positive(
+                "coherent_flat_omission_limit", self.coherent_flat_omission_limit, allow_zero=True
+            )
         if self.line_quadrature is not _ABSENT:
             if self.line_quadrature != "bin-mean":
                 raise ValueError("line_quadrature must be absent or 'bin-mean'")

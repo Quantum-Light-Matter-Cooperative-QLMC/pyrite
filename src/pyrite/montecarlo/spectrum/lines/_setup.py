@@ -49,7 +49,7 @@ SETUP_STATS: dict[str, float] = {}
 
 @dataclass(frozen=True, eq=False)
 class SpectrumRequest:
-    """The 27 inputs of :func:`mc_spectrum`, bound into one value.
+    """The 28 inputs of :func:`mc_spectrum`, bound into one value.
 
     Grouping them is what lets the spectrum phases below be module-level
     functions instead of closures over ``mc_spectrum``'s locals: a phase takes
@@ -95,6 +95,7 @@ class SpectrumRequest:
     temporal: Any = None
     coefficient_capture: Any = None
     physical_electrons: Any = None
+    coherent_flat_omission_limit: Any = 0.0
 
 
 @dataclass
@@ -541,6 +542,9 @@ def _prepare_spectrum(request):
     #
     # Validation: coherent-inter-electron-decoherence
     decoherence_active = False
+    flat_omission_limit = float(request.coherent_flat_omission_limit)
+    if not np.isfinite(flat_omission_limit) or flat_omission_limit < 0.0:
+        raise ValueError("coherent_flat_omission_limit must be finite and nonnegative")
     if coherent:
         seg_r_geom = seg_r
         d_all_geom = seg_t_mid - _matvec3(seg_r, n_hat_d)

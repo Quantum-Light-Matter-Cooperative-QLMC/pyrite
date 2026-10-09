@@ -18,6 +18,7 @@ from ..._line_grid_policy import (
     COHERENT_NYQUIST_OVERSAMPLING,
     COHERENT_WINDOW_BIN_EV,
     DEFAULT_COHERENT_DECOHERENCE_LIMIT,
+    DEFAULT_COHERENT_FLAT_OMISSION_LIMIT,
     DEFAULT_COHERENT_LEAK_LIMIT,
     LOCAL_RESOLUTION_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
@@ -352,6 +353,16 @@ def longitudinal_rms_fs(case):
     if kind is None and case.get("long_shape", "gaussian") == "gaussian":
         return case.get("bunch_length_fs")
     return None
+
+
+def coherent_flat_omission_limit(case):
+    """Share of a coherent row's floor the reducer may omit (#362).
+
+    ``case['coherent_flat_omission_limit']``, else the policy default; ``0``
+    evaluates the full inter-electron blend. Validation: coherent-flat-term-omission
+    """
+    limit = case.get("coherent_flat_omission_limit")
+    return DEFAULT_COHERENT_FLAT_OMISSION_LIMIT if limit is None else float(limit)
 
 
 def _direction_populations(case, segments, n_hat, Ne, abs_layers, groove, start, ceiling, profile):
