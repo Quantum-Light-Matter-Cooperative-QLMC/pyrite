@@ -53,7 +53,7 @@ pyrite-dev = "pyrite._dev:main"
 [project.urls]
 Homepage = "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#readme"
 Repository = "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite"
-Documentation = "https://quantum-light-matter-cooperative-qlmc.github.io/pyrite/"
+Documentation = "https://pyrite.readthedocs.io/en/latest/"
 
 [build-system]
 requires = ["hatchling"]
