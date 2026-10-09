@@ -501,7 +501,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "promising_low_ne",
             "hopg",
-            "7c80f85eb288d9454beee3a0a4345e348d8728f024ccac3ae359690e6c1a83df",
+            "fdbc032615671ce9d0fb570573b06dcabe5d09b994b1545de5622982bed75bc1",
         ),
     ],
 )
@@ -530,7 +530,9 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     any coherent emission now carry the ``coherent_population_model`` marker
     (``physical-distinct-pairs-v1``) for the physical-bunch-charge pair
     weighting. The other pinned profiles use incoherent emission, which omits
-    the marker, so their digests held.
+    the marker, so their digests held. #370 moved it once more: the marker
+    became ``physical-distinct-pairs-v2`` (finite-footprint transverse form
+    factor and tilted face-arrival delay).
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in
