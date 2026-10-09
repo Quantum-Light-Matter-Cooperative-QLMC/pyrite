@@ -3919,3 +3919,135 @@ The ledger text states that there is no a-priori dispersive certificate and that
 5. Window-excluded power is untested empirically: in the ladders, the windows cover the axis.
 
 Verdict: dispersion building blocks `rederived`. The re-scoped claim is honest and matches the code.
+
+## Independent zero-weight-joint derivation (2026-10-09, issue #374)
+
+This scoped derivation was recorded before reading the implementation bodies or
+issue patch. Inputs were the claim, source identities, checks, and
+`coherent_edge_leak` signature/docstring. A targeted ledger excerpt inadvertently
+also exposed historical Notes; this independence-boundary limitation is disclosed
+here. No new dispersion, sampling-convergence, or human sign-off is claimed.
+
+Let $k=\hbar c$, with units eV Angstrom. At a joint of continuous endpoint phase,
+write the frozen-carrier endpoint contribution for each polarization as
+
+$$
+b_J(E)=\frac{a_L}{z_L(E)}-\frac{a_R}{z_R(E)},\qquad
+z_i(E)=E-E_i+i k\lambda_i.
+$$
+
+The endpoint amplitudes include attenuation at the endpoint; signed attenuation
+slopes $\lambda_i$ have inverse-Angstrom units. Both real and imaginary parts of
+$z_i$ have eV units. Thus $b_J$ has amplitude/eV units. With retarded positions
+$\tau_J$ in Angstrom, the endpoint transform is proportional to
+$k\sum_J e^{i E\tau_J/k}b_J(E)$; Parseval normalization converts the
+energy-tail integral to the dimensionless fraction $k\int\|\sum_J
+ e^{i E\tau_J/k}b_J(E)\|^2\,dE/P$.
+
+Combining the two rational terms gives
+
+$$
+b_J(E)=\frac{(a_L-a_R)z_L(E)+a_L[z_R(E)-z_L(E)]}
+ {z_L(E)z_R(E)}.
+$$
+
+For a collinear subdivision of one unchanged frozen-carrier piece,
+$a_L=a_R$, $E_L=E_R$, and $\lambda_L=\lambda_R$. Therefore
+$b_J(E)=0$ identically at every interior joint. If both endpoint amplitudes
+vanish, the same conclusion holds regardless of carriers or slopes. Equal
+amplitudes alone do not imply cancellation when either the carrier or signed
+attenuation slope differs. A zero at one energy likewise does not imply an
+identically zero endpoint function. No amplitude tolerance is licensed by this
+identity: a nonzero joint, however small, must retain its majorant.
+
+For a cluster $C$, Minkowski gives its tail bound
+
+$$
+T_C\leq\left(\sum_{J\in C}\sqrt{T_J}\right)^2.
+$$
+
+An identically zero endpoint term has $T_J=B_J=0$, so deleting it leaves both
+the Fourier field and each fixed cluster's majorant unchanged. Its position has
+no physical support in the endpoint sum. Clustering only the remaining nonzero
+majorants can split a former chain of nearby positions into separated clusters.
+For a retained separation threshold $\delta=Mk/u_{\min}$, rank-separated
+clusters remain at least their rank difference times $\delta$ apart. The stated
+integration-by-parts pair bound and harmonic rank sum therefore apply to the
+new partition with the same coefficients. This operation changes tightness,
+not the normalized physical tail.
+
+In particular, an unsplit piece and its collinear subdivision have the same
+nonzero endpoint terms, endpoint positions, carrier set, and Parseval power.
+After zero-weight-joint removal they must return the same cluster-bound value
+on either side of any edge outside the common resonance band. Splitting does
+not alter the remaining carrier distance $u_{\min}$ in this limiting case.
+If other zero-amplitude pieces introduce unrelated carriers, retaining those
+carriers can still make the bound looser; this scoped identity does not require
+removing them or changing carrier-distance conventions.
+
+Cheap filters: units pass; whole/split and both-zero-amplitude limits pass;
+signed-slope convention passes because the full complex denominators must
+coincide. The limits with unequal carrier, unequal slope, or arbitrarily small
+nonzero amplitude difference forbid deleting those joints.
+
+### Scoped implementation comparison and independent anchors
+
+The patch removes a captured term exactly when every polarization has equal
+left/right amplitude and either the carrier and signed slope match or both
+amplitudes vanish. This matches the independently derived sufficient and
+necessary rational-function cancellation conditions for finite inputs. It
+filters the sorted endpoint positions before recomputing gaps, preserves
+per-electron cluster boundaries, and returns zero for an empty endpoint sum.
+It does not discard near cancellation or a norm that underflows on squaring.
+No coefficient, attenuation law, Parseval power, or separation constant changes.
+
+For an undamped constant-amplitude piece of length $L$, with edge distance $u$
+and $x=Lu/k$, the independently integrated exact one-sided tail fraction is
+
+$$
+Q_{\rm exact}(L,u)=\frac{k}{\pi L}\left[
+ \frac{1-\cos x}{u}+\frac{L}{k}
+ \left(\frac{\pi}{2}-\operatorname{Si}(x)\right)\right].
+$$
+
+When its two endpoints form separate clusters, their independent tail
+majorants and the stated harmonic cross-term allowance give
+
+$$
+Q_{\rm bound}(L,u)=\frac{k}{\pi Lu}
+ \left[1+\frac{4(1+\ln 2)}{M}\right],\qquad M=64.
+$$
+
+These expressions do not call implementation tail helpers. They apply equally
+to the upper and lower side of the carrier. Independent scratch checks use the
+project test runner to compare the implementation directly against this bound,
+its exact tail, and whole/split equality for a 50 Angstrom piece split into four
+at a 5000 eV halo and a 5000 Angstrom piece split into 400 at 50 and 500 eV
+halos. Additional checks retain unequal carriers, unequal signed slopes, and
+nonzero amplitudes of order $10^{-200}$, while a field with both amplitude
+sides zero leaves no endpoint terms.
+
+All seven independent scratch checks passed. For the first two length/halo
+combinations, the exact fraction is $0.00252927419760506$ and the bound is
+$0.00277831636043205$; for the 5000 Angstrom, 500 eV combination they are
+$0.000251093036028446$ and $0.000277831636043205$. Both sides and whole/split
+representations reproduce the independent bound within $2\times10^{-15}$
+relative tolerance. The checks retain all three endpoint terms for unequal
+carrier, unequal slope, and $10^{-200}$ nonzero amplitude cases; the all-zero
+field returns zero without a division by its zero power.
+
+The task owner's paired CPU lockstep, seed-zero, cache-isolated HOPG anchor
+measurement reports unchanged grid size 126021, row point counts 86118 and
+105601, and identical windows. This is attributed owner evidence, not a new
+independent transport run. That fixture has no removable captured jumps
+(57 and 60 before and after), so no speedup is expected there. The independent
+straight-piece checks establish the targeted tightness improvement: the prior
+zero-weight bridge can no longer change the whole/split bound.
+
+Scoped adjudication: `rederived` for exact zero-endpoint removal and the existing
+frozen-carrier clustering proof. Continued `anchored` status is appropriate when
+the maintained regression anchors pass. Material dispersion remains uncertified;
+this review adds no dispersion certificate, sampling certificate, or human
+sign-off. Suggested ledger change: replace the zero-weight-chain qualification
+of the collinear limit by equality after exact cancellation, and record this
+scoped verifier verdict and retained nonzero-joint anchors.

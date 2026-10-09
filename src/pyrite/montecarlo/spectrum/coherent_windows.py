@@ -420,6 +420,15 @@ class _RowJumps:
         tau = np.concatenate([lo, hi[free_end]])
         owner = np.concatenate([electron, electron[free_end]])
         order = np.lexsort((tau, owner))
+        # An identically zero endpoint term must not bridge clusters or count
+        # towards their cross-term allowance. Test the captured values exactly:
+        # equal amplitudes cancel only on equal complex carrier denominators.
+        # Never drop a small nonzero jump because its squared norm underflows.
+        equal_amplitude = np.all(self.left_A == self.right_A, axis=0)
+        equal_denominator = (self.left_E == self.right_E) & (self.left_slope == self.right_slope)
+        zero_amplitude = np.all(self.left_A == 0.0, axis=0)
+        zero_jump = equal_amplitude & (equal_denominator | zero_amplitude)
+        order = order[~zero_jump[order]]
         self.left_A, self.right_A = self.left_A[:, order], self.right_A[:, order]
         self.left_E, self.right_E = self.left_E[order], self.right_E[order]
         self.left_slope = self.left_slope[order]
@@ -502,8 +511,13 @@ def coherent_edge_leak(
     over ``n_C`` clusters. The fraction is ``hbar c`` times the bound
     over the row's Parseval power ``2 pi sum |a|^2 dd <exp(-tau)>``.
 
+    Identically zero captured jumps are removed before clustering, so an
+    exact collinear subdivision has the whole flight's bound at every edge.
+
     Validation: coherent-line-grid-windowed-resolution
     """
+    if jumps.jumps == 0:
+        return 0.0
     terms = jumps.terms(edge_eV, upper)
     sign = 1.0 if upper else -1.0
     u_min = float(np.min(sign * (edge_eV - np.concatenate((jumps.left_E, jumps.right_E)))))

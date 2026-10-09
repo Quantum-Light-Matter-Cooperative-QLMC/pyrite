@@ -133,17 +133,60 @@ def test_single_segment_leak_is_the_incoherent_sinc_tail_bound():
     )
 
 
-def test_a_collinear_split_leaks_exactly_what_the_whole_flight_leaks():
+@pytest.mark.parametrize(
+    "duration,pieces,distance",
+    [(800.0, 2, 50.0), (50.0, 4, 5000.0), (5000.0, 400, 50.0), (5000.0, 400, 500.0)],
+)
+@pytest.mark.parametrize("upper", [False, True])
+def test_a_collinear_split_leaks_exactly_what_the_whole_flight_leaks(
+    duration, pieces, distance, upper
+):
     """Joints of one electron share their phase: equal amplitudes cancel."""
-    whole = _field([800.0], 1000.0, 1.0)
-    split = _field([300.0, 500.0], 1000.0, 1.0)
+    whole = _field([duration], 1000.0, 1.0)
+    split = _field(np.full(pieces, duration / pieces), 1000.0, 1.0)
+    edge = 1000.0 + (distance if upper else -distance)
+    whole_leak = cw.coherent_edge_leak(cw._RowJumps(whole), whole.power, edge, upper=upper)
+    split_leak = cw.coherent_edge_leak(cw._RowJumps(split), split.power, edge, upper=upper)
+    assert split_leak == pytest.approx(whole_leak, rel=1e-12)
     _, whole_summary = _seeds([whole])
     _, split_summary = _seeds([split])
     for key in ("window_eV", "span_all_ang", "span_electron_ang"):
         np.testing.assert_allclose(
             whole_summary["rows"][0][key], split_summary["rows"][0][key], rtol=1e-12
         )
-    assert split_summary["rows"][0]["joints"] == 1
+    assert split_summary["rows"][0]["joints"] == pieces - 1
+
+
+@pytest.mark.parametrize("change", ["amplitude", "carrier", "slope", "subnormal"])
+@pytest.mark.parametrize("polarization", [0, 1])
+def test_nonzero_captured_joints_are_retained(change, polarization):
+    """No tolerance or squared-norm underflow may erase a nonzero jump."""
+    field = _field([25.0, 25.0], 1000.0, 1.0)
+    field = replace(field, amplitude=np.ones((2, 2), dtype=complex))
+    if change == "amplitude":
+        field.amplitude[polarization, 1] = np.nextafter(1.0, 2.0)
+    elif change == "carrier":
+        field.energy_eV[1] = np.nextafter(1000.0, 1001.0)
+    elif change == "slope":
+        field = replace(field, attenuation_slope_ang=np.array([0.0, 1e-15]))
+    else:
+        field.amplitude[:] = np.nextafter(0.0, 1.0)
+        field.amplitude[polarization, 1] *= 2.0
+    jumps = cw._RowJumps(field)
+    assert jumps.joints == 1
+    assert jumps.jumps == 3
+
+
+def test_zero_endpoint_fields_leave_no_tail_clusters():
+    """Both-zero fields cancel even with distinct carriers and slopes."""
+    field = replace(
+        _field([25.0, 25.0], [1000.0, 1001.0], 0.0),
+        attenuation_slope_ang=np.array([0.0, 0.1]),
+    )
+    jumps = cw._RowJumps(field)
+    assert jumps.jumps == 0
+    for upper, edge in ((True, 1500.0), (False, 500.0)):
+        assert cw.coherent_edge_leak(jumps, field.power, edge, upper=upper) == 0.0
 
 
 def test_default_coherent_step_resolves_a_straight_track_half_maximum():
@@ -952,6 +995,22 @@ def test_coherent_cache_tracks_the_frozen_coupling_weight(tiny):
         _, changed = _resolve({**case, "B_ang2": 1.0}, ladder, policy)
     assert first["cache"] == changed["cache"] == "miss"
     assert first["cache_key"] != changed["cache_key"]
+
+
+def test_zero_jump_filter_does_not_reuse_the_previous_coherent_cache(tiny, monkeypatch):
+    from pyrite.montecarlo.runner import line_grid
+
+    case, ladder = tiny
+    policy = _policy(case, windows=True)
+    with monkeypatch.context() as previous:
+        previous.setattr(line_grid, "COHERENT_WINDOW_REVISION", 8)
+        _, old = _resolve(case, ladder, policy)
+    grid, current = _resolve(case, ladder, policy)
+    assert current["cache"] == "miss"
+    assert current["cache_key"] != old["cache_key"]
+    warm_grid, warm = _resolve(case, ladder, policy)
+    assert warm["cache"] == "hit"
+    np.testing.assert_array_equal(warm_grid, grid)
 
 
 def test_coherent_refinement_does_not_reuse_the_four_node_cache(tiny, monkeypatch):
