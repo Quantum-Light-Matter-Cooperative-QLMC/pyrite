@@ -204,7 +204,16 @@ include = [
 ]
 
 [tool.ty.analysis]
-allowed-unresolved-imports = ["cupy*", "cupy*.*"]
+allowed-unresolved-imports = [
+    "cupy*",
+    "cupy*.*",
+    # Optional `trajectory-viewer` extra; CI type-checks without it.
+    "pyvista*",
+    "trame*",
+    "trame.**",
+    "vtkmodules*",
+    "vtkmodules.**",
+]
 
 [tool.ty.overrides.rules]
 unresolved-attribute = "ignore"
@@ -220,6 +229,13 @@ include = [
 invalid-argument-type = "ignore"
 invalid-return-type = "ignore"
 no-matching-overload = "ignore"
+
+# PyVista typing suppressions apply only when the optional extra is installed.
+[[tool.ty.overrides]]
+include = ["src/pyrite/trajectory_viewer/**/*.py"]
+
+[tool.ty.overrides.rules]
+unused-ignore-comment = "ignore"
 
 [tool.importlinter]
 root_packages = ["pyrite"]
