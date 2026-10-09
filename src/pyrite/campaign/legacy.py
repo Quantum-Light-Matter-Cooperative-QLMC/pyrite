@@ -4,10 +4,7 @@ Permanent infrastructure, not a shim awaiting removal. `adapt_configured_sweep`
 is what `pyrite scan` and `pyrite material blaze` run through on every
 invocation, via `api.build_configured_cases`. The `*_from_legacy` helpers keep
 that name because their *input* is the older representation; nothing about the
-callers is legacy.
-
-The one retiring thing in this area is the public door,
-`Sweep.from_legacy()`, which is scheduled in `campaign.model`.
+callers is legacy. The public `Sweep.from_legacy()` door was removed in 0.5.0.
 """
 
 from dataclasses import replace

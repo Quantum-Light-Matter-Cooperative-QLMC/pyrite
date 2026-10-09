@@ -64,95 +64,15 @@ def _public_export_entry(
 
 
 #: Keyed by the full compatibility module path used in an import.
-MODULE_DEPRECATIONS: dict[str, ModuleDeprecation] = {
-    entry.module: entry
-    for entry in (
-        _entry("pyrite.analyze", "pyrite.apps.analyze"),
-        _entry("pyrite.archive", "pyrite.checkpoints.archive"),
-        _entry("pyrite.beam_metrics", "pyrite.campaign.beam_metrics"),
-        _entry("pyrite.blaze", "pyrite.runs.blaze"),
-        _entry("pyrite.campaign_lock", "pyrite.checkpoints.campaign_lock"),
-        _entry("pyrite.check", "pyrite.apps.check"),
-        _entry("pyrite.check_config", "pyrite.cli.commands.check_config"),
-        _entry(
-            "pyrite.checkpoint_cleanup",
-            "pyrite.checkpoints.checkpoint_cleanup",
-        ),
-        _entry("pyrite.config", "pyrite.campaign.config"),
-        _entry("pyrite.export", "pyrite.cli.commands.export"),
-        _entry("pyrite.longitudinal", "pyrite.campaign.longitudinal"),
-        _entry(
-            "pyrite.performance_analysis",
-            "pyrite.perf.performance_analysis",
-        ),
-        _entry(
-            "pyrite.performance_profile",
-            "pyrite.perf.performance_profile",
-        ),
-        _entry("pyrite.plots.altair_detectors", "pyrite.plots.altair.detectors"),
-        _entry("pyrite.plots.altair_spectra", "pyrite.plots.altair.spectra"),
-        _entry("pyrite.plots.altair_sweeps", "pyrite.plots.altair.sweeps"),
-        _entry(
-            "pyrite.plots.altair_trajectories",
-            "pyrite.plots.altair.trajectories",
-        ),
-        _entry(
-            "pyrite.plots.crystal_lattice",
-            "pyrite.plots.plotly.crystal_lattice",
-        ),
-        _entry("pyrite.plots.detectors", "pyrite.plots.mpl.detectors"),
-        _entry("pyrite.plots.interactive", "pyrite.plots.mpl.interactive"),
-        _entry(
-            "pyrite.plots.plotly_trajectories",
-            "pyrite.plots.plotly.trajectories",
-        ),
-        _entry(
-            "pyrite.plots.render_trajectories",
-            "pyrite.plots.plotly.render",
-        ),
-        _entry("pyrite.plots.spectra", "pyrite.plots.mpl.spectra"),
-        _entry("pyrite.plots.sweeps", "pyrite.plots.mpl.sweeps"),
-        _entry("pyrite.plots.trajectories", "pyrite.plots.mpl.trajectories"),
-        _entry("pyrite.profiles", "pyrite.campaign.profiles"),
-        _entry("pyrite.recompute", "pyrite.checkpoints.recompute"),
-        _entry(
-            "pyrite.recompute_defaults",
-            "pyrite.checkpoints.recompute_defaults",
-        ),
-        _entry("pyrite.run", "pyrite.runs.run"),
-        _entry("pyrite.scan", "pyrite.runs.scan"),
-        _entry("pyrite.slim", "pyrite.checkpoints.slim"),
-        _entry("pyrite.sweep", "pyrite.campaign.sweep"),
-        _entry("pyrite.transverse", "pyrite.montecarlo.transverse"),
-        _entry(
-            "pyrite.validation_background",
-            "pyrite.validation.validation_background",
-        ),
-        _entry(
-            "pyrite.validation_oracles",
-            "pyrite.validation.validation_oracles",
-        ),
-        _entry("pyrite.viewer", "pyrite.apps.viewer"),
-    )
-}
+#:
+#: Empty since 0.5.0, when the flat re-export cohort was removed.
+MODULE_DEPRECATIONS: dict[str, ModuleDeprecation] = {}
 
 
 #: Keyed by the compatibility package and exported attribute.
-PUBLIC_EXPORT_DEPRECATIONS: dict[tuple[str, str], PublicExportDeprecation] = {
-    (entry.module, entry.name): entry
-    for entry in (
-        _public_export_entry(
-            "pyrite.montecarlo",
-            "convolve_detector",
-            "pyrite.detectors.convolve_detector",
-        ),
-        _public_export_entry(
-            "pyrite.montecarlo",
-            "detector_efficiency",
-            "pyrite.detectors.detector_efficiency",
-        ),
-    )
-}
+#:
+#: Empty since 0.5.0, when the relocated detector-response exports were removed.
+PUBLIC_EXPORT_DEPRECATIONS: dict[tuple[str, str], PublicExportDeprecation] = {}
 
 
 def warn_module_deprecation(module: str) -> None:

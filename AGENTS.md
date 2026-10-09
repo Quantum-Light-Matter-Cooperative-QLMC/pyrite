@@ -58,6 +58,9 @@ If `uv run` cannot write project environment, add
   work.
 - CLI changes preserve documented command/help/output/exit contracts and
   regenerate `docs/repo-design/cli/cli-reference.md`.
+- Never bump the version outside a release PR (`docs/repo-design/releasing.md`,
+  `release` skill). A PR that changes default numerical output bumps the
+  relevant `*_MODEL` marker or `tables-*-N` tag in that PR.
 - Heavy sweeps/GPU work use `pyrite remote`; never run locally.
 - Add imports with first use. Verify with smallest useful command.
 

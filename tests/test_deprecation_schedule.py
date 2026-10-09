@@ -17,8 +17,7 @@ or being conspicuously absent.
 import pytest
 
 from pyrite import __version__
-from pyrite._module_deprecations import MODULE_DEPRECATIONS
-from pyrite.campaign.model import FROM_LEGACY_REMOVE_IN
+from pyrite._module_deprecations import MODULE_DEPRECATIONS, PUBLIC_EXPORT_DEPRECATIONS
 from pyrite.cli._deprecations import DEPRECATED_FLAGS, DEPRECATIONS, IMPLICIT_DEFAULTS
 
 
@@ -83,9 +82,25 @@ def test_no_compatibility_module_path_is_past_its_removal_target() -> None:
     )
 
 
-def test_the_public_d7_bridge_is_not_past_its_removal_target() -> None:
-    """`Sweep.from_legacy()` is scheduled by a constant, not by a registry."""
-    assert not _overdue({"Sweep.from_legacy": FROM_LEGACY_REMOVE_IN})
+def test_no_relocated_public_export_is_past_its_removal_target() -> None:
+    overdue = _overdue(
+        {
+            f"{mod}.{name}": entry.remove_in
+            for (mod, name), entry in PUBLIC_EXPORT_DEPRECATIONS.items()
+        }
+    )
+
+    assert not overdue, (
+        f"pyrite-mc {__version__} still ships {len(overdue)} relocated export(s) "
+        f"at or past their removal target: {sorted(overdue)}."
+    )
+
+
+def test_no_scheduled_removal_is_due_at_the_shipping_version() -> None:
+    """The release gate and the shipping version agree: nothing due is left."""
+    from pyrite.devtools.release import due_removals
+
+    assert not due_removals(__version__)
 
 
 @pytest.mark.parametrize(
@@ -94,7 +109,7 @@ def test_the_public_d7_bridge_is_not_past_its_removal_target() -> None:
         pytest.param([entry.remove_in for entry in DEPRECATIONS.values()], id="commands"),
         pytest.param([entry.remove_in for entry in DEPRECATED_FLAGS.values()], id="options"),
         pytest.param([entry.remove_in for entry in MODULE_DEPRECATIONS.values()], id="modules"),
-        pytest.param([FROM_LEGACY_REMOVE_IN], id="d7-bridge"),
+        pytest.param([e.remove_in for e in PUBLIC_EXPORT_DEPRECATIONS.values()], id="exports"),
     ],
 )
 def test_every_removal_target_is_a_parseable_version(targets: list[str]) -> None:
@@ -110,15 +125,4 @@ def test_the_comparison_actually_fails_on_an_overdue_row() -> None:
     """
     assert _overdue({"retired-in-0.3.0": "0.3.0"}) == {"retired-in-0.3.0": "0.3.0"}
     assert _overdue({"older": "0.1.0"}) == {"older": "0.1.0"}
-    assert _overdue({"future": "0.5.0"}) == {}
-
-
-def test_legacy_table_tier_is_not_past_its_removal_target() -> None:
-    """ADR-0014: the pre-workspace xsgen table tier warns for one release."""
-    from pyrite.xsgen.store import LEGACY_TABLE_TIER_REMOVE_IN
-
-    assert not _overdue({"xsgen legacy table tier": LEGACY_TABLE_TIER_REMOVE_IN}), (
-        f"pyrite-mc {__version__} still searches the legacy "
-        "~/.local/share/pyrite/xsgen/tables tier; remove it from "
-        "pyrite.xsgen.store.search_dirs together with `pyrite tables migrate`."
-    )
+    assert _overdue({"future": "0.6.0"}) == {}

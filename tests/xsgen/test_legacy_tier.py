@@ -1,7 +1,6 @@
-"""The deprecated pre-workspace table tier: warning, migration, removal target."""
+"""The pre-workspace table directory: no longer searched (0.5.0), still migratable."""
 
 import json
-import warnings
 
 import numpy as np
 import pytest
@@ -20,7 +19,6 @@ def workspace(tmp_path, monkeypatch):
     monkeypatch.setattr("pyrite.paths.user_data_path", lambda *a, **k: tmp_path / "data")
     monkeypatch.setattr("pyrite.xsgen.store.data_dir", lambda: tmp_path / "packaged")
     monkeypatch.setenv("PYRITE_HOME", str(tmp_path / "ws"))
-    monkeypatch.setattr(store, "_WARNED_LEGACY", set())
     return tmp_path
 
 
@@ -39,16 +37,11 @@ def test_legacy_tier_is_only_distinct_with_a_workspace(tmp_path, monkeypatch):
     assert report.active is False and report.copied == ()
 
 
-def test_resolving_from_the_legacy_tier_warns_once_naming_the_fix(workspace):
+def test_legacy_directory_is_no_longer_searched(workspace):
     key, _ = _legacy_table()
 
-    with pytest.warns(FutureWarning, match=r"pyrite tables migrate.*") as caught:
-        found = store.resolve(key)
-    assert found is not None and found.tier == "legacy"
-    assert store.LEGACY_TABLE_TIER_REMOVE_IN in str(caught[0].message)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        assert store.resolve(key) is not None  # once per process
+    assert store.legacy_table_dir() not in store.search_dirs()
+    assert store.resolve(key) is None
 
 
 def test_migrate_copies_missing_pairs_and_never_touches_the_source(workspace):

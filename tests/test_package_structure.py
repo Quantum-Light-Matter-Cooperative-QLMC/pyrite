@@ -4,36 +4,7 @@ from importlib import import_module, util
 from importlib.metadata import distribution
 from pathlib import Path
 
-import pytest
-
 import pyrite
-
-_COMPAT_MODULES = {
-    "analyze": "apps.analyze",
-    "archive": "checkpoints.archive",
-    "beam_metrics": "campaign.beam_metrics",
-    "blaze": "runs.blaze",
-    "campaign_lock": "checkpoints.campaign_lock",
-    "check": "apps.check",
-    "check_config": "cli.commands.check_config",
-    "checkpoint_cleanup": "checkpoints.checkpoint_cleanup",
-    "config": "campaign.config",
-    "export": "cli.commands.export",
-    "longitudinal": "campaign.longitudinal",
-    "performance_analysis": "perf.performance_analysis",
-    "performance_profile": "perf.performance_profile",
-    "profiles": "campaign.profiles",
-    "recompute": "checkpoints.recompute",
-    "recompute_defaults": "checkpoints.recompute_defaults",
-    "run": "runs.run",
-    "scan": "runs.scan",
-    "slim": "checkpoints.slim",
-    "sweep": "campaign.sweep",
-    "transverse": "montecarlo.transverse",
-    "validation_background": "validation.validation_background",
-    "validation_oracles": "validation.validation_oracles",
-    "viewer": "apps.viewer",
-}
 
 
 def test_distribution_identity_exposes_only_canonical_namespace() -> None:
@@ -80,24 +51,6 @@ def test_root_exports_stay_frozen() -> None:
         "Sweep",
         "simulate",
     ]
-
-
-@pytest.mark.parametrize(("legacy_name", "canonical_name"), _COMPAT_MODULES.items())
-def test_root_module_reexports(legacy_name: str, canonical_name: str) -> None:
-    legacy = import_module(f"pyrite.{legacy_name}")
-    canonical = import_module(f"pyrite.{canonical_name}")
-    exports = getattr(
-        canonical,
-        "__all__",
-        [name for name in vars(canonical) if not name.startswith("_")],
-    )
-    stable_exports = [name for name in exports if callable(getattr(canonical, name))]
-
-    assert stable_exports
-    assert all(getattr(legacy, name) is getattr(canonical, name) for name in stable_exports)
-    # The canonical module must live in the package its dotted path names, so a
-    # shim cannot quietly start pointing somewhere else in the tree.
-    assert Path(canonical.__file__).parent.name == canonical_name.rsplit(".", 2)[-2]
 
 
 def test_remote_facade_is_the_public_package() -> None:

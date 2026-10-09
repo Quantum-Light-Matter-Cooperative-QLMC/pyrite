@@ -29,6 +29,7 @@ Commands:
     startup    benchmark fresh-process CPU imports and the README simulation
     performance list, analyze, or delete compute-performance artifacts
     energy-grid maintain derived detector energy-grid artifacts
+    release    bump version, gate on due deprecation removals, print release notes
     sync-skills mirror .agents/skills into .claude/skills
     check-skills validate the canonical skills and exact mirror
     verify     check skills, docs, imports, generated structure, lint, types, and tests
@@ -573,6 +574,35 @@ def cmd_cli_deprecations(args: argparse.Namespace) -> None:
         raise SystemExit(status)
 
 
+def cmd_release(args: argparse.Namespace) -> None:
+    from pyrite import __version__ as old
+    from pyrite.devtools import release
+
+    try:
+        if release.parse_version(args.version) <= release.parse_version(old):
+            raise release.ReleaseError(f"target {args.version} must be greater than {old}")
+        due = release.due_removals(args.version)
+        if due:
+            rows = "\n".join(f"  {label}: remove in {target}" for label, target in due.items())
+            raise release.ReleaseError(
+                f"{len(due)} deprecation removal(s) due at or before {args.version} remain:\n{rows}"
+            )
+        base = release.notes_base(ROOT, args.base)
+        notes = release.render_notes(args.version, base, release.collect_changes(ROOT, base))
+        if not args.check:
+            release.bump_versions(ROOT, args.version)
+            # uv.lock records the project version; CI syncs with --locked.
+            subprocess.run(["uv", "lock"], cwd=ROOT, check=True)
+            # Generated docs embed __version__, so regenerate in fresh processes.
+            for command in ("cli-reference", "cli-deprecations"):
+                run("-m", "pyrite._dev", command, "--write")
+    except release.ReleaseError as exc:
+        raise SystemExit(f"release: {exc}") from exc
+    if args.notes_file:
+        Path(args.notes_file).write_text(notes, encoding="utf-8")
+    print(notes, end="")
+
+
 def cmd_cli_reference(args: argparse.Namespace) -> None:
     from pyrite.devtools.cli_reference import main
 
@@ -803,6 +833,16 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     cli_deprecation_mode.add_argument("--write", action="store_true")
     cli_deprecation_mode.add_argument("--check", action="store_true")
     cli_deprecations.set_defaults(func=cmd_cli_deprecations)
+    release_cmd = sub.add_parser(
+        "release", help="bump version, regenerate docs, print release notes (see releasing.md)"
+    )
+    release_cmd.add_argument("version", help="target version X.Y.Z")
+    release_cmd.add_argument("--base", help="notes base rev (default: last v* tag/release commit)")
+    release_cmd.add_argument("--notes-file", help="also write the release notes to this path")
+    release_cmd.add_argument(
+        "--check", action="store_true", help="validate and print notes without editing files"
+    )
+    release_cmd.set_defaults(func=cmd_release)
     cli_reference = sub.add_parser("cli-reference")
     cli_reference_mode = cli_reference.add_mutually_exclusive_group()
     cli_reference_mode.add_argument("--write", action="store_true")

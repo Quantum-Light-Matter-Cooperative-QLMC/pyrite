@@ -2,9 +2,12 @@
 
 import hashlib
 import json
+import subprocess
 from collections.abc import Mapping
 from dataclasses import fields, is_dataclass
+from functools import cache
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -134,12 +137,44 @@ def _package_version(name: str) -> str | None:
         return None
 
 
+@cache
+def source_git_state() -> tuple[str | None, bool | None]:
+    """Return ``(git_sha, git_dirty)`` of the source checkout, or ``(None, None)``.
+
+    Only a checkout whose top level is this package's own repository counts, so
+    an installed wheel sitting inside some unrelated project's git tree reports
+    nulls instead of that project's revision. Cached per process: the code does
+    not change under a running interpreter.
+    """
+    root = Path(__file__).resolve().parents[2]
+
+    def git(*args: str) -> str | None:
+        try:
+            result = subprocess.run(
+                ["git", *args], cwd=root, capture_output=True, text=True, timeout=30
+            )
+        except OSError, subprocess.SubprocessError:
+            return None
+        return result.stdout.strip() if result.returncode == 0 else None
+
+    top = git("rev-parse", "--show-toplevel")
+    if top is None or Path(top).resolve() != root:
+        return None, None
+    sha = git("rev-parse", "HEAD")
+    status = git("status", "--porcelain", "--untracked-files=no")
+    if sha is None or status is None:
+        return None, None
+    return sha, bool(status)
+
+
 def run_provenance(case: Case | Mapping[str, Any], xsgen_tables: Mapping[str, str] | None):
     """Software, backend, and physics-model provenance of one transport case.
 
     Shared by :func:`simulate` results and persisted observations, so every
-    producer records the same keys.
+    producer records the same keys. ``git_sha``/``git_dirty`` identify the
+    source checkout and are ``None`` outside one (for example an installed wheel).
     """
+    git_sha, git_dirty = source_git_state()
     return {
         "kinematic_validity": case_kinematic_validity(case),
         "xsgen_tables": xsgen_tables,
@@ -149,6 +184,8 @@ def run_provenance(case: Case | Mapping[str, Any], xsgen_tables: Mapping[str, st
         "bremsstrahlung_model": case_bremsstrahlung_marker(case),
         "backend": BACKEND.name,
         "device": BACKEND.device,
+        "git_sha": git_sha,
+        "git_dirty": git_dirty,
         "versions": {
             "pyrite": __version__,
             "numpy": np.__version__,

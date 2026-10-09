@@ -72,6 +72,8 @@ _PROVENANCE_KEYS = (
     "versions",
     "backend",
     "device",
+    "git_sha",
+    "git_dirty",
     "stopping_model",
     "characteristic_model",
     "attenuation_model",

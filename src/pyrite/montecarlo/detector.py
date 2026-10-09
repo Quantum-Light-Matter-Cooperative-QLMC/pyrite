@@ -115,20 +115,3 @@ def mosaic_psi_rad(case, E_pk_eV):
         if best is None or d < best[0]:
             best = (d, psi)
     return None if best is None else best[1]
-
-
-_DEPRECATED_RESPONSE_EXPORTS = frozenset({"convolve_detector", "detector_efficiency"})
-
-
-def __getattr__(name: str):
-    """Lazily resolve detector-owned response operators on their old path."""
-    if name not in _DEPRECATED_RESPONSE_EXPORTS:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from importlib import import_module
-
-    from .._module_deprecations import warn_public_export_deprecation
-
-    value = getattr(import_module("pyrite.detectors.response"), name)
-    warn_public_export_deprecation("pyrite.montecarlo", name)
-    globals()[name] = value
-    return value

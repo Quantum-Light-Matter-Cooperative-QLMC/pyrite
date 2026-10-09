@@ -138,3 +138,31 @@ def test_build_sweep_cases_remains_public_from_api():
     from pyrite.api import build_sweep_cases
 
     assert callable(build_sweep_cases)
+
+
+def test_run_provenance_records_git_state_in_repo_and_null_outside(monkeypatch, tmp_path) -> None:
+    from pyrite import api
+
+    case = {}
+    monkeypatch.setattr(api, "case_kinematic_validity", lambda _case: {})
+    monkeypatch.setattr(api, "case_bremsstrahlung_marker", lambda _case: "x")
+
+    api.source_git_state.cache_clear()
+    sha, dirty = api.source_git_state()
+    assert sha is not None and len(sha) == 40
+    assert isinstance(dirty, bool)
+    provenance = api.run_provenance(case, None)
+    assert (provenance["git_sha"], provenance["git_dirty"]) == (sha, dirty)
+
+    # Not a git checkout: the package root moved to an empty directory.
+    fake = tmp_path / "src" / "pyrite"
+    fake.mkdir(parents=True)
+    monkeypatch.setattr(api, "__file__", str(fake / "api.py"))
+    api.source_git_state.cache_clear()
+    try:
+        provenance = api.run_provenance(case, None)
+        assert provenance["git_sha"] is None
+        assert provenance["git_dirty"] is None
+    finally:
+        monkeypatch.undo()
+        api.source_git_state.cache_clear()

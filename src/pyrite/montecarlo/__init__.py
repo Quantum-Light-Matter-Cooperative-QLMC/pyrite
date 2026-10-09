@@ -220,12 +220,10 @@ __all__ = [
     "mc_brem_spectrum",
     "load_external_brem",
     # detector
-    "detector_efficiency",
     "eds_fwhm_eV",
     "aperture_fwhm_eV",
     "mosaic_fwhm_eV",
     "mosaic_psi_rad",
-    "convolve_detector",
     # runner
     "run_case",
     "_transport_case",
@@ -237,17 +235,9 @@ __all__ = [
 ]
 
 
-_DEPRECATED_RESPONSE_EXPORTS = frozenset({"convolve_detector", "detector_efficiency"})
-
-
 def __getattr__(name: str) -> Any:
     """Resolve the historical Monte Carlo exports only when requested."""
-    if name in _DEPRECATED_RESPONSE_EXPORTS:
-        from .._module_deprecations import warn_public_export_deprecation
-
-        value = getattr(import_module("pyrite.detectors.response"), name)
-        warn_public_export_deprecation(__name__, name)
-    elif name in _EXPORT_MODULES:
+    if name in _EXPORT_MODULES:
         value = getattr(import_module(_EXPORT_MODULES[name], __name__), name)
     else:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

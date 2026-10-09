@@ -10,6 +10,7 @@ It is intended primarily for contributors and maintainers. User-facing instructi
 
 development-workspace
 documentation
+releasing
 ../validation/formatting-style
 configuration-resolution
 materials-catalog-schema
