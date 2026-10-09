@@ -1,0 +1,1036 @@
+{
+  "date": "2026-10-05",
+  "environment": {
+    "os": "Ubuntu 26.04 / Linux x86_64",
+    "cpu_threads": 16,
+    "ram_gib": 30.5,
+    "renderer": "Mesa llvmpipe (software; LIBGL_ALWAYS_SOFTWARE=1)",
+    "python": "3.14",
+    "browser": "Google Chrome 154.0.8037.97 headless via Playwright 1.63.0",
+    "versions": {
+      "vtk": "9.7.1",
+      "pyvista": "0.49.0",
+      "trame": "3.13.2",
+      "trame-vtk": "2.11.17",
+      "trame-vuetify": "3.3.0",
+      "trame-server": "3.15.0",
+      "trame-client": "3.13.6"
+    }
+  },
+  "notes": [
+    "One fresh server process and browser session per input; single trial, not repeated.",
+    "Client and server on one host over loopback: no real network latency or bandwidth limit.",
+    "ui_settled_s: input to updated DOM state; first_new_image_s: input to a new server image blob in the page.",
+    "bytes/frames: all server->client websocket frames after the input until settled + 0.5 s (state and images).",
+    "server_tree_rss_mib: launch process tree VmRSS when sampled; browser memory and VRAM not measured.",
+    "Synthetic inputs replicate one real shower with distinct identities (checks/saved_trajectory_viewer_probe.py --replicate); they repeat geometry and overdraw.",
+    "1.01M input launched with --max-segments 2000000 (default admission refuses it).",
+    "Picked tracks were primaries; parent navigation from a secondary is covered by tests/montecarlo/test_saved_viewer.py.",
+    "Follow-up regressions below verify secondary-parent navigation, decoded export content/provenance, Clear, and filesystem export failure without a download. They are functional checks, not additional workload trials."
+  ],
+  "command": "LIBGL_ALWAYS_SOFTWARE=1 uv run --extra trajectory-viewer --with playwright python checks/saved_trajectory_browser_probe.py CAPTURE.h5 --output trial.json [--max-segments 2000000]",
+  "runs": {
+    "20-shell-soft-hard": {
+      "capture": "20-shell-soft-hard.h5",
+      "client": "headless Chrome via Playwright on the same host (loopback)",
+      "steps": {
+        "energy_half": {
+          "ui_settled_s": 0.19077767799990397,
+          "first_new_image_s": 0.1938653430006525,
+          "bytes_received": 241934,
+          "frames_received": 12,
+          "displayed_cells": 1478,
+          "server_tree_rss_mib": 746.21484375
+        },
+        "energy_zero": {
+          "ui_settled_s": 0.26574386399988725,
+          "first_new_image_s": 0.7695357439997679,
+          "bytes_received": 84496,
+          "frames_received": 10,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 746.22265625
+        },
+        "energy_keyboard": {
+          "ui_settled_s": 0.18766453499938507,
+          "first_new_image_s": 0.6827399989997502,
+          "bytes_received": 80635,
+          "frames_received": 4,
+          "displayed_cells": 1971,
+          "server_tree_rss_mib": 746.22265625
+        },
+        "energy_keyboard_home": {
+          "ui_settled_s": 0.052956973000618746,
+          "first_new_image_s": 0.5644520440000633,
+          "bytes_received": 84034,
+          "frames_received": 4,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 746.2265625
+        },
+        "generation_zero": {
+          "ui_settled_s": 0.1859319549994325,
+          "first_new_image_s": 0.6807969579995188,
+          "bytes_received": 83927,
+          "frames_received": 5,
+          "displayed_cells": 2443,
+          "server_tree_rss_mib": 746.2578125
+        },
+        "generation_max": {
+          "ui_settled_s": 0.22409833199981222,
+          "first_new_image_s": 0.2282913090002694,
+          "bytes_received": 67217,
+          "frames_received": 9,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 746.26171875
+        },
+        "time_small": {
+          "ui_settled_s": 0.1844205659999716,
+          "first_new_image_s": 0.262594595000337,
+          "bytes_received": 24058,
+          "frames_received": 11,
+          "displayed_cells": 33,
+          "server_tree_rss_mib": 746.28515625
+        },
+        "time_max": {
+          "ui_settled_s": 0.17419935100042494,
+          "first_new_image_s": 0.2435102489998826,
+          "bytes_received": 34173,
+          "frames_received": 11,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 746.2890625
+        },
+        "clip_on": {
+          "ui_settled_s": 0.061368515999674855,
+          "first_new_image_s": 0.1518777510000291,
+          "bytes_received": 26186,
+          "frames_received": 3,
+          "displayed_cells": 603,
+          "server_tree_rss_mib": 746.734375
+        },
+        "clip_move": {
+          "ui_settled_s": 0.17494148300011148,
+          "first_new_image_s": 0.26449084599971684,
+          "bytes_received": 24325,
+          "frames_received": 11,
+          "displayed_cells": 96,
+          "server_tree_rss_mib": 746.734375
+        },
+        "clip_off": {
+          "ui_settled_s": 0.05289978099972359,
+          "first_new_image_s": 0.14757859200017265,
+          "bytes_received": 33557,
+          "frames_received": 3,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 746.73828125
+        },
+        "reset_camera": {
+          "ui_settled_s": 0.01813093700002355,
+          "first_new_image_s": 0.5493366139999125,
+          "bytes_received": 83947,
+          "frames_received": 2,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 747.12890625
+        },
+        "scale_instrument": {
+          "ui_settled_s": 0.5453675369999473,
+          "first_new_image_s": 0.5473499250001623,
+          "bytes_received": 85325,
+          "frames_received": 4,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 747.1796875
+        },
+        "scale_closeup": {
+          "ui_settled_s": 0.5339815140005157,
+          "first_new_image_s": 0.5406964440007869,
+          "bytes_received": 168347,
+          "frames_received": 4,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 747.18359375
+        }
+      },
+      "failures": [],
+      "startup": {
+        "launch_to_page_s": 2.017005476000122,
+        "page_to_first_image_s": 0.6041777199998251,
+        "launch_to_first_image_s": 2.621183195999947,
+        "server_tree_rss_mib": 711.20703125
+      },
+      "pick": {
+        "search_s": 0.396958602000268,
+        "segment_id": 2394,
+        "track_id": 7,
+        "parent_id": -1,
+        "parent_status": "Primary track: no parent."
+      },
+      "orbit": {
+        "frames_received": 18,
+        "bytes_received": 287940
+      },
+      "downloads": {
+        "screenshot": {
+          "seconds": 0.11556412600020849,
+          "bytes": 49565,
+          "size": [
+            1200,
+            916
+          ],
+          "frames": 1
+        },
+        "orbit_gif": {
+          "seconds": 2.8042609390004145,
+          "bytes": 727161,
+          "size": [
+            1200,
+            916
+          ],
+          "frames": 30
+        }
+      },
+      "browser_errors": [],
+      "input": {
+        "description": "real 20 keV shell-soft-hard",
+        "sha256": "1ee0905809bdc1d952e58ba07e91e6042fdcd384dd9181f366cd2cdfcb48edce",
+        "bytes": 592990
+      }
+    },
+    "200-shell-soft-hard": {
+      "capture": "200-shell-soft-hard.h5",
+      "client": "headless Chrome via Playwright on the same host (loopback)",
+      "steps": {
+        "energy_half": {
+          "ui_settled_s": 0.19590162500026054,
+          "first_new_image_s": 0.198683436000465,
+          "bytes_received": 226730,
+          "frames_received": 12,
+          "displayed_cells": 11673,
+          "server_tree_rss_mib": 765.96875
+        },
+        "energy_zero": {
+          "ui_settled_s": 0.20425163700019766,
+          "first_new_image_s": 0.7014467119997789,
+          "bytes_received": 79592,
+          "frames_received": 10,
+          "displayed_cells": 29756,
+          "server_tree_rss_mib": 765.97265625
+        },
+        "energy_keyboard": {
+          "ui_settled_s": 0.17415027700008068,
+          "first_new_image_s": 0.6750951509993683,
+          "bytes_received": 75737,
+          "frames_received": 4,
+          "displayed_cells": 16126,
+          "server_tree_rss_mib": 765.98046875
+        },
+        "energy_keyboard_home": {
+          "ui_settled_s": 0.06359084799987613,
+          "first_new_image_s": 0.5647577449999517,
+          "bytes_received": 79130,
+          "frames_received": 4,
+          "displayed_cells": 29756,
+          "server_tree_rss_mib": 765.984375
+        },
+        "generation_zero": {
+          "ui_settled_s": 0.1993437540004379,
+          "first_new_image_s": 0.6947484800002712,
+          "bytes_received": 79140,
+          "frames_received": 5,
+          "displayed_cells": 23532,
+          "server_tree_rss_mib": 765.984375
+        },
+        "generation_max": {
+          "ui_settled_s": 0.24563143300019874,
+          "first_new_image_s": 0.2534293600001547,
+          "bytes_received": 63388,
+          "frames_received": 9,
+          "displayed_cells": 29756,
+          "server_tree_rss_mib": 765.984375
+        },
+        "time_small": {
+          "ui_settled_s": 0.17057010799999262,
+          "first_new_image_s": 0.22059945599994535,
+          "bytes_received": 23758,
+          "frames_received": 11,
+          "displayed_cells": 205,
+          "server_tree_rss_mib": 765.98828125
+        },
+        "time_max": {
+          "ui_settled_s": 0.17700827000044228,
+          "first_new_image_s": 0.25620954600071855,
+          "bytes_received": 32258,
+          "frames_received": 11,
+          "displayed_cells": 29756,
+          "server_tree_rss_mib": 765.98828125
+        },
+        "clip_on": {
+          "ui_settled_s": 0.07550121399981435,
+          "first_new_image_s": 0.14625595400048041,
+          "bytes_received": 27982,
+          "frames_received": 3,
+          "displayed_cells": 14939,
+          "server_tree_rss_mib": 766.43359375
+        },
+        "clip_move": {
+          "ui_settled_s": 0.18112977200053137,
+          "first_new_image_s": 0.22200463999979547,
+          "bytes_received": 24389,
+          "frames_received": 11,
+          "displayed_cells": 2659,
+          "server_tree_rss_mib": 766.4375
+        },
+        "clip_off": {
+          "ui_settled_s": 0.06325839399960387,
+          "first_new_image_s": 0.1451054409999415,
+          "bytes_received": 31642,
+          "frames_received": 3,
+          "displayed_cells": 29756,
+          "server_tree_rss_mib": 766.4375
+        },
+        "reset_camera": {
+          "ui_settled_s": 0.024629770000501594,
+          "first_new_image_s": 0.5589482940004018,
+          "bytes_received": 79175,
+          "frames_received": 2,
+          "displayed_cells": 29756,
+          "server_tree_rss_mib": 766.76171875
+        },
+        "scale_instrument": {
+          "ui_settled_s": 0.6488725680001153,
+          "first_new_image_s": 0.6525668060003227,
+          "bytes_received": 85250,
+          "frames_received": 4,
+          "displayed_cells": 29756,
+          "server_tree_rss_mib": 766.81640625
+        },
+        "scale_closeup": {
+          "ui_settled_s": 0.5832524340003147,
+          "first_new_image_s": 0.586125677000382,
+          "bytes_received": 158920,
+          "frames_received": 4,
+          "displayed_cells": 29756,
+          "server_tree_rss_mib": 766.82421875
+        }
+      },
+      "failures": [],
+      "startup": {
+        "launch_to_page_s": 1.9387327200001891,
+        "page_to_first_image_s": 0.6715284080000856,
+        "launch_to_first_image_s": 2.6102611280002748,
+        "server_tree_rss_mib": 730.8046875
+      },
+      "pick": {
+        "search_s": 0.701593122000304,
+        "segment_id": 7680,
+        "track_id": 2,
+        "parent_id": -1,
+        "parent_status": "Primary track: no parent."
+      },
+      "orbit": {
+        "frames_received": 19,
+        "bytes_received": 266230
+      },
+      "downloads": {
+        "screenshot": {
+          "seconds": 0.123871329999929,
+          "bytes": 49428,
+          "size": [
+            1200,
+            916
+          ],
+          "frames": 1
+        },
+        "orbit_gif": {
+          "seconds": 3.017848619000688,
+          "bytes": 732444,
+          "size": [
+            1200,
+            916
+          ],
+          "frames": 30
+        }
+      },
+      "browser_errors": [],
+      "input": {
+        "description": "real 200 keV shell-soft-hard",
+        "sha256": "592a69515312c323d049bf039adacad341594890be51efd7bb4e056219fedc61",
+        "bytes": 5797039
+      }
+    },
+    "x4": {
+      "capture": "x4.h5",
+      "client": "headless Chrome via Playwright on the same host (loopback)",
+      "steps": {
+        "energy_half": {
+          "ui_settled_s": 0.24644438399991486,
+          "first_new_image_s": 0.25170050899942,
+          "bytes_received": 226653,
+          "frames_received": 11,
+          "displayed_cells": 46692,
+          "server_tree_rss_mib": 828.44140625
+        },
+        "energy_zero": {
+          "ui_settled_s": 0.28864387799967517,
+          "first_new_image_s": 0.8003227460003473,
+          "bytes_received": 79594,
+          "frames_received": 10,
+          "displayed_cells": 119024,
+          "server_tree_rss_mib": 828.4453125
+        },
+        "energy_keyboard": {
+          "ui_settled_s": 0.17694070600009582,
+          "first_new_image_s": 0.6902412580002419,
+          "bytes_received": 75737,
+          "frames_received": 4,
+          "displayed_cells": 64504,
+          "server_tree_rss_mib": 830.5703125
+        },
+        "energy_keyboard_home": {
+          "ui_settled_s": 0.12279573600062577,
+          "first_new_image_s": 0.6276817960006156,
+          "bytes_received": 79132,
+          "frames_received": 4,
+          "displayed_cells": 119024,
+          "server_tree_rss_mib": 830.5703125
+        },
+        "generation_zero": {
+          "ui_settled_s": 0.24647869299951708,
+          "first_new_image_s": 0.7547246879994418,
+          "bytes_received": 79142,
+          "frames_received": 5,
+          "displayed_cells": 94128,
+          "server_tree_rss_mib": 830.5703125
+        },
+        "generation_max": {
+          "ui_settled_s": 0.3859926710001673,
+          "first_new_image_s": 0.39052620000074967,
+          "bytes_received": 63390,
+          "frames_received": 9,
+          "displayed_cells": 119024,
+          "server_tree_rss_mib": 830.578125
+        },
+        "time_small": {
+          "ui_settled_s": 0.17875915300010092,
+          "first_new_image_s": 0.2955204970003251,
+          "bytes_received": 23759,
+          "frames_received": 11,
+          "displayed_cells": 820,
+          "server_tree_rss_mib": 830.58203125
+        },
+        "time_max": {
+          "ui_settled_s": 0.25072980400000233,
+          "first_new_image_s": 0.3051845609998054,
+          "bytes_received": 32260,
+          "frames_received": 11,
+          "displayed_cells": 119024,
+          "server_tree_rss_mib": 830.5859375
+        },
+        "clip_on": {
+          "ui_settled_s": 0.16413114200076961,
+          "first_new_image_s": 0.2145641990000513,
+          "bytes_received": 27982,
+          "frames_received": 3,
+          "displayed_cells": 59756,
+          "server_tree_rss_mib": 831.03125
+        },
+        "clip_move": {
+          "ui_settled_s": 0.2678536729999905,
+          "first_new_image_s": 0.3046612329999334,
+          "bytes_received": 24389,
+          "frames_received": 11,
+          "displayed_cells": 10636,
+          "server_tree_rss_mib": 831.0390625
+        },
+        "clip_off": {
+          "ui_settled_s": 0.15198440999938612,
+          "first_new_image_s": 0.20408039299945813,
+          "bytes_received": 31644,
+          "frames_received": 3,
+          "displayed_cells": 119024,
+          "server_tree_rss_mib": 831.0390625
+        },
+        "reset_camera": {
+          "ui_settled_s": 0.03256219400009286,
+          "first_new_image_s": 0.617678199000693,
+          "bytes_received": 79175,
+          "frames_received": 2,
+          "displayed_cells": 119024,
+          "server_tree_rss_mib": 831.3671875
+        },
+        "scale_instrument": {
+          "ui_settled_s": 0.9085174570000163,
+          "first_new_image_s": 0.9125416500000938,
+          "bytes_received": 85251,
+          "frames_received": 4,
+          "displayed_cells": 119024,
+          "server_tree_rss_mib": 833.3203125
+        },
+        "scale_closeup": {
+          "ui_settled_s": 0.7197198710000521,
+          "first_new_image_s": 0.7231592279995311,
+          "bytes_received": 79576,
+          "frames_received": 3,
+          "displayed_cells": 119024,
+          "server_tree_rss_mib": 833.32421875
+        }
+      },
+      "failures": [],
+      "startup": {
+        "launch_to_page_s": 2.0102574509992337,
+        "page_to_first_image_s": 0.9940277670002615,
+        "launch_to_first_image_s": 3.004285217999495,
+        "server_tree_rss_mib": 791.30859375
+      },
+      "pick": {
+        "search_s": 0.9612677280001662,
+        "segment_id": 7680,
+        "track_id": 2,
+        "parent_id": -1,
+        "parent_status": "Primary track: no parent."
+      },
+      "orbit": {
+        "frames_received": 16,
+        "bytes_received": 204171
+      },
+      "downloads": {
+        "screenshot": {
+          "seconds": 0.20058212200001435,
+          "bytes": 49428,
+          "size": [
+            1200,
+            916
+          ],
+          "frames": 1
+        },
+        "orbit_gif": {
+          "seconds": 3.5636802909994003,
+          "bytes": 732444,
+          "size": [
+            1200,
+            916
+          ],
+          "frames": 30
+        }
+      },
+      "browser_errors": [],
+      "input": {
+        "description": "synthetic: 200 keV shell-soft-hard x4",
+        "sha256": "aca82dff6ab4fd5d64cabaecd75c4a10627319805e2fa6ebeb02bab234cf4f72",
+        "bytes": 15859823
+      }
+    },
+    "x34": {
+      "capture": "x34.h5",
+      "client": "headless Chrome via Playwright on the same host (loopback)",
+      "steps": {
+        "energy_half": {
+          "ui_settled_s": 0.511164433999511,
+          "first_new_image_s": 0.5138290799995957,
+          "bytes_received": 226348,
+          "frames_received": 7,
+          "displayed_cells": 396882,
+          "server_tree_rss_mib": 1551.90234375
+        },
+        "energy_zero": {
+          "ui_settled_s": 0.6712523499991221,
+          "first_new_image_s": 1.1756138269993244,
+          "bytes_received": 79594,
+          "frames_received": 10,
+          "displayed_cells": 1011704,
+          "server_tree_rss_mib": 1554.0625
+        },
+        "energy_keyboard": {
+          "ui_settled_s": 0.4829832890000034,
+          "first_new_image_s": 0.9987245180000173,
+          "bytes_received": 75739,
+          "frames_received": 4,
+          "displayed_cells": 548284,
+          "server_tree_rss_mib": 1642.0
+        },
+        "energy_keyboard_home": {
+          "ui_settled_s": 0.5026252640000166,
+          "first_new_image_s": 1.0165324449999389,
+          "bytes_received": 79132,
+          "frames_received": 4,
+          "displayed_cells": 1011704,
+          "server_tree_rss_mib": 1642.0078125
+        },
+        "generation_zero": {
+          "ui_settled_s": 0.620742037999662,
+          "first_new_image_s": 1.1319525870003417,
+          "bytes_received": 79142,
+          "frames_received": 5,
+          "displayed_cells": 800088,
+          "server_tree_rss_mib": 1749.140625
+        },
+        "generation_max": {
+          "ui_settled_s": 0.8024622190005175,
+          "first_new_image_s": 0.8068396480002775,
+          "bytes_received": 63390,
+          "frames_received": 9,
+          "displayed_cells": 1011704,
+          "server_tree_rss_mib": 1716.80859375
+        },
+        "time_small": {
+          "ui_settled_s": 0.23851054000078875,
+          "first_new_image_s": 0.28554070300015155,
+          "bytes_received": 23759,
+          "frames_received": 11,
+          "displayed_cells": 6970,
+          "server_tree_rss_mib": 1547.8515625
+        },
+        "time_max": {
+          "ui_settled_s": 0.6364812319998236,
+          "first_new_image_s": 0.6713824110001951,
+          "bytes_received": 32260,
+          "frames_received": 11,
+          "displayed_cells": 1011704,
+          "server_tree_rss_mib": 1547.8515625
+        },
+        "clip_on": {
+          "ui_settled_s": 0.8191675220004981,
+          "first_new_image_s": 0.8537351730001319,
+          "bytes_received": 27984,
+          "frames_received": 3,
+          "displayed_cells": 507926,
+          "server_tree_rss_mib": 1780.14453125
+        },
+        "clip_move": {
+          "ui_settled_s": 0.6621920910001791,
+          "first_new_image_s": 0.7159105950004232,
+          "bytes_received": 24391,
+          "frames_received": 11,
+          "displayed_cells": 90406,
+          "server_tree_rss_mib": 1687.66015625
+        },
+        "clip_off": {
+          "ui_settled_s": 0.5114341059997969,
+          "first_new_image_s": 0.5579439519997322,
+          "bytes_received": 31644,
+          "frames_received": 3,
+          "displayed_cells": 1011704,
+          "server_tree_rss_mib": 1567.64453125
+        },
+        "reset_camera": {
+          "ui_settled_s": 0.028618059000109497,
+          "first_new_image_s": 0.7042341629994553,
+          "bytes_received": 79174,
+          "frames_received": 2,
+          "displayed_cells": 1011704,
+          "server_tree_rss_mib": 1567.96875
+        },
+        "scale_instrument": {
+          "ui_settled_s": 3.255079071000182,
+          "first_new_image_s": 3.2573132269999405,
+          "bytes_received": 85251,
+          "frames_received": 4,
+          "displayed_cells": 1011704,
+          "server_tree_rss_mib": 1693.3046875
+        },
+        "scale_closeup": {
+          "ui_settled_s": 1.7681947900000523,
+          "first_new_image_s": 1.770047424999575,
+          "bytes_received": 158921,
+          "frames_received": 4,
+          "displayed_cells": 1011704,
+          "server_tree_rss_mib": 1697.68359375
+        }
+      },
+      "failures": [],
+      "startup": {
+        "launch_to_page_s": 2.675442691999706,
+        "page_to_first_image_s": 3.064923252999506,
+        "launch_to_first_image_s": 5.740365944999212,
+        "server_tree_rss_mib": 1383.5390625
+      },
+      "pick": {
+        "search_s": 2.149173026000426,
+        "segment_id": 7680,
+        "track_id": 2,
+        "parent_id": -1,
+        "parent_status": "Primary track: no parent."
+      },
+      "orbit": {
+        "frames_received": 14,
+        "bytes_received": 141957
+      },
+      "downloads": {
+        "screenshot": {
+          "seconds": 0.39469051099968055,
+          "bytes": 49428,
+          "size": [
+            1200,
+            916
+          ],
+          "frames": 1
+        },
+        "orbit_gif": {
+          "seconds": 6.968982440000218,
+          "bytes": 732444,
+          "size": [
+            1200,
+            916
+          ],
+          "frames": 30
+        }
+      },
+      "browser_errors": [],
+      "input": {
+        "description": "synthetic: 200 keV shell-soft-hard x34",
+        "sha256": "6b08cb75022c263db998a8d478a4c55dec0694d92fa9b013a64f878b0f92f962",
+        "bytes": 134586263
+      }
+    }
+  },
+  "regressions": {
+    "secondary-fixture": {
+      "capture": "secondary-fixture.h5",
+      "host": {
+        "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+        "python": "3.14.4"
+      },
+      "client": "headless Chrome via Playwright on the same host (loopback)",
+      "steps": {
+        "energy_half": {
+          "ui_settled_s": 0.2779871250004362,
+          "first_new_image_s": 0.2810229120004806,
+          "bytes_received": 170433,
+          "frames_received": 14,
+          "displayed_cells": 8,
+          "server_tree_rss_mib": 744.1796875
+        },
+        "energy_zero": {
+          "ui_settled_s": 0.2432613669998318,
+          "first_new_image_s": 0.7804212380005993,
+          "bytes_received": 58872,
+          "frames_received": 10,
+          "displayed_cells": 12,
+          "server_tree_rss_mib": 744.1796875
+        },
+        "energy_keyboard": {
+          "ui_settled_s": 0.16719325899975956,
+          "first_new_image_s": 0.6739488749999509,
+          "bytes_received": 56283,
+          "frames_received": 4,
+          "displayed_cells": 10,
+          "server_tree_rss_mib": 746.3046875
+        },
+        "energy_keyboard_home": {
+          "ui_settled_s": 0.1155882399998518,
+          "first_new_image_s": 0.6170053539999572,
+          "bytes_received": 58410,
+          "frames_received": 4,
+          "displayed_cells": 12,
+          "server_tree_rss_mib": 746.3046875
+        },
+        "generation_zero": {
+          "ui_settled_s": 0.22419895899929543,
+          "first_new_image_s": 0.7355005049994361,
+          "bytes_received": 52876,
+          "frames_received": 4,
+          "displayed_cells": 6,
+          "server_tree_rss_mib": 746.3046875
+        },
+        "generation_max": {
+          "ui_settled_s": 0.2770857249997789,
+          "first_new_image_s": 0.2836497379994398,
+          "bytes_received": 51785,
+          "frames_received": 8,
+          "displayed_cells": 12,
+          "server_tree_rss_mib": 746.3046875
+        },
+        "time_small": {
+          "ui_settled_s": 0.24029060399971058,
+          "first_new_image_s": 0.29831697800000256,
+          "bytes_received": 24786,
+          "frames_received": 11,
+          "displayed_cells": 2,
+          "server_tree_rss_mib": 746.30859375
+        },
+        "time_max": {
+          "ui_settled_s": 0.17348335000042425,
+          "first_new_image_s": 0.31080974500036973,
+          "bytes_received": 27201,
+          "frames_received": 11,
+          "displayed_cells": 12,
+          "server_tree_rss_mib": 746.30859375
+        },
+        "clip_on": {
+          "ui_settled_s": 0.06551421699987259,
+          "first_new_image_s": 0.18571335599972372,
+          "bytes_received": 25811,
+          "frames_received": 3,
+          "displayed_cells": 10,
+          "server_tree_rss_mib": 746.7578125
+        },
+        "clip_move": {
+          "ui_settled_s": 0.18554730199957703,
+          "first_new_image_s": 0.3145954679994247,
+          "bytes_received": 25999,
+          "frames_received": 11,
+          "displayed_cells": 8,
+          "server_tree_rss_mib": 746.7578125
+        },
+        "clip_off": {
+          "ui_settled_s": 0.11994409100043413,
+          "first_new_image_s": 0.1528972360001717,
+          "bytes_received": 26585,
+          "frames_received": 3,
+          "displayed_cells": 12,
+          "server_tree_rss_mib": 746.7578125
+        },
+        "picked_filter": {
+          "ui_settled_s": 0.2407558049999352,
+          "first_new_image_s": 0.25773798699992767,
+          "bytes_received": 54995,
+          "frames_received": 14,
+          "displayed_cells": 2,
+          "server_tree_rss_mib": 747.3203125
+        },
+        "picked_restore": {
+          "ui_settled_s": 0.20619241099939245,
+          "first_new_image_s": 0.29695714699937525,
+          "bytes_received": 29377,
+          "frames_received": 11,
+          "displayed_cells": 12,
+          "server_tree_rss_mib": 747.32421875
+        },
+        "reset_camera": {
+          "ui_settled_s": 0.028827702999478788,
+          "first_new_image_s": 0.5902800980002212,
+          "bytes_received": 59233,
+          "frames_received": 2,
+          "displayed_cells": 12,
+          "server_tree_rss_mib": 747.32421875
+        },
+        "scale_instrument": {
+          "ui_settled_s": 0.538102123000499,
+          "first_new_image_s": 0.5416933820006307,
+          "bytes_received": 75814,
+          "frames_received": 4,
+          "displayed_cells": 12,
+          "server_tree_rss_mib": 747.35546875
+        },
+        "scale_closeup": {
+          "ui_settled_s": 0.527092600999822,
+          "first_new_image_s": 0.5312258570002086,
+          "bytes_received": 118862,
+          "frames_received": 4,
+          "displayed_cells": 12,
+          "server_tree_rss_mib": 747.36328125
+        }
+      },
+      "failures": [],
+      "fixture": "deterministic secondary inspection",
+      "capture_sha256": "e43288e903a9ca56dba04bfcfb2b1755b493ca4a9144d2f3c676db574e89e6be",
+      "startup": {
+        "launch_to_page_s": 3.3968002730007356,
+        "page_to_first_image_s": 1.1378484469996692,
+        "launch_to_first_image_s": 4.534648720000405,
+        "server_tree_rss_mib": 711.12109375
+      },
+      "pick": {
+        "search_s": 11.284645527000066,
+        "segment_id": 4,
+        "track_id": 1,
+        "parent_id": 0,
+        "parent_status": "Parent track 0."
+      },
+      "orbit": {
+        "frames_received": 22,
+        "bytes_received": 267500
+      },
+      "downloads": {
+        "screenshot": {
+          "seconds": 0.15220169499934855,
+          "bytes": 24713,
+          "size": [
+            1200,
+            916
+          ],
+          "frames": 1,
+          "distinct_frames": 1
+        },
+        "orbit_gif": {
+          "seconds": 3.625371009000446,
+          "bytes": 447165,
+          "size": [
+            1200,
+            916
+          ],
+          "frames": 30,
+          "distinct_frames": 30
+        }
+      },
+      "export_failure_status": "Export failed: [Errno 17] File exists: '/tmp/pyrite-browser-probe-ojb2tu5u/exports'",
+      "browser_errors": [],
+      "command": "LIBGL_ALWAYS_SOFTWARE=1 uv run --extra trajectory-viewer --with playwright python checks/saved_trajectory_browser_probe.py --fixture-secondary --output trial.json",
+      "measurement_scope": "functional regression; timings are not repeated workload measurements"
+    },
+    "real-20-keV-follow-up": {
+      "capture": "20-shell-soft-hard.h5",
+      "host": {
+        "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+        "python": "3.14.4"
+      },
+      "client": "headless Chrome via Playwright on the same host (loopback)",
+      "steps": {
+        "energy_half": {
+          "ui_settled_s": 0.255881247000616,
+          "first_new_image_s": 0.26090541600024153,
+          "bytes_received": 241934,
+          "frames_received": 12,
+          "displayed_cells": 1478,
+          "server_tree_rss_mib": 748.8359375
+        },
+        "energy_zero": {
+          "ui_settled_s": 0.25726573599968106,
+          "first_new_image_s": 0.7700194469998678,
+          "bytes_received": 84496,
+          "frames_received": 10,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 748.83984375
+        },
+        "energy_keyboard": {
+          "ui_settled_s": 0.2648668390002058,
+          "first_new_image_s": 0.7784324290005316,
+          "bytes_received": 80635,
+          "frames_received": 4,
+          "displayed_cells": 1971,
+          "server_tree_rss_mib": 750.96484375
+        },
+        "energy_keyboard_home": {
+          "ui_settled_s": 0.10806696799954807,
+          "first_new_image_s": 0.6290308749994438,
+          "bytes_received": 84034,
+          "frames_received": 4,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 750.96484375
+        },
+        "generation_zero": {
+          "ui_settled_s": 0.2389145910001389,
+          "first_new_image_s": 0.7395539190001728,
+          "bytes_received": 83927,
+          "frames_received": 5,
+          "displayed_cells": 2443,
+          "server_tree_rss_mib": 750.97265625
+        },
+        "generation_max": {
+          "ui_settled_s": 0.2809139339997273,
+          "first_new_image_s": 0.2898597000003065,
+          "bytes_received": 67217,
+          "frames_received": 9,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 750.9765625
+        },
+        "time_small": {
+          "ui_settled_s": 0.29861428200001683,
+          "first_new_image_s": 0.3468041039996024,
+          "bytes_received": 24058,
+          "frames_received": 11,
+          "displayed_cells": 33,
+          "server_tree_rss_mib": 751.0390625
+        },
+        "time_max": {
+          "ui_settled_s": 0.30393877100050304,
+          "first_new_image_s": 0.3453159370001231,
+          "bytes_received": 34173,
+          "frames_received": 11,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 751.0390625
+        },
+        "clip_on": {
+          "ui_settled_s": 0.15156497499992838,
+          "first_new_image_s": 0.1927148680006212,
+          "bytes_received": 26186,
+          "frames_received": 3,
+          "displayed_cells": 603,
+          "server_tree_rss_mib": 751.8515625
+        },
+        "clip_move": {
+          "ui_settled_s": 0.21309304299938958,
+          "first_new_image_s": 0.3463404750000336,
+          "bytes_received": 24325,
+          "frames_received": 11,
+          "displayed_cells": 96,
+          "server_tree_rss_mib": 751.85546875
+        },
+        "clip_off": {
+          "ui_settled_s": 0.14935472900015156,
+          "first_new_image_s": 0.1915957660003187,
+          "bytes_received": 33557,
+          "frames_received": 3,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 751.85546875
+        },
+        "reset_camera": {
+          "ui_settled_s": 0.035719908999453764,
+          "first_new_image_s": 0.6229766110000128,
+          "bytes_received": 83947,
+          "frames_received": 2,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 752.1328125
+        },
+        "scale_instrument": {
+          "ui_settled_s": 0.5323845679995429,
+          "first_new_image_s": 0.5356768490000832,
+          "bytes_received": 85325,
+          "frames_received": 4,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 752.18359375
+        },
+        "scale_closeup": {
+          "ui_settled_s": 0.5445165310002267,
+          "first_new_image_s": 0.54668436799966,
+          "bytes_received": 168347,
+          "frames_received": 4,
+          "displayed_cells": 2561,
+          "server_tree_rss_mib": 752.19140625
+        }
+      },
+      "failures": [],
+      "fixture": null,
+      "capture_sha256": "1ee0905809bdc1d952e58ba07e91e6042fdcd384dd9181f366cd2cdfcb48edce",
+      "startup": {
+        "launch_to_page_s": 3.048882527999922,
+        "page_to_first_image_s": 1.2630265600000712,
+        "launch_to_first_image_s": 4.311909087999993,
+        "server_tree_rss_mib": 715.98046875
+      },
+      "pick": {
+        "search_s": 0.6118747700002132,
+        "segment_id": 2394,
+        "track_id": 7,
+        "parent_id": -1,
+        "parent_status": "Primary track: no parent."
+      },
+      "orbit": {
+        "frames_received": 17,
+        "bytes_received": 253860
+      },
+      "downloads": {
+        "screenshot": {
+          "seconds": 0.13891901500028325,
+          "bytes": 49565,
+          "size": [
+            1200,
+            916
+          ],
+          "frames": 1,
+          "distinct_frames": 1
+        },
+        "orbit_gif": {
+          "seconds": 3.615498091000518,
+          "bytes": 727161,
+          "size": [
+            1200,
+            916
+          ],
+          "frames": 30,
+          "distinct_frames": 30
+        }
+      },
+      "export_failure_status": "Export failed: [Errno 17] File exists: '/tmp/pyrite-browser-probe-k__hhlgx/exports'",
+      "browser_errors": [],
+      "command": "LIBGL_ALWAYS_SOFTWARE=1 uv run --extra trajectory-viewer --with playwright python checks/saved_trajectory_browser_probe.py 20-shell-soft-hard.h5 --output trial.json",
+      "measurement_scope": "functional regression; timings are not repeated workload measurements"
+    }
+  }
+}

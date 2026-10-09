@@ -97,6 +97,9 @@ Without activating the environment, prefix commands with `uv run` (for example
 repeat the same `--extra` on later syncs. Contributor and CI commands are in
 the [development workspace guide](docs/repo-design/development-workspace.md).
 
+For saved-shower inspection, `uv sync --extra trajectory-viewer` installs the
+optional PyVista/trame viewer; see the [saved trajectory guide](docs/guides/saved-trajectory-viewer.md).
+
 ## Run
 
 `pyrite run` executes a resumable campaign over a named profile and writes

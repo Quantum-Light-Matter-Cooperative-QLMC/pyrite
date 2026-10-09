@@ -47,6 +47,14 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/trajectory_paraview_probe.py": (),
     "checks/trajectory_trame_probe.py": (),
     "checks/trajectory_viewer_benchmark.py": (),
+    # Saved-trajectory viewer browser/server/native workload probes (#319):
+    # UI behaviour and resource costs, not transport physics; no records.
+    "checks/saved_trajectory_browser_probe.py": (),
+    "checks/saved_trajectory_browser_worker.py": (),
+    "checks/saved_trajectory_remote_trials.py": (),
+    "checks/saved_trajectory_remote_worker.py": (),
+    "checks/saved_trajectory_server_probe.py": (),
+    "checks/saved_trajectory_viewer_probe.py": (),
     "checks/shell_ionization_comparison.py": ("eedl-shell-ionization-comparison",),
     "checks/brem_angular_comparison.py": ("bremslib-angular-schiff",),
     "checks/radiation_error_estimator_calibration.py": ("radiation-error-estimators",),

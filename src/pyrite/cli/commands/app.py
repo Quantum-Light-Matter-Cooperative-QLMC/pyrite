@@ -1,4 +1,4 @@
-"""Lazy ``pyrite app`` hierarchy for interactive marimo applications."""
+"""Lazy ``pyrite app`` hierarchy for analysis and inspection applications."""
 
 from copy import copy
 from importlib import import_module
@@ -9,6 +9,7 @@ from .._deprecations import canonical_option
 from .._groups import LazyGroup
 
 _LEAVES = {
+    "trajectories": "pyrite.cli.commands.app_trajectories.command",
     "analysis": "pyrite.cli.commands.app.analysis_command",
     "pixels": "pyrite.cli.commands.app.pixels_command",
     "compare": "pyrite.cli.commands.app.compare_command",
@@ -16,6 +17,7 @@ _LEAVES = {
     "validation": "pyrite.cli.commands.app.validation_command",
 }
 _HELP = {
+    "trajectories": "Inspect or render saved trajectory captures (optional PyVista/trame).",
     "analysis": "Launch or export the analysis app.",
     "pixels": "Launch or export the pixel-detector observation app.",
     "compare": "Launch or export the case and cross-material comparison app.",
@@ -37,7 +39,7 @@ class AppGroup(LazyGroup):
 
 @click.command(cls=AppGroup, lazy_commands=_LEAVES, lazy_help=_HELP, no_args_is_help=True)
 def command() -> None:
-    """Launch or export interactive analysis notebooks."""
+    """Launch, inspect or export analysis applications."""
 
 
 def _load(path: str):

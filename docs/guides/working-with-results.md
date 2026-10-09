@@ -132,6 +132,9 @@ Prefer artifact reuse when you redo only the spectrum phase of the same transpor
 
 ### Export scene geometry
 
+For bounded saved-shower inspection with optional native PyVista or a reactive
+trame server, see the [saved trajectory viewer](saved-trajectory-viewer.md).
+
 ```bash
 uv run pyrite checkpoint export-trajectories trajectories/hopg/ --scene
 ```

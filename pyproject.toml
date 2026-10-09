@@ -29,6 +29,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+trajectory-viewer = [
+    "pyvista>=0.49,<0.50",
+    "trame>=3.12,<4",
+    "trame-vtk>=2.11,<3",
+    "trame-vuetify>=3.2,<4",
+    "imageio>=2.37,<3",
+    "pillow>=12,<13",
+]
 external-db = [
     "mp-api>=0.46",
 ]

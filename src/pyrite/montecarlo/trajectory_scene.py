@@ -101,6 +101,8 @@ def export_trajectory_scene(
     *,
     include_vacuum: bool = True,
     overwrite: bool = False,
+    include_tracks: bool = True,
+    extent_ang: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> tuple[Path, Path]:
     """Export close-up lab-angstrom and instrument lab-mm scene manifests.
 
@@ -110,6 +112,8 @@ def export_trajectory_scene(
     replaced individually. Old sidecar directories remain usable on overwrite.
     An interrupted publication never leaves a manifest pointing at partial
     data. Old HDF5 artifacts without a scene omit filters/detector explicitly.
+    ``include_tracks=False`` builds geometry only for bounded saved viewers;
+    ``extent_ang`` supplies that selection's sample-frame close-up bounds.
     """
     import h5py
 
@@ -145,7 +149,9 @@ def export_trajectory_scene(
                 )
             layers = case.get("abs_layers")
             thickness = float(layers[-1][1] if layers else case["thickness_ang"])
-            low, high = _extent(handle["transport"], thickness)
+            low, high = (
+                extent_ang if extent_ang is not None else _extent(handle["transport"], thickness)
+            )
             common: dict[str, Any] = {
                 "case_sha256": header["case_sha256"],
                 "parameter_sha256": header.get("parameter_sha256", ""),
@@ -168,7 +174,7 @@ def export_trajectory_scene(
             }
             near = dict(common, units="angstrom", scale_group="closeup", extent="capture-fitted")
             far = dict(common, units="mm", scale_group="instrument")
-            close_blocks = [("tracks", f"{directory.name}/tracks.vtp")]
+            close_blocks = [("tracks", f"{directory.name}/tracks.vtp")] if include_tracks else []
             far_blocks = []
 
             def add(name, points, *, triangles=None, lines=None, distant=False, **metadata):
@@ -271,14 +277,15 @@ def export_trajectory_scene(
                 distant=True,
                 representation="incident lab-axis reference",
             )
-        export_segments_vtp(
-            artifact,
-            directory / "tracks.vtp",
-            include_vacuum=include_vacuum,
-            _rotation=rotation,
-            _origin_ang=origin * 1e7,
-            _metadata=near,
-        )
+        if include_tracks:
+            export_segments_vtp(
+                artifact,
+                directory / "tracks.vtp",
+                include_vacuum=include_vacuum,
+                _rotation=rotation,
+                _origin_ang=origin * 1e7,
+                _metadata=near,
+            )
         if read_trajectory_header(artifact) != header:
             raise TrajectoryArtifactError("trajectory artifact changed during scene export; retry")
         _manifest(staged[0], close_blocks, near)

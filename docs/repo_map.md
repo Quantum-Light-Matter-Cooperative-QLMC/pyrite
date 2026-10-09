@@ -39,11 +39,12 @@ Components (a + b denotes a static import cycle):
   p15: remote
   p16: results
   p17: runs
-  p18: validation
-  p19: xsgen
+  p18: trajectory_viewer
+  p19: validation
+  p20: xsgen
 Edges (importer -> imported):
   p0 -> p10
-  p0 -> p18
+  p0 -> p19
   p0 -> p4
   p0 -> p5
   p1 -> p10
@@ -53,12 +54,12 @@ Edges (importer -> imported):
   p1 -> p15
   p1 -> p16
   p1 -> p17
-  p1 -> p18
+  p1 -> p19
   p1 -> p2
   p1 -> p3
   p1 -> p5
   p11 -> p10
-  p11 -> p19
+  p11 -> p20
   p11 -> p5
   p12 -> p11
   p12 -> p16
@@ -75,9 +76,9 @@ Edges (importer -> imported):
   p15 -> p13
   p15 -> p16
   p15 -> p17
-  p15 -> p18
   p15 -> p19
   p15 -> p2
+  p15 -> p20
   p15 -> p3
   p15 -> p5
   p16 -> p10
@@ -89,25 +90,26 @@ Edges (importer -> imported):
   p17 -> p12
   p17 -> p13
   p17 -> p16
-  p17 -> p19
   p17 -> p2
+  p17 -> p20
   p17 -> p3
   p17 -> p5
   p17 -> p9
-  p18 -> p10
   p18 -> p11
-  p18 -> p2
-  p18 -> p3
-  p18 -> p5
-  p18 -> p6
   p19 -> p10
+  p19 -> p11
+  p19 -> p2
+  p19 -> p3
   p19 -> p5
+  p19 -> p6
   p2 -> p10
   p2 -> p11
   p2 -> p16
-  p2 -> p19
+  p2 -> p20
   p2 -> p6
   p2 -> p9
+  p20 -> p10
+  p20 -> p5
   p3 -> p10
   p3 -> p11
   p3 -> p16
@@ -118,8 +120,9 @@ Edges (importer -> imported):
   p4 -> p13
   p4 -> p15
   p4 -> p17
-  p4 -> p19
+  p4 -> p18
   p4 -> p2
+  p4 -> p20
   p4 -> p3
   p4 -> p5
   p4 -> p8
@@ -129,7 +132,7 @@ Edges (importer -> imported):
   p7 -> p14
   p7 -> p16
   p7 -> p17
-  p7 -> p18
+  p7 -> p19
   p7 -> p2
   p7 -> p4
   p7 -> p5
@@ -177,6 +180,7 @@ Edges (importer -> imported):
 - **`pyrite job list|status|logs|attach|stop`** → `cli.commands.job`: one lifecycle for run, grid, recompute, and validation jobs. `list --kind` normalizes legacy submitter metadata to `run|grid|recompute|validate`; destructive stop targets exactly one job ID, profile, or all live jobs.
 - **`pyrite run ... --trajectories DIR [--overwrite-trajectories]`** → `runs.scan._run_material` builds a `montecarlo.trajectories.TrajectoryCapture` rooted at `DIR/<stem>/`; off by default, local only. **`pyrite checkpoint export-trajectories ARTIFACT...`** → `cli.commands.trajectories` → `montecarlo.trajectory_export.export_segments_vtp`. **`pyrite checkpoint score-trajectories ARTIFACT...`** → `cli.commands.trajectories.score_command` → `checkpoints.trajectory_scoring` (plan/check every artifact and target, then `runner.stream_spectrum_from_artifact` per case into `<checkpoint-dir>/<stem>`; no transport, no shared cache) (#186).
 - **Trajectory scenes**: `instrument.scene` snapshots downstream geometry separately from the transport case. `montecarlo.trajectory_scene` adds opt-in, independently viewable close-up/instrument VTK manifests through `export-trajectories --scene`. Numeric meshes, groove ribbons and transforms live in `_scene_geometry`, shared with `plots.plotly.trajectories`; see [scene design](repo-design/storage/trajectory-scenes.md).
+- **`pyrite app trajectories inspect|launch|export`** → `cli.commands.app_trajectories`: saved-capture selection/cost admission in `trajectory_viewer.selection`, optional lazy PyVista rendering/inspection/export in `render`, native controls in `native`, and image-streaming trame controls in `server`. Geometry-only scene exports reuse `montecarlo.trajectory_scene`; no transport is run. See the [saved viewer guide](guides/saved-trajectory-viewer.md).
 - **`pyrite checkpoint slim <checkpoint-dir> [--grid]`** → `slim:slim_checkpoint` → `results.slim_results`: shrink a checkpoint HDF5 artifact for transfer (drop wide-brem / float32 / filter configs; `--grid` keep only material's current-grid configs).
 - **`pyrite checkpoint archive|restore|list|merge`** → `archive:*`: local checkpoint shelf — copy active slot `checkpoints/<stem>/` to/from long-term `checkpoints/archive/<label>/`; `merge` combines a shelved checkpoint back into the active slot for the same material. Retired top-level spellings are hidden compatibility aliases.
 - **Sweep worker**: `montecarlo.run_case` (module-level so it pickles into `run_cases` process pool).
