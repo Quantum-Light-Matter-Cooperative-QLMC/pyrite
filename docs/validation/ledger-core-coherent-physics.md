@@ -343,6 +343,8 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 
 - **Anchored (2026-10-08):** promoted from the frozen-carrier `rederived` verdict with the green pinned regression `tests/energy-grid/test_coherent_windowed_line_grid.py::test_windowed_auto_matches_a_fine_explicit_grid_on_identical_trajectories` (yield, centroid and FWHM within 1e-3 of a uniform full-axis reference at a quarter of the finest step any row's bins actually take, including all-electron bins below a row's switch energy). The anchor scope equals the verified scope: frozen-carrier float64 with `sinc_cutoff = None`; material dispersion stays uncertified and warned. Human sign-off pending (#277).
 
+- **Independent dispersion-helper verification (2026-10-09, #373):** fresh-context verifier returns `rederived` for `_affine_dispersion_row`, `_dispersion_residual_power_bound`, `_dispersion_window_audit` and `CoherentDispersionLaw.certificate` (658 HOPG intervals, sampled secant residual and derivative at most 0.973 of certified bounds); no discrepancy. Status unchanged (`anchored`). Caveats: the bound is relative to the reducer's carrier-frozen coupling and attenuation; sampling error and Parseval normalization of the true nonlinear field stay uncertified; ladders use whole-axis windows so window-excluded power is untested; `short-bunch-370.json` row 2 fraction 64.89 is dominated by 2 L1-fallback intervals (pre-#370 records: $7.44\times10^{4}$, reference power unchanged at about $7.19\times10^{-5}$ eV, the drop is the #370 transverse envelope in the numerator). Human sign-off pending (#277).
+
 
 ## `line-grid-sinc-convergence`
 

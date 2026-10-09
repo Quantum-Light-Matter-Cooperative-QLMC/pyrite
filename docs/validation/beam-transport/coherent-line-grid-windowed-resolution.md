@@ -15,7 +15,7 @@ Automatic line-grid resolution serves `coherent_emission` when the policy carrie
 2. **Step.** Inside the window the Nyquist step is $h = \pi\hbar c / D$, with $D$ the span of the time support of *every* radiating piece of the row: the per-electron span $D_e$ for the $\sum_e |S_e|^2$ floor, the all-electron span for the $|\sum_e S_e|^2$ term. Nodes are placed at $h/8$ (`COHERENT_NYQUIST_OVERSAMPLING = 8`, adopted from the 2026-10-08 ladder; see [Default refinement](#default-refinement-2026-10-08)).
 3. **Decoherence switch.** A 100 eV window bin takes the per-electron step when $F_\mathrm{max} N_e \le \eta_F = 10^{-4}$ over the bin, where with a physical bunch charge $N_e$ is the tail population bound $1 + s_\mathrm{pair}(H-1)$ for $H$ emitting samples and physical pair scale $s_\mathrm{pair}$ ([`coherent-physical-bunch-population`](../radiation-physics/coherent-physical-bunch-population.md)), and the all-electron step otherwise. $F$ is bounded only on a finite footprint, by the analytic $F_z = e^{-(\omega\sigma_z)^2}$ the reducer applies; with no offsets ($F \equiv 1$) or an infinite slab (empirical characteristic function, no closed-form bound) every bin takes the all-electron step.
 4. **Budget.** The plan is refused, with its coordinate count, above the policy point budget `max_points` (`DEFAULT_MAX_POINTS = 600000`, `PYRITE_ENERGY_GRID_MAX_POINTS`). It is never coarsened. A policy without windows still refuses coherent emission (#117).
-5. **Dispersion scope (re-scoped 2026-10-08).** Items 1–2 are claimed for the frozen-carrier row field. The material-dispersive phase is not covered by an a-priori bound: the rigorous dispersive excluded-power bound is reported through `LineShapePrecisionWarning` when the worst row exceeds $2\eta_\mathrm{leak}$ (up to $7.4\times10^{4}$ times the frozen reference on the reduced short-bunch case) and is not a measured error. Dispersive sampling is checked instead by same-trajectory convergence against uniform full-axis references; in those cases the row windows cover the whole axis, so the references test dispersive sampling, not power excluded from the windows ([charge-weighted ladders](../radiation-physics/coherent-physical-bunch-population.md#charge-weighted-remote-checks-2026-10-08): yield, centroid and global FWHM errors at most $2.002\times10^{-4}$ at 30 and 60 keV), and by the opt-in runtime full-axis yield and centroid audits. Window-excluded dispersive power and a general dispersive certificate are out of scope for this row.
+5. **Dispersion scope (re-scoped 2026-10-08).** Items 1–2 are claimed for the frozen-carrier row field. The material-dispersive phase is not covered by an a-priori bound: the rigorous dispersive excluded-power bound is reported through `LineShapePrecisionWarning` when the worst row exceeds $2\eta_\mathrm{leak}$ (up to $7.4\times10^{4}$ times the frozen reference on the reduced short-bunch case before #370; $64.9$ after the analytic transverse envelope, with only the row carrying two L1-fallback intervals still above $2\eta_\mathrm{leak}$) and is not a measured error. Dispersive sampling is checked instead by same-trajectory convergence against uniform full-axis references; in those cases the row windows cover the whole axis, so the references test dispersive sampling, not power excluded from the windows ([charge-weighted ladders](../radiation-physics/coherent-physical-bunch-population.md#charge-weighted-remote-checks-2026-10-08): yield, centroid and global FWHM errors at most $2.002\times10^{-4}$ at 30 and 60 keV), and by the opt-in runtime full-axis yield and centroid audits. Window-excluded dispersive power and a general dispersive certificate are out of scope for this row.
 
 ## Derivation
 
@@ -3874,3 +3874,48 @@ length: real 1 Å gaps at a $10^7$ Å origin stay gaps, and the fixture
 returns to 49 joints and its previous windows. Captured rows also carry the
 nonincreasing transverse envelope $F_z(E)\sup_{E'\ge E}F_\perp(E')$ used in
 place of $F_z$.
+
+## Independent verification of dispersion handling (2026-10-09)
+
+Fresh context. Scope: the re-scoped item 5 and the dispersion helpers `_affine_dispersion_row`, `_dispersion_residual_power_bound`, `CoherentDispersionLaw.certificate` and `_dispersion_window_audit`. Prior exposure: I read the ledger row (including the owner Notes) and the owner sections of this page before deriving, so the derivation below is not blind to the stated results. I re-derived each result and then compared the code.
+
+### Derivation
+
+With $H=\hbar c$ and a piece's escape distance $L(d)=L_{\rm mid}+(\Delta L/\Delta d)(d-d_j)$, the dispersive phase factor is $e^{-i\,\delta\omega(E)L(d)}$. For an affine law $\delta\omega=sE+b$ the coefficient of $(d-d_j)$ in the exponent is $[kE-E_j-Hb\Delta L/\Delta d]/H$ with $k=1-Hs\Delta L/\Delta d$, which equals $k(E-E'_j)/H$. Substituting $y-y_{\rm mid}=k(d-d_j)$ gives
+
+$$
+E'_j=\frac{E_j+Hb\Delta L/\Delta d}{k},\quad
+\Delta y=k\Delta d,\quad
+y_{\rm mid}=d_j-HsL_{\rm mid},\quad
+a'=\frac{a}{k},\quad
+\lambda'=\frac{\lambda}{k},
+$$
+
+and a constant phase $-bL_{\rm mid}$. Parseval gives $P'=\sum|a|^2\Delta d\,\langle e^{-\tau}\rangle/k$. The constant-$\delta$ example ($k=0.9$) gives 90 Å, carrier $1000/0.9$ eV and step $\pi H/90$.
+
+Residual: at fixed $E$, with $r=\delta\omega-(sE+b)$, $|\Delta S_{e,p}|\le\sum_j|a|\,\Delta d\,m_j\min(2,R\,L_{\max,j})=:G_{e,p}$, where $m_j$ is the mean amplitude transmission. Then $\int_W\sum|\Delta S|^2\le W\sum_{e,p}G_{e,p}^2$. Replacing the sum of per-electron minima by the minimum of sums, $\min(4\sum(\sum w)^2,\ R^2\sum(\sum wL)^2)$, is still an upper bound. Minkowski in $L^2(E,e,p)$ gives $Y\le(\sqrt{Y'}+\sqrt{\mathcal E})^2$. The population factor $1+F(N_e-1)$ multiplies it, with $F$ taken at the lower edge because it is nonincreasing.
+
+Material law: $w=E(1-\mathrm{Re}\,n)/H$, $|1-n|\le|\chi|$ for $\mathrm{Re}\,n>0$. $w'$ and $w''$ follow from $n'=\chi'/2n$ and $n''=\chi''/2n-\chi'^2/4n^3$. The secant residual is at most $M_2(\Delta E)^2/8$. The terms $\chi',\chi''$ come from $F/E^2$ with $F$ a cubic plus a power law, and $f_2/E^2\propto E^{p-2}$.
+
+### Comparison with code
+
+- The code in `_affine_dispersion_row` matches term by term: carrier, amplitude, duration, centre, slope, phase sign (`phase_rad` enters as $-g\cdot r$, so $+bL_{\rm mid}$ is correct), `centre_scale` and the guards.
+- `_piece_l1_amplitudes` and `_electron_l1_power` match $G$.
+- `_dispersion_residual_power_bound` matches $W\sum G^2$.
+- In the audit, the `min(4 l1, R^2 coef)` form matches the minimum-of-sums bound. Per-interval factors, Minkowski, the L1 fallback `proxy <= W*l1`, the edge-leak branches (which lower-tail or upper-tail leak applies only when the interval lies wholly beyond the affine carriers) and the full-power default otherwise are all valid.
+- `certificate()` matches $M_1$, $M_2$ and the Bernstein, power-law and $\chi$ derivative expressions.
+- Numeric: on HOPG 10--6000 eV, over 658 smooth intervals, sampled secant residual and sampled first derivative are at most 0.973 of the certificate. Dispersion-related focused tests pass.
+
+### Item 5 honesty
+
+The ledger text states that there is no a-priori dispersive certificate and that the audit is a diagnostic: `relative_production_bound=False`, with the warning text "not a measured grid error". The code agrees. The warning fires when the fraction exceeds $2\eta_{\rm leak}$, on cold and warm caches. The record `short-bunch-370.json` shows `excluded_power_bound_eV` 4.667e-3 for row 2 and `frozen_reference_fraction` 64.888 (the ledger's 64.89x), with 2 L1-fallback intervals and an identical warning string. A cheap consistency check gives reference = 7.19e-5 eV. The 14367 s spectrum run was not reproduced, because it is remote-only.
+
+### Qualifications
+
+1. The bound is relative to the reducer's captured field, which freezes coupling and attenuation at the carrier. It is not a bound on the true energy-dependent physical field.
+2. The affine-tail step uses the frozen-scope edge-leak proof, which the previous verification covered.
+3. The audit gives no sampling-error control. The $\pi H/\mathrm{span}$ step is a diagnostic.
+4. The ratio 64.9 comes mostly from the L1 fallback, with $W\cdot L_1^2$ scaling. It is a loose upper bound and is not evidence of error.
+5. Window-excluded power is untested empirically: in the ladders, the windows cover the axis.
+
+Verdict: dispersion building blocks `rederived`. The re-scoped claim is honest and matches the code.

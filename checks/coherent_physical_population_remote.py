@@ -448,7 +448,13 @@ def run(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("ladder", "smoke"), required=True)
-    parser.add_argument("--energy", type=float, choices=(30.0, 60.0), default=30.0)
+    parser.add_argument(
+        "--energy",
+        type=float,
+        choices=(30.0, 60.0),
+        default=30.0,
+        help="ladder mode only; smoke mode always runs 60 keV (the value is still logged in config)",
+    )
     parser.add_argument("--charge-pc", type=float, default=1.0)
     parser.add_argument("--max-points", type=int, default=20000000)
     parser.add_argument("--reference-points", type=int, default=40000000)
