@@ -75,11 +75,11 @@ def test_missing_selected_catalog_fails_without_fallback(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("profile", "warned"),
+    ("profile", "missing"),
     [("coh_test", ("beam",)), ("hopg_short", ("detector",)), ("standard", ("beam",))],
 )
-def test_selected_catalog_run_warns_for_implicit_example_instrument(
-    tmp_path, monkeypatch, profile, warned
+def test_selected_catalog_run_rejects_implicit_example_instrument(
+    tmp_path, monkeypatch, profile, missing
 ):
     from pyrite.runs import scan as runs_scan
 
@@ -95,10 +95,9 @@ def test_selected_catalog_run_warns_for_implicit_example_instrument(
         env={"PYRITE_MC_BACKEND": "cpu"},
     )
 
-    assert result.exit_code == 0, result.output
-    for key in ("beam", "detector"):
-        line = f"warning: profile '{profile}' names no {key};"
-        assert (line in result.stderr) is (key in warned), result.stderr
+    assert result.exit_code == 2, result.output
+    assert f"Error: profile '{profile}' names no {' or '.join(missing)};" in result.stderr
+    assert "removed in 0.6.0" in result.stderr
 
 
 def test_bundled_catalog_run_does_not_warn_for_example_instrument(tmp_path, monkeypatch):

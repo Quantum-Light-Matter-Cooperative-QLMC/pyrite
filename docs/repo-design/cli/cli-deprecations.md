@@ -8,37 +8,24 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 
 ## Commands
 
-| Deprecated spelling | Replacement | Deprecated in | Remove in | Note |
-| --- | --- | --- | --- | --- |
-| `pyrite material set` | `pyrite profile set` | 0.4.0 | 0.6.0 | per-material range overrides are retired (issue #359): set shared ranges with 'pyrite profile set', or give one material its own profile with 'pyrite profile create NAME --from PROFILE --material MATERIAL'; 'pyrite material set MATERIAL --reset all' still removes existing overrides during the window. |
+No command spelling is currently deprecated. Every spelling the CLI accepts is canonical; anything else exits as an unknown command.
 
 ## Options
 
 | Command | Deprecated option | Replacement | Deprecated in | Remove in | Note |
 | --- | --- | --- | --- | --- | --- |
 | `pyrite app validation export` | `--ne-brem` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
-| `pyrite checkpoint recompute brem` | `--fidelity` | omit it; recompute reads fidelity from checkpoint metadata | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
 | `pyrite checkpoint recompute brem` | `--ne-brem` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
-| `pyrite checkpoint recompute line` | `--fidelity` | omit it; recompute reads fidelity from checkpoint metadata | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
 | `pyrite profile add` | `--ne-brem` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
 | `pyrite profile add` | `--ne-line` | `--line-trials` | 0.5.1 | 0.7.0 |  |
 | `pyrite profile create` | `--ne-brem` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
 | `pyrite profile create` | `--ne-line` | `--line-trials` | 0.5.1 | 0.7.0 |  |
 | `pyrite profile numerics set` | `--bremsstrahlung-electrons` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
 | `pyrite profile numerics set` | `--line-electrons` | `--line-trials` | 0.5.1 | 0.7.0 |  |
-| `pyrite profile numerics show` | `--fidelity` | omit it; numerics resolve against full | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
 | `pyrite profile set` | `--ne-brem` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
 | `pyrite profile set` | `--ne-line` | `--line-trials` | 0.5.1 | 0.7.0 |  |
-| `pyrite-dev perf` | `--fidelity` | omit it for full; for reduced runs use --quick or a user-defined catalog profile | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
-| `pyrite run` | `--fidelity` | omit it for full; for reduced runs use --quick or a user-defined catalog profile | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
 | `pyrite run` | `--ne-brem` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
 
 ## Implicit defaults
 
-A run that leaves one of these unnamed still resolves the fallback, warns on stderr, and must name it explicitly from the removal release.
-
-| Unnamed | Current fallback | Name it explicitly | Deprecated in | Remove in | Note |
-| --- | --- | --- | --- | --- | --- |
-| beam | the built-in example beam (5 kHz, 1 pC, as bundled `default`) | set the profile's `beam` with 'pyrite profile set NAME --beam BEAM' | 0.4.0 | 0.6.0 | Profiles in a user-selected catalog; bundled example profiles are exempt. |
-| detector | the code-default scalar detector (90-degree example geometry) | declare `[profiles.NAME.detectors.ID]` or set the legacy `detector` reference | 0.4.0 | 0.6.0 | Profiles in a user-selected catalog; bundled example profiles are exempt. |
-| profile | the `standard` profile | pass PROFILE, set PYRITE_PROFILE, or run 'pyrite config set profile.current NAME' | 0.4.0 | 0.6.0 | `pyrite run` and `pyrite remote start`; `standard` stays a named profile. |
+No implicit default is currently deprecated. A run that leaves its profile unnamed, or a user-catalog profile that names no beam or detector, exits as a usage error.

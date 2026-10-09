@@ -12,7 +12,6 @@ from ...console.output import (
     POSITIVE_INT,
     CLIError,
     emit_diagnostic,
-    fidelity_option,
     output_option,
     run,
 )
@@ -140,7 +139,6 @@ def _recompute_options(function):
     help="Recompute brem-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
-@fidelity_option(help="Fidelity preset supplying omitted grid and electron defaults.")
 @click.option(
     "--brem-trials",
     "--ne-brem",
@@ -156,7 +154,6 @@ def _recompute_options(function):
 def rebrem_command(
     material,
     all_,
-    fidelity,
     redo_all,
     dry_run,
     no_sync,
@@ -175,7 +172,6 @@ def rebrem_command(
         _cli_rebrem,
         material=materials,
         all_=all_,
-        fidelity=fidelity,
         ne_brem=ne_brem,
         start=start,
         stop=stop,
@@ -193,7 +189,6 @@ def rebrem_command(
     help="Recompute line-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
-@fidelity_option(help="Fidelity preset supplying omitted grid and electron defaults.")
 @click.option("--line-ne", type=POSITIVE_INT, default=None, help="New line electron count.")
 @click.option("--start", type=NONNEGATIVE_FLOAT, default=None, help="Line lower bound in eV.")
 @click.option("--stop", type=POSITIVE_FLOAT, default=None, help="Line exclusive upper bound in eV.")
@@ -207,7 +202,6 @@ def rebrem_command(
 def reline_command(
     material,
     all_,
-    fidelity,
     redo_all,
     dry_run,
     no_sync,
@@ -226,7 +220,6 @@ def reline_command(
         _cli_reline,
         material=materials,
         all_=all_,
-        fidelity=fidelity,
         line_ne=line_ne,
         start=start,
         stop=stop,
@@ -245,7 +238,6 @@ class _StartFlags:
 
     catalog_profile: str | None
     material: str | None
-    fidelity: str
     quick: bool
     workers: int | None
     parallel_materials: int | None
@@ -353,9 +345,7 @@ def _reject_start_allocation_conflicts(flags, chunk_minutes):
 
 
 def _reject_start_mode_conflicts(flags):
-    """Reject fidelity, grid, and attachment combinations ``remote run`` cannot honour."""
-    if flags.quick and flags.fidelity != "full":
-        raise click.UsageError("--quick cannot be combined with --fidelity survey")
+    """Reject grid and attachment combinations ``remote run`` cannot honour."""
     if flags.quick and flags.grid:
         raise click.UsageError(
             "run --quick --grid: quick checkpoints aren't grid-filterable; drop --grid"
@@ -394,7 +384,6 @@ _start_selection_options = _option_group(
         shell_complete=_cli_completion.complete_material,
         help="Run one material from PROFILE instead of its full membership.",
     ),
-    fidelity_option(help="Named settings/grid policy. survey is provisional and reduced."),
     click.option("--quick", is_flag=True, help="Use tiny smoke-test grid."),
 )
 
@@ -570,8 +559,8 @@ _start_transfer_options = _option_group(
         "Use --headless to return after submission. Use --no-pull to track "
         "through completion without automatically pulling checkpoints.\n\n"
         "PROFILE selects the catalog campaign and its material membership; when "
-        "omitted it uses the current configured profile (standard built-in; the "
-        "built-in fallback warns and is deprecated). Use "
+        "omitted it uses PYRITE_PROFILE or the configured profile.current, and is "
+        "a usage error when neither is set. Use "
         "-m/--material to run one member only. Profiles without an explicit "
         "membership run every catalog material.\n\n"
         "A profile run names the job after PROFILE (NAME, then "
@@ -594,16 +583,15 @@ def start_command(**params):
         resolved_profile = cli_config.resolve("profile.current", flags.catalog_profile)
     except cli_config.ConfigError as exc:
         raise CLIError(str(exc)) from exc
+    _implicit_defaults.require_explicit_profile(resolved_profile)
     catalog_profile = resolved_profile.value
 
     materials = resolve_profile_materials(catalog_profile, flags.material)
-    _implicit_defaults.warn_implicit_profile(resolved_profile)
-    _implicit_defaults.warn_implicit_instrument(catalog_profile)
+    _implicit_defaults.require_explicit_instrument(catalog_profile)
     plan = _plan_start(flags, catalog_profile)
     return _invoke_action(
         _cli_start,
         materials=materials,
-        fidelity=flags.fidelity,
         catalog_profile=catalog_profile,
         quick=flags.quick,
         workers=flags.workers,

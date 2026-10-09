@@ -4,8 +4,6 @@ import sys
 import pytest
 
 from pyrite.checkpoints import _checkpoint_io, slim
-from pyrite.cli import command as root_command
-from pyrite.cli._deprecations import option_message
 from pyrite.cli.commands import app_analysis as analyze
 from pyrite.cli.commands import app_validation as check
 from pyrite.cli.commands import app_viewer as viewer
@@ -67,7 +65,6 @@ def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch):
         "all": False,
         "actually_all": False,
         "workers": 0,
-        "fidelity": "full",
         "catalog_profile": "standard",
         "quick": False,
         "n_families": None,
@@ -150,19 +147,6 @@ def test_perf_cache_flag_precedence(monkeypatch, extra, expected):
     result = invoke(performance_command, ["standard", "-m", "hopg", *extra])
     assert_clean_result(result)
     assert (seen["cache_read"], seen["cache_write"]) == expected
-
-
-def test_run_fidelity_dispatch_and_quick_conflict(monkeypatch):
-    seen = _capture(monkeypatch, scan, "run")
-    result = invoke(root_command, ["run", "standard", "-m", "hopg", "--fidelity", "survey"])
-    assert_clean_result(result, stderr=option_message("run", "--fidelity") + "\n")
-    assert seen["fidelity"] == "survey"
-
-    conflict = invoke(
-        scan_cli.command, ["standard", "-m", "hopg", "--fidelity", "survey", "--quick"]
-    )
-    assert conflict.exit_code == 2
-    assert "cannot be combined" in conflict.stderr
 
 
 def test_blaze_preserves_one_flag_many_values_syntax(monkeypatch):

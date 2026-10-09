@@ -143,7 +143,6 @@ def _cli_rebrem(
     *,
     material,
     all_,
-    fidelity,
     ne_brem,
     start,
     stop,
@@ -158,7 +157,6 @@ def _cli_rebrem(
     materials = _selected_materials("rebrem", all_, material)
     jobid = lifecycle.start_rebrem_queue(
         materials,
-        fidelity=fidelity,
         ne_brem=ne_brem,
         brem_start_eV=start,
         brem_stop_eV=stop,
@@ -191,7 +189,6 @@ def _cli_reline(
     *,
     material,
     all_,
-    fidelity,
     line_ne,
     start,
     stop,
@@ -206,7 +203,6 @@ def _cli_reline(
     materials = _selected_materials("reline", all_, material)
     jobid = lifecycle.start_reline_queue(
         materials,
-        fidelity=fidelity,
         line_ne=line_ne,
         line_start_eV=start,
         line_stop_eV=stop,
@@ -323,7 +319,6 @@ def _cli_start(
     materials,
     catalog_profile,
     quick,
-    fidelity,
     workers,
     parallel_materials,
     chunk_minutes,
@@ -353,7 +348,6 @@ def _cli_start(
     jobid = lifecycle.start_queue(
         materials,
         quick=quick,
-        fidelity=fidelity,
         workers=workers,
         parallel_materials=parallel_materials,
         chunk_minutes=chunk_minutes,
@@ -411,11 +405,11 @@ def _cli_start(
         )
         return
     materials_needing_pull = set(state._materials_needing_pull(jobid, completed))
-    if quick or (fidelity == "full" and catalog_profile == "standard"):
+    if quick or catalog_profile == "standard":
         material_stems = scripts._material_stems(
             completed,
             quick,
-            fidelity,
+            "full",
             high_energy_min_kev=high_energy_min_kev,
             catalog_profile=catalog_profile,
         )
@@ -426,9 +420,7 @@ def _cli_start(
         material_stems = [
             (material, stem)
             for material in completed
-            for stem in lifecycle.resolve_profile_stems(
-                material, catalog_profile, fidelity=fidelity
-            )
+            for stem in lifecycle.resolve_profile_stems(material, catalog_profile, fidelity="full")
         ]
     from ...checkpoints import _checkpoint_store
 

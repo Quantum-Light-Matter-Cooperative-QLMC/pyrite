@@ -382,35 +382,6 @@ def output_option(function):
     )(function)
 
 
-FIDELITY_CHOICES = click.Choice(("full", "survey"), case_sensitive=True)
-FIDELITY_DEPRECATED_HELP = "Deprecated (removal in 0.6.0; issue #215)."
-_DEFAULT_FIDELITY_HELP = (
-    f"{FIDELITY_DEPRECATED_HELP} Named settings/grid-reduction policy; survey is retired."
-)
-
-
-def fidelity_option(*, help: str = _DEFAULT_FIDELITY_HELP, cls: type[click.Option] = click.Option):
-    """Add ``--fidelity`` option to a Click command.
-
-    Public commands pass ``cls=DeprecatedOption`` so a command-line use warns.
-    The internal ``remote`` targets that ``run --remote`` and ``checkpoint
-    recompute --remote`` reach through ``ctx.invoke`` keep the plain option:
-    their values arrive already warned about.
-    """
-
-    def decorator(function):
-        return click.option(
-            "--fidelity",
-            cls=cls,
-            type=FIDELITY_CHOICES,
-            default="full",
-            show_default=True,
-            help=help,
-        )(function)
-
-    return decorator
-
-
 def emit_result(message: str) -> None:
     click.echo(message)
 

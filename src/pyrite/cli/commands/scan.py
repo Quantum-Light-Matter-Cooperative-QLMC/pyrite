@@ -12,7 +12,7 @@ from ...console import output as _cli_core
 from ...runs import scan as _scan
 from .. import _completion as _cli_completion
 from .. import _implicit_defaults
-from .._deprecations import DeprecatedOption, RetiredOption, canonical_option
+from .._deprecations import RetiredOption, canonical_option
 from .._options import remote_option
 
 _PERFORMANCE_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
@@ -54,9 +54,9 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     "run",
     help=(
         "Run a catalog profile's MC sweeps or one ephemeral pixel scene.\n\n"
-        "PROFILE defaults to the current configured profile (standard built-in; "
-        "the built-in fallback warns and is deprecated) "
-        "and owns material membership, campaign ranges, and workload settings. "
+        "PROFILE defaults to PYRITE_PROFILE or the configured profile.current; with "
+        "neither set, naming no profile is a usage error. PROFILE "
+        "owns material membership, campaign ranges, and workload settings. "
         "Use -m/--material to run one profile member instead of the full resolved "
         "membership.\n\n"
         "Resumes compatible checkpoints in CHECKPOINTS. Full writes component "
@@ -315,7 +315,6 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     ),
 )
 @click.pass_context
-@_cli_core.fidelity_option(cls=DeprecatedOption)
 @_cli_core.output_option
 def _command(
     ctx,
@@ -325,7 +324,6 @@ def _command(
     detector_id,
     output_file,
     workers,
-    fidelity,
     quick,
     n_families,
     checkpoint_dir,
@@ -402,7 +400,8 @@ def _command(
             resolved = _cli_config.resolve("profile.current", catalog_profile)
         except _cli_config.ConfigError as exc:
             raise _cli_core.CLIError(str(exc)) from exc
-        _implicit_defaults.warn_implicit_profile(resolved)
+        if (error := _implicit_defaults.implicit_profile_error(resolved)) is not None:
+            simulation_usage_error(error, output_format)
 
         def resolver(document, material, profile_name, detector_id):
             return resolve_scene(
@@ -461,7 +460,6 @@ def _command(
             "catalog_profile": "PROFILE",
             "material": "--material",
             "workers": "--workers",
-            "fidelity": "--fidelity",
             "quick": "--quick",
             "n_families": "--n-families",
             "checkpoint_dir": "--checkpoint-dir",
@@ -516,7 +514,7 @@ def _command(
                 dry_run=dry_run,
             )
     if resolved_profile is not None:
-        _implicit_defaults.warn_implicit_profile(resolved_profile)
+        _implicit_defaults.require_explicit_profile(resolved_profile)
     if remote_target is not None or nsys:
         from ...campaign.config import _catalog
 
@@ -559,7 +557,6 @@ def _command(
                 remote_cli.start_command,
                 catalog_profile=catalog_profile,
                 material=material,
-                fidelity=fidelity,
                 quick=quick,
                 workers=workers,
                 perf=perf,
@@ -579,9 +576,7 @@ def _command(
                 chunk_minutes=chunk_minutes,
             )
     if resolved_profile is not None:
-        _implicit_defaults.warn_implicit_instrument(catalog_profile)
-    if quick and fidelity != "full":
-        raise click.UsageError("--quick cannot be combined with --fidelity survey")
+        _implicit_defaults.require_explicit_instrument(catalog_profile)
     if perf and performance_profile is None:
         # -p is sugar for --performance-profile PROFILE: profile the positional
         # profile's full membership (or one member when -m is given).
@@ -621,7 +616,6 @@ def _command(
             performance_dir=performance_dir,
             performance_interval=performance_interval,
             workers=workers,
-            fidelity=fidelity,
             quick=quick,
             n_families=n_families,
             max_minutes=max_minutes,
@@ -637,7 +631,6 @@ def _command(
             performance_dir=performance_dir,
             performance_interval=performance_interval,
             workers=workers,
-            fidelity=fidelity,
             quick=quick,
             n_families=n_families,
             max_minutes=max_minutes,
@@ -660,7 +653,6 @@ def _command(
             all=False,
             actually_all=False,
             workers=workers,
-            fidelity=fidelity,
             catalog_profile=catalog_profile,
             quick=quick,
             n_families=n_families,
@@ -684,7 +676,6 @@ def _command(
         all=False,
         actually_all=False,
         workers=workers,
-        fidelity=fidelity,
         catalog_profile=catalog_profile,
         quick=quick,
         n_families=n_families,

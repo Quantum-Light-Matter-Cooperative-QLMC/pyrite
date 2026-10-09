@@ -19,7 +19,7 @@ from ...checkpoints import recompute as _recompute
 from ...console import json as cli_json
 from ...console import output as _cli_core
 from .. import _completion as _cli_completion
-from .._deprecations import DeprecatedOption, canonical_option
+from .._deprecations import canonical_option
 from .._options import remote_option
 
 
@@ -37,7 +37,6 @@ def _brem_cli(args):
         brem_start_eV=getattr(args, "start", None),
         brem_stop_eV=getattr(args, "stop", None),
         brem_step_eV=args.step,
-        fidelity=getattr(args, "fidelity", None),
         catalog_profile=getattr(args, "catalog_profile", None),
         require_identity=True,
         redo_all=args.redo_all,
@@ -69,7 +68,6 @@ def _brem_cli_json(args):
                 brem_start_eV=getattr(args, "start", None),
                 brem_stop_eV=getattr(args, "stop", None),
                 brem_step_eV=args.step,
-                fidelity=getattr(args, "fidelity", None),
                 catalog_profile=getattr(args, "catalog_profile", None),
                 require_identity=True,
                 redo_all=args.redo_all,
@@ -194,16 +192,6 @@ def _reject_remote_local_options(ctx: click.Context, json_output: bool) -> None:
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
 @click.option(
-    "--fidelity",
-    cls=DeprecatedOption,
-    type=_cli_core.FIDELITY_CHOICES,
-    default=None,
-    help=(
-        f"{_cli_core.FIDELITY_DEPRECATED_HELP} Override dataset fidelity; defaults to "
-        "checkpoint metadata or full for legacy data."
-    ),
-)
-@click.option(
     "--profile",
     "catalog_profile",
     default=None,
@@ -266,7 +254,6 @@ def brem_command(
     ctx,
     materials,
     all_,
-    fidelity,
     catalog_profile,
     ne_brem,
     start,
@@ -310,7 +297,6 @@ def brem_command(
                 remote_cli.rebrem_command,
                 material=materials,
                 all_=all_,
-                fidelity=fidelity or "full",
                 redo_all=redo_all,
                 dry_run=dry_run,
                 no_sync=no_sync,
@@ -326,7 +312,6 @@ def brem_command(
         handler,
         material=list(materials),
         all=all_,
-        fidelity=fidelity,
         catalog_profile=catalog_profile,
         ne_brem=ne_brem,
         start=start,
@@ -355,7 +340,6 @@ def _line_cli(args):
         line_start_eV=getattr(args, "start", None),
         line_stop_eV=getattr(args, "stop", None),
         line_step_eV=args.line_step,
-        fidelity=getattr(args, "fidelity", None),
         catalog_profile=getattr(args, "catalog_profile", None),
         require_identity=True,
         redo_all=args.redo_all,
@@ -387,7 +371,6 @@ def _line_cli_json(args):
                 line_start_eV=getattr(args, "start", None),
                 line_stop_eV=getattr(args, "stop", None),
                 line_step_eV=args.line_step,
-                fidelity=getattr(args, "fidelity", None),
                 catalog_profile=getattr(args, "catalog_profile", None),
                 require_identity=True,
                 redo_all=args.redo_all,
@@ -438,16 +421,6 @@ def _line_cli_json(args):
     shell_complete=_cli_completion.complete_checkpoint_stem,
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
-@click.option(
-    "--fidelity",
-    cls=DeprecatedOption,
-    type=_cli_core.FIDELITY_CHOICES,
-    default=None,
-    help=(
-        f"{_cli_core.FIDELITY_DEPRECATED_HELP} Override dataset fidelity; defaults to "
-        "checkpoint metadata or full for legacy data."
-    ),
-)
 @click.option(
     "--profile",
     "catalog_profile",
@@ -509,7 +482,6 @@ def line_command(
     ctx,
     materials,
     all_,
-    fidelity,
     catalog_profile,
     line_ne,
     start,
@@ -553,7 +525,6 @@ def line_command(
                 remote_cli.reline_command,
                 material=materials,
                 all_=all_,
-                fidelity=fidelity or "full",
                 redo_all=redo_all,
                 dry_run=dry_run,
                 no_sync=no_sync,
@@ -569,7 +540,6 @@ def line_command(
         handler,
         material=list(materials),
         all=all_,
-        fidelity=fidelity,
         catalog_profile=catalog_profile,
         line_ne=line_ne,
         start=start,

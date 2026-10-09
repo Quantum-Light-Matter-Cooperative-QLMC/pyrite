@@ -29,7 +29,7 @@ pyrite profile show my-survey
 pyrite material show hopg --profile my-survey
 ```
 
-Set ranges on the profile. When one material needs different ranges, give it its own profile (`pyrite profile create NAME --from PROFILE --material MATERIAL`) rather than a per-material override: overrides silently diverge one material from the profile it appears to follow. `pyrite material set` is deprecated (removal in 0.6.0, issue #359); during the window, `pyrite material set MATERIAL --profile NAME --reset all` removes the range overrides it wrote. Inspect the effective material after every edit; `pyrite material show` marks each range `inherited` or `overridden`, and the displayed result, not the TOML fragment alone, is what a run hashes.
+Set ranges on the profile. When one material needs different ranges, give it its own profile (`pyrite profile create NAME --from PROFILE --material MATERIAL`) rather than a per-material override: overrides silently diverge one material from the profile it appears to follow. `pyrite material set` was removed in 0.6.0 (issue #359); remove existing `[profiles.NAME.overrides.MATERIAL]` range keys by editing the catalog TOML. Inspect the effective material after every edit; `pyrite material show` marks each range `inherited` or `overridden`, and the displayed result, not the TOML fragment alone, is what a run hashes.
 
 ## Reuse a named beam
 

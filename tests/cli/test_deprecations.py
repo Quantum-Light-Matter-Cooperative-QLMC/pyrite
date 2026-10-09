@@ -15,7 +15,6 @@ from pyrite.cli._deprecations import (
     _window,
     canonical_option,
     message,
-    option_message,
 )
 from pyrite.cli.commands.scan import performance_command as perf_command
 from pyrite.devtools.cli_commands import energy_grid_command, performance_command
@@ -339,22 +338,3 @@ def test_deprecated_option_help_does_not_warn() -> None:
     assert result.exit_code == 0
     assert "--fidelity" in result.stdout
     assert result.stderr == ""
-
-
-def test_fidelity_rows_name_the_removal_release() -> None:
-    assert option_message("checkpoint recompute brem", "--fidelity") == (
-        "warning: '--fidelity' is deprecated and will be removed in 0.6.0; "
-        "omit it; recompute reads fidelity from checkpoint metadata"
-    )
-    for key, entry in DEPRECATED_FLAGS.items():
-        if key[1] == "--fidelity":
-            assert (entry.deprecated_in, entry.remove_in) == ("0.4.0", "0.6.0")
-
-
-def test_profile_numerics_show_warns_once_with_registry_message() -> None:
-    result = invoke(command, ["profile", "numerics", "show", "standard", "--fidelity", "full"])
-
-    assert result.exit_code == 0, result.output
-    warnings = [line for line in result.stderr.splitlines() if "is deprecated" in line]
-    assert warnings == [option_message("profile numerics show", "--fidelity")]
-    assert "fidelity=full" in result.stdout

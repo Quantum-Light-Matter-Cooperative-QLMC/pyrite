@@ -33,8 +33,9 @@ def test_run_help_keeps_beam_overrides_profile_owned():
     result = CliRunner().invoke(scan_cli.command, ["--help"])
 
     assert result.exit_code == 0
-    assert "PROFILE defaults to the current configured profile" in result.output
-    assert "standard built-in" in result.output
+    assert "PROFILE defaults to PYRITE_PROFILE or the configured profile.current" in " ".join(
+        result.output.split()
+    )
     assert "--beam-" not in result.output
 
 
@@ -170,7 +171,6 @@ def test_nsys_reexec_command_builds_launcher_and_uncached_checkpoint():
         performance_dir=None,
         performance_interval=2.0,
         workers=0,
-        fidelity="survey",
         quick=False,
         n_families=None,
         max_minutes=1.5,
@@ -180,6 +180,7 @@ def test_nsys_reexec_command_builds_launcher_and_uncached_checkpoint():
     assert "--output=performance-profiles/sub_100keV/hopg" in argv
     assert "-m" in argv and "pyrite._dev" in argv and "perf" in argv
     assert "--nsys" not in argv  # child must not recurse
+    assert "--fidelity" not in argv
     assert "--performance-profile" not in argv and "sub_100keV" in argv
     assert "--perf-interval" in argv and "2" in argv
     assert "--max-minutes" in argv and "1.5" in argv
@@ -197,7 +198,6 @@ def test_nsys_reexec_command_full_membership_uses_profile_stem():
         performance_dir=None,
         performance_interval=5.0,
         workers=None,
-        fidelity="full",
         quick=False,
         n_families=None,
     )
@@ -217,7 +217,6 @@ def test_nsys_reexec_forwards_explicit_recompute():
         performance_dir=None,
         performance_interval=5.0,
         workers=None,
-        fidelity="full",
         quick=False,
         n_families=None,
         recompute=True,
@@ -236,7 +235,6 @@ def test_reexec_under_nsys_errors_when_nsys_missing(monkeypatch):
             performance_dir=None,
             performance_interval=5.0,
             workers=None,
-            fidelity="full",
             quick=False,
             n_families=None,
         )
@@ -251,7 +249,6 @@ def test_py_spy_reexec_command_samples_an_uncached_child():
         performance_dir=None,
         performance_interval=5.0,
         workers=None,
-        fidelity="full",
         quick=False,
         n_families=None,
     )

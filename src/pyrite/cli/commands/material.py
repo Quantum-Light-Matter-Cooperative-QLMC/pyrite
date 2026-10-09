@@ -1,10 +1,8 @@
-"""Inspect effective material ranges and edit per-profile overrides."""
+"""Inspect effective material ranges, simulate scenes, and blaze materials."""
 
-import difflib
 from pathlib import Path
 
 import click
-import tomlkit
 from tomlkit.exceptions import ParseError
 
 from pyrite.cli import _catalog_io
@@ -13,18 +11,11 @@ from pyrite.cli._groups import LazyGroup
 from pyrite.cli.commands._simulation import _write_simulation_artifact as _write_simulation_artifact
 from pyrite.console import json as cli_json
 from pyrite.console.output import (
-    AZIMUTH_CSV_RANGE,
-    ENERGY_CSV_RANGE,
-    THICKNESS_CSV_RANGE,
-    TILT_CSV_RANGE,
     CLIError,
     emit_json_result,
     emit_result,
-    flatten_option_values,
     output_option,
 )
-
-_RESET_CHOICES = click.Choice((*_catalog_io.RANGES, "all"), case_sensitive=False)
 
 _COMMANDS = {
     "blaze": "pyrite.cli.commands.blaze.command",
@@ -155,96 +146,6 @@ def _show(material, profile_name, json_output, *, schema="cxr.material.show"):
     return 0
 
 
-def _range_options(function):
-    options = (
-        ("--thickness", THICKNESS_CSV_RANGE, "ANGSTROM,...", "Crystal thicknesses in angstrom."),
-        ("--energy", ENERGY_CSV_RANGE, "KEV,...", "Beam energies in keV."),
-        ("--polar", TILT_CSV_RANGE, "DEG,...", "Polar tilts in degrees [0, 90)."),
-        ("--azimuth", AZIMUTH_CSV_RANGE, "DEG,...", "Azimuth tilts in degrees [0, 360]."),
-    )
-    for flag, value_type, metavar, help_text in reversed(options):
-        function = click.option(
-            flag,
-            type=value_type,
-            multiple=True,
-            metavar=f"{metavar} | START:STOP:STEP",
-            help=(
-                f"{help_text} Comma-separated, mixable with start:stop:step ranges; "
-                "repeat to combine."
-            ),
-        )(function)
-    return function
-
-
-def _set(
-    material,
-    profile_name,
-    thickness,
-    energy,
-    polar,
-    azimuth,
-    reset_keys,
-    yes,
-    dry_run,
-):
-    updates = {
-        label: value
-        for label, value in {
-            "thickness": flatten_option_values(thickness),
-            "energy": flatten_option_values(energy),
-            "polar": flatten_option_values(polar),
-            "azimuth": flatten_option_values(azimuth),
-        }.items()
-        if value is not None
-    }
-    if not updates and not reset_keys:
-        raise click.UsageError("provide a range option or --reset")
-    try:
-        original, document = _catalog_io.catalog_text()
-        if material not in _catalog_io.material_rows(document):
-            _unknown_material(document, material)
-        if profile_name not in _catalog_io.profile_rows(document):
-            _unknown_profile(document, profile_name)
-        profile = _catalog_io.existing_profile(document, profile_name)
-        target = _catalog_io.material_override_table(profile, material)
-        overwriting = [label for label in updates if _catalog_io.RANGES[label] in target]
-    except (OSError, ValueError, ParseError) as exc:
-        raise CLIError(str(exc)) from None
-    if overwriting and not yes and not dry_run:
-        click.confirm(
-            f"overwrite {', '.join(overwriting)} for profile {profile_name}, material {material}?",
-            err=True,
-            abort=True,
-        )
-    try:
-        for label, values in updates.items():
-            target[_catalog_io.RANGES[label]] = _catalog_io.values_item(values)
-        reset = set(reset_keys)
-        if "all" in reset:
-            reset = set(_catalog_io.RANGES)
-        for label in reset:
-            target.pop(_catalog_io.RANGES[label], None)
-        proposed = tomlkit.dumps(document)
-        _catalog_io.validate(_catalog_io.active_catalog_path(), proposed)
-    except (OSError, ValueError, ParseError) as exc:
-        raise CLIError(str(exc)) from None
-    if dry_run:
-        emit_result(
-            "".join(
-                difflib.unified_diff(
-                    original.splitlines(True),
-                    proposed.splitlines(True),
-                    "catalog (current)",
-                    "catalog (proposed)",
-                )
-            )
-        )
-        return 0
-    _catalog_io.atomic_write(_catalog_io.active_catalog_path(), proposed)
-    emit_result(f"updated profile {profile_name}, material {material}")
-    return 0
-
-
 @click.group(
     name="material",
     cls=LazyGroup,
@@ -259,8 +160,7 @@ def command():
     Profile membership and ranges live under ``pyrite profile``. ``show``
     reports effective ranges and any per-material override that diverges from
     the profile; ``validate`` checks the complete catalog; ``blaze`` writes a
-    face-specific checkpoint. The deprecated ``set`` (removal in 0.6.0) only
-    remains to reset existing overrides.
+    face-specific checkpoint.
     """
 
 
@@ -324,47 +224,3 @@ def simulate_command(material, profile_name, detector_id, output_format, output_
 def show_command(material, profile_name, json_output):
     """Show MATERIAL's effective ranges and inherited/overridden sources."""
     return _show(material, profile_name, json_output)
-
-
-@command.command("set", hidden=True)
-@click.argument("material", shell_complete=_cli_completion.complete_material)
-@click.option(
-    "--profile",
-    "profile_name",
-    default=_catalog_io.DEFAULT_PROFILE,
-    show_default=True,
-    shell_complete=_cli_completion.complete_profile,
-    help="Edit overrides under profile NAME.",
-)
-@_range_options
-@click.option(
-    "--reset",
-    "reset_keys",
-    type=_RESET_CHOICES,
-    multiple=True,
-    help="Remove one override; repeat, or use --reset all.",
-)
-@click.option("-y", "--yes", "yes", is_flag=True, help="Skip overwrite confirmation.")
-@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def set_command(
-    material, profile_name, thickness, energy, polar, azimuth, reset_keys, yes, dry_run
-):
-    """Deprecated: set or reset MATERIAL overrides under one profile.
-
-    Per-material overrides quietly diverge one material from its profile and
-    are retired in 0.6.0 (issue #359). Set shared ranges with ``pyrite profile
-    set``, or give a material its own profile with ``pyrite profile create NAME
-    --from PROFILE --material MATERIAL``. ``--reset all`` removes the four
-    range overrides this command wrote.
-    """
-    return _set(
-        material,
-        profile_name,
-        thickness,
-        energy,
-        polar,
-        azimuth,
-        reset_keys,
-        yes,
-        dry_run,
-    )

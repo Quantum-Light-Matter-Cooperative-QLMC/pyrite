@@ -102,10 +102,10 @@ Usage: pyrite run [OPTIONS] [PROFILE]
 
   Run a catalog profile's MC sweeps or one ephemeral pixel scene.
 
-  PROFILE defaults to the current configured profile (standard built-in; the built-in
-  fallback warns and is deprecated) and owns material membership, campaign ranges, and
-  workload settings. Use -m/--material to run one profile member instead of the full
-  resolved membership.
+  PROFILE defaults to PYRITE_PROFILE or the configured profile.current; with neither
+  set, naming no profile is a usage error. PROFILE owns material membership, campaign
+  ranges, and workload settings. Use -m/--material to run one profile member instead of
+  the full resolved membership.
 
   Resumes compatible checkpoints in CHECKPOINTS. Full writes component data beneath
   <material>/; variants use identity-qualified stems. With --ephemeral, require -m and
@@ -166,9 +166,6 @@ Options:
   --chunk-minutes MINUTES         With -R/--remote, self-resubmitting SLURM slice
                                   length; defaults to 10, or 0 (one unchunked
                                   allocation) for profiling captures.
-  --fidelity [full|survey]        Deprecated (removal in 0.6.0; issue #215). Named
-                                  settings/grid-reduction policy; survey is retired.
-                                  [default: full]
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
@@ -533,9 +530,6 @@ Usage: pyrite checkpoint recompute brem [OPTIONS] [MATERIALS]...
 
 Options:
   -a, --all                       Recompute every checkpoint.
-  --fidelity [full|survey]        Deprecated (removal in 0.6.0; issue #215). Override
-                                  dataset fidelity; defaults to checkpoint metadata or
-                                  full for legacy data.
   --profile NAME                  Catalog profile for legacy data; otherwise must match
                                   checkpoint metadata.
   --brem-trials N                 Monte Carlo electron histories used to estimate
@@ -576,9 +570,6 @@ Usage: pyrite checkpoint recompute line [OPTIONS] [MATERIALS]...
 
 Options:
   -a, --all                       Recompute every checkpoint.
-  --fidelity [full|survey]        Deprecated (removal in 0.6.0; issue #215). Override
-                                  dataset fidelity; defaults to checkpoint metadata or
-                                  full for legacy data.
   --profile NAME                  Catalog profile for legacy data; otherwise must match
                                   checkpoint metadata.
   --line-ne N                     Line-spectrum electron count; overrides profile
@@ -1767,9 +1758,6 @@ Usage: pyrite profile numerics show [OPTIONS] NAME
   Show explicit and effective PROFILE numerics with value sources.
 
 Options:
-  --fidelity [full|survey]        Deprecated (removal in 0.6.0; issue #215). Resolve
-                                  profile values against this fidelity preset.
-                                  [default: full]
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
@@ -2141,8 +2129,7 @@ Usage: pyrite profile energy-grid defaults [OPTIONS]
   controls only applied bremsstrahlung spacing.
 
   Empty ``polar`` or ``azimuth`` mean inherit each material's catalog-profile angles.
-  These are not physical scan defaults and do not select scan ``--fidelity
-  full|survey``.
+  These are not physical scan defaults.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
@@ -2170,7 +2157,6 @@ Usage: pyrite material [OPTIONS] COMMAND [ARGS]...
   Profile membership and ranges live under ``pyrite profile``. ``show`` reports
   effective ranges and any per-material override that diverges from the profile;
   ``validate`` checks the complete catalog; ``blaze`` writes a face-specific checkpoint.
-  The deprecated ``set`` (removal in 0.6.0) only remains to reset existing overrides.
 
 Options:
   -h, --help  Show this message and exit.

@@ -146,23 +146,6 @@ def filter_rows(profile):
     return filters
 
 
-def material_override_table(profile, material):
-    """Return writable ``[profiles.NAME.overrides.MATERIAL]`` table."""
-    overrides = profile.get("overrides")
-    if overrides is None:
-        overrides = tomlkit.table()
-        profile["overrides"] = overrides
-    elif not isinstance(overrides, dict):
-        raise ValueError("profile overrides table must be a table")
-    target = overrides.get(material)
-    if target is None:
-        target = tomlkit.table()
-        overrides[material] = target
-    elif not isinstance(target, dict):
-        raise ValueError(f"overrides.{material} must be a table")
-    return target
-
-
 def existing_profile(document, name):
     profiles = profile_rows(document)
     if name not in profiles:

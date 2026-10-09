@@ -2,7 +2,7 @@
 
 `pyrite run` resolves every sweep at `full` fidelity: automatic case-local line grids, 300 line electrons, 150 bremsstrahlung electrons, and complete configured reflection sets.
 
-`--fidelity {full,survey}` is deprecated in 0.4.0 and will be removed in 0.6.0 (see [CLI deprecations](../repo-design/cli/cli-deprecations.md)). During the window it still works and warns once on stderr. `--fidelity full` is the default and can simply be omitted. The provisional `survey` preset (60/30 electrons, at most two beam energies, three thicknesses, five polar tilts, two azimuths, two reflection families with at most four resolved reflections, and explicit photon grids cropped to their central 70% then sampled at one-quarter density) is retired with no built-in replacement. Use `--quick` for a smoke test, or a user-defined catalog profile with explicit electron counts and narrower grids for a reduced campaign (see the [configuration cookbook](configuration-cookbook.md)).
+`--fidelity {full,survey}` was deprecated in 0.4.0 and removed in 0.6.0; passing it is a usage error. The provisional `survey` preset (60/30 electrons, at most two beam energies, three thicknesses, five polar tilts, two azimuths, two reflection families with at most four resolved reflections, and explicit photon grids cropped to their central 70% then sampled at one-quarter density) is retired with no built-in replacement. Use `--quick` for a smoke test, or a user-defined catalog profile with explicit electron counts and narrower grids for a reduced campaign (see the [configuration cookbook](configuration-cookbook.md)).
 
 Existing `--survey` checkpoints keep their identity: they remain readable, and `pyrite remote pull MATERIAL@PROFILE --hash PREFIX` selects one when several variants share a profile. Full-fidelity stems and digests are unchanged. `profile` names catalog `[profiles.*]` campaigns only; see [ADR-0005](../adr/0005-energy-grid-schema-decisions.md) for the decision record.
 
@@ -194,14 +194,14 @@ Detector geometry can be declared in `[profiles.NAME.detectors.ID]` tables. Each
 
 ### Bundled examples and implicit defaults
 
-The bundled `default` beam (200 fs, 5 kHz, 1 pC) and `default` detector (90 degrees) are examples, not a description of your beamline or detector, and the bundled `standard` profile is a 128-line example sweep. PyRITE still falls back to them when nothing names a choice, and warns on stderr:
+The bundled `default` beam (200 fs, 5 kHz, 1 pC) and `default` detector (90 degrees) are examples, not a description of your beamline or detector, and the bundled `standard` profile is a 128-line example sweep. Since 0.6.0 PyRITE no longer falls back to them silently; a run that leaves the choice unnamed exits with a usage error (status 2):
 
-- `pyrite run` and `pyrite remote start` without `PROFILE`, `PYRITE_PROFILE`, or a saved `profile.current` run `standard` and warn. Select a profile with `pyrite run NAME` or keep one with `pyrite config set profile.current NAME`.
-- A run from a user-selected catalog (see [External catalogs](external-catalog.md)) whose profile names no `beam` uses the built-in example beam and warns; one that names no `detector` uses the code-default scalar detector and warns. Attach your own with `pyrite profile set NAME --beam BEAM --detector DETECTOR`. Profiles run from the bundled catalog are examples themselves and do not warn.
+- `pyrite run` (locally or with `--remote`) needs `PROFILE`, `PYRITE_PROFILE`, or a saved `profile.current`. Select a profile with `pyrite run NAME` or keep one with `pyrite config set profile.current NAME`.
+- A run from a user-selected catalog (see [External catalogs](external-catalog.md)) whose profile names no `beam`, or names no `detector`, is refused. Attach your own with `pyrite profile set NAME --beam BEAM --detector DETECTOR`. Profiles run from the bundled catalog are examples themselves and stay exempt.
 
 A profile that omits `detector` and `physical_detector` resolves the code-default scalar detector and no physical detector; it does not inherit geometry or a counting observation from `standard`. Attach the intended detector explicitly to use other geometry. The `standard` profile itself and profiles with explicit geometry keep their resolved identities.
 
-The [deprecation schedule](../repo-design/cli/cli-deprecations.md#implicit-defaults) gives the release from which each fallback becomes an error. Only the fallback changes: `standard` keeps its name and contents, and its checkpoints keep their stems.
+Only the fallback changed: `standard` keeps its name and contents, and its checkpoints keep their stems.
 
 ## Beam block
 
