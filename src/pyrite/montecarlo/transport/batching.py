@@ -369,6 +369,7 @@ def _drive_per_electron_batches(
     radiative_args=None,
     secondaries=False,
     on_batch=None,
+    split_args=None,
 ):
     """Run capacity-replayed batches for either exact or LUT transport.
 
@@ -395,6 +396,10 @@ def _drive_per_electron_batches(
     extra_args = (inelastic_args,) if inelastic else ()
     if radiative:
         extra_args = (inelastic_args if inelastic else (), radiative_args)
+    if split_args is not None:
+        # Detector-cone splitting (#203): its buffers are indexed by global
+        # electron and reset per electron, so a capacity replay rewrites them.
+        extra_args = (inelastic_args if inelastic else (), radiative_args, split_args)
     batches = []
     cap = max(1, int(config.seg_capacity))
     seen_max = 0
@@ -694,6 +699,7 @@ def _run_per_electron_transport(
     radiative=None,
     keys=None,
     on_batch=None,
+    split_args=None,
 ):
     """Drive ``core`` over electron batches and compact the result.
 
@@ -813,6 +819,7 @@ def _run_per_electron_transport(
         radiative_args,
         secondaries=None if inelastic is None else bool(inelastic[4]),
         on_batch=on_batch,
+        split_args=split_args,
     )
 
 

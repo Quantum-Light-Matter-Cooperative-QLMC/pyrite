@@ -25,12 +25,14 @@ from .beam_entry import (
     resolve_bunch_times,
     table_energy_range,
 )
+from .cone_split import ConeSplit
 from .cores import (
     _transport_core_grooved,
     _transport_core_ungrooved_lut,
     _transport_core_ungrooved_lut_inelastic,
     _transport_core_ungrooved_perelectron_lut,
     _transport_core_ungrooved_perelectron_lut_inelastic,
+    cone_split_core,
     exact_ungrooved_core,
 )
 from .events import TransportStepLimitError
@@ -103,6 +105,7 @@ def simulate_trajectories(
     _secondary=None,
     _electron_start=0,
     _energy_range_keV=None,
+    _cone_split=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -440,6 +443,12 @@ def simulate_trajectories(
         stream takes global indices ``[start, start + Ne)``; ``electron_id``
         stays block-local. See ``runner/block_transport.py`` and
         :func:`.beam_entry.check_electron_block`.
+    _cone_split
+        Internal #203 prototype: a :class:`.cone_split.ConeSplit` runs the
+        primaries on the exact per-electron CPU core with detector-cone
+        splitting, then their in-cone copies as one launched generation, and
+        returns the primaries' result with a ``cone_split`` entry (copies'
+        result, parent, weight, flight). ``None`` is the analog transport.
 
     Returns
     -------
@@ -467,6 +476,11 @@ def simulate_trajectories(
         (secondary_threshold_eV, pair_production_model, positron_transport, _secondary, groove),
         (gdf_source, bunch_length_fs, long_offsets_fs, longitudinal_distribution),
     )
+    if isinstance(_cone_split, ConeSplit):
+        arguments = dict(locals())
+        from .cone_split import transport_cone_split
+
+        return transport_cone_split(simulate_trajectories, arguments)
     if (secondary_threshold_eV, pair_production_model, positron_transport) != (None, None, False):
         arguments = dict(locals())
         from .secondaries import transport_secondary_cascade
@@ -524,6 +538,13 @@ def simulate_trajectories(
         transport_core = resolve_transport_core(transport_core, Ne, groove)
     if transport_core != "lockstep" and groove is not None:
         raise ValueError("grooved transport is only implemented for the lockstep core")
+    if _cone_split is not None and (
+        transport_core != "per-electron" or groove is not None or elastic_model != "elsepa"
+    ):
+        raise ValueError(
+            "detector-cone splitting runs only on the ungrooved per-electron CPU core "
+            "with elastic_model='elsepa'"
+        )
     if electron_start and transport_core == "lockstep":
         raise ValueError("electron blocks need counter-addressed streams, not the lockstep core")
     if keep_segments_on_device and transport_core != "cuda":
@@ -992,7 +1013,17 @@ def simulate_trajectories(
     elif groove is None and transport_core != "lockstep":
         # Per-electron streams and run-to-completion ordering. Not bit-for-bit
         # with the lockstep core -- see `_transport_core_ungrooved_perelectron`.
-        if transport_core == "cuda":
+        split_args = None
+        if _cone_split is not None:
+            if transport_core != "per-electron" or elastic_model != "elsepa":
+                raise ValueError(
+                    "detector-cone splitting runs only on the exact per-electron CPU core "
+                    "with elastic_model='elsepa'"
+                )
+            split_args = _cone_split.core_args(transport_keys, Ne)
+            core = cone_split_core(inelastic=shell_mode, radiative=radiative_mode)
+            core_xp = np
+        elif transport_core == "cuda":
             from ._jit_launch import make_cuda_transport_core
 
             core, core_xp = make_cuda_transport_core()
@@ -1057,8 +1088,12 @@ def simulate_trajectories(
                 keys=transport_keys,
                 on_batch=transport_progress,
                 radiative=((radiative_args, seg_rad_k, seg_rad_Z) if radiative_mode else None),
+                split_args=split_args,
             )
         )
+        if split_args is not None:
+            assert _cone_split is not None
+            split_record = _cone_split.collect(split_args, transport_keys, Ne)
     elif groove is None:
         exact_core = exact_ungrooved_core(
             per_electron=False, inelastic=shell_mode, radiative=radiative_mode
@@ -1231,6 +1266,10 @@ def simulate_trajectories(
             radiative_cutoff_eV,
             seed if _secondary is None else _secondary.photon_seed,
         )
+    if _cone_split is not None:
+        result["cone_split"] = split_record
+        result["initial_E_cut_keV"] = np.asarray(E_cut_by_electrons, dtype=float).copy()
+        result["table_range_keV"] = (table_lo, table_hi)
     if collect_diagnostics:
         result["transport_diagnostics"] = _flight_diagnostic_summary(
             E_seg,

@@ -7,6 +7,8 @@ Validation: transport-midpoint-stopping
 Validation: sbethe-corrected-stopping
 """
 
+from functools import cache
+
 import numpy as np
 from numba import njit
 
@@ -16,6 +18,7 @@ from ._jit_radiative import (
     radiative_layer_moments_scalar,
     sample_hard_photon_energy_scalar,
 )
+from .cone_split import EXIT_CONE_SPLIT, _event_key, cone_split_event
 from .core_geometry import (
     _first_prism_exit_scalar,
     _rotate_direction_scalar,
@@ -77,7 +80,13 @@ EXIT_NOT_ENTERED = np.int8(5)
 
 
 def make_cpu_transport_core(
-    *, grooved=False, per_electron=False, lut=False, inelastic=False, radiative=False
+    *,
+    grooved=False,
+    per_electron=False,
+    lut=False,
+    inelastic=False,
+    radiative=False,
+    cone_split=False,
 ):
     """Generate one CPU specialization with compile-time-frozen axis flags.
 
@@ -103,9 +112,17 @@ def make_cpu_transport_core(
     historical ones; it requires the midpoint row schema and is not
     available for grooved transport.
 
+    ``cone_split=True`` compiles the opt-in detector-cone splitting prototype
+    (#203, :mod:`.cone_split`) into the exact per-electron core: each ELSEPA
+    elastic event may record one weighted in-cone copy, from draws on a
+    separate split-key domain, and a primary whose analog outgoing direction
+    enters the cone ends after that event. Without it the cores are the
+    unchanged historical ones.
+
     Validation: gpu-transport-core
     Validation: shell-secondary-transport
     Validation: shell-soft-hard-transport
+    Validation: detector-cone-variance-reduction
     """
     if grooved and (per_electron or lut):
         raise ValueError("grooved transport has only an exact lockstep specialization")
@@ -113,6 +130,8 @@ def make_cpu_transport_core(
         raise ValueError("shell soft/hard inelastic transport has no grooved specialization")
     if radiative and (grooved or lut):
         raise ValueError("coupled radiative transport has only exact ungrooved specializations")
+    if cone_split and (grooved or lut or not per_electron):
+        raise ValueError("detector-cone splitting has only exact per-electron specializations")
 
     @njit(cache=True)
     def body(
@@ -130,6 +149,7 @@ def make_cpu_transport_core(
         straggling,
         inelastic_args,
         radiative_args=None,
+        split_args=None,
     ):
         (max_steps, max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
         (
@@ -231,6 +251,26 @@ def make_cpu_transport_core(
                 rad_top,
                 rad_chi,
             ) = radiative_args
+        if cone_split:
+            assert split_args is not None
+            (
+                sp_nx,
+                sp_ny,
+                sp_nz,
+                sp_cos_c,
+                sp_sin_c,
+                sp_target,
+                sp_keys,
+                sp_cap,
+                sp_count,
+                sp_killed,
+                sp_pos,
+                sp_dir,
+                sp_E,
+                sp_t,
+                sp_w,
+                sp_flight,
+            ) = split_args
         if per_electron:
             (e_start, e_count, cap, stream_key) = run
             (seg_count, exit_code) = pe_out
@@ -277,6 +317,9 @@ def make_cpu_transport_core(
                 i = e - e_start
                 seg_count[i] = 0
                 exit_code[i] = EXIT_NOT_ENTERED
+                if cone_split:
+                    sp_count[e] = 0
+                    sp_killed[e] = False
                 if straggle_on:
                     stragg_dE[e] = 0.0
                 if alive[e]:
@@ -1031,9 +1074,43 @@ def make_cpu_transport_core(
                     )
                 else:
                     cos_t = _sample_cos_theta_from_alpha(alpha, cos_u)
+                if cone_split and elastic_model_code == 2:
+                    # The in-cone copy of this event, from the incident
+                    # direction and the element already chosen; its draws use
+                    # the (electron, flight) split key, never this stream.
+                    made, ox, oy, oz, w_copy = cone_split_event(
+                        dirs[e, 0], dirs[e, 1], dirs[e, 2], sp_nx, sp_ny, sp_nz,
+                        sp_cos_c, sp_sin_c, sp_target,
+                        _event_key(sp_keys[e], flight_id[e] - 1),
+                        E_keV[e], el_logE, el_cdf, el_pdf, el_mu,
+                        el_start[L, i_el], el_len[L, i_el],
+                    )  # fmt: skip
+                    if made:
+                        k_copy = sp_count[e]
+                        if k_copy < sp_cap:
+                            row = e * sp_cap + k_copy
+                            sp_pos[row, 0], sp_pos[row, 1] = pos[e, 0], pos[e, 1]
+                            sp_pos[row, 2] = pos[e, 2]
+                            sp_dir[row, 0], sp_dir[row, 1], sp_dir[row, 2] = ox, oy, oz
+                            sp_E[row], sp_t[row], sp_w[row] = E_keV[e], clock[e], w_copy
+                            sp_flight[row] = flight_id[e] - 1
+                        sp_count[e] = k_copy + 1
                 dirs[e, 0], dirs[e, 1], dirs[e, 2] = _rotate_direction_scalar(
                     dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, 2.0 * np.pi * phi_u
                 )
+                if (
+                    cone_split
+                    and elastic_model_code == 2
+                    and dirs[e, 0] * sp_nx + dirs[e, 1] * sp_ny + dirs[e, 2] * sp_nz >= sp_cos_c
+                ):
+                    # The analog outcome lies in the cone, which the copies
+                    # represent: the primary ends after this event.
+                    i = e - e_start
+                    sp_killed[e] = True
+                    exit_code[i] = EXIT_CONE_SPLIT
+                    seg_count[i] = local_nseg[e]
+                    cursor += 1
+                    continue
             if grooved:
                 if not reentered:
                     material_steps[e] += 1
@@ -1077,6 +1154,40 @@ def make_cpu_transport_core(
                 pe_out,
                 straggling,
                 inelastic_args,
+            )
+    elif per_electron and cone_split:
+
+        @njit(cache=True)
+        def core(
+            run,
+            control,
+            geometry,
+            materials,
+            mott,
+            state,
+            segments,
+            pe_out,
+            straggling,
+            inelastic_args,
+            radiative_args,
+            split_args,
+        ):
+            return body(
+                run,
+                0,
+                control,
+                geometry,
+                (),
+                materials,
+                mott,
+                (),
+                state,
+                segments,
+                pe_out,
+                straggling,
+                inelastic_args,
+                radiative_args,
+                split_args,
             )
     elif per_electron:
 
@@ -1221,6 +1332,14 @@ _transport_core_ungrooved_perelectron_radiative = make_cpu_transport_core(
 _transport_core_ungrooved_perelectron_inelastic_radiative = make_cpu_transport_core(
     per_electron=True, inelastic=True, radiative=True
 )
+
+
+@cache
+def cone_split_core(*, inelastic, radiative):
+    """The exact per-electron CPU core with detector-cone splitting (#203 prototype)."""
+    return make_cpu_transport_core(
+        per_electron=True, inelastic=inelastic, radiative=radiative, cone_split=True
+    )
 
 
 def exact_ungrooved_core(*, per_electron, inelastic, radiative):
