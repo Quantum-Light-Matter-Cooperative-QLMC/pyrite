@@ -18,6 +18,7 @@ from pyrite.montecarlo.transport.annihilation import (
     sample_heitler_zeta,
     truncate_in_flight,
 )
+from tests.helpers.positron_tables import require_positron_tables
 
 _PI_RE2 = np.pi * 2.8179403262e-5**2
 _ENERGIES_KEV = (10.0, 1_000.0, 10_000.0)
@@ -222,12 +223,7 @@ def test_scored_photons_escape_or_interact():
 
 @pytest.fixture
 def _positron_tables():
-    from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
-
-    try:
-        resolve_catalog_table("silicon", projectile="positron")
-    except Exception as error:  # pragma: no cover - depends on fetched tables
-        pytest.skip(f"positron tables are not installed: {error}")
+    require_positron_tables()
 
 
 def _thick(monkeypatch, *, sigma_scale=1.0, **kw):

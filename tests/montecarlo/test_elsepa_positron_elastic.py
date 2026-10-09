@@ -11,11 +11,14 @@ from pyrite.montecarlo.transport.scattering import (
     elsepa_angular_pdf,
     pack_elsepa_tables,
 )
+from tests.helpers.positron_tables import require_positron_elsepa_tables
 
 
 def _arrays(element, projectile):
     from pyrite.xsgen.elsepa.catalog import resolve_layer_tables
 
+    if projectile == "positron":
+        require_positron_elsepa_tables()
     try:
         return resolve_layer_tables([(element, 1.0)], projectile=projectile)[0].arrays
     except Exception as error:  # pragma: no cover - depends on fetched tables

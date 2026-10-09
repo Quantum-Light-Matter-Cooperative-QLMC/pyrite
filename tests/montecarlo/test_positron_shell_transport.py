@@ -23,13 +23,12 @@ from pyrite.montecarlo.transport.shell_sampling import BRANCHES, sample_shell_ha
 from pyrite.montecarlo.transport.shell_transport import build_shell_inelastic_tables
 from pyrite.montecarlo.transport.stopping import prepare_sbethe_stopping_table
 from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
+from tests.helpers.positron_tables import require_positron_sbethe_tables
 
 
 def _positron_table(key):
-    try:
-        return resolve_catalog_table(key, projectile="positron").arrays()
-    except Exception as error:  # pragma: no cover - depends on fetched tables
-        pytest.skip(f"positron SBETHE tables are not installed: {error}")
+    require_positron_sbethe_tables()
+    return resolve_catalog_table(key, projectile="positron").arrays()
 
 
 @pytest.fixture(autouse=True)

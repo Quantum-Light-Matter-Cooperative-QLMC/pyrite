@@ -576,9 +576,17 @@ def _emit_table(selected: str, result, *, json_output: bool) -> None:
     emit_result(f"{action}: {table.key}\npath: {table.path}")
 
 
-#: Every code ``pyrite tables fetch`` installs, in the order a bare fetch runs.
+#: Every code ``pyrite tables fetch`` installs.
 FETCH_CODES = ("eedl", "eadl", "epdl", "sbethe", "sbethe-tables", "elsepa", "bremslib")
 _DATASET_FETCH_CODES = ("eedl", "eadl", "epdl")
+_POSITRON_FETCH_CODES = ("sbethe-tables", "elsepa")
+#: ``(code, projectile)`` pins a bare fetch installs, in order: each code, with
+#: its positron pin right after the electron one (#385).
+BARE_FETCH_STEPS = tuple(
+    (code, projectile)
+    for code in FETCH_CODES
+    for projectile in (("electron", "positron") if code in _POSITRON_FETCH_CODES else ("electron",))
+)
 
 
 def _fetch_one(code: str, archive: str | None, *, projectile: str = "electron") -> dict:
@@ -616,11 +624,17 @@ def _fetch_one(code: str, archive: str | None, *, projectile: str = "electron") 
     }
 
 
+def _step_name(code: str, projectile: str) -> str:
+    return code if projectile == "electron" else f"{code} ({projectile})"
+
+
 def _fetch_line(payload: dict) -> str:
     action = "installed" if payload["installed"] else "already installed"
     if payload["code"] in _DATASET_FETCH_CODES:
         return f"{action}: {payload['path']}"
     unit = "files" if payload["code"] == "sbethe" else "tables"
+    if "projectile" in payload:
+        unit = f"{payload['projectile']} {unit}"
     return f"{action}: {payload['path']} ({payload['file_count']} {unit})"
 
 
@@ -671,8 +685,10 @@ def fetch_command(
                    catalogue material may contain, so no BremsLib checkout is
                    needed for them.
 
-    Without CODE every one is fetched in the order above; one that fails is
-    reported and the rest still run, and the command exits 1 if any failed.
+    Without CODE every one is fetched in the order above, sbethe-tables and
+    elsepa for both electrons and positrons (the positron pins are what
+    `--projectile positron` installs); one that fails is reported and the rest
+    still run, and the command exits 1 if any failed.
     Data lands in the user data directory, or in the selected workspace when
     PYRITE_HOME or workspace.root is set. Each archive or file is SHA-256
     verified before anything is installed, whether it was downloaded or given
@@ -695,13 +711,14 @@ def fetch_command(
         if archive is not None:
             raise click.UsageError("--archive installs one CODE; name it, e.g. `fetch elsepa`")
         results, failed = [], []
-        for selected in FETCH_CODES:
+        for selected, species in BARE_FETCH_STEPS:
+            species_field = {} if species == "electron" else {"projectile": species}
             try:
-                payload = _fetch_one(selected, None)
+                payload = _fetch_one(selected, None, projectile=species) | species_field
             except DataFetchError as exc:
-                failed.append({"code": selected, "message": str(exc)})
+                failed.append({"code": selected, **species_field, "message": str(exc)})
                 if not json_output:
-                    emit_diagnostic(f"failed: {selected}: {exc}")
+                    emit_diagnostic(f"failed: {_step_name(selected, species)}: {exc}")
                 continue
             results.append(payload)
             if not json_output:
@@ -710,13 +727,22 @@ def fetch_command(
             emit_json(
                 "pyrite.tables.fetch-all.v1",
                 {"results": results, "failed": failed},
-                errors=[{"code": "fetch-failed", "message": item["code"]} for item in failed],
+                errors=[
+                    {
+                        "code": "fetch-failed",
+                        "message": _step_name(item["code"], item.get("projectile", "electron")),
+                    }
+                    for item in failed
+                ],
             )
         if failed:
             if not json_output:
                 emit_diagnostic(
-                    f"{len(failed)} of {len(FETCH_CODES)} failed: "
-                    + ", ".join(item["code"] for item in failed)
+                    f"{len(failed)} of {len(BARE_FETCH_STEPS)} failed: "
+                    + ", ".join(
+                        _step_name(item["code"], item.get("projectile", "electron"))
+                        for item in failed
+                    )
                 )
             raise click.exceptions.Exit(1)
         return
