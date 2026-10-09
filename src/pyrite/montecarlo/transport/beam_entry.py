@@ -25,8 +25,10 @@ def initial_beam_positions(
     tilt_azim_rad,
     groove,
     start=0,
+    E0_keV=None,
+    energy_spread_frac=None,
 ):
-    """Return ``(pos, transverse_slopes)`` for electrons ``[start, start + Ne)``.
+    """Return ``(pos, transverse_slopes, beam_entry)`` for electrons ``[start, start + Ne)``.
 
     Spot and Twiss draws are counter-addressed per electron inside their child
     namespaces, so a block ``[start, stop)`` equals that slice of one larger
@@ -34,8 +36,10 @@ def initial_beam_positions(
     transport is lockstep-only and never runs in electron blocks.
 
     ``transverse_slopes`` is ``(x', y')`` from a Twiss ``transverse_distribution``,
-    else ``None``. See ``simulate_trajectories`` for the beam-spot, Twiss and
-    groove-phase conventions.
+    else ``None``. ``beam_entry`` is :func:`beam_entry_record` for nominal
+    energy ``E0_keV`` (``None`` when it is not given). See
+    ``simulate_trajectories`` for the beam-spot, Twiss and groove-phase
+    conventions.
     """
     pos = np.zeros((Ne, 3))
     transverse_slopes = None
@@ -89,7 +93,19 @@ def initial_beam_positions(
         x_e, z_e = entry_points(pos[:, 0], groove)
         pos[:, 0] = x_e
         pos[:, 2] = z_e
-    return pos, transverse_slopes
+    record = None
+    if E0_keV is not None:
+        record = beam_entry_record(
+            transverse_distribution=transverse_distribution,
+            beam_fwhm_mm=beam_fwhm_mm,
+            beam_fwhm_y_mm=beam_fwhm_y_mm,
+            tilt_polar_rad=tilt_polar_rad,
+            tilt_azim_rad=tilt_azim_rad,
+            E0_keV=E0_keV,
+            energy_spread_frac=energy_spread_frac,
+            groove=groove,
+        )
+    return pos, transverse_slopes, record
 
 
 def beam_entry_record(
@@ -164,6 +180,22 @@ def face_arrival_delay_ang(record, initial_r_ang, initial_E_keV):
         initial_r_ang[:, :2], record["tilt_polar_rad"], record["tilt_azim_rad"]
     )
     return path / beta_from_keV(np.asarray(initial_E_keV, dtype=float))
+
+
+def resolve_bunch_times(t0_ang, clock, record, pos, E_keV, *, gdf_t0=None, launch=None):
+    """``(t0, clock, beam_entry)`` after GDF, secondary-launch or analytic-spot entry.
+
+    GDF beams and secondary launches carry their own arrival times and no
+    analytic spot. An analytic spot adds :func:`face_arrival_delay_ang` (exact
+    zeros untilted), so a tilted face meets an oblique pulse front.
+
+    Validation: transverse-bunch-form-factor
+    """
+    if gdf_t0 is not None:
+        return gdf_t0, clock, None
+    if launch is not None:
+        return launch.t0_ang.copy(), launch.t_ang.copy(), None
+    return t0_ang + face_arrival_delay_ang(record, pos, E_keV), clock, record
 
 
 def initial_energies_keV(E0_keV, Ne, seed, energy_spread_frac, *, start=0):

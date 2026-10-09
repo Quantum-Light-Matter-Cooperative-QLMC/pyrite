@@ -106,8 +106,8 @@ def test_transverse_entry_blocks_equal_the_slice(beam):
         tilt_azim_rad=0.1,
         groove=None,
     )
-    pos, slopes = initial_beam_positions(5, 50, **kw)
-    blk_pos, blk_slopes = initial_beam_positions(5, 20, start=17, **kw)
+    pos, slopes, _ = initial_beam_positions(5, 50, **kw)
+    blk_pos, blk_slopes, _ = initial_beam_positions(5, 20, start=17, **kw)
     np.testing.assert_array_equal(blk_pos, pos[17:37])
     if slopes is not None:
         for whole, part in zip(slopes, blk_slopes, strict=True):
