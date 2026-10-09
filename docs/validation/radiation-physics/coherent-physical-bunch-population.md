@@ -14,8 +14,8 @@ form is $N[1+(N-1)F]$ times the one-electron intensity, as in
 [Su et al., Nuclear Science and Techniques 29, 30 (2018), Eq. (2)](https://www.nst.sinap.ac.cn/article/id/3343).
 The distinct-pair estimator below follows directly from this expansion.
 
-This is an implementation-context derivation. Fresh-context verification is
-pending; it does not certify the full window-envelope or production sampling claim.
+This is an implementation-context derivation. The fresh-context review below verifies this operator; it does not certify the
+full window-envelope or production sampling claim.
 
 ## Derivation
 
@@ -111,7 +111,7 @@ reference/thick runs must be repeated before production acceptance.
 
 ## Checks and status
 
-Status: **filtered**, pending fresh-context derivation and source-to-code review.
+Status: **rederived**, following the independent review below.
 `tests/montecarlo/test_coherent_physical_population.py` checks the exact aligned
 limit at fixed charge, unequal geometric and offset phases, the exact expectation
 of iid zero-mean fields by enumerating all small samples, missed entries,
@@ -131,3 +131,179 @@ delimiters. Four neighboring profile/scan tests fail identically on unchanged
 expects MoSe2's high-energy range to omit the catalog's 5 MeV entry. They are
 outside this slice. Existing dispersion warnings remain; no CUDA or new remote
 production certificate is claimed.
+
+
+## Independent verification (2026-10-08)
+
+A fresh verifier derived the expression before inspecting implementation bodies
+or the owner derivation. Review target: `4507c4b5`. Primary-source indexed text
+confirmed the cited Eq. (2); direct page retrieval timed out.
+
+For an iid complete incident-electron field $S$, including zero for a missed
+entry, independent expansion gives
+
+$$
+\mathbb E\left|\sum_{e=1}^N S_e\right|^2
+=N\mathbb E|S|^2+N(N-1)|\mathbb E S|^2.
+$$
+
+For $M$ equally weighted incident histories, $P-G$ contains $M(M-1)$ ordered
+distinct pairs and has expectation $M(M-1)|\mathbb E S|^2$. Thus the independently
+derived per-physical-electron estimate is
+
+$$
+\widehat Y=\frac{G+(N-1)(P-G)/(M-1)}{M},\qquad M\ge2.
+$$
+
+Independent Gaussian arrival times multiply only the cross term by
+$F_z=\exp[-\omega^2\sigma_t^2]$, with amplitude characteristic function
+$\chi=\exp[-\omega^2\sigma_t^2/2]$. Infinite slabs retain complete sampled
+fields, avoiding a second empirical form-factor multiplier. The limits are
+$N|S|^2$ for identical aligned fields independently of $M$, $G/M$ for $N=1$,
+and no mean excess for zero-mean iid fields. Factors are dimensionless.
+
+The verifier reproduced $|P-G|\le(H-1)G$ for $H\ge2$ and zero difference
+for $H=1$. The absolute tail multiplier agrees. The full-axis audit's convex
+composition is supported only when $0\le (N-1)F/(M-1)\le1$ across the axis;
+its refusal outside that scope agrees. The temporal distinct-pair coefficient
+and Fourier normalization obey discrete Parseval. Finite-footprint temporal
+self terms retain sampled realized arrival shifts; analytic filtering applies
+to the cross term only. This preserves the spectral self/distinct-pair integral.
+
+Source-to-code comparison found no divergent normalization, factor, sign or
+exponent in charge conversion, pair weighting, complete offsets, Gaussian
+averaging, final incident normalization, negative/nonfinite refusal, temporal
+output, window support bounds, convex audit gating or charge-sensitive cache
+identity. CUDA branches were inspected but not executed by the verifier.
+
+Verifier checks: **37 passed** across population, temporal and docs modules;
+**2 passed** for physical-window widening and charge-sensitive grid caching.
+Rendered math had no leftover dollar delimiters. Verdict: **rederived** for the
+population operator and inspected CPU integrations. This does not establish
+Monte Carlo convergence, the full production window-envelope claim, CUDA
+execution correctness, or human sign-off.
+
+
+## Charge-weighted remote checks (2026-10-08)
+
+The CUDA float64 harness at clean revision `d8a1c07e4ca9d35d46d540a0cedaa7be4fb41f32`
+uses 1 pC, or 6,241,509.074460763 physical electrons, and 40 incident Monte Carlo
+histories for each thick HOPG ladder. Geometry is 1 mm thickness, 5° tilt,
+0° azimuth, 100 fs bunch duration, 1 mm beam FWHM, 5 mm footprint and seed 7.
+One persisted transport, checked by its segment fingerprint, serves every grid
+and scheduler slice. The automatic grid has eight nodes per frozen-carrier
+Nyquist step; the finer grid doubles that resolution. Uniform reference axes
+include the automatic axis's two endpoints. These comparisons concern yield,
+centroid and global FWHM, each with a relative tolerance of $10^{-3}$.
+
+The CUDA aligned-field checks pass at fixed physical population 12 with
+2, 3 and 7 samples; the negative-estimate refusal also passes. These are scoped
+execution checks, not a general CUDA equivalence proof.
+
+The [30 keV record](../check-records/coherent-physical-population/charge30.json)
+from SLURM 1148 (`20261008-101206-268396aa`) passes against the initial
+24-node uniform reference:
+
+| grid | coordinates | wall [s] | yield rel. | centroid rel. | FWHM rel. |
+|---|---|---|---|---|---|
+| automatic | 2,184,166 | 42.97 | 7.43e-9 | 3.67e-10 | 1.72e-6 |
+| finer | 4,368,330 | 91.57 | 1.12e-9 | 5.38e-11 | 3.15e-8 |
+| uniform reference | 6,552,489 | 142.25 | — | — | — |
+
+The exported harness used `ceil(span/target_step)` points for an
+endpoint-inclusive reference. The resulting 30 keV spacing is
+0.0005631448695518405 eV, versus the requested 0.0005631448171156663 eV
+(relative excess 9.31e-8). Actual counts and spacing in the records identify
+the grids used for these comparisons. Subsequent commit `fe2dc9b6` uses
+`ceil(span/target_step) + 1` and budgets that count; a spacing-bound regression
+fails before and passes after the correction. The immutable remote runs continue
+with the exported harness. No observable-error bound is inferred from the
+small spacing difference.
+
+Peak host RSS was 2,293,412 KiB. The stronger nominal 32-node reference
+and the smaller-chunk 60 keV retry have completed (below). No sampling or
+production-window certificate follows from these runs. The full windowed-resolution
+claim remains `discrepancy`.
+
+
+### Stronger 30 keV reference
+
+The [stronger reference record](../check-records/coherent-physical-population/charge30-reference32.json)
+from SLURM 1151 (`20261008-105411-ee57f43f`) uses the original 30 keV
+transport fingerprint `589c5d8fb186dc76f891bc31415fb3d3`, importing its
+completed automatic/finer evaluations without regenerating trajectories.
+Only the uniform-reference spacing selector changes. Actual reference spacing
+is 0.0004223586360494427 eV; peak host RSS for the reference-only process
+is 1,939,480 KiB. Both window grids pass all three $10^{-3}$ gates:
+
+| grid | coordinates | wall [s] | yield rel. | centroid rel. | FWHM rel. |
+|---|---|---|---|---|---|---|
+| automatic, reused | 2,184,166 | 42.97 | 7.84e-9 | 3.87e-10 | 1.86e-6 |
+| finer, reused | 4,368,330 | 91.57 | 1.54e-9 | 7.36e-11 | 1.64e-7 |
+| stronger uniform reference | 8,736,652 | 203.03 | — | — | — |
+
+### Completed 60 keV ladder
+
+The [60 keV record](../check-records/coherent-physical-population/charge60.json)
+from job `20261008-101206-e4a577f6` uses the original transport fingerprint
+`d73442df808c54affafeed86a1ca2c18`. The initial allocation (SLURM 1149)
+timed out; the retry (SLURM 1152) completed at 13:26 Pacific using one-row
+spectrum chunks and the same saved trajectories and axes. Both window grids
+pass all three $10^{-3}$ gates against the 29,115,499-coordinate reference:
+
+| grid | coordinates | wall [s] | yield rel. | centroid rel. | FWHM rel. |
+|---|---|---|---|---|---|
+| automatic | 9,705,171 | 460.13 | 4.02e-8 | 1.51e-8 | 2.00e-4 |
+| finer | 19,410,336 | 875.35 | 6.55e-9 | 2.32e-9 | 1.57e-5 |
+| uniform reference | 29,115,499 | 1319.64 | — | — | — |
+
+Actual reference spacing is 0.00020573235601190816 eV. Peak host RSS was
+3,614,760 KiB. Timings cover the completed spectrum evaluations, excluding
+the timed-out attempt. The record identifies clean revision `d8a1c07e` and
+code digest `775d7674ba6d77c9211c6dbd3dfe285e671a8a7f70d14fab75aee87a5d355a17`.
+The reference uses the exported harness's endpoint-count convention described
+above. This is same-trajectory grid-convergence evidence for the physical
+population operator, not a sampling or production-envelope certificate.
+
+### Reduced short-bunch refusal
+
+The [short-bunch record](../check-records/coherent-physical-population/short-bunch.json)
+from SLURM 1150 (`20261008-101206-eca01929`) records a failed full-spectrum
+check. Inputs are HOPG, 60 keV, 10 µm thickness, 45° tilt, 135° azimuth,
+0.1 mm beam FWHM, 5 mm footprint, Gaussian RMS duration 0.001 fs, seed 1,
+1 pC and 200 incident histories. The fixed transport contains 39,187 segments
+(fingerprint `f9d5bae2d8e6254ae1912c56ebe2bfd2`). Its 11,936,606-coordinate
+axis from 10 to 6000 eV is within the explicit 20,000,000-point budget.
+
+The final coherent-spectrum guard raises `CoherentSamplingError` for negative
+or nonfinite pair power. The exported diagnostic combines those conditions;
+it does not record their separate counts. No accepted coherent spectrum,
+yield or FWHM is produced; the sample, charge and operator are unchanged,
+and no clipping or resampling is applied. Allocation elapsed time was
+48 min 37 s, not a successful spectrum-evaluation timing.
+
+The record also retains the unresolved material-dispersion envelope warning:
+the finite-axis excluded-power upper bound is 7.444e4 times the frozen
+reference for row 2, with a material phase-slope step of 1.537e-5 eV.
+This upper bound is not a measured grid error. This run does not resolve
+sampling or production-window certification, and does not establish the
+full 81-case profile's acceptance.
+
+### Failure diagnostics
+
+The production guard reports finite negative estimates separately from nonfinite
+values. `CoherentSamplingError.diagnostics` contains scalar counts, the minimum
+finite **raw** power before incident normalization (or `null` if none is finite),
+and the first invalid flattened index. Spectrum failures also identify its energy
+in eV; both spectrum and temporal failures identify the incident sample count and
+physical population. Negative infinity counts as nonfinite, not finite negative.
+A nonfinite failure calls for checking numerical inputs and arithmetic; finite
+negative pair power calls for sample refinement and convergence checks.
+
+The remote harness persists these values as `sampling_diagnostics` in its failed
+JSON record and clears them after a successful retry. Reductions run on the active
+backend and transfer only scalars to the host. No power is clipped, normalized,
+resampled or accepted by this diagnostic. The historical short-bunch record above
+has no separate counts; this addition does not infer its cause or certify sampling
+convergence. Synthetic CPU regressions cover mixed failures, all-nonfinite power,
+energy/population context, unchanged arrays, strict JSON persistence and retry.

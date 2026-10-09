@@ -14,6 +14,10 @@ COHERENT_POPULATION_MODEL = "physical-distinct-pairs-v1"
 class CoherentSamplingError(ValueError):
     """A physical coherent estimate is unresolved by its incident sample."""
 
+    def __init__(self, message, *, diagnostics=None):
+        super().__init__(message)
+        self.diagnostics = diagnostics
+
 
 def physical_bunch_electrons(case):
     """Convert bunch charge in pC to physical electrons; default is 1 pC.
@@ -77,7 +81,9 @@ def mixed_row_power(st, grouped, flat, factor):
     return grouped + scale * factor * (flat - grouped)
 
 
-def require_resolved_power(power):
+def require_resolved_power(
+    power, *, energy_eV=None, incident_samples=None, physical_electrons=None, quantity="power"
+):
     """Refuse negative/nonfinite estimates without clipping or changing samples.
 
     Source: exact intensity is a squared field norm and nonnegative.
@@ -85,8 +91,41 @@ def require_resolved_power(power):
     This is a necessary check, not a statistical convergence certificate.
     Validation: coherent-physical-bunch-population
     """
-    if bool(_to_cpu(xp.any(~xp.isfinite(power)))) or bool(_to_cpu(xp.any(power < 0))):
-        raise CoherentSamplingError(
-            "physical coherent power is unresolved: negative or nonfinite pair estimate; "
-            "increase --ne-line and check sampling convergence; no clipping is applied"
-        )
+    finite = xp.isfinite(power)
+    negative = finite & (power < 0)
+    invalid = ~finite | negative
+    if not bool(_to_cpu(xp.any(invalid))):
+        return
+    # Reduce on the active backend; never copy the full failed spectrum to CPU.
+    nonfinite_count = int(_to_cpu(xp.count_nonzero(~finite)))
+    negative_count = int(_to_cpu(xp.count_nonzero(negative)))
+    first = int(_to_cpu(xp.argmax(invalid)))
+    minimum = (
+        float(_to_cpu(xp.min(xp.where(finite, power, xp.inf))))
+        if nonfinite_count < power.size
+        else None
+    )
+    diagnostics = {
+        "quantity": quantity,
+        "total_count": int(power.size),
+        "negative_count": negative_count,
+        "nonfinite_count": nonfinite_count,
+        "minimum_finite_raw_power": minimum,
+        "first_invalid_index": first,
+        "incident_samples": int(incident_samples) if incident_samples is not None else None,
+        "physical_electrons": float(physical_electrons) if physical_electrons is not None else None,
+    }
+    if energy_eV is not None:
+        diagnostics["first_invalid_energy_eV"] = float(_to_cpu(energy_eV[first]))
+    remedy = (
+        "check numerical inputs and arithmetic"
+        if nonfinite_count
+        else "increase --ne-line and check sampling convergence"
+    )
+    raise CoherentSamplingError(
+        "physical coherent power is unresolved: negative or nonfinite pair estimate; "
+        f"{quantity}: {negative_count} finite negative, {nonfinite_count} nonfinite "
+        f"of {power.size}; first invalid index {first}; "
+        f"{remedy}; no clipping is applied",
+        diagnostics=diagnostics,
+    )

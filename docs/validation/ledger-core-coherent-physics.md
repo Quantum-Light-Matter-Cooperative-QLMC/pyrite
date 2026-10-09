@@ -433,7 +433,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Claim:** Per-physical-electron coherent source power estimated with distinct incident Monte Carlo pairs; physical bunch charge weights the cross-electron excess, sample count normalizes the estimator
 - **Code:** `montecarlo/spectrum/coherent_population.py::{physical_bunch_electrons,pair_scale,mixed_row_power,require_resolved_power}`; `montecarlo/spectrum/lines/_temporal.py::add_coherent_row`
 - **Source:** Independent-electron field expansion; Su et al., Nuclear Science and Techniques 29, 30 (2018), Eq. (2), identical-emitter `N[1+(N-1)F]` limit; SI elementary charge
-- **Status:** filtered
-- **Checks:** Implementation-context units, distinct-pair normalization, identical aligned fields, zero-mean iid fields, missed entries, Gaussian longitudinal limit, negative-estimate refusal, temporal and detector normalization; fresh-context verification pending
+- **Status:** rederived
+- **Checks:** Implementation-context units, distinct-pair normalization, identical aligned fields, zero-mean iid fields, missed entries, Gaussian longitudinal limit, negative-estimate refusal, temporal and detector normalization; fresh-context independent derivation and source-to-code comparison match
 - **Anchor:** `tests/montecarlo/test_coherent_physical_population.py`; `tests/montecarlo/test_temporal_profile.py`
 - **Notes:** [Derivation, assumptions and integration limits](radiation-physics/coherent-physical-bunch-population.md). Production supplies physical charge; low-level callers without it retain historical semantics. Nonnegative output is not a sampling certificate. Convex full-axis audits refuse signed weights they cannot enclose. Earlier remote evidence must be repeated under this operator. Does not promote the full windowed-resolution claim; human sign-off pending.

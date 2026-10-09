@@ -3537,5 +3537,6 @@ entries in the incident normalization. Infinite-slab capture includes the comple
 sampled offsets. Coherent cache revision 7 includes physical charge; coherent
 spectrum identities carry their own operator generation. Existing remote ladders
 and smoke runs predate this operator and require fresh charge-weighted confirmation.
-The full claim remains **discrepancy**. New population verification is pending;
-convex audits refuse signed weights outside their supported enclosure.
+The full claim remains **discrepancy**. Fresh-context population verification is
+**rederived**; charge-weighted remote comparisons are recorded in the linked derivation.
+Convex audits refuse signed weights outside their supported enclosure.
