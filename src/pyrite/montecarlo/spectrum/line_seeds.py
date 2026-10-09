@@ -21,9 +21,8 @@ from typing import Any
 import numpy as np
 
 from ..._line_windows import FeatureSeed
-from ...materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
-from ..geometry import _mosaic_quadrature, _orientation_R
-from ..transport import beta_from_keV
+from ...materials.crystal import CRYSTALS, HBARC_EV_ANG
+from .reflection_rows import MIN_RESONANCE_EV, ReflectionRows, reflection_rows
 
 __all__ = [
     "CHARACTERISTIC_SOURCE",
@@ -48,6 +47,8 @@ __all__ = [
     "local_spacing_seeds",
     "register_seed_provider",
     "resonance_population_stop_eV",
+    "ReflectionRows",
+    "reflection_rows",
     "resonance_populations",
     "seed_provider_names",
     "sincsq_upper_tail_bound",
@@ -91,7 +92,7 @@ EPDL_EDGE_SPACING_FRACTION = 1.0e-3
 SEEDING_REVISION = 4
 
 #: Kinematic resonances below this are dropped by the line kernels too.
-_MIN_RESONANCE_EV = 10.0
+_MIN_RESONANCE_EV = MIN_RESONANCE_EV
 
 
 def _host(array):
@@ -165,89 +166,32 @@ def resonance_populations(
 
     Validation: line-window-seeding
     """
-    from .segment_escape import segment_escape_gradient
-
-    # Seeding is host work even when transport returned device arrays.
-    segments = {
-        key: _host(value) if hasattr(value, "shape") else value for key, value in segments.items()
-    }
-    if segments.get("r_mid") is not None and segments.get("thickness_ang") is not None:
-        from .lines._formation import expand_escape_pieces
-
-        segments, _, _, _ = expand_escape_pieces(segments, n_hat, groove=groove)
-    gradient = np.asarray(segment_escape_gradient(segments, n_hat, groove=groove), dtype=float)
-    energy_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
-    energy = _host(segments[energy_field]).astype(float, copy=False)
-    length = _host(segments["L_ang"]).astype(float, copy=False)
-    direction = _host(segments["v_hat"]).astype(float, copy=False).reshape(-1, 3)
-    if electron_limit is not None:
-        line = _host(segments["elec_id"]) < int(electron_limit)
-        energy, length, direction = energy[line], length[line], direction[line]
-        gradient = gradient[line]
-    beta = beta_from_keV(energy)
-    velocity = beta[:, None] * direction
-    v_dot_n = velocity @ np.asarray(n_hat, dtype=float)
-    parent_length = np.asarray(segments.get("line_parent_L_ang", segments["L_ang"]), dtype=float)
-    fraction = np.asarray(
-        segments.get("line_piece_fraction", np.ones_like(parent_length)), dtype=float
+    rows = reflection_rows(
+        segments,
+        n_hat,
+        crystal=crystal,
+        hkl_list=hkl_list,
+        beam_uvw=beam_uvw,
+        surface_hkl=surface_hkl,
+        azimuth_rad=azimuth_rad,
+        recip_miscut_rad=recip_miscut_rad,
+        mosaic_fwhm_rad=mosaic_fwhm_rad,
+        mosaic_nodes=mosaic_nodes,
+        electron_limit=electron_limit,
+        label_prefix=label_prefix,
+        composition=composition,
+        band_eV=band_eV,
+        groove=groove,
     )
-    if electron_limit is not None:
-        parent_length, fraction = parent_length[line], fraction[line]
-    weight = (parent_length / beta) ** 2 * fraction
-    usable = np.isfinite(weight) & (weight > 0.0) & np.isfinite(v_dot_n) & (v_dot_n < 1.0)
-    velocity, v_dot_n, weight = velocity[usable], v_dot_n[usable], weight[usable]
-    gradient = gradient[usable]
-    v_dot_grad = np.sum(velocity * gradient, axis=1)
-    grad2 = np.sum(gradient**2, axis=1)
-    flight_time = parent_length[usable] / beta[usable]
-    refractive = None
-    if band_eV is not None:
-        from ...materials.crystal import refractive_index
-        from .lines._kernels import _line_tabulation_grid
-
-        # The kernels' table for an axis spanning band_eV (lines/_setup.py).
-        start, stop = float(band_eV[0]), float(band_eV[1])
-        pad = 0.2 * (stop - start)
-        table_energy = _line_tabulation_grid(
-            CRYSTALS[crystal], list(composition or ()), max(start - pad, 1.0), stop + pad
-        )
-        refractive = (
-            np.asarray(refractive_index(crystal, table_energy).real, dtype=float),
-            table_energy,
-        )
-    if refractive is not None:
-        from .lines._kernels import _in_medium_kinematics
-
-    lattice = CRYSTALS[crystal]["lattice"]
-    rotation = _orientation_R(
-        lattice, beam_uvw, azimuth_rad, recip_miscut_rad, surface_hkl=surface_hkl
-    )
-    orientations = _mosaic_quadrature(mosaic_fwhm_rad, mosaic_nodes) or [(None, 1.0)]
-
     populations = []
-    for hkl in hkl_list:
-        g_vector, _magnitude = reciprocal_g_vector(hkl, lattice)
-        if rotation is not None:
-            g_vector = rotation @ g_vector
+    for label, orientations in rows.reflections:
         energies, weights, widths = [], [], []
-        for mosaic_rotation, mosaic_weight in orientations:
-            g_row = g_vector if mosaic_rotation is None else mosaic_rotation @ g_vector
-            v_dot_g = velocity @ g_row
-            with np.errstate(divide="ignore", invalid="ignore"):
-                if refractive is None:
-                    denominator = 1.0 - v_dot_n
-                else:
-                    denominator, _ = _in_medium_kinematics(
-                        v_dot_n, v_dot_g, *refractive, v_dot_grad, grad2
-                    )
-                resonance = HBARC_EV_ANG * v_dot_g / denominator
-            radiating = np.isfinite(resonance) & (resonance > _MIN_RESONANCE_EV)
+        for mosaic_weight, radiating, resonance, denominator in orientations:
             energies.append(resonance[radiating])
-            weights.append(weight[radiating] * float(mosaic_weight))
+            weights.append(rows.weight[radiating] * float(mosaic_weight))
             widths.append(
-                2.0 * np.pi * HBARC_EV_ANG / (denominator[radiating] * flight_time[radiating])
+                2.0 * np.pi * HBARC_EV_ANG / (denominator[radiating] * rows.flight_time[radiating])
             )
-        label = label_prefix + "(" + " ".join(str(int(index)) for index in hkl) + ")"
         populations.append(
             ResonancePopulation(
                 label, np.concatenate(energies), np.concatenate(weights), np.concatenate(widths)

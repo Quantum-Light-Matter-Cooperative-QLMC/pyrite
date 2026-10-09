@@ -30,7 +30,11 @@ windows
     maximum spacing plus fine windows seeded from kinematics, absorption edges
     and characteristic lines (:mod:`pyrite._line_windows`). Off unless a
     per-call or stored policy asks for it; a policy without windows keeps its
-    historical payload bit-for-bit.
+    historical payload bit-for-bit. Windows are also what opts automatic
+    resolution into ``coherent_emission`` (#350): a coherent case resolves
+    its fringes only inside per-row coherent windows, and a policy without
+    windows still refuses it (#117).
+    Validation: coherent-line-grid-windowed-resolution
 
 quadrature
     How the ``sinc^2`` line profile is evaluated on those coordinates (#116).
@@ -74,6 +78,11 @@ __all__ = [
     "BANDWIDTH_POLICIES",
     "BANDWIDTH_PROXY_SAFETY",
     "AUTOMATIC_RESOLUTION_POLICY",
+    "COHERENT_JUMP_CLUSTER_SEPARATION",
+    "COHERENT_NYQUIST_OVERSAMPLING",
+    "COHERENT_WINDOW_BIN_EV",
+    "DEFAULT_COHERENT_DECOHERENCE_LIMIT",
+    "DEFAULT_COHERENT_LEAK_LIMIT",
     "DEFAULT_LOCAL_HALO_LIMIT",
     "LOCAL_RESOLUTION_POLICY",
     "RESOLUTION_POLICIES",
@@ -184,6 +193,31 @@ RESOLUTION_POLICIES = (AUTOMATIC_RESOLUTION_POLICY, LOCAL_RESOLUTION_POLICY)
 #: feature-window row of ``tbl-line-budget-allocation``, which measured-bandwidth
 #: cases do not otherwise spend.
 DEFAULT_LOCAL_HALO_LIMIT = 1.0e-4
+#: Coherent feature windows (#350). Per-side share of a coherent row's power
+#: the window may leave to the backbone, as a fraction of the row's
+#: per-electron (decoherence-floor) power. Charged, with
+#: :data:`DEFAULT_COHERENT_DECOHERENCE_LIMIT`, to the feature-window row of
+#: ``tbl-line-budget-allocation``: ``2 * 1e-4 + 1e-4`` of its ``5e-4``.
+DEFAULT_COHERENT_LEAK_LIMIT = 1.0e-4
+#: Largest ``F * N_e`` at which a coherent window bin leaves the
+#: inter-electron ``F |sum_e S_e|^2`` term unresolved (grouped step): the
+#: term is then at most this share of the floor at every energy.
+DEFAULT_COHERENT_DECOHERENCE_LIMIT = 1.0e-4
+#: Nodes per Nyquist step ``pi hbar c / D`` inside a coherent window. Nyquist
+#: resolves the fringes and makes yield and centroid exact, but the FWHM
+#: observable reads the half-maximum crossing by linear interpolation, whose
+#: error falls as the square of the step; four nodes per Nyquist step hold the
+#: dominant-line FWHM inside the issue's 1e-3 intrinsic share on the anchor.
+#: Numerical policy, certified by the refinement ladder, not derived.
+COHERENT_NYQUIST_OVERSAMPLING = 4.0
+#: Width of the coherent window bins over which the step choice is made.
+COHERENT_WINDOW_BIN_EV = 100.0
+#: Jumps closer in retardation time than this many ``hbar c / u`` are bounded
+#: together by the triangle inequality in the coherent tail bound; jumps in
+#: clusters ``k`` ranks apart keep a cross term of at most ``2 u B_J B_K / (k M)``
+#: (``B`` the jumps' decreasing-envelope moduli at the edge), at most
+#: ``4 (1 + ln n) u / M`` times ``sum_C (sum_J B_J)^2`` over ``n`` clusters.
+COHERENT_JUMP_CLUSTER_SEPARATION = 64.0
 
 #: Selectors a ``[profiles.NAME.line_grid_policy]`` table may set, each with
 #: its accepted values, default first. The other resolver inputs (tolerances,

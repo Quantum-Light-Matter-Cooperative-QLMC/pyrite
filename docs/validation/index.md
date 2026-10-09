@@ -35,6 +35,7 @@ beam-transport/beam-phase-space-injection
 beam-transport/beam-phase-space-metrics
 beam-transport/gpt-gdf-injection
 beam-transport/coherent-line-grid-fringe-spacing
+beam-transport/coherent-line-grid-windowed-resolution
 beam-transport/dielectric-bulk-loss
 beam-transport/eedl-material-shell-rates
 beam-transport/elsepa-elastic-sampling

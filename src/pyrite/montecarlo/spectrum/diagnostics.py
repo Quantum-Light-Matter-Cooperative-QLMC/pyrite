@@ -110,6 +110,64 @@ def sinc_feature_spacing(
     return step, aliased, int(width.size)
 
 
+def coherent_retardation(segments, n_hat, *, electron_limit=None):
+    """Per-row retardation scalar ``d`` the coherent reducer phases with [Ang].
+
+    ``d_j = t_mid,j - n_hat . r_j`` in the reducer's own geometry
+    (``lines/_setup.py``): when bunch offsets make decoherence active on an
+    infinite slab, each electron is evaluated at its offset-free transverse
+    position, ``r - (x0_e, y0_e, 0)``, so ``n_hat_perp . r0_perp,e`` is added
+    back here. A finite footprint, or no offsets at all, keeps the sampled
+    positions. The longitudinal ``t0`` never enters (``t_ang`` is the
+    relative age). Returns ``(d, t_L, elec_id)`` as host float arrays over every
+    row; ``electron_limit`` only selects the offset population, as in the
+    reducer.
+
+    Validation: coherent-line-grid-fringe-spacing
+    Validation: coherent-line-grid-windowed-resolution
+    """
+    energy_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
+    energy = _host(segments[energy_field]).astype(float, copy=False)
+    length = _host(segments["L_ang"]).astype(float, copy=False)
+    r_mid = _host(segments["r_mid"]).astype(float, copy=False).reshape(-1, 3)
+    start_time = segments.get("t_ang")
+    start_time = (
+        np.zeros(energy.size) if start_time is None else _host(start_time).astype(float, copy=False)
+    )
+    elec_id = _host(segments["elec_id"])
+    n_vec = np.asarray(n_hat, dtype=float)
+    t_L = length / beta_from_keV(energy)
+    d = (start_time + 0.5 * t_L) - (r_mid @ n_vec)
+    finite_footprint = (
+        segments.get("crystal_width_ang") is not None
+        and segments.get("crystal_height_ang") is not None
+    )
+    if not finite_footprint:
+        population = _offset_population(segments, electron_limit)
+        if population is not None:
+            _t0_pop, xy0_pop = population
+            if xy0_pop.shape[0] and elec_id.size:
+                owner = np.clip(elec_id, 0, xy0_pop.shape[0] - 1)
+                d = d + xy0_pop[owner] @ n_vec[:2]
+    return d, t_L, elec_id
+
+
+def _offset_population(segments, electron_limit):
+    """``(t0, xy0)`` of the line electrons when decoherence is active, else ``None``.
+
+    Mirrors ``lines/_setup.py``: active when any line electron carries a
+    nonzero longitudinal or transverse launch offset.
+    """
+    t0_pop = np.asarray(_host(segments.get("initial_t0_ang", np.zeros(0))), dtype=float)
+    xy0_pop = np.asarray(_host(segments.get("initial_r_ang", np.zeros((0, 3)))), dtype=float)
+    xy0_pop = xy0_pop.reshape(-1, 3)[:, :2]
+    if electron_limit is not None:
+        t0_pop, xy0_pop = t0_pop[: int(electron_limit)], xy0_pop[: int(electron_limit)]
+    if (t0_pop.size and np.any(t0_pop != 0.0)) or (xy0_pop.size and np.any(xy0_pop != 0.0)):
+        return t0_pop, xy0_pop
+    return None
+
+
 def coherent_fringe_spacing(segments, n_hat, *, electron_limit=None, grouped=False):
     """Largest uniform step resolving the coherent route's interference fringes.
 
@@ -122,7 +180,9 @@ def coherent_fringe_spacing(segments, n_hat, *, electron_limit=None, grouped=Fal
     (the ``-g.r_j`` term is energy-independent and the in-medium
     ``L_esc delta_omega`` term is smaller by ``1 - n_re ~ 1e-5``). The fastest
     fringe therefore has period ``2 pi / (s_max - s_min)`` and the Nyquist step
-    is ``pi HBARC_EV_ANG / D_span`` over the span of ``d``.
+    is ``pi HBARC_EV_ANG / D_span`` over the span of ``d``. ``d`` is taken in the
+    reducer's own geometry (:func:`coherent_retardation`), offset-free on an
+    infinite slab with active decoherence.
 
     This is NOT the incoherent :func:`sinc_feature_spacing` width. Along one
     segment the increment of ``d`` is exactly ``(1 - beta v.n) t_L``, the very
@@ -138,26 +198,16 @@ def coherent_fringe_spacing(segments, n_hat, *, electron_limit=None, grouped=Fal
     """
     energy_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
     energy = _host(segments[energy_field]).astype(float, copy=False)
-    length = _host(segments["L_ang"]).astype(float, copy=False)
     direction = _host(segments["v_hat"]).astype(float, copy=False)
-    r_mid = _host(segments["r_mid"]).astype(float, copy=False)
-    start_time = segments.get("t_ang")
-    start_time = (
-        np.zeros(energy.size) if start_time is None else _host(start_time).astype(float, copy=False)
-    )
-    elec_id = _host(segments["elec_id"])
+    d, t_L, elec_id = coherent_retardation(segments, n_hat, electron_limit=electron_limit)
     if electron_limit is not None:
         line = elec_id < int(electron_limit)
-        energy, length, direction = energy[line], length[line], direction[line]
-        r_mid, start_time, elec_id = r_mid[line], start_time[line], elec_id[line]
+        energy, direction = energy[line], direction[line]
+        d, t_L, elec_id = d[line], t_L[line], elec_id[line]
 
     n_vec = np.asarray(n_hat, dtype=float)
     beta = beta_from_keV(energy)
-    t_L = length / beta
     denominator = 1.0 - beta * (direction @ n_vec)
-    # Geometric (offset-free) retardation scalar, matching the phase the
-    # coherent reducer actually applies; see lines/_setup.py.
-    d = (start_time + 0.5 * t_L) - (r_mid @ n_vec)
     valid = np.isfinite(d) & np.isfinite(denominator) & (denominator > 0.0) & (t_L > 0.0)
     d, elec_id = d[valid], elec_id[valid]
     if d.size == 0:

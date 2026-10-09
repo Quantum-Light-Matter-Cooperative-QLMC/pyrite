@@ -116,6 +116,41 @@ def test_coherent_line_spectrum_chunk_invariant(segments):
     _assert_chunk_invariant(one_shot, chunked)
 
 
+def test_electron_grouped_coherent_chunk_invariant(segments):
+    """The per-electron grouped term slices energy when one electron outgrows ``chunk``.
+
+    Bunch offsets activate the decoherence blend and the sinc cutoff keeps the
+    eager per-reflection route, so ``chunk=1`` leaves every electron a block
+    larger than the chunk; the energy slicing that bounds its memory must not
+    change the spectrum.
+    """
+    active = dict(segments)
+    rng = np.random.default_rng(3)
+    active["initial_t0_ang"] = rng.normal(0.0, 300.0, NE)
+    active["initial_r_ang"] = np.zeros((NE, 3))
+    kw = dict(
+        crystal="hopg",
+        hkl_list=HKL,
+        theta_obs_rad=THETA,
+        B_ang2=B_002,
+        coherent=True,
+        sinc_cutoff=4.0,
+    )
+    one_shot = mc_spectrum(active, E_LINE, chunk=BIG_CHUNK, **kw)
+    chunked = mc_spectrum(active, E_LINE, chunk=1, **kw)
+    _assert_chunk_invariant(one_shot, chunked)
+
+
+def test_energy_slices_bound_an_oversized_group_block():
+    from pyrite.montecarlo.spectrum.lines._kernels import _energy_slices
+
+    assert list(_energy_slices(5, 8, 100)) == [slice(0, 100)]
+    slices = list(_energy_slices(40, 8, 100))
+    assert all((s.stop - s.start) * 40 <= 8 * 100 for s in slices)
+    assert [i for s in slices for i in range(s.start, s.stop)] == list(range(100))
+    assert list(_energy_slices(10**6, 1, 3)) == [slice(0, 1), slice(1, 2), slice(2, 3)]
+
+
 def test_brem_spectrum_chunk_invariant(segments):
     kw = dict(element="C", n_atoms_per_ang3=_n_atoms, theta_obs_rad=THETA)
     one_shot = mc_brem_spectrum(segments, E_BREM, chunk=BIG_CHUNK, **kw)

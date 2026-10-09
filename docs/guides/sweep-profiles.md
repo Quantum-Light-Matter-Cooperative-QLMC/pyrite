@@ -121,6 +121,16 @@ The table applies to every case of the profile and joins its dataset identity: e
 
 Tolerances, maximum spacing, point budget, backend ULPs and feature windows are not profile keys. Set them per call through `Sweep.line_grid_policy` or with `PYRITE_ENERGY_GRID_*`; see the [profile settings reference](../repo-design/profile-settings.md) for names and built-in values.
 
+For automatic coherent emission, opt in to feature windows in the profile file:
+
+```toml
+[line_grid_policy]
+windows = true
+max_points = 5000000
+```
+
+`windows` is a boolean; `true` selects the resolver's default feature-window settings and `false` disables them. `max_points` is an integer greater than one, with a default of 600000. Larger coherent cases may need an explicitly raised budget on the remote host. Plans above the budget refuse with their coordinate count. A policy without windows still refuses automatic coherent resolution. The current windowed coherent path warns that full-spectrum dispersion and sampling remain uncertified; its band-integration building blocks do not establish the complete grid's accuracy. See the [validation record](../validation/beam-transport/coherent-line-grid-windowed-resolution.md).
+
 ## Identity and storage
 
 Every profile-aware scan resolves settings and complete `Sweep` first, converts them to JSON-compatible values, and hashes that payload with SHA-256. Component checkpoint `meta.json` stores profile, hash, and exact resolved parameter payload under `dataset_identity`.
