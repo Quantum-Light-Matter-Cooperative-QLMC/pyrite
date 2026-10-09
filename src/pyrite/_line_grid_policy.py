@@ -204,12 +204,12 @@ DEFAULT_COHERENT_LEAK_LIMIT = 1.0e-4
 #: term is then at most this share of the floor at every energy.
 DEFAULT_COHERENT_DECOHERENCE_LIMIT = 1.0e-4
 #: Nodes per Nyquist step ``pi hbar c / D`` inside a coherent window. Nyquist
-#: resolves the fringes and makes yield and centroid exact, but the FWHM
+#: resolves the frozen-carrier fringes, but the FWHM
 #: observable reads the half-maximum crossing by linear interpolation, whose
-#: error falls as the square of the step; four nodes per Nyquist step hold the
-#: dominant-line FWHM inside the issue's 1e-3 intrinsic share on the anchor.
-#: Numerical policy, certified by the refinement ladder, not derived.
-COHERENT_NYQUIST_OVERSAMPLING = 4.0
+#: error falls as the square of the step. Eight nodes pass the measured
+#: 30/60 keV ladders' 1e-3 FWHM gate; four miss it at 60 keV. This is
+#: numerical convergence evidence, not a general production certificate.
+COHERENT_NYQUIST_OVERSAMPLING = 8.0
 #: Width of the coherent window bins over which the step choice is made.
 COHERENT_WINDOW_BIN_EV = 100.0
 #: Jumps closer in retardation time than this many ``hbar c / u`` are bounded
