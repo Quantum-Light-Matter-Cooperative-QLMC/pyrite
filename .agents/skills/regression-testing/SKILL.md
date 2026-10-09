@@ -19,7 +19,8 @@ regression.
 5. Choose tolerances from numerical conditioning and backend precision, not from
    the observed error alone.
 6. Keep CPU tests fast; place expensive external or publication comparisons in
-   `checks/`.
+   `checks/`. Time new tests (`--durations=0`); mark any >5 s wall or with a
+   large peak RSS `@pytest.mark.slow` (CI still runs them on every PR).
 
 Report original symptom, pre-fix failure, seed/tolerance rationale, and focused
 command:

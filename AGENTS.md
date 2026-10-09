@@ -64,6 +64,8 @@ If `uv run` cannot write project environment, add
   relevant `*_MODEL` marker or `tables-*-N` tag in that PR.
 - Heavy sweeps/GPU work use `pyrite remote`; never run locally.
 - Add imports with first use. Verify with smallest useful command.
+- New tests >5 s wall or with large peak RSS get `@pytest.mark.slow`
+  (default runs skip them; CI runs them). Check with `--durations=0`.
 
 ## Task dispatch
 
