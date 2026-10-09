@@ -6,7 +6,11 @@ import pytest
 from pyrite.api import build_sweep_cases
 from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.geometry import Layer, Slab, Stack
-from pyrite.campaign.legacy import analysis_from_legacy, numerics_from_legacy
+from pyrite.campaign.legacy import (
+    adapt_configured_sweep,
+    analysis_from_legacy,
+    numerics_from_legacy,
+)
 from pyrite.campaign.model import Analysis, Convergence, Numerics, Scene, Sweep
 from pyrite.campaign.sweep import BeamSpec
 from pyrite.campaign.sweep import build_cases as build_legacy_cases
@@ -89,8 +93,7 @@ def test_legacy_pair_distributes_settings_and_swept_scene_fields() -> None:
     )
     settings = Settings(n_electrons=12, n_electrons_brem=6, emission="both")
 
-    with pytest.warns(DeprecationWarning):
-        sweep = Sweep.from_legacy(old, settings)
+    sweep = adapt_configured_sweep(old, settings)
 
     assert len(sweep.expand()) == 4
     assert sweep.base.emission == "both"
@@ -98,7 +101,7 @@ def test_legacy_pair_distributes_settings_and_swept_scene_fields() -> None:
     assert analysis_from_legacy(settings).beam_current_na == settings.beam_current_na
 
 
-def test_legacy_bridge_preserves_expanded_cases_exactly() -> None:
+def test_configured_adapter_preserves_expanded_cases_exactly() -> None:
     from pyrite.campaign.sweep import Sweep as LegacySweep
 
     old = LegacySweep(
@@ -110,8 +113,7 @@ def test_legacy_bridge_preserves_expanded_cases_exactly() -> None:
     )
     settings = Settings(n_electrons=12, n_electrons_brem=6, emission="both")
 
-    with pytest.warns(DeprecationWarning):
-        converted = Sweep.from_legacy(old, settings)
+    converted = adapt_configured_sweep(old, settings)
 
     expected = build_legacy_cases(
         old,
@@ -128,8 +130,7 @@ def test_every_catalog_profile_round_trips_a_resolved_case_list() -> None:
         members = CATALOG.profile_materials(profile)
         material = members[0] if members else "hopg"
         old = material_sweep(material, fidelity="survey", catalog_profile=profile)
-        with pytest.warns(DeprecationWarning):
-            converted = Sweep.from_legacy(old, settings)
+        converted = adapt_configured_sweep(old, settings)
         expected = build_legacy_cases(
             old,
             settings.n_electrons,

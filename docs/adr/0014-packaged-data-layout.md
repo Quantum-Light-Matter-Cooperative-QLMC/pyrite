@@ -213,6 +213,11 @@ overwrites anything. `pyrite tables list` labels those rows `legacy`. The
 tier stops being searched in 0.5.0 (`LEGACY_TABLE_TIER_REMOVE_IN`, held by
 `tests/test_deprecation_schedule.py`). The legacy sdbase path is unchanged.
 
+*Removed in 0.5.0 (#378):* the table tier is no longer searched, the
+`FutureWarning` and the `legacy` list label are gone, and
+`LEGACY_TABLE_TIER_REMOVE_IN` is deleted. `pyrite tables migrate` stays as the
+way to copy pre-workspace tables into a workspace.
+
 ## Consequences
 
 Measured wheel sizes are in

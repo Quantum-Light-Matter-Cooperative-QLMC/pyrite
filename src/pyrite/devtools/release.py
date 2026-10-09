@@ -16,8 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)\Z")
-_PYPROJECT_VERSION = re.compile(r'^(version\s*=\s*)"[^"]*"', re.MULTILINE)
-_INIT_VERSION = re.compile(r'^(__version__\s*=\s*)"[^"]*"', re.MULTILINE)
+_PYPROJECT_VERSION = re.compile(r'^(version\s*=\s*)"([^"]*)"', re.MULTILINE)
+_INIT_VERSION = re.compile(r'^(__version__\s*=\s*)"([^"]*)"', re.MULTILINE)
 _RELEASE_SUBJECT = "chore(release): bump version to"
 _CONVENTIONAL = re.compile(
     r"(?P<type>[a-z]+)(?:\((?P<scope>[^)]*)\))?(?P<bang>!)?:\s*(?P<desc>.+)\Z"
@@ -67,15 +67,13 @@ def parse_version(text: str) -> tuple[int, int, int]:
 
 def _minor(version: str) -> tuple[int, int]:
     major, minor, *_ = version.split(".")
-    return int(major), int(re.match(r"\d+", minor).group())
+    return int(major), int(re.sub(r"\D.*", "", minor))
 
 
 def removal_targets() -> dict[str, str]:
     """Every scheduled removal as ``label -> remove_in`` across all shim families."""
-    from pyrite._module_deprecations import MODULE_DEPRECATIONS
-    from pyrite.campaign.model import FROM_LEGACY_REMOVE_IN
+    from pyrite._module_deprecations import MODULE_DEPRECATIONS, PUBLIC_EXPORT_DEPRECATIONS
     from pyrite.cli._deprecations import DEPRECATED_FLAGS, DEPRECATIONS, IMPLICIT_DEFAULTS
-    from pyrite.xsgen.store import LEGACY_TABLE_TIER_REMOVE_IN
 
     targets = {f"command {path}": entry.remove_in for path, entry in DEPRECATIONS.items()}
     targets.update(
@@ -83,8 +81,12 @@ def removal_targets() -> dict[str, str]:
     )
     targets.update({f"default {key}": entry.remove_in for key, entry in IMPLICIT_DEFAULTS.items()})
     targets.update({f"module {name}": e.remove_in for name, e in MODULE_DEPRECATIONS.items()})
-    targets["Sweep.from_legacy"] = FROM_LEGACY_REMOVE_IN
-    targets["xsgen legacy table tier"] = LEGACY_TABLE_TIER_REMOVE_IN
+    targets.update(
+        {
+            f"export {mod}.{name}": e.remove_in
+            for (mod, name), e in PUBLIC_EXPORT_DEPRECATIONS.items()
+        }
+    )
     return targets
 
 
@@ -105,8 +107,8 @@ def bump_versions(root: Path, new: str) -> tuple[str, str]:
     init_match = _INIT_VERSION.search(init_text)
     if old_match is None or init_match is None:
         raise ReleaseError("could not find the version line in pyproject.toml or __init__.py")
-    old = re.search(r'"([^"]*)"', old_match.group(0)).group(1)
-    if old != re.search(r'"([^"]*)"', init_match.group(0)).group(1):
+    old = old_match.group(2)
+    if old != init_match.group(2):
         raise ReleaseError("pyproject.toml and __init__.py disagree on the current version")
     if parse_version(new) <= parse_version(old):
         raise ReleaseError(f"target {new} must be greater than the current version {old}")

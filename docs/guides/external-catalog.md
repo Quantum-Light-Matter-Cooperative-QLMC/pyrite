@@ -58,13 +58,11 @@ fetched SBETHE reference data use
 `workspace/xsgen/reference-data/sbethe/sdbase/`, and the fetched EEDL and EADL
 files use `workspace/datasets/`. New writes go to the workspace. Tables in the
 older per-user data directory (`~/.local/share/pyrite/xsgen/tables` on Linux)
-remain readable for one more release as a deprecated tier: `pyrite tables list`
-shows them as `legacy`, the first one a run reads prints a `FutureWarning`, and
-PyRITE 0.5.0 stops searching there. `pyrite tables migrate` (try `--dry-run`
-first) copies every legacy table the workspace lacks into it; it never deletes
-or overwrites anything, so remove the old copy yourself once `pyrite tables
-list` shows no `legacy` rows. With no explicit workspace, the per-user data
-directory is the selected tier and nothing is deprecated. Fetched SBETHE data
+are no longer searched as of PyRITE 0.5.0. `pyrite tables migrate` (try
+`--dry-run` first) copies every table the workspace lacks from there into it;
+it never deletes or overwrites anything, so remove the old copy yourself
+afterwards. With no explicit workspace, the per-user data directory is the
+selected tier. Fetched SBETHE data
 and the EEDL/EADL datasets are not copied automatically; rerun
 `pyrite tables fetch` in the workspace, or copy them.
 

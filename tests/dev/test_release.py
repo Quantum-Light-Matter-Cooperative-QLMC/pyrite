@@ -54,14 +54,29 @@ def test_due_removals_flags_targets_at_or_before_release_minor() -> None:
     assert release.due_removals("0.6.0", rows) == rows
 
 
-def test_real_registries_are_covered_by_the_gate() -> None:
+def test_removal_targets_reads_every_registry_family(monkeypatch) -> None:
+    import types
+
+    from pyrite import _module_deprecations as modules
+    from pyrite.cli import _deprecations as cli
+
+    row = types.SimpleNamespace(remove_in="0.9.0")
+    monkeypatch.setattr(modules, "MODULE_DEPRECATIONS", {"pyrite.old": row})
+    monkeypatch.setattr(modules, "PUBLIC_EXPORT_DEPRECATIONS", {("pyrite.m", "n"): row})
+    monkeypatch.setattr(cli, "DEPRECATIONS", {"a b": row})
+    monkeypatch.setattr(cli, "DEPRECATED_FLAGS", {("run", "--x"): row})
+    monkeypatch.setattr(cli, "IMPLICIT_DEFAULTS", {"profile": row})
+
     labels = release.removal_targets()
 
-    assert "Sweep.from_legacy" in labels
-    assert "xsgen legacy table tier" in labels
-    assert any(label.startswith("module ") for label in labels)
-    # Everything the registries schedule is due by some far-future release.
-    assert release.due_removals("99.0.0") == dict(sorted(labels.items()))
+    assert set(labels) == {
+        "module pyrite.old",
+        "export pyrite.m.n",
+        "command a b",
+        "option run --x",
+        "default profile",
+    }
+    assert set(labels.values()) == {"0.9.0"}
 
 
 def test_classify_separates_breaking_physics_and_noise() -> None:

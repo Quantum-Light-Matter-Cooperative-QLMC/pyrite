@@ -2748,9 +2748,8 @@ Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
 
   Tables are produced by external Fortran codes (ELSEPA, SBETHE, BremsLib) and resolved
   in two tiers: your own tables first, then the tables shipped with PyRITE. Consumers
-  cannot tell the two apart. With an explicit workspace, the deprecated pre-workspace
-  directory is searched between them until the next release; `pyrite tables migrate`
-  copies it forward.
+  cannot tell the two apart. With an explicit workspace, the pre-workspace directory is
+  no longer searched; `pyrite tables migrate` copies its tables into the workspace.
 
   Examples:
     pyrite tables path

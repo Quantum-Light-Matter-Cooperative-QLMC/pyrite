@@ -7,26 +7,7 @@ dropped name fails here loudly rather than at some consumer's import. Importing
 the package pulls in matplotlib but draws nothing, so it stays in the fast suite.
 """
 
-from importlib import import_module
-
-import pytest
-
 import pyrite.plots as p
-
-_COMPAT_SUBMODULES = {
-    "altair_detectors": ("altair.detectors", "_collapsed"),
-    "altair_spectra": ("altair.spectra", "_record_frame"),
-    "altair_sweeps": ("altair.sweeps", "scan_charts"),
-    "altair_trajectories": ("altair.trajectories", "_GROOVE"),
-    "crystal_lattice": ("plotly.crystal_lattice", "crystal_lattice_figure"),
-    "detectors": ("mpl.detectors", "_eag_wide_brem"),
-    "interactive": ("mpl.interactive", "browse"),
-    "plotly_trajectories": ("plotly.trajectories", "_CAMERA_EYE"),
-    "render_trajectories": ("plotly.render", "render_cache_key"),
-    "spectra": ("mpl.spectra", "_comparison_drop_message"),
-    "sweeps": ("mpl.sweeps", "_HEATMAP_QUANTITIES"),
-    "trajectories": ("mpl.trajectories", "groove_profile_knots"),
-}
 
 # Every top-level name the old plots.py defined, now re-exported from the package.
 # Adding a name is fine; REMOVING one (or failing to re-export it) breaks this test.
@@ -129,12 +110,3 @@ def test_public_names_resolve_to_subpackage():
     assert p.plot_heatmaps.__module__ == "pyrite.plots.mpl.sweeps"
     assert p.plot_timepix_efficiency.__module__ == "pyrite.plots.mpl.detectors"
     assert p.plot_trajectory_grid.__module__ == "pyrite.plots.mpl.trajectories"
-
-
-@pytest.mark.parametrize(("legacy_name", "canonical"), _COMPAT_SUBMODULES.items())
-def test_flat_submodule_paths_reexport_canonical_names(legacy_name, canonical):
-    canonical_name, representative = canonical
-    legacy = import_module(f"pyrite.plots.{legacy_name}")
-    implementation = import_module(f"pyrite.plots.{canonical_name}")
-
-    assert getattr(legacy, representative) is getattr(implementation, representative)
