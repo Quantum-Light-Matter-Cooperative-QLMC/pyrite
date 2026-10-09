@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from pyrite.cli._deprecations import flag_message
 from pyrite.cli.commands import recompute as recompute_cli
 from pyrite.cli.commands import remote as remote_cli
 from pyrite.cli.commands import scan
@@ -197,7 +198,10 @@ def test_zhai_preset_waits_pulls_and_restores_explicit_target(monkeypatch, brem_
         ],
     )
 
-    assert_clean_result(result)
+    warning = (
+        flag_message("", brem_flag, "--brem-trials") + "\n" if brem_flag == "--ne-brem" else ""
+    )
+    assert_clean_result(result, stderr=warning)
     assert seen == {
         "ne": 11,
         "ne_brem": 3,
@@ -260,7 +264,7 @@ def test_zhai_preset_runs_locally_without_remote(monkeypatch):
 
     result = invoke(
         scan.command,
-        ["--preset", "zhai", "--ne", "11", "--ne-brem", "3", "--ne-supp", "5", "--refresh"],
+        ["--preset", "zhai", "--ne", "11", "--brem-trials", "3", "--ne-supp", "5", "--refresh"],
     )
 
     assert_clean_result(result)
@@ -314,7 +318,10 @@ def test_recompute_remote_modifier_delegates_and_restores_target(monkeypatch, br
         ["hopg", "--remote=box-a", "--detach", brem_flag, "25"],
     )
 
-    assert_clean_result(result)
+    warning = (
+        flag_message("", brem_flag, "--brem-trials") + "\n" if brem_flag == "--ne-brem" else ""
+    )
+    assert_clean_result(result, stderr=warning)
     assert seen["material"] == ["hopg"]
     assert seen["ne_brem"] == 25
     assert seen["detach"] is True

@@ -8,6 +8,7 @@ import pytest
 from click.testing import CliRunner, Result
 
 from pyrite import cli
+from pyrite.cli._deprecations import RetiredOption
 
 CONTRACT = Path(__file__).parents[1] / "data" / "cli_contract.json"
 
@@ -131,8 +132,16 @@ def test_click_tree_preserves_frozen_command_and_option_names():
         # `pyrite app <leaf>` stopped launching implicitly at 0.3.0, so the
         # launch options it used to advertise now sit on its `launch` child.
         relocated = _run(*path, "launch", "--help").stdout if path[:1] == ("app",) else ""
+        current = cli.command
+        ctx = click.Context(current)
+        for part in path:
+            current = current.get_command(ctx, part)
+            ctx = click.Context(current, parent=ctx, info_name=part)
+        retired = {
+            param.retired_flag for param in current.params if isinstance(param, RetiredOption)
+        }
         for option in _node_options(node):
-            assert option in completed.stdout or option in relocated
+            assert option in completed.stdout or option in relocated or option in retired
         for child in node["subcommands"]:
             if child["path"].startswith("line-grid"):
                 continue

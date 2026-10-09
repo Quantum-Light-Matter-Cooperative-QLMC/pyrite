@@ -12,7 +12,7 @@ from ...console import output as _cli_core
 from ...runs import scan as _scan
 from .. import _completion as _cli_completion
 from .. import _implicit_defaults
-from .._deprecations import DeprecatedOption
+from .._deprecations import DeprecatedOption, RetiredOption, canonical_option
 from .._options import remote_option
 
 _PERFORMANCE_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
@@ -274,10 +274,10 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     show_default=True,
     help="With --preset zhai, Fig. 1c line electrons per energy.",
 )
-@click.option(
+@canonical_option(
     "--brem-trials",
-    "--ne-brem",
     "ne_brem",
+    retired=("--ne-brem",),
     type=_cli_core.POSITIVE_INT,
     default=200,
     show_default=True,
@@ -726,7 +726,9 @@ def _derived_command(name, *, excluded, implied, help):
     """Build a public command view over the shared run implementation."""
     params = []
     for parameter in _command.params:
-        if parameter.name in excluded:
+        if parameter.name in excluded or (
+            isinstance(parameter, RetiredOption) and parameter.canonical_dest in excluded
+        ):
             continue
         cloned = copy.copy(parameter)
         if name == "perf" and isinstance(cloned, click.Option):

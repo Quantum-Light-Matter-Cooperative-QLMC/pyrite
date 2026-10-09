@@ -19,7 +19,7 @@ from ...checkpoints import recompute as _recompute
 from ...console import json as cli_json
 from ...console import output as _cli_core
 from .. import _completion as _cli_completion
-from .._deprecations import DeprecatedOption
+from .._deprecations import DeprecatedOption, canonical_option
 from .._options import remote_option
 
 
@@ -211,10 +211,10 @@ def _reject_remote_local_options(ctx: click.Context, json_output: bool) -> None:
     shell_complete=_cli_completion.complete_profile,
     help="Catalog profile for legacy data; otherwise must match checkpoint metadata.",
 )
-@click.option(
+@canonical_option(
     "--brem-trials",
-    "--ne-brem",
     "ne_brem",
+    retired=("--ne-brem",),
     type=_cli_core.POSITIVE_INT,
     default=None,
     metavar="N",

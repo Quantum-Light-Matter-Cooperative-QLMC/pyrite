@@ -105,20 +105,20 @@ def _catalog_key(label):
 
 
 def _ne_cli_options(function):
-    function = click.option(
+    function = canonical_option(
         "-b",
         "--brem-trials",
-        "--ne-brem",
         "ne_brem",
+        retired=("--ne-brem",),
         type=COUNT_CSV,
         metavar="N,...",
         help="Monte Carlo electron histories used to estimate bremsstrahlung; positive integers.",
     )(function)
-    function = click.option(
+    function = canonical_option(
         "-l",
         "--line-trials",
-        "--ne-line",
         "ne_line",
+        retired=("--ne-line",),
         type=COUNT_CSV,
         metavar="N,...",
         help="Monte Carlo electron histories used to estimate the line spectrum; positive integers.",
@@ -447,18 +447,18 @@ def numerics_show_command(name, fidelity, json_output):
 
 @numerics_command.command("set")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
-@click.option(
+@canonical_option(
     "--line-trials",
-    "--line-electrons",
     "line_electrons",
+    retired=("--line-electrons",),
     type=click.IntRange(min=1),
     metavar="N",
     help="Monte Carlo electron histories used to estimate the line spectrum.",
 )
-@click.option(
+@canonical_option(
     "--brem-trials",
-    "--bremsstrahlung-electrons",
     "bremsstrahlung_electrons",
+    retired=("--bremsstrahlung-electrons",),
     type=click.IntRange(min=1),
     metavar="N",
     help="Monte Carlo electron histories used to estimate bremsstrahlung.",

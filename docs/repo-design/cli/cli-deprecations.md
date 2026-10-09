@@ -16,11 +16,22 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 
 | Command | Deprecated option | Replacement | Deprecated in | Remove in | Note |
 | --- | --- | --- | --- | --- | --- |
+| `pyrite app validation export` | `--ne-brem` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
 | `pyrite checkpoint recompute brem` | `--fidelity` | omit it; recompute reads fidelity from checkpoint metadata | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
+| `pyrite checkpoint recompute brem` | `--ne-brem` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
 | `pyrite checkpoint recompute line` | `--fidelity` | omit it; recompute reads fidelity from checkpoint metadata | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
+| `pyrite profile add` | `--ne-brem` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
+| `pyrite profile add` | `--ne-line` | `--line-trials` | 0.5.1 | 0.7.0 |  |
+| `pyrite profile create` | `--ne-brem` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
+| `pyrite profile create` | `--ne-line` | `--line-trials` | 0.5.1 | 0.7.0 |  |
+| `pyrite profile numerics set` | `--bremsstrahlung-electrons` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
+| `pyrite profile numerics set` | `--line-electrons` | `--line-trials` | 0.5.1 | 0.7.0 |  |
 | `pyrite profile numerics show` | `--fidelity` | omit it; numerics resolve against full | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
+| `pyrite profile set` | `--ne-brem` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
+| `pyrite profile set` | `--ne-line` | `--line-trials` | 0.5.1 | 0.7.0 |  |
 | `pyrite-dev perf` | `--fidelity` | omit it for full; for reduced runs use --quick or a user-defined catalog profile | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
 | `pyrite run` | `--fidelity` | omit it for full; for reduced runs use --quick or a user-defined catalog profile | 0.4.0 | 0.6.0 | `survey` is retired with no built-in replacement (issue #215); existing `--survey` checkpoints stay readable and pullable. |
+| `pyrite run` | `--ne-brem` | `--brem-trials` | 0.5.1 | 0.7.0 |  |
 
 ## Implicit defaults
 

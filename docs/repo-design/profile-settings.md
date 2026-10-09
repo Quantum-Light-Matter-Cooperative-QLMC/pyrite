@@ -32,7 +32,7 @@ explicit value, effective value and source (`profile`, `fidelity`, `built-in`).
 
 | TOML key | Setter flag | Notes |
 |---|---|---|
-| `n_electrons`, `n_electrons_brem` | `--line-trials`, `--brem-trials` | single-value grids; `profile set\|add -l/-b` edit them as sweepable grids; old electron option names remain aliases |
+| `n_electrons`, `n_electrons_brem` | `--line-trials`, `--brem-trials` | single-value grids; `profile set\|add -l/-b` edit them as sweepable grids; old electron options warn and are scheduled for removal in 0.7.0 |
 | `n_families`, `max_reflections` | `--reflection-families`, `--maximum-reflections` | |
 | `mosaic_nodes`, `mosaic_route` | `--mosaic-nodes`, `--mosaic-route` | |
 | `straggling`, `energy_model`, `max_dE_frac` | `--straggling`, `--energy-model`, `--maximum-fractional-energy-loss` | also accepted by `profile create\|set` for compatibility |

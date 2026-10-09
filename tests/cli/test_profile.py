@@ -6,7 +6,7 @@ import tomlkit
 from pyrite import _energy_grid_artifacts as artifacts
 from pyrite.cli import _catalog_io
 from pyrite.cli import command as root_command
-from pyrite.cli._deprecations import option_message
+from pyrite.cli._deprecations import flag_message, option_message
 from pyrite.cli.commands import profile
 from pyrite.console import output as _core
 from tests.helpers.cli import assert_clean_result, invoke
@@ -567,7 +567,7 @@ def test_set_concatenates_repeated_range_options(tmp_path, monkeypatch):
 def test_set_reports_a_new_profile_parameter(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    result = invoke(profile.command, ["set", "sub_100keV", "--ne-line", "100,200"])
+    result = invoke(profile.command, ["set", "sub_100keV", "--line-trials", "100,200"])
 
     assert_clean_result(
         result,
@@ -584,9 +584,17 @@ def test_profile_trial_grids_keep_catalog_keys(tmp_path, monkeypatch, verb, line
     catalog = _catalog(tmp_path, monkeypatch)
     name = "trial_scan" if verb == "create" else "sub_100keV"
 
-    result = invoke(profile.command, [verb, name, line_flag, "100,200", brem_flag, "50,75"])
+    result = invoke(root_command, ["profile", verb, name, line_flag, "100,200", brem_flag, "50,75"])
 
-    assert_clean_result(result)
+    warnings = ""
+    if line_flag == "--ne-line":
+        warnings = (
+            flag_message(f"profile {verb}", line_flag, "--line-trials")
+            + "\n"
+            + flag_message(f"profile {verb}", brem_flag, "--brem-trials")
+            + "\n"
+        )
+    assert_clean_result(result, stderr=warnings)
     row = tomlkit.parse(catalog.read_text())["profiles"][name]
     assert row["n_electrons"]["values"] == [100, 200]
     assert row["n_electrons_brem"]["values"] == [50, 75]
@@ -614,11 +622,28 @@ def test_numerics_trial_aliases_set_and_reset(tmp_path, monkeypatch, line_field,
     catalog = _catalog(tmp_path, monkeypatch)
 
     result = invoke(
-        profile.command,
-        ["numerics", "set", "sub_100keV", f"--{line_field}", "100", f"--{brem_field}", "50"],
+        root_command,
+        [
+            "profile",
+            "numerics",
+            "set",
+            "sub_100keV",
+            f"--{line_field}",
+            "100",
+            f"--{brem_field}",
+            "50",
+        ],
     )
 
-    assert_clean_result(result)
+    warnings = ""
+    if line_field == "line-electrons":
+        warnings = (
+            flag_message("profile numerics set", f"--{line_field}", "--line-trials")
+            + "\n"
+            + flag_message("profile numerics set", f"--{brem_field}", "--brem-trials")
+            + "\n"
+        )
+    assert_clean_result(result, stderr=warnings)
     row = tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]
     assert row["n_electrons"]["values"] == [100]
     assert row["n_electrons_brem"]["values"] == [50]
@@ -709,7 +734,7 @@ def test_add_material_is_canonical_and_composes_with_ranges(tmp_path, monkeypatc
 def test_add_accepts_electron_count_grids(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
-    result = invoke(profile.command, ["add", "sub_100keV", "--ne-line", "100,200"])
+    result = invoke(profile.command, ["add", "sub_100keV", "--line-trials", "100,200"])
 
     assert_clean_result(result, stdout="updated profile sub_100keV\n")
     assert "n_electrons = {values = [100, 200]}" in catalog.read_text()
@@ -889,8 +914,8 @@ def test_numerics_help_exposes_scientific_controls_not_execution_tuning():
     setting = invoke(profile.command, ["numerics", "set", "--help"])
     assert_clean_result(setting)
     for option in (
-        "--line-electrons",
-        "--bremsstrahlung-electrons",
+        "--line-trials",
+        "--brem-trials",
         "--reflection-families",
         "--maximum-reflections",
         "--mosaic-nodes",
@@ -911,7 +936,7 @@ def test_numerics_set_dry_run_write_validation_and_reset(tmp_path, monkeypatch):
             "numerics",
             "set",
             "sub_100keV",
-            "--line-electrons",
+            "--line-trials",
             "12",
             "--reflection-families",
             "3",

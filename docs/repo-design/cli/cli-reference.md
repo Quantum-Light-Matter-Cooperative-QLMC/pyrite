@@ -150,8 +150,7 @@ Options:
                                   unless -R/--remote.
   --ne NUMBER                     With --preset zhai, Fig. 1c line electrons per energy.
                                   [default: 20000]
-  --brem-trials, --ne-brem NUMBER
-                                  With --preset zhai, Monte Carlo electron histories for
+  --brem-trials NUMBER            With --preset zhai, Monte Carlo electron histories for
                                   Fig. 1c bremsstrahlung per energy.  [default: 200]
   --ne-supp NUMBER                With --preset zhai, supplementary electrons per polar-
                                   tilt spectrum.  [default: 200]
@@ -432,13 +431,12 @@ Usage: pyrite app validation export [OPTIONS]
   Write cached validation figures; never starts marimo.
 
 Options:
-  --outdir DIRECTORY              [default: figures]
-  --ne INTEGER                    [default: 20000]
-  --brem-trials, --ne-brem INTEGER
-                                  Monte Carlo electron histories for Fig. 1c
-                                  bremsstrahlung per energy.  [default: 200]
-  --ne-supp INTEGER               [default: 200]
-  -h, --help                      Show this message and exit.
+  --outdir DIRECTORY     [default: figures]
+  --ne INTEGER           [default: 20000]
+  --brem-trials INTEGER  Monte Carlo electron histories for Fig. 1c bremsstrahlung per
+                         energy.  [default: 200]
+  --ne-supp INTEGER      [default: 200]
+  -h, --help             Show this message and exit.
 ```
 
 ## `pyrite app validation launch`
@@ -540,7 +538,7 @@ Options:
                                   full for legacy data.
   --profile NAME                  Catalog profile for legacy data; otherwise must match
                                   checkpoint metadata.
-  --brem-trials, --ne-brem N      Monte Carlo electron histories used to estimate
+  --brem-trials N                 Monte Carlo electron histories used to estimate
                                   bremsstrahlung; overrides profile default.
   --start EV                      Wide-bremsstrahlung lower bound in eV; overrides
                                   profile.
@@ -1337,11 +1335,9 @@ Options:
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges; repeat to
                                   combine.
-  -l, --line-trials, --ne-line N,...
-                                  Monte Carlo electron histories used to estimate the
+  -l, --line-trials N,...         Monte Carlo electron histories used to estimate the
                                   line spectrum; positive integers.
-  -b, --brem-trials, --ne-brem N,...
-                                  Monte Carlo electron histories used to estimate
+  -b, --brem-trials N,...         Monte Carlo electron histories used to estimate
                                   bremsstrahlung; positive integers.
   --material KEY,...              Add comma-separated material keys to explicit
                                   membership.
@@ -1387,11 +1383,9 @@ Options:
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges; repeat to
                                   combine.
-  -l, --line-trials, --ne-line N,...
-                                  Monte Carlo electron histories used to estimate the
+  -l, --line-trials N,...         Monte Carlo electron histories used to estimate the
                                   line spectrum; positive integers.
-  -b, --brem-trials, --ne-brem N,...
-                                  Monte Carlo electron histories used to estimate
+  -b, --brem-trials N,...         Monte Carlo electron histories used to estimate
                                   bremsstrahlung; positive integers.
   --straggling / --no-straggling  Enable or disable Urban energy-loss straggling.
   --energy-model [frozen|midpoint]
@@ -1691,11 +1685,9 @@ Usage: pyrite profile numerics set [OPTIONS] NAME
   Set one or more explicit result-affecting controls on PROFILE.
 
 Options:
-  --line-trials, --line-electrons N
-                                  Monte Carlo electron histories used to estimate the
+  --line-trials N                 Monte Carlo electron histories used to estimate the
                                   line spectrum.  [x>=1]
-  --brem-trials, --bremsstrahlung-electrons N
-                                  Monte Carlo electron histories used to estimate
+  --brem-trials N                 Monte Carlo electron histories used to estimate
                                   bremsstrahlung.  [x>=1]
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
@@ -2081,11 +2073,9 @@ Options:
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges; repeat to
                                   combine.
-  -l, --line-trials, --ne-line N,...
-                                  Monte Carlo electron histories used to estimate the
+  -l, --line-trials N,...         Monte Carlo electron histories used to estimate the
                                   line spectrum; positive integers.
-  -b, --brem-trials, --ne-brem N,...
-                                  Monte Carlo electron histories used to estimate
+  -b, --brem-trials N,...         Monte Carlo electron histories used to estimate
                                   bremsstrahlung; positive integers.
   --straggling / --no-straggling  Enable or disable Urban energy-loss straggling.
   --energy-model [frozen|midpoint]
