@@ -7,10 +7,9 @@ from pathlib import Path
 
 import numpy as np
 
+from ..datasets import PDATCONF_SHA256
 from ..materials.atomic import Z_TABLE
 from .eedl_ionization import EEDL_SUBSHELL_LABELS, load_eedl_shell_ionization
-
-PDATCONF_SHA256 = "cd239554bb6e823692ea4611d443df8684b4cace06006fc271a4168cb78c62d2"
 
 
 @dataclass(frozen=True, slots=True)

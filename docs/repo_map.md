@@ -27,110 +27,123 @@ Components (a + b denotes a static import cycle):
   p3: checkpoints
   p4: cli
   p5: console
-  p6: detectors + instrument
+  p6: detectors
   p7: devtools
   p8: energy_grid
-  p9: materials
-  p10: montecarlo + xsgen
-  p11: observations
-  p12: perf
-  p13: plots
-  p14: remote
-  p15: results
-  p16: runs
-  p17: validation
+  p9: instrument
+  p10: materials
+  p11: montecarlo
+  p12: observations
+  p13: perf
+  p14: plots
+  p15: remote
+  p16: results
+  p17: runs
+  p18: validation
+  p19: xsgen
 Edges (importer -> imported):
-  p0 -> p17
+  p0 -> p10
+  p0 -> p18
   p0 -> p4
   p0 -> p5
-  p0 -> p9
   p1 -> p10
   p1 -> p11
-  p1 -> p13
+  p1 -> p12
   p1 -> p14
   p1 -> p15
   p1 -> p16
   p1 -> p17
+  p1 -> p18
   p1 -> p2
   p1 -> p3
   p1 -> p5
-  p1 -> p9
-  p10 -> p5
-  p10 -> p6
-  p10 -> p9
   p11 -> p10
-  p11 -> p15
-  p11 -> p3
+  p11 -> p19
   p11 -> p5
-  p11 -> p6
-  p13 -> p10
-  p13 -> p15
-  p13 -> p6
-  p13 -> p9
+  p12 -> p11
+  p12 -> p16
+  p12 -> p3
+  p12 -> p5
+  p12 -> p6
+  p12 -> p9
   p14 -> p10
-  p14 -> p12
-  p14 -> p15
+  p14 -> p11
   p14 -> p16
-  p14 -> p17
-  p14 -> p2
-  p14 -> p3
-  p14 -> p5
-  p14 -> p9
+  p14 -> p6
   p15 -> p10
-  p15 -> p6
-  p15 -> p9
+  p15 -> p11
+  p15 -> p13
+  p15 -> p16
+  p15 -> p17
+  p15 -> p18
+  p15 -> p19
+  p15 -> p2
+  p15 -> p3
+  p15 -> p5
   p16 -> p10
   p16 -> p11
-  p16 -> p12
-  p16 -> p15
-  p16 -> p2
-  p16 -> p3
-  p16 -> p5
   p16 -> p6
   p16 -> p9
   p17 -> p10
+  p17 -> p11
+  p17 -> p12
+  p17 -> p13
+  p17 -> p16
+  p17 -> p19
   p17 -> p2
   p17 -> p3
   p17 -> p5
-  p17 -> p6
   p17 -> p9
+  p18 -> p10
+  p18 -> p11
+  p18 -> p2
+  p18 -> p3
+  p18 -> p5
+  p18 -> p6
+  p19 -> p10
+  p19 -> p5
   p2 -> p10
-  p2 -> p15
+  p2 -> p11
+  p2 -> p16
+  p2 -> p19
   p2 -> p6
   p2 -> p9
   p3 -> p10
-  p3 -> p15
+  p3 -> p11
+  p3 -> p16
   p3 -> p2
   p3 -> p5
-  p3 -> p9
   p4 -> p10
-  p4 -> p12
-  p4 -> p14
-  p4 -> p16
+  p4 -> p11
+  p4 -> p13
+  p4 -> p15
+  p4 -> p17
+  p4 -> p19
   p4 -> p2
   p4 -> p3
   p4 -> p5
-  p4 -> p6
   p4 -> p8
   p4 -> p9
-  p5 -> p9
-  p6 -> p9
-  p7 -> p13
-  p7 -> p15
+  p5 -> p10
+  p6 -> p10
+  p7 -> p14
   p7 -> p16
   p7 -> p17
+  p7 -> p18
   p7 -> p2
   p7 -> p4
   p7 -> p5
   p7 -> p8
   p8 -> p10
-  p8 -> p14
+  p8 -> p11
   p8 -> p15
+  p8 -> p16
   p8 -> p2
   p8 -> p3
   p8 -> p5
   p8 -> p6
-  p8 -> p9
+  p9 -> p10
+  p9 -> p6
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
 
@@ -196,8 +209,14 @@ Portable array backend shared by every device-dispatching kernel: NumPy, CUDA/RO
 ### `_energy_grid_artifacts.py`
 Immutable, content-addressed energy-grid artifact store: canonical `cxr.energy-grid-artifact.v1` identity bytes, SHA-256 naming, sharded storage, atomic dedup publication, and corruption checks. Imports nothing first-party. Read by `materials.catalog` when resolving `[profiles.*.energy_grid_refs]` at catalog-load time and written by `energy_grid.apply` / collected by `energy_grid.gc`, so it sits below both rather than inside `energy_grid/`. Deps: none (leaf; stdlib only).
 
+### `_bremslib_table.py`
+BremsLib table staging: `BremsLibBremsstrahlungTable`, `prepare_bremslib_table` (exact piecewise-linear solid-angle renormalization, geometric `T1` refinement), `solid_angle_integral`, `top_reduced_energy`, and `BREMSSTRAHLUNG_BREMSLIB_MODEL`. A leaf below `montecarlo` and `xsgen` so `xsgen.bremslib.tables` stages tables without importing Monte Carlo; `montecarlo.spectrum.brem_bremslib` re-exports every public name. Ledger `bremslib-angular-model`. Deps: none (leaf; NumPy only).
+
+### `_planar_geometry.py`
+Planar pose and point-source ray geometry: `PlanarPose`, `PixelGrid`, `PixelRays`, `solid_angle_sr`, and `planar_rays(pose, pixels=, size_mm=)`. A leaf below `montecarlo`, `detectors`, and `instrument`: `montecarlo.geometry` tiles a detector face and `detectors.eaglexo_response` takes its solid angle without importing the instrument model. `instrument` and `instrument.geometry` re-export the public names; `instrument.geometry.planar_detector_rays` delegates to `planar_rays`. Ledger `positioned-filter-attenuation`. Deps: none (leaf; NumPy only).
+
 ### `datasets.py`
-Hash-pinned upstream datasets (ADR-0014 class b): the EPICS2025 EEDL and EADL files and the PyRITE-derived EPDL photon table. Pins (ordered URLs: upstream then PyRITE's release mirror; SHA-256, and EEDL's declared final-CRLF transformation of the published bytes), install path `<data root>/datasets/<name>/<file>` (data root from `console.config.fetched_data_root`, shared with xsgen tables), `require_dataset`/`verify_dataset`, and `fetch_dataset` behind `pyrite tables fetch eedl|eadl|epdl`. Read by `montecarlo.eedl_ionization` and `montecarlo.eadl_relaxation`, verified by `xsgen.verify`, shipped by `remote.transport` sync. Deps: `console.config`, `xsgen` (fetch only, lazy).
+Hash-pinned upstream datasets (ADR-0014 class b): the EPICS2025 EEDL and EADL files and the PyRITE-derived EPDL photon table. Pins (ordered URLs: upstream then PyRITE's release mirror; SHA-256, and EEDL's declared final-CRLF transformation of the published bytes), install path `<data root>/datasets/<name>/<file>` (data root from `console.config.fetched_data_root`, shared with xsgen tables), `require_dataset`/`verify_dataset`, `fetch_dataset`, and the SBETHE `PDATCONF_SHA256` pin read by `montecarlo.shell_configuration` and `xsgen.verify` behind `pyrite tables fetch eedl|eadl|epdl`. Read by `montecarlo.eedl_ionization` and `montecarlo.eadl_relaxation`, verified by `xsgen.verify`, shipped by `remote.transport` sync. Deps: `console.config`, `xsgen` (fetch only, lazy).
 
 ### `materials/` (package)
 Material domain package. Narrow top-level API expose immutable `CATALOG`, frozen record types (`MaterialCatalog`, `CrystalInfo`, `CrystalSpec`, `MediumSpec`, `MaterialIdentity`, `MaterialSpec`, `MaterialValidationSpec`, `ScanSpec`, `LayerSpec`), `load_material_catalog`, compatibility projections (`CRYSTALS`, `MATERIALS`, `MATERIAL_LABELS`). Implementation helpers stay in submodules below.
@@ -449,7 +468,7 @@ Renderer-neutral data preparation plus backend packages under `mpl/`, `altair/`,
 ## Downstream instrument and detector forward models
 
 ### `instrument/`
-Closed, analytic post-emission photon geometry. `model.py` owns frozen `PlanarPose`, `PixelGrid`, `FilterPlate`, physical `PlanarDetector`, and the narrow `PixelScorer` request; `geometry.py` owns point-source pixel rays, solid-angle weights, coarse angular partitions, and exact finite-box path lengths; `attenuation.py` owns stacked per-filter attenuation coefficients and primary-photon transmission. `Scene` owns ordered plates and accepts either the legacy scalar `Detector` or physical `PlanarDetector`; instrument objects never enter the electron-transport navigator. Deps: `detectors.spec`, `materials`.
+Closed, analytic post-emission photon geometry. `model.py` owns frozen `FilterPlate`, physical `PlanarDetector`, and the narrow `PixelScorer` request, re-exporting `PlanarPose` and `PixelGrid` from `_planar_geometry`; `geometry.py` owns `planar_detector_rays` (delegating to `_planar_geometry.planar_rays`), solid-angle weights, coarse angular partitions, and exact finite-box path lengths; `attenuation.py` owns stacked per-filter attenuation coefficients and primary-photon transmission. `Scene` owns ordered plates and accepts either the legacy scalar `Detector` or physical `PlanarDetector`; instrument objects never enter the electron-transport navigator. Deps: `_planar_geometry`, `detectors.spec`, `materials`.
 
 ### `detectors/`
 Detector configuration, read-time scoring, and detector-adjacent forward models. `spec.py` owns `Detector`, its fine-line/wide-bremsstrahlung `EnergyBins`, the `Timepix3`/`EagleXO`/`LegacyEDS` response adapters, and the deprecated `DetectorSpec` spelling. Stored arrays remain response-free; plots and result tables call `Detector.score`. Deps: `materials.crystal`, `montecarlo` (legacy analytic response only), `DATA_DIR`.

@@ -294,7 +294,9 @@ allow_indirect_imports = true
 
 # Detector-response operators are owned by ``detectors``. The Monte Carlo
 # facade preserves their historical exports lazily, so no static transport code
-# may regain a direct dependency on the detector package.
+# may regain a dependency on the detector package, directly or through
+# ``instrument`` (which imports ``detectors``). Planar pose, pixel-grid, and
+# ray geometry live in the ``pyrite._planar_geometry`` leaf below all three.
 [[tool.importlinter.contracts]]
 id = "montecarlo-imports-no-detectors"
 name = "Monte Carlo imports no detector package"
@@ -304,8 +306,25 @@ source_modules = [
 ]
 forbidden_modules = [
     "pyrite.detectors",
+    "pyrite.instrument",
 ]
-allow_indirect_imports = true
+allow_indirect_imports = false
+
+# ``xsgen`` is the table-generation layer that the Monte Carlo runner calls
+# into on the host; it must not import back. BremsLib table staging lives in
+# the ``pyrite._bremslib_table`` leaf and the SBETHE ``pdatconf.p14`` pin in
+# ``pyrite.datasets``, both below the two packages.
+[[tool.importlinter.contracts]]
+id = "xsgen-imports-no-montecarlo"
+name = "Table generation imports no Monte Carlo package"
+type = "forbidden"
+source_modules = [
+    "pyrite.xsgen",
+]
+forbidden_modules = [
+    "pyrite.montecarlo",
+]
+allow_indirect_imports = false
 
 [[tool.importlinter.contracts]]
 id = "material-leaves-stay-independent"

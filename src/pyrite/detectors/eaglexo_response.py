@@ -86,7 +86,7 @@ is W_Si = 3.65 eV/pair (each absorbed photon of energy E makes E/W_Si electrons)
 import numpy as np
 
 from .. import DATA_DIR
-from ..instrument.geometry import solid_angle_sr
+from .._planar_geometry import solid_angle_sr
 from ..materials.crystal import absorption_length_ang
 from ._si_sensor import (
     FANO_SI,

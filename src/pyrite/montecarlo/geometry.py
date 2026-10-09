@@ -18,8 +18,7 @@ plane (zero y-component).
 import numpy as np
 from numba import njit
 
-from ..instrument import PixelGrid, PlanarDetector, PlanarPose
-from ..instrument.geometry import planar_detector_rays
+from .._planar_geometry import PixelGrid, PlanarPose, planar_rays
 from ..materials.crystal import _direct_lattice_vectors, _rotation_between, reciprocal_g_vector
 
 X_MIN = 0
@@ -469,11 +468,10 @@ def detector_directions(
     R = _rotation_between(np.array([0.0, 0.0, 1.0]), normal_lab)
 
     step = chip_mm / n_side
-    detector = PlanarDetector(
-        pose=PlanarPose.from_observation(dist_mm, np.rad2deg(theta_obs_rad)),
+    rays = planar_rays(
+        PlanarPose.from_observation(dist_mm, np.rad2deg(theta_obs_rad)),
         pixels=PixelGrid((n_side, n_side), (step, step)),
     )
-    rays = planar_detector_rays(detector)
     n_hats = rays.directions_lab.reshape(-1, 3) @ R
     weights = rays.solid_angle_sr.reshape(-1).copy()
     weights *= domega_sr / weights.sum()  # conserve the detector's total Omega

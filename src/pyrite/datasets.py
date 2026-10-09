@@ -104,6 +104,13 @@ EPDL = Dataset(
     sha256="fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9",
     description="EPDL2025 MF=23 photon cross sections, knot-thinned by PyRITE (1.5 MB)",
 )
+#: SHA-256 of SBETHE's ``sdbase/pdatconf.p14``, the atomic-shell file every
+#: default-model run reads. ``sdbase/`` is a multi-file tree fetched by
+#: :mod:`pyrite.xsgen.fetch`, so it is pinned here rather than as a
+#: :class:`Dataset`; :mod:`pyrite.montecarlo.shell_configuration` checks it on
+#: load and :mod:`pyrite.xsgen.verify` on ``pyrite tables verify``.
+PDATCONF_SHA256 = "cd239554bb6e823692ea4611d443df8684b4cace06006fc271a4168cb78c62d2"
+
 #: Every fetched dataset, in report order.
 DATASETS: dict[str, Dataset] = {dataset.name: dataset for dataset in (EEDL, EADL, EPDL)}
 
@@ -335,6 +342,7 @@ __all__ = [
     "MISMATCH",
     "MISSING",
     "OK",
+    "PDATCONF_SHA256",
     "Dataset",
     "DatasetFetchResult",
     "DatasetMismatchError",

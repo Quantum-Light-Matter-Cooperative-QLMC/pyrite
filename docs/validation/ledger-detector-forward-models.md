@@ -5,7 +5,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `positioned-filter-attenuation`
 
 - **Claim:** primary photons reaching pixel centre `p` through finite plates have factor `T_p(E) = exp[-Σ_j μ_j(E)ℓ_pj]`, where each `ℓ_pj` is the exact source-to-pixel ray length inside plate `j`; pixel flux is `F_p(E) = I_q(p)(E) ΔΩ_p T_p(E)`
-- **Code:** `materials/attenuation.py::linear_attenuation_inv_mm`; `instrument/geometry.py::planar_detector_rays`; `instrument/geometry.py::ray_box_path_lengths`; `instrument/attenuation.py::primary_transmission`
+- **Code:** `materials/attenuation.py::linear_attenuation_inv_mm`; `_planar_geometry.py::planar_rays`; `instrument/geometry.py::ray_box_path_lengths`; `instrument/attenuation.py::primary_transmission`
 - **Source:** Bouguer--Beer exponential attenuation; `μ_j` is the narrow-beam total of `narrow-beam-total-attenuation`, sourced from EPDL2025 since issue #274 (Henke et al. 1993 `f₂` convention / Chantler tabulation before it)
 - **Status:** rederived
 - **Checks:** implementation-side units, positive optical depth, zero-filter identity, uncovered-ray identity, normal-incidence thickness, compound additivity, plate-order invariance; fresh-context derivation and external numerical oracle pending

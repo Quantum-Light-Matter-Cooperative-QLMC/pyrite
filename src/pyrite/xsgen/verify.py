@@ -133,7 +133,7 @@ def verify_pinned(codes: Iterable[str] = CODES) -> list[TableCheck]:
 
 def _verify_sdbase() -> TableCheck:
     """Check the installed ``sdbase/`` the default shell model would read."""
-    from ..montecarlo.shell_configuration import PDATCONF_SHA256
+    from ..datasets import PDATCONF_SHA256
     from .fetch import REQUIRED_SBETHE_FILES
     from .sources import installed_data_dir
 
