@@ -11,6 +11,7 @@ Pages here may inform future implementation, but their presence does not imply s
 beam-transport/electron-transport-physics-recommendations
 beam-transport/energy-grid-recommendations
 beam-transport/stochastic-sampling-recommendations
+beam-transport/detector-cone-line-variance
 ```
 
 ```{toctree}
