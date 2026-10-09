@@ -217,16 +217,16 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
     row.key: row
     for row in (
         *(
-            _flag(command, old, replacement, since="0.5.1")
+            _flag(command, old, replacement, since="0.6.0")
             for command in ("profile create", "profile set", "profile add")
             for old, replacement in (("--ne-line", "--line-trials"), ("--ne-brem", "--brem-trials"))
         ),
         *(
-            _flag(command, "--ne-brem", "--brem-trials", since="0.5.1")
+            _flag(command, "--ne-brem", "--brem-trials", since="0.6.0")
             for command in ("run", "app validation export", "checkpoint recompute brem")
         ),
-        _flag("profile numerics set", "--line-electrons", "--line-trials", since="0.5.1"),
-        _flag("profile numerics set", "--bremsstrahlung-electrons", "--brem-trials", since="0.5.1"),
+        _flag("profile numerics set", "--line-electrons", "--line-trials", since="0.6.0"),
+        _flag("profile numerics set", "--bremsstrahlung-electrons", "--brem-trials", since="0.6.0"),
     )
 }
 
