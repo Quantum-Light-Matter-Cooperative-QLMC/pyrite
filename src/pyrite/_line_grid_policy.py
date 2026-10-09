@@ -82,6 +82,7 @@ __all__ = [
     "COHERENT_NYQUIST_OVERSAMPLING",
     "COHERENT_WINDOW_BIN_EV",
     "DEFAULT_COHERENT_DECOHERENCE_LIMIT",
+    "DEFAULT_COHERENT_FLAT_OMISSION_LIMIT",
     "DEFAULT_COHERENT_LEAK_LIMIT",
     "DEFAULT_LOCAL_HALO_LIMIT",
     "LOCAL_RESOLUTION_POLICY",
@@ -196,13 +197,21 @@ DEFAULT_LOCAL_HALO_LIMIT = 1.0e-4
 #: Coherent feature windows (#350). Per-side share of a coherent row's power
 #: the window may leave to the backbone, as a fraction of the row's
 #: per-electron (decoherence-floor) power. Charged, with
-#: :data:`DEFAULT_COHERENT_DECOHERENCE_LIMIT`, to the feature-window row of
-#: ``tbl-line-budget-allocation``: ``2 * 1e-4 + 1e-4`` of its ``5e-4``.
+#: :data:`DEFAULT_COHERENT_DECOHERENCE_LIMIT` and
+#: :data:`DEFAULT_COHERENT_FLAT_OMISSION_LIMIT`, to the feature-window row of
+#: ``tbl-line-budget-allocation``: ``2 * 1e-4 + 1e-4 + 1e-4`` of its ``5e-4``.
 DEFAULT_COHERENT_LEAK_LIMIT = 1.0e-4
 #: Largest ``F * N_e`` at which a coherent window bin leaves the
 #: inter-electron ``F |sum_e S_e|^2`` term unresolved (grouped step): the
 #: term is then at most this share of the floor at every energy.
 DEFAULT_COHERENT_DECOHERENCE_LIMIT = 1.0e-4
+#: Largest ``F (N - 1)`` (physical population, or sampled count if absent)
+#: at which the coherent reducer omits the all-electron
+#: ``|sum_e S_e|^2`` term of a row's energy and keeps the grouped floor (#362).
+#: Cauchy-Schwarz bounds the omission by this share of that row's floor, so it
+#: is charged, separately from the grid's decoherence share, to the
+#: feature-window row of ``tbl-line-budget-allocation``. ``0`` disables it.
+DEFAULT_COHERENT_FLAT_OMISSION_LIMIT = 1.0e-4
 #: Nodes per Nyquist step ``pi hbar c / D`` inside a coherent window. Nyquist
 #: resolves the frozen-carrier fringes, but the FWHM
 #: observable reads the half-maximum crossing by linear interpolation, whose

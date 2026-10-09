@@ -8,6 +8,8 @@ route is checked against.
 Validation: coherent-formation-absorption
 """
 
+from dataclasses import replace
+
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
@@ -174,6 +176,126 @@ def _row_decoherence_factor(st, g_vec_d):
     return (chi.real**2 + chi.imag**2).astype(REAL)
 
 
+def _coherent_population(st):
+    """Population setting the omission bound: physical N, or sampled M.
+
+    The physical estimator weights distinct sampled pairs by (N-1)/(M-1).
+    Source: coherent_population.pair_scale and the Cauchy-Schwarz bound.
+    N=1 has no pair excess; absent N retains the historical sampled blend.
+    Validation: coherent-flat-term-omission
+    """
+    population = getattr(st.request, "physical_electrons", None)
+    return int(st.Ne) if population is None else float(population)
+
+
+def _flat_omission_weight(st):
+    """Outward bound on the reducer's pair weight times max(M-1, 1).
+
+    For M>=2, |Flat-G| <= (M-1) G; physical pairs multiply this by
+    (N-1)/(M-1). For M=1, Flat=G and physical N>1 is refused.
+    Use the actual floating-point pair scale, with outward multiplication,
+    so rounding of the ratio cannot license an underestimate.
+    Source: Cauchy-Schwarz. N<=1 gives zero pair excess.
+    Validation: coherent-flat-term-omission
+    """
+    population = _coherent_population(st)
+    if getattr(st.request, "physical_electrons", None) is None:
+        return max(population - 1, 0)
+    scale = pair_scale(population, st.Ne)
+    # Backend weak scalars multiply REAL arrays in that dtype (CUDA fp32).
+    # Enclose an upward scalar cast too, not only the host ratio rounding.
+    with np.errstate(over="ignore"):
+        scale = max(scale, float(np.asarray(scale, dtype=np.dtype(REAL))))
+    weight = scale * max(st.Ne - 1, 1)
+    return 0.0 if weight == 0.0 else np.nextafter(weight, np.inf)
+
+
+def _flat_energy_keep(st, F):
+    """Host indices of the energies whose all-electron term must be evaluated.
+
+    ``F`` is the blend's own inter-electron factor, one row ``(n_E,)`` or a
+    stack ``(N_g, n_E)``; a stack keeps the union over its rows. ``None`` keeps
+    every energy: the omission limit is ``0`` or decoherence is inactive.
+
+    For M sampled fields, 0<=Flat<=M G. The physical estimator is
+    G + (N-1)/(M-1) F (Flat-G), hence |change|<=F (N-1) G for M>=2.
+    Historical calls without physical N use N=M. Physical infinite slabs
+    use F=1 (complete sampled fields); historical slabs use empirical F.
+    Finite footprints also certify the analytic Gaussian with directed upper
+    bounds. Invalid F is always kept. Certification uses the actual rounded
+    pair weight and outward products at evaluated energies, not bin integrals.
+    Source: Cauchy-Schwarz and mixed_row_power. F->0 gives G; physical N<=1
+    has no pair excess; sampled M=1 has Flat=G; limit=0 keeps the full reducer.
+
+    Validation: coherent-flat-term-omission
+    """
+    limit = float(st.request.coherent_flat_omission_limit)
+    if F is None or limit <= 0.0:
+        return None
+    F_host = np.asarray(_to_cpu(F), dtype=np.float64)
+    weight = _flat_omission_weight(st)
+    valid = np.isfinite(F_host) & (F_host >= 0.0) & (F_host <= 1.0)
+    with np.errstate(over="ignore", invalid="ignore"):
+        bound = F_host * weight
+        # Directed multiplication: zero is exact; positive products round up.
+        bound = np.where(bound == 0.0, 0.0, np.nextafter(bound, np.inf))
+    keep = ~(valid & (bound <= limit))
+    if keep.ndim > 1:
+        keep = keep.any(axis=0)
+    if st.finite_footprint_now and weight > 0:
+        from ...transport.kinematics import C_ANG_PER_FS
+        from ..coherent_form_factor import gaussian_form_factor_bounds
+
+        energy = np.asarray(_to_cpu(st.E_grid), dtype=np.float64)
+        sigma = float(st.request.longitudinal_rms_fs) * C_ANG_PER_FS
+        # Gaussian F decreases on a nonnegative axis. Certify the first
+        # candidate, which bounds every later coordinate, without evaluating
+        # an interval exponential at every energy or transferring row fields.
+        for index in np.flatnonzero(~keep):
+            try:
+                _, upper = gaussian_form_factor_bounds(
+                    energy[index], energy[index], sigma_z_ang=sigma
+                )
+            except ValueError:
+                keep[:] = True
+                break
+            if np.nextafter(upper * weight, np.inf) <= limit:
+                break
+            keep[index] = True
+    return np.flatnonzero(keep)
+
+
+def _flat_view(st, keep):
+    """``st`` restricted to the energies ``keep`` for the all-electron term."""
+    if keep is None:
+        return st
+    k = xp.asarray(keep)
+    return replace(
+        st,
+        E_grid=st.E_grid[k],
+        omega_grid=st.omega_grid[k],
+        delta_omega_grid=st.delta_omega_grid[k],
+    )
+
+
+def _decoherence_blend(st, F, grouped, flat, keep):
+    """Weighted pair estimator, with Flat evaluated only on kept energies.
+
+    Elsewhere return G exactly. keep=None calls the unchanged reducer,
+    preserving both physical and historical sampled-population arithmetic.
+    Source: mixed_row_power and the Cauchy-Schwarz omission bound.
+    F->0 or physical N<=1 gives G; limit=0 keeps the full estimator.
+    Validation: coherent-flat-term-omission
+    """
+    if keep is None:
+        return mixed_row_power(st, grouped, flat, F)
+    out = grouped.copy()
+    if keep.size:
+        k = xp.asarray(keep)
+        out[..., k] = mixed_row_power(st, grouped[..., k], flat, F[..., k])
+    return out
+
+
 def _coherent_electron_grouped_row(
     st, elec_id_sel, lines_sel, d_geom_sel, g_phase_sel, L_esc_sel, coefs_sel
 ):
@@ -335,8 +457,6 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
     spec = st.spec
     seg_elec_id = st.seg_elec_id
     cdtype = st.cdtype
-    omega_grid = st.omega_grid
-    delta_omega_grid = st.delta_omega_grid
     seg_r_geom = st.seg_r_geom
     d_all_geom = st.d_all_geom
     decoherence_active = st.decoherence_active or req.physical_electrons is not None
@@ -407,26 +527,34 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
                 xp.ascontiguousarray(a[sel], dtype=REAL) for a in (half_dL, apb, bma, q)
             )
             L_esc_sel = xp.ascontiguousarray(L_esc[sel], dtype=REAL)
-            E_grid_c = xp.ascontiguousarray(E_grid, dtype=REAL)
-            dom_c = xp.ascontiguousarray(delta_omega_grid, dtype=REAL)
             # Decoherence-inactive: unchanged single fused call
-            # straight into spec with the row's mosaic weight.
-            out_flat = spec if not decoherence_active else xp.zeros(E_grid.size, dtype=REAL)
+            # straight into spec with the row's mosaic weight. Active: the
+            # all-electron term runs only on energies ``keep`` the omission
+            # bound does not license dropping.
+            F_row = keep = None
+            if decoherence_active:
+                F_row = _row_decoherence_factor(st, g_vec_d)
+                keep = _flat_energy_keep(st, F_row)
+            flat_st = _flat_view(st, keep)
+            E_grid_c = xp.ascontiguousarray(flat_st.E_grid, dtype=REAL)
+            dom_c = xp.ascontiguousarray(flat_st.delta_omega_grid, dtype=REAL)
+            out_flat = spec if not decoherence_active else xp.zeros(E_grid_c.size, dtype=REAL)
             f_half_dL, f_apb, f_bma, f_q = formation_sel
-            run_coherent_reduction_kernel(
-                *per_line_sel,
-                E_grid_c,
-                out=out_flat,
-                mosaic_weight=1.0 if decoherence_active else wm,
-                L_esc=L_esc_sel,
-                delta_omega=dom_c,
-                half_dL=f_half_dL,
-                apb=f_apb,
-                bma=f_bma,
-                q=f_q,
-                sinc_cutoff=sinc_cutoff,
-                config=DEFAULT_COHERENT_KERNEL_CONFIG,
-            )
+            if E_grid_c.size:
+                run_coherent_reduction_kernel(
+                    *per_line_sel,
+                    E_grid_c,
+                    out=out_flat,
+                    mosaic_weight=1.0 if decoherence_active else wm,
+                    L_esc=L_esc_sel,
+                    delta_omega=dom_c,
+                    half_dL=f_half_dL,
+                    apb=f_apb,
+                    bma=f_bma,
+                    q=f_q,
+                    sinc_cutoff=sinc_cutoff,
+                    config=DEFAULT_COHERENT_KERNEL_CONFIG,
+                )
             if decoherence_active:
                 grouped_total = _coherent_jit_grouped_row(
                     st,
@@ -436,20 +564,30 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
                     formation_sel,
                     xp.zeros(E_grid.size, dtype=REAL),
                 )
-                F_row = _row_decoherence_factor(st, g_vec_d)
-                spec[:] += mixed_row_power(st, grouped_total, out_flat, F_row) * wm
+                spec[:] += _decoherence_blend(st, F_row, grouped_total, out_flat, keep) * wm
         return
 
-    fields = [xp.zeros(E_grid.size, dtype=cdtype) for _ in coefs]
-    if sinc_cutoff is None:
+    F_row = keep = None
+    if decoherence_active:
+        F_row = _row_decoherence_factor(st, g_vec_d)
+        keep = _flat_energy_keep(st, F_row)
+    # The all-electron term on its kept energies (all of them when inactive).
+    flat_st = _flat_view(st, keep)
+    E_flat = flat_st.E_grid
+    omega_flat = flat_st.omega_grid
+    dom_flat = flat_st.delta_omega_grid
+    fields = [xp.zeros(E_flat.size, dtype=cdtype) for _ in coefs]
+    if E_flat.size == 0:
+        pass
+    elif sinc_cutoff is None:
         for j0 in range(0, idx.size, chunk):
             sl = slice(j0, min(j0 + chunk, idx.size))
             m = xp.flatnonzero(good[sl]) + j0
             if not m.size:
                 continue
-            arg = d[m, None] * omega_grid[None, :] - g_phase[m, None]
-            arg = arg - L_esc[m, None] * delta_omega_grid[None, :]
-            SP = _formation_SP(st, lines.take(m)) * xp.exp(1j * arg)
+            arg = d[m, None] * omega_flat[None, :] - g_phase[m, None]
+            arg = arg - L_esc[m, None] * dom_flat[None, :]
+            SP = _formation_SP(flat_st, lines.take(m)) * xp.exp(1j * arg)
             for c, f in zip(coefs, fields, strict=True):
                 f += c[m] @ SP
     else:
@@ -457,7 +595,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
         # |v| > sinc_cutoff is the same conservative tail cut the undamped
         # sinc had. The energy window around E_vac widens by the largest
         # refractive shift |half_dL| max|delta omega|.
-        dom_max = _delta_omega_max(st)
+        dom_max = _delta_omega_max(flat_st)
         half_all = formation_window_half_width(a_vac, half_dL, dom_max, sinc_cutoff)
         order = xp.argsort(E_vac)
         blk = 8192
@@ -469,13 +607,13 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
             half = half_all[sel]
             lo = float(_to_cpu((E_vac[sel] - half).min()))
             hi = float(_to_cpu((E_vac[sel] + half).max()))
-            i0, i1 = _sinc_window_bounds(E_grid, lo, hi)
+            i0, i1 = _sinc_window_bounds(E_flat, lo, hi)
             if i1 <= i0:
                 continue
-            arg = d[sel][:, None] * omega_grid[None, i0:i1] - g_phase[sel][:, None]
-            arg = arg - L_esc[sel][:, None] * delta_omega_grid[None, i0:i1]
+            arg = d[sel][:, None] * omega_flat[None, i0:i1] - g_phase[sel][:, None]
+            arg = arg - L_esc[sel][:, None] * dom_flat[None, i0:i1]
             SP = _formation_SP(
-                st, lines.take(sel), slice(i0, i1), sinc_cutoff=sinc_cutoff
+                flat_st, lines.take(sel), slice(i0, i1), sinc_cutoff=sinc_cutoff
             ) * xp.exp(1j * arg)
             for c, f in zip(coefs, fields, strict=True):
                 f[i0:i1] += c[sel] @ SP
@@ -491,8 +629,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
             L_esc[sel_full],
             [c[sel_full] for c in coefs],
         )
-        F_row = _row_decoherence_factor(st, g_vec_d)
-        spec[:] += mixed_row_power(st, grouped_total, flat_total, F_row) * wm
+        spec[:] += _decoherence_blend(st, F_row, grouped_total, flat_total, keep) * wm
     else:
         spec[:] += flat_total * wm
     return

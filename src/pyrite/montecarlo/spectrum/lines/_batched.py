@@ -14,7 +14,6 @@ import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
 from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
-from ..coherent_population import mixed_row_power
 from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._attribution import record_line_attribution
@@ -42,6 +41,9 @@ from ._kernels import (
 from ._per_hkl import (
     _coherent_electron_grouped_row,
     _coherent_jit_grouped_row,
+    _decoherence_blend,
+    _flat_energy_keep,
+    _flat_view,
     _FormationLines,
     _row_decoherence_factor,
 )
@@ -765,7 +767,15 @@ def _batched_incoherent_block(st, bt, blk, line_batch):
 
 
 def _batched_coherent_finalize(
-    st, bt, coh_blocks, coh_counts, coherent_fields, stream_segment_block, stream_field_mag2
+    st,
+    bt,
+    coh_blocks,
+    coh_counts,
+    coherent_fields,
+    stream_segment_block,
+    stream_field_mag2,
+    stream_F_rows=None,
+    stream_keep=None,
 ):
     """Reduce the coherent route's retained fields into the spectrum.
 
@@ -787,7 +797,6 @@ def _batched_coherent_finalize(
     spec = st.spec
     seg_elec_id = st.seg_elec_id
     cdtype = st.cdtype
-    delta_omega_grid = st.delta_omega_grid
     decoherence_active = st.decoherence_active or st.request.physical_electrons is not None
     N_g = bt.N_g
     seg_block = bt.seg_block
@@ -855,8 +864,7 @@ def _batched_coherent_finalize(
                     )
                     group0 = group1
             # F PER ROW, before the incoherent row sum.
-            F_rows = xp.stack([_row_decoherence_factor(st, G[i_row]) for i_row in range(N_g)])
-            blended = mixed_row_power(st, grouped_mag2, flat_mag2, F_rows)
+            blended = _decoherence_blend(st, stream_F_rows, grouped_mag2, flat_mag2, stream_keep)
             spec[:] += (WM.reshape(-1)[:, None] * blended).sum(axis=0)
         else:
             finalize_coherent_fields(
@@ -901,23 +909,33 @@ def _batched_coherent_finalize(
             elec_id_i = row[9]  # emitting electron id (decoherence_active only)
             half_dL_i, apb_i, bma_i, q_i = row[10:14]  # formation factor
             wm_i = float(wm_rows[i_row])
+            # The all-electron term runs only on energies ``keep`` the
+            # omission bound does not license dropping (all when inactive).
+            F_row = keep = None
+            if decoherence_active:
+                F_row = _row_decoherence_factor(st, G[i_row])
+                keep = _flat_energy_keep(st, F_row)
+            flat_st = _flat_view(st, keep)
+            E_flat = flat_st.E_grid
+            dom_flat = flat_st.delta_omega_grid
             if _use_jit_coherent_reduction:
                 per_line_i = (E_r_i, aw_i, ps_i, gp_i, csr, csi, cpr, cpi)
                 formation_i = (half_dL_i, apb_i, bma_i, q_i)
-                out_flat = spec if not decoherence_active else xp.zeros(E_grid.size, dtype=REAL)
-                run_coherent_reduction_kernel(
-                    *per_line_i,
-                    E_grid,
-                    out=out_flat,
-                    mosaic_weight=1.0 if decoherence_active else wm_i,
-                    L_esc=L_i,
-                    delta_omega=delta_omega_grid,
-                    half_dL=half_dL_i,
-                    apb=apb_i,
-                    bma=bma_i,
-                    q=q_i,
-                    config=DEFAULT_COHERENT_KERNEL_CONFIG,
-                )
+                out_flat = spec if not decoherence_active else xp.zeros(E_flat.size, dtype=REAL)
+                if E_flat.size:
+                    run_coherent_reduction_kernel(
+                        *per_line_i,
+                        E_flat,
+                        out=out_flat,
+                        mosaic_weight=1.0 if decoherence_active else wm_i,
+                        L_esc=L_i,
+                        delta_omega=dom_flat,
+                        half_dL=half_dL_i,
+                        apb=apb_i,
+                        bma=bma_i,
+                        q=q_i,
+                        config=DEFAULT_COHERENT_KERNEL_CONFIG,
+                    )
                 if decoherence_active:
                     grouped_total = _coherent_jit_grouped_row(
                         st,
@@ -927,19 +945,18 @@ def _batched_coherent_finalize(
                         formation_i,
                         xp.zeros(E_grid.size, dtype=REAL),
                     )
-                    F_row = _row_decoherence_factor(st, G[i_row])
-                    spec[:] += mixed_row_power(st, grouped_total, out_flat, F_row) * wm_i
+                    spec[:] += _decoherence_blend(st, F_row, grouped_total, out_flat, keep) * wm_i
                 continue
-            f_s = xp.zeros(E_grid.size, dtype=cdtype)
-            f_p = xp.zeros(E_grid.size, dtype=cdtype)
-            for j0 in range(0, E_r_i.size, chunk):
+            f_s = xp.zeros(E_flat.size, dtype=cdtype)
+            f_p = xp.zeros(E_flat.size, dtype=cdtype)
+            for j0 in range(0, E_r_i.size if E_flat.size else 0, chunk):
                 sl = slice(j0, min(j0 + chunk, E_r_i.size))
-                arg = ps_i[sl][:, None] * E_grid[None, :] - gp_i[sl][:, None]
-                arg = arg - L_i[sl][:, None] * delta_omega_grid[None, :]
+                arg = ps_i[sl][:, None] * E_flat[None, :] - gp_i[sl][:, None]
+                arg = arg - L_i[sl][:, None] * dom_flat[None, :]
                 ph = xp.exp(1j * arg)
                 F = formation_profile(
-                    E_grid,
-                    delta_omega_grid,
+                    E_flat,
+                    dom_flat,
                     E_r_i[sl],
                     aw_i[sl],
                     half_dL_i[sl],
@@ -963,8 +980,7 @@ def _batched_coherent_finalize(
                     L_i,
                     [csr + 1j * csi, cpr + 1j * cpi],
                 )
-                F_row = _row_decoherence_factor(st, G[i_row])
-                spec[:] += mixed_row_power(st, grouped_total, flat_total, F_row) * wm_i
+                spec[:] += _decoherence_blend(st, F_row, grouped_total, flat_total, keep) * wm_i
             else:
                 spec[:] += flat_total * wm_i
         _nsys_pop()
@@ -1114,7 +1130,20 @@ def _accumulate_batched(st):
         _coh_L_start = xp.ascontiguousarray(st.escape_ends[0], dtype=REAL)
         _coh_L_end = xp.ascontiguousarray(st.escape_ends[1], dtype=REAL)
         _coh_half_dL = xp.ascontiguousarray(0.5 * (_coh_L_end - _coh_L_start), dtype=REAL)
-        coherent_fields = allocate_coherent_fields(N_g, E_grid.size)
+        # The planes share one energy axis across rows, so the all-electron
+        # term streams on the union of the rows' kept energies; a row's
+        # energy kept only for another row gets its exact full blend.
+        # Validation: coherent-flat-term-omission
+        stream_F_rows = stream_keep = None
+        if st.decoherence_active or st.request.physical_electrons is not None:
+            stream_F_rows = xp.stack([_row_decoherence_factor(st, G[i]) for i in range(N_g)])
+            stream_keep = _flat_energy_keep(st, stream_F_rows)
+        _flat_st = _flat_view(st, stream_keep)
+        _E_flat = xp.ascontiguousarray(_flat_st.E_grid, dtype=REAL)
+        _dom_flat = xp.ascontiguousarray(_flat_st.delta_omega_grid, dtype=REAL)
+        if stream_keep is None:
+            _E_flat, _dom_flat = E_grid, delta_omega_grid
+        coherent_fields = allocate_coherent_fields(N_g, _E_flat.size)
 
         def _stream_segment_block(sel, n_sel, *, group_starts=None, grouped_out=None):
             """Run prologue, then flat-field or segmented grouped reduction."""
@@ -1170,7 +1199,6 @@ def _accumulate_batched(st):
                 # g-independent, so it stays segment-sized here even though
                 # the prologue's other outputs are pair-sized.
                 "L_esc": L_esc_full[sel].reshape(-1),
-                "delta_omega": delta_omega_grid,
                 "half_dL": _coh_half_dL[sel],
                 "apb": f_apb,
                 "bma": f_bma,
@@ -1181,8 +1209,9 @@ def _accumulate_batched(st):
             if group_starts is None:
                 run_coherent_field_accumulation_kernel(
                     *line_data,
-                    E_grid,  # ty: ignore[too-many-positional-arguments]
+                    _E_flat,  # ty: ignore[too-many-positional-arguments]
                     fields=coherent_fields,
+                    delta_omega=_dom_flat,
                     **common,
                 )
             else:
@@ -1191,6 +1220,7 @@ def _accumulate_batched(st):
                     E_grid,  # ty: ignore[too-many-positional-arguments]
                     group_starts,
                     out=grouped_out,
+                    delta_omega=delta_omega_grid,
                     **common,
                 )
             _nsys_pop()
@@ -1204,9 +1234,10 @@ def _accumulate_batched(st):
             pass, but F depends on the row (through q_perp = (omega n + g)_perp)
             and must multiply BEFORE the rows are summed."""
             mag2 = sum(plane * plane for plane in coherent_fields)
-            return mag2.reshape(N_g, E_grid.size)
+            return mag2.reshape(N_g, _E_flat.size)
     else:
         coherent_fields = ()
+        stream_F_rows = stream_keep = None
 
     # Compatibility-fallback buffers. The streaming RawKernel path above
     # does not retain line records across segment blocks; these stay empty when
@@ -1223,7 +1254,8 @@ def _accumulate_batched(st):
         sb = slice(s0, min(s0 + seg_block, n_seg))
 
         if _use_jit_coherent_stream:
-            _stream_segment_block(sb, sb.stop - sb.start)
+            if any(plane.size for plane in coherent_fields):  # no energies: nothing to stream
+                _stream_segment_block(sb, sb.stop - sb.start)
             continue
 
         blk = _batched_block(st, bt, sb)
@@ -1245,4 +1277,6 @@ def _accumulate_batched(st):
             coherent_fields,
             _stream_segment_block if _use_jit_coherent_stream else None,
             _stream_field_mag2 if _use_jit_coherent_stream else None,
+            stream_F_rows,
+            stream_keep,
         )

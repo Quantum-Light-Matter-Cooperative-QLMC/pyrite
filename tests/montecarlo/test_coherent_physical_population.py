@@ -399,7 +399,7 @@ def test_finite_footprint_audit_preserves_pair_factor_above_one(monkeypatch):
     )
     monkeypatch.setattr(audit, "collector", lambda *args: None)
     state = SimpleNamespace(
-        request=SimpleNamespace(physical_electrons=12.0),
+        request=SimpleNamespace(physical_electrons=12.0, coherent_flat_omission_limit=0.0),
         Ne=2,
         decoherence_active=True,
         finite_footprint_now=True,
