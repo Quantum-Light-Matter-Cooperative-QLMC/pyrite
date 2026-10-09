@@ -50,7 +50,7 @@ The command:
    (module shims, command/option spellings, implicit defaults, `Sweep.from_legacy`,
    the legacy xsgen table tier) targets a minor at or before `X.Y`. Do those
    removals first, with call sites, tests, and docs.
-3. Bumps `pyproject.toml` and `src/pyrite/__init__.py`.
+3. Bumps `pyproject.toml` and `src/pyrite/__init__.py`, then refreshes `uv.lock` (CI syncs with `--locked`).
 4. Regenerates `docs/repo-design/cli/cli-reference.md` and
    `docs/repo-design/cli/cli-deprecations.md`.
 5. Prints release notes from conventional commits since the last `v*` tag
