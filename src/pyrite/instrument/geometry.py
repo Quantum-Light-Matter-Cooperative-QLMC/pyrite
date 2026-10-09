@@ -1,140 +1,21 @@
 """Analytic point-source geometry for bounded downstream photon objects."""
 
-from dataclasses import dataclass
-
 import numpy as np
 
+from .._planar_geometry import PixelRays, planar_rays, solid_angle_sr
 from .model import FilterPlate, PlanarDetector
-
-
-def _readonly_float_array(value: object) -> np.ndarray:
-    array = np.asarray(value, dtype=float)
-    array.setflags(write=False)
-    return array
-
-
-def solid_angle_sr(width_mm: float, height_mm: float, distance_mm: float) -> float:
-    """Return the exact on-axis solid angle [sr] of a rectangular face.
-
-    The source lies on the rectangle normal through its centre. The result
-    tends to ``width * height / distance²`` in the far field.
-    """
-    a, b, d = 0.5 * width_mm, 0.5 * height_mm, float(distance_mm)
-    return float(4.0 * np.arctan(a * b / (d * np.sqrt(a * a + b * b + d * d))))
-
-
-def _triangle_solid_angle_sr(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
-    """Return the unsigned solid angle [sr] of a source-to-corner triangle."""
-    denominator = (
-        np.linalg.norm(a) * np.linalg.norm(b) * np.linalg.norm(c)
-        + np.dot(a, b) * np.linalg.norm(c)
-        + np.dot(b, c) * np.linalg.norm(a)
-        + np.dot(c, a) * np.linalg.norm(b)
-    )
-    return float(2.0 * np.arctan2(abs(np.dot(a, np.cross(b, c))), denominator))
-
-
-def _rectangle_solid_angle_sr(
-    center_mm: np.ndarray,
-    x_axis: np.ndarray,
-    y_axis: np.ndarray,
-    width_mm: float,
-    height_mm: float,
-) -> float:
-    """Return the exact point-source solid angle [sr] of a planar rectangle."""
-    distance = float(np.linalg.norm(center_mm))
-    normal = np.cross(x_axis, y_axis)
-    if np.isclose(abs(np.dot(center_mm / distance, normal)), 1.0, rtol=0.0, atol=1.0e-14):
-        return solid_angle_sr(width_mm, height_mm, distance)
-
-    half_width, half_height = 0.5 * width_mm, 0.5 * height_mm
-    corners = (
-        center_mm - half_width * x_axis - half_height * y_axis,
-        center_mm + half_width * x_axis - half_height * y_axis,
-        center_mm + half_width * x_axis + half_height * y_axis,
-        center_mm - half_width * x_axis + half_height * y_axis,
-    )
-    return _triangle_solid_angle_sr(corners[0], corners[1], corners[2]) + _triangle_solid_angle_sr(
-        corners[0], corners[2], corners[3]
-    )
-
-
-@dataclass(frozen=True, eq=False)
-class PixelRays:
-    """Point-source rays and differential acceptance for a detector grid."""
-
-    centers_mm: np.ndarray
-    directions_lab: np.ndarray
-    distance_mm: np.ndarray
-    solid_angle_sr: np.ndarray
-
-    def __post_init__(self) -> None:
-        centers = _readonly_float_array(self.centers_mm)
-        directions = _readonly_float_array(self.directions_lab)
-        distance = _readonly_float_array(self.distance_mm)
-        solid_angle = _readonly_float_array(self.solid_angle_sr)
-        if centers.ndim != 3 or centers.shape[-1] != 3:
-            raise ValueError("PixelRays.centers_mm must have shape (ny, nx, 3)")
-        if directions.shape != centers.shape:
-            raise ValueError("PixelRays.directions_lab must match centers_mm")
-        if distance.shape != centers.shape[:2] or solid_angle.shape != distance.shape:
-            raise ValueError("PixelRays scalar fields must have shape (ny, nx)")
-        if not np.allclose(np.linalg.norm(directions, axis=-1), 1.0, rtol=0.0, atol=1.0e-9):
-            raise ValueError("PixelRays.directions_lab must be unit vectors")
-        object.__setattr__(self, "centers_mm", centers)
-        object.__setattr__(self, "directions_lab", directions)
-        object.__setattr__(self, "distance_mm", distance)
-        object.__setattr__(self, "solid_angle_sr", solid_angle)
-
-    @property
-    def shape(self) -> tuple[int, int]:
-        """Return the physical/scoring grid shape ``(ny, nx)``."""
-        return self.distance_mm.shape  # type: ignore[return-value]
 
 
 def planar_detector_rays(detector: PlanarDetector) -> PixelRays:
     """Construct lab-frame source-to-pixel-centre rays.
 
     Pixels are point samples with their full pitch area. An unpixelated
-    detector instead uses its exact finite-rectangle solid angle.
-
-    Validation: positioned-filter-attenuation
+    detector instead uses its exact finite-rectangle solid angle; see
+    :func:`pyrite._planar_geometry.planar_rays`.
     """
     if not isinstance(detector, PlanarDetector):
         raise TypeError("detector must be a PlanarDetector")
-    center = np.asarray(detector.pose.center_mm)
-    x_axis = np.asarray(detector.pose.x_axis)
-    y_axis = np.asarray(detector.pose.y_axis)
-    normal = np.asarray(detector.pose.normal)
-    if detector.pixels is None:
-        x_offsets = np.array([0.0])
-        y_offsets = np.array([0.0])
-        assert detector.size_mm is not None
-        pixel_area_mm2 = detector.size_mm[0] * detector.size_mm[1]
-    else:
-        ny, nx = detector.pixels.shape
-        pitch_y, pitch_x = detector.pixels.pitch_mm
-        x_offsets = (np.arange(nx) - (nx - 1) / 2.0) * pitch_x
-        y_offsets = (np.arange(ny) - (ny - 1) / 2.0) * pitch_y
-        pixel_area_mm2 = pitch_x * pitch_y
-    centers = (
-        center[None, None, :]
-        + y_offsets[:, None, None] * y_axis[None, None, :]
-        + x_offsets[None, :, None] * x_axis[None, None, :]
-    )
-    distance = np.linalg.norm(centers, axis=-1)
-    directions = centers / distance[..., None]
-    obliquity = directions @ normal
-    if np.any(obliquity <= 0.0):
-        raise ValueError("detector pixels must see the source through their local -z face")
-    if detector.pixels is None:
-        assert detector.size_mm is not None
-        solid_angle = np.array(
-            [[_rectangle_solid_angle_sr(center, x_axis, y_axis, *detector.size_mm)]]
-        )
-    else:
-        solid_angle = pixel_area_mm2 * obliquity / distance**2
-    return PixelRays(centers, directions, distance, solid_angle)
+    return planar_rays(detector.pose, pixels=detector.pixels, size_mm=detector.size_mm)
 
 
 def ray_box_path_lengths(rays: PixelRays, plate: FilterPlate) -> np.ndarray:
@@ -336,4 +217,5 @@ __all__ = [
     "filter_path_lengths",
     "planar_detector_rays",
     "ray_box_path_lengths",
+    "solid_angle_sr",
 ]

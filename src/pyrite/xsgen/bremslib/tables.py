@@ -3,7 +3,7 @@
 The physics core may not import :mod:`pyrite.xsgen`, so the spectrum takes
 its BremsLib tables as an argument. This module is the driver-side half:
 it resolves one stored table per element and stages it with
-:func:`pyrite.montecarlo.spectrum.brem_bremslib.prepare_bremslib_table`.
+:func:`pyrite._bremslib_table.prepare_bremslib_table`.
 
 Resolution order, per element:
 
@@ -25,11 +25,8 @@ from typing import Literal, cast
 
 import numpy as np
 
+from ..._bremslib_table import BremsLibBremsstrahlungTable, prepare_bremslib_table
 from ...materials.atomic import Z_TABLE
-from ...montecarlo.spectrum.brem_bremslib import (
-    BremsLibBremsstrahlungTable,
-    prepare_bremslib_table,
-)
 from .._errors import SourceUnavailableError, TableNotFoundError
 from ..store import StoredTable
 from .generate import generate_element

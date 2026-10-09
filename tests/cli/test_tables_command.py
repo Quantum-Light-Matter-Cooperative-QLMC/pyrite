@@ -985,11 +985,11 @@ def small_sdbase(isolated, monkeypatch):
     """Return an empty sdbase install target with a few-byte pdatconf.p14 pin."""
     import hashlib
 
-    from pyrite.montecarlo import shell_configuration
+    from pyrite import datasets
     from pyrite.xsgen import fetch
 
     body = b"shells\n"
-    monkeypatch.setattr(shell_configuration, "PDATCONF_SHA256", hashlib.sha256(body).hexdigest())
+    monkeypatch.setattr(datasets, "PDATCONF_SHA256", hashlib.sha256(body).hexdigest())
     target = isolated / "data" / "xsgen" / "reference-data" / "sbethe" / "sdbase"
 
     def install(pdatconf: bytes = body, omit: str | None = None) -> None:
