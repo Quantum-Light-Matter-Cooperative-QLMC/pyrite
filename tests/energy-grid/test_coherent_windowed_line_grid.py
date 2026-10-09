@@ -509,6 +509,7 @@ def test_clustered_joints_stay_inside_the_bound(edge_distance):
     assert _exact_tail(field, 1000.0 + edge_distance) <= bound
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("gap", [1500.0, 4000.0])
 def test_near_cancelling_joints_far_apart_stay_inside_the_bound(gap):
     """Verification counterexample: joints whose ``|J|^2`` vanishes inside the tail.
@@ -530,6 +531,7 @@ def test_near_cancelling_joints_far_apart_stay_inside_the_bound(gap):
     assert _exact_tail(field, 1100.0) <= bound
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("seed", [0, 1])
 def test_a_scattered_track_with_moving_carriers_stays_inside_the_bound(seed):
     """Random amplitudes, carriers and piece lengths along two tracks."""
@@ -771,6 +773,7 @@ def test_weighted_spectrum_audit_checks_a_same_trajectory_production_band(tiny):
     assert result.relative_error_upper <= INTRINSIC_RTOL
 
 
+@pytest.mark.slow
 def test_automatic_full_axis_yield_audit_uses_the_production_capture():
     """One short physical track exercises the full automatic axis and runner."""
     from pyrite.montecarlo import runner
@@ -1010,6 +1013,7 @@ def _finest_used_step(row):
     return row["step_electron_eV"]
 
 
+@pytest.mark.slow
 def test_windowed_auto_matches_a_fine_explicit_grid_on_identical_trajectories(tiny):
     """Anchor: yield, centroid and FWHM within the 1e-3 intrinsic-source share.
 
@@ -1042,6 +1046,7 @@ def test_windowed_auto_matches_a_fine_explicit_grid_on_identical_trajectories(ti
     assert abs(auto["fwhm_eV"] - reference["fwhm_eV"]) <= INTRINSIC_RTOL * reference["fwhm_eV"]
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("hkl", [(0, 0, 2), (0, 0, 4)])
 def test_the_production_reducer_leaks_less_than_the_window_bound(tiny, hkl):
     """Verification anchor: the reducer's own tail beyond each window edge.

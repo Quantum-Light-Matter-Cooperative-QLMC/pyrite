@@ -51,6 +51,7 @@ def test_numerics_and_settings_validate_pair_requirements():
         replace(default_settings(), **PAIR)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("resolved", ["bremslib", "eedl"])
 def test_case_key_joins_only_coupled_cases(monkeypatch, resolved):
     monkeypatch.setattr(

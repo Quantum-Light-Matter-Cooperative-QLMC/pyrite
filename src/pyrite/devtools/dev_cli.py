@@ -20,9 +20,11 @@ Commands:
                (--numba disables JIT via NUMBA_DISABLE_JIT=1, must precede
                other forwarded args, to measure @njit bodies under --cov;
                runs without test paths use memory-bounded xdist workers,
-               PYRITE_TEST_WORKERS=N overrides, 1 = serial)
+               PYRITE_TEST_WORKERS=N overrides, 1 = serial;
+               --slow also runs tests marked slow via PYRITE_SLOW_TESTS=1)
     test-suite run one stable core/CLI/app/packaging/integration test suite
-               with the same memory-bounded xdist worker default as test
+               with the same memory-bounded xdist worker default and --slow
+               flag as test
     package-smoke build and install clean wheel/editable environments
     smoke      exercise checkpoint loading and plotting
     perf       measure MC sweeps with compute-performance telemetry
@@ -325,12 +327,26 @@ def parallel_pytest_args(pytest_args: list[str]) -> list[str]:
     return ["-n", str(workers), "--dist", "worksteal", *pytest_args]
 
 
-def cmd_test(args: argparse.Namespace) -> None:
-    pytest_args = parallel_pytest_args(getattr(args, "pytest_args", []))
+def _pytest_env(args: argparse.Namespace) -> dict[str, str]:
+    """Environment overrides selected by ``test``/``test-suite``/``verify`` flags."""
+    env = {}
     if getattr(args, "numba", False):
-        run("-m", "pytest", *pytest_args, extra_env={"NUMBA_DISABLE_JIT": "1"})
+        env["NUMBA_DISABLE_JIT"] = "1"
+    if getattr(args, "slow", False):
+        env["PYRITE_SLOW_TESTS"] = "1"
+    return env
+
+
+def _run_pytest(args: argparse.Namespace, *pytest_args: str) -> None:
+    env = _pytest_env(args)
+    if env:
+        run("-m", "pytest", *pytest_args, extra_env=env)
     else:
         run("-m", "pytest", *pytest_args)
+
+
+def cmd_test(args: argparse.Namespace) -> None:
+    _run_pytest(args, *parallel_pytest_args(getattr(args, "pytest_args", [])))
 
 
 def test_files_for_suite(name: str, root: Path = ROOT) -> list[Path]:
@@ -366,8 +382,12 @@ def test_files_for_suite(name: str, root: Path = ROOT) -> list[Path]:
 
 def cmd_test_suite(args: argparse.Namespace) -> None:
     paths = [str(path.relative_to(ROOT)) for path in test_files_for_suite(args.suite)]
-    pytest_args = parallel_pytest_args(getattr(args, "pytest_args", []))
-    run("-m", "pytest", *pytest_args, *paths)
+    pytest_args = list(getattr(args, "pytest_args", []))
+    # argparse's REMAINDER swallows a flag that follows the suite name.
+    if pytest_args[:1] == ["--slow"]:
+        args.slow = True
+        pytest_args = pytest_args[1:]
+    _run_pytest(args, *parallel_pytest_args(pytest_args), *paths)
 
 
 def cmd_smoke(args: argparse.Namespace) -> None:
@@ -709,6 +729,9 @@ def cmd_energy_grid(args: argparse.Namespace) -> None:
     )
 
 
+_SLOW_HELP = "also run tests marked slow (sets PYRITE_SLOW_TESTS=1); must precede pytest_args"
+
+
 def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog=prog_name)
     sub = ap.add_subparsers(dest="command", required=True)
@@ -764,10 +787,12 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
             "must precede pytest_args, e.g. `pyrite-dev test --numba --cov`"
         ),
     )
+    test.add_argument("--slow", action="store_true", help=_SLOW_HELP)
     test.add_argument("pytest_args", nargs=argparse.REMAINDER)
     test.set_defaults(func=cmd_test)
     test_suite = sub.add_parser("test-suite")
     test_suite.add_argument("suite", choices=TEST_SUITE_NAMES)
+    test_suite.add_argument("--slow", action="store_true", help=_SLOW_HELP)
     test_suite.add_argument("pytest_args", nargs=argparse.REMAINDER)
     test_suite.set_defaults(func=cmd_test_suite)
     smoke = sub.add_parser("smoke")
@@ -780,6 +805,7 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
         action="store_true",
         help="run the full non-test verification gate (CI runs tests in domain suites)",
     )
+    verify.add_argument("--slow", action="store_true", help=_SLOW_HELP)
     verify.add_argument("pytest_args", nargs=argparse.REMAINDER)
     verify.set_defaults(func=cmd_verify)
     regen_golden = sub.add_parser("regen-golden")
@@ -892,13 +918,16 @@ def main(argv: list[str] | None = None, *, prog_name: str = "pyrite-dev") -> Non
                 build_parser(prog_name).error(
                     "verify --skip-tests does not accept pytest arguments"
                 )
-        numba = bool(rest) and rest[0] == "--numba"
-        pytest_args = rest[1:] if numba else rest
+        # pyrite-dev's own flags lead, in any order; the rest goes to pytest.
+        flags = set()
+        while rest and rest[0] in {"--numba", "--slow"} - flags:
+            flags.add(rest.pop(0))
         func(
             argparse.Namespace(
                 command=command,
-                numba=numba,
-                pytest_args=pytest_args,
+                numba="--numba" in flags,
+                slow="--slow" in flags,
+                pytest_args=rest,
                 skip_tests=skip_tests,
             )
         )

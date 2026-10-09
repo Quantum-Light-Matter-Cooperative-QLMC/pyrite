@@ -178,6 +178,7 @@ def light_line_masses():
     return base, populations
 
 
+@pytest.mark.slow
 def test_light_case_meets_its_target_over_20_seeds(light_line_masses):
     """Target 10 % on the per-electron line mass (skewness ~ 8).
 
@@ -204,6 +205,7 @@ def test_light_case_meets_its_target_over_20_seeds(light_line_masses):
     assert abs(paired.mean()) < reported.min()
 
 
+@pytest.mark.slow
 def test_stop_inside_transport_equals_the_rule_on_the_population(light_line_masses):
     """The monitor inside block transport reads the per-electron prefix exactly."""
     base, populations = light_line_masses

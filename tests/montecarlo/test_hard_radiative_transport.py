@@ -61,6 +61,7 @@ def _run(table, core="lockstep", **kwargs):
     )
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("core", CPU_CORES)
 @pytest.mark.parametrize("straggling", [False, True])
 def test_hard_radiative_events_debit_energy_and_close_cpu_flights(core, straggling):
@@ -187,6 +188,7 @@ def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks(c
         np.testing.assert_array_equal(coupled[field], legacy[field])
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("core", CPU_CORES)
 @pytest.mark.parametrize("straggling", [False, True])
 def test_radiative_and_shell_collision_modes_share_the_cpu_event_contract(core, straggling):
@@ -223,6 +225,7 @@ def test_radiative_and_shell_collision_modes_share_the_cpu_event_contract(core, 
     assert result["radiative"]["model"] == "bremslib-soft-hard"
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("core", CPU_CORES)
 @pytest.mark.parametrize("cutoff_eV", [100.0, 10_000.0])
 def test_soft_and_hard_radiative_loss_reproduce_the_full_moment(cutoff_eV, core):

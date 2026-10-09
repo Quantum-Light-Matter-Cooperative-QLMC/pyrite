@@ -114,6 +114,7 @@ def test_gate_cases_by_penetration_forwards_abs_layers_total_thickness(monkeypat
     assert calls == [(30.0, 150.0, abs_layers)]
 
 
+@pytest.mark.slow
 def test_gate_cases_by_penetration_drops_with_real_transport():
     # A real (unmocked) pyrite.montecarlo.simulate_trajectories call: a 15 keV
     # beam through a light element (carbon) should fully transmit at 10nm,

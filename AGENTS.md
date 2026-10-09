@@ -33,6 +33,7 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite cli
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite apps
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite packaging
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test path/to/test.py -k test_name
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow   # include slow tier
 PYRITE_ONLINE_TESTS=1 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --cov
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --numba --cov

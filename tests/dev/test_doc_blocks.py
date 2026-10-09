@@ -104,6 +104,7 @@ def _python_blocks() -> list[FencedBlock]:
     return [b for b in extract_fenced_blocks(path) if b.language == "python"]
 
 
+@pytest.mark.slow
 def test_python_api_workflow_executes_as_one_accumulating_namespace():
     blocks = _python_blocks()
     assert len(blocks) == 7

@@ -124,6 +124,7 @@ def test_adjacent_electron_streams_are_uncorrelated():
 # ---- per-electron core --------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_default_core_is_the_lockstep_core_below_the_cuda_threshold():
     # BASE_CASE is 120 electrons, so "auto" resolves to the historical core on
     # every box, GPU or not. The threshold policy itself lives in
@@ -241,6 +242,7 @@ def test_segments_are_electron_major_and_step_minor():
         assert np.all(np.diff(t) > 0)
 
 
+@pytest.mark.slow
 def test_per_electron_core_matches_lockstep_physics():
     # The two cores realize different samples of the same distribution -- they
     # cannot be compared trajectory by trajectory, only in aggregate.

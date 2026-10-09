@@ -42,6 +42,7 @@ def _cases(tilt_deg, tilt_azim_deg, energy_keV):
     return build_cases(sweep)
 
 
+@pytest.mark.slow
 def test_plot_electron_trajectories_draws_one_axis():
     case = _cases(10.0, 0.0, 20.0)[0]
     ax = plot_electron_trajectories(case, Ne=_NE, seed=0)

@@ -43,6 +43,9 @@ jobs:
         run: uv run pyrite tables fetch
 
       - name: Test ${{ matrix.suite }} suite
+        # Every PR runs the opt-in slow tier too (#381).
+        env:
+          PYRITE_SLOW_TESTS: "1"
         run: |
           if [ "${{ matrix.suite }}" = core ]; then
             uv run pyrite-dev test-suite core --durations=30 --durations-min=0.5

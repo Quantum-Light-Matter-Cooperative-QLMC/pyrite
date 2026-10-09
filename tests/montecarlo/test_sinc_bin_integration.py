@@ -270,6 +270,7 @@ def _hybrid_population(seed=5, count=200):
     return np.pi / width, rng.uniform(3000.0, 17000.0, count), width
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("step", [0.5, 3.0])
 @pytest.mark.parametrize("exact_widths", [16.0, bq.BIN_MEAN_EXACT_WIDTHS])
 def test_far_envelope_yield_error_stays_inside_its_bound(step, exact_widths):

@@ -45,6 +45,7 @@ def _line_spectrum(energy_keV, *, energy_spread_frac=None):
     return np.asarray(out["E_grid"], dtype=float), pxr
 
 
+@pytest.mark.slow
 def test_simulated_line_moves_by_the_predicted_sensitivity():
     """A 5% beam energy step must move the line by S*0.05 of its energy.
 

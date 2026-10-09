@@ -132,6 +132,7 @@ configuration.
 | `PYRITE_DOCS_SHOW_AUTODOC_WARNINGS` | Set exactly `1` to show otherwise baselined autodoc warnings during a docs build; unset suppresses them. | `docs._warning_baseline` |
 | `PYRITE_ONLINE_TESTS` | Set exactly `1` to run tests that fetch external structure data; unset skips them. | pytest marker config |
 | `PYRITE_EXTERN_CODES_TESTS` | Set exactly `1` to run ELSEPA, SBETHE, and BremsLib tests when a compiler and source trees exist; unset skips them. | pytest marker config |
+| `PYRITE_SLOW_TESTS` | Set exactly `1` to run tests marked `slow` (`pyrite-dev test --slow`); unset skips them unless selected by node id or `-m`. | `tests.helpers.slow_marker` |
 | `PYRITE_TEST_BACKEND` | Backend name for test collection/session; unset is `cpu`. | `tests.conftest` |
 | `PYRITE_RUN_INTEL_SYCL_TESTS` | Set exactly `1` to enable Intel SYCL hardware tests; unset skips them. | integration tests |
 

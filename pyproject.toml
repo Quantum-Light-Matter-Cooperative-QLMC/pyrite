@@ -121,7 +121,8 @@ notebooks = [
 [tool.pytest.ini_options]
 # Put src/ on the path so `import pyrite` resolves without requiring an install
 # (an editable install via `uv sync` also works). Tests stay CPU-only/fast -- the
-# heavy MC physics validation lives in checks/, not here.
+# heavy MC physics validation lives in checks/, not here; heavy tests that do
+# live here carry the opt-in `slow` marker (tests/helpers/slow_marker.py).
 testpaths = ["tests"]
 addopts = [
     "-q",
@@ -131,6 +132,7 @@ addopts = [
 # tmpfs (RAM): keep only failed tests' directories for post-mortem.
 tmp_path_retention_policy = "failed"
 markers = [
+    "slow: heavy (>5 s or large peak RSS) or rarely-needed test; skipped unless PYRITE_SLOW_TESTS=1 (pyrite-dev test --slow), -m selects slow, or the test is named by node id",
     "online: test fetches from an external structure database (COD/MP); skipped unless PYRITE_ONLINE_TESTS=1",
     "oracle: test requires the pinned optional independent-validation backend",
     "hardware: requires specific physical hardware or device drivers",

@@ -59,6 +59,7 @@ def _cases_by_key(material, catalog_profile):
     return {(c["name"], c["E0_keV"]): c for c in cases}
 
 
+@pytest.mark.slow
 def test_case_content_key_matches_across_profiles_for_shared_cases():
     """The whole feature: sub_100keV's energy grid is a prefix of standard's with
     identical thickness/tilt/azim grids, so every case they share (energies <=100
@@ -789,6 +790,7 @@ def test_identity_from_stem_reads_sidecar_when_profile_edited_after_run(tmp_path
     assert identity_from_stem(stem, tmp_path / "no-such-checkpoint") is None
 
 
+@pytest.mark.slow
 def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
     default = replace(default_settings(), energy_model="midpoint")
     settings = replace(default, inelastic_model="continuous")

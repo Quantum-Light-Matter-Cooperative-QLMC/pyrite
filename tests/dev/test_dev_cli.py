@@ -185,6 +185,53 @@ def test_test_without_numba_omits_extra_env_kwarg(dev_module, monkeypatch) -> No
     assert calls == [("-m", "pytest", "-k", "forward")]
 
 
+@pytest.mark.parametrize(
+    ("argv", "numba", "pytest_args"),
+    [
+        (["test", "--slow", "-k", "x"], False, ["-k", "x"]),
+        (["test", "--slow", "--numba", "--cov"], True, ["--cov"]),
+        (["test", "--numba", "--slow"], True, []),
+        (["verify", "--slow"], False, []),
+    ],
+)
+def test_main_strips_leading_slow_flag_before_pytest_args(
+    dev_module, monkeypatch, argv, numba, pytest_args
+) -> None:
+    calls = []
+    monkeypatch.setattr(dev_module, "cmd_test", lambda args: calls.append(args))
+    monkeypatch.setattr(dev_module, "cmd_verify", lambda args: calls.append(args))
+
+    dev_module.main(argv)
+
+    assert calls[0].slow is True
+    assert calls[0].numba is numba
+    assert calls[0].pytest_args == pytest_args
+
+
+def test_test_slow_sets_opt_in_env_for_pytest_subprocess(dev_module, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setenv("PYRITE_TEST_WORKERS", "1")
+    monkeypatch.setattr(dev_module, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    dev_module.cmd_test(Namespace(numba=False, slow=True, pytest_args=["-x"]))
+
+    assert calls == [(("-m", "pytest", "-x"), {"extra_env": {"PYRITE_SLOW_TESTS": "1"}})]
+
+
+@pytest.mark.parametrize(
+    "argv", [["test-suite", "--slow", "integration"], ["test-suite", "integration", "--slow"]]
+)
+def test_test_suite_slow_sets_opt_in_env(dev_module, monkeypatch, argv) -> None:
+    calls = []
+    monkeypatch.setenv("PYRITE_TEST_WORKERS", "1")
+    monkeypatch.setattr(dev_module, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    dev_module.main(argv)
+
+    paths = [f"tests/{name}" for name in dev_module.INTEGRATION_TESTS]
+    assert calls == [(("-m", "pytest", *paths), {"extra_env": {"PYRITE_SLOW_TESTS": "1"}})]
+
+
 def test_full_suite_test_run_adds_memory_bounded_xdist_workers(dev_module, monkeypatch) -> None:
     monkeypatch.delenv("PYRITE_TEST_WORKERS", raising=False)
     monkeypatch.setattr(dev_module.os, "cpu_count", lambda: 16)
