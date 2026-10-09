@@ -1,6 +1,6 @@
 [project]
 name = "pyrite-mc"
-version = "0.6.0"
+version = "0.6.1"
 description = "Coherent X-ray radiation and electron transport in crystals."
 readme = "README.md"
 license = { file = "LICENSE.txt" }
