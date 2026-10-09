@@ -3239,36 +3239,66 @@ def test_attach_pull_keybinding_confirms_without_stopping_job(monkeypatch, capsy
     assert "PULL ARMED" in capsys.readouterr().out
 
 
-def test_pull_attached_progress_uses_reporting_profile_stems(monkeypatch):
-    sections = {
-        "META": ("materials: hopg hbn\nquick: False\nfidelity: full\ncatalog_profile: sub_100keV"),
-        "PROGRESS": (
-            '{"material":"hopg","total_cases":4,"cached_cases":1,'
-            '"completed_new_cases":1,"state":"running"}'
-        ),
-    }
-    stem_calls = []
+_PARTIAL_SECTIONS = {
+    "META": "materials: hbn hopg\nquick: False\nfidelity: full\ncatalog_profile: high_energy",
+    "PROGRESS": (
+        '{"material":"hbn","total_cases":4,"cached_cases":1,'
+        '"completed_new_cases":1,"state":"running"}'
+    ),
+}
+
+
+def test_pull_attached_progress_uses_remote_reserved_stems_not_local_catalog(monkeypatch):
     pulls = []
     monkeypatch.setattr(
-        scripts,
-        "_stems",
-        lambda materials, quick, fidelity, **kwargs: (
-            stem_calls.append((materials, quick, fidelity, kwargs)) or ["hopg-profile"]
+        scripts, "_stems", lambda *a, **k: pytest.fail("must not predict stems from local catalog")
+    )
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _cmd: (
+            "written hbn@high_energy-1ca2a03dbfd5\n"
+            "unwritten hopg@high_energy-aaaaaaaaaaaa\n"
+            "written hbn@other-ffffffffffff\n"
+            "written hbnx@high_energy-bbbbbbbbbbbb\n"
         ),
     )
     monkeypatch.setattr(lifecycle, "pull", lambda stems, **kwargs: pulls.append((stems, kwargs)))
 
-    viewer._pull_attached_progress("j", sections)
+    viewer._pull_attached_progress("j", _PARTIAL_SECTIONS)
 
-    assert stem_calls == [
-        (
-            ["hopg"],
-            False,
-            "full",
-            {"high_energy_min_kev": None, "catalog_profile": "sub_100keV"},
-        )
+    # Only the progress-reporting material (hbn) is pulled; unwritten hopg is skipped.
+    assert pulls == [
+        (["hbn@high_energy-1ca2a03dbfd5", "hbn@other-ffffffffffff"], {"no_sync": True})
     ]
-    assert pulls == [(["hopg-profile"], {"no_sync": True})]
+
+
+def test_pull_attached_progress_unwritten_checkpoint_is_actionable(monkeypatch):
+    monkeypatch.setattr(
+        transport, "_ssh_capture", lambda _cmd: "unwritten hbn@high_energy-1ca2a03dbfd5\n"
+    )
+    monkeypatch.setattr(lifecycle, "pull", lambda *a, **k: pytest.fail("nothing to pull"))
+
+    with pytest.raises(
+        SystemExit, match="no written checkpoints.*not yet written.*hbn@high_energy"
+    ):
+        viewer._pull_attached_progress("j", _PARTIAL_SECTIONS)
+
+
+def test_attach_pull_failure_reports_and_attachment_continues(monkeypatch, capsys):
+    running = _status_output("running hopg [1/1] since now", squeue_state="RUNNING")
+    done = _status_output("done now", squeue_state="NOT_QUEUED")
+    monkeypatch.setattr(viewer, "_status_stream", lambda _cmd: iter([running, running, done]))
+    monkeypatch.setattr(viewer, "KeyListener", lambda: _FakeKeyListener([["p"], ["y"], []]))
+
+    def boom(jobid, sections):
+        raise SystemExit("remote pull failed for 1 of 1 requested checkpoint(s): hbn")
+
+    monkeypatch.setattr(viewer, "_pull_attached_progress", boom)
+    monkeypatch.setattr(lifecycle, "_stop_jobid", lambda _j: pytest.fail("must not cancel"))
+
+    assert remote.attach("20260101-000000") is True
+    assert "PARTIAL PULL FAILED" in capsys.readouterr().out
 
 
 def test_attach_cancel_keybinding_confirms_and_scancels_the_job(monkeypatch, capsys):
@@ -6854,3 +6884,11 @@ def test_ssh_argv_shares_one_connection_per_host(monkeypatch, tmp_path):
 def test_ssh_argv_mux_can_be_disabled(monkeypatch):
     monkeypatch.setenv("PYRITE_SSH_MUX", "0")
     assert remote.config.ssh_argv("box") == ["ssh", "box"]
+
+
+def test_job_reserved_stems_command_filters_by_owner_and_reports_written(monkeypatch):
+    command = scripts._job_reserved_stems_command("job-1")
+    assert 'cat "$d/jobid"' in command and '"job-1"' in command
+    assert 'echo "written $s"' in command and 'echo "unwritten $s"' in command
+    with pytest.raises(SystemExit, match="invalid remote shell token"):
+        scripts._job_reserved_stems_command("bad id;")

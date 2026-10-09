@@ -67,6 +67,25 @@ def _release_job_reservations_command(jobid: str) -> str:
     )
 
 
+def _job_reserved_stems_command(jobid: str) -> str:
+    """Return a remote command listing the checkpoint stems a job reserved.
+
+    One ``written <stem>`` / ``unwritten <stem>`` line per reservation owned by
+    ``jobid``; ``written`` means ``checkpoints/<stem>`` exists on the box. The
+    reservation set is the run's own submit-time identity list, so it is
+    independent of the catalog the caller has selected locally.
+    """
+    transport._check_shell_tokens([jobid])
+    return (
+        f"R={config.shell_word(_reservation_root())}; J={config.shell_word(jobid)}; "
+        f"C={config.shell_remote_path('checkpoints')}; "
+        'for d in "$R"/*; do [ -d "$d" ] || continue; '
+        '[ "$(cat "$d/jobid" 2>/dev/null)" = "$J" ] || continue; '
+        's=$(basename "$d"); '
+        'if [ -e "$C/$s" ]; then echo "written $s"; else echo "unwritten $s"; fi; done'
+    )
+
+
 def _reserve_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
     """Atomically reserve checkpoint stems while a job is being staged.
 

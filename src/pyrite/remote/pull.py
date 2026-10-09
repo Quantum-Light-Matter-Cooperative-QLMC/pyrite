@@ -202,6 +202,28 @@ def resolve_profile_stems(material, catalog_profile, *, fidelity=None):
     ]
 
 
+def resolve_job_stems(jobid, materials):
+    """Resolve the written checkpoint stems a live job reserved for ``materials``.
+
+    Reads the job's remote checkpoint reservations -- the identities chosen at
+    submit time -- rather than predicting stems from the local catalog, so a
+    local catalog that differs from the run's cannot name a nonexistent
+    checkpoint. Returns ``(written, unwritten)`` stem lists, restricted to
+    stems belonging to ``materials`` (``<material>``, ``<material>@...``,
+    ``<material>--...`` or ``<material>_quick...``).
+    """
+    import re
+
+    owner = re.compile(rf"(?:{'|'.join(re.escape(m) for m in materials)})(?:@|--|_quick|$)")
+    written, unwritten = [], []
+    for line in transport._ssh_capture(scripts._job_reserved_stems_command(jobid)).splitlines():
+        kind, _, stem = line.strip().partition(" ")
+        if kind not in ("written", "unwritten") or owner.match(stem) is None:
+            continue
+        (written if kind == "written" else unwritten).append(stem)
+    return sorted(written), sorted(unwritten)
+
+
 def pull(
     stems,
     grid=False,
