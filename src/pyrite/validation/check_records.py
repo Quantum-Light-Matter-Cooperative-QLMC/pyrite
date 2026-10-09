@@ -12,6 +12,8 @@ Verdict = Literal["pass", "fail", "skip"]
 
 CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/brem_source_comparison.py": ("brem-source-comparison",),
+    "checks/coherent_flat_omission.py": ("coherent-flat-term-omission",),
+    "checks/coherent_physical_population_remote.py": ("coherent-physical-bunch-population",),
     "checks/coherent_transverse_coherence.py": ("transverse-bunch-form-factor",),
     "checks/collision_statistics_refinement.py": ("energy-controlled-propagation",),
     "checks/cross_reflection_coherence.py": ("cross-reflection-coherence",),

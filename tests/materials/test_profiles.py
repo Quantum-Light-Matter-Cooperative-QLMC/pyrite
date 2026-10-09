@@ -501,7 +501,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "promising_low_ne",
             "hopg",
-            "3ad6abfadb504d9f7fe8c4296e0d823e867bb78ee6b03df4dfbd6576c03be449",
+            "7c80f85eb288d9454beee3a0a4345e348d8728f024ccac3ae359690e6c1a83df",
         ),
     ],
 )
@@ -526,6 +526,11 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     every identity the runner writes, and the earlier pin omitted it.
     The profiles without fixed electron counts moved again for #361's
     adaptive default: their identities now carry the default precision policy.
+    ``promising_low_ne`` alone moved again for #350 (afc4c418): identities with
+    any coherent emission now carry the ``coherent_population_model`` marker
+    (``physical-distinct-pairs-v1``) for the physical-bunch-charge pair
+    weighting. The other pinned profiles use incoherent emission, which omits
+    the marker, so their digests held.
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in
