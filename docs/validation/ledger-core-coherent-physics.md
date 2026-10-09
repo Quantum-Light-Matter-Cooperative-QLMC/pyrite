@@ -327,6 +327,8 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 
   **Default refinement (2026-10-08):** coherent windows now use eight nodes per Nyquist step, cache revision 6. The corrected 60 keV remote ladder measured global FWHM error 1.18e-3 at four nodes and 2.00e-4 at eight; the 30 keV eight-node rung also passes yield/centroid/FWHM. A straight-track analytic sinc regression independently reproduces the four-node FWHM failure (1.346197e-3) and passes at eight. Cache/refusal regression preserves the explicit point budget when the refined axis exceeds a previously sufficient budget. This is a numerical policy correction, not a general shape or physical-population certificate. Status remains `discrepancy`; no acceptance is promoted. [evidence and cost](beam-transport/coherent-line-grid-windowed-resolution.md#default-refinement-2026-10-08)
 
+- **Scoped signed-yield verification:** Fresh-context derivation at `bf39de6b` returns `rederived` for signed finite-band and complete finite-axis stored-input yield enclosure: negative endpoints retained, both sectors budgeted, positive complete row floors required. Independent rational composition, signed sums, variable-weight and budget checks pass; an asymmetric 80-digit field integral is enclosed. Broad varying-weight refinement safely refuses after 9,990 evaluations, so no scalable production accuracy is claimed. Centroid remains convex-only; full Status stays `discrepancy`. See [independent signed-yield derivation](beam-transport/coherent-line-grid-windowed-resolution.md#independent-signed-yield-derivation-2026-10-08).
+
 ## `line-grid-sinc-convergence`
 
 - **Claim:** reproducible convergence-instrument contract for the incoherent CXR line spectrum: every rung uses bit-identical transport segments; `h <= pi/a_width` is a sufficient exact-integration bound rather than an empirical acceptance ceiling; the Richardson gate requires a passing suffix of triples; and float32/FP64 comparisons share one serialized transport
@@ -426,3 +428,14 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** units; zero coupling and thickness; exact Bragg detuning; no absorption; sign symmetry. Case adapter retains the offline audit's positive-g resonance and plus-g detuning; tests cover orientation and crystalline layers.
 - **Anchor:** `tests/materials/test_kinematic_validity.py::test_reference_parameters`, `::test_thick_silicon_and_thin_hopg`; `tests/scan/test_kinematic_validity.py`
 - **Notes:** Issue #342. Fresh-context verifier rederived the scalar parameters and source-to-code agreement; analytic and Si/HOPG anchors pass. Central incident ray and scalar detector direction, vacuum optical kinematics. No certification over scattering, mosaic domains, energy spread or detector acceptance; the extinction flag only says that a Bragg exchange length is reachable. Optical-data misses are recorded explicitly. Thresholds are project policy. [Independent derivation](radiation-physics/kinematic-validity-envelope.md). Human sign-off belongs to #277.
+
+
+## `coherent-physical-bunch-population`
+
+- **Claim:** Per-physical-electron coherent source power estimated with distinct incident Monte Carlo pairs; physical bunch charge weights the cross-electron excess, sample count normalizes the estimator
+- **Code:** `montecarlo/spectrum/coherent_population.py::{physical_bunch_electrons,pair_scale,mixed_row_power,require_resolved_power}`; `montecarlo/spectrum/lines/_temporal.py::add_coherent_row`
+- **Source:** Independent-electron field expansion; Su et al., Nuclear Science and Techniques 29, 30 (2018), Eq. (2), identical-emitter `N[1+(N-1)F]` limit; SI elementary charge
+- **Status:** rederived
+- **Checks:** Implementation-context units, distinct-pair normalization, identical aligned fields, zero-mean iid fields, missed entries, Gaussian longitudinal limit, negative-estimate refusal, temporal and detector normalization; fresh-context independent derivation and source-to-code comparison match
+- **Anchor:** `tests/montecarlo/test_coherent_physical_population.py`; `tests/montecarlo/test_temporal_profile.py`
+- **Notes:** [Derivation, assumptions and integration limits](radiation-physics/coherent-physical-bunch-population.md). Production supplies physical charge; low-level callers without it retain historical semantics. Nonnegative output is not a sampling certificate. Convex full-axis audits refuse signed weights they cannot enclose. Earlier remote evidence must be repeated under this operator. Does not promote the full windowed-resolution claim; human sign-off pending.

@@ -1,6 +1,7 @@
 """Spectrum chunk sizing and shared runner resource policy."""
 
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 import numpy as np
@@ -166,3 +167,17 @@ def _admit_chunk(chunk, bins, *, intermediates=3):
 
 def _real_itemsize() -> int:
     return np.dtype(_spectrum_mod.REAL).itemsize
+
+
+@contextmanager
+def _cpu_spectrum_backend():
+    """Temporarily execute spectrum helpers with NumPy in the driver."""
+
+    previous = (_RESOURCE_POLICY.gpu, _spectrum_mod.xp, _spectrum_mod.REAL)
+    _RESOURCE_POLICY.gpu = False
+    _spectrum_mod.xp = np
+    _spectrum_mod.REAL = np.float64
+    try:
+        yield
+    finally:
+        _RESOURCE_POLICY.gpu, _spectrum_mod.xp, _spectrum_mod.REAL = previous

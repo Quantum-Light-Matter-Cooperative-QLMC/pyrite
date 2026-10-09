@@ -3526,3 +3526,230 @@ its scope.
   construction and sample arithmetic, outside-axis power, FWHM, scalable
   reference/thick certificates and corrected remote ladders remain open.
   No `signed-off` transition is proposed.
+
+
+## Physical population continuation (2026-10-08)
+
+Production coherent reduction now uses physical bunch charge and distinct incident
+Monte Carlo pairs; see [coherent-physical-bunch-population](../radiation-physics/coherent-physical-bunch-population.md).
+Window tail multipliers use the same physical pair scale and include missed
+entries in the incident normalization. Infinite-slab capture includes the complete
+sampled offsets. Coherent cache revision 7 includes physical charge; coherent
+spectrum identities carry their own operator generation. Existing remote ladders
+and smoke runs predate this operator and require fresh charge-weighted confirmation.
+The full claim remains **discrepancy**. Fresh-context population verification is
+**rederived**; charge-weighted remote comparisons are recorded in the linked derivation.
+The original convex audit scope is extended for yield below; centroid retains
+its convex-weight restriction.
+
+
+## Signed physical pair-weight yield enclosure
+
+This extension supports finite-axis **yield** with physical pair weights above
+one. Fresh-context verification below returns **rederived** for its exact
+stored-input scope; the full claim remains **discrepancy**. Existing independently
+verified convex scopes retain their original limits. The physical population
+operator itself is unchanged.
+
+Let $G(E)\ge0$ be the grouped power and $P(E)\ge0$ the complete coherent
+power of the same captured row. For $M\ge2$ incident histories and physical
+population $N\ge1$, the raw production estimator is
+
+$$
+R(E)=(1-q(E))G(E)+q(E)P(E),\qquad
+q(E)=\frac{N-1}{M-1}F(E).
+$$
+
+A one-electron or zero-charge bunch retains the grouped self term; its pair
+coefficient is zero, including the supported single-history case. The final
+source still divides by $M$ and combines rows with their nonnegative mosaic weights. All coefficients here are dimensionless; integrating a raw row
+adds the energy unit. This extension assumes the same exact stored fields,
+material law and whole-interval coefficient bounds as the existing directed
+integration scopes; it does not certify Monte Carlo convergence.
+
+On a band $I$, the existing directed interpolation/endpoint-strip certificates
+separately enclose $G_I=\int_I G$ and $P_I=\int_I P$. Suppose
+$q(E)\in[q_-,q_+]$ throughout $I$, with $0\le q_-\le q_+$. Since the pure
+sector powers are nonnegative,
+
+$$
+\int_I R\in
+(1-[q_-,q_+])[G_I^-,G_I^+]+[q_-,q_+][P_I^-,P_I^+].
+$$
+
+Interval products select all endpoint sign combinations and round outward.
+In particular, a negative coefficient multiplies the sector's **upper** bound
+for a lower result. The two appearances of $q$ are enclosed independently:
+this is conservative, and remains valid when $q$ varies with energy. Treating
+$q$ as one constant common to the two integrated sectors would require an
+additional proof and is not used. Negative band endpoints and negative sums
+are preserved throughout refinement; they are not replaced by zero.
+
+Both pure-sector calls count against the global evaluation budget. Every
+signed interval uses twice its per-sector sample count. Initialization,
+resampling, both children of a bisection, and reservations for later positive
+mosaic-weight rows include this factor. Intersections of successive whole-row
+bounds remain valid. Relative acceptance requires a strictly positive complete
+row floor, or an exactly zero enclosure; a negative or zero-crossing enclosure
+exhausts its budget without returning acceptance. This does not yet support
+cancellation between rows whose individual integrals lack positive floors.
+
+Limits and regressions: zero field gives exactly zero; for two identical
+aligned histories and $N=12$, $q=11$ gives raw $24$ times the one-track power
+and per-incident yield $12$ times that power. Two opposed fields give negative
+raw power and refuse acceptance. A varying coefficient crossing one encloses
+the independent symmetric sinc integral. A complete finite-axis analytic yield
+passes the $10^{-3}$ gate; insufficient initialization budgets refuse before
+partial work is accepted. Production capture retains coefficients above one
+without altering the emitted spectrum.
+
+The centroid's current first-moment enclosure relies on pointwise positivity.
+A signed pair estimator may violate that assumption between production nodes,
+even when its integrated yield is positive. Centroid audits therefore still
+require convex coefficients in $[0,1]$; a signed first-moment enclosure is a
+separate remaining slice. No production envelope, outside-axis, reference/thick
+shape or sampling acceptance is promoted by this yield extension.
+
+## Independent signed-yield derivation (2026-10-08)
+
+Fresh verifier; target checkpoint `bf39de6b`. This derivation was written before
+reading implementation bodies or the owner's signed-enclosure section. The
+handoff supplied the intended operator and scope. A read of the independently
+validated population source inadvertently exposed its final brief summary of the
+new extension; a ledger text search also exposed historical owner/verifier
+Notes. Neither supplied an implementation body. This limited prior exposure is
+recorded rather than treated as independent evidence.
+
+The source is the already derived physical distinct-pair population operator in
+[coherent physical bunch population](../radiation-physics/coherent-physical-bunch-population.md).
+For a fixed stored field, let $G(E)\ge0$ be its grouped power and $P(E)\ge0$ its
+complete coherent power. On a finite interval $I$, assume certified bounds
+$0\le q_-\le q(E)\le q_+<\infty$, with
+$q=(N-1)F/(M-1)$ for $M\ge2$. Zero or one physical electron has zero pair scale.
+The required raw integral is
+
+$$
+J_I=\int_I\big[(1-q(E))G(E)+q(E)P(E)\big]\,dE.
+$$
+
+Let independently valid nonnegative pure-sector integral boxes be
+$g_-\le\int_I G\le g_+$ and $p_-\le\int_I P\le p_+$. Since $G$ is nonnegative,
+$\int_I(1-q)G$ belongs to the product of the real intervals
+$[1-q_+,1-q_-]$ and $[g_-,g_+]$. This remains true when $q$ varies or crosses
+one: integrate the pointwise coefficient inequalities first, then allow every
+possible grouped integral. Since $q$ and $P$ are nonnegative,
+$\int_I qP\in[q_-p_-,q_+p_+]$. Therefore define
+
+$$
+\begin{aligned}
+C_-&=\min\{(1-q_+)g_-,(1-q_+)g_+,(1-q_-)g_-,(1-q_-)g_+\},\\
+C_+&=\max\{(1-q_+)g_-,(1-q_+)g_+,(1-q_-)g_-,(1-q_-)g_+\},\\
+L_I&=C_-+q_-p_-,\qquad U_I=C_++q_+p_+.
+\end{aligned}
+$$
+
+Then $L_I\le J_I\le U_I$. Correlation between sectors can make this loose but
+cannot invalidate it. All subtraction, multiplication, addition and interval
+sums require outward rounding, including negative subnormal results. Lower
+endpoints must retain their sign. Pure-sector zero must be proven, rather than
+inferred from rounded products. The units are power times energy; every pair
+coefficient is dimensionless. Limits $q=0$ and $q=1$ recover the grouped and
+complete coherent integral respectively. Constant $q>1$ reverses the grouped
+endpoint order. For $G=1$, $P=0$, $q=2$, the exact unit-interval result is $-1$;
+clipping it to zero is invalid.
+
+For disjoint intervals, add signed endpoints. Intersections of independent
+whole-domain enclosures remain valid. A positive row floor $L>0$ permits the
+relative uncertainty certificate $(U-L)/L$; $L=U=0$ permits the exact-zero
+convention. A negative complete integral or a box containing zero must not pass
+this positive-yield acceptance rule, even if its width is small. Some individual
+intervals may be negative while the complete row integral is positive. Division
+by the positive incident population and summation with nonnegative mosaic
+weights preserve enclosure; they do not license clipping negative row endpoints.
+
+Both pure-sector primitive evaluations must be charged: $n$ coordinates cost
+$2n$ on the signed path, at initialization and every refinement. Global
+reservations must cover all remaining rows before spending on a current row.
+Callback coefficient bounds may contract under interval subdivision; repeated
+sampling of an unchanged interval cannot contract the coefficient range itself.
+A fixed bound can instead benefit from denser pure-sector sampling. For the
+centroid, positivity of the complete integral alone does not imply pointwise
+positivity: the inequality $aJ\le\int_I ER\le bJ$ fails for a signed integrand.
+The existing moment proof must therefore retain its convex coefficient scope.
+
+### Source-to-code comparison and adversarial checks
+
+`_signed_row_power_bounds` matches the independent product box above. Its
+interval context subtracts the coefficient bounds, multiplies both pure-sector
+boxes, and adds outward; floor/ceiling conversion plus a successor retains both
+negative and positive subnormal endpoints. `_sum_intervals(..., signed=True)`
+retains negative totals. The signed path initializes its retained lower bound
+at negative infinity. `BandPowerCertificate.relative_width_upper` accepts
+exact zero or a strictly positive complete floor, and returns infinity for
+negative or zero-crossing floors. No divergent factor, sign or normalization
+was found.
+
+Initialization and refinement charge both sector samples through one fixed
+multiplier for the entire row certificate. `_pair_sampling_multiplier` uses
+whole-interval bounds before admission. Callback bisections charge both children
+before replacing their parent; fixed bounds resample the whole interval and
+intersect successive boxes. The weighted audit reserves the doubled initial
+cost for every remaining positive-weight row. After each row has passed its
+positive-floor or exact-zero gate, the weighted sum and division by the incident
+sample count remain nonnegative; the existing positive weighted-sum conversion
+is valid under that gate. It is not a license to combine uncertified negative
+rows.
+
+The full-axis yield audit forwards the complete axis and retains the established
+stored-sample trapezoid enclosure. Its initial allocation check is a preliminary
+single-sector lower bound; the subsequent weighted audit computes the actual
+doubled cost before any row primitive runs. The capture hook retains physical
+pair scales above one, uses zero for zero/one-electron scale, and multiplies
+Gaussian whole-band endpoint bounds outward. Centroid entry validates convex
+coefficient bounds throughout the same integration path before applying its
+pointwise-positive moment proof. Yield acceptance does not bypass that refusal.
+
+Independent scratch evidence uses exact rational reference arithmetic rather
+than the signed implementation's interval helpers: 1,200 endpoint product
+boxes span binary exponents from $-1074$ through $400$; 100 piecewise-constant
+integrals vary the coefficient across one; 300 signed sums include cancellation,
+negative totals and subnormals. All are enclosed. A separate instrumented
+primitive confirms remaining-row reservations: a budget of 18 permits only the
+first row's six initialization evaluations and refuses before an incomplete
+split; a budget of 36 charges both sectors of both complete bisections; fixed
+bounds charge 32 evaluations for two rows at sample rungs three and five.
+These stubbed primitive checks validate composition and accounting only.
+
+Maintained checks: **104 passed** across
+`tests/energy-grid/test_coherent_band_audit.py`,
+`tests/energy-grid/test_coherent_spectrum_audit.py`,
+`tests/montecarlo/test_coherent_physical_population.py` and
+`tests/dev/test_docs.py`. They include aligned and opposed analytic fields,
+variable coefficients crossing one, exact-zero fields, initialization refusal,
+full-axis signed yield and centroid refusal, and capture of physical pair
+weights above one.
+
+Scoped verdict: **rederived** for the signed finite-band and complete finite-axis
+stored-input yield extension at `bf39de6b`. This trusts the existing pure-sector
+primitive only within its already reviewed scope. It does not certify upstream
+capture/interpolant construction, production sample arithmetic, outside-axis
+power, Monte Carlo convergence, FWHM, thick-target acceptance, GPU execution or
+human sign-off. The full ledger claim remains **discrepancy**. Suggested ledger
+change: append this scoped evidence to Notes and link this independent section;
+retain the claim's Status.
+
+An additional independently constructed two-history row uses phase difference
+$1.6$ radians, a 100 Angstrom undamped flight centred at 50 Angstrom, a
+1000 eV carrier and the asymmetric interval $[990,1015]$ eV. The coefficient
+$q(E)=0.5+3(E-990)/25$ crosses one. Direct 80-digit quadrature of
+
+$$
+\left[2+2q(E)\cos(1.6)\right]
+\left[100\operatorname{sinc}\left(\frac{100(E-1000)}{2\hbar c}\right)\right]^2
+$$
+
+lies inside the returned six-evaluation box; its insufficient budget refuses
+acceptance. A stronger refinement attempt also safely refused after 9,990
+charged evaluations, with relative width upper 0.00879927 against a requested
+0.003. That conservative convergence cost is recorded as a limitation, not a
+passing accuracy gate or a counterexample to enclosure.

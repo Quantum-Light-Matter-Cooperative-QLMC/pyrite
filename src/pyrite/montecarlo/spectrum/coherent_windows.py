@@ -66,6 +66,7 @@ from ..._line_windows import FeatureSeed
 from ...materials.crystal import HBARC_EV_ANG
 from ..transport.kinematics import C_ANG_PER_FS
 from .coherent_dispersion import CoherentDispersionLaw
+from .coherent_population import pair_scale
 from .diagnostics import _offset_population
 
 __all__ = [
@@ -618,7 +619,7 @@ def coherent_window_seeds(
     *,
     start_eV: float,
     stop_eV: float,
-    electron_count: int,
+    electron_count: float,
     decoherence: Callable[[np.ndarray], np.ndarray] | None,
     leak_limit: float = DEFAULT_COHERENT_LEAK_LIMIT,
     decoherence_limit: float = DEFAULT_COHERENT_DECOHERENCE_LIMIT,
@@ -654,7 +655,7 @@ def coherent_window_seeds(
     if not 0.0 < float(decoherence_limit) < 1.0:
         raise ValueError("decoherence_limit must lie in (0, 1)")
     start, stop = float(start_eV), float(stop_eV)
-    count = max(int(electron_count), 1)
+    count = max(float(electron_count), 1.0)
 
     def factor_at(energy):
         if decoherence is None:
@@ -794,6 +795,7 @@ def coherent_case_seeds(
     stop_eV: float,
     longitudinal_rms_fs: float | None,
     dispersion_law: CoherentDispersionLaw | None = None,
+    physical_electrons: float | None = None,
 ) -> tuple[list[FeatureSeed], dict[str, Any]]:
     """Coherent windows of one direction's captured rows.
 
@@ -809,15 +811,37 @@ def coherent_case_seeds(
     electrons = [row.electron for row in rows]
     # N_e of the Cauchy-Schwarz bound: the line electrons that left pieces.
     electron_count = int(np.unique(np.concatenate(electrons)).size) if electrons else 1
+    samples = int(segments["Ne"] if electron_limit is None else electron_limit)
+    bound_count = electron_count
+    if physical_electrons is not None:
+        # |P-G| <= (H-1) G for H emitting incident electrons.
+        # Including missed entries in M is essential; H only bounds support.
+        # Validation: coherent-physical-bunch-population
+        scale = pair_scale(physical_electrons, samples)
+        bound_count = 1.0 + scale * max(electron_count - 1, 0)
+        if scale == 0.0 or electron_count <= 1:
+
+            def decoherence(energy):
+                return np.zeros_like(np.asarray(energy, dtype=float))
+
     seeds, summary = coherent_window_seeds(
         rows,
         start_eV=start_eV,
         stop_eV=stop_eV,
-        electron_count=electron_count,
+        electron_count=bound_count,
         decoherence=decoherence,
     )
+    if physical_electrons is not None:
+        summary.update(
+            physical_electrons=float(physical_electrons),
+            incident_samples=samples,
+            emitting_samples=electron_count,
+            tail_population_bound=bound_count,
+        )
+    if physical_electrons is not None and (scale == 0.0 or electron_count <= 1):
+        summary["decoherence_bound"] = "self-only (no sampled cross-electron excess)"
     if dispersion_law is not None:
         summary["dispersion"] = _dispersion_window_audit(
-            rows, summary, dispersion_law, decoherence, electron_count
+            rows, summary, dispersion_law, decoherence, bound_count
         )
     return seeds, summary

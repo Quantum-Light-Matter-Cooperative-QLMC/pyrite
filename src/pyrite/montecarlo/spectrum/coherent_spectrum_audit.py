@@ -12,6 +12,7 @@ from .coherent_band_audit import (
     BandPowerBudgetError,
     BandPowerCertificate,
     _context,
+    _pair_sampling_multiplier,
     _smooth_band_spans,
     _upper_float,
     certify_row_band_power,
@@ -276,6 +277,20 @@ def audit_full_axis_spectrum_centroid(
     """
     if not np.isfinite(centroid_relative_tolerance) or not 0 < centroid_relative_tolerance < 1:
         raise ValueError("centroid audit needs a relative share in (0,1)")
+
+    def convex_bounds(a, b):
+        factors = np.asarray(
+            form_factor_bounds(a, b) if callable(form_factor_bounds) else form_factor_bounds,
+            dtype=float,
+        )
+        if (
+            factors.shape != (2,)
+            or np.any(~np.isfinite(factors))
+            or not 0 <= factors[0] <= factors[1] <= 1
+        ):
+            raise ValueError("centroid audit requires convex pair weights inside [0, 1]")
+        return float(factors[0]), float(factors[1])
+
     captured = list(rows)
     audit = audit_full_axis_spectrum_yield(
         captured,
@@ -287,7 +302,7 @@ def audit_full_axis_spectrum_centroid(
         initial_samples=initial_samples,
         max_evaluations=max_evaluations,
         integration_bins=integration_bins,
-        form_factor_bounds=form_factor_bounds,
+        form_factor_bounds=convex_bounds,
     )
     if audit.spectrum.lower <= 0 or audit.quadrature_lower <= 0:
         raise ValueError("centroid audit needs certified positive yield and quadrature")
@@ -433,7 +448,9 @@ def audit_captured_spectrum_yield(
     selected = None if bands is None else list(bands)
     spans = _smooth_band_spans(law, selected)
     active = np.flatnonzero(weights > 0).tolist()
-    per_row_initial = initial_samples * len(spans)
+    per_row_initial = (
+        initial_samples * len(spans) * _pair_sampling_multiplier(form_factor_bounds, spans)
+    )
     required = per_row_initial * len(active)
     if required > max_evaluations:
         raise SpectrumPowerBudgetError(

@@ -215,3 +215,136 @@ def test_looser_child_enclosures_retain_the_valid_whole_band_intersection(monkey
         (990.0, 1000.0),
         (1000.0, 1010.0),
     ]
+
+
+def _pair_row(opposed=False):
+    from dataclasses import replace
+
+    one = _row()
+    return replace(
+        one,
+        amplitude=np.array([[1.0, -1.0 if opposed else 1.0]]),
+        energy_eV=np.repeat(one.energy_eV, 2),
+        duration_ang=np.repeat(one.duration_ang, 2),
+        centre_ang=np.repeat(one.centre_ang, 2),
+        electron=np.array([0, 1]),
+        start_transmission=np.ones(2),
+        end_transmission=np.ones(2),
+        mean_transmission=np.ones(2),
+        attenuation_slope_ang=np.zeros(2),
+        escape_mid_ang=np.zeros(2),
+        escape_change_ang=np.zeros(2),
+        phase_rad=np.zeros(2),
+    )
+
+
+def test_physical_pair_scale_above_one_encloses_the_analytic_aligned_integral():
+    from mpmath import mp
+
+    certificate = certify_row_band_power(
+        _pair_row(),
+        _law(),
+        form_factor_bounds=(11.0, 11.0),
+        max_evaluations=2000,
+    )
+    with mp.workdps(70):
+        H = mp.mpf(HBARC_EV_ANG)
+        expected = 24 * mp.quad(
+            lambda E: (100 * mp.sinc(100 * (E - 1000) / (2 * H))) ** 2, [990, 1000, 1010]
+        )
+        assert mp.mpf(certificate.lower) <= expected <= mp.mpf(certificate.upper)
+    assert certificate.relative_width_upper <= 1e-3
+    assert certificate.evaluations <= 2000
+    assert certificate.evaluations % 2 == 0
+
+
+def test_negative_pair_integral_is_preserved_and_never_certified_as_zero():
+    with pytest.raises(BandPowerBudgetError) as caught:
+        certify_row_band_power(
+            _pair_row(opposed=True),
+            _law(),
+            form_factor_bounds=(11.0, 11.0),
+            max_evaluations=100,
+        )
+    certificate = caught.value.certificate
+    assert certificate.lower < certificate.upper < 0
+    assert certificate.relative_width_upper == float("inf")
+    assert certificate.evaluations <= 100
+
+
+def test_signed_pair_initialization_budgets_both_sector_evaluations():
+    with pytest.raises(BandPowerBudgetError, match="needs 6 sample evaluations") as caught:
+        certify_row_band_power(
+            _pair_row(),
+            _law(),
+            form_factor_bounds=(11.0, 11.0),
+            max_evaluations=5,
+        )
+    assert caught.value.certificate is None
+
+
+def test_varying_pair_weight_across_one_keeps_signed_contributions():
+    from mpmath import mp
+
+    def bounds(a, b):
+        return 1 + 1e-4 * (a - 1000), 1 + 1e-4 * (b - 1000)
+
+    result = certify_row_band_power(
+        _pair_row(),
+        _law(),
+        form_factor_bounds=bounds,
+        max_evaluations=3000,
+    )
+    with mp.workdps(70):
+        H = mp.mpf(HBARC_EV_ANG)
+        # Odd weight variation integrates to zero on the symmetric sinc field.
+        expected = 4 * mp.quad(
+            lambda E: (100 * mp.sinc(100 * (E - 1000) / (2 * H))) ** 2, [990, 1000, 1010]
+        )
+        assert mp.mpf(result.lower) <= expected <= mp.mpf(result.upper)
+    assert result.relative_width_upper <= 1e-3
+    assert result.evaluations <= 3000
+
+
+def test_full_axis_signed_yield_passes_but_centroid_requires_positive_weights():
+    from pyrite.montecarlo.spectrum.coherent_spectrum_audit import (
+        audit_full_axis_spectrum_centroid,
+        audit_full_axis_spectrum_yield,
+    )
+
+    law = CoherentDispersionLaw("hopg", 999.0, 1001.0, use_henke=False)
+    energy = np.linspace(law.start, law.stop, 201)
+    source = 12 * (100 * np.sinc(100 * (energy - 1000) / (2 * np.pi * HBARC_EV_ANG))) ** 2
+    options = dict(electron_count=2, form_factor_bounds=(11.0, 11.0), max_evaluations=3000)
+    result = audit_full_axis_spectrum_yield([_pair_row()], law, energy, source, **options)
+    assert result.within_tolerance
+    assert result.spectrum.evaluations <= 3000
+    with pytest.raises(ValueError, match="centroid audit requires convex pair weights"):
+        audit_full_axis_spectrum_centroid([_pair_row()], law, energy, source, **options)
+
+
+def test_signed_zero_field_stays_exact_zero():
+    from dataclasses import replace
+
+    row = replace(_pair_row(), amplitude=np.zeros((1, 2)))
+    result = certify_row_band_power(row, _law(), form_factor_bounds=(11.0, 11.0), max_evaluations=6)
+    assert result.lower == result.upper == 0
+    assert result.relative_width_upper == result.relative_error_upper(0) == 0
+    assert result.evaluations == 6
+
+
+def test_weighted_spectrum_reserves_both_sectors_for_every_row():
+    from pyrite.montecarlo.spectrum.coherent_spectrum_audit import (
+        SpectrumPowerBudgetError,
+        audit_captured_spectrum_yield,
+    )
+
+    with pytest.raises(SpectrumPowerBudgetError, match="needs 12 sample evaluations"):
+        audit_captured_spectrum_yield(
+            [_pair_row(), _pair_row()],
+            _law(),
+            electron_count=2,
+            numerical_yield=1.0,
+            form_factor_bounds=(11.0, 11.0),
+            max_evaluations=11,
+        )

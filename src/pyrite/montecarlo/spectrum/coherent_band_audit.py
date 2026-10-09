@@ -25,11 +25,11 @@ def _context() -> Any:
     return ctx
 
 
-def _upper_float(value: Any) -> float:
+def _upper_float(value: Any, *, signed: bool = False) -> float:
     from mpmath.libmp import round_ceiling, to_float
 
     upper = to_float(value._mpi_[1], rnd=round_ceiling)
-    return float(np.nextafter(upper, np.inf)) if value.b > 0 else 0.0
+    return float(np.nextafter(upper, np.inf)) if (value.b != 0 if signed else value.b > 0) else 0.0
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,7 @@ class BandInterval:
 class BandPowerCertificate:
     """Outward sum, intersected across refinements, of disjoint band enclosures.
 
-    Source: additivity/positivity of integrals on disjoint intervals. A
+    Source: additivity of integrals on disjoint intervals. A
     supplied numerical yield Q needs its own relative_error_upper check;
     convergence of this enclosure alone does not certify Q. Empty requested
     bands have zero power. This is not full-axis power if bands omit regions.
@@ -80,9 +80,9 @@ class BandPowerCertificate:
 
         Validation: coherent-line-grid-windowed-resolution
         """
-        if self.upper == 0:
+        if self.upper == self.lower == 0:
             return 0.0
-        if self.lower == 0:
+        if self.lower <= 0:
             return float("inf")
         ctx = _context()
         return _upper_float((ctx.mpf(self.upper) - ctx.mpf(self.lower)) / ctx.mpf(self.lower))
@@ -100,6 +100,8 @@ class BandPowerCertificate:
         estimate = float(estimate)
         if not np.isfinite(estimate) or estimate < 0:
             raise ValueError("a numerical yield must be finite and nonnegative")
+        if self.lower < 0:
+            return float("inf")
         if self.lower == 0:
             if estimate > 0:
                 return float("inf")
@@ -118,11 +120,14 @@ class BandPowerBudgetError(ValueError):
         self.certificate = certificate
 
 
-def _sum_intervals(intervals: list[BandInterval], evaluations: int) -> BandPowerCertificate:
+def _sum_intervals(
+    intervals: list[BandInterval], evaluations: int, *, signed: bool = False
+) -> BandPowerCertificate:
     """Sum certified integral bounds outward, including subnormal conversion.
 
-    Source: positivity and disjoint integral additivity. Exact zero stays
-    zero; nonrepresentable positive upper sums retain an outward successor.
+    Source: disjoint integral additivity. Signed mode retains negative
+    endpoints; default mode uses sector positivity. Exact zero stays zero;
+    nonrepresentable sums retain outward successors.
 
     Validation: coherent-line-grid-windowed-resolution
     """
@@ -131,8 +136,9 @@ def _sum_intervals(intervals: list[BandInterval], evaluations: int) -> BandPower
     ctx = _context()
     lower = sum((ctx.mpf(b.lower) for b in intervals), ctx.mpf(0))
     upper = sum((ctx.mpf(b.upper) for b in intervals), ctx.mpf(0))
-    lo = max(0.0, np.nextafter(to_float(lower._mpi_[0], rnd=round_floor), -np.inf))
-    hi = _upper_float(upper)
+    lo = np.nextafter(to_float(lower._mpi_[0], rnd=round_floor), -np.inf)
+    lo = (0.0 if lower.a == 0 else lo) if signed else max(0.0, lo)
+    hi = _upper_float(upper, signed=signed)
     if not np.all(np.isfinite([lo, hi])):
         raise ValueError("band-power sums have no finite outward enclosure")
     return BandPowerCertificate(float(lo), hi, evaluations, tuple(intervals))
@@ -169,6 +175,65 @@ def _smooth_band_spans(
     return spans
 
 
+def _pair_sampling_multiplier(bounds, spans):
+    """Charge both pure-sector evaluations when pair weights exceed one."""
+    signed = False
+    for a, b in spans:
+        factors = np.asarray(bounds(a, b) if callable(bounds) else bounds, dtype=float)
+        if (
+            factors.shape != (2,)
+            or np.any(~np.isfinite(factors))
+            or not 0 <= factors[0] <= factors[1]
+        ):
+            raise ValueError("pair-weight bounds must be finite, ordered and nonnegative")
+        signed |= factors[1] > 1
+    return 2 if signed else 1
+
+
+def _signed_row_power_bounds(field, law, a, b, nodes, *, form_factor_bounds):
+    """Enclose G + q(P-G) with signed interval arithmetic, without clipping.
+
+    Source: positive G/P sector integrals and whole-band q bounds imply
+    integral((1-q)G+qP) lies in (1-[qlo,qhi])*[Glo,Ghi]+[qlo,qhi]*[Plo,Phi].
+    This remains valid when q varies and when 1-q changes sign. Stored field,
+    material law and coefficients are exact inputs; each pure sector uses the
+    established directed field/interpolation enclosure. Constant q=0 or 1
+    selects its sector. A negative result is an unresolved signed estimator,
+    not zero physical power. Both sector sample evaluations count in budget.
+    Validation: coherent-line-grid-windowed-resolution
+    """
+    from mpmath.libmp import round_floor, to_float
+
+    factors = np.asarray(form_factor_bounds, dtype=float)
+    if factors.shape != (2,) or np.any(~np.isfinite(factors)) or not 0 <= factors[0] <= factors[1]:
+        raise ValueError("pair-weight bounds must be finite, ordered and nonnegative")
+    grouped = _certified_interpolated_row_power_bounds(
+        field,
+        law,
+        a,
+        b,
+        nodes,
+        form_factor_bounds=(0.0, 0.0),
+    )
+    flat = _certified_interpolated_row_power_bounds(
+        field,
+        law,
+        a,
+        b,
+        nodes,
+        form_factor_bounds=(1.0, 1.0),
+    )
+    ctx = _context()
+    q = ctx.mpf(form_factor_bounds)
+    result = (1 - q) * ctx.mpf(grouped) + q * ctx.mpf(flat)
+    lo = to_float(result._mpi_[0], rnd=round_floor)
+    lo = 0.0 if result.a == 0 else float(np.nextafter(lo, -np.inf))
+    hi = _upper_float(result, signed=True)
+    if not np.all(np.isfinite([lo, hi])):
+        raise ValueError("signed pair power has no finite outward enclosure")
+    return lo, hi
+
+
 def certify_row_band_power(
     field: CoherentRowField,
     law: CoherentDispersionLaw,
@@ -196,7 +261,12 @@ def certify_row_band_power(
 
     Bands default to the whole material-law axis; supplied gaps stay omitted,
     and overlaps are refused. F bounds, fixed or callable per smooth interval,
-    must certify the WHOLE interval, not merely its samples. Row/law/F refer
+    must certify the WHOLE interval, not merely its samples. Values above one
+    represent physical pair weights q=(N-1)F/(M-1). That path encloses both
+    pure sectors separately, preserves signed endpoints, and charges twice
+    the per-sector samples against the evaluation budget. It requires a
+    positive whole-row integral floor (or exact zero) before acceptance.
+    Row/law/F refer
     to one unchanged physical field throughout refinement. Every primitive
     call counts all its samples; no sample reuse is assumed. Budget exhaustion
     raises BandPowerBudgetError with the current certificate when available;
@@ -221,7 +291,9 @@ def certify_row_band_power(
     spans = _smooth_band_spans(law, bands)
     if not spans:
         return _sum_intervals([], 0)
-    required = initial_samples * len(spans)
+    multiplier = _pair_sampling_multiplier(form_factor_bounds, spans)
+    signed = multiplier == 2
+    required = multiplier * initial_samples * len(spans)
     if required > max_evaluations:
         raise BandPowerBudgetError(
             f"band initialization needs {required} sample evaluations over {len(spans)} smooth intervals, "
@@ -239,7 +311,8 @@ def certify_row_band_power(
         if factor_values.shape != (2,):
             raise ValueError("each smooth band requires one global form-factor bound pair")
         factors = (float(factor_values[0]), float(factor_values[1]))
-        lo, hi = _certified_interpolated_row_power_bounds(
+        bound = _signed_row_power_bounds if signed else _certified_interpolated_row_power_bounds
+        lo, hi = bound(
             field,
             law,
             a,
@@ -251,9 +324,9 @@ def certify_row_band_power(
 
     intervals = [evaluate(a, b, initial_samples) for a, b in spans]
     evaluations = required
-    retained_lower, retained_upper = 0.0, float("inf")
+    retained_lower, retained_upper = (float("-inf") if signed else 0.0), float("inf")
     while True:
-        result = _sum_intervals(intervals, evaluations)
+        result = _sum_intervals(intervals, evaluations, signed=signed)
         retained_lower = max(retained_lower, result.lower)
         retained_upper = min(retained_upper, result.upper)
         if retained_lower > retained_upper:
@@ -265,8 +338,10 @@ def certify_row_band_power(
         previous = intervals[index]
         remaining = max_evaluations - evaluations
         split = callable(form_factor_bounds)
-        count = initial_samples if split else min(2 * previous.samples - 1, remaining)
-        if (split and 2 * count > remaining) or (not split and count <= previous.samples):
+        count = initial_samples if split else min(2 * previous.samples - 1, remaining // multiplier)
+        if (split and 2 * count * multiplier > remaining) or (
+            not split and count <= previous.samples
+        ):
             raise BandPowerBudgetError(
                 f"band power remains uncertified after {evaluations} sample evaluations: "
                 f"relative width upper {result.relative_width_upper:.6g} exceeds {relative_tolerance:g}; "
@@ -284,11 +359,11 @@ def certify_row_band_power(
                 evaluate(middle, previous.stop_eV, count),
             ]
             intervals[index : index + 1] = children
-            evaluations += 2 * count
+            evaluations += 2 * count * multiplier
             continue
         current = evaluate(previous.start_eV, previous.stop_eV, count)
         lo, hi = max(previous.lower, current.lower), min(previous.upper, current.upper)
         if lo > hi:
             raise ValueError("successive band-power certificates are inconsistent")
         intervals[index] = replace(current, lower=lo, upper=hi)
-        evaluations += count
+        evaluations += count * multiplier

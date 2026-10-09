@@ -18,6 +18,7 @@ from ....materials.attenuation import _normalize_composition
 from ....materials.crystal import CRYSTALS, HBARC_EV_ANG, refractive_index
 from ...geometry import _mosaic_quadrature, _orientation_R
 from ...transport import C_ANG_PER_FS, beta_from_keV
+from ..coherent_population import pair_scale
 from ..segment_escape import segment_escape_gradient, segment_escape_pieces
 from ._bin_quadrature import BIN_MEAN_QUADRATURE, bin_axis, validate_line_quadrature
 from ._formation import expand_escape_pieces
@@ -93,6 +94,7 @@ class SpectrumRequest:
     truncation_audit: Any = None
     temporal: Any = None
     coefficient_capture: Any = None
+    physical_electrons: Any = None
 
 
 @dataclass
@@ -268,6 +270,9 @@ def _prepare_spectrum(request):
         Ne = segments["Ne"]
     else:
         Ne = electron_limit
+
+    if coherent and request.physical_electrons is not None:
+        pair_scale(request.physical_electrons, Ne)
 
     n_hat = _observation_direction(theta_obs_rad, n_hat)
     if groove is not None:
@@ -613,12 +618,19 @@ def _prepare_spectrum(request):
         else segment_escape_pieces(segments, n_hat, layers=layers, groove=groove, xp=xp)
     )
 
+    if coherent and request.physical_electrons is not None and not finite_footprint_now:
+        # Pair complete electron fields, including their sampled offsets. This
+        # remains unbiased when phase offsets and trajectory fields correlate.
+        # Validation: coherent-physical-bunch-population
+        seg_r_geom = seg_r
+        d_all_geom = d_all
+
     temporal_buf = temporal_tau = temporal_tau_geo = None
     if request.temporal is not None:
         temporal_buf = request.temporal.buffer()
         temporal_tau, _ = segment_arrival_times(segments, n_hat, xp=xp)
         temporal_tau_geo = temporal_tau
-        if decoherence_active:
+        if decoherence_active and (request.physical_electrons is None or finite_footprint_now):
             # Same offset-free arrival as ``d_all_geom``, in float64.
             t0_seg = xp.asarray(
                 segments.get("t0_ang", np.zeros(temporal_tau.size)),

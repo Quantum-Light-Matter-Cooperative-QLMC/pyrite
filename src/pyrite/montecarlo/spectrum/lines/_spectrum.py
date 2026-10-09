@@ -9,6 +9,7 @@ over a detector solid angle.
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
+from ..coherent_population import require_resolved_power
 from . import _policy
 from ._batched import _accumulate_batched
 from ._per_hkl import _accumulate_per_hkl
@@ -46,6 +47,7 @@ def mc_spectrum(
     truncation_audit=None,
     temporal=None,
     coefficient_capture=None,
+    physical_electrons=None,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron] on
@@ -147,6 +149,12 @@ def mc_spectrum(
         its per-electron ``I(t)`` for ``n_hat`` into the profile, from the
         same lines and emission policy as the spectrum. Forces the per-hkl
         route. Validation: temporal-intensity-profile
+    physical_electrons
+        Physical bunch population N (zero or >=1). With M incident samples,
+        returns [G + (N-1) F (P-G)/(M-1)]/M; requires M>=2 for N>1.
+        Negative estimates refuse as insufficient sampling. None retains
+        the historical sampled-bunch blend for direct low-level callers.
+        Validation: coherent-physical-bunch-population
     coefficient_capture
         Optional callable (coherent route only). Called once per
         ``(reflection, orientation)`` row with ``(st, idx, coefs, good,
@@ -212,6 +220,7 @@ def mc_spectrum(
         truncation_audit=truncation_audit,
         temporal=temporal,
         coefficient_capture=coefficient_capture,
+        physical_electrons=physical_electrons,
     )
     return _mc_spectrum(request)
 
@@ -229,6 +238,21 @@ def _finalize_spectrum(st):
     spec = st.spec
     spec_pxr = st.spec_pxr
     spec_cbs = st.spec_cbs
+    if st.request.coherent and st.request.physical_electrons is not None:
+        require_resolved_power(
+            spec,
+            energy_eV=st.E_grid,
+            incident_samples=Ne,
+            physical_electrons=st.request.physical_electrons,
+            quantity="spectral_power",
+        )
+        if st.temporal_buf is not None:
+            require_resolved_power(
+                st.temporal_buf,
+                incident_samples=Ne,
+                physical_electrons=st.request.physical_electrons,
+                quantity="temporal_power",
+            )
     if st.temporal_buf is not None:
         st.request.temporal.commit(st.temporal_buf, 1.0 / Ne)
 
