@@ -1331,7 +1331,7 @@ Commands:
   remove             Remove values from an existing profile's...
   rename             Rename profile NAME to NEW_NAME.
   set                Replace range grids, the beam reference,...
-  show               Show one profile's ranges, beam, detector,...
+  show               Show PROFILE in tables grouped by CLI...
   energy-grid        Manage profile-scoped energy-grid derivation inputs.
 ```
 
@@ -2207,7 +2207,12 @@ Options:
 ```text
 Usage: pyrite profile show [OPTIONS] NAME
 
-  Show one profile's ranges, beam, detector, membership, and overrides.
+  Show PROFILE in tables grouped by CLI settings owner.
+
+  Sweep axes, instruments, numerics, precision, line-grid policy, energy grids and
+  material overrides have separate sections. Numerics use full fidelity; trial counts
+  defer to the precision policy in adaptive mode. Use --output json for the stable
+  automation payload.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation

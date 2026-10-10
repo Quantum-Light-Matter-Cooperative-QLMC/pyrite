@@ -12,6 +12,14 @@ new checkpoint stems and earlier results stay under their old identity.
 
 ## Ranges and membership
 
+`pyrite profile show NAME` presents Setting / Value tables grouped by editing
+command: sweep/membership/emission, beam, detectors, filters, numerics
+(sampling/convergence/transport), precision, line-grid, energy grids and material
+overrides. Numerics resolve at `full` fidelity and name their source; adaptive
+sampling delegates `line-trials` and `brem-trials` to the precision policy.
+Long values wrap in the default table output; `--output wide` keeps each value
+on one line. `--output json` retains the stable machine payload.
+
 | TOML key | Type / unit | Setter | Reset / notes |
 |---|---|---|---|
 | `materials` | material keys; absent = all | `profile set\|add\|remove --material` | `profile set --all-materials` |

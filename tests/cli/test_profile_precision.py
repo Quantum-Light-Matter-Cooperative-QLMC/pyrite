@@ -5,7 +5,7 @@ import tomlkit
 from pyrite.cli import command as root_command
 from pyrite.cli.commands import profile
 from tests.cli.test_profile import _CATALOG, _catalog
-from tests.helpers.cli import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, assert_table_row, invoke
 
 _POLICY = [
     "--target-rse",
@@ -43,9 +43,10 @@ def test_precision_show_reports_the_default_policy_without_a_table(tmp_path, mon
     )
     assert payload["effective"]["min_electrons"] == 200
     summary = invoke(profile.command, ["show", "sub_100keV"])
-    assert "electron counts: adaptive (default), target RSE 0.05, 200-20000 electrons" in (
-        summary.stdout
-    )
+    assert_table_row(summary.stdout, "mode", "adaptive (default policy)")
+    assert_table_row(summary.stdout, "target-rse", "0.05")
+    assert_table_row(summary.stdout, "min-electrons", "200")
+    assert_table_row(summary.stdout, "max-electrons", "20000")
 
 
 def test_precision_show_names_why_a_profile_keeps_fixed_counts(tmp_path, monkeypatch):
@@ -118,7 +119,9 @@ def test_precision_set_show_and_reset_round_trip(tmp_path, monkeypatch):
     assert machine["payload"]["effective"]["stability_blocks"] == 3
     assert "stability_blocks" not in machine["payload"]["explicit"]
     summary = invoke(profile.command, ["show", "sub_100keV"])
-    assert "electron counts: adaptive, target RSE 0.1, 200-2000 electrons" in summary.stdout
+    assert_table_row(summary.stdout, "mode", "adaptive (profile policy)")
+    assert_table_row(summary.stdout, "target-rse", "0.1")
+    assert_table_row(summary.stdout, "max-electrons", "2000")
 
     field = invoke(profile.command, ["precision", "reset", "sub_100keV", "max-electron-share"])
     assert_clean_result(

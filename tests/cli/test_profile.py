@@ -8,7 +8,7 @@ from pyrite.cli import _catalog_io
 from pyrite.cli import command as root_command
 from pyrite.cli.commands import profile
 from pyrite.console import output as _core
-from tests.helpers.cli import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, assert_table_row, invoke
 
 _CATALOG = """[profiles.standard]
 thickness_ang = { values = [1000.0] }
@@ -166,12 +166,12 @@ def test_list_and_show_expose_energy_grid_refs(tmp_path, monkeypatch):
 
     shown = invoke(profile.command, ["show", "sub_100keV"])
     assert_clean_result(shown)
-    assert f"    hopg -> {stored.digest}" in shown.stdout
+    assert_table_row(shown.stdout, "hopg", stored.digest)
 
     # A profile with no refs uses inline catalog grids.
     legacy = invoke(profile.command, ["show", "standard"])
     assert_clean_result(legacy)
-    assert "energy grids: inline (E_grid_brem + material overrides)" in legacy.stdout
+    assert_table_row(legacy.stdout, "storage", "inline (E_grid_brem + material overrides)")
 
     machine = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
     assert_clean_result(machine)
@@ -190,14 +190,15 @@ def test_show_and_bare_name_alias(tmp_path, monkeypatch):
     shown = invoke(profile.command, ["show", "sub_100keV"])
     assert_clean_result(shown)
     assert "[sub_100keV]" in shown.stdout
-    assert "energy: [30, 50]" in shown.stdout
-    assert "materials: hopg" in shown.stdout
-    assert "  detectors:\n    default: scalar\n" in shown.stdout
+    assert_table_row(shown.stdout, "energy", "[30, 50] keV")
+    assert_table_row(shown.stdout, "materials", "hopg")
+    assert "Detector default (profile set --detector; pyrite detector)" in shown.stdout
+    assert_table_row(shown.stdout, "kind", "scalar")
     assert "pixel" not in shown.stdout
-    assert "emission: incoherent (default)" in shown.stdout
-    assert "straggling: False (default)" in shown.stdout
-    assert "energy model: midpoint (default)" in shown.stdout
-    assert "max dE fraction: 0 (default)" in shown.stdout
+    assert_table_row(shown.stdout, "emission", "incoherent (default)")
+    assert_table_row(shown.stdout, "straggling", "off (built-in)")
+    assert_table_row(shown.stdout, "energy-model", "midpoint (built-in)")
+    assert_table_row(shown.stdout, "maximum-fractional-energy-loss", "0 (built-in)")
 
     aliased = invoke(profile.command, ["sub_100keV"])
     assert_clean_result(aliased)
@@ -769,7 +770,7 @@ def test_show_emission_defaults_to_incoherent(tmp_path, monkeypatch):
 
     shown = invoke(profile.command, ["show", "sub_100keV"])
     assert_clean_result(shown)
-    assert "emission: incoherent (default)" in shown.stdout
+    assert_table_row(shown.stdout, "emission", "incoherent (default)")
 
     machine = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
     assert_clean_result(machine)
@@ -784,7 +785,7 @@ def test_set_emission_replaces_and_reports_in_show(tmp_path, monkeypatch):
     assert_clean_result(result, stdout="updated profile sub_100keV\n")
     assert 'emission = "coherent"' in catalog.read_text()
     shown = invoke(profile.command, ["show", "sub_100keV"])
-    assert "emission: coherent" in shown.stdout
+    assert_table_row(shown.stdout, "emission", "coherent")
 
     replaced = invoke(profile.command, ["set", "sub_100keV", "--emission", "both"])
     assert_clean_result(replaced, stdout="updated profile sub_100keV\n")
@@ -796,14 +797,16 @@ def test_set_temporal_profile_toggles_key_and_show(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
     shown = invoke(profile.command, ["show", "sub_100keV"])
-    assert "temporal profile: off (default)" in shown.stdout
+    assert_table_row(shown.stdout, "temporal-profile", "off (default)")
     machine = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
     assert json.loads(machine.stdout)["payload"]["temporal_profile"] is False
 
     result = invoke(profile.command, ["set", "sub_100keV", "--temporal-profile"])
     assert_clean_result(result, stdout="updated profile sub_100keV\n")
     assert "temporal_profile = true" in catalog.read_text()
-    assert "temporal profile: on" in invoke(profile.command, ["show", "sub_100keV"]).stdout
+    assert_table_row(
+        invoke(profile.command, ["show", "sub_100keV"]).stdout, "temporal-profile", "on"
+    )
 
     result = invoke(profile.command, ["set", "sub_100keV", "--no-temporal-profile"])
     assert_clean_result(result, stdout="updated profile sub_100keV\n")
@@ -848,9 +851,9 @@ def test_set_transport_numerics_round_trips_and_validates_coupling(tmp_path, mon
     assert "max_dE_frac = 0.02" in text
 
     shown = invoke(profile.command, ["show", "sub_100keV"])
-    assert "straggling: True" in shown.stdout
-    assert "energy model: midpoint" in shown.stdout
-    assert "max dE fraction: 0.02" in shown.stdout
+    assert_table_row(shown.stdout, "straggling", "on (profile)")
+    assert_table_row(shown.stdout, "energy-model", "midpoint (profile)")
+    assert_table_row(shown.stdout, "maximum-fractional-energy-loss", "0.02 (profile)")
 
 
 def test_numerics_show_reports_effective_values_and_sources(tmp_path, monkeypatch):
@@ -1104,7 +1107,7 @@ def test_remove_sole_emission_mode_drops_key_entirely(tmp_path, monkeypatch):
     assert "emission: removed coherent (no explicit emission left)" in result.stdout
     assert "emission" not in catalog.read_text()
     shown = invoke(profile.command, ["show", "sub_100keV"])
-    assert "emission: incoherent (default)" in shown.stdout
+    assert_table_row(shown.stdout, "emission", "incoherent (default)")
 
 
 def test_remove_emission_mode_not_present_errors(tmp_path, monkeypatch):
@@ -1142,7 +1145,7 @@ def test_members_reset_restores_implicit_membership(tmp_path, monkeypatch):
     section = catalog.read_text().split("[profiles.sub_100keV]", 1)[1].split("\n[", 1)[0]
     assert "materials" not in section
     assert_clean_result(shown)
-    assert "materials: all catalog materials (implicit)" in shown.stdout
+    assert_table_row(shown.stdout, "materials", "all catalog materials (implicit)")
 
 
 def test_set_all_materials_conflicts_with_explicit_materials(tmp_path, monkeypatch):
@@ -1403,7 +1406,9 @@ def test_set_attaches_named_beam_by_reference(tmp_path, monkeypatch):
 
     text_shown = invoke(profile.command, ["show", "sub_100keV"])
     assert_clean_result(text_shown)
-    assert "beam: rf_gun_200fs (named reference)" in text_shown.stdout
+    assert_table_row(
+        text_shown.stdout, "reference", "rf_gun_200fs (named reference; pyrite beam show)"
+    )
 
 
 def test_create_attaches_named_beam_by_reference(tmp_path, monkeypatch):
@@ -1612,7 +1617,8 @@ def test_numerics_set_shell_inelastic_mode_validates_and_resets(tmp_path, monkey
     assert 'inelastic_model = "shell-soft-hard"' in catalog.read_text()
     assert "inelastic_cutoff_eV = 50.0" in catalog.read_text()
     shown = invoke(profile.command, ["show", "sub_100keV"])
-    assert "inelastic model: shell-soft-hard (W_c 50 eV)" in shown.stdout
+    assert_table_row(shown.stdout, "inelastic-model", "shell-soft-hard (profile)")
+    assert_table_row(shown.stdout, "inelastic-cutoff-ev", "50 (profile)")
 
     zero = invoke(profile.command, ["numerics", "set", "sub_100keV", "--inelastic-cutoff-ev", "0"])
     assert zero.exit_code == 2
@@ -1623,7 +1629,7 @@ def test_numerics_set_shell_inelastic_mode_validates_and_resets(tmp_path, monkey
     assert_clean_result(secondary, stdout="updated numerics for profile sub_100keV\n")
     assert "secondary_threshold_eV = 1000.0" in catalog.read_text()
     shown = invoke(profile.command, ["show", "sub_100keV"])
-    assert "secondary threshold: 1000 eV" in shown.stdout
+    assert_table_row(shown.stdout, "secondary-threshold-ev", "1000 (profile)")
     pair = invoke(
         profile.command,
         ["numerics", "set", "sub_100keV", "--pair-production-model", "penelope-2024"],
@@ -1631,12 +1637,12 @@ def test_numerics_set_shell_inelastic_mode_validates_and_resets(tmp_path, monkey
     assert_clean_result(pair, stdout="updated numerics for profile sub_100keV\n")
     assert 'pair_production_model = "penelope-2024"' in catalog.read_text()
     shown = invoke(profile.command, ["show", "sub_100keV"])
-    assert "pair production model: penelope-2024" in shown.stdout
+    assert_table_row(shown.stdout, "pair-production-model", "penelope-2024 (profile)")
     positron = invoke(profile.command, ["numerics", "set", "sub_100keV", "--positron-transport"])
     assert_clean_result(positron, stdout="updated numerics for profile sub_100keV\n")
     assert "positron_transport = true" in catalog.read_text()
     shown = invoke(profile.command, ["show", "sub_100keV"])
-    assert "positron transport: on" in shown.stdout
+    assert_table_row(shown.stdout, "positron-transport", "on (profile)")
     unpositron = invoke(
         profile.command, ["numerics", "reset", "sub_100keV", "positron-transport", "--yes"]
     )
@@ -1665,3 +1671,108 @@ def test_numerics_set_shell_inelastic_mode_validates_and_resets(tmp_path, monkey
     )
     assert_clean_result(reset, stdout="reset numerics for profile sub_100keV\n")
     assert "inelastic_model" not in catalog.read_text()
+
+
+def test_show_groups_trial_grids_and_complete_numerics_in_aligned_columns(tmp_path, monkeypatch):
+    import re
+
+    text = _CATALOG.replace(
+        "[profiles.sub_100keV]",
+        "[profiles.sub_100keV]\n"
+        "n_electrons = { values = [100, 200] }\n"
+        "n_electrons_brem = { values = [50, 150] }\n"
+        'n_families = 8\nmax_reflections = 6\nmosaic_nodes = 7\nmosaic_route = "mc"',
+    )
+    catalog = _catalog(tmp_path, monkeypatch, text)
+    original = catalog.read_bytes()
+    shown = invoke(profile.command, ["show", "sub_100keV"])
+    assert_clean_result(shown)
+    assert catalog.read_bytes() == original
+    sections = [
+        "Sweep / membership / emission",
+        "Beam (",
+        "Detector default (",
+        "Filters (",
+        "Numerics / sampling",
+        "Numerics / convergence",
+        "Numerics / transport",
+        "Precision (",
+        "Line-grid policy (",
+        "Energy grids (",
+        "Material overrides (",
+    ]
+    offsets = [shown.stdout.index(section) for section in sections]
+    assert offsets == sorted(offsets)
+    sweep = shown.stdout[offsets[0] : offsets[1]]
+    for axis in ("thickness", "energy", "polar", "azimuth"):
+        assert re.search(rf"^  {axis} {{2,}}\[", sweep, re.MULTILINE)
+    assert "trials" not in sweep
+    sampling = shown.stdout[offsets[4] : offsets[5]]
+    assert_table_row(sampling, "line-trials", "[100, 200] (profile)")
+    assert_table_row(sampling, "brem-trials", "[50, 150] (profile)")
+    convergence = shown.stdout[offsets[5] : offsets[6]]
+    for label, value in (
+        ("reflection-families", "8"),
+        ("maximum-reflections", "6"),
+        ("mosaic-nodes", "7"),
+        ("mosaic-route", "mc"),
+    ):
+        assert_table_row(convergence, label, value + " (profile)")
+    assert "ne-line" not in shown.stdout and "ne-brem" not in shown.stdout
+    for section in shown.stdout.split("\n\n")[1:]:
+        lines = section.splitlines()
+        value_column = lines[1].index("Value")
+        for line in lines[3:]:
+            if line.strip():
+                assert line[value_column] != " "
+                assert line[value_column - 2 : value_column] == "  "
+    machine = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
+    assert_clean_result(machine)
+    envelope = json.loads(machine.stdout)
+    assert envelope["schema"] == "cxr.profile.show"
+    assert envelope["payload"]["ranges"][-2:] == [
+        {"name": "ne_line", "catalog_key": "n_electrons", "values": [100, 200]},
+        {"name": "ne_brem", "catalog_key": "n_electrons_brem", "values": [50, 150]},
+    ]
+
+
+def test_show_flattens_inline_beam_and_preserves_filter_order(tmp_path, monkeypatch):
+    text = _INLINE_BEAM_CATALOG.replace(
+        "[profiles.inline]",
+        "[profiles.inline]\n"
+        'filters = [{ name = "first", material = "al", thickness_mm = 0.1, size_mm = [10, 10] }, '
+        '{ name = "second", material = "cu", thickness_mm = 0.2, size_mm = [20, 20] }]',
+    )
+    _catalog(tmp_path, monkeypatch, text)
+    shown = invoke(profile.command, ["show", "inline"])
+    assert_clean_result(shown)
+    assert "{'" not in shown.stdout
+    assert "Beam (profile set --beam; pyrite beam)" in shown.stdout
+    assert_table_row(shown.stdout, "1. first", "al, 0.1 mm, [10, 10] mm")
+    assert_table_row(shown.stdout, "2. second", "cu, 0.2 mm, [20, 20] mm")
+    assert shown.stdout.index("1. first") < shown.stdout.index("2. second")
+
+
+def test_show_wraps_values_and_wide_keeps_them_on_one_line(tmp_path, monkeypatch):
+    import os
+
+    from pyrite.cli.commands import _profile_show
+
+    members = ", ".join(f"material_{index}" for index in range(12))
+    text = _CATALOG.replace(
+        'materials = ["hopg"]',
+        "materials = [" + ", ".join(f'"material_{index}"' for index in range(12)) + "]",
+    )
+    _catalog(tmp_path, monkeypatch, text)
+    monkeypatch.setattr(
+        _profile_show.shutil, "get_terminal_size", lambda: os.terminal_size((80, 24))
+    )
+    monkeypatch.setenv("NO_COLOR", "1")
+    shown = invoke(profile.command, ["show", "sub_100keV"])
+    wide = invoke(profile.command, ["show", "sub_100keV", "-o", "wide"])
+    assert_clean_result(shown)
+    assert_clean_result(wide)
+    assert members not in shown.stdout
+    assert members in wide.stdout
+    assert "\x1b" not in shown.stdout
+    assert all(len(line) <= 80 for line in shown.stdout.splitlines())
