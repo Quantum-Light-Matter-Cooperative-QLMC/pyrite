@@ -17,9 +17,7 @@ def test_checkpoint_group_exposes_resource_oriented_tree():
         "slim",
         "recompute",
         "archive",
-        "restore",
         "list",
-        "merge",
         "gc",
         "rm",
         "export-trajectories",
@@ -27,11 +25,27 @@ def test_checkpoint_group_exposes_resource_oriented_tree():
     ]
 
 
-def test_checkpoint_list_dispatches_existing_archive_handler(monkeypatch):
+def test_checkpoint_archive_group_exposes_shelf_commands():
+    ctx = click.Context(archive.archive_group, info_name="archive")
+
+    assert archive.archive_group.list_commands(ctx) == ["list", "merge", "restore", "store"]
+
+
+def test_checkpoint_list_dispatches_active_handler(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(archive, "_cli_checkpoints", lambda args: seen.update(vars(args)))
+
+    result = invoke(root_command, ["checkpoint", "list"])
+
+    assert_clean_result(result)
+    assert seen == {}
+
+
+def test_checkpoint_archive_list_dispatches_archive_handler(monkeypatch):
     seen = {}
     monkeypatch.setattr(archive, "_cli_archives", lambda args: seen.update(vars(args)))
 
-    result = invoke(root_command, ["checkpoint", "list"])
+    result = invoke(root_command, ["checkpoint", "archive", "list"])
 
     assert_clean_result(result)
     assert seen == {}

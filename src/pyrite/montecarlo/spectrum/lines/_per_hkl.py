@@ -1067,7 +1067,7 @@ def _accumulate_reflection(
     #                  * sinc^2[(1 - v.n)(omega - omega_res) t_L / 2] * T_abs
     # weight = everything except the sinc^2 (times the mosaic weight wm);
     # a_width converts (E - E_res) to the sinc argument: P t_L = a_width(E - E_res).
-    _nsys_push("cxr.lines.accum")
+    _nsys_push("pyrite.lines.accum")
     pref = ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * t_L**2 * T_abs
     weight = pref * A2 * wm
     targets = [(weight, spec)]
@@ -1173,7 +1173,7 @@ def _accumulate_per_hkl(st):
     # (reflection, orientation). U_g/m_e is now pre-scaled at table build and
     # the fallback shares one interpolation bracket; these are algebraically
     # identical with only float-rounding-level movement.
-    _nsys_push("cxr.lines.tab")
+    _nsys_push("pyrite.lines.tab")
     g_rows, es_rows, ep_rows, wm_rows, hkl_of_row = [], [], [], [], []
     CHI_RE, CHI_IM, U_RE, U_IM = _reflection_tables(  # (N_hkl, N_tab)
         crystal, hkl_list, E_tab, B_ang2, use_henke

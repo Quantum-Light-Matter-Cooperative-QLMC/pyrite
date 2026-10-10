@@ -471,7 +471,7 @@ Usage: pyrite checkpoint [OPTIONS] COMMAND [ARGS]...
 
   Examples:
     pyrite checkpoint list
-    pyrite checkpoint archive hopg keeper
+    pyrite checkpoint archive store hopg keeper
     pyrite checkpoint recompute line hopg
     pyrite checkpoint gc --profile standard
     pyrite checkpoint rm --profile standard
@@ -482,10 +482,8 @@ Options:
 Commands:
   slim                 Shrink one checkpoint for transfer.
   recompute            Recompute selected checkpoint datasets.
-  archive              Copy an active checkpoint to long-term shelf.
-  restore              Copy a shelved checkpoint back to active slot.
-  list                 List long-term checkpoint shelf.
-  merge                Merge a shelved checkpoint into active slot.
+  archive              Manage the long-term checkpoint shelf.
+  list                 List active local checkpoints.
   gc                   Reclaim records obsolete under current scan profiles.
   rm                   Delete local datasets and newly unreachable shared cases.
   export-trajectories  Export captured trajectories to VTK PolyData.
@@ -611,22 +609,59 @@ Options:
 ## `pyrite checkpoint archive`
 
 ```text
-Usage: pyrite checkpoint archive [OPTIONS] STEM [LABEL]
+Usage: pyrite checkpoint archive [OPTIONS] COMMAND [ARGS]...
 
-  Copy an active checkpoint to long-term shelf.
+  Store, list, restore, and merge long-term archived checkpoints.
 
-  LABEL defaults to a date-stamped label inferred from STEM. Existing labels are
-  preserved unless --force.
+  Examples:
+    pyrite checkpoint archive store hopg keeper
+    pyrite checkpoint archive list
+    pyrite checkpoint archive restore keeper --as hopg
 
 Options:
-  --force     Overwrite existing archive label.
   -h, --help  Show this message and exit.
+
+Commands:
+  list     List long-term checkpoint shelf.
+  merge    Merge an archived checkpoint into active slot.
+  restore  Copy an archived checkpoint back to active slot.
+  store    Copy an active checkpoint to long-term shelf.
 ```
 
-## `pyrite checkpoint restore`
+## `pyrite checkpoint archive list`
 
 ```text
-Usage: pyrite checkpoint restore [OPTIONS] LABEL
+Usage: pyrite checkpoint archive list [OPTIONS]
+
+  List long-term checkpoint shelf.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite checkpoint archive merge`
+
+```text
+Usage: pyrite checkpoint archive merge [OPTIONS] STEM LABEL
+
+  Merge an archived checkpoint into active slot.
+
+  Requires matching materials. Live records win overlaps; source archive is retained and
+  live checkpoint is backed up by default.
+
+Options:
+  --no-archive      Skip pre-union backup of live checkpoint.
+  --delete-archive  Delete source archive after successful union.
+  --force           Overwrite existing pre-union archive label.
+  -h, --help        Show this message and exit.
+```
+
+## `pyrite checkpoint archive restore`
+
+```text
+Usage: pyrite checkpoint archive restore [OPTIONS] LABEL
 
   Copy an archived checkpoint back to active slot.
 
@@ -639,34 +674,32 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
+## `pyrite checkpoint archive store`
+
+```text
+Usage: pyrite checkpoint archive store [OPTIONS] STEM [LABEL]
+
+  Copy an active checkpoint to long-term shelf.
+
+  LABEL defaults to a date-stamped label inferred from STEM. Existing labels are
+  preserved unless --force.
+
+Options:
+  --force     Overwrite existing archive label.
+  -h, --help  Show this message and exit.
+```
+
 ## `pyrite checkpoint list`
 
 ```text
 Usage: pyrite checkpoint list [OPTIONS]
 
-  List long-term checkpoint shelf.
+  List active local checkpoints.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
-```
-
-## `pyrite checkpoint merge`
-
-```text
-Usage: pyrite checkpoint merge [OPTIONS] STEM LABEL
-
-  Merge an archived checkpoint into active slot.
-
-  Requires matching materials. Live records win overlaps; source archive is retained and
-  live checkpoint is backed up by default.
-
-Options:
-  --no-archive      Skip pre-union backup of live checkpoint.
-  --delete-archive  Delete source archive after successful union.
-  --force           Overwrite existing pre-union archive label.
-  -h, --help        Show this message and exit.
 ```
 
 ## `pyrite checkpoint gc`

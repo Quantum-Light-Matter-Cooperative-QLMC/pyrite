@@ -8,10 +8,8 @@ from .._groups import LazyGroup
 _COMMANDS = {
     "slim": "pyrite.cli.commands.slim.command",
     "recompute": "pyrite.cli.commands.checkpoint.recompute_command",
-    "archive": "pyrite.cli.commands.archive.archive_command",
-    "restore": "pyrite.cli.commands.archive.restore_command",
-    "list": "pyrite.cli.commands.archive.archives_command",
-    "merge": "pyrite.cli.commands.archive.union_command",
+    "archive": "pyrite.cli.commands.archive.archive_group",
+    "list": "pyrite.cli.commands.archive.list_command",
     "gc": "pyrite.cli.commands.cleanup.gc_command",
     "rm": "pyrite.cli.commands.cleanup.rm_command",
     "export-trajectories": "pyrite.cli.commands.trajectories.command",
@@ -21,10 +19,8 @@ _COMMANDS = {
 _COMMAND_HELP = {
     "slim": "Shrink one checkpoint for transfer.",
     "recompute": "Recompute selected checkpoint datasets.",
-    "archive": "Copy an active checkpoint to long-term shelf.",
-    "restore": "Copy a shelved checkpoint back to active slot.",
-    "list": "List long-term checkpoint shelf.",
-    "merge": "Merge a shelved checkpoint into active slot.",
+    "archive": "Manage the long-term checkpoint shelf.",
+    "list": "List active local checkpoints.",
     "gc": "Reclaim records obsolete under current scan profiles.",
     "rm": "Delete local datasets and newly unreachable shared cases.",
     "export-trajectories": "Export captured trajectories to VTK PolyData.",
@@ -66,7 +62,7 @@ def command() -> None:
     \b
     Examples:
       pyrite checkpoint list
-      pyrite checkpoint archive hopg keeper
+      pyrite checkpoint archive store hopg keeper
       pyrite checkpoint recompute line hopg
       pyrite checkpoint gc --profile standard
       pyrite checkpoint rm --profile standard

@@ -10,7 +10,7 @@ import sys
 nbs = [
     os.path.join("notebooks", "scan.ipynb"),
     os.path.join("notebooks", "analysis.ipynb"),
-    os.path.join("checks", "cxr_analysis_feranchuk.ipynb"),
+    os.path.join("checks", "feranchuk_analysis.ipynb"),
     os.path.join("checks", "zhai_fig1c_check.ipynb"),
     os.path.join("checks", "zhai_fig1c_validation.ipynb"),
 ]

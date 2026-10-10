@@ -72,6 +72,9 @@ _REMOVED_OPTIONS = {
         ("checkpoint", "recompute", "line"),
         ("profile", "numerics", "show"),
     )
+} | {
+    # `checkpoint archive` became a group; its `--force` moved to `archive store`.
+    (("checkpoint", "archive"), "--force"),
 }
 
 _REMOVED_OPTIONS.update(

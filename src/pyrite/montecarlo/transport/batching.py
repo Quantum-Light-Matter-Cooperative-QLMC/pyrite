@@ -409,7 +409,7 @@ def _drive_per_electron_batches(
         snap = (d_pos[sl].copy(), d_dirs[sl].copy(), d_E[sl].copy(), d_clock[sl].copy())
 
         while True:
-            _nsys_push("cxr.transport.scratch")
+            _nsys_push("pyrite.transport.scratch")
             scratch = _alloc_scratch(xp, m, cap, midpoint)
             if inelastic:
                 scratch += _alloc_hard_scratch(xp, m, cap, secondaries)
@@ -418,7 +418,7 @@ def _drive_per_electron_batches(
             seg_count = xp.zeros(m, dtype=xp.int64)
             exit_code = xp.zeros(m, dtype=xp.int8)
             _nsys_pop()
-            _nsys_push("cxr.transport.launch")
+            _nsys_push("pyrite.transport.launch")
             core(
                 (e, m, cap, d_keys),
                 *core_args,
@@ -430,7 +430,7 @@ def _drive_per_electron_batches(
             _nsys_pop()
 
             # CUDA launches asynchronously; this scalar read is the device sync.
-            _nsys_push("cxr.transport.capsync")
+            _nsys_push("pyrite.transport.capsync")
             needed = int(seg_count.max())
             _nsys_pop()
             seen_max = max(seen_max, needed)
@@ -445,7 +445,7 @@ def _drive_per_electron_batches(
         total = int(seg_count.sum())
         if nseg + total > max_segments:
             raise RuntimeError("segment buffer exhausted")
-        _nsys_push("cxr.transport.compact")
+        _nsys_push("pyrite.transport.compact")
         keep = xp.arange(cap)[None, :] < seg_count[:, None]
         s_dir, s_mid, s_len, s_E, s_t0, s_id, s_lay = scratch[:7]
         slots = (
@@ -474,7 +474,7 @@ def _drive_per_electron_batches(
         nseg += total
         _nsys_pop()
 
-        _nsys_push("cxr.transport.exitcodes")
+        _nsys_push("pyrite.transport.exitcodes")
         n_back += int((exit_code == EXIT_BACKSCATTERED).sum())
         n_trans += int((exit_code == EXIT_TRANSMITTED).sum())
         n_side += int((exit_code == EXIT_SIDE).sum())
@@ -489,7 +489,7 @@ def _drive_per_electron_batches(
 
     joined = None
     if keep_on_device:
-        _nsys_push("cxr.transport.join")
+        _nsys_push("pyrite.transport.join")
         empty = _alloc_scratch(xp, 0, 1, midpoint)
         if inelastic:
             empty += _alloc_hard_scratch(xp, 0, 1, secondaries)
@@ -566,7 +566,7 @@ def _run_per_electron_transport_lut(
 
     from ..runner import _nsys_pop, _nsys_push
 
-    _nsys_push("cxr.transport.upload")
+    _nsys_push("pyrite.transport.upload")
     d_keys = to_dev(stream_keys(seed, Ne) if keys is None else keys)
     d_alive = to_dev(alive)
     d_clock = to_dev(clock)
@@ -742,7 +742,7 @@ def _run_per_electron_transport(
     # runner imports this module, so a top-level import would be circular.
     from ..runner import _nsys_pop, _nsys_push
 
-    _nsys_push("cxr.transport.upload")
+    _nsys_push("pyrite.transport.upload")
     d_keys = to_dev(stream_keys(seed, Ne) if keys is None else keys)
     d_alive = to_dev(alive)
     d_clock = to_dev(clock)

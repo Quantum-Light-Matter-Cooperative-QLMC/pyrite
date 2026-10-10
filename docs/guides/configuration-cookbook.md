@@ -15,7 +15,7 @@ For a temporary override, use a command option or environment variable. It wins 
 
 ```bash
 PYRITE_PROFILE=quickstart pyrite run -m hopg --quick
-PYRITE_HOME=/scratch/my-run pyrite checkpoint list  # archive shelf in that workspace
+PYRITE_HOME=/scratch/my-run pyrite checkpoint list  # active checkpoints in that workspace
 ```
 
 For the complete inventory, accepted formats, defaults, and operational controls, see the [environment-variable reference](../repo-design/configuration-resolution.md#environment-variable-reference).

@@ -41,9 +41,9 @@ The exact internal files are implementation details; use `pyrite checkpoint` and
 
 ## Lifecycle and safety
 
-- Active datasets live beneath the effective checkpoint root and are exposed by checkpoint-consuming workflows such as the analysis app. `checkpoint list` inventories only the long-term archive shelf.
-- `checkpoint archive` and `restore` copy complete component directories, including provenance.
-- `checkpoint merge` rejects identity-bearing datasets with different resolved hashes.
+- Active datasets live beneath the effective checkpoint root and are exposed by checkpoint-consuming workflows such as the analysis app. `checkpoint list` inventories active datasets; `checkpoint archive list` inventories the long-term archive shelf.
+- `checkpoint archive store` and `archive restore` copy complete component directories, including provenance.
+- `checkpoint archive merge` rejects identity-bearing datasets with different resolved hashes.
 - `checkpoint gc` retains only datasets exactly matching current profile resolution; preview is the default.
 - `checkpoint rm` deletes selected datasets and blobs kept reachable only by them; preview is the default.
 - `pyrite-dev energy-grid verify` checks immutable object bytes and profile references; `pyrite-dev energy-grid gc` reclaims unreachable objects after its grace period.

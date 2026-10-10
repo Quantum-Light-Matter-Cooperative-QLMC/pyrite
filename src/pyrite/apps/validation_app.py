@@ -234,7 +234,7 @@ def _(mo):
             "reason": "Shared analytic implementation used by multiple independent comparisons.",
         },
         {
-            "artifact": "cxr_analysis_feranchuk.ipynb/.md",
+            "artifact": "feranchuk_analysis.ipynb/.md",
             "role": "provenance",
             "decision": "preserve",
             "reason": "Unique derivation narrative and paper-figure studies; not a pass/fail check.",

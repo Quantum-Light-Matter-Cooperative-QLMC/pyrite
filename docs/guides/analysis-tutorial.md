@@ -4,7 +4,7 @@ This tutorial starts from an existing survey checkpoint and produces an interact
 
 ## 1. Find a dataset
 
-Inspect the effective `pyrite-output/checkpoints/` directory or open the analysis app's dataset selector, then choose the identity-qualified stem produced by your run. `pyrite checkpoint list` lists only long-term archive labels, not active datasets. If no active checkpoint exists, complete the [Getting started](getting-started.md) survey first. Check that both line and bremsstrahlung components are present before comparing a total spectrum.
+Run `pyrite checkpoint list`, inspect the effective `pyrite-output/checkpoints/` directory, or open the analysis app's dataset selector, then choose the identity-qualified stem produced by your run. `pyrite checkpoint archive list` lists long-term archive labels instead. If no active checkpoint exists, complete the [Getting started](getting-started.md) survey first. Check that both line and bremsstrahlung components are present before comparing a total spectrum.
 
 ## 2. Launch analysis
 

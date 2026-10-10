@@ -64,7 +64,7 @@ def _sincsq_lineshape(a_width_j, E_grid, E_r_j):
     Previously spelled ``xp.sinc(x)**2`` over a freshly built ``x``; on the GPU
     that was 5+ separate CuPy elementwise kernels (subtract, multiply, divide,
     sinc, square) each allocating a full ``[seg, E]`` temporary -- the launch
-    storm that dominated the 300 keV line profile (``cxr.lines`` ~75 s, ~187k
+    storm that dominated the 300 keV line profile (``pyrite.lines`` ~75 s, ~187k
     ``cuLaunchKernel``). Written as one function it JIT-fuses to a single kernel
     under CuPy (see ``xp.fuse`` wrap below); on NumPy it runs eager but is
     bit-for-bit identical to the old ``np.sinc(x)**2`` -- ``np.sinc`` is exactly
@@ -148,7 +148,7 @@ def _line_amp_sq_core(
     """One polarization's |A|^2, |A_PXR|^2, |A_CBS|^2 (Feranchuk Eq. 13/14) as a single
     fused GPU kernel. Replaces the per-reflection storm of complex CuPy elementwise
     kernels (chi/detuning, the CBS braced product, three ``abs()**2``) that made up
-    the bulk of the residual ``cxr.lines`` GPU-idle after the sincsq fuse.
+    the bulk of the residual ``pyrite.lines`` GPU-idle after the sincsq fuse.
 
     Split the complex amplitudes into real/imag: A_PXR = chi * f_pxr and
     A_CBS = eUg/m * f_cbs with REAL scalars

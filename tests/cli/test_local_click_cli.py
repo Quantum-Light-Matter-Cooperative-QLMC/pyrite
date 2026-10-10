@@ -27,7 +27,7 @@ LOCAL_COMMANDS = [
     slim_cli.command,
     recompute_cli.brem_command,
     recompute_cli.line_command,
-    archive.archive_command,
+    archive.store_command,
     archive.restore_command,
     archive.archives_command,
     archive.union_command,
@@ -263,7 +263,7 @@ def test_export_click_dispatches_default_stem(monkeypatch):
     ("command", "handler_name", "argv", "expected"),
     [
         (
-            archive.archive_command,
+            archive.store_command,
             "_cli_archive",
             ["hopg", "keeper", "--force"],
             {"stem": "hopg", "label": "keeper", "force": True},

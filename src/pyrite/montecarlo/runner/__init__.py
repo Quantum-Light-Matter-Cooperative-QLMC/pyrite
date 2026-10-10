@@ -904,7 +904,7 @@ def _spectrum_case(case, tp, record_timing=False):
     timed = _TIMING or record_timing
     if timed:
         _line_setup.SETUP_STATS.clear()
-    with _nsys_range(f"cxr.spectrum_case:{case.get('name', 'case')}"):
+    with _nsys_range(f"pyrite.spectrum_case:{case.get('name', 'case')}"):
         out = _spectrum_case_impl(case, tp, record_timing)
     if timed:
         out.update(_stage_counters(tp))
@@ -958,7 +958,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # Opt-in temporal profile (#292): one accumulator per emission policy.
     temporal, temporal_coherent = case_temporal_profiles(case, tp, want_coherent)
     truncation_audit = line_truncation_audit(case, E_grid, n_electrons=Ne_lines)
-    with _nsys_range("cxr.lines"):
+    with _nsys_range("pyrite.lines"):
         try:
             spec = _lines_for_segments(
                 segs_dev,
@@ -1005,7 +1005,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # incoherent, so one component serves both the PXR/CBS spectrum and its
     # coherent companion. It stays a separate array; consumers combine
     # components through pyrite._spectral_components (issue #123).
-    with _nsys_range("cxr.characteristic"):
+    with _nsys_range("pyrite.characteristic"):
         try:
             spec_characteristic = _characteristic_from_segments(
                 segs_dev,
@@ -1026,7 +1026,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # over layers (a single layer is exactly the old single-material brem).
     # Factored into _brem_wide_from_segments so run.repair_brem_wide reuses this
     # SAME path (via _brem_for_case) and can't drift back to single-slab brem.
-    with _nsys_range("cxr.brem"):
+    with _nsys_range("pyrite.brem"):
         try:
             brem_wide = _brem_wide_from_segments(
                 segs_dev,
@@ -1041,7 +1041,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
             if not _is_gpu_oom(error):
                 raise
             raise _SpectrumPhaseOOM("brem", error) from error
-    with _nsys_range("cxr.interpolate"):
+    with _nsys_range("pyrite.interpolate"):
         brem = np.interp(E_grid, E_brem, brem_wide)  # brem under the lines (line grid)
     # Return this case's GPU scratch on the A2 cadence so the CuPy memory pool
     # can't accumulate (and fragment) across a long sweep until it fills the card.

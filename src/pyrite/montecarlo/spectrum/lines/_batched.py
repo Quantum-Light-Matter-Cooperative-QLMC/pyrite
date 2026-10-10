@@ -165,7 +165,7 @@ class _LineBatch:
             aw_batch = xp.concatenate(self.aw)
             w_batch = xp.concatenate(self.w)
 
-        _nsys_push("cxr.lines.reduce")
+        _nsys_push("pyrite.lines.reduce")
 
         if self.bin_edges is not None:  # Validation: sinc-bin-integration
             run_bin_mean_reduction_kernel(
@@ -249,7 +249,7 @@ def _batched_reflection_tables(st):
     )
     tables = None if _table_cache is None else _table_cache.get(table_key)
     if tables is None:
-        _nsys_push("cxr.lines.tab")
+        _nsys_push("pyrite.lines.tab")
         g_rows, es_rows, ep_rows, wm_rows, table_rows = [], [], [], [], []
         # One coupling row per reflection; its mosaic orientations index it
         # through ROW_TABLE rather than carrying (N_g, N_tab) copies.
@@ -741,7 +741,7 @@ def _batched_incoherent_block(st, bt, blk, line_batch):
     if req.truncation_audit is not None and "collect" in req.truncation_audit:
         return
 
-    _nsys_push("cxr.lines.accum")
+    _nsys_push("pyrite.lines.accum")
 
     if line_batch is not None:
         line_batch.append(E_r_f, aw_f, w_f)
@@ -796,7 +796,7 @@ def _accumulate_batched(st):
     # Every reflection/orientation shares the segment geometry, so run the
     # per-orientation block (steps 1-6) ONCE over an (n_seg, N_g) grid rather
     # than ~N_g separate _accumulate passes -- this collapses the tiny-kernel
-    # launch storm that starved the GPU (cxr.lines setup ~59 s at 6% util).
+    # launch storm that starved the GPU (pyrite.lines setup ~59 s at 6% util).
     # Length-3 contractions expand to component-wise fused multiply-adds (no
     # cuBLAS, no (n_seg, N_g, 3) temporaries), and the g-independent segment
     # quantities are hoisted out of the pass.
@@ -926,7 +926,7 @@ def _accumulate_batched(st):
 
         def _stream_segment_block(sel, n_sel, *, group_starts=None, grouped_out=None):
             """Run prologue, then flat-field or segmented grouped reduction."""
-            _nsys_push("cxr.lines.coherent_prologue")
+            _nsys_push("pyrite.lines.coherent_prologue")
             coh_line_data = run_coherent_prologue_kernel(
                 v_all[sel].reshape(-1),
                 denom_full[sel].reshape(-1),
@@ -971,7 +971,7 @@ def _accumulate_batched(st):
             line_data = coh_line_data[:8]
             f_apb, f_bma, f_q = coh_line_data[8:]
             _nsys_pop()
-            _nsys_push("cxr.lines.coherent_field")
+            _nsys_push("pyrite.lines.coherent_field")
             common = {
                 "n_g": N_g,
                 "n_seg": n_sel,

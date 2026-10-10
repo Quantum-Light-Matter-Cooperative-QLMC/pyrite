@@ -18,6 +18,7 @@ def _stem(_ctx, param, value):
         raise click.BadParameter("STEM must be one directory name", param=param)
     return value
 
+
 def _filters(function):
     function = click.option(
         "--energy",

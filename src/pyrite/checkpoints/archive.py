@@ -1,4 +1,4 @@
-"""``pyrite archive`` / ``restore`` / ``archives`` / ``union`` -- a durable local
+"""``pyrite checkpoint archive store|restore|list|merge`` -- a durable local
 shelf for checkpoints (checkpoint lifecycle, component 2).
 
 The GPU box is scratch compute; the laptop is the durable store. A grid-filtered
@@ -173,38 +173,52 @@ def _dataset_identity(path, is_directory):
         return None
 
 
-def list_archives(root=None):
-    """Print the shelf: each label with its size (MB) and record count, sorted by
-    label. Returns the list of labels."""
-    root = _default_root() if root is None else root
-    adir = _archive_dir(root)
-    if not os.path.isdir(adir):
-        print("(no archives)")
+def _list_shelf(directory, root, empty, *, archived):
+    """Print each checkpoint under ``directory`` with size (MB), record count and
+    profile, sorted by label. Returns the list of labels."""
+    if not os.path.isdir(directory):
+        print(empty)
         return []
+    directory = Path(directory)
     labels = sorted(
         {
             entry.name
-            for entry in Path(adir).iterdir()
-            if entry.is_dir() and _checkpoint_store.checkpoint_exists(entry.name, Path(adir))
+            for entry in directory.iterdir()
+            if entry.is_dir() and _checkpoint_store.checkpoint_exists(entry.name, directory)
         }
-        | {entry.stem for entry in Path(adir).glob("*.pkl")}
+        | {entry.stem for entry in directory.glob("*.pkl")}
     )
     if not labels:
-        print("(no archives)")
+        print(empty)
         return []
     for label in labels:
-        path, is_directory = _archive_paths(label, root)
+        path, is_directory = (_archive_paths if archived else _active_paths)(label, root)
         mb = (
-            sum(item.stat().st_size for item in path.glob("*.pkl")) / 1e6
+            sum(item.stat().st_size for item in [*path.glob("*.h5"), *path.glob("*.pkl")]) / 1e6
             if is_directory
             else path.stat().st_size / 1e6
         )
         n = _record_count(path)
         n_str = "?" if n is None else str(n)
         identity = _dataset_identity(path, is_directory)
-        profile = "" if identity is None else f"  {identity['profile']}"
+        name = None if identity is None else identity.get("catalog_profile")
+        profile = "" if name is None else f"  {name}"
         print(f"  {label:<32}  {mb:7.1f} MB  {n_str:>6} records{profile}")
     return labels
+
+
+def list_archives(root=None):
+    """Print the shelf: each label with its size (MB) and record count, sorted by
+    label. Returns the list of labels."""
+    root = _default_root() if root is None else root
+    return _list_shelf(_archive_dir(root), root, "(no archives)", archived=True)
+
+
+def list_checkpoints(root=None):
+    """Print the active checkpoints under ``root`` like :func:`list_archives`.
+    Returns the list of stems."""
+    root = _default_root() if root is None else root
+    return _list_shelf(root, root, "(no checkpoints)", archived=False)
 
 
 def _material_of(results):
