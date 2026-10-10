@@ -122,6 +122,32 @@ def test_legacy_scene_does_not_invent_detector_or_footprint(tmp_path):
     assert _strings(_blocks(near)["tracks"])["downstream_scene"] == "unavailable"
 
 
+def test_closeup_crop_follows_selected_off_axis_history(tmp_path):
+    from pyrite.montecarlo.trajectory_selection import select_trajectories
+
+    transport = dict(
+        r_mid=np.array([[1e6, -2e6, 10.0], [-1e6, 2e6, 10.0]]),
+        v_hat=np.array([[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]]),
+        L_ang=np.array([20.0, 20.0]),
+        E_start_keV=np.array([30.0, 30.0]),
+        electron_id=np.array([0, 1]),
+    )
+    artifact = write_trajectory_artifact(
+        tmp_path / "spot.h5",
+        transport,
+        case=dict(name="spot", crystal="Si", E0_keV=30.0, thickness_ang=100.0),
+    )
+    near, _ = export_trajectory_scene(
+        artifact, tmp_path / "spot.vtp", selection=select_trajectories(artifact, histories=(0,))
+    )
+    points = ET.parse(_blocks(near)["crystal"]).find(".//Points/DataArray")
+    xyz = np.fromstring(points.text, sep=" ").reshape(-1, 3)
+    # A micron-scale shower landing 0.1 mm off-axis must not crop back to the origin
+    # or include the unselected history on the opposite side of the beam spot.
+    np.testing.assert_allclose(xyz[:, :2].mean(axis=0), [1e6, -2e6])
+    assert np.max(np.ptp(xyz[:, :2], axis=0)) < 100.0
+
+
 def test_scene_grooves_use_bounded_shared_mesh(tmp_path):
     artifact = _capture(
         tmp_path,

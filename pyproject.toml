@@ -196,7 +196,13 @@ include = [
 ]
 
 [tool.ty.analysis]
-allowed-unresolved-imports = ["cupy*", "cupy*.*"]
+allowed-unresolved-imports = [
+    "cupy*",
+    "cupy*.*",
+    # Bundled ParaView preset runs under pvpython, never PyRITE's interpreter.
+    "paraview*",
+    "paraview.**",
+]
 
 [tool.ty.overrides.rules]
 unresolved-attribute = "ignore"

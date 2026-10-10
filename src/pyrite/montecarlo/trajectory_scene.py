@@ -17,7 +17,8 @@ from .._scene_geometry import (
     groove_mesh,
 )
 from .trajectories import TrajectoryArtifactError, read_trajectory_header
-from .trajectory_export import _BLOCK_ROWS, _field_data, export_segments_vtp
+from .trajectory_export import _BLOCK_ROWS, _field_data, _pieces, export_segments_vtp
+from .trajectory_selection import TrajectorySelection
 
 
 def scene_output_paths(output: Path) -> tuple[Path, Path]:
@@ -73,24 +74,29 @@ def _manifest(path, blocks, metadata):
     ET.ElementTree(xml).write(path, encoding="utf-8", xml_declaration=True)
 
 
-def _extent(transport, thickness):
-    """Fit sample x/y to captured endpoints, without loading the full shower."""
-    low = np.zeros(2)
-    high = np.zeros(2)
-    for start in range(0, len(transport["L_ang"]), _BLOCK_ROWS):
-        stop = start + _BLOCK_ROWS
+def _extent(transport, thickness, selection=None):
+    """Fit sample x/y to exported endpoints, without loading the full shower."""
+    low = np.full(2, np.inf)
+    high = np.full(2, -np.inf)
+    if selection is None:
+        material = ((0, len(transport["L_ang"])),)
+        vacuum = (
+            ((0, len(transport["vacuum_start_ang"])),) if "vacuum_start_ang" in transport else ()
+        )
+    else:
+        material, vacuum = selection.ranges, selection.vacuum_ranges
+    for start, stop in _pieces(material, _BLOCK_ROWS):
         mid = transport["r_mid"][start:stop, :2]
         half = 0.5 * transport["L_ang"][start:stop][:, None] * transport["v_hat"][start:stop, :2]
-        if len(mid):
-            low = np.minimum(low, np.minimum(mid - half, mid + half).min(axis=0))
-            high = np.maximum(high, np.maximum(mid - half, mid + half).max(axis=0))
-    for name in ("vacuum_start_ang", "vacuum_end_ang"):
-        if name in transport:
-            for start in range(0, len(transport[name]), _BLOCK_ROWS):
-                points = transport[name][start : start + _BLOCK_ROWS, :2]
-                if len(points):
-                    low = np.minimum(low, points.min(axis=0))
-                    high = np.maximum(high, points.max(axis=0))
+        low = np.minimum(low, np.minimum(mid - half, mid + half).min(axis=0))
+        high = np.maximum(high, np.maximum(mid - half, mid + half).max(axis=0))
+    for start, stop in _pieces(vacuum, _BLOCK_ROWS):
+        for name in ("vacuum_start_ang", "vacuum_end_ang"):
+            points = transport[name][start:stop, :2]
+            low = np.minimum(low, points.min(axis=0))
+            high = np.maximum(high, points.max(axis=0))
+    if not np.all(np.isfinite(low)):
+        low = high = np.zeros(2)
     pad = max(1.0, thickness * 0.02, float(np.max(high - low)) * 0.05)
     return low - pad, high + pad
 
@@ -101,6 +107,7 @@ def export_trajectory_scene(
     *,
     include_vacuum: bool = True,
     overwrite: bool = False,
+    selection: TrajectorySelection | None = None,
 ) -> tuple[Path, Path]:
     """Export close-up lab-angstrom and instrument lab-mm scene manifests.
 
@@ -110,6 +117,9 @@ def export_trajectory_scene(
     replaced individually. Old sidecar directories remain usable on overwrite.
     An interrupted publication never leaves a manifest pointing at partial
     data. Old HDF5 artifacts without a scene omit filters/detector explicitly.
+    ``selection`` limits the tracks block to whole selected histories/tracks
+    (see :func:`~pyrite.montecarlo.trajectory_export.export_segments_vtp`) and
+    fits the close-up crop to them.
     """
     import h5py
 
@@ -145,7 +155,7 @@ def export_trajectory_scene(
                 )
             layers = case.get("abs_layers")
             thickness = float(layers[-1][1] if layers else case["thickness_ang"])
-            low, high = _extent(handle["transport"], thickness)
+            low, high = _extent(handle["transport"], thickness, selection)
             common: dict[str, Any] = {
                 "case_sha256": header["case_sha256"],
                 "parameter_sha256": header.get("parameter_sha256", ""),
@@ -275,6 +285,7 @@ def export_trajectory_scene(
             artifact,
             directory / "tracks.vtp",
             include_vacuum=include_vacuum,
+            selection=selection,
             _rotation=rotation,
             _origin_ang=origin * 1e7,
             _metadata=near,
