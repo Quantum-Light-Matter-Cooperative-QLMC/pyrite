@@ -475,7 +475,7 @@ class Case(Mapping[str, Any]):
 def _finite(name: str, value: object) -> None:
     try:
         finite = math.isfinite(float(cast(Any, value)))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         finite = False
     if not finite:
         raise ValueError(f"{name} must be finite")

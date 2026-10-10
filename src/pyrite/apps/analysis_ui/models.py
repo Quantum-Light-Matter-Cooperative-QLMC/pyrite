@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
@@ -58,7 +60,7 @@ class AnalysisContext:
             if isinstance(text, str):
                 params["text"] = f"{text} (blazed)"
                 return chart.properties(title=alt.TitleParams(**params))
-        except AttributeError, TypeError, ValueError:
+        except (AttributeError, TypeError, ValueError):
             pass
         return chart
 

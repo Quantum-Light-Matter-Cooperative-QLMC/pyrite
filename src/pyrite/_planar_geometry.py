@@ -7,6 +7,8 @@ The public names stay importable from :mod:`pyrite.instrument` and
 :mod:`pyrite.instrument.geometry`.
 """
 
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass
 from numbers import Integral, Real

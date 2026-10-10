@@ -85,7 +85,7 @@ def _require_persistent_executable() -> None:
 def _is_within(path: Path, parent: Path) -> bool:
     try:
         path.resolve().relative_to(parent)
-    except OSError, ValueError:
+    except (OSError, ValueError):
         return False
     return True
 

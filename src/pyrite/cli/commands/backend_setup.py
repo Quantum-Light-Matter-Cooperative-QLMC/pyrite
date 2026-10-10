@@ -55,7 +55,7 @@ def _has_device_nodes(pattern: str) -> bool:
 def _run_text(cmd: list[str]) -> str | None:
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, check=False)
-    except OSError, subprocess.TimeoutExpired:
+    except (OSError, subprocess.TimeoutExpired):
         return None
     if result.returncode != 0:
         return None

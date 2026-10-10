@@ -153,7 +153,7 @@ def source_git_state() -> tuple[str | None, bool | None]:
             result = subprocess.run(
                 ["git", *args], cwd=root, capture_output=True, text=True, timeout=30
             )
-        except OSError, subprocess.SubprocessError:
+        except (OSError, subprocess.SubprocessError):
             return None
         return result.stdout.strip() if result.returncode == 0 else None
 

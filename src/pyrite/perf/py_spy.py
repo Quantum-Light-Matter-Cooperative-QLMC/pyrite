@@ -35,7 +35,7 @@ def read_status(status_file: str | Path) -> int:
     """Exit status :func:`main` recorded, or 1 when the command never reported."""
     try:
         return int(Path(status_file).read_text().strip())
-    except OSError, ValueError:
+    except (OSError, ValueError):
         return 1
 
 

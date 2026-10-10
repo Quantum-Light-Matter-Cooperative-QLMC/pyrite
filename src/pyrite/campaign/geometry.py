@@ -22,6 +22,8 @@ The material and layer resolution helpers that lowering needs live here too, so
 this module stays below :mod:`pyrite.campaign.sweep` and imports without it.
 """
 
+from __future__ import annotations
+
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass

@@ -411,9 +411,9 @@ Component storage adapter: active datasets live under `checkpoints/<stem>/{line,
 - Deps: `_checkpoint_io`, NumPy.
 
 ### `checkpoints/_checkpoint_io.py`
-Result leaf codec. New writes use `pyrite.result` HDF5 schema version 1 with portable per-array gzip filters. Reads sniff bytes and permanently dispatch across current HDF5 plus legacy zstd, gzip, and plain pickle generations. `dump_stream` stages seekable HDF5 output before copying it to remote-pull pipes.
+Result leaf codec. New writes use uncompressed `pyrite.result` HDF5 schema version 2 with content-addressed arrays. Reads sniff bytes and permanently dispatch across current and schema-version-1 HDF5 plus legacy zstd, gzip, and plain pickle generations. `dump_stream` stages seekable HDF5 output before zstd-framing it onto remote-pull pipes.
 - Internal: `dump`, `dump_stream`, `load`; schema/version and compatibility constants.
-- Deps: h5py, NumPy, stdlib compression/pickle compatibility readers.
+- Deps: h5py, NumPy, stdlib gzip/pickle compatibility readers; stdlib `compression.zstd` on Python 3.14+, `backports.zstd` on Python 3.13.
 
 ### `runs/scan.py`
 Headless sweep driver: build cases → `run_sweep` → checkpoint; owns `--no-cache`/`--recompute` and performance-run cache defaults, catalog-profile resolution, and nsys re-exec. Click wiring is in `cli/commands/scan.py`; `scan.command` stays available via a lazy `__getattr__` so the Monte Carlo hot path never imports Click.

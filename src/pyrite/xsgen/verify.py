@@ -97,7 +97,7 @@ def verify_pinned(codes: Iterable[str] = CODES) -> list[TableCheck]:
     for code, label, key, pinned in pinned_tables(wanted):
         try:
             found = resolve(key)
-        except OSError, ValueError:
+        except (OSError, ValueError):
             checks.append(TableCheck(code, label, key, CORRUPT))
             continue
         if found is None:
@@ -106,7 +106,7 @@ def verify_pinned(codes: Iterable[str] = CODES) -> list[TableCheck]:
         try:
             recorded = found.digest
             consistent = manifest_digest(found.manifest) == recorded
-        except KeyError, TypeError, ValueError, json.JSONDecodeError:
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
             checks.append(TableCheck(code, label, key, CORRUPT, found.tier))
             continue
         if not consistent:

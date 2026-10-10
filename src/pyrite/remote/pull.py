@@ -85,7 +85,7 @@ def _remote_meta_json(stem):
     try:
         mtime = float(mtime_line)
         meta = json.loads(body)
-    except ValueError, TypeError, json.JSONDecodeError:
+    except (ValueError, TypeError, json.JSONDecodeError):
         return None
     return mtime, meta
 
@@ -190,7 +190,7 @@ def resolve_profile_stems(material, catalog_profile, *, fidelity=None):
             else load_material_catalog(profile=catalog_profile)
         )
         detector_ids = tuple(catalog.profile_detector_set(catalog_profile))
-    except KeyError, ValueError:
+    except (KeyError, ValueError):
         return [resolve_profile_stem(material, catalog_profile, fidelity=fidelity)]
     return [
         resolve_profile_stem(

@@ -8,8 +8,9 @@ license-files = ["LICENSE.txt", "THIRD-PARTY-NOTICES.md"]
 classifiers = [
     "License :: Other/Proprietary License",
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
+    "backports.zstd>=1.7; python_version < '3.14'",
     "click>=8.4.1",
     "numpy>=2.4.6",
     "pandas>=3.0.3",
@@ -197,6 +198,9 @@ include = [
 
 [tool.ty.analysis]
 allowed-unresolved-imports = [
+    # The Python 3.13 zstd backport is intentionally absent on Python 3.14+.
+    "backports",
+    "backports.zstd",
     "cupy*",
     "cupy*.*",
     # Bundled ParaView preset runs under pvpython, never PyRITE's interpreter.

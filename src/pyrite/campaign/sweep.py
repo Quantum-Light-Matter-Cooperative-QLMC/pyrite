@@ -26,6 +26,8 @@ are imported here (no GPU), so this module is cheap to import and test.
 Validation: surface-hkl-orientation
 """
 
+from __future__ import annotations
+
 import math
 import warnings
 from collections.abc import Sequence

@@ -271,7 +271,7 @@ def cached_material_analysis(material, analyze, key, checkpoint_dir=None):
             value = cached["value"]
             _material_analysis_cache[cache_key] = value
             return value
-    except FileNotFoundError, EOFError, OSError, KeyError, TypeError, pickle.UnpicklingError:
+    except (FileNotFoundError, EOFError, OSError, KeyError, TypeError, pickle.UnpicklingError):
         pass
 
     value = analyze(load_checkpoint(material, checkpoint_dir))
@@ -428,7 +428,7 @@ def _manifest_save(checkpoint_path, results, dataset_identity=None):
         try:
             with open(manifest_path) as existing:
                 dataset_identity = json.load(existing).get("dataset_identity")
-        except OSError, ValueError, TypeError:
+        except (OSError, ValueError, TypeError):
             pass
     manifest = _manifest_for(results, dataset_identity)
     return _manifest_write(checkpoint_path, manifest)
@@ -464,7 +464,7 @@ def _save_recomputed_checkpoint(checkpoint_path, results, *, components):
         try:
             with open(manifest_path) as handle:
                 dataset_identity = json.load(handle).get("dataset_identity")
-        except OSError, ValueError, TypeError:
+        except (OSError, ValueError, TypeError):
             dataset_identity = None
 
     _checkpoint_components_save(checkpoint_path, results, components=components)

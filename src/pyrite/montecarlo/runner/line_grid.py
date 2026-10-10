@@ -152,7 +152,7 @@ def _cached_grid(cached):
         return np.linspace(cached["start_eV"], cached["stop_eV"], int(cached["num"]))
     try:
         return window_plan_from_payload(plan_payload).coordinates()
-    except KeyError, TypeError, ValueError:
+    except (KeyError, TypeError, ValueError):
         return None
 
 

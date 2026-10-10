@@ -201,6 +201,6 @@ def _existing_parameter_digest(manifest_path: str) -> str | None:
     try:
         with open(manifest_path) as handle:
             identity = json.load(handle).get("dataset_identity") or {}
-    except OSError, ValueError, TypeError:
+    except (OSError, ValueError, TypeError):
         return None
     return identity.get("parameter_sha256")

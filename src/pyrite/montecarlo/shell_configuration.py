@@ -122,7 +122,7 @@ def _parse_atomic_shells(data: bytes, source: str) -> dict[int, tuple[AtomicShel
         for shell in shells:
             try:
                 consistent = _nl(shell.label) == shell.orbital[:2]
-            except KeyError, ValueError, IndexError:
+            except (KeyError, ValueError, IndexError):
                 consistent = False
             if not consistent:
                 raise ValueError(

@@ -147,7 +147,7 @@ def _level_width_eV(core_widths: Mapping[str, object], level: str) -> float | No
         value = core_widths.get(label)
         try:
             width = float(str(value))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             continue
         if np.isfinite(width) and width >= 0.0:
             widths.append(width)

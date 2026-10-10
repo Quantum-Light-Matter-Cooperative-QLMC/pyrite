@@ -18,10 +18,8 @@ import gzip
 import io
 import os
 import pickle
+import sys
 import tempfile
-
-# stdlib since 3.14 (the version this project pins); ty's typeshed lags.
-from compression import zstd
 from typing import IO, Any, cast
 
 import h5py
@@ -30,6 +28,11 @@ import numpy as np
 from pyrite._spectral_components import COMPONENTS_ATTR, SEPARATE_CONTRACT, separate_legacy
 
 from . import _result_v2
+
+if sys.version_info >= (3, 14):
+    from compression import zstd
+else:
+    from backports import zstd
 
 _HDF5_MAGIC = b"\x89HDF\r\n\x1a\n"
 _GZIP_MAGIC = b"\x1f\x8b"

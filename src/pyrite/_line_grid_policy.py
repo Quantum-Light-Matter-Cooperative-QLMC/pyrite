@@ -954,7 +954,7 @@ def cached_coordinates(key: str) -> dict[str, Any] | None:
     try:
         with path.open("rb") as stream:
             record = json.load(stream)
-    except OSError, ValueError:
+    except (OSError, ValueError):
         return None
     if not isinstance(record, dict) or record.get("schema") not in (
         LINE_GRID_POLICY_SCHEMA,
