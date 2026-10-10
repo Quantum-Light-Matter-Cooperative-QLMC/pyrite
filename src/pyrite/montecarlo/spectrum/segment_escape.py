@@ -260,8 +260,8 @@ def segment_escape_paths(segments, index, n_hat, *, layers=None, groove=None, xp
     fraction = fraction_all[owner, part]
     # A piece endpoint can lie on a crystal face -- every track starts on the
     # entrance plane -- where the box exit distance is degenerate: the face the
-    # photon leaves through sits at distance 0 and ``first_prism_exit`` skips
-    # it for a farther one. The paths are affine on each piece, so sample at
+    # photon leaves through sits at distance 0 where face switches meet. The
+    # paths are affine on each piece, so sample at
     # 1/4 and 3/4 and extrapolate to the one-sided endpoint values exactly.
     delta = r1[owner] - r0[owner]
     left = ordered[owner, part, None]

@@ -1,3 +1,5 @@
+import types
+
 import numpy as np
 import pytest
 
@@ -92,3 +94,42 @@ def test_project_beam_entry_stretch_axis_follows_azimuth():
 def test_validate_transverse_dimensions_rejects_invalid_pairs(width, height):
     with pytest.raises(ValueError):
         validate_transverse_dimensions(width, height, unit="Ang")
+
+
+def test_first_prism_exit_compiled_and_array_paths_agree_off_the_interior():
+    """The numba CPU loop and the xp (CUDA) path must agree on every origin.
+
+    Origins on an exit face, past one, and on a non-exit face are where the
+    two once diverged (#298): the loop skipped ``t <= 0`` faces and took a far
+    one, while the array path returned the signed exit-face distance.
+    """
+    array_xp = types.ModuleType("numpy_array_path")
+    array_xp.__dict__.update({k: getattr(np, k) for k in dir(np) if not k.startswith("__")})
+    rng = np.random.default_rng(298)
+    r = np.vstack(
+        [
+            rng.uniform([-7.0, -7.0, -2.0], [7.0, 7.0, 12.0], size=(400, 3)),
+            [[5.0, 0.0, 5.0], [-5.0, 0.0, 5.0], [0.0, 0.0, 0.0], [0.0, 0.0, 10.0]],
+        ]
+    )
+    for d in (np.array([1.0, 0.0, 0.01]), np.array([-0.3, 0.5, -0.8]), np.array([0, 0, 1.0])):
+        d = d / np.linalg.norm(d)
+        for dims in ({"width_ang": 10.0, "height_ang": 10.0}, {}):
+            kw = {"z_min_ang": 0.0, "z_max_ang": 10.0, **dims}
+            compiled = first_prism_exit(r, d, **kw)
+            array = first_prism_exit(r, d, xp=array_xp, **kw)
+            np.testing.assert_array_equal(compiled[0], array[0])
+            np.testing.assert_array_equal(compiled[1], array[1])
+
+
+def test_first_prism_exit_on_and_past_the_exit_face():
+    distance, face = first_prism_exit(
+        np.array([[5.0, 0.0, 5.0], [6.0, 0.0, 5.0], [0.0, 0.0, 0.0]]),
+        np.array([[1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, -1.0]]),
+        z_min_ang=0.0,
+        z_max_ang=10.0,
+        width_ang=10.0,
+        height_ang=10.0,
+    )
+    np.testing.assert_array_equal(distance, [0.0, -1.0, 0.0])
+    assert face.tolist() == [X_MAX, X_MAX, Z_MIN]

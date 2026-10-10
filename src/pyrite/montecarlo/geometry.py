@@ -69,6 +69,9 @@ def _first_prism_exit_numba(
         y_min_ang = -height_ang / 2
         y_max_ang = height_ang / 2
 
+    # Each axis nominates only its exit-side face, and the signed distance is
+    # kept, so an origin on that face exits at 0 and one already past it gets a
+    # negative distance -- the same candidates and ties as the xp path below.
     for i in range(n):
         rx = r[i, 0]
         ry = r[i, 1]
@@ -79,41 +82,39 @@ def _first_prism_exit_numba(
         dz = d[i, 2]
 
         best_t = np.inf
-        best_face = Z_MIN
+        best_face = X_MIN if finite_xy else Z_MIN
 
         if finite_xy:
-            if dx != 0.0:
+            if dx < 0.0:
                 t = (x_min_ang - rx) / dx
-                if t > 0.0 and t < best_t:
+                if t < best_t:
                     best_t = t
                     best_face = X_MIN
-
+            elif dx > 0.0:
                 t = (x_max_ang - rx) / dx
-                if t > 0.0 and t < best_t:
+                if t < best_t:
                     best_t = t
                     best_face = X_MAX
 
-            if dy != 0.0:
+            if dy < 0.0:
                 t = (y_min_ang - ry) / dy
-                if t > 0.0 and t < best_t:
+                if t < best_t:
                     best_t = t
                     best_face = Y_MIN
-
+            elif dy > 0.0:
                 t = (y_max_ang - ry) / dy
-                if t > 0.0 and t < best_t:
+                if t < best_t:
                     best_t = t
                     best_face = Y_MAX
 
-        if dz != 0.0:
+        if dz < 0.0:
             t = (z_min_ang - rz) / dz
-
-            if t > 0.0 and t < best_t:
+            if t < best_t:
                 best_t = t
                 best_face = Z_MIN
-
+        elif dz > 0.0:
             t = (z_max_ang - rz) / dz
-
-            if t > 0.0 and t < best_t:
+            if t < best_t:
                 best_t = t
                 best_face = Z_MAX
 
@@ -139,13 +140,19 @@ def first_prism_exit(
     height_ang=None,
     xp=np,
 ):
-    """Return each inside-origin ray's first forward rectangular-prism face exit.
+    """Return each ray's signed distance to its first exit-side prism face.
 
     The sample-frame prism is ``[-width/2, width/2] x [-height/2, height/2] x
-    [z_min_ang, z_max_ang]``. Origins must be inside that prism, and rays with
-    a zero component never nominate the corresponding parallel faces. When both
-    transverse dimensions are ``None``, the limiting geometry is the original
-    z-only slab. Face ties resolve to the lowest face constant.
+    [z_min_ang, z_max_ang]``. Each axis nominates only the face its direction
+    component points toward; rays with a zero component never nominate that
+    axis. For an origin inside the prism this is the forward exit distance,
+    ``0`` on the exit face itself. An origin already past an exit face gets a
+    negative distance, which escape callers clip to zero. When both transverse
+    dimensions are ``None``, the limiting geometry is the original z-only slab.
+    Face ties resolve to the lowest face constant, and a ray with no
+    candidate returns ``inf`` with the lowest candidate face constant. The
+    compiled CPU loop and the array path agree on every origin, so
+    backends cannot diverge on segments that reach a face.
 
     Validation: finite-transverse-crystal
     """
