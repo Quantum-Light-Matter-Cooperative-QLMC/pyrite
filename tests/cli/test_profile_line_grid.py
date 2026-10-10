@@ -8,7 +8,7 @@ from pyrite.campaign.config import material_sweep
 from pyrite.cli import _catalog_io
 from pyrite.cli import command as root_command
 from pyrite.materials.catalog import load_material_catalog
-from tests.helpers.cli import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, assert_table_row, invoke
 from tests.helpers.user_catalog import copy_full_catalog
 
 _FULL_POLICY = {
@@ -87,7 +87,8 @@ def test_show_reports_explicit_effective_and_grid_source(catalog):
     assert_clean_result(profile_json)
     assert json.loads(profile_json.stdout)["payload"]["line_grid_policy"] == _FULL_POLICY
     profile_text = invoke(root_command, ["profile", "show", "sub_100keV"])
-    assert "line-grid policy: none" in profile_text.stdout
+    assert "Line-grid policy (profile line-grid)" in profile_text.stdout
+    assert_table_row(profile_text.stdout, "policy", "none (explicit, stored or built-in grids)")
 
 
 def test_set_dry_run_write_reload_and_case_policy(catalog):

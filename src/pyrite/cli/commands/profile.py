@@ -8,7 +8,6 @@ import tomlkit
 from tomlkit.exceptions import ParseError
 
 from pyrite import _catalog_layout
-from pyrite._numerics import DEFAULT_RADIATIVE_CUTOFF_EV
 from pyrite.campaign import profile_edit as _profile_edit
 from pyrite.campaign.profiles import resolve_numerics
 from pyrite.cli import _catalog_io
@@ -20,6 +19,7 @@ from pyrite.cli.commands import (
     _profile_filters,
     _profile_line_grid,
     _profile_precision,
+    _profile_show,
 )
 from pyrite.cli.commands._profile_members import (
     add_membership as _add_membership,
@@ -200,135 +200,6 @@ def _energy_grid_refs(profile):
     return _profile_edit.energy_grid_refs(profile)
 
 
-def _emit_show(payload):
-    emit_result(f"[{payload['name']}]")
-    for row in payload["ranges"]:
-        emit_result(f"  {row['name']}: [{_catalog_io.display(row['values'])}]")
-    if payload["materials"] is None:
-        emit_result("  materials: all catalog materials (implicit)")
-    else:
-        emit_result(f"  materials: {', '.join(payload['materials']) or '(none)'}")
-    if payload["beam_ref"] is not None:
-        emit_result(f"  beam: {payload['beam_ref']} (named reference)")
-    elif payload["beam"] is not None:
-        beam = payload["beam"]
-        for key in (
-            "transverse_fwhm_mm",
-            "rep_rate_hz",
-            "bunch_charge_pc",
-            "energy_spread_frac",
-        ):
-            if key in beam:
-                emit_result(f"  beam.{key}: {beam[key]:g}")
-        transverse = beam.get("transverse")
-        if isinstance(transverse, dict):
-            for key in sorted(transverse):
-                emit_result(f"  beam.transverse.{key}: {transverse[key]:g}")
-        longitudinal = beam.get("longitudinal")
-        if isinstance(longitudinal, dict):
-            emit_result(f"  beam.longitudinal.kind: {longitudinal['kind']}")
-            if "envelope_rms_fs" in longitudinal:
-                emit_result(
-                    f"  beam.longitudinal.envelope_rms_fs: {longitudinal['envelope_rms_fs']:g}"
-                )
-    emit_result("  detectors:")
-    for detector_id, detector_entry in payload["detectors"].items():
-        reference = detector_entry["reference"]
-        suffix = f" (reference: {reference})" if reference else ""
-        emit_result(f"    {detector_id}: {detector_entry['kind']}{suffix}")
-        settings = detector_entry["settings"]
-        for key, label, unit in _ACTIVE_DETECTOR_FIELDS:
-            value = detector_entry["acceptance"][key]
-            display = "unspecified" if value is None else f"{value:g} {unit}"
-            emit_result(f"      {label}: {display}")
-        if detector_entry["kind"] == "pixel":
-            defaults = {
-                "polar_deg": 90.0,
-                "azimuth_deg": 0.0,
-                "roll_deg": 0.0,
-                "offset_mm": (0.0, 0.0),
-                "shape": (256, 256),
-                "pitch_mm": (0.055, 0.055),
-            }
-            for key in (
-                "distance_mm",
-                "polar_deg",
-                "azimuth_deg",
-                "roll_deg",
-                "offset_mm",
-                "shape",
-                "pitch_mm",
-                "scorer",
-                "response",
-                "acquisition",
-            ):
-                if key in settings or key in defaults:
-                    emit_result(f"      {key}: {settings.get(key, defaults.get(key))}")
-    filters = payload["filters"]
-    if not filters:
-        emit_result("  filters: none")
-    else:
-        emit_result("  filters:")
-        for index, row in enumerate(filters, start=1):
-            label = row.get("name") or f"#{index}"
-            emit_result(
-                f"    {label}: {row.get('material')}, {row.get('thickness_mm'):g} mm, "
-                f"{tuple(row.get('size_mm', ()))} mm"
-            )
-    emit_result(f"  emission: {payload['emission'] or 'incoherent (default)'}")
-    emit_result("  temporal profile: " + ("on" if payload["temporal_profile"] else "off (default)"))
-    policy = payload["line_grid_policy"]
-    emit_result(
-        "  line-grid policy: none (explicit, stored or built-in grids)"
-        if not policy
-        else "  line-grid policy: "
-        + ", ".join(f"{key}={value}" for key, value in policy.items())
-        + " (automatic for every case)"
-    )
-    emit_result(_profile_precision.show_line(payload["precision"]))
-    numerics = payload["transport_numerics"]
-    for key, label, default in (
-        ("straggling", "straggling", False),
-        ("energy_model", "energy model", "midpoint"),
-        ("max_dE_frac", "max dE fraction", 0.0),
-    ):
-        value = numerics.get(key, default)
-        display = f"{value:g}" if key == "max_dE_frac" else str(value)
-        emit_result(f"  {label}: {display}{' (default)' if key not in numerics else ''}")
-    if "inelastic_model" in numerics:
-        cutoff = numerics.get("inelastic_cutoff_eV")
-        emit_result(
-            f"  inelastic model: {numerics['inelastic_model']}"
-            + ("" if cutoff is None else f" (W_c {cutoff:g} eV)")
-        )
-    else:
-        emit_result("  inelastic model: auto (default)")
-    if "secondary_threshold_eV" in numerics:
-        emit_result(f"  secondary threshold: {numerics['secondary_threshold_eV']:g} eV")
-    if "elastic_model" in numerics:
-        emit_result(f"  elastic model: {numerics['elastic_model']}")
-    if "bremsstrahlung_model" in numerics:
-        emit_result(f"  bremsstrahlung model: {numerics['bremsstrahlung_model']}")
-    if "radiative_model" in numerics:
-        k_c = numerics.get("radiative_cutoff_eV") or DEFAULT_RADIATIVE_CUTOFF_EV
-        emit_result(f"  radiative model: {numerics['radiative_model']} (k_c {k_c:g} eV)")
-    if "pair_production_model" in numerics:
-        emit_result(f"  pair production model: {numerics['pair_production_model']}")
-    if "positron_transport" in numerics:
-        emit_result(f"  positron transport: {'on' if numerics['positron_transport'] else 'off'}")
-    if "atomic_electron_deflection" in numerics:
-        emit_result(f"  atomic-electron deflection: {numerics['atomic_electron_deflection']}")
-    for material, labels in payload["overrides"].items():
-        emit_result(f"  {material}: overrides {', '.join(labels)}")
-    refs = payload["energy_grid_refs"]
-    if not refs:
-        emit_result("  energy grids: inline (E_grid_brem + material overrides)")
-    else:
-        emit_result("  energy grids:")
-        for material, digest in refs.items():
-            emit_result(f"    {material} -> {digest}")
-
-
 class _ProfileGroup(LazyGroup):
     """``pyrite profile NAME`` aliases ``pyrite profile show NAME``."""
 
@@ -411,7 +282,7 @@ def numerics_show_command(name, json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.profile.numerics.show", payload))
         return 0
-    emit_result(f"[{name} numerics; fidelity={fidelity}]")
+    emit_result(f"[{name} numerics]")
     for group in groups:
         emit_result(f"{group['name']}:")
         fields = group["fields"]
@@ -431,9 +302,8 @@ def numerics_show_command(name, json_output):
             )
             explicit = row["explicit"]
             explicit_display = "unset" if explicit is None else explicit
-            emit_result(
-                f"  {row['label']}: {display} ({row['source']}); explicit: {explicit_display}"
-            )
+            source = "default" if row["source"] == "fidelity" else row["source"]
+            emit_result(f"  {row['label']}: {display} ({source}); explicit: {explicit_display}")
     return 0
 
 
@@ -679,10 +549,18 @@ def list_command(json_output):
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @output_option
 def show_command(name, json_output):
-    """Show one profile's ranges, beam, detector, membership, and overrides."""
+    """Show PROFILE in tables grouped by CLI settings owner.
+
+    Sweep axes, instruments, numerics, precision, line-grid policy, energy grids
+    and material overrides have separate sections. Trial counts defer to the
+    precision policy in adaptive mode.
+    Use --output json for the stable automation payload."""
     try:
         _text, document = _catalog_io.catalog_text()
         payload = _profile_payload(document, name)
+        if not json_output:
+            target = _existing_profile(document, name)
+            resolution = resolve_numerics(_profile_edit.profile_numerics_values(target))
     except (OSError, ValueError, ParseError) as exc:
         if json_output:
             emit_json_result(cli_json.failure("cxr.profile.show", {}, str(exc)))
@@ -691,7 +569,12 @@ def show_command(name, json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.profile.show", payload))
         return 0
-    _emit_show(payload)
+    names = {
+        value: key
+        for key, value in _NUMERICS_FIELD_NAMES.items()
+        if key not in {"line-electrons", "bremsstrahlung-electrons"}
+    }
+    _profile_show.emit_show(payload, target, resolution, names)
     return 0
 
 
@@ -1110,7 +993,7 @@ def remove_command(
     --coherent/--incoherent subtract from the profile's emission mode set; a
     requested mode not currently present errors. Emptying the set (e.g.
     removing the sole explicit mode) drops the ``emission`` key entirely,
-    reverting to the fidelity preset's own default. Removing one mode from
+    reverting to the built-in incoherent default. Removing one mode from
     'both' leaves the other explicit -- e.g. removing incoherent from 'both'
     leaves 'coherent'.
     """

@@ -6,7 +6,7 @@ import pytest
 from pyrite._catalog_layout import read_text
 from pyrite.cli import _catalog_io
 from pyrite.cli.commands import profile
-from tests.helpers.cli import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, assert_table_row, invoke
 from tests.helpers.user_catalog import copy_full_catalog
 
 SET = ["physical-detector", "set"]
@@ -115,9 +115,10 @@ def test_geometry_then_acquisition_makes_a_counting_observation(catalog) -> None
     assert "response: ideal (default)" in human.stdout
     assert "scalar projection used by sweeps: observation angle 60 deg" in human.stdout
     shown = invoke(profile.command, ["show", "standard"])
-    assert "    physical: pixel\n" in shown.stdout
-    assert "      observation angle: 60 deg\n" in shown.stdout
-    assert "      acquisition: {'exposure_s': 2.0" in shown.stdout
+    assert "Detector physical (profile physical-detector; pyrite detector)" in shown.stdout
+    assert_table_row(shown.stdout, "kind", "pixel")
+    assert_table_row(shown.stdout, "observation angle", "60 deg")
+    assert_table_row(shown.stdout, "acquisition.exposure-s", "2")
 
 
 def test_reporting_axis_spellings_replace_each_other(catalog) -> None:

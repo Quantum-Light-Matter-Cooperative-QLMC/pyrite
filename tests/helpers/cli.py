@@ -22,3 +22,15 @@ def assert_clean_result(
         assert result.stdout == stdout
     assert result.stderr == stderr
     assert "Traceback" not in result.output
+
+
+def assert_table_row(stdout: str, label: str, value: str) -> None:
+    """Assert a human table row while allowing column padding and value wrapping."""
+    import re
+
+    pattern = (
+        rf"^  {re.escape(label)} {{2,}}"
+        + r"\s+".join(re.escape(word) for word in value.split())
+        + r"(?:\n|$)"
+    )
+    assert re.search(pattern, stdout, re.MULTILINE), stdout
