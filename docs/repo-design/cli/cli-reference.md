@@ -2095,7 +2095,7 @@ Usage: pyrite profile remove [OPTIONS] NAME
   validation rejects removals that would empty a required grid. --coherent/--incoherent
   subtract from the profile's emission mode set; a requested mode not currently present
   errors. Emptying the set (e.g. removing the sole explicit mode) drops the ``emission``
-  key entirely, reverting to the fidelity preset's own default. Removing one mode from
+  key entirely, reverting to the built-in incoherent default. Removing one mode from
   'both' leaves the other explicit -- e.g. removing incoherent from 'both' leaves
   'coherent'.
 
@@ -2210,9 +2210,8 @@ Usage: pyrite profile show [OPTIONS] NAME
   Show PROFILE in tables grouped by CLI settings owner.
 
   Sweep axes, instruments, numerics, precision, line-grid policy, energy grids and
-  material overrides have separate sections. Numerics use full fidelity; trial counts
-  defer to the precision policy in adaptive mode. Use --output json for the stable
-  automation payload.
+  material overrides have separate sections. Trial counts defer to the precision policy
+  in adaptive mode. Use --output json for the stable automation payload.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation

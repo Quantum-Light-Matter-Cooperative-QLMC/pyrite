@@ -861,9 +861,10 @@ def test_numerics_show_reports_effective_values_and_sources(tmp_path, monkeypatc
 
     shown = invoke(root_command, ["profile", "numerics", "show", "sub_100keV"])
     assert_clean_result(shown)
-    assert shown.stdout.startswith("[sub_100keV numerics; fidelity=full]")
+    assert shown.stdout.startswith("[sub_100keV numerics]")
     assert "sampling:" in shown.stdout
-    assert "line electrons: 300 (fidelity)" in shown.stdout
+    assert "line electrons: 300 (default)" in shown.stdout
+    assert "fidelity" not in shown.stdout
     assert "reflection families: 4 (built-in)" in shown.stdout
     assert "mosaic nodes: 5 (built-in)" in shown.stdout
     assert "energy model: midpoint (built-in)" in shown.stdout
@@ -1719,6 +1720,7 @@ def test_show_groups_trial_grids_and_complete_numerics_in_aligned_columns(tmp_pa
     ):
         assert_table_row(convergence, label, value + " (profile)")
     assert "ne-line" not in shown.stdout and "ne-brem" not in shown.stdout
+    assert "fidelity" not in shown.stdout
     for section in shown.stdout.split("\n\n")[1:]:
         lines = section.splitlines()
         value_column = lines[1].index("Value")

@@ -282,7 +282,7 @@ def numerics_show_command(name, json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.profile.numerics.show", payload))
         return 0
-    emit_result(f"[{name} numerics; fidelity={fidelity}]")
+    emit_result(f"[{name} numerics]")
     for group in groups:
         emit_result(f"{group['name']}:")
         fields = group["fields"]
@@ -302,9 +302,8 @@ def numerics_show_command(name, json_output):
             )
             explicit = row["explicit"]
             explicit_display = "unset" if explicit is None else explicit
-            emit_result(
-                f"  {row['label']}: {display} ({row['source']}); explicit: {explicit_display}"
-            )
+            source = "default" if row["source"] == "fidelity" else row["source"]
+            emit_result(f"  {row['label']}: {display} ({source}); explicit: {explicit_display}")
     return 0
 
 
@@ -553,8 +552,8 @@ def show_command(name, json_output):
     """Show PROFILE in tables grouped by CLI settings owner.
 
     Sweep axes, instruments, numerics, precision, line-grid policy, energy grids
-    and material overrides have separate sections. Numerics use full fidelity;
-    trial counts defer to the precision policy in adaptive mode.
+    and material overrides have separate sections. Trial counts defer to the
+    precision policy in adaptive mode.
     Use --output json for the stable automation payload."""
     try:
         _text, document = _catalog_io.catalog_text()
@@ -994,7 +993,7 @@ def remove_command(
     --coherent/--incoherent subtract from the profile's emission mode set; a
     requested mode not currently present errors. Emptying the set (e.g.
     removing the sole explicit mode) drops the ``emission`` key entirely,
-    reverting to the fidelity preset's own default. Removing one mode from
+    reverting to the built-in incoherent default. Removing one mode from
     'both' leaves the other explicit -- e.g. removing incoherent from 'both'
     leaves 'coherent'.
     """

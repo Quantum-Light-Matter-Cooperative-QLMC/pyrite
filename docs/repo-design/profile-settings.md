@@ -15,7 +15,7 @@ new checkpoint stems and earlier results stay under their old identity.
 `pyrite profile show NAME` presents Setting / Value tables grouped by editing
 command: sweep/membership/emission, beam, detectors, filters, numerics
 (sampling/convergence/transport), precision, line-grid, energy grids and material
-overrides. Numerics resolve at `full` fidelity and name their source; adaptive
+overrides. Numerics name their value source; adaptive
 sampling delegates `line-trials` and `brem-trials` to the precision policy.
 Long values wrap in the default table output; `--output wide` keeps each value
 on one line. `--output json` retains the stable machine payload.
@@ -36,7 +36,8 @@ on one line. `--output json` retains the stable machine payload.
 ## Calculation numerics
 
 `pyrite profile numerics show|set|reset NAME` owns these; `show` reports
-explicit value, effective value and source (`profile`, `fidelity`, `built-in`).
+explicit value, effective value and source (`profile`, `default`, `built-in`)
+in human output. The JSON payload retains its existing source spellings.
 
 | TOML key | Setter flag | Notes |
 |---|---|---|

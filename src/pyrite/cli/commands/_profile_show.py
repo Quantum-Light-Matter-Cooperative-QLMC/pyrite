@@ -137,9 +137,10 @@ def emit_show(payload, target, resolution, numerics_names):
             if group["name"] == "sampling" and payload["precision"]["effective"] is not None:
                 value = "adaptive (profile precision)"
             else:
-                value = f"{_display(row['effective'])} ({row['source']})"
+                source = "default" if row["source"] == "fidelity" else row["source"]
+                value = f"{_display(row['effective'])} ({source})"
             rows.append((label, value))
-        _table(f"Numerics / {group['name']} (profile numerics; fidelity=full)", rows)
+        _table(f"Numerics / {group['name']} (profile numerics)", rows)
 
     precision = payload["precision"]
     if precision["effective"] is None:
