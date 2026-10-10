@@ -959,7 +959,8 @@ def _segment_escape_distance(segments, n_hat, *, xp):
         height_ang=height,
         xp=xp,
     )
-    return distance
+    # A midpoint already past its exit face has no in-crystal path.
+    return xp.maximum(distance, 0.0)
 
 
 def _flight_blocks(bounds, chunk):

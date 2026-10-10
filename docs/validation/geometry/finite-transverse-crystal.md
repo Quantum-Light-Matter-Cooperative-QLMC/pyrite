@@ -50,7 +50,7 @@ Electron free flights follow the same minimum-distance rule. A Gaussian-beam ent
 
 ## Implementation comparison
 
-`first_prism_exit` implements the six candidates above, replaces zero-direction candidates with infinity, discards non-positive candidates, and takes their minimum. Its face order is `X_MIN`, `X_MAX`, `Y_MIN`, `Y_MAX`, `Z_MIN`, `Z_MAX`; `argmin` therefore realizes the specified tie convention. The all-`None` branch constructs only the two $z$ candidates.
+`first_prism_exit` implements the six candidates above, nominating per axis only the exit-side face the direction component points toward, replaces zero-direction candidates with infinity, and takes their minimum. For an origin inside the prism every exit-side candidate is $\ge0$ and every other one $\le0$, so this is the forward minimum; an origin on its exit face returns 0. An origin outside the prism, past an exit face, returns that negative signed distance, which escape callers clip to zero. The compiled CPU loop and the array (CUDA) path share this rule for every origin (#298). Its face order is `X_MIN`, `X_MAX`, `Y_MIN`, `Y_MAX`, `Z_MIN`, `Z_MAX`; `argmin` therefore realizes the specified tie convention. The all-`None` branch constructs only the two $z$ candidates.
 
 `simulate_trajectories` validates the public pair, converts each dimension as `mm * 1e7` once, and uses the common exit helper for each finite free flight. Missed entries are excluded from `alive` but the returned `Ne` is the supplied incident count. The line spectrum returns its accumulated result divided by `Ne`; the bremsstrahlung spectrum does the same (and its `1/(4 pi)` factor is the stated isotropic solid-angle convention, not a changed normalization).
 

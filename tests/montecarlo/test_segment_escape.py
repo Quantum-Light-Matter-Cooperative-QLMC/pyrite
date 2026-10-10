@@ -172,8 +172,8 @@ def test_finite_side_exit_crosses_absorber_layer_at_exact_breakpoint(pieces):
 def test_finite_box_track_starting_on_entrance_face_escapes_through_it(layered):
     """Every track starts on z = 0; escape back through that face starts at zero path.
 
-    ``first_prism_exit`` skips a face at distance 0, so an endpoint evaluated on
-    the entrance plane would take the far side face instead.
+    The exit distance is degenerate on that face (the compiled prism exit once
+    skipped it for the far side face), so endpoints come from interior samples.
     """
     segments = _track([400.0], direction=(0.5, 0.0, 1.0))
     segments.update(thickness_ang=2000.0, crystal_width_ang=5.0e7, crystal_height_ang=5.0e7)
