@@ -999,58 +999,6 @@ class Result:
         )
         return frame
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """Return every spectral array as one tidy long-form ``DataFrame``.
-
-        One row per (component, photon energy), with columns ``component``,
-        ``energy_eV`` and ``density`` (photons per incident electron per eV per
-        sr). Components are ``line`` (``spectrum``), ``coherent`` and
-        ``characteristic`` when present, and ``background``. Each keeps its own
-        energy grid: nothing is interpolated or padded. ``line_total`` is
-        derived and omitted; sum ``line`` and ``characteristic`` rows, or call
-        :meth:`line_total`.
-
-        Everything else on the result rides in ``df.attrs``: ``provenance``
-        (a plain ``dict`` copy), ``case``, and ``units``. pandas drops
-        ``attrs`` on some operations such as ``concat``; read them first.
-        Per-pixel ``spatial`` data is not flattened -- use :meth:`acquire`,
-        :meth:`acquisition_image`, or ``spatial.spectra``.
-
-        Returns
-        -------
-        pandas.DataFrame
-            Columns ``component`` (category), ``energy_eV``, ``density``.
-        """
-        import pandas as pd
-
-        parts = [("line", self.energy_eV, self.spectrum)]
-        if self.coherent_spectrum is not None:
-            parts.append(("coherent", self.energy_eV, self.coherent_spectrum))
-        if self.characteristic_spectrum is not None:
-            parts.append(("characteristic", self.energy_eV, self.characteristic_spectrum))
-        parts.append(("background", self.background_energy_eV, self.background))
-        names = [name for name, _, _ in parts]
-        frame = pd.concat(
-            [
-                pd.DataFrame(
-                    {
-                        "component": pd.Categorical([name] * len(energy), categories=names),
-                        "energy_eV": np.asarray(energy, dtype=np.float64),
-                        "density": np.asarray(density, dtype=np.float64),
-                    }
-                )
-                for name, energy, density in parts
-            ],
-            ignore_index=True,
-        )
-        frame.attrs["provenance"] = dict(self.provenance)
-        frame.attrs["case"] = self.case
-        frame.attrs["units"] = {
-            "energy_eV": "eV",
-            "density": "photons / (electron eV sr)",
-        }
-        return frame
-
     def _acquisition_context(self):
         scene = self.provenance.get("scene")
         acquisition = getattr(scene, "acquisition", None)

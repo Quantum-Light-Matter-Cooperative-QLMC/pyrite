@@ -111,6 +111,23 @@ def test_dataframe_preserves_modes_unequal_grids_and_normalization():
     assert "added" not in result.provenance
 
 
+def test_dataframe_omits_absent_families_and_carries_case():
+    result = Result(
+        cxr=CxrSpectra(SpectralDensity([100.0, 200.0, 300.0], [1.0, 2.0, 3.0])),
+        brem=SpectralDensity([100.0, 400.0], [0.5, 0.25]),
+        characteristic=None,
+        case={"crystal": "hopg"},
+        provenance={"identity_digest": "abc"},
+    )
+    frame = result.to_dataframe()
+    assert frame.groupby("component", observed=True).size().to_dict() == {"cxr": 3, "brem": 2}
+    assert set(frame.loc[frame.component == "cxr", "mode"]) == {"incoherent"}
+    assert frame["photon_energy_eV"].dtype == np.float64
+    assert frame.attrs["case"] == {"crystal": "hopg"}
+    assert frame.attrs["provenance"] == {"identity_digest": "abc"}
+    assert frame.attrs["normalization"] == {"cxr": "source", "brem": "source"}
+
+
 def test_catalog_key_translation_preserves_literals_order_and_profile_names():
     from pyrite._cxr_vocabulary import translate_catalog_text
 
