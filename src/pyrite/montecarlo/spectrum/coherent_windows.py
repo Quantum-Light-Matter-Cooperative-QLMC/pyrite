@@ -10,11 +10,11 @@ Three rules, derived in
 ``docs/validation/beam-transport/coherent-line-grid-windowed-resolution.md``:
 
 The envelope bounds the captured frozen-carrier field, including affine
-absorption. Escape geometry is captured for an exact affine-dispersion
-transform and a finite-band residual charge. The full-axis material law is
-bounded on smooth intervals and audited against the current windows. The
-production seeder still uses the frozen-carrier bound; physical finite-band
-normalization and certified sampling remain an open validation discrepancy.
+absorption, and a dispersive envelope bounds the production field with the
+material phase: at fixed energy that phase is affine along each piece, so the
+field is exactly its endpoint terms on shifted carriers. A window widens
+until both bounds meet the leak share. Physical finite-band normalization and
+certified sampling remain open.
 
 envelope
     A row's coherent window is its resonance band ``[min E_res, max E_res]``
@@ -66,7 +66,7 @@ from ..._line_grid_policy import (
 from ..._line_windows import FeatureSeed
 from ...materials.crystal import HBARC_EV_ANG
 from ..transport.kinematics import C_ANG_PER_FS
-from .coherent_dispersion import CoherentDispersionLaw
+from .coherent_dispersion import CoherentDispersionLaw, DispersionBands
 from .coherent_population import pair_scale
 from .diagnostics import _offset_population
 
@@ -84,6 +84,8 @@ COHERENT_SOURCE = "pxr-coherent"
 #: Bisection steps for each window edge; the edge is then fixed to well below
 #: one eV over any production bandwidth.
 _EDGE_BISECTIONS = 32
+#: Carrier-distance ratio between candidate near/far splits of an omitted band.
+_SPLIT_RATIO = 2.0**0.25
 
 
 def decoherence_bound(
@@ -379,12 +381,20 @@ class _RowJumps:
     Each jump carries the field value just before it (left piece, attenuated
     to its end) and just after it (right piece, attenuated at its start), each
     on its own carrier; a track end or gap leaves one side zero.
+
+    ``dispersive=True`` also keeps each side's escape gradient ``g = dL/dd``
+    and escape distance ``L`` at the jump (the right side's for a joint, with
+    ``escape_mismatch = |L_left - L_right|``), and drops a jump as identically
+    zero only when those agree too: the dispersive carrier is
+    ``E_j + hbar c g delta_omega(E)`` and the endpoint phase
+    ``-delta_omega(E) L``.
     """
 
-    def __init__(self, row: CoherentRowField):
+    def __init__(self, row: CoherentRowField, *, dispersive: bool = False):
         lo = row.centre_ang - 0.5 * row.duration_ang
         hi = row.centre_ang + 0.5 * row.duration_ang
         order = np.lexsort((lo, row.electron))
+        pieces = order
         energy, electron = row.energy_eV[order], row.electron[order]
         slope = HBARC_EV_ANG * row.slope_ang[order]
         lo, hi = lo[order], hi[order]
@@ -426,6 +436,22 @@ class _RowJumps:
         # Never drop a small nonzero jump because its squared norm underflows.
         equal_amplitude = np.all(self.left_A == self.right_A, axis=0)
         equal_denominator = (self.left_E == self.right_E) & (self.left_slope == self.right_slope)
+        if dispersive:
+            if row.escape_mid_ang is None or row.escape_change_ang is None:
+                raise ValueError("dispersive endpoint terms require captured escape geometry")
+            gradient = (row.escape_change_ang / row.duration_ang)[pieces]
+            start_L = (row.escape_mid_ang - 0.5 * row.escape_change_ang)[pieces]
+            end_L = (row.escape_mid_ang + 0.5 * row.escape_change_ang)[pieces]
+            left_g = gradient.copy()
+            left_g[1:][joint] = gradient[:-1][joint]
+            left_L = start_L.copy()
+            left_L[1:][joint] = end_L[:-1][joint]
+            self.left_g = np.concatenate([left_g, gradient[free_end]])
+            self.right_g = np.concatenate([gradient, gradient[free_end]])
+            left_L = np.concatenate([left_L, end_L[free_end]])
+            self.escape = np.concatenate([start_L, end_L[free_end]])
+            self.escape_mismatch = np.abs(left_L - self.escape)
+            equal_denominator &= (self.left_g == self.right_g) & (self.escape_mismatch == 0.0)
         zero_amplitude = np.all(self.left_A == 0.0, axis=0)
         zero_jump = equal_amplitude & (equal_denominator | zero_amplitude)
         order = order[~zero_jump[order]]
@@ -433,7 +459,12 @@ class _RowJumps:
         self.left_E, self.right_E = self.left_E[order], self.right_E[order]
         self.left_slope = self.left_slope[order]
         self.right_slope = self.right_slope[order]
+        if dispersive:
+            self.left_g, self.right_g = self.left_g[order], self.right_g[order]
+            self.escape = self.escape[order]
+            self.escape_mismatch = self.escape_mismatch[order]
         tau, owner = tau[order], owner[order]
+        self.owner = owner
         gap = np.diff(tau)
         self.gap = np.where(owner[1:] == owner[:-1], gap, np.inf)
         self.joints = int(joint.sum())
@@ -531,11 +562,260 @@ def coherent_edge_leak(
     return HBARC_EV_ANG * bound / (2.0 * np.pi * power)
 
 
-def _edge(jumps, power, band_edge, axis_edge, factor, limit, *, upper):
+def _dispersion_blocks(bands: DispersionBands, lo_eV, hi_eV, band_edge, shift_scale, *, upper):
+    """Partition ``[lo_eV, hi_eV]`` into blocks of whole smooth intervals.
+
+    Each block carries the union of its intervals' phase enclosures. A block
+    grows outward from the window edge while its width stays within a quarter
+    of its near end's distance ``u`` from the resonance band edge, so the
+    ``1/u`` tail profile is resolved with few blocks, and while the union's
+    carrier shift ``shift_scale * (phase_max - phase_min)`` (``shift_scale =
+    hbar c max |g|``) stays within a tenth of it. Any partition is valid;
+    this one only bounds the work.
+    """
+    keep = (bands.hi_eV > lo_eV) & (bands.lo_eV < hi_eV)
+    lo = np.maximum(bands.lo_eV[keep], lo_eV)
+    hi = np.minimum(bands.hi_eV[keep], hi_eV)
+    phase_min, phase_max = bands.phase_min[keep], bands.phase_max[keep]
+    if not upper:
+        lo, hi, phase_min, phase_max = hi[::-1], lo[::-1], phase_min[::-1], phase_max[::-1]
+    blocks = []
+    start = 0
+    while start < lo.size:
+        near = lo[start]
+        reach = 0.25 * max(abs(near - band_edge), 1e-300)
+        stop = start + 1
+        while (
+            stop < lo.size
+            and abs(hi[stop] - near) <= reach
+            and shift_scale * (max(phase_max[start : stop + 1]) - min(phase_min[start : stop + 1]))
+            <= 0.1 * reach
+        ):
+            stop += 1
+        blocks.append(
+            (
+                min(near, hi[stop - 1]),
+                max(near, hi[stop - 1]),
+                float(phase_min[start:stop].min()),
+                float(phase_max[start:stop].max()),
+            )
+        )
+        start = stop
+    return np.array(blocks, dtype=float).reshape(-1, 4)
+
+
+def _dispersive_region_leak(
+    jumps: _RowJumps,
+    power: float,
+    bands: DispersionBands,
+    edge_eV: float,
+    axis_eV: float,
+    *,
+    upper: bool,
+    separation: float = COHERENT_JUMP_CLUSTER_SEPARATION,
+) -> float:
+    """Bound on the dispersive row power between ``edge_eV`` and ``axis_eV``, as a fraction.
+
+    Source: at fixed ``E`` the reducer's in-medium phase ``-delta_omega(E)
+    L(d)`` is affine in ``d`` on each piece, so a piece's production field is
+    exactly its endpoint terms with denominator ``z_i(E) = E - E_i - hbar c
+    g_i delta_omega(E) + i hbar c lambda_i`` (``g = dL/dd``) and endpoint
+    phase ``E tau/hbar c - delta_omega(E) L``, continuous at a joint. On each
+    block of smooth material intervals the certified enclosure of
+    ``delta_omega`` bounds ``|z_i|`` below by the distance to the shifted
+    carrier, and each jump's ``L^2`` norm follows in closed form. Clusters
+    take the triangle inequality. Across clusters the cross-term phase slope
+    is ``dtau/hbar c - delta_omega' dL`` with ``|dL| <= r_e |dtau|`` (``r_e``
+    the electron's largest consecutive ``|dL|/dtau``). With ``eps = hbar c
+    M1 r_e < 1``, clusters split at gaps above ``M hbar c/(u_min (1 -
+    eps))`` keep it at least ``k M/u_min``, and integration by parts with
+    the slope's variation ``TV`` multiplies the frozen allowance by ``1 +
+    hbar c r_e TV/(2 (1 - eps))`` and each derivative envelope by ``1 +
+    hbar c |g| M1``; an electron with ``eps >= 1`` is one cluster. Returns
+    ``inf`` when a shifted carrier can reach the omitted band. With
+    ``delta_omega = 0`` this is at most :func:`coherent_edge_leak` with its
+    diagonal truncated at ``axis_eV``.
+
+    Validation: coherent-line-grid-windowed-resolution
+    """
+    sign = 1.0 if upper else -1.0
+    if jumps.jumps == 0 or (axis_eV - edge_eV) * sign <= 0.0:
+        return 0.0
+    H = HBARC_EV_ANG
+    region = (edge_eV, axis_eV) if upper else (axis_eV, edge_eV)
+    if region[0] < bands.lo_eV[0] or region[1] > bands.hi_eV[-1]:
+        raise ValueError("the material bands must cover the whole omitted region")
+    carriers = np.concatenate((jumps.left_E, jumps.right_E))
+    band_edge = float(carriers.max() if upper else carriers.min())
+    shift_scale = H * float(np.abs(np.concatenate((jumps.left_g, jumps.right_g))).max())
+    blocks = _dispersion_blocks(bands, *region, band_edge, shift_scale, upper=upper)
+    b_lo, b_hi, p_min, p_max = (blocks[:, k : k + 1] for k in range(4))
+    near, far = (b_lo, b_hi) if upper else (b_hi, b_lo)
+
+    def distance(energy, gradient, at, phase_lo, phase_hi):
+        """Lower bound of ``sign (E - E_i - H g delta)`` over the phase enclosure."""
+        shift = H * np.where(sign * gradient >= 0.0, gradient * phase_hi, gradient * phase_lo)
+        return sign * (at - energy - shift)
+
+    d_near_L = distance(jumps.left_E, jumps.left_g, near, p_min, p_max)
+    d_near_R = distance(jumps.right_E, jumps.right_g, near, p_min, p_max)
+    if np.any(d_near_L <= 0.0) or np.any(d_near_R <= 0.0):
+        return float("inf")
+    d_far_L = distance(jumps.left_E, jumps.left_g, far, p_min, p_max)
+    d_far_R = distance(jumps.right_E, jumps.right_g, far, p_min, p_max)
+
+    def inverse_norm(d_near, d_far):
+        return np.sqrt((d_far - d_near) / (d_near * d_far))
+
+    m_near, m_far = np.minimum(d_near_L, d_near_R), np.minimum(d_far_L, d_far_R)
+    product_norm = np.sqrt((m_far**3 - m_near**3) / (3.0 * m_near**3 * m_far**3))
+    phase_abs = np.maximum(np.abs(p_min), np.abs(p_max))
+    gradient_change = np.abs(jumps.left_g - jumps.right_g)
+    carrier_change = np.hypot(
+        np.abs(jumps.left_E - jumps.right_E) + H * gradient_change * phase_abs,
+        jumps.left_slope - jumps.right_slope,
+    )
+    # A joint's endpoint escapes may differ by roundoff; that phase
+    # exp(-i delta_omega dL) rides on the left amplitude.
+    escape_phase = np.minimum(2.0, phase_abs * jumps.escape_mismatch)
+    a1, a2 = jumps.left_A[:, None, :], jumps.right_A[:, None, :]
+    numerator = np.abs(a1 - a2) + np.maximum(np.abs(a1), np.abs(a2)) * escape_phase
+    norm = np.minimum(
+        numerator * inverse_norm(d_near_L, d_far_L) + np.abs(a2) * carrier_change * product_norm,
+        numerator * inverse_norm(d_near_R, d_far_R) + np.abs(a1) * carrier_change * product_norm,
+    )
+    terms = np.sum(norm**2, axis=(0, 1))
+
+    # Cross terms: one envelope over the whole omitted region.
+    keep = (bands.hi_eV > region[0]) & (bands.lo_eV < region[1])
+    phase_lo, phase_hi = float(bands.phase_min[keep].min()), float(bands.phase_max[keep].max())
+    slope_max = float(bands.slope_max[keep].max())
+    variation = float(bands.variation[keep].sum())
+    phase_abs = max(abs(phase_lo), abs(phase_hi))
+    u1 = distance(jumps.left_E, jumps.left_g, edge_eV, phase_lo, phase_hi)
+    u2 = distance(jumps.right_E, jumps.right_g, edge_eV, phase_lo, phase_hi)
+    owner = jumps.owner
+    starts_e = np.flatnonzero(np.r_[True, owner[1:] != owner[:-1]])
+    # Lipschitz constant of the endpoint escape L along each electron's
+    # sorted jumps: the largest consecutive |dL|/dtau bounds every pair.
+    same = np.isfinite(jumps.gap)
+    escape_step = np.abs(np.diff(jumps.escape))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio = np.where(
+            same & (escape_step > 0.0), escape_step / np.where(same, jumps.gap, 1.0), 0.0
+        )
+    ratio = np.nan_to_num(ratio, nan=np.inf)
+    rate = np.zeros(owner.size)
+    np.maximum.at(rate, np.arange(1, owner.size), ratio)
+    lipschitz = np.maximum.reduceat(rate, starts_e)
+    detuning = H * slope_max * lipschitz
+    u_min = float(min(u1.min(), u2.min()))
+    if u_min > 0.0 and np.isfinite(variation):
+        separable = detuning < 1.0
+        electron_threshold = np.where(
+            separable,
+            float(separation) * H / (u_min * np.where(separable, 1.0 - detuning, 1.0)),
+            np.inf,
+        )
+        threshold = np.repeat(electron_threshold, np.diff(np.r_[starts_e, owner.size]))[1:]
+        # Electrons never share a cluster, even when no gap separates within one.
+        split = (jumps.gap > threshold) | ~same
+        starts = np.concatenate(([0], np.flatnonzero(split) + 1))
+    else:
+        separable = np.zeros(starts_e.size, dtype=bool)
+        starts = starts_e
+    bound = float((np.add.reduceat(np.sqrt(np.maximum(terms, 0.0)), starts) ** 2).sum())
+    count = starts.size
+    if count > starts_e.size:
+        u1_far = distance(jumps.left_E, jumps.left_g, axis_eV, phase_lo, phase_hi)
+        u2_far = distance(jumps.right_E, jumps.right_g, axis_eV, phase_lo, phase_hi)
+        stretch = 1.0 + H * slope_max * np.maximum(np.abs(jumps.left_g), np.abs(jumps.right_g))
+        change = np.hypot(
+            np.abs(jumps.left_E - jumps.right_E) + H * gradient_change * phase_abs,
+            jumps.left_slope - jumps.right_slope,
+        )
+        escape_phase = np.minimum(2.0, phase_abs * jumps.escape_mismatch)
+        escape_rate = jumps.escape_mismatch * slope_max
+        reach = np.minimum(u1_far, u2_far)
+        larger = np.maximum(np.abs(jumps.left_A), np.abs(jumps.right_A))
+        numerator = np.abs(jumps.left_A - jumps.right_A) + larger * escape_phase
+        moduli = []
+        # Decompose a1 e^{i theta}/z1 - a2/z2 about either carrier; derivative
+        # envelopes carry |z_i'| <= stretch and the E-dependence of
+        # z1 - z2 and of the mismatch phase.
+        for u_near, u_reach, a_other in ((u1, u1_far, jumps.right_A), (u2, u2_far, jumps.left_A)):
+            c1 = numerator * stretch + larger * escape_rate * u_reach
+            c2 = (
+                np.abs(a_other) * (change * stretch + H * gradient_change * slope_max * reach)
+                + larger * change * escape_rate * reach
+            )
+            moduli.append(c1 / u_near + c2 / (u1 * u2))
+        modulus = np.sqrt(np.sum(np.minimum(*moduli) ** 2, axis=0))
+        cluster_moduli = np.add.reduceat(modulus, starts)
+        cluster_owner = owner[starts]
+        owner_index = np.searchsorted(owner[starts_e], cluster_owner)
+        # Only clusters of one electron interfere; a one-cluster electron has
+        # no cross term.
+        clusters_per_electron = np.bincount(owner_index, minlength=starts_e.size)
+        paired = separable & (clusters_per_electron > 1)
+        kappa = np.where(
+            paired,
+            1.0 + H * lipschitz * variation / (2.0 * np.where(paired, 1.0 - detuning, 1.0)),
+            0.0,
+        )[owner_index]
+        bound += (
+            4.0
+            * (1.0 + np.log(count))
+            * u_min
+            / float(separation)
+            * float(np.sum(kappa * cluster_moduli**2))
+        )
+    return H * bound / (2.0 * np.pi * power)
+
+
+def dispersive_edge_leak(
+    jumps: _RowJumps,
+    power: float,
+    bands: DispersionBands,
+    edge_eV: float,
+    axis_eV: float,
+    *,
+    upper: bool,
+    separation: float = COHERENT_JUMP_CLUSTER_SEPARATION,
+) -> float:
+    """Certified dispersive row power between ``edge_eV`` and ``axis_eV``, as a fraction.
+
+    The omitted region is the union of a near part ``[edge, Y]`` and a far
+    part ``[Y, axis]``, so the sum of their region bounds
+    (:func:`_dispersive_region_leak`) bounds it for any split ``Y``. A large
+    material slope far from the window (an absorption edge, the plasmon
+    region) then only forces the far part into one cluster per electron.
+    Splits are tried at carrier distances growing by ``2**0.25`` from the
+    edge's; the least bound, with no split among the candidates, is returned.
+
+    Validation: coherent-line-grid-windowed-resolution
+    """
+    leak = partial(_dispersive_region_leak, jumps, power, bands, upper=upper, separation=separation)
+    best = leak(edge_eV, axis_eV)
+    sign = 1.0 if upper else -1.0
+    if jumps.jumps == 0 or (axis_eV - edge_eV) * sign <= 0.0:
+        return best
+    carriers = np.concatenate((jumps.left_E, jumps.right_E))
+    band_edge = float(carriers.max() if upper else carriers.min())
+    distance = sign * (edge_eV - band_edge)
+    if not distance > 0.0:
+        return best
+    while (axis_eV - (split := band_edge + sign * _SPLIT_RATIO * distance)) * sign > 0.0:
+        best = min(best, leak(edge_eV, split) + leak(split, axis_eV))
+        distance *= _SPLIT_RATIO
+    return best
+
+
+def _edge(leak, band_edge, axis_edge, factor, limit, *, upper):
     """Smallest halo edge in ``[band_edge, axis_edge]`` meeting ``limit``."""
     if (axis_edge - band_edge) * (1.0 if upper else -1.0) <= 0.0:
         return float(axis_edge), 0.0
-    at_axis = factor(axis_edge) * coherent_edge_leak(jumps, power, axis_edge, upper=upper)
+    at_axis = factor(axis_edge) * leak(axis_edge)
     if at_axis > limit:
         return float(axis_edge), float(at_axis)
     near, far = float(band_edge), float(axis_edge)
@@ -543,12 +823,27 @@ def _edge(jumps, power, band_edge, axis_edge, factor, limit, *, upper):
         middle = 0.5 * (near + far)
         if middle in (near, far):
             break
-        leak = factor(middle) * coherent_edge_leak(jumps, power, middle, upper=upper)
-        if leak > limit:
+        if factor(middle) * leak(middle) > limit:
             near = middle
         else:
             far = middle
-    return far, float(factor(far) * coherent_edge_leak(jumps, power, far, upper=upper))
+    return far, float(factor(far) * leak(far))
+
+
+def _dispersive_leak(jumps, power, bands, axis_eV, edge_eV, *, upper):
+    return dispersive_edge_leak(jumps, power, bands, edge_eV, axis_eV, upper=upper)
+
+
+def _widen(leak, edge, axis_edge, factor, limit, *, upper):
+    """Keep ``edge`` when its dispersive bound meets ``limit``, else widen it.
+
+    Windows only grow: the frozen-carrier edge stays the inner bound.
+    """
+    at_edge = factor(edge) * leak(edge)
+    if at_edge <= limit:
+        return float(edge), float(at_edge), False
+    widened, bound = _edge(leak, edge, axis_edge, factor, limit, upper=upper)
+    return widened, bound, True
 
 
 def _support_span(lo, hi, electron=None):
@@ -562,93 +857,72 @@ def _support_span(lo, hi, electron=None):
 
 
 def _dispersion_window_audit(rows, summary, law, decoherence, electron_count):
-    """Absolute production-field envelope over the omitted finite-axis regions.
+    """Certified dispersive row power the windows exclude from the finite axis.
 
-    On each smooth material interval an affine field supplies the tail norm;
-    Minkowski adds the certified nonlinear residual at amplitude level.
-    Nonmonotone/overlapping affine supports use a finite-band L1 bound.
-    The reported frozen-reference fraction is diagnostic: it is not a
-    relative production-power certificate or a sampling-error certificate.
+    Per row and side, :func:`dispersive_edge_leak` between the window edge and
+    the axis edge, times ``1 + F (N_e - 1)`` (``F`` at the upper edge, at the
+    axis start for the lower side), relative to the frozen Parseval
+    reference ``2 pi hbar c sum |a|^2 dd <exp(-tau)>``; the absolute bound is
+    in the units of ``integral sum_e,p |S|^2 dE``. It is not relative to the
+    production row power and not a sampling-error certificate.
     ``decoherence`` must be the production nonincreasing analytic upper bound
     from :func:`decoherence_bound`, or None (F <= 1), not an arbitrary callback.
 
     Validation: coherent-line-grid-windowed-resolution
     """
+    bands = law.bands()
     output = {
         "material_fingerprint": law.fingerprint,
-        "intervals": len(law.breaks) - 1,
-        "normalization": "integral of float64 row intensity dE with E in eV; frozen reference is diagnostic",
+        "intervals": int(bands.lo_eV.size),
+        "normalization": "integral of float64 row intensity dE with E in eV; "
+        "fractions are of the frozen Parseval reference",
         "scope": "float64 material phase and endpoint reconstruction convention",
         "relative_production_bound": False,
         "rows": [],
     }
+    start, stop = float(bands.lo_eV[0]), float(bands.hi_eV[-1])
+    count = max(float(electron_count), 1.0)
     for field, record in zip(rows, summary["rows"], strict=True):
         if field.power <= 0.0 or "window_eV" not in record:
             continue
         lower, upper = record["window_eV"]
-        boundaries = np.unique(np.r_[law.breaks, lower, upper])
-        omitted = residual_total = 0.0
-        fallback = intervals = 0
-        min_step = np.inf
-        # A finite-band L1 majorant needs no monotonic Fourier map, no phase
-        # continuity, and no Parseval normalization.
-        piece_l1 = _piece_l1_amplitudes(field)
-        l1 = _electron_l1_power(piece_l1, field.electron)
-        escape_max = np.abs(field.escape_mid_ang) + 0.5 * np.abs(field.escape_change_ang)
-        residual_coefficient = _electron_l1_power(piece_l1 * escape_max, field.electron)
+        row_decoherence = _row_decoherence(decoherence, field)
+
+        def factor(energy, row_decoherence=row_decoherence):
+            if row_decoherence is None:
+                return count
+            return 1.0 + float(row_decoherence(np.asarray(energy, dtype=float))) * (count - 1)
+
+        jumps = _RowJumps(field, dispersive=True)
+        leak = {
+            "lower": float(
+                factor(start)
+                * dispersive_edge_leak(jumps, field.power, bands, lower, start, upper=False)
+            ),
+            "upper": float(
+                factor(upper)
+                * dispersive_edge_leak(jumps, field.power, bands, upper, stop, upper=True)
+            ),
+        }
+        fraction = leak["lower"] + leak["upper"]
+        reference = 2.0 * np.pi * HBARC_EV_ANG * field.power
         d_lo = field.centre_ang - 0.5 * field.duration_ang
         d_hi = field.centre_ang + 0.5 * field.duration_ang
         L_lo = field.escape_mid_ang - 0.5 * field.escape_change_ang
         L_hi = field.escape_mid_ang + 0.5 * field.escape_change_ang
-        d_span = _support_span(d_lo, d_hi)
         L_span = float(np.maximum(L_lo, L_hi).max() - np.minimum(L_lo, L_hi).min())
-        for lo, hi in zip(boundaries[:-1], boundaries[1:], strict=True):
-            if lo < law.start or hi > law.stop or hi <= lo:
-                continue
-            certificate = law.certificate(lo, hi)
-            width = hi - lo
-            error = (
-                width
-                * min(2.0 * np.sqrt(l1), certificate.residual_max * np.sqrt(residual_coefficient))
-                ** 2
-            )
-            residual_total += error
-            intervals += 1
-            span = d_span + HBARC_EV_ANG * certificate.first_derivative_max * L_span
-            if hi > lower and lo < upper:
-                min_step = min(min_step, np.pi * HBARC_EV_ANG / span / summary["oversampling"])
-                continue
-            row_decoherence = _row_decoherence(decoherence, field)
-            factor = 1.0 + (electron_count - 1) * (
-                1.0 if row_decoherence is None else float(row_decoherence(np.asarray(lo)))
-            )
-            try:
-                affine = _affine_dispersion_row(field, certificate.slope, certificate.intercept)
-            except ValueError:
-                proxy = width * l1
-                fallback += 1
-            else:
-                proxy = 2.0 * np.pi * HBARC_EV_ANG * affine.power
-                if hi < float(affine.energy_eV.min()):
-                    proxy *= min(
-                        1.0, coherent_edge_leak(_RowJumps(affine), affine.power, hi, upper=False)
-                    )
-                elif lo > float(affine.energy_eV.max()):
-                    proxy *= min(
-                        1.0, coherent_edge_leak(_RowJumps(affine), affine.power, lo, upper=True)
-                    )
-                proxy = min(proxy, width * l1)
-            omitted += factor * (np.sqrt(proxy) + np.sqrt(error)) ** 2
-        reference = 2.0 * np.pi * HBARC_EV_ANG * field.power
+        inside = (bands.hi_eV > lower) & (bands.lo_eV < upper)
+        slope = float(bands.slope_max[inside].max()) if inside.any() else 0.0
+        span = _support_span(d_lo, d_hi) + HBARC_EV_ANG * slope * L_span
         output["rows"].append(
             {
                 "row": field.label,
-                "intervals": intervals,
-                "l1_fallback_intervals": fallback,
-                "excluded_power_bound_eV": float(omitted),
-                "frozen_reference_fraction": float(omitted / reference),
-                "affine_residual_power_bound_eV": float(residual_total),
-                "phase_slope_step_all_eV": float(min_step) if np.isfinite(min_step) else None,
+                "leak_bound": leak,
+                "excluded_power_bound_eV": float(fraction * reference),
+                "frozen_reference_fraction": float(fraction),
+                "phase_slope_step_all_eV": float(
+                    np.pi * HBARC_EV_ANG / span / summary["oversampling"]
+                ),
             }
         )
     return output
@@ -688,6 +962,7 @@ def coherent_window_seeds(
     decoherence_limit: float = DEFAULT_COHERENT_DECOHERENCE_LIMIT,
     bin_eV: float = COHERENT_WINDOW_BIN_EV,
     oversampling: float = COHERENT_NYQUIST_OVERSAMPLING,
+    dispersion: DispersionBands | None = None,
 ) -> tuple[list[FeatureSeed], dict[str, Any]]:
     """Coherent windows of every ``(reflection, orientation)`` row.
 
@@ -794,25 +1069,49 @@ def coherent_window_seeds(
             summary["rows"].append(row)
             continue
         jumps = _RowJumps(field)
-        lower_factor = factor_at(start, row_decoherence)
-        upper, upper_leak = _edge(
-            jumps,
-            power,
-            band_hi,
-            stop,
-            partial(factor_at, decoherence=row_decoherence),
-            float(leak_limit),
-            upper=True,
-        )
-        lower, lower_leak = _edge(
-            jumps,
-            power,
-            band_lo,
-            start,
-            lambda _edge_eV, value=lower_factor: value,
-            float(leak_limit),
-            upper=False,
-        )
+        lower_value = factor_at(start, row_decoherence)
+        factors = {
+            True: partial(factor_at, decoherence=row_decoherence),
+            False: lambda _edge_eV, value=lower_value: value,
+        }
+        axes = {True: stop, False: start}
+        edges, leaks = {}, {}
+        for side, band_edge in ((True, band_hi), (False, band_lo)):
+            edges[side], leaks[side] = _edge(
+                partial(coherent_edge_leak, jumps, power, upper=side),
+                band_edge,
+                axes[side],
+                factors[side],
+                float(leak_limit),
+                upper=side,
+            )
+        if dispersion is not None:
+            dispersive = _RowJumps(field, dispersive=True)
+            dispersion_leak, widened = {}, {}
+            for side in (True, False):
+                edges[side], dispersion_leak[side], widened[side] = _widen(
+                    partial(
+                        _dispersive_leak, dispersive, power, dispersion, axes[side], upper=side
+                    ),
+                    edges[side],
+                    axes[side],
+                    factors[side],
+                    float(leak_limit),
+                    upper=side,
+                )
+            row["dispersion_leak_bound"] = {
+                "lower": dispersion_leak[False],
+                "upper": dispersion_leak[True],
+            }
+            row["dispersion_widened"] = {"lower": widened[False], "upper": widened[True]}
+            for side in (True, False):
+                if widened[side]:
+                    # The frozen bound reported is the frozen tail at the edge used.
+                    leaks[side] = factors[side](edges[side]) * coherent_edge_leak(
+                        jumps, power, edges[side], upper=side
+                    )
+        upper, upper_leak = edges[True], leaks[True]
+        lower, lower_leak = edges[False], leaks[False]
         lower, upper = max(lower, start), min(upper, stop)
         row.update(
             {
@@ -904,6 +1203,7 @@ def coherent_case_seeds(
         stop_eV=stop_eV,
         electron_count=bound_count,
         decoherence=decoherence,
+        dispersion=None if dispersion_law is None else dispersion_law.bands(),
     )
     if physical_electrons is not None:
         summary.update(

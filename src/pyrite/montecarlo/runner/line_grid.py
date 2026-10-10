@@ -142,7 +142,7 @@ _WEIGHT_INPUT_KEYS = ("B_ang2",)
 
 #: Bumped whenever the same inputs would seed different coherent windows; it
 #: keys the speed cache of coherent cases only.
-COHERENT_WINDOW_REVISION = 9
+COHERENT_WINDOW_REVISION = 10
 
 
 def _cached_grid(cached):
@@ -290,7 +290,7 @@ def _windowed_line_grid(
 
 
 def _warn_coherent_dispersion(record):
-    """Report a material-law audit gap on cold and warm coordinate-cache paths."""
+    """Report a dispersive window bound above the leak share, cold or warm cache."""
     summaries = record.get("coherent_windows", [])
     if isinstance(summaries, dict):
         summaries = [summaries]
@@ -303,12 +303,11 @@ def _warn_coherent_dispersion(record):
     step = worst["phase_slope_step_all_eV"]
     step_text = "unavailable" if step is None else f"{step:.4g} eV"
     warnings.warn(
-        "coherent window dispersion remains uncertified: the finite-axis excluded-power "
-        f"upper bound is {worst['frozen_reference_fraction']:.4g} times the frozen reference "
-        f"for {worst['row']}; the material phase-slope step is {step_text}. "
-        "This upper bound is not a measured grid error. Production normalization and "
-        "sampling error still need a certificate; use a refined explicit E_grid_line "
-        "for controlled coherent convergence",
+        "coherent window dispersion bound exceeds the leak share: the certified "
+        f"finite-axis excluded-power bound is {worst['frozen_reference_fraction']:.4g} times "
+        f"the frozen reference for {worst['row']}; the material phase-slope step is "
+        f"{step_text}. Production normalization and sampling error still need a "
+        "certificate; use a refined explicit E_grid_line for controlled coherent convergence",
         LineShapePrecisionWarning,
         stacklevel=3,
     )

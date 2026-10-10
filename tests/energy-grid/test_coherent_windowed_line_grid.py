@@ -6,7 +6,10 @@ tests pin the derived rules and their limiting cases; the tiny real transport
 anchors windowed-auto against a fine explicit grid on identical trajectories.
 """
 
+import warnings
+from contextlib import contextmanager
 from dataclasses import replace
+from functools import partial
 
 import numpy as np
 import pytest
@@ -495,47 +498,216 @@ def test_dispersion_helpers_require_complete_geometry_and_a_valid_certificate():
         cw._affine_dispersion_row(replace(row, escape_mid_ang=np.array([np.nan])), 0.0)
 
 
-@pytest.mark.parametrize("delta,residual", [(1e-5, 0.0), (1e-5, 1e-4), (1.1e-4, 0.0)])
-def test_dispersion_window_audit_bounds_the_actual_excluded_field(delta, residual):
-    """Direct physical-field integration covers a shifted resonance and L1 fallback."""
+def _analytic_law(start, stop, slope, residual=0.0, period=30.0):
+    """``delta_omega = slope E + residual sin((E - start)/period)``, one smooth interval."""
     from types import SimpleNamespace
 
-    from pyrite.montecarlo.spectrum.coherent_dispersion import DispersionCertificate
+    from pyrite.montecarlo.spectrum.coherent_dispersion import DispersionBands
 
-    slope = delta / HBARC_EV_ANG
-    law = SimpleNamespace(
-        start=900.0,
-        stop=1200.0,
-        breaks=np.array([900.0, 1200.0]),
-        fingerprint="analytic test law",
-        certificate=lambda lo, hi: DispersionCertificate(
-            lo, hi, slope, 0.0, residual, abs(slope) + residual / 30.0
-        ),
+    def law(energies):
+        energies = np.asarray(energies, dtype=float)
+        return slope * energies + residual * np.sin((energies - start) / period)
+
+    ends = slope * np.array([start, stop])
+    bands = DispersionBands(
+        lo_eV=np.array([start]),
+        hi_eV=np.array([stop]),
+        phase_min=np.array([ends.min() - residual]),
+        phase_max=np.array([ends.max() + residual]),
+        slope_max=np.array([abs(slope) + residual / period]),
+        variation=np.array([residual / period**2 * (stop - start)]),
     )
+    return SimpleNamespace(
+        start=start, stop=stop, fingerprint="analytic test law", bands=lambda: bands, law=law
+    )
+
+
+def _track(seed, electrons=2, pieces=10, escape=2e5):
+    """Joined pieces per electron with moving carriers, escape gradients and damping."""
+    rng = np.random.default_rng(seed)
+    n = electrons * pieces
+    durations = rng.uniform(30.0, 300.0, n)
+    electron = np.repeat(np.arange(electrons), pieces)
+    lo = np.zeros(n)
+    for e in range(electrons):
+        sel = electron == e
+        lo[sel] = 1e4 * e + np.cumsum(np.r_[0.0, durations[sel][:-1]])
+    gradient = -rng.uniform(1.5, 5.5, n)
+    change = gradient * durations
+    start_L = np.zeros(n)
+    for e in range(electrons):
+        idx = np.flatnonzero(electron == e)
+        start_L[idx] = escape + np.cumsum(np.r_[0.0, change[idx][:-1]])
+    tau = rng.uniform(0.0, 0.4, n)
+    slope = tau / (2 * durations)
+    start_T = np.ones(n)
+    end_T = np.exp(-tau / 2)
+    return cw.CoherentRowField(
+        label="track",
+        energy_eV=rng.uniform(900.0, 1100.0, n),
+        amplitude=(rng.uniform(0.5, 1.5, (2, n)) * np.exp(1j * rng.uniform(0, 2 * np.pi, (2, n)))),
+        duration_ang=durations,
+        centre_ang=lo + 0.5 * durations,
+        electron=electron,
+        start_transmission=start_T,
+        end_transmission=end_T,
+        mean_transmission=(1 - np.exp(-tau)) / tau,
+        attenuation_slope_ang=slope,
+        escape_mid_ang=start_L + 0.5 * change,
+        escape_change_ang=change,
+        phase_rad=np.zeros(n),
+    )
+
+
+def _production_tail(field, law, lo, hi):
+    """Independent quadrature of the production row field's power on ``[lo, hi]``."""
+    from pyrite.montecarlo.spectrum.coherent_normalization import _sample_row_fields
+
+    span = cw._support_span(
+        field.centre_ang - 0.5 * field.duration_ang,
+        field.centre_ang + 0.5 * field.duration_ang,
+        field.electron,
+    )
+    step = np.pi * HBARC_EV_ANG / span / 16.0
+    energies = np.linspace(lo, hi, int(np.ceil((hi - lo) / step)) + 1)
+    fields = _sample_row_fields(field, law, energies, remove_global_phase=True)
+    power = np.trapezoid(np.sum(np.abs(fields) ** 2, axis=(0, 1)), energies)
+    return power / (2 * np.pi * HBARC_EV_ANG * field.power)
+
+
+@pytest.mark.parametrize("upper", [True, False])
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_dispersive_leak_bounds_the_production_field_beyond_the_edge(upper, seed):
+    """Joined tracks, moving carriers and escape gradients under the HOPG law.
+
+    The lower side reaches 10 eV through the carbon K edge and the plasmon
+    region, where the material slope forces one cluster per electron.
+    """
+    from pyrite.montecarlo.spectrum.coherent_dispersion import CoherentDispersionLaw
+
+    law = CoherentDispersionLaw("hopg", 10.0, 3000.0)
+    field = _track(seed)
+    jumps = cw._RowJumps(field, dispersive=True)
+    edge, axis = (1250.0, 3000.0) if upper else (750.0, 10.0)
+    bound = cw.dispersive_edge_leak(jumps, field.power, law.bands(), edge, axis, upper=upper)
+    actual = _production_tail(field, law, min(edge, axis), max(edge, axis))
+    assert 0.0 < actual <= bound < 1.0
+
+
+def test_dispersive_leak_with_no_material_phase_is_the_frozen_bound():
+    """With delta_omega = 0 the certificate is at most the frozen one; one segment equals it."""
+    from pyrite.montecarlo.spectrum.coherent_dispersion import DispersionBands
+
+    field = replace(_track(3, electrons=1), energy_eV=np.full(10, 1000.0))
+    zero = DispersionBands(*(np.array([v]) for v in (10.0, 1e9, 0.0, 0.0, 0.0, 0.0)))
+    for edge, upper in ((1200.0, True), (800.0, False)):
+        axis = 1e9 if upper else 10.0
+        bound = cw.dispersive_edge_leak(
+            cw._RowJumps(field, dispersive=True), field.power, zero, edge, axis, upper=upper
+        )
+        frozen = cw.coherent_edge_leak(cw._RowJumps(field), field.power, edge, upper=upper)
+        assert 0.0 < bound <= frozen * (1 + 1e-12)
+    single = replace(
+        _field([50.0], 1000.0, 1.0),
+        escape_mid_ang=np.array([1e5]),
+        escape_change_ang=np.array([-200.0]),
+    )
+    w = 2 * np.pi * HBARC_EV_ANG / 50.0
+    jumps = cw._RowJumps(single, dispersive=True)
+    region = cw._dispersive_region_leak(jumps, single.power, zero, 1100.0, 1e9, upper=True)
+    # Within M hbar c / dd the two free ends form one cluster: w / (pi^2 u).
+    assert region == pytest.approx(float(sincsq_upper_tail_bound(w, 100.0)), rel=1e-6)
+    # A far split decorrelates the ends there, never loosening the bound.
+    split = cw.dispersive_edge_leak(jumps, single.power, zero, 1100.0, 1e9, upper=True)
+    assert split <= region
+
+
+def test_the_material_slope_jump_bound_covers_every_knot():
+    """f2 is log-linear: delta_omega' jumps at table energies, within the bound."""
+    from pyrite.montecarlo.spectrum.coherent_dispersion import CoherentDispersionLaw
+
+    law = CoherentDispersionLaw("hopg", 10.0, 6000.0)
+    breaks = law.breaks
+    jumps = []
+
+    def value(energy):
+        return law(np.array([energy]))[0]
+
+    for i in range(1, breaks.size - 1):
+        knot = breaks[i]
+        # Second-order one-sided stencils inside each neighbouring interval;
+        # their error is within the intervals' curvature bound times h.
+        h = 0.02 * min(knot - breaks[i - 1], breaks[i + 1] - knot)
+        left = (3 * value(knot) - 4 * value(knot - h) + value(knot - 2 * h)) / (2 * h)
+        right = (-3 * value(knot) + 4 * value(knot + h) - value(knot + 2 * h)) / (2 * h)
+        curvature = max(
+            law.certificate(breaks[i - 1], knot).second_derivative_max,
+            law.certificate(knot, breaks[i + 1]).second_derivative_max,
+        )
+        assert abs(right - left) <= law.slope_jump_bound(knot) + 2 * curvature * h
+        jumps.append(abs(right - left))
+    assert max(jumps) > 0.0
+    bands = law.bands()
+    assert np.all(bands.variation >= 0.0) and np.all(np.isfinite(bands.variation))
+
+
+def test_a_shifted_carrier_is_never_certified_and_the_window_widens_over_it():
+    """2026-10-06 counterexample: the escape gradient moves the 1000 eV carrier to 1111 eV."""
+    law = _analytic_law(900.0, 1400.0, 1e-5 / HBARC_EV_ANG)
     row = replace(
-        _field([100.0], 1000.0, 1.0),
-        escape_mid_ang=np.array([5e5]),
-        escape_change_ang=np.array([1e6]),
+        _field([1e4], 1000.0, 1.0),
+        escape_mid_ang=np.array([5e7]),
+        escape_change_ang=np.array([1e8]),
+        phase_rad=np.zeros(1),
     )
-    summary = {"rows": [{"window_eV": [950.0, 1050.0]}], "oversampling": 2.0}
-    audit = cw._dispersion_window_audit([row], summary, law, None, 1)
-    finite = 0.0
-    for lo, hi in ((900.0, 950.0), (1050.0, 1200.0)):
-        energies = np.linspace(lo, hi, 20001)
-        dw = slope * energies + residual * np.sin((energies - 900.0) / 30.0)
-        v = 100.0 * (energies - 1000.0) / (2 * HBARC_EV_ANG) - 5e5 * dw
-        actual = 100.0 * np.sinc(v / np.pi)
-        finite += np.trapezoid(actual**2, energies)
-    result = audit["rows"][0]
-    assert 0.0 < finite <= result["excluded_power_bound_eV"]
+    jumps = cw._RowJumps(row, dispersive=True)
+    assert cw.dispersive_edge_leak(jumps, row.power, law.bands(), 1100.0, 1400.0, upper=True) == (
+        np.inf
+    )
+    seeds = partial(
+        cw.coherent_window_seeds,
+        [row],
+        start_eV=900.0,
+        stop_eV=1400.0,
+        electron_count=1,
+        decoherence=None,
+        leak_limit=1e-2,
+    )
+    _, frozen = seeds()
+    assert frozen["rows"][0]["window_eV"][1] < 1000.0 / 0.9
+    _, summary = seeds(dispersion=law.bands())
+    record = summary["rows"][0]
+    assert record["dispersion_widened"]["upper"]
+    assert record["window_eV"][1] > 1000.0 / 0.9
+    assert record["dispersion_leak_bound"]["upper"] <= summary["leak_limit"]
+    # The certified window holds the actual excluded field.
+    actual = _production_tail(row, law.law, record["window_eV"][1], 1400.0)
+    assert actual <= record["dispersion_leak_bound"]["upper"]
+
+
+@pytest.mark.parametrize("residual", [0.0, 1e-6])
+def test_dispersion_window_audit_bounds_the_actual_excluded_field(residual):
+    """The audit's side bounds hold the production field beyond each window edge."""
+    law = _analytic_law(10.0, 3000.0, 2e-8, residual)
+    field = _track(4)
+    _, summary = cw.coherent_window_seeds(
+        [field],
+        start_eV=10.0,
+        stop_eV=3000.0,
+        electron_count=1,
+        decoherence=None,
+        dispersion=law.bands(),
+    )
+    audit = cw._dispersion_window_audit([field], summary, law, None, 1)
+    (result,) = audit["rows"]
+    lower, upper = summary["rows"][0]["window_eV"]
     assert audit["relative_production_bound"] is False
     assert result["phase_slope_step_all_eV"] > 0.0
-    if delta > 1e-4:
-        assert result["l1_fallback_intervals"] == 2
-    else:
-        assert result["l1_fallback_intervals"] == 0
-    if residual == 0.0:
-        assert result["affine_residual_power_bound_eV"] == 0.0
+    for side, (lo, hi) in (("lower", (10.0, lower)), ("upper", (upper, 3000.0))):
+        if hi > lo:
+            actual = _production_tail(field, law.law, lo, hi)
+            assert 0.0 < actual <= result["leak_bound"][side] <= summary["leak_limit"]
+    assert result["frozen_reference_fraction"] == pytest.approx(sum(result["leak_bound"].values()))
 
 
 @pytest.mark.parametrize("edge_distance", [20.0, 80.0, 400.0])
@@ -652,6 +824,16 @@ def tiny():
     case["bunch_length_fs"] = 100.0
     ladder = cc.CaseLadder(case, transport_core="lockstep")
     return case, ladder
+
+
+@contextmanager
+def _certified_dispersion():
+    """The dispersive window bound meets the leak share: no dispersion warning."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "error", message="coherent window dispersion", category=LineShapePrecisionWarning
+        )
+        yield
 
 
 def _policy(case, **per_call):
@@ -952,7 +1134,7 @@ def test_uniform_automatic_policy_still_refuses_coherent_emission(tiny):
 def test_a_windowed_policy_resolves_coherent_emission_and_records_its_windows(tiny):
     case, ladder = tiny
     policy = _policy(case, windows=True)
-    with pytest.warns(LineShapePrecisionWarning, match="dispersion remains uncertified"):
+    with _certified_dispersion():
         grid, record = _resolve(case, ladder, policy)
     coherent = record["coherent_windows"]
     assert grid.size == record["num"]
@@ -968,7 +1150,11 @@ def test_a_windowed_policy_resolves_coherent_emission_and_records_its_windows(ti
     audit = coherent["dispersion"]
     assert audit["intervals"] > 0 and audit["relative_production_bound"] is False
     assert audit["rows"] and all(row["excluded_power_bound_eV"] >= 0 for row in audit["rows"])
-    with pytest.warns(LineShapePrecisionWarning, match="dispersion remains uncertified"):
+    for row, summary in zip(audit["rows"], rows, strict=True):
+        # The windows certify the dispersive field: each side meets the share.
+        assert max(row["leak_bound"].values()) <= coherent["leak_limit"]
+        assert summary["dispersion_leak_bound"] == pytest.approx(row["leak_bound"], rel=1e-12)
+    with _certified_dispersion():
         warm_grid, warm_record = _resolve(case, ladder, policy)
     np.testing.assert_array_equal(warm_grid, grid)
     assert warm_record["cache"] == "hit"
@@ -989,9 +1175,9 @@ def test_coherent_and_incoherent_grids_never_share_a_cache_entry(tiny):
 def test_coherent_cache_tracks_the_frozen_coupling_weight(tiny):
     case, ladder = tiny
     policy = _policy(case, windows=True)
-    with pytest.warns(LineShapePrecisionWarning, match="dispersion remains uncertified"):
+    with _certified_dispersion():
         _, first = _resolve({**case, "B_ang2": 0.0}, ladder, policy)
-    with pytest.warns(LineShapePrecisionWarning, match="dispersion remains uncertified"):
+    with _certified_dispersion():
         _, changed = _resolve({**case, "B_ang2": 1.0}, ladder, policy)
     assert first["cache"] == changed["cache"] == "miss"
     assert first["cache_key"] != changed["cache_key"]
@@ -1136,6 +1322,53 @@ def test_the_production_reducer_leaks_less_than_the_window_bound(tiny, hkl):
     if not row["at_axis"]["lower"]:
         below = energy <= lower
         assert np.trapezoid(lines[below], energy[below]) <= limit * total
+
+
+@pytest.mark.slow
+def test_production_field_beyond_the_certified_windows_stays_inside_the_dispersive_bound(tiny):
+    """Anchor: window-excluded dispersive power on the real transport (#372).
+
+    Both rows' windows stop inside the axis on at least one side, so the
+    production field (``_sample_row_fields``, the reducer's own formation and
+    phase law, pinned to ``_lines_for_segments`` above) has nonzero power
+    outside them. Integrated at the per-electron window step it stays inside
+    each side's certified fraction of the frozen Parseval reference. Row 1's
+    lower edge sits at the dispersive (not the frozen) bound: its omitted band
+    reaches 10 eV through the carbon K edge.
+    """
+    from pyrite.montecarlo.runner.line_grid import _coherent_rows, longitudinal_rms_fs
+    from pyrite.montecarlo.spectrum.coherent_dispersion import CoherentDispersionLaw
+
+    case, ladder = tiny
+    tp = ladder.transport
+    bandwidth = case["line_grid_policy"]["bandwidth"]
+    start, stop = bandwidth["start_eV"], bandwidth["stop_eV"]
+    rows = _coherent_rows(
+        case, ladder.segments, tp["n_hat"], tp["Ne_lines"], start, stop, None, None
+    )
+    law = CoherentDispersionLaw(case["crystal"], start, stop)
+    _, summary = cw.coherent_case_seeds(
+        rows,
+        ladder.segments,
+        electron_limit=tp["Ne_lines"],
+        start_eV=start,
+        stop_eV=stop,
+        longitudinal_rms_fs=longitudinal_rms_fs(case),
+        dispersion_law=law,
+    )
+    measured = []
+    for field, record, audit in zip(
+        rows, summary["rows"], summary["dispersion"]["rows"], strict=True
+    ):
+        lower, upper = record["window_eV"]
+        for side, (lo, hi) in (("lower", (start, lower)), ("upper", (upper, stop))):
+            if hi <= lo:
+                continue
+            actual = _production_tail(field, law, lo, hi)
+            assert actual <= audit["leak_bound"][side] <= summary["leak_limit"]
+            measured.append((record["row"], side, actual, record["dispersion_widened"][side]))
+    assert any(actual > 0.0 for *_, actual, _widened in measured)
+    assert any(widened for *_, widened in measured)
 
 
 def test_physical_charge_widens_windows_and_keeps_incident_misses_in_bound():
