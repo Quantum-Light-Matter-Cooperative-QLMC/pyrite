@@ -49,6 +49,7 @@ def mc_spectrum(
     coefficient_capture=None,
     physical_electrons=None,
     coherent_flat_omission_limit=0.0,
+    phase_retention=None,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron] on
@@ -176,6 +177,13 @@ def mc_spectrum(
         use the certified Gaussian F_z. ``0`` (default) evaluates the full
         estimator bit-identically. Validation: coherent-flat-term-omission
 
+    phase_retention
+        Optional ``PhaseRetentionPolicy`` cost/observable gate for the existing
+        certified flat omission. Unknown cost or unsupported scope retains full
+        phase. ``enabled=False`` disables omission. The existing omission limit
+        supplies the accuracy share; no additional budget is allocated. With
+        ``None``, the historical explicit omission control is unchanged.
+
     Returns
     -------
     numpy.ndarray or tuple of numpy.ndarray
@@ -232,6 +240,7 @@ def mc_spectrum(
         coefficient_capture=coefficient_capture,
         physical_electrons=physical_electrons,
         coherent_flat_omission_limit=coherent_flat_omission_limit,
+        phase_retention=phase_retention,
     )
     return _mc_spectrum(request)
 

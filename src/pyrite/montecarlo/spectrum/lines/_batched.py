@@ -914,7 +914,9 @@ def _accumulate_batched(st):
         stream_F_rows = stream_keep = None
         if st.decoherence_active or st.request.physical_electrons is not None:
             stream_F_rows = xp.stack([_row_decoherence_factor(st, G[i]) for i in range(N_g)])
-            stream_keep = _flat_energy_keep(st, stream_F_rows)
+            stream_keep = _flat_energy_keep(
+                st, stream_F_rows, route="batched-stream", row_vectors=G
+            )
         _flat_st = _flat_view(st, stream_keep)
         _E_flat = xp.ascontiguousarray(_flat_st.E_grid, dtype=REAL)
         _dom_flat = xp.ascontiguousarray(_flat_st.delta_omega_grid, dtype=REAL)

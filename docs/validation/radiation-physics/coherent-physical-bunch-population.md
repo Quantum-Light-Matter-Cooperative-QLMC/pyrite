@@ -105,7 +105,8 @@ its original operator; it does not validate this new estimator automatically.
 Temporal output scales its cross-electron difference by the same pair weight.
 
 Coherent grid cache revision is 8 (7 before #370) and includes the physical population. Dataset
-and content identities carry `physical-distinct-pairs-v2` (v1 before #370) only for coherent
+and content identities carry `physical-distinct-pairs-v3` (v2 before #365's transverse
+omission certificate, v1 before #370) only for coherent
 emission, preventing reuse of sampled-population spectra. Previous remote ladders
 remain evidence for their recorded operator; charge-weighted default-policy
 reference/thick runs must be repeated before production acceptance.

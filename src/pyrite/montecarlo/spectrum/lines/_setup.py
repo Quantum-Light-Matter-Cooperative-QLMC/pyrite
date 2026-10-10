@@ -97,6 +97,7 @@ class SpectrumRequest:
     coefficient_capture: Any = None
     physical_electrons: Any = None
     coherent_flat_omission_limit: Any = 0.0
+    phase_retention: Any = None
 
 
 @dataclass
@@ -549,6 +550,11 @@ def _prepare_spectrum(request):
     # Validation: coherent-inter-electron-decoherence
     decoherence_active = False
     flat_omission_limit = float(request.coherent_flat_omission_limit)
+    if request.phase_retention is not None:
+        from ..phase_retention import PhaseRetentionPolicy
+
+        if not isinstance(request.phase_retention, PhaseRetentionPolicy):
+            raise ValueError("phase_retention must be a PhaseRetentionPolicy or None")
     if not np.isfinite(flat_omission_limit) or flat_omission_limit < 0.0:
         raise ValueError("coherent_flat_omission_limit must be finite and nonnegative")
     if coherent:

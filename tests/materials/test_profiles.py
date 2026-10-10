@@ -503,7 +503,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "promising_low_ne",
             "hopg",
-            "fdbc032615671ce9d0fb570573b06dcabe5d09b994b1545de5622982bed75bc1",
+            "7a8dba8798e320dddd6da8a1b1e18a043774cc8b7ffabf457434217b9b69099b",
         ),
     ],
 )
@@ -534,7 +534,8 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     weighting. The other pinned profiles use incoherent emission, which omits
     the marker, so their digests held. #370 moved it once more: the marker
     became ``physical-distinct-pairs-v2`` (finite-footprint transverse form
-    factor and tilted face-arrival delay).
+    factor and tilted face-arrival delay), then ``physical-distinct-pairs-v3``
+    for #365 (flat omission certified by ``F_z F_perp``).
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in

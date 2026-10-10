@@ -169,7 +169,12 @@ def _batched_coherent_finalize(
             F_row = keep = None
             if decoherence_active:
                 F_row = _row_decoherence_factor(st, G[i_row])
-                keep = _flat_energy_keep(st, F_row)
+                keep = _flat_energy_keep(
+                    st,
+                    F_row,
+                    route="batched-jit" if _use_jit_coherent_reduction else "batched-eager",
+                    row_vectors=G[i_row],
+                )
             flat_st = _flat_view(st, keep)
             E_flat = flat_st.E_grid
             dom_flat = flat_st.delta_omega_grid

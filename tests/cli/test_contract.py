@@ -8,7 +8,7 @@ import pytest
 from click.testing import CliRunner, Result
 
 from pyrite import cli
-from pyrite.cli._deprecations import RetiredOption
+from pyrite.cli._deprecations import DEPRECATIONS, RetiredOption
 
 CONTRACT = Path(__file__).parents[1] / "data" / "cli_contract.json"
 
@@ -165,7 +165,12 @@ def test_click_tree_preserves_frozen_command_and_option_names():
             child_name = child["path"].split()[-1]
             child_path = tuple(child["path"].split())
             if not _retired(child_path) and not child["hidden"]:
-                assert child_name in completed.stdout
+                if child["path"] in DEPRECATIONS:
+                    # Registered deprecated aliases remain callable but leave help.
+                    assert current.get_command(ctx, child_name).hidden
+                    assert child_name not in completed.stdout
+                else:
+                    assert child_name in completed.stdout
             check(child)
 
     check(_FROZEN["root"])

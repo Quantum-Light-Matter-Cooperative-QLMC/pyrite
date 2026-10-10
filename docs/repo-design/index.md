@@ -28,6 +28,8 @@ core-architecture-rfc
 compute/coherent-streaming-rawkernel.md
 compute/compute-performance-optimization.md
 compute/startup-latency.md
+compute/phase-retention.md
+compute/phase-retention-benchmarks.md
 compute/gpu-transport-rawkernel.md
 compute/jit-spectrum-kernel-walkthrough.md
 compute/straggled-transport-integration.md

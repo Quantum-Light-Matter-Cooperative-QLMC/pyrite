@@ -25,6 +25,7 @@ Validation: transverse-bunch-form-factor
 """
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -173,3 +174,75 @@ def transverse_envelope(spot, n_hat, g_vec):
         return np.where(omega >= omega_star, exact, np.exp(-q_min))
 
     return bound
+
+
+def _interval_exponent(spot, omega, n_hat, g_vec):
+    """Interval ``q(omega) = K^T Sigma_f K`` and ``q'(omega) / 2``.
+
+    ``omega`` is one point or a ``(low, high)`` pair; for a pair the result
+    encloses the range over the whole interval. Binary64 ``omega``, ``Sigma_f``, ``a = (n_hat - b/beta)_xy`` and ``g_xy`` are
+    exact, formed as in :func:`transverse_form_factor` (whose off-diagonal entry
+    ``Sigma_f[0, 1]`` multiplies both cross terms).
+    """
+    from mpmath.ctx_iv import MPIntervalContext
+
+    S = spot.face_covariance.tolist()
+    a = np.asarray(_to_cpu(n_hat), dtype=float)[:2] - spot.beam_xy_over_beta
+    g = np.asarray(_to_cpu(g_vec), dtype=float)[:2]
+    low, high = (omega, omega) if np.ndim(omega) == 0 else omega
+    values = [float(low), float(high), *map(float, a), *map(float, g), S[0][0], S[0][1], S[1][1]]
+    if not np.all(np.isfinite(values)) or values[0] > values[1]:
+        raise ValueError("transverse factor bounds need finite inputs and an ordered interval")
+    ctx: Any = MPIntervalContext()
+    ctx.dps = 50
+    w = ctx.mpf([values[0], values[1]])
+    a0, a1, g0, g1, s00, s01, s11 = (ctx.mpf(value) for value in values[2:])
+    kx, ky = w * a0 + g0, w * a1 + g1
+    exponent = kx**2 * s00 + 2 * kx * ky * s01 + ky**2 * s11
+    half_slope = kx * a0 * s00 + (a0 * ky + kx * a1) * s01 + ky * a1 * s11
+    return ctx, exponent, half_slope
+
+
+def transverse_form_factor_upper(spot, omega, n_hat, g_vec):
+    """Directed upper bound on ``exp(-max(q, 0))`` at ``omega`` [1/Ang].
+
+    ``omega`` is one point or a ``(low, high)`` pair bounding the whole
+    interval (looser: interval dependency). Encloses the real-valued production law of :func:`transverse_form_factor`
+    with its binary64 inputs treated as exact; it does not enclose device
+    arithmetic. The result lies in ``[0, 1]``; positive underflow keeps the
+    smallest positive bound, never a certified zero.
+
+    Validation: coherent-transverse-flat-omission
+    """
+    from mpmath.libmp import round_ceiling, to_float
+
+    ctx, exponent, _ = _interval_exponent(spot, omega, n_hat, g_vec)
+    # Lower endpoint, clamped like the production PSD guard (degenerate interval).
+    q_low = exponent.a if exponent.a > 0 else ctx.mpf(0)
+    # exp(-1000) is below the smallest positive binary64 number.
+    if q_low.a >= 1000:
+        return float(np.nextafter(0.0, np.inf))
+    value = ctx.exp(-q_low)
+    upper = to_float(value._mpi_[1], rnd=round_ceiling)
+    # Conversion can round inward at binary64 subnormals: move outward.
+    while ctx.mpf(upper) < value.b:
+        upper = float(np.nextafter(upper, np.inf))
+    return min(1.0, max(upper, float(np.nextafter(0.0, np.inf))))
+
+
+def transverse_slope_sign(spot, omega, n_hat, g_vec):
+    """Certified sign of ``dq/domega`` at one ``omega``: ``1``, ``-1`` or ``0``.
+
+    ``0`` means the interval contains zero (undecided). ``q`` is a quadratic
+    in ``omega`` with ``q'' = 2 a^T Sigma_f a``; its derivative is affine, so
+    equal certified signs at two points hold on the whole interval between
+    them, making ``F_perp`` monotone there.
+
+    Validation: coherent-transverse-flat-omission
+    """
+    _, _, half_slope = _interval_exponent(spot, omega, n_hat, g_vec)
+    if half_slope.a > 0:
+        return 1
+    if half_slope.b < 0:
+        return -1
+    return 0

@@ -291,7 +291,7 @@ def test_population_model_revision_invalidates_coherent_dataset_identity(monkeyp
     assert "coherent_population_model" not in old_plain["resolved_parameters"]
     assert (
         old_coherent["resolved_parameters"]["coherent_population_model"]
-        == "physical-distinct-pairs-v2"
+        == "physical-distinct-pairs-v3"
     )
     monkeypatch.setattr(profiles, "COHERENT_POPULATION_MODEL", "next-physical-pair-model")
     assert identity(plain)["parameter_sha256"] == old_plain["parameter_sha256"]

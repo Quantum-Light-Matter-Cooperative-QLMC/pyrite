@@ -1,0 +1,2900 @@
+{
+  "format": "pyrite.phase-retention-measurements.v1",
+  "slurm_jobs": {
+    "paired": 1171,
+    "calibrated": 1174
+  },
+  "code_identity_calibrated": "code_digest: fb97be4a1dd850f12e9b5c9178437bc5cd6177769ab69dd96985c99a30f33a48\ncode_revision: 6702fd560d06df7ec4a7fd504831ad3c6018c81f\ncode_dirty: True\ncode_synced_at: 2026-10-09T17:59:39+00:00\ncode_source: ALEX-DESKTOP:/home/alexa/dev/pyrite/.worktrees/issue-365-adaptive-phase-retention\ncode_tables_digest: c0d084d6b77f513e9c1686c1817d907d765be1560b8f414af3898c59bf0cb014\n",
+  "reports": {
+    "paired": [
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 50000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 7,
+          "seed": 362,
+          "bunch_rms_fs": 0.01,
+          "observation_deg": 95.0,
+          "trajectory": "results/phase365/thick-long.h5",
+          "phase_policy": true,
+          "route": "auto"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 13232,
+        "segment_sha256": "f5c06210ef15325dc9125632ad8b2d65120d2e97afda1254ebf378b7994af03a",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.4266304349876009,
+        "artifact_io_s": 0.032448425015900284,
+        "replayed_trajectory": false,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.019673951988806948,
+            0.019656931021017954,
+            0.019271247991127893,
+            0.01979075398412533,
+            0.019560261978767812,
+            0.019486339995637536,
+            0.01918672799365595
+          ],
+          "masked": [
+            0.020316979003837332,
+            0.019779642985668033,
+            0.01995208498556167,
+            0.019988145999377593,
+            0.01984611398074776,
+            0.020204547996399924,
+            0.020497610996244475
+          ],
+          "gated_fallback": [
+            0.022335599991492927,
+            0.02190017601242289,
+            0.022066817997256294,
+            0.02175597398309037,
+            0.02209990899427794,
+            0.022283471014816314,
+            0.022620269999606535
+          ]
+        },
+        "speedup_median": 0.9785931111057972,
+        "yield": [
+          2.1985267235723647e-07,
+          2.1985267235723647e-07
+        ],
+        "centroid_eV": [
+          1563.2968151322639,
+          1563.2968151322639
+        ],
+        "relative_change": {
+          "yield": 0.0,
+          "centroid": 0.0
+        },
+        "max_relative_observable_change": 0.0,
+        "max_absolute_spectrum_change": 0.0,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 8.337892144294826e-14,
+        "peak_rss_kib": 777460,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 7,
+              "cost": null,
+              "reason": "missing-cost-evidence",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 0,
+                "route": "batched-stream",
+                "rows": 2,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.003433542005950585
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thick-long-auto"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 50000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 7,
+          "seed": 362,
+          "bunch_rms_fs": 0.01,
+          "observation_deg": 95.0,
+          "trajectory": "results/phase365/thick-long.h5",
+          "phase_policy": true,
+          "route": "eager"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 13232,
+        "segment_sha256": "f5c06210ef15325dc9125632ad8b2d65120d2e97afda1254ebf378b7994af03a",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.022416421998059377,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.12569865098339505,
+            0.125836318009533,
+            0.12560015497729182,
+            0.12564534600824118,
+            0.12546024602488615,
+            0.12516351498197764,
+            0.12510220499825664
+          ],
+          "masked": [
+            0.09338210901478305,
+            0.09374169597867876,
+            0.09364376502344385,
+            0.09351779401185922,
+            0.09393822200945579,
+            0.09326498399605043,
+            0.0933361949864775
+          ],
+          "gated_fallback": [
+            0.13031289298669435,
+            0.12995712499832734,
+            0.13038156801485457,
+            0.1301444049749989,
+            0.1307813159946818,
+            0.13020784000400454,
+            0.13049910400877707
+          ]
+        },
+        "speedup_median": 1.3430615670998842,
+        "yield": [
+          2.1985253519131932e-07,
+          2.1985253519131932e-07
+        ],
+        "centroid_eV": [
+          1563.2961894319828,
+          1563.2961894319828
+        ],
+        "relative_change": {
+          "yield": 0.0,
+          "centroid": 0.0
+        },
+        "max_relative_observable_change": 0.0,
+        "max_absolute_spectrum_change": 0.0,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 8.338113728113827e-14,
+        "peak_rss_kib": 800608,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 14,
+              "cost": null,
+              "reason": "missing-cost-evidence",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 0,
+                "route": "batched-eager",
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.005679110996425152
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thick-long-eager"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 50000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 7,
+          "seed": 362,
+          "bunch_rms_fs": 0.01,
+          "observation_deg": 95.0,
+          "trajectory": "results/phase365/thick-long.h5",
+          "phase_policy": true,
+          "route": "jit"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 13232,
+        "segment_sha256": "f5c06210ef15325dc9125632ad8b2d65120d2e97afda1254ebf378b7994af03a",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.023276858002645895,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.03791517700301483,
+            0.03806970900041051,
+            0.03803231701022014,
+            0.037666563992388546,
+            0.03759060299489647,
+            0.037597553979139775,
+            0.03743284000665881
+          ],
+          "masked": [
+            0.042214902001433074,
+            0.041838717996142805,
+            0.041216401994461194,
+            0.04233812299207784,
+            0.04074719699565321,
+            0.04117808098089881,
+            0.04070036701159552
+          ],
+          "gated_fallback": [
+            0.04261913601658307,
+            0.04238982399692759,
+            0.04258015600498766,
+            0.042088281974429265,
+            0.0424099639931228,
+            0.04206927100312896,
+            0.04218131201923825
+          ]
+        },
+        "speedup_median": 0.9138731711091694,
+        "yield": [
+          2.198516238348763e-07,
+          2.198516238348763e-07
+        ],
+        "centroid_eV": [
+          1563.2968926001672,
+          1563.2968926001672
+        ],
+        "relative_change": {
+          "yield": 0.0,
+          "centroid": 0.0
+        },
+        "max_relative_observable_change": 0.0,
+        "max_absolute_spectrum_change": 0.0,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 8.337840644691633e-14,
+        "peak_rss_kib": 750368,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 14,
+              "cost": null,
+              "reason": "missing-cost-evidence",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 0,
+                "route": "batched-jit",
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.005186296009924263
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thick-long-jit"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 50000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 7,
+          "seed": 362,
+          "bunch_rms_fs": 0.001,
+          "observation_deg": 119.0,
+          "trajectory": "results/phase365/thick-short.h5",
+          "phase_policy": true,
+          "route": "auto"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 13232,
+        "segment_sha256": "dd34105428c1ba9c49c0b7b7145e3cdc11749e0ebb2014aacd03220e798f2658",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.4401605069870129,
+        "artifact_io_s": 0.032410054991487414,
+        "replayed_trajectory": false,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.020634347980376333,
+            0.020218869991367683,
+            0.020565168000757694,
+            0.020571658009430394,
+            0.02053779800189659,
+            0.020279218995710835,
+            0.02020778998848982
+          ],
+          "masked": [
+            0.021911222982453182,
+            0.02174279300379567,
+            0.02242946100886911,
+            0.021652263996656984,
+            0.021836903993971646,
+            0.02171395398909226,
+            0.021996133000357077
+          ],
+          "gated_fallback": [
+            0.02307748797466047,
+            0.022935029002837837,
+            0.023108477995265275,
+            0.022735649981768802,
+            0.022985957999480888,
+            0.022941767994780093,
+            0.022952708997763693
+          ]
+        },
+        "speedup_median": 0.9405086915052752,
+        "yield": [
+          1.0004207513114796e-06,
+          1.0004207512816818e-06
+        ],
+        "centroid_eV": [
+          1323.3673223329204,
+          1323.3673222955028
+        ],
+        "relative_change": {
+          "yield": 2.9785285349248625e-11,
+          "centroid": 2.8274493857338712e-11
+        },
+        "max_relative_observable_change": 2.9785285349248625e-11,
+        "max_absolute_spectrum_change": 3.9810548520952116e-19,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 4.4916124313822137e-13,
+        "peak_rss_kib": 776924,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 7,
+              "cost": null,
+              "reason": "missing-cost-evidence",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 1004,
+                "route": "batched-stream",
+                "rows": 2,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.0029006880067754537
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thick-short-auto"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 50000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 7,
+          "seed": 362,
+          "bunch_rms_fs": 0.001,
+          "observation_deg": 119.0,
+          "trajectory": "results/phase365/thick-short.h5",
+          "phase_policy": true,
+          "route": "eager"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 13232,
+        "segment_sha256": "dd34105428c1ba9c49c0b7b7145e3cdc11749e0ebb2014aacd03220e798f2658",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.02191988201229833,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.12733474298147485,
+            0.12714331000461243,
+            0.12732696702005342,
+            0.12735241701011546,
+            0.12727527599781752,
+            0.1270523880084511,
+            0.12725978999515064
+          ],
+          "masked": [
+            0.10224581000511535,
+            0.10258754398091696,
+            0.10269082899321802,
+            0.10190899998997338,
+            0.10262050799792632,
+            0.10203919600462541,
+            0.10222332601551898
+          ],
+          "gated_fallback": [
+            0.13223223498789594,
+            0.13170726998941973,
+            0.13277231599204242,
+            0.13215078800567426,
+            0.13224505298421718,
+            0.1317418690014165,
+            0.13205863098846748
+          ]
+        },
+        "speedup_median": 1.2447969847512572,
+        "yield": [
+          1.0004371529511308e-06,
+          1.0004371838321903e-06
+        ],
+        "centroid_eV": [
+          1323.3700181394033,
+          1323.3700191352643
+        ],
+        "relative_change": {
+          "yield": 3.08675656146562e-08,
+          "centroid": 7.525189360535478e-10
+        },
+        "max_relative_observable_change": 3.08675656146562e-08,
+        "max_absolute_spectrum_change": 1.9539925233402755e-14,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 4.4918487874558155e-13,
+        "peak_rss_kib": 870548,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 14,
+              "cost": null,
+              "reason": "missing-cost-evidence",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 1004,
+                "route": "batched-eager",
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.005719927983591333
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thick-short-eager"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 50000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 7,
+          "seed": 362,
+          "bunch_rms_fs": 0.001,
+          "observation_deg": 119.0,
+          "trajectory": "results/phase365/thick-short.h5",
+          "phase_policy": true,
+          "route": "jit"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 13232,
+        "segment_sha256": "dd34105428c1ba9c49c0b7b7145e3cdc11749e0ebb2014aacd03220e798f2658",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.021951884002191946,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.037678180990042165,
+            0.03771021301508881,
+            0.03906217700568959,
+            0.038038736005546525,
+            0.03805822698632255,
+            0.03786017501261085,
+            0.03775293298531324
+          ],
+          "masked": [
+            0.04201184900011867,
+            0.04255746598937549,
+            0.042609877011273056,
+            0.04242461500689387,
+            0.041967999015469104,
+            0.04230652400292456,
+            0.04216077201999724
+          ],
+          "gated_fallback": [
+            0.04252784501295537,
+            0.042490605992497876,
+            0.0443167150078807,
+            0.04268889798549935,
+            0.042645437992177904,
+            0.04209728998830542,
+            0.04282139698625542
+          ]
+        },
+        "speedup_median": 0.89490157617283,
+        "yield": [
+          1.0004198529761263e-06,
+          1.0004198529463226e-06
+        ],
+        "centroid_eV": [
+          1323.3672997234098,
+          1323.3672996859846
+        ],
+        "relative_change": {
+          "yield": 2.979116953127914e-11,
+          "centroid": 2.8280267017066762e-11
+        },
+        "max_relative_observable_change": 2.979116953127914e-11,
+        "max_absolute_spectrum_change": 3.97681968735894e-19,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 4.4916254418082835e-13,
+        "peak_rss_kib": 750356,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 14,
+              "cost": null,
+              "reason": "missing-cost-evidence",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 1004,
+                "route": "batched-jit",
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.006638534017838538
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thick-short-jit"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 1000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 7,
+          "seed": 362,
+          "bunch_rms_fs": 1e-09,
+          "observation_deg": 119.0,
+          "trajectory": "results/phase365/thin.h5",
+          "phase_policy": true,
+          "route": "auto"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 443,
+        "segment_sha256": "70e800f4cd8a9fcae7465424937d06f4c1cefb9e7f3d8d5f97132bdacfc30f87",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.4607256200106349,
+        "artifact_io_s": 0.12319499801378697,
+        "replayed_trajectory": false,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.008623891975730658,
+            0.007690395985264331,
+            0.007685446995310485,
+            0.007745466980850324,
+            0.007730306999292225,
+            0.007665106008062139,
+            0.007828928995877504
+          ],
+          "masked": [
+            0.008528256003046408,
+            0.008177192008588463,
+            0.008415724994847551,
+            0.008203921985113993,
+            0.008350254007382318,
+            0.00814546100446023,
+            0.008219652023399249
+          ],
+          "gated_fallback": [
+            0.008129761990858242,
+            0.008192692999728024,
+            0.007870927976910025,
+            0.00789873002213426,
+            0.008147251995978877,
+            0.007977611006936058,
+            0.008073131000855938
+          ]
+        },
+        "speedup_median": 0.9404664549406734,
+        "yield": [
+          4.2352384682467635e-06,
+          4.2352384682467635e-06
+        ],
+        "centroid_eV": [
+          1356.0260348591946,
+          1356.0260348591946
+        ],
+        "relative_change": {
+          "yield": 0.0,
+          "centroid": 0.0
+        },
+        "max_relative_observable_change": 0.0,
+        "max_absolute_spectrum_change": 0.0,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 9.469607389900325e-12,
+        "peak_rss_kib": 1154168,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 7,
+              "cost": null,
+              "reason": "no-certified-work-to-skip",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 5750,
+                "route": "batched-stream",
+                "rows": 2,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 443
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.0005275869916658849
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thin-control-auto"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 1000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 7,
+          "seed": 362,
+          "bunch_rms_fs": 1e-09,
+          "observation_deg": 119.0,
+          "trajectory": "results/phase365/thin.h5",
+          "phase_policy": true,
+          "route": "eager"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 443,
+        "segment_sha256": "70e800f4cd8a9fcae7465424937d06f4c1cefb9e7f3d8d5f97132bdacfc30f87",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.02128659497248009,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.013030650996370241,
+            0.01332285301759839,
+            0.012959749990841374,
+            0.012663617002544925,
+            0.013179561996366829,
+            0.01301254000281915,
+            0.013071221008431166
+          ],
+          "masked": [
+            0.01336652401369065,
+            0.013592506991699338,
+            0.013694408000446856,
+            0.013341743993805721,
+            0.013789677992463112,
+            0.013487495016306639,
+            0.01346514601027593
+          ],
+          "gated_fallback": [
+            0.01326655299635604,
+            0.013043210987234488,
+            0.013184053008444607,
+            0.013495375023921952,
+            0.013738038018345833,
+            0.013139552000211552,
+            0.013129241997376084
+          ]
+        },
+        "speedup_median": 0.9661283270626558,
+        "yield": [
+          4.235239934095868e-06,
+          4.235239934095868e-06
+        ],
+        "centroid_eV": [
+          1356.0259801570396,
+          1356.0259801570396
+        ],
+        "relative_change": {
+          "yield": 0.0,
+          "centroid": 0.0
+        },
+        "max_relative_observable_change": 0.0,
+        "max_absolute_spectrum_change": 0.0,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 9.469478153001365e-12,
+        "peak_rss_kib": 784492,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 7,
+              "cost": null,
+              "reason": "no-certified-work-to-skip",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 5750,
+                "route": "batched-eager",
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 443
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.0010744210158009082
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thin-control-eager"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 1000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 7,
+          "seed": 362,
+          "bunch_rms_fs": 1e-09,
+          "observation_deg": 119.0,
+          "trajectory": "results/phase365/thin.h5",
+          "phase_policy": true,
+          "route": "jit"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 443,
+        "segment_sha256": "70e800f4cd8a9fcae7465424937d06f4c1cefb9e7f3d8d5f97132bdacfc30f87",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.021217359986621886,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.03542835402186029,
+            0.035786288004601374,
+            0.03507663300842978,
+            0.03518743300810456,
+            0.03519673299160786,
+            0.03523592298734002,
+            0.03514679300133139
+          ],
+          "masked": [
+            0.03545745398150757,
+            0.035420374013483524,
+            0.03539036400616169,
+            0.035756969009526074,
+            0.035757518984610215,
+            0.0356699489930179,
+            0.03564630800974555
+          ],
+          "gated_fallback": [
+            0.03541122400201857,
+            0.03535408299649134,
+            0.03559969799243845,
+            0.036425565980607644,
+            0.035322114010341465,
+            0.0354119049734436,
+            0.035470524977426976
+          ]
+        },
+        "speedup_median": 0.9873878939155555,
+        "yield": [
+          4.23523414500012e-06,
+          4.23523414500012e-06
+        ],
+        "centroid_eV": [
+          1356.025975407625,
+          1356.025975407625
+        ],
+        "relative_change": {
+          "yield": 0.0,
+          "centroid": 0.0
+        },
+        "max_relative_observable_change": 0.0,
+        "max_absolute_spectrum_change": 0.0,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 9.469470346745723e-12,
+        "peak_rss_kib": 788064,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 7,
+              "cost": null,
+              "reason": "no-certified-work-to-skip",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 5750,
+                "route": "batched-jit",
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 443
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.0013489329721778631
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thin-control-jit"
+      }
+    ],
+    "calibrated": [
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 50000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 9,
+          "seed": 362,
+          "bunch_rms_fs": 0.01,
+          "observation_deg": 95.0,
+          "trajectory": "results/phase365-calibration/thick-long.h5",
+          "single_reflection": true,
+          "calibrate_policy": true,
+          "phase_policy": true,
+          "route": "auto"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 13232,
+        "segment_sha256": "f5c06210ef15325dc9125632ad8b2d65120d2e97afda1254ebf378b7994af03a",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.07479575398610905,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.016359686997020617,
+            0.016179124999325722,
+            0.01617354399058968,
+            0.01695035200100392,
+            0.01607587398029864,
+            0.01635853701736778,
+            0.01741683599539101,
+            0.0174325370171573,
+            0.016545198013773188
+          ],
+          "masked": [
+            0.018296905007446185,
+            0.016910670994548127,
+            0.016760930011514574,
+            0.018757968995487317,
+            0.018064731993945315,
+            0.017387550993589684,
+            0.017681308992905542,
+            0.017552347999298945,
+            0.017081313009839505
+          ],
+          "gated_fallback": [
+            0.019904150016373023,
+            0.01942747601424344,
+            0.018436326005030423,
+            0.01849301700713113,
+            0.01837485597934574,
+            0.018906111014075577,
+            0.019234714010963216,
+            0.018724068999290466,
+            0.018999502004589885
+          ]
+        },
+        "speedup_median": 0.9320511989435281,
+        "yield": [
+          2.1257553180448394e-07,
+          2.1257553180448394e-07
+        ],
+        "centroid_eV": [
+          1579.627096184557,
+          1579.627096184557
+        ],
+        "relative_change": {
+          "yield": 0.0,
+          "centroid": 0.0
+        },
+        "max_relative_observable_change": 0.0,
+        "max_absolute_spectrum_change": 0.0,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 8.337718671947228e-14,
+        "peak_rss_kib": 746900,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": null,
+              "reason": "missing-cost-evidence",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 0,
+                "route": "batched-stream",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.003828276036074385
+        },
+        "calibrated_policy": {
+          "calibration": {
+            "full_lower_s": 0.01607587398029864,
+            "reduced_upper_s": 0.018757968995487317,
+            "overhead_upper_s": 0.003828276036074385,
+            "interpretation": "empirical estimates; not certified runtime bounds"
+          },
+          "accepted": false,
+          "spectrum_wall_s": {
+            "full": [
+              0.015865522000240162,
+              0.015588859998388216,
+              0.015626308013452217,
+              0.01605211300193332,
+              0.016101804008940235,
+              0.016522596997674555,
+              0.015879742015386,
+              0.016221825004322454,
+              0.016075962979812175
+            ],
+            "calibrated": [
+              0.020162622997304425,
+              0.019311654003104195,
+              0.018590057996334508,
+              0.01866035899729468,
+              0.018510466994484887,
+              0.018772470008116215,
+              0.018809370027156547,
+              0.018417316023260355,
+              0.018805569008691236
+            ]
+          },
+          "speedup_median": 0.8550879556602431,
+          "reported_reduction_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": {
+                "evidence": "paired calibration on f5c06210ef15325dc9125632ad8b2d65120d2e97afda1254ebf378b7994af03a; same process/axis/row",
+                "full_lower_s": 0.01607587398029864,
+                "overhead_upper_s": 0.003828276036074385,
+                "reduced_upper_s": 0.018757968995487317,
+                "scope": {
+                  "backend": "cupy",
+                  "electrons": 200,
+                  "energies": 5750,
+                  "limit": 0.0001,
+                  "observable": "evaluated-spectrum",
+                  "physical_electrons": 200.0,
+                  "precision": "float32",
+                  "reference": "grouped-per-electron-floor",
+                  "retained": 0,
+                  "route": "batched-stream",
+                  "row_vectors_inv_ang": [
+                    [
+                      0.0,
+                      0.0,
+                      1.872503399848938
+                    ]
+                  ],
+                  "rows": 1,
+                  "rule": "certified-flat-omission",
+                  "sector": "inter-electron",
+                  "segments": 13232
+                }
+              },
+              "reason": "no-net-saving",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 0,
+                "route": "batched-stream",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ]
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thick-long-auto"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 50000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 9,
+          "seed": 362,
+          "bunch_rms_fs": 0.01,
+          "observation_deg": 95.0,
+          "trajectory": "results/phase365-calibration/thick-long.h5",
+          "single_reflection": true,
+          "calibrate_policy": true,
+          "phase_policy": true,
+          "route": "eager"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 13232,
+        "segment_sha256": "f5c06210ef15325dc9125632ad8b2d65120d2e97afda1254ebf378b7994af03a",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.024106151977321133,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.12505612999666482,
+            0.1229240600077901,
+            0.12380157900042832,
+            0.12540450401138514,
+            0.12528317401302047,
+            0.1237990100053139,
+            0.12391632999060676,
+            0.12405518200830556,
+            0.12426913500530645
+          ],
+          "masked": [
+            0.09201903300709091,
+            0.0905697800044436,
+            0.09122474500327371,
+            0.09121256502112374,
+            0.09137927700066939,
+            0.09210567499394529,
+            0.09121432600659318,
+            0.09123653700225987,
+            0.0926406109938398
+          ],
+          "gated_fallback": [
+            0.1262677120103035,
+            0.12693551697884686,
+            0.12660507601685822,
+            0.1274073839886114,
+            0.12646376399789006,
+            0.1260827310034074,
+            0.12614327200572006,
+            0.1268009079794865,
+            0.12719198199920356
+          ]
+        },
+        "speedup_median": 1.3597094550534377,
+        "yield": [
+          2.1257467809607639e-07,
+          2.1257467809607639e-07
+        ],
+        "centroid_eV": [
+          1579.6269377154,
+          1579.6269377154
+        ],
+        "relative_change": {
+          "yield": 0.0,
+          "centroid": 0.0
+        },
+        "max_relative_observable_change": 0.0,
+        "max_absolute_spectrum_change": 0.0,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 8.337941611018945e-14,
+        "peak_rss_kib": 793536,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": null,
+              "reason": "missing-cost-evidence",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 0,
+                "route": "batched-eager",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.004483323980821297
+        },
+        "calibrated_policy": {
+          "calibration": {
+            "full_lower_s": 0.1229240600077901,
+            "reduced_upper_s": 0.0926406109938398,
+            "overhead_upper_s": 0.004483323980821297,
+            "interpretation": "empirical estimates; not certified runtime bounds"
+          },
+          "accepted": true,
+          "spectrum_wall_s": {
+            "full": [
+              0.1232231049798429,
+              0.12458788699586876,
+              0.12487242897623219,
+              0.12391527902218513,
+              0.12422927300212905,
+              0.12332391500240192,
+              0.12374131800606847,
+              0.12398817201028578,
+              0.12470707800821401
+            ],
+            "calibrated": [
+              0.09068413299974054,
+              0.09124526201048866,
+              0.09071326299454086,
+              0.09086118600680493,
+              0.09121414899709634,
+              0.09075327398022637,
+              0.09219429799122736,
+              0.09103590701124631,
+              0.09257711199461482
+            ]
+          },
+          "speedup_median": 1.361969975154624,
+          "reported_reduction_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": {
+                "evidence": "paired calibration on f5c06210ef15325dc9125632ad8b2d65120d2e97afda1254ebf378b7994af03a; same process/axis/row",
+                "full_lower_s": 0.1229240600077901,
+                "overhead_upper_s": 0.004483323980821297,
+                "reduced_upper_s": 0.0926406109938398,
+                "scope": {
+                  "backend": "cupy",
+                  "electrons": 200,
+                  "energies": 5750,
+                  "limit": 0.0001,
+                  "observable": "evaluated-spectrum",
+                  "physical_electrons": 200.0,
+                  "precision": "float32",
+                  "reference": "grouped-per-electron-floor",
+                  "retained": 0,
+                  "route": "batched-eager",
+                  "row_vectors_inv_ang": [
+                    [
+                      0.0,
+                      0.0,
+                      1.872503399848938
+                    ]
+                  ],
+                  "rows": 1,
+                  "rule": "certified-flat-omission",
+                  "sector": "inter-electron",
+                  "segments": 13232
+                }
+              },
+              "reason": "certified-and-profitable",
+              "retained": 0,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 0,
+                "route": "batched-eager",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": true,
+              "skipped": 5750
+            }
+          ]
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thick-long-eager"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 50000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 9,
+          "seed": 362,
+          "bunch_rms_fs": 0.01,
+          "observation_deg": 95.0,
+          "trajectory": "results/phase365-calibration/thick-long.h5",
+          "single_reflection": true,
+          "calibrate_policy": true,
+          "phase_policy": true,
+          "route": "jit"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 13232,
+        "segment_sha256": "f5c06210ef15325dc9125632ad8b2d65120d2e97afda1254ebf378b7994af03a",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.022112128004664555,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.036730963009176776,
+            0.037071775004733354,
+            0.03682762401876971,
+            0.036764693999430165,
+            0.03608295597950928,
+            0.03723307998734526,
+            0.0370256690075621,
+            0.038092986011179164,
+            0.037238780001644045
+          ],
+          "masked": [
+            0.039644151023821905,
+            0.03968605099362321,
+            0.03986686299322173,
+            0.04029562702635303,
+            0.037614336994010955,
+            0.03884538100101054,
+            0.03845522800111212,
+            0.038557098974706605,
+            0.03830826698685996
+          ],
+          "gated_fallback": [
+            0.03991305400268175,
+            0.03995710500748828,
+            0.039532561000669375,
+            0.03909613599535078,
+            0.03974561599898152,
+            0.04052971099736169,
+            0.040962548984680325,
+            0.03980033699190244,
+            0.04063738297554664
+          ]
+        },
+        "speedup_median": 0.9531549968990882,
+        "yield": [
+          2.125744945749583e-07,
+          2.125744945749583e-07
+        ],
+        "centroid_eV": [
+          1579.627253067882,
+          1579.627253067882
+        ],
+        "relative_change": {
+          "yield": 0.0,
+          "centroid": 0.0
+        },
+        "max_relative_observable_change": 0.0,
+        "max_absolute_spectrum_change": 0.0,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 8.337667172344035e-14,
+        "peak_rss_kib": 750872,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": null,
+              "reason": "missing-cost-evidence",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 0,
+                "route": "batched-jit",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.004879593005171046
+        },
+        "calibrated_policy": {
+          "calibration": {
+            "full_lower_s": 0.03608295597950928,
+            "reduced_upper_s": 0.04029562702635303,
+            "overhead_upper_s": 0.004879593005171046,
+            "interpretation": "empirical estimates; not certified runtime bounds"
+          },
+          "accepted": false,
+          "spectrum_wall_s": {
+            "full": [
+              0.037113210011739284,
+              0.03778833398246206,
+              0.03698535999865271,
+              0.037884785007918254,
+              0.036811327998293564,
+              0.03628531499998644,
+              0.03635397498146631,
+              0.03598487199633382,
+              0.036336535995360464
+            ],
+            "calibrated": [
+              0.04036916999029927,
+              0.03985915699740872,
+              0.04152692697243765,
+              0.03983183699892834,
+              0.041781364008784294,
+              0.03907637199154124,
+              0.03868105000583455,
+              0.0388892820046749,
+              0.038724190002540126
+            ]
+          },
+          "speedup_median": 0.9241684735575706,
+          "reported_reduction_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": {
+                "evidence": "paired calibration on f5c06210ef15325dc9125632ad8b2d65120d2e97afda1254ebf378b7994af03a; same process/axis/row",
+                "full_lower_s": 0.03608295597950928,
+                "overhead_upper_s": 0.004879593005171046,
+                "reduced_upper_s": 0.04029562702635303,
+                "scope": {
+                  "backend": "cupy",
+                  "electrons": 200,
+                  "energies": 5750,
+                  "limit": 0.0001,
+                  "observable": "evaluated-spectrum",
+                  "physical_electrons": 200.0,
+                  "precision": "float32",
+                  "reference": "grouped-per-electron-floor",
+                  "retained": 0,
+                  "route": "batched-jit",
+                  "row_vectors_inv_ang": [
+                    [
+                      0.0,
+                      0.0,
+                      1.872503399848938
+                    ]
+                  ],
+                  "rows": 1,
+                  "rule": "certified-flat-omission",
+                  "sector": "inter-electron",
+                  "segments": 13232
+                }
+              },
+              "reason": "no-net-saving",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 0,
+                "route": "batched-jit",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ]
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thick-long-jit"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 50000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 9,
+          "seed": 362,
+          "bunch_rms_fs": 0.001,
+          "observation_deg": 119.0,
+          "trajectory": "results/phase365-calibration/thick-short.h5",
+          "single_reflection": true,
+          "calibrate_policy": true,
+          "phase_policy": true,
+          "route": "auto"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 13232,
+        "segment_sha256": "dd34105428c1ba9c49c0b7b7145e3cdc11749e0ebb2014aacd03220e798f2658",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.08259816700592637,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.016589548002230003,
+            0.016940002009505406,
+            0.0172614449984394,
+            0.01693485098076053,
+            0.017736138979671523,
+            0.016707959002815187,
+            0.01670807899790816,
+            0.017032153002219275,
+            0.01704010198591277
+          ],
+          "masked": [
+            0.018322474003070965,
+            0.019292783981654793,
+            0.018025330995442346,
+            0.018520356999943033,
+            0.02014170298934914,
+            0.01941818601335399,
+            0.01868165799533017,
+            0.020697136991657317,
+            0.01856655700248666
+          ],
+          "gated_fallback": [
+            0.01933607499813661,
+            0.019327173999045044,
+            0.0191902740043588,
+            0.019229963014367968,
+            0.019279002997791395,
+            0.019699757976923138,
+            0.019240694004110992,
+            0.020188963011605665,
+            0.019443044991930947
+          ]
+        },
+        "speedup_median": 0.9067718729108453,
+        "yield": [
+          9.804364634780628e-07,
+          9.80436463448263e-07
+        ],
+        "centroid_eV": [
+          1322.8444190359025,
+          1322.8444189977008
+        ],
+        "relative_change": {
+          "yield": 3.039446472286045e-11,
+          "centroid": 2.8878455182734797e-11
+        },
+        "max_relative_observable_change": 3.039446472286045e-11,
+        "max_absolute_spectrum_change": 3.97681968735894e-19,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 4.4915490055551233e-13,
+        "peak_rss_kib": 746404,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": null,
+              "reason": "missing-cost-evidence",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 1004,
+                "route": "batched-stream",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.0035994150093756616
+        },
+        "calibrated_policy": {
+          "calibration": {
+            "full_lower_s": 0.016589548002230003,
+            "reduced_upper_s": 0.020697136991657317,
+            "overhead_upper_s": 0.0035994150093756616,
+            "interpretation": "empirical estimates; not certified runtime bounds"
+          },
+          "accepted": false,
+          "spectrum_wall_s": {
+            "full": [
+              0.016870391002157703,
+              0.017677428986644372,
+              0.017089294007746503,
+              0.016693399025825784,
+              0.01698449201649055,
+              0.01695163201657124,
+              0.017016752011841163,
+              0.016999712999677286,
+              0.01689785101916641
+            ],
+            "calibrated": [
+              0.019295313977636397,
+              0.019496545020956546,
+              0.020149632007814944,
+              0.019924749998608604,
+              0.019510337006067857,
+              0.019083582010352984,
+              0.020751808013301343,
+              0.021414453978650272,
+              0.01967572802095674
+            ]
+          },
+          "speedup_median": 0.8632205120135967,
+          "reported_reduction_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": {
+                "evidence": "paired calibration on dd34105428c1ba9c49c0b7b7145e3cdc11749e0ebb2014aacd03220e798f2658; same process/axis/row",
+                "full_lower_s": 0.016589548002230003,
+                "overhead_upper_s": 0.0035994150093756616,
+                "reduced_upper_s": 0.020697136991657317,
+                "scope": {
+                  "backend": "cupy",
+                  "electrons": 200,
+                  "energies": 5750,
+                  "limit": 0.0001,
+                  "observable": "evaluated-spectrum",
+                  "physical_electrons": 200.0,
+                  "precision": "float32",
+                  "reference": "grouped-per-electron-floor",
+                  "retained": 1004,
+                  "route": "batched-stream",
+                  "row_vectors_inv_ang": [
+                    [
+                      0.0,
+                      0.0,
+                      1.872503399848938
+                    ]
+                  ],
+                  "rows": 1,
+                  "rule": "certified-flat-omission",
+                  "sector": "inter-electron",
+                  "segments": 13232
+                }
+              },
+              "reason": "no-net-saving",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 1004,
+                "route": "batched-stream",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ]
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thick-short-auto"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 50000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 9,
+          "seed": 362,
+          "bunch_rms_fs": 0.001,
+          "observation_deg": 119.0,
+          "trajectory": "results/phase365-calibration/thick-short.h5",
+          "single_reflection": true,
+          "calibrate_policy": true,
+          "phase_policy": true,
+          "route": "eager"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 13232,
+        "segment_sha256": "dd34105428c1ba9c49c0b7b7145e3cdc11749e0ebb2014aacd03220e798f2658",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.024691294005606323,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.1264373220037669,
+            0.12583744700532407,
+            0.12693318800302222,
+            0.12580909798271023,
+            0.12581735700950958,
+            0.12487966899061576,
+            0.12536045399610884,
+            0.12582936001126654,
+            0.12624288100050762
+          ],
+          "masked": [
+            0.09802827797830105,
+            0.09896124701481313,
+            0.09835443197516724,
+            0.09823654999490827,
+            0.09836584201548249,
+            0.09940605200245045,
+            0.10033607098739594,
+            0.0978943379886914,
+            0.09824110000045039
+          ],
+          "gated_fallback": [
+            0.12941476199193858,
+            0.12872651498764753,
+            0.12950258300406858,
+            0.12915118000819348,
+            0.1289567280036863,
+            0.13047796400496736,
+            0.12864551600068808,
+            0.12838548398576677,
+            0.12936739798169583
+          ]
+        },
+        "speedup_median": 1.279346110636237,
+        "yield": [
+          9.804455471575506e-07,
+          9.804455781619583e-07
+        ],
+        "centroid_eV": [
+          1322.844389964644,
+          1322.8443905912573
+        ],
+        "relative_change": {
+          "yield": 3.1622773732919995e-08,
+          "centroid": 4.736862013743348e-10
+        },
+        "max_relative_observable_change": 3.1622773732919995e-08,
+        "max_absolute_spectrum_change": 1.9539925233402755e-14,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 4.491784819527639e-13,
+        "peak_rss_kib": 826096,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": null,
+              "reason": "missing-cost-evidence",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 1004,
+                "route": "batched-eager",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.005598295014351606
+        },
+        "calibrated_policy": {
+          "calibration": {
+            "full_lower_s": 0.12487966899061576,
+            "reduced_upper_s": 0.10033607098739594,
+            "overhead_upper_s": 0.005598295014351606,
+            "interpretation": "empirical estimates; not certified runtime bounds"
+          },
+          "accepted": true,
+          "spectrum_wall_s": {
+            "full": [
+              0.12534890900133178,
+              0.12570930400397629,
+              0.127678892982658,
+              0.12547983200056478,
+              0.12604092701803893,
+              0.12469647399848327,
+              0.12466463501914404,
+              0.12651140199159272,
+              0.12638751999475062
+            ],
+            "calibrated": [
+              0.09811242800788023,
+              0.09791050798958167,
+              0.09839807098614983,
+              0.09830582098220475,
+              0.09881212600157596,
+              0.09797179899760522,
+              0.0981632909970358,
+              0.09840971298399381,
+              0.09736696298932657
+            ]
+          },
+          "speedup_median": 1.2806141962760018,
+          "reported_reduction_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": {
+                "evidence": "paired calibration on dd34105428c1ba9c49c0b7b7145e3cdc11749e0ebb2014aacd03220e798f2658; same process/axis/row",
+                "full_lower_s": 0.12487966899061576,
+                "overhead_upper_s": 0.005598295014351606,
+                "reduced_upper_s": 0.10033607098739594,
+                "scope": {
+                  "backend": "cupy",
+                  "electrons": 200,
+                  "energies": 5750,
+                  "limit": 0.0001,
+                  "observable": "evaluated-spectrum",
+                  "physical_electrons": 200.0,
+                  "precision": "float32",
+                  "reference": "grouped-per-electron-floor",
+                  "retained": 1004,
+                  "route": "batched-eager",
+                  "row_vectors_inv_ang": [
+                    [
+                      0.0,
+                      0.0,
+                      1.872503399848938
+                    ]
+                  ],
+                  "rows": 1,
+                  "rule": "certified-flat-omission",
+                  "sector": "inter-electron",
+                  "segments": 13232
+                }
+              },
+              "reason": "certified-and-profitable",
+              "retained": 1004,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 1004,
+                "route": "batched-eager",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": true,
+              "skipped": 4746
+            }
+          ]
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thick-short-eager"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 50000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 9,
+          "seed": 362,
+          "bunch_rms_fs": 0.001,
+          "observation_deg": 119.0,
+          "trajectory": "results/phase365-calibration/thick-short.h5",
+          "single_reflection": true,
+          "calibrate_policy": true,
+          "phase_policy": true,
+          "route": "jit"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 13232,
+        "segment_sha256": "dd34105428c1ba9c49c0b7b7145e3cdc11749e0ebb2014aacd03220e798f2658",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.025615477992687374,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.038331356015987694,
+            0.039913333021104336,
+            0.037228417000733316,
+            0.037864953017560765,
+            0.03714384598424658,
+            0.03845286899013445,
+            0.03807102600694634,
+            0.03781191201414913,
+            0.03743131901137531
+          ],
+          "masked": [
+            0.03912040201248601,
+            0.040119565004715696,
+            0.04002454300643876,
+            0.04048881900962442,
+            0.041185665992088616,
+            0.0424891589791514,
+            0.039862183009972796,
+            0.04032072800328024,
+            0.038936463999561965
+          ],
+          "gated_fallback": [
+            0.040029481024248526,
+            0.04180645299493335,
+            0.04269870099960826,
+            0.03968661098042503,
+            0.041350346989929676,
+            0.03985063300933689,
+            0.04005269499612041,
+            0.040399788005743176,
+            0.04035096801817417
+          ]
+        },
+        "speedup_median": 0.9438026811384939,
+        "yield": [
+          9.804355689682218e-07,
+          9.804355689384164e-07
+        ],
+        "centroid_eV": [
+          1322.844379870671,
+          1322.8443798324633
+        ],
+        "relative_change": {
+          "yield": 3.0400126860286036e-11,
+          "centroid": 2.8882896074833297e-11
+        },
+        "max_relative_observable_change": 3.0400126860286036e-11,
+        "max_absolute_spectrum_change": 3.9810548520952116e-19,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 4.4915625580822793e-13,
+        "peak_rss_kib": 750984,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": null,
+              "reason": "missing-cost-evidence",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 1004,
+                "route": "batched-jit",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.005554855015361682
+        },
+        "calibrated_policy": {
+          "calibration": {
+            "full_lower_s": 0.03714384598424658,
+            "reduced_upper_s": 0.0424891589791514,
+            "overhead_upper_s": 0.005554855015361682,
+            "interpretation": "empirical estimates; not certified runtime bounds"
+          },
+          "accepted": false,
+          "spectrum_wall_s": {
+            "full": [
+              0.03909388498868793,
+              0.03753875000984408,
+              0.037330718972953036,
+              0.037360468006227165,
+              0.0371902970073279,
+              0.03712567500770092,
+              0.03727289801463485,
+              0.03835084801539779,
+              0.0395187700050883
+            ],
+            "calibrated": [
+              0.04058204998727888,
+              0.04208118500537239,
+              0.03973506100010127,
+              0.039954303996637464,
+              0.04008776499540545,
+              0.03967712100711651,
+              0.03975989200989716,
+              0.04206833601347171,
+              0.041029074985999614
+            ]
+          },
+          "speedup_median": 0.9319668485012605,
+          "reported_reduction_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": {
+                "evidence": "paired calibration on dd34105428c1ba9c49c0b7b7145e3cdc11749e0ebb2014aacd03220e798f2658; same process/axis/row",
+                "full_lower_s": 0.03714384598424658,
+                "overhead_upper_s": 0.005554855015361682,
+                "reduced_upper_s": 0.0424891589791514,
+                "scope": {
+                  "backend": "cupy",
+                  "electrons": 200,
+                  "energies": 5750,
+                  "limit": 0.0001,
+                  "observable": "evaluated-spectrum",
+                  "physical_electrons": 200.0,
+                  "precision": "float32",
+                  "reference": "grouped-per-electron-floor",
+                  "retained": 1004,
+                  "route": "batched-jit",
+                  "row_vectors_inv_ang": [
+                    [
+                      0.0,
+                      0.0,
+                      1.872503399848938
+                    ]
+                  ],
+                  "rows": 1,
+                  "rule": "certified-flat-omission",
+                  "sector": "inter-electron",
+                  "segments": 13232
+                }
+              },
+              "reason": "no-net-saving",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 1004,
+                "route": "batched-jit",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 13232
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ]
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thick-short-jit"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 1000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 9,
+          "seed": 362,
+          "bunch_rms_fs": 1e-09,
+          "observation_deg": 119.0,
+          "trajectory": "results/phase365-calibration/thin.h5",
+          "single_reflection": true,
+          "calibrate_policy": true,
+          "phase_policy": true,
+          "route": "auto"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 443,
+        "segment_sha256": "70e800f4cd8a9fcae7465424937d06f4c1cefb9e7f3d8d5f97132bdacfc30f87",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.5243459320045076,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.007641691976459697,
+            0.007671942992601544,
+            0.007775143982144073,
+            0.00816714801476337,
+            0.008257259003585204,
+            0.008167018997482955,
+            0.00871368299704045,
+            0.008331249991897494,
+            0.007905235019279644
+          ],
+          "masked": [
+            0.00812398802372627,
+            0.007897564995801076,
+            0.008204157988075167,
+            0.008580702007748187,
+            0.008994364994578063,
+            0.008018714986974373,
+            0.008365499001229182,
+            0.008570091013098136,
+            0.0082479489792604
+          ],
+          "gated_fallback": [
+            0.007912895001936704,
+            0.007930296007543802,
+            0.00794764599413611,
+            0.007888414984336123,
+            0.0081057770003099,
+            0.008148878026986495,
+            0.007956665998790413,
+            0.008739742974285036,
+            0.007940185023471713
+          ]
+        },
+        "speedup_median": 0.9901878658584159,
+        "yield": [
+          4.2352384682467635e-06,
+          4.2352384682467635e-06
+        ],
+        "centroid_eV": [
+          1356.0260348591946,
+          1356.0260348591946
+        ],
+        "relative_change": {
+          "yield": 0.0,
+          "centroid": 0.0
+        },
+        "max_relative_observable_change": 0.0,
+        "max_absolute_spectrum_change": 0.0,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 9.469607389900325e-12,
+        "peak_rss_kib": 741440,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": null,
+              "reason": "no-certified-work-to-skip",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 5750,
+                "route": "batched-stream",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 443
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.0010980509978253394
+        },
+        "calibrated_policy": {
+          "calibration": {
+            "full_lower_s": 0.007641691976459697,
+            "reduced_upper_s": 0.008994364994578063,
+            "overhead_upper_s": 0.0010980509978253394,
+            "interpretation": "empirical estimates; not certified runtime bounds"
+          },
+          "accepted": false,
+          "spectrum_wall_s": {
+            "full": [
+              0.007659924012841657,
+              0.007892844005255029,
+              0.0077461339824367315,
+              0.00790754600893706,
+              0.007838193996576592,
+              0.008033436024561524,
+              0.00813092800672166,
+              0.008177587995305657,
+              0.007854635012336075
+            ],
+            "calibrated": [
+              0.007825484004570171,
+              0.007814524986315519,
+              0.008037786989007145,
+              0.008004354982404038,
+              0.00797514701844193,
+              0.007940835988847539,
+              0.009353843022836372,
+              0.008453831018414348,
+              0.008108117006486282
+            ]
+          },
+          "speedup_median": 0.9860687116708162,
+          "reported_reduction_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": null,
+              "reason": "no-certified-work-to-skip",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 5750,
+                "route": "batched-stream",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 443
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ]
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thin-control-auto"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 1000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 9,
+          "seed": 362,
+          "bunch_rms_fs": 1e-09,
+          "observation_deg": 119.0,
+          "trajectory": "results/phase365-calibration/thin.h5",
+          "single_reflection": true,
+          "calibrate_policy": true,
+          "phase_policy": true,
+          "route": "eager"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 443,
+        "segment_sha256": "70e800f4cd8a9fcae7465424937d06f4c1cefb9e7f3d8d5f97132bdacfc30f87",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.0239614239835646,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.01347907300805673,
+            0.0127384890220128,
+            0.013557444006437436,
+            0.012573487998452038,
+            0.012515927985077724,
+            0.013770949997706339,
+            0.012678149010753259,
+            0.013894795993110165,
+            0.013081830984447151
+          ],
+          "masked": [
+            0.013211562007199973,
+            0.013005740998778492,
+            0.013856756006134674,
+            0.012933719990542158,
+            0.01294524100376293,
+            0.014248510007746518,
+            0.013224091992015019,
+            0.013847566006006673,
+            0.013428103004116565
+          ],
+          "gated_fallback": [
+            0.012694050004938617,
+            0.012907019990961999,
+            0.013663065008586273,
+            0.012675788981141523,
+            0.012934840022353455,
+            0.013178891007555649,
+            0.012922761001391336,
+            0.013029110996285453,
+            0.012835340021410957
+          ]
+        },
+        "speedup_median": 0.9892422853944326,
+        "yield": [
+          4.235239934095868e-06,
+          4.235239934095868e-06
+        ],
+        "centroid_eV": [
+          1356.0259801570396,
+          1356.0259801570396
+        ],
+        "relative_change": {
+          "yield": 0.0,
+          "centroid": 0.0
+        },
+        "max_relative_observable_change": 0.0,
+        "max_absolute_spectrum_change": 0.0,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 9.469478153001365e-12,
+        "peak_rss_kib": 785140,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": null,
+              "reason": "no-certified-work-to-skip",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 5750,
+                "route": "batched-eager",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 443
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.0011471370235085487
+        },
+        "calibrated_policy": {
+          "calibration": {
+            "full_lower_s": 0.012515927985077724,
+            "reduced_upper_s": 0.014248510007746518,
+            "overhead_upper_s": 0.0011471370235085487,
+            "interpretation": "empirical estimates; not certified runtime bounds"
+          },
+          "accepted": false,
+          "spectrum_wall_s": {
+            "full": [
+              0.012745567975798622,
+              0.012260738003533334,
+              0.012487890984630212,
+              0.014224687998648733,
+              0.012240418000146747,
+              0.012394469988066703,
+              0.012848163984017447,
+              0.013107856007991359,
+              0.012603122013388202
+            ],
+            "calibrated": [
+              0.012549450999358669,
+              0.01248128100996837,
+              0.013868973997887224,
+              0.013972123997518793,
+              0.012986096000531688,
+              0.012399169994750991,
+              0.01324987699626945,
+              0.013474400999257341,
+              0.012686192989349365
+            ]
+          },
+          "speedup_median": 0.9705089206850306,
+          "reported_reduction_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": null,
+              "reason": "no-certified-work-to-skip",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 5750,
+                "route": "batched-eager",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 443
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ]
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thin-control-eager"
+      },
+      {
+        "workload": {
+          "electrons": 200,
+          "physical_electrons": 200.0,
+          "thickness_ang": 1000.0,
+          "energy_kev": 60.0,
+          "step_ev": 2.0,
+          "stop_ev": 12000.0,
+          "repeats": 9,
+          "seed": 362,
+          "bunch_rms_fs": 1e-09,
+          "observation_deg": 119.0,
+          "trajectory": "results/phase365-calibration/thin.h5",
+          "single_reflection": true,
+          "calibrate_policy": true,
+          "phase_policy": true,
+          "route": "jit"
+        },
+        "backend": "cupy",
+        "dtype": "float32",
+        "host": "DESKTOP-QNIHO3D",
+        "python": "3.14.6",
+        "segments": 443,
+        "segment_sha256": "70e800f4cd8a9fcae7465424937d06f4c1cefb9e7f3d8d5f97132bdacfc30f87",
+        "energy_sha256": "f9a39f182f4d3c93b71181ffbfb3439efa0a9e533ab749b6b6a3fbd89bd2a0fa",
+        "points": 5750,
+        "transport_s": 0.0,
+        "artifact_io_s": 0.020801940001547337,
+        "replayed_trajectory": true,
+        "warmups_per_arm": 1,
+        "spectrum_wall_s": {
+          "full": [
+            0.03670285301632248,
+            0.036384829989401624,
+            0.03540277399588376,
+            0.0366330920078326,
+            0.035226851992774755,
+            0.03550264399382286,
+            0.037044475990114734,
+            0.03556376401684247,
+            0.03689030499663204
+          ],
+          "masked": [
+            0.035733705008169636,
+            0.035328114026924595,
+            0.03588881800533272,
+            0.03587605699431151,
+            0.03569401599816047,
+            0.03523859300184995,
+            0.03561055500176735,
+            0.03600195801118389,
+            0.035894026019377634
+          ],
+          "gated_fallback": [
+            0.03705262701259926,
+            0.035568863997468725,
+            0.035652713995659724,
+            0.03712216598796658,
+            0.036632612987887114,
+            0.035186150984372944,
+            0.03540922299725935,
+            0.03680528499535285,
+            0.03556130497599952
+          ]
+        },
+        "speedup_median": 1.0182215916620772,
+        "yield": [
+          4.23523414500012e-06,
+          4.23523414500012e-06
+        ],
+        "centroid_eV": [
+          1356.025975407625,
+          1356.025975407625
+        ],
+        "relative_change": {
+          "yield": 0.0,
+          "centroid": 0.0
+        },
+        "max_relative_observable_change": 0.0,
+        "max_absolute_spectrum_change": 0.0,
+        "omission_bound_plus_roundoff_passed": true,
+        "comparison_roundoff_absolute": 9.469470346745723e-12,
+        "peak_rss_kib": 744076,
+        "phase_policy": {
+          "mode": "missing-cost-evidence",
+          "full_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": null,
+              "reason": "no-certified-work-to-skip",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 5750,
+                "route": "batched-jit",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 443
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ],
+          "overhead_empirical_upper_s": 0.0018953139951918274
+        },
+        "calibrated_policy": {
+          "calibration": {
+            "full_lower_s": 0.035226851992774755,
+            "reduced_upper_s": 0.03600195801118389,
+            "overhead_upper_s": 0.0018953139951918274,
+            "interpretation": "empirical estimates; not certified runtime bounds"
+          },
+          "accepted": false,
+          "spectrum_wall_s": {
+            "full": [
+              0.03659671300556511,
+              0.03600479901069775,
+              0.03583144600270316,
+              0.03648770198924467,
+              0.036016117985127494,
+              0.035084651986835524,
+              0.03503699999419041,
+              0.034781249007210135,
+              0.03508324100403115
+            ],
+            "calibrated": [
+              0.035465263994410634,
+              0.03696255502291024,
+              0.03699023599619977,
+              0.03532403300050646,
+              0.03686427397769876,
+              0.03568167600315064,
+              0.03505899099400267,
+              0.035346713004400954,
+              0.03511000197613612
+            ]
+          },
+          "speedup_median": 1.0103250890321933,
+          "reported_reduction_equivalence": true,
+          "decisions": [
+            {
+              "count": 9,
+              "cost": null,
+              "reason": "no-certified-work-to-skip",
+              "retained": 5750,
+              "scope": {
+                "backend": "cupy",
+                "electrons": 200,
+                "energies": 5750,
+                "limit": 0.0001,
+                "observable": "evaluated-spectrum",
+                "physical_electrons": 200.0,
+                "precision": "float32",
+                "reference": "grouped-per-electron-floor",
+                "retained": 5750,
+                "route": "batched-jit",
+                "row_vectors_inv_ang": [
+                  [
+                    0.0,
+                    0.0,
+                    1.872503399848938
+                  ]
+                ],
+                "rows": 1,
+                "rule": "certified-flat-omission",
+                "sector": "inter-electron",
+                "segments": 443
+              },
+              "simplify": false,
+              "skipped": 0
+            }
+          ]
+        },
+        "gpu_pool_used_bytes_at_end": 0,
+        "gpu": "b'NVIDIA GeForce RTX 5080'",
+        "name": "thin-control-jit"
+      }
+    ]
+  }
+}

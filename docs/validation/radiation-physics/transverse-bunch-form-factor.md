@@ -185,7 +185,8 @@ is a convex quadratic with minimiser $\omega^*$, so
 $F_z(E)\sup_{E'\ge E}F_\perp(E')$, equal to $F_\perp$ above $\omega^*$ and
 $e^{-q_{\min}}$ below, is one; each captured row carries it. The full-axis audit
 keeps the $F_z$ upper bound and lowers its factor bound to zero. Flat-term
-omission keeps its conservative $F_z$ certificate.
+omission additionally certifies rows by a directed $F_zF_\perp$ bound; see
+[transverse flat-term omission](../beam-transport/coherent-transverse-flat-omission.md).
 
 On the tilted HOPG (002) geometries ($\mathbf g_{xy}=0$) the delay multiplies the
 exponent by 12.0 (45°/135°, 60 keV) and 1.67 (5°/0°, 30 keV). At the
