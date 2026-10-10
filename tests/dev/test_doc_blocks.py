@@ -151,7 +151,7 @@ def test_python_api_workflow_executes_as_one_accumulating_namespace():
 def test_sweep_profiles_toml_blocks_are_valid_and_internally_consistent():
     path = GUIDES / "sweep-profiles.md"
     toml_blocks = [b for b in extract_fenced_blocks(path) if b.language == "toml"]
-    assert len(toml_blocks) == 3
+    assert len(toml_blocks) == 4
 
     errors = [error for block in toml_blocks for error in check_toml_block(block)]
     assert not errors, "\n".join(errors)
