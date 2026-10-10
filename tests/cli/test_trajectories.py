@@ -11,6 +11,7 @@ from pyrite.cli._deprecations import message
 from pyrite.montecarlo import trajectory_inventory
 from pyrite.montecarlo.trajectories import write_trajectory_artifact
 from tests.helpers.cli import invoke
+from tests.helpers.trajectory_schema import downgrade
 from tests.montecarlo.test_trajectory_selection import _CASE, _secondaries
 
 _PROVENANCE = {"checkpoint_stem": "hopg@demo", "profile": "demo", "fidelity": "quick"}
@@ -42,14 +43,6 @@ def root(tmp_path):
     with h5py.File(stem / "foreign.h5", "w") as handle:
         handle["x"] = np.arange(3)
     return tmp_path
-
-
-def _schema_1(path):
-    with h5py.File(path, "r+") as handle:
-        handle.attrs["schema_version"] = 1
-        del handle["case/payload"]
-        del handle.attrs["row_order"]
-    return path
 
 
 def test_root_lists_trajectories_group():
@@ -133,13 +126,13 @@ class _ReadGuard:
         monkeypatch.setattr(h5py.Dataset, "__getitem__", guarded)
 
 
-@pytest.mark.parametrize("schema", [1, 2])
+@pytest.mark.parametrize("schema", [1, 2, 3])
 def test_info_reads_only_id_columns(tmp_path, monkeypatch, schema):
     path = write_trajectory_artifact(
         tmp_path / "a.h5", _secondaries(), case=_CASE, provenance=_PROVENANCE
     )
-    if schema == 1:
-        _schema_1(path)
+    if schema < 3:
+        downgrade(path, schema)
     guard = _ReadGuard(monkeypatch)
 
     result = invoke(root_command, ["trajectories", "info", str(path), "-o", "json"])

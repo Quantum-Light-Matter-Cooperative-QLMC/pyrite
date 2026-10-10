@@ -17,6 +17,7 @@ from pyrite.checkpoints.persistence import _checkpoint_load
 from pyrite.cli.commands.trajectories import score_command
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.trajectories import (
+    SCHEMA_VERSION,
     TrajectoryCapture,
     read_trajectory_artifact,
     write_trajectory_artifact,
@@ -92,7 +93,7 @@ def test_scores_a_captured_run_into_its_own_records(tmp_path, monkeypatch):
         assert source == {
             "path": str(path),
             "sha256": trajectory_scoring.file_sha256(path),
-            "schema_version": 2,
+            "schema_version": SCHEMA_VERSION,
         }
     meta = json.loads((tmp_path / "scored" / "hopg" / "meta.json").read_text())
     assert meta["dataset_identity"]["parameter_sha256"] == _IDENTITY["parameter_sha256"]

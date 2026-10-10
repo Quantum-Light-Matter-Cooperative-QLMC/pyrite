@@ -27,6 +27,7 @@ from pyrite.montecarlo.trajectories import (
     write_trajectory_artifact,
 )
 from pyrite.montecarlo.trajectory_export import export_segments_vtp
+from tests.helpers.trajectory_schema import SCHEMA2_FIXTURE, downgrade
 
 _SI = dict(element="Si", n_atoms_per_ang3=0.05)
 
@@ -775,9 +776,7 @@ def _captured(tmp_path):
 
 def test_schema_1_artifacts_stay_readable_but_cannot_feed_spectra(tmp_path):
     case, path = _captured(tmp_path)
-    with h5py.File(path, "r+") as handle:  # downgrade to the schema-1 layout
-        handle.attrs["schema_version"] = 1
-        del handle["case/payload"], handle["spectrum_inputs"]
+    downgrade(path, 1)
 
     artifact = read_trajectory_artifact(path)
 
@@ -897,9 +896,187 @@ def test_stream_refuses_cases_that_need_every_segment(tmp_path):
 
 def test_stream_refuses_schema_1(tmp_path):
     _case_, path = _captured(tmp_path)
-    with h5py.File(path, "r+") as handle:
-        handle.attrs["schema_version"] = 1
-        del handle.attrs["row_order"], handle["case/payload"], handle["spectrum_inputs"]
+    downgrade(path, 1)
 
     with pytest.raises(TrajectoryArtifactError, match="predates spectrum-phase inputs"):
         runner.stream_spectrum_from_artifact(path)
+
+
+# ---- schema 3: compact rows and per-electron index (#398) -------------------
+
+
+def _bunched_interleaved_transport():
+    segs = simulate_trajectories(
+        20.0,
+        30,
+        2000.0,
+        seed=5,
+        transport_core="lockstep",
+        energy_model="midpoint",
+        max_dE_frac=0.05,
+        beam_fwhm_mm=1e-4,
+        bunch_length_fs=10.0,
+        **_SI,
+    )
+    assert np.unique(segs["t0_ang"]).size > 1  # a real bunch: t0 differs by history
+    return segs
+
+
+def test_schema_3_stores_compact_rows_and_reads_them_back_exactly(tmp_path):
+    segs = _bunched_interleaved_transport()
+    path = write_trajectory_artifact(tmp_path / "c.h5", segs, case=_case())
+    order = np.argsort(segs["electron_id"], kind="stable")
+    stored_ids = segs["electron_id"][order]
+    starts = np.flatnonzero(np.r_[True, np.diff(stored_ids) != 0])
+
+    with h5py.File(path) as handle:
+        transport = handle["transport"]
+        ids = transport["electron_id"]
+        assert ids.dtype == np.int32 and ids.attrs["pyrite_dtype"] == segs["electron_id"].dtype.str
+        assert transport["substep_id"].dtype == np.int16
+        assert transport["flight_id"].dtype == np.int32
+        assert transport["elec_id"] == ids  # the alias links to the compact dataset
+        r_mid = transport["r_mid"]
+        assert r_mid.chunks == (min(traj._ROW_CHUNK, r_mid.shape[0]), 3)
+        assert r_mid.compression == traj._ROW_FILTERS["compression"] and r_mid.shuffle
+        assert "pyrite_dtype" not in r_mid.attrs  # floats keep their dtype
+        t0 = transport["t0_ang"]
+        assert t0.attrs["pyrite_kind"] == "electron_rows" and t0.attrs["rows"] == len(
+            segs["t0_ang"]
+        )
+        np.testing.assert_array_equal(t0[()], segs["t0_ang"][order][starts])
+        index = handle["electron_index"]
+        np.testing.assert_array_equal(index["electron_id"][()], stored_ids[starts])
+        np.testing.assert_array_equal(index["row_start"][()], starts)
+        np.testing.assert_array_equal(index["row_stop"][()], np.r_[starts[1:], stored_ids.size])
+        assert handle["transport_order"].dtype == np.int32
+    artifact = read_trajectory_artifact(path)
+    assert artifact.schema_version == 3
+    _assert_same_tree(artifact.transport, segs)
+
+
+def test_per_history_field_that_varies_stays_per_row(tmp_path):
+    segs = simulate_trajectories(20.0, 5, 2000.0, seed=0, **_SI)
+    segs["t0_ang"] = np.arange(segs["L_ang"].size, dtype=float)
+
+    path = write_trajectory_artifact(tmp_path / "v.h5", segs, case=_case())
+
+    with h5py.File(path) as handle:
+        assert handle["transport/t0_ang"].attrs["pyrite_kind"] == "array"
+    _assert_same_tree(read_trajectory_artifact(path).transport, segs)
+
+
+def test_ids_outside_the_compact_range_keep_their_dtype(tmp_path):
+    segs = simulate_trajectories(20.0, 5, 2000.0, seed=0, **_SI)
+    segs["electron_id"] = segs["electron_id"] + 2**40
+    segs["elec_id"] = segs["electron_id"]
+
+    path = write_trajectory_artifact(tmp_path / "w.h5", segs, case=_case())
+
+    with h5py.File(path) as handle:
+        assert handle["transport/electron_id"].dtype == np.int64
+        assert "pyrite_dtype" not in handle["transport/electron_id"].attrs
+        assert handle["electron_index/electron_id"].dtype == np.int64
+    _assert_same_tree(read_trajectory_artifact(path).transport, segs)
+
+
+def test_device_row_fields_compact_in_bounded_blocks(tmp_path, monkeypatch):
+    class FakeDevice:
+        """Device-array stand-in: slicing and reductions stay on device."""
+
+        def __init__(self, host):
+            self.host = host
+            self.shape, self.dtype, self.size = host.shape, host.dtype, host.size
+
+        def __getitem__(self, index):
+            # Under the CUDA backend the writer indexes with device arrays.
+            return FakeDevice(self.host[index.get() if hasattr(index, "get") else index])
+
+        def min(self):
+            return self.host.min()
+
+        def max(self):
+            return self.host.max()
+
+    def _download(value):
+        downloads.append(value.host.shape[0])
+        return value.host.copy()
+
+    downloads = []
+    monkeypatch.setattr(traj, "is_device_array", lambda value: isinstance(value, FakeDevice))
+    monkeypatch.setattr(traj, "_to_cpu", _download)
+    monkeypatch.setattr(traj, "_DEVICE_BLOCK_BYTES", 10 * 3 * 8)
+    host = _bunched_interleaved_transport()
+    rows = ("r_mid", "electron_id", "t0_ang", "L_ang")
+    device = {key: FakeDevice(host[key]) for key in rows}
+
+    path = write_trajectory_artifact(tmp_path / "d.h5", device, case=_case())
+
+    # Only the ID column the row order and index derive from comes down whole.
+    n_rows = host["L_ang"].size
+    assert downloads.count(n_rows) == 1 and max(d for d in downloads if d != n_rows) <= 30
+    with h5py.File(path) as handle:
+        assert handle["transport/t0_ang"].attrs["pyrite_kind"] == "electron_rows"
+        assert handle["transport/electron_id"].dtype == np.int32
+    _assert_same_tree(read_trajectory_artifact(path).transport, {key: host[key] for key in rows})
+
+
+def test_row_view_slices_like_the_transported_arrays(tmp_path):
+    segs = _bunched_interleaved_transport()
+    path = write_trajectory_artifact(tmp_path / "s.h5", segs, case=_case())
+    order = np.argsort(segs["electron_id"], kind="stable")
+
+    with h5py.File(path) as handle:
+        view = traj.transport_view(handle)
+        n = len(segs["L_ang"])
+        for key in ("electron_id", "t0_ang", "substep_id", "r_mid"):
+            stored = segs[key][order]
+            node = view[key]
+            assert node.dtype == stored.dtype and node.shape == stored.shape, key
+            for a, b in ((0, n), (3, 17), (n - 5, n), (7, 7)):
+                np.testing.assert_array_equal(node[a:b], stored[a:b], err_msg=key)
+            assert node[-1] == stored[-1] if stored.ndim == 1 else True
+            np.testing.assert_array_equal(node[()], stored)
+        np.testing.assert_array_equal(view["r_mid"][2:9, :2], segs["r_mid"][order][2:9, :2])
+
+
+@pytest.mark.parametrize("max_rows", [1, 7, 40, 10**9])
+def test_indexed_and_legacy_streams_yield_identical_blocks(tmp_path, max_rows):
+    segs = _bunched_interleaved_transport()
+    current = write_trajectory_artifact(tmp_path / "3.h5", segs, case=_case())
+    legacy = downgrade(write_trajectory_artifact(tmp_path / "2.h5", segs, case=_case()), 2)
+    with h5py.File(legacy) as handle:
+        assert "electron_index" not in handle and handle["transport/electron_id"].dtype == np.int64
+
+    indexed = list(traj.iter_electron_row_blocks(current, max_rows))
+    scanned = list(traj.iter_electron_row_blocks(legacy, max_rows))
+
+    assert len(indexed) == len(scanned)
+    for a, b in zip(indexed, scanned, strict=True):
+        _assert_same_tree(a, b, "block")
+
+
+def test_genuine_schema_2_capture_reads_and_replays_as_schema_3(tmp_path):
+    legacy = read_trajectory_artifact(SCHEMA2_FIXTURE)
+    assert legacy.schema_version == 2
+    rewritten = read_trajectory_artifact(
+        write_trajectory_artifact(
+            tmp_path / "r.h5",
+            legacy.transport,
+            case=legacy.case,
+            settings=legacy.settings,
+            provenance=legacy.provenance,
+            spectrum_inputs=legacy.spectrum_inputs,
+        )
+    )
+
+    assert rewritten.schema_version == 3
+    _assert_same_tree(rewritten.transport, legacy.transport)
+    _assert_same_output(
+        runner.spectrum_from_artifact(rewritten), runner.spectrum_from_artifact(legacy)
+    )
+    block = max(1, legacy.attrs["segment_count"] // 5)
+    _assert_same_output(
+        runner.stream_spectrum_from_artifact(rewritten.path, max_segments=block),
+        runner.stream_spectrum_from_artifact(SCHEMA2_FIXTURE, max_segments=block),
+    )

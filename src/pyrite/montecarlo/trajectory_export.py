@@ -33,7 +33,7 @@ from xml.sax.saxutils import quoteattr
 
 import numpy as np
 
-from .trajectories import TrajectoryArtifactError, read_trajectory_header
+from .trajectories import TrajectoryArtifactError, read_trajectory_header, transport_view
 from .trajectory_selection import TrajectorySelection
 
 
@@ -154,7 +154,7 @@ def export_segments_vtp(
     if selection is not None and Path(selection.path).resolve() != artifact.resolve():
         raise TrajectoryArtifactError(f"selection of {selection.path} applied to {artifact}")
     with h5py.File(artifact, "r") as handle:
-        transport = handle["transport"]
+        transport = transport_view(handle)
         for required in ("r_mid", "v_hat", "L_ang"):
             if required not in transport:
                 raise TrajectoryArtifactError(f"{artifact} has no {required!r} segment field")
