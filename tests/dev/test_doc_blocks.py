@@ -115,12 +115,14 @@ def test_python_api_workflow_executes_as_one_accumulating_namespace():
         exec(code, namespace)  # noqa: S102 -- executing the documented example itself
 
     result = namespace["result"]
-    assert result.energy_eV.shape == result.spectrum.shape
-    assert result.background_energy_eV.shape == result.background.shape
-    assert np.all(np.isfinite(result.energy_eV))
-    assert np.all(np.isfinite(result.spectrum))
-    assert np.all(np.isfinite(result.background_energy_eV))
-    assert np.all(np.isfinite(result.background))
+    cxr = result.cxr.incoherent
+    brem = result.brem
+    assert cxr.photon_energy_eV.shape == cxr.density.shape
+    assert brem.photon_energy_eV.shape == brem.density.shape
+    assert np.all(np.isfinite(cxr.photon_energy_eV))
+    assert np.all(np.isfinite(cxr.density))
+    assert np.all(np.isfinite(brem.photon_energy_eV))
+    assert np.all(np.isfinite(brem.density))
 
     provenance = result.provenance
     assert namespace["digest"] == provenance["identity_digest"]
@@ -128,8 +130,8 @@ def test_python_api_workflow_executes_as_one_accumulating_namespace():
     assert namespace["device"] == provenance["device"]
     assert namespace["resolved_case"] == result.case
 
-    detected_line = namespace["detected_line"]
-    assert np.shape(detected_line) == result.energy_eV.shape
+    detected_cxr = namespace["detected_cxr"]
+    assert np.shape(detected_cxr) == cxr.photon_energy_eV.shape
 
     # 3 beam energies x 3 tilt angles: analytically derivable from the
     # documented axes, independent of Monte Carlo content.
