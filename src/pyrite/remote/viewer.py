@@ -108,6 +108,12 @@ def _status_remote_command(job_assign, detail):
         '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done; '
         "} | emit PROGRESS; "
     )
+    captures = (
+        '{ R=$(sed -n "s/^trajectories: //p" "$D/meta" | tail -1); '
+        'if [ -n "$R" ] && [ -d "$R" ]; then '
+        'for d in "$R"/*/; do [ -d "$d" ] || continue; '
+        'du -sb -- "$d"; done; fi; } | emit TRAJECTORIES; '
+    )
     performance = (
         f'{{ for f in {config.shell_word(config.remote_output_path("performance"))}/"$JOB"/*/*.latest.json; do '
         '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done; '
@@ -169,7 +175,7 @@ def _status_remote_command(job_assign, detail):
         "{ "
         "printf 'cohort_partition=%s|order=priority_desc_job_id_asc\\n' \"$PART\"; "
         'if [ -n "${QUEUE_RAW+x}" ]; then printf "%s\\n" "$QUEUE_RAW"; fi; '
-        "} | emit QUEUE; " + progress + performance + resources + log
+        "} | emit QUEUE; " + progress + captures + performance + resources + log
     )
 
 

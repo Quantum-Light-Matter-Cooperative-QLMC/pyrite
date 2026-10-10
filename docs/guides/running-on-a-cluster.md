@@ -138,6 +138,74 @@ pyrite run standard -m hopg --remote --dry-run
 
 `pyrite run standard -m hopg --remote` syncs, submits, follows the SLURM job, and pulls the checkpoint. Add `--detach` to return after submission. The hidden compatibility command retains advanced `--chunk-minutes` / `--parallel-materials` controls during migration; use concurrent materials only for workloads measured to fit. Use `pyrite job status`, `pyrite job logs --follow`, or `pyrite job attach` to monitor the allocation. Attached status shows an independent case-progress bar for each material; `logs --follow` shows the raw shared job log. While pending, status ranks the target among all pending jobs in the configured SLURM partition by scheduler priority (descending, then numeric job ID) and shows the current queue leader and reason. This is a consideration-order snapshot, not a start-time promise: priority can change and backfill can run a lower-ranked job first.
 
+### Remote trajectory captures
+
+Capture transport on the compute node while leaving the large HDF5 files there:
+
+```bash
+pyrite run trajectory_demo --remote --trajectories --detach
+pyrite job status trajectory_demo
+pyrite remote trajectories ls
+```
+
+Bare `--trajectories` uses `<REMOTE_DIR>/pyrite-output/trajectories/<stem>/`.
+An explicit `--trajectories=DIR` names a directory on the **remote** host,
+relative to its checkout; absolute paths must also stay inside that checkout.
+Use `pyrite remote trajectories --root DIR ...` for later operations on a
+custom root. The job runs the same capture preflight as a local run, retaining
+matching captures on resume and requiring `--overwrite-trajectories` before
+replacing cases that will transport again. Cached cases without artifacts are
+not re-transported; use `--recompute` to capture those cases.
+
+`pyrite job status` reports capture-directory bytes per stem, including partial
+writes. After the first transported case, the job log reports its measured
+bytes per segment and an approximate total scaled by the requested electron
+counts. A projection over 10 GiB warns. Energy, geometry, secondary production,
+and adaptive stopping can change the actual size. Captures are never included
+in automatic checkpoint pulls.
+
+Inspect the exact on-disk stem with `ls`, then preview a case subset before
+transferring it. Case names and energies are exact matches; repeat either
+filter to select several values. Combining filters takes their intersection.
+
+```bash
+pyrite remote trajectories info STEM
+pyrite remote trajectories pull STEM --energy 30
+pyrite remote trajectories pull STEM --energy 30 --yes
+```
+
+Without `--yes`, `pull` lists complete files and their byte total. With `--yes`,
+it records remote SHA-256 hashes, uses rsync to resume into local staging
+files, and verifies each file's bytes, hash, and HDF5 `complete` header before
+renaming it into `pyrite-output/trajectories/`. Both hosts need rsync. Rerun the
+same command after an interrupted transfer; matching verified local files are
+skipped. Differing local files require `--overwrite`; a failed transfer leaves
+those files intact. `--out-dir DIR` selects a different local capture root.
+This copies whole case artifacts byte for byte, preserving their scoring
+inputs. History subsets are VTK exports, not reduced HDF5 artifacts.
+
+Work directly with the remote captures and retrieve only a small ParaView view:
+
+```bash
+pyrite remote trajectories export STEM --energy 30 --history 0 --history 1
+pyrite remote trajectories export STEM --first 20 --out-dir vtk-subset
+pyrite remote trajectories score STEM --energy 30
+```
+
+`export` requires `--history`, `--track`, `--first`, or `--sample` and applies the
+same whole-history/track selection as local `checkpoint export-trajectories`.
+`--seed` controls `--sample`; track filters intersect history selection. Only
+verified `.vtp` outputs come back, under `pyrite-output/trajectories-exports/`
+by default. The remote exports remain under that directory in a separate
+request directory. `--overwrite` permits replacing differing local VTK files.
+See [working with results](working-with-results.md) for the ParaView preset.
+
+`score` submits bounded spectrum replay through SLURM using the already synced
+code, writing the remote checkpoint stem recorded in the artifacts. Monitor
+its printed job ID with `pyrite job attach JOBID`, then pull checkpoints with
+`pyrite remote pull STEM`. Existing records are kept unless `--overwrite`.
+Captures exclude CPU-only profiling and repeated performance sessions.
+
 Progress timing uses additive active worker-process seconds persisted in each atomic progress record. Cached cases reduce remaining work but do not inflate measured throughput; chunk queue time and pauses do not count as compute time. Elapsed compute is always shown when valid. ETA and estimated total remain `—` until at least one new unit of work supplies a finite rate. Cost-weighted work is preferred when available; parallel-material process seconds are folded back to approximate wall time using the submitted parallelism.
 
 Use the developer performance command to enable resource sampling for the selected profile:

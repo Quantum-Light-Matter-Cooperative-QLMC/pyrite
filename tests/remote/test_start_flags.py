@@ -37,6 +37,8 @@ DEFAULT_FLAGS = {
     "drop_wide_brem": False,
     "downcast": False,
     "level9": False,
+    "trajectories": None,
+    "overwrite_trajectories": False,
 }
 
 

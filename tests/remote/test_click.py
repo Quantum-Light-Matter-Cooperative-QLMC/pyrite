@@ -16,6 +16,7 @@ REMOTE_COMMANDS = (
     "rm",
     "prune-jobs",
     "sync",
+    "trajectories",
 )
 
 

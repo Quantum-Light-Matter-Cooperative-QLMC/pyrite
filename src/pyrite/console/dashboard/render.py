@@ -133,6 +133,8 @@ def metadata_fields(metadata):
 
 def mode_summary(metadata):
     fields = metadata_fields(metadata)
+    if fields.get("kind") == "trajectory-score":
+        return "trajectory spectrum replay · monolithic"
     if fields.get("kind") == "rebrem":
         parts = ["brem-only recompute"]
         if fields.get("ne_brem") not in (None, "None"):
@@ -685,6 +687,9 @@ def format_job_status(sections, detail):
     rows = [
         ("State", display_state),
     ]
+    capture_sizes = sanitize_terminal(sections.get("TRAJECTORIES", ""), multiline=True).strip()
+    if capture_sizes:
+        rows.append(("Trajectory bytes / stem", capture_sizes))
     timeout_event = sanitize_terminal(sections.get("TIMEOUT", "")).strip()
     if timeout_event:
         rows.append(("Last timeout", timeout_event))

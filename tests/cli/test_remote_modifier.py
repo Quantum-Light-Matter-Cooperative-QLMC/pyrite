@@ -88,7 +88,6 @@ def test_remote_wait_detach_and_local_only_options_are_rejected():
     conflict = invoke(scan.command, ["standard", "--remote", "--wait", "--detach"])
     local_only = invoke(scan.command, ["standard", "--remote", "--checkpoint-dir", "elsewhere"])
     local_wait = invoke(scan.command, ["standard", "--wait"])
-    local_capture = invoke(scan.command, ["standard", "--remote", "--trajectories", "traj"])
 
     assert conflict.exit_code == 2
     assert "--wait and --detach are mutually exclusive" in conflict.stderr
@@ -96,8 +95,6 @@ def test_remote_wait_detach_and_local_only_options_are_rejected():
     assert "local-only option(s): --checkpoint-dir" in local_only.stderr
     assert local_wait.exit_code == 2
     assert "--wait/--detach require -R/--remote" in local_wait.stderr
-    assert local_capture.exit_code == 2
-    assert "local-only option(s): --trajectories" in local_capture.stderr
 
 
 def test_cpu_profile_flags_require_remote_and_reach_the_job(monkeypatch):
@@ -389,3 +386,25 @@ def test_run_chunk_minutes_requires_remote(monkeypatch):
     assert "--chunk-minutes requires -R/--remote" in local.stderr
     assert negative.exit_code == 2
     assert "--chunk-minutes" in negative.stderr
+
+
+@pytest.mark.parametrize(
+    "capture_args, expected",
+    [
+        (["--trajectories"], "pyrite-output/trajectories"),
+        (["--trajectories=traj", "--overwrite-trajectories"], Path("traj")),
+    ],
+)
+def test_remote_capture_options_delegate(monkeypatch, capture_args, expected):
+    seen = {}
+    monkeypatch.setattr(remote_cli, "_cli_start", lambda **kwargs: seen.update(kwargs))
+    result = invoke(scan.command, ["standard", "-m", "hopg", "--remote", "--detach", *capture_args])
+    assert_clean_result(result)
+    assert seen["trajectories"] == expected
+    assert seen["overwrite_trajectories"] == ("--overwrite-trajectories" in capture_args)
+
+
+def test_remote_overwrite_capture_requires_root():
+    result = invoke(scan.command, ["standard", "--remote", "--overwrite-trajectories"])
+    assert result.exit_code == 2
+    assert "--overwrite-trajectories requires --trajectories" in result.stderr
