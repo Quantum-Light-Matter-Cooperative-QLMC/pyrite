@@ -1975,9 +1975,7 @@ def multi_detector_standard(tmp_path, monkeypatch):
 
     root = tmp_path / "catalog"
     shutil.copytree(DATA_DIR / "catalog", root)
-    # A copied catalog is user-selected, so its profiles must name their beam.
     profile = root / "profiles" / "standard.toml"
-    profile.write_text('beam = "default"\n' + profile.read_text())
     with profile.open("a") as handle:
         handle.write("\n[physical_detector]\ndistance_mm = 300.0\nshape = [2, 3]\n")
         handle.write("pitch_mm = [0.1, 0.2]\n")
