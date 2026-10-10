@@ -105,6 +105,7 @@ This mode supports incoherent scalar-detector scenes on the per-electron or CUDA
    pyrite.Precision
    pyrite.Analysis
    pyrite.Result
+   pyrite.fetch_tables
    pyrite.simulate
 ```
 
