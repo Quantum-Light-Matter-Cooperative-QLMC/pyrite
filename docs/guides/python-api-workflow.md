@@ -253,7 +253,9 @@ deprecation window, with removal scheduled for 0.13.
 `photon_energy_eV`, and `density` columns. CXR modes are `incoherent` and
 `coherent`; the other families have no mode. It does not interpolate different
 grids or add totals. Units, normalization, case, and provenance are in
-`DataFrame.attrs`.
+`DataFrame.attrs`. The frame plots directly, e.g.
+`alt.Chart(df).mark_line().encode(x="photon_energy_eV:Q", y="density:Q", color="component:N", strokeDash="mode:N")`.
+Per-pixel `spatial` data is not flattened.
 
 Runtime controls are `PYRITE_MC_CXR_CHUNK` and `PYRITE_MC_CXR_BUDGET_MB`.
 Their retired `PYRITE_MC_SPEC_*` spellings warn when used as fallbacks; canonical
