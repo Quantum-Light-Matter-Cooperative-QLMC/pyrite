@@ -597,7 +597,7 @@ def test_vtp_opens_in_vtk(tmp_path):
 
 
 def test_export_cli_writes_beside_artifacts_and_refuses_to_clobber(tmp_path):
-    from pyrite.cli.commands.trajectories import command
+    from pyrite.cli.commands.trajectories import export_command as command
 
     segs = simulate_trajectories(20.0, 5, 2000.0, seed=0, **_SI)
     write_trajectory_artifact(tmp_path / "run" / "a" / "E0_20keV.h5", segs, case=_case())
@@ -614,7 +614,7 @@ def test_export_cli_writes_beside_artifacts_and_refuses_to_clobber(tmp_path):
 
 
 def test_export_cli_out_dir_mirrors_a_run_directory(tmp_path):
-    from pyrite.cli.commands.trajectories import command
+    from pyrite.cli.commands.trajectories import export_command as command
 
     segs = simulate_trajectories(20.0, 5, 2000.0, seed=0, **_SI)
     run = tmp_path / "run"

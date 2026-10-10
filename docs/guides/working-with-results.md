@@ -99,6 +99,17 @@ Things to know before enabling it:
 - **Interrupted runs.** Files are written as `<name>.partial` and renamed only once complete, so a crash or budget stop cannot leave a truncated file under the final name. A resumed run discards stale `.partial` files of the cases it transports.
 - **Remote captures stay remote.** `pyrite run ... --remote --trajectories` writes on the compute host; transfer selected cases or export selected histories with `pyrite remote trajectories`. See [remote trajectory captures](running-on-a-cluster.md#remote-trajectory-captures).
 
+### Find and describe captures
+
+```bash
+pyrite trajectories ls
+pyrite trajectories info pyrite-output/trajectories/<stem>/<config>-<digest>/E0_30keV.h5
+```
+
+`ls` lists every file under the capture root (or each `DIR` given): checkpoint stem, case, E0, schema, status, segment rows, histories with segments, highest secondary generation, and size, then totals per stem. Stray `.partial` files, incomplete artifacts, and HDF5 files that are not trajectory artifacts appear with their status rather than failing the listing. `info` prints one artifact's case, seed, provenance, whether a scene was recorded, history ID range, track count, segments per generation, and every `/transport` field with its role (per-segment, per-electron, nested, scalar), dtype, shape, and units; the per-segment names are the cell arrays an export carries. Both read headers, node metadata, and integer ID columns in bounded blocks only, never segment arrays. `-o json` emits one stable JSON envelope. `export` and `score` likewise skip non-artifact files in a directory with a warning.
+
+`pyrite checkpoint export-trajectories` and `score-trajectories` remain as deprecated aliases of `pyrite trajectories export` and `score`; captures are not checkpoints.
+
 Reopen a file from Python:
 
 ```python
@@ -115,7 +126,7 @@ The HDF5 layout is self-describing and readable with any HDF5 tool: `/transport`
 ### Export segments for visualization
 
 ```bash
-pyrite checkpoint export-trajectories pyrite-output/trajectories/
+pyrite trajectories export pyrite-output/trajectories/
 ```
 
 Every artifact becomes a VTK XML PolyData (`.vtp`) file beside it, readable by ParaView, VisIt, and PyVista/VTK. Each segment is a two-point line cell from `r_mid - L_ang v_hat / 2` to `r_mid + L_ang v_hat / 2` in the slab frame, in angstrom. All per-segment fields ride along as cell data, so thresholding on `electron_id` (or `track_id` with secondaries) isolates one history. Grooved vacuum legs are extra cells with `is_vacuum = 1`, where only `electron_id`, `E_start_keV`, `t_start_ang`, `t0_ang`, `L_ang`, and `v_hat` are defined and other fields are NaN or -1; `--no-vacuum` drops them.
@@ -125,12 +136,12 @@ VTK PolyData was chosen because it represents disconnected straight segments wit
 ### Score spectra from saved trajectories
 
 ```bash
-pyrite checkpoint score-trajectories pyrite-output/trajectories/
+pyrite trajectories score pyrite-output/trajectories/
 ```
 
 This replays only the spectrum phase (line, characteristic, and bremsstrahlung spectra) of every captured case and stores each result as an ordinary record of the checkpoint stem and run identity the capturing run recorded, under `--checkpoint-dir` (default `pyrite-output/checkpoints/<stem>`). It never transports. Each new record carries `source_trajectory` with the artifact's path and SHA-256. Records that already exist are kept unless `--overwrite`, and records of cases without an artifact are never touched, so re-scoring a run's own checkpoint after a spectrum-phase change replaces exactly the captured cases. The shared per-case cache is neither read nor written.
 
-Every artifact is checked before anything is written. The command refuses artifacts from before this schema (re-run the case with `--trajectories`), incomplete or foreign files, artifacts written outside a run, two runs' artifacts for one stem, and a target checkpoint written by a different run. Spectrum inputs that the case alone determines are recomputed and must match what the artifact stored.
+Every artifact is checked before anything is written. The command refuses artifacts from before this schema (re-run the case with `--trajectories`), incomplete or foreign files named explicitly (a directory scan skips them with a warning), artifacts written outside a run, two runs' artifacts for one stem, and a target checkpoint written by a different run. Spectrum inputs that the case alone determines are recomputed and must match what the artifact stored.
 
 Segments are read in whole-electron blocks of at most `--max-segments` rows (default 1,048,576), so host memory does not grow with the artifact. On a 7.1-million-segment CPU artifact, the peak above the process baseline was about 1.1 GiB at the default, 0.7 GiB at 262,144 rows, and 0.4 GiB at 65,536 rows. Reading the whole artifact at once peaked at 4.9 GiB. At a fixed block size the peak does not grow with the artifact: 65,536-row blocks peaked at 0.4 GiB for both 2.4 and 7.1 million segments, while whole-artifact reads grew from 1.7 to 4.9 GiB. Smaller blocks were not slower on the CPU. Scored spectra equal the live run's to floating-point summation order (relative 1e-12). Cases with coherent emission or a temporal profile need every segment at once and are refused; score those in Python with `pyrite.montecarlo.runner.spectrum_from_artifact`, which matches the live run bit for bit but holds the whole artifact in memory.
 
@@ -139,7 +150,7 @@ Prefer artifact reuse when you redo only the spectrum phase of the same transpor
 ### Export scene geometry
 
 ```bash
-pyrite checkpoint export-trajectories pyrite-output/trajectories/ --scene
+pyrite trajectories export pyrite-output/trajectories/ --scene
 ```
 
 In addition to each original slab-frame `.vtp`, `--scene` writes two independently viewable scenes:
@@ -164,10 +175,10 @@ New capture-enabled profile runs snapshot downstream geometry in the HDF5 artifa
 ParaView reads a whole `.vtp` into memory, so export only the histories you need from a large capture:
 
 ```bash
-pyrite checkpoint export-trajectories trajectories/ --first 20
-pyrite checkpoint export-trajectories case.h5 --sample 200 --seed 1 --scene
-pyrite checkpoint export-trajectories case.h5 --history 7 --history 12
-pyrite checkpoint export-trajectories case.h5 --track 4031
+pyrite trajectories export trajectories/ --first 20
+pyrite trajectories export case.h5 --sample 200 --seed 1 --scene
+pyrite trajectories export case.h5 --history 7 --history 12
+pyrite trajectories export case.h5 --track 4031
 ```
 
 Selections take complete histories (a primary `electron_id` with every secondary of its shower) or complete tracks; `--track` intersects a history selection. `--first N` takes the first N histories that have segments, `--sample N` draws N at random (reproducibly from `--seed`, default 0). Only the selected rows are read, so export memory and the output size follow the selection, not the capture. A subset `.vtp` adds the cell array `segment_id`, each cell's row index in the full transported result, and a `selection` FieldData record of the request and the resolved history IDs. Grooved vacuum legs follow selected histories and are left out of track selections, whose ancestry they cannot express. An empty selection exports nothing and reports which history IDs have segments.
@@ -188,7 +199,7 @@ A ParaView script ships with PyRITE. It colours tracks by a cell array (`E_start
 
 <!-- verify: skip (needs ParaView pvbatch, not a pyrite/pyrite-dev command) -->
 ```bash
-SCRIPT=$(pyrite checkpoint export-trajectories --paraview-script)
+SCRIPT=$(pyrite trajectories export --paraview-script)
 pvbatch "$SCRIPT" case.vtp --screenshot case.png
 pvbatch "$SCRIPT" case.vtm --color generation --threshold electron_id 0 9 --screenshot closeup.png
 ```
@@ -196,7 +207,7 @@ pvbatch "$SCRIPT" case.vtm --color generation --threshold electron_id 0 9 --scre
 For a first GUI check with the bundled demo, export twenty whole histories:
 
 ```bash
-pyrite checkpoint export-trajectories trajectories/ --first 20 --scene --out-dir traj-vtk/
+pyrite trajectories export trajectories/ --first 20 --scene --out-dir traj-vtk/
 ```
 
 Open the resulting close-up `.vtm` (without `.instrument` in its name), click **Apply**, select the reader in the Pipeline Browser, then run the imported macro. Other profiles can have millimetre-wide beam spots while each shower travels only micrometres: fitting twenty such histories can still make each shower tiny. Use `--first 1` or `--history ID` for a local shower from those captures, and the instrument view for the full footprint. The close-up crystal is a lateral crop around the selected tracks, retains the recorded thickness, and appears as wireframe so its faces do not hide them. Coordinates and track lengths are never stretched or recentered.

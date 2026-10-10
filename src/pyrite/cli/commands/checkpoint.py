@@ -12,7 +12,7 @@ _COMMANDS = {
     "list": "pyrite.cli.commands.archive.list_command",
     "gc": "pyrite.cli.commands.cleanup.gc_command",
     "rm": "pyrite.cli.commands.cleanup.rm_command",
-    "export-trajectories": "pyrite.cli.commands.trajectories.command",
+    "export-trajectories": "pyrite.cli.commands.trajectories.export_command",
     "score-trajectories": "pyrite.cli.commands.trajectories.score_command",
 }
 
@@ -23,8 +23,6 @@ _COMMAND_HELP = {
     "list": "List active local checkpoints.",
     "gc": "Reclaim records obsolete under current scan profiles.",
     "rm": "Delete local datasets and newly unreachable shared cases.",
-    "export-trajectories": "Export captured trajectories to VTK PolyData.",
-    "score-trajectories": "Score records from captured trajectories.",
 }
 
 _RECOMPUTE_COMMANDS = {
@@ -54,6 +52,7 @@ def recompute_command() -> None:
     cls=LazyGroup,
     lazy_commands=_COMMANDS,
     lazy_help=_COMMAND_HELP,
+    lazy_hidden=("export-trajectories", "score-trajectories"),
     no_args_is_help=True,
 )
 def command() -> None:

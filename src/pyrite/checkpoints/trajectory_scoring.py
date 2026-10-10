@@ -34,17 +34,6 @@ SAVE_EVERY = 25
 _HASH_BLOCK_BYTES = 8 * 1024 * 1024
 
 
-def discover_artifacts(paths: Iterable[str | os.PathLike[str]]) -> list[Path]:
-    """Expand directories recursively to their ``*.h5`` files; keep explicit files."""
-    found: list[Path] = []
-    for path in map(Path, paths):
-        if path.is_dir():
-            found.extend(p for p in sorted(path.rglob("*.h5")) if p.is_file())
-        else:
-            found.append(path)
-    return found
-
-
 def file_sha256(path: str | os.PathLike[str]) -> str:
     """SHA-256 of a file's bytes, read in bounded blocks."""
     digest = hashlib.sha256()

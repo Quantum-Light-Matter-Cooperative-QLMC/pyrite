@@ -21,6 +21,7 @@ from pyrite.montecarlo.trajectories import (
     read_trajectory_artifact,
     write_trajectory_artifact,
 )
+from pyrite.montecarlo.trajectory_inventory import discover_artifacts
 from pyrite.runs.run import run_sweep
 from tests.helpers.cli import invoke
 from tests.montecarlo.test_trajectory_capture import _case
@@ -165,7 +166,9 @@ def test_cases_that_cannot_stream_are_refused_at_planning(tmp_path):
     _captured_run(tmp_path, cases=[{**_case("c"), "coherent_emission": True}])
 
     with pytest.raises(trajectory_scoring.TrajectoryArtifactError, match="coherent_emission"):
-        trajectory_scoring.plan_stems(trajectory_scoring.discover_artifacts([tmp_path / "traj"]))
+        trajectory_scoring.plan_stems(
+            found.path for found in discover_artifacts([tmp_path / "traj"]).artifacts
+        )
 
 
 def test_two_runs_of_one_stem_are_refused(tmp_path):
@@ -193,7 +196,7 @@ def test_usage_and_empty_input_contracts(tmp_path):
 
 
 def test_help_documents_side_effects():
-    text = invoke(score_command, ["--help"]).stdout
+    text = " ".join(invoke(score_command, ["--help"]).stdout.split())
 
     for phrase in ("--overwrite", "SHA-256", "never touched", "shared per-case cache"):
         assert phrase in text, phrase

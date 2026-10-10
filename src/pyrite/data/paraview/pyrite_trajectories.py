@@ -2,7 +2,7 @@
 
 Runs under ParaView's Python (``pvpython``/``pvbatch``) or as a GUI macro; it
 does not import PyRITE. Print its path with
-``pyrite checkpoint export-trajectories --paraview-script``.
+``pyrite trajectories export --paraview-script``.
 
 Batch / headless::
 

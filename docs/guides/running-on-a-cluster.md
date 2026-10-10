@@ -193,7 +193,7 @@ pyrite remote trajectories score STEM --energy 30
 ```
 
 `export` requires `--history`, `--track`, `--first`, or `--sample` and applies the
-same whole-history/track selection as local `checkpoint export-trajectories`.
+same whole-history/track selection as local `trajectories export`.
 `--seed` controls `--sample`; track filters intersect history selection. Only
 verified `.vtp` outputs come back, under `pyrite-output/trajectories-exports/`
 by default. The remote exports remain under that directory in a separate

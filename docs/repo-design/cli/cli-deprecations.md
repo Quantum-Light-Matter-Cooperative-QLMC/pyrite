@@ -8,7 +8,10 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 
 ## Commands
 
-No command spelling is currently deprecated. Every spelling the CLI accepts is canonical; anything else exits as an unknown command.
+| Deprecated spelling | Replacement | Deprecated in | Remove in | Note |
+| --- | --- | --- | --- | --- |
+| `pyrite checkpoint export-trajectories` | `pyrite trajectories export` | 0.11.0 | 0.13.0 | Trajectory captures are not checkpoints (issue #397). |
+| `pyrite checkpoint score-trajectories` | `pyrite trajectories score` | 0.11.0 | 0.13.0 | Trajectory captures are not checkpoints (issue #397). |
 
 ## Options
 
