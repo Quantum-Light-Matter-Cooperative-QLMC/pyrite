@@ -163,7 +163,7 @@ def test_perf_nsys_reexecs_instead_of_running_in_process(monkeypatch):
     assert captured["performance_profile"] == "sub_100keV"
 
 
-def test_nsys_reexec_command_builds_launcher_and_uncached_checkpoint():
+def test_nsys_reexec_command_builds_launcher_and_uncached_checkpoint(tmp_path):
     argv, trace_base = scan._nsys_reexec_command(
         catalog_profile="sub_100keV",
         material="hopg",
@@ -177,7 +177,7 @@ def test_nsys_reexec_command_builds_launcher_and_uncached_checkpoint():
     )
 
     assert argv[0] == "nsys" and argv[1] == "profile"
-    assert "--output=performance-profiles/sub_100keV/hopg" in argv
+    assert f"--output={tmp_path}/pyrite-output/performance/sub_100keV/hopg" in argv
     assert "-m" in argv and "pyrite._dev" in argv and "perf" in argv
     assert "--nsys" not in argv  # child must not recurse
     assert "--fidelity" not in argv
@@ -186,11 +186,13 @@ def test_nsys_reexec_command_builds_launcher_and_uncached_checkpoint():
     assert "--max-minutes" in argv and "1.5" in argv
     # isolated, always-uncached checkpoint dir so the trace covers real work
     assert "--checkpoint-dir" in argv
-    assert "performance-profiles/sub_100keV/nsys-checkpoints/hopg" in argv
-    assert str(trace_base) == "performance-profiles/sub_100keV/hopg"
+    assert (
+        f"{tmp_path}/pyrite-output/checkpoints/performance/sub_100keV/nsys-checkpoints/hopg" in argv
+    )
+    assert str(trace_base) == f"{tmp_path}/pyrite-output/performance/sub_100keV/hopg"
 
 
-def test_nsys_reexec_command_full_membership_uses_profile_stem():
+def test_nsys_reexec_command_full_membership_uses_profile_stem(tmp_path):
     argv, trace_base = scan._nsys_reexec_command(
         catalog_profile="sub_100keV",
         material=None,
@@ -204,9 +206,12 @@ def test_nsys_reexec_command_full_membership_uses_profile_stem():
 
     # full membership: only the `python -m pyrite._entry.scan` flag, no `-m <mat>`
     assert argv.count("-m") == 1
-    assert "--output=performance-profiles/sub_100keV/sub_100keV" in argv
-    assert "performance-profiles/sub_100keV/nsys-checkpoints/sub_100keV" in argv
-    assert str(trace_base) == "performance-profiles/sub_100keV/sub_100keV"
+    assert f"--output={tmp_path}/pyrite-output/performance/sub_100keV/sub_100keV" in argv
+    assert (
+        f"{tmp_path}/pyrite-output/checkpoints/performance/sub_100keV/nsys-checkpoints/sub_100keV"
+        in argv
+    )
+    assert str(trace_base) == f"{tmp_path}/pyrite-output/performance/sub_100keV/sub_100keV"
 
 
 def test_nsys_reexec_forwards_explicit_recompute():
@@ -240,7 +245,7 @@ def test_reexec_under_nsys_errors_when_nsys_missing(monkeypatch):
         )
 
 
-def test_py_spy_reexec_command_samples_an_uncached_child():
+def test_py_spy_reexec_command_samples_an_uncached_child(tmp_path):
     argv, output, status = scan._py_spy_reexec_command(
         ["py-spy"],
         catalog_profile="sub_100keV",
@@ -257,14 +262,21 @@ def test_py_spy_reexec_command_samples_an_uncached_child():
     assert argv[:2] == ["py-spy", "record"]
     assert {"--subprocesses", "--nonblocking", "--idle"} <= set(argv[:separator])
     assert argv[argv.index("--output") + 1] == str(output)
-    assert str(output) == "performance-profiles/sub_100keV/hopg.py-spy.json"
+    assert str(output) == f"{tmp_path}/pyrite-output/performance/sub_100keV/hopg.py-spy.json"
     wrapper = argv[separator + 1 :]
     assert wrapper[1:3] == ["-m", "pyrite.perf.py_spy"]
-    assert wrapper[3] == str(status) == "performance-profiles/sub_100keV/hopg.py-spy.status"
+    assert (
+        wrapper[3]
+        == str(status)
+        == f"{tmp_path}/pyrite-output/performance/sub_100keV/hopg.py-spy.status"
+    )
     child = wrapper[wrapper.index("--") + 1 :]
     assert child[1:4] == ["-m", "pyrite._dev", "perf"]
     assert "--py-spy" not in child  # child must not recurse
-    assert "performance-profiles/sub_100keV/py-spy-checkpoints/hopg" in child
+    assert (
+        f"{tmp_path}/pyrite-output/checkpoints/performance/sub_100keV/py-spy-checkpoints/hopg"
+        in child
+    )
 
 
 def test_perf_rejects_py_spy_with_nsys(monkeypatch):

@@ -37,6 +37,7 @@ import click
 from ..._acp import running_acp
 from ..._app_defaults import get_viewer_default, set_viewer_default
 from ...console import output as _cli_core
+from ...console.outputs import output_dir
 from ...paths import app_dir
 from .. import _completion as _cli_completion
 from .._deprecations import canonical_option
@@ -86,7 +87,8 @@ def _export(stem: str | None, material: str | None) -> None:
     """Export viewer HTML without starting a marimo server or browser."""
     resolved = material or get_viewer_default() or "hopg"
     stem = stem or f"pyrite_viewer_{resolved}"
-    output = Path("results") / f"{stem}.html"
+    output = output_dir("results") / f"{stem}.html"
+    output.parent.mkdir(parents=True, exist_ok=True)
     click.echo(f"exporting {NOTEBOOK} -> {output}")
     subprocess.run(_smoke_command(resolved, output), check=True)
 
@@ -184,7 +186,7 @@ def command(material, persist_default, watch, smoke, edit, acp, tunnel, no_token
     type=_cli_completion.MATERIAL,
     shell_complete=_cli_completion.complete_material,
 )
-@click.option("--stem", help="Output stem under results/ (without .html).")
+@click.option("--stem", help="Output stem under pyrite-output/results/ (without .html).")
 def export_command(material, stem):
     _export(stem, material)
 

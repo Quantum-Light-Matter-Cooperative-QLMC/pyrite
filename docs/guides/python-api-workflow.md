@@ -127,7 +127,7 @@ window_image = configured.acquisition_image((4_000.0, 8_000.0), pixel_chunk=1024
 
 ### Persist, reopen, and rescore an observation
 
-`pyrite.observations.ObservationStore` keeps observations beside, not inside, intrinsic checkpoints; `pyrite run` writes one per case of a counting-observation profile under `observations/<stem>/`. A true-spatial object stores only factors -- tile map, solid angles, filter paths, representative directions, per-tile spectra, attenuation -- and every response or acquisition over it is a small record, so rescoring never repeats transport:
+`pyrite.observations.ObservationStore` keeps observations beside, not inside, intrinsic checkpoints; `pyrite run` writes one per case of a counting-observation profile under `pyrite-output/observations/<stem>/`. A true-spatial object stores only factors -- tile map, solid angles, filter paths, representative directions, per-tile spectra, attenuation -- and every response or acquisition over it is a small record, so rescoring never repeats transport:
 
 ```python
 import tempfile

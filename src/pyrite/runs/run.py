@@ -35,7 +35,6 @@ from ..checkpoints import _checkpoint_store
 from ..checkpoints.persistence import (  # noqa: F401 -- compatibility exports
     _CAS_OPTIONAL_PAYLOAD_KEYS,
     _CAS_PAYLOAD_KEYS,
-    DEFAULT_CHECKPOINT_DIR,
     _cas_payload_from_record,
     _case_manifest_path,
     _case_set_proof,
@@ -61,6 +60,7 @@ from ..checkpoints.persistence import (  # noqa: F401 -- compatibility exports
     cases_from_results,
     checkpoint_manifest,
     checkpoint_path_for,
+    default_checkpoint_dir,
     load_checkpoint,
 )
 from ..checkpoints.recompute import (  # noqa: F401 -- compatibility exports
@@ -71,6 +71,13 @@ from ..checkpoints.recompute import (  # noqa: F401 -- compatibility exports
 )
 from ..montecarlo import run_cases, runner
 from ..results import store_result
+
+
+def __getattr__(name):
+    # Compatibility export resolved on access, like its persistence original.
+    if name == "DEFAULT_CHECKPOINT_DIR":
+        return default_checkpoint_dir()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _default_group_key(case):
@@ -92,7 +99,7 @@ def run_sweep(
     cases,
     results,
     *,
-    checkpoint_dir=DEFAULT_CHECKPOINT_DIR,
+    checkpoint_dir=None,
     checkpoint_path=None,
     resume=True,
     max_workers=None,
@@ -122,7 +129,8 @@ def run_sweep(
 
     cases : list of typed cases from sweep.build_cases.
     results : the dict to fill ({name: {E0: record}}).
-    checkpoint_dir : directory for the per-material checkpoints. A sweep is
+    checkpoint_dir : directory for the per-material checkpoints (default
+        ``pyrite-output/checkpoints`` in the workspace). A sweep is
         single-material, so each writes ``<checkpoint_dir>/<material>.pkl``
         holding ONLY that material's configs -- different materials never share a
         pickle, and ``results`` can hold several materials in one kernel without

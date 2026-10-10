@@ -94,17 +94,14 @@ def test_checkpoint_completion_honors_explicit_path(tmp_path):
 
 
 def test_archive_label_completion_reads_only_archive_shelf(tmp_path):
-    (tmp_path / "active.pkl").touch()
-    archive_dir = tmp_path / "archive"
-    archive_dir.mkdir()
+    root = tmp_path / "pyrite-output" / "checkpoints"
+    archive_dir = root / "archive"
+    archive_dir.mkdir(parents=True)
+    (root / "active.pkl").touch()
     (archive_dir / "good-run.pkl").touch()
-    old_root = _cli_completion._ARCHIVE_CHECKPOINT_ROOT
-    _cli_completion._ARCHIVE_CHECKPOINT_ROOT = tmp_path
-    try:
-        labels = _values(_cli_completion.complete_archive_label(None, None, "good"))
-        stems = _values(_cli_completion.complete_archive_stem(None, None, "act"))
-    finally:
-        _cli_completion._ARCHIVE_CHECKPOINT_ROOT = old_root
+
+    labels = _values(_cli_completion.complete_archive_label(None, None, "good"))
+    stems = _values(_cli_completion.complete_archive_stem(None, None, "act"))
 
     assert labels == ["good-run"]
     assert stems == ["active"]

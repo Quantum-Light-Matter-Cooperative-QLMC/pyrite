@@ -14,7 +14,8 @@ from ...console.output import (
     emit_json_result,
     emit_result,
 )
-from ...remote import config, lifecycle, scripts, state, transport, viewer
+from ...console.outputs import output_dir
+from ...remote import lifecycle, scripts, state, transport, viewer
 
 
 def remote_scan(material, quick=False, workers=None, fidelity="full"):
@@ -307,7 +308,7 @@ def _cli_pull_json(
         materials,
         completed,
         failed_materials=failed,
-        checkpoints=[config.LOCAL_ROOT / "checkpoints" / item for item in materials],
+        checkpoints=[output_dir("checkpoints") / item for item in materials],
         elapsed_seconds=time.monotonic() - started,
         material_errors=errors,
     )
@@ -424,7 +425,7 @@ def _cli_start(
         ]
     from ...checkpoints import _checkpoint_store
 
-    checkpoint_root = config.LOCAL_ROOT / "checkpoints"
+    checkpoint_root = output_dir("checkpoints")
     stems = [
         stem
         for material, stem in material_stems
@@ -444,7 +445,7 @@ def _cli_start(
     )
     for stem in stems:
         print(
-            f"\ndone. checkpoints/{stem}/ is local; run `pyrite app analysis {stem}` "
+            f"\ndone. pyrite-output/checkpoints/{stem}/ is local; run `pyrite app analysis {stem}` "
             f"(or run `pyrite app analysis export`) -- visualization and static-HTML export "
             "stay local."
         )

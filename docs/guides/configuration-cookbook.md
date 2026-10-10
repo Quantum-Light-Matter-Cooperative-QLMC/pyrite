@@ -20,6 +20,29 @@ PYRITE_HOME=/scratch/my-run pyrite checkpoint list  # archive shelf in that work
 
 For the complete inventory, accepted formats, defaults, and operational controls, see the [environment-variable reference](../repo-design/configuration-resolution.md#environment-variable-reference).
 
+## Choose an output home
+
+Generated outputs default to `<workspace>/pyrite-output/`: `checkpoints/`,
+`observations/`, `trajectories/`, `performance/`, `results/`, `figures/`, and
+`cache/`. Set `workspace.root` once for a fixed home when using `uv tool install`.
+A per-kind directory option overrides its default. Otherwise `PYRITE_HOME` wins
+over `workspace.root`; without either, the nearest ancestor of cwd containing
+`pyrite-output/` is used, falling back to cwd. Running
+from a workspace subdirectory therefore reuses its existing output tree.
+
+On the first CLI output-path resolution, legacy `checkpoints/`, `observations/`,
+`performance-profiles/`, and `results/` with data move into the new tree. A notice
+on stderr names each move. Cross-filesystem moves copy and verify contents
+before removing the source. When both locations exist, PyRITE warns once and uses
+the new location without merging or reading the old one. Help and library imports
+do not move files. Symlinked legacy directories are left alone.
+
+`cache/` contains regenerable Zhai reproductions, analysis intermediates, photon
+grid resolutions, and viewer renders; it is safe to delete. Checkpoints,
+observations, captured trajectories, and exports remain outside it. Remote jobs
+use the same `pyrite-output/<kind>/` layout; remote pulls resolve local destinations
+from the current workspace, including installed-package runs.
+
 ## Create and inspect a campaign
 
 ```bash

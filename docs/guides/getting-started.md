@@ -40,6 +40,6 @@ Bundled profiles resolve a conservative case-local line grid automatically; no d
 
 ## Inspect the result
 
-Runs write identity-qualified component checkpoints beneath `checkpoints/`. Continue with [Working with results](working-with-results.md) for checkpoint, analysis-app, export, and cleanup workflows.
+Runs write identity-qualified component checkpoints beneath `pyrite-output/checkpoints/`. Continue with [Working with results](working-with-results.md) for checkpoint, analysis-app, export, and cleanup workflows.
 
 Before using output for scientific claims, inspect the [validation ledger](../validation/physics-validation-ledger.md). A successful run does not imply that every model or instrument input is signed off.

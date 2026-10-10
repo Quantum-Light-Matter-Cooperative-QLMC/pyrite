@@ -36,7 +36,7 @@ from typing import Any
 import h5py
 import numpy as np
 
-from ..console.config import workspace_root
+from ..console.outputs import output_dir
 from ..detectors import IdealPhotonCounter, Timepix3
 from ..detectors.spec import DetectorResponse
 from ..instrument import (
@@ -91,8 +91,8 @@ class ObservationStoreError(RuntimeError):
 
 
 def default_observation_root() -> Path:
-    """Return ``<workspace>/observations``, the sibling of ``checkpoints``."""
-    return workspace_root() / "observations"
+    """Return ``<workspace>/pyrite-output/observations``, beside ``checkpoints``."""
+    return output_dir("observations")
 
 
 def _array_identity(array: np.ndarray) -> dict[str, Any]:

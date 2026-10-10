@@ -50,7 +50,7 @@ _ENV_NAMES = (
 def _isolated(monkeypatch, tmp_path):
     for name in _ENV_NAMES:
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(_line_grid_policy, "cache_dir", lambda: tmp_path)
+    monkeypatch.setattr(_line_grid_policy, "output_dir", lambda _kind: tmp_path)
 
 
 def _uncovered_energy_sweep(energy_keV=77.0, **policy):

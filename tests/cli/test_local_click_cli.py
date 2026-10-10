@@ -53,7 +53,7 @@ def _capture(monkeypatch, module, handler_name):
     return seen
 
 
-def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch):
+def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch, tmp_path):
     seen = _capture(monkeypatch, scan, "run")
     result = invoke(
         scan_cli.command,
@@ -69,7 +69,7 @@ def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch):
         "quick": False,
         "n_families": None,
         "beam_uvw": None,
-        "checkpoint_dir": "checkpoints",
+        "checkpoint_dir": str(tmp_path / "pyrite-output" / "checkpoints"),
         "max_minutes": None,
         "performance_profile": None,
         "performance_interval": 5.0,
@@ -203,7 +203,7 @@ def test_blaze_unknown_option_after_variadic_value_is_not_swallowed():
             check.command,
             "_cli",
             ["--export", "--ne", "11"],
-            {"export": True, "ne": 11, "outdir": "figures"},
+            {"export": True, "ne": 11, "outdir": None},
         ),
         (
             slim,

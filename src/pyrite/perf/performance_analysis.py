@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ..console.outputs import output_dir
 from .performance_profile import PROFILE_SCHEMA
 
 TERMINAL_EVENTS = {"done", "paused", "failed"}
@@ -615,14 +616,14 @@ def _plot_timeline(
 
 def analyze_performance_profile(
     profile: str,
-    root: Path = Path("performance-profiles"),
+    root: Path | None = None,
     *,
     sample_period: float = 5.0,
 ) -> dict[str, Any]:
     """Analyze one profile directory and return generated artifact metadata."""
     if sample_period <= 0 or not math.isfinite(sample_period):
         raise PerformanceAnalysisError("sample period must be a finite positive number")
-    profile_root = Path(root) / profile
+    profile_root = (output_dir("performance") if root is None else Path(root)) / profile
     if not profile_root.is_dir():
         raise PerformanceAnalysisError(
             f"performance profile directory does not exist: {profile_root}"

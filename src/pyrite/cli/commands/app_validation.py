@@ -12,8 +12,8 @@ resolve or persist.
     pyrite app validation --watch     # add marimo's --watch
     pyrite app validation --edit      # `marimo edit` instead of `marimo run`
     pyrite app validation export      # skip marimo; render the full Zhai figure
-                                    # set from checkpoints/zhai_reproduction/
-                                    # (see `pyrite run --preset zhai`) to figures/
+                                    # set from pyrite-output/cache/zhai_reproduction/
+                                    # (see `pyrite run --preset zhai`) to pyrite-output/figures/
 """
 
 import importlib
@@ -66,7 +66,7 @@ def _launch(*, edit=False, watch=False, acp=False, tunnel=False):
         return
 
 
-def _export(outdir="figures", ne=20_000, ne_brem=200, ne_supp=200):
+def _export(outdir=None, ne=20_000, ne_brem=200, ne_supp=200):
     af = importlib.import_module("pyrite.validation.anchor_figures")
 
     try:
@@ -109,8 +109,8 @@ def _cli(args):
 @click.option("--export", "export_", is_flag=True, help="Render cached figures instead of marimo.")
 @click.option(
     "--outdir",
-    default="figures",
-    show_default=True,
+    default=None,
+    show_default="pyrite-output/figures",
     metavar="DIR",
     help="With --export, output directory.",
 )

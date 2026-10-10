@@ -701,7 +701,7 @@ def _production_case(kind, tmp_path, monkeypatch):
         assert "secondary_threshold_eV" in case
         return case
     else:  # an uncovered energy resolves its line grid from the trajectories
-        monkeypatch.setattr(_line_grid_policy, "cache_dir", lambda: tmp_path / "grid-cache")
+        monkeypatch.setattr(_line_grid_policy, "output_dir", lambda _kind: tmp_path / "grid-cache")
         sweep = material_sweep("hopg")
         sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=77.0))
     case = build_cases(sweep, n_electrons=24, n_electrons_brem=12)[0]

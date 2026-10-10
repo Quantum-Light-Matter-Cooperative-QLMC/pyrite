@@ -6,7 +6,7 @@ Navigation aid for `src/pyrite/` — importable package. Read before exploring s
 
 - Root `pyrite-mc`: sole publishable distribution and owner of `src/pyrite/`, packaged data, `pyrite`, `pyrite-dev`, and the test suite. No `uv` workspace split; `uv run pyrite-dev ...` needs no `--package` flag.
 - Stable `pyrite-dev test-suite {core,cli,apps,packaging}` selectors partition all test modules; `integration` overlaps deliberately; `verify` remains full gate.
-- Runtime paths resolve through `pyrite.paths` and `console.config`: packaged read-only data stays package-relative; a complete selected catalog uses per-call `--catalog` > `PYRITE_CATALOG` > `catalog.path` > bundled; workspace artifacts use explicit path > `PYRITE_HOME` > `workspace.root` config > cwd; mutable user state uses Click's platform app directory. An explicit workspace also owns generated `xsgen/` tables and fetched reference data. Marimo apps ship under `pyrite.apps`; validation figure builders and their reference data ship under `pyrite.validation`; standalone `checks/` scripts remain developer-only.
+- Runtime paths resolve through `pyrite.paths` and `console.config`: packaged read-only data stays package-relative; a complete selected catalog uses per-call `--catalog` > `PYRITE_CATALOG` > `catalog.path` > bundled; generated outputs use `console.outputs` under `<workspace>/pyrite-output/<kind>/`; workspace precedence is explicit path > `PYRITE_HOME` > `workspace.root` config > nearest ancestor containing `pyrite-output/` > cwd; mutable user state uses Click's platform app directory. An explicit workspace also owns generated `xsgen/` tables and fetched reference data. Marimo apps ship under `pyrite.apps`; validation figure builders and their reference data ship under `pyrite.validation`; standalone `checks/` scripts remain developer-only.
 - `vendor/xsgen/{elsepa,sbethe}/`: generator inputs (ELSEPA 2020 Fortran and `database/`, `sbethe.f`), not in the wheel. `xsgen.sources` resolves them as the vendored tier from a checkout, and `pyrite remote sync` ships `vendor/`. Their data classes are set by [ADR-0014](adr/0014-packaged-data-layout.md). ELSEPA's published test-run output is a test fixture under `tests/data/xsgen/elsepa/`.
 - Root domain implementations are grouped under `campaign/`, `checkpoints/`, `runs/`, `apps/`, `validation/`, `perf/`, and `remote/`. Former flat root module paths were removed in 0.5.0; import the owning subpackage.
 
@@ -66,9 +66,11 @@ Edges (importer -> imported):
   p12 -> p5
   p12 -> p6
   p12 -> p9
+  p13 -> p5
   p14 -> p10
   p14 -> p11
   p14 -> p16
+  p14 -> p5
   p14 -> p6
   p15 -> p10
   p15 -> p11
@@ -511,6 +513,7 @@ Terminal presentation primitives shared by the CLI and the domain packages, and 
 - `output.py` — colour, Click parameter types, destructive-action confirmation, result/diagnostic emission, JSON envelopes, and `run()`, which preserves the pyrite exit contract around Click.
 - `json.py` — stable JSON payload adapters for automation.
 - `config.py` — the persistent context store (`profile.current`, `remote.*` target and SLURM profile, `workspace.root`, `catalog.path`, `xsgen.*`), its per-call > `PYRITE_*` > store > built-in precedence resolver, and workspace/catalog path helpers.
+- `outputs.py` — lazy workspace output paths, ancestor discovery, CLI-only legacy migration (rename or verified cross-filesystem copy), and shared output-kind defaults; `config.py` exposes resolver wrappers.
 - `dashboard/` — below.
 
 `checkpoints`, `runs` and `remote` all emit results and render progress while they work. Sourcing that from `cli/` is what put `cli` in a bidirectional pair with each of them; the `domain-packages-stay-below-cli` and `console-stays-below-every-driver` contracts hold the split.
@@ -615,7 +618,7 @@ Optional SSH/SLURM orchestration for a configured remote host: sync, bounded and
   - `viewer.py` — one-shot/attached status and logs rendering; attached status reuses one framed SSH stream across refreshes. Names re-export as import-time snapshots; internal cross-module calls resolve through the owning submodule, so tests patch the owner (e.g. `transport._ssh_capture`), not the facade.
 
 ### `cli/commands/export.py`
-`pyrite app analysis export` subcommand — `marimo export html` of `src/pyrite/apps/analysis_app.py` → `results/<stem>.html`. Body and Click wiring are both here.
+`pyrite app analysis export` subcommand — `marimo export html` of `src/pyrite/apps/analysis_app.py` → `pyrite-output/results/<stem>.html`. Body and Click wiring are both here.
 - Public: `command`, `main`.
 
 ### `checkpoints/slim.py`

@@ -710,7 +710,7 @@ def test_queue_script_profiles_uncached_repetitions_with_fixed_runtime_knobs():
     assert "export PYRITE_MC_BREM_CHUNK=10000" in script
     assert "performance_repetitions=3" in script
     assert "repetition<=performance_repetitions" in script
-    assert '--checkpoint-dir "$JOBDIR/performance-checkpoints/$m/$repetition"' in script
+    assert '--checkpoint-dir "$PERFCKPT/$m/$repetition"' in script
     assert "--perf-interval 1" in script
 
 
@@ -743,7 +743,7 @@ def test_queue_script_wraps_single_profile_session_with_nsys():
     assert "--python-backtrace=cuda" in script
     assert '--output="$trace_base"' in script
     assert 'scan_launcher=("/path/to/pyrite/.venv/bin/python")' in script
-    assert '--checkpoint-dir "$JOBDIR/performance-checkpoints/$m/$repetition"' in script
+    assert '--checkpoint-dir "$PERFCKPT/$m/$repetition"' in script
     assert "nsys stats" in script
     assert "--report cuda_api_sum,cuda_gpu_kern_sum,cuda_kern_exec_sum,nvtx_sum" in script
     assert "nsys: True" in metadata
@@ -893,7 +893,7 @@ def test_queue_script_cpu_failure_is_terminal_and_keeps_primary_artifacts(
     fake_uv.chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
     monkeypatch.setattr(config, "REMOTE_UV", str(fake_uv))
-    artifact = tmp_path / "jobs" / "j" / "performance" / "baseline" / "mos2.ndjson"
+    artifact = tmp_path / "pyrite-output" / "performance" / "j" / "baseline" / "mos2.ndjson"
     artifact.parent.mkdir(parents=True)
     artifact.write_text("primary artifact\n", encoding="utf-8")
     script = remote._queue_script(
@@ -957,7 +957,7 @@ def test_queue_scripts_and_metadata_record_performance_profile():
 
     for script in (monolithic, chunked):
         assert "--performance-profile baseline" in script
-        assert '--performance-dir "$JOBDIR/performance"' in script
+        assert '--performance-dir "$PERFDIR"' in script
     assert "performance_profile: baseline" in metadata
 
 
@@ -979,11 +979,11 @@ def test_pull_performance_profile_fetches_each_matching_job(monkeypatch, tmp_pat
     pulled = lifecycle.pull_performance_profile("baseline")
 
     assert pulled == [
-        tmp_path / "performance-profiles" / "baseline" / "job-1" / "hopg.ndjson",
-        tmp_path / "performance-profiles" / "baseline" / "job-2" / "mos2.ndjson",
+        tmp_path / "pyrite-output" / "performance" / "baseline" / "job-1" / "hopg.ndjson",
+        tmp_path / "pyrite-output" / "performance" / "baseline" / "job-2" / "mos2.ndjson",
     ]
     assert all(path.is_file() for path in pulled)
-    assert all("/performance/baseline/" in command for command in remote_commands)
+    assert all("/pyrite-output/performance/job-" in command for command in remote_commands)
 
 
 def test_pull_performance_profile_fetches_nsys_artifacts(monkeypatch, tmp_path):
@@ -1010,12 +1010,12 @@ def test_pull_performance_profile_fetches_nsys_artifacts(monkeypatch, tmp_path):
     pulled = lifecycle.pull_performance_profile("baseline")
 
     assert pulled == [
-        tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.ndjson",
-        tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.nsys-rep",
-        tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.sqlite",
-        tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.nsys-stats.txt",
-        tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.cpu.prof",
-        tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.cpu.txt",
+        tmp_path / "pyrite-output" / "performance" / "baseline" / "job-3" / "mos2.ndjson",
+        tmp_path / "pyrite-output" / "performance" / "baseline" / "job-3" / "mos2.nsys-rep",
+        tmp_path / "pyrite-output" / "performance" / "baseline" / "job-3" / "mos2.sqlite",
+        tmp_path / "pyrite-output" / "performance" / "baseline" / "job-3" / "mos2.nsys-stats.txt",
+        tmp_path / "pyrite-output" / "performance" / "baseline" / "job-3" / "mos2.cpu.prof",
+        tmp_path / "pyrite-output" / "performance" / "baseline" / "job-3" / "mos2.cpu.txt",
     ]
 
 
@@ -1035,7 +1035,7 @@ def test_remote_performance_inventory_parses_artifact_totals(monkeypatch):
         ("job-1", "baseline", 2, 80),
         ("job-2", "baseline", 3, 120),
     ]
-    assert '"$JOBS"/*/performance/*/' in commands[0]
+    assert '"$JOBS"/*/*/' in commands[0]
 
 
 def test_remote_performance_inventory_rejects_malformed_output(monkeypatch):
@@ -1093,8 +1093,8 @@ def test_prune_remote_performance_revalidates_and_deletes_exact_paths(monkeypatc
     lifecycle.prune_remote_performance(["baseline"], yes=True)
 
     assert len(commands) == 1
-    assert f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/job-1/performance/baseline" in commands[0]
-    assert f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/job-2/performance/baseline" in commands[0]
+    assert f"{config.REMOTE_DIR}/pyrite-output/performance/job-1/baseline" in commands[0]
+    assert f"{config.REMOTE_DIR}/pyrite-output/performance/job-2/baseline" in commands[0]
     assert "job-3" not in commands[0]
     assert "deleted 2 remote performance profile path(s)" in capsys.readouterr().out
 
@@ -1960,7 +1960,9 @@ def test_successful_profile_run_resolves_remote_stem_before_real_pull(monkeypatc
 
     assert resolved == [("hopg", "sub_100keV", "full")]
     assert len(transfers) == 1
-    assert _checkpoint_store.checkpoint_exists(remote_stem, tmp_path / "checkpoints")
+    assert _checkpoint_store.checkpoint_exists(
+        remote_stem, tmp_path / "pyrite-output" / "checkpoints"
+    )
 
 
 @pytest.fixture
@@ -4693,7 +4695,7 @@ def test_prune_remote_reserves_previous_profile_identity_for_reclamation(monkeyp
     lifecycle.prune_remote(catalog_profile="hopg_hbn")
 
     assert f"for stem in {old} {current.stem}" in commands[0]
-    assert "would delete obsolete profile checkpoint: checkpoints/%s/" in commands[0]
+    assert "would delete obsolete profile checkpoint: pyrite-output/checkpoints/%s/" in commands[0]
     assert old in commands[0]
     assert "would prune remote" in capsys.readouterr().out
 
@@ -5180,8 +5182,8 @@ def test_clear_listing_snippet_exits_zero_when_quick_pkl_missing(monkeypatch, tm
     clear before the dry preview prints. Execute the real snippet under bash
     against a checkpoints/ dir holding only hopg.pkl."""
     bash = _bash_or_skip(tmp_path)
-    (tmp_path / "checkpoints").mkdir()
-    (tmp_path / "checkpoints" / "hopg.pkl").write_bytes(b"x")  # no hopg_quick.pkl
+    (tmp_path / "pyrite-output" / "checkpoints").mkdir(parents=True)
+    (tmp_path / "pyrite-output" / "checkpoints" / "hopg.pkl").write_bytes(b"x")  # no hopg_quick.pkl
 
     _no_live_jobs(monkeypatch)
     monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
@@ -5279,10 +5281,10 @@ def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkey
 
     remote.pull(["hopg"], grid=True, level9=True, no_sync=True)
 
-    assert (tmp_path / "checkpoints" / "hopg" / "line.h5").is_file()
-    assert (tmp_path / "checkpoints" / "hopg" / "brem.h5").is_file()
-    assert (tmp_path / "checkpoints" / "hopg" / "characteristic.h5").is_file()
-    loaded = _checkpoint_store.load("hopg", tmp_path / "checkpoints")
+    assert (tmp_path / "pyrite-output" / "checkpoints" / "hopg" / "line.h5").is_file()
+    assert (tmp_path / "pyrite-output" / "checkpoints" / "hopg" / "brem.h5").is_file()
+    assert (tmp_path / "pyrite-output" / "checkpoints" / "hopg" / "characteristic.h5").is_file()
+    loaded = _checkpoint_store.load("hopg", tmp_path / "pyrite-output" / "checkpoints")
     assert np.array_equal(loaded["cfg"][30.0]["spec"], np.array([3.0, 4.0]))
     assert len(transfers) == 1
     transfer_command, destination = transfers[0]
@@ -5295,7 +5297,7 @@ def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkey
     # so the box's compress pass overlaps the transfer.
     assert transfer_command.endswith("-o -")
     assert "cat " not in transfer_command
-    assert destination == tmp_path / "checkpoints" / ".hopg.incoming.pkl"
+    assert destination == tmp_path / "pyrite-output" / "checkpoints" / ".hopg.incoming.pkl"
     syntax = subprocess.run(["bash", "-n", "-c", transfer_command], capture_output=True, text=True)
     assert syntax.returncode == 0, syntax.stderr
 
@@ -5389,7 +5391,7 @@ def _fake_remote_catalog(listing, meta_by_stem):
     stem's path it names."""
 
     def fake(command):
-        if command.startswith("[ -d "):
+        if "-mindepth 1 -maxdepth 1 -type d" in command:
             return listing
         for stem, (mtime, meta) in meta_by_stem.items():
             if f"checkpoints/{stem}/meta.json" in command:
@@ -5522,7 +5524,7 @@ def test_pull_resolves_profile_selector_to_the_predicted_stem(monkeypatch, tmp_p
     remote.pull(["hopg@sub_100keV"], grid=True, no_sync=True)
 
     assert resolved == [("hopg", "sub_100keV", None)]
-    assert _checkpoint_store.checkpoint_exists("hopg", tmp_path / "checkpoints")
+    assert _checkpoint_store.checkpoint_exists("hopg", tmp_path / "pyrite-output" / "checkpoints")
 
 
 def test_pull_bare_material_also_pulls_matching_survey_checkpoint(monkeypatch, tmp_path, capsys):
@@ -5560,8 +5562,10 @@ def test_pull_bare_material_also_pulls_matching_survey_checkpoint(monkeypatch, t
     remote.pull(["hopg"], grid=True, no_sync=True)
 
     assert len(transfers) == 2  # canonical stem + discovered survey variant
-    assert _checkpoint_store.checkpoint_exists("hopg", tmp_path / "checkpoints")
-    assert _checkpoint_store.checkpoint_exists(survey_stem, tmp_path / "checkpoints")
+    assert _checkpoint_store.checkpoint_exists("hopg", tmp_path / "pyrite-output" / "checkpoints")
+    assert _checkpoint_store.checkpoint_exists(
+        survey_stem, tmp_path / "pyrite-output" / "checkpoints"
+    )
     assert "also pulling identity-qualified survey checkpoint" in capsys.readouterr().out
 
 
@@ -5750,7 +5754,7 @@ def test_pull_rejects_unsafe_stem_before_sync_or_local_mutation(monkeypatch, tmp
     with pytest.raises(SystemExit, match="invalid remote shell token"):
         remote.pull(["bad;stem"], grid=True)
 
-    assert not (tmp_path / "checkpoints").exists()
+    assert not (tmp_path / "pyrite-output" / "checkpoints").exists()
 
 
 def test_sync_paths_do_not_include_retired_material_manifest():
@@ -5897,8 +5901,8 @@ def test_pull_zhai_cache_fetches_every_listed_file(monkeypatch, tmp_path):
         transport,
         "_ssh_capture",
         lambda *a: (
-            "/r/checkpoints/zhai_reproduction/zhai-a.pkl\n"
-            "/r/checkpoints/zhai_reproduction/zhai-b.pkl\n"
+            "/r/pyrite-output/cache/zhai_reproduction/zhai-a.pkl\n"
+            "/r/pyrite-output/cache/zhai_reproduction/zhai-b.pkl\n"
         ),
     )
     runs = []
@@ -5908,7 +5912,7 @@ def test_pull_zhai_cache_fetches_every_listed_file(monkeypatch, tmp_path):
 
     assert len(runs) == 2
     assert runs[0][0] == "scp" and runs[0][1].endswith("zhai-a.pkl")
-    assert (tmp_path / "checkpoints" / "zhai_reproduction").is_dir()
+    assert (tmp_path / "pyrite-output" / "cache" / "zhai_reproduction").is_dir()
 
 
 def test_pull_zhai_cache_reports_when_empty(monkeypatch, tmp_path, capsys):
@@ -6263,7 +6267,7 @@ def test_pull_dataset_merges_and_archives(monkeypatch, tmp_path):
     from pyrite.remote import lifecycle
 
     # local checkpoint with a line record
-    ckpt = tmp_path / "checkpoints" / "mos2.pkl"
+    ckpt = tmp_path / "pyrite-output" / "checkpoints" / "mos2.pkl"
     ckpt.parent.mkdir(parents=True)
     local = {
         "n": {

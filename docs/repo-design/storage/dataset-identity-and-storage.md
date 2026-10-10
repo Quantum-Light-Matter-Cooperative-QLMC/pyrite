@@ -20,7 +20,7 @@ Current array leaves use [HDF5 result schema version 2](result-schema.md). Its r
 
 ```text
 <workspace>/
-  checkpoints/
+  pyrite-output/checkpoints/
     <stem>/
       line.h5
       brem.h5
@@ -29,7 +29,12 @@ Current array leaves use [HDF5 result schema version 2](result-schema.md). Its r
     <material>/<first-two-case-key-chars>/<case-key>.h5
     archive/<label>/<stem>/...
   energy-grid-artifacts/<first-two-hash-chars>/<sha256>.json
-  performance-profiles/<profile>/...
+  pyrite-output/performance/<profile>/...
+  pyrite-output/observations/<stem>/...
+  pyrite-output/trajectories/<stem>/...
+  pyrite-output/results/
+  pyrite-output/figures/
+  pyrite-output/cache/  # regenerable; safe to delete
 ```
 
 The exact internal files are implementation details; use `pyrite checkpoint` and the `pyrite material energy-grid` / `pyrite-dev energy-grid` commands rather than editing them. A command's `--checkpoint-dir` overrides the workspace checkpoint root for that invocation.

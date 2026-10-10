@@ -118,9 +118,9 @@ def observation_inventory(
         manifests, indices, or records become ``problems``.
     """
     if checkpoint_dir is None:
-        from ..checkpoints.persistence import DEFAULT_CHECKPOINT_DIR
+        from ..checkpoints.persistence import default_checkpoint_dir
 
-        checkpoint_dir = DEFAULT_CHECKPOINT_DIR
+        checkpoint_dir = default_checkpoint_dir()
     root = Path(checkpoint_dir).resolve()
     store = ObservationStore(
         stem, root.parent / "observations" if observation_root is None else observation_root

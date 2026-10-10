@@ -56,7 +56,7 @@ from pyrite.montecarlo import (  # noqa: E402
     simulate_trajectories,
 )
 from pyrite.montecarlo.geometry import tilted_geometry  # noqa: E402
-from pyrite.console.config import workspace_root  # noqa: E402
+from pyrite.console.outputs import output_dir  # noqa: E402
 from pyrite.validation._anchor_conditions import (  # noqa: E402, F401, I001
     GRAPHITE_B_002 as GRAPHITE_B_002,
     ZHAI_SUPPLEMENTARY_STUDIES as ZHAI_SUPPLEMENTARY_STUDIES,
@@ -95,6 +95,11 @@ from pyrite.validation.validation_background import (  # noqa: E402
 _EXTERNAL_BREM_V1 = _HERE / "reference_data" / "external_brem" / "v1"
 _ZHAI_FIG3B_BREM = _EXTERNAL_BREM_V1 / "zhai_fig3b_25kev_1mm_brem.csv"
 _ZHAI_FIG3B_EXPERIMENT = _EXTERNAL_BREM_V1 / "zhai_fig3b_25kev_1mm_experiment.csv"
+
+
+def zhai_cache_dir() -> Path:
+    """Return the default Zhai cache, ``<workspace>/pyrite-output/cache/zhai_reproduction``."""
+    return output_dir("cache") / "zhai_reproduction"
 
 
 class ZhaiCacheMiss(FileNotFoundError):
@@ -276,15 +281,11 @@ def cached_model_spectra(
     """Load or atomically cache a Zhai reproduction keyed by inputs and code.
 
     Returns ``(model, cache_hit, path)``. Cache files are local generated
-    artifacts under ``checkpoints/zhai_reproduction`` by default.
+    artifacts under ``pyrite-output/cache/zhai_reproduction`` by default.
     """
     from pyrite.checkpoints import _checkpoint_io
 
-    root = (
-        Path(cache_dir)
-        if cache_dir is not None
-        else workspace_root() / "checkpoints" / "zhai_reproduction"
-    )
+    root = Path(cache_dir) if cache_dir is not None else zhai_cache_dir()
     path = root / f"zhai-v{ZHAI_CACHE_SCHEMA}-{_zhai_cache_key(anchor, ne, ne_brem)}.pkl"
     if path.exists() and not refresh:
         cached = _cache_payload(
@@ -452,11 +453,7 @@ def cached_coherent_spectra(
     """Load or atomically cache one supplementary coherent-only condition set."""
     from pyrite.checkpoints import _checkpoint_io
 
-    root = (
-        Path(cache_dir)
-        if cache_dir is not None
-        else workspace_root() / "checkpoints" / "zhai_reproduction"
-    )
+    root = Path(cache_dir) if cache_dir is not None else zhai_cache_dir()
     key = _supplementary_cache_key(study, thickness_nm, ne, exploratory_azimuth_deg)
     path = root / f"zhai-supplement-v{ZHAI_CACHE_SCHEMA}-{key}.pkl"
     if path.exists() and not refresh:
@@ -508,7 +505,7 @@ def reproduce_all(
     exploratory-azimuth control default; the value is part of the cache key.
 
     No figures -- this only leaves correct, hash-addressed .pkl files on disk
-    under ``cache_dir`` (default checkpoints/zhai_reproduction/). This is the
+    under ``cache_dir`` (default pyrite-output/cache/zhai_reproduction/). This is the
     unit behind ``pyrite._entry.reproduce_zhai`` / ``pyrite run --preset zhai``,
     which runs here by default and on the box with ``--remote``.
 
@@ -1018,7 +1015,7 @@ def figure_supplementary_overview(spectra: dict[str, np.ndarray]):
 
 
 def export_all_figures(
-    outdir: str | Path = "figures",
+    outdir: str | Path | None = None,
     ne: int = 20_000,
     ne_brem: int = 200,
     ne_supp: int = 200,
@@ -1039,7 +1036,7 @@ def export_all_figures(
     except Exception:
         pass
 
-    outpath = Path(outdir)
+    outpath = output_dir("figures") if outdir is None else Path(outdir)
     outpath.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
 
@@ -1114,7 +1111,7 @@ def validation_table(anchor: ZhaiAnchor, model: dict) -> list[list]:
     return rows
 
 
-def main(outdir: str = "figures", ne: int = 500, ne_brem: int = 200) -> None:
+def main(outdir: str | None = None, ne: int = 500, ne_brem: int = 200) -> None:
     import matplotlib
 
     try:
@@ -1151,8 +1148,8 @@ def main(outdir: str = "figures", ne: int = 500, ne_brem: int = 200) -> None:
         f"(film transmitted {model['film']['n_transmitted']} electrons)"
     )
 
-    outpath = workspace_root() / outdir
-    outpath.mkdir(exist_ok=True)
+    outpath = output_dir("figures") if outdir is None else Path(outdir)
+    outpath.mkdir(parents=True, exist_ok=True)
     figs = {
         "zhai_fig1c_spectra_vs_theory": figure_spectra(anchor, model, reference),
         "zhai_flux_anchor": figure_flux_anchor(anchor, model),
@@ -1161,7 +1158,7 @@ def main(outdir: str = "figures", ne: int = 500, ne_brem: int = 200) -> None:
     for name, fig in figs.items():
         for ext in ("png", "pdf"):
             fig.savefig(outpath / f"{name}.{ext}", dpi=150, bbox_inches="tight")
-        print("wrote", (outpath / f"{name}.png").relative_to(workspace_root()))
+        print("wrote", outpath / f"{name}.png")
 
 
 if __name__ == "__main__":

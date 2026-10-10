@@ -8,6 +8,7 @@ from pathlib import Path
 import click
 
 from ...console.output import CLIError, confirm_destructive, emit_result
+from ...console.outputs import output_default, output_label
 
 _PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 
@@ -77,8 +78,8 @@ def analyze(name: str, performance_dir: Path, sample_period: float) -> int:
 @click.option(
     "--performance-dir",
     type=click.Path(path_type=Path, file_okay=False),
-    default=Path("performance-profiles"),
-    show_default=True,
+    default=output_default("performance"),
+    show_default=output_label("performance"),
 )
 def list_command(profiles, performance_dir):
     """List local performance profiles with artifact counts and sizes."""
@@ -102,8 +103,8 @@ def list_command(profiles, performance_dir):
 @click.option(
     "--performance-dir",
     type=click.Path(path_type=Path, file_okay=False),
-    default=Path("performance-profiles"),
-    show_default=True,
+    default=output_default("performance"),
+    show_default=output_label("performance"),
     help="Directory containing NAME's local or pulled NDJSON logs.",
 )
 @click.option(
@@ -126,8 +127,8 @@ def analyze_command(name, performance_dir, sample_period):
 @click.option(
     "--performance-dir",
     type=click.Path(path_type=Path, file_okay=False),
-    default=Path("performance-profiles"),
-    show_default=True,
+    default=output_default("performance"),
+    show_default=output_label("performance"),
 )
 def rm_command(profiles, all_profiles, yes, performance_dir):
     """Delete explicitly selected local performance profiles; preview by default."""

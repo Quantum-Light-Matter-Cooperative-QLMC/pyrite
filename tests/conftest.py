@@ -86,6 +86,23 @@ def _isolate_user_catalog(monkeypatch, tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
+def _isolate_output_workspace(monkeypatch, tmp_path):
+    """Resolve default outputs (``pyrite-output/``) under each test's tmp_path.
+
+    Without an explicit workspace the output root follows the working
+    directory, which under pytest is the checkout itself. Tests that exercise
+    cwd discovery patch ``outputs._cwd`` themselves.
+    """
+    from pyrite.console import outputs
+
+    monkeypatch.setattr(outputs, "_cwd", lambda: tmp_path.resolve())
+    # The root ``pyrite`` callback opts its process into legacy moves; keep
+    # one CLI test from moving another test's fixture ``checkpoints/``.
+    monkeypatch.setattr(outputs, "_migration_enabled", False)
+    monkeypatch.setattr(outputs, "_migrated", set())
+
+
+@pytest.fixture(autouse=True)
 def _pin_remote_paths(monkeypatch):
     """Give remote tests a fixed host and fixed absolute paths.
 

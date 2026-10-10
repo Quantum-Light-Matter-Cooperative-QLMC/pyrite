@@ -58,7 +58,7 @@ def test_analysis_leaf_launches_and_export_dispatches(monkeypatch):
     assert launched["export"] == "report"
 
 
-def test_viewer_export_never_launches(monkeypatch):
+def test_viewer_export_never_launches(monkeypatch, tmp_path):
     launched = []
     monkeypatch.setattr(
         viewer.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
@@ -69,10 +69,12 @@ def test_viewer_export_never_launches(monkeypatch):
     )
 
     assert result.exit_code == 0
-    assert launched[0][0][0] == viewer._smoke_command("mose2", "results/trace.html")
+    assert launched[0][0][0] == viewer._smoke_command(
+        "mose2", tmp_path / "pyrite-output" / "results" / "trace.html"
+    )
 
 
-def test_viewer_export_defaults_to_pyrite_stem(monkeypatch):
+def test_viewer_export_defaults_to_pyrite_stem(monkeypatch, tmp_path):
     launched = []
     monkeypatch.setattr(
         viewer.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
@@ -80,7 +82,9 @@ def test_viewer_export_defaults_to_pyrite_stem(monkeypatch):
 
     viewer._export(None, "mose2")
 
-    assert launched[0][0][0] == viewer._smoke_command("mose2", "results/pyrite_viewer_mose2.html")
+    assert launched[0][0][0] == viewer._smoke_command(
+        "mose2", tmp_path / "pyrite-output" / "results" / "pyrite_viewer_mose2.html"
+    )
 
 
 def test_validation_leaf_and_export_dispatch_without_cross_mode_flags(monkeypatch):
@@ -167,7 +171,7 @@ def test_split_app_commands_target_their_notebooks_and_ports():
     assert smoke[-2:] == ["--material", "hopg"]
 
 
-def test_split_app_export_never_launches(monkeypatch):
+def test_split_app_export_never_launches(monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr(
         views.subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs))
@@ -178,8 +182,10 @@ def test_split_app_export_never_launches(monkeypatch):
     default = CliRunner().invoke(cli.command, ["app", "compare", "export"])
 
     assert named.exit_code == 0 and default.exit_code == 0
-    assert calls[0][0][0] == views._smoke_command(views.PIXELS, "mose2", "results/px.html")
+    assert calls[0][0][0] == views._smoke_command(
+        views.PIXELS, "mose2", tmp_path / "pyrite-output" / "results" / "px.html"
+    )
     assert calls[1][0][0] == views._smoke_command(
-        views.COMPARE, "hopg", "results/pyrite_compare_hopg.html"
+        views.COMPARE, "hopg", tmp_path / "pyrite-output" / "results" / "pyrite_compare_hopg.html"
     )
     assert calls[1][1]["env"]["PYRITE_ANALYZE_INITIAL"] == "hopg"

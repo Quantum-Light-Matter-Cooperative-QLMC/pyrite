@@ -2,7 +2,7 @@
 shim over src/pyrite/validation/anchor_figures.py::reproduce_all.
 
 The remote box invokes ``python -m pyrite._entry.reproduce_zhai`` inside its
-uv-synced checkout. Populates checkpoints/zhai_reproduction/ for every cache the
+uv-synced checkout. Populates pyrite-output/cache/zhai_reproduction/ for every cache the
 validation app's Zhai sections hit -- no figures, no display -- so a later ``pyrite
 remote pull --preset zhai`` (or plain local ``pyrite check``) sees an instant cache hit.
 ``pyrite run --preset zhai`` runs this same workload in-process; add ``--remote``

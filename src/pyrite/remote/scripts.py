@@ -78,7 +78,7 @@ def _job_reserved_stems_command(jobid: str) -> str:
     transport._check_shell_tokens([jobid])
     return (
         f"R={config.shell_word(_reservation_root())}; J={config.shell_word(jobid)}; "
-        f"C={config.shell_remote_path('checkpoints')}; "
+        f"C={config.shell_word(config.remote_output_path('checkpoints'))}; "
         'for d in "$R"/*; do [ -d "$d" ] || continue; '
         '[ "$(cat "$d/jobid" 2>/dev/null)" = "$J" ] || continue; '
         's=$(basename "$d"); '
@@ -385,7 +385,7 @@ def _clear_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
         f'if [ "$(cat "$R/{stem}/jobid" 2>/dev/null)" = "$J" ]; then rm -rf "$R/{stem}"; fi;'
         for stem in stems
     )
-    return f"""R={config.shell_word(reservations)}; J={config.shell_word(jobid)}; C={config.shell_remote_path("checkpoints")}; \
+    return f"""R={config.shell_word(reservations)}; J={config.shell_word(jobid)}; C={config.shell_word(config.remote_output_path("checkpoints"))}; \
 mkdir -p "$R" || exit $?; \
 release() {{ {releases} }}; trap release EXIT; \
 for stem in {stem_words}; do \
@@ -432,20 +432,20 @@ def _prune_checkpoint_stems_command(
     if not obsolete_stems:
         return base
     obsolete_words = " ".join(obsolete_stems)
-    checkpoint_dir = config.shell_remote_path("checkpoints")
+    checkpoint_dir = config.shell_word(config.remote_output_path("checkpoints"))
     if yes:
         reclaim = (
             f"cd {checkpoint_dir} 2>/dev/null || exit 0; "
             f"for stem in {obsolete_words}; do "
             '[ -d "$stem" ] || continue; rm -rf -- "$stem" || exit $?; '
-            "printf 'CLEARED obsolete profile checkpoint: checkpoints/%s/\\n' \"$stem\"; done"
+            "printf 'CLEARED obsolete profile checkpoint: pyrite-output/checkpoints/%s/\\n' \"$stem\"; done"
         )
     else:
         reclaim = (
             f"cd {checkpoint_dir} 2>/dev/null || exit 0; "
             f"for stem in {obsolete_words}; do "
             '[ -d "$stem" ] || continue; '
-            "printf 'would delete obsolete profile checkpoint: checkpoints/%s/\\n' \"$stem\"; done"
+            "printf 'would delete obsolete profile checkpoint: pyrite-output/checkpoints/%s/\\n' \"$stem\"; done"
         )
     return f'{base}; status=$?; [ "$status" -eq 0 ] || exit "$status"; {reclaim}'
 

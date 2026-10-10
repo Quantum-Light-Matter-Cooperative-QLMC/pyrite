@@ -8,15 +8,28 @@ import pickle
 from collections import defaultdict
 from pathlib import Path
 
-from ..console.config import workspace_root
+from ..console.outputs import output_dir
 from ..results import records, sweep_values
 from . import _checkpoint_io, _checkpoint_store
 
-DEFAULT_CHECKPOINT_DIR = str(workspace_root() / "checkpoints")
+
+def default_checkpoint_dir() -> str:
+    """Return the default checkpoint root, ``<workspace>/pyrite-output/checkpoints``."""
+    return str(output_dir("checkpoints"))
 
 
-def checkpoint_path_for(material, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):
+def __getattr__(name):
+    # ``DEFAULT_CHECKPOINT_DIR`` resolves on access so ``PYRITE_HOME`` and the
+    # working directory are read when a caller asks, not when this imports.
+    if name == "DEFAULT_CHECKPOINT_DIR":
+        return default_checkpoint_dir()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def checkpoint_path_for(material, checkpoint_dir=None):
     """Path to the per-material component checkpoint directory."""
+    if checkpoint_dir is None:
+        checkpoint_dir = default_checkpoint_dir()
     return os.path.join(checkpoint_dir, material)
 
 
@@ -186,7 +199,7 @@ def _load_checkpoint_cached(path, signature):
     return results
 
 
-def load_checkpoint(material, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):
+def load_checkpoint(material, checkpoint_dir=None):
     """Load a per-material results checkpoint (``checkpoints/<material>.pkl``)
     written by :func:`run_sweep`, WITHOUT re-running anything -- this is how the
     visualization app (``src/pyrite/apps/analysis_app.py``) gets its ``results`` after the
@@ -202,6 +215,8 @@ def load_checkpoint(material, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):
     free until the checkpoint file next changes. Prefer :func:`checkpoint_manifest`
     when only the checkpoint's energies/record count/sweep values are needed --
     it avoids the unpickle entirely on the common path."""
+    if checkpoint_dir is None:
+        checkpoint_dir = default_checkpoint_dir()
     path = checkpoint_path_for(material, checkpoint_dir)
     if not _checkpoint_exists(path):
         print(f"no checkpoint at {path} -- run `pyrite run standard -m {material}` first")
@@ -215,12 +230,14 @@ _MATERIAL_ANALYSIS_CACHE_VERSION = 1
 
 def _material_analysis_cache_path(path, key):
     """Stable disk-cache path for one checkpoint analysis."""
-    payload = pickle.dumps((_MATERIAL_ANALYSIS_CACHE_VERSION, key), protocol=5)
+    payload = pickle.dumps(
+        (_MATERIAL_ANALYSIS_CACHE_VERSION, str(Path(path).resolve()), key), protocol=5
+    )
     digest = hashlib.sha256(payload).hexdigest()[:20]
-    return Path(path).parent / ".analysis-cache" / f"{Path(path).stem}-{digest}.pkl"
+    return output_dir("cache") / "analysis" / f"{Path(path).stem}-{digest}.pkl"
 
 
-def cached_material_analysis(material, analyze, key, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):
+def cached_material_analysis(material, analyze, key, checkpoint_dir=None):
     """Persist ``analyze(load_checkpoint(material))`` per material, keyed on the
     checkpoint's ``(resolved path, mtime_ns, size)`` plus caller-supplied ``key``
     (e.g. selection parameters distinguishing what ``analyze`` computed).
@@ -231,12 +248,14 @@ def cached_material_analysis(material, analyze, key, checkpoint_dir=DEFAULT_CHEC
     catalog material thrashes it, forcing a full 140-225 MB gzip re-unpickle
     of every material on each re-render. This cache instead stores
     ``analyze``'s small return value both in memory and under
-    ``checkpoints/.analysis-cache/``. Thus app restarts and eviction from the
+    ``pyrite-output/cache/analysis/``. Thus app restarts and eviction from the
     small unpickle cache do not touch the large checkpoint again. Rewriting or
     replacing the checkpoint invalidates the persistent entry automatically.
 
     Returns ``None`` if no checkpoint exists for ``material``, without
     calling ``analyze``."""
+    if checkpoint_dir is None:
+        checkpoint_dir = default_checkpoint_dir()
     path = checkpoint_path_for(material, checkpoint_dir)
     if not _checkpoint_exists(path):
         return None
@@ -458,7 +477,7 @@ def _save_recomputed_checkpoint(checkpoint_path, results, *, components):
     )
 
 
-def checkpoint_manifest(material, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):
+def checkpoint_manifest(material, checkpoint_dir=None):
     """Summary of a checkpoint's contents -- distinct beam energies, record
     count, and swept case fields -- WITHOUT unpickling the checkpoint itself.
 
@@ -479,6 +498,8 @@ def checkpoint_manifest(material, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):
         {"energies_keV": [float, ...], "n_records": int,
          "sweep": {field: [values, ...]}}
     """
+    if checkpoint_dir is None:
+        checkpoint_dir = default_checkpoint_dir()
     path = checkpoint_path_for(material, checkpoint_dir)
     if not _checkpoint_exists(path):
         return None

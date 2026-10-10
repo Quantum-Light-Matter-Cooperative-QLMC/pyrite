@@ -15,13 +15,13 @@ def test_export_targets_existing_notebook():
     assert Path(export.NOTEBOOK).exists()
 
 
-def test_command_invokes_marimo_html_export():
+def test_command_invokes_marimo_html_export(tmp_path):
     cmd = export._command("mystem")
     assert cmd[0] == sys.executable
     assert cmd[1:4] == ["-m", "marimo", "export"]
     assert "html" in cmd
     assert export.NOTEBOOK in cmd
-    assert "results/mystem.html" in cmd
+    assert str(tmp_path / "pyrite-output/results/mystem.html") in cmd
 
 
 def test_default_stem_is_dated():

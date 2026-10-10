@@ -272,20 +272,17 @@ utils/
 
 sgconfig.yml
 *.local.md
-checkpoints/*.h5
-checkpoints/**/*.h5
-checkpoints/*.pkl
-checkpoints/**/*.pkl
-checkpoints/**/*.tmp
-checkpoints/**/*meta.json
-checkpoints/*.lock.json
-checkpoints/**/*.lock.json
+# Generated outputs (checkpoints, observations, trajectories, performance,
+# results, figures, cache). Legacy pre-pyrite-output/ locations stay ignored
+# until the CLI moves them.
+/pyrite-output/
+/results/
+/figures/
+/checkpoints/
 performance-profiles/
 RTK.md
 .headroom_wrap_marker.json
 *.tar.gz
-checkpoints/**/cases.json
-# Workspace pixel-detector observation stores (sibling of checkpoints/).
 /observations/
 src/pyrite/apps/.claude/settings.local.json
 *.github-issues

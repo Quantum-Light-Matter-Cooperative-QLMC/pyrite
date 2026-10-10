@@ -133,7 +133,7 @@ Options:
                                   <material>_quick/ component directory.
   --n-families NUMBER             Override positive dominant reflection-family count.
   --checkpoint-dir DIR            Read and write component checkpoints in DIR.
-                                  [default: checkpoints]
+                                  [default: (pyrite-output/checkpoints)]
   --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
                                   resumable work remains.
   --no-cache                      Neither read nor write the shared per-case checkpoint
@@ -142,11 +142,13 @@ Options:
                                   checkpoint or observation-store I/O.
   --recompute                     Ignore cached cases and recompute fresh, but
                                   repopulate the shared per-case cache with the results.
-  --trajectories DIR              Opt in to saving each transported case's full
-                                  electron-transport result as HDF5 under DIR/<stem>/.
-                                  Files can be much larger than checkpoints; cached
-                                  cases are not re-transported (use --recompute to
-                                  capture them).
+  --trajectories [DIR]            Opt in to saving each transported case's full
+                                  electron-transport result as HDF5 under DIR/<stem>/
+                                  (bare flag: pyrite-output/trajectories). Put PROFILE
+                                  before a bare --trajectories, or use
+                                  --trajectories=DIR. Files can be much larger than
+                                  checkpoints; cached cases are not re-transported (use
+                                  --recompute to capture them).
   --overwrite-trajectories        Replace existing trajectory files for cases this run
                                   transports; requires --trajectories.
   --no-progress                   Disable progress bars/dashboard.
@@ -219,7 +221,7 @@ Usage: pyrite app analysis export [OPTIONS] [STEM]
 
   Render the analysis application to static HTML.
 
-  Writes results/<stem>.html; STEM defaults to analysis.
+  Writes pyrite-output/results/<stem>.html; STEM defaults to a dated analysis name.
 
 Options:
   -h, --help  Show this message and exit.
@@ -272,10 +274,11 @@ Usage: pyrite app pixels export [OPTIONS] [MATERIAL]
 
   Render the pixel-detector observation app as static HTML without starting marimo.
 
-  Writes results/<stem>.html; the stem defaults to pyrite_pixels_<material>.
+  Writes pyrite-output/results/<stem>.html; the stem defaults to
+  pyrite_pixels_<material>.
 
 Options:
-  --stem TEXT  Output stem under results/ (without .html).
+  --stem TEXT  Output stem under pyrite-output/results/ (without .html).
   -h, --help   Show this message and exit.
 ```
 
@@ -327,10 +330,11 @@ Usage: pyrite app compare export [OPTIONS] [MATERIAL]
   Render the case and cross-material comparison app as static HTML without starting
   marimo.
 
-  Writes results/<stem>.html; the stem defaults to pyrite_compare_<material>.
+  Writes pyrite-output/results/<stem>.html; the stem defaults to
+  pyrite_compare_<material>.
 
 Options:
-  --stem TEXT  Output stem under results/ (without .html).
+  --stem TEXT  Output stem under pyrite-output/results/ (without .html).
   -h, --help   Show this message and exit.
 ```
 
@@ -383,7 +387,7 @@ Usage: pyrite app viewer export [OPTIONS] [MATERIAL]
   Render the viewer as static HTML without starting marimo.
 
 Options:
-  --stem TEXT  Output stem under results/ (without .html).
+  --stem TEXT  Output stem under pyrite-output/results/ (without .html).
   -h, --help   Show this message and exit.
 ```
 
@@ -433,7 +437,7 @@ Usage: pyrite app validation export [OPTIONS]
   Write cached validation figures; never starts marimo.
 
 Options:
-  --outdir DIRECTORY     [default: figures]
+  --outdir DIRECTORY     [default: (pyrite-output/figures)]
   --ne INTEGER           [default: 20000]
   --brem-trials INTEGER  Monte Carlo electron histories for Fig. 1c bremsstrahlung per
                          energy.  [default: 200]
@@ -547,7 +551,7 @@ Options:
                                   profile default.
   --redo-all                      Recompute records already at target.
   --checkpoint-dir DIR            Root containing component checkpoint directories to
-                                  update.  [default: checkpoints]
+                                  update.  [default: (pyrite-output/checkpoints)]
   --save-every N                  Atomically save after every N recomputed records.
                                   [default: 100]
   -R, --remote [TARGET]           Run remotely; bare uses the configured target, =TARGET
@@ -586,7 +590,7 @@ Options:
                                   grid.
   --redo-all                      Recompute records already at target.
   --checkpoint-dir DIR            Root containing component checkpoint directories to
-                                  update.  [default: checkpoints]
+                                  update.  [default: (pyrite-output/checkpoints)]
   --save-every N                  Atomically save after every N recomputed records.
                                   [default: 100]
   -R, --remote [TARGET]           Run remotely; bare uses the configured target, =TARGET
@@ -693,7 +697,7 @@ Options:
   --all                 Delete every active dataset.
   -y, --yes             Delete exact previewed targets.
   --checkpoint-dir DIR  Checkpoint root containing active datasets, archives, and shared
-                        CAS blobs.  [default: checkpoints]
+                        CAS blobs.  [default: (pyrite-output/checkpoints)]
   -h, --help            Show this message and exit.
 ```
 
@@ -744,7 +748,7 @@ Usage: pyrite checkpoint score-trajectories [OPTIONS] ARTIFACT...
 
 Options:
   --checkpoint-dir DIR  Root containing component checkpoint directories to write.
-                        [default: checkpoints]
+                        [default: (pyrite-output/checkpoints)]
   --max-segments N      Segment rows read per block; bounds host memory (whole electrons
                         stay together, so one long history may exceed it). [default:
                         1048576]
@@ -2210,7 +2214,7 @@ Options:
   --polar A                       Polar tilt values in degrees.  [0.0<x<90.0]
   --workers NUMBER                run_cases max_workers (default auto; 0 = serial).
   --checkpoint-dir DIR            Read and write blazed component checkpoints in DIR.
-                                  [default: checkpoints]
+                                  [default: (pyrite-output/checkpoints)]
   --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
                                   resumable work remains.
   -o, --output [table|json|wide]  Output format; only json is a stable automation

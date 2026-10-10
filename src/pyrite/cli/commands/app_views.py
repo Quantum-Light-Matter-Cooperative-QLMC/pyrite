@@ -18,7 +18,7 @@ reaches the marimo subprocess through ``-- --material <X>`` and the
     pyrite app pixels launch               # persisted analysis default (fallback hopg)
     pyrite app pixels launch wse2          # start the picker on wse2
     pyrite app compare launch --smoke      # execute the app once without a browser
-    pyrite app compare export --stem cmp   # write results/cmp.html
+    pyrite app compare export --stem cmp   # write pyrite-output/results/cmp.html
 """
 
 import os
@@ -32,6 +32,7 @@ import click
 
 from ..._acp import running_acp
 from ..._app_defaults import get_analysis_default
+from ...console.outputs import output_dir
 from ...paths import app_dir
 from .. import _completion as _cli_completion
 
@@ -127,7 +128,8 @@ def _export(app, stem: str | None, material: str | None) -> None:
     """Export the app's HTML without starting a marimo server or browser."""
     resolved = resolve_material(material)
     stem = stem or f"pyrite_{app.name}_{resolved}"
-    output = Path("results") / f"{stem}.html"
+    output = output_dir("results") / f"{stem}.html"
+    output.parent.mkdir(parents=True, exist_ok=True)
     click.echo(f"exporting {app.notebook} -> {output}")
     env = {**os.environ, "PYRITE_ANALYZE_INITIAL": resolved}
     subprocess.run(_smoke_command(app, resolved, output), check=True, env=env)
@@ -178,12 +180,12 @@ def _export_command(app: MarimoApp) -> click.Command:
         "export",
         help=(
             f"Render the {app.title} app as static HTML without starting marimo.\n\n"
-            "Writes results/<stem>.html; the stem defaults to pyrite_"
+            "Writes pyrite-output/results/<stem>.html; the stem defaults to pyrite_"
             f"{app.name}_<material>."
         ),
     )
     @_MATERIAL_ARGUMENT
-    @click.option("--stem", help="Output stem under results/ (without .html).")
+    @click.option("--stem", help="Output stem under pyrite-output/results/ (without .html).")
     def command(material, stem):
         _export(app, stem, material)
 

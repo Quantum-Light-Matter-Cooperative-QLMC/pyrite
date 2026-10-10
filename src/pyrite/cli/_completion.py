@@ -19,7 +19,7 @@ from .._catalog_keys import beam_keys as _beam_keys
 from .._catalog_keys import detector_keys as _detector_keys
 from .._catalog_keys import material_keys as _material_keys
 from .._catalog_keys import profile_keys as _profile_keys
-from ..console.config import workspace_root
+from ..console.outputs import output_dir
 
 MAX_LOCAL_CANDIDATES = 200
 MAX_REMOTE_CANDIDATES = 100
@@ -31,8 +31,6 @@ MAX_REMOTE_CANDIDATES = 100
 # as multi-second hang to the user.
 REMOTE_COMPLETION_TIMEOUT_SECONDS = 0.5
 
-_DEFAULT_CHECKPOINT_ROOT = Path("checkpoints")
-_ARCHIVE_CHECKPOINT_ROOT = workspace_root() / "checkpoints"
 
 Completion = Callable[[object, object, str], list[CompletionItem]]
 
@@ -171,7 +169,16 @@ def _safe_checkpoint_stems(directory: Path) -> list[str]:
 def _checkpoint_root(ctx: object) -> Path:
     params = getattr(ctx, "params", {})
     configured = params.get("checkpoint_dir") if isinstance(params, dict) else None
-    return Path(configured) if configured else _DEFAULT_CHECKPOINT_ROOT
+    return Path(configured) if configured else _default_checkpoint_root()
+
+
+def _default_checkpoint_root() -> Path:
+    """Return the default checkpoint root, shown relative to cwd when inside it."""
+    root = output_dir("checkpoints")
+    try:
+        return root.relative_to(Path.cwd().resolve())
+    except ValueError:
+        return root
 
 
 def complete_checkpoint_stem(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
@@ -181,9 +188,9 @@ def complete_checkpoint_stem(ctx: object, param: object, incomplete: str) -> lis
 
 
 def complete_archive_stem(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
-    """Complete repo-anchored active stems used by archive commands."""
+    """Complete active stems in the default checkpoint root for archive commands."""
     del ctx, param
-    return _items(_safe_checkpoint_stems(_ARCHIVE_CHECKPOINT_ROOT), incomplete)
+    return _items(_safe_checkpoint_stems(_default_checkpoint_root()), incomplete)
 
 
 def complete_checkpoint(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
@@ -212,7 +219,7 @@ def complete_checkpoint(ctx: object, param: object, incomplete: str) -> list[Com
 def complete_archive_label(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
     """Complete labels from the local checkpoint archive shelf."""
     del ctx, param
-    archive_dir = _ARCHIVE_CHECKPOINT_ROOT / "archive"
+    archive_dir = _default_checkpoint_root() / "archive"
     return _items(_safe_file_stems(archive_dir), incomplete)
 
 

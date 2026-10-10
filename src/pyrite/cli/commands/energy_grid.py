@@ -37,6 +37,7 @@ from pyrite.console.output import (
     invoke_legacy,
     output_option,
 )
+from pyrite.console.outputs import output_default, output_label
 from pyrite.energy_grid import apply, defaults, job
 from pyrite.energy_grid import gc as artifact_gc
 
@@ -558,8 +559,8 @@ def rm_command(material, energies, yes, dry_run, catalog_profile, json_output):
 @click.command("verify")
 @click.option(
     "--checkpoint-dir",
-    default="checkpoints",
-    show_default=True,
+    default=output_default("checkpoints"),
+    show_default=output_label("checkpoints"),
     metavar="DIR",
     help="Checkpoint root whose campaign locks are reachability roots.",
 )
@@ -583,8 +584,8 @@ def verify_command(checkpoint_dir):
 @click.command("gc")
 @click.option(
     "--checkpoint-dir",
-    default="checkpoints",
-    show_default=True,
+    default=output_default("checkpoints"),
+    show_default=output_label("checkpoints"),
     metavar="DIR",
     help="Checkpoint root whose active/archive campaign locks remain reachable.",
 )

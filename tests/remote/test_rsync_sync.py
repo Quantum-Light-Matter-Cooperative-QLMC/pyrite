@@ -94,7 +94,12 @@ def test_rsync_mirrors_deletions_and_spares_box_state(tmp_path, monkeypatch):
     local, box = tmp_path / "local", tmp_path / "box"
     pkg = _tree(local)
     box.mkdir()
-    for keep in ("checkpoints/run/out.npz", "jobs/j1/meta", "xsgen/tables/t.npz", ".venv/x"):
+    for keep in (
+        "pyrite-output/checkpoints/run/out.npz",
+        "jobs/j1/meta",
+        "xsgen/tables/t.npz",
+        ".venv/x",
+    ):
         (box / keep).parent.mkdir(parents=True, exist_ok=True)
         (box / keep).write_text("box state")
     _configure(monkeypatch, local, box)
@@ -114,8 +119,32 @@ def test_rsync_mirrors_deletions_and_spares_box_state(tmp_path, monkeypatch):
     assert not (box / "src/pyrite/gone.py").exists()
     assert (box / "src/pyrite/keep.py").read_text() == "KEEP = 2\n"
     assert (box / "src/pyrite/data.bin").stat().st_ino == kept_inode  # untouched
-    for keep in ("checkpoints/run/out.npz", "jobs/j1/meta", "xsgen/tables/t.npz", ".venv/x"):
+    for keep in (
+        "pyrite-output/checkpoints/run/out.npz",
+        "jobs/j1/meta",
+        "xsgen/tables/t.npz",
+        ".venv/x",
+    ):
         assert (box / keep).read_text() == "box state"
+
+
+@needs_rsync
+def test_sync_moves_legacy_box_outputs_under_pyrite_output(tmp_path, monkeypatch):
+    local, box = tmp_path / "local", tmp_path / "box"
+    _tree(local)
+    (box / "checkpoints" / "hopg").mkdir(parents=True)
+    (box / "checkpoints" / "hopg" / "meta.json").write_text("{}")
+    (box / "checkpoints" / "zhai_reproduction").mkdir()
+    (box / "checkpoints" / "zhai_reproduction" / "zhai-a.pkl").write_text("z")
+    _configure(monkeypatch, local, box)
+    _fake_box(monkeypatch)
+
+    transport.sync_code()
+
+    assert (box / "pyrite-output/checkpoints/hopg/meta.json").read_text() == "{}"
+    assert (box / "pyrite-output/cache/zhai_reproduction/zhai-a.pkl").read_text() == "z"
+    assert not (box / "checkpoints").exists()
+    assert (box / config.SYNC_STAMP_NAME).is_file()
 
 
 @needs_rsync
@@ -266,7 +295,15 @@ def test_delete_never_targets_box_state(tmp_path, monkeypatch):
     deleting = [c[-1] for c in calls if c[0] == "rsync" and "--delete" in c]
     allowed = {f"{HOST}:{remote}/{p}/" for p in ("src", "checks", "vendor", "external-catalog")}
     assert deleting and set(deleting) <= allowed
-    for state in ("", "checkpoints", "jobs", ".venv", config.SYNC_STAMP_NAME, "xsgen/tables"):
+    for state in (
+        "",
+        "pyrite-output",
+        "checkpoints",
+        "jobs",
+        ".venv",
+        config.SYNC_STAMP_NAME,
+        "xsgen/tables",
+    ):
         assert f"{HOST}:{remote}/{state}".rstrip("/") + "/" not in deleting
 
 
@@ -318,7 +355,8 @@ def test_external_catalog_dir_is_mirrored_through_an_include_filter(tmp_path, mo
     cat_call = next(c for c in calls if c[-1].endswith("/external-catalog/"))
     assert "--delete-excluded" in cat_call and cat_call[-2] == f"{catalog}/"
     assert rules == ["+ /catalog.toml\n+ /cifs/\n+ /cifs/a.cif\n- *\n"]
-    assert "rm -rf external-catalog.toml user-catalog && printf %s" in calls[-1][-1]
+    assert "rm -rf external-catalog.toml user-catalog && { _pyrite_migrate()" in calls[-1][-1]
+    assert "; } && printf %s" in calls[-1][-1]
 
 
 @pytest.mark.parametrize(

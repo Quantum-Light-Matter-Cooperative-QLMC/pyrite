@@ -126,7 +126,7 @@ def _launch_validation(
         acp=acp,
         tunnel=tunnel,
         export_=False,
-        outdir="figures",
+        outdir=None,
         ne=20_000,
         ne_brem=200,
         ne_supp=200,
@@ -134,7 +134,12 @@ def _launch_validation(
 
 
 @click.command("export", help="Write cached validation figures; never starts marimo.")
-@click.option("--outdir", type=click.Path(file_okay=False), default="figures", show_default=True)
+@click.option(
+    "--outdir",
+    type=click.Path(file_okay=False),
+    default=None,
+    show_default="pyrite-output/figures",
+)
 @click.option("--ne", type=int, default=20_000, show_default=True)
 @canonical_option(
     "--brem-trials",
@@ -148,7 +153,7 @@ def _launch_validation(
 @click.option("--ne-supp", type=int, default=200, show_default=True)
 @click.pass_context
 def validation_export_command(
-    ctx: click.Context, outdir: str, ne: int, ne_brem: int, ne_supp: int
+    ctx: click.Context, outdir: str | None, ne: int, ne_brem: int, ne_supp: int
 ) -> None:
     """Delegate cached-figure export to existing validation orchestration."""
     check = _load("pyrite.cli.commands.app_validation.command")

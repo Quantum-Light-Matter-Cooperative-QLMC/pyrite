@@ -142,8 +142,12 @@ def _list_checkpoint_dirs_command() -> str:
     example ``<material>--survey-<hash>/``) that a bare material name alone
     cannot address, since their on-disk name carries a parameter digest a
     caller cannot predict without recomputing the identity."""
-    ckpt = config.shell_arg(config.remote_path("checkpoints"))
-    return f"[ -d {ckpt} ] || exit 0; find {ckpt} -mindepth 1 -maxdepth 1 -type d -printf '%f\\n'"
+    ckpt = config.shell_arg(config.remote_output_path("checkpoints"))
+    return (
+        f"cd {config.shell_remote_dir()} || exit $?; "
+        f"{config.remote_output_migration_command()}; "
+        f"[ -d {ckpt} ] || exit 0; find {ckpt} -mindepth 1 -maxdepth 1 -type d -printf '%f\\n'"
+    )
 
 
 def _new_jobid() -> str:
@@ -226,8 +230,8 @@ def _cpu_profile_block(catalog_profile, performance_profile, cpu_flags):
         'p.sort_stats("cumulative").print_stats(60)'
     )
     return f"""  echo "profiling CPU $m [$i/$total] since $(date -Is)" > "$JOBDIR/state"
-  cpu_prof_base="$JOBDIR/performance/{performance_profile}/$m.cpu"
-  cpu_ckpt="$JOBDIR/cpu-profile-checkpoints/$m"
+  cpu_prof_base="$PERFDIR/{performance_profile}/$m.cpu"
+  cpu_ckpt="$PERFCKPT/cpu-profile-checkpoints/$m"
   mkdir -p "$(dirname "$cpu_prof_base")" "$cpu_ckpt"
   printf '%s\\n' "cProfile pass (serial CPU)" >> "$JOBDIR/log"
   cpu_prof_rc=0
@@ -298,9 +302,7 @@ def _queue_script(
     elif recompute:
         flags += " --recompute"
     if performance_profile is not None and not cpu_only:
-        flags += (
-            f' --performance-profile {performance_profile} --performance-dir "$JOBDIR/performance"'
-        )
+        flags += f' --performance-profile {performance_profile} --performance-dir "$PERFDIR"'
         if performance_interval != 5.0:
             flags += f" --perf-interval {performance_interval:g}"
     # cProfile phase uses the same material, forced onto the serial NumPy path so it can
@@ -333,6 +335,8 @@ def _queue_script(
         for arg in py_spy_record_args("__OUTPUT__")
     )
     return f"""JOBDIR={config.shell_word(jobdir)}
+PERFDIR={config.shell_word(config.remote_output_path("performance", jobid))}
+PERFCKPT={config.shell_word(config.remote_output_path("checkpoints", "performance", jobid))}
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
@@ -368,7 +372,7 @@ run_material() {{
   for (( repetition=1; repetition<=performance_repetitions; repetition++ )); do
     checkpoint_flags=()
     if [ "$performance_repetitions" -gt 1 ] || [ "$nsys_enabled" -eq 1 ] || [ "$py_spy_enabled" -eq 1 ]; then
-      checkpoint_flags=(--checkpoint-dir "$JOBDIR/performance-checkpoints/$m/$repetition")
+      checkpoint_flags=(--checkpoint-dir "$PERFCKPT/$m/$repetition")
     fi
     if [ "$performance_repetitions" -gt 1 ]; then
       printf '%s\\n' "performance repetition $repetition/$performance_repetitions" >> "$JOBDIR/log"
@@ -389,7 +393,7 @@ run_material() {{
     )
     scan_rc=0
     if [ "$nsys_enabled" -eq 1 ]; then
-      trace_base="$JOBDIR/performance/{performance_profile}/$m"
+      trace_base="$PERFDIR/{performance_profile}/$m"
       mkdir -p "$(dirname "$trace_base")"
       if ! command -v nsys >/dev/null 2>&1; then
         echo "ERROR: --nsys requested but nsys is unavailable on the worker" >> "$JOBDIR/log"
@@ -420,7 +424,7 @@ run_material() {{
           "${{scan_command[@]}}" >> "$JOBDIR/log" 2>&1 || scan_rc=$?
       fi
     elif [ "$py_spy_enabled" -eq 1 ]; then
-      trace_base="$JOBDIR/performance/{performance_profile}/$m"
+      trace_base="$PERFDIR/{performance_profile}/$m"
       mkdir -p "$(dirname "$trace_base")"
       # py-spy launches the scan itself, so it needs no ptrace permission. With
       # --subprocesses it exits 0 whatever the scan does; the status wrapper
@@ -659,9 +663,7 @@ def _chunked_queue_script(
     elif recompute:
         flags += " --recompute"
     if performance_profile is not None:
-        flags += (
-            f' --performance-profile {performance_profile} --performance-dir "$JOBDIR/performance"'
-        )
+        flags += f' --performance-profile {performance_profile} --performance-dir "$PERFDIR"'
         if performance_interval != 5.0:
             flags += f" --perf-interval {performance_interval:g}"
     runtime_exports = ""
@@ -674,6 +676,8 @@ def _chunked_queue_script(
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
     return f"""JOBDIR={config.shell_word(jobdir)}
+PERFDIR={config.shell_word(config.remote_output_path("performance", jobid))}
+PERFCKPT={config.shell_word(config.remote_output_path("checkpoints", "performance", jobid))}
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"

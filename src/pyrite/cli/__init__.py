@@ -99,6 +99,11 @@ def command() -> None:
       pyrite run sub_100keV --remote --dry-run
       pyrite app analysis launch
     """
+    # Opt this process into moving legacy ./checkpoints-style outputs under
+    # pyrite-output/ the first time a command resolves an output directory.
+    from ..console.outputs import enable_legacy_migration
+
+    enable_legacy_migration()
 
 
 def main(argv: Sequence[str] | None = None):

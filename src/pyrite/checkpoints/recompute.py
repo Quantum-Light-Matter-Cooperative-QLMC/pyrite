@@ -29,6 +29,7 @@ from pathlib import Path
 from .._energy_grid_encoding import decode_energy_grid, encode_energy_grid
 from .._grid_semantics import is_uniform_grid
 from .._progress import _ProgressTimer, _write_progress_record
+from ..console.outputs import output_dir
 from ..montecarlo import runner
 from . import _checkpoint_store
 from .persistence import (
@@ -61,7 +62,7 @@ def _progress_callback(progress_file, stem, latest, progress_timer, write_progre
 
 def rebrem_checkpoints(
     materials=None,
-    checkpoint_dir="checkpoints",
+    checkpoint_dir=None,
     ne_brem=None,
     brem_start_eV=None,
     brem_stop_eV=None,
@@ -91,7 +92,7 @@ def rebrem_checkpoints(
     and a fresh ``status`` dict. If any material stops short of complete, the
     sweep raises ``SystemExit(75)`` after the loop so the chunked remote queue
     self-resubmits. ``max_minutes=None`` (local default) never raises."""
-    ckpt_dir = Path(checkpoint_dir)
+    ckpt_dir = output_dir("checkpoints") if checkpoint_dir is None else Path(checkpoint_dir)
     if materials:
         paths = [checkpoint_path_for(m, str(ckpt_dir)) for m in materials]
     else:
@@ -236,7 +237,7 @@ def rebrem_checkpoints(
 
 def reline_checkpoints(
     materials=None,
-    checkpoint_dir="checkpoints",
+    checkpoint_dir=None,
     line_ne=None,
     line_start_eV=None,
     line_stop_eV=None,
@@ -262,7 +263,7 @@ def reline_checkpoints(
     and a fresh ``status`` dict. If any material stops short of complete, the
     sweep raises ``SystemExit(75)`` after the loop so the chunked remote queue
     self-resubmits. ``max_minutes=None`` (local default) never raises."""
-    ckpt_dir = Path(checkpoint_dir)
+    ckpt_dir = output_dir("checkpoints") if checkpoint_dir is None else Path(checkpoint_dir)
     if materials:
         paths = [checkpoint_path_for(m, str(ckpt_dir)) for m in materials]
     else:
