@@ -61,7 +61,8 @@ class DispersionCertificate:
     """Secant phase law and a uniform residual on one smooth energy interval.
 
     ``slope``: 1/(Ang eV); ``intercept``/``residual_max``: 1/Ang;
-    ``first_derivative_max``: 1/(Ang eV). Bounds describe the reconstructed
+    ``first_derivative_max``: 1/(Ang eV); ``second_derivative_max``:
+    1/(Ang eV^2), infinite when not bounded. Bounds describe the reconstructed
     material law, with an explicit float64 evaluation allowance.
 
     Validation: coherent-line-grid-windowed-resolution
@@ -73,6 +74,36 @@ class DispersionCertificate:
     intercept: float
     residual_max: float
     first_derivative_max: float
+    second_derivative_max: float = float("inf")
+
+    def phase_range(self) -> tuple[float, float]:
+        """Enclosure of ``delta_omega`` on the interval: secant +- residual."""
+        ends = (
+            self.slope * self.start_eV + self.intercept,
+            self.slope * self.stop_eV + self.intercept,
+        )
+        return _outward(min(ends) - self.residual_max, max(ends) + self.residual_max)
+
+
+@dataclass(frozen=True, slots=True)
+class DispersionBands:
+    """Per smooth interval: phase enclosure, slope bound, slope variation.
+
+    ``variation[k]`` bounds the total variation of ``delta_omega'``
+    over interval ``k`` plus its jump at the interval's upper knot (zero at
+    the axis stop). Units as :class:`DispersionCertificate`. Fields:
+    ``phase_min``/``phase_max`` (1/Ang), ``slope_max`` and ``variation``
+    (1/(Ang eV)).
+
+    Validation: coherent-line-grid-windowed-resolution
+    """
+
+    lo_eV: np.ndarray
+    hi_eV: np.ndarray
+    phase_min: np.ndarray
+    phase_max: np.ndarray
+    slope_max: np.ndarray
+    variation: np.ndarray
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,5 +281,90 @@ class CoherentDispersionLaw:
         if not np.all(np.isfinite([slope, intercept, residual, first_bound])):
             raise ValueError("the material interval has no finite float64 dispersion certificate")
         return DispersionCertificate(
-            lo, hi, slope, intercept, residual, float(np.nextafter(first_bound, np.inf))
+            lo,
+            hi,
+            slope,
+            intercept,
+            residual,
+            float(np.nextafter(first_bound, np.inf)),
+            float(np.nextafter(second_bound, np.inf)),
         )
+
+    def slope_jump_bound(self, energy_eV: float) -> float:
+        """Bound ``|delta_omega'(E+) - delta_omega'(E-)|`` at one knot.
+
+        ``delta_omega`` is continuous (f1 and f2 are). Its derivative
+        ``[(1 - Re n) - E Re n']/hbar c`` jumps only through
+        ``chi' = -C (F'/E^2 - 2F/E^3)``, ``F = sum(f1 + i f2)``: f1 is a cubic
+        spline and f2 log-linear, so ``Delta F' = sum(Delta f1' + i f2
+        Delta p / E)`` with ``p`` the log-log slope either side. With
+        ``n' = chi'/(2n)`` the jump is at most ``E C |Delta F'| /
+        (2 E^2 |n| hbar c)``. Zero at a point where neither interpolant breaks.
+
+        Validation: coherent-line-grid-windowed-resolution
+        """
+        energy = float(energy_eV)
+        if not self.start < energy < self.stop:
+            return 0.0
+        real = imag = 0.0
+        forward = complex(self.forward_constant)
+        for atom in self.atoms:
+            spline, slope_poly = atom.f1[0], atom.f1[1]
+            forward += atom.count * (spline(energy) + 1j * atom.imaginary(np.array([energy]))[0])
+            right = int(np.searchsorted(slope_poly.x, energy, side="right") - 1)
+            if 0 < right < slope_poly.c.shape[1] and slope_poly.x[right] == energy:
+                left = right - 1
+                coefficients = slope_poly.c[:, left]
+                offset = energy - slope_poly.x[left]
+                value_left = sum(
+                    c * offset ** (coefficients.size - 1 - m) for m, c in enumerate(coefficients)
+                )
+                difference = slope_poly.c[-1, right] - value_left
+                real += atom.count * (
+                    abs(difference)
+                    + 64 * np.finfo(float).eps * (abs(value_left) + np.abs(coefficients).sum())
+                )
+            index = int(np.searchsorted(atom.energies, energy))
+            if 0 < index < atom.energies.size - 1 and atom.energies[index] == energy:
+                logs = np.log(atom.f2[index - 1 : index + 2])
+                steps = np.diff(np.log(atom.energies[index - 1 : index + 2]))
+                powers = np.diff(logs) / steps
+                imag += (
+                    atom.count
+                    * atom.f2[index]
+                    * (abs(powers[1] - powers[0]) + 64 * np.finfo(float).eps * np.abs(powers).sum())
+                    / energy
+                )
+        if real == 0.0 and imag == 0.0:
+            return 0.0
+        chi = -self.prefactor * forward / energy**2
+        modulus = abs(1.0 + chi) - 64 * np.finfo(float).eps * (1.0 + abs(chi))
+        if not modulus > 0.0:
+            return float("inf")
+        bound = self.prefactor * np.hypot(real, imag) / (2.0 * energy * np.sqrt(modulus))
+        return float(np.nextafter(bound * (1 + 1e-12) / HBARC_EV_ANG, np.inf))
+
+    def bands(self) -> DispersionBands:
+        """:class:`DispersionBands` over every smooth interval of the full axis.
+
+        Validation: coherent-line-grid-windowed-resolution
+        """
+        cached = getattr(self, "_bands", None)
+        if cached is not None:
+            return cached
+        lo, hi = self.breaks[:-1], self.breaks[1:]
+        certificates = [self.certificate(a, b) for a, b in zip(lo, hi, strict=True)]
+        ranges = np.array([c.phase_range() for c in certificates])
+        jumps = np.array([self.slope_jump_bound(b) for b in hi])
+        # Inside a smooth interval the variation is at most the integral of
+        # |delta_omega''|; a knot adds its jump.
+        inner = np.array([c.second_derivative_max for c in certificates]) * (hi - lo)
+        self._bands = DispersionBands(
+            lo_eV=lo.copy(),
+            hi_eV=hi.copy(),
+            phase_min=ranges[:, 0],
+            phase_max=ranges[:, 1],
+            slope_max=np.array([c.first_derivative_max for c in certificates]),
+            variation=np.nextafter(inner + jumps, np.inf),
+        )
+        return self._bands

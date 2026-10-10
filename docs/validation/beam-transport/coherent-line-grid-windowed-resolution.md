@@ -6,8 +6,9 @@ Ledger row: [`coherent-line-grid-windowed-resolution`](../ledger-core-coherent-p
 
 Current status: **`anchored`** (fresh-context verdict `rederived`, pinned by the windowed-vs-fine regression) for the frozen-carrier,
 float64, `sinc_cutoff = None` scope ([2026-10-08 verification](#independent-verification-of-frozen-carrier-scope-2026-10-08)).
-Material dispersion has no error certificate (item 5). This section states the current policy; dated
-sections below are the historical record.
+The dispersive window certificate of item 5 (#372) is `rederived` by a fresh context
+([2026-10-10 verification](#independent-verification-of-the-dispersive-certificate-2026-10-10-372)) and
+pinned by the window-excluded-power anchor; it joins the anchored scope when that anchor is green in CI. This section states the current policy; dated sections below are the historical record.
 
 Automatic line-grid resolution serves `coherent_emission` when the policy carries feature windows. Per `(reflection, orientation)` row and observation direction:
 
@@ -15,7 +16,7 @@ Automatic line-grid resolution serves `coherent_emission` when the policy carrie
 2. **Step.** Inside the window the Nyquist step is $h = \pi\hbar c / D$, with $D$ the span of the time support of *every* radiating piece of the row: the per-electron span $D_e$ for the $\sum_e |S_e|^2$ floor, the all-electron span for the $|\sum_e S_e|^2$ term. Nodes are placed at $h/8$ (`COHERENT_NYQUIST_OVERSAMPLING = 8`, adopted from the 2026-10-08 ladder; see [Default refinement](#default-refinement-2026-10-08)).
 3. **Decoherence switch.** A 100 eV window bin takes the per-electron step when $F_\mathrm{max} N_e \le \eta_F = 10^{-4}$ over the bin, where with a physical bunch charge $N_e$ is the tail population bound $1 + s_\mathrm{pair}(H-1)$ for $H$ emitting samples and physical pair scale $s_\mathrm{pair}$ ([`coherent-physical-bunch-population`](../radiation-physics/coherent-physical-bunch-population.md)), and the all-electron step otherwise. $F$ is bounded only on a finite footprint, by the analytic $F_z = e^{-(\omega\sigma_z)^2}$ the reducer applies; with no offsets ($F \equiv 1$) or an infinite slab (empirical characteristic function, no closed-form bound) every bin takes the all-electron step.
 4. **Budget.** The plan is refused, with its coordinate count, above the policy point budget `max_points` (`DEFAULT_MAX_POINTS = 600000`, `PYRITE_ENERGY_GRID_MAX_POINTS`). It is never coarsened. A policy without windows still refuses coherent emission (#117).
-5. **Dispersion scope (re-scoped 2026-10-08).** Items 1–2 are claimed for the frozen-carrier row field. The material-dispersive phase is not covered by an a-priori bound: the rigorous dispersive excluded-power bound is reported through `LineShapePrecisionWarning` when the worst row exceeds $2\eta_\mathrm{leak}$ (up to $7.4\times10^{4}$ times the frozen reference on the reduced short-bunch case before #370; $64.9$ after the analytic transverse envelope, with only the row carrying two L1-fallback intervals still above $2\eta_\mathrm{leak}$) and is not a measured error. Dispersive sampling is checked instead by same-trajectory convergence against uniform full-axis references; in those cases the row windows cover the whole axis, so the references test dispersive sampling, not power excluded from the windows ([charge-weighted ladders](../radiation-physics/coherent-physical-bunch-population.md#charge-weighted-remote-checks-2026-10-08): yield, centroid and global FWHM errors at most $2.002\times10^{-4}$ at 30 and 60 keV), and by the opt-in runtime full-axis yield and centroid audits. Window-excluded dispersive power and a general dispersive certificate are out of scope for this row.
+5. **Dispersion certificate (#372).** With a material law (always, on the production path) each window edge is also held to a *dispersive* bound: the production row field, with the reducer's energy-dependent in-medium phase $-\delta\omega(E)L$, has at most $\eta_\mathrm{leak}$ of the frozen Parseval power, times $1 + F(N_e-1)$, between the edge and the axis edge ([Dispersive envelope](#dispersive-envelope-372)). The frozen edge of item 1 is kept when it already meets this bound; otherwise the edge is widened by bisection until it does, so windows only grow. A carrier that the escape gradient can shift into an omitted band is never certified there, and the window widens over it. The bound covers power the windows exclude from the finite axis. It is relative to the frozen Parseval reference, not to the production row power, and it gives no sampling certificate: dispersive sampling inside the windows still rests on the same-trajectory ladders against uniform full-axis references ([charge-weighted ladders](../radiation-physics/coherent-physical-bunch-population.md#charge-weighted-remote-checks-2026-10-08): yield, centroid and global FWHM errors at most $2.002\times10^{-4}$ at 30 and 60 keV) and the opt-in runtime full-axis yield and centroid audits. The audit `coherent_windows.dispersion` reports each side's certified fraction; `LineShapePrecisionWarning` fires only if a row's total exceeds $2\eta_\mathrm{leak}$, which the widening rule prevents. Before #372 the audit used an affine-map proxy with no a-priori certificate (up to $7.4\times10^{4}$ times the frozen reference on the reduced short-bunch case before #370, $64.9$ after it, $183.7$ on the anchor).
 
 ## Derivation
 
@@ -87,9 +88,31 @@ The inter-electron term adds at most $F(N_e - 1)$ times the floor's tail by the 
 
 This is where coherent and incoherent windows differ. The incoherent route leaks every piece's own two edges; the coherent per-electron field leaks only the amplitude *changes* along the track and its ends. The pre-verification rule took the $t_L^2$ proxy $a_j = 1/(1-\beta\hat v_j\cdot\hat n)$ and a fixed $\kappa = 2$ on the diagonal jump sum; the verifier showed that the coupling $c_j$ changes at first order across a deflection (through $\hat v\cdot\mathbf g$ in $A_\mathrm{PXR}$ and $A_\mathrm{CBS}$) and that clustered joints break the diagonal estimate (below). Both are what the reducer coefficients and the cluster bound now carry.
 
+### Dispersive envelope (#372)
+
+The reducer multiplies each piece by $e^{-i\delta\omega(E)L(d)}$, with $\delta\omega(E) = E(1-\mathrm{Re}\,n(E))/\hbar c$ and the escape distance affine along the piece, $L(d) = L_\mathrm{mid} + g_j(d-d_j)$, $g_j = \Delta L_j/\Delta d_j$ (`lines/_formation.py`; `coherent_normalization._sample_row_fields` reproduces it and is pinned to `_lines_for_segments`). At fixed $E$ the exponent is therefore affine in $d$ on every piece, and the piece integral is exactly its two endpoint terms, with denominator and endpoint phase
+
+$$
+z_j(E) = E - E_j - \hbar c\,g_j\,\delta\omega(E) + i\hbar c\,\lambda_j,
+\qquad
+\Phi(E) = E\tau/\hbar c - \delta\omega(E)\,L(\tau).
+$$
+
+$L$ is continuous along a track, so at a joint both pieces share $\Phi$; captured endpoint escapes differ by float64 roundoff only ($\lesssim10^{-14}$ relative on the anchor), and the residual phase $\delta\omega\,|L_\mathrm{L}-L_\mathrm{R}|$ is charged to the numerator. Every frozen-envelope step then carries over with a shifted carrier, with no change of variable and no Parseval identity for the dispersive field. This replaces the 2026-10-06 affine-map audit, whose Jacobian $1-\hbar c\,s\,g$ goes nonpositive at low energy (48 L1-fallback intervals on the anchor) and whose nonlinear residual was charged as $W L_1^2$; together they made the audit $183.7$ times the frozen reference there.
+
+*Material enclosure.* On each smooth interval of the reconstructed law (`CoherentDispersionLaw.certificate`), $\delta\omega$ lies within its secant $\pm$ the certified residual, $|\delta\omega'| \le M_1$ and $|\delta\omega''| \le M_2$. Across a knot $\delta\omega$ is continuous; f1 is a $C^2$ cubic spline and f2 log-linear, so $\delta\omega'$ jumps only through $\Delta F' = \sum(\Delta f_1' + i f_2\Delta p/E)$, by at most $C|\Delta F'|/(2E|n|\hbar c)$ (`slope_jump_bound`; on HOPG 10–6000 eV the measured one-sided jumps reach 0.90 of it; 430 of the 657 interior breaks carry a jump above $10^{-3}$ of the bound). The variation of $\delta\omega'$ over a band is at most $\sum_k M_{2,k}w_k$ plus those jumps (`CoherentDispersionLaw.bands`).
+
+*Diagonal.* Partition the omitted band into blocks of smooth intervals. On a block the shifted carrier lies in $E_j + \hbar c\,g_j[\delta_\mathrm{min},\delta_\mathrm{max}]$, so $|z_j(E)|$ is at least the distance to the nearer end of that set, and the closed forms of the frozen proof hold on the block: $\|1/z\|^2 \le 1/d_\mathrm{near} - 1/d_\mathrm{far}$, $\|1/(z_1z_2)\|^2 \le (m_\mathrm{near}^{-3} - m_\mathrm{far}^{-3})/3$, with $|z_1-z_2| \le [(|\Delta E| + \hbar c|\Delta g|\hat\delta)^2 + (\hbar c\Delta\lambda)^2]^{1/2}$. Summing squares over blocks bounds each jump's $L^2$ norm on the band. A block on which a shifted carrier can reach the band returns $\infty$.
+
+*Cross terms.* Over the whole band take global enclosures, so the envelopes $1/u_j(E)$ decrease, with $u_j(E) = E - \max(E_j + \hbar c g_j\delta)$ on the upper side, and $|z_j'| = |1 - \hbar c g_j\delta\omega'| \le 1 + \hbar c|g_j|M_1$. The derivative envelopes of the frozen decomposition gain that factor, plus terms from the $E$-dependence of $z_1-z_2$ (rate $\hbar c|\Delta g|M_1$) and of the mismatch phase. The cross term of jumps $J,K$ is $\int h\,e^{i\Phi_{JK}}$ with $\Phi_{JK}' = \Delta\tau/\hbar c - \delta\omega'\Delta L$. Integrating by parts with $|h| \le G$, $|h'| \le -G'$ and $|\Phi'| \ge \lambda$ gives $|\int| \le G(X)(2/\lambda + V/\lambda^2)$, with $V$ the variation of $\Phi'$, jumps included. Along one electron's sorted jumps $|L_J - L_K| \le r_e|\tau_J-\tau_K|$, $r_e$ the largest consecutive $|\Delta L|/\Delta\tau$. With $\varepsilon_e = \hbar c M_1 r_e < 1$ and clusters split at gaps above $M\hbar c/(u_\mathrm{min}(1-\varepsilon_e))$, rank-$k$ pairs have $\lambda \ge kM/u_\mathrm{min}$ and $V/(2\lambda) \le \hbar c\,r_e\,\mathrm{TV}(\delta\omega')/(2(1-\varepsilon_e))$. The frozen allowance is thus multiplied by $\kappa_e = 1 + \hbar c\,r_e\,\mathrm{TV}/(2(1-\varepsilon_e))$; an electron with $\varepsilon_e \ge 1$ is one cluster (triangle inequality). Different electrons never share a cluster and add no cross term.
+
+*Near/far split.* $\int_\Omega = \int_{[X,Y]} + \int_{[Y,\mathrm{axis}]}$ for any $Y$, so each side's bound is the least of the unsplit bound and the split bounds at carrier distances growing by $2^{1/4}$. A steep law far from the window, such as the carbon K edge and plasmon region below a row, then forces only the far part into one cluster per electron.
+
+*Frozen limit.* With $\delta\omega \equiv 0$ there is no shift, $M_1 = \mathrm{TV} = 0$ and $\kappa = 1$, with the frozen threshold and moduli. Block norms sum (Minkowski in $\ell^2$) to at most the frozen $T_J$ truncated at the axis, so the dispersive bound is at most the frozen one, and one segment's unsplit bound is $w/(\pi^2u)$.
+
 ### Assumptions
 
-- Each piece has a frozen carrier and coefficient, and an affine optical depth. Signed attenuation slopes are included exactly in the endpoint denominators. The reducer's energy-dependent in-medium phase is still omitted: no rigorous dispersion error charge has been established, so this is not yet a proved tolerance guarantee for the full production spectrum.
+- Each piece has a frozen carrier and coefficient, and an affine optical depth. Signed attenuation slopes are included exactly in the endpoint denominators. The frozen envelope omits the reducer's energy-dependent in-medium phase; the [dispersive envelope](#dispersive-envelope-372) includes it exactly, but keeps the coupling and absorption frozen at the carrier as the reducer does, so neither bounds the true energy-dependent physical field.
 - Leakage is measured against diagonal per-electron Parseval power, not against the blended spectrum. In general $I \ge (1-F)\sum_e|S_e|^2$, and destructive inter-electron interference can make $I$ smaller than that diagonal power. A relative-to-spectrum tolerance therefore needs a separate lower bound.
 - The cluster separation $M = 64$ and the bin width are numerical policy. The cross-term coefficient $4(1+\ln n_C)/M$ stays below one for $n_C \le 10^6$ clusters.
 - The reducer's retardation phases are float64. In float32 (`_backend.py` default on CUDA) $d/\hbar c$ is rounded at $\lvert d\rvert \sim 10^7$ Å to about 1 Å, up to 0.7 rad per piece at keV energies; joints lose phase continuity and the tail is no longer the jump spectrum. `_coherent_rows` warns (`LineShapePrecisionWarning`, "float64 phases only") and resolution proceeds; `PYRITE_FP64=1` is the supported setting.
@@ -101,6 +124,7 @@ This is where coherent and incoherent windows differ. The incoherent route leaks
 - **Single segment.** One undamped piece has two free ends of amplitude $a$, $\Delta d$ apart. Within $u < M\hbar c/\Delta d$ of its edge they form one cluster, $(2\sqrt{a^2/u})^2 = 4a^2/u$, and the bound returns exactly `sincsq_upper_tail_bound`, $w/(\pi^2 u)$ with $w = 2\pi\hbar c/\Delta d$ — the incoherent `sinc²` tail bound. Farther out the two ends decorrelate and the bound falls to $(1+4(1+\ln 2)/M)/2$ of it, still above the exact tail. Its span is $\Delta d$, so the Nyquist step is $\pi\hbar c/\Delta d = w/2$: two nodes per first-zero width of the incoherent `sinc²` (the incoherent policy's integration-exact step $w$ carries the same factor two between integration and reconstruction). Pinned by `test_single_segment_leak_is_the_incoherent_sinc_tail_bound`.
 - **Collinear split.** A straight flight cut into pieces has equal amplitudes and carriers at its joint, which cancel; window and spans equal the unsplit flight's (`test_a_collinear_split_leaks_exactly_what_the_whole_flight_leaks`).
 - **Clustered joints.** The verification's amplitude ramps (20 pieces within $\hbar c/u$, twice) and scattered tracks with moving carriers stay inside the bound against an independent quadrature of the time-domain field (`test_clustered_joints_stay_inside_the_bound`, `test_a_scattered_track_with_moving_carriers_stays_inside_the_bound`); exact/bound is 0.17–0.30 for the ramps and 0.06–0.10 for the scattered tracks. The 2026-10-06 counterexample to the earlier lemma (101 at 1000 eV joined to 100 at 1003 eV, a zero of $\lvert\mathcal J\rvert^2$ at 1303 eV beyond an 1100 eV edge) repeated at cluster separations: exact/bound 0.45 (`test_near_cancelling_joints_far_apart_stay_inside_the_bound`).
+- **Dispersive limit.** $\delta\omega \to 0$ returns at most the frozen bound and, unsplit, the single-segment $w/(\pi^2 u)$ (`test_dispersive_leak_with_no_material_phase_is_the_frozen_bound`). A shifted carrier inside an omitted band is never certified and the window widens over it; this is the 2026-10-06 constant-$\delta$ counterexample, 1000 eV moved to 1111 eV (`test_a_shifted_carrier_is_never_certified_and_the_window_widens_over_it`). Joined tracks with moving carriers, escape gradients and damping under the HOPG law, on both sides and the lower one to 10 eV through the K edge, stay inside it against independent quadrature of the production field (`test_dispersive_leak_bounds_the_production_field_beyond_the_edge`).
 - **$F \to 0$.** Every bin takes the per-electron step (`test_vanishing_decoherence_takes_the_per_electron_step_everywhere`); $F \equiv 1$ takes the all-electron step everywhere (`test_unbounded_decoherence_takes_the_all_electron_step`).
 
 ## Measurements
@@ -242,8 +266,21 @@ the ledger status stays `discrepancy`.
 
 Reduced `hopg_short` (hopg, 60 keV, 10 µm, tilt 45°, azimuth 135°, beam `1_atto` with `transverse_fwhm_mm = 0.1`, 5 mm footprint, $N_e = 200$): the 1 as bunch gives $F_z N_e > 10^{-4}$ below ~2.5–2.9 keV, so most of every window takes the all-electron Nyquist step (1.16–1.36 × 10⁻³ eV shipped, against 2.8–3.2 × 10⁻³ eV per-electron). Under the default 600 000 budget the plan is refused with its count (4 600 923 on a CPU transport of $4.1\times10^6$ segments). With `PYRITE_ENERGY_GRID_MAX_POINTS=5000000` on the GPU host (`PYRITE_FP64=1`, `f8821d07`) it completes: 39 187 segments, 2 607 240 coordinates, transport plus resolution 3.8 s, spectrum 637 s, finite incoherent and coherent spectra (coherent yield $2.03\times10^{-6}$). The full 81-case profile is not run.
 
+### Dispersive certificate on the anchor (2026-10-10, #372)
+
+CPU anchor (HOPG 30 keV, 1 µm, $N_e = 3$, seed 0, 100 fs, lockstep), commit `f3b4b5f2`, `checks/coherent_window_excluded_dispersion.py --case anchor`. Each reflection runs alone with one mosaic orientation. The production reducer is evaluated on a uniform axis at half the per-electron step over each band the windows omit, plus the far axis end so the reducer keeps the same resonating pieces, and $N_e\int$ is compared with the audit's absolute bound. The reducer's fractions equal the independent `_sample_row_fields` quadrature to the digits shown.
+
+| row | omitted band (eV) | measured / frozen reference | certified | measured / certified |
+|---|---|---|---|---|
+| (0 0 2) | 1942.3–3700 | $5.215\times10^{-5}$ | $7.086\times10^{-5}$ | 0.736 |
+| (0 0 4) | 10–330.6 | $4.755\times10^{-6}$ | $1.000\times10^{-4}$ | 0.048 |
+| (0 0 4) | 2829.2–3700 | $2.665\times10^{-5}$ | $7.858\times10^{-5}$ | 0.339 |
+
+Only the (0 0 4) lower edge moved. The frozen edge 459.7 eV certified $1.59\times10^{-4}$ dispersively (unsplit $2.26\times10^{-4}$) and widened to 330.6 eV, raising that row's plan from 105 601 to 111 357 points. The former audit reported $183.7$ times the frozen reference for that row. Anchored by `test_production_field_beyond_the_certified_windows_stays_inside_the_dispersive_bound` (slow, 9 s).
+
 ## Open
 
+- **Thick-target dispersive measurement (#372).** The 1 mm remote run of `checks/coherent_window_excluded_dispersion.py --case thick` is on hold for GPU availability; the CPU anchor is the only measured window-excluded case.
 - **Re-verification.** The 2026-10-06 re-verification (below) returned a narrowed `discrepancy`; its three items are addressed in "Resolution (task owner, 2026-10-06)". A fresh context re-checks them before the row moves.
 - **Inter-electron term without a closed-form bound.** For a sub-femtosecond bunch the Cauchy–Schwarz switch is conservative by roughly $N_e$: random transverse positions make $|\sum_e S_e|^2 \approx \sum_e|S_e|^2$ on average, so the unresolved term is $\sim F$ of the floor, not $F N_e$. Using that statistical estimate, or the empirical $F$ of infinite slabs, would bring `hopg_short`-class cases under the budget but is a modelling decision outside #350.
 - **Budget.** `hopg_short`-class plans need a `max_points` near $3\times10^6$–$5\times10^6$; the shipped default stays 600 000, so they run on a GPU host with `PYRITE_ENERGY_GRID_MAX_POINTS` raised.
@@ -4051,3 +4088,109 @@ this review adds no dispersion certificate, sampling certificate, or human
 sign-off. Suggested ledger change: replace the zero-weight-chain qualification
 of the collinear limit by equality after exact cancellation, and record this
 scoped verifier verdict and retained nonzero-joint anchors.
+
+## Independent verification of the dispersive certificate (2026-10-10, #372)
+
+Scope: Claim item 5 only (the dispersive window certificate), at commit `70f2893e`. That commit is the user's rebase of `5e86d501`/`5f4598b7` onto `main`. The four #372 commits are content-identical, and `git diff` shows no change between them under `src/pyrite/montecarlo/spectrum/`, `tests/energy-grid/` or `docs/validation/`. Verdict: **`rederived`** (scoped). No discrepancy was found.
+
+### Independence boundary
+
+Before deriving, this fresh context read `docs/validation/methodology.md`, the formatting rules, the `physics-validation` skill and the ledger row, including the owner's 2026-10-10 Notes with their anchor ratios and their description of the former affine audit. It also read this page's Claim (including item 5) and the frozen derivation ("Time-domain field of one row" through "Envelope: the coherent tail is the jump spectrum"). It did not read "Dispersive envelope (#372)", "Dispersive certificate on the anchor", any implementation body or the owner tests before the derivation below was written to a scratch file. Those were read afterwards, for the comparison only. The verifier is a different context from the implementer. Whether the model differs is not known.
+
+### Derivation (recorded before inspecting the implementation)
+
+**Field of one piece.** Use $A(E)=\int e(\tau)\,e^{iE\tau/\hbar c}\,d\tau$. On piece $j$, with $s=\tau-d_j\in[-\Delta d_j/2,\Delta d_j/2]$, the production integrand is $a_j e^{-\lambda_j s}\,e^{i\psi_0(\tau)}\,e^{-i\delta\omega(E)L(\tau)}$. Here $L(\tau)=L_{{\rm mid},j}+g_js$ with $g_j=\Delta L_j/\Delta d_j$, and $\psi_0(\tau)=-\mathbf g\cdot\mathbf r_j-E_js/\hbar c$ is the frozen carrier phase, continuous along a track. At fixed $E$, $\delta\omega(E)$ is a constant, so the exponent is affine in $s$ with coefficient $k_j=(E-E_j)/\hbar c-g_j\delta\omega(E)+i\lambda_j$:
+
+$$
+\int_{-\Delta d_j/2}^{\Delta d_j/2}e^{ik_js}\,ds=\Delta d_j\,\frac{\sin w_j}{w_j},\qquad
+w_j=\frac{k_j\Delta d_j}{2}=v_j+\frac{i\lambda_j\Delta d_j}{2},\quad
+v_j=\frac{\Delta d_j(E-E_j)}{2\hbar c}-\frac{\Delta L_j}{2}\delta\omega(E).
+$$
+
+This is the source statement's damped sinc. The reducer's $\sinh(iv-q)/(iv-q)$ (`formation_factor`) is the same function with $q=\lambda_j\Delta d_j/2$. The same integral is exactly the difference of its endpoint terms, valid for every $E$:
+
+$$
+A_j(E)=\Big[\frac{\hbar c\,a_j(\tau)\,e^{i\theta(\tau)}}{i\,z_j(E)}\Big]_{\tau_j^-}^{\tau_j^+},\qquad
+z_j(E)=E-E_j-\hbar c\,g_j\,\delta\omega(E)+i\hbar c\,\lambda_j,\qquad
+\theta(\tau)=\frac{E\tau}{\hbar c}-\delta\omega(E)L(\tau)+\psi_0(\tau).
+$$
+
+At a joint of one electron, $\tau$, $\psi_0$ and the attenuated amplitude are shared. If $L$ is also shared, the two terms combine to $e^{i\theta}\big(a_1/z_1-a_2/z_2\big)$. If the captured escapes differ by $\Delta L_{12}$, a relative factor $e^{-i\delta\omega(E)\Delta L_{12}}$ rides on $a_1$. This is claim (a).
+
+**Normalization (h).** Parseval gives $\int\lvert A\rvert^2dE=2\pi\hbar c\int\lvert e\rvert^2d\tau=2\pi\hbar c\,P$, with $P=\sum_{j,p}\lvert a_{j,p}\rvert^2\Delta d_j\langle e^{-\tau_{\rm abs}}\rangle_j$. Writing $A=\hbar c\sum b$ with endpoint terms $b=a/z$, the excluded fraction is $\hbar c\int\lvert\sum b\rvert^2dE/(2\pi P)$ and the absolute excluded power is that fraction times $2\pi\hbar c\,P$. By $\lvert\sum_eS_e\rvert^2\le N_e\sum_e\lvert S_e\rvert^2$, the blend $(1-F)\sum_e\lvert S_e\rvert^2+F\lvert\sum_eS_e\rvert^2$ is at most $1+F(N_e-1)$ times the floor. $F$ is nonincreasing, so it is evaluated at the upper edge, and at the axis start for the lower side.
+
+**Diagonal (b).** On a block with $\delta\omega\in[\delta_-,\delta_+]$, upper side, $\mathrm{Re}\,z_j(E)\ge E-E_j-\hbar c\max(g_j\delta_\pm)$. This grows with unit slope in $E$, so with $d$ that distance at the block's near and far ends, $\int\lvert z_j\rvert^{-2}\le 1/d_{\rm near}-1/d_{\rm far}$. The decomposition $a_1/z_1-a_2/z_2=(a_1e^{i\vartheta}-a_2)/z_1+a_2(z_2-z_1)/(z_1z_2)$, or its mirror, with $\lvert z_2-z_1\rvert\le[(\lvert\Delta E\rvert+\hbar c\lvert\Delta g\rvert\max\lvert\delta\rvert)^2+(\hbar c\Delta\lambda)^2]^{1/2}$ and $\int(z_1z_2)^{-2}\le(m_{\rm near}^{-3}-m_{\rm far}^{-3})/3$, gives a Minkowski $L^2$ bound per block. Squared norms add over disjoint blocks, and over polarizations. A block whose shifted carrier set reaches it has no bound.
+
+**Cross terms (c).** For jumps $J,K$ of one electron, $\int b_Jb_K^*=\int h\,e^{i\varphi}$ with $\varphi'=\Delta\tau/\hbar c-\delta\omega'(E)\Delta L$. On consecutive sorted jumps, the triangle inequality gives $\lvert\Delta L\rvert\le r_e\lvert\Delta\tau\rvert$, so $\lvert\varphi'\rvert\ge(1-\varepsilon_e)\lvert\Delta\tau\rvert/\hbar c$ with $\varepsilon_e=\hbar c M_1r_e$. For $\varepsilon_e<1$ the sign of $\varphi'$ is fixed. Write each jump as a sum of terms $f$ with real majorants $p$ satisfying $\lvert f\rvert\le p$ and $\lvert f'\rvert\le-p'$; products inherit this property. Stieltjes integration by parts then gives
+
+$$
+\Big\lvert\int_X^Y h\,e^{i\varphi}\Big\rvert\le P(X)\Big[\frac{2}{\varphi'_{\min}}+\frac{\mathrm{TV}(\varphi')}{\varphi'^2_{\min}}\Big]
+=\frac{2\hbar c\,P(X)}{(1-\varepsilon_e)\lvert\Delta\tau\rvert}\Big[1+\frac{\hbar c\,r_e\,\mathrm{TV}(\delta\omega')}{2(1-\varepsilon_e)}\Big],
+$$
+
+using $\mathrm{TV}(\varphi')\le r_e\lvert\Delta\tau\rvert\,\mathrm{TV}(\delta\omega')$. Knot jumps of $\delta\omega'$ enter as jumps of $1/\varphi'$, and $\varphi$ stays continuous. With the cluster threshold $\theta_e=M\hbar c/(u_{\min}(1-\varepsilon_e))$, rank-$k$ pairs give $2u_{\min}\kappa_eB_JB_K/(kM)$. The frozen harmonic sum then yields $4(1+\ln n_C)\,u_{\min}/M\cdot\sum_C\kappa_eB_C^2$; any positive $u_{\min}$ is admissible provided the threshold and the allowance use the same value. For the majorants: on the upper side $\lvert z_i(E)\rvert\ge w_i(E)=u_i+(E-X)$, with $u_i$ taken from the region's global $\delta$ range, and $\lvert z_i'\rvert\le1+\hbar c\lvert g_i\rvert M_1$. The term $(a_1e^{i\vartheta}-a_2)/z_1$ has majorant $c_1/w_1$ with $c_1=\lvert N\rvert(1+\hbar c\lvert g\rvert M_1)+\lvert a\rvert_{\max}M_1\lvert\Delta L_{12}\rvert\,w_1(Y)$. The term $a(z_2-z_1)/(z_1z_2)$ has majorant $c_2/(w_1w_2)$ with $c_2=\lvert a\rvert[\lvert\Delta z\rvert(1+\hbar c\lvert g\rvert M_1)+\hbar c\lvert\Delta g\rvert M_1\min_iw_i(Y)]$, plus the mismatch-phase rate, because $w_1w_2/(w_1+w_2)\le\min_iw_i(Y)$. If $\varepsilon_e\ge1$, the triangle inequality over the whole electron needs no phase information.
+
+**Material slope variation (d).** With $n^2=1-CF/E^2$ and $F=\sum(f_1+if_2)$, $\delta\omega=E(1-\mathrm{Re}\,n)/\hbar c$ and $\delta\omega'=[(1-\mathrm{Re}\,n)-E\,\mathrm{Re}\,n']/\hbar c$. Here $n$ is continuous, $\mathrm{Im}\,\chi\ne0$ keeps the principal root off its cut, and $f_1$ and $f_2$ are continuous. So only $n'=-C(F'/E^2-2F/E^3)/(2n)$ jumps, through $\Delta F'$, and $\lvert\Delta\delta\omega'\rvert\le C\lvert\Delta F'\rvert/(2E\lvert n\rvert\hbar c)$. Also $\mathrm{TV}(\delta\omega')\le\sum_kM_{2,k}w_k+\sum{\rm jumps}$. The derivative chain: $\lvert1-\mathrm{Re}\,n\rvert\le\lvert\chi\rvert/\lvert1+n\rvert\le\lvert\chi\rvert$ because $\mathrm{Re}\,n\ge0$, $\lvert n''\rvert\le\lvert\chi''\rvert/(2\lvert n\rvert)+\lvert\chi'\rvert^2/(4\lvert n\rvert^3)$, and the secant residual is at most $M_2w^2/8$.
+
+**Split, frozen limit and widening (e–g).** Integrals of $\lvert\cdot\rvert^2$ over disjoint ranges add, so for any split $Y$ the near and far bounds add, each with its own constants and boundary terms. With $\delta\omega\equiv0$: $M_1=\mathrm{TV}=0$, $\kappa=1$, the majorant inflation is 1 and $u$ is unshifted, so the diagonal is at most the frozen $T_J$ truncated at the axis and the cross allowance at most the frozen one. A seeder that starts at the frozen edge and returns an edge between it and the axis, together with the bound evaluated at that edge, only grows windows and certifies its returned value.
+
+### Cheap filters
+
+| quantity | units | result |
+|---|---|---|
+| $z_j=E-E_j-\hbar c\,g\,\delta\omega+i\hbar c\lambda$ | eV ($\hbar c$ eV Å, $\delta\omega$ and $\lambda$ 1/Å, $g$ dimensionless) | pass |
+| $\varepsilon=\hbar c\,M_1r_e$, $\kappa$ | dimensionless ($M_1$, TV in 1/(Å eV)) | pass |
+| threshold $M\hbar c/(u_{\min}(1-\varepsilon))$ | Å | pass |
+| knot jump $C\lvert\Delta F'\rvert/(2E\lvert n\rvert\hbar c)$ | 1/(Å eV) ($C$ in eV²) | pass |
+| fraction $\hbar c\int\lvert b\rvert^2dE/(2\pi P)$ | dimensionless | pass |
+
+Limits: $\delta\omega\to0$ recovers the frozen bound; a single piece recovers the $\mathrm{sinc}^2$ tail; $\varepsilon\to1$ gives the threshold $\to\infty$, so one cluster. Signs: the attenuation sign matches `formation_factor` ($q=\lambda\Delta d/2$, $w=v+iq$), and the shifted-carrier sign in `distance` takes $\max(g\delta)$ on the upper side and $\min(g\delta)$ on the lower side. All pass.
+
+### Source-to-code comparison
+
+| item | code | comparison |
+|---|---|---|
+| (a) endpoint denominator and phase, joint and mismatch | `_RowJumps(dispersive=True)`: `left_g`/`right_g`, `escape` (right side at a joint), `escape_mismatch`; zero-jump removal also requires equal $g$ and zero mismatch | matches |
+| (b) block distances and closed forms | `_dispersion_blocks`, `_dispersive_region_leak` (`distance`, `inverse_norm`, `product_norm`, `carrier_change`, `escape_phase`, two decompositions) | matches term for term |
+| (c) $r_e$, $\varepsilon$, threshold, $\kappa$, inflated moduli | `lipschitz` (largest consecutive $\lvert\Delta L\rvert$/gap, $\infty$ at a zero gap), `detuning`, `electron_threshold`, `stretch`, `c1`/`c2` with `escape_rate` and `reach`; $\kappa$ zero for single-cluster or non-separable electrons; $\ln$ of the total cluster count (at least the per-electron count) | matches, conservative where it differs |
+| (d) TV and knot jump | `bands().variation` $=M_2w+$ upper-knot jump; `slope_jump_bound` with $\lvert n\rvert=\sqrt{\lvert1+\chi\rvert}$ lowered by roundoff; `certificate` derivative chain | matches |
+| (e) split | `dispersive_edge_leak`: least of the unsplit bound and $2^{1/4}$-spaced splits | matches |
+| (f) frozen limit | as derived | matches |
+| (g) widening | `_widen`/`_edge`: keeps the frozen edge if certified, else bisects toward the axis; the returned value is the bound at the returned edge | matches |
+| (h) normalization | `_dispersion_window_audit`: `reference_eV` $=2\pi\hbar c\,P$, absolute $=$ fraction $\times$ reference, factor $1+F(N_e-1)$ at the upper edge and the axis start | matches |
+
+The reconstruction convention `_sample_row_fields` equals the source statement. Its couplings and absorption are frozen per piece, as in the reducer, and it is pinned to `_lines_for_segments` by `test_captured_midpoint_phases_reproduce_the_production_coherent_source`.
+
+### Independent evidence
+
+The verifier's own scratch code (outside the repository) contained a field evaluator written from the source statement (complex sinc, not `formation_factor`), an endpoint-sum evaluator and a trapezoid quadrature at 16–32 nodes per per-electron Nyquist step.
+
+- **Identity (a):** over 40 random multi-electron rows with gaps, attenuation, escape mismatches and nonlinear laws, at 1200 energies, the endpoint sum equals the field to $4.2\times10^{-11}$ of $\sum\lvert a\rvert\Delta d$. The verifier field equals `_sample_row_fields` to $8.8\times10^{-17}$.
+- **Parseval (h):** a two-piece damped row integrated over $\pm4\times10^5$ eV gives $\int\lvert S\rvert^2dE/(2\pi\hbar c\,P)=0.999988$. The deficit matches the truncated tail.
+- **Random adversarial sweep:** 144 sides of six families: random joined tracks, clustered ramps, near-cancelling joints differing only in $g$, single long pieces, $g=\pm20$ shifted carriers, and scattered moving carriers. The families include attenuation, gaps, escape mismatches up to 50 Å, 1–3 electrons, and analytic laws $sE+b+R\sin((E-E_0)/P)$ on 1–40 bands. 117 sides were certified, with **0 violations; worst measured/bound 0.855** (single-piece sinc). The other 27 returned $\infty$, a conservative refusal.
+- **eps/kappa attacks:** linear law with $\varepsilon=0.5$, 0.9, 0.99 and 0.999 on the lower side (phase slope reduced), separated bright clusters and single pieces: worst 0.66. Maximal TV with $\varepsilon=0.95$ (oscillation periods 2–20 eV, $\kappa$ of several hundred) and $\varepsilon=1.2$ (one cluster): 0.002–0.004, loose but valid.
+- **Coherent comb:** 3 and 8 gapped pulses at 1.05 and 2 cluster thresholds, the edge scanned across comb phases, $\varepsilon$ up to 0.98, both law signs and sides: worst 0.54. **Shifted carriers 0.3–3 eV outside the edge:** worst 0.11.
+- **Real laws:** random tracks under `CoherentDispersionLaw` for HOPG 10–3700 eV (lower tails through the carbon K edge and the plasmon region) and WSe2 200–5000 eV: 54 of 56 sides certified, 0 violations, worst 0.572 (HOPG) and 0.589 (WSe2).
+- **Material law (d), 50-digit mpmath:** piecewise-analytic $\delta\omega$, $\delta\omega'$, $\delta\omega''$ rebuilt from the PPoly coefficients and the log-linear $f_2$, on HOPG 10–6000 eV (657 interior breaks), WSe2 200–5000, Si 30–8000 and MoTe2 100–6000. No phase-enclosure excess. Worst $\lvert\delta\omega'\rvert/M_1=0.998$ and $\lvert\delta\omega''\rvert/M_2=0.9995$, both at 0.03–0.25 eV bands at the carbon K edge, where the $f_2$ power-law bound is attained at the band's lower end; dense sampling (200 points per band) confirms. Worst knot jump/`slope_jump_bound` 0.904 (HOPG) and at most 0.024 elsewhere. $\delta\omega$ is continuous at the knots to $3\times10^{-17}$ Å⁻¹. The reconstructed law equals the production `refractive_index` phase to $2.8\times10^{-16}$ Å⁻¹ (HOPG, WSe2).
+- **Frozen limit (f):** 400 random sides, worst dispersive/frozen 0.99992.
+- **Widening (g):** 60 rows. Windows never shrink, and the reported bound equals a recomputation at the chosen edge, within the limit (one row widened).
+- **Audit (h):** 12 three-electron rows with $F=1$ on $\lvert\sum_eS_e\rvert^2$: measured absolute excluded power over the audit's `excluded_power_bound_eV`, worst 0.126.
+- **Production reducer on the CPU anchor** (`checks/coherent_window_excluded_dispersion.py --case anchor`, rerun at `70f2893e`, scratch output): (0 0 2) upper 0.736, (0 0 4) lower 0.048, (0 0 4) upper 0.339. This reproduces the owner's table.
+- **Maintained tests:** 13 selected tests in `tests/energy-grid/test_coherent_windowed_line_grid.py` (five dispersive regressions, the slow anchor, the reducer-pin test, others matched by `-k`) passed with `--slow`.
+
+### Qualifications
+
+- The certificate bounds the reconstructed production field with per-piece frozen couplings and absorption, as the reducer computes it. It is relative to the frozen Parseval reference, not to the production row power, and it is not a sampling certificate. All of this is stated in item 5.
+- The frozen-carrier phase continuity $\psi_0$ at joints is inherited from the anchored frozen scope and was not re-derived here.
+- The bound arithmetic is plain float64 without directed rounding: the closed forms subtract nearby quantities, for example $d_{\rm far}-d_{\rm near}$. The relative error is $O(10^{-16})$, immaterial against the worst measured ratio of 0.855, but this is not an interval certificate. The verifier's quadratures are likewise uncertified trapezoid sums.
+- Of the random sides, 15–20% were refused ($\infty$). That is safe, but widens windows in production. On the anchor only one edge moved.
+- Minor observations, not discrepancies: `_dispersion_window_audit` iterates the unfiltered `rows`, while the seeder filters non-finite pieces first; this matters only for rows with non-finite captured pieces. The owner text's "430 knots" differs from the 657 interior breaks of the 10–6000 eV HOPG law; the 0.90 ratio agrees. The reducer's pre-existing `A_PXR` divide warning is outside this scope.
+- The thick-target remote measurement was not run (no remote/GPU work in this review).
+
+### Verdict
+
+- **Claim**: `coherent-line-grid-windowed-resolution`, item 5. Code: `montecarlo/spectrum/coherent_windows.py::{_RowJumps, _dispersion_blocks, _dispersive_region_leak, dispersive_edge_leak, _widen, coherent_window_seeds, _dispersion_window_audit}` and `montecarlo/spectrum/coherent_dispersion.py::{DispersionCertificate, CoherentDispersionLaw.slope_jump_bound, CoherentDispersionLaw.bands}`. Source: the reducer's affine in-medium phase, Parseval, Minkowski, Stieltjes integration by parts.
+- **Filters**: units pass; limits pass; signs and conventions pass.
+- **Re-derivation**: `matches`.
+- **Verdict**: `rederived` (scoped to the dispersive window certificate).
+- **Suggested ledger change** (task owner applies; never `signed-off`): record "fresh-context verification 2026-10-10 (`70f2893e`): dispersion certificate `rederived`; 0 violations in 171 independent adversarial and real-law certified sides, worst measured/bound 0.855; law enclosures and knot jumps confirmed at 50 digits on four materials". The dispersive scope may then join the anchored scope through its listed anchors. Human sign-off remains pending (#277).
