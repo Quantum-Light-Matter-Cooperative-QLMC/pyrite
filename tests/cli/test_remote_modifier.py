@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pytest
 
-from pyrite.cli._deprecations import flag_message
 from pyrite.cli.commands import recompute as recompute_cli
 from pyrite.cli.commands import remote as remote_cli
 from pyrite.cli.commands import scan
@@ -168,7 +167,7 @@ def test_invalid_remote_target_is_usage_error_and_restores_host(monkeypatch):
     assert remote_config.remote_host() == "configured-box"
 
 
-@pytest.mark.parametrize("brem_flag", ["--brem-trials", "--ne-brem"])
+@pytest.mark.parametrize("brem_flag", ["--brem-trials"])
 def test_zhai_preset_waits_pulls_and_restores_explicit_target(monkeypatch, brem_flag):
     seen = {}
     monkeypatch.setattr(remote_config, "HOST", "configured-box")
@@ -198,10 +197,7 @@ def test_zhai_preset_waits_pulls_and_restores_explicit_target(monkeypatch, brem_
         ],
     )
 
-    warning = (
-        flag_message("", brem_flag, "--brem-trials") + "\n" if brem_flag == "--ne-brem" else ""
-    )
-    assert_clean_result(result, stderr=warning)
+    assert_clean_result(result)
     assert seen == {
         "ne": 11,
         "ne_brem": 3,
@@ -303,7 +299,7 @@ def test_remote_optional_value_parses_around_profile(monkeypatch):
     assert seen == [("standard", "box-a"), ("standard", "box-b")]
 
 
-@pytest.mark.parametrize("brem_flag", ["--brem-trials", "--ne-brem"])
+@pytest.mark.parametrize("brem_flag", ["--brem-trials"])
 def test_recompute_remote_modifier_delegates_and_restores_target(monkeypatch, brem_flag):
     seen = {}
     monkeypatch.setattr(remote_config, "HOST", "configured-box")
@@ -318,10 +314,7 @@ def test_recompute_remote_modifier_delegates_and_restores_target(monkeypatch, br
         ["hopg", "--remote=box-a", "--detach", brem_flag, "25"],
     )
 
-    warning = (
-        flag_message("", brem_flag, "--brem-trials") + "\n" if brem_flag == "--ne-brem" else ""
-    )
-    assert_clean_result(result, stderr=warning)
+    assert_clean_result(result)
     assert seen["material"] == ["hopg"]
     assert seen["ne_brem"] == 25
     assert seen["detach"] is True

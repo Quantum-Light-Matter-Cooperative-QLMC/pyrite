@@ -74,6 +74,22 @@ _REMOVED_OPTIONS = {
     )
 }
 
+_REMOVED_OPTIONS.update(
+    (tuple(path.split()), flag)
+    for path, flag in (
+        *(
+            (f"profile {verb}", flag)
+            for verb in ("create", "set", "add")
+            for flag in ("--ne-line", "--ne-brem")
+        ),
+        ("run", "--ne-brem"),
+        ("app validation export", "--ne-brem"),
+        ("checkpoint recompute brem", "--ne-brem"),
+        ("profile numerics set", "--line-electrons"),
+        ("profile numerics set", "--bremsstrahlung-electrons"),
+    )
+)
+
 
 class _EntryPoint:
     """Adapts ``cli.main``'s argv contract to ``CliRunner.invoke``."""

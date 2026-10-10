@@ -6,7 +6,6 @@ import tomlkit
 from pyrite import _energy_grid_artifacts as artifacts
 from pyrite.cli import _catalog_io
 from pyrite.cli import command as root_command
-from pyrite.cli._deprecations import flag_message
 from pyrite.cli.commands import profile
 from pyrite.console import output as _core
 from tests.helpers.cli import assert_clean_result, invoke
@@ -578,7 +577,7 @@ def test_set_reports_a_new_profile_parameter(tmp_path, monkeypatch):
 @pytest.mark.parametrize("verb", ["create", "set", "add"])
 @pytest.mark.parametrize(
     ("line_flag", "brem_flag"),
-    [("--line-trials", "--brem-trials"), ("-l", "-b"), ("--ne-line", "--ne-brem")],
+    [("--line-trials", "--brem-trials"), ("-l", "-b")],
 )
 def test_profile_trial_grids_keep_catalog_keys(tmp_path, monkeypatch, verb, line_flag, brem_flag):
     catalog = _catalog(tmp_path, monkeypatch)
@@ -586,15 +585,7 @@ def test_profile_trial_grids_keep_catalog_keys(tmp_path, monkeypatch, verb, line
 
     result = invoke(root_command, ["profile", verb, name, line_flag, "100,200", brem_flag, "50,75"])
 
-    warnings = ""
-    if line_flag == "--ne-line":
-        warnings = (
-            flag_message(f"profile {verb}", line_flag, "--line-trials")
-            + "\n"
-            + flag_message(f"profile {verb}", brem_flag, "--brem-trials")
-            + "\n"
-        )
-    assert_clean_result(result, stderr=warnings)
+    assert_clean_result(result)
     row = tomlkit.parse(catalog.read_text())["profiles"][name]
     assert row["n_electrons"]["values"] == [100, 200]
     assert row["n_electrons_brem"]["values"] == [50, 75]
@@ -616,7 +607,7 @@ def test_profile_trial_grids_reject_nonpositive_counts(tmp_path, monkeypatch, fl
 
 @pytest.mark.parametrize(
     ("line_field", "brem_field"),
-    [("line-trials", "brem-trials"), ("line-electrons", "bremsstrahlung-electrons")],
+    [("line-trials", "brem-trials")],
 )
 def test_numerics_trial_aliases_set_and_reset(tmp_path, monkeypatch, line_field, brem_field):
     catalog = _catalog(tmp_path, monkeypatch)
@@ -635,15 +626,7 @@ def test_numerics_trial_aliases_set_and_reset(tmp_path, monkeypatch, line_field,
         ],
     )
 
-    warnings = ""
-    if line_field == "line-electrons":
-        warnings = (
-            flag_message("profile numerics set", f"--{line_field}", "--line-trials")
-            + "\n"
-            + flag_message("profile numerics set", f"--{brem_field}", "--brem-trials")
-            + "\n"
-        )
-    assert_clean_result(result, stderr=warnings)
+    assert_clean_result(result)
     row = tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]
     assert row["n_electrons"]["values"] == [100]
     assert row["n_electrons_brem"]["values"] == [50]

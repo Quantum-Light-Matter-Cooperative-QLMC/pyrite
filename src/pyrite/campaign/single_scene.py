@@ -20,7 +20,7 @@ def _one(values, label, command_name):
 
 
 def resolve_pixel_scene(
-    catalog, material, profile_name, detector_id=None, *, command_name="material simulate"
+    catalog, material, profile_name, detector_id=None, *, command_name="run --ephemeral"
 ):
     """Resolve one profile case without constructing a Sweep or checkpoint."""
     from pyrite.campaign.longitudinal import LongitudinalDistribution

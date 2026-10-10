@@ -1,15 +1,11 @@
-"""Inspect effective material ranges, simulate scenes (deprecated), and blaze materials."""
-
-import shlex
-from pathlib import Path
+"""Inspect effective material ranges and blaze materials."""
 
 import click
 from tomlkit.exceptions import ParseError
 
-from pyrite.cli import _catalog_io, _deprecations
+from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli._groups import LazyGroup
-from pyrite.cli.commands._simulation import _write_simulation_artifact as _write_simulation_artifact
 from pyrite.console import json as cli_json
 from pyrite.console.output import (
     CLIError,
@@ -29,12 +25,6 @@ _COMMAND_HELP = {
     "energy-grid": "Derive and inspect detector energy-grid inputs.",
     "validate": "Validate a material catalog without starting simulation.",
 }
-
-
-def _simulation_scene(document, material, profile_name, detector_id=None):
-    from ._simulation import resolve_scene
-
-    return resolve_scene(document, material, profile_name, detector_id)
 
 
 def _unknown_material(document, material):
@@ -163,62 +153,6 @@ def command():
     the profile; ``validate`` checks the complete catalog; ``blaze`` writes a
     face-specific checkpoint.
     """
-
-
-@command.command("simulate", hidden=True)
-@click.argument("material", shell_complete=_cli_completion.complete_material)
-@click.option(
-    "--profile",
-    "profile_name",
-    default=_catalog_io.DEFAULT_PROFILE,
-    show_default=True,
-    shell_complete=_cli_completion.complete_profile,
-    help="Resolve one scene from profile NAME.",
-)
-@click.option(
-    "--detector", "detector_id", help="Pixel detector ID; required when the profile has several."
-)
-@click.option(
-    "-o",
-    "--output",
-    "output_format",
-    type=click.Choice(("table", "json", "wide")),
-    default="table",
-    show_default=True,
-    is_eager=True,
-    help="Output format; json is the stable automation contract.",
-)
-@click.option(
-    "--output-file",
-    type=click.Path(path_type=Path, dir_okay=False, writable=True),
-    help="Write full factorized spatial arrays as a new compressed .npz file.",
-)
-def simulate_command(material, profile_name, detector_id, output_format, output_file):
-    """Deprecated: use 'pyrite run PROFILE -m MATERIAL --ephemeral'.
-
-    Simulate one material/profile scene on a selected pixel detector. This is
-    filesystem-free except for an explicit --output-file: it calls the public
-    single-scene API and does not create a sweep or checkpoint.
-    """
-    from ._simulation import execute_simulation
-
-    replacement = ["pyrite", "run", profile_name, "-m", material, "--ephemeral"]
-    if detector_id is not None:
-        replacement += ["--detector", detector_id]
-    if output_file is not None:
-        replacement += ["--output-file", str(output_file)]
-    if output_format != "table":
-        replacement += ["-o", output_format]
-    _deprecations.warn_self("material simulate", shlex.join(replacement))
-
-    return execute_simulation(
-        material,
-        profile_name,
-        detector_id,
-        output_format,
-        output_file,
-        resolver=_simulation_scene,
-    )
 
 
 @command.command("show")

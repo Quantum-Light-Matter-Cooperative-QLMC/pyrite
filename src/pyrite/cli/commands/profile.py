@@ -109,7 +109,6 @@ def _ne_cli_options(function):
         "-b",
         "--brem-trials",
         "ne_brem",
-        retired=("--ne-brem",),
         type=COUNT_CSV,
         metavar="N,...",
         help="Monte Carlo electron histories used to estimate bremsstrahlung; positive integers.",
@@ -118,7 +117,6 @@ def _ne_cli_options(function):
         "-l",
         "--line-trials",
         "ne_line",
-        retired=("--ne-line",),
         type=COUNT_CSV,
         metavar="N,...",
         help="Monte Carlo electron histories used to estimate the line spectrum; positive integers.",
@@ -444,7 +442,6 @@ def numerics_show_command(name, json_output):
 @canonical_option(
     "--line-trials",
     "line_electrons",
-    retired=("--line-electrons",),
     type=click.IntRange(min=1),
     metavar="N",
     help="Monte Carlo electron histories used to estimate the line spectrum.",
@@ -452,7 +449,6 @@ def numerics_show_command(name, json_output):
 @canonical_option(
     "--brem-trials",
     "bremsstrahlung_electrons",
-    retired=("--bremsstrahlung-electrons",),
     type=click.IntRange(min=1),
     metavar="N",
     help="Monte Carlo electron histories used to estimate bremsstrahlung.",

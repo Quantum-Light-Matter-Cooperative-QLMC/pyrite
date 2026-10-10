@@ -301,7 +301,6 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
 @canonical_option(
     "--brem-trials",
     "ne_brem",
-    retired=("--ne-brem",),
     type=_cli_core.POSITIVE_INT,
     default=200,
     show_default=True,

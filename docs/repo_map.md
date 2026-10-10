@@ -335,7 +335,7 @@ Supported scalar scene API: `Beam`, `Scene`, path-addressed `Sweep`, `Numerics`,
 
 ### `campaign/single_scene.py` and `cli/commands/_simulation.py`
 
-The CLI singleton-profile resolver lives in `campaign/single_scene.py`, which lowers validated catalog fields without CLI dependencies or checkpoint I/O. `cli/commands/_simulation.py` shares catalog-boundary validation, simulation dispatch, JSON/presentation, and `.npz` serialization between `run --ephemeral` and the deprecated `material simulate`; the latter bypasses the checkpoint sweep driver.
+The CLI singleton-profile resolver lives in `campaign/single_scene.py`, which lowers validated catalog fields without CLI dependencies or checkpoint I/O. `cli/commands/_simulation.py` owns catalog-boundary validation, simulation dispatch, JSON/presentation, and `.npz` serialization for `run --ephemeral`, which bypasses the checkpoint sweep driver.
 
 ### `api.py`
 

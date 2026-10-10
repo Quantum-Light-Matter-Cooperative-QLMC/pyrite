@@ -15,8 +15,8 @@ without a row and a row cannot outlive the alias it describes, and
 
 The 0.1.0 cohort reached its target and was removed at 0.3.0; the 0.4.0 cohort
 (`material set`, `--fidelity`, implicit profile/beam/detector) at 0.6.0
-(issue #387). Current option rows cover the electron-count spellings replaced by
-trial names.
+(issue #387). The 0.6.0 cohort (`material simulate` and electron-count spellings) was
+removed at 0.8.0.
 """
 
 import re
@@ -55,25 +55,15 @@ def _entry(path: str, replacement: str, *, since: str = "0.1.0", note: str = "")
 #:
 #: The 0.1.0 cohort of 68 command spellings was removed at 0.3.0 (issue #68),
 #: and `material set` (deprecated 0.4.0, issue #359) at 0.6.0 (issue #387).
-#: `material simulate` duplicates `run --ephemeral` (issues #257, #259).
-DEPRECATIONS: dict[str, Deprecation] = {
-    entry.path: entry
-    for entry in (
-        _entry(
-            "material simulate",
-            "pyrite run PROFILE -m MATERIAL --ephemeral",
-            since="0.6.0",
-            note="Pass the same `--detector`, `--output-file`, and `-o` values.",
-        ),
-    )
-}
+#: `material simulate` was removed at 0.8.0; use `run --ephemeral`.
+DEPRECATIONS: dict[str, Deprecation] = {}
 
 
 #: Paths whose canonical replacement depends on the arguments given, so the
 #: command computes it and calls `warn_self(path, replacement)` from its own
 #: callback. `DeprecatingGroup` leaves these alone rather than pre-empting them
 #: with the registry's generic replacement.
-SELF_WARNING: frozenset[str] = frozenset({"material simulate"})
+SELF_WARNING: frozenset[str] = frozenset()
 
 
 def message(path: str, *, replacement: str | None = None) -> str:
@@ -229,22 +219,7 @@ def _flag(
 #: `--fidelity` cohort (deprecated in 0.4.0, issue #215) at 0.6.0 (issue #387).
 #: `RetiredOption` and `canonical_option` (renamed spellings) and
 #: `DeprecatedOption` (whole options) stay as the substrate ADR-0002 requires.
-DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
-    row.key: row
-    for row in (
-        *(
-            _flag(command, old, replacement, since="0.6.0")
-            for command in ("profile create", "profile set", "profile add")
-            for old, replacement in (("--ne-line", "--line-trials"), ("--ne-brem", "--brem-trials"))
-        ),
-        *(
-            _flag(command, "--ne-brem", "--brem-trials", since="0.6.0")
-            for command in ("run", "app validation export", "checkpoint recompute brem")
-        ),
-        _flag("profile numerics set", "--line-electrons", "--line-trials", since="0.6.0"),
-        _flag("profile numerics set", "--bremsstrahlung-electrons", "--brem-trials", since="0.6.0"),
-    )
-}
+DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {}
 
 
 def flag_message(command: str, flag: str, replacement: str) -> str:
