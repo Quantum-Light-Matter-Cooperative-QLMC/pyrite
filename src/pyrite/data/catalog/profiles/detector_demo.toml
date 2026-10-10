@@ -14,7 +14,7 @@ materials = ["hopg"]
 n_electrons = {values = [500]}
 n_electrons_brem = {values = [100]}
 beam = "example"
-detector = "default"
+detector = "reference"
 
 [physical_detector]
 distance_mm = 300.0

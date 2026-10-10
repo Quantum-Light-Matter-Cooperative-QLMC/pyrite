@@ -192,12 +192,14 @@ def test_bundled_profiles_name_packaged_beam_and_detector():
     """Every bundled profile names a packaged beam and detector, so it runs even
     when a user catalog layer removes the bundled-catalog instrument exemption."""
     catalog = DATA_DIR / "catalog"
-    for name in BUNDLED_PROFILES:
-        row = tomllib.loads((catalog / "profiles" / f"{name}.toml").read_text())
-        assert isinstance(row.get("beam"), str), name
-        assert (catalog / "beams" / f"{row['beam']}.toml").is_file(), name
-        assert isinstance(row.get("detector"), str), name
-        assert (catalog / "detectors" / f"{row['detector']}.toml").is_file(), name
+    for path in sorted((catalog / "profiles").glob("*.toml")):
+        row = tomllib.loads(path.read_text())
+        assert isinstance(row.get("beam"), str), path.stem
+        assert (catalog / "beams" / f"{row['beam']}.toml").is_file(), path.stem
+        references = row.get("detectors", {"default": row.get("detector")})
+        for reference in references.values():
+            assert isinstance(reference, str), path.stem
+            assert (catalog / "detectors" / f"{reference}.toml").is_file(), path.stem
 
 
 def test_example_beam_is_the_implicit_beam_spec():
@@ -1050,3 +1052,54 @@ def test_member_overrides_copies_only_member_rows_without_uniform_brem():
         "sapphire": {"thickness_ang": 5000000.0},
         "mote2_product": {"thickness_layers": 3},
     }
+
+
+@pytest.mark.parametrize("name", BUNDLED_PROFILES)
+def test_reference_detector_migration_preserves_dataset_and_case_identity(name):
+    from pyrite.campaign.config import catalog_detector
+    from pyrite.campaign.sweep import TIMEPIX3_DOMEGA_SR, TIMEPIX3_DTHETA_OBS_DEG
+
+    detector = catalog_detector(name, "default")
+    assert detector.observation_angle_deg == 90.0
+    assert detector.polar_acceptance_deg == TIMEPIX3_DTHETA_OBS_DEG
+    assert detector.solid_angle_sr == TIMEPIX3_DOMEGA_SR
+    assert detector.response is None
+    spectrum = np.array([2.0, 5.0, 3.0])
+    np.testing.assert_array_equal(
+        detector.score(np.array([100.0, 200.0, 300.0]), spectrum), spectrum
+    )
+
+    sweep = material_sweep("hopg", catalog_profile=name, detector_id="default")
+    # Before #423 bundled scalar objects contained only observation_angle_deg.
+    legacy = replace(
+        sweep, detector=replace(sweep.detector, polar_acceptance_deg=None, solid_angle_sr=None)
+    )
+    settings = profiles.profile_run_settings(default_settings(), name, "full")
+    assert dataset_identity(
+        "hopg", "full", settings, sweep, catalog_profile=name
+    ) == dataset_identity("hopg", "full", settings, legacy, catalog_profile=name)
+    # Reduce the product without transport; cases must retain the same CAS keys.
+    changes = {
+        "beam": replace(sweep.beam, energy_keV=np.array([30.0])),
+        "target": profiles.target_replace(
+            sweep.target,
+            thickness_ang=np.array([2000.0]),
+            tilt_deg=np.array([45.0]),
+            tilt_azim_deg=np.array([180.0]),
+        ),
+    }
+    new_case = build_cases(replace(sweep, **changes), 4, 4)[0]
+    old_case = build_cases(replace(legacy, **changes), 4, 4)[0]
+    assert case_content_key(new_case) == case_content_key(old_case)
+
+
+def test_bundled_profile_display_has_explicit_detector_acceptance():
+    from pyrite._catalog_layout import bundled_catalog, read_text
+
+    document = tomlkit.parse(read_text(bundled_catalog()))
+    assert "default" not in document["detectors"]
+    for name in BUNDLED_PROFILES:
+        payload = profile_edit.profile_payload(document, name)
+        assert payload["detector_ref"] == "reference"
+        for detector in payload["detectors"].values():
+            assert all(value is not None for value in detector["acceptance"].values())

@@ -80,7 +80,7 @@ pyrite profile precision show hopg_scan
 
 Bundled demos are read-only: copy one with `pyrite profile create NAME --from DEMO` and edit the copy (maintainers edit the bundled file with `pyrite-dev profile`). The policy is stored as `[profiles.NAME.precision]`. The minimum, maximum and optional `--pilot-electrons` must be multiples of the block size. Optional guards default to `--max-electron-share 0.05`, `--min-effective-electrons 100`, `--stability-blocks 3` and `--stability-fraction 0.5`. `--band-ev START,STOP` fixes the monitor band; it defaults to the case's line band. `--batch-means-band-ev` adds reported per-bin errors and is never used to stop.
 
-Electron sampling and the line grid are independent. A `[profiles.NAME.line_grid_policy]` table resolves each case's line grid automatically (see [line-grid policy](#line-grid-policy)) whether the counts are fixed or adaptive, and precision commands never change it; `pyrite profile line-grid show NAME` lists the grid sources. The bundled `quickstart`, `sweep_demo`, `high_energy_demo` and `hopg_emittance_demo` profiles run adaptive. `high_energy_demo` also resolves its line grid with the measured policy. `coherent_demo` (coherent emission), `detector_demo` (physical detector) and `trajectory_demo` (trajectory capture) keep fixed counts because adaptive precision does not support those routes. Removing the demos' fixed counts changed their dataset identities, so earlier demo checkpoints do not resume.
+Electron sampling and the line grid are independent. A `[profiles.NAME.line_grid_policy]` table resolves each case's line grid automatically (see [line-grid policy](#line-grid-policy)) whether the counts are fixed or adaptive, and precision commands never change it; `pyrite profile line-grid show NAME` lists the grid sources. The bundled `quickstart`, `sweep_demo`, `high_energy_demo` and `hopg_emittance_demo` profiles run adaptive. `high_energy_demo` also resolves its line grid with the measured policy. `coherent_demo` (coherent emission), `detector_demo` and `pixelated_detector_demo` (physical detectors), and `trajectory_demo` (trajectory capture) keep fixed counts because adaptive precision does not support those routes. `two_detector_demo` also uses fixed counts to bound the two-detector workload. Removing the demos' fixed counts changed their dataset identities, so earlier demo checkpoints do not resume.
 
 A profile with an explicit `precision` table cannot also set `n_electrons`/`n_electrons_brem` grids, directly or in a material override, or coherent emission; the catalog loader rejects each combination. An explicit policy also refuses physical detectors (`run --ephemeral`), GDF beams, grooves, and particle cascades, rather than falling back. Adaptive runs use only the per-electron or CUDA transport cores. An adaptive run never uses the canonical `<material>` checkpoint stem.
 
@@ -203,18 +203,19 @@ Detector geometry can be declared in `[profiles.NAME.detectors.ID]` tables. Each
 
 ### Bundled examples and implicit defaults
 
-The bundled catalog ships read-only demo profiles (`quickstart`, `sweep_demo`, `trajectory_demo`, `coherent_demo`, `detector_demo`, `high_energy_demo`, `hopg_emittance_demo`) plus `standard`, the base profile every material's default scan ranges resolve from. Each names a packaged beam and detector (`beams/` and `detectors/` in the catalog): profiles that need no special beam use `example`, a 1 mm FWHM spot at 5 kHz and 1 pC with no bunch profile, and every scalar demo uses the `default` 90° detector. They therefore still run from a copied or external catalog, and `pyrite profile create NAME --from DEMO` inherits both. `pyrite profile` writes the profiles you create to the user catalog layer (`catalog.user`, `PYRITE_USER_CATALOG`; the platform config directory by default) as `profiles/NAME.toml`, read over the bundled catalog; a user profile may not reuse a bundled name. Copy a demo with `pyrite profile create NAME --from DEMO`. Maintainers edit the shipped demos with `pyrite-dev profile`, the same command tree aimed at the bundled catalog. Remote runs ship the layer to the box as `user-catalog/`.
+The bundled catalog ships read-only demo profiles (`quickstart`, `sweep_demo`, `trajectory_demo`, `coherent_demo`, `detector_demo`, `pixelated_detector_demo`, `two_detector_demo`, `high_energy_demo`, `hopg_emittance_demo`) plus `standard`, the base profile every material's default scan ranges resolve from. Each names a packaged beam and detector (`beams/` and `detectors/` in the catalog): profiles that need no special beam use `example`, a 1 mm FWHM spot at 5 kHz and 1 pC with no bunch profile, and scalar demos use `reference` (90°), with `reference_135` added by `two_detector_demo`. They therefore still run from a copied or external catalog, and `pyrite profile create NAME --from DEMO` inherits both. `pyrite profile` writes the profiles you create to the user catalog layer (`catalog.user`, `PYRITE_USER_CATALOG`; the platform config directory by default) as `profiles/NAME.toml`, read over the bundled catalog; a user profile may not reuse a bundled name. Copy a demo with `pyrite profile create NAME --from DEMO`. Maintainers edit the shipped demos with `pyrite-dev profile`, the same command tree aimed at the bundled catalog. Remote runs ship the layer to the box as `user-catalog/`.
 
-Releases up to 0.6.1 bundled the research campaigns `sub_100keV`, `high_energy`, `hopg_short`, `hopg_hbn`, and `coh_test`. To keep using one, copy its TOML from the 0.6.1 tree (`src/pyrite/data/catalog/profiles/NAME.toml`) into `profiles/` under your user layer. Unchanged content keeps its dataset identity, so existing checkpoints resume. Like other profiles read with the bundled catalog, they stay exempt from the beam/detector requirement below; attaching an instrument changes their identity.
+Releases up to 0.6.1 bundled the research campaigns `sub_100keV`, `high_energy`, `hopg_short`, `hopg_hbn`, and `coh_test`. To keep using one, copy its TOML from the 0.6.1 tree (`src/pyrite/data/catalog/profiles/NAME.toml`) into `profiles/` under your user layer. Unchanged content keeps its dataset identity, so existing checkpoints resume. Their unnamed scalar detector setup now warns; attach the equivalent `reference` detector to keep the same numerical results and checkpoint identity.
 
-The bundled `default` beam (200 fs, 5 kHz, 1 pC) and `default` detector (90 degrees) are examples, not a description of your beamline or detector, and the bundled `standard` profile is a 128-line example sweep. Since 0.6.0 PyRITE no longer falls back to them silently; a run that leaves the choice unnamed exits with a usage error (status 2):
+The bundled `reference` detector integrates the Timepix3 chip aperture (14.08 mm square at 400 mm) as one scalar detector at 90°. Its full polar acceptance is 2.016603235051288° and its solid angle is 0.0012390399999999998 sr, the exact existing fallback values. It has ideal response and exposes the raw source spectrum without pixel binning, response broadening or count acquisition. A physical Timepix detector with pixels and counting response is configured separately.
 
-- `pyrite run` (locally or with `--remote`) needs `PROFILE`, `PYRITE_PROFILE`, or a saved `profile.current`. Select a profile with `pyrite run NAME` or keep one with `pyrite config set profile.current NAME`.
-- A run from a user-selected catalog (see [External catalogs](external-catalog.md)) whose profile names no `beam`, or names no `detector`, is refused. Attach your own with `pyrite profile set NAME --beam BEAM --detector DETECTOR`. Profiles read with the bundled catalog (bundled demos and your user-layer profiles) stay exempt.
+Use `pyrite profile set NAME --detector reference`, or `detector = "reference"` in the profile TOML. A complete external catalog must include `detectors/reference.toml` from the bundled catalog, or declare an equivalent detector. For a collection, set each affected `profiles.NAME.detectors.ID = "reference"`, retaining its ID.
 
-A profile that omits `detector` and `physical_detector` resolves the code-default scalar detector and no physical detector; it does not inherit geometry or a counting observation from `standard`. Attach the intended detector explicitly to use other geometry. The `standard` profile itself and profiles with explicit geometry keep their resolved identities.
+Starting in 0.9.0, runs warn when scalar detector geometry omits observation angle, polar acceptance or solid angle, including user-layer profiles and partial inline/named objects. The setup keeps working through 0.10.x; from 0.11.0 it fails with a usage error (status 2) naming `reference`. Explicit scalar geometry and physical pixel geometry remain valid. For partial custom geometry, preserve its configured fields and explicitly fill the missing acceptance fields rather than replacing its angle/aperture. Selecting the equivalent `reference` through the existing single-detector field preserves legacy dataset digests, checkpoint stems and case content keys; detector collection IDs retain their existing ownership rules.
 
-Only the fallback changed: `standard` keeps its name and contents, and its checkpoints keep their stems.
+A run must still select a profile through `PROFILE`, `PYRITE_PROFILE` or `pyrite config set profile.current NAME`. User-selected external catalog profiles must still name a beam; these requirements date from 0.6.0. The beam exemption for profiles read over the bundled catalog remains in place.
+
+A profile without a detector declaration uses the scalar fallback during this warning window; it inherits no counting observation from `standard`.
 
 ## Beam block
 
@@ -223,6 +224,40 @@ A beam table -- named or inline -- decodes into `BeamSpec`. The nested `longitud
 Both sub-tables join `parameter_sha256` only when they diverge from the inert defaults, so a profile that never sets them hashes exactly as it did before the keys existed and resumes into its existing checkpoints.
 
 ## Detector collections, filters, and counting observations
+
+### Detector demo profiles
+
+```bash
+pyrite run two_detector_demo
+pyrite run pixelated_detector_demo
+```
+
+Both profiles contain one 30 keV HOPG case, with 500 line trials and 100
+bremsstrahlung trials. Clone either with `pyrite profile create NAME --from DEMO`
+to edit it.
+
+`two_detector_demo` attaches two integrated scalar apertures by name:
+
+```toml
+[detectors]
+at_90 = "reference"
+at_135 = "reference_135"
+```
+
+Both represent the 14.08 mm Timepix3 aperture at 400 mm, with identical
+acceptance and ideal response; the observation angles are 90° and 135°.
+Each exposes a raw source spectrum in its own ID-qualified checkpoint.
+There is no pixel binning or count acquisition in this profile.
+
+`pixelated_detector_demo` instead attaches `camera = "pixelated_reference"`.
+That named object specifies the native 256×256 grid at 0.055 mm pitch, 400 mm
+from the target at 90°, with a 2×2 angular scorer and ideal photon counting
+response. Its acquisition stores expected counts for 1 s in 100 eV bins from
+0 to 30 keV, with no hit threshold or Poisson realization. The run writes a
+scalar source checkpoint and a factorized pixel observation; inspect the latter
+with `pyrite app pixels launch hopg` and select its checkpoint. These measured
+count bins do not broaden the scalar checkpoint spectrum. The existing
+`detector_demo` remains the separate filtered, Poisson-count example.
 
 A profile can mix scalar and pixel detectors. For example:
 
@@ -264,7 +299,7 @@ pyrite profile physical-detector set filter_demo --exposure-s 1 \
 
 One `pyrite run` invocation executes every detector ID for each selected material. Each detector gets a distinct checkpoint stem containing its ID and parameter digest. With an acquisition, that detector also writes a factorized observation under `pyrite-output/observations/<stem>/`, beside its checkpoint. The scalar acceptance used for a pixel detector's source case comes from its geometry, including when there is no acquisition. `profile show` prints that derived acceptance.
 
-Legacy `detector` becomes ID `default`; legacy `physical_detector` becomes ID `physical`. If both are present, a run executes both, and each gets an ID-qualified checkpoint stem. A profile with neither has one implicit scalar `default` detector. A profile with only one legacy detector keeps its checkpoint identity where its resolved geometry is unchanged.
+Legacy `detector` becomes ID `default`; legacy `physical_detector` becomes ID `physical`. If both are present, a run executes both, and each gets an ID-qualified checkpoint stem. A profile with neither has one implicit scalar `default` detector during the warning window. A profile with only one legacy detector keeps its checkpoint identity where its resolved geometry is unchanged.
 
 What an edit costs on the next run: pose and pixel grid change the projection and therefore the dataset; angular shape and filters re-evaluate observations on new transport while cached scalar records are kept; response, acquisition, and beam normalization only rescore stored observations, with no transport. Remote transfer and garbage collection of observation stores are not implemented.
 

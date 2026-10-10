@@ -2,10 +2,12 @@
 
 Issue #214 deprecated the implicit fallbacks in 0.4.0; issue #387 made them
 errors in 0.6.0. A run that names no profile no longer falls back to
-``standard``, and a user-catalog profile that names no beam or detector no
-longer falls back to the bundled examples. Bundled catalog profiles are
-examples themselves and stay exempt.
+``standard``, and a user-selected catalog profile must name a beam.
+Implicit scalar detector acceptance follows the 0.9.0 to 0.11.0 warning window;
+use the bundled ``reference`` object to preserve its Timepix3 aperture.
 """
+
+from collections.abc import Mapping
 
 import click
 
@@ -32,32 +34,76 @@ def require_explicit_profile(profile: _cli_config.ResolvedValue) -> None:
 
 
 def require_explicit_instrument(profile: str) -> None:
-    """Raise a usage error when user-catalog *profile* names no beam or detector."""
+    """Enforce the beam requirement and scalar detector deprecation window."""
     from .._catalog_layout import bundled_catalog, selected_catalog
     from ..materials import CATALOG
 
-    # Profiles read with the bundled catalog -- demos and user-layer profiles
-    # alike -- stay exempt: the layer holds campaigns that moved out of the
-    # bundle in #403, and attaching an instrument would change their identity.
-    if selected_catalog().resolve() == bundled_catalog().resolve():
-        return
     if profile not in CATALOG.profile_names:
         return
-    missing: dict[str, str] = {}
-    if CATALOG.profile_beam(profile) is None:
-        missing["beam"] = f"set its beam with 'pyrite profile set {profile} --beam BEAM'"
-    detectors = CATALOG.profile_detector_set(profile)
     if (
-        profile not in CATALOG.profile_detectors
-        and profile not in CATALOG.profile_physical_detectors
-        and tuple(detectors) == ("default",)
-        and not detectors["default"]
+        selected_catalog().resolve() != bundled_catalog().resolve()
+        and CATALOG.profile_beam(profile) is None
     ):
-        missing["detector"] = (
-            f"declare '[profiles.{profile}.detectors.ID]' or set the legacy 'detector' reference"
-        )
-    if missing:
         raise click.UsageError(
-            f"profile '{profile}' names no {' or '.join(missing)}; {'; '.join(missing.values())} "
-            "(implicit example beam/detector selection was removed in 0.6.0)"
+            f"profile '{profile}' names no beam; set its beam with "
+            f"'pyrite profile set {profile} --beam BEAM' "
+            "(implicit example beam selection was removed in 0.6.0)"
         )
+    require_explicit_detector(profile, CATALOG.profile_detector_set(profile))
+
+
+def require_explicit_detector(profile: str, detectors: Mapping[str, Mapping[str, object]]) -> None:
+    """Warn, then reject, scalar detectors that inherit unnamed acceptance."""
+    from .. import __version__
+    from ._deprecations import IMPLICIT_DEFAULTS
+
+    implicit = [
+        name
+        for name, spec in detectors.items()
+        if "distance_mm" not in spec
+        and any(
+            key not in spec
+            for key in ("observation_angle_deg", "polar_acceptance_deg", "solid_angle_sr")
+        )
+    ]
+    if not implicit:
+        return
+    entry = IMPLICIT_DEFAULTS["profile detector"]
+    replacement = f"pyrite profile set {profile} --detector reference"
+    if len(detectors) > 1 or tuple(detectors) != ("default",):
+        replacement = "; ".join(
+            f'set profiles.{profile}.detectors.{name} = "reference"' for name in implicit
+        )
+    # A partial custom angle/aperture must be completed without changing it.
+    from ..campaign.sweep import TIMEPIX3_DOMEGA_SR, TIMEPIX3_DTHETA_OBS_DEG
+
+    reference = {
+        "observation_angle_deg": 90.0,
+        "polar_acceptance_deg": TIMEPIX3_DTHETA_OBS_DEG,
+        "solid_angle_sr": TIMEPIX3_DOMEGA_SR,
+    }
+    if any(
+        value != reference[key]
+        for name in implicit
+        for key, value in detectors[name].items()
+        if key in reference
+    ):
+        replacement = (
+            "keep the configured geometry and fill its missing scalar fields explicitly "
+            "(see pyrite detector show reference for inherited Timepix3 acceptance)"
+        )
+    detail = (
+        f"profile '{profile}' inherits implicit detector acceptance "
+        f"({', '.join(implicit)}); use '{replacement}'"
+    )
+    version = tuple(int(part) for part in __version__.split(".")[:2])
+    removal = tuple(int(part) for part in entry.remove_in.split(".")[:2])
+    if version >= removal:
+        raise click.UsageError(
+            f"{detail} (implicit detector setup was removed in {entry.remove_in})"
+        )
+    click.echo(
+        f"warning: {detail} (deprecated in {entry.deprecated_in}; "
+        f"will be removed in {entry.remove_in})",
+        err=True,
+    )

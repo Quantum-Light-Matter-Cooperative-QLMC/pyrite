@@ -2,6 +2,7 @@ from pathlib import Path
 
 import click
 import pytest
+from click.testing import CliRunner
 
 from pyrite import _dev
 from pyrite._env import GENERATED_INVOCATION_ENV
@@ -338,3 +339,62 @@ def test_deprecated_option_help_does_not_warn() -> None:
     assert result.exit_code == 0
     assert "--fidelity" in result.stdout
     assert result.stderr == ""
+
+
+@pytest.mark.parametrize("version, exit_code", [("0.9.0", 0), ("0.10.0", 0), ("0.11.0", 2)])
+@pytest.mark.parametrize("spec", [{}, {"observation_angle_deg": 90.0}])
+def test_implicit_detector_warning_then_usage_error(monkeypatch, version, exit_code, spec):
+    import pyrite
+    from pyrite.cli._implicit_defaults import require_explicit_detector
+
+    monkeypatch.setattr(pyrite, "__version__", version)
+
+    @click.command()
+    def probe():
+        require_explicit_detector("mine", {"default": spec})
+        click.echo("raw spectrum")
+
+    result = CliRunner().invoke(probe)
+    assert result.exit_code == exit_code, result.output
+    assert "pyrite profile set mine --detector reference" in result.stderr
+    assert "0.11.0" in result.stderr
+    assert result.stdout == ("raw spectrum\n" if exit_code == 0 else "")
+
+
+def test_explicit_and_pixel_detectors_have_no_implicit_warning(monkeypatch):
+    import pyrite
+    from pyrite.cli._implicit_defaults import require_explicit_detector
+
+    monkeypatch.setattr(pyrite, "__version__", "0.11.0")
+
+    @click.command()
+    def probe():
+        require_explicit_detector(
+            "mine",
+            {
+                "scalar": {
+                    "observation_angle_deg": 90.0,
+                    "polar_acceptance_deg": 2.0,
+                    "solid_angle_sr": 0.001,
+                },
+                "pixel": {"distance_mm": 400.0},
+            },
+        )
+
+    result = CliRunner().invoke(probe)
+    assert result.exit_code == 0, result.output
+    assert result.stderr == ""
+
+
+def test_partial_custom_detector_warning_preserves_configured_geometry():
+    from pyrite.cli._implicit_defaults import require_explicit_detector
+
+    @click.command()
+    def probe():
+        require_explicit_detector("mine", {"eds": {"observation_angle_deg": 135.0}})
+
+    result = CliRunner().invoke(probe)
+    assert result.exit_code == 0, result.output
+    assert "keep the configured geometry" in result.stderr
+    assert "pyrite detector show reference" in result.stderr
+    assert 'detectors.eds = "reference"' not in result.stderr

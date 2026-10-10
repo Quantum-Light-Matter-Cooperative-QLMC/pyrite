@@ -66,7 +66,10 @@ def test_beam_completion_is_empty_when_catalog_read_fails(missing_catalog):
 
 
 def test_detector_completion_reads_offline_catalog():
-    assert _values(_cli_completion.complete_detector(None, None, "def")) == ["default"]
+    assert _values(_cli_completion.complete_detector(None, None, "ref")) == [
+        "reference",
+        "reference_135",
+    ]
 
 
 def test_detector_completion_is_empty_when_catalog_read_fails(missing_catalog):

@@ -391,6 +391,15 @@ def test_run_profile_and_material_dispatch(monkeypatch):
         profile_names = ("standard", "sub_100keV")
         material_keys = ("hopg", "mose2")
 
+        def profile_detector_set(self, _name):
+            return {
+                "default": {
+                    "observation_angle_deg": 90.0,
+                    "polar_acceptance_deg": 2.0,
+                    "solid_angle_sr": 0.001,
+                }
+            }
+
         def profile_materials(self, _name):
             return None  # no membership row -> every candidate stays
 
@@ -418,6 +427,15 @@ def test_run_profile_with_membership_defaults_materials(monkeypatch):
         profile_names = ("standard", "sub_100keV")
         material_keys = ("hopg", "mose2")
 
+        def profile_detector_set(self, _name):
+            return {
+                "default": {
+                    "observation_angle_deg": 90.0,
+                    "polar_acceptance_deg": 2.0,
+                    "solid_angle_sr": 0.001,
+                }
+            }
+
         def profile_materials(self, _name):
             return ("hopg", "mose2")
 
@@ -442,6 +460,15 @@ def test_run_profile_without_membership_uses_catalog_materials(monkeypatch):
     class _FakeCatalog:
         profile_names = ("standard", "sub_100keV")
         material_keys = ("mose2", "hopg")
+
+        def profile_detector_set(self, _name):
+            return {
+                "default": {
+                    "observation_angle_deg": 90.0,
+                    "polar_acceptance_deg": 2.0,
+                    "solid_angle_sr": 0.001,
+                }
+            }
 
         def profile_materials(self, _name):
             return None

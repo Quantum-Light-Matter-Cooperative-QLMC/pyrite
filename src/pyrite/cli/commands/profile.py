@@ -605,7 +605,10 @@ def show_command(name, json_output):
     "detector_name",
     metavar="NAME",
     shell_complete=_cli_completion.complete_detector,
-    help="Attach a named [detectors.NAME] reference; create it with 'pyrite detector create'.",
+    help=(
+        "Attach a named detector; reference uses the Timepix3 aperture with ideal response "
+        "and raw spectra. Create others with 'pyrite detector create'."
+    ),
 )
 @canonical_option(
     "--material",
@@ -642,7 +645,7 @@ def create_command(
     overrides are not cloned. Beam phase space and detector geometry are set
     only through named objects: build them with ``pyrite beam create`` /
     ``pyrite detector create`` and attach them here with --beam NAME /
-    --detector NAME.
+    --detector NAME. Use --detector reference for the ideal Timepix3 aperture.
     """
     _check_name(name)
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
@@ -666,6 +669,7 @@ def create_command(
                 for key, label in (
                     ("beam", "beam"),
                     ("detector", "detector"),
+                    ("detectors", "detector collection"),
                     ("physical_detector", "physical detector"),
                     ("filters", "filters"),
                     ("emission", "emission"),
@@ -714,7 +718,10 @@ def create_command(
     "detector_name",
     metavar="NAME",
     shell_complete=_cli_completion.complete_detector,
-    help="Attach a named [detectors.NAME] reference; create it with 'pyrite detector create'.",
+    help=(
+        "Attach a named detector; reference uses the Timepix3 aperture with ideal response "
+        "and raw spectra. Create others with 'pyrite detector create'."
+    ),
 )
 @canonical_option(
     "--material",

@@ -174,7 +174,7 @@ def test_shared_precedence_is_call_environment_store_default(monkeypatch, tmp_pa
 
 def test_run_and_remote_host_read_shared_context(monkeypatch, tmp_path):
     _isolated_store(monkeypatch, tmp_path)
-    _config.set_stored("profile.current", "sub_100keV")
+    _config.set_stored("profile.current", "quickstart")
     _config.set_stored("remote.target", "box-a")
     seen = {}
     monkeypatch.setattr(scan._scan, "run", lambda args: seen.update(vars(args)))
@@ -182,7 +182,7 @@ def test_run_and_remote_host_read_shared_context(monkeypatch, tmp_path):
     result = invoke(scan.command)
 
     assert_clean_result(result)
-    assert seen["catalog_profile"] == "sub_100keV"
+    assert seen["catalog_profile"] == "quickstart"
     assert remote_config.remote_host() == "box-a"
 
 

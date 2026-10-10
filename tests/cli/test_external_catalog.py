@@ -77,7 +77,7 @@ def test_missing_selected_catalog_fails_without_fallback(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize(
     ("profile", "missing"),
-    [("coh_test", ("beam",)), ("hopg_short", ("detector",))],
+    [("coh_test", ("beam",))],
 )
 def test_selected_catalog_run_rejects_implicit_example_instrument(
     tmp_path, monkeypatch, profile, missing
@@ -122,7 +122,7 @@ def test_selected_catalog_runs_bundled_profiles_with_packaged_instrument(
     assert result.exit_code == 0, result.output
 
 
-def test_bundled_catalog_run_does_not_warn_for_example_instrument(tmp_path, monkeypatch):
+def test_bundled_catalog_user_profile_warns_for_implicit_detector(tmp_path, monkeypatch):
     from pyrite.runs import scan as runs_scan
 
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
@@ -134,4 +134,21 @@ def test_bundled_catalog_run_does_not_warn_for_example_instrument(tmp_path, monk
     )
 
     assert result.exit_code == 0, result.output
-    assert result.stderr == ""
+    assert "--detector reference" in result.stderr
+    assert "will be removed in 0.11.0" in result.stderr
+
+
+def test_selected_catalog_implicit_detector_warns_during_support_window(tmp_path, monkeypatch):
+    from pyrite.runs import scan as runs_scan
+
+    monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
+    monkeypatch.setattr(runs_scan, "run", lambda args: None)
+    catalog = copy_full_catalog(tmp_path / "catalog")
+    result = CliRunner().invoke(
+        command,
+        ["--catalog", str(catalog), "run", "hopg_short", "-m", "hopg"],
+        env={"PYRITE_MC_BACKEND": "cpu"},
+    )
+    assert result.exit_code == 0, result.output
+    assert "--detector reference" in result.stderr
+    assert "will be removed in 0.11.0" in result.stderr

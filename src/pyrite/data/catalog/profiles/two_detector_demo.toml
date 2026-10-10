@@ -1,0 +1,16 @@
+# Demo: two integrated Timepix3 apertures, at 90 and 135 degrees.
+# Both use ideal response and expose raw spectra in separate checkpoints.
+#   pyrite run two_detector_demo
+thickness_ang = {values = [20000.0]}
+energy_keV = {values = [30.0]}
+tilt_deg = {values = [45.0]}
+tilt_azim_deg = {values = [180.0]}
+E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
+materials = ["hopg"]
+n_electrons = {values = [500]}
+n_electrons_brem = {values = [100]}
+beam = "example"
+
+[detectors]
+at_90 = "reference"
+at_135 = "reference_135"
