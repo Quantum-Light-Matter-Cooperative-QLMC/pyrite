@@ -1,0 +1,24 @@
+# Native Timepix3 chip geometry, ideal response, deterministic expected counts.
+label = "Timepix3 native pixel grid with ideal response"
+distance_mm = 400.0
+polar_deg = 90.0
+azimuth_deg = 0.0
+roll_deg = 0.0
+offset_mm = [0.0, 0.0]
+shape = [256, 256]
+pitch_mm = [0.055, 0.055]
+
+[scorer]
+angular_shape = [2, 2]
+reconstruction = "nearest_tile"
+
+[response]
+kind = "ideal"
+
+[acquisition]
+exposure_s = 1.0
+measured_min_eV = 0.0
+measured_max_eV = 30000.0
+measured_bin_width_eV = 100.0
+hit_threshold_eV = 0.0
+mode = "expected"

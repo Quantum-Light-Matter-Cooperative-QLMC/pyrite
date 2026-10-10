@@ -145,6 +145,8 @@ or two on CPU:
 | `trajectory_demo` | `--trajectories` capture and VTK export |
 | `coherent_demo` | coherent + incoherent emission in windowed line grids |
 | `detector_demo` | a pixel detector behind a filter, with Poisson counts |
+| `pixelated_detector_demo` | native Timepix3 pixel grid with ideal response and expected counts |
+| `two_detector_demo` | two ideal scalar apertures at 90° and 135°, exposing raw spectra |
 | `high_energy_demo` | a 1 MeV beam with the measured line-grid policy |
 | `hopg_emittance_demo` | Courant-Snyder transverse beam phase space |
 

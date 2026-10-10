@@ -192,12 +192,14 @@ def test_bundled_profiles_name_packaged_beam_and_detector():
     """Every bundled profile names a packaged beam and detector, so it runs even
     when a user catalog layer removes the bundled-catalog instrument exemption."""
     catalog = DATA_DIR / "catalog"
-    for name in BUNDLED_PROFILES:
-        row = tomllib.loads((catalog / "profiles" / f"{name}.toml").read_text())
-        assert isinstance(row.get("beam"), str), name
-        assert (catalog / "beams" / f"{row['beam']}.toml").is_file(), name
-        assert isinstance(row.get("detector"), str), name
-        assert (catalog / "detectors" / f"{row['detector']}.toml").is_file(), name
+    for path in sorted((catalog / "profiles").glob("*.toml")):
+        row = tomllib.loads(path.read_text())
+        assert isinstance(row.get("beam"), str), path.stem
+        assert (catalog / "beams" / f"{row['beam']}.toml").is_file(), path.stem
+        references = row.get("detectors", {"default": row.get("detector")})
+        for reference in references.values():
+            assert isinstance(reference, str), path.stem
+            assert (catalog / "detectors" / f"{reference}.toml").is_file(), path.stem
 
 
 def test_example_beam_is_the_implicit_beam_spec():

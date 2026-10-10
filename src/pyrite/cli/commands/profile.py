@@ -669,6 +669,7 @@ def create_command(
                 for key, label in (
                     ("beam", "beam"),
                     ("detector", "detector"),
+                    ("detectors", "detector collection"),
                     ("physical_detector", "physical detector"),
                     ("filters", "filters"),
                     ("emission", "emission"),
