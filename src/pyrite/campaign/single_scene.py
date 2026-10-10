@@ -25,7 +25,7 @@ def resolve_pixel_scene(
     """Resolve one profile case without constructing a Sweep or checkpoint."""
     from pyrite.campaign.longitudinal import LongitudinalDistribution
     from pyrite.campaign.model import Beam, Numerics
-    from pyrite.campaign.sweep import beam_replace, target_from_flat
+    from pyrite.campaign.sweep import BeamSpec, beam_replace, target_from_flat
     from pyrite.detectors import EnergyBins
     from pyrite.instrument import PixelScorer
     from pyrite.montecarlo.transverse import TransverseDistribution
@@ -36,7 +36,7 @@ def resolve_pixel_scene(
         raise ValueError(f"material {material!r} is not a member of profile {profile_name!r}")
     scan = spec.scan
     energy = _one(scan.energy_keV, profile_name, command_name)
-    beam = Beam(energy_keV=energy)
+    beam = BeamSpec(energy_keV=energy)
     fields = catalog.profile_beam(profile_name)
     if fields:
         changes = dict(fields)
@@ -56,6 +56,7 @@ def resolve_pixel_scene(
             changes.setdefault("transverse_fwhm_x_mm", None)
             changes.setdefault("transverse_fwhm_y_mm", None)
         beam = beam_replace(beam, **changes)
+    beam = Beam.from_spec(beam)
     target = target_from_flat(
         spec.crystal_key,
         thickness_ang=_one(scan.thickness_ang, profile_name, command_name),

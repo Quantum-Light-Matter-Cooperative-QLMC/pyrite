@@ -14,6 +14,7 @@ from .._precision import Precision
 from ..detectors import Detector
 from ..instrument import Acquisition, FilterPlate, PixelScorer, PlanarDetector
 from ..instrument.model import validate_downstream_scene
+from .beam import Beam
 from .geometry import Slab, Stack, Target
 from .sweep import BeamSpec
 
@@ -22,61 +23,6 @@ BremSource = Literal["mc", "external", "none"]
 
 _SEGMENT = re.compile(r"(?P<name>[A-Za-z_]\w*)(?P<indexes>(?:\[\d+\])*)\Z")
 _INDEX = re.compile(r"\[(\d+)\]")
-
-
-class Beam(BeamSpec):
-    """Describe the electron beam at the crystal entrance plane.
-
-    Parameters
-    ----------
-    energy_keV
-        Central kinetic energy in keV. A scalar creates one scene; campaign
-        builders may expand a sequence.
-    transverse_fwhm_x_mm, transverse_fwhm_y_mm
-        Gaussian entrance-spot FWHM values in mm. Set both to ``None`` for a
-        point source. Mutually exclusive with ``transverse``.
-    bunch_length_fs
-        RMS bunch duration in fs. ``None`` selects a point bunch.
-    long_shape
-        Sampling law for ``bunch_length_fs``.
-    long_offsets_fs
-        Explicit per-electron arrival offsets in fs, replacing random sampling.
-    longitudinal
-        Declarative longitudinal-distribution policy. Mutually exclusive with
-        the legacy flat longitudinal fields.
-    transverse
-        Declarative Courant--Snyder transverse-distribution policy.
-    rep_rate_hz
-        Pulse repetition rate in Hz used for flux normalization.
-    bunch_charge_pc
-        Charge per bunch in pC used for flux normalization.
-    divergence_mrad
-        Deprecated input placeholder. Divergence is derived from
-        ``transverse`` and the case energy; supplying a value is rejected.
-    energy_spread_frac
-        RMS fractional kinetic-energy spread; ``None`` is monoenergetic.
-
-    source, gdf_path, gdf_time_s, gdf_time_tolerance_s
-        ``source="gpt_gdf"`` loads a native GPT time-output snapshot or selected screen. Its
-        correlated energies replace ``energy_keV`` during case construction.
-        Default absolute time tolerance is 1e-15 seconds.
-    gdf_shape_only
-        Preserve imported positions/directions/weights, assign each sweep energy,
-        and discard imported crossing times. Default False imports energies.
-    gdf_normalization
-        ``pyrite_current`` retains configured source normalization;
-        ``gdf_charge`` derives current from absolute bunch charge and the
-        resolved shared ``rep_rate_hz`` (finite and positive). File-derived
-        charge replaces configured ``bunch_charge_pc`` in this mode.
-    gdf_z_origin_m
-        Required explicit target-origin lab z coordinate in meters. GPT axes
-        are PyRITE lab axes; individual rays project onto the tilted entrance.
-        Clear both transverse FWHMs and omit analytic phase-space policies.
-
-    Notes
-    -----
-    Sampling counts and execution controls belong to :class:`Numerics`.
-    """
 
 
 def _one_float(name: str, value: Any) -> float:
@@ -163,7 +109,7 @@ class Scene:
         If geometry, scoring, or policy values are inconsistent.
     """
 
-    beam: BeamSpec
+    beam: Beam
     target: Target
     detector: Detector | PlanarDetector = field(default_factory=Detector)
     filters: tuple[FilterPlate, ...] = ()
@@ -173,8 +119,10 @@ class Scene:
     brem_source: BremSource = "mc"
 
     def __post_init__(self) -> None:
-        if not isinstance(self.beam, BeamSpec):
-            raise TypeError("Scene.beam must be a BeamSpec")
+        if isinstance(self.beam, BeamSpec):
+            object.__setattr__(self, "beam", Beam.from_spec(self.beam))
+        if not isinstance(self.beam, Beam):
+            raise TypeError("Scene.beam must be a Beam")
         if not isinstance(self.detector, (Detector, PlanarDetector)):
             raise TypeError("Scene.detector must be a Detector or PlanarDetector")
         try:

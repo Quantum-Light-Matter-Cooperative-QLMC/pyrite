@@ -80,6 +80,12 @@ This mode supports incoherent scalar-detector scenes on the per-electron or CUDA
    :toctree: _autosummary
 
    pyrite.Beam
+   pyrite.Spot
+   pyrite.Point
+   pyrite.PointBunch
+   pyrite.BunchLength
+   pyrite.Offsets
+   pyrite.GdfSource
    pyrite.Slab
    pyrite.Stack
    pyrite.Layer

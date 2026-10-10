@@ -24,7 +24,7 @@ def build_case(scene: Scene, numerics: Numerics) -> Case:
     )
     legacy = LegacySweep(
         material=scene.target.material,
-        beam=scene.beam,
+        beam=scene.beam.to_spec(),
         target=scene.target,
         detector=scalar_detector,
         n_families=convergence.n_families,

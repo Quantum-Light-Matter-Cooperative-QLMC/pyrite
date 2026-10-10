@@ -25,7 +25,6 @@ _ANALYTIC_FIELDS = {
     "long_shape",
     "long_offsets_fs",
     "energy_spread_frac",
-    "divergence_mrad",
 }
 
 

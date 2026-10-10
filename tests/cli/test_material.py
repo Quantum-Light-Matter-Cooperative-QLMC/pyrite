@@ -638,6 +638,7 @@ def test_ephemeral_real_api_preserves_case_and_spatial_output(tmp_path, monkeypa
 def test_single_scene_named_gdf_clears_default_spot(tmp_path, monkeypatch):
     import tomlkit
 
+    from pyrite.campaign.beam import Point
     from tests.montecarlo.test_gdf import write_gdf
 
     document = _single_scene_catalog(tmp_path, monkeypatch)
@@ -652,8 +653,7 @@ def test_single_scene_named_gdf_clears_default_spot(tmp_path, monkeypatch):
     document["profiles"]["single"]["beam"] = "gpt_import"
     _catalog_io.atomic_write(_catalog_io.active_catalog_path(), tomlkit.dumps(document))
     beam, *_ = _simulation.resolve_scene(document, "hopg", "single")
-    assert beam.source == "gpt_gdf"
-    assert beam.transverse_fwhm_x_mm is None
-    assert beam.transverse_fwhm_y_mm is None
+    assert beam.gdf is not None and beam.gdf.normalization == "gdf_charge"
+    assert isinstance(beam.transverse, Point)
     assert beam.rep_rate_hz == 3000
-    assert beam.gdf_beam().absolute_charge_c > 0
+    assert beam.to_spec().gdf_beam().absolute_charge_c > 0

@@ -42,6 +42,27 @@ if TYPE_CHECKING:
     # Static view of the lazy exports below, so editors resolve hover docs and types.
     from pyrite._precision import Precision as Precision
     from pyrite.api import simulate as simulate
+    from pyrite.campaign.beam import (
+        Beam as Beam,
+    )
+    from pyrite.campaign.beam import (
+        BunchLength as BunchLength,
+    )
+    from pyrite.campaign.beam import (
+        GdfSource as GdfSource,
+    )
+    from pyrite.campaign.beam import (
+        Offsets as Offsets,
+    )
+    from pyrite.campaign.beam import (
+        Point as Point,
+    )
+    from pyrite.campaign.beam import (
+        PointBunch as PointBunch,
+    )
+    from pyrite.campaign.beam import (
+        Spot as Spot,
+    )
     from pyrite.campaign.geometry import (
         BlazedGrooves as BlazedGrooves,
     )
@@ -59,9 +80,6 @@ if TYPE_CHECKING:
     )
     from pyrite.campaign.model import (
         Analysis as Analysis,
-    )
-    from pyrite.campaign.model import (
-        Beam as Beam,
     )
     from pyrite.campaign.model import (
         Convergence as Convergence,
@@ -129,7 +147,13 @@ _PUBLIC_OBJECTS = {
     "Analysis": ("pyrite.campaign.model", "Analysis"),
     "Acquisition": ("pyrite.instrument", "Acquisition"),
     "AcquisitionBatch": ("pyrite.instrument", "AcquisitionBatch"),
-    "Beam": ("pyrite.campaign.model", "Beam"),
+    "Beam": ("pyrite.campaign.beam", "Beam"),
+    "BunchLength": ("pyrite.campaign.beam", "BunchLength"),
+    "GdfSource": ("pyrite.campaign.beam", "GdfSource"),
+    "Offsets": ("pyrite.campaign.beam", "Offsets"),
+    "Point": ("pyrite.campaign.beam", "Point"),
+    "PointBunch": ("pyrite.campaign.beam", "PointBunch"),
+    "Spot": ("pyrite.campaign.beam", "Spot"),
     "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
     "Convergence": ("pyrite.campaign.model", "Convergence"),
     "Detector": ("pyrite.detectors", "Detector"),

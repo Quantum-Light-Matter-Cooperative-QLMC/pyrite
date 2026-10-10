@@ -23,7 +23,6 @@ _BEAM_POSITIVE_KEYS = frozenset(
         "bunch_length_fs",
         "rep_rate_hz",
         "bunch_charge_pc",
-        "divergence_mrad",
         "energy_spread_frac",
     }
 )

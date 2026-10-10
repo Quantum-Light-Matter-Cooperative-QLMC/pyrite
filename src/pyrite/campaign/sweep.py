@@ -157,10 +157,12 @@ class BeamSpec:
       with the legacy spot FWHMs, which describe a zero-emittance waist.
     * ``energy_spread_frac`` -- RMS relative energy deviation, sampled as an
       independent uncorrelated draw (no chirp model: ``<t delta> = 0``).
-    * ``divergence_mrad`` -- DERIVED, read-only. The RMS slope at the case
-      energy, available once a ``transverse`` policy is set. It is not a stored
-      input: a fixed number here would be energy-independent, and the physical
-      RMS slope of one beam falls as ``1/sqrt(beta*gamma)``.
+    * Divergence is not a field: it is derived (:meth:`derived_divergence_mrad`)
+      from a ``transverse`` policy at the case energy, because the physical RMS
+      slope of one beam falls as ``1/sqrt(beta*gamma)``.
+
+    This flat record is the internal lowering target of the public
+    :class:`pyrite.Beam`, which holds one sub-object per kind of property.
 
     Reference plane: every field describes the beam **at the crystal entrance
     face**. There is no space-charge model and no source-to-crystal beamline
@@ -186,7 +188,6 @@ class BeamSpec:
     transverse: TransverseDistribution | None = None
     rep_rate_hz: float = 5000.0
     bunch_charge_pc: float = 1.0
-    divergence_mrad: float | None = None
     energy_spread_frac: float | None = None
     source: str = "analytic"
     gdf_shape_only: bool = False
@@ -229,7 +230,6 @@ class BeamSpec:
             or self.bunch_length_fs is not None
             or self.long_offsets_fs is not None
             or self.energy_spread_frac is not None
-            or self.divergence_mrad is not None
             or self.long_shape != "gaussian"
             or self.transverse_fwhm_x_mm is not None
             or self.transverse_fwhm_y_mm is not None
@@ -255,9 +255,9 @@ class BeamSpec:
     def derived_divergence_mrad(self, energy_keV: float) -> tuple[float, float] | None:
         """Per-plane RMS slope [mrad] at ``energy_keV``, or ``None`` if collimated.
 
-        The canonical replacement for the legacy ``divergence_mrad`` input,
-        which cannot be right across a multi-energy sweep: at fixed normalized
-        emittance the physical RMS slope falls as ``1/sqrt(beta*gamma)``.
+        Divergence is derived rather than stored, because it cannot be right
+        across a multi-energy sweep: at fixed normalized emittance the physical
+        RMS slope falls as ``1/sqrt(beta*gamma)``.
         """
         if self.transverse is None:
             return None
@@ -483,6 +483,9 @@ class Sweep:
         ``target`` here so an invalid target fails in the user's script instead of
         after profile resolution.
         """
+        lower = getattr(self.beam, "to_spec", None)
+        if lower is not None:  # a public Beam lowers to its flat record
+            self.beam = lower()
         self._normalize_detector(theta_obs_deg, dtheta_obs_deg, domega_sr)
         # Only the sentinel means "not supplied": an explicit None is a statement
         # (``crystal_width_mm=None`` IS the infinite slab, ``substrate=None`` IS a
@@ -861,9 +864,7 @@ def build_cases(
             "long_shape, and long_offsets_fs fields"
         )
     if b.transverse is not None and (
-        b.transverse_fwhm_x_mm is not None
-        or b.transverse_fwhm_y_mm is not None
-        or b.divergence_mrad is not None
+        b.transverse_fwhm_x_mm is not None or b.transverse_fwhm_y_mm is not None
     ):
         # Spot FWHM, divergence and emittance are three numbers for two
         # independent moments plus a correlation. Resolving that by precedence
@@ -871,8 +872,8 @@ def build_cases(
         # is an error. Note the FWHM fields DEFAULT to a 1 mm spot: a transverse
         # policy has to clear them explicitly (BeamSpec.with_transverse does).
         raise ValueError(
-            "transverse policy is incompatible with the legacy transverse_fwhm_x_mm, "
-            "transverse_fwhm_y_mm, and divergence_mrad fields; clear them "
+            "transverse policy is incompatible with the legacy transverse_fwhm_x_mm "
+            "and transverse_fwhm_y_mm fields; clear them "
             "(they default to a 1 mm spot) or use BeamSpec.with_transverse"
         )
     if b.bunch_length_fs is not None or b.long_offsets_fs is not None:
