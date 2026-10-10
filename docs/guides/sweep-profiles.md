@@ -10,6 +10,8 @@ The supported high-level Python API has no fidelity shorthand. Construct a `Scen
 
 `pyrite material energy-grid derive`, locally or with `--remote`, is an optional optimization upstream of this choice: it measures line and bremsstrahlung bounds without a fidelity setting and installs those bounds for `--profile NAME` (or the configured current profile). Without installed bounds, runs use automatic line-grid resolution.
 
+The bundled `trajectory_demo` profile is a single fixed-count case with a micron-scale beam for [saved-trajectory inspection](working-with-results.md#save-electron-trajectories). Run it directly with `pyrite run trajectory_demo --trajectories trajectories/`; `--quick` is unnecessary.
+
 ## Calculation numerics
 
 Use the nested profile workflow to inspect every result-affecting calculation control and the source of its effective value:

@@ -78,8 +78,10 @@ Timepix3 counts are clustered photon events attributed to the incident-ray pixel
 Checkpoints keep spectra, not the electron histories behind them. To keep the complete transport result of a run for later analysis, opt in per run:
 
 ```bash
-uv run pyrite run standard -m hopg --trajectories
+uv run pyrite run trajectory_demo --trajectories
 ```
+
+The bundled `trajectory_demo` profile runs one case: 100 fixed histories of 30 keV electrons in a 2 µm HOPG slab, tilted 45° at azimuth 180°, with a round 1 µm FWHM incident beam. Its compact beam spot keeps multiple histories visible at the same scale as their scattering paths. These counts are for visualization, not converged spectra. The profile needs neither `--quick` nor edits to `standard`.
 
 Each case the run transports writes one HDF5 file, `pyrite-output/trajectories/<stem>/<config>-<digest>/E0_<energy>keV.h5`, where `<stem>` is the checkpoint stem and the digest keeps configuration names that sanitize alike apart. The file holds the exact mapping the case's spectrum phase consumed: every per-segment array, grooved runs' vacuum legs, the sampled incident phase space, the exit tallies, and whichever optional midpoint, shell, secondary, radiative, straggling, or diagnostic fields the run produced, with dtype, shape, and row order preserved. It also records the resolved case, the seed, the run identity, the resolved transport settings (core, per-electron cutoffs, `n_hat`), and each field's unit. Field meanings are in [transport outputs](../physics/beam-transport/transport-outputs.md).
 
@@ -89,7 +91,8 @@ Capture never changes a result. The file is written after transport and before t
 
 Things to know before enabling it:
 
-- **Size.** A file holds every segment of every electron: roughly 100 bytes per segment for the default frozen fields, more with midpoint or shell fields. That is usually far larger than the spectra; start with `-m` and `--quick` to gauge it.
+- **Fixed counts required.** The default `standard` profile uses adaptive counts, which cannot capture trajectories. `trajectory_demo` already sets fixed counts. For another profile, set them with `pyrite profile numerics set NAME --line-trials N --brem-trials N`; reset any explicit precision policy first (see [adaptive electron counts](sweep-profiles.md#adaptive-electron-counts)).
+- **Size.** A file holds every segment of every electron: about 100 to 220 bytes per segment depending on the fields the transport mode records (a 30 keV silicon capture with the default midpoint fields measured 140). That is usually far larger than the spectra; start with `-m` and `--quick` to gauge it.
 - **Cached cases are not captured.** Only cases this run transports get a file. Cases resumed from a checkpoint or replayed from the shared cache are never re-transported just to write one; the run reports how many and `--recompute` transports them again.
 - **Existing files.** Before any transport the run checks the directory. A case that already has a file stops the run unless `--overwrite-trajectories` is given. A cached case whose file records different physics also stops the run: remove the file or pick another directory.
 - **Interrupted runs.** Files are written as `<name>.partial` and renamed only once complete, so a crash or budget stop cannot leave a truncated file under the final name. A resumed run discards stale `.partial` files of the cases it transports.
@@ -100,7 +103,7 @@ Reopen a file from Python:
 ```python
 from pyrite.montecarlo.trajectories import read_trajectory_artifact
 
-artifact = read_trajectory_artifact("pyrite-output/trajectories/hopg/.../E0_30keV.h5")
+artifact = read_trajectory_artifact("pyrite-output/trajectories/<stem>/.../E0_30keV.h5")
 segs = artifact.transport  # same keys and arrays as simulate_trajectories
 artifact.units["r_mid"]  # "angstrom"
 artifact.case["seed"], artifact.settings["transport_core"]
@@ -111,7 +114,7 @@ The HDF5 layout is self-describing and readable with any HDF5 tool: `/transport`
 ### Export segments for visualization
 
 ```bash
-uv run pyrite checkpoint export-trajectories pyrite-output/trajectories/hopg/
+uv run pyrite checkpoint export-trajectories pyrite-output/trajectories/
 ```
 
 Every artifact becomes a VTK XML PolyData (`.vtp`) file beside it, readable by ParaView, VisIt, and PyVista/VTK. Each segment is a two-point line cell from `r_mid - L_ang v_hat / 2` to `r_mid + L_ang v_hat / 2` in the slab frame, in angstrom. All per-segment fields ride along as cell data, so thresholding on `electron_id` (or `track_id` with secondaries) isolates one history. Grooved vacuum legs are extra cells with `is_vacuum = 1`, where only `electron_id`, `E_start_keV`, `t_start_ang`, `t0_ang`, `L_ang`, and `v_hat` are defined and other fields are NaN or -1; `--no-vacuum` drops them.
@@ -121,7 +124,7 @@ VTK PolyData was chosen because it represents disconnected straight segments wit
 ### Score spectra from saved trajectories
 
 ```bash
-uv run pyrite checkpoint score-trajectories pyrite-output/trajectories/hopg/
+uv run pyrite checkpoint score-trajectories pyrite-output/trajectories/
 ```
 
 This replays only the spectrum phase (line, characteristic, and bremsstrahlung spectra) of every captured case and stores each result as an ordinary record of the checkpoint stem and run identity the capturing run recorded, under `--checkpoint-dir` (default `pyrite-output/checkpoints/<stem>`). It never transports. Each new record carries `source_trajectory` with the artifact's path and SHA-256. Records that already exist are kept unless `--overwrite`, and records of cases without an artifact are never touched, so re-scoring a run's own checkpoint after a spectrum-phase change replaces exactly the captured cases. The shared per-case cache is neither read nor written.
@@ -135,7 +138,7 @@ Prefer artifact reuse when you redo only the spectrum phase of the same transpor
 ### Export scene geometry
 
 ```bash
-uv run pyrite checkpoint export-trajectories pyrite-output/trajectories/hopg/ --scene
+uv run pyrite checkpoint export-trajectories pyrite-output/trajectories/ --scene
 ```
 
 In addition to each original slab-frame `.vtp`, `--scene` writes two independently viewable scenes:
@@ -157,7 +160,46 @@ New capture-enabled profile runs snapshot downstream geometry in the HDF5 artifa
 4. To inspect groove-gap flights, threshold cell `is_vacuum` to `1`; threshold to `0` for material segments. The array is present when vacuum diagnostics are included; `--no-vacuum` omits those cells.
 5. Threshold `electron_id` to select a complete primary history/shower, or `track_id` to select one electron trajectory. Use **Spreadsheet View** to inspect track, parent, energy and event attributes. Use **Clip** to inspect a depth range without changing the original artifact.
 
-Large showers may require substantial reader and rendering memory even though export itself streams in bounded blocks. A standalone PyVista viewer is under evaluation; marimo embedding constraints do not rule it out. See [trajectory scene design and viewer evaluation](../repo-design/storage/trajectory-scenes.md).
+ParaView reads a whole `.vtp` into memory, so export only the histories you need from a large capture:
+
+```bash
+uv run pyrite checkpoint export-trajectories trajectories/ --first 20
+uv run pyrite checkpoint export-trajectories case.h5 --sample 200 --seed 1 --scene
+uv run pyrite checkpoint export-trajectories case.h5 --history 7 --history 12
+uv run pyrite checkpoint export-trajectories case.h5 --track 4031
+```
+
+Selections take complete histories (a primary `electron_id` with every secondary of its shower) or complete tracks; `--track` intersects a history selection. `--first N` takes the first N histories that have segments, `--sample N` draws N at random (reproducibly from `--seed`, default 0). Only the selected rows are read, so export memory and the output size follow the selection, not the capture. A subset `.vtp` adds the cell array `segment_id`, each cell's row index in the full transported result, and a `selection` FieldData record of the request and the resolved history IDs. Grooved vacuum legs follow selected histories and are left out of track selections, whose ancestry they cannot express. An empty selection exports nothing and reports which history IDs have segments.
+
+The same selection is available from Python:
+
+```python
+from pyrite.montecarlo.trajectory_selection import read_selection, select_trajectories
+
+selection = select_trajectories("trajectories/<stem>/.../E0_30keV.h5", sample=50, seed=1)
+segs = read_selection(selection, ["r_mid", "E_start_keV", "electron_id"])
+segs.transport["segment_id"], segs.units["E_start_keV"]
+```
+
+#### ParaView preset
+
+A ParaView script ships with PyRITE. It colours tracks by a cell array (`E_start_keV` by default), adds ready-to-enable Threshold filters for secondaries, material segments and one history, shows scene geometry as faint grey wireframe, and opens the instrument manifest in its own view. The close-up camera fits the visible tracks rather than the full crystal and reference axis. It needs ParaView's Python, not PyRITE's:
+
+```bash
+SCRIPT=$(uv run pyrite checkpoint export-trajectories --paraview-script)
+pvbatch "$SCRIPT" case.vtp --screenshot case.png
+pvbatch "$SCRIPT" case.vtm --color generation --threshold electron_id 0 9 --screenshot closeup.png
+```
+
+For a first GUI check with the bundled demo, export twenty whole histories:
+
+```bash
+uv run pyrite checkpoint export-trajectories trajectories/ --first 20 --scene --out-dir traj-vtk/
+```
+
+Open the resulting close-up `.vtm` (without `.instrument` in its name), click **Apply**, select the reader in the Pipeline Browser, then run the imported macro. Other profiles can have millimetre-wide beam spots while each shower travels only micrometres: fitting twenty such histories can still make each shower tiny. Use `--first 1` or `--history ID` for a local shower from those captures, and the instrument view for the full footprint. The close-up crystal is a lateral crop around the selected tracks, retains the recorded thickness, and appears as wireframe so its faces do not hide them. Coordinates and track lengths are never stretched or recentered.
+
+`--color` takes any cell array (`generation`, `layer`, `event_kind`, `t_start_ang`, ...); an unknown name lists the available ones. `--threshold FIELD LOW HIGH` repeats. Headless hosts need `pvbatch --force-offscreen-rendering` or an OSMesa/EGL ParaView build. In the GUI, use **Macros > Import new macro...** with the same file, select an opened export in the Pipeline Browser, and run the macro. For a remote capture, export a subset there and copy the `.vtp`, or connect the ParaView client to a `pvserver` on that host.
 
 ## Preserve or reduce data
 

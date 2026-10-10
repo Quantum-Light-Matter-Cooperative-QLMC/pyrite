@@ -34,6 +34,7 @@ from xml.sax.saxutils import quoteattr
 import numpy as np
 
 from .trajectories import TrajectoryArtifactError, read_trajectory_header
+from .trajectory_selection import TrajectorySelection
 
 
 def _field_data(metadata):
@@ -100,11 +101,19 @@ def _fill_value(dtype: np.dtype):
     return 0
 
 
+def _pieces(ranges, block_rows):
+    """Split ``[start, stop)`` runs into pieces of at most ``block_rows``."""
+    for a, b in ranges:
+        for start in range(a, b, block_rows):
+            yield start, min(b, start + block_rows)
+
+
 def export_segments_vtp(
     artifact: str | os.PathLike[str],
     output: str | os.PathLike[str],
     *,
     include_vacuum: bool = True,
+    selection: TrajectorySelection | None = None,
     _rotation=None,
     _origin_ang=None,
     _metadata=None,
@@ -119,6 +128,12 @@ def export_segments_vtp(
         Destination ``.vtp`` path; replaced atomically.
     include_vacuum
         Append grooved runs' vacuum legs as ``is_vacuum`` cells.
+    selection
+        Whole histories/tracks of ``artifact`` from
+        :func:`~pyrite.montecarlo.trajectory_selection.select_trajectories`;
+        only their rows are read. Adds a ``segment_id`` cell array (transported
+        row index; -1 on vacuum legs) and a ``selection`` FieldData record.
+        ``None`` exports every segment.
 
     Returns
     -------
@@ -128,36 +143,49 @@ def export_segments_vtp(
     Raises
     ------
     TrajectoryArtifactError
-        If ``artifact`` is not a complete trajectory artifact.
+        If ``artifact`` is not a complete trajectory artifact, or
+        ``selection`` was made from another file.
     """
     import h5py
 
     artifact = Path(artifact)
     output = Path(output)
     read_trajectory_header(artifact)
+    if selection is not None and Path(selection.path).resolve() != artifact.resolve():
+        raise TrajectoryArtifactError(f"selection of {selection.path} applied to {artifact}")
     with h5py.File(artifact, "r") as handle:
         transport = handle["transport"]
         for required in ("r_mid", "v_hat", "L_ang"):
             if required not in transport:
                 raise TrajectoryArtifactError(f"{artifact} has no {required!r} segment field")
-        n_seg = int(transport["L_ang"].shape[0])
+        n_rows = int(transport["L_ang"].shape[0])
         fields = [name for name in segment_fields() if name in transport]
         has_vacuum = include_vacuum and "vacuum_start_ang" in transport
-        n_vac = int(transport["vacuum_start_ang"].shape[0]) if has_vacuum else 0
+        if selection is None:
+            material = ((0, n_rows),) if n_rows else ()
+            n_legs = int(transport["vacuum_start_ang"].shape[0]) if has_vacuum else 0
+            vacuum = ((0, n_legs),) if n_legs else ()
+        else:
+            material = selection.ranges
+            vacuum = selection.vacuum_ranges if has_vacuum else ()
+        n_seg = sum(b - a for a, b in material)
+        n_vac = sum(b - a for a, b in vacuum)
         n_cells = n_seg + n_vac
-
-        arrays = []  # (name, vtk type, components, writer)
+        # Every array is emitted piece by piece in the same order: material
+        # runs, then vacuum runs; ``vacuum`` marks which source a piece reads.
+        pieces = [(False, a, b) for a, b in _pieces(material, _BLOCK_ROWS)]
+        pieces += [(True, a, b) for a, b in _pieces(vacuum, _BLOCK_ROWS)]
+        order = handle["transport_order"] if "transport_order" in handle else None
 
         def _rows(name, start, stop):
             return transport[name][start:stop]
 
-        def _points(start, stop):
-            if stop <= n_seg:
-                mid = _rows("r_mid", start, stop).astype("<f8")
-                half = 0.5 * _rows("L_ang", start, stop)[:, None] * _rows("v_hat", start, stop)
+        def _points(is_vacuum, a, b):
+            if not is_vacuum:
+                mid = _rows("r_mid", a, b).astype("<f8")
+                half = 0.5 * _rows("L_ang", a, b)[:, None] * _rows("v_hat", a, b)
                 points = np.stack([mid - half, mid + half], axis=1).reshape(-1, 3)
             else:
-                a, b = start - n_seg, stop - n_seg
                 points = np.stack(
                     [_rows("vacuum_start_ang", a, b), _rows("vacuum_end_ang", a, b)], axis=1
                 ).reshape(-1, 3)
@@ -180,9 +208,10 @@ def export_segments_vtp(
                     return delta / length[:, None]
             return np.full(shape, _fill_value(dtype), dtype=dtype)
 
+        arrays = []  # (name, vtk dtype, components)
         for name in fields:
             dataset = transport[name]
-            if dataset.shape[0] != n_seg:
+            if dataset.shape[0] != n_rows:
                 continue
             dtype = _storage_dtype(dataset.dtype)
             components = 1 if dataset.ndim == 1 else int(np.prod(dataset.shape[1:]))
@@ -191,17 +220,20 @@ def export_segments_vtp(
             arrays.append((name, dtype, components))
         if has_vacuum:
             arrays.append(("is_vacuum", np.dtype("uint8"), 1))
+        if selection is not None:
+            arrays.append(("segment_id", np.dtype("int64"), 1))
 
-        def _cell_block(name, dtype, components, start, stop):
+        def _cell_block(name, dtype, components, is_vacuum, a, b):
             if name == "is_vacuum":
-                return (np.arange(start, stop) >= n_seg).astype(np.uint8)
-            parts = []
-            if start < n_seg:
-                parts.append(transport[name][start : min(stop, n_seg)])
-            if stop > n_seg:
-                a, b = max(start, n_seg) - n_seg, stop - n_seg
-                parts.append(_vacuum_values(name, a, b, dtype, components))
-            block = np.concatenate(parts) if len(parts) > 1 else parts[0]
+                return np.full(b - a, is_vacuum, dtype=np.uint8)
+            if name == "segment_id":
+                if is_vacuum:
+                    return np.full(b - a, -1, dtype=np.int64)
+                return order[a:b] if order is not None else np.arange(a, b)
+            if is_vacuum:
+                block = _vacuum_values(name, a, b, dtype, components)
+            else:
+                block = transport[name][a:b]
             if (
                 name
                 in {
@@ -217,7 +249,7 @@ def export_segments_vtp(
                 block = block @ _rotation.T
                 if _origin_ang is not None:
                     block = block + _origin_ang
-            return np.asarray(block).astype(dtype, copy=False).reshape(stop - start, components)
+            return np.asarray(block).astype(dtype, copy=False).reshape(b - a, components)
 
         # Appended-raw layout: each array is a UInt64 byte count then its bytes.
         offset = 0
@@ -234,12 +266,15 @@ def export_segments_vtp(
                 f'NumberOfComponents="{components}" format="appended" offset="{data_offset}"/>\n'
             )
 
+        metadata = dict(_metadata or {})
+        if selection is not None:
+            metadata["selection"] = selection.request
         xml = [
             '<?xml version="1.0"?>\n',
             '<VTKFile type="PolyData" version="1.0" byte_order="LittleEndian" '
             'header_type="UInt64">\n',
             "  <PolyData>\n",
-            _field_data(_metadata) if _metadata is not None else "",
+            _field_data(metadata) if metadata else "",
             f'    <Piece NumberOfPoints="{2 * n_cells}" NumberOfVerts="0" '
             f'NumberOfLines="{n_cells}" NumberOfStrips="0" NumberOfPolys="0">\n',
             "      <Points>\n",
@@ -271,33 +306,28 @@ def export_segments_vtp(
                     for block in blocks:
                         stream.write(np.ascontiguousarray(block).tobytes())
 
-                def _ranges():
-                    for start in range(0, n_cells, _BLOCK_ROWS):
-                        yield start, min(start + _BLOCK_ROWS, n_cells)
+                def _cell_ranges():
+                    cell = 0
+                    for _, a, b in pieces:
+                        yield cell, cell + b - a
+                        cell += b - a
 
-                def _point_blocks():
-                    for start, stop in _ranges():
-                        # A block straddling the material/vacuum boundary splits.
-                        cuts = sorted({start, stop, *([n_seg] if start < n_seg < stop else [])})
-                        for a, b in zip(cuts, cuts[1:], strict=False):
-                            yield _points(a, b).astype("<f8")
-
-                _emit(sizes[0], _point_blocks())
+                _emit(sizes[0], (_points(*piece).astype("<f8") for piece in pieces))
                 _emit(
                     sizes[1],
-                    (np.arange(2 * a, 2 * b, dtype="<i8") for a, b in _ranges()),
+                    (np.arange(2 * a, 2 * b, dtype="<i8") for a, b in _cell_ranges()),
                 )
                 _emit(
                     sizes[2],
-                    (np.arange(2 * a + 2, 2 * b + 2, 2, dtype="<i8") for a, b in _ranges()),
+                    (np.arange(2 * a + 2, 2 * b + 2, 2, dtype="<i8") for a, b in _cell_ranges()),
                 )
                 for name, dtype, components in arrays:
                     little = np.dtype(dtype).newbyteorder("<")
                     _emit(
                         n_cells * components * dtype.itemsize,
                         (
-                            _cell_block(name, dtype, components, a, b).astype(little, copy=False)
-                            for a, b in _ranges()
+                            _cell_block(name, dtype, components, *piece).astype(little, copy=False)
+                            for piece in pieces
                         ),
                     )
                 stream.write(b"\n  </AppendedData>\n</VTKFile>\n")
