@@ -9,7 +9,7 @@ Canonical full runs use `pyrite-output/checkpoints/<material>/`. Survey runs and
 Active datasets are directories beneath the effective `pyrite-output/checkpoints/` root and are offered by the analysis app's dataset selector. `pyrite checkpoint list` does not list them; it lists labels in the long-term archive shelf:
 
 ```bash
-uv run pyrite checkpoint list
+pyrite checkpoint list
 ```
 
 The [sweep-profile guide](sweep-profiles.md) explains how fidelity and profile resolution affect dataset identity. The [checkpoint store design](../repo-design/storage/checkpoint-case-store.md) documents the internal persistence model.
@@ -19,7 +19,7 @@ The [sweep-profile guide](sweep-profiles.md) explains how fidelity and profile r
 Launch the checkpoint-driven analysis app for a material:
 
 ```bash
-uv run pyrite app analysis launch hopg
+pyrite app analysis launch hopg
 ```
 
 The sidebar holds the **Material** and **Checkpoint** pickers, the **Emission** choice, and one shared slice: beam energy, polar tilt, azimuth, and crystal thickness. The Checkpoint menu lists every dataset for the material with its face, for example `standard · flat`, `standard · blazed`, or `high_energy (a7b2ce) · flat`. It opens on the standard flat run; when a material has none, it opens on **choose a checkpoint** and loads nothing until you pick one.
@@ -35,7 +35,7 @@ A pinned thickness the beam never reached at a low beam energy falls back to tha
 To compare hand-picked cases across datasets (the case basket) or the best lines of every material with a checkpoint, launch the compare app:
 
 ```bash
-uv run pyrite app compare launch hopg
+pyrite app compare launch hopg
 ```
 
 Its Material and Checkpoint pickers select the dataset cases are added from; the basket persists while you switch either. The cross-material view ignores that picker and reads every catalog material's checkpoint.
@@ -61,7 +61,7 @@ A profile detector with an acquisition also stores one counting observation per 
 The pixel app reads one dataset's observations without loading its checkpoint. Pick the material and checkpoint that name the dataset:
 
 ```bash
-uv run pyrite app pixels launch hopg
+pyrite app pixels launch hopg
 ```
 
 In the app:
@@ -78,7 +78,7 @@ Timepix3 counts are clustered photon events attributed to the incident-ray pixel
 Checkpoints keep spectra, not the electron histories behind them. To keep the complete transport result of a run for later analysis, opt in per run:
 
 ```bash
-uv run pyrite run trajectory_demo --trajectories
+pyrite run trajectory_demo --trajectories
 ```
 
 The bundled `trajectory_demo` profile runs one case: 100 fixed histories of 30 keV electrons in a 2 µm HOPG slab, tilted 45° at azimuth 180°, with a round 1 µm FWHM incident beam. Its compact beam spot keeps multiple histories visible at the same scale as their scattering paths. These counts are for visualization, not converged spectra. The profile needs neither `--quick` nor edits to `standard`.
@@ -114,7 +114,7 @@ The HDF5 layout is self-describing and readable with any HDF5 tool: `/transport`
 ### Export segments for visualization
 
 ```bash
-uv run pyrite checkpoint export-trajectories pyrite-output/trajectories/
+pyrite checkpoint export-trajectories pyrite-output/trajectories/
 ```
 
 Every artifact becomes a VTK XML PolyData (`.vtp`) file beside it, readable by ParaView, VisIt, and PyVista/VTK. Each segment is a two-point line cell from `r_mid - L_ang v_hat / 2` to `r_mid + L_ang v_hat / 2` in the slab frame, in angstrom. All per-segment fields ride along as cell data, so thresholding on `electron_id` (or `track_id` with secondaries) isolates one history. Grooved vacuum legs are extra cells with `is_vacuum = 1`, where only `electron_id`, `E_start_keV`, `t_start_ang`, `t0_ang`, `L_ang`, and `v_hat` are defined and other fields are NaN or -1; `--no-vacuum` drops them.
@@ -124,7 +124,7 @@ VTK PolyData was chosen because it represents disconnected straight segments wit
 ### Score spectra from saved trajectories
 
 ```bash
-uv run pyrite checkpoint score-trajectories pyrite-output/trajectories/
+pyrite checkpoint score-trajectories pyrite-output/trajectories/
 ```
 
 This replays only the spectrum phase (line, characteristic, and bremsstrahlung spectra) of every captured case and stores each result as an ordinary record of the checkpoint stem and run identity the capturing run recorded, under `--checkpoint-dir` (default `pyrite-output/checkpoints/<stem>`). It never transports. Each new record carries `source_trajectory` with the artifact's path and SHA-256. Records that already exist are kept unless `--overwrite`, and records of cases without an artifact are never touched, so re-scoring a run's own checkpoint after a spectrum-phase change replaces exactly the captured cases. The shared per-case cache is neither read nor written.
@@ -138,7 +138,7 @@ Prefer artifact reuse when you redo only the spectrum phase of the same transpor
 ### Export scene geometry
 
 ```bash
-uv run pyrite checkpoint export-trajectories pyrite-output/trajectories/ --scene
+pyrite checkpoint export-trajectories pyrite-output/trajectories/ --scene
 ```
 
 In addition to each original slab-frame `.vtp`, `--scene` writes two independently viewable scenes:
@@ -163,10 +163,10 @@ New capture-enabled profile runs snapshot downstream geometry in the HDF5 artifa
 ParaView reads a whole `.vtp` into memory, so export only the histories you need from a large capture:
 
 ```bash
-uv run pyrite checkpoint export-trajectories trajectories/ --first 20
-uv run pyrite checkpoint export-trajectories case.h5 --sample 200 --seed 1 --scene
-uv run pyrite checkpoint export-trajectories case.h5 --history 7 --history 12
-uv run pyrite checkpoint export-trajectories case.h5 --track 4031
+pyrite checkpoint export-trajectories trajectories/ --first 20
+pyrite checkpoint export-trajectories case.h5 --sample 200 --seed 1 --scene
+pyrite checkpoint export-trajectories case.h5 --history 7 --history 12
+pyrite checkpoint export-trajectories case.h5 --track 4031
 ```
 
 Selections take complete histories (a primary `electron_id` with every secondary of its shower) or complete tracks; `--track` intersects a history selection. `--first N` takes the first N histories that have segments, `--sample N` draws N at random (reproducibly from `--seed`, default 0). Only the selected rows are read, so export memory and the output size follow the selection, not the capture. A subset `.vtp` adds the cell array `segment_id`, each cell's row index in the full transported result, and a `selection` FieldData record of the request and the resolved history IDs. Grooved vacuum legs follow selected histories and are left out of track selections, whose ancestry they cannot express. An empty selection exports nothing and reports which history IDs have segments.
@@ -185,8 +185,9 @@ segs.transport["segment_id"], segs.units["E_start_keV"]
 
 A ParaView script ships with PyRITE. It colours tracks by a cell array (`E_start_keV` by default), adds ready-to-enable Threshold filters for secondaries, material segments and one history, shows scene geometry as faint grey wireframe, and opens the instrument manifest in its own view. The close-up camera fits the visible tracks rather than the full crystal and reference axis. It needs ParaView's Python, not PyRITE's:
 
+<!-- verify: skip (needs ParaView pvbatch, not a pyrite/pyrite-dev command) -->
 ```bash
-SCRIPT=$(uv run pyrite checkpoint export-trajectories --paraview-script)
+SCRIPT=$(pyrite checkpoint export-trajectories --paraview-script)
 pvbatch "$SCRIPT" case.vtp --screenshot case.png
 pvbatch "$SCRIPT" case.vtm --color generation --threshold electron_id 0 9 --screenshot closeup.png
 ```
@@ -194,7 +195,7 @@ pvbatch "$SCRIPT" case.vtm --color generation --threshold electron_id 0 9 --scre
 For a first GUI check with the bundled demo, export twenty whole histories:
 
 ```bash
-uv run pyrite checkpoint export-trajectories trajectories/ --first 20 --scene --out-dir traj-vtk/
+pyrite checkpoint export-trajectories trajectories/ --first 20 --scene --out-dir traj-vtk/
 ```
 
 Open the resulting close-up `.vtm` (without `.instrument` in its name), click **Apply**, select the reader in the Pipeline Browser, then run the imported macro. Other profiles can have millimetre-wide beam spots while each shower travels only micrometres: fitting twenty such histories can still make each shower tiny. Use `--first 1` or `--history ID` for a local shower from those captures, and the instrument view for the full footprint. The close-up crystal is a lateral crop around the selected tracks, retains the recorded thickness, and appears as wireframe so its faces do not hide them. Coordinates and track lengths are never stretched or recentered.
@@ -206,9 +207,9 @@ Open the resulting close-up `.vtm` (without `.instrument` in its name), click **
 Use checkpoint commands instead of manually editing checkpoint directories:
 
 ```bash
-uv run pyrite checkpoint --help
-uv run pyrite checkpoint archive --help
-uv run pyrite checkpoint slim --help
+pyrite checkpoint --help
+pyrite checkpoint archive --help
+pyrite checkpoint slim --help
 ```
 
 `gc` removes cases that no longer match current profile resolution; `rm` targets selected datasets. Both provide previews and confirmation controls. Review their help before destructive use.

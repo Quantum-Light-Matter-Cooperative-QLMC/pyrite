@@ -212,7 +212,7 @@ Device out-of-memory handling can replay transport with downloaded segments. Cou
 The ledger row `gpu-transport-core` records the core-selection and reproducibility checks. Reproduce the host-side checks with:
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
+pyrite-dev test \
   tests/montecarlo/test_transport_per_electron.py \
   tests/montecarlo/test_transport_core_default.py \
   tests/montecarlo/test_segment_staging.py

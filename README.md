@@ -92,8 +92,9 @@ uv sync                       # creates .venv/; add --extra nvidia|amd|intel for
 source .venv/bin/activate     # Windows: .venv\Scripts\activate
 ```
 
-Without activating the environment, prefix commands with `uv run` (for example
-`uv run pyrite --help`). `uv sync` removes extras it is not told about, so
+Commands in the README and user guides assume `pyrite` is on your `PATH`:
+activate `.venv` in each shell, or install once with `uv tool install .`
+(see the [shell-completion guide](docs/guides/shell-completion.md)). `uv sync` removes extras it is not told about, so
 repeat the same `--extra` on later syncs. Contributor and CI commands are in
 the [development workspace guide](docs/repo-design/development-workspace.md).
 

@@ -77,8 +77,8 @@ These should stay at float-rounding scale and are covered by the existing `coher
 Run at minimum:
 
 ```text
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_coherent_emission.py
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_chunk_invariance.py
+pyrite-dev test tests/montecarlo/test_coherent_emission.py
+pyrite-dev test tests/montecarlo/test_chunk_invariance.py
 ```
 
 The updated coherent tests include:

@@ -150,7 +150,7 @@ Symbolically, every factor, sign and conjugation agrees with the independent res
 
 ## Anchors
 
-Run with `UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cpu uv run pyrite-dev test tests/montecarlo/test_line_friedel_pairing.py tests/materials/test_crystallography.py -k "friedel or emission_coupling"`: **7 passed**.
+Run with `PYRITE_MC_BACKEND=cpu pyrite-dev test tests/montecarlo/test_line_friedel_pairing.py tests/materials/test_crystallography.py -k "friedel or emission_coupling"`: **7 passed**.
 
 - `tests/montecarlo/test_line_friedel_pairing.py` point-reflects one 4H-SiC $(102)$ segment ($\mathbf v,\hat{\mathbf n},hkl\to-\mathbf v,-\hat{\mathbf n},-hkl$) at tilts $-12^\circ,0^\circ,+12^\circ$, with a vacuum index and line energies 2531, 2883 and 3182 eV near the Si K edge. It checks the closed-form peak, CBS invariance, and $\sum{\rm PXR}_-/\sum{\rm PXR}_+=|\chi(hkl)|^2/|\chi(-hkl)|^2$.
   - **Discriminating.** The new code gives ratios 0.66986, 0.73434 and 0.77384, matching the expected values to $10^{-7}$. With `emission_coupling_tables` swapped back to `reflection_coupling_tables` (the old $\chi(+hkl)$ pairing), the ratios are 1.4928, 1.3618 and 1.2923, the inverses. The test fails by 50–120%, well outside its `rtol=2e-3`.

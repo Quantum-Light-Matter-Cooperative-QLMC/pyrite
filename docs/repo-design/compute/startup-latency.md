@@ -14,7 +14,7 @@ the checkout being measured, with its locked dependencies and bundled catalog:
 
 ```bash
 UV_CACHE_DIR=/tmp/pyrite-uv-cache NUMBA_CACHE_DIR=/tmp/pyrite-startup-numba \
-  uv run pyrite-dev startup --cache warm --repeats 3 --json \
+  pyrite-dev startup --cache warm --repeats 3 --json \
   --profile /tmp/pyrite-startup.prof > /tmp/pyrite-startup.json
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python -m pstats /tmp/pyrite-startup.prof
 ```

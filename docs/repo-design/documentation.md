@@ -146,7 +146,7 @@ Agent task plans and handoffs belong under `agentdocs/`, not under `docs/`.
 Before review, run:
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
+pyrite-dev docs
 ```
 
 This removes generated doctrees and autosummary stubs and performs the canonical offline warnings-as-errors documentation build.
@@ -154,7 +154,7 @@ This removes generated doctrees and autosummary stubs and performs the canonical
 To additionally check external links, run:
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs --linkcheck
+pyrite-dev docs --linkcheck
 ```
 
 External link checking requires network access and is therefore not part of the offline gate.

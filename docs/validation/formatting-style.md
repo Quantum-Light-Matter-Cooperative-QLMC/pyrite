@@ -80,5 +80,5 @@ Only the markup changed — same symbols, same factors, same sign.
 - [ ] Literal source pseudocode stays in a fenced code block, untouched.
 - [ ] Code identifiers stay as exact-spelling inline code, not converted to symbols.
 - [ ] Diff contains no changed number, sign, exponent, unit, word of adjudication, or verdict — `git diff` should read as pure markup substitution.
-- [ ] `uv run pyrite-dev docs` builds without new Sphinx/MyST warnings for the touched file.
+- [ ] `pyrite-dev docs` builds without new Sphinx/MyST warnings for the touched file.
 - [ ] The rendered page proves it: every expression in the built `docs/_build/html/validation/<domain>/<id>.html` sits inside a `class="math notranslate"` element, and no `$` survives in the article body. An unrendered equation raises no warning, so this positive check is the only one that catches it.

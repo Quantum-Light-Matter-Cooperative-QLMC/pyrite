@@ -53,7 +53,7 @@ Confirmed **structural, not a coincidence**: it follows purely from `D = μkT/q`
 
 ## 5. Test suite
 
-`UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/detectors/test_grating.py -k charge_cloud -v` → **4 passed**: `test_charge_cloud_sigma_soft_photon_is_maximum_blur`, `test_charge_cloud_sigma_zero_when_absorbed_at_front`, `test_charge_cloud_sigma_positive_and_bounded_by_soft_limit`, `test_charge_cloud_sigma_decreases_with_energy_over_Si_absorption_band`. Each is numerically independent of the code's internals (reconstructs `kT_over_q` and `max_sigma` from first principles in the test itself) and correctly exercises the limiting cases and monotonicity derived above.
+`pyrite-dev test tests/detectors/test_grating.py -k charge_cloud -v` → **4 passed**: `test_charge_cloud_sigma_soft_photon_is_maximum_blur`, `test_charge_cloud_sigma_zero_when_absorbed_at_front`, `test_charge_cloud_sigma_positive_and_bounded_by_soft_limit`, `test_charge_cloud_sigma_decreases_with_energy_over_Si_absorption_band`. Each is numerically independent of the code's internals (reconstructs `kT_over_q` and `max_sigma` from first principles in the test itself) and correctly exercises the limiting cases and monotonicity derived above.
 
 ## 6. Citation specificity
 

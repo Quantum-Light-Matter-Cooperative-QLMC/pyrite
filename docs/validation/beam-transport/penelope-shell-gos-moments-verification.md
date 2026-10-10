@@ -311,7 +311,7 @@ density agrees with SBETHE to $\le5.5\times10^{-5}$.
 ## Item 5: tests
 
 Command:
-`PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_shell_gos.py -q`.
+`PYRITE_MC_BACKEND=cpu pyrite-dev test tests/montecarlo/test_shell_gos.py -q`.
 Result: 32 passed and 3 xfailed.
 
 - **Assertions can fail.** Every `pytest.approx` on a cm²-scale quantity
@@ -375,7 +375,7 @@ The following commands ran in `/tmp/pyrite-issue-93` with
   moments;
 - `uv run python` running the independent-moment, ratio-table, variant,
   limit and Bethe scripts (session scratchpad, not committed);
-- `uv run pyrite-dev test tests/montecarlo/test_shell_gos.py -q`.
+- `pyrite-dev test tests/montecarlo/test_shell_gos.py -q`.
 
 ## Author resolution
 
@@ -475,7 +475,7 @@ The residual $\le1\times10^{-4}$ equals the xraydb-versus-SBETHE molar-mass
 difference, well inside the test's absolute tolerance of $2\times10^{-4}$.
 The ledger note's 1 keV excesses (13%, 21%, 15%) and 10 keV excesses (1.4%,
 3.2%, 6.8%) match. The quadrature test and the new threshold test pass
-(`uv run pyrite-dev test tests/montecarlo/test_shell_gos.py`).
+(`pyrite-dev test tests/montecarlo/test_shell_gos.py`).
 
 ### Findings
 

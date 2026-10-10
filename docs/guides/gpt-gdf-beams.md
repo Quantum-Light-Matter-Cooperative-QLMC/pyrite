@@ -16,7 +16,7 @@ Run GPT and inspect the native output directly:
 
 ```bash
 gpt -o beam.gdf beam.in
-uv run pyrite beam gdf-times beam.gdf
+pyrite beam gdf-times beam.gdf
 ```
 
 If you do not yet have GPT output, save this small fixture generator as
@@ -51,9 +51,9 @@ easygdf.save("beam.gdf", blocks=blocks, creator="GPT")
 Generate and inspect `beam.gdf`:
 
 ```bash
-uv run python make_example_gdf.py
-uv run pyrite beam gdf-times beam.gdf
-uv run pyrite beam gdf-inspect beam.gdf --time-s 1e-9
+python make_example_gdf.py
+pyrite beam gdf-times beam.gdf
+pyrite beam gdf-inspect beam.gdf --time-s 1e-9
 ```
 
 The equivalent Python workflow is:
@@ -173,7 +173,7 @@ emission = "incoherent"
 The example origin is an explicit placement choice; choose an origin appropriate to
 **your** beam and target. Catalog GDF paths resolve
 relative to the catalog file. Inline `[profiles.NAME.beam]` tables accept the
-same fields. Run this profile with `uv run pyrite run gpt_import -m hopg`.
+same fields. Run this profile with `pyrite run gpt_import -m hopg`.
 
 For configured-current normalization, replace the final normalization settings
 in `[beams.gpt_import]` with:
@@ -193,14 +193,14 @@ analytic spot, energy-spread, Twiss, or longitudinal-distribution settings.
 Create a reusable beam, attach it, and run the profile:
 
 ```bash
-uv run pyrite beam gdf-inspect beam.gdf --time-s 1e-9
-uv run pyrite beam create gpt_beam \
+pyrite beam gdf-inspect beam.gdf --time-s 1e-9
+pyrite beam create gpt_beam \
   --source gpt_gdf --gdf-path beam.gdf \
   --gdf-time-s 1e-9 --gdf-time-tolerance-s 1e-15 \
   --gdf-z-origin-m 0.1 \
   --gdf-normalization gdf_charge --rep-rate-hz 5000
-uv run pyrite profile set standard --beam gpt_beam
-uv run pyrite run standard -m hopg
+pyrite profile set standard --beam gpt_beam
+pyrite run standard -m hopg
 ```
 
 The time, physical target origin, and repetition rate are examples. Creating or
@@ -212,12 +212,12 @@ absolute paths. `beam show gpt_beam` displays its source and GDF fields;
 For configured-current normalization:
 
 ```bash
-uv run pyrite beam create gpt_current \
+pyrite beam create gpt_current \
   --source gpt_gdf --gdf-path beam.gdf --gdf-time-s 1e-9 \
   --gdf-z-origin-m 0.1 --gdf-normalization pyrite_current \
   --bunch-charge-pc 1 --rep-rate-hz 5000
-uv run pyrite profile set standard --beam gpt_current
-uv run pyrite run standard -m hopg
+pyrite profile set standard --beam gpt_current
+pyrite run standard -m hopg
 ```
 
 GDF settings belong to named beams; `run` accepts no source/GDF overrides.
@@ -266,13 +266,13 @@ transport; actual GPU validation has not been performed for this source.
 List outputs and inspect the sole time snapshot in `beam.gdf` automatically:
 
 ```bash
-uv run pyrite beam gdf-inspect beam.gdf
+pyrite beam gdf-inspect beam.gdf
 ```
 
 Inspect a particular screen, including actual lab x/y/z ranges and weighted means:
 
 ```bash
-uv run pyrite beam gdf-inspect screen.gdf --screen-position-m 1.05
+pyrite beam gdf-inspect screen.gdf --screen-position-m 1.05
 ```
 
 Add `-o json` for structured output. Use the physical target's lab-z coordinate
@@ -284,12 +284,12 @@ x/y ranges with the finite target footprint.
 For a target placed at lab z = 1.05 m, import that screen with:
 
 ```bash
-uv run pyrite beam create gpt_screen --source gpt_gdf \
+pyrite beam create gpt_screen --source gpt_gdf \
   --gdf-path screen.gdf --gdf-screen-position-m 1.05 \
   --gdf-screen-tolerance-m 1e-9 --gdf-z-origin-m 1.05 \
   --gdf-normalization gdf_charge --rep-rate-hz 5000
-uv run pyrite profile set standard --beam gpt_screen
-uv run pyrite run standard -m hopg
+pyrite profile set standard --beam gpt_screen
+pyrite run standard -m hopg
 ```
 
 `gdf_screen_position_m` and `gdf_time_s` are mutually exclusive. The screen
@@ -312,9 +312,9 @@ and the selected target origin retain their usual meanings.
 For the generated time snapshot and the standard profile energies:
 
 ```bash
-uv run pyrite beam set gpt_beam --gdf-shape-only
-uv run pyrite profile set standard --beam gpt_beam
-uv run pyrite run standard -m hopg
+pyrite beam set gpt_beam --gdf-shape-only
+pyrite profile set standard --beam gpt_beam
+pyrite run standard -m hopg
 ```
 
 Catalog/Python field: `gdf_shape_only = true` / `gdf_shape_only=True`.

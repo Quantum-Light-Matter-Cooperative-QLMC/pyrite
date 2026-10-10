@@ -110,7 +110,7 @@ The GPU raw-kernel routes reproduce the same term: `coherent_jit_kernel.py::run_
 Numerically: `tests/montecarlo/test_xray_dispersion.py` (hopg 002, 100 keV, theta_obs=119 deg) reports the two-segment relative phase `-delta(E) omega(E)(z1-z2)/(-n_hat_z) = +1.588643 rad`, matching the derived closed form to 5.7e-13 rad (float64 rounding) — reran locally:
 
 ```
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
+pyrite-dev test \
     tests/montecarlo/test_xray_dispersion.py -k "phase or escape or coherent"
 # 6 passed, 10 deselected
 ```
