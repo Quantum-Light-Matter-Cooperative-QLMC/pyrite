@@ -485,7 +485,7 @@ class MaterialCatalog:
     #: They intentionally remain plain schema data here: importing instrument
     #: objects would invert the materials -> instrument dependency boundary.
     profile_filters: Mapping[str, tuple[Mapping[str, object], ...]] = MappingProxyType({})
-    #: Declarative planar-pixel detector geometry for ``material simulate``.
+    #: Declarative planar-pixel detector geometry for ``run --ephemeral``.
     profile_physical_detectors: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Named per-profile detector collection rows. Each mapping value combines
     #: optional scalar acceptance and optional pixelated geometry settings.

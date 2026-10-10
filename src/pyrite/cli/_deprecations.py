@@ -53,21 +53,27 @@ def _entry(path: str, replacement: str, *, since: str = "0.1.0", note: str = "")
 
 #: Keyed by full command path as the user types it, minus the ``pyrite`` prefix.
 #:
-#: Empty as of 0.6.0. The 0.1.0 cohort of 68 command spellings was removed at
-#: 0.3.0 (issue #68), and `material set` (deprecated 0.4.0, issue #359) at
-#: 0.6.0 (issue #387). The machinery below -- `DeprecatingGroup`,
-#: `RetiredOption`, `canonical_option`, `hidden_alias` -- is deliberately
-#: retained: ADR-0002 requires it for the next rename, and
-#: `tests/cli/test_deprecations.py` still exercises it against a locally
-#: declared command.
-DEPRECATIONS: dict[str, Deprecation] = {}
+#: The 0.1.0 cohort of 68 command spellings was removed at 0.3.0 (issue #68),
+#: and `material set` (deprecated 0.4.0, issue #359) at 0.6.0 (issue #387).
+#: `material simulate` duplicates `run --ephemeral` (issues #257, #259).
+DEPRECATIONS: dict[str, Deprecation] = {
+    entry.path: entry
+    for entry in (
+        _entry(
+            "material simulate",
+            "pyrite run PROFILE -m MATERIAL --ephemeral",
+            since="0.6.0",
+            note="Pass the same `--detector`, `--output-file`, and `-o` values.",
+        ),
+    )
+}
 
 
 #: Paths whose canonical replacement depends on the arguments given, so the
-#: command computes it and calls `warn(path, replacement=...)` from its own
+#: command computes it and calls `warn_self(path, replacement)` from its own
 #: callback. `DeprecatingGroup` leaves these alone rather than pre-empting them
-#: with the registry's generic replacement. Empty while `DEPRECATIONS` is.
-SELF_WARNING: frozenset[str] = frozenset()
+#: with the registry's generic replacement.
+SELF_WARNING: frozenset[str] = frozenset({"material simulate"})
 
 
 def message(path: str, *, replacement: str | None = None) -> str:
@@ -94,6 +100,16 @@ def warn(path: str, *, replacement: str | None = None) -> None:
 #: even when a deprecated group and a deprecated leaf both resolve.
 WARNED_META_KEY = "pyrite.deprecation_warned"
 PENDING_WARNING_META_KEY = "pyrite_pending_deprecation"
+
+
+def warn_self(path: str, replacement: str) -> None:
+    """Warn once for a `SELF_WARNING` *path* with its argument-specific *replacement*."""
+    meta = click.get_current_context().meta
+    if meta.get(WARNED_META_KEY):
+        return
+    meta[WARNED_META_KEY] = True
+    meta.pop(PENDING_WARNING_META_KEY, None)
+    warn(path, replacement=replacement)
 
 
 def invocation_path(ctx: click.Context) -> str:
