@@ -25,7 +25,7 @@ from pyrite.campaign.profiles import (
     named_profile_stem,
     variant_stem,
 )
-from pyrite.campaign.sweep import build_cases, target_flat_fields
+from pyrite.campaign.sweep import BeamSpec, build_cases, target_flat_fields
 from pyrite.checkpoints import _checkpoint_store
 from pyrite.detectors import Detector, EnergyBins, Timepix3
 from pyrite.energy_grid.floor import floored_lattice_start_eV
@@ -52,6 +52,18 @@ def _pin_default_continuum_to_bremslib(monkeypatch):
     monkeypatch.setattr(
         "pyrite.xsgen.bremslib.tables.resolve_bremsstrahlung_model", _resolve_auto_as_installed
     )
+
+
+BUNDLED_PROFILES = (
+    "coherent_demo",
+    "detector_demo",
+    "high_energy_demo",
+    "hopg_emittance_demo",
+    "quickstart",
+    "standard",
+    "sweep_demo",
+    "trajectory_demo",
+)
 
 
 def _cases_by_key(material, catalog_profile):
@@ -174,6 +186,24 @@ def test_hopg_short_keeps_finite_footprint_and_attosecond_bunch():
     longitudinal = case["longitudinal_distribution"]
     assert longitudinal["kind"] == "gaussian"
     assert longitudinal["rms_duration_fs"] == 0.001
+
+
+def test_bundled_profiles_name_packaged_beam_and_detector():
+    """Every bundled profile names a packaged beam and detector, so it runs even
+    when a user catalog layer removes the bundled-catalog instrument exemption."""
+    catalog = DATA_DIR / "catalog"
+    for name in BUNDLED_PROFILES:
+        row = tomllib.loads((catalog / "profiles" / f"{name}.toml").read_text())
+        assert isinstance(row.get("beam"), str), name
+        assert (catalog / "beams" / f"{row['beam']}.toml").is_file(), name
+        assert isinstance(row.get("detector"), str), name
+        assert (catalog / "detectors" / f"{row['detector']}.toml").is_file(), name
+
+
+def test_example_beam_is_the_implicit_beam_spec():
+    """Naming ``example`` must leave the identities of formerly beamless profiles alone."""
+    beam = material_sweep("hopg", catalog_profile="quickstart").beam
+    assert beam == BeamSpec(energy_keV=beam.energy_keV)
 
 
 def test_trajectory_demo_is_one_fixed_count_case_with_micron_beam():

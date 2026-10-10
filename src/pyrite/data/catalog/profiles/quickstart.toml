@@ -10,4 +10,5 @@ E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
 materials = ["hopg"]
 n_electrons = {values = [1000]}
 n_electrons_brem = {values = [150]}
+beam = "example"
 detector = "default"
