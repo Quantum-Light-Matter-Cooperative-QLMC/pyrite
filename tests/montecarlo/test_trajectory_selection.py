@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from click.testing import CliRunner
 
-from pyrite.cli.commands.trajectories import command
+from pyrite.cli.commands.trajectories import export_command as command
 from pyrite.montecarlo import trajectory_selection
 from pyrite.montecarlo.trajectories import TrajectoryArtifactError, write_trajectory_artifact
 from pyrite.montecarlo.trajectory_export import export_segments_vtp

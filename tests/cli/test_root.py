@@ -48,7 +48,11 @@ def test_root_help_prefers_grouped_checkpoint_commands(capsys):
     command_lines = {
         line.split()[0]
         for line in lines
-        if line.startswith("  ") and line.strip() and not line.lstrip().startswith("-")
+        # Wrapped descriptions continue at a deeper indent.
+        if line.startswith("  ")
+        and not line.startswith("   ")
+        and line.strip()
+        and not line.lstrip().startswith("-")
     }
     assert "checkpoint" in command_lines
     assert {"app", "material"}.issubset(command_lines)
@@ -80,4 +84,6 @@ def test_root_help_prefers_grouped_checkpoint_commands(capsys):
         # Added by #161: generated cross-section tables and the external code
         # trees they come from.
         "tables",
+        # Added by #397: saved trajectory captures.
+        "trajectories",
     }

@@ -56,7 +56,20 @@ def _entry(path: str, replacement: str, *, since: str = "0.1.0", note: str = "")
 #: The 0.1.0 cohort of 68 command spellings was removed at 0.3.0 (issue #68),
 #: and `material set` (deprecated 0.4.0, issue #359) at 0.6.0 (issue #387).
 #: `material simulate` was removed at 0.8.0; use `run --ephemeral`.
-DEPRECATIONS: dict[str, Deprecation] = {}
+DEPRECATIONS: dict[str, Deprecation] = {
+    "checkpoint export-trajectories": _entry(
+        "checkpoint export-trajectories",
+        "pyrite trajectories export",
+        since="0.11.0",
+        note="Trajectory captures are not checkpoints (issue #397).",
+    ),
+    "checkpoint score-trajectories": _entry(
+        "checkpoint score-trajectories",
+        "pyrite trajectories score",
+        since="0.11.0",
+        note="Trajectory captures are not checkpoints (issue #397).",
+    ),
+}
 
 
 #: Paths whose canonical replacement depends on the arguments given, so the

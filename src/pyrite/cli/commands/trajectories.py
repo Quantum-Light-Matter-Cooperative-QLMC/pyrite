@@ -1,12 +1,57 @@
-"""Click wiring for exporting captured transport trajectories."""
+"""Click wiring for listing, describing, exporting, and scoring trajectory captures.
+
+``pyrite trajectories`` is the one home for artifacts written by
+``pyrite run --trajectories`` (#397). ``pyrite trajectories export``
+and ``score-trajectories`` stay as hidden deprecated aliases of ``export`` and
+``score``.
+"""
 
 from pathlib import Path
 
 import click
 
 from ...console import output as _cli_core
-from ...console.outputs import output_default, output_label
+from ...console.output import emit_diagnostic, emit_json, emit_result, output_option
+from ...console.outputs import output_default, output_dir, output_label
 from .. import _completion as _cli_completion
+from .._groups import LazyGroup
+
+_COMMANDS = {
+    "ls": "pyrite.cli.commands.trajectories.ls_command",
+    "info": "pyrite.cli.commands.trajectories.info_command",
+    "export": "pyrite.cli.commands.trajectories.export_command",
+    "score": "pyrite.cli.commands.trajectories.score_command",
+}
+
+_COMMAND_HELP = {
+    "ls": "List captured artifacts, partial writes, and foreign files.",
+    "info": "Describe one artifact's case, provenance, and fields.",
+    "export": "Export captured trajectories to VTK PolyData.",
+    "score": "Score checkpoint records from captured trajectories.",
+}
+
+
+@click.group(
+    "trajectories",
+    cls=LazyGroup,
+    lazy_commands=_COMMANDS,
+    lazy_help=_COMMAND_HELP,
+    no_args_is_help=True,
+)
+def command() -> None:
+    """List, describe, export, and score saved trajectory captures.
+
+    Captures are HDF5 artifacts written by `pyrite run --trajectories DIR`,
+    one per case under DIR/<stem>/. They are not checkpoints; `score` turns
+    them into checkpoint records.
+
+    \b
+    Examples:
+      pyrite trajectories ls
+      pyrite trajectories info hopg@trajectory_demo/<case>/E0_20keV.h5
+      pyrite trajectories export hopg@trajectory_demo --first 20
+      pyrite trajectories score hopg@trajectory_demo
+    """
 
 
 def _print_paraview_script(ctx, _param, value):
@@ -18,30 +63,263 @@ def _print_paraview_script(ctx, _param, value):
     ctx.exit()
 
 
-def _artifacts(paths):
-    """Expand directories to ``(artifact, path relative to its root)`` pairs.
+def _discover(paths):
+    """Complete artifacts under ``paths``; warn about every skipped file."""
+    from ...montecarlo.trajectory_inventory import discover_artifacts
 
-    A directory's artifacts keep their layout below it (every case has an
-    ``E0_<E>keV.h5`` file, so names alone collide); an explicit file is its
-    own name.
-    """
-    found = []
-    for path in paths:
-        if path.is_dir():
-            found.extend(
-                (p, p.relative_to(path)) for p in sorted(path.rglob("*.h5")) if p.is_file()
-            )
-        else:
-            found.append((path, Path(path.name)))
-    return found
+    found = discover_artifacts(paths)
+    for skipped in found.skipped:
+        emit_diagnostic(f"warning: skipping {skipped.status} file {skipped.path}: {skipped.reason}")
+    if not found.artifacts:
+        raise _cli_core.CLIError("no trajectory artifacts (*.h5) found")
+    return found.artifacts
+
+
+def _cell(value) -> str:
+    if value is None:
+        return "-"
+    if isinstance(value, float):
+        return f"{value:g}"
+    return str(value)
+
+
+def _emit_table(header: list[str], rows: list[list[str]]) -> None:
+    widths = [max(len(row[i]) for row in [header, *rows]) for i in range(len(header))]
+    for row in [header, *rows]:
+        emit_result(
+            "  ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=True)).rstrip()
+        )
+
+
+_LS_COLUMNS = (
+    ("STEM", "stem"),
+    ("CASE", "case"),
+    ("E0_KEV", "E0_keV"),
+    ("SCHEMA", "schema_version"),
+    ("STATUS", "status"),
+    ("SEGMENTS", "segments"),
+    ("HISTORIES", "histories"),
+    ("MAX_GEN", "max_generation"),
+    ("BYTES", "bytes"),
+    ("PATH", "path"),
+)
 
 
 @click.command(
-    "export-trajectories",
+    "ls",
+    help=(
+        "List trajectory artifacts under each DIR (default: the local capture "
+        "root, pyrite-output/trajectories).\n\n"
+        "One row per file: checkpoint stem, case name, incident energy E0 [keV], "
+        "schema, status, segment rows, histories with segments, highest "
+        "secondary generation, and size [bytes], then totals per stem. Stray "
+        "interrupted writes (*.h5.partial), incomplete artifacts, and HDF5 files "
+        "that are not trajectory artifacts are listed with their status instead "
+        "of failing. History and generation counts scan only integer ID "
+        "columns in bounded blocks; no segment array is loaded.\n\n"
+        "DIR may also be a checkpoint selector naming its local capture "
+        "directory, or an artifact file."
+    ),
+)
+@click.argument(
+    "dirs",
+    nargs=-1,
+    metavar="[DIR]...",
+    type=_cli_completion.TRAJECTORY_ARTIFACT,
+)
+@output_option
+def ls_command(dirs, json_output):
+    from ...montecarlo.trajectories import TrajectoryArtifactError
+    from ...montecarlo.trajectory_inventory import describe_artifact, discover_artifacts
+
+    if not dirs:
+        root = output_dir("trajectories")
+        dirs = (root,) if root.is_dir() else ()
+    found = discover_artifacts(dirs)
+    rows = []
+    for artifact in found.artifacts:
+        try:
+            info = describe_artifact(artifact.path)
+        except (TrajectoryArtifactError, OSError) as error:
+            rows.append(_skipped_row(artifact.path, "foreign", str(error)))
+            continue
+        rows.append(
+            {
+                "path": str(artifact.path),
+                "stem": info["provenance"].get("checkpoint_stem"),
+                "case": info["case"]["name"],
+                "E0_keV": info["case"]["E0_keV"],
+                "schema_version": info["schema_version"],
+                "status": "complete",
+                "segments": info["segments"],
+                "histories": info.get("histories"),
+                "max_generation": info.get("max_generation"),
+                "bytes": info["bytes"],
+            }
+        )
+    rows += [_skipped_row(item.path, item.status, item.reason) for item in found.skipped]
+    rows.sort(key=lambda row: str(row["path"]))
+    stems: dict[str, dict] = {}
+    for row in rows:
+        if row["status"] != "complete":
+            continue
+        total = stems.setdefault(
+            row["stem"] or "-",
+            {"stem": row["stem"], "artifacts": 0, "segments": 0, "bytes": 0},
+        )
+        total["artifacts"] += 1
+        total["segments"] += row["segments"]
+        total["bytes"] += row["bytes"]
+    if json_output:
+        emit_json(
+            "pyrite.trajectories.ls.v1",
+            {"artifacts": rows, "stems": list(stems.values())},
+        )
+        return
+    if not rows:
+        emit_result("No trajectory artifacts found.")
+        return
+    _emit_table(
+        [title for title, _ in _LS_COLUMNS],
+        [[_cell(row.get(key)) for _, key in _LS_COLUMNS] for row in rows],
+    )
+    for total in stems.values():
+        emit_result(
+            f"{_cell(total['stem'])}: {total['artifacts']} artifact(s), "
+            f"{total['segments']} segments, {total['bytes']} bytes"
+        )
+
+
+def _skipped_row(path: Path, status: str, reason: str) -> dict:
+    try:
+        size = path.stat().st_size
+    except OSError:
+        size = None
+    return {
+        "path": str(path),
+        "stem": None,
+        "case": None,
+        "E0_keV": None,
+        "schema_version": None,
+        "status": status,
+        "segments": None,
+        "histories": None,
+        "max_generation": None,
+        "bytes": size,
+        "reason": reason,
+    }
+
+
+@click.command(
+    "info",
+    help=(
+        "Describe one trajectory artifact without loading its segment arrays.\n\n"
+        "Prints the case, seed, provenance (checkpoint stem, profile, fidelity), "
+        "whether a scene was recorded, schema and row order, then every "
+        "/transport field with its role, dtype, shape, and units. Per-segment "
+        "field names are the valid cell arrays of `pyrite trajectories export` "
+        "and colouring names of the ParaView preset. History ID range, number "
+        "of histories with segments, track count, and segments per secondary "
+        "generation come from bounded scans of the integer ID columns.\n\n"
+        "ARTIFACT is an HDF5 file written by `pyrite run --trajectories`; list "
+        "candidates with `pyrite trajectories ls`."
+    ),
+)
+@click.argument("artifact", metavar="ARTIFACT", type=_cli_completion.TRAJECTORY_ARTIFACT)
+@output_option
+def info_command(artifact, json_output):
+    from ...montecarlo.trajectories import TrajectoryArtifactError
+    from ...montecarlo.trajectory_inventory import describe_artifact
+
+    if artifact.is_dir():
+        raise click.BadParameter(
+            f"{artifact} is a directory; pick one file from `pyrite trajectories ls {artifact}`",
+            param_hint="ARTIFACT",
+        )
+    try:
+        info = describe_artifact(artifact)
+    except (TrajectoryArtifactError, OSError) as error:
+        raise _cli_core.CLIError(str(error)) from error
+    if json_output:
+        emit_json("pyrite.trajectories.info.v1", info)
+        return
+    _print_info(info)
+
+
+def _print_info(info: dict) -> None:
+    case = info["case"]
+    provenance = info["provenance"]
+    lines = [
+        ("path", info["path"]),
+        ("case", case["name"]),
+        ("E0 [keV]", case["E0_keV"]),
+        ("crystal", case.get("crystal")),
+        ("thickness [angstrom]", case.get("thickness_ang")),
+        ("tilt [deg]", case.get("tilt_deg")),
+        ("electrons (Ne)", case.get("Ne")),
+        ("seed", info["seed"]),
+        ("stem", provenance.get("checkpoint_stem")),
+        ("profile", provenance.get("profile")),
+        ("fidelity", provenance.get("fidelity")),
+        ("scene", "recorded" if info["scene"] else "not recorded"),
+        ("spectrum inputs", "recorded" if info["spectrum_inputs"] else "not recorded"),
+        ("schema", info["schema_version"]),
+        ("row order", info["row_order"]),
+        ("pyrite version", info["pyrite_version"]),
+        ("created (UTC)", info["created_utc"]),
+        ("size [bytes]", info["bytes"]),
+        ("segments", info["segments"]),
+        ("sampled histories", info["sampled_histories"]),
+        ("histories with segments", info.get("histories")),
+    ]
+    if info.get("history_id_range"):
+        low, high = info["history_id_range"]
+        lines.append(("history IDs", f"{low}..{high}"))
+    if "tracks" in info:
+        lines.append(("tracks", info["tracks"]))
+    if "segments_by_generation" in info:
+        lines.append(
+            (
+                "segments by generation",
+                ", ".join(f"{g}: {n}" for g, n in info["segments_by_generation"].items()),
+            )
+        )
+    width = max(len(label) for label, _ in lines)
+    for label, value in lines:
+        emit_result(f"{label.ljust(width)}  {_cell(value)}")
+    for role, title in (
+        ("segment", "Per-segment fields"),
+        ("electron", "Per-electron fields"),
+        ("nested", "Nested fields"),
+        ("scalar", "Scalars"),
+        ("other", "Other arrays"),
+    ):
+        records = [record for record in info["fields"] if record["role"] == role]
+        if not records:
+            continue
+        emit_result("")
+        emit_result(f"{title}:")
+        _emit_table(
+            ["  NAME", "DTYPE", "SHAPE", "UNITS"],
+            [
+                [
+                    f"  {record['name']}",
+                    record.get("dtype", record["kind"]),
+                    "x".join(map(str, record.get("shape", []))) or "-",
+                    record.get("units", "-"),
+                ]
+                for record in records
+            ],
+        )
+
+
+@click.command(
+    "export",
     help=(
         "Export captured trajectory segments to VTK PolyData (.vtp).\n\n"
         "ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, a "
-        "directory searched recursively for them, or a checkpoint from "
+        "directory searched recursively for them (other files are skipped with "
+        "a warning), or a checkpoint from "
         "`pyrite checkpoint list` (exact name, unique prefix, or unique "
         "fragment such as its hash) naming its local capture directory. "
         "Each artifact becomes one .vtp "
@@ -56,10 +334,10 @@ def _artifacts(paths):
         "array and a FieldData record of the selection. Vacuum legs follow "
         "selected histories and are omitted from track selections.\n\n"
         "Examples:\n\n"
-        "  pyrite checkpoint export-trajectories hopg@trajectory_demo --first 20\n\n"
-        "  pyrite checkpoint export-trajectories case.h5 --sample 100 --seed 1 --scene\n\n"
+        "  pyrite trajectories export hopg@trajectory_demo --first 20\n\n"
+        "  pyrite trajectories export case.h5 --sample 100 --seed 1 --scene\n\n"
         "ParaView preset (colouring, thresholds, scene views, headless PNG): "
-        '`pvbatch "$(pyrite checkpoint export-trajectories --paraview-script)" '
+        '`pvbatch "$(pyrite trajectories export --paraview-script)" '
         "case.vtp --screenshot case.png`, or import the script as a ParaView macro."
     ),
 )
@@ -133,7 +411,7 @@ def _artifacts(paths):
     metavar="S",
     help="Random seed of --sample. [default: 0]",
 )
-def command(
+def export_command(
     artifacts, out_dir, no_vacuum, overwrite, scene, histories, tracks, first, sample, seed
 ):
     from ...montecarlo.trajectories import TrajectoryArtifactError
@@ -152,9 +430,7 @@ def command(
         raise click.UsageError("--seed requires --sample")
     selecting = bool(histories or tracks or first or sample)
 
-    paths = _artifacts(artifacts)
-    if not paths:
-        raise _cli_core.CLIError("no trajectory artifacts (*.h5) found")
+    paths = [(found.path, found.relative) for found in _discover(artifacts)]
     targets = [
         ((out_dir / rel if out_dir is not None else path).with_suffix(".vtp"), path)
         for path, rel in paths
@@ -218,21 +494,22 @@ def command(
 
 
 @click.command(
-    "score-trajectories",
+    "score",
     help=(
         "Score checkpoint records from captured trajectories without re-transporting.\n\n"
         "ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, a "
-        "directory searched recursively for them, or a checkpoint selector as "
-        "for export-trajectories. Each artifact's spectrum phase "
+        "directory searched recursively for them (other files are skipped with "
+        "a warning), or a checkpoint selector as for `pyrite trajectories "
+        "export`. Each artifact's spectrum phase "
         "(line, characteristic, and bremsstrahlung spectra) is replayed from its "
         "stored segments and saved as a record of the checkpoint stem and run "
         "identity it was captured under, in DIR/<stem>. Records already present "
         "are kept unless --overwrite; records of cases without an artifact are "
         "never touched. Each new record stores its artifact's path and SHA-256. "
         "The shared per-case cache is neither read nor written.\n\n"
-        "Every artifact is checked before anything is written: schema-1, "
-        "incomplete, foreign, or mismatched artifacts, and a checkpoint written "
-        "by a different run, are refused. Cases needing every segment at once "
+        "Every artifact is checked before anything is written: schema-1 or "
+        "mismatched artifacts, incomplete or foreign files named explicitly, and "
+        "a checkpoint written by a different run, are refused. Cases needing every segment at once "
         "(coherent emission, temporal profile) are refused; score those with "
         "`spectrum_from_artifact` from Python."
     ),
@@ -270,16 +547,13 @@ def command(
 def score_command(artifacts, checkpoint_dir, max_segments, overwrite):
     from ...checkpoints.trajectory_scoring import (
         check_targets,
-        discover_artifacts,
         plan_stems,
         score_stem,
     )
     from ...montecarlo.runner.artifacts import STREAM_MAX_SEGMENTS
     from ...montecarlo.trajectories import TrajectoryArtifactError
 
-    paths = discover_artifacts(artifacts)
-    if not paths:
-        raise _cli_core.CLIError("no trajectory artifacts (*.h5) found")
+    paths = [found.path for found in _discover(artifacts)]
 
     def _scored(artifact, out):
         click.echo(

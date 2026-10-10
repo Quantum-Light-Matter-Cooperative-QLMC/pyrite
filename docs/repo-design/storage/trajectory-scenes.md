@@ -1,6 +1,6 @@
 # Trajectory scenes and viewer evaluation
 
-Trajectory HDF5 is the authoritative transport snapshot. `checkpoint export-trajectories` preserves its original slab-frame, angstrom `.vtp` default. The additive `--scene` option exports two independently viewable `.vtm` files, with private sidecars:
+Trajectory HDF5 is the authoritative transport snapshot. `trajectories export` preserves its original slab-frame, angstrom `.vtp` default. The additive `--scene` option exports two independently viewable `.vtm` files, with private sidecars:
 
 | Manifest | Coordinates | Contents |
 |---|---|---|
@@ -87,7 +87,7 @@ The optional `checks/trajectory_trame_probe.py` smoke starts a live `VtkRemoteVi
 
 The #319 prototype (branch commit `3bb81704`, raw records removed in the follow-up; recover them from that commit) selected whole histories/tracks from HDF5 before rendering and served native and trame image-streaming views. Its measurements: at 1.01M synthetic segments, native first headless PNG 0.70 s at about 1.5 GiB sampled process-tree RSS; connected-browser energy-control images 0.8–1.4 s and instrument scale switches 1.4–5.3 s across local and SSH deployments, with 1.4–1.7 GiB server and 1.1–1.2 GiB Chrome RSS; one exploratory 10M-segment trial at 8–9 GiB server RSS. User review of the browser application found most controls broken.
 
-ParaView already provides colouring by any cell array, Threshold/Clip/Spreadsheet analysis, client–server remote rendering, `pvpython`/`pvbatch` scripting and routine 10^7-cell scenes. The prototype's only unique capability was selecting complete tracks before loading. That now lives in export: `montecarlo.trajectory_selection` resolves whole histories (bisection over electron-major rows) or tracks (bounded block scan) to stored-row runs, and `export-trajectories --history/--track/--first/--sample` streams only those runs, adding a `segment_id` cell array and a `selection` FieldData record. A bundled preset (`src/pyrite/data/paraview/pyrite_trajectories.py`, path printed by `--paraview-script`) sets up colouring, thresholds, scene context and headless PNG output; it was exercised with ParaView 6.2.0 `pvbatch`.
+ParaView already provides colouring by any cell array, Threshold/Clip/Spreadsheet analysis, client–server remote rendering, `pvpython`/`pvbatch` scripting and routine 10^7-cell scenes. The prototype's only unique capability was selecting complete tracks before loading. That now lives in export: `montecarlo.trajectory_selection` resolves whole histories (bisection over electron-major rows) or tracks (bounded block scan) to stored-row runs, and `trajectories export --history/--track/--first/--sample` streams only those runs, adding a `segment_id` cell array and a `selection` FieldData record. A bundled preset (`src/pyrite/data/paraview/pyrite_trajectories.py`, path printed by `--paraview-script`) sets up colouring, thresholds, scene context and headless PNG output; it was exercised with ParaView 6.2.0 `pvbatch`.
 
 The trame server, native desktop mode, PyVista PNG/GIF export and their `trajectory-viewer` extra were removed. A custom viewer is justified only for physics-aware interaction, such as linking an electron to the emission it produced; that belongs in the marimo trace app, not a third rendering stack. The live Plotly preview is unchanged.
 

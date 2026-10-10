@@ -87,17 +87,18 @@ Options:
   -h, --help                   Show this message and exit.
 
 Commands:
-  run         Run a profile's MC sweeps and write checkpoints.
-  app         Launch or export interactive analysis notebooks.
-  checkpoint  Inspect, transform, recompute, archive, and reclaim checkpoints.
-  config      Set profile, catalog, workspace, and remote defaults.
-  remote      Run and manage MC sweeps on a remote GPU host.
-  job         List, inspect, follow, or stop asynchronous remote jobs.
-  profile     Manage named catalog campaigns and material membership.
-  material    Inspect, validate, edit, and blaze individual materials.
-  beam        Manage named beams, attachable to profiles by name.
-  detector    Manage named detector geometries.
-  tables      Inspect generated cross-section tables and external code trees.
+  run           Run a profile's MC sweeps and write checkpoints.
+  app           Launch or export interactive analysis notebooks.
+  checkpoint    Inspect, transform, recompute, archive, and reclaim checkpoints.
+  trajectories  List, describe, export, and score saved trajectory captures.
+  config        Set profile, catalog, workspace, and remote defaults.
+  remote        Run and manage MC sweeps on a remote GPU host.
+  job           List, inspect, follow, or stop asynchronous remote jobs.
+  profile       Manage named catalog campaigns and material membership.
+  material      Inspect, validate, edit, and blaze individual materials.
+  beam          Manage named beams, attachable to profiles by name.
+  detector      Manage named detector geometries.
+  tables        Inspect generated cross-section tables and external code trees.
 ```
 
 ## `pyrite run`
@@ -480,14 +481,12 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  slim                 Shrink one checkpoint for transfer.
-  recompute            Recompute selected checkpoint datasets.
-  archive              Manage the long-term checkpoint shelf.
-  list                 List active local checkpoints.
-  gc                   Reclaim records obsolete under current scan profiles.
-  rm                   Delete local datasets and newly unreachable shared cases.
-  export-trajectories  Export captured trajectories to VTK PolyData.
-  score-trajectories   Score records from captured trajectories.
+  slim       Shrink one checkpoint for transfer.
+  recompute  Recompute selected checkpoint datasets.
+  archive    Manage the long-term checkpoint shelf.
+  list       List active local checkpoints.
+  gc         Reclaim records obsolete under current scan profiles.
+  rm         Delete local datasets and newly unreachable shared cases.
 ```
 
 ## `pyrite checkpoint slim`
@@ -738,21 +737,95 @@ Options:
   -h, --help            Show this message and exit.
 ```
 
-## `pyrite checkpoint export-trajectories`
+## `pyrite trajectories`
 
 ```text
-Usage: pyrite checkpoint export-trajectories [OPTIONS] ARTIFACT...
+Usage: pyrite trajectories [OPTIONS] COMMAND [ARGS]...
+
+  List, describe, export, and score saved trajectory captures.
+
+  Captures are HDF5 artifacts written by `pyrite run --trajectories DIR`, one per case
+  under DIR/<stem>/. They are not checkpoints; `score` turns them into checkpoint
+  records.
+
+  Examples:
+    pyrite trajectories ls
+    pyrite trajectories info hopg@trajectory_demo/<case>/E0_20keV.h5
+    pyrite trajectories export hopg@trajectory_demo --first 20
+    pyrite trajectories score hopg@trajectory_demo
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  ls      List captured artifacts, partial writes, and foreign files.
+  info    Describe one artifact's case, provenance, and fields.
+  export  Export captured trajectories to VTK PolyData.
+  score   Score checkpoint records from captured trajectories.
+```
+
+## `pyrite trajectories ls`
+
+```text
+Usage: pyrite trajectories ls [OPTIONS] [DIR]...
+
+  List trajectory artifacts under each DIR (default: the local capture root, pyrite-
+  output/trajectories).
+
+  One row per file: checkpoint stem, case name, incident energy E0 [keV], schema,
+  status, segment rows, histories with segments, highest secondary generation, and size
+  [bytes], then totals per stem. Stray interrupted writes (*.h5.partial), incomplete
+  artifacts, and HDF5 files that are not trajectory artifacts are listed with their
+  status instead of failing. History and generation counts scan only integer ID columns
+  in bounded blocks; no segment array is loaded.
+
+  DIR may also be a checkpoint selector naming its local capture directory, or an
+  artifact file.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite trajectories info`
+
+```text
+Usage: pyrite trajectories info [OPTIONS] ARTIFACT
+
+  Describe one trajectory artifact without loading its segment arrays.
+
+  Prints the case, seed, provenance (checkpoint stem, profile, fidelity), whether a
+  scene was recorded, schema and row order, then every /transport field with its role,
+  dtype, shape, and units. Per-segment field names are the valid cell arrays of `pyrite
+  trajectories export` and colouring names of the ParaView preset. History ID range,
+  number of histories with segments, track count, and segments per secondary generation
+  come from bounded scans of the integer ID columns.
+
+  ARTIFACT is an HDF5 file written by `pyrite run --trajectories`; list candidates with
+  `pyrite trajectories ls`.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite trajectories export`
+
+```text
+Usage: pyrite trajectories export [OPTIONS] ARTIFACT...
 
   Export captured trajectory segments to VTK PolyData (.vtp).
 
   ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, a directory searched
-  recursively for them, or a checkpoint from `pyrite checkpoint list` (exact name,
-  unique prefix, or unique fragment such as its hash) naming its local capture
-  directory. Each artifact becomes one .vtp of two-point line cells in the slab frame
-  [angstrom] with per-segment cell data, including electron_id; per-electron arrays,
-  tallies, and complete transport metadata stay in the authoritative HDF5 artifact.
-  Opens in ParaView, VisIt, and PyVista. --scene also exports lab-frame geometry as
-  separate close-up and instrument scenes.
+  recursively for them (other files are skipped with a warning), or a checkpoint from
+  `pyrite checkpoint list` (exact name, unique prefix, or unique fragment such as its
+  hash) naming its local capture directory. Each artifact becomes one .vtp of two-point
+  line cells in the slab frame [angstrom] with per-segment cell data, including
+  electron_id; per-electron arrays, tallies, and complete transport metadata stay in the
+  authoritative HDF5 artifact. Opens in ParaView, VisIt, and PyVista. --scene also
+  exports lab-frame geometry as separate close-up and instrument scenes.
 
   --history, --track, --first, or --sample export only whole selected histories (primary
   electron_id with every secondary of its shower) or tracks, reading only their rows;
@@ -761,13 +834,13 @@ Usage: pyrite checkpoint export-trajectories [OPTIONS] ARTIFACT...
 
   Examples:
 
-    pyrite checkpoint export-trajectories hopg@trajectory_demo --first 20
+    pyrite trajectories export hopg@trajectory_demo --first 20
 
-    pyrite checkpoint export-trajectories case.h5 --sample 100 --seed 1 --scene
+    pyrite trajectories export case.h5 --sample 100 --seed 1 --scene
 
   ParaView preset (colouring, thresholds, scene views, headless PNG): `pvbatch "$(pyrite
-  checkpoint export-trajectories --paraview-script)" case.vtp --screenshot case.png`, or
-  import the script as a ParaView macro.
+  trajectories export --paraview-script)" case.vtp --screenshot case.png`, or import the
+  script as a ParaView macro.
 
 Options:
   --paraview-script  Print the path of the bundled ParaView preset script and exit.
@@ -788,26 +861,26 @@ Options:
   -h, --help         Show this message and exit.
 ```
 
-## `pyrite checkpoint score-trajectories`
+## `pyrite trajectories score`
 
 ```text
-Usage: pyrite checkpoint score-trajectories [OPTIONS] ARTIFACT...
+Usage: pyrite trajectories score [OPTIONS] ARTIFACT...
 
   Score checkpoint records from captured trajectories without re-transporting.
 
   ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, a directory searched
-  recursively for them, or a checkpoint selector as for export-trajectories. Each
-  artifact's spectrum phase (line, characteristic, and bremsstrahlung spectra) is
-  replayed from its stored segments and saved as a record of the checkpoint stem and run
-  identity it was captured under, in DIR/<stem>. Records already present are kept unless
-  --overwrite; records of cases without an artifact are never touched. Each new record
-  stores its artifact's path and SHA-256. The shared per-case cache is neither read nor
-  written.
+  recursively for them (other files are skipped with a warning), or a checkpoint
+  selector as for `pyrite trajectories export`. Each artifact's spectrum phase (line,
+  characteristic, and bremsstrahlung spectra) is replayed from its stored segments and
+  saved as a record of the checkpoint stem and run identity it was captured under, in
+  DIR/<stem>. Records already present are kept unless --overwrite; records of cases
+  without an artifact are never touched. Each new record stores its artifact's path and
+  SHA-256. The shared per-case cache is neither read nor written.
 
-  Every artifact is checked before anything is written: schema-1, incomplete, foreign,
-  or mismatched artifacts, and a checkpoint written by a different run, are refused.
-  Cases needing every segment at once (coherent emission, temporal profile) are refused;
-  score those with `spectrum_from_artifact` from Python.
+  Every artifact is checked before anything is written: schema-1 or mismatched
+  artifacts, incomplete or foreign files named explicitly, and a checkpoint written by a
+  different run, are refused. Cases needing every segment at once (coherent emission,
+  temporal profile) are refused; score those with `spectrum_from_artifact` from Python.
 
 Options:
   --checkpoint-dir DIR  Root containing component checkpoint directories to write.

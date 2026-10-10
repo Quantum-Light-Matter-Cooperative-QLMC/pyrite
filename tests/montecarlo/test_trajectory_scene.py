@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from click.testing import CliRunner
 
-from pyrite.cli.commands.trajectories import command
+from pyrite.cli.commands.trajectories import export_command as command
 from pyrite.instrument import FilterPlate, PixelGrid, PlanarDetector, PlanarPose
 from pyrite.instrument.scene import scene_payload
 from pyrite.montecarlo.trajectories import (
