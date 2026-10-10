@@ -107,7 +107,7 @@ def _python_blocks() -> list[FencedBlock]:
 @pytest.mark.slow
 def test_python_api_workflow_executes_as_one_accumulating_namespace():
     blocks = _python_blocks()
-    assert len(blocks) == 7
+    assert len(blocks) == 8
 
     namespace: dict[str, object] = {}
     for block in blocks:
