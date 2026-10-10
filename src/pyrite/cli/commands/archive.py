@@ -80,11 +80,12 @@ def _cli_union(args):
     "store",
     help=(
         "Copy an active checkpoint to long-term shelf.\n\n"
-        "LABEL defaults to a date-stamped label inferred from STEM. Existing "
-        "labels are preserved unless --force."
+        "STEM accepts a unique prefix or fragment of an active checkpoint "
+        "name. LABEL defaults to a date-stamped label inferred from STEM. "
+        "Existing labels are preserved unless --force."
     ),
 )
-@click.argument("stem", shell_complete=_cli_completion.complete_archive_stem)
+@click.argument("stem", type=_cli_completion.CHECKPOINT_STEM)
 @click.argument("label", required=False)
 @click.option("--force", is_flag=True, help="Overwrite existing archive label.")
 def store_command(stem, label, force):
@@ -126,11 +127,12 @@ def archives_command(json_output):
     "merge",
     help=(
         "Merge an archived checkpoint into active slot.\n\n"
+        "STEM accepts a unique prefix or fragment of an active checkpoint name. "
         "Requires matching materials. Live records win overlaps; source archive "
         "is retained and live checkpoint is backed up by default."
     ),
 )
-@click.argument("stem", shell_complete=_cli_completion.complete_archive_stem)
+@click.argument("stem", type=_cli_completion.CHECKPOINT_STEM)
 @click.argument("label", shell_complete=_cli_completion.complete_archive_label)
 @click.option(
     "--no-archive",

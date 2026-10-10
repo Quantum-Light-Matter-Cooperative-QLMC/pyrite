@@ -648,8 +648,9 @@ Usage: pyrite checkpoint archive merge [OPTIONS] STEM LABEL
 
   Merge an archived checkpoint into active slot.
 
-  Requires matching materials. Live records win overlaps; source archive is retained and
-  live checkpoint is backed up by default.
+  STEM accepts a unique prefix or fragment of an active checkpoint name. Requires
+  matching materials. Live records win overlaps; source archive is retained and live
+  checkpoint is backed up by default.
 
 Options:
   --no-archive      Skip pre-union backup of live checkpoint.
@@ -681,8 +682,9 @@ Usage: pyrite checkpoint archive store [OPTIONS] STEM [LABEL]
 
   Copy an active checkpoint to long-term shelf.
 
-  LABEL defaults to a date-stamped label inferred from STEM. Existing labels are
-  preserved unless --force.
+  STEM accepts a unique prefix or fragment of an active checkpoint name. LABEL defaults
+  to a date-stamped label inferred from STEM. Existing labels are preserved unless
+  --force.
 
 Options:
   --force     Overwrite existing archive label.
@@ -743,12 +745,14 @@ Usage: pyrite checkpoint export-trajectories [OPTIONS] ARTIFACT...
 
   Export captured trajectory segments to VTK PolyData (.vtp).
 
-  ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, or a directory
-  searched recursively for them. Each artifact becomes one .vtp of two-point line cells
-  in the slab frame [angstrom] with per-segment cell data, including electron_id; per-
-  electron arrays, tallies, and complete transport metadata stay in the authoritative
-  HDF5 artifact. Opens in ParaView, VisIt, and PyVista. --scene also exports lab-frame
-  geometry as separate close-up and instrument scenes.
+  ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, a directory searched
+  recursively for them, or a checkpoint from `pyrite checkpoint list` (exact name,
+  unique prefix, or unique fragment such as its hash) naming its local capture
+  directory. Each artifact becomes one .vtp of two-point line cells in the slab frame
+  [angstrom] with per-segment cell data, including electron_id; per-electron arrays,
+  tallies, and complete transport metadata stay in the authoritative HDF5 artifact.
+  Opens in ParaView, VisIt, and PyVista. --scene also exports lab-frame geometry as
+  separate close-up and instrument scenes.
 
   --history, --track, --first, or --sample export only whole selected histories (primary
   electron_id with every secondary of its shower) or tracks, reading only their rows;
@@ -757,7 +761,7 @@ Usage: pyrite checkpoint export-trajectories [OPTIONS] ARTIFACT...
 
   Examples:
 
-    pyrite checkpoint export-trajectories trajectories/hopg/ --first 20
+    pyrite checkpoint export-trajectories hopg@trajectory_demo --first 20
 
     pyrite checkpoint export-trajectories case.h5 --sample 100 --seed 1 --scene
 
@@ -791,13 +795,14 @@ Usage: pyrite checkpoint score-trajectories [OPTIONS] ARTIFACT...
 
   Score checkpoint records from captured trajectories without re-transporting.
 
-  ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, or a directory
-  searched recursively for them. Each artifact's spectrum phase (line, characteristic,
-  and bremsstrahlung spectra) is replayed from its stored segments and saved as a record
-  of the checkpoint stem and run identity it was captured under, in DIR/<stem>. Records
-  already present are kept unless --overwrite; records of cases without an artifact are
-  never touched. Each new record stores its artifact's path and SHA-256. The shared per-
-  case cache is neither read nor written.
+  ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, a directory searched
+  recursively for them, or a checkpoint selector as for export-trajectories. Each
+  artifact's spectrum phase (line, characteristic, and bremsstrahlung spectra) is
+  replayed from its stored segments and saved as a record of the checkpoint stem and run
+  identity it was captured under, in DIR/<stem>. Records already present are kept unless
+  --overwrite; records of cases without an artifact are never touched. Each new record
+  stores its artifact's path and SHA-256. The shared per-case cache is neither read nor
+  written.
 
   Every artifact is checked before anything is written: schema-1, incomplete, foreign,
   or mismatched artifacts, and a checkpoint written by a different run, are refused.
