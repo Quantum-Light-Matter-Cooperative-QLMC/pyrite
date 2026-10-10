@@ -155,6 +155,18 @@ def test_coherent_profile_refuses_any_policy(catalog):
     assert _profile_file(catalog, "hopg_short") == before
 
 
+def test_coherent_profile_accepts_a_windowed_policy(catalog):
+    """#350: feature windows resolve the coherent route, so the editor allows them."""
+    path = catalog / "profiles" / "hopg_short.toml"
+    path.write_text(path.read_text() + "\n[line_grid_policy]\nwindows = true\n")
+
+    result = _line_grid("set", "hopg_short", "--bandwidth", "kinematic-ceiling")
+
+    assert result.exit_code == 0, result.stderr
+    # Editing a selector keeps the TOML-only window opt-in.
+    assert _stored(catalog, "hopg_short") == {"windows": True, "bandwidth": "kinematic-ceiling"}
+
+
 def test_reset_partial_conflict_named_and_whole(catalog):
     conflict = _line_grid("reset", "high_energy", "bandwidth", "-y")
     assert conflict.exit_code == 2
