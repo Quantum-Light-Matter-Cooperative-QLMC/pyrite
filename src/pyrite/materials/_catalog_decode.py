@@ -8,7 +8,7 @@ from typing import cast
 import numpy as np
 
 GridValue = int | float | Mapping[str, object]
-LineGridByEnergy = Mapping[float, np.ndarray]
+CxrGridByEnergy = Mapping[float, np.ndarray]
 _GRID_KINDS = frozenset({"values", "arange", "linspace", "logspace"})
 
 
@@ -151,8 +151,8 @@ def _grid(value: object, path: str, errors: _Errors) -> np.ndarray | None:
 _SOURCE_KINDS = frozenset({"derived", "manual"})
 
 
-def _energy_grid_rows(value: object, path: str, errors: _Errors) -> LineGridByEnergy | None:
-    """Decode one ``[energy_grids.<material>].line_by_energy`` array.
+def _energy_grid_rows(value: object, path: str, errors: _Errors) -> CxrGridByEnergy | None:
+    """Decode one ``[energy_grids.<material>].cxr_by_energy`` array.
 
     The shared per-material derived-grid store (docs/cli-energy-grid-sweep-rework-
     plan.md decision 3): keyed by beam energy, each row carries its own
@@ -230,7 +230,7 @@ def _table(value: object, path: str, errors: _Errors) -> Mapping[str, object] | 
 
 __all__ = [
     "GridValue",
-    "LineGridByEnergy",
+    "CxrGridByEnergy",
     "grid_descriptor_kind",
     "resolve_grid_descriptor",
 ]

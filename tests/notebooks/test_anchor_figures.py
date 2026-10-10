@@ -113,7 +113,9 @@ def test_model_routes_resolved_case_geometry_through_all_components(monkeypatch)
 
     monkeypatch.setattr(af, "tilted_geometry", fake_geometry)
     monkeypatch.setattr(af, "simulate_trajectories", fake_segments)
-    monkeypatch.setattr(af, "mc_spectrum", lambda *_args, **_kwargs: np.ones(anchor.E_grid.size))
+    monkeypatch.setattr(
+        af, "mc_cxr_spectrum", lambda *_args, **_kwargs: np.ones(anchor.E_grid.size)
+    )
     monkeypatch.setattr(
         af, "mc_brem_spectrum", lambda *_args, **_kwargs: np.zeros(anchor.E_grid.size)
     )
@@ -583,7 +585,7 @@ def test_supplementary_model_uses_reported_hbn_azimuth(monkeypatch):
 
     monkeypatch.setattr(af, "tilted_geometry", fake_geometry)
     monkeypatch.setattr(af, "simulate_trajectories", lambda *args, **kwargs: np.zeros((1, 2)))
-    monkeypatch.setattr(af, "mc_spectrum", lambda *args, **kwargs: np.zeros(600))
+    monkeypatch.setattr(af, "mc_cxr_spectrum", lambda *args, **kwargs: np.zeros(600))
 
     study = af.supplementary_study("hbn")
     spectra = af.model_coherent_spectra(study, 921.0, ne=1)
@@ -607,7 +609,7 @@ def test_supplementary_model_requires_explicit_unreported_azimuth(monkeypatch):
 
     monkeypatch.setattr(af, "tilted_geometry", fake_geometry)
     monkeypatch.setattr(af, "simulate_trajectories", lambda *args, **kwargs: np.zeros((1, 2)))
-    monkeypatch.setattr(af, "mc_spectrum", lambda *args, **kwargs: np.zeros(400))
+    monkeypatch.setattr(af, "mc_cxr_spectrum", lambda *args, **kwargs: np.zeros(400))
 
     af.model_coherent_spectra(study, 42.0, ne=1, exploratory_azimuth_deg=35.0)
 

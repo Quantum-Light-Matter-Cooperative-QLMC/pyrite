@@ -8,7 +8,7 @@ out of ``runner/__init__.py`` (re-exported there under the same names).
 import os
 from collections.abc import Mapping
 
-from ..spectrum.lines import _setup as _line_setup
+from ..spectrum.cxr import _setup as _cxr_setup
 from .chunking import (
     _EEDL_BREM_DENSE_INTERMEDIATES,
     _RESOURCE_POLICY,
@@ -31,7 +31,7 @@ def _stage_counters(tp):
     segments = tp.get("segs")
     if isinstance(segments, Mapping) and "L_ang" in segments:
         counters["_segments"] = int(segments["L_ang"].size)
-    for key, value in _line_setup.SETUP_STATS.items():
+    for key, value in _cxr_setup.SETUP_STATS.items():
         counters[f"_{key}"] = value
     counters.update(_host_rss_mib())
     return counters

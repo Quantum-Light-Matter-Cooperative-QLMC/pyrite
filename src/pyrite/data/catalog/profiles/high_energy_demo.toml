@@ -13,7 +13,7 @@ materials = ["hopg"]
 beam = "example"
 detector = "reference"
 
-[line_grid_policy]
+[cxr_grid_policy]
 bandwidth = "resonance-population"
 resolution = "resonance-local"
 quadrature = "bin-mean"

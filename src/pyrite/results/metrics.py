@@ -3,8 +3,8 @@ results.metrics
 ================
 
 Per-record scalar metrics for the parametric heatmaps: peak-finding on the
-coherent LINE spectrum (:func:`line_index`, :func:`line_quality`) and the
-full metrics bundle (:func:`line_metrics`) they feed.
+coherent LINE spectrum (:func:`cxr_index`, :func:`cxr_quality`) and the
+full metrics bundle (:func:`cxr_metrics`) they feed.
 """
 
 import warnings
@@ -12,12 +12,12 @@ import warnings
 import numpy as np
 from scipy.signal import find_peaks, peak_widths
 
-from .._spectral_components import line_spectrum
+from .._spectral_components import cxr_spectrum
 from .store import beam_current_na
 
 
 def _find_peaks_props(spec, rel_prominence):
-    """One peak-finding pass shared by line_index/line_quality/line_metrics:
+    """One peak-finding pass shared by cxr_index/cxr_quality/cxr_metrics:
     returns (peaks, props, smax). props carries 'prominences' and 'widths'
     (FWHM in samples). Empty peaks array if the spectrum is flat/zero."""
     spec = np.asarray(spec, dtype=float)
@@ -61,7 +61,7 @@ def _quality_from_peaks(size, peaks, props, smax, rel_width_max):
     return float(dominance * contrast * narrowness)
 
 
-def line_index(spec, rel_prominence=0.03, metric="sharpness"):
+def cxr_index(spec, rel_prominence=0.03, metric="sharpness"):
     """Index of the coherent LINE in a spectrum. Operates on the LINE spectrum
     only (r['spec']); the incoherent brem never enters here.
 
@@ -79,7 +79,7 @@ def line_index(spec, rel_prominence=0.03, metric="sharpness"):
 
     NOTE: this ALWAYS returns an index, even when the spectrum has no
     well-defined line (a broad ramp, or many comparable peaks) -- it just falls
-    back to argmax. Use line_quality() to decide whether that index is
+    back to argmax. Use cxr_quality() to decide whether that index is
     meaningful before trusting line_eV / fwhm_eV."""
     spec = np.asarray(spec, dtype=float)
     if spec.size == 0:
@@ -88,7 +88,7 @@ def line_index(spec, rel_prominence=0.03, metric="sharpness"):
     return _select_index(spec, peaks, props, smax, metric)
 
 
-def line_quality(spec, rel_prominence=0.03, rel_width_max=0.10):
+def cxr_quality(spec, rel_prominence=0.03, rel_width_max=0.10):
     """How "well-defined" the dominant coherent line is, as a score in [0, 1].
     Designed to flag the geometries where there is NO single meaningful line, so
     the heatmaps can blank them instead of plotting a peak-finder artifact.
@@ -116,7 +116,7 @@ def line_quality(spec, rel_prominence=0.03, rel_width_max=0.10):
 
 
 # Cross-call cache for the (expensive, per-record scipy peak-finding)
-# `line_metrics` result -- `plots._common._metrics_map` already dedupes within one call via
+# `cxr_metrics` result -- `plots._common._metrics_map` already dedupes within one call via
 # `id(rec)`, but every fresh call (e.g. a marimo tab re-rendering because an
 # unrelated widget elsewhere changed) redid the whole O(records) pass from
 # scratch. Measured on the densest checkpoint (mose2, 3720 records): this pass
@@ -132,27 +132,27 @@ def line_quality(spec, rel_prominence=0.03, rel_width_max=0.10):
 # unlike the rest of `case` (which can carry unhashable `composition`/
 # `hkl_list`/`abs_layers` entries) is always a plain hashable (str, float)
 # pair. Derived source current is the only record/settings value
-# `line_metrics` reads today -- extend this key if that grows.
-_LINE_METRICS_CACHE = {}
-_LINE_METRICS_CACHE_MAX = 100_000
+# `cxr_metrics` reads today -- extend this key if that grows.
+_CXR_METRICS_CACHE = {}
+_CXR_METRICS_CACHE_MAX = 100_000
 
 
-def _cached_line_metrics(r, settings, rel_prominence, line_metric):
+def _cached_cxr_metrics(r, settings, rel_prominence, cxr_metric):
     case = r["case"]
     key = (
         case["name"],
         case["E0_keV"],
         beam_current_na(r, settings),
         rel_prominence,
-        line_metric,
+        cxr_metric,
     )
-    cached = _LINE_METRICS_CACHE.get(key)
+    cached = _CXR_METRICS_CACHE.get(key)
     if cached is not None:
         return cached
-    value = line_metrics(r, settings, rel_prominence, metric=line_metric)
-    if len(_LINE_METRICS_CACHE) >= _LINE_METRICS_CACHE_MAX:
-        _LINE_METRICS_CACHE.clear()
-    _LINE_METRICS_CACHE[key] = value
+    value = cxr_metrics(r, settings, rel_prominence, metric=cxr_metric)
+    if len(_CXR_METRICS_CACHE) >= _CXR_METRICS_CACHE_MAX:
+        _CXR_METRICS_CACHE.clear()
+    _CXR_METRICS_CACHE[key] = value
     return value
 
 
@@ -192,7 +192,7 @@ def _integrate_energy_window(
     return float(np.trapezoid(samples, energies))
 
 
-def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness"):
+def cxr_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness"):
     """Scalar metrics for one record, used by the heatmaps. Two flux quantities
     are deliberately distinct:
 
@@ -206,15 +206,15 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
     * ``total_flux`` integrates line plus background over the line grid.
     * ``coherent_brem_ratio`` compares all line flux to all local-grid background.
     * ``line_brem_ratio`` compares the dominant peak to its local background.
-    * ``line_quality`` is the dominant-line definition score in ``[0, 1]``.
+    * ``cxr_quality`` is the dominant-line definition score in ``[0, 1]``.
 
     The coherent-line quantities (peak_flux, coherent_flux, line_eV, fwhm_eV,
     and line_flux) are calculated from the LINE spectrum r['spec']. Brem enters
     total_flux, the line_frac denominator, coherent_brem_ratio (over the full
     line grid), and line_brem_ratio (over the dominant line's local window).
     peak_flux / coherent_flux / total_flux need no peak and stay valid
-    everywhere; the line_index-based quantities are unreliable where
-    line_quality is low (broad ramps, or many comparable peaks).
+    everywhere; the cxr_index-based quantities are unreliable where
+    cxr_quality is low (broad ramps, or many comparable peaks).
 
     Parameters
     ----------
@@ -227,7 +227,7 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
     n_fwhm
         Width of the dominant-line integration window in FWHM units.
     metric
-        Peak-selection metric forwarded to :func:`line_index`.
+        Peak-selection metric forwarded to :func:`cxr_index`.
 
     Returns
     -------
@@ -236,7 +236,7 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
         line-to-background ratios, and finite-footprint hit fraction.
     """
     E = np.asarray(r["E_grid"], dtype=float)
-    spec = np.asarray(line_spectrum(r), dtype=float)
+    spec = np.asarray(cxr_spectrum(r), dtype=float)
     brem = np.asarray(r["brem"], dtype=float)
     cur, sc = beam_current_na(r, settings), r["scale"]
     smax = float(spec.max()) if spec.size else 0.0
@@ -248,7 +248,7 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
         idx, quality = 0, 0.0
     try:
         # a zero-prominence/zero-width peak (argmax fallback, single-sample spike)
-        # is expected at ill-defined geometries -- line_quality already gates those,
+        # is expected at ill-defined geometries -- cxr_quality already gates those,
         # so silence scipy's per-peak PeakPropertyWarning (private class, hence the
         # broad filter on this one call) rather than spamming the scan log.
         with warnings.catch_warnings():
@@ -262,8 +262,8 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
     half_window_eV = n_fwhm * fwhm_eV / 2.0
     lower_eV = float(E[idx]) - half_window_eV
     upper_eV = float(E[idx]) + half_window_eV
-    line_int = _integrate_energy_window(spec, E, lower_eV, upper_eV)
-    brem_line_int = _integrate_energy_window(brem, E, lower_eV, upper_eV)
+    cxr_int = _integrate_energy_window(spec, E, lower_eV, upper_eV)
+    brem_cxr_int = _integrate_energy_window(brem, E, lower_eV, upper_eV)
     coh_int = float(np.trapezoid(spec, E)) if spec.size else 0.0
     brem_int = float(np.trapezoid(brem, E))
     total_int = coh_int + brem_int
@@ -276,20 +276,40 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
         # sampled spectral densities, not energy-integrated fluxes.
         "peak_flux_per_na": smax * sc,
         "coherent_flux_per_na": coh_int * sc,
-        "line_flux_per_na": line_int * sc,
+        "line_flux_per_na": cxr_int * sc,
         "total_flux_per_na": total_int * sc,
         "peak_spectral_flux_density": smax * sc * cur,
         "peak_flux": smax * sc * cur,
         "coherent_flux": coh_int * sc * cur,
         "line_eV": float(E[idx]),
         "fwhm_eV": fwhm_eV,
-        "line_flux": line_int * sc * cur,
-        "line_frac": (line_int / total_int) if total_int > 0 else float("nan"),
+        "line_flux": cxr_int * sc * cur,
+        "line_frac": (cxr_int / total_int) if total_int > 0 else float("nan"),
         "total_flux": total_int * sc * cur,
         "coherent_brem_ratio": (coh_int / brem_int) if brem_int > 0 else float("nan"),
-        "line_brem_ratio": (line_int / brem_line_int) if brem_line_int > 0 else float("nan"),
+        "line_brem_ratio": (cxr_int / brem_cxr_int) if brem_cxr_int > 0 else float("nan"),
         "line_quality": quality,
         # geometry diagnostic (not spectrum-derived): finite-crystal footprint-hit
         # fraction carried straight from the record. NaN on pre-feature checkpoints.
         "hit_frac": float(r.get("hit_frac", float("nan"))),
     }
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {
+    "_cached_line_metrics": "_cached_cxr_metrics",
+    "line_metrics": "cxr_metrics",
+}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]
+
+
+_CXR_RENAMED_EXPORTS.update({"line_index": "cxr_index", "line_quality": "cxr_quality"})

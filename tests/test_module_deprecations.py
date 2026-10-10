@@ -9,11 +9,12 @@ from pyrite._module_deprecations import MODULE_DEPRECATIONS, PUBLIC_EXPORT_DEPRE
 def _live_module_shims() -> set[str]:
     package = Path(__file__).parents[1] / "src" / "pyrite"
     live: set[str] = set()
-    for directory, prefix in ((package, "pyrite"), (package / "plots", "pyrite.plots")):
-        for path in directory.glob("*.py"):
-            tree = ast.parse(path.read_text())
-            if (ast.get_docstring(tree) or "").startswith("Compatibility re-export for"):
-                live.add(f"{prefix}.{path.stem}")
+    for path in package.rglob("*.py"):
+        tree = ast.parse(path.read_text())
+        if (ast.get_docstring(tree) or "").startswith("Compatibility re-export for"):
+            relative = path.relative_to(package).with_suffix("")
+            parts = relative.parts[:-1] if relative.name == "__init__" else relative.parts
+            live.add(".".join(("pyrite", *parts)))
     return live
 
 

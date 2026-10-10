@@ -230,13 +230,13 @@ def save(
         _atomic_dump(component_path(stem, component, root), _component_store(results, component))
 
 
-def _merge(line: dict, brem: dict, characteristic: dict) -> dict:
+def _merge(cxr: dict, brem: dict, characteristic: dict) -> dict:
     merged = {}
-    for name, by_energy in line.items():
+    for name, by_energy in cxr.items():
         merged[name] = {}
-        for energy, line_record in by_energy.items():
-            record = dict(line_record)
-            record["case"] = copy.deepcopy(line_record["case"])
+        for energy, cxr_record in by_energy.items():
+            record = dict(cxr_record)
+            record["case"] = copy.deepcopy(cxr_record["case"])
             brem_record = brem.get(name, {}).get(energy)
             if brem_record is not None:
                 for key in _BREM_KEYS:
@@ -276,7 +276,7 @@ def _merge(line: dict, brem: dict, characteristic: dict) -> dict:
 def load(stem: str, root: str | os.PathLike[str]) -> dict:
     line_path = component_read_path(stem, "line", root)
     if line_path.is_file():
-        line = _checkpoint_io.load(str(line_path))
+        cxr = _checkpoint_io.load(str(line_path))
         legacy = None
         brem_path = component_read_path(stem, "brem", root)
         if brem_path.is_file():
@@ -294,7 +294,7 @@ def load(stem: str, root: str | os.PathLike[str]) -> dict:
             characteristic = _component_store(legacy, "characteristic")
         else:
             characteristic = {}
-        merged = _merge(line, brem, characteristic)
+        merged = _merge(cxr, brem, characteristic)
         return _overlay(merged, load_parts(stem, root))
     old = legacy_path(stem, root)
     if old.is_file():

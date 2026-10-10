@@ -43,30 +43,30 @@ def _cell_edges(disp_vals):
     return np.concatenate([[v[0] - (mids[0] - v[0])], mids, [v[-1] + (v[-1] - mids[-1])]])
 
 
-def _value_heatmap(recs, x, y, panel, value, value_label, cmap, auto_lines, title):
-    """Single-figure heatmap (or line plot, if ``auto_lines`` and an axis is
+def _value_heatmap(recs, x, y, panel, value, value_label, cmap, auto_cxr, title):
+    """Single-figure heatmap (or line plot, if ``auto_cxr`` and an axis is
     thin) of ``value(record)``, max-reduced per cell -- the ``value=`` mode of
     :func:`plot_heatmaps`, factored out so it doesn't clutter the
-    quantities/line_metrics path above."""
+    quantities/cxr_metrics path above."""
     label = value_label or "value"
-    if auto_lines:
+    if auto_cxr:
         nx = len({r["case"][x] for r in recs})
         ny = len({r["case"][y] for r in recs})
         if nx < 2 or ny < 2:
-            line_x, thin = (x, y) if nx >= ny else (y, x)
+            cxr_x, thin = (x, y) if nx >= ny else (y, x)
             n_panel = len({r["case"][panel] for r in recs})
             hue = panel if n_panel > 1 else thin
             print(
                 f"plot_heatmaps: axis {thin!r} has <2 values -> line plot "
-                f"(value vs {line_x!r}, one line per {hue!r})."
+                f"(value vs {cxr_x!r}, one line per {hue!r})."
             )
             hue_vals = sorted({r["case"][hue] for r in recs})
-            div_x = _AXIS_SPECS.get(line_x, (None, 1.0))[1]
+            div_x = _AXIS_SPECS.get(cxr_x, (None, 1.0))[1]
             fig, ax = plt.subplots(figsize=(8, 5))
             for j, hv in enumerate(hue_vals):
                 hr = [r for r in recs if r["case"][hue] == hv]
-                xs = sorted({r["case"][line_x] for r in hr})
-                ys = [max(value(r) for r in hr if r["case"][line_x] == xv) for xv in xs]
+                xs = sorted({r["case"][cxr_x] for r in hr})
+                ys = [max(value(r) for r in hr if r["case"][cxr_x] == xv) for xv in xs]
                 col = energy_color(hv, hue_vals) if hue == "E0_keV" else COLORS[j % len(COLORS)]
                 ax.plot(
                     [v / div_x for v in xs],
@@ -76,7 +76,7 @@ def _value_heatmap(recs, x, y, panel, value, value_label, cmap, auto_lines, titl
                     lw=1.8,
                     label=_value_label(hue, hv),
                 )
-            ax.set_xlabel(_axis_label(line_x))
+            ax.set_xlabel(_axis_label(cxr_x))
             ax.set_ylabel(label)
             ax.set_title(title or f"{label} (best per point)", fontsize=12)
             ax.grid(alpha=0.3)
@@ -134,14 +134,14 @@ def plot_heatmaps(
     panel="E0_keV",
     select="quality_line",
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
     min_flux_frac=0.02,
-    min_line_quality=0.2,
+    min_cxr_quality=0.2,
     *,
     value=None,
     value_label=None,
     value_cmap="viridis",
-    auto_lines=False,
+    auto_cxr=False,
     title=None,
     metrics=None,
 ):
@@ -150,7 +150,7 @@ def plot_heatmaps(
 
     For two axes that may or may not both sweep, prefer :func:`plot_scan`, which
     auto-picks this heatmap or a line plot from how many values each axis has;
-    this function always draws the map (unless ``auto_lines`` is set with
+    this function always draws the map (unless ``auto_cxr`` is set with
     ``value``, see below).
 
     ``x`` / ``y`` / ``panel`` are case-dict keys -- any of "tilt_deg",
@@ -167,7 +167,7 @@ def plot_heatmaps(
     shows ITS metric -- i.e. "the best achievable here". For the default axes each
     cell is a single case, so the reduction is a no-op (matches the old maps).
 
-    Default quantities (see results.line_metrics): the integrated coherent flux
+    Default quantities (see results.cxr_metrics): the integrated coherent flux
     of ALL lines, the integrated flux under the single dominant
     line, that line's energy and FWHM, its share of the total flux, a
     line-definition quality map, and the total integrated flux. Maps that need NO
@@ -175,7 +175,7 @@ def plot_heatmaps(
     the spacing-dependent sampled ``peak_flux`` remains available by explicit
     request. Dominant-line maps are gated by BOTH ``min_flux_frac`` (cell
     coherent flux below this fraction of the panel max -> no emission) AND
-    ``min_line_quality`` (line_quality below this [0,1] -> no well-defined line:
+    ``min_cxr_quality`` (cxr_quality below this [0,1] -> no well-defined line:
     a broad ramp or a cluster of comparable peaks). Set either to 0 to disable.
 
     Pass ``cases`` (the current sweep from build_cases) to restrict to THIS
@@ -186,12 +186,12 @@ def plot_heatmaps(
     records (computed once here when omitted and shared across every quantity's
     figure); :func:`plot_scan` passes its own map through.
 
-    ``value`` bypasses ``quantities``/line_metrics/``select`` entirely: pass a
+    ``value`` bypasses ``quantities``/cxr_metrics/``select`` entirely: pass a
     ``callable(record) -> float`` and each cell shows the MAX of ``value`` over
     its records (there is no separate quality score -- the record achieving that
     max IS the "best" one). Produces exactly one figure, labelled
     ``value_label`` (colorbar/axis) on ``value_cmap``, with ``title`` as the
-    suptitle (a generic default if omitted). With ``auto_lines=True`` a
+    suptitle (a generic default if omitted). With ``auto_cxr=True`` a
     single-valued x or y axis renders a line plot (value vs the varying axis,
     one line per the other) instead of a degenerate 1-wide/1-tall heatmap --
     for consumers of ``value`` (e.g. plot_eaglexo_charge_map) that don't go
@@ -202,12 +202,12 @@ def plot_heatmaps(
         print("no results yet")
         return []
     if value is not None:
-        return _value_heatmap(recs, x, y, panel, value, value_label, value_cmap, auto_lines, title)
+        return _value_heatmap(recs, x, y, panel, value, value_label, value_cmap, auto_cxr, title)
 
     quantities = quantities or _HEATMAP_QUANTITIES
     panel_vals = sorted({r["case"][panel] for r in recs})
     if metrics is None:  # one shared map across every quantity's figure
-        metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
+        metrics = _metrics_map(recs, settings, rel_prominence, cxr_metric)
 
     figs = []
     for key, label, cmap in quantities:
@@ -221,9 +221,9 @@ def plot_heatmaps(
             select=select,
             cases=cases,
             rel_prominence=rel_prominence,
-            line_metric=line_metric,
+            cxr_metric=cxr_metric,
             min_flux_frac=min_flux_frac,
-            min_line_quality=min_line_quality,
+            min_cxr_quality=min_cxr_quality,
             metrics=metrics,
         )
         panels = []  # (panel_value, Z, x_edges, y_edges)
@@ -277,7 +277,7 @@ def facet_metric(
     logy=False,
     sharey=True,
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
     max_facets=36,
 ):
     """Small-multiples ("facet grid") view of a many-knob sweep (TODO P3 #9): a
@@ -297,7 +297,7 @@ def facet_metric(
     (``"max"|"min"|"mean"|"median"``). Returns the Figure (None if empty)."""
     from ...results import results_dataframe
 
-    df = results_dataframe(results, settings, rel_prominence=rel_prominence, metric=line_metric)
+    df = results_dataframe(results, settings, rel_prominence=rel_prominence, metric=cxr_metric)
     if df.empty:
         print("no results yet")
         return None
@@ -375,7 +375,7 @@ def plot_metric_vs(
     select="quality_line",
     cases=None,
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
     logx=False,
     logy=False,
     metrics=None,
@@ -388,7 +388,7 @@ def plot_metric_vs(
         plot_metric_vs(res, s, x="thickness_ang", metric="line_flux", logx=True)
         plot_metric_vs(res, s, x="E0_keV", metric="coherent_flux", hue="tilt_deg")
 
-    ``metric`` is any line_metrics key. Generalizes plot_peak_vs_tilt
+    ``metric`` is any cxr_metrics key. Generalizes plot_peak_vs_tilt
     The spacing-dependent sampled ``peak_flux`` metric remains available by
     explicit request. ``metrics`` is a
     precomputed ``_common._metrics_map`` (computed in the frame builder when
@@ -424,7 +424,7 @@ def plot_metric_vs(
         select=select,
         cases=cases,
         rel_prominence=rel_prominence,
-        line_metric=line_metric,
+        cxr_metric=cxr_metric,
         metrics=metrics,
     )
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -464,9 +464,9 @@ def plot_scan(
     select="quality_line",
     cases=None,
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
     min_flux_frac=0.02,
-    min_line_quality=0.2,
+    min_cxr_quality=0.2,
     logx=False,
     logy=False,
     force=None,
@@ -484,7 +484,7 @@ def plot_scan(
         of horizontal bands (delegates to plot_metric_vs, one call per quantity).
 
     Either way you get ONE FIGURE PER QUANTITY (same list-of-figs contract as
-    plot_heatmaps). ``quantities`` is a list of line_metrics keys (strings) and/or
+    plot_heatmaps). ``quantities`` is a list of cxr_metrics keys (strings) and/or
     ``(key, label, cmap)`` triples; default is the full heatmap set.
 
     Knobs: ``heatmap_min`` is the per-axis value count below which a heatmap row/
@@ -504,7 +504,7 @@ def plot_scan(
 
     mode = scan_mode(recs, x, y, heatmap_min, force)
     # one metrics map shared across every quantity's figure (quantity-independent)
-    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
+    metrics = _metrics_map(recs, settings, rel_prominence, cxr_metric)
 
     if mode == "heatmap":
         print(f"plot_scan: heatmap mode ({x} x {y}, panel per {panel})")
@@ -518,26 +518,26 @@ def plot_scan(
             panel=panel,
             select=select,
             rel_prominence=rel_prominence,
-            line_metric=line_metric,
+            cxr_metric=cxr_metric,
             min_flux_frac=min_flux_frac,
-            min_line_quality=min_line_quality,
+            min_cxr_quality=min_cxr_quality,
             metrics=metrics,
         )
 
     # line mode: denser axis -> x, sparser -> hue (unless hue is given)
-    line_x, hue = pick_hue(recs, x, y, panel, hue)
-    print(f"plot_scan: line mode ({line_x} on x, one line per {hue})")
+    cxr_x, hue = pick_hue(recs, x, y, panel, hue)
+    print(f"plot_scan: line mode ({cxr_x} on x, one line per {hue})")
     return [
         plot_metric_vs(
             results,
             settings,
-            x=line_x,
+            x=cxr_x,
             metric=key,
             hue=hue,
             select=select,
             cases=cases,
             rel_prominence=rel_prominence,
-            line_metric=line_metric,
+            cxr_metric=cxr_metric,
             logx=logx,
             logy=logy,
             metrics=metrics,

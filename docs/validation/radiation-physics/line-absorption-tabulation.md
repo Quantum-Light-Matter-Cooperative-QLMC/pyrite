@@ -117,14 +117,14 @@ stored logarithmic coefficients.
 The implementation matches the boxed elemental interpolation and the stable
 fraction. `_elemental_log_mu_table` samples EPDL totals per composition entry;
 `_interp_elemental_mu` exponentiates each blended row before summing.
-`_line_tabulation_grid` unions the 1 eV mesh, basis/absorber Chantler energies,
+`_cxr_tabulation_grid` unions the 1 eV mesh, basis/absorber Chantler energies,
 and absorber EPDL knots. `_epdl_mesh_nodes` adds adjacent float32 values around
 each repeated-energy photoelectric edge. The repeated energy itself survives
 `np.unique`, so exact float64 edge nodes retain the right-hand value, while the
 interval immediately below that node smooths the jump. The discontinuous
 interval has width at most one float32 ulp, not one float64 ulp.
 
-`mc_spectrum` delegates setup and evaluation to `_setup.py`, `_batched.py`, and
+`mc_cxr_spectrum` delegates setup and evaluation to `_setup.py`, `_batched.py`, and
 `_per_hkl.py`. Setup builds coefficients on the host once and casts the mesh and
 log rows to `REAL`. The batched gather and per-reflection route use a common
 bracket and the log fraction. The streaming CUDA prologue computes the same

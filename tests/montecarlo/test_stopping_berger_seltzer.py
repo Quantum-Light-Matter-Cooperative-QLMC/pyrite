@@ -338,7 +338,7 @@ def test_spliced_vectorized_agrees_with_the_scalar_form():
 # implementations: the compound-scalar form the lockstep and grooved cores call,
 # the padded form the per-electron core calls, the host NumPy helper the cost
 # proxy and the diagnostics replay call, and the device-array twin in
-# ``spectrum.lines``. They are separate code, so nothing but a test keeps them
+# ``spectrum.cxr``. They are separate code, so nothing but a test keeps them
 # in step -- and the copies that used to live in ``campaign.sweep`` and
 # ``spectrum.diagnostics`` are exactly how the last model change drifted.
 
@@ -372,7 +372,7 @@ def test_host_helper_matches_the_padded_form():
 
 
 def test_stopping_mirrors_agree():
-    """``spectrum.lines`` carries a device-array twin that cannot delegate.
+    """``spectrum.cxr`` carries a device-array twin that cannot delegate.
 
     Its rows may live on the GPU, so it re-implements the model against ``xp``
     instead of calling the host helper. This is the pin that keeps the two from

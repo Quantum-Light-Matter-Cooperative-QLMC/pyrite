@@ -39,20 +39,20 @@ from typing import Any
 import numpy as np
 
 from .._backend import BACKEND, _to_cpu
+from .._cxr_grid_policy import DEFAULT_RTOL
+from .._cxr_windows import build_window_plan
 from .._grid_semantics import resolution_num
-from .._line_grid_policy import DEFAULT_RTOL
-from .._line_windows import build_window_plan
 from ..campaign.config import material_sweep
 from ..campaign.sweep import build_cases
 from ..materials import CATALOG
 from ..montecarlo import runner
-from ..montecarlo.spectrum.diagnostics import sinc_feature_spacing
-from ..montecarlo.spectrum.line_seeds import (
+from ..montecarlo.spectrum.cxr_seeds import (
     DEFAULT_SEED_PROVIDERS,
     DEFAULT_TAIL_WIDTHS,
     SeedContext,
     collect_feature_seeds,
 )
+from ..montecarlo.spectrum.diagnostics import sinc_feature_spacing
 from .convergence import (
     Rung,
     SpectrumSample,
@@ -197,7 +197,7 @@ class CaseLadder:
         before squaring.
         """
         tp = self.transport
-        lines = runner._lines_for_segments(
+        lines = runner._cxr_for_segments(
             self._segments_device,
             np.asarray(E_grid_eV, dtype=float),
             self.case,
@@ -241,7 +241,7 @@ class CaseLadder:
         E = np.asarray(E_grid_eV, dtype=float)
         characteristic = self._characteristic(E)
         return SpectrumSample(
-            line=self.lines(E),
+            cxr=self.lines(E),
             background=self.continuum(E),
             informational={
                 "characteristic_yield": float(np.trapezoid(characteristic, E)),

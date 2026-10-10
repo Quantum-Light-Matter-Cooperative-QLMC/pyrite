@@ -43,7 +43,7 @@ in human output. The JSON payload retains its existing source spellings.
 
 | TOML key | Setter flag | Notes |
 |---|---|---|
-| `n_electrons`, `n_electrons_brem` | `--line-trials`, `--brem-trials` | single-value grids; `profile set\|add -l/-b` edit them as sweepable grids; old electron options warn and are scheduled for removal in 0.8.0 |
+| `n_electrons`, `n_electrons_brem` | `--cxr-trials`, `--brem-trials` | single-value grids; `profile set\|add -l/-b` edit them as sweepable grids; old electron options warn and are scheduled for removal in 0.8.0 |
 | `n_families`, `max_reflections` | `--reflection-families`, `--maximum-reflections` | |
 | `mosaic_nodes`, `mosaic_route` | `--mosaic-nodes`, `--mosaic-route` | |
 | `straggling`, `energy_model`, `max_dE_frac` | `--straggling`, `--energy-model`, `--maximum-fractional-energy-loss` | also accepted by `profile create\|set` for compatibility |
@@ -55,7 +55,7 @@ in human output. The JSON payload retains its existing source spellings.
 
 ## Line-grid policy
 
-`pyrite profile line-grid show|set|reset NAME` owns `[profiles.NAME.line_grid_policy]`.
+`pyrite profile cxr-grid show|set|reset NAME` owns `[profiles.NAME.line_grid_policy]`.
 
 | TOML key | Values (default first) | Flag |
 |---|---|---|

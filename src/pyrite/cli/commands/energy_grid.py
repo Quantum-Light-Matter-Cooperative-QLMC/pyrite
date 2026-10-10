@@ -457,7 +457,7 @@ def set_command(material, energy, stop, num, start, note, catalog_profile):
     """Set one line-grid row by repointing an immutable artifact."""
     resolved_profile = _cli_config.resolve("profile.current", catalog_profile).value
     try:
-        digest = apply.set_line_artifact(
+        digest = apply.set_cxr_artifact(
             material,
             energy,
             stop,
@@ -512,7 +512,7 @@ def rm_command(material, energies, yes, dry_run, catalog_profile, json_output):
     resolved_profile = _cli_config.resolve("profile.current", catalog_profile).value
     if dry_run:
         try:
-            apply.remove_line_rows(material, energies, profile=resolved_profile, dry_run=True)
+            apply.remove_cxr_rows(material, energies, profile=resolved_profile, dry_run=True)
         except (KeyError, ValueError, OSError) as exc:
             _expected_failure(exc)
         return 0
@@ -520,7 +520,7 @@ def rm_command(material, energies, yes, dry_run, catalog_profile, json_output):
         energy_list = ", ".join(f"{e:g}" for e in energies)
         try:
             preview_original = apply._read_catalog(apply.active_catalog_path())
-            apply.remove_line_rows(material, energies, profile=resolved_profile, dry_run=True)
+            apply.remove_cxr_rows(material, energies, profile=resolved_profile, dry_run=True)
         except (KeyError, ValueError, OSError) as exc:
             _expected_failure(exc)
         if not confirm_destructive(
@@ -531,7 +531,7 @@ def rm_command(material, energies, yes, dry_run, catalog_profile, json_output):
             return 0
     try:
         kwargs = {} if yes else {"expected_original": preview_original}
-        deleted, digest = apply.remove_line_rows(
+        deleted, digest = apply.remove_cxr_rows(
             material, energies, profile=resolved_profile, **kwargs
         )
     except (KeyError, ValueError, OSError) as exc:
@@ -814,7 +814,7 @@ def defaults_command(
         try:
             values = defaults.load_defaults()
             source = "persisted" if defaults.DEFAULTS_PATH.exists() else "fallback"
-            result = cli_json.line_grid_defaults(values, source=source)
+            result = cli_json.cxr_grid_defaults(values, source=source)
         except (OSError, TypeError, ValueError) as exc:
             result = cli_json.failure("cxr.energy-grid.defaults", {}, str(exc))
         emit_json_result(result)
@@ -839,7 +839,7 @@ def _show(json_output, material, catalog_profile, *, band=None):
                 profile=resolved_profile
             )
             materials = raw["materials"]
-            result = cli_json.line_grid_show(
+            result = cli_json.cxr_grid_show(
                 materials,
                 energy_grids,
                 brem_by_material,
@@ -890,7 +890,7 @@ def show_command(json_output, material, catalog_profile):
     shell_complete=_cli_completion.complete_profile,
     help="Resolve profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
 )
-def line_show_command(json_output, material, catalog_profile):
+def cxr_show_command(json_output, material, catalog_profile):
     """Show coherent line-energy grids."""
     return _show(json_output, material, catalog_profile, band="line")
 
@@ -908,3 +908,17 @@ def line_show_command(json_output, material, catalog_profile):
 def brem_show_command(json_output, material, catalog_profile):
     """Show bremsstrahlung energy grids."""
     return _show(json_output, material, catalog_profile, band="brem")
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {"line_show_command": "cxr_show_command"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

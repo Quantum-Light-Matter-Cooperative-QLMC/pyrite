@@ -37,7 +37,7 @@ The split is refused entirely where it would be ambiguous: under the coherent po
 
 ## Solid-angle integration
 
-The default evaluation uses a single fixed far-field direction, and the caller multiplies by a solid angle downstream. `mc_spectrum_solid_angle` instead tiles the detector face into directions carrying solid-angle weights and sums the per-direction spectra, returning $dN/dE$ **already multiplied by $\Omega$**.
+The default evaluation uses a single fixed far-field direction, and the caller multiplies by a solid angle downstream. `mc_cxr_spectrum_solid_angle` instead tiles the detector face into directions carrying solid-angle weights and sums the per-direction spectra, returning $dN/dE$ **already multiplied by $\Omega$**.
 
 Because both the resonance energy and the amplitudes depend on the observation direction, this resolves the direction-dependent lineshape and intensity across the face, subject to convergence of the angular quadrature. Consequently:
 

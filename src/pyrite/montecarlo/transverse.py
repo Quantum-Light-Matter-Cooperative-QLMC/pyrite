@@ -137,7 +137,7 @@ def resolve_transverse_distribution(
 
     Assumptions: the two planes are uncoupled (no ``<x y>`` term), and the
     parameters describe the beam at the crystal entrance face -- no space
-    charge and no beamline transport carry it there.
+    charge and no beamCXR transport carry it there.
 
     Limiting cases: ``eps_n -> 0`` gives a collimated point beam;
     ``alpha = 0`` is the waist, where the correlation vanishes and

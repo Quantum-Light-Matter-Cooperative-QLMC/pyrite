@@ -65,8 +65,95 @@ def _public_export_entry(
 
 #: Keyed by the full compatibility module path used in an import.
 #:
-#: Empty since 0.5.0, when the flat re-export cohort was removed.
-MODULE_DEPRECATIONS: dict[str, ModuleDeprecation] = {}
+#: CXR vocabulary shims introduced in 0.11.0. The older flat re-export cohort
+#: was removed in 0.5.0.
+MODULE_DEPRECATIONS: dict[str, ModuleDeprecation] = {
+    "pyrite._line_grid_policy": _entry(
+        "pyrite._line_grid_policy", "pyrite._cxr_grid_policy", since="0.11.0"
+    ),
+    "pyrite._line_windows": _entry("pyrite._line_windows", "pyrite._cxr_windows", since="0.11.0"),
+    "pyrite.montecarlo.spectrum.line_seeds": _entry(
+        "pyrite.montecarlo.spectrum.line_seeds",
+        "pyrite.montecarlo.spectrum.cxr_seeds",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.spectrum.line_jit_kernel": _entry(
+        "pyrite.montecarlo.spectrum.line_jit_kernel",
+        "pyrite.montecarlo.spectrum.cxr_jit_kernel",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.runner.line_grid": _entry(
+        "pyrite.montecarlo.runner.line_grid", "pyrite.montecarlo.runner.cxr_grid", since="0.11.0"
+    ),
+    "pyrite.cli.commands._profile_line_grid": _entry(
+        "pyrite.cli.commands._profile_line_grid",
+        "pyrite.cli.commands._profile_cxr_grid",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.spectrum.lines._temporal": _entry(
+        "pyrite.montecarlo.spectrum.lines._temporal",
+        "pyrite.montecarlo.spectrum.cxr._temporal",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.spectrum.lines._batched_finalize": _entry(
+        "pyrite.montecarlo.spectrum.lines._batched_finalize",
+        "pyrite.montecarlo.spectrum.cxr._batched_finalize",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.spectrum.lines._bin_tree": _entry(
+        "pyrite.montecarlo.spectrum.lines._bin_tree",
+        "pyrite.montecarlo.spectrum.cxr._bin_tree",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.spectrum.lines._spectrum": _entry(
+        "pyrite.montecarlo.spectrum.lines._spectrum",
+        "pyrite.montecarlo.spectrum.cxr._spectrum",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.spectrum.lines._batched": _entry(
+        "pyrite.montecarlo.spectrum.lines._batched",
+        "pyrite.montecarlo.spectrum.cxr._batched",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.spectrum.lines._kernels": _entry(
+        "pyrite.montecarlo.spectrum.lines._kernels",
+        "pyrite.montecarlo.spectrum.cxr._kernels",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.spectrum.lines": _entry(
+        "pyrite.montecarlo.spectrum.lines", "pyrite.montecarlo.spectrum.cxr", since="0.11.0"
+    ),
+    "pyrite.montecarlo.spectrum.lines._policy": _entry(
+        "pyrite.montecarlo.spectrum.lines._policy",
+        "pyrite.montecarlo.spectrum.cxr._policy",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.spectrum.lines._attribution": _entry(
+        "pyrite.montecarlo.spectrum.lines._attribution",
+        "pyrite.montecarlo.spectrum.cxr._attribution",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.spectrum.lines._per_hkl": _entry(
+        "pyrite.montecarlo.spectrum.lines._per_hkl",
+        "pyrite.montecarlo.spectrum.cxr._per_hkl",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.spectrum.lines._bin_quadrature": _entry(
+        "pyrite.montecarlo.spectrum.lines._bin_quadrature",
+        "pyrite.montecarlo.spectrum.cxr._bin_quadrature",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.spectrum.lines._formation": _entry(
+        "pyrite.montecarlo.spectrum.lines._formation",
+        "pyrite.montecarlo.spectrum.cxr._formation",
+        since="0.11.0",
+    ),
+    "pyrite.montecarlo.spectrum.lines._setup": _entry(
+        "pyrite.montecarlo.spectrum.lines._setup",
+        "pyrite.montecarlo.spectrum.cxr._setup",
+        since="0.11.0",
+    ),
+}
 
 
 #: Keyed by the compatibility package and exported attribute.

@@ -1,7 +1,7 @@
 """Closed-form ``sinc^2`` bin integration (issue #116).
 
 Pins the antiderivative and its ``Si`` evaluator, the mass identity on uniform
-and windowed grids, both limits, the ``mc_spectrum`` opt-in on both routes, the
+and windowed grids, both limits, the ``mc_cxr_spectrum`` opt-in on both routes, the
 explicit refusals, and that node sampling stays the default.
 
 Validation: sinc-bin-integration
@@ -13,10 +13,10 @@ from scipy.integrate import quad
 from scipy.special import sici
 
 from pyrite._backend import REAL
-from pyrite._line_windows import FeatureSeed, build_window_plan
-from pyrite.montecarlo import mc_spectrum
+from pyrite._cxr_windows import FeatureSeed, build_window_plan
+from pyrite.montecarlo import mc_cxr_spectrum
 from pyrite.montecarlo.spectrum.characteristic import _energy_bin_edges_and_widths
-from pyrite.montecarlo.spectrum.lines import (
+from pyrite.montecarlo.spectrum.cxr import (
     SpectrumRequest,
     _accumulate_batched,
     _accumulate_per_hkl,
@@ -24,7 +24,7 @@ from pyrite.montecarlo.spectrum.lines import (
     _policy,
     _prepare_spectrum,
 )
-from pyrite.montecarlo.spectrum.lines import _bin_quadrature as bq
+from pyrite.montecarlo.spectrum.cxr import _bin_quadrature as bq
 from tests.helpers import host_backend_only, scaled_rtol, to_device, to_host
 from tests.helpers.backend import IS_FLOAT32
 from tests.montecarlo.test_spectrum_phases import B_ANG2, CRYSTAL, HKL, N_HAT, _segments
@@ -150,7 +150,7 @@ def test_infinite_width_parameter_puts_all_mass_in_the_resonance_bin():
     assert fractions[-1] == pytest.approx(1.0, abs=1e-5)
 
 
-# ---- mc_spectrum opt-in -------------------------------------------------------
+# ---- mc_cxr_spectrum opt-in -------------------------------------------------------
 _KW = {"crystal": CRYSTAL, "hkl_list": [HKL], "B_ang2": B_ANG2, "n_hat": N_HAT}
 
 
@@ -168,14 +168,14 @@ def _yield(grid, spec):
 def test_bin_mean_yield_is_spacing_independent_where_node_sampling_aliases():
     segs = _long_flights()
     dense = _uniform_axis(0.002, 701.0, 1499.0)
-    reference = _yield(dense, mc_spectrum(segs, dense, **_KW))
+    reference = _yield(dense, mc_cxr_spectrum(segs, dense, **_KW))
     for spacing in SPACINGS_EV:
         grid = _uniform_axis(spacing, 701.0, 1499.0)
-        binned = _yield(grid, mc_spectrum(segs, grid, line_quadrature="bin-mean", **_KW))
+        binned = _yield(grid, mc_cxr_spectrum(segs, grid, line_quadrature="bin-mean", **_KW))
         # float32 casts the dense reference's nodes by up to an ulp.
         assert binned == pytest.approx(reference, rel=1e-3 if IS_FLOAT32 else 1e-5)
     coarse = _uniform_axis(3.0, 701.0, 1499.0)
-    aliased = _yield(coarse, mc_spectrum(segs, coarse, **_KW))
+    aliased = _yield(coarse, mc_cxr_spectrum(segs, coarse, **_KW))
     assert abs(aliased / reference - 1.0) > 1e-2, "fixture no longer aliases"
 
 
@@ -183,8 +183,8 @@ def test_node_quadrature_is_the_unchanged_default():
     segs = _long_flights()
     grid = _uniform_axis(3.0, 701.0, 1499.0)
     np.testing.assert_array_equal(
-        to_host(mc_spectrum(segs, grid, **_KW)),
-        to_host(mc_spectrum(segs, grid, line_quadrature="node", **_KW)),
+        to_host(mc_cxr_spectrum(segs, grid, **_KW)),
+        to_host(mc_cxr_spectrum(segs, grid, line_quadrature="node", **_KW)),
     )
 
 
@@ -208,16 +208,18 @@ def test_per_hkl_and_batched_routes_agree_under_bin_mean():
 def test_fused_and_fallback_routes_agree(monkeypatch):
     """Off CUDA float32 both spellings take the fallback; on it, the fused kernel."""
     grid = _uniform_axis(3.0, 701.0, 1499.0)
-    fused = to_host(mc_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW))
-    monkeypatch.setattr(_policy, "_USE_JIT_LINE_REDUCTION", False)
-    fallback = to_host(mc_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW))
+    fused = to_host(mc_cxr_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW))
+    monkeypatch.setattr(_policy, "_USE_JIT_CXR_REDUCTION", False)
+    fallback = to_host(mc_cxr_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW))
     np.testing.assert_allclose(fused, fallback, rtol=scaled_rtol(1e-12, eps_multiple=64.0))
 
 
 def test_components_are_supported_and_sum_to_the_total_parts():
     grid = _uniform_axis(3.0, 701.0, 1499.0)
-    total = mc_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW)
-    both = mc_spectrum(_long_flights(), grid, line_quadrature="bin-mean", components=True, **_KW)
+    total = mc_cxr_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW)
+    both = mc_cxr_spectrum(
+        _long_flights(), grid, line_quadrature="bin-mean", components=True, **_KW
+    )
     np.testing.assert_allclose(
         to_host(both[0]), to_host(total), rtol=scaled_rtol(1e-12, eps_multiple=8.0)
     )
@@ -235,13 +237,13 @@ def test_components_are_supported_and_sum_to_the_total_parts():
 def test_unsupported_combinations_are_refused(over, match):
     kw = {"line_quadrature": "bin-mean", **over}
     with pytest.raises(ValueError, match=match):
-        mc_spectrum(_long_flights(), _uniform_axis(3.0, 701.0, 1499.0), **_KW, **kw)
+        mc_cxr_spectrum(_long_flights(), _uniform_axis(3.0, 701.0, 1499.0), **_KW, **kw)
 
 
 @host_backend_only("flight-grouped reduction is host-only")
 def test_numerical_substeps_are_refused():
     with pytest.raises(ValueError, match="numerical substeps"):
-        mc_spectrum(
+        mc_cxr_spectrum(
             _segments(flights=True),
             _uniform_axis(3.0, 701.0, 1499.0),
             line_quadrature="bin-mean",

@@ -24,7 +24,7 @@ means depends on the kernel's own coherence semantics:
 - ``brem`` -- ``mc_brem_spectrum`` sums an independent path integral per row,
   so substep rows are a refined Riemann sum of the same per-flight integral.
   The ladder converges to the exact refined continuum.
-- ``cxrC`` -- ``mc_spectrum(coherent=True)`` sums ONE global complex field over
+- ``cxrC`` -- ``mc_cxr_spectrum(coherent=True)`` sums ONE global complex field over
   every row and squares at the end (``elec_id`` only masks rows at
   ``elec_id < Ne``; per-electron decoherence is emergent from the ``t0_ang``
   spread, not a grouping).  Substep rows therefore refine that global field
@@ -32,7 +32,7 @@ means depends on the kernel's own coherence semantics:
 - ``cxrCfz`` -- the same ladder integrated with the frozen rule against the same
   midpoint reference, so the pair isolates the propagation rule from the
   substep count.
-- ``cxrI`` -- ``mc_spectrum(coherent=False)`` accumulates ``|A_j|^2 |Q_j|^2``
+- ``cxrI`` -- ``mc_cxr_spectrum(coherent=False)`` accumulates ``|A_j|^2 |Q_j|^2``
   per ROW.  Refining a flight into n substeps splits one emitter into n
   independent ones, each with a 1/n shorter coherent time and an n-times wider
   sinc: the reduction is NOT invariant, and this column is a CONTROL that
@@ -74,13 +74,13 @@ import argparse
 import numpy as np
 
 from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
-from pyrite.montecarlo.spectrum import mc_brem_spectrum, mc_spectrum
+from pyrite.montecarlo.spectrum import mc_brem_spectrum, mc_cxr_spectrum
+from pyrite.montecarlo.spectrum.cxr import _observation_direction
 from pyrite.montecarlo.spectrum.diagnostics import (
     _flight_E_end_keV,
     _host,
     _stopping_keV_per_ang,
 )
-from pyrite.montecarlo.spectrum.lines import _observation_direction
 from pyrite.montecarlo.transport import beta_from_keV, simulate_trajectories
 
 CARBON = [("C", 0.1136)]
@@ -427,11 +427,13 @@ def _radiation_reductions(rows, composition, cxr_grid, only=None):
         if "brem" in wanted:
             values["brem"] = mc_brem_spectrum(rows, BREM_GRID, composition=composition)
         if cxr_grid is not None and "cxr_coh" in wanted:
-            values["cxr_coh"] = mc_spectrum(
+            values["cxr_coh"] = mc_cxr_spectrum(
                 rows, cxr_grid, composition=composition, coherent=True, **CXR_KWARGS
             )
         if cxr_grid is not None and "cxr_incoh" in wanted:
-            values["cxr_incoh"] = mc_spectrum(rows, cxr_grid, composition=composition, **CXR_KWARGS)
+            values["cxr_incoh"] = mc_cxr_spectrum(
+                rows, cxr_grid, composition=composition, **CXR_KWARGS
+            )
     return values
 
 
@@ -456,7 +458,7 @@ def _flight_incoherent_cxr(rows, parent, composition, cxr_grid, Ne):
         }
         one["Ne"] = 1
         with np.errstate(all="ignore"):
-            total += mc_spectrum(
+            total += mc_cxr_spectrum(
                 one, cxr_grid, composition=composition, coherent=True, **CXR_KWARGS
             )
     return total / Ne
@@ -813,9 +815,9 @@ def part_d(Ne):
         grid = _cxr_grid(E0, g002, n_hat)
         base_rows, _, _ = _subdivide(segments, comp, None)
         with np.errstate(all="ignore"):
-            base = mc_spectrum(base_rows, grid, composition=comp, coherent=True, **kwargs)
+            base = mc_cxr_spectrum(base_rows, grid, composition=comp, coherent=True, **kwargs)
             split = [
-                mc_spectrum(
+                mc_cxr_spectrum(
                     _subdivide(segments, comp, f, refine="geometry")[0],
                     grid,
                     composition=comp,

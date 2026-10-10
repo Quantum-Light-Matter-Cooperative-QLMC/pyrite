@@ -7,7 +7,7 @@ import pytest
 
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner.timing import _TimingAgg
-from pyrite.montecarlo.spectrum.lines import _setup as line_setup
+from pyrite.montecarlo.spectrum.cxr import _setup as line_setup
 
 
 def _tp():

@@ -289,7 +289,7 @@ def test_every_per_row_array_is_registered_in_the_owning_field_registry():
     per-row array that skips it survives a row mask at full length and silently
     desynchronizes layer filtering, cutoff clipping, and device staging. The
     named-field assertions above cannot catch a field nobody thought to add."""
-    from pyrite.montecarlo.spectrum.lines import _SEG_ARRAYS
+    from pyrite.montecarlo.spectrum.cxr import _SEG_ARRAYS
 
     n_electrons = 24
     segments = simulate_trajectories(

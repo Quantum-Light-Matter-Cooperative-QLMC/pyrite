@@ -37,9 +37,9 @@ def _case(name):
 
 
 def run(args):
-    from pyrite._line_grid_policy import resolve_line_grid_policy
+    from pyrite._cxr_grid_policy import resolve_cxr_grid_policy
     from pyrite.energy_grid import convergence_case as cc
-    from pyrite.montecarlo.runner.line_grid import resolve_line_grid
+    from pyrite.montecarlo.runner.cxr_grid import resolve_cxr_grid
 
     output = Path(args.out)
     snapshot = output.with_suffix(".transport.pkl")
@@ -60,13 +60,13 @@ def run(args):
     result = {"case": args.case, "start_eV": start, "stop_eV": stop, "rows": []}
     for hkl in case["hkl_list"]:
         row_case = {**case, "hkl_list": [hkl], "coherent_emission": True}
-        payload = resolve_line_grid_policy(
+        payload = resolve_cxr_grid_policy(
             start_eV=start,
             stop_eV=stop,
             per_call={"windows": True, "max_points": args.max_points},
         ).payload()
         row_case["line_grid_policy"] = payload
-        _, record = resolve_line_grid(row_case, ladder.segments, tp["n_hat"], tp["Ne_lines"], None)
+        _, record = resolve_cxr_grid(row_case, ladder.segments, tp["n_hat"], tp["Ne_lines"], None)
         summary = record["coherent_windows"]
         rows = [row for row in summary["rows"] if row.get("points")]
         if not rows:

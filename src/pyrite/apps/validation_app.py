@@ -435,7 +435,7 @@ def _(mo):
 def _(af, mo):
     anchor = af.ZhaiAnchor()
     theory_energies = af.theory_line_energies(anchor)
-    line_energy_anchors = mo.ui.table(
+    cxr_energy_anchors = mo.ui.table(
         [
             {"Beam energy (keV)": energy, "Eq. (10) line energy (eV)": line_energy}
             for energy, line_energy in theory_energies.items()
@@ -443,7 +443,7 @@ def _(af, mo):
         selection=None,
         label="Analytic line-energy anchors",
     )
-    return anchor, line_energy_anchors
+    return anchor, cxr_energy_anchors
 
 
 @app.cell
@@ -884,7 +884,7 @@ def _(
     anchors_controls,
     anchors_intro,
     anchors_results,
-    line_energy_anchors,
+    cxr_energy_anchors,
     mo,
     provenance_audit,
     provenance_findings,
@@ -914,7 +914,7 @@ def _(
                     mo.md("**Authority: Anchor** — published-condition reproduction."),
                     reproductions_intro,
                     reproductions_controls,
-                    line_energy_anchors,
+                    cxr_energy_anchors,
                     reproductions_results,
                 ]
             ),

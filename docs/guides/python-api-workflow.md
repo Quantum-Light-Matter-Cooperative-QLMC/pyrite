@@ -18,8 +18,8 @@ result = pr.simulate(
     target,
     detector,
     numerics=pr.Numerics(
-        n_electrons=450,
-        n_electrons_brem=100,
+        cxr_trials=450,
+        brem_trials=100,
         convergence=pr.Convergence(n_families=4),
     ),
 )
@@ -31,13 +31,13 @@ result = pr.simulate(
 
 ## Interpret the result
 
-`Result.energy_eV` and `Result.background_energy_eV` are the photon-energy coordinates for `spectrum` and `background`. With a scalar `Detector`, both arrays are response-free source photon density per incident electron per eV per sr. They exclude acceptance scaling, source current, quantum efficiency, and measured-energy redistribution. With a `PlanarDetector`, the scalar arrays are filter-attenuated, solid-angle-weighted observation averages; see the spatial-scoring boundary below.
+`Result.cxr.incoherent.photon_energy_eV` and `Result.brem.photon_energy_eV` are the photon-energy coordinates for `spectrum` and `background`. With a scalar `Detector`, both arrays are response-free source photon density per incident electron per eV per sr. They exclude acceptance scaling, source current, quantum efficiency, and measured-energy redistribution. With a `PlanarDetector`, the scalar arrays are filter-attenuated, solid-angle-weighted observation averages; see the spatial-scoring boundary below.
 
 ```python
-line_energy_eV = result.energy_eV
-source_line = result.spectrum
-continuum_energy_eV = result.background_energy_eV
-source_continuum = result.background
+cxr_energy_eV = result.cxr.incoherent.photon_energy_eV
+source_cxr = result.cxr.incoherent.density
+continuum_energy_eV = result.brem.photon_energy_eV
+source_continuum = result.brem.density
 
 digest = result.provenance["identity_digest"]
 backend = result.provenance["backend"]
@@ -47,7 +47,12 @@ resolved_case = result.case
 
 Provenance also contains the resolved scene, numerics, and PyRITE/NumPy versions. Record the digest and software revision with any derived figure or table.
 
-`emission="both"` computes incoherent and coherent spectra from the same transport. `result.spectrum` remains the incoherent array and `result.coherent_spectrum` holds the coherent companion. With `emission="coherent"`, both names select the coherent array. This model remains inside the [documented validation boundary](../physics/radiation-physics/coherent-emission.md).
+`emission="both"` and `emission="coherent"` expose both CXR modes from the
+same transport: `result.cxr.incoherent.density` always means incoherent CXR,
+and `result.cxr.coherent.density` is its coherent companion. Neither includes
+atomic characteristic emission. Use `result.combined_cxr(mode="coherent")`
+for the coherent CXR-plus-characteristic density and its grid. The coherent
+model remains inside the [documented validation boundary](../physics/radiation-physics/coherent-emission.md).
 
 The high-level API currently cannot inject an external bremsstrahlung array. `brem_source="external"` and `brem_source="none"` therefore return zeros on the resolved continuum grid; use `brem_source="mc"` for simulated background.
 
@@ -82,14 +87,14 @@ assert spatial is not None
 
 energy_eV, selected = spatial.spectra(
     pixels=[(128, 64), (128, 192)],
-    component="line",
+    component="cxr",
 )
-line_image = spatial.image((4_000.0, 6_000.0), component="line")
+line_image = spatial.image((4_000.0, 6_000.0), component="cxr")
 metadata = spatial.pixel_metadata(pixels=[(128, 64), (128, 192)])
 shadow = spatial.transmission_image(5_000.0, component="background")
 ```
 
-Selected spectra include each pixel's solid angle and therefore have units of photons per incident electron per eV. `component="line"` and `"coherent"` are PXR/CBS only; `"characteristic"` is the atomic-relaxation component, and `"line_total"`/`"coherent_total"` add it to the corresponding line. `Result.spectrum` remains a detector- averaged density per sr. `SpatialResult` stores tile spectra, pixel rays, and attenuation coefficients as separate factors; `spectra` materializes only the selection and `image` works in bounded pixel chunks rather than allocating a full `(row, column, energy)` cube. Pass `measured=True` to either method to apply a configured `PlanarDetector.response` explicitly.
+Selected spectra include each pixel's solid angle and therefore have units of photons per incident electron per eV. `component="cxr"` and `"coherent"` are PXR/CBS only; `"characteristic"` is the atomic-relaxation component, and `"cxr_total"`/`"coherent_total"` add it to the corresponding line. `Result.cxr.incoherent.density` remains a detector- averaged density per sr. `SpatialResult` stores tile spectra, pixel rays, and attenuation coefficients as separate factors; `spectra` materializes only the selection and `image` works in bounded pixel chunks rather than allocating a full `(row, column, energy)` cube. Pass `measured=True` to either method to apply a configured `PlanarDetector.response` explicitly.
 
 `pixel_metadata` returns, for a selection only, each pixel's detector-local and lab position, unit direction with lab polar/azimuth angles, distance, scored solid angle, angular tile (and its representative direction when retained), and per-filter path length. `filter_coverage()` marks which centre rays cross each plate, and `transmission_image(energy_eV, component=...)` is the primary transmission at the nearest stored node of that component's energy grid (`energy_node` reports it); an energy outside the grid is an error rather than a snap to its end, so use `"background"` for the wide continuum grid. Uncovered pixels are exactly 1.
 
@@ -160,9 +165,9 @@ Simulation output remains free of the configured detector response even when the
 from pyrite.detectors import Timepix3
 
 timepix = pr.Detector(response=Timepix3(thickness_um=500.0, bias_v=100.0))
-detected_line = timepix.score(
-    result.energy_eV,
-    result.spectrum,
+detected_cxr = timepix.score(
+    result.cxr.incoherent.photon_energy_eV,
+    result.cxr.incoherent.density,
     scale=1.0,
 )
 ```
@@ -212,3 +217,36 @@ An explicit `Numerics.backend` validates the already-active backend; it does not
 `Result` is an in-memory return type and has no supported save/load method. Resumable campaigns store result mappings in component checkpoints. Current `.pkl` paths contain versioned HDF5 data; older pickle generations remain readable. See [Working with results](working-with-results.md), the [result schema](../repo-design/storage/result-schema.md), and the [supported API reference](../api.md).
 
 No MCPL or other particle-interchange adapter is currently implemented.
+
+## Migrate spectral names
+
+Use `Numerics(cxr_trials=..., brem_trials=..., cxr_chunk=...)` and
+`EnergyBins(cxr=..., cxr_by_energy=..., brem=...)`. Dataclass introspection and
+`dataclasses.replace` use these canonical field names. Retired constructor and
+attribute names warn; they remain supported from 0.11 through the two-minor
+deprecation window, with removal scheduled for 0.13.
+
+| Retired name | Canonical name |
+| --- | --- |
+| `Numerics.n_electrons` | `Numerics.cxr_trials` |
+| `Numerics.n_electrons_brem` | `Numerics.brem_trials` |
+| `Numerics.spec_chunk` | `Numerics.cxr_chunk` |
+| `EnergyBins.line`, `.line_by_energy` | `EnergyBins.cxr`, `.cxr_by_energy` |
+| `Sweep.line_grid_policy` | `Sweep.cxr_grid_policy` |
+| spatial component `line`, `background` | `cxr`, `brem` |
+
+`result.to_dataframe()` returns native-grid rows with `component`, `mode`,
+`photon_energy_eV`, and `density` columns. CXR modes are `incoherent` and
+`coherent`; the other families have no mode. It does not interpolate different
+grids or add totals. Units, normalization, case, and provenance are in
+`DataFrame.attrs`.
+
+Runtime controls are `PYRITE_MC_CXR_CHUNK` and `PYRITE_MC_CXR_BUDGET_MB`.
+Their retired `PYRITE_MC_SPEC_*` spellings warn when used as fallbacks; canonical
+values take precedence when both are set.
+
+Persisted Case/record keys, HDF5 group names, checkpoint filenames, identity
+payload keys, format tags, and RNG stream identifiers retain their historical
+spellings. These compatibility contracts keep existing runs reusable and
+preserve seeded observations. Atomic characteristic lines and mathematical
+line shapes retain their domain terminology.

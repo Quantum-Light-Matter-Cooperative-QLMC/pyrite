@@ -15,7 +15,7 @@ digitized Fig 1c curve in the repo, the model is anchored against EXACT theory:
      (Feranchuk-Spence Eq. 10, the zero-scattering resonance): the MC peak
      positions must land on these. Drawn as vertical markers per beam energy.
   2. Feranchuk-Spence closed-form absolute line flux (Eq. 12, photons/electron
-     into dOmega): a SINGLE straight segment integrated through mc_spectrum
+     into dOmega): a SINGLE straight segment integrated through mc_cxr_spectrum
      reproduces it to <1% (the lineshape-normalization anchor); the full
      transport-broadened MC line then shows the transport correction.
   3. Bulk vs 29 nm film enhancement (MC), with the analytic effective-length
@@ -52,7 +52,7 @@ from pyrite.montecarlo import (  # noqa: E402
     beta_from_keV,
     eds_fwhm_eV,
     mc_brem_spectrum,
-    mc_spectrum,
+    mc_cxr_spectrum,
     simulate_trajectories,
 )
 from pyrite.montecarlo.geometry import tilted_geometry  # noqa: E402
@@ -150,7 +150,7 @@ def model_spectra(anchor: ZhaiAnchor, ne: int = 500, ne_brem: int = 200) -> dict
             seed=case["seed"],
             beam_dir=beam_dir,
         )
-        spec = mc_spectrum(
+        spec = mc_cxr_spectrum(
             segs,
             E_grid,
             crystal=case["crystal"],
@@ -225,7 +225,7 @@ def model_spectra(anchor: ZhaiAnchor, ne: int = 500, ne_brem: int = 200) -> dict
         seed=film_case["seed"],
         beam_dir=film_beam_dir,
     )
-    spec_f = mc_spectrum(
+    spec_f = mc_cxr_spectrum(
         segs_f,
         E_grid,
         crystal=film_case["crystal"],
@@ -403,7 +403,7 @@ def model_coherent_spectra(
             E_cut_keV=5.0,
             seed=case["seed"],
         )
-        spectra[condition] = mc_spectrum(
+        spectra[condition] = mc_cxr_spectrum(
             segments,
             study.E_grid,
             crystal=case["crystal"],
@@ -810,8 +810,8 @@ def figure_enhancement(anchor: ZhaiAnchor, model: dict):
     film = model["film"]["spec_det"] * scale
     mc_enh = float(bulk.max() / film.max())
 
-    E_line = line_energy_eV(anchor, E0)
-    L_abs = crystal_absorption_length_ang(anchor.crystal, E_line)
+    E_cxr = line_energy_eV(anchor, E0)
+    L_abs = crystal_absorption_length_ang(anchor.crystal, E_cxr)
     n_z = np.cos(anchor.theta_obs_rad)  # geometry="lif", as feranchuk_line_flux
     leff_bulk = escape_limited_length_ang(anchor.thick_bulk_ang, L_abs, n_z)
     leff_film = escape_limited_length_ang(anchor.thick_film_ang, L_abs, n_z)
@@ -820,7 +820,7 @@ def figure_enhancement(anchor: ZhaiAnchor, model: dict):
     fig, ax = plt.subplots(figsize=(7, 5))
     ax.plot(anchor.E_grid, bulk, color="C0", label=f"{E0:g} keV, 1 mm bulk")
     ax.plot(anchor.E_grid, film, color="C1", label=f"{E0:g} keV, 29 nm film")
-    ax.axvline(E_line, color="C3", ls=":", lw=1.2, alpha=0.7, label="Eq.(10) line energy")
+    ax.axvline(E_cxr, color="C3", ls=":", lw=1.2, alpha=0.7, label="Eq.(10) line energy")
     ax.set_xlabel("Photon energy (eV)")
     ax.set_ylabel("Intensity (Phs/eV/s/nA)")
     ax.set_title(

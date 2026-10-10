@@ -111,7 +111,7 @@ def test_material_comparison_applies_default_quality_floor_before_every_selectio
     high_quality = _record("Quality floor", 60.0, 200.0, peak=10.0)
     results = {"Test": {"scan": {30.0: low_quality, 60.0: high_quality}}}
 
-    assert inspect.signature(plot_material_comparison).parameters["min_line_quality"].default == 0.5
+    assert inspect.signature(plot_material_comparison).parameters["min_cxr_quality"].default == 0.5
     for select in ("quality_peak", "peak", "line_brem_ratio"):
         fig = plot_material_comparison(results, default_settings(), select=select)
         assert fig.axes[0].texts[0].get_text() == "  Test (60 keV, θ=0°, φ=0°)"
@@ -162,7 +162,7 @@ def test_cross_material_tab_requests_new_comparisons():
     assert 'label="Compare all beam energies"' in app_source
     assert 'label="beam energy"' in app_source
     assert "cross_material_energy_options" in app_source
-    assert view_source.count("min_line_quality=0.5") == 2
+    assert view_source.count("min_cxr_quality=0.5") == 2
     assert "exclude_labels" not in view_source
 
 

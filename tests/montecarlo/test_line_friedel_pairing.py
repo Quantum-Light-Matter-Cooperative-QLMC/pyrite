@@ -23,7 +23,7 @@ from pyrite.materials.crystal import (
     chi_g,
     reciprocal_g_vector,
 )
-from pyrite.montecarlo import mc_spectrum
+from pyrite.montecarlo import mc_cxr_spectrum
 
 CRYSTAL = "4h_sic"  # P6_3mc: noncentrosymmetric, Si K-edge f'' near 3 keV
 HKL = np.array([1, 0, 2])
@@ -64,7 +64,7 @@ def _segment(v_hat):
 
 @pytest.mark.parametrize("tilt_deg", [-12.0, 0.0, 12.0])
 def test_line_couples_to_the_friedel_mate_of_its_resonant_harmonic(tilt_deg, monkeypatch):
-    from pyrite.montecarlo.spectrum.lines import _setup
+    from pyrite.montecarlo.spectrum.cxr import _setup
 
     # Vacuum index so the line centre is the closed-form vacuum root.
     monkeypatch.setattr(
@@ -75,13 +75,13 @@ def test_line_couples_to_the_friedel_mate_of_its_resonant_harmonic(tilt_deg, mon
     g_mag, g_hat, v_hat, n_hat = _geometry(tilt_deg)
     beta = float(beta_from_Ee(E_KEV * 1e3))
     # Independent closed form for the line centre (vacuum, straight flight).
-    E_line = HBARC_EV_ANG * beta * g_mag * (g_hat @ v_hat) / (1.0 - beta * (n_hat @ v_hat))
-    grid = np.linspace(0.9 * E_line, 1.1 * E_line, 4001)
+    E_cxr = HBARC_EV_ANG * beta * g_mag * (g_hat @ v_hat) / (1.0 - beta * (n_hat @ v_hat))
+    grid = np.linspace(0.9 * E_cxr, 1.1 * E_cxr, 4001)
     step = grid[1] - grid[0]
 
     def run(sign):
         hkl = tuple(int(sign * h) for h in HKL)
-        return mc_spectrum(
+        return mc_cxr_spectrum(
             _segment(sign * v_hat),
             grid,
             crystal=CRYSTAL,
@@ -97,14 +97,14 @@ def test_line_couples_to_the_friedel_mate_of_its_resonant_harmonic(tilt_deg, mon
 
     # Line energy: closed form, and opposite tilts are genuinely distinct.
     for total in (total_p, total_m):
-        assert abs(grid[np.argmax(total)] - E_line) <= step
+        assert abs(grid[np.argmax(total)] - E_cxr) <= step
 
     # U_g carries no f'': conj(U(-g)) == U(g), so the CBS yield is invariant.
     np.testing.assert_allclose(cbs_m.sum(), cbs_p.sum(), rtol=1e-9)
 
     # PXR: the +hkl line couples to chi(-hkl), the -hkl line to chi(+hkl).
-    chi_plus = chi_g(CRYSTAL, HKL, E_line, 0.5, True)
-    chi_minus = chi_g(CRYSTAL, -HKL, E_line, 0.5, True)
+    chi_plus = chi_g(CRYSTAL, HKL, E_cxr, 0.5, True)
+    chi_minus = chi_g(CRYSTAL, -HKL, E_cxr, 0.5, True)
     expected = abs(chi_plus) ** 2 / abs(chi_minus) ** 2
     assert abs(expected - 1.0) > 0.2  # the case actually discriminates
     np.testing.assert_allclose(pxr_m.sum() / pxr_p.sum(), expected, rtol=2e-3)
@@ -119,7 +119,7 @@ def test_total_yield_matches_the_unconjugated_native_pairing(monkeypatch):
     keeps both components but changes the interference, and fails here.
     """
     from pyrite.materials.crystal import reflection_coupling_tables
-    from pyrite.montecarlo.spectrum.lines import _kernels, _setup
+    from pyrite.montecarlo.spectrum.cxr import _kernels, _setup
 
     monkeypatch.setattr(
         _setup,
@@ -128,8 +128,8 @@ def test_total_yield_matches_the_unconjugated_native_pairing(monkeypatch):
     )
     g_mag, g_hat, v_hat, n_hat = _geometry(-12.0)
     beta = float(beta_from_Ee(E_KEV * 1e3))
-    E_line = HBARC_EV_ANG * beta * g_mag * (g_hat @ v_hat) / (1.0 - beta * (n_hat @ v_hat))
-    grid = np.linspace(0.9 * E_line, 1.1 * E_line, 2001)
+    E_cxr = HBARC_EV_ANG * beta * g_mag * (g_hat @ v_hat) / (1.0 - beta * (n_hat @ v_hat))
+    grid = np.linspace(0.9 * E_cxr, 1.1 * E_cxr, 2001)
     kwargs = {
         "crystal": CRYSTAL,
         "hkl_list": [tuple(int(h) for h in HKL)],
@@ -137,13 +137,13 @@ def test_total_yield_matches_the_unconjugated_native_pairing(monkeypatch):
         "B_ang2": 0.5,
         "use_henke": True,
     }
-    production = mc_spectrum(_segment(v_hat), grid, **kwargs)
+    production = mc_cxr_spectrum(_segment(v_hat), grid, **kwargs)
 
     def native(crystal, hkl_list, *args, **kw):
         mates = [-np.asarray(hkl, dtype=float) for hkl in hkl_list]
         return reflection_coupling_tables(crystal, mates, *args, **kw)
 
     monkeypatch.setattr(_kernels, "emission_coupling_tables", native)
-    unconjugated = mc_spectrum(_segment(v_hat), grid, **kwargs)
+    unconjugated = mc_cxr_spectrum(_segment(v_hat), grid, **kwargs)
     assert production.max() > 0.0
     np.testing.assert_allclose(unconjugated, production, rtol=1e-9, atol=1e-9 * production.max())

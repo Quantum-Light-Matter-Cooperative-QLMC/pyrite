@@ -171,7 +171,7 @@ over the bundled catalog:
 # Clone a demo, then replace its energy (keV) and thickness (Å) grids.
 pyrite profile create my_scan --from quickstart --energy 30:60:10 --thickness 5000,20000
 pyrite profile set my_scan --material hopg,hbn
-pyrite profile numerics set my_scan --line-trials 2000
+pyrite profile numerics set my_scan --cxr-trials 2000
 pyrite profile show my_scan
 pyrite run my_scan -m hopg
 ```
@@ -197,7 +197,7 @@ result = pr.simulate(
     beam,
     target,
     detector,
-    numerics=pr.Numerics(n_electrons=450, n_electrons_brem=100),
+    numerics=pr.Numerics(cxr_trials=450, brem_trials=100),
 )
 print(result.provenance["identity_digest"])
 ```

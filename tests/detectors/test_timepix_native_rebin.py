@@ -36,8 +36,8 @@ def test_native_line_mass_is_independent_of_source_cell_partition():
 
 
 def test_native_gaussian_counts_agree_on_uniform_and_resonance_local_axes():
-    from pyrite._line_windows import build_window_plan
-    from pyrite.montecarlo.spectrum.line_seeds import ResonancePopulation, local_spacing_seeds
+    from pyrite._cxr_windows import build_window_plan
+    from pyrite.montecarlo.spectrum.cxr_seeds import ResonancePopulation, local_spacing_seeds
 
     centre, sigma = 2_000.3, 3.0
     population = ResonancePopulation("test-line", np.array([centre]), np.ones(1), np.array([0.5]))

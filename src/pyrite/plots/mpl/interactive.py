@@ -15,7 +15,7 @@ from ...results import (
 from .._common import (
     _best_azimuth,
     _case_title,
-    _line_brem,
+    _cxr_brem,
     _peak_line,
 )
 from .._style import (
@@ -196,9 +196,9 @@ def browse_plotly(
                 az = r["case"]["tilt_azim_deg"]
                 lbl = f"{E0:g} keV (φ={az:.1f}°)"
                 vis = ti == 0
-                line_det, brem_det = _line_brem(r, settings, convolve=False)
+                cxr_det, brem_det = _cxr_brem(r, settings, convolve=False)
                 if kind == "by_energy":
-                    y = (line_det + brem_det) if include_brem else line_det
+                    y = (cxr_det + brem_det) if include_brem else cxr_det
                     fig.add_trace(
                         go.Scattergl(
                             x=r["E_grid"],
@@ -229,7 +229,7 @@ def browse_plotly(
                     Eb = np.asarray(r["E_grid_brem"], dtype=float)
                     detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe))
                     brem_wide_det = detector.score(Eb, r["brem_wide"], scale=r["scale"])
-                    total_line = (line_det + brem_det) * r["scale"]
+                    total_line = (cxr_det + brem_det) * r["scale"]
                     fig.add_trace(
                         go.Scattergl(
                             x=Eb,
@@ -337,10 +337,10 @@ def _draw_chunk(fig, trecs, settings):
         lbl = rf"{E0:g} keV ($\phi={az:g}\degree$"
         lbl += rf", {r['case']['thickness_ang'] / 1e4:g} $\mu$m)" if multi_t else ")"
         E = r["E_grid"] / 1e3
-        line_raw, brem_raw = _line_brem(r, settings, convolve=False)  # response-free source
-        ax_tot.plot(E, (line_raw + brem_raw) * r["scale"], color=c, lw=1.2, label=lbl)
+        cxr_raw, brem_raw = _cxr_brem(r, settings, convolve=False)  # response-free source
+        ax_tot.plot(E, (cxr_raw + brem_raw) * r["scale"], color=c, lw=1.2, label=lbl)
         ax_tot.plot(E, brem_raw * r["scale"], color=c, ls="--", lw=0.6)
-        ax_cxr.plot(E, line_raw * r["scale"], color=c, lw=1.2, label=lbl)
+        ax_cxr.plot(E, cxr_raw * r["scale"], color=c, lw=1.2, label=lbl)
     case = best[0]["case"]
     fig.suptitle(
         _case_title(case, "best azimuth per energy (response-free source)", tilt_fmt="g"),

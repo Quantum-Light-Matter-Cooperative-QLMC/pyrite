@@ -14,8 +14,9 @@ from typing import cast
 from .._catalog_layout import CatalogLayoutError, Sources, catalog_root, selected_catalog
 from .._catalog_layout import load_raw as _load_raw
 from .._catalog_layout import read_sources as _read_sources
+from .._cxr_vocabulary import translate_catalog_fields
 from ._beam_detector_parse import _parse_beams, _parse_detectors
-from ._catalog_decode import LineGridByEnergy, _Errors, _grid
+from ._catalog_decode import CxrGridByEnergy, _Errors, _grid
 from ._parse import (
     _load_profile_artifacts,
     _parse_crystals,
@@ -90,6 +91,11 @@ def _load_material_catalog_cached(
 
     if not isinstance(raw, Mapping):
         raise MaterialConfigError((f"{source}: root must be a table",))
+
+    try:
+        translate_catalog_fields(raw)
+    except ValueError as exc:
+        raise MaterialConfigError((str(exc),)) from exc
 
     errors.keys(
         raw,
@@ -191,7 +197,7 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if isinstance(row.get("precision"), Mapping)
     }
-    profile_line_grid_policies = {
+    profile_cxr_grid_policies = {
         name: MappingProxyType(dict(cast("Mapping[str, object]", row["line_grid_policy"])))
         for name, row in profiles.items()
         if isinstance(row.get("line_grid_policy"), Mapping)
@@ -261,7 +267,7 @@ def _load_material_catalog_cached(
         profile_temporal_profiles=MappingProxyType(profile_temporal_profiles),
         profile_precisions=MappingProxyType(profile_precisions),
         profile_transport_numerics=MappingProxyType(profile_transport_numerics),
-        profile_line_grid_policies=MappingProxyType(profile_line_grid_policies),
+        profile_cxr_grid_policies=MappingProxyType(profile_cxr_grid_policies),
         profile_filters=MappingProxyType(profile_filters),
         profile_physical_detectors=MappingProxyType(profile_physical_detectors),
         profile_detector_sets=MappingProxyType(profile_detector_sets),
@@ -297,7 +303,7 @@ __all__ = [
     "CrystalInfo",
     "CrystalSpec",
     "LayerSpec",
-    "LineGridByEnergy",
+    "CxrGridByEnergy",
     "MaterialCatalog",
     "MaterialConfigError",
     "MaterialSpec",

@@ -43,7 +43,7 @@ Confirm the effective `workspace.root`, any `PYRITE_HOME`, and any `--checkpoint
 
 ## Only one spectral component is present
 
-Interrupted runs and component recomputation can leave line or brem alone. Use `pyrite checkpoint recompute line|brem MATERIAL` for the missing component. Check identity before merging or restoring data; incompatible identities are correctly rejected.
+Interrupted runs and component recomputation can leave line or brem alone. Use `pyrite checkpoint recompute cxr|brem MATERIAL` for the missing component. Check identity before merging or restoring data; incompatible identities are correctly rejected.
 
 ## The GPU is unavailable or runs out of memory
 

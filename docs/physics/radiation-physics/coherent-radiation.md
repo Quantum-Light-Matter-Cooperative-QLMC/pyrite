@@ -182,7 +182,7 @@ The default `incoherent` policy sums intensities over flights and electrons unde
 
 Ledger rows: `coherent-line-spectrum` (how $|A|^2$ is used, summed, and normalized), `pxr-amplitude` and `cbs-amplitude` (the couplings themselves), `finite-time-lineshape`, `line-energy-dispersion` (**open discrepancy** on the harmonic sign), `line-absorption-tabulation`, `self-absorption`, `mosaic-mc`, and — for the representative energy and flight grouping — `substep-radiation-invariance`. The evaluation-order rows `line-hkl-batch`, `coherent-line-hkl-batch`, `line-amplitude-fusion`, and `line-gemv-elementwise` cover the batched and fused arithmetic paths, which are algebraically identical to the reference loop up to float reassociation. `closed-form-flux` is `anchored`: the reference includes the exit-angle factor in its escape length. The corrected escape term still awaits an independent derivation check and human sign-off; this status does not settle all absolute comparisons with literature.
 
-Follow those rows in the [validation ledger](../../validation/physics-validation-ledger.md) before scientific use; no row in this section is human `signed-off` yet. Implementation owners: `pyrite.materials.crystal.chi_g`, `pyrite.materials.crystal.U_g`, and `pyrite.montecarlo.spectrum.lines.mc_spectrum`.
+Follow those rows in the [validation ledger](../../validation/physics-validation-ledger.md) before scientific use; no row in this section is human `signed-off` yet. Implementation owners: `pyrite.materials.crystal.chi_g`, `pyrite.materials.crystal.U_g`, and `pyrite.montecarlo.spectrum.cxr.mc_cxr_spectrum`.
 
 
 ## Runtime kinematic screen

@@ -1,6 +1,6 @@
 # `coherent-line-grid-fringe-spacing`
 
-Ledger row: [`coherent-line-grid-fringe-spacing`](../ledger-core-coherent-physics.md). Instrument: `montecarlo/spectrum/diagnostics.py::coherent_fringe_spacing` (estimator), `montecarlo/runner/line_grid.py::_refuse_coherent_resolution` (policy, non-windowed), `energy_grid/convergence_case.py` (ladder, now route-switchable). No kernel change: this row records the band limit of the existing coherent reducer and the evidence for refusing automatic resolution on that route (issue #117).
+Ledger row: [`coherent-line-grid-fringe-spacing`](../ledger-core-coherent-physics.md). Instrument: `montecarlo/spectrum/diagnostics.py::coherent_fringe_spacing` (estimator), `montecarlo/runner/cxr_grid.py::_refuse_coherent_resolution` (policy, non-windowed), `energy_grid/convergence_case.py` (ladder, now route-switchable). No kernel change: this row records the band limit of the existing coherent reducer and the evidence for refusing automatic resolution on that route (issue #117).
 
 ## Claim
 

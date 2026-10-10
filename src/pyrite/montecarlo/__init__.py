@@ -46,7 +46,7 @@ backward compatibility. The submodules are:
   pyrite.materials.attenuation -- composition normalization + X-ray self-absorption
   transport -- electron transport, scattering, stopping power
   geometry  -- tilted-sample / detector / orientation rotations
-  spectrum  -- CXR line spectrum, solid-angle integral, bremsstrahlung
+  spectrum  -- CXR CXR spectrum, solid-angle integral, bremsstrahlung
   detector  -- detector efficiency, line widths, convolution
   runner    -- per-case driver and the pipelined run_cases sweep
 """
@@ -87,7 +87,7 @@ _EXPORT_MODULES = {
     "GrooveSpec": ".groove",
     "blazed_groove_spec": ".groove",
     "_brem_for_case": ".runner",
-    "_lines_for_case": ".runner",
+    "_cxr_for_case": ".runner",
     "_spectrum_case": ".runner",
     "_transport_case": ".runner",
     "_worker_init": ".runner",
@@ -117,8 +117,8 @@ _EXPORT_MODULES = {
     "load_external_brem": ".spectrum",
     "mc_brem_spectrum": ".spectrum",
     "mc_characteristic_spectrum": ".spectrum",
-    "mc_spectrum": ".spectrum",
-    "mc_spectrum_solid_angle": ".spectrum",
+    "mc_cxr_spectrum": ".spectrum",
+    "mc_cxr_spectrum_solid_angle": ".spectrum",
     "A0_SQ_CM2": ".transport",
     "TRANSPORT_ELEMENTS": ".transport",
     "MottTableUnavailableError": ".transport",
@@ -141,21 +141,17 @@ _EXPORT_MODULES = {
 }
 
 __all__ = [
-    # backend
     "xp",
     "cp",
     "REAL",
     "_to_cpu",
     "_GPU",
-    # case
     "Case",
-    # materials
     "_normalize_composition",
     "_mu_total_inv_ang",
     "_layer_dz",
     "_layer_path_length",
     "_stack_tau",
-    # transport
     "TRANSPORT_ELEMENTS",
     "MottTableUnavailableError",
     "mott_tables_dir",
@@ -175,7 +171,6 @@ __all__ = [
     "_dEds_bs_packed_scalar",
     "_rotate_directions",
     "simulate_trajectories",
-    # geometry
     "X_MIN",
     "X_MAX",
     "Y_MIN",
@@ -189,10 +184,8 @@ __all__ = [
     "_orientation_R",
     "_small_tilt_R",
     "_mosaic_quadrature",
-    # groove
     "GrooveSpec",
     "blazed_groove_spec",
-    # spectrum
     "_SEG_ARRAYS",
     "_segments_in_layer",
     "_polarization_pair",
@@ -219,12 +212,10 @@ __all__ = [
     "_eedl_brem_dsigma_dk",
     "mc_brem_spectrum",
     "load_external_brem",
-    # detector
     "eds_fwhm_eV",
     "aperture_fwhm_eV",
     "mosaic_fwhm_eV",
     "mosaic_psi_rad",
-    # runner
     "run_case",
     "_transport_case",
     "_spectrum_case",
@@ -232,11 +223,25 @@ __all__ = [
     "_lines_for_case",
     "_worker_init",
     "run_cases",
+    "mc_cxr_spectrum",
+    "mc_cxr_spectrum_solid_angle",
+    "_cxr_for_case",
 ]
 
 
 def __getattr__(name: str) -> Any:
     """Resolve the historical Monte Carlo exports only when requested."""
+    renamed = {
+        "mc_spectrum": "mc_cxr_spectrum",
+        "mc_spectrum_solid_angle": "mc_cxr_spectrum_solid_angle",
+        "_lines_for_case": "_cxr_for_case",
+    }
+    if name in renamed:
+        from .._api_deprecations import warn_renamed
+
+        replacement = renamed[name]
+        warn_renamed(f"pyrite.montecarlo.{name}", f"pyrite.montecarlo.{replacement}")
+        return __getattr__(replacement)
     if name in _EXPORT_MODULES:
         value = getattr(import_module(_EXPORT_MODULES[name], __name__), name)
     else:

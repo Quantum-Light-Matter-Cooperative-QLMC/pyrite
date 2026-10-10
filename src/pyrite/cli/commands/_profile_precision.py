@@ -13,6 +13,8 @@ from pyrite.console import json as cli_json
 from pyrite.console import output as _output
 from pyrite.console.output import CLIError, emit_json_result, emit_result, output_option
 
+from .._deprecations import canonical_option
+
 _PRECISION_FIELD_NAMES = {
     "target-rse": "target_rse",
     "min-electrons": "min_electrons",
@@ -73,7 +75,7 @@ def _policy_options(function):
         ),
         click.option(
             "--observable",
-            type=click.Choice(OBSERVABLES),
+            type=click.Choice((*OBSERVABLES, "line")),
             multiple=True,
             help=(
                 "Yield that must converge; repeat for both. Replaces the watched set "
@@ -151,7 +153,7 @@ def _interactive():
     return _output._stdin_is_tty()
 
 
-def show_line(precision):
+def show_cxr(precision):
     """Return the `profile show` summary line for a resolved precision payload."""
     effective = precision["effective"]
     if effective is None:
@@ -163,7 +165,7 @@ def show_line(precision):
     )
 
 
-def _mode_line(document, name):
+def _mode_cxr(document, name):
     """One-line resulting electron-count mode after an edit."""
     _explicit, effective, source, reason = _profile_edit.precision_resolution(
         _profile_edit.existing_profile(document, name)
@@ -193,7 +195,7 @@ def command():
       disable  opt out: drop any policy and select fixed counts
 
     Electron sampling is independent of the line grid; see
-    'pyrite profile line-grid'.
+    'pyrite profile cxr-grid'.
     """
 
 
@@ -208,7 +210,7 @@ def precision_show_command(name, json_output):
         explicit, effective, source, fixed_reason = _profile_edit.precision_resolution(profile)
         counts = _profile_edit.fixed_counts(profile)
         blockers = _profile_edit.precision_blockers(profile)
-        grid = _profile_edit.line_grid_sources(document, profile)
+        grid = _profile_edit.cxr_grid_sources(document, profile)
     except (OSError, TypeError, ValueError, ParseError) as exc:
         if json_output:
             emit_json_result(cli_json.failure("cxr.profile.precision.show", {}, str(exc)))
@@ -224,7 +226,7 @@ def precision_show_command(name, json_output):
             "explicit": explicit,
             "effective": effective,
             "fixed_counts": {
-                _profile_edit.SAMPLING_FLAGS[key].replace("-", "_"): value
+                {"n_electrons": "line_trials", "n_electrons_brem": "brem_trials"}[key]: value
                 for key, value in counts.items()
             },
             "blockers": blockers,
@@ -247,13 +249,13 @@ def precision_show_command(name, json_output):
     for blocker in blockers:
         emit_result(f"  adaptive unsupported: {blocker}")
     emit_result(
-        "  line grid: "
+        "  CXR grid: "
         + (
-            "automatic for every case (line-grid policy)"
+            "automatic for every case (cxr-grid policy)"
             if automatic_grid
             else "explicit or stored grids first, automatic for the rest"
         )
-        + f"; independent of electron sampling, see 'pyrite profile line-grid show {name}'"
+        + f"; independent of electron sampling, see 'pyrite profile cxr-grid show {name}'"
     )
     if effective is not None:
         emit_result(f"  to select fixed counts: pyrite profile precision disable {name}")
@@ -283,7 +285,7 @@ def precision_enable_command(name, yes, dry_run, **values):
         removed = _profile_edit.enable_precision(document, name, _updates(values))
     except (OSError, TypeError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
-    if document.as_string() == original:
+    if _catalog_io.is_unchanged(document, original):
         emit_result(f"profile {name}: already adaptive; nothing to change")
         return 0
     confirm_standard(name, "enable adaptive precision on", yes, dry_run)
@@ -291,7 +293,7 @@ def precision_enable_command(name, yes, dry_run, **values):
     if not dry_run:
         if removed:
             emit_result(f"  removed fixed counts: {_profile_edit.describe_counts(removed)}")
-        emit_result(_mode_line(document, name))
+        emit_result(_mode_cxr(document, name))
     return status
 
 
@@ -348,17 +350,19 @@ def precision_reset_command(name, fields, yes, dry_run):
     done = "removed precision policy" if not keys else "reset precision fields"
     status = write(document, original, dry_run, f"{done} for profile {name}")
     if not dry_run:
-        emit_result(_mode_line(document, name))
+        emit_result(_mode_cxr(document, name))
     return status
 
 
 @command.command("disable")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
-@click.option(
-    "--line-trials",
+@canonical_option(
+    "--cxr-trials",
+    "line_trials",
+    retired=("--line-trials",),
     type=click.IntRange(min=1),
     metavar="N",
-    help="Fixed Monte Carlo electron histories for the line spectrum.",
+    help="Fixed Monte Carlo electron histories for the CXR spectrum.",
 )
 @click.option(
     "--brem-trials",
@@ -373,7 +377,7 @@ def precision_reset_command(name, fields, yes, dry_run):
 def precision_disable_command(name, line_trials, brem_trials, yes, dry_run):
     """Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
 
-    --line-trials/--brem-trials replace that count. A count the profile already
+    --cxr-trials/--brem-trials replace that count. A count the profile already
     sets is otherwise kept, including a sweep grid. A count it lacks is prompted
     for on a terminal; without a terminal, or with --yes or --dry-run, it takes
     the full-fidelity default (300 line, 150 brem).
@@ -403,7 +407,7 @@ def precision_disable_command(name, line_trials, brem_trials, yes, dry_run):
         result = _profile_edit.fixed_counts(_profile_edit.existing_profile(document, name))
     except (OSError, TypeError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
-    if document.as_string() == original:
+    if _catalog_io.is_unchanged(document, original):
         emit_result(f"profile {name}: already uses fixed counts; nothing to change")
         return 0
     confirm_standard(name, "select fixed electron counts on", yes, dry_run)
@@ -415,3 +419,17 @@ def precision_disable_command(name, line_trials, brem_trials, yes, dry_run):
             emit_result("  removed precision policy")
         emit_result(f"  counts: {_profile_edit.describe_counts(result)}")
     return status
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {"show_line": "show_cxr", "_mode_line": "_mode_cxr"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

@@ -1,4 +1,4 @@
-"""pyrite -- coherent X-ray radiation (PXR + coherent bremsstrahlung) from
+"""pyrite -- crystal X-ray radiation (PXR + coherent bremsstrahlung) from
 table-top electron beams in crystals.
 
 The package is intentionally light at import time: ``import pyrite`` pulls in
@@ -109,6 +109,9 @@ if TYPE_CHECKING:
         ResolvedObservation as ResolvedObservation,
     )
     from pyrite.results.model import (
+        CxrSpectra as CxrSpectra,
+    )
+    from pyrite.results.model import (
         PixelMetadata as PixelMetadata,
     )
     from pyrite.results.model import (
@@ -119,6 +122,9 @@ if TYPE_CHECKING:
     )
     from pyrite.results.model import (
         SpatialResult as SpatialResult,
+    )
+    from pyrite.results.model import (
+        SpectralDensity as SpectralDensity,
     )
     from pyrite.results.model import (
         SpectralFactors as SpectralFactors,
@@ -132,6 +138,7 @@ _PUBLIC_OBJECTS = {
     "Beam": ("pyrite.campaign.model", "Beam"),
     "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
     "Convergence": ("pyrite.campaign.model", "Convergence"),
+    "CxrSpectra": ("pyrite.results.model", "CxrSpectra"),
     "Detector": ("pyrite.detectors", "Detector"),
     "EnergyBins": ("pyrite.detectors", "EnergyBins"),
     "Footprint": ("pyrite.campaign.geometry", "Footprint"),
@@ -152,6 +159,7 @@ _PUBLIC_OBJECTS = {
     "Slab": ("pyrite.campaign.geometry", "Slab"),
     "Stack": ("pyrite.campaign.geometry", "Stack"),
     "SpatialResult": ("pyrite.results.model", "SpatialResult"),
+    "SpectralDensity": ("pyrite.results.model", "SpectralDensity"),
     "SpectralFactors": ("pyrite.results.model", "SpectralFactors"),
     "Sweep": ("pyrite.campaign.model", "Sweep"),
     "fetch_tables": ("pyrite.xsgen.install", "fetch_tables"),

@@ -28,7 +28,7 @@ _performance_job_states = performance._performance_job_states
 prune_remote_performance = performance.prune_remote_performance
 
 start_rebrem_queue = recompute.start_rebrem_queue
-start_reline_queue = recompute.start_reline_queue
+start_recxr_queue = recompute.start_recxr_queue
 
 _stage_job_script = jobs._stage_job_script
 _submission_outcome = jobs._submission_outcome

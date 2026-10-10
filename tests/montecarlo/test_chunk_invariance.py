@@ -24,7 +24,7 @@ from pyrite.materials.crystal import CRYSTALS
 from pyrite.montecarlo import (
     _brem_dsigma_dk,
     mc_brem_spectrum,
-    mc_spectrum,
+    mc_cxr_spectrum,
     simulate_trajectories,
     spectrum,
 )
@@ -91,8 +91,8 @@ def finite_side_segments():
 
 def test_line_spectrum_chunk_invariant(segments):
     kw = dict(crystal="hopg", hkl_list=HKL, theta_obs_rad=THETA, B_ang2=B_002)
-    one_shot = mc_spectrum(segments, E_LINE, chunk=BIG_CHUNK, **kw)
-    chunked = mc_spectrum(segments, E_LINE, chunk=TINY_CHUNK, **kw)
+    one_shot = mc_cxr_spectrum(segments, E_LINE, chunk=BIG_CHUNK, **kw)
+    chunked = mc_cxr_spectrum(segments, E_LINE, chunk=TINY_CHUNK, **kw)
     _assert_chunk_invariant(one_shot, chunked)
 
 
@@ -111,8 +111,8 @@ def test_coherent_line_spectrum_chunk_invariant(segments):
         B_ang2=B_002,
         coherent=True,
     )
-    one_shot = mc_spectrum(segments, E_LINE, chunk=BIG_CHUNK, **kw)
-    chunked = mc_spectrum(segments, E_LINE, chunk=TINY_CHUNK, **kw)
+    one_shot = mc_cxr_spectrum(segments, E_LINE, chunk=BIG_CHUNK, **kw)
+    chunked = mc_cxr_spectrum(segments, E_LINE, chunk=TINY_CHUNK, **kw)
     _assert_chunk_invariant(one_shot, chunked)
 
 
@@ -136,13 +136,13 @@ def test_electron_grouped_coherent_chunk_invariant(segments):
         coherent=True,
         sinc_cutoff=4.0,
     )
-    one_shot = mc_spectrum(active, E_LINE, chunk=BIG_CHUNK, **kw)
-    chunked = mc_spectrum(active, E_LINE, chunk=1, **kw)
+    one_shot = mc_cxr_spectrum(active, E_LINE, chunk=BIG_CHUNK, **kw)
+    chunked = mc_cxr_spectrum(active, E_LINE, chunk=1, **kw)
     _assert_chunk_invariant(one_shot, chunked)
 
 
 def test_energy_slices_bound_an_oversized_group_block():
-    from pyrite.montecarlo.spectrum.lines._kernels import _energy_slices
+    from pyrite.montecarlo.spectrum.cxr._kernels import _energy_slices
 
     assert list(_energy_slices(5, 8, 100)) == [slice(0, 100)]
     slices = list(_energy_slices(40, 8, 100))
@@ -165,8 +165,8 @@ def test_finite_line_spectrum_chunk_invariant(finite_side_segments):
         B_ang2=B_002,
         n_hat=np.array([1.0, 0.0, 0.01]),
     )
-    one_shot = mc_spectrum(finite_side_segments, E_LINE, chunk=BIG_CHUNK, **kw)
-    chunked = mc_spectrum(finite_side_segments, E_LINE, chunk=1, **kw)
+    one_shot = mc_cxr_spectrum(finite_side_segments, E_LINE, chunk=BIG_CHUNK, **kw)
+    chunked = mc_cxr_spectrum(finite_side_segments, E_LINE, chunk=1, **kw)
     _assert_chunk_invariant(one_shot, chunked)
 
 
@@ -178,8 +178,8 @@ def test_finite_coherent_line_spectrum_chunk_invariant(finite_side_segments):
         n_hat=np.array([1.0, 0.0, 0.01]),
         coherent=True,
     )
-    one_shot = mc_spectrum(finite_side_segments, E_LINE, chunk=BIG_CHUNK, **kw)
-    chunked = mc_spectrum(finite_side_segments, E_LINE, chunk=1, **kw)
+    one_shot = mc_cxr_spectrum(finite_side_segments, E_LINE, chunk=BIG_CHUNK, **kw)
+    chunked = mc_cxr_spectrum(finite_side_segments, E_LINE, chunk=1, **kw)
     _assert_chunk_invariant(one_shot, chunked)
 
 
@@ -203,16 +203,16 @@ def test_brem_dsigma_gpu_scalar_z_preserves_real_precision():
 
 # ---- the env-var override that drives the A1 spike ---------------------------
 def test_env_chunk_parses_positive_override(monkeypatch):
-    monkeypatch.setenv("PYRITE_MC_SPEC_CHUNK", "250000")
-    assert _env_chunk("PYRITE_MC_SPEC_CHUNK", 40000) == 250000
+    monkeypatch.setenv("PYRITE_MC_CXR_CHUNK", "250000")
+    assert _env_chunk("PYRITE_MC_CXR_CHUNK", 40000) == 250000
 
 
 @pytest.mark.parametrize("bad", ["", "0", "-5", "12.5", "lots", "  "])
 def test_env_chunk_falls_back_on_bad_values(monkeypatch, bad):
-    monkeypatch.setenv("PYRITE_MC_SPEC_CHUNK", bad)
-    assert _env_chunk("PYRITE_MC_SPEC_CHUNK", 40000) == 40000
+    monkeypatch.setenv("PYRITE_MC_CXR_CHUNK", bad)
+    assert _env_chunk("PYRITE_MC_CXR_CHUNK", 40000) == 40000
 
 
 def test_env_chunk_falls_back_when_unset(monkeypatch):
-    monkeypatch.delenv("PYRITE_MC_SPEC_CHUNK", raising=False)
-    assert _env_chunk("PYRITE_MC_SPEC_CHUNK", 40000) == 40000
+    monkeypatch.delenv("PYRITE_MC_CXR_CHUNK", raising=False)
+    assert _env_chunk("PYRITE_MC_CXR_CHUNK", 40000) == 40000

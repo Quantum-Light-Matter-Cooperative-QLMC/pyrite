@@ -17,7 +17,7 @@ from ...console.output import (
 )
 from ...remote import config, lifecycle, transport
 from .. import _completion as _cli_completion
-from .._deprecations import DeprecatingGroup
+from .._deprecations import DeprecatingGroup, canonical_option
 from ._remote_actions import (
     _cli_check,
     _cli_clear,
@@ -30,7 +30,7 @@ from ._remote_actions import (
     _cli_pull_json,
     _cli_reap,
     _cli_rebrem,
-    _cli_reline,
+    _cli_recxr,
     _cli_start,
     _cli_sync,
     _ensure_utf8_stdio,
@@ -189,24 +189,33 @@ def rebrem_command(
     help="Recompute line-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
-@click.option("--line-ne", type=POSITIVE_INT, default=None, help="New line electron count.")
+@canonical_option(
+    "--cxr-trials",
+    "cxr_ne",
+    retired=("--line-ne",),
+    type=POSITIVE_INT,
+    default=None,
+    help="New line electron count.",
+)
 @click.option("--start", type=NONNEGATIVE_FLOAT, default=None, help="Line lower bound in eV.")
 @click.option("--stop", type=POSITIVE_FLOAT, default=None, help="Line exclusive upper bound in eV.")
-@click.option(
-    "--line-step",
+@canonical_option(
+    "--cxr-step",
+    "line_step",
+    retired=("--line-step",),
     type=POSITIVE_FLOAT,
     default=None,
     help="Explicit uniform line-grid spacing in eV.",
 )
 @click.option("--detach", is_flag=True, help="Return after remote submission.")
-def reline_command(
+def recxr_command(
     material,
     all_,
     redo_all,
     dry_run,
     no_sync,
     chunk_minutes,
-    line_ne,
+    cxr_ne,
     start,
     stop,
     line_step,
@@ -217,10 +226,10 @@ def reline_command(
     if start is not None and stop is not None and stop <= start:
         raise click.UsageError("reline --stop must be greater than --start")
     return _invoke_action(
-        _cli_reline,
+        _cli_recxr,
         material=materials,
         all_=all_,
-        line_ne=line_ne,
+        cxr_ne=cxr_ne,
         start=start,
         stop=stop,
         line_step=line_step,
@@ -306,7 +315,7 @@ def _resolve_performance_profile(flags, catalog_profile):
     if flags.performance_interval != 5.0:
         raise click.UsageError("--perf-interval requires --perf")
     if flags.spec_chunk is not None:
-        raise click.UsageError("--spec-chunk requires --perf")
+        raise click.UsageError("--cxr-chunk requires --perf")
     if flags.brem_chunk is not None:
         raise click.UsageError("--brem-chunk requires --perf")
     return None
@@ -457,8 +466,10 @@ _start_performance_options = _option_group(
         metavar="SECONDS",
         help="Performance telemetry sampling interval; requires --perf.",
     ),
-    click.option(
-        "--spec-chunk",
+    canonical_option(
+        "--cxr-chunk",
+        "spec_chunk",
+        retired=("--spec-chunk",),
         type=POSITIVE_INT,
         default=None,
         metavar="N",
@@ -755,12 +766,14 @@ def performance_rm_command(profiles, all_profiles, yes, ssh_verbose):
 @click.option(
     "--brem-only",
     is_flag=True,
-    help="Merge only brem arrays locally; mutually exclusive with --line-only.",
+    help="Merge only brem arrays locally; mutually exclusive with --cxr-only.",
 )
-@click.option(
-    "--line-only",
+@canonical_option(
+    "--cxr-only",
+    "cxr_only",
+    retired=("--line-only",),
     is_flag=True,
-    help="Merge only line spectra locally; mutually exclusive with --brem-only.",
+    help="Merge only CXR spectra locally; mutually exclusive with --brem-only.",
 )
 @click.option(
     "--force",
@@ -784,7 +797,7 @@ def pull_command(
     level9,
     no_sync,
     brem_only,
-    line_only,
+    cxr_only,
     force,
     json_output,
     ssh_verbose,
@@ -804,7 +817,7 @@ def pull_command(
             "level9": level9,
             "no_sync": no_sync,
             "brem_only": brem_only,
-            "line_only": line_only,
+            "cxr_only": cxr_only,
             "force": force,
             "output": (
                 ctx.get_parameter_source("json_output") is click.core.ParameterSource.COMMANDLINE
@@ -849,8 +862,8 @@ def pull_command(
     elif narrowed:
         raise click.UsageError("-m/--material requires a PROFILE")
     _reject_all_with_values("pull", all_, materials)
-    if brem_only and line_only:
-        raise click.UsageError("--brem-only and --line-only are mutually exclusive")
+    if brem_only and cxr_only:
+        raise click.UsageError("--brem-only and --cxr-only are mutually exclusive")
     if hash_prefix is not None and sum("@" in m for m in materials) != 1:
         raise click.UsageError("--hash requires exactly one MATERIAL@PROFILE selector to pull")
     return _invoke_action(
@@ -865,7 +878,7 @@ def pull_command(
         level9=level9,
         no_sync=no_sync,
         brem_only=brem_only,
-        line_only=line_only,
+        cxr_only=cxr_only,
         force=force,
         ssh_verbose=ssh_verbose,
     )
@@ -1086,3 +1099,17 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {"reline_command": "recxr_command"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

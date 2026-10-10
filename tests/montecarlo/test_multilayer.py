@@ -16,7 +16,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from pyrite._spectral_components import line_spectrum
+from pyrite._spectral_components import cxr_spectrum
 from pyrite.campaign.sweep import (
     BeamSpec,
     LayerSpec,
@@ -39,7 +39,7 @@ from pyrite.montecarlo import (
     _stack_tau,
     _transport_case,
     mc_characteristic_spectrum,
-    mc_spectrum,
+    mc_cxr_spectrum,
     simulate_trajectories,
 )
 
@@ -143,7 +143,7 @@ def test_stack_tau_back_exit_substrate_closed_form():
     # the film adds EXACTLY mu_sub * t_sub / |n_z| to the optical depth of every
     # film segment, independent of emission depth (the film escape path is shared).
     # This is what checks/multilayer_validation_check.py confirms end-to-end as the
-    # integrated film-line flux ratio through mc_spectrum.
+    # integrated film-line flux ratio through mc_cxr_spectrum.
     z = np.array([50.0, 200.0, 480.0])  # all inside the film [0, 500]
     E = np.full(3, 1438.0)
     film = [("Mo", 0.019), ("Se", 0.038)]
@@ -371,7 +371,7 @@ def test_build_cases_rejects_substrate_plus_stack():
 
 
 def test_spectrum_case_passes_per_layer_azimuth(monkeypatch):
-    # each layer's radiator must reach mc_spectrum with ITS OWN azimuth_rad
+    # each layer's radiator must reach mc_cxr_spectrum with ITS OWN azimuth_rad
     from pyrite.montecarlo import runner
 
     calls = []
@@ -380,7 +380,7 @@ def test_spectrum_case_passes_per_layer_azimuth(monkeypatch):
         calls.append(kw)
         return np.zeros_like(E_grid)
 
-    monkeypatch.setattr(runner, "mc_spectrum", fake_spec)
+    monkeypatch.setattr(runner, "mc_cxr_spectrum", fake_spec)
     monkeypatch.setattr(runner, "mc_brem_spectrum", lambda *a, **k: np.zeros(3))
     monkeypatch.setattr(
         runner,
@@ -449,7 +449,7 @@ def _cuda_accumulation_case():
         material="mose2",
         beam=BeamSpec(energy_keV=30.0),
         target=Stack.on_substrate("mose2", 300.0, "silicon", 3000.0, tilt_deg=-30.0),
-        detector=Detector(energy_bins=EnergyBins(line=line, brem=brem)),
+        detector=Detector(energy_bins=EnergyBins(cxr=line, brem=brem)),
     )
     # The manual reference below uses the same bounded launches as the runner;
     # it only changes the association of the four per-layer contributions.
@@ -479,7 +479,7 @@ def _manual_cuda_layer_sum(case, transport):
         )
         coherent = np.zeros_like(manual)
         if radiator is not None:
-            coherent = mc_spectrum(
+            coherent = mc_cxr_spectrum(
                 segments,
                 transport["E_grid"],
                 crystal=radiator["crystal"],
@@ -526,7 +526,7 @@ def test_cuda_multilayer_spectrum_case_matches_per_layer_sum():
     assert int(transport["segs"]["n_layers"]) == 2
     assert _segments_in_layer(transport["segs"], 1)["L_ang"].size > 0
 
-    actual = line_spectrum(_spectrum_case(case, transport))
+    actual = cxr_spectrum(_spectrum_case(case, transport))
     expected = _manual_cuda_layer_sum(case, transport)
     peak = float(np.max(np.abs(expected)))
     assert peak > 0.0

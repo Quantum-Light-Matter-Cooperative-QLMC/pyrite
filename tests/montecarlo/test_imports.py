@@ -41,7 +41,7 @@ def test_public_scene_construction_does_not_initialize_execution() -> None:
         "pyrite.montecarlo.transport._jit_lut_kernel",
         "pyrite.montecarlo.transport._jit_shell_device",
         "pyrite.montecarlo.spectrum.brem_jit_kernel",
-        "pyrite.montecarlo.spectrum.line_jit_kernel",
+        "pyrite.montecarlo.spectrum.cxr_jit_kernel",
         "pyrite.montecarlo.spectrum.coherent_jit_kernel",
         "pyrite.montecarlo.spectrum.coherent_stream_jit_kernel",
         "pyrite.montecarlo.spectrum.coherent_grouped_jit_kernel",
@@ -94,7 +94,7 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
         #
         # config
         # -> montecarlo
-        # -> spectrum.line_jit_kernel
+        # -> spectrum.cxr_jit_kernel
         #
         # The import should now finish using the CPU backend.
         importlib.import_module("pyrite.campaign.config")
@@ -115,7 +115,7 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
             "pyrite.montecarlo.transport._jit_launch",
             "pyrite.montecarlo.transport._jit_lut_kernel",
             "pyrite.montecarlo.transport._jit_shell_device",
-            "pyrite.montecarlo.spectrum.line_jit_kernel",
+            "pyrite.montecarlo.spectrum.cxr_jit_kernel",
             "pyrite.montecarlo.spectrum.coherent_jit_kernel",
             "pyrite.montecarlo.spectrum.brem_jit_kernel",
         }

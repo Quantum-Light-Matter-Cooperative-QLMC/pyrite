@@ -190,8 +190,10 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     metavar="SECONDS",
     help="Performance-telemetry sampling interval; requires -p/--perf.",
 )
-@click.option(
-    "--spec-chunk",
+@canonical_option(
+    "--cxr-chunk",
+    "spec_chunk",
+    retired=("--spec-chunk",),
     type=_cli_core.POSITIVE_INT,
     default=None,
     metavar="N",
@@ -615,7 +617,7 @@ def _command(
     if performance_interval != 5.0 and performance_profile is None:
         raise click.UsageError("--perf-interval requires -p/--perf")
     if (spec_chunk is not None or brem_chunk is not None) and performance_profile is None:
-        raise click.UsageError("--spec-chunk/--brem-chunk require -p/--perf")
+        raise click.UsageError("--cxr-chunk/--brem-chunk require -p/--perf")
     if nsys and performance_profile is None:
         raise click.UsageError("--nsys requires -p/--perf")
     if py_spy and performance_profile is None:
@@ -634,9 +636,9 @@ def _command(
     # Pin the GPU spectrum/brem chunk before the runtime import so the main
     # process and every spawned transport worker (env inherited on spawn/
     # forkserver) read it. Mirrors the remote job script's `export
-    # PYRITE_MC_SPEC_CHUNK` / `PYRITE_MC_BREM_CHUNK`.
+    # PYRITE_MC_CXR_CHUNK` / `PYRITE_MC_BREM_CHUNK`.
     if spec_chunk is not None:
-        set_canonical_env("PYRITE_MC_SPEC_CHUNK", str(spec_chunk))
+        set_canonical_env("PYRITE_MC_CXR_CHUNK", str(spec_chunk))
     if brem_chunk is not None:
         set_canonical_env("PYRITE_MC_BREM_CHUNK", str(brem_chunk))
     if nsys:

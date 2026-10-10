@@ -1,6 +1,6 @@
 # Phase retention decisions
 
-`mc_spectrum(..., phase_retention=policy)` optionally gates an already certified
+`mc_cxr_spectrum(..., phase_retention=policy)` optionally gates an already certified
 reduction on its observable and measured cost. The owner is
 `montecarlo/spectrum/phase_retention.py`. The initial supported rule is
 [certified flat-term omission](../../validation/beam-transport/coherent-flat-term-omission.md).
@@ -75,7 +75,7 @@ from pyrite.montecarlo.spectrum.phase_retention import PhaseRetentionPolicy
 decisions = []
 policy = PhaseRetentionPolicy(report=decisions.append)
 # No cost provider: full phase is retained even if the accuracy mask permits omission.
-spec = mc_spectrum(
+spec = mc_cxr_spectrum(
     segments,
     energy,
     crystal="hopg",

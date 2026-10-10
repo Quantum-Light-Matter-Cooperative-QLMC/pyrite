@@ -11,18 +11,18 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from pyrite._energy_grid_encoding import decode_energy_grid
-from pyrite._line_grid_policy import (
+from pyrite._cxr_grid_policy import (
     AUTOMATIC_BANDWIDTH_POLICY,
     DEFAULT_RTOL,
     OBSERVABLE_CLASSES,
-    LineGridToleranceError,
+    CxrGridToleranceError,
     coordinate_cache_key,
-    kinematic_line_stop_eV,
-    line_start_eV,
-    resolve_line_grid_policy,
+    cxr_start_eV,
+    kinematic_cxr_stop_eV,
+    resolve_cxr_grid_policy,
     resolved_coordinates,
 )
+from pyrite._energy_grid_encoding import decode_energy_grid
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.profiles import case_content_key
 from pyrite.campaign.sweep import build_cases
@@ -51,9 +51,9 @@ def _clean_environment(monkeypatch):
 
 
 def _uncovered_energy_sweep(energy_keV=77.0):
-    """A hopg sweep at a beam energy no stored ``line_by_energy`` row covers."""
+    """A hopg sweep at a beam energy no stored ``cxr_by_energy`` row covers."""
     sweep = material_sweep("hopg")
-    assert energy_keV not in {float(e) for e in sweep.detector.energy_bins.line_by_energy}
+    assert energy_keV not in {float(e) for e in sweep.detector.energy_bins.cxr_by_energy}
     return replace(sweep, beam=replace(sweep.beam, energy_keV=energy_keV))
 
 
@@ -69,7 +69,7 @@ def _stored_energy_sweep():
                 sweep.detector,
                 energy_bins=replace(
                     sweep.detector.energy_bins,
-                    line_by_energy={30.0: stored},
+                    cxr_by_energy={30.0: stored},
                 ),
             ),
         ),
@@ -81,7 +81,7 @@ def _stored_energy_sweep():
 def test_leaf_constants_match_the_materials_package():
     """The leaf restates hbar*c and m_e c^2 to stay dependency-free; they must
     not drift from the values the line kernels actually use."""
-    from pyrite import _line_grid_policy as policy
+    from pyrite import _cxr_grid_policy as policy
 
     assert policy._HBARC_EV_ANG == HBARC_EV_ANG
     assert policy._ELECTRON_REST_EV == M_E_EV
@@ -96,7 +96,7 @@ def test_kinematic_stop_bounds_the_resonance_over_random_directions():
     rng = np.random.default_rng(20261101)
     g_mag = 3.745
     for energy_keV in (30.0, 100.0, 300.0):
-        stop = kinematic_line_stop_eV([g_mag], energy_keV, round_to_eV=1e-9)
+        stop = kinematic_cxr_stop_eV([g_mag], energy_keV, round_to_eV=1e-9)
         beta = beta_from_Ee(energy_keV * 1.0e3)
         directions = rng.normal(size=(4000, 3))
         directions /= np.linalg.norm(directions, axis=1, keepdims=True)
@@ -110,27 +110,27 @@ def test_kinematic_stop_bounds_the_resonance_over_random_directions():
 
 
 def test_kinematic_stop_scales_linearly_with_g_and_vanishes_with_beta():
-    single = kinematic_line_stop_eV([1.0], 100.0, round_to_eV=1e-9)
-    doubled = kinematic_line_stop_eV([2.0], 100.0, round_to_eV=1e-9)
+    single = kinematic_cxr_stop_eV([1.0], 100.0, round_to_eV=1e-9)
+    doubled = kinematic_cxr_stop_eV([2.0], 100.0, round_to_eV=1e-9)
     assert doubled == pytest.approx(2.0 * single)
-    assert kinematic_line_stop_eV([1.0], 1e-6, round_to_eV=1e-12) < single * 1e-3
+    assert kinematic_cxr_stop_eV([1.0], 1e-6, round_to_eV=1e-12) < single * 1e-3
 
 
 def test_kinematic_stop_refuses_empty_or_nonphysical_inputs():
     with pytest.raises(ValueError, match="at least one positive"):
-        kinematic_line_stop_eV([], 100.0)
+        kinematic_cxr_stop_eV([], 100.0)
     with pytest.raises(ValueError, match="finite and positive"):
-        kinematic_line_stop_eV([1.0], -1.0)
+        kinematic_cxr_stop_eV([1.0], -1.0)
 
 
 def test_line_start_convention_matches_the_catalog():
-    assert line_start_eV(60.0) == 10.0
-    assert line_start_eV(60.1) == 50.0
+    assert cxr_start_eV(60.0) == 10.0
+    assert cxr_start_eV(60.1) == 50.0
 
 
 # ---- precedence -------------------------------------------------------------
 def test_built_in_defaults_are_per_observable():
-    policy = resolve_line_grid_policy(start_eV=10.0, stop_eV=1000.0)
+    policy = resolve_cxr_grid_policy(start_eV=10.0, stop_eV=1000.0)
     assert dict(policy.rtol) == dict(DEFAULT_RTOL)
     assert policy.max_points == 600_000
     assert len(set(dict(policy.rtol).values())) == len(OBSERVABLE_CLASSES)
@@ -140,7 +140,7 @@ def test_built_in_defaults_are_per_observable():
 def test_global_environment_rtol_is_a_fallback_not_an_override(monkeypatch):
     monkeypatch.setenv("PYRITE_ENERGY_GRID_RTOL", "0.05")
     monkeypatch.setenv("PYRITE_ENERGY_GRID_RTOL_INTRINSIC_SOURCE", "0.002")
-    policy = resolve_line_grid_policy(start_eV=10.0, stop_eV=1000.0)
+    policy = resolve_cxr_grid_policy(start_eV=10.0, stop_eV=1000.0)
     rtol, sources = dict(policy.rtol), dict(policy.sources)
     assert rtol["intrinsic_source"] == 0.002
     assert sources["rtol.intrinsic_source"] == "PYRITE_ENERGY_GRID_RTOL_INTRINSIC_SOURCE"
@@ -150,7 +150,7 @@ def test_global_environment_rtol_is_a_fallback_not_an_override(monkeypatch):
 
 def test_per_call_outranks_environment_which_outranks_stored(monkeypatch):
     monkeypatch.setenv("PYRITE_ENERGY_GRID_MAX_SPACING_EV", "2.0")
-    policy = resolve_line_grid_policy(
+    policy = resolve_cxr_grid_policy(
         start_eV=10.0,
         stop_eV=1000.0,
         stored={"max_spacing_eV": 9.0, "rtol": {"detected_counts": 0.02}},
@@ -161,7 +161,7 @@ def test_per_call_outranks_environment_which_outranks_stored(monkeypatch):
     assert dict(policy.rtol)["detected_counts"] == 0.02
     assert sources["rtol.detected_counts"] == "stored configuration"
 
-    per_call = resolve_line_grid_policy(
+    per_call = resolve_cxr_grid_policy(
         start_eV=10.0,
         stop_eV=1000.0,
         per_call={"max_spacing_eV": 0.5},
@@ -173,7 +173,7 @@ def test_per_call_outranks_environment_which_outranks_stored(monkeypatch):
 
 def test_unknown_observable_class_is_refused():
     with pytest.raises(ValueError, match="unknown observable classes"):
-        resolve_line_grid_policy(start_eV=10.0, stop_eV=1000.0, per_call={"rtol": {"bogus": 0.1}})
+        resolve_cxr_grid_policy(start_eV=10.0, stop_eV=1000.0, per_call={"rtol": {"bogus": 0.1}})
 
 
 @pytest.mark.parametrize(
@@ -188,7 +188,7 @@ def test_unknown_observable_class_is_refused():
 def test_malformed_environment_values_are_refused(monkeypatch, name, value):
     monkeypatch.setenv(name, value)
     with pytest.raises(ValueError, match=name):
-        resolve_line_grid_policy(start_eV=10.0, stop_eV=1000.0)
+        resolve_cxr_grid_policy(start_eV=10.0, stop_eV=1000.0)
 
 
 # ---- no derivation prerequisite --------------------------------------------
@@ -208,7 +208,7 @@ def test_high_energy_hbn_rejects_impossible_budget_before_transport(monkeypatch)
     sweep = material_sweep("hbn")
     sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=5000.0))
 
-    with pytest.raises(LineGridToleranceError) as caught:
+    with pytest.raises(CxrGridToleranceError) as caught:
         build_cases(sweep, n_electrons=2, n_electrons_brem=2)
 
     message = str(caught.value)
@@ -221,10 +221,10 @@ def _automatic_policy(material, energy_keV, per_call=None):
     from types import SimpleNamespace
 
     from pyrite.campaign.geometry import crystal_params
-    from pyrite.campaign.sweep import _automatic_line_grid_policy
+    from pyrite.campaign.sweep import _automatic_cxr_grid_policy
 
-    sweep = SimpleNamespace(line_grid_policy=per_call)
-    return _automatic_line_grid_policy(sweep, crystal_params(material), energy_keV)
+    sweep = SimpleNamespace(cxr_grid_policy=per_call)
+    return _automatic_cxr_grid_policy(sweep, crystal_params(material), energy_keV)
 
 
 def _kinematic_stop(material, energy_keV):
@@ -232,7 +232,7 @@ def _kinematic_stop(material, energy_keV):
 
     cp = crystal_params(material)
     lattice = CRYSTALS[cp["crystal"]]["lattice"]
-    return kinematic_line_stop_eV(
+    return kinematic_cxr_stop_eV(
         [reciprocal_g_vector(hkl, lattice)[1] for hkl in cp["hkl_list"]], energy_keV
     )
 
@@ -240,10 +240,10 @@ def _kinematic_stop(material, energy_keV):
 def test_automatic_stop_is_capped_at_the_atomic_data_emission_ceiling():
     """Validation: line-grid-emission-ceiling"""
     from pyrite.campaign.geometry import crystal_params
-    from pyrite.montecarlo.spectrum.lines import _line_emission_ceiling
+    from pyrite.montecarlo.spectrum.cxr import _cxr_emission_ceiling
 
     cp = crystal_params("hopg")
-    ceiling = _line_emission_ceiling(CRYSTALS[cp["crystal"]], cp["composition"])
+    ceiling = _cxr_emission_ceiling(CRYSTALS[cp["crystal"]], cp["composition"])
     policy = _automatic_policy("hopg", 5000.0)
     assert _kinematic_stop("hopg", 5000.0) > ceiling
     assert ceiling <= policy.stop_eV < ceiling + 100.0
@@ -259,9 +259,9 @@ def test_automatic_stop_keeps_the_kinematic_bound_when_it_is_lowest():
 
 def test_automatic_stop_is_capped_at_the_beam_kinetic_energy(monkeypatch):
     """Validation: line-grid-emission-ceiling"""
-    import pyrite.montecarlo.spectrum.lines as lines
+    import pyrite.montecarlo.spectrum.cxr as lines
 
-    monkeypatch.setattr(lines, "_line_emission_ceiling", lambda *args, **kwargs: float("inf"))
+    monkeypatch.setattr(lines, "_cxr_emission_ceiling", lambda *args, **kwargs: float("inf"))
     policy = _automatic_policy("hopg", 50_000.0)
     assert _kinematic_stop("hopg", 50_000.0) > 50.0e6
     assert policy.stop_eV == 50.0e6
@@ -308,7 +308,7 @@ def test_explicit_fixed_grid_outranks_environment_policy(monkeypatch):
         beam=replace(sweep.beam, energy_keV=30.0),
         detector=replace(
             sweep.detector,
-            energy_bins=replace(sweep.detector.energy_bins, line=explicit),
+            energy_bins=replace(sweep.detector.energy_bins, cxr=explicit),
         ),
     )
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
@@ -373,7 +373,7 @@ def test_changing_resolved_coordinates_changes_case_identity():
         sweep,
         detector=replace(
             sweep.detector,
-            energy_bins=replace(sweep.detector.energy_bins, line=np.linspace(10.0, 2600.0, 865)),
+            energy_bins=replace(sweep.detector.energy_bins, cxr=np.linspace(10.0, 2600.0, 865)),
         ),
     )
     other = build_cases(shifted, n_electrons=2, n_electrons_brem=2)[0]
@@ -390,13 +390,13 @@ def test_case_payload_without_automatic_resolution_is_unchanged():
 
 # ---- refusal instead of silent coarsening -----------------------------------
 def _payload(*, start_eV=10.0, stop_eV=10_000.0, **resolution):
-    base = resolve_line_grid_policy(start_eV=start_eV, stop_eV=stop_eV).payload()
+    base = resolve_cxr_grid_policy(start_eV=start_eV, stop_eV=stop_eV).payload()
     base["resolution"].update(resolution)
     return base
 
 
 def test_point_budget_shortfall_reports_the_unmet_tolerance_and_a_correction():
-    with pytest.raises(LineGridToleranceError) as caught:
+    with pytest.raises(CxrGridToleranceError) as caught:
         resolved_coordinates(_payload(max_points=100), 0.01)
     message = str(caught.value)
     assert "rtol=0.001" in message
@@ -406,7 +406,7 @@ def test_point_budget_shortfall_reports_the_unmet_tolerance_and_a_correction():
 
 
 def test_backend_precision_shortfall_reports_the_unmet_tolerance():
-    with pytest.raises(LineGridToleranceError) as caught:
+    with pytest.raises(CxrGridToleranceError) as caught:
         # A narrow, high-energy window: the point budget is satisfied, but one
         # float32 ULP at 10 keV is ~1e-3 eV, so 1e-5 eV spacing is unreachable.
         resolved_coordinates(

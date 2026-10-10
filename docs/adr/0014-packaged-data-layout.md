@@ -79,7 +79,7 @@ change.
 * - Entry
   - Class
   - State after #282
-* - `catalog/`, `cifs/`, `line_grid_defaults.toml`, `line_grid_provenance.toml`, `conduction_band.toml`, `eaglexo_qe.csv`
+* - `catalog/`, `cifs/`, `cxr_grid_defaults.toml`, `line_grid_provenance.toml`, `conduction_band.toml`, `eaglexo_qe.csv`
   - a
   - Unchanged. Authored here, under 0.1 MiB, read by every run.
 * - `xsgen/elsepa-tables.json`, `xsgen/bremslib-tables.json`, `xsgen/sbethe-tables.json`

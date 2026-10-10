@@ -7,7 +7,9 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from typing import Any
 
-OBSERVABLES = ("line", "brem")
+from ._api_deprecations import warn_renamed
+
+OBSERVABLES = ("cxr", "brem")
 REQUIRED_FIELDS = ("target_rse", "min_electrons", "max_electrons", "block_electrons")
 
 
@@ -29,7 +31,7 @@ class Precision:
     block_electrons
         Electrons per transport block; the rule is checked at block ends.
     observables
-        Non-empty subset of ``('line', 'brem')`` that must all converge.
+        Non-empty subset of ``('cxr', 'brem')`` that must all converge.
     max_electron_share
         Guard: the largest single-electron value may hold at most this share
         of the observable's sum.
@@ -58,7 +60,7 @@ class Precision:
     min_electrons: int
     max_electrons: int
     block_electrons: int
-    observables: tuple[str, ...] = ("line",)
+    observables: tuple[str, ...] = ("cxr",)
     max_electron_share: float = 0.05
     min_effective_electrons: float = 100.0
     stability_blocks: int = 3
@@ -69,7 +71,11 @@ class Precision:
 
     def __post_init__(self) -> None:
         # Freeze caller-owned sequences as well as the dataclass itself.
-        object.__setattr__(self, "observables", tuple(self.observables))
+        observables = tuple(self.observables)
+        if "line" in observables:
+            warn_renamed("Precision observable 'line'", "'cxr'")
+            observables = tuple("cxr" if value == "line" else value for value in observables)
+        object.__setattr__(self, "observables", observables)
         for name in ("band_eV", "batch_means_band_eV"):
             band = getattr(self, name)
             if band is not None:
@@ -124,7 +130,13 @@ class Precision:
 
     def to_dict(self) -> dict[str, Any]:
         """Return the requested policy, without realized counts or statistics."""
-        return asdict(self)
+        # Persisted requested-policy and identity payloads retain their historical
+        # vocabulary. Public in-memory observables are canonical CXR names.
+        values = asdict(self)
+        values["observables"] = tuple(
+            "line" if name == "cxr" else name for name in self.observables
+        )
+        return values
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> Precision:
@@ -142,6 +154,10 @@ class Precision:
         for name in ("observables", "band_eV", "batch_means_band_eV"):
             if name in values and values[name] is not None:
                 values[name] = tuple(values[name])
+        if "observables" in values:
+            values["observables"] = tuple(
+                "cxr" if value == "line" else value for value in values["observables"]
+            )
         return cls(**values)
 
     def validate_case(self, case: Mapping[str, Any]) -> None:
@@ -168,7 +184,7 @@ DEFAULT_PRECISION = Precision(
     min_electrons=200,
     max_electrons=20_000,
     block_electrons=100,
-    observables=("line", "brem"),
+    observables=("cxr", "brem"),
 )
 
 

@@ -329,7 +329,7 @@ def _queue_script(
     )
     runtime_exports = "\nexport PYRITE_TRAJECTORY_SIZE_REPORT=1" if trajectories is not None else ""
     if spec_chunk is not None:
-        runtime_exports += f"\nexport PYRITE_MC_SPEC_CHUNK={spec_chunk}"
+        runtime_exports += f"\nexport PYRITE_MC_CXR_CHUNK={spec_chunk}"
     if brem_chunk is not None:
         runtime_exports += f"\nexport PYRITE_MC_BREM_CHUNK={brem_chunk}"
     runtime_exports += _forwarded_env_exports()
@@ -680,7 +680,7 @@ def _chunked_queue_script(
             flags += f" --perf-interval {performance_interval:g}"
     runtime_exports = "\nexport PYRITE_TRAJECTORY_SIZE_REPORT=1" if trajectories is not None else ""
     if spec_chunk is not None:
-        runtime_exports += f"\nexport PYRITE_MC_SPEC_CHUNK={spec_chunk}"
+        runtime_exports += f"\nexport PYRITE_MC_CXR_CHUNK={spec_chunk}"
     if brem_chunk is not None:
         runtime_exports += f"\nexport PYRITE_MC_BREM_CHUNK={brem_chunk}"
     runtime_exports += _forwarded_env_exports()
@@ -856,7 +856,7 @@ def _rebrem_chunked_queue_script(
 ):
     """One SLURM slice of a self-resubmitting brem-only recompute chain.
 
-    Mirror of ``_reline_chunked_queue_script`` for ``pyrite checkpoint recompute
+    Mirror of ``_recxr_chunked_queue_script`` for ``pyrite checkpoint recompute
     brem``: each slice resumes from checkpoint, does about ``chunk_minutes`` of
     work via that command's ``--max-minutes``, and either terminates the chain
     (all materials completed:/failed:) or self-resubmits with
@@ -948,20 +948,20 @@ def _rebrem_queue_metadata(
     )
 
 
-def _reline_flags(
-    line_ne,
+def _recxr_flags(
+    cxr_ne,
     line_step_eV,
     redo_all,
-    line_start_eV=None,
+    cxr_start_eV=None,
     line_stop_eV=None,
 ):
     flags = ""
-    if line_ne is not None:
-        flags += f" --line-ne {int(line_ne)}"
+    if cxr_ne is not None:
+        flags += f" --cxr-trials {int(cxr_ne)}"
     if line_step_eV is not None:
-        flags += f" --line-step {float(line_step_eV):g}"
-    if line_start_eV is not None:
-        flags += f" --start {float(line_start_eV):g}"
+        flags += f" --cxr-step {float(line_step_eV):g}"
+    if cxr_start_eV is not None:
+        flags += f" --start {float(cxr_start_eV):g}"
     if line_stop_eV is not None:
         flags += f" --stop {float(line_stop_eV):g}"
     if redo_all:
@@ -969,14 +969,14 @@ def _reline_flags(
     return flags
 
 
-def _reline_queue_script(
+def _recxr_queue_script(
     jobid,
     materials,
-    line_ne,
+    cxr_ne,
     line_step_eV,
     redo_all,
     fidelity="full",
-    line_start_eV=None,
+    cxr_start_eV=None,
     line_stop_eV=None,
 ):
     """CXR payload for a line-only checkpoint recompute (``pyrite checkpoint
@@ -984,7 +984,7 @@ def _reline_queue_script(
     material; each writes the same per-material JSON progress record a scan or
     brem recompute does, and the ``completed:``/``failed:`` markers match so
     ``state._completed_materials`` drives the post-attach pull unchanged."""
-    flags = _reline_flags(line_ne, line_step_eV, redo_all, line_start_eV, line_stop_eV)
+    flags = _recxr_flags(cxr_ne, line_step_eV, redo_all, cxr_start_eV, line_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     return f"""JOBDIR={config.shell_word(jobdir)}
@@ -1001,7 +1001,7 @@ for m in "${{mats[@]}}"; do
   n=$((n + 1))
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
-  if ! {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute line "$m"{flags} \
+  if ! {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute cxr "$m"{flags} \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: reline failed for $m; continuing" >> "$JOBDIR/log"
@@ -1021,15 +1021,15 @@ fi
 """
 
 
-def _reline_chunked_queue_script(
+def _recxr_chunked_queue_script(
     jobid,
     materials,
-    line_ne,
+    cxr_ne,
     line_step_eV,
     redo_all,
     chunk_minutes,
     fidelity="full",
-    line_start_eV=None,
+    cxr_start_eV=None,
     line_stop_eV=None,
 ):
     """One SLURM slice of a self-resubmitting line-only recompute chain.
@@ -1042,7 +1042,7 @@ def _reline_chunked_queue_script(
     contract per material: ``rc==0`` -> ``completed:``, ``rc==75`` -> leave
     unresolved (a later slice finishes it), else -> ``failed:``.
     """
-    flags = _reline_flags(line_ne, line_step_eV, redo_all, line_start_eV, line_stop_eV)
+    flags = _recxr_flags(cxr_ne, line_step_eV, redo_all, cxr_start_eV, line_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
@@ -1075,7 +1075,7 @@ for m in "${{mats[@]}}"; do
   (
     uv_pid=
     trap '[ -z "$uv_pid" ] || {{ kill -TERM "$uv_pid" 2>/dev/null || true; wait "$uv_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
-    {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute line "$m"{flags} --max-minutes "$remaining_min" \
+    {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute cxr "$m"{flags} --max-minutes "$remaining_min" \
       --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 &
     uv_pid=$!
     wait "$uv_pid"
@@ -1097,14 +1097,14 @@ done
 """
 
 
-def _reline_queue_metadata(
+def _recxr_queue_metadata(
     jobid,
     materials,
-    line_ne,
+    cxr_ne,
     line_step_eV,
     redo_all,
     fidelity="full",
-    line_start_eV=None,
+    cxr_start_eV=None,
     line_stop_eV=None,
 ):
     """Static metadata for a reline queue. ``kind: reline`` keys the Mode line."""
@@ -1115,8 +1115,8 @@ def _reline_queue_metadata(
             "quick: False",
             "kind: reline",
             f"fidelity: {fidelity}",
-            f"line_ne: {line_ne}",
-            f"line_start_eV: {line_start_eV}",
+            f"line_ne: {cxr_ne}",
+            f"line_start_eV: {cxr_start_eV}",
             f"line_stop_eV: {line_stop_eV}",
             f"line_step_eV: {line_step_eV}",
             f"redo_all: {bool(redo_all)}",
@@ -1204,3 +1204,22 @@ def _zhai_queue_metadata(jobid, ne, ne_brem, ne_supp):
             "",
         ]
     )
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {
+    "_reline_flags": "_recxr_flags",
+    "_reline_queue_script": "_recxr_queue_script",
+    "_reline_chunked_queue_script": "_recxr_chunked_queue_script",
+    "_reline_queue_metadata": "_recxr_queue_metadata",
+}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

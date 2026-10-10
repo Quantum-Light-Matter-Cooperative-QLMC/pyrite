@@ -2,13 +2,13 @@
 
 ## Claim and scope
 
-- **Claim:** `montecarlo/spectrum/lines.py::mc_spectrum` (the incoherent, ungrooved, unlayered path) returns the per-electron line spectrum $d^2N/(dE\,d\Omega)$ in photons / (eV sr incident-electron) as a sum of $\lvert A_{\rm PXR}+A_{\rm CBS}\rvert^2$ contributions over transport segments, with an exact incoherent average over mosaic crystallite orientations.
+- **Claim:** `montecarlo/spectrum/lines.py::mc_cxr_spectrum` (the incoherent, ungrooved, unlayered path) returns the per-electron line spectrum $d^2N/(dE\,d\Omega)$ in photons / (eV sr incident-electron) as a sum of $\lvert A_{\rm PXR}+A_{\rm CBS}\rvert^2$ contributions over transport segments, with an exact incoherent average over mosaic crystallite orientations.
 - **Source:** Feranchuk, Ulyanenkov, Harada, Spence, *Phys. Rev. E* **62**, 4225 (2000), Eqs. (10) and (12); Zhai (2025) SI Eqs. (5)–(7).
 - **This row covers:** the spectral prefactor multiplying $\lvert A\rvert^2$, how per-segment squared amplitudes are accumulated into $d^2N/(dE\,d\Omega)$, which degrees of freedom are added in intensity rather than in amplitude (segments, electrons, polarizations, reflections, mosaic crystallites), the per-electron normalization, and the mosaic orientation average.
 
 **Given inputs, not re-verified here.** The constituent amplitudes and the factors they carry are separately ledgered and are taken as given: `pxr-amplitude` ($\chi_{\mathbf g}$), `cbs-amplitude` ($U_{\mathbf g}$ and the braced relativistic PXR/CBS assembly, currently `filtered`), `finite-time-lineshape` ($\lvert Q\rvert^2=t_L^2\operatorname{sinc}^2$), `coherent-emission` (the opt-in phased branch), and `line-absorption-tabulation` ($\mu(E)$ and the Beer–Lambert escape factor). The open `line-energy-dispersion` harmonic-sign discrepancy sets the *centre* $\omega_{\rm res}$ of every line; it is noted in passing and is not adjudicated here, because it does not touch the squaring/summing structure that is this row's subject.
 
-The derivation in the next section was written from the source, the ledger row, and the `mc_spectrum` signature and docstring, before the implementation body was read.
+The derivation in the next section was written from the source, the ledger row, and the `mc_cxr_spectrum` signature and docstring, before the implementation body was read.
 
 ## Independent derivation
 
@@ -175,10 +175,10 @@ One deliberate approximation enters here. The strictly correct prefactor carries
 
 ## Implementation comparison
 
-The ungrooved, unlayered, incoherent run takes the batched branch of `mc_spectrum`. Its accumulation reduces to (literal source, with the per-hkl `_accumulate_reflection` fallback spelling the same thing inline):
+The ungrooved, unlayered, incoherent run takes the batched branch of `mc_cxr_spectrum`. Its accumulation reduces to (literal source, with the per-hkl `_accumulate_reflection` fallback spelling the same thing inline):
 
 ```python
-pref = alpha_fs * omega_res / pref_c1 * (t_L * t_L) * T_abs  # _line_weight_core
+pref = alpha_fs * omega_res / pref_c1 * (t_L * t_L) * T_abs  # _cxr_weight_core
 weight = pref * A2 * WM
 a_width = denom * t_L / (2.0 * HBARC_EV_ANG) * xp.ones_like(omega_res)
 S = _sincsq_lineshape(a_width, E_grid, E_res)  # sinc(a_width*(E-E_r)/pi)**2
@@ -187,7 +187,7 @@ spec += weight @ S
 return _to_cpu(spec / Ne)
 ```
 
-with `_PREF_C1 = 4.0 * xp.pi**2 * HBARC_EV_ANG`, `A2` the sum of `_line_amp_sq_core` over the `(ES, EP)` polarization pair, and `WM` the `(1, N_g)` row of mosaic weights from `_mosaic_quadrature`.
+with `_PREF_C1 = 4.0 * xp.pi**2 * HBARC_EV_ANG`, `A2` the sum of `_cxr_amp_sq_core` over the `(ES, EP)` polarization pair, and `WM` the `(1, N_g)` row of mosaic weights from `_mosaic_quadrature`.
 
 Term by term against the boxed independent result:
 
@@ -198,11 +198,11 @@ Term by term against the boxed independent result:
 | $\sum_s\lvert A_{\rm PXR}+A_{\rm CBS}\rvert^2$ | `A2` accumulated over `(ES, G_DOT_ES)` and `(EP, G_DOT_EP)` | exact; basis-independence confirmed numerically |
 | $t_{L,j}^2$ | `t_L * t_L`, `t_L = L_ang / beta` | exact |
 | $\operatorname{sinc}^2(D t_L(E-E_{\rm res})/2\pi\hbar c)$ | `a_width = denom * t_L / (2 HBARC_EV_ANG)`, `sinc(a_width*(E-E_r)/pi)**2` | exact |
-| $e^{-\mu L_{\rm esc}}$ | `T_abs = exp(-(L_esc * mu))` inside `_line_weight_core` | exact |
+| $e^{-\mu L_{\rm esc}}$ | `T_abs = exp(-(L_esc * mu))` inside `_cxr_weight_core` | exact |
 | $\sum_j$ over segments | `weight @ S` matrix product over the segment axis | intensity sum, exact |
 | $\sum_{\mathbf g}$ over reflections | rows of the `(n_seg, N_g)` grid, all reduced into one `spec` | intensity sum, exact |
 | $\sum_m w_m$ over crystallites | `WM` multiplies `weight`; orientation rows also reduce into `spec` | intensity sum, weights sum to 1 |
-| $1/N_e$ | `spec / Ne`, with `Ne = segments["Ne"]` or `electron_limit` and `line_electron = elec_id < Ne` masking surplus rows | exact |
+| $1/N_e$ | `spec / Ne`, with `Ne = segments["Ne"]` or `electron_limit` and `cxr_electron = elec_id < Ne` masking surplus rows | exact |
 
 Structural points confirmed on inspection:
 
@@ -212,7 +212,7 @@ Structural points confirmed on inspection:
 
 ## Numeric checks
 
-All checks use a synthetic segment array fed directly to `mc_spectrum`, and a reference spectrum coded from the boxed expression above with hard-coded CODATA constants ($\hbar c=1973.269804$ eV·Å, $\alpha^{-1}=137.035999084$, $m_ec^2=510998.95$ eV) and with an **arbitrary** orthonormal polarization basis rather than the implementation's $\sigma/\pi$ construction. Only $\chi_{\mathbf g}$ and $U_{\mathbf g}$ are taken from the repository, as the given inputs of their own ledger rows. Case: HOPG $(002)$, 30 keV, one $L=290$ Å segment along $+z$, $\theta_{\rm obs}=119^\circ$, $B=0.6$ Å², giving $E_{\rm res}=1046.700402$ eV.
+All checks use a synthetic segment array fed directly to `mc_cxr_spectrum`, and a reference spectrum coded from the boxed expression above with hard-coded CODATA constants ($\hbar c=1973.269804$ eV·Å, $\alpha^{-1}=137.035999084$, $m_ec^2=510998.95$ eV) and with an **arbitrary** orthonormal polarization basis rather than the implementation's $\sigma/\pi$ construction. Only $\chi_{\mathbf g}$ and $U_{\mathbf g}$ are taken from the repository, as the given inputs of their own ledger rows. Case: HOPG $(002)$, 30 keV, one $L=290$ Å segment along $+z$, $\theta_{\rm obs}=119^\circ$, $B=0.6$ Å², giving $E_{\rm res}=1046.700402$ eV.
 
 | check | result |
 | --- | --- |
@@ -258,6 +258,6 @@ t_{L,j}^2\operatorname{sinc}^2\!\left(
 e^{-\mu L_{{\rm esc},j}}
 $$
 
-is reproduced by `mc_spectrum` term for term, with no divergent factor, sign, exponent, or unit. Numerically the absolute normalization agrees to $6\times10^{-10}$ relative, whose entire budget is the repository's truncated fine-structure constant. The claimed incoherence structure holds exactly in the code: segments, electrons, polarizations, reflections, and mosaic orientations all add in intensity, confirmed by the exact $1/N$ subdivision falloff, the bitwise reflection additivity, and the invariance of the per-electron spectrum under electron replication. The mosaic average is an intensity average over a Gauss–Hermite quadrature whose weights sum to unity and which collapses to the perfect crystal as $\eta\to0$.
+is reproduced by `mc_cxr_spectrum` term for term, with no divergent factor, sign, exponent, or unit. Numerically the absolute normalization agrees to $6\times10^{-10}$ relative, whose entire budget is the repository's truncated fine-structure constant. The claimed incoherence structure holds exactly in the code: segments, electrons, polarizations, reflections, and mosaic orientations all add in intensity, confirmed by the exact $1/N$ subdivision falloff, the bitwise reflection additivity, and the invariance of the per-electron spectrum under electron replication. The mosaic average is an intensity average over a Gauss–Hermite quadrature whose weights sum to unity and which collapses to the perfect crystal as $\eta\to0$.
 
-Verdict: `rederived`. Not `anchored` — the ledgered anchor `src/pyrite/validation/anchor_figures.py::single_segment_anchor` compares `mc_spectrum` against another implementation helper (`feranchuk_line_flux`, itself the `unverified` `closed-form-flux` row) and is not a CI-green regression test on this row's normalization. Not `signed-off`; only a human applies that.
+Verdict: `rederived`. Not `anchored` — the ledgered anchor `src/pyrite/validation/anchor_figures.py::single_segment_anchor` compares `mc_cxr_spectrum` against another implementation helper (`feranchuk_line_flux`, itself the `unverified` `closed-form-flux` row) and is not a CI-green regression test on this row's normalization. Not `signed-off`; only a human applies that.

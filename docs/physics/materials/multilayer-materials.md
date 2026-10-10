@@ -16,7 +16,7 @@ The pipeline models an ordered stack of layers. A single-crystal slab is the one
 |---|---|---|
 | Sample definition | catalog material + optional ordered `stack`/`substrate`; the resolved case keeps the film's scalar fields plus `abs_layers`/`layer_radiators` | `materials.catalog`, `sweep.build_cases` |
 | Transport | composition-aware flights truncated at each internal boundary | `montecarlo.simulate_trajectories(layers=...)` |
-| Line spectrum | one radiator per crystalline layer, summed incoherently | `montecarlo.runner._spectrum_case`, `mc_spectrum` |
+| Line spectrum | one radiator per crystalline layer, summed incoherently | `montecarlo.runner._spectrum_case`, `mc_cxr_spectrum` |
 | Self-absorption | piecewise optical depth through every crossed layer | `materials.attenuation._stack_tau` |
 | Bremsstrahlung | per-layer emitting segments with the same cross-stack escape depth | `mc_brem_spectrum` |
 | Geometry | whole stack shares one normal/tilt | `montecarlo.tilted_geometry` |
@@ -50,7 +50,7 @@ stack = [
 - `MaterialCatalog.resolve_stack` resolves catalog references to immutable, ordered physical layers with cumulative boundaries and number densities.
 - `sweep.build_cases` keeps the film's scalar `crystal`/`composition`/`hkl_list`/`B_ang2` fields and adds `abs_layers` plus aligned `layer_radiators` when a stack is present.
 - `montecarlo._transport_case` passes the layer stack to `simulate_trajectories`.
-- `montecarlo._spectrum_case` loops over crystalline layers, accumulating `mc_spectrum` per layer with the cross-stack `T_abs`; `mc_brem_spectrum` is summed per layer likewise.
+- `montecarlo._spectrum_case` loops over crystalline layers, accumulating `mc_cxr_spectrum` per layer with the cross-stack `T_abs`; `mc_brem_spectrum` is summed per layer likewise.
 - `results.store_result` / `plots` label records by stack name. Per-record metrics are unchanged, since `spec`/`brem` remain one array per case.
 - Checkpoints store `abs_layers` and aligned `layer_radiators` for stacked cases; single-material checkpoints without those fields still load.
 
@@ -80,7 +80,7 @@ T_abs(E) = exp( − (1/|n̂_z|) · Σ_i  μ_i(E) · Δz_i )
 `_spectrum_case` loops over the stack's crystalline layers and sums their spectra incoherently. Each layer:
 
 - is assigned its segments by midpoint depth `z_mid` via `montecarlo._segments_in_layer`. Segments are short relative to layer thickness, so boundary-straddling is neglected.
-- radiates with its own `crystal`/`hkl_list`/`B_ang2`/`beam_uvw` through `mc_spectrum`, applying the cross-stack `T_abs` (`layers=abs_layers`, the optical depth through every layer on the escape path).
+- radiates with its own `crystal`/`hkl_list`/`B_ang2`/`beam_uvw` through `mc_cxr_spectrum`, applying the cross-stack `T_abs` (`layers=abs_layers`, the optical depth through every layer on the escape path).
 - is described by `case["layer_radiators"]`, a per-layer list aligned with `abs_layers` and built in `sweep.build_cases`: a `{crystal, hkl_list, B_ang2, beam_uvw}` dict for a crystalline layer (the film, and a crystalline substrate via `sweep.substrate_radiator`), or `None` for an amorphous one. `layer_radiators=None` (no substrate) is the single-slab path.
 
 Amorphous layers are skipped for lines, but their segments still feed bremsstrahlung and they still absorb. Bremsstrahlung (`mc_brem_spectrum`) is summed per layer with the same cross-stack `T_abs`.

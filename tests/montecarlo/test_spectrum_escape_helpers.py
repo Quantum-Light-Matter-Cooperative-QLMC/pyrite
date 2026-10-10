@@ -9,7 +9,7 @@ from pyrite.montecarlo.spectrum import (
     _observation_direction,
     _segment_escape_distance,
     mc_brem_spectrum,
-    mc_spectrum,
+    mc_cxr_spectrum,
 )
 from tests.helpers import real_eps, scaled_rtol
 
@@ -77,8 +77,8 @@ def test_finite_side_exit_shortens_coherent_and_brem_self_absorption():
         B_ang2=0.8,
         n_hat=n_hat,
     )
-    short_line = mc_spectrum(short, np.arange(700.0, 1500.0), **line_kw)
-    wide_line = mc_spectrum(wide, np.arange(700.0, 1500.0), **line_kw)
+    short_line = mc_cxr_spectrum(short, np.arange(700.0, 1500.0), **line_kw)
+    wide_line = mc_cxr_spectrum(wide, np.arange(700.0, 1500.0), **line_kw)
     assert np.sum(short_line) > np.sum(wide_line)
 
     brem_kw = dict(composition=[("C", 0.176)], n_hat=n_hat)
@@ -113,8 +113,8 @@ def test_finite_side_exit_layered_absorption_stays_in_emission_layer():
         n_hat=n_hat,
         composition=carbon,
     )
-    reference_line = mc_spectrum(segments, np.arange(700.0, 1500.0), **line_kw)
-    layered_line = mc_spectrum(segments, np.arange(700.0, 1500.0), layers=layers, **line_kw)
+    reference_line = mc_cxr_spectrum(segments, np.arange(700.0, 1500.0), **line_kw)
+    layered_line = mc_cxr_spectrum(segments, np.arange(700.0, 1500.0), layers=layers, **line_kw)
     # Equal in exact arithmetic: the W layer starts below the emission depth, so
     # the escape path never enters it. The two paths reach that answer through
     # different absorption bookkeeping (per-layer tau stack versus a single
@@ -152,8 +152,8 @@ def test_all_none_footprint_retains_z_only_spectrum_results():
 
     line_kw = dict(crystal="hopg", hkl_list=[(0, 0, 2)], B_ang2=0.8, n_hat=n_hat)
     np.testing.assert_array_equal(
-        mc_spectrum(omitted, np.arange(700.0, 1500.0), **line_kw),
-        mc_spectrum(explicit_none, np.arange(700.0, 1500.0), **line_kw),
+        mc_cxr_spectrum(omitted, np.arange(700.0, 1500.0), **line_kw),
+        mc_cxr_spectrum(explicit_none, np.arange(700.0, 1500.0), **line_kw),
     )
 
     brem_kw = dict(composition=[("C", 0.176)], n_hat=n_hat)

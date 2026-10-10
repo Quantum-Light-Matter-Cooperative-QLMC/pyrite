@@ -9,7 +9,7 @@ import pytest
 
 import pyrite as pr
 from pyrite import api
-from pyrite._line_grid_policy import LineYieldStatisticsWarning
+from pyrite._cxr_grid_policy import CxrYieldStatisticsWarning
 from pyrite.campaign.profiles import case_content_key, dataset_identity
 from pyrite.campaign.sweep import BeamSpec, build_cases
 from pyrite.campaign.sweep import Sweep as LegacySweep
@@ -46,12 +46,12 @@ def test_precision_roundtrips_json_and_process_pickle(precision):
 
 
 def test_precision_freezes_caller_owned_sequences():
-    observables = ["line"]
+    observables = ["cxr"]
     band = [1000.0, 3000.0]
     precision = pr.Precision(0.1, 40, 60, 20, observables=observables, band_eV=band)
     observables.append("brem")
     band[1] = 5000.0
-    assert precision.observables == ("line",)
+    assert precision.observables == ("cxr",)
     assert precision.band_eV == (1000.0, 3000.0)
 
 
@@ -64,7 +64,7 @@ def test_numerics_requires_typed_precision():
 
 def test_lowering_uses_policy_maximum_and_ignores_fixed_defaults(scene, numerics):
     first = api.build_case(scene, numerics)
-    other = api.build_case(scene, replace(numerics, n_electrons=7, n_electrons_brem=3))
+    other = api.build_case(scene, replace(numerics, cxr_trials=7, brem_trials=3))
     assert first.Ne == first.Ne_brem == numerics.precision.max_electrons
     assert first.adaptive_precision == numerics.precision.to_dict()
     assert case_content_key(first) == case_content_key(other)
@@ -118,7 +118,7 @@ def test_adaptive_dataset_identity_hashes_policy_not_unused_fixed_counts(scene, 
 @pytest.fixture
 def adaptive_output(scene, numerics):
     case = api.build_case(scene, numerics)
-    with pytest.warns(LineYieldStatisticsWarning, match="max_electrons=60"):
+    with pytest.warns(CxrYieldStatisticsWarning, match="max_electrons=60"):
         output = runner.run_case(case, transport_core="per-electron")
     return case, output
 
@@ -138,7 +138,7 @@ def test_public_runner_equals_fixed_n_and_records_statistics(adaptive_output):
 
 def test_split_transport_spectrum_path_retains_provenance(scene, numerics):
     case = api.build_case(scene, numerics)
-    with pytest.warns(LineYieldStatisticsWarning):
+    with pytest.warns(CxrYieldStatisticsWarning):
         transport = runner._transport_case(case, transport_core="per-electron")
     output = runner._spectrum_case(case, transport)
     assert output["adaptive_sampling"]["realized_electrons"] == transport["Ne_lines"]
@@ -180,7 +180,7 @@ def test_public_batch_means_survive_checkpoint_storage(scene, numerics, tmp_path
         numerics, precision=replace(numerics.precision, batch_means_band_eV=(1000.0, 3000.0))
     )
     case = api.build_case(scene, numerics)
-    with pytest.warns(LineYieldStatisticsWarning):
+    with pytest.warns(CxrYieldStatisticsWarning):
         output = runner.run_case(case, transport_core="per-electron")
     results = {}
     store_result(results, case, output)
@@ -196,7 +196,7 @@ def test_public_batch_means_survive_checkpoint_storage(scene, numerics, tmp_path
 
 
 def test_simulate_carries_requested_identity_and_realized_provenance(scene, numerics):
-    with pytest.warns(LineYieldStatisticsWarning):
+    with pytest.warns(CxrYieldStatisticsWarning):
         result = pr.simulate(scene.beam, scene.target, scene.detector, numerics=numerics)
     sampling = result.provenance["adaptive_sampling"]
     assert sampling["mode"] == "adaptive" and sampling["realized_electrons"] == 60
@@ -263,7 +263,7 @@ def test_adaptive_case_rejects_count_mismatch(scene, numerics):
 
 def test_pre_precision_case_pickle_state_keeps_manual_controls(scene):
     case = api.build_case(
-        scene, pr.Numerics(n_electrons=8, n_electrons_brem=4, bremsstrahlung_model="eedl")
+        scene, pr.Numerics(cxr_trials=8, brem_trials=4, bremsstrahlung_model="eedl")
     )
     case = replace(case, E_cut_lines_keV=7.0, E_cut_brem_keV=2.0, brem_step_eV=100.0)
     # Frozen/slotted dataclasses pickle a positional list of field values.
@@ -308,7 +308,7 @@ def test_mixed_cpu_pool_preserves_fixed_case_and_adaptive_provenance(scene, monk
     )
     adaptive = api.build_case(scene, pr.Numerics(precision=precision, bremsstrahlung_model="eedl"))
     fixed = api.build_case(
-        scene, pr.Numerics(n_electrons=8, n_electrons_brem=4, bremsstrahlung_model="eedl")
+        scene, pr.Numerics(cxr_trials=8, brem_trials=4, bremsstrahlung_model="eedl")
     )
     expected_fixed = runner.run_cases([fixed], max_workers=1, progress=False, engine="cpu")[0]
     expected_adaptive = runner.run_case(adaptive, transport_core="per-electron")

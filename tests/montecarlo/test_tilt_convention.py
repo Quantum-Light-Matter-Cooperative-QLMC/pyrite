@@ -10,7 +10,7 @@ convention-design.md):
   the physical slab normal n (a crystal miscut). None is a strict no-op.
 
 This module covers the convention itself (tilted_geometry) and the hook
-(_orientation_R / mc_spectrum); the grid-value flips in materials/registry.py /
+(_orientation_R / mc_cxr_spectrum); the grid-value flips in materials/registry.py /
 config.py / sweep.py / scan.py / src/pyrite/validation/anchor_figures.py are covered by
 their existing consumer tests (already updated to the positive convention).
 """
@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 
 from pyrite.materials.crystal import CRYSTALS
-from pyrite.montecarlo import mc_spectrum, simulate_trajectories, tilted_geometry
+from pyrite.montecarlo import mc_cxr_spectrum, simulate_trajectories, tilted_geometry
 from pyrite.montecarlo.geometry import _orientation_R
 
 THETA_OBS = np.deg2rad(119.0)
@@ -114,7 +114,7 @@ def test_orientation_R_recip_miscut_zero_polar_is_identity_like():
     assert np.array_equal(R_none, R_zero)
 
 
-# ---- mc_spectrum: the same guarantee at the production call site ---------------
+# ---- mc_cxr_spectrum: the same guarantee at the production call site ---------------
 E0_KEV = 25.0
 B_002 = 0.8
 HKL = ((0, 0, 2), (0, 0, -2))
@@ -133,15 +133,15 @@ def _segments():
 
 def test_mc_spectrum_recip_miscut_none_reproduces_bit_for_bit(_segments):
     kw = dict(crystal="hopg", hkl_list=HKL, theta_obs_rad=THETA_OBS, B_ang2=B_002)
-    default = mc_spectrum(_segments, E_LINE, **kw)
-    explicit_none = mc_spectrum(_segments, E_LINE, recip_miscut_rad=None, **kw)
+    default = mc_cxr_spectrum(_segments, E_LINE, **kw)
+    explicit_none = mc_cxr_spectrum(_segments, E_LINE, recip_miscut_rad=None, **kw)
     np.testing.assert_array_equal(default, explicit_none)
 
 
 def test_mc_spectrum_recip_miscut_nonzero_changes_spectrum(_segments):
     kw = dict(crystal="hopg", hkl_list=HKL, theta_obs_rad=THETA_OBS, B_ang2=B_002)
-    default = mc_spectrum(_segments, E_LINE, **kw)
-    miscut = mc_spectrum(
+    default = mc_cxr_spectrum(_segments, E_LINE, **kw)
+    miscut = mc_cxr_spectrum(
         _segments, E_LINE, recip_miscut_rad=(np.deg2rad(15.0), np.deg2rad(0.0)), **kw
     )
     assert not np.allclose(default, miscut)

@@ -41,7 +41,7 @@ from ..eedl_ionization import (
 )
 from ..eedl_ionization import EEDLSubshellTable as EEDLSubshellTable
 from ..eedl_ionization import load_eedl_shell_ionization as load_eedl_shell_ionization
-from .lines import (
+from .cxr import (
     _clip_segments_to_cutoff,
     _observation_direction,
     _validate_groove_escape_direction,
@@ -128,7 +128,7 @@ class CharacteristicCrossSectionTable:
     line_final_shell: tuple[str, ...]
     line_source: tuple[str, ...]
     line_energy_eV: np.ndarray
-    line_fwhm_eV: np.ndarray
+    cxr_fwhm_eV: np.ndarray
     vacancy_transfer: np.ndarray
     line_yield_per_vacancy: np.ndarray
 
@@ -446,7 +446,7 @@ def _parse_characteristic_file(
         line_final_shell=tuple(record[2] for record in line_records),
         line_source=tuple(record[3] for record in line_records),
         line_energy_eV=line_energy,
-        line_fwhm_eV=_readonly([record[5] for record in line_records]),
+        cxr_fwhm_eV=_readonly([record[5] for record in line_records]),
         vacancy_transfer=_readonly(transfer),
         line_yield_per_vacancy=_readonly(line_yields),
     )
@@ -621,7 +621,7 @@ def characteristic_line_window_mass(
     edges, _widths = _energy_bin_edges_and_widths(E_grid_eV)
     report: dict[str, tuple[float, float]] = {}
     for label, energy, fwhm in zip(
-        table.line_labels, table.line_energy_eV, table.line_fwhm_eV, strict=True
+        table.line_labels, table.line_energy_eV, table.cxr_fwhm_eV, strict=True
     ):
         if energy <= cutoff:
             continue
@@ -801,13 +801,13 @@ def mc_characteristic_spectrum(
     for el, number_density_ang3 in comp:
         table = all_tables[el]
         _transfer, line_yield_per_vacancy = _cascade_line_yields(table, relaxation_cutoff)
-        line_work = []
-        for line_index, (line_energy, line_fwhm) in enumerate(
-            zip(table.line_energy_eV, table.line_fwhm_eV, strict=True)
+        cxr_work = []
+        for cxr_index, (line_energy, line_fwhm) in enumerate(
+            zip(table.line_energy_eV, table.cxr_fwhm_eV, strict=True)
         ):
             if line_energy <= relaxation_cutoff:
                 continue
-            if not np.any(line_yield_per_vacancy[:, line_index] > 0.0):
+            if not np.any(line_yield_per_vacancy[:, cxr_index] > 0.0):
                 continue
             weights_cpu = _lorentzian_bin_weights(edges, line_energy, line_fwhm)
             if not np.any(weights_cpu > 0.0):
@@ -820,35 +820,35 @@ def mc_characteristic_spectrum(
                 # centre sits entirely outside E_grid_eV and only contributes a
                 # deliberately small physical tail (see
                 # `characteristic_line_window_mass` for that case's breakdown).
-                severe_truncation.append((el, str(table.line_labels[line_index]), captured))
+                severe_truncation.append((el, str(table.line_labels[cxr_index]), captured))
             profile_cpu = weights_cpu / bin_widths
             profile = xp.asarray(profile_cpu, dtype=REAL)
             if layers is None:
-                line_grid = xp.asarray([line_energy], dtype=REAL)
+                cxr_grid = xp.asarray([line_energy], dtype=REAL)
                 mu = _finite_mu_or_raise(
-                    _mu_total_inv_ang(comp, line_grid), line_grid, "characteristic line energy"
+                    _mu_total_inv_ang(comp, cxr_grid), cxr_grid, "characteristic line energy"
                 )[0]
                 layer_mu = ()
             else:
                 mu = None
-                line_grid = xp.asarray([line_energy], dtype=REAL)
+                cxr_grid = xp.asarray([line_energy], dtype=REAL)
                 layer_mu = [
                     _finite_mu_or_raise(
-                        _mu_total_inv_ang(c, line_grid), line_grid, "characteristic line energy"
+                        _mu_total_inv_ang(c, cxr_grid), cxr_grid, "characteristic line energy"
                     )[0]
                     for _z_top, _z_bot, c in layers
                 ]
-            response = xp.asarray(line_yield_per_vacancy[:, line_index], dtype=REAL)
-            line_work.append((profile, response, mu, layer_mu))
+            response = xp.asarray(line_yield_per_vacancy[:, cxr_index], dtype=REAL)
+            cxr_work.append((profile, response, mu, layer_mu))
 
-        if not line_work:
+        if not cxr_work:
             continue
-        line_yields = xp.zeros(len(line_work), dtype=REAL)
+        line_yields = xp.zeros(len(cxr_work), dtype=REAL)
         for start in range(0, int(seg_E.size), chunk):
             sl = slice(start, min(start + chunk, int(seg_E.size)))
             shell_sigma_cm2 = _interpolate_shell_cross_sections(table, seg_E[sl])
             path_cm = seg_L[sl] * 1.0e-8
-            for work_index, (_profile, response, mu, layer_mu) in enumerate(line_work):
+            for work_index, (_profile, response, mu, layer_mu) in enumerate(cxr_work):
                 mu_by_layer = xp.asarray([mu] if layers is None else layer_mu, dtype=REAL)
                 transmission = mean_transmission(
                     path_start[sl] @ mu_by_layer, path_end[sl] @ mu_by_layer, xp=xp
@@ -858,7 +858,7 @@ def mc_characteristic_spectrum(
                     number_density_ang3 * 1.0e24 * path_cm * effective_line_sigma_cm2 * transmission
                 )
         for (profile, _response, _mu, _layer_mu), line_yield in zip(
-            line_work,
+            cxr_work,
             line_yields,
             strict=True,
         ):

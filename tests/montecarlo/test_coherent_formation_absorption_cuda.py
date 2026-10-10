@@ -1,7 +1,7 @@
 """CUDA-gated parity for the coherent formation factor under absorption.
 
 Formation mode replaces each line's real sinc by the complex factor ``F`` of
-``spectrum.lines._formation`` on the vacuum centre/width plus the escape-path
+``spectrum.cxr._formation`` on the vacuum centre/width plus the escape-path
 refractive slope, and moves the attenuation from the coefficients into ``F``.
 These tests pin every CUDA coherent kernel's formation branch to that NumPy
 reference, and the prologue's formation outputs to its legacy outputs.
@@ -12,8 +12,8 @@ Validation: coherent-formation-absorption
 import numpy as np
 import pytest
 
-from pyrite.montecarlo.spectrum.lines import _RESONANCE_ROOT_RTOL
-from pyrite.montecarlo.spectrum.lines._formation import (
+from pyrite.montecarlo.spectrum.cxr import _RESONANCE_ROOT_RTOL
+from pyrite.montecarlo.spectrum.cxr._formation import (
     formation_coefficients,
     formation_factor,
 )

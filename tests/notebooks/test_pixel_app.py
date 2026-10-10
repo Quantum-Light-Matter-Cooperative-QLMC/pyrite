@@ -92,7 +92,7 @@ def test_selected_observation_renders_images_spectra_and_histogram(tmp_path) -> 
     )
 
     assert "unit-efficiency, energy-preserving reference response" in view.text
-    assert spectrum_components(observation) == ("line", "characteristic", "background")
+    assert spectrum_components(observation) == ("cxr", "characteristic", "brem")
 
 
 def test_inverted_window_falls_back_to_the_full_range_with_a_warning(tmp_path) -> None:

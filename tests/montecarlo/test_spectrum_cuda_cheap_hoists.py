@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from pyrite._backend import BACKEND
-from pyrite.montecarlo.spectrum.lines import _RESONANCE_ROOT_RTOL
+from pyrite.montecarlo.spectrum.cxr import _RESONANCE_ROOT_RTOL
 from pyrite.montecarlo.spectrum.segment_escape import mean_transmission
 
 cp = pytest.importorskip("cupy")

@@ -1,6 +1,6 @@
 """Is it safe to drop the cross-reflection terms of the coherent segment sum?
 
-``mc_spectrum(coherent=True)`` accumulates a complex field per ``(reflection,
+``mc_cxr_spectrum(coherent=True)`` accumulates a complex field per ``(reflection,
 mosaic orientation)`` row and squares each row separately, so distinct
 reflections add as INTENSITIES.  Writing the total field as
 ``F = sum_g F_g`` the exact intensity is
@@ -51,7 +51,7 @@ from pyrite.materials.crystal import (
     beta_from_Ee,
     reciprocal_g_vector,
 )
-from pyrite.montecarlo import mc_spectrum, simulate_trajectories
+from pyrite.montecarlo import mc_cxr_spectrum, simulate_trajectories
 
 THETA_OBS_DEG = 119.0
 
@@ -113,9 +113,9 @@ def _measure(label, crystal, E0_keV, thickness_ang, grid, n_electrons, seed, chu
         composition=composition,
         chunk=chunk,
     )
-    total = mc_spectrum(segments, E_grid, hkl_list=hkl_list, coherent=True, **kwargs)
+    total = mc_cxr_spectrum(segments, E_grid, hkl_list=hkl_list, coherent=True, **kwargs)
     per_hkl = {
-        hkl: mc_spectrum(segments, E_grid, hkl_list=[hkl], coherent=True, **kwargs)
+        hkl: mc_cxr_spectrum(segments, E_grid, hkl_list=[hkl], coherent=True, **kwargs)
         for hkl in hkl_list
     }
     resummed = sum(per_hkl.values())

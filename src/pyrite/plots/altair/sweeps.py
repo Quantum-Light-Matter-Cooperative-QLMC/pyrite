@@ -3,7 +3,7 @@
 Altair / Vega-Lite renderers for the parametric-sweep figures -- the interactive
 counterparts of the matplotlib :mod:`pyrite.plots.mpl.sweeps` heatmaps and metric
 scans. Same contract as :mod:`pyrite.plots.altair.spectra`: these reuse the exact
-per-record metric prep (``results.line_metrics`` + ``results.selection_score``)
+per-record metric prep (``results.cxr_metrics`` + ``results.selection_score``)
 and the shared axis/metric registries from :mod:`pyrite.plots._frames`, so the
 numbers are identical -- only the renderer differs. Not re-exported from
 ``pyrite.plots`` (frozen export-set guard); import from the submodule:
@@ -76,7 +76,7 @@ def metric_vs_chart(
     select="quality_line",
     cases=None,
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
     logx=False,
     logy=False,
     width=720,
@@ -102,7 +102,7 @@ def metric_vs_chart(
         select=select,
         cases=cases,
         rel_prominence=rel_prominence,
-        line_metric=line_metric,
+        cxr_metric=cxr_metric,
         metrics=metrics,
     )
     if df.empty:
@@ -133,9 +133,9 @@ def heatmap_chart(
     select="quality_line",
     cases=None,
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
     min_flux_frac=0.02,
-    min_line_quality=0.2,
+    min_cxr_quality=0.2,
     width=_HEATMAP_WIDTH,
     height=_HEATMAP_HEIGHT,
     metrics=None,
@@ -165,9 +165,9 @@ def heatmap_chart(
         select=select,
         cases=cases,
         rel_prominence=rel_prominence,
-        line_metric=line_metric,
+        cxr_metric=cxr_metric,
         min_flux_frac=min_flux_frac,
-        min_line_quality=min_line_quality,
+        min_cxr_quality=min_cxr_quality,
         metrics=metrics,
     )
     if df.empty:
@@ -214,9 +214,9 @@ def heatmap_select_chart(
     select="quality_line",
     cases=None,
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
     min_flux_frac=0.02,
-    min_line_quality=0.2,
+    min_cxr_quality=0.2,
     width=_HEATMAP_WIDTH,
     height=_HEATMAP_HEIGHT,
     metrics=None,
@@ -250,9 +250,9 @@ def heatmap_select_chart(
         select=select,
         cases=cases,
         rel_prominence=rel_prominence,
-        line_metric=line_metric,
+        cxr_metric=cxr_metric,
         min_flux_frac=min_flux_frac,
-        min_line_quality=min_line_quality,
+        min_cxr_quality=min_cxr_quality,
         metrics=metrics,
     )
     if df.empty:
@@ -316,9 +316,9 @@ def scan_charts(
     select="quality_line",
     cases=None,
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
     min_flux_frac=0.02,
-    min_line_quality=0.2,
+    min_cxr_quality=0.2,
     logx=False,
     logy=False,
     force=None,
@@ -336,7 +336,7 @@ def scan_charts(
 
     mode = scan_mode(recs, x, y, heatmap_min, force)
     # one metrics map shared across every quantity's chart (quantity-independent)
-    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
+    metrics = _metrics_map(recs, settings, rel_prominence, cxr_metric)
 
     if mode == "heatmap":
         charts = [
@@ -350,9 +350,9 @@ def scan_charts(
                 select=select,
                 cases=cases,
                 rel_prominence=rel_prominence,
-                line_metric=line_metric,
+                cxr_metric=cxr_metric,
                 min_flux_frac=min_flux_frac,
-                min_line_quality=min_line_quality,
+                min_cxr_quality=min_cxr_quality,
                 metrics=metrics,
             )
             for key, label, cmap in quantities
@@ -360,18 +360,18 @@ def scan_charts(
         return [c for c in charts if c is not None]
 
     # line mode: denser axis -> x, sparser -> hue (unless hue is given)
-    line_x, hue = pick_hue(recs, x, y, panel, hue)
+    cxr_x, hue = pick_hue(recs, x, y, panel, hue)
     charts = [
         metric_vs_chart(
             results,
             settings,
-            x=line_x,
+            x=cxr_x,
             metric=key,
             hue=hue,
             select=select,
             cases=cases,
             rel_prominence=rel_prominence,
-            line_metric=line_metric,
+            cxr_metric=cxr_metric,
             logx=logx,
             logy=logy,
             metrics=metrics,

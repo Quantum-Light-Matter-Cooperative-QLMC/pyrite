@@ -63,10 +63,10 @@ RECORD_SCHEMA = "pyrite.observation-record.v1"
 
 #: HDF5 group name -> ``SpatialResult`` attribute for each spectral factor.
 _FACTORS = {
-    "line": "line",
-    "background": "background",
-    "coherent_line": "coherent_line",
-    "characteristic_line": "characteristic_line",
+    "line": "cxr",
+    "background": "brem",
+    "coherent_line": "coherent_cxr",
+    "characteristic_line": "characteristic",
 }
 _RAY_ARRAYS = ("tile_index", "solid_angle_sr", "path_length_mm")
 _FACTOR_ARRAYS = ("energy_eV", "intrinsic_by_tile", "mu_by_filter_inv_mm")
@@ -169,8 +169,8 @@ class StoredObservation:
     def _components(self, components: tuple[str, ...] | None) -> tuple[str, ...]:
         if components is not None:
             return components
-        line = "coherent" if self.emission == "coherent" else "line"
-        return (line, "background")
+        cxr = "coherent" if self.emission == "coherent" else "cxr"
+        return (cxr, "brem")
 
     def acquire(
         self,
@@ -575,11 +575,11 @@ class ObservationStore:
         _, ray_map, directions, factors = self._read_true(identity.true_spatial_digest)
         spatial = SpatialResult(
             ray_map=ray_map,
-            line=factors["line"],
-            background=factors["background"],
+            cxr=factors["line"],
+            brem=factors["background"],
             detector=_decode_detector(layers["true_spatial"], response),
-            coherent_line=factors.get("coherent_line"),
-            characteristic_line=factors.get("characteristic_line"),
+            coherent_cxr=factors.get("coherent_line"),
+            characteristic=factors.get("characteristic_line"),
             tile_directions_lab=directions,
             reconstruction=layers["true_spatial"]["scorer"].get("reconstruction", "nearest_tile"),
         )

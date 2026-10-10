@@ -9,7 +9,7 @@ from pyrite.montecarlo.spectrum import (
     _clip_segments_to_cutoff,
     mc_brem_spectrum,
 )
-from pyrite.montecarlo.spectrum.lines import _prepare_spectrum
+from pyrite.montecarlo.spectrum.cxr import _prepare_spectrum
 from pyrite.montecarlo.transport import (
     TransportLUTConfig,
     prepare_sbethe_stopping_table,

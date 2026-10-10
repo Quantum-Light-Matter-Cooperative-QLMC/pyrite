@@ -1,7 +1,7 @@
 # blazed-groove-geometry
 
 - **Claim id**: `blazed-groove-geometry`
-- **Anchors**: `src/pyrite/montecarlo/groove.py::{blazed_groove_spec,surface_depth_ang,in_material,first_surface_event,escape_distance_ang,entry_points}`; `src/pyrite/montecarlo/transport.py::simulate_trajectories`; `src/pyrite/montecarlo/spectrum/lines.py::mc_spectrum`; `src/pyrite/montecarlo/spectrum/brem.py::mc_brem_spectrum`
+- **Anchors**: `src/pyrite/montecarlo/groove.py::{blazed_groove_spec,surface_depth_ang,in_material,first_surface_event,escape_distance_ang,entry_points}`; `src/pyrite/montecarlo/transport.py::simulate_trajectories`; `src/pyrite/montecarlo/spectrum/lines.py::mc_cxr_spectrum`; `src/pyrite/montecarlo/spectrum/brem.py::mc_brem_spectrum`
 - **Source**: elementary periodic ray–plane intersection (no literature equation)
 - **Verifier**: independent fresh context (did not write the implementation), 2026-07-24. Sections 1--3 were derived **before** reading implementation bodies (only the ledger row, module/function derivation docstrings, and signatures were read first, per the [validation methodology](../methodology.md)).
 
@@ -28,7 +28,7 @@ Restricted geometry θ_obs = 90°, tilt_azim = 180°, tilt_polar tp ∈ (0°, 90
 
 **Limiting cases.**
 - tp → 0 or tp → 90°: h = Λ sin tp cos tp → 0 and one of b, n̂ becomes tangent to the face; the claim is that these are *rejected*, which is the correct behaviour (a silent flat profile would hide the degenerate entrance/exit-face assignment). Pass by design.
-- h → 0 at fixed z (Λ → 0): claimed L → z/sin tp = z/|n̂_z|, the flat-face Beer–Lambert path used by `mc_spectrum`. Verified analytically in §3.3. Pass.
+- h → 0 at fixed z (Λ → 0): claimed L → z/sin tp = z/|n̂_z|, the flat-face Beer–Lambert path used by `mc_cxr_spectrum`. Verified analytically in §3.3. Pass.
 - Λ → 0: claimed z_entry → 0 (flat face). s1 ∈ [0, Λ sin tp) → 0, so z_entry = s1 cos tp → 0. Pass.
 
 Analytic signs, flat-profile limits, exact valley-band handling, and finite-footprint edge scaling pass after the implementation corrections re-checked in §§4.1 and 4.4.
@@ -188,7 +188,7 @@ Permanent no-reentry rays increment entrance-face exit count. Vacuum arrays are 
 
 ### 4.3 Coherent and bremsstrahlung radiation
 
-Both spectrum functions validate the supported direction and single-slab scope. `mc_spectrum` and `mc_brem_spectrum` call the same `escape_distance_ang`; both form `exp(−mu*L_esc)`. Vacuum legs never enter either segment sum. Coherent amplitude/resonance expressions and bremsstrahlung cross sections are unchanged. Supported-direction no-reentry proof in §3.6 therefore matches implementation.
+Both spectrum functions validate the supported direction and single-slab scope. `mc_cxr_spectrum` and `mc_brem_spectrum` call the same `escape_distance_ang`; both form `exp(−mu*L_esc)`. Vacuum legs never enter either segment sum. Coherent amplitude/resonance expressions and bremsstrahlung cross sections are unchanged. Supported-direction no-reentry proof in §3.6 therefore matches implementation.
 
 ### 4.4 Finite-footprint decoupling
 

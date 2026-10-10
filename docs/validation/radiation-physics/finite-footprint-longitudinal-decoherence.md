@@ -4,7 +4,7 @@
 
 This section was written before inspecting implementation bodies or the previous
 write-up. Source: the Gaussian characteristic function and conditional expectation;
-no external paper equation is claimed. The ledger and `mc_spectrum` signature/docstring
+no external paper equation is claimed. The ledger and `mc_cxr_spectrum` signature/docstring
 specify a per-electron photon density in photons per eV per sr, with a Gaussian RMS
 arrival duration `longitudinal_rms_fs` and finite transverse crystal geometry.
 
@@ -76,7 +76,7 @@ independent expression above; they supplied no independent certification. This
 revision preserves their conditional scope, assumptions and regression anchors,
 and distinguishes physical time from the code's length-valued timing coordinates.
 
-`mc_spectrum` forwards the request into `_setup.py`. For a finite width and height
+`mc_cxr_spectrum` forwards the request into `_setup.py`. For a finite width and height
 with a nonzero sampled offset population, setup computes `sigma_z_ang` from the
 supplied duration using `C_ANG_PER_FS` and evaluates
 

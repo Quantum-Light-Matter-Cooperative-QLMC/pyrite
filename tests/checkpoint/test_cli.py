@@ -53,9 +53,9 @@ def test_checkpoint_archive_list_dispatches_archive_handler(monkeypatch):
 
 def test_checkpoint_recompute_line_dispatches_existing_handler(monkeypatch):
     seen = {}
-    monkeypatch.setattr(recompute_cli, "_line_cli", lambda args: seen.update(vars(args)))
+    monkeypatch.setattr(recompute_cli, "_cxr_cli", lambda args: seen.update(vars(args)))
 
-    result = invoke(root_command, ["checkpoint", "recompute", "line", "hopg"])
+    result = invoke(root_command, ["checkpoint", "recompute", "cxr", "hopg"])
 
     assert_clean_result(result)
     assert seen["material"] == ["hopg"]
@@ -75,9 +75,9 @@ def test_checkpoint_gc_dispatches_existing_handler(monkeypatch):
 def test_canonical_recompute_line_dispatches_without_a_diagnostic(monkeypatch):
     """`pyrite reline` retired at 0.3.0; the grouped path is the only door."""
     seen = {}
-    monkeypatch.setattr(recompute_cli, "_line_cli", lambda args: seen.update(vars(args)))
+    monkeypatch.setattr(recompute_cli, "_cxr_cli", lambda args: seen.update(vars(args)))
 
-    result = invoke(root_command, ["checkpoint", "recompute", "line", "hopg"])
+    result = invoke(root_command, ["checkpoint", "recompute", "cxr", "hopg"])
     retired = invoke(root_command, ["reline", "hopg"])
 
     assert result.exit_code == 0

@@ -22,7 +22,7 @@ from .brem_bremslib import (
     evaluate_bremslib_rows,
     stage_bremslib_table,
 )
-from .lines import _observation_direction
+from .cxr import _observation_direction
 from .segment_escape import _escape_paths_at
 
 

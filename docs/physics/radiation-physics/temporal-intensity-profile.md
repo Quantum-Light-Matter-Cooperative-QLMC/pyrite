@@ -69,4 +69,4 @@ The option forces the per-reflection line route for every policy. The incoherent
 
 ## Validation
 
-[Validation: `temporal-intensity-profile`](../../validation/radiation-physics/temporal-intensity-profile.md). Implementation owner: `pyrite.montecarlo.spectrum.lines._temporal`.
+[Validation: `temporal-intensity-profile`](../../validation/radiation-physics/temporal-intensity-profile.md). Implementation owner: `pyrite.montecarlo.spectrum.cxr._temporal`.

@@ -52,7 +52,7 @@ def segments_on_device(segments: dict[str, Any]) -> dict[str, Any]:
     """Stage a segment dict's row arrays, leaving its scalar fields alone.
 
     The test-side twin of ``lines._segments_on_device``, for tests that call an
-    internal row kernel directly instead of going through ``mc_spectrum``.
+    internal row kernel directly instead of going through ``mc_cxr_spectrum``.
     """
 
     out = dict(segments)

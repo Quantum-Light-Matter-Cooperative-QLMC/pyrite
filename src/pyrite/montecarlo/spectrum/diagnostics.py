@@ -42,7 +42,7 @@ from ..transport import (
     spliced_stopping_keV_per_ang,
 )
 from .brem import BremsstrahlungModel, _bremsstrahlung_dsigma_dk
-from .lines import _SEG_ARRAYS, _observation_direction
+from .cxr import _SEG_ARRAYS, _observation_direction
 
 # Measured calibration defaults; see the validation doc named above. Drift is
 # in units of the flight's sinc half-width to its first zero; the brem error
@@ -460,7 +460,7 @@ def cxr_endpoint_resonance_drift(
     ``W = 2 pi HBARC_EV_ANG / (dnm * t_L)``,  ``t_L = L / beta(E_start)``.
 
     ``g_vectors``: (G, 3) lab-frame reciprocal vectors [1/Ang], the oriented
-    set the caller's ``mc_spectrum`` run sums over. The per-flight metric is
+    set the caller's ``mc_cxr_spectrum`` run sums over. The per-flight metric is
     the worst drift over G. Flights whose start-energy resonance falls below
     the kernel's hard 10 eV floor are excluded (they radiate nothing).
 

@@ -2,7 +2,7 @@
 
 - **Ledger row**: per-electron relative energy spread `δ ~ N(0, σ_δ)`, `E_i = E₀(1 + δ_i)`, drawn independently of the longitudinal arrival offsets; fractional line shift `S δ` with `S = (γ−1)/(γ³β²(1 − β cos θ_obs))`.
 - **Anchors**: `montecarlo/transport.py::simulate_trajectories` (sampling), `energy_grid/bounds.py::line_shift_fraction` (closed form).
-- **Source cited**: PXR resonance condition used by the kernel, `ω = v·g / (1 − n·v)` (`montecarlo/spectrum/lines.py::_line_kin_core`), plus the standard relativistic relation between kinetic energy and speed.
+- **Source cited**: PXR resonance condition used by the kernel, `ω = v·g / (1 − n·v)` (`montecarlo/spectrum/lines.py::_cxr_kin_core`), plus the standard relativistic relation between kinetic energy and speed.
 - **Assumptions stated**: standard Gaussian relative energy/momentum spread, no energy-position chirp; first order in `δ`; fixed emission direction (spread moves the line, does not redistribute it over angle); `S` is differentiated from the resonance formula at fixed geometry (fixed `g`, fixed beam direction, fixed `θ_obs`).
 - **Limiting cases claimed**: `δ → 0` ⇒ no shift; `γ → 1` (non-relativistic) ⇒ `S → 1/2`; monotone falling `S` over 30–300 keV; `θ_obs = 90°` used as the catalog's worst-case geometry.
 
@@ -107,15 +107,15 @@ All limiting-case and monotonicity filters pass; no discrepancy found in the `S`
 ## 5. Comparison against the implementation
 
 - `energy_grid/bounds.py::line_shift_fraction`: computes `gamma = 1 + E/m_ec²`; `beta_sq = 1 − 1/gamma**2`; `sensitivity = (gamma−1)/(gamma**3 * beta_sq * (1 − sqrt(beta_sq)*cos_theta_obs))`; returns `sensitivity * energy_spread_frac`. This is symbolically identical, term for term, to the independently re-derived `S` and `S·δ` above — same numerator `(γ−1)`, same `γ³β²` factor, same `(1 − β cos θ_obs)` Doppler denominator, no extra factors of 2, no sign inversion.
-- `montecarlo/spectrum/lines.py::_line_kin_core` / its caller: uses `denom = 1 − v·n` (i.e. `1 − n·v`) and `omega_res = v_dot_g/denom`, confirming the cited resonance convention `ω = v·g/(1 − n·v)` is in fact the one the derivation started from (not a mismatched sign or a `1+n·v` variant).
+- `montecarlo/spectrum/lines.py::_cxr_kin_core` / its caller: uses `denom = 1 − v·n` (i.e. `1 − n·v`) and `omega_res = v_dot_g/denom`, confirming the cited resonance convention `ω = v·g/(1 − n·v)` is in fact the one the derivation started from (not a mismatched sign or a `1+n·v` variant).
 - `montecarlo/transport.py::simulate_trajectories`: `energy_spread_frac` branch matches the claimed sampling law `E_keV = E_keV * (1 + f * standard_normal(Ne))` on its own RNG substream, with the same hard-error-on-non-positive-energy behavior described above.
 
 No divergent term, sign, exponent, or convention found between the independent derivation and the implementation.
 
 ## Verdict
 
-- **Claim**: `beam-energy-spread-injection` — `montecarlo/transport.py::simulate_trajectories`, `energy_grid/bounds.py::line_shift_fraction` — PXR resonance `ω = v·g/(1−n·v)` (`spectrum.py::_line_kin_core`), differentiated at fixed geometry to give `S = (γ−1)/(γ³β²(1−β cos θ_obs))`.
-- **Filters**: units `pass`; limits `pass` (`γ→1 ⇒ S→1/2`, `δ→0 ⇒` no shift, monotone fall 30–300 keV at `cos θ_obs=0`); signs/conventions `pass` (`S>0` everywhere physical, resonance-denominator sign matches `_line_kin_core`'s `1 − n·v`).
+- **Claim**: `beam-energy-spread-injection` — `montecarlo/transport.py::simulate_trajectories`, `energy_grid/bounds.py::line_shift_fraction` — PXR resonance `ω = v·g/(1−n·v)` (`spectrum.py::_cxr_kin_core`), differentiated at fixed geometry to give `S = (γ−1)/(γ³β²(1−β cos θ_obs))`.
+- **Filters**: units `pass`; limits `pass` (`γ→1 ⇒ S→1/2`, `δ→0 ⇒` no shift, monotone fall 30–300 keV at `cos θ_obs=0`); signs/conventions `pass` (`S>0` everywhere physical, resonance-denominator sign matches `_cxr_kin_core`'s `1 − n·v`).
 - **Re-derivation**: `matches` — the closed form for `S`, the sampling law `E_i = E₀(1+δ_i)`, and the RNG-stream independence argument for `⟨t δ⟩ = 0` all reproduce the implementation exactly; no divergent term found.
 - **Verdict**: `filtered` (re-derivation corroborates; ledger status unchanged pending anchoring/human sign-off — this write-up does not itself flip the ledger).
 - **Write-up**: `docs/validation/beam-transport/beam-energy-spread-injection.md`.

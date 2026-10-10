@@ -77,8 +77,8 @@ def _grid_summary(value, *, brem=False):
 
 def energy_grid_rows(document, target):
     """Report declared sources and case semantics without resolving trajectories."""
-    sources = profile_edit.line_grid_sources(document, target)
-    policy = profile_edit.profile_line_grid_values(target)
+    sources = profile_edit.cxr_grid_sources(document, target)
+    policy = profile_edit.profile_cxr_grid_values(target)
     refs = profile_edit.energy_grid_refs(target)
     if policy:
         line = "automatic for every case (profile policy)"
@@ -233,7 +233,7 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
 
     policy = payload["line_grid_policy"]
     _table(
-        "Line-grid policy (profile line-grid)",
+        "CXR-grid policy (profile cxr-grid)",
         [("source", "automatic for every case"), *list(_rows(policy))]
         if policy
         else [("policy", "none (explicit, stored or built-in grids)")],

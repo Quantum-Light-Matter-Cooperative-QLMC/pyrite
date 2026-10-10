@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from pyrite._spectral_components import incident_spectrum, line_spectrum, separate_legacy
+from pyrite._spectral_components import cxr_spectrum, incident_spectrum, separate_legacy
 from pyrite.results.model import Result
 
 
@@ -18,9 +18,9 @@ def _record():
 def test_line_spectrum_adds_characteristic_on_request():
     record = _record()
 
-    np.testing.assert_array_equal(line_spectrum(record), [1.5, 2.25])
-    np.testing.assert_array_equal(line_spectrum(record, characteristic=False), [1.0, 2.0])
-    np.testing.assert_array_equal(line_spectrum(record, coherent=True), [3.5, 4.25])
+    np.testing.assert_array_equal(cxr_spectrum(record), [1.5, 2.25])
+    np.testing.assert_array_equal(cxr_spectrum(record, characteristic=False), [1.0, 2.0])
+    np.testing.assert_array_equal(cxr_spectrum(record, coherent=True), [3.5, 4.25])
     np.testing.assert_array_equal(incident_spectrum(record), [11.5, 22.25])
 
 
@@ -28,7 +28,7 @@ def test_line_spectrum_without_characteristic_component_is_the_line():
     record = _record()
     del record["spec_characteristic"]
 
-    np.testing.assert_array_equal(line_spectrum(record), record["spec"])
+    np.testing.assert_array_equal(cxr_spectrum(record), record["spec"])
 
 
 def test_separate_legacy_subtracts_once_from_nested_store_totals():

@@ -56,14 +56,14 @@ from typing import Any
 
 import numpy as np
 
-from ..._line_grid_policy import (
+from ..._cxr_grid_policy import (
     COHERENT_JUMP_CLUSTER_SEPARATION,
     COHERENT_NYQUIST_OVERSAMPLING,
     COHERENT_WINDOW_BIN_EV,
     DEFAULT_COHERENT_DECOHERENCE_LIMIT,
     DEFAULT_COHERENT_LEAK_LIMIT,
 )
-from ..._line_windows import FeatureSeed
+from ..._cxr_windows import FeatureSeed
 from ...materials.crystal import HBARC_EV_ANG
 from ..transport.kinematics import C_ANG_PER_FS
 from .coherent_dispersion import CoherentDispersionLaw, DispersionBands
@@ -183,7 +183,7 @@ class CoherentRowField:
 
 
 class CoherentRowCollector:
-    """``coefficient_capture`` hook of ``mc_spectrum``: records every row.
+    """``coefficient_capture`` hook of ``mc_cxr_spectrum``: records every row.
 
     Validation: coherent-line-grid-windowed-resolution
     """
@@ -968,7 +968,7 @@ def coherent_window_seeds(
     """Coherent windows of every ``(reflection, orientation)`` row.
 
     Source equation: the coherent reducer's own row field
-    (:class:`CoherentRowField`, captured from ``mc_spectrum``): per piece the
+    (:class:`CoherentRowField`, captured from ``mc_cxr_spectrum``): per piece the
     time-domain carrier ``a_j exp(-i omega_j tau)`` on ``|tau - d_j| <= dd_j/2``
     with ``a_j = c_j / dd_j`` from the reducer's complex coefficient ``c_j``
     per polarization, damped by ``exp(-tau_abs/2)``, phase continuous along a

@@ -90,7 +90,7 @@ Fresh-context validation and human sign-off pending.
 
 Fresh-context verifier, 2026-09-28, worktree HEAD `1a8434e9`. Derived from the ledger row and the `sinc-bin-integration` profile alone, before the implementation bodies or the derivation above were read. The verifier changed only this section. Scratch scripts are outside the repository.
 
-- **Claim**: `sinc-bin-far-envelope` — `montecarlo/spectrum/lines/_bin_quadrature.py::_host_bin_mean`, `::_far_envelope_float32`, `SINCSQ_BIN_PREAMBLE::pyrite_sincsq_far_mean`, `::pyrite_sincsq_bin_mean_hybrid`, `_BIN_REDUCE_SOURCE`, `BIN_MEAN_EXACT_WIDTHS` — $\operatorname{sinc}^2x=\tfrac12(\pi x)^{-2}-\cos(2\pi x)/(2\pi^2x^2)$ plus integration by parts
+- **Claim**: `sinc-bin-far-envelope` — `montecarlo/spectrum/cxr/_bin_quadrature.py::_host_bin_mean`, `::_far_envelope_float32`, `SINCSQ_BIN_PREAMBLE::pyrite_sincsq_far_mean`, `::pyrite_sincsq_bin_mean_hybrid`, `_BIN_REDUCE_SOURCE`, `BIN_MEAN_EXACT_WIDTHS` — $\operatorname{sinc}^2x=\tfrac12(\pi x)^{-2}-\cos(2\pi x)/(2\pi^2x^2)$ plus integration by parts
 - **Filters**: units pass; limits pass; signs/conventions pass (see the table)
 - **Re-derivation**: `matches` for the envelope mean, telescoping, and both bounds. The implementation `differs` in one convention: the resonance energy is rounded to float32 *before* the offset $\epsilon-E_{\mathrm{res}}$ is formed. This contradicts the stated assumption (Assumptions, third bullet) and breaks {eq}`eq-sbfe-yield-bound` when $\mathrm{ulp}_{32}(E_{\mathrm{res}})/(2w)\gtrsim 1$ (finding 1)
 - **Verdict**: `discrepancy` (narrow: the mathematics is rederived; the stated yield bound is unconditional, but the code meets it only under an unstated resolving-power condition)
@@ -178,7 +178,7 @@ Mutation tests (scratch copy of the test file; `_far_envelope_float32` monkeypat
 
 Second fresh-context verifier, 2026-09-28, worktree HEAD `c5bb3f1e`. Derived from the ledger row and the `sinc-bin-integration` profile before reading the implementation, the author's text, or the first verifier's section. The verifier changed only this section. Scratch scripts, a host-compiled copy of `SINCSQ_BIN_PREAMBLE`, and mutated copies of the test functions are outside the repository.
 
-- **Claim**: `sinc-bin-far-envelope` — `montecarlo/spectrum/lines/_bin_quadrature.py::_host_bin_mean`, `::_far_envelope_float32`, `SINCSQ_BIN_PREAMBLE::pyrite_sincsq_far_mean`, `::pyrite_sincsq_bin_mean_hybrid`, `_BIN_REDUCE_SOURCE`, `BIN_MEAN_EXACT_WIDTHS` — $\operatorname{sinc}^2x=\tfrac12(\pi x)^{-2}-\cos(2\pi x)/(2\pi^2x^2)$ plus integration by parts
+- **Claim**: `sinc-bin-far-envelope` — `montecarlo/spectrum/cxr/_bin_quadrature.py::_host_bin_mean`, `::_far_envelope_float32`, `SINCSQ_BIN_PREAMBLE::pyrite_sincsq_far_mean`, `::pyrite_sincsq_bin_mean_hybrid`, `_BIN_REDUCE_SOURCE`, `BIN_MEAN_EXACT_WIDTHS` — $\operatorname{sinc}^2x=\tfrac12(\pi x)^{-2}-\cos(2\pi x)/(2\pi^2x^2)$ plus integration by parts
 - **Filters**: units pass; limits pass; signs/conventions pass (see the table)
 - **Re-derivation**: `matches` — envelope mean, product form, telescoping, and both bounds, which are valid upper bounds. The offset now uses the float32 head/remainder split of both the edge and the resonance. Every route uses one resonance value for classification and for near bins
 - **Verdict**: `rederived`

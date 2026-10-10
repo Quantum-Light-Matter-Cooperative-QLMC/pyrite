@@ -2,7 +2,7 @@
 
 Pins the ``quadrature`` policy field (off by default, schema 3 only when
 selected), its precedence, its case key and identity, the early refusals, the
-cache schema, and that the runner hands the case's choice to ``mc_spectrum``.
+cache schema, and that the runner hands the case's choice to ``mc_cxr_spectrum``.
 
 Validation: sinc-bin-integration
 """
@@ -13,15 +13,15 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from pyrite import _line_grid_policy
-from pyrite._line_grid_policy import (
-    LINE_GRID_POLICY_SCHEMA,
-    LINE_QUADRATURES,
-    QUADRATURE_LINE_GRID_POLICY_SCHEMA,
-    WINDOWED_LINE_GRID_POLICY_SCHEMA,
+from pyrite import _cxr_grid_policy
+from pyrite._cxr_grid_policy import (
+    CXR_GRID_POLICY_SCHEMA,
+    CXR_QUADRATURES,
+    QUADRATURE_CXR_GRID_POLICY_SCHEMA,
+    WINDOWED_CXR_GRID_POLICY_SCHEMA,
     cached_coordinates,
-    line_quadrature_from_payload,
-    resolve_line_grid_policy,
+    cxr_quadrature_from_payload,
+    resolve_cxr_grid_policy,
     store_coordinates,
 )
 from pyrite.campaign.config import material_sweep
@@ -29,14 +29,14 @@ from pyrite.campaign.profiles import case_content_key
 from pyrite.campaign.sweep import build_cases
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.case import Case
-from pyrite.montecarlo.spectrum.lines import _bin_quadrature
+from pyrite.montecarlo.spectrum.cxr import _bin_quadrature
 
 
 @pytest.fixture(autouse=True)
 def _isolated(monkeypatch, tmp_path):
-    for name in _line_grid_policy.ENVIRONMENT_NAMES:
+    for name in _cxr_grid_policy.ENVIRONMENT_NAMES:
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(_line_grid_policy, "output_dir", lambda _kind: tmp_path)
+    monkeypatch.setattr(_cxr_grid_policy, "output_dir", lambda _kind: tmp_path)
 
 
 def _sweep(energy_keV=77.0, **policy):
@@ -44,48 +44,48 @@ def _sweep(energy_keV=77.0, **policy):
     return replace(
         sweep,
         beam=replace(sweep.beam, energy_keV=energy_keV),
-        line_grid_policy=policy or None,
+        cxr_grid_policy=policy or None,
     )
 
 
 def _policy(**per_call):
-    return resolve_line_grid_policy(start_eV=10.0, stop_eV=10_000.0, per_call=per_call or None)
+    return resolve_cxr_grid_policy(start_eV=10.0, stop_eV=10_000.0, per_call=per_call or None)
 
 
 # ---- policy field -------------------------------------------------------------
 def test_quadratures_match_the_kernel_module():
-    assert LINE_QUADRATURES == _bin_quadrature.LINE_QUADRATURES
-    assert LINE_QUADRATURES[0] == _bin_quadrature.NODE_QUADRATURE
+    assert CXR_QUADRATURES == _bin_quadrature.CXR_QUADRATURES
+    assert CXR_QUADRATURES[0] == _bin_quadrature.NODE_QUADRATURE
 
 
 def test_node_quadrature_keeps_the_historical_payload():
     default = _policy().payload()
-    assert default["schema"] == LINE_GRID_POLICY_SCHEMA
+    assert default["schema"] == CXR_GRID_POLICY_SCHEMA
     assert "quadrature" not in default and "quadrature" not in default["sources"]
     assert _policy(quadrature="node").payload() == default
     windowed = _policy(windows=True).payload()
     assert _policy(windows=True, quadrature="node").payload() == windowed
-    assert windowed["schema"] == WINDOWED_LINE_GRID_POLICY_SCHEMA
+    assert windowed["schema"] == WINDOWED_CXR_GRID_POLICY_SCHEMA
 
 
 @pytest.mark.parametrize("windows", [False, True])
 def test_bin_mean_bumps_the_schema_and_records_its_source(windows):
     payload = _policy(quadrature="bin-mean", windows=windows).payload()
-    assert payload["schema"] == QUADRATURE_LINE_GRID_POLICY_SCHEMA
+    assert payload["schema"] == QUADRATURE_CXR_GRID_POLICY_SCHEMA
     assert payload["quadrature"] == "bin-mean"
     assert payload["sources"]["quadrature"] == "per-call"
     assert ("windows" in payload) is windows
     assert json.loads(json.dumps(payload)) == payload
-    assert line_quadrature_from_payload(payload) == "bin-mean"
-    assert line_quadrature_from_payload(None) == "node"
+    assert cxr_quadrature_from_payload(payload) == "bin-mean"
+    assert cxr_quadrature_from_payload(None) == "node"
 
 
 def test_quadrature_precedence_is_per_call_then_stored():
-    stored = resolve_line_grid_policy(
+    stored = resolve_cxr_grid_policy(
         start_eV=10.0, stop_eV=10_000.0, stored={"quadrature": "bin-mean"}
     ).payload()
     assert stored["sources"]["quadrature"] == "stored configuration"
-    overridden = resolve_line_grid_policy(
+    overridden = resolve_cxr_grid_policy(
         start_eV=10.0,
         stop_eV=10_000.0,
         per_call={"quadrature": "node"},
@@ -98,12 +98,12 @@ def test_unknown_quadrature_is_refused():
     with pytest.raises(ValueError, match="quadrature must be one of"):
         _policy(quadrature="simpson")
     with pytest.raises(ValueError, match="quadrature must be one of"):
-        line_quadrature_from_payload({"quadrature": "simpson"})
+        cxr_quadrature_from_payload({"quadrature": "simpson"})
 
 
 def test_schema_three_cache_records_are_readable():
-    store_coordinates("ab" * 16, {"schema": QUADRATURE_LINE_GRID_POLICY_SCHEMA, "num": 3})
-    assert cached_coordinates("ab" * 16) == {"schema": QUADRATURE_LINE_GRID_POLICY_SCHEMA, "num": 3}
+    store_coordinates("ab" * 16, {"schema": QUADRATURE_CXR_GRID_POLICY_SCHEMA, "num": 3})
+    assert cached_coordinates("ab" * 16) == {"schema": QUADRATURE_CXR_GRID_POLICY_SCHEMA, "num": 3}
 
 
 # ---- case identity ------------------------------------------------------------
@@ -148,7 +148,7 @@ def test_runner_forwards_the_case_quadrature(monkeypatch):
         seen.append(kwargs["line_quadrature"])
         return np.zeros(len(E_grid))
 
-    monkeypatch.setattr(runner, "mc_spectrum", fake_spectrum)
+    monkeypatch.setattr(runner, "mc_cxr_spectrum", fake_spectrum)
     grid = np.linspace(100.0, 200.0, 11)
     for case, expected in (
         (build_cases(_sweep(), n_electrons=2, n_electrons_brem=2)[0], "node"),
@@ -157,5 +157,5 @@ def test_runner_forwards_the_case_quadrature(monkeypatch):
             "bin-mean",
         ),
     ):
-        runner._lines_for_segments({}, grid, dict(case), np.array([0.0, 0.0, -1.0]), None, None)
+        runner._cxr_for_segments({}, grid, dict(case), np.array([0.0, 0.0, -1.0]), None, None)
         assert seen[-1] == expected

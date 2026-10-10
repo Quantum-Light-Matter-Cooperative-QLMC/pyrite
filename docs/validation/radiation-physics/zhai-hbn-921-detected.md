@@ -132,8 +132,8 @@ the Debye–Waller factor but does not give these two h-BN parameter values.
 ## Implementation comparison
 
 The inspected owners are `anchor_figures.py::_supplementary_detected_spectrum`,
-`model_coherent_spectra`, `montecarlo/spectrum/lines/_setup.py::_prepare_spectrum`,
-`_kernels.py::_line_weight_core`, `_line_amp_sq_core`, and the batched
+`model_coherent_spectra`, `montecarlo/spectrum/cxr/_setup.py::_prepare_spectrum`,
+`_kernels.py::_cxr_weight_core`, `_cxr_amp_sq_core`, and the batched
 incoherent reduction. Detector scoring is owned by `detectors/spec.py::LegacyEDS`
 and `detectors/response.py`; aperture and EDS widths by `montecarlo/detector.py`.
 

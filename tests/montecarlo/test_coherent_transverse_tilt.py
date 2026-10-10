@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
-from pyrite.montecarlo import mc_spectrum
+from pyrite.montecarlo import mc_cxr_spectrum
 from pyrite.montecarlo.geometry import project_beam_entry, sample_to_lab_R
 from pyrite.montecarlo.spectrum.coherent_transverse import (
     transverse_envelope,
@@ -202,9 +202,9 @@ def test_tilted_finite_footprint_reducer_applies_the_analytic_transverse_factor(
         initial_t0_ang=np.zeros(1),
         Ne=1,
     )
-    self_term = mc_spectrum(single, energy, coherent=True, **kwargs)
+    self_term = mc_cxr_spectrum(single, energy, coherent=True, **kwargs)
     population = 50.0
-    actual = mc_spectrum(
+    actual = mc_cxr_spectrum(
         segments,
         energy,
         coherent=True,
@@ -232,7 +232,7 @@ def test_finite_footprint_refuses_a_spot_reaching_the_edge():
     segments, _ = _tilted_identical_tracks(4, 2.0)
     segments.update(crystal_width_ang=100.0, crystal_height_ang=100.0)
     with pytest.raises(ValueError, match="well inside the footprint"):
-        mc_spectrum(
+        mc_cxr_spectrum(
             segments,
             np.arange(700.0, 1500.0, 2.0),
             "hopg",

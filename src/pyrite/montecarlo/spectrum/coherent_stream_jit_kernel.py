@@ -134,7 +134,7 @@ def _coherent_prologue_kernel(
     L_esc,
     L_start,
     L_end,
-    line_electron,
+    cxr_electron,
     r_flat,
     g_flat,
     es_flat,
@@ -193,7 +193,7 @@ def _coherent_prologue_kernel(
     cp_re_out[pair] = F32_ZERO
     cp_im_out[pair] = F32_ZERO
 
-    if not line_electron[seg]:
+    if not cxr_electron[seg]:
         return
 
     vbase = seg * U32_THREE
@@ -799,7 +799,7 @@ def run_coherent_prologue_kernel(
     gamma,
     t_L,
     L_esc,
-    line_electron,
+    cxr_electron,
     r_flat,
     phase_slope_seg,
     g_flat,
@@ -981,7 +981,7 @@ def run_coherent_prologue_kernel(
             L_esc,
             L_start,
             L_end,
-            line_electron,
+            cxr_electron,
             r_flat,
             g_flat,
             es_flat,

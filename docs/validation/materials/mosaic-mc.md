@@ -3,7 +3,7 @@
 ## Claim
 
 - **ID:** `mosaic-mc`
-- **Symbol:** `montecarlo/spectrum/lines.py::mc_spectrum` (`mosaic_route="mc"`)
+- **Symbol:** `montecarlo/spectrum/lines.py::mc_cxr_spectrum` (`mosaic_route="mc"`)
 - **Source:** Gaussian mosaic-block orientation average; product Gauss--Hermite quadrature.
 - **Intended quantity:** incoherent expectation of the full single-crystallite spectrum over two independent small tilts.
 
@@ -30,15 +30,15 @@ Units: tilt coordinates, `sigma`, and FWHM are radians (dimensionless); quadratu
 
 ## Implementation comparison
 
-`_mosaic_quadrature` uses `hermgauss(nodes)`, `sigma = eta_FWHM / 2.3548200450309493`, nodes `sqrt(2) sigma x_i`, and per-axis weights `w_i/sqrt(pi)`.  The product rule is therefore exactly `w_i w_j/pi`.  `_small_tilt_R` is a proper Rodrigues rotation. `mc_spectrum` rotates `g` at every node, recomputes resonance, polarization, PXR/CBS amplitudes, lineshape, and energy-dependent attenuation, then adds intensities with the product weights.  It does not average complex amplitudes. This matches the independent expression term-for-term.
+`_mosaic_quadrature` uses `hermgauss(nodes)`, `sigma = eta_FWHM / 2.3548200450309493`, nodes `sqrt(2) sigma x_i`, and per-axis weights `w_i/sqrt(pi)`.  The product rule is therefore exactly `w_i w_j/pi`.  `_small_tilt_R` is a proper Rodrigues rotation. `mc_cxr_spectrum` rotates `g` at every node, recomputes resonance, polarization, PXR/CBS amplitudes, lineshape, and energy-dependent attenuation, then adds intensities with the product weights.  It does not average complex amplitudes. This matches the independent expression term-for-term.
 
 Independent numeric point: seven nodes per axis at `eta_FWHM=2 deg` gave weight sum error `0.0`; the weighted radial second moment matched `2 sigma^2` with relative error `1.2e-13`.  Focused tests cover identity, proper rotation, normalization, node scaling, and analytic/MC mutual exclusion; the combined focused run passed (`36 passed`).  The existing heavier check remains the line-shape/transport anchor and was not rerun for this analytic verification.
 
-Follow-up applied after independent verification: both `mc_spectrum` and `_mosaic_quadrature` now contain `Validation: mosaic-mc`.
+Follow-up applied after independent verification: both `mc_cxr_spectrum` and `_mosaic_quadrature` now contain `Validation: mosaic-mc`.
 
 ## Verdict
 
-- **Claim**: `mosaic-mc` — `montecarlo/spectrum/lines.py::mc_spectrum` — Gaussian mosaic-block intensity average by product Gauss--Hermite quadrature
+- **Claim**: `mosaic-mc` — `montecarlo/spectrum/lines.py::mc_cxr_spectrum` — Gaussian mosaic-block intensity average by product Gauss--Hermite quadrature
 - **Filters**: units `pass`; limits `pass`; signs/conventions `pass`
 - **Re-derivation**: `matches` — no divergent factor; normalization is exactly `1/pi`
 - **Verdict**: `rederived`

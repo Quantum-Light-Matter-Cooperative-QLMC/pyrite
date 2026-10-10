@@ -38,7 +38,7 @@ def _sample_row_fields(
 
     Validation: coherent-line-grid-windowed-resolution
     """
-    from .lines._formation import formation_factor
+    from .cxr._formation import formation_factor
 
     if field.phase_rad is None or field.escape_mid_ang is None or field.escape_change_ang is None:
         raise ValueError("a physical row sample requires captured midpoint and escape phases")

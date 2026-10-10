@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cached_property
 from numbers import Integral
 from types import MappingProxyType
@@ -11,14 +11,16 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from .._spectral_components import line_spectrum
+from .._api_deprecations import renamed_fields, warn_renamed
 from ..instrument import PlanarDetector
 from ..montecarlo import Case
 
 #: Spatial result components. ``*_total`` adds characteristic radiation.
-COMPONENTS = ("line", "background", "coherent", "characteristic", "line_total", "coherent_total")
+COMPONENTS = ("cxr", "brem", "coherent", "characteristic", "cxr_total", "coherent_total")
 
 if TYPE_CHECKING:
+    import pandas as pd
+
     from ..instrument import Acquisition, AcquisitionBatch
     from ..instrument.geometry import PixelRays
 
@@ -178,6 +180,12 @@ class PixelMetadata:
                 object.__setattr__(self, name, _readonly_array(value))
 
 
+@renamed_fields(
+    line="cxr",
+    background="brem",
+    coherent_line="coherent_cxr",
+    characteristic_line="characteristic",
+)
 @dataclass(frozen=True)
 class SpatialResult:
     """Provide lazy spatial scoring from factorized planar-detector data.
@@ -190,11 +198,11 @@ class SpatialResult:
         Pre-filter line and continuum source factors.
     detector
         Physical detector used for geometry and optional measured response.
-    coherent_line
+    coherent_cxr
         Optional coherent line factors, available for coherent calculations.
-    characteristic_line
+    characteristic
         Optional characteristic-radiation factors. ``line`` and
-        ``coherent_line`` exclude it; the ``"line_total"`` and
+        ``coherent_cxr`` exclude it; the ``"cxr_total"`` and
         ``"coherent_total"`` components add it.
     tile_directions_lab
         Optional representative unit direction per angular tile with shape
@@ -207,11 +215,11 @@ class SpatialResult:
     """
 
     ray_map: PixelRayMap
-    line: SpectralFactors
-    background: SpectralFactors
+    cxr: SpectralFactors
+    brem: SpectralFactors
     detector: PlanarDetector
-    coherent_line: SpectralFactors | None = None
-    characteristic_line: SpectralFactors | None = None
+    coherent_cxr: SpectralFactors | None = None
+    characteristic: SpectralFactors | None = None
     tile_directions_lab: np.ndarray | None = None
     reconstruction: str = "nearest_tile"
 
@@ -232,19 +240,19 @@ class SpatialResult:
             if not np.all(np.isfinite(directions)):
                 raise ValueError("tile_directions_lab must contain finite values")
             object.__setattr__(self, "tile_directions_lab", directions)
-        for name in ("line", "background"):
+        for name in ("cxr", "brem"):
             factor = getattr(self, name)
             if not isinstance(factor, SpectralFactors):
                 raise TypeError(f"{name} must be SpectralFactors")
             self._validate_factor(factor)
-        if self.coherent_line is not None:
-            if not isinstance(self.coherent_line, SpectralFactors):
-                raise TypeError("coherent_line must be SpectralFactors or None")
-            self._validate_factor(self.coherent_line)
-        if self.characteristic_line is not None:
-            if not isinstance(self.characteristic_line, SpectralFactors):
-                raise TypeError("characteristic_line must be SpectralFactors or None")
-            self._validate_factor(self.characteristic_line)
+        if self.coherent_cxr is not None:
+            if not isinstance(self.coherent_cxr, SpectralFactors):
+                raise TypeError("coherent_cxr must be SpectralFactors or None")
+            self._validate_factor(self.coherent_cxr)
+        if self.characteristic is not None:
+            if not isinstance(self.characteristic, SpectralFactors):
+                raise TypeError("characteristic must be SpectralFactors or None")
+            self._validate_factor(self.characteristic)
         if not isinstance(self.detector, PlanarDetector):
             raise TypeError("detector must be a PlanarDetector")
 
@@ -345,7 +353,7 @@ class SpatialResult:
             )
         return int(np.argmin(np.abs(grid - energy)))
 
-    def energy_node(self, energy_eV: float, *, component: str = "line") -> float:
+    def energy_node(self, energy_eV: float, *, component: str = "cxr") -> float:
         """Return the stored energy node in eV nearest ``energy_eV`` on a component grid.
 
         Raises
@@ -355,7 +363,7 @@ class SpatialResult:
         """
         return float(self._factor(component).energy_eV[self._energy_node(energy_eV, component)])
 
-    def transmission_image(self, energy_eV: float, *, component: str = "line") -> np.ndarray:
+    def transmission_image(self, energy_eV: float, *, component: str = "cxr") -> np.ndarray:
         """Return ``(ny, nx)`` primary filter transmission at one energy node.
 
         ``energy_eV`` selects the nearest sample of the component's energy
@@ -373,21 +381,25 @@ class SpatialResult:
         )[..., 0]
 
     def _factor(self, component: str) -> SpectralFactors:
-        if component == "line":
-            return self.line
-        if component == "background":
-            return self.background
+        aliases = {"line": "cxr", "background": "brem", "line_total": "cxr_total"}
+        if component in aliases:
+            warn_renamed(f"SpatialResult component {component!r}", repr(aliases[component]))
+            component = aliases[component]
+        if component == "cxr":
+            return self.cxr
+        if component == "brem":
+            return self.brem
         if component == "coherent":
-            if self.coherent_line is None:
-                raise ValueError("coherent line spectrum is not available")
-            return self.coherent_line
+            if self.coherent_cxr is None:
+                raise ValueError("coherent CXR spectrum is not available")
+            return self.coherent_cxr
         if component == "characteristic":
-            if self.characteristic_line is None:
-                raise ValueError("characteristic line spectrum is not available")
-            return self.characteristic_line
-        if component in {"line_total", "coherent_total"}:
+            if self.characteristic is None:
+                raise ValueError("characteristic CXR spectrum is not available")
+            return self.characteristic
+        if component in {"cxr_total", "coherent_total"}:
             base = self._factor(component.removesuffix("_total"))
-            extra = self.characteristic_line
+            extra = self.characteristic
             if extra is None:
                 return base
             # Both factors share the line grid and attenuation, so the
@@ -464,7 +476,7 @@ class SpatialResult:
         *,
         pixels=None,
         region=None,
-        component: str = "line",
+        component: str = "cxr",
         measured: bool = False,
         fwhm_eV: float | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
@@ -479,8 +491,8 @@ class SpatialResult:
             ``(row_slice, column_slice)`` selection. Mutually exclusive with
             ``pixels``.
         component
-            One of :data:`COMPONENTS`. ``"line"`` and ``"coherent"`` exclude
-            characteristic radiation; ``"line_total"`` and ``"coherent_total"``
+            One of :data:`COMPONENTS`. ``"cxr"`` and ``"coherent"`` exclude
+            characteristic radiation; ``"cxr_total"`` and ``"coherent_total"``
             include it.
         measured
             Apply the detector response after geometric scoring.
@@ -513,7 +525,7 @@ class SpatialResult:
         self,
         energy_range_eV: tuple[float, float],
         *,
-        component: str = "line",
+        component: str = "cxr",
         measured: bool = False,
         fwhm_eV: float | None = None,
         pixel_chunk: int = 1024,
@@ -525,8 +537,8 @@ class SpatialResult:
         energy_range_eV
             Finite increasing ``(low, high)`` bounds in eV, inclusive.
         component
-            One of :data:`COMPONENTS`. ``"line"`` and ``"coherent"`` exclude
-            characteristic radiation; ``"line_total"`` and ``"coherent_total"``
+            One of :data:`COMPONENTS`. ``"cxr"`` and ``"coherent"`` exclude
+            characteristic radiation; ``"cxr_total"`` and ``"coherent_total"``
             include it.
         measured
             Apply detector response before integration.
@@ -580,8 +592,8 @@ class SpatialResult:
         Parameters
         ----------
         component
-            One of :data:`COMPONENTS`. ``"line"`` and ``"coherent"`` exclude
-            characteristic radiation; ``"line_total"`` and ``"coherent_total"``
+            One of :data:`COMPONENTS`. ``"cxr"`` and ``"coherent"`` exclude
+            characteristic radiation; ``"cxr_total"`` and ``"coherent_total"``
             include it.
         pixel_chunk
             Positive maximum pixels materialized per working chunk.
@@ -611,12 +623,13 @@ class SpatialResult:
         observation_digest: str,
         pixels=None,
         region=None,
-        components: tuple[str, ...] = ("line", "background"),
+        components: tuple[str, ...] = ("cxr", "brem"),
     ) -> AcquisitionBatch:
         """Score selected pixels into common reporting bins and count channels."""
         from ..instrument import combine_acquisitions, score_acquisition
 
-        resolved_components = tuple(components)
+        aliases = {"line": "cxr", "background": "brem", "line_total": "cxr_total"}
+        resolved_components = tuple(aliases.get(name, name) for name in components)
         if not resolved_components:
             raise ValueError("components must not be empty")
         if len(set(resolved_components)) != len(resolved_components):
@@ -626,19 +639,22 @@ class SpatialResult:
         batches = []
         for component in resolved_components:
             factor = self._factor(component)
-            batches.append(
-                score_acquisition(
-                    detector,
-                    factor.energy_eV,
-                    self._materialize(factor, coordinates),
-                    acquisition,
-                    rep_rate_hz=rep_rate_hz,
-                    bunch_charge_pc=bunch_charge_pc,
-                    observation_digest=observation_digest,
-                    coordinates=coordinates,
-                    component=component,
-                )
+            batch = score_acquisition(
+                detector,
+                factor.energy_eV,
+                self._materialize(factor, coordinates),
+                acquisition,
+                rep_rate_hz=rep_rate_hz,
+                bunch_charge_pc=bunch_charge_pc,
+                observation_digest=observation_digest,
+                coordinates=coordinates,
+                # Component names seed stored Poisson observations. Keep
+                # historical stream keys while returning canonical labels.
+                component={"cxr": "line", "brem": "background", "cxr_total": "line_total"}.get(
+                    component, component
+                ),
             )
+            batches.append(replace(batch, components=(component,)))
         return combine_acquisitions(batches)
 
     def acquisition_image(
@@ -649,7 +665,7 @@ class SpatialResult:
         bunch_charge_pc: float,
         observation_digest: str,
         energy_range_eV: tuple[float, float] | None = None,
-        components: tuple[str, ...] = ("line", "background"),
+        components: tuple[str, ...] = ("cxr", "brem"),
         pixel_chunk: int = 1024,
     ) -> np.ndarray:
         """Return a total or reporting-window count image in bounded pixel chunks."""
@@ -678,90 +694,310 @@ class SpatialResult:
 
 
 @dataclass(frozen=True)
+class SpectralDensity:
+    """One radiation component paired with its own photon-energy grid.
+
+    photon_energy_eV
+        One-dimensional photon-energy coordinates in eV.
+    density
+        Density on exactly that grid, in photons / incident electron / eV / sr.
+    normalization
+        ``source`` means response-free source density without acceptance or
+        current scaling. ``observation-average`` means filter-attenuated,
+        solid-angle-weighted physical-detector average, still per sr.
+    """
+
+    photon_energy_eV: np.ndarray
+    density: np.ndarray
+    normalization: str = "source"
+
+    def __post_init__(self) -> None:
+        energy = np.asarray(self.photon_energy_eV)
+        density = np.asarray(self.density)
+        if energy.ndim != 1 or density.shape != energy.shape:
+            raise ValueError("density must match its one-dimensional photon_energy_eV grid")
+        if self.normalization not in {"source", "observation-average"}:
+            raise ValueError("normalization must be 'source' or 'observation-average'")
+        object.__setattr__(self, "photon_energy_eV", energy)
+        object.__setattr__(self, "density", density)
+
+
+@dataclass(frozen=True)
+class CxrSpectra:
+    """PXR/CBS densities in photons / incident electron / eV / sr.
+
+    incoherent
+        Incoherent CXR density paired with its photon-energy grid in eV.
+    coherent
+        Optional coherent CXR density on the same photon-energy grid; ``None``
+        when not calculated. Neither component includes atomic characteristic
+        radiation. Both carry their source/observation normalization.
+    """
+
+    incoherent: SpectralDensity
+    coherent: SpectralDensity | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.incoherent, SpectralDensity):
+            raise TypeError("incoherent must be a SpectralDensity")
+        if self.coherent is not None:
+            if not isinstance(self.coherent, SpectralDensity):
+                raise TypeError("coherent must be a SpectralDensity or None")
+            if (
+                not np.array_equal(self.incoherent.photon_energy_eV, self.coherent.photon_energy_eV)
+                or self.incoherent.normalization != self.coherent.normalization
+            ):
+                raise ValueError("CXR modes must share their photon-energy grid and normalization")
+
+
+@dataclass(frozen=True, init=False)
 class Result:
-    """Scalar spectral arrays, optional spatial factors, and provenance.
+    """Radiation families with explicit grids, normalization, and provenance.
 
-    ``spectrum`` and ``background`` are photon densities per incident electron
-    per eV per sr. For scalar-detector simulations they are response-free source
-    densities without acceptance or current scaling. For a
-    physical planar detector they are filter-attenuated, solid-angle-weighted
-    observation averages. Selected ``spatial`` spectra are accepted per-pixel
-    flux, with pixel solid angle included. ``energy_eV`` and
-    ``background_energy_eV`` are the respective photon-energy coordinates.
-
-    Parameters
-    ----------
-    energy_eV, background_energy_eV
-        One-dimensional line and background photon-energy coordinates in eV.
-    spectrum, background
-        Line and continuum densities in photons per incident electron per eV
-        per sr.
+    cxr
+        PXR/CBS modes, each pairing photon-energy coordinates in eV with density
+        in photons / incident electron / eV / sr. Mode selection never changes
+        the meaning of ``cxr.incoherent``.
+    brem
+        Bremsstrahlung density in the same units, on its own photon-energy grid.
+    characteristic
+        Optional atomic emission density in the same units on the CXR grid.
+        It is separate from both CXR modes.
     case
         Fully resolved transport input that produced the arrays.
     provenance
-        Immutable-view metadata describing scene, numerics, identity, backend,
-        and dependency versions.
-    coherent_spectrum
-        Optional coherent line density on ``energy_eV``.
-    characteristic_spectrum
-        Optional characteristic-radiation density on ``energy_eV``.
-        ``spectrum`` and ``coherent_spectrum`` exclude it; use
-        :meth:`line_total` for the sum.
+        Immutable-view scene, numerics, identity, backend, and version metadata.
     spatial
-        Optional factorized planar-detector result.
+        Optional factorized pixel data. Selected spectra include pixel solid
+        angle and have units photons / incident electron / eV, not per sr.
+
+    Old flat constructor arguments and attributes remain warning aliases through
+    0.13.0. For old constructors, ``spectrum`` supplies the incoherent density;
+    callers constructing coherent-only legacy results should migrate to groups.
     """
 
-    energy_eV: np.ndarray
-    spectrum: np.ndarray
-    background_energy_eV: np.ndarray
-    background: np.ndarray
+    cxr: CxrSpectra
+    brem: SpectralDensity
+    characteristic: SpectralDensity | None
     case: Case
     provenance: Mapping[str, Any]
-    coherent_spectrum: np.ndarray | None = None
-    characteristic_spectrum: np.ndarray | None = None
-    spatial: SpatialResult | None = None
+    spatial: SpatialResult | None
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "energy_eV", np.asarray(self.energy_eV))
-        object.__setattr__(self, "spectrum", np.asarray(self.spectrum))
-        object.__setattr__(self, "background_energy_eV", np.asarray(self.background_energy_eV))
-        object.__setattr__(self, "background", np.asarray(self.background))
-        if self.coherent_spectrum is not None:
-            object.__setattr__(self, "coherent_spectrum", np.asarray(self.coherent_spectrum))
-        if self.characteristic_spectrum is not None:
-            object.__setattr__(
-                self,
-                "characteristic_spectrum",
-                np.asarray(self.characteristic_spectrum),
+    def __init__(
+        self,
+        *args,
+        cxr: CxrSpectra | None = None,
+        brem: SpectralDensity | None = None,
+        characteristic: SpectralDensity | None = None,
+        case: Case | None = None,
+        provenance: Mapping[str, Any] | None = None,
+        spatial: SpatialResult | None = None,
+        **legacy,
+    ) -> None:
+        names = (
+            "energy_eV",
+            "spectrum",
+            "background_energy_eV",
+            "background",
+            "case",
+            "provenance",
+            "coherent_spectrum",
+            "characteristic_spectrum",
+            "spatial",
+        )
+        if len(args) > len(names):
+            raise TypeError("too many positional Result arguments")
+        for name, value in zip(names, args, strict=False):
+            if (
+                name in legacy
+                or (name == "case" and case is not None)
+                or (name == "provenance" and provenance is not None)
+                or (name == "spatial" and spatial is not None)
+            ):
+                raise TypeError(f"multiple values for {name}")
+            legacy[name] = value
+        case = legacy.pop("case", case)
+        provenance = legacy.pop("provenance", provenance)
+        spatial = legacy.pop("spatial", spatial)
+        unknown = set(legacy) - set(names)
+        if unknown:
+            raise TypeError(f"unknown Result arguments: {sorted(unknown)}")
+        if legacy:
+            if cxr is not None or brem is not None or characteristic is not None:
+                raise TypeError("cannot combine grouped and legacy spectral arguments")
+            warn_renamed(
+                "Result flat spectral arguments", "Result(cxr=..., brem=..., characteristic=...)"
             )
-        object.__setattr__(self, "provenance", MappingProxyType(dict(self.provenance)))
-
-        if self.spatial is not None and not isinstance(self.spatial, SpatialResult):
+            missing = [name for name in names[:4] if name not in legacy]
+            if missing:
+                raise TypeError(f"missing Result arguments: {missing}")
+            energy = legacy["energy_eV"]
+            norm = (
+                "observation-average"
+                if isinstance(
+                    getattr((provenance or {}).get("scene"), "detector", None), PlanarDetector
+                )
+                else "source"
+            )
+            coherent = legacy.get("coherent_spectrum")
+            atomic = legacy.get("characteristic_spectrum")
+            cxr = CxrSpectra(
+                SpectralDensity(energy, legacy["spectrum"], norm),
+                None if coherent is None else SpectralDensity(energy, coherent, norm),
+            )
+            brem = SpectralDensity(legacy["background_energy_eV"], legacy["background"], norm)
+            characteristic = None if atomic is None else SpectralDensity(energy, atomic, norm)
+        if not isinstance(cxr, CxrSpectra) or not isinstance(brem, SpectralDensity):
+            raise TypeError("Result requires cxr=CxrSpectra and brem=SpectralDensity")
+        if characteristic is not None:
+            if not isinstance(characteristic, SpectralDensity):
+                raise TypeError("characteristic must be a SpectralDensity or None")
+            if not np.array_equal(characteristic.photon_energy_eV, cxr.incoherent.photon_energy_eV):
+                raise ValueError("characteristic must use the CXR photon-energy grid")
+            if characteristic.normalization != cxr.incoherent.normalization:
+                raise ValueError("characteristic and CXR normalization must match")
+        if spatial is not None and not isinstance(spatial, SpatialResult):
             raise TypeError("spatial must be a SpatialResult or None")
+        if case is None or provenance is None:
+            raise TypeError("Result requires case and provenance")
+        for name, value in (
+            ("cxr", cxr),
+            ("brem", brem),
+            ("characteristic", characteristic),
+            ("case", case),
+            ("provenance", MappingProxyType(dict(provenance))),
+            ("spatial", spatial),
+        ):
+            object.__setattr__(self, name, value)
+
+    def combined_cxr(
+        self, *, mode: str = "incoherent", include_characteristic: bool = True
+    ) -> SpectralDensity:
+        """Return the selected CXR mode plus optional atomic emission on its grid.
+
+        The returned density is photons / incident electron / eV / sr, with
+        the selected mode's source/observation normalization. Brem is excluded
+        because it may use another photon-energy grid.
+        """
+        if mode not in {"incoherent", "coherent"}:
+            raise ValueError("mode must be 'incoherent' or 'coherent'")
+        component = getattr(self.cxr, mode)
+        if component is None:
+            raise ValueError("coherent spectrum is not available")
+        density = component.density
+        if include_characteristic and self.characteristic is not None:
+            density = density + self.characteristic.density
+        return SpectralDensity(component.photon_energy_eV, density, component.normalization)
+
+    @property
+    def energy_eV(self) -> np.ndarray:
+        """Deprecated CXR photon-energy coordinates in eV."""
+        warn_renamed("Result.energy_eV", "Result.cxr.incoherent.photon_energy_eV")
+        return self.cxr.incoherent.photon_energy_eV
+
+    @property
+    def spectrum(self) -> np.ndarray:
+        """Deprecated selected-mode CXR density, photons / electron / eV / sr."""
+        warn_renamed(
+            "Result.spectrum", "Result.cxr.incoherent.density or Result.cxr.coherent.density"
+        )
+        scene = self.provenance.get("scene")
+        component = (
+            self.cxr.coherent
+            if getattr(scene, "emission", None) == "coherent"
+            else self.cxr.incoherent
+        )
+        if component is None:
+            raise ValueError("coherent spectrum is not available")
+        return component.density
+
+    @property
+    def background_energy_eV(self) -> np.ndarray:
+        """Deprecated brem photon-energy coordinates in eV."""
+        warn_renamed("Result.background_energy_eV", "Result.brem.photon_energy_eV")
+        return self.brem.photon_energy_eV
+
+    @property
+    def background(self) -> np.ndarray:
+        """Deprecated brem density, photons / electron / eV / sr, on its grid."""
+        warn_renamed("Result.background", "Result.brem.density")
+        return self.brem.density
+
+    @property
+    def coherent_spectrum(self) -> np.ndarray | None:
+        """Deprecated coherent CXR density on the CXR grid, photons / electron / eV / sr."""
+        warn_renamed("Result.coherent_spectrum", "Result.cxr.coherent.density")
+        return None if self.cxr.coherent is None else self.cxr.coherent.density
+
+    @property
+    def characteristic_spectrum(self) -> np.ndarray | None:
+        """Deprecated atomic density on the CXR grid, photons / electron / eV / sr."""
+        warn_renamed("Result.characteristic_spectrum", "Result.characteristic.density")
+        return None if self.characteristic is None else self.characteristic.density
 
     def line_total(self, *, coherent: bool = False, characteristic: bool = True) -> np.ndarray:
-        """Return the line-grid emission density on ``energy_eV``.
+        """Deprecated CXR-plus-atomic density on the CXR grid, photons / electron / eV / sr."""
+        warn_renamed("Result.line_total", "Result.combined_cxr")
+        selected_coherent = (
+            coherent or getattr(self.provenance.get("scene"), "emission", None) == "coherent"
+        )
+        return self.combined_cxr(
+            mode="coherent" if selected_coherent else "incoherent",
+            include_characteristic=characteristic,
+        ).density
 
-        Parameters
-        ----------
-        coherent
-            Use ``coherent_spectrum`` instead of ``spectrum``.
-        characteristic
-            Add ``characteristic_spectrum`` when present.
+    def to_dataframe(self) -> pd.DataFrame:
+        """Return the separate spectral arrays as a tidy long-form DataFrame.
 
-        Returns
-        -------
-        numpy.ndarray
-            Photons per incident electron per eV per sr.
+        Columns are ``component`` (``cxr``, ``brem``, ``characteristic``),
+        ``mode`` (CXR ``incoherent``/``coherent``, missing for other families),
+        ``photon_energy_eV`` (eV), and ``density`` (photons / incident electron /
+        eV / sr). Each array keeps its own grid; nothing is interpolated or
+        padded, and derived CXR-plus-characteristic totals are omitted.
+
+        ``attrs`` carries a plain provenance copy, the resolved case, units,
+        and each family's source/observation normalization. Some pandas
+        operations drop ``attrs``; read them before combining frames. Spatial
+        pixel spectra/counts stay on ``spatial`` and the acquisition methods.
         """
-        if coherent and self.coherent_spectrum is None:
-            raise ValueError("coherent spectrum is not available")
-        record = {
-            "spec": self.spectrum,
-            "spec_coherent": self.coherent_spectrum,
-            "spec_characteristic": self.characteristic_spectrum,
-        }
-        return line_spectrum(record, coherent=coherent, characteristic=characteristic)
+        import pandas as pd
+
+        parts: list[tuple[str, str | None, SpectralDensity]] = [
+            ("cxr", "incoherent", self.cxr.incoherent)
+        ]
+        if self.cxr.coherent is not None:
+            parts.append(("cxr", "coherent", self.cxr.coherent))
+        if self.characteristic is not None:
+            parts.append(("characteristic", None, self.characteristic))
+        parts.append(("brem", None, self.brem))
+        families = list(dict.fromkeys(name for name, _, _ in parts))
+        frame = pd.concat(
+            [
+                pd.DataFrame(
+                    {
+                        "component": pd.Categorical(
+                            [name] * len(component.density), categories=families
+                        ),
+                        "mode": pd.Categorical(
+                            [mode] * len(component.density), categories=["incoherent", "coherent"]
+                        ),
+                        "photon_energy_eV": np.asarray(
+                            component.photon_energy_eV, dtype=np.float64
+                        ),
+                        "density": np.asarray(component.density, dtype=np.float64),
+                    }
+                )
+                for name, mode, component in parts
+            ],
+            ignore_index=True,
+        )
+        frame.attrs.update(
+            provenance=dict(self.provenance),
+            case=self.case,
+            units={"photon_energy_eV": "eV", "density": "photons / (electron eV sr)"},
+            normalization={name: component.normalization for name, _, component in parts},
+        )
+        return frame
 
     def _acquisition_context(self):
         scene = self.provenance.get("scene")
@@ -787,7 +1023,7 @@ class Result:
         acquisition, beam, digest, scene = self._acquisition_context()
         assert self.spatial is not None
         selected = (
-            (("coherent", "background") if scene.emission == "coherent" else ("line", "background"))
+            (("coherent", "brem") if scene.emission == "coherent" else ("cxr", "brem"))
             if components is None
             else components
         )
@@ -812,7 +1048,7 @@ class Result:
         acquisition, beam, digest, scene = self._acquisition_context()
         assert self.spatial is not None
         selected = (
-            (("coherent", "background") if scene.emission == "coherent" else ("line", "background"))
+            (("coherent", "brem") if scene.emission == "coherent" else ("cxr", "brem"))
             if components is None
             else components
         )

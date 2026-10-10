@@ -1,15 +1,15 @@
-"""Pin line_index / line_quality / line_metrics outputs on synthetic spectra.
+"""Pin cxr_index / cxr_quality / cxr_metrics outputs on synthetic spectra.
 
 Guards the peak-finding fast path (issue #232): optimizations must leave every
 value unchanged. Expected values were recorded from the pre-optimization
-implementation. ``line_index`` and the metric key order are exact; floats use a
+implementation. ``cxr_index`` and the metric key order are exact; floats use a
 few-ulp relative tolerance (``_REL``, NaN-aware) because summation order, SIMD,
 and libm differ across platforms (issue #302: CI differed by one ulp)."""
 
 import numpy as np
 import pytest
 
-from pyrite.results import Settings, line_index, line_metrics, line_quality
+from pyrite.results import Settings, cxr_index, cxr_metrics, cxr_quality
 
 _REL = 1e-13
 
@@ -52,10 +52,10 @@ def _observed():
     got = {}
     for i, (name, spec) in enumerate(_spectra().items()):
         for metric in _METRICS:
-            m = line_metrics(_record(spec, i), Settings(), metric=metric)
+            m = cxr_metrics(_record(spec, i), Settings(), metric=metric)
             got[(name, metric)] = (
-                line_index(spec, metric=metric),
-                line_quality(spec),
+                cxr_index(spec, metric=metric),
+                cxr_quality(spec),
                 {k: m[k] for k in sorted(m) if k != "hit_frac"},
             )
     return got
@@ -460,17 +460,17 @@ def test_top_geometries_shares_line_metrics_cache(monkeypatch):
             "thickness_ang": 1.0e4,
         }
         store.setdefault(f"m{i}", {})[30.0] = rec
-    _metrics._LINE_METRICS_CACHE.clear()
-    real = _metrics.line_metrics
+    _metrics._CXR_METRICS_CACHE.clear()
+    real = _metrics.cxr_metrics
     calls = {"n": 0}
 
     def counting(*a, **k):
         calls["n"] += 1
         return real(*a, **k)
 
-    monkeypatch.setattr(_metrics, "line_metrics", counting)
+    monkeypatch.setattr(_metrics, "cxr_metrics", counting)
     first = top_geometries(store, Settings())
     second = top_geometries(store, Settings())
     assert calls["n"] == 3
     assert first.equals(second)
-    _metrics._LINE_METRICS_CACHE.clear()
+    _metrics._CXR_METRICS_CACHE.clear()

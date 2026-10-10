@@ -1,7 +1,7 @@
 """The multi-quantity sweep drivers compute the per-record metrics map ONCE.
 
 plot_heatmaps / plot_scan (matplotlib) and scan_charts (Altair) render one
-figure per quantity, but the expensive per-record ``results.line_metrics``
+figure per quantity, but the expensive per-record ``results.cxr_metrics``
 reduction is quantity-independent -- these guard that the drivers build the
 map once and share it across quantities, instead of once per quantity
 (the pre-fix behaviour: 8 default quantities -> 8x the metric extraction).
@@ -68,21 +68,21 @@ def _store():
 
 @pytest.fixture
 def line_metrics_calls(monkeypatch):
-    """Count every per-record line_metrics computation (the shared cache in
-    results.metrics resolves the name at call time). Clears `_LINE_METRICS_CACHE`
+    """Count every per-record cxr_metrics computation (the shared cache in
+    results.metrics resolves the name at call time). Clears `_CXR_METRICS_CACHE`
     first: it persists across calls (and so across tests, within one process)
     by design -- every test here uses the same deterministic `_store()` +
-    default rel_prominence/line_metric, so without a reset the second test
+    default rel_prominence/cxr_metric, so without a reset the second test
     onward would cache-hit the first test's entries and see zero calls."""
-    _common._LINE_METRICS_CACHE.clear()
-    real = _metrics.line_metrics
+    _common._CXR_METRICS_CACHE.clear()
+    real = _metrics.cxr_metrics
     calls = {"n": 0}
 
     def counting(*args, **kwargs):
         calls["n"] += 1
         return real(*args, **kwargs)
 
-    monkeypatch.setattr(_metrics, "line_metrics", counting)
+    monkeypatch.setattr(_metrics, "cxr_metrics", counting)
     return calls
 
 

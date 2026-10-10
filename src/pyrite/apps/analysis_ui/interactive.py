@@ -25,7 +25,7 @@ def make_map_widget(mo, alt, results, settings, cases, *, quantity, energy, them
         quantity=specification,
         panel_value=energy,
         cases=cases,
-        line_metric="prominence",
+        cxr_metric="prominence",
         color_domain=(0.0, 1.0) if specification[0] == "hit_frac" else None,
     )
     if chart is None:

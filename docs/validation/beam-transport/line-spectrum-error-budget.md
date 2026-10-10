@@ -24,7 +24,7 @@ A reported line observable $q$ — integrated yield, centroid, dominant-line FWH
 
 The sum is linear, not in quadrature. Only $\varepsilon_\mathrm{stat}$ is random; the other five are deterministic biases of one case and may align, so a root-sum-square would understate the worst case. Bandwidth truncation and quadrature aliasing in particular have fixed signs — truncation always removes yield, and an under-sampled $\operatorname{sinc}^2$ comb aliases into the same bins on every rung of a ladder.
 
-**The first four terms are grid error; the last two are not.** That split is what makes the budget measurable. The refinement ladder of `energy_grid/convergence.py` evaluates every rung on one fixed set of transport segments and proves the identity with a segment fingerprint, so $\varepsilon_\mathrm{trans}$ and $\varepsilon_\mathrm{stat}$ are held exactly constant across rungs and cancel in every rung-to-rung difference. What the ladder gates is therefore $\varepsilon_\mathrm{band} + \varepsilon_\mathrm{quad} + \varepsilon_\mathrm{interp} + \varepsilon_\mathrm{fp}$, and that is the quantity the production tolerances of `pyrite._line_grid_policy.DEFAULT_RTOL` bound. Those tolerances are the **grid share of the budget, not the total error of a spectrum**: at production electron counts $\varepsilon_\mathrm{stat}$ is usually the largest single term in {eq}`eq-line-budget-decomposition`.
+**The first four terms are grid error; the last two are not.** That split is what makes the budget measurable. The refinement ladder of `energy_grid/convergence.py` evaluates every rung on one fixed set of transport segments and proves the identity with a segment fingerprint, so $\varepsilon_\mathrm{trans}$ and $\varepsilon_\mathrm{stat}$ are held exactly constant across rungs and cancel in every rung-to-rung difference. What the ladder gates is therefore $\varepsilon_\mathrm{band} + \varepsilon_\mathrm{quad} + \varepsilon_\mathrm{interp} + \varepsilon_\mathrm{fp}$, and that is the quantity the production tolerances of `pyrite._cxr_grid_policy.DEFAULT_RTOL` bound. Those tolerances are the **grid share of the budget, not the total error of a spectrum**: at production electron counts $\varepsilon_\mathrm{stat}$ is usually the largest single term in {eq}`eq-line-budget-decomposition`.
 
 ## Allocation of the grid share
 
@@ -41,7 +41,7 @@ The sum is linear, not in quadrature. Only $\varepsilon_\mathrm{stat}$ is random
   - $0$
   - $0$
   - $0$
-  - `kinematic_line_stop_eV`, `line_start_eV`
+  - `kinematic_cxr_stop_eV`, `cxr_start_eV`
 * - quadrature, backbone
   - $2\times10^{-4}$
   - $2\times10^{-3}$
@@ -101,7 +101,7 @@ and the spectrum is the trapezoid rule over the grid's own coordinates. The feat
 The term splits along the window plan:
 
 - **Backbone.** The uniform piece spanning $[\texttt{start}, \texttt{stop}]$ at `DEFAULT_MAX_SPACING_EV` $=3$ eV, carrying the continuum between features. Measured under uniform refinement by [`line-grid-sinc-convergence`](line-grid-sinc-convergence.md): at the derived `sinc-nyquist` spacing, hopg yield error is at most $7.7\times10^{-5}$ and centroid shift at most $0.017$ eV, inside the $2\times10^{-4}$ share. The same measurement shows the fixed 3 eV catalog rows carrying 0.12–4.7% yield error and up to 30 eV centroid shift — three to four orders outside the share — which is the evidence that the backbone alone cannot hold the budget where features are unresolved.
-- **Feature windows.** The fine uniform pieces the planner (`_line_windows.build_window_plan`) lays over deterministically seeded features. The starting heuristic is `line_seeds.DEFAULT_SAMPLES_PER_FEATURE` $=8$ nodes across the narrowest shape-bearing feature, with `DEFAULT_TAIL_WIDTHS` $=2$ sinc widths of tail on each side. **The heuristic is not the certificate.** The window-refinement ladder (`convergence_case.window_ladder`, submitted by `convergence_job start-windows`) refines samples per feature on a deliberately fixed backbone and judges each observable under the Richardson gate of {eq}`eq-line-grid-richardson-gate`, then compares the finest windowed rung against a dense uniform reference. The $5\times10^{-4}$ share is what that comparison must meet. It is met in all twelve measured cases ({numref}`tbl-line-budget-window-measured`).
+- **Feature windows.** The fine uniform pieces the planner (`_cxr_windows.build_window_plan`) lays over deterministically seeded features. The starting heuristic is `cxr_seeds.DEFAULT_SAMPLES_PER_FEATURE` $=8$ nodes across the narrowest shape-bearing feature, with `DEFAULT_TAIL_WIDTHS` $=2$ sinc widths of tail on each side. **The heuristic is not the certificate.** The window-refinement ladder (`convergence_case.window_ladder`, submitted by `convergence_job start-windows`) refines samples per feature on a deliberately fixed backbone and judges each observable under the Richardson gate of {eq}`eq-line-grid-richardson-gate`, then compares the finest windowed rung against a dense uniform reference. The $5\times10^{-4}$ share is what that comparison must meet. It is met in all twelve measured cases ({numref}`tbl-line-budget-window-measured`).
 
 **Measured-bandwidth cases (#192).** A case under `resonance-population` bandwidth and `resonance-local` resolution does not use the feature-window planner, so the feature-window row funds its two policy shares: the upper-edge truncation share $\epsilon=$ `DEFAULT_BANDWIDTH_TRUNCATION` $=10^{-4}$ (the selector targets $\epsilon/2$; the spectrum audit gates $\epsilon$), and the local halo's per-line tail share $2\eta=2\times$ `DEFAULT_LOCAL_HALO_LIMIT` $=2\times10^{-4}$. Together they take $3\times10^{-4}$ of the $5\times10^{-4}$ row; the production bin-mean far-field envelope ([`sinc-bin-far-envelope`](../radiation-physics/sinc-bin-far-envelope.md), $\le 1.2\times10^{-5}$) and the optional large-batch near/far sum ([`sinc-bin-near-far`](../radiation-physics/sinc-bin-near-far.md), $<7.3\times10^{-10}$ in exact arithmetic) take further shares of the same row. The backbone row stays with the global sinc floor. The truncation share applies to every `resonance-population` case; the halo share only to `resonance-local`, which requires `bin-mean` quadrature. Under `bin-mean` the halo moves no integrated yield, so its $2\eta$ charge is conservative for yield; it affects only line shape, for which no bound is derived.
 
@@ -185,7 +185,7 @@ Measured directly over each case's own segments (hopg 30/100 keV, wse2 30 keV, $
 
 The width distribution is bounded below rather than heavy tailed: with $\pi/a_w \propto 1/\big((1 - \boldsymbol\beta\cdot\hat{\mathbf n})\,t_L\big)$, the longest single flight floors $t_L$, and the elastic mean free path gives flight lengths no long tail. So the quantile width *is* the narrowest width to within 11%, the nominal eight nodes do land across the narrowest feature, and the interference fringes inside a window — the $\operatorname{sinc}^2$ sidelobes, whose period is the same $\pi/a_w$ as the main lobe — are sampled at the same eight nodes per period.
 
-Two consequences. First, **fringe resolution inside windows is already separate from backbone continuum spacing** by construction: window spacing runs 0.03–0.9 eV against a fixed 3 eV backbone. A *further* separate fringe control, a finer quantile used only inside windows, would buy at most 11% finer spacing at proportionally more points, and nothing at all in three of the four cases measured — the same shape of argument that retired the $\mathrm{ulp}/\mathrm{rtol}$ spacing floor in `line-grid-sinc-convergence`. It is not warranted by these data. Second, because this is a measured property of four cases and not a theorem, `kinematic_line_seeds` reports `narrowest_feature_width_eV` and `samples_at_narrowest` in its seed summary, so a case whose quantile drifts above its narrowest feature shows it rather than under-resolving silently.
+Two consequences. First, **fringe resolution inside windows is already separate from backbone continuum spacing** by construction: window spacing runs 0.03–0.9 eV against a fixed 3 eV backbone. A *further* separate fringe control, a finer quantile used only inside windows, would buy at most 11% finer spacing at proportionally more points, and nothing at all in three of the four cases measured — the same shape of argument that retired the $\mathrm{ulp}/\mathrm{rtol}$ spacing floor in `line-grid-sinc-convergence`. It is not warranted by these data. Second, because this is a measured property of four cases and not a theorem, `kinematic_cxr_seeds` reports `narrowest_feature_width_eV` and `samples_at_narrowest` in its seed summary, so a case whose quantile drifts above its narrowest feature shows it rather than under-resolving silently.
 
 This covers the incoherent route only. The coherent route sums complex amplitudes before squaring, where the fringe period is set by phase differences across segments rather than by any single $\pi/a_w$; that is #117's scope and remains open.
 
@@ -272,10 +272,10 @@ Each tolerance that gates a line observable names its share of {numref}`tbl-line
   - Constant
   - Share cited
 * - automatic policy, intrinsic source
-  - `_line_grid_policy.DEFAULT_RTOL["intrinsic_source"]`
+  - `_cxr_grid_policy.DEFAULT_RTOL["intrinsic_source"]`
   - the intrinsic-source column total, $10^{-3}$
 * - automatic policy, detected counts
-  - `_line_grid_policy.DEFAULT_RTOL["detected_counts"]`
+  - `_cxr_grid_policy.DEFAULT_RTOL["detected_counts"]`
   - the detected-counts column total, $10^{-2}$
 * - ladder, yield and centroid
   - `convergence.HARNESS_RTOL["intrinsic_source"]`
@@ -288,7 +288,7 @@ Each tolerance that gates a line observable names its share of {numref}`tbl-line
   - the shape column total, $10^{-2}$; the ungated
     `SHAPE_DIAGNOSTIC_RTOL` reports the distance to $10^{-3}$
 * - window plan, node collapse
-  - `_line_grid_policy.DEFAULT_BACKEND_SAFETY_ULPS`
+  - `_cxr_grid_policy.DEFAULT_BACKEND_SAFETY_ULPS`
   - the backend-precision row, $10^{-4}$ intrinsic source
 * - ladder, resampling noise
   - `convergence.NOISE_FRACTION`

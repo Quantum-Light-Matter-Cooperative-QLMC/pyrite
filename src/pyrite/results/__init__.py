@@ -21,16 +21,16 @@ and internal name remains importable as ``from pyrite.results import X`` for
 backward compatibility. The submodules are:
   store     -- Settings, store_result, detected_background
   selection -- records/filter/select/slim helpers, best_azimuth
-  metrics   -- per-record line-finding scalar metrics (line_metrics et al.)
+  metrics   -- per-record line-finding scalar metrics (cxr_metrics et al.)
   scoring   -- selection_score + the top_geometries/show_top ranked table
   tables    -- results_dataframe, summary_table/show_summary
 """
 
 from .metrics import (
     _find_peaks_props,
-    line_index,
-    line_metrics,
-    line_quality,
+    cxr_index,
+    cxr_metrics,
+    cxr_quality,
 )
 from .model import Result
 from .scoring import (
@@ -43,7 +43,7 @@ from .selection import (
     _RECORD_ARRAY_FIELDS,
     _WIDE_BREM_FIELDS,
     BREM_RECORD_KEYS,
-    LINE_RECORD_KEYS,
+    CXR_RECORD_KEYS,
     _peak,
     best_azimuth,
     case_label,
@@ -66,8 +66,8 @@ from .store import (
     EmissionMode,
     Settings,
     beam_current_na,
+    cxr_fwhm_eV,
     detected_background,
-    line_fwhm_eV,
     store_result,
 )
 from .tables import (
@@ -79,7 +79,6 @@ from .tables import (
 )
 
 __all__ = [
-    # store
     "PER_NA",
     "DEFAULT_BEAM_CURRENT_NA",
     "EmissionMode",
@@ -89,7 +88,6 @@ __all__ = [
     "store_result",
     "detected_background",
     "Result",
-    # selection
     "records",
     "records_for_cases",
     "filter_results",
@@ -109,20 +107,50 @@ __all__ = [
     "case_label",
     "case_table_rows",
     "slim_case_record",
-    # metrics
     "_find_peaks_props",
     "line_index",
     "line_quality",
     "line_metrics",
-    # scoring
     "SELECTION_MODES",
     "selection_score",
     "top_geometries",
     "show_top",
-    # tables
     "results_dataframe",
     "_ROUND",
     "_CONFIG_COLS",
     "summary_table",
     "show_summary",
+    "cxr_fwhm_eV",
+    "CXR_RECORD_KEYS",
+    "cxr_index",
+    "cxr_quality",
+    "cxr_metrics",
 ]
+
+
+_CXR_RENAMED_EXPORTS = {"line_metrics": "cxr_metrics"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]
+
+
+_CXR_RENAMED_EXPORTS.update(
+    {"line_fwhm_eV": "cxr_fwhm_eV", "line_quality": "cxr_quality", "line_index": "cxr_index"}
+)
+
+_CXR_RENAMED_EXPORTS.update(
+    {
+        "line_fwhm_eV": "cxr_fwhm_eV",
+        "LINE_RECORD_KEYS": "CXR_RECORD_KEYS",
+        "line_index": "cxr_index",
+        "line_quality": "cxr_quality",
+        "line_metrics": "cxr_metrics",
+    }
+)

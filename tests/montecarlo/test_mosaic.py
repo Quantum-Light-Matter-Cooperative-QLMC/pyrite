@@ -28,7 +28,7 @@ def _sweep(material, **kw):
         thickness_ang=1e4,
         beam=BeamSpec(energy_keV=30),
         tilt_deg=30.0,
-        detector=Detector(energy_bins=EnergyBins(line=LINE_GRID, brem=BREM_GRID)),
+        detector=Detector(energy_bins=EnergyBins(cxr=LINE_GRID, brem=BREM_GRID)),
         **kw,
     )
 

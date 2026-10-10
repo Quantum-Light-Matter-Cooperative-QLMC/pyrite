@@ -188,12 +188,12 @@ def synthetic_si_tables(monkeypatch):
 def _coupled_case(target=None, **numerics_overrides):
     detector = pr.Detector(
         energy_bins=EnergyBins(
-            line=np.linspace(1500.0, 2000.0, 20), brem=np.arange(5000.0, 40_001.0, 500.0)
+            cxr=np.linspace(1500.0, 2000.0, 20), brem=np.arange(5000.0, 40_001.0, 500.0)
         )
     )
     numerics = pr.Numerics(
-        n_electrons=12,
-        n_electrons_brem=12,
+        cxr_trials=12,
+        brem_trials=12,
         energy_model="midpoint",
         elastic_model="mott",
         bremsstrahlung_model="bremslib",

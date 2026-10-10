@@ -4,7 +4,7 @@
 
 The production coherent line spectrum uses the physical bunch population
 $N=Q/e$, where $Q$ is `bunch_charge_pc` converted to coulombs and $e$ is the
-SI elementary charge. `--line-trials` supplies $M$ equally weighted incident Monte
+SI elementary charge. `--cxr-trials` supplies $M$ equally weighted incident Monte
 Carlo samples, including missed entries. It controls estimation and normalization,
 not the physical enhancement.
 
@@ -78,7 +78,7 @@ final check. Nonnegativity is a necessary check, **not** a statistical error bou
 a positive estimate can still have large Monte Carlo uncertainty. Accepted outputs
 conditioned on passing this check are not themselves an unbiased ensemble.
 
-Low-level `mc_spectrum(physical_electrons=None)` retains the historical
+Low-level `mc_cxr_spectrum(physical_electrons=None)` retains the historical
 sampled-bunch semantics. Every production runner coherent call supplies physical
 charge, including dual spectra, recompute and coefficient capture.
 

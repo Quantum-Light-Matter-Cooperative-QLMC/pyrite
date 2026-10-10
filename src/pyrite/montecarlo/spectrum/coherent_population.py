@@ -63,7 +63,7 @@ def pair_scale(physical_electrons, incident_samples):
     if incident_samples < 2:
         raise CoherentSamplingError(
             "physical coherent cross-electron power requires at least two incident samples; "
-            "increase --line-trials"
+            "increase --cxr-trials"
         )
     return (population - 1.0) / (incident_samples - 1)
 
@@ -123,7 +123,7 @@ def require_resolved_power(
     remedy = (
         "check numerical inputs and arithmetic"
         if nonfinite_count
-        else "increase --line-trials and check sampling convergence"
+        else "increase --cxr-trials and check sampling convergence"
     )
     raise CoherentSamplingError(
         "physical coherent power is unresolved: negative or nonfinite pair estimate; "

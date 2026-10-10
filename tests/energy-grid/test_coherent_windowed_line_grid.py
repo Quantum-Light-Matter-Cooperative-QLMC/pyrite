@@ -14,18 +14,18 @@ from functools import partial
 import numpy as np
 import pytest
 
-from pyrite import _line_grid_policy
-from pyrite._line_grid_policy import (
-    LineGridToleranceError,
+from pyrite import _cxr_grid_policy
+from pyrite._cxr_grid_policy import (
+    CxrGridToleranceError,
     LineShapePrecisionWarning,
-    resolve_line_grid_policy,
+    resolve_cxr_grid_policy,
 )
 from pyrite.energy_grid import convergence_case as cc
 from pyrite.energy_grid.convergence import spectrum_observables
 from pyrite.materials.crystal import HBARC_EV_ANG
-from pyrite.montecarlo.runner.line_grid import resolve_line_grid
+from pyrite.montecarlo.runner.cxr_grid import resolve_cxr_grid
 from pyrite.montecarlo.spectrum import coherent_windows as cw
-from pyrite.montecarlo.spectrum.line_seeds import sincsq_upper_tail_bound
+from pyrite.montecarlo.spectrum.cxr_seeds import sincsq_upper_tail_bound
 
 _ENV_NAMES = (
     "PYRITE_ENERGY_GRID_RTOL",
@@ -43,7 +43,7 @@ INTRINSIC_RTOL = 1.0e-3
 def _isolated(monkeypatch, tmp_path):
     for name in _ENV_NAMES:
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(_line_grid_policy, "output_dir", lambda _kind: tmp_path)
+    monkeypatch.setattr(_cxr_grid_policy, "output_dir", lambda _kind: tmp_path)
 
 
 # ---- synthetic rows -----------------------------------------------------------
@@ -201,7 +201,7 @@ def test_default_coherent_step_resolves_a_straight_track_half_maximum():
     """
     from scipy.optimize import brentq
 
-    from pyrite._line_windows import build_window_plan
+    from pyrite._cxr_windows import build_window_plan
 
     centre = 1000.0
     field = _field([2 * np.pi * HBARC_EV_ANG], centre, 1.0)
@@ -356,7 +356,7 @@ def test_capture_preserves_extreme_attenuation_endpoints_and_slopes():
 @pytest.mark.parametrize("intercept", [-1e-4, 0.0, 1e-4])
 def test_affine_dispersion_maps_the_complete_formation_field(delta, intercept):
     """Independent direct field pins Jacobian, midpoint phase and signed damping."""
-    from pyrite.montecarlo.spectrum.lines._formation import formation_coefficients, formation_factor
+    from pyrite.montecarlo.spectrum.cxr._formation import formation_coefficients, formation_factor
 
     duration, change, midpoint = 100.0, 1e6, 6e5
     tau_start, tau_end = np.array([0.2]), np.array([0.8])
@@ -838,7 +838,7 @@ def _certified_dispersion():
 
 def _policy(case, **per_call):
     bandwidth = case["line_grid_policy"]["bandwidth"]
-    return resolve_line_grid_policy(
+    return resolve_cxr_grid_policy(
         start_eV=bandwidth["start_eV"], stop_eV=bandwidth["stop_eV"], per_call=per_call
     ).payload()
 
@@ -846,13 +846,13 @@ def _policy(case, **per_call):
 def _resolve(case, ladder, payload, coherent=True):
     case = {**case, "line_grid_policy": payload, "coherent_emission": coherent}
     tp = ladder.transport
-    return resolve_line_grid(case, ladder.segments, tp["n_hat"], tp["Ne_lines"], None)
+    return resolve_cxr_grid(case, ladder.segments, tp["n_hat"], tp["Ne_lines"], None)
 
 
 def test_captured_midpoint_phases_reproduce_the_production_coherent_source(tiny):
     from pyrite.materials.crystal import refractive_index
-    from pyrite.montecarlo.runner import _lines_for_segments
-    from pyrite.montecarlo.runner.line_grid import _coherent_rows, longitudinal_rms_fs
+    from pyrite.montecarlo.runner import _cxr_for_segments
+    from pyrite.montecarlo.runner.cxr_grid import _coherent_rows, longitudinal_rms_fs
     from pyrite.montecarlo.spectrum.coherent_dispersion import CoherentDispersionLaw
     from pyrite.montecarlo.spectrum.coherent_normalization import _sample_row_fields
 
@@ -909,7 +909,7 @@ def test_captured_midpoint_phases_reproduce_the_production_coherent_source(tiny)
             + F * (2 * np.sqrt(flat) * amplitude_guard + amplitude_guard**2)
             + 64 * np.finfo(float).eps * (grouped + flat)
         )
-    actual = _lines_for_segments(
+    actual = _cxr_for_segments(
         ladder.segments, energies, case, tp["n_hat"], None, None, coherent=True, Ne=tp["Ne_lines"]
     )
     assert np.all(
@@ -919,8 +919,8 @@ def test_captured_midpoint_phases_reproduce_the_production_coherent_source(tiny)
 
 
 def test_captured_mosaic_weights_reconstruct_the_production_spectrum(tiny):
-    from pyrite.montecarlo.runner import _lines_for_segments
-    from pyrite.montecarlo.runner.line_grid import _coherent_rows
+    from pyrite.montecarlo.runner import _cxr_for_segments
+    from pyrite.montecarlo.runner.cxr_grid import _coherent_rows
     from pyrite.montecarlo.spectrum.coherent_dispersion import CoherentDispersionLaw
     from pyrite.montecarlo.spectrum.coherent_normalization import _sample_row_fields
 
@@ -939,7 +939,7 @@ def test_captured_mosaic_weights_reconstruct_the_production_spectrum(tiny):
     for row in rows:
         fields = _sample_row_fields(row, law, energies)
         reconstructed += row.mosaic_weight * np.sum(np.abs(fields) ** 2, axis=(0, 1))
-    actual = _lines_for_segments(
+    actual = _cxr_for_segments(
         ladder.segments, energies, case, tp["n_hat"], None, None, coherent=True, Ne=tp["Ne_lines"]
     )
     assert actual.max() > 0
@@ -951,8 +951,8 @@ def test_captured_mosaic_weights_reconstruct_the_production_spectrum(tiny):
 def test_weighted_spectrum_audit_checks_a_same_trajectory_production_band(tiny):
     from functools import partial
 
-    from pyrite.montecarlo.runner import _lines_for_segments
-    from pyrite.montecarlo.runner.line_grid import _coherent_rows, longitudinal_rms_fs
+    from pyrite.montecarlo.runner import _cxr_for_segments
+    from pyrite.montecarlo.runner.cxr_grid import _coherent_rows, longitudinal_rms_fs
     from pyrite.montecarlo.spectrum.coherent_dispersion import CoherentDispersionLaw
     from pyrite.montecarlo.spectrum.coherent_form_factor import gaussian_form_factor_bounds
     from pyrite.montecarlo.spectrum.coherent_spectrum_audit import audit_captured_spectrum_yield
@@ -970,7 +970,7 @@ def test_weighted_spectrum_audit_checks_a_same_trajectory_production_band(tiny):
     fine = np.linspace(*band, 257)
     # Preserve the full production material-table axis while measuring only
     # this narrow band. No second transport is run.
-    source = _lines_for_segments(
+    source = _cxr_for_segments(
         ladder.segments,
         np.r_[10.0, fine, 5000.0],
         case,
@@ -1046,8 +1046,8 @@ def test_automatic_full_axis_yield_audit_uses_the_production_capture():
 
 @pytest.mark.parametrize("method", ["cone", "curvature", "field"])
 def test_directed_band_enclosure_covers_the_same_trajectory_production_source(tiny, method):
-    from pyrite.montecarlo.runner import _lines_for_segments
-    from pyrite.montecarlo.runner.line_grid import _coherent_rows, longitudinal_rms_fs
+    from pyrite.montecarlo.runner import _cxr_for_segments
+    from pyrite.montecarlo.runner.cxr_grid import _coherent_rows, longitudinal_rms_fs
     from pyrite.montecarlo.spectrum.coherent_dispersion import CoherentDispersionLaw
     from pyrite.montecarlo.spectrum.coherent_normalization import (
         _certified_interpolated_row_power_bounds,
@@ -1098,7 +1098,7 @@ def test_directed_band_enclosure_covers_the_same_trajectory_production_source(ti
         ]
     # Full-axis endpoints keep production's spline selection identical to
     # the captured law. Integrate only the narrow band on the same transport.
-    source = _lines_for_segments(
+    source = _cxr_for_segments(
         ladder.segments,
         np.r_[10.0, fine, 5000.0],
         case,
@@ -1127,7 +1127,7 @@ def test_uniform_automatic_policy_still_refuses_coherent_emission(tiny):
     case, ladder = tiny
     with pytest.raises(ValueError, match="without feature windows") as excinfo:
         _resolve(case, ladder, _policy(case))
-    assert not isinstance(excinfo.value, LineGridToleranceError)
+    assert not isinstance(excinfo.value, CxrGridToleranceError)
     assert "windows = true" in str(excinfo.value)
 
 
@@ -1184,12 +1184,12 @@ def test_coherent_cache_tracks_the_frozen_coupling_weight(tiny):
 
 
 def test_zero_jump_filter_does_not_reuse_the_previous_coherent_cache(tiny, monkeypatch):
-    from pyrite.montecarlo.runner import line_grid
+    from pyrite.montecarlo.runner import cxr_grid
 
     case, ladder = tiny
     policy = _policy(case, windows=True)
     with monkeypatch.context() as previous:
-        previous.setattr(line_grid, "COHERENT_WINDOW_REVISION", 8)
+        previous.setattr(cxr_grid, "COHERENT_WINDOW_REVISION", 8)
         _, old = _resolve(case, ladder, policy)
     grid, current = _resolve(case, ladder, policy)
     assert current["cache"] == "miss"
@@ -1200,13 +1200,13 @@ def test_zero_jump_filter_does_not_reuse_the_previous_coherent_cache(tiny, monke
 
 
 def test_coherent_refinement_does_not_reuse_the_four_node_cache(tiny, monkeypatch):
-    from pyrite.montecarlo.runner import line_grid
+    from pyrite.montecarlo.runner import cxr_grid
 
     case, ladder = tiny
     policy = _policy(case, windows=True)
     with monkeypatch.context() as old_policy:
-        old_policy.setattr(line_grid, "COHERENT_NYQUIST_OVERSAMPLING", 4.0)
-        old_policy.setattr(line_grid, "COHERENT_WINDOW_REVISION", 5)
+        old_policy.setattr(cxr_grid, "COHERENT_NYQUIST_OVERSAMPLING", 4.0)
+        old_policy.setattr(cxr_grid, "COHERENT_WINDOW_REVISION", 5)
         old_policy.setattr(
             cw.coherent_window_seeds,
             "__kwdefaults__",
@@ -1221,14 +1221,14 @@ def test_coherent_refinement_does_not_reuse_the_four_node_cache(tiny, monkeypatc
     assert warm["cache"] == "hit"
     np.testing.assert_array_equal(warm_grid, grid)
     # A budget that admitted the previous axis must refuse the refined one.
-    with pytest.raises(LineGridToleranceError, match=r"above the .*point budget"):
+    with pytest.raises(CxrGridToleranceError, match=r"above the .*point budget"):
         _resolve(case, ladder, _policy(case, windows=True, max_points=old["num"]))
 
 
 def test_a_plan_above_the_budget_is_refused_with_its_count(tiny):
     case, ladder = tiny
     payload = _policy(case, windows=True, max_points=200)
-    with pytest.raises(LineGridToleranceError, match=r"coherent windowed .* needs \d+ coordinates"):
+    with pytest.raises(CxrGridToleranceError, match=r"coherent windowed .* needs \d+ coordinates"):
         _resolve(case, ladder, payload)
 
 
@@ -1241,11 +1241,11 @@ def test_a_windowed_policy_refuses_a_sinc_cutoff(tiny):
 
 
 def test_a_float32_reducer_warns_that_the_bound_needs_float64_phases(tiny, monkeypatch):
-    from pyrite._line_grid_policy import LineShapePrecisionWarning
-    from pyrite.montecarlo.runner import line_grid
+    from pyrite._cxr_grid_policy import LineShapePrecisionWarning
+    from pyrite.montecarlo.runner import cxr_grid
 
     case, ladder = tiny
-    monkeypatch.setattr(line_grid, "REAL", np.float32)
+    monkeypatch.setattr(cxr_grid, "REAL", np.float32)
     with pytest.warns(LineShapePrecisionWarning, match="float64 phases only"):
         _resolve(case, ladder, _policy(case, windows=True))
 
@@ -1330,13 +1330,13 @@ def test_production_field_beyond_the_certified_windows_stays_inside_the_dispersi
 
     Both rows' windows stop inside the axis on at least one side, so the
     production field (``_sample_row_fields``, the reducer's own formation and
-    phase law, pinned to ``_lines_for_segments`` above) has nonzero power
+    phase law, pinned to ``_cxr_for_segments`` above) has nonzero power
     outside them. Integrated at the per-electron window step it stays inside
     each side's certified fraction of the frozen Parseval reference. Row 1's
     lower edge sits at the dispersive (not the frozen) bound: its omitted band
     reaches 10 eV through the carbon K edge.
     """
-    from pyrite.montecarlo.runner.line_grid import _coherent_rows, longitudinal_rms_fs
+    from pyrite.montecarlo.runner.cxr_grid import _coherent_rows, longitudinal_rms_fs
     from pyrite.montecarlo.spectrum.coherent_dispersion import CoherentDispersionLaw
 
     case, ladder = tiny

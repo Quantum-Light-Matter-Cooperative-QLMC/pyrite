@@ -9,16 +9,16 @@ collected production lines.
 import numpy as np
 import pytest
 
-from pyrite._line_grid_policy import (
+from pyrite._cxr_grid_policy import (
     DEFAULT_LOCAL_HALO_LIMIT,
     LOCAL_RESOLUTION_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
-    RESONANCE_LINE_GRID_POLICY_SCHEMA,
-    LineGridToleranceError,
-    resolve_line_grid_policy,
+    RESONANCE_CXR_GRID_POLICY_SCHEMA,
+    CxrGridToleranceError,
+    resolve_cxr_grid_policy,
 )
-from pyrite.montecarlo.runner.line_grid import _measured_line_grid
-from pyrite.montecarlo.spectrum.line_seeds import (
+from pyrite.montecarlo.runner.cxr_grid import _measured_cxr_grid
+from pyrite.montecarlo.spectrum.cxr_seeds import (
     LOCAL_SPACING_SOURCE,
     ResonancePopulation,
     local_spacing_seeds,
@@ -132,7 +132,7 @@ def test_invalid_spacing_and_halo_arguments_raise():
 
 
 def _local_policy(**per_call):
-    return resolve_line_grid_policy(
+    return resolve_cxr_grid_policy(
         start_eV=50.0,
         stop_eV=100_000.0,
         per_call={
@@ -146,7 +146,7 @@ def _local_policy(**per_call):
 
 def test_local_policy_payload_carries_its_halo_share():
     payload = _local_policy()
-    assert payload["schema"] == RESONANCE_LINE_GRID_POLICY_SCHEMA
+    assert payload["schema"] == RESONANCE_CXR_GRID_POLICY_SCHEMA
     assert payload["resolution"]["policy"] == LOCAL_RESOLUTION_POLICY
     assert payload["resolution"]["halo_limit"] == DEFAULT_LOCAL_HALO_LIMIT
     assert payload["sources"]["resolution"] == "per-call"
@@ -154,7 +154,7 @@ def test_local_policy_payload_carries_its_halo_share():
 
 def test_local_resolution_needs_the_measured_bandwidth():
     with pytest.raises(ValueError, match="needs the resonance-population bandwidth"):
-        resolve_line_grid_policy(
+        resolve_cxr_grid_policy(
             start_eV=50.0, stop_eV=1000.0, per_call={"resolution": LOCAL_RESOLUTION_POLICY}
         )
 
@@ -177,13 +177,13 @@ def _collecting_lines(monkeypatch, energy, width, weight):
         kwargs["truncation_audit"]["collect"].append(collected)
         return np.zeros(axis.size)
 
-    monkeypatch.setattr(runner, "_lines_for_segments", collect)
+    monkeypatch.setattr(runner, "_cxr_for_segments", collect)
 
 
 def _measured_local_grid(monkeypatch, collected, **per_call):
     _collecting_lines(monkeypatch, *collected)
     case = {"name": "hbn test", "E0_keV": 5000.0, "composition": [("B", 0.5), ("N", 0.5)]}
-    return _measured_line_grid(
+    return _measured_cxr_grid(
         _local_policy(**per_call), case, {}, (np.array([0.0, 0.0, 1.0]),), 2, 0.25, None, None
     )
 
@@ -218,14 +218,14 @@ def test_measured_local_grid_over_directions_unions_lines_and_widest_stop(monkey
         kwargs["truncation_audit"]["collect"].append((energy, np.ones(1), np.ones(1)))
         return np.zeros(axis.size)
 
-    monkeypatch.setattr(runner, "_lines_for_segments", collect)
+    monkeypatch.setattr(runner, "_cxr_for_segments", collect)
     case = {"name": "hbn test", "E0_keV": 5000.0, "composition": [("B", 0.5), ("N", 0.5)]}
     directions = (np.array([0.0, 0.0, 1.0]), np.array([1.0, 0.0, 0.0]))
-    grid, record, bandwidth = _measured_line_grid(
+    grid, record, bandwidth = _measured_cxr_grid(
         _local_policy(), case, {}, directions, 2, 0.25, None, None
     )
     single = [
-        _measured_line_grid(_local_policy(), case, {}, (direction,), 2, 0.25, None, None)
+        _measured_cxr_grid(_local_policy(), case, {}, (direction,), 2, 0.25, None, None)
         for direction in directions
     ]
     assert bandwidth["stop_eV"] == max(one[2]["stop_eV"] for one in single) == grid[-1]
@@ -240,12 +240,12 @@ def test_measured_local_grid_over_directions_unions_lines_and_widest_stop(monkey
 
 
 def test_measured_local_grid_refuses_beyond_the_point_budget(monkeypatch):
-    with pytest.raises(LineGridToleranceError, match="above the 100-point budget"):
+    with pytest.raises(CxrGridToleranceError, match="above the 100-point budget"):
         _measured_local_grid(monkeypatch, ([5000.0], [1.0], [1.0]), max_points=100)
 
 
 def test_block_streaming_matches_one_block(monkeypatch):
-    from pyrite.montecarlo.spectrum import line_seeds
+    from pyrite.montecarlo.spectrum import cxr_seeds
 
     rng = np.random.default_rng(0)
     energy = rng.uniform(1000.0, 20_000.0, 200)
@@ -266,12 +266,12 @@ def test_block_streaming_matches_one_block(monkeypatch):
         bin_eV=100.0,
     )
     expected = local_spacing_seeds(whole, **kwargs)
-    expected_stop = line_seeds.resonance_population_stop_eV(
+    expected_stop = cxr_seeds.resonance_population_stop_eV(
         whole, ceiling_eV=1e6, truncation_limit=1e-4
     )
-    monkeypatch.setattr(line_seeds, "_POPULATION_BLOCK_SIZE", 7)
+    monkeypatch.setattr(cxr_seeds, "_POPULATION_BLOCK_SIZE", 7)
     assert local_spacing_seeds(split, **kwargs) == expected
-    stop, summary = line_seeds.resonance_population_stop_eV(
+    stop, summary = cxr_seeds.resonance_population_stop_eV(
         split, ceiling_eV=1e6, truncation_limit=1e-4
     )
     assert stop == expected_stop[0]
@@ -289,7 +289,7 @@ def _join_population(width, offset, seed=7):
 
 
 def _local_axis(energy, width, weight, **core):
-    from pyrite._line_windows import build_window_plan
+    from pyrite._cxr_windows import build_window_plan
 
     seeds, _ = local_spacing_seeds(
         [ResonancePopulation("t", energy, weight, width)],
@@ -304,7 +304,7 @@ def _local_axis(energy, width, weight, **core):
 
 
 def _yield_error(energy, width, weight, *, bin_mean, **core):
-    from pyrite.montecarlo.spectrum.lines._bin_quadrature import bin_axis, sincsq_bin_lineshape
+    from pyrite.montecarlo.spectrum.cxr._bin_quadrature import bin_axis, sincsq_bin_lineshape
 
     grid = _local_axis(energy, width, weight, **core)
     edges, inv_width = bin_axis(grid)

@@ -359,7 +359,7 @@ def test_merge_dataset_line_overwrites_spec_and_reinterps_brem():
 
 def test_project_dataset_line_carries_line_companions():
     """Coherent and characteristic components live on the line grid, so a
-    --line-only pull must ship both audit arrays with the combined spectrum."""
+    --cxr-only pull must ship both audit arrays with the combined spectrum."""
     from pyrite.results import project_dataset
 
     rec = {

@@ -103,7 +103,7 @@ def test_new_energy_not_in_reference_table_falls_back_to_start_eV_convention(mon
 
     assert complete is True
     assert rows[0]["energy_keV"] == 25.0
-    assert rows[0]["start_eV"] == analyze.line_start_eV(25.0) == 10.0
+    assert rows[0]["start_eV"] == analyze.cxr_start_eV(25.0) == 10.0
 
 
 def test_budget_expiry_returns_tempfail_without_starting_next_energy(monkeypatch):

@@ -15,7 +15,7 @@ and #117 (coherent-route analysis) supply their own coordinates to the same
 
 Gated observables and their tolerance classes (``GATED_OBSERVABLES``) reuse the
 per-observable tolerances of the automatic line-grid policy
-(:data:`pyrite._line_grid_policy.DEFAULT_RTOL`, unchanged): line and continuum
+(:data:`pyrite._cxr_grid_policy.DEFAULT_RTOL`, unchanged): line and continuum
 yield and centroid as intrinsic-source quantities at ``1e-3``, detector-counted
 quantities at ``1e-2``. Dominant-line FWHM and line/background form a
 harness-only ``shape`` class gated at ``1e-2`` and are also reported, ungated,
@@ -24,7 +24,7 @@ at ``1e-3``: automatic
 which belongs to #101's local windows. Peak height is deliberately not an
 observable -- a sampled density maximum scales with the local spacing.
 Dominant-line FWHM and the line/background ratio come from
-:func:`pyrite.results.metrics.line_metrics`, whose widths are physical-energy
+:func:`pyrite.results.metrics.cxr_metrics`, whose widths are physical-energy
 half-maximum crossings (#110), not sample counts times one spacing.
 
 Validation: line-grid-sinc-convergence
@@ -40,10 +40,11 @@ from typing import Any
 
 import numpy as np
 
+from .._api_deprecations import renamed_fields
+from .._cxr_grid_policy import DEFAULT_RTOL
 from .._grid_semantics import resolution_num
-from .._line_grid_policy import DEFAULT_RTOL
 from ..detectors.spec import EagleXO, Timepix3
-from ..results.metrics import line_metrics
+from ..results.metrics import cxr_metrics
 
 __all__ = [
     "DEFAULT_ATOL",
@@ -154,6 +155,7 @@ class SegmentMismatchError(RuntimeError):
     """Two ladder rungs were evaluated on different transport segments."""
 
 
+@renamed_fields(line="cxr")
 @dataclass(frozen=True)
 class SpectrumSample:
     """One spectrum evaluation on one grid.
@@ -163,7 +165,7 @@ class SpectrumSample:
     grid-exact characteristic yield) that a report keeps beside the gated set.
     """
 
-    line: np.ndarray
+    cxr: np.ndarray
     background: np.ndarray
     informational: Mapping[str, float] = field(default_factory=dict)
 
@@ -304,7 +306,7 @@ def require_identical_segments(
 
 def spectrum_observables(
     E_grid_eV: object,
-    line_density: object,
+    cxr_density: object,
     background_density: object,
     *,
     rel_prominence: float = 0.03,
@@ -316,7 +318,7 @@ def spectrum_observables(
     ``continuum_centroid_eV`` are trapezoids over the rung's own coordinates.
     ``fwhm_eV`` and ``line_background_ratio`` are the dominant
     (largest-prominence) line's physical-energy FWHM and its local line/
-    background ratio from :func:`pyrite.results.metrics.line_metrics`.
+    background ratio from :func:`pyrite.results.metrics.cxr_metrics`.
     Detected counts integrate each read-time detector response separately for
     the line and continuum densities (default:
     :class:`~pyrite.detectors.spec.Timepix3` and
@@ -324,20 +326,20 @@ def spectrum_observables(
     per incident electron per sr (or eV for positions and widths).
     """
     E = np.asarray(E_grid_eV, dtype=float)
-    line = np.asarray(_host(line_density), dtype=float)
+    cxr = np.asarray(_host(cxr_density), dtype=float)
     background = np.asarray(_host(background_density), dtype=float)
-    if line.shape != E.shape or background.shape != E.shape:
+    if cxr.shape != E.shape or background.shape != E.shape:
         raise ValueError("line and background densities must match the grid shape")
-    total = float(np.trapezoid(line, E))
-    centroid = float(np.trapezoid(E * line, E) / total) if total > 0.0 else float("nan")
+    total = float(np.trapezoid(cxr, E))
+    centroid = float(np.trapezoid(E * cxr, E) / total) if total > 0.0 else float("nan")
     continuum_total = float(np.trapezoid(background, E))
     continuum_centroid = (
         float(np.trapezoid(E * background, E) / continuum_total)
         if continuum_total > 0.0
         else float("nan")
     )
-    metrics = line_metrics(
-        {"E_grid": E, "spec": line, "brem": background, "scale": 1.0},
+    metrics = cxr_metrics(
+        {"E_grid": E, "spec": cxr, "brem": background, "scale": 1.0},
         None,
         rel_prominence=rel_prominence,
         metric="prominence",
@@ -358,7 +360,7 @@ def spectrum_observables(
         else detectors
     )
     for name, response in responses.items():
-        detected = response.score(E, line, fwhm_eV=None, scale=1.0)
+        detected = response.score(E, cxr, fwhm_eV=None, scale=1.0)
         out[name] = float(np.trapezoid(np.asarray(detected, dtype=float), E))
         continuum_detected = response.score(E, background, fwhm_eV=None, scale=1.0)
         out[f"{name.removesuffix('_counts')}_continuum_counts"] = float(
@@ -417,7 +419,7 @@ def evaluate_ladder(
         previous = spacing
         started = time.perf_counter()
         sample = evaluate(E)
-        line = np.asarray(_host(sample.line), dtype=float)
+        cxr = np.asarray(_host(sample.cxr), dtype=float)
         background = np.asarray(_host(sample.background), dtype=float)
         wall = time.perf_counter() - started
         if reference is not None and segments is not None:
@@ -427,7 +429,7 @@ def evaluate_ladder(
             n_points=int(E.size),
             start_eV=float(E[0]),
             stop_eV=float(E[-1]),
-            observables=observables(E, line, background),
+            observables=observables(E, cxr, background),
             informational={key: float(value) for key, value in sample.informational.items()},
             wall_s=float(wall),
             host_peak_rss_mib=_host_peak_rss_mib(),

@@ -31,7 +31,7 @@ Set controls without editing TOML directly:
 
 ```bash
 pyrite profile numerics set standard \
-  --line-trials 500 --brem-trials 200 \
+  --cxr-trials 500 --brem-trials 200 \
   --reflection-families 6 --maximum-reflections 12 \
   --mosaic-route mc --mosaic-nodes 7 --yes
 
@@ -46,9 +46,9 @@ pyrite profile numerics reset standard reflection-families mosaic-route --yes
 pyrite profile numerics reset standard --yes
 ```
 
-`profile create|set|add` accepts `-l/--line-trials` and `-b/--brem-trials`, including comma-separated trial-count grids. A trial is one Monte Carlo electron history used to estimate the corresponding spectrum, rather than one electron in the physical beam. These counts select histories from shared transport, so they are not added together to determine the transport count.
+`profile create|set|add` accepts `-l/--cxr-trials` and `-b/--brem-trials`, including comma-separated trial-count grids. A trial is one Monte Carlo electron history used to estimate the corresponding spectrum, rather than one electron in the physical beam. These counts select histories from shared transport, so they are not added together to determine the transport count.
 
-The old `--ne-line`/`--ne-brem` options and `profile numerics set --line-electrons`/`--bremsstrahlung-electrons`, deprecated in 0.6.0, were removed in 0.8.0; use `--line-trials`/`--brem-trials`. `profile numerics reset` still accepts both trial and electron field names. Existing `--straggling`, `--energy-model`, and `--max-de-frac` spellings remain compatible. Worker, chunk, backend, core, and other execution-only tuning are intentionally absent: they affect runtime, not calculation results or checkpoint identity.
+The old `--ne-line`/`--ne-brem` options and `profile numerics set --line-electrons`/`--bremsstrahlung-electrons`, deprecated in 0.6.0, were removed in 0.8.0; use `--cxr-trials`/`--brem-trials`. `profile numerics reset` still accepts both trial and electron field names. Existing `--straggling`, `--energy-model`, and `--max-de-frac` spellings remain compatible. Worker, chunk, backend, core, and other execution-only tuning are intentionally absent: they affect runtime, not calculation results or checkpoint identity.
 
 `pyrite profile create NAME` starts from the packaged `standard` sweep's ranges and membership; an omitted bremsstrahlung grid uses the built-in 25 eV spacing. It uses only materials present in the selected catalog. Packaged per-material overrides, such as stack layer counts, are copied only for the new profile's member materials. A non-member resolves against `standard`, so its row would never be read. It does not copy the selected catalog's mutable `standard` profile or attach a beam, scalar detector, physical detector, filters, emission policy, transport numerics, or line-grid policy. Absent emission resolves to incoherent and absent straggling resolves to off. `pyrite profile show NAME` marks code defaults with `(default)` and shows an absent detector as `none`.
 
@@ -70,17 +70,17 @@ pyrite profile precision enable hopg_scan --observable line   # drop counts; cus
 pyrite profile precision set hopg_scan --target-rse 0.02      # customize one field
 pyrite profile precision reset hopg_scan stability-blocks     # one field back to its default
 pyrite profile precision reset hopg_scan              # drop the table: default policy
-pyrite profile precision disable hopg_scan --line-trials 500 --brem-trials 100   # opt out
+pyrite profile precision disable hopg_scan --cxr-trials 500 --brem-trials 100   # opt out
 pyrite profile precision show hopg_scan
 ```
 
 `enable` removes `n_electrons`/`n_electrons_brem` and, in the same write, stores a policy when options are given; it reports the counts it removed and never changes emission, cascades, beam, geometry or line-grid selectors. It refuses, writing nothing, when the profile cannot run adaptive, including per-material count overrides (`[profiles.NAME.overrides.MATERIAL]`), which must be removed from the catalog by hand. `set` customizes a policy: an existing policy keeps the fields not given, and a new one starts from the default (target 0.05, 200–20,000 electrons, blocks of 100, line and brem). On a fixed-count profile `set` refuses and names `enable`. `--observable` replaces the watched set, so `--observable line` alone stops watching bremsstrahlung.
 
-`reset` without fields removes the table and returns the profile to the default policy; it does not add fixed counts. To opt out, `disable` removes any policy and sets fixed counts. Explicit `--line-trials`/`--brem-trials` replace that count, and a count the profile already sets, including a sweep grid, is otherwise kept. A missing count is prompted for on a terminal; without one, or with `--yes`/`--dry-run`, it takes the full-fidelity default (300 line, 150 brem). `pyrite profile numerics set --line-trials` on a profile with a policy is refused and names `disable`. Every command accepts `--dry-run`.
+`reset` without fields removes the table and returns the profile to the default policy; it does not add fixed counts. To opt out, `disable` removes any policy and sets fixed counts. Explicit `--cxr-trials`/`--brem-trials` replace that count, and a count the profile already sets, including a sweep grid, is otherwise kept. A missing count is prompted for on a terminal; without one, or with `--yes`/`--dry-run`, it takes the full-fidelity default (300 line, 150 brem). `pyrite profile numerics set --cxr-trials` on a profile with a policy is refused and names `disable`. Every command accepts `--dry-run`.
 
 Bundled demos are read-only: copy one with `pyrite profile create NAME --from DEMO` and edit the copy (maintainers edit the bundled file with `pyrite-dev profile`). The policy is stored as `[profiles.NAME.precision]`. The minimum, maximum and optional `--pilot-electrons` must be multiples of the block size. Optional guards default to `--max-electron-share 0.05`, `--min-effective-electrons 100`, `--stability-blocks 3` and `--stability-fraction 0.5`. `--band-ev START,STOP` fixes the monitor band; it defaults to the case's line band. `--batch-means-band-ev` adds reported per-bin errors and is never used to stop.
 
-Electron sampling and the line grid are independent. A `[profiles.NAME.line_grid_policy]` table resolves each case's line grid automatically (see [line-grid policy](#line-grid-policy)) whether the counts are fixed or adaptive, and precision commands never change it; `pyrite profile line-grid show NAME` lists the grid sources. The bundled `quickstart`, `sweep_demo`, `high_energy_demo` and `hopg_emittance_demo` profiles run adaptive. `high_energy_demo` also resolves its line grid with the measured policy. `coherent_demo` (coherent emission), `detector_demo` and `pixelated_detector_demo` (physical detectors), and `trajectory_demo` (trajectory capture) keep fixed counts because adaptive precision does not support those routes. `two_detector_demo` also uses fixed counts to bound the two-detector workload. Removing the demos' fixed counts changed their dataset identities, so earlier demo checkpoints do not resume.
+Electron sampling and the line grid are independent. A `[profiles.NAME.line_grid_policy]` table resolves each case's line grid automatically (see [line-grid policy](#line-grid-policy)) whether the counts are fixed or adaptive, and precision commands never change it; `pyrite profile cxr-grid show NAME` lists the grid sources. The bundled `quickstart`, `sweep_demo`, `high_energy_demo` and `hopg_emittance_demo` profiles run adaptive. `high_energy_demo` also resolves its line grid with the measured policy. `coherent_demo` (coherent emission), `detector_demo` and `pixelated_detector_demo` (physical detectors), and `trajectory_demo` (trajectory capture) keep fixed counts because adaptive precision does not support those routes. `two_detector_demo` also uses fixed counts to bound the two-detector workload. Removing the demos' fixed counts changed their dataset identities, so earlier demo checkpoints do not resume.
 
 A profile with an explicit `precision` table cannot also set `n_electrons`/`n_electrons_brem` grids, directly or in a material override, or coherent emission; the catalog loader rejects each combination. An explicit policy also refuses physical detectors (`run --ephemeral`), GDF beams, grooves, and particle cascades, rather than falling back. Adaptive runs use only the per-electron or CUDA transport cores. An adaptive run never uses the canonical `<material>` checkpoint stem.
 
@@ -111,14 +111,14 @@ By default each case's line axis spans a closed-form kinematic bandwidth at the 
 `resonance-local` requires `resonance-population` and `bin-mean`. Edit the table with the `line-grid` group rather than TOML; impossible combinations are usage errors (exit 2) and nothing is written:
 
 ```bash
-pyrite profile line-grid show high_energy
-pyrite profile line-grid show high_energy -o json
-pyrite profile line-grid set my_profile --bandwidth resonance-population \
+pyrite profile cxr-grid show high_energy
+pyrite profile cxr-grid show high_energy -o json
+pyrite profile cxr-grid set my_profile --bandwidth resonance-population \
   --resolution resonance-local --quadrature bin-mean --dry-run
-pyrite profile line-grid set my_profile --bandwidth resonance-population \
+pyrite profile cxr-grid set my_profile --bandwidth resonance-population \
   --resolution resonance-local --quadrature bin-mean
-pyrite profile line-grid reset my_profile resolution quadrature
-pyrite profile line-grid reset my_profile
+pyrite profile cxr-grid reset my_profile resolution quadrature
+pyrite profile cxr-grid reset my_profile
 ```
 
 `show` lists each selector's explicit value, effective value and source, and which grid source the profile's cases use. `pyrite profile show NAME` prints a one-line summary, and its JSON payload carries `line_grid_policy` (`null` when unset). Editing `standard` prompts unless `--yes`.
@@ -132,7 +132,7 @@ Grid-source precedence per case, highest first:
 
 Automatic resolution supports coherent emission only inside feature windows (#117, #350), so the editor refuses a policy without `windows = true` on a `coherent` or `both` profile. `bin-mean` also refuses a positive `max_dE_frac`.
 
-The table applies to every case of the profile and joins its dataset identity: editing it gives new checkpoints, and earlier results stay under their old identity. `profile create --from SOURCE` clones it; a fresh `profile create` does not set one. `high_energy` uses the full measured policy. A measured-bandwidth case records its upper-edge truncation audit and the line yield's per-electron relative standard error in `line_grid_resolved`. When a few electrons carry the yield (relative standard error above 0.1, typical at 5 MeV where rare electrons scatter into the detector's radiation cone), the case still runs, is flagged `statistics_limited`, and raises `LineYieldStatisticsWarning`.
+The table applies to every case of the profile and joins its dataset identity: editing it gives new checkpoints, and earlier results stay under their old identity. `profile create --from SOURCE` clones it; a fresh `profile create` does not set one. `high_energy` uses the full measured policy. A measured-bandwidth case records its upper-edge truncation audit and the line yield's per-electron relative standard error in `line_grid_resolved`. When a few electrons carry the yield (relative standard error above 0.1, typical at 5 MeV where rare electrons scatter into the detector's radiation cone), the case still runs, is flagged `statistics_limited`, and raises `CxrYieldStatisticsWarning`.
 
 Tolerances, maximum spacing, backend ULPs and detailed window maps are not profile keys. Set them per call through `Sweep.line_grid_policy` or with `PYRITE_ENERGY_GRID_*`; see the [profile settings reference](../repo-design/profile-settings.md) for names and built-in values.
 

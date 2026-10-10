@@ -22,7 +22,7 @@ See [longitudinal structure](../../physics/beam-transport/longitudinal-structure
 
 ## Physical charge must be distinct from sample count
 
-At the inspected revision, [`_finalize_spectrum`](../../../src/pyrite/montecarlo/spectrum/lines/_spectrum.py) divides accumulated radiation by the simulated electron count. Meanwhile, [`results.store`](../../../src/pyrite/results/store.py) uses bunch charge and repetition rate as an average-current normalization. Fully constructive inter-electron enhancement can therefore grow with the numerical population. Increasing Monte Carlo resolution must not change a fixed physical bunch's predicted yield.
+At the inspected revision, [`_finalize_spectrum`](../../../src/pyrite/montecarlo/spectrum/cxr/_spectrum.py) divides accumulated radiation by the simulated electron count. Meanwhile, [`results.store`](../../../src/pyrite/results/store.py) uses bunch charge and repetition rate as an average-current normalization. Fully constructive inter-electron enhancement can therefore grow with the numerical population. Increasing Monte Carlo resolution must not change a fixed physical bunch's predicted yield.
 
 For independent, identically distributed electron field amplitudes, the candidate physical normalization separates self and pair terms:
 

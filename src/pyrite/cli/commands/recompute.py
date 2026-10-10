@@ -326,18 +326,18 @@ def brem_command(
     )
 
 
-def _line_cli(args):
+def _cxr_cli(args):
     """CLI handler -- returns None so the dict never reaches sys.exit."""
     if bool(args.material) == bool(args.all):
         raise SystemExit(
             "pyrite reline: give one or more materials, or -a/--all for every checkpoint "
             "(exactly one of the two)"
         )
-    return _recompute.reline_checkpoints(
+    return _recompute.recxr_checkpoints(
         materials=args.material or None,
         checkpoint_dir=args.checkpoint_dir,
-        line_ne=args.line_ne,
-        line_start_eV=getattr(args, "start", None),
+        cxr_ne=args.cxr_ne,
+        cxr_start_eV=getattr(args, "start", None),
         line_stop_eV=getattr(args, "stop", None),
         line_step_eV=args.line_step,
         catalog_profile=getattr(args, "catalog_profile", None),
@@ -349,7 +349,7 @@ def _line_cli(args):
     )
 
 
-def _line_cli_json(args):
+def _cxr_cli_json(args):
     if bool(args.material) == bool(args.all):
         raise SystemExit(
             "pyrite reline: give one or more materials, or -a/--all for every checkpoint "
@@ -364,11 +364,11 @@ def _line_cli_json(args):
     caught = None
     try:
         with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
-            _recompute.reline_checkpoints(
+            _recompute.recxr_checkpoints(
                 materials=args.material or None,
                 checkpoint_dir=args.checkpoint_dir,
-                line_ne=args.line_ne,
-                line_start_eV=getattr(args, "start", None),
+                cxr_ne=args.cxr_ne,
+                cxr_start_eV=getattr(args, "start", None),
                 line_stop_eV=getattr(args, "stop", None),
                 line_step_eV=args.line_step,
                 catalog_profile=getattr(args, "catalog_profile", None),
@@ -408,9 +408,9 @@ def _line_cli_json(args):
 
 
 @click.command(
-    "reline",
+    "cxr",
     help=(
-        "Recompute only line spectra in existing checkpoints.\n\n"
+        "Recompute only CXR spectra in existing checkpoints.\n\n"
         "Pass MATERIALS or --all, never both. Updates checkpoint files in place "
         "and skips records already at target unless --redo-all."
     ),
@@ -429,12 +429,14 @@ def _line_cli_json(args):
     shell_complete=_cli_completion.complete_profile,
     help="Catalog profile for legacy data; otherwise must match checkpoint metadata.",
 )
-@click.option(
-    "--line-ne",
+@canonical_option(
+    "--cxr-trials",
+    "cxr_ne",
+    retired=("--line-ne",),
     type=_cli_core.POSITIVE_INT,
     default=None,
     metavar="N",
-    help="Line-spectrum electron count; overrides profile default.",
+    help="CXR trial count; overrides profile default.",
 )
 @click.option(
     "--start",
@@ -450,8 +452,10 @@ def _line_cli_json(args):
     metavar="EV",
     help="Line-grid exclusive upper bound in eV; overrides profile.",
 )
-@click.option(
-    "--line-step",
+@canonical_option(
+    "--cxr-step",
+    "line_step",
+    retired=("--line-step",),
     type=_cli_core.POSITIVE_FLOAT,
     default=None,
     metavar="EV",
@@ -478,12 +482,12 @@ def _line_cli_json(args):
 @_remote_controls
 @click.pass_context
 @_cli_core.output_option
-def line_command(
+def cxr_command(
     ctx,
     materials,
     all_,
     catalog_profile,
-    line_ne,
+    cxr_ne,
     start,
     stop,
     line_step,
@@ -522,26 +526,26 @@ def line_command(
         target = None if remote_target == "__configured__" else remote_target
         with remote_config.override_remote_host(target):
             return ctx.invoke(
-                remote_cli.reline_command,
+                remote_cli.recxr_command,
                 material=materials,
                 all_=all_,
                 redo_all=redo_all,
                 dry_run=dry_run,
                 no_sync=no_sync,
                 chunk_minutes=10.0 if chunk_minutes is None else chunk_minutes,
-                line_ne=line_ne,
+                cxr_ne=cxr_ne,
                 start=start,
                 stop=stop,
                 line_step=line_step,
                 detach=detach,
             )
-    handler = _line_cli_json if json_output else _line_cli
+    handler = _cxr_cli_json if json_output else _cxr_cli
     return _cli_core.invoke_legacy(
         handler,
         material=list(materials),
         all=all_,
         catalog_profile=catalog_profile,
-        line_ne=line_ne,
+        cxr_ne=cxr_ne,
         start=start,
         stop=stop,
         line_step=line_step,
@@ -552,3 +556,21 @@ def line_command(
         save_every=save_every,
         json_output=json_output,
     )
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {
+    "_line_cli": "_cxr_cli",
+    "_line_cli_json": "_cxr_cli_json",
+    "line_command": "cxr_command",
+}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

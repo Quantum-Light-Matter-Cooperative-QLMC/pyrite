@@ -3,7 +3,6 @@
 import difflib
 
 import click
-import tomlkit
 from tomlkit.exceptions import ParseError
 
 from pyrite.campaign import profile_edit as _profile_edit
@@ -27,7 +26,7 @@ def confirm_standard(name, action, yes, dry_run):
 def write(document, original, dry_run, done_message):
     """Validate, then print a diff (dry-run) or atomically write the catalog."""
     try:
-        proposed = tomlkit.dumps(document)
+        proposed = _catalog_io.render_catalog(document)
         _catalog_io.validate(_catalog_io.active_catalog_path(), proposed)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None

@@ -59,8 +59,8 @@ Paths below are relative to `src/pyrite/`.
 
 | Owner | Current constraint | Required change |
 | --- | --- | --- |
-| `montecarlo/spectrum/lines/_per_hkl.py` | Sinc-window bounds use a single `dE` | Search actual coordinates |
-| `montecarlo/spectrum/lines/_kernels.py::_line_tabulation_grid` | Internal 1 eV mesh across the interval | Use validated sparse nodes plus native edge data |
+| `montecarlo/spectrum/cxr/_per_hkl.py` | Sinc-window bounds use a single `dE` | Search actual coordinates |
+| `montecarlo/spectrum/cxr/_kernels.py::_cxr_tabulation_grid` | Internal 1 eV mesh across the interval | Use validated sparse nodes plus native edge data |
 | `detectors/_si_sensor.py::poisson_core` | Counts use the first spacing everywhere | Consume explicit bin masses or local widths |
 | `detectors/_si_sensor.py::grid_key` | Size and endpoints identify a uniform grid | Hash complete coordinates and grid semantics |
 | `detectors/timepix_response.py` | Rebinning uses one input-bin width | Conservative mapping to response input bins |

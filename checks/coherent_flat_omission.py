@@ -17,8 +17,8 @@ import numpy as np
 
 from pyrite._backend import REAL, _to_cpu, xp
 from pyrite.materials.crystal import CRYSTALS
-from pyrite.montecarlo import mc_spectrum, simulate_trajectories
-from pyrite.montecarlo.spectrum.lines import _policy
+from pyrite.montecarlo import mc_cxr_spectrum, simulate_trajectories
+from pyrite.montecarlo.spectrum.cxr import _policy
 from pyrite.montecarlo.spectrum.phase_retention import PhaseRetentionCost, PhaseRetentionPolicy
 
 
@@ -153,7 +153,7 @@ def main():
         if xp.__name__ == "cupy":
             xp.cuda.get_current_stream().synchronize()
         started = perf_counter()
-        spectrum = mc_spectrum(
+        spectrum = mc_cxr_spectrum(
             segments,
             energy,
             coherent_flat_omission_limit=limit,

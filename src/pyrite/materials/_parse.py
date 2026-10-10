@@ -12,8 +12,8 @@ import numpy as np
 
 from .. import DATA_DIR
 from .._catalog_layout import ARTIFACT_DIR, catalog_root
+from .._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS
 from .._energy_grid_artifacts import ArtifactError, load_artifact
-from .._line_grid_policy import PROFILE_LINE_GRID_SELECTORS
 from .._numerics import validate_profile_numerics
 from .._precision import Precision
 from ._beam_detector_parse import (
@@ -24,7 +24,7 @@ from ._beam_detector_parse import (
     _parse_profile_detector,
 )
 from ._catalog_decode import (
-    LineGridByEnergy,
+    CxrGridByEnergy,
     _direction,
     _energy_grid_rows,
     _Errors,
@@ -304,13 +304,13 @@ def _scan(
     crystal: CrystalSpec | None,
     errors: _Errors,
     *,
-    line_grid_store: LineGridByEnergy | None = None,
+    cxr_grid_store: CxrGridByEnergy | None = None,
 ) -> ScanSpec | None:
     has_ang = "thickness_ang" in values
     has_layers = "thickness_layers" in values
     if has_ang == has_layers:
         errors.add(path, "requires exactly one of thickness_ang or thickness_layers")
-    has_line = "E_grid_line" in values
+    has_cxr = "E_grid_line" in values
     grids: dict[str, np.ndarray | None] = {}
     for key in ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem"):
         if key == "E_grid_brem" and key not in values:
@@ -320,14 +320,14 @@ def _scan(
             grids[key] = None
         else:
             grids[key] = _grid(values[key], f"{path}.{key}", errors)
-    if has_line:
+    if has_cxr:
         grids["E_grid_line"] = _grid(values["E_grid_line"], f"{path}.E_grid_line", errors)
     else:
         grids["E_grid_line"] = None
     # An empty mapping opts missing catalog rows into automatic case-local
     # resolution. None is reserved for an explicit fixed line grid.
-    line_grids: LineGridByEnergy | None = None if has_line else MappingProxyType({})
-    if not has_line:
+    cxr_grids: CxrGridByEnergy | None = None if has_cxr else MappingProxyType({})
+    if not has_cxr:
         energy_grid = grids.get("energy_keV")
         if energy_grid is not None:
             # dict preserves energy_keV's declared order (e.g. 30,40,...,300),
@@ -339,14 +339,14 @@ def _scan(
             # resolution in campaign.sweep, so `pyrite material energy-grid
             # derive` is no longer a correctness prerequisite for a valid
             # material at a supported beam energy.
-            if line_grid_store:
+            if cxr_grid_store:
                 covered = {
-                    energy: line_grid_store[energy]
+                    energy: cxr_grid_store[energy]
                     for energy in configured
-                    if energy in line_grid_store
+                    if energy in cxr_grid_store
                 }
                 if covered:
-                    line_grids = MappingProxyType(covered)
+                    cxr_grids = MappingProxyType(covered)
     thickness = None
     layer_grid = None
     if has_ang:
@@ -410,7 +410,7 @@ def _scan(
         tilt_deg=tilt_deg,
         tilt_azim_deg=tilt_azim_deg,
         E_grid_line=grids["E_grid_line"],
-        E_grid_line_by_energy=line_grids,
+        E_grid_line_by_energy=cxr_grids,
         E_grid_brem=E_grid_brem,
         n_electrons=electron_grids["n_electrons"],
         n_electrons_brem=electron_grids["n_electrons_brem"],
@@ -476,10 +476,10 @@ def _parse_profile_overrides(raw: object, path: str, errors: _Errors) -> None:
 
 
 #: Allowed values of ``[profiles.NAME.line_grid_policy]`` keys.
-_PROFILE_LINE_GRID_POLICY_VALUES = PROFILE_LINE_GRID_SELECTORS
+_PROFILE_CXR_GRID_POLICY_VALUES = PROFILE_CXR_GRID_SELECTORS
 
 
-def _parse_profile_line_grid_policy(raw: object, path: str, errors: _Errors) -> None:
+def _parse_profile_cxr_grid_policy(raw: object, path: str, errors: _Errors) -> None:
     """Validate named grid policies, window opt-in and the coordinate budget.
 
     The table becomes each case's ``Sweep.line_grid_policy``, so it joins the
@@ -489,8 +489,8 @@ def _parse_profile_line_grid_policy(raw: object, path: str, errors: _Errors) -> 
     table = _table(raw, path, errors)
     if table is None:
         return
-    errors.keys(table, path, set(_PROFILE_LINE_GRID_POLICY_VALUES) | {"windows", "max_points"})
-    for key, allowed in _PROFILE_LINE_GRID_POLICY_VALUES.items():
+    errors.keys(table, path, set(_PROFILE_CXR_GRID_POLICY_VALUES) | {"windows", "max_points"})
+    for key, allowed in _PROFILE_CXR_GRID_POLICY_VALUES.items():
         if key in table and table[key] not in allowed:
             errors.add(f"{path}.{key}", f"must be one of {allowed}")
     if "windows" in table and type(table["windows"]) is not bool:
@@ -574,7 +574,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         if "overrides" in row:
             _parse_profile_overrides(row["overrides"], f"{path}.overrides", errors)
         if "line_grid_policy" in row:
-            _parse_profile_line_grid_policy(
+            _parse_profile_cxr_grid_policy(
                 row["line_grid_policy"], f"{path}.line_grid_policy", errors
             )
         refs = row.get("energy_grid_refs")
@@ -717,7 +717,7 @@ def _material_elements(
     return elements
 
 
-def _artifact_line_grids(identity: Mapping[str, object]) -> LineGridByEnergy:
+def _artifact_cxr_grids(identity: Mapping[str, object]) -> CxrGridByEnergy:
     """Decode a verified v1 artifact's normalized line rows exactly."""
     rows = cast("list[Mapping[str, Any]]", identity["line_rows"])
     decoded: dict[float, np.ndarray] = {}
@@ -777,7 +777,7 @@ def _parse_materials(
     raw: object,
     crystals: Mapping[str, CrystalSpec],
     media: Mapping[str, MediumSpec],
-    energy_grids: Mapping[str, LineGridByEnergy],
+    energy_grids: Mapping[str, CxrGridByEnergy],
     errors: _Errors,
     profiles: Mapping[str, Mapping[str, object]],
     profile_artifacts: Mapping[str, tuple[str, Mapping[str, object]]],
@@ -836,7 +836,7 @@ def _parse_materials(
         values.update({name: override[name] for name in _SCAN_KEYS if name in override})
 
         artifact = profile_artifacts.get(key) if resolves_selected else None
-        artifact_line_grids = None
+        artifact_cxr_grids = None
         artifact_energies: list[float] = []
         if artifact is not None:
             digest, identity = artifact
@@ -854,7 +854,7 @@ def _parse_materials(
                 }
             }
             values.pop("E_grid_line", None)
-            artifact_line_grids = _artifact_line_grids(identity)
+            artifact_cxr_grids = _artifact_cxr_grids(identity)
             resolved_artifact_refs[key] = digest
 
         scan = _scan(
@@ -862,8 +862,8 @@ def _parse_materials(
             f"{path}.scan",
             crystals.get(str(crystal_key)),
             errors,
-            line_grid_store=(
-                artifact_line_grids if artifact_line_grids is not None else energy_grids.get(key)
+            cxr_grid_store=(
+                artifact_cxr_grids if artifact_cxr_grids is not None else energy_grids.get(key)
             ),
         )
         if artifact is not None and scan is not None:
@@ -976,7 +976,7 @@ def _parse_materials(
     return out
 
 
-def _parse_energy_grids(raw: object, errors: _Errors) -> dict[str, LineGridByEnergy]:
+def _parse_energy_grids(raw: object, errors: _Errors) -> dict[str, CxrGridByEnergy]:
     """Parse the shared per-material derived-grid store: ``[energy_grids.*]``.
 
     Decision 3 (docs/adr/0005-energy-grid-schema-decisions.md): line-grid bounds
@@ -988,17 +988,34 @@ def _parse_energy_grids(raw: object, errors: _Errors) -> dict[str, LineGridByEne
     table = _table(raw, "energy_grids", errors)
     if table is None:
         return {}
-    out: dict[str, LineGridByEnergy] = {}
+    out: dict[str, CxrGridByEnergy] = {}
     for material_key, value in table.items():
         path = f"energy_grids.{material_key}"
         row = _table(value, path, errors)
         if row is None:
             continue
-        errors.keys(row, path, {"line_by_energy"})
-        if "line_by_energy" not in row:
-            errors.add(f"{path}.line_by_energy", "missing required key")
+        errors.keys(row, path, {"cxr_by_energy"})
+        if "cxr_by_energy" not in row:
+            errors.add(f"{path}.cxr_by_energy", "missing required key")
             continue
-        rows = _energy_grid_rows(row["line_by_energy"], f"{path}.line_by_energy", errors)
+        rows = _energy_grid_rows(row["cxr_by_energy"], f"{path}.cxr_by_energy", errors)
         if rows is not None:
             out[material_key] = rows
     return out
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {
+    "_parse_profile_line_grid_policy": "_parse_profile_cxr_grid_policy",
+    "_artifact_line_grids": "_artifact_cxr_grids",
+}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

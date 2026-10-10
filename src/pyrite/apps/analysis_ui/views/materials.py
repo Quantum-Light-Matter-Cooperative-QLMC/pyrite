@@ -73,7 +73,7 @@ def render_cross_material(
                 summary,
                 select=select,
                 beam_energy_keV=beam_energy,
-                min_line_quality=0.5,
+                min_cxr_quality=0.5,
             )
             label = CATALOG.material(material_key).label
             if point is None:
@@ -87,7 +87,7 @@ def render_cross_material(
                 dropped,
                 select=select,
                 beam_energy_keV=beam_energy,
-                min_line_quality=0.5,
+                min_cxr_quality=0.5,
             ),
             theme,
         )

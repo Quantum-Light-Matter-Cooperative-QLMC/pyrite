@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from pyrite.montecarlo.spectrum.lines._bin_quadrature import _host_bin_mean
-from pyrite.montecarlo.spectrum.lines._bin_tree import reduce_host
+from pyrite.montecarlo.spectrum.cxr._bin_quadrature import _host_bin_mean
+from pyrite.montecarlo.spectrum.cxr._bin_tree import reduce_host
 
 
 @pytest.mark.parametrize("seed", [4, 19])

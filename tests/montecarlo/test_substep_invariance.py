@@ -12,7 +12,7 @@ points and decorrelates the trajectories entirely.
 import numpy as np
 import pytest
 
-from pyrite.montecarlo.spectrum import mc_brem_spectrum, mc_spectrum, subdivide_flights
+from pyrite.montecarlo.spectrum import mc_brem_spectrum, mc_cxr_spectrum, subdivide_flights
 from pyrite.montecarlo.transport import simulate_trajectories
 from tests.helpers import host_backend_only
 
@@ -155,7 +155,7 @@ def test_incoherent_cxr_converges_under_substep_refinement():
     reference, _ = subdivide_flights(
         segments, composition=CARBON, max_dE_frac=FINEST_FRAC, max_substeps=MAX_SUBSTEPS
     )
-    ref_spec = mc_spectrum(reference, CXR_GRID_EV, **CXR_KWARGS)
+    ref_spec = mc_cxr_spectrum(reference, CXR_GRID_EV, **CXR_KWARGS)
     assert ref_spec.max() > 0.0
 
     errors, peak_errors = [], []
@@ -163,7 +163,7 @@ def test_incoherent_cxr_converges_under_substep_refinement():
         rows, _ = subdivide_flights(
             segments, composition=CARBON, max_dE_frac=max_dE_frac, max_substeps=MAX_SUBSTEPS
         )
-        refined = mc_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
+        refined = mc_cxr_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
         errors.append(_grid_l1(refined, ref_spec))
         peak_errors.append(abs(refined.max() / ref_spec.max() - 1.0))
 
@@ -194,8 +194,8 @@ def test_treating_substeps_as_independent_emitters_destroys_the_line():
             segments, composition=CARBON, max_dE_frac=max_dE_frac, max_substeps=MAX_SUBSTEPS
         )
         ungrouped = {key: value for key, value in rows.items() if key != "flight_id"}
-        grouped = mc_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
-        without_grouping = mc_spectrum(ungrouped, CXR_GRID_EV, **CXR_KWARGS)
+        grouped = mc_cxr_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
+        without_grouping = mc_cxr_spectrum(ungrouped, CXR_GRID_EV, **CXR_KWARGS)
         ratios.append(without_grouping.max() / grouped.max())
 
     # Unsplit rows leave nothing to group, so the two reductions coincide there;
@@ -211,7 +211,7 @@ def test_grouped_reduction_equals_a_coherent_sum_per_physical_flight():
     """Definition check: coherent within a flight, incoherent across flights."""
     segments = _flights(Ne=6)
     rows, _ = subdivide_flights(segments, composition=CARBON, max_dE_frac=1e-3)
-    grouped = mc_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
+    grouped = mc_cxr_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
 
     key = np.stack([rows["elec_id"], rows["flight_id"]])
     new_flight = np.concatenate(([True], np.any(key[:, 1:] != key[:, :-1], axis=0)))
@@ -229,7 +229,7 @@ def test_grouped_reduction_equals_a_coherent_sum_per_physical_flight():
         # its per-electron normalization pointed at this flight alone.
         one["elec_id"] = np.zeros(hi - lo, dtype=np.int64)
         one["Ne"] = 1
-        per_flight += mc_spectrum(one, CXR_GRID_EV, coherent=True, **CXR_KWARGS)
+        per_flight += mc_cxr_spectrum(one, CXR_GRID_EV, coherent=True, **CXR_KWARGS)
     per_flight /= segments["Ne"]
 
     np.testing.assert_allclose(grouped, per_flight, rtol=1e-9, atol=1e-9 * grouped.max())
@@ -251,12 +251,12 @@ def test_substepped_rows_fail_closed_on_unported_options(bad, monkeypatch):
 
     if bad == "components":
         with pytest.raises(ValueError, match="incompatible with numerical substeps"):
-            mc_spectrum(rows, CXR_GRID_EV, components=True, **CXR_KWARGS)
+            mc_cxr_spectrum(rows, CXR_GRID_EV, components=True, **CXR_KWARGS)
     else:
         # The host-only guard reads `xp` in `_prepare_spectrum`, so the fake
         # backend has to land on the submodule that owns it -- rebinding the
         # `lines` package attribute would not reach the route.
-        from pyrite.montecarlo.spectrum.lines import _setup
+        from pyrite.montecarlo.spectrum.cxr import _setup
 
         class _FakeCupy:
             __name__ = "cupy"
@@ -266,7 +266,7 @@ def test_substepped_rows_fail_closed_on_unported_options(bad, monkeypatch):
 
         monkeypatch.setattr(_setup, "xp", _FakeCupy())
         with pytest.raises(ValueError, match="host-only"):
-            mc_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
+            mc_cxr_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
 
 
 @_grouped_is_host_only
@@ -306,7 +306,7 @@ def test_transport_substeps_reach_the_grouped_reduction(core):
         distinct_flights = np.unique(key, axis=1).shape[1]
         assert groups_if_keyed_on_adjacency > distinct_flights
 
-    grouped = mc_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
+    grouped = mc_cxr_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
     flights, gid = np.unique(key, axis=1, return_inverse=True)
     per_flight = np.zeros_like(grouped)
     row_keys = [k for k in rows if isinstance(rows[k], np.ndarray) and rows[k].shape]
@@ -318,7 +318,7 @@ def test_transport_substeps_reach_the_grouped_reduction(core):
                 one[name] = rows[name][take]
         one["elec_id"] = np.zeros(take.size, dtype=np.int64)
         one["Ne"] = 1
-        per_flight += mc_spectrum(one, CXR_GRID_EV, coherent=True, **CXR_KWARGS)
+        per_flight += mc_cxr_spectrum(one, CXR_GRID_EV, coherent=True, **CXR_KWARGS)
     per_flight /= rows["Ne"]
 
     np.testing.assert_allclose(grouped, per_flight, rtol=1e-9, atol=1e-9 * grouped.max())

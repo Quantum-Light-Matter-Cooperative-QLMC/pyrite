@@ -2,7 +2,7 @@
 detectors/grating.py
 
 EXPLORATORY forward model for a grazing-incidence soft X-ray diffraction grating
-spectrometer (TODO P3 #8): disperse the model's PXR+CBS line spectrum across a
+spectrometer (TODO P3 #8): disperse the model's PXR+CBS CXR spectrum across a
 position-sensitive detector (Eagle XO CCD or similar) so a *spatial* image can be
 compared to experiment, instead of an energy spectrum at a fixed take-off angle.
 
@@ -28,7 +28,7 @@ onto a fixed pixel grid sized to the greateyes ALEX-s 1k256/2k512 formats --
 geometry only (no QE, charge-sharing, or energy resolution yet).
 
 `detected_image` (phased-plan step 4) is the single combined forward-model
-entry: `mc_spectrum` output + a `Grating` + a `SimpleCCD` -> the dispersed,
+entry: `mc_cxr_spectrum` output + a `Grating` + a `SimpleCCD` -> the dispersed,
 detected image (counts vs pixel), chaining `disperse_spectrum` and
 `bin_to_pixels` so it slots in beside the Timepix / Eagle XO detector models.
 
@@ -370,8 +370,8 @@ def detected_image(
     beta_ref_rad=None,
     center_mm=None,
 ):
-    """Combined forward-model entry (phased-plan step 4): the model's `mc_spectrum`
-    (or `mc_spectrum_solid_angle`) output on ``E_grid_eV`` + a ``grating`` + a
+    """Combined forward-model entry (phased-plan step 4): the model's `mc_cxr_spectrum`
+    (or `mc_cxr_spectrum_solid_angle`) output on ``E_grid_eV`` + a ``grating`` + a
     ``ccd`` (`SimpleCCD`) -> the dispersed, DETECTED image (counts vs pixel), by
     chaining `disperse_spectrum` then `bin_to_pixels`. So it slots in beside the
     Timepix / Eagle XO detector forward models.
@@ -604,7 +604,7 @@ def detected_image_physical(
     spectrum. That is a single characteristic width for the whole frame, not a
     per-photon energy-dependent blur (the latter would need per-photon
     tracking this module doesn't do) -- a reasonable simplification when one
-    line/band dominates the frame, less so for a broad multi-line spectrum
+    line/band dominates the frame, less so for a broad multi-CXR spectrum
     spanning a wide charge-cloud-sigma range. The blur is applied with
     zero-padded (not periodic) edges, so it is flux-conserving except for
     charge diffusing past the sensor's physical edge pixels -- the same

@@ -1,6 +1,6 @@
 """Per-(reflection, orientation) resonance rows over a case's line pieces.
 
-The shared kinematics behind :mod:`.line_seeds` (incoherent resonance
+The shared kinematics behind :mod:`.cxr_seeds` (incoherent resonance
 populations and kinematic windows) and :mod:`.coherent_windows` (coherent
 windows, #350): one resonance and in-medium denominator per usable piece and
 row, read exactly as the line kernels read them.
@@ -67,7 +67,7 @@ def reflection_rows(
     """Resonance and in-medium denominator of every usable piece, per row.
 
     The shared kinematics behind :func:`resonance_populations` and the
-    coherent window seeds; see :func:`kinematic_line_seeds` for the source
+    coherent window seeds; see :func:`kinematic_cxr_seeds` for the source
     equation and root solver.
 
     Validation: line-window-seeding
@@ -79,7 +79,7 @@ def reflection_rows(
         key: _host(value) if hasattr(value, "shape") else value for key, value in segments.items()
     }
     if segments.get("r_mid") is not None and segments.get("thickness_ang") is not None:
-        from .lines._formation import expand_escape_pieces
+        from .cxr._formation import expand_escape_pieces
 
         segments, _, _, _ = expand_escape_pieces(segments, n_hat, groove=groove)
     gradient = np.asarray(segment_escape_gradient(segments, n_hat, groove=groove), dtype=float)
@@ -111,12 +111,12 @@ def reflection_rows(
     refractive = None
     if band_eV is not None:
         from ...materials.crystal import refractive_index
-        from .lines._kernels import _line_tabulation_grid
+        from .cxr._kernels import _cxr_tabulation_grid
 
         # The kernels' table for an axis spanning band_eV (lines/_setup.py).
         start, stop = float(band_eV[0]), float(band_eV[1])
         pad = 0.2 * (stop - start)
-        table_energy = _line_tabulation_grid(
+        table_energy = _cxr_tabulation_grid(
             CRYSTALS[crystal], list(composition or ()), max(start - pad, 1.0), stop + pad
         )
         refractive = (
@@ -124,7 +124,7 @@ def reflection_rows(
             table_energy,
         )
     if refractive is not None:
-        from .lines._kernels import _in_medium_kinematics
+        from .cxr._kernels import _in_medium_kinematics
 
     lattice = CRYSTALS[crystal]["lattice"]
     rotation = _orientation_R(

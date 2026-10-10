@@ -7,5 +7,5 @@ thickness_ang = { values = [20000.0] }
 energy_keV = { values = [30.0] }
 tilt_deg = { values = [45.0] }
 tilt_azim_deg = { values = [180.0] }
-n_electrons = { values = [100] }
-n_electrons_brem = { values = [100] }
+cxr_trials = { values = [100] }
+brem_trials = { values = [100] }

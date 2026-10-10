@@ -69,16 +69,16 @@ def pick_hue(recs, x, y, panel, hue=None):
     the denser of ``x``/``y`` becomes the line x-axis, the sparser becomes
     ``hue`` (unless ``hue`` is given explicitly), falling back to ``panel``
     if the sparser axis doesn't vary, and finally to the sparser axis itself
-    if nothing else varies (a single line). Returns ``(line_x, hue)``."""
+    if nothing else varies (a single line). Returns ``(cxr_x, hue)``."""
     nx, ny = _ndistinct(recs, x), _ndistinct(recs, y)
-    line_x, other = (x, y) if nx >= ny else (y, x)
+    cxr_x, other = (x, y) if nx >= ny else (y, x)
     if hue is not None:
-        return line_x, hue
+        return cxr_x, hue
     if _ndistinct(recs, other) >= 2:
-        return line_x, other
+        return cxr_x, other
     if _ndistinct(recs, panel) >= 2:
-        return line_x, panel
-    return line_x, other
+        return cxr_x, panel
+    return cxr_x, other
 
 
 # ---- axis/metric display registries (shared with pyrite.plots.mpl.sweeps) --------
@@ -94,9 +94,9 @@ _AXIS_SPECS = {
 
 # Line-characterization maps are meaningless where the line is ill-defined --
 # either near-zero emission OR a broad ramp / a cluster of comparable peaks
-# (low line_quality, see results.line_quality). Gate these by BOTH coherent flux
-# and line_quality. The always-well-defined maps (peak density, coherent_flux,
-# total_flux) and the diagnostic line_quality map itself are never gated.
+# (low cxr_quality, see results.cxr_quality). Gate these by BOTH coherent flux
+# and cxr_quality. The always-well-defined maps (peak density, coherent_flux,
+# total_flux) and the diagnostic cxr_quality map itself are never gated.
 _FLUX_GATED = {"line_eV", "fwhm_eV", "line_frac", "line_flux"}
 
 
@@ -182,7 +182,7 @@ def metric_vs_frame(
     select="quality_line",
     cases=None,
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
     metrics=None,
 ):
     """Tidy long-form table for a 1-D metric scan: one row per (hue value, x value),
@@ -199,7 +199,7 @@ def metric_vs_frame(
         return pd.DataFrame(columns=["x", "metric", "hue"])
     x = _effective_x(recs, x, hue)
     if metrics is None:
-        metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
+        metrics = _metrics_map(recs, settings, rel_prominence, cxr_metric)
     div_x = _AXIS_SPECS.get(x, (None, 1.0))[1]
     rows = []
     for hv in sorted({r["case"][hue] for r in recs}):
@@ -228,9 +228,9 @@ def heatmap_frame(
     select="quality_line",
     cases=None,
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
     min_flux_frac=0.02,
-    min_line_quality=0.2,
+    min_cxr_quality=0.2,
     metrics=None,
 ):
     """Tidy long-form table for one heatmap quantity over ``x`` x ``y``, one block
@@ -251,7 +251,7 @@ def heatmap_frame(
     if not recs:
         return pd.DataFrame(columns=cols)
     if metrics is None:
-        metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
+        metrics = _metrics_map(recs, settings, rel_prominence, cxr_metric)
     gated = quantity in _FLUX_GATED
     rows = []
     for pv in sorted({r["case"][panel] for r in recs}):
@@ -266,7 +266,7 @@ def heatmap_frame(
                 best[ck] = (s, r)
         for (xv, yv), (_, r) in best.items():
             m = metrics[id(r)]
-            if gated and (m["coherent_flux"] < floor or m["line_quality"] < min_line_quality):
+            if gated and (m["coherent_flux"] < floor or m["line_quality"] < min_cxr_quality):
                 continue  # near-zero emission / ill-defined line -> blank
             rows.append(
                 {

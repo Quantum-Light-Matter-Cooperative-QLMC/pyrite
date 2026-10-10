@@ -132,16 +132,16 @@ def start_rebrem_queue(
     return jobid
 
 
-def start_reline_queue(
+def start_recxr_queue(
     materials,
-    line_ne=None,
+    cxr_ne=None,
     line_step_eV=None,
     redo_all=False,
     no_sync=False,
     dry_run=False,
     chunk_minutes=10.0,
     fidelity="full",
-    line_start_eV=None,
+    cxr_start_eV=None,
     line_stop_eV=None,
 ):
     """Submit a line-only checkpoint recompute (``pyrite checkpoint recompute
@@ -161,27 +161,27 @@ def start_reline_queue(
     stems = list(materials)
     chunked = chunk_minutes > 0
     if chunked:
-        payload = scripts._reline_chunked_queue_script(
+        payload = scripts._recxr_chunked_queue_script(
             jobid,
             materials,
-            line_ne,
+            cxr_ne,
             line_step_eV,
             redo_all,
             chunk_minutes,
             fidelity,
-            line_start_eV,
+            cxr_start_eV,
             line_stop_eV,
         )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
     else:
-        payload = scripts._reline_queue_script(
+        payload = scripts._recxr_queue_script(
             jobid,
             materials,
-            line_ne,
+            cxr_ne,
             line_step_eV,
             redo_all,
             fidelity,
-            line_start_eV,
+            cxr_start_eV,
             line_stop_eV,
         )
         time_limit = config.SLURM_TIME
@@ -195,14 +195,14 @@ def start_reline_queue(
     )
     upload = scripts._write_job_script_command(
         jobdir,
-        scripts._reline_queue_metadata(
+        scripts._recxr_queue_metadata(
             jobid,
             materials,
-            line_ne,
+            cxr_ne,
             line_step_eV,
             redo_all,
             fidelity,
-            line_start_eV,
+            cxr_start_eV,
             line_stop_eV,
         ),
     )
@@ -211,7 +211,7 @@ def start_reline_queue(
     if dry_run:
         print(
             f"# reline job {jobid}: {' '.join(materials)} "
-            f"line_ne={line_ne} line_step={line_step_eV} redo_all={redo_all}"
+            f"cxr_ne={cxr_ne} line_step={line_step_eV} redo_all={redo_all}"
         )
         print(f"# --- ssh {config.remote_host()}: {upload} <<\n")
         print(script)
@@ -233,14 +233,14 @@ def start_reline_queue(
                 (
                     "Mode",
                     presentation.mode_summary(
-                        scripts._reline_queue_metadata(
+                        scripts._recxr_queue_metadata(
                             jobid,
                             materials,
-                            line_ne,
+                            cxr_ne,
                             line_step_eV,
                             redo_all,
                             fidelity,
-                            line_start_eV,
+                            cxr_start_eV,
                             line_stop_eV,
                         )
                     ),
@@ -253,3 +253,17 @@ def start_reline_queue(
         )
     )
     return jobid
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {"start_reline_queue": "start_recxr_queue"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

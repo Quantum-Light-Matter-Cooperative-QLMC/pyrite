@@ -23,7 +23,7 @@ scheduled removals.
 Physics identity is carried by the model markers, not by the release version.
 A PR that changes default numerical output bumps the relevant `*_MODEL` marker
 (for example `STOPPING_MODEL`, `CHARACTERISTIC_MODEL`, `BREMSSTRAHLUNG_MODEL`,
-`LINE_ESCAPE_MODEL`, `COHERENT_POPULATION_MODEL`) or `tables-*-N` table tag
+`CXR_ESCAPE_MODEL`, `COHERENT_POPULATION_MODEL`) or `tables-*-N` table tag
 **in the same PR**. The release version only bundles markers; it never replaces
 them.
 

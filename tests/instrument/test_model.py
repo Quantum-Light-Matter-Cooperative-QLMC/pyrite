@@ -133,7 +133,7 @@ def test_pixel_scorer_requires_physical_pixels_and_bounded_angular_shape() -> No
 
 def test_physical_detector_projects_to_unchanged_case_schema() -> None:
     scene = _scene()
-    case = api.build_case(scene, pr.Numerics(n_electrons=1, n_electrons_brem=1))
+    case = api.build_case(scene, pr.Numerics(cxr_trials=1, brem_trials=1))
 
     assert case.theta_obs_rad == pytest.approx(0.0)
     assert "filters" not in case.to_dict()
@@ -164,7 +164,7 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
     kwargs = dict(
         filters=(plate,),
         pixel_scorer=pr.PixelScorer(),
-        numerics=pr.Numerics(n_electrons=1, n_electrons_brem=1),
+        numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
     )
     result = pr.simulate(
         pr.Beam(30.0),
@@ -251,7 +251,7 @@ def test_acquisition_enabled_simulation_exposes_layered_identity(monkeypatch) ->
         measured_edges_eV=(0.0, 500.0, 1_000.0),
     )
     kwargs = dict(
-        numerics=pr.Numerics(n_electrons=1, n_electrons_brem=1),
+        numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
         pixel_scorer=pr.PixelScorer((1, 1)),
     )
     first = pr.simulate(

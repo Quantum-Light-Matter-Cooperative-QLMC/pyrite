@@ -124,11 +124,11 @@ def test_perf_chunk_pins_exported_before_runtime_import(monkeypatch):
     seen = {}
 
     def capture(args):
-        seen["spec"] = os.environ.get("PYRITE_MC_SPEC_CHUNK")
+        seen["spec"] = os.environ.get("PYRITE_MC_CXR_CHUNK")
         seen["brem"] = os.environ.get("PYRITE_MC_BREM_CHUNK")
 
     monkeypatch.setattr(scan, "run", capture)
-    monkeypatch.delenv("PYRITE_MC_SPEC_CHUNK", raising=False)
+    monkeypatch.delenv("PYRITE_MC_CXR_CHUNK", raising=False)
     monkeypatch.delenv("PYRITE_MC_BREM_CHUNK", raising=False)
     result = CliRunner().invoke(
         performance_command,

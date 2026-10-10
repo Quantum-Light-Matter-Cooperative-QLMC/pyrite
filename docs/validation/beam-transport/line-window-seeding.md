@@ -1,6 +1,6 @@
 # `line-window-seeding`
 
-Ledger row: [`line-window-seeding`](../ledger-core-coherent-physics.md#line-window-seeding). Code under review: `src/pyrite/montecarlo/spectrum/line_seeds.py` (`kinematic_line_seeds`, `absorption_edge_seeds`, `characteristic_line_seeds`) and `src/pyrite/_line_windows.py::build_window_plan`. Acceptance evidence the row cites: [line-spectrum error budget](line-spectrum-error-budget.md).
+Ledger row: [`line-window-seeding`](../ledger-core-coherent-physics.md#line-window-seeding). Code under review: `src/pyrite/montecarlo/spectrum/cxr_seeds.py` (`kinematic_cxr_seeds`, `absorption_edge_seeds`, `characteristic_line_seeds`) and `src/pyrite/_cxr_windows.py::build_window_plan`. Acceptance evidence the row cites: [line-spectrum error budget](line-spectrum-error-budget.md).
 
 Initial fresh-context verification, 2026-09-17. The derivation below was written from the ledger row, the docstrings, and the cited upstream rows before the function bodies were read. No implementation file was modified.
 
@@ -8,7 +8,7 @@ The initial `discrepancy` verdict records the pre-fix implementation. Section 6 
 
 ## Initial verdict summary (pre-fix)
 
-- **Claim**: `line-window-seeding`. Code: `montecarlo/spectrum/line_seeds.py::kinematic_line_seeds`, `::absorption_edge_seeds`, `::characteristic_line_seeds`, and `_line_windows.py::build_window_plan`. Source: the vacuum resonance of `line-energy-dispersion` (Zhai SI Eq. 10), the finite-time width of `finite-time-lineshape`, $\mu$ from `absorption-length`, and xraydb lines from `characteristic-radiation`.
+- **Claim**: `line-window-seeding`. Code: `montecarlo/spectrum/cxr_seeds.py::kinematic_cxr_seeds`, `::absorption_edge_seeds`, `::characteristic_line_seeds`, and `_cxr_windows.py::build_window_plan`. Source: the vacuum resonance of `line-energy-dispersion` (Zhai SI Eq. 10), the finite-time width of `finite-time-lineshape`, $\mu$ from `absorption-length`, and xraydb lines from `characteristic-radiation`.
 - **Filters**: units pass; limiting cases pass (both); signs and conventions pass.
 - **Re-derivation**: `differs` on two stated properties. The kernel conventions match exactly.
   1. The per-segment offset between the vacuum and in-medium resonance is $\Delta E\simeq -E\,\delta\,\beta\cos\Theta/(1-\beta\cos\Theta)$. The docstring calls this "$O(\delta)\sim10^{-5}$ relative, inside the `tail_widths` margin". Its ratio to the margin $\tau\,w_\varepsilon$ has no $O(\delta)$ bound. It is measured at up to $5.4\,w_\varepsilon$ against a margin of $2\,w_\varepsilon$, above 300 eV, on hopg 300 keV tilt 85.
@@ -113,11 +113,11 @@ The attenuation that the kernels apply is $\mu=2r_e\lambda\sum_in_if_{2,i}$, wit
 
 ### Check 1: seed rows and velocity convention match the kernels
 
-| Item | Seeds (`line_seeds.py`) | Kernels | Match |
+| Item | Seeds (`cxr_seeds.py`) | Kernels | Match |
 | --- | --- | --- | --- |
 | energy field | `E_repr_keV` else `E_keV` (l. 159) | same (`lines/_setup.py:255`) | yes |
 | velocity | `beta_from_keV(E)[:,None]*v_hat` (l. 166–167) | `beta_all[:, None] * seg_v` (`_setup.py:262–263`) | yes |
-| electron subset | `elec_id < electron_limit` (l. 163–165); runner passes `Ne` (`runner/line_grid.py:95`) | `seg_elec_id < Ne` (`_setup.py:261`) | yes |
+| electron subset | `elec_id < electron_limit` (l. 163–165); runner passes `Ne` (`runner/cxr_grid.py:95`) | `seg_elec_id < Ne` (`_setup.py:261`) | yes |
 | orientation | `_orientation_R(lattice, beam_uvw, azimuth_rad, recip_miscut_rad, surface_hkl=)` (l. 187–189); same case/radiator fallbacks (l. 439–444) | same call (`_setup.py:203–209`); runner keys (`runner/__init__.py:651–655, 672–692`) | yes |
 | row order | `mosaic_rotation @ (rotation @ g_hkl)`, weight `mosaic_weight` (l. 194–204) | `R_m @ (R_orient @ g_vec)`, `wm` (`_per_hkl.py:661–673`; `_batched.py:231–243`) | yes |
 | mosaic quadrature | `_mosaic_quadrature(case["mosaic_mc_fwhm_rad"], case["mosaic_mc_nodes"])` | same helper and keys (`_setup.py:466`) | yes |
@@ -142,7 +142,7 @@ The implementation seeds from the vacuum root (l. 201), exactly as documented. T
 
 The rule is at l. 227–234: `share == 0.0 or dropped_weight + share <= epsilon * total` over the reflections sorted ascending, stopping at the first failure. The quantiles use `searchsorted(..., side="left")` (l. 80–85) at $(\varepsilon/2,\,1/2,\,1-\varepsilon/2)$ (l. 240–244). This is exactly the construction of §1.4, so $U<2\varepsilon W$. A randomized check ran 300 synthetic populations with six reflections and $\varepsilon\in\{10^{-3},10^{-2},0.05,0.2\}$, using a margin of essentially zero. The largest value of $U/(2\varepsilon W)$ was 0.93. The bound held and was nearly tight. **Verdict: pass**, with the in-band normalization caveat of §1.4.
 
-A robustness finding, not physics: `_line_grid_policy` accepts `tail_widths = 0` (l. 345–347). A reflection whose radiating population is a single value, or all coincident values, then produces `below_eV = above_eV = 0`, and `FeatureSeed` raises `has an empty window and no anchor`. The failure was reproduced with `tail_widths=0.0` in the randomized check.
+A robustness finding, not physics: `_cxr_grid_policy` accepts `tail_widths = 0` (l. 345–347). A reflection whose radiating population is a single value, or all coincident values, then produces `below_eV = above_eV = 0`, and `FeatureSeed` raises `has an empty window and no anchor`. The failure was reproduced with `tail_widths=0.0` in the randomized check.
 
 ### Check 4: Chantler bracket versus xraydb edge energy
 
@@ -186,7 +186,7 @@ An enumeration over all 26 catalog crystal elements compared the kernel's line s
 ### Limiting cases (`build_window_plan`)
 
 - **Single straight flight.** The quantiles collapse to $E_0$. The window is $E_0\pm\tau w$ at spacing $w/8$, and the reflection is never dropped, since $W_r\le\varepsilon W_r$ is impossible for $\varepsilon<1$. This is confirmed by the independent numeric point above (half-extents $1.6=2\times0.8$ eV, spacing 0.1 eV) and by `test_single_flight_window_is_centred_on_the_closed_form_resonance`. **Pass.**
-- **No seeds.** The breakpoints are $\{\texttt{start},\texttt{stop}\}$, giving one piece at the backbone spacing. `coordinates()` returns `np.linspace(start, stop, resolution_num(...))` (`_line_windows.py:159–165, 228–235`). Across 2000 random $(\texttt{start},\texttt{stop},h)$ triples there were zero mismatches with `np.array_equal`. **Pass.**
+- **No seeds.** The breakpoints are $\{\texttt{start},\texttt{stop}\}$, giving one piece at the backbone spacing. `coordinates()` returns `np.linspace(start, stop, resolution_num(...))` (`_cxr_windows.py:159–165, 228–235`). Across 2000 random $(\texttt{start},\texttt{stop},h)$ triples there were zero mismatches with `np.array_equal`. **Pass.**
 
 ### Tests
 
@@ -237,7 +237,7 @@ Human sign-off remains required.
 
 Fresh-context re-verification on 2026-09-17 started again from the cited source equations, units, assumptions, and limiting cases before inspecting the remediated implementation. No implementation file was modified.
 
-- **Claim**: `line-window-seeding` — `montecarlo/spectrum/line_seeds.py::kinematic_line_seeds`, `::absorption_edge_seeds`, and `::characteristic_line_seeds`. The governing equations are the in-medium resonance $E_{\rm res}=\hbar c\,(\mathbf v\cdot\mathbf g)/ (1-\operatorname{Re}n(E_{\rm res})\,\mathbf v\cdot\hat{\mathbf n})$ and the finite-time first-zero width $2\pi\hbar c/(D t_L)$, together with the Chantler $f_2$ edge brackets and xraydb characteristic energies and widths.
+- **Claim**: `line-window-seeding` — `montecarlo/spectrum/cxr_seeds.py::kinematic_cxr_seeds`, `::absorption_edge_seeds`, and `::characteristic_line_seeds`. The governing equations are the in-medium resonance $E_{\rm res}=\hbar c\,(\mathbf v\cdot\mathbf g)/ (1-\operatorname{Re}n(E_{\rm res})\,\mathbf v\cdot\hat{\mathbf n})$ and the finite-time first-zero width $2\pi\hbar c/(D t_L)$, together with the Chantler $f_2$ edge brackets and xraydb characteristic energies and widths.
 - **Filters**: units pass; limiting cases pass; signs and conventions pass, conditional on the repository's inherited positive-$\mathbf g$ convention. This claim does not resolve the separate `line-energy-dispersion` harmonic-sign discrepancy.
 - **Re-derivation**: `matches`. Production passes the case band and composition into kinematic seeding; seeding builds the kernels' padded native-node table, calls their `_in_medium_kinematics`, rejects the same unsettled roots, and derives feature widths from the same denominator as `a_width`. The independent pointwise-Brent regression pins the in-medium centre.
 - **Secondary-edge remediation**: `matches`. Shells are processed strongest first, but each weaker shell selects the strongest qualifying bracket outside already claimed native-node windows. The Se L2 regression pins the previously omitted nearby edge; independent probes also found W M4/L1 and Mo/Ga/As/Ti L2 anchors within 0.24% of their nominal edges.

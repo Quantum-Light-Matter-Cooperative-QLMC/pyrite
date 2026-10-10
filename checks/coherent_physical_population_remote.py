@@ -53,7 +53,7 @@ def _require_gpu():
 
 
 def _gpu_limits():
-    from pyrite.montecarlo import mc_spectrum
+    from pyrite.montecarlo import mc_cxr_spectrum
     from pyrite.montecarlo.spectrum.coherent_population import CoherentSamplingError
 
     energy = np.arange(700.0, 1500.0, 2.0)
@@ -74,7 +74,7 @@ def _gpu_limits():
         }
 
     def spectrum(segments, population):
-        return mc_spectrum(
+        return mc_cxr_spectrum(
             segments,
             energy,
             "hopg",
@@ -184,7 +184,7 @@ def _replay_transport(record_path, config, stamp):
 
 def run(args):
     from pyrite._backend import BACKEND, REAL, _to_cpu
-    from pyrite._line_windows import FeatureSeed, build_window_plan
+    from pyrite._cxr_windows import FeatureSeed, build_window_plan
     from pyrite.energy_grid.convergence import require_identical_segments, spectrum_observables
     from pyrite.energy_grid.convergence_case import CaseLadder
     from pyrite.montecarlo import runner

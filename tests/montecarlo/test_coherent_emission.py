@@ -10,7 +10,7 @@ from pyrite.materials.crystal import (
     beta_from_Ee,
     reciprocal_g_vector,
 )
-from pyrite.montecarlo import mc_spectrum
+from pyrite.montecarlo import mc_cxr_spectrum
 from pyrite.montecarlo.transport import C_ANG_PER_FS
 from tests.helpers import scaled_rtol
 
@@ -131,7 +131,7 @@ def _constant_velocity_field(segments, energy_eV):
 
 
 def test_single_segment_coherent_equals_incoherent_self_term(monkeypatch):
-    from pyrite.montecarlo.spectrum.lines import _setup
+    from pyrite.montecarlo.spectrum.cxr import _setup
 
     # Constant-index limit: full delta(E) has a derivative Jacobian, separately
     # pinned by test_dispersive_formation_integral_has_the_derivative_jacobian.
@@ -142,8 +142,8 @@ def test_single_segment_coherent_equals_incoherent_self_term(monkeypatch):
     )
     segments = _segments()
 
-    incoherent = mc_spectrum(segments, E_GRID, coherent=False, **KWARGS)
-    coherent = mc_spectrum(segments, E_GRID, coherent=True, **KWARGS)
+    incoherent = mc_cxr_spectrum(segments, E_GRID, coherent=False, **KWARGS)
+    coherent = mc_cxr_spectrum(segments, E_GRID, coherent=True, **KWARGS)
     # Parseval gives the same energy yield in this constant-index limit.
     # Full delta(E) instead carries the derivative Jacobian documented and
     # anchored under xray-in-medium-resonance.
@@ -157,11 +157,11 @@ def test_single_segment_coherent_equals_incoherent_self_term(monkeypatch):
 def test_coherent_decoherence_blend_matches_reference_formula():
     """Two electrons with distinct longitudinal offsets: the coherent output
     must equal the closed-form blend (1-F)*sum_e|S_e|^2 + F*|sum_e S_e|^2.
-    Both reference terms come from mc_spectrum itself on ALREADY-validated
+    Both reference terms come from mc_cxr_spectrum itself on ALREADY-validated
     (offset-free, decoherence-inactive) sub-cases: the fully-coherent flat
-    term is mc_spectrum on the same two electrons with t0_ang=0 (the
+    term is mc_cxr_spectrum on the same two electrons with t0_ang=0 (the
     degenerate limit locked in by test_identical_in_phase_electrons_reach_
-    n_squared_limit), and the intra-electron floor is the SUM of mc_spectrum
+    n_squared_limit), and the intra-electron floor is the SUM of mc_cxr_spectrum
     on each electron alone (Ne=1, always trivially self-coherent, per
     test_single_segment_coherent_equals_incoherent_self_term). F is the
     empirical characteristic function of the actual t0 offsets, computed
@@ -176,15 +176,15 @@ def test_coherent_decoherence_blend_matches_reference_formula():
         # decoherence_active rejects the finite-footprint branch (out of
         # scope, see the rejection test below); an apples-to-apples
         # comparison also needs the SAME footprint setting on every one of
-        # this test's three mc_spectrum calls, active or not.
+        # this test's three mc_cxr_spectrum calls, active or not.
         segs.update(crystal_width_ang=None, crystal_height_ang=None)
         return segs
 
     active = _no_footprint(_segments(2))
     active.update(t0_ang=t0_values, initial_t0_ang=t0_values, initial_r_ang=np.zeros((2, 3)))
-    actual = mc_spectrum(active, energy_grid, coherent=True, **KWARGS)
+    actual = mc_cxr_spectrum(active, energy_grid, coherent=True, **KWARGS)
 
-    # mc_spectrum divides its row sum by Ne exactly once, at the very end --
+    # mc_cxr_spectrum divides its row sum by Ne exactly once, at the very end --
     # AFTER the (1-F)*grouped + F*flat blend, not per term. So the two
     # reference terms must be un-normalized back to that same RAW (pre-/Ne)
     # scale before blending: flat_ref's own Ne=2 call already divided by 2
@@ -192,10 +192,11 @@ def test_coherent_decoherence_blend_matches_reference_formula():
     # their sum is already the raw sum_e|S_e|^2.
     ne_total = active["Ne"]
     flat_raw = (
-        mc_spectrum(_no_footprint(_segments(2)), energy_grid, coherent=True, **KWARGS) * ne_total
+        mc_cxr_spectrum(_no_footprint(_segments(2)), energy_grid, coherent=True, **KWARGS)
+        * ne_total
     )
     grouped_raw = sum(
-        mc_spectrum(_no_footprint(_segments(1)), energy_grid, coherent=True, **KWARGS)
+        mc_cxr_spectrum(_no_footprint(_segments(1)), energy_grid, coherent=True, **KWARGS)
         for _ in range(2)
     )
 
@@ -254,15 +255,15 @@ def test_coherent_decoherence_blend_holds_on_the_per_hkl_route(sinc_cutoff):
 
     active = _flat(2)
     active.update(t0_ang=t0_values, initial_t0_ang=t0_values, initial_r_ang=np.zeros((2, 3)))
-    actual = mc_spectrum(active, energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs)
+    actual = mc_cxr_spectrum(active, energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs)
 
     ne_total = active["Ne"]
     flat_raw = (
-        mc_spectrum(_flat(2), energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs)
+        mc_cxr_spectrum(_flat(2), energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs)
         * ne_total
     )
     grouped_raw = sum(
-        mc_spectrum(_flat(1), energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs)
+        mc_cxr_spectrum(_flat(1), energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs)
         for _ in range(2)
     )
     omega = energy_grid / HBARC_EV_ANG
@@ -284,9 +285,9 @@ def test_coherent_decoherence_inactive_by_default():
     the coherent-inter-electron-decoherence change itself."""
     segments = _segments(2)
     assert "initial_t0_ang" not in segments and "initial_r_ang" not in segments
-    coherent = mc_spectrum(segments, E_GRID, coherent=True, **KWARGS)
+    coherent = mc_cxr_spectrum(segments, E_GRID, coherent=True, **KWARGS)
     np.testing.assert_array_equal(
-        coherent, mc_spectrum(_segments(2), E_GRID, coherent=True, **KWARGS)
+        coherent, mc_cxr_spectrum(_segments(2), E_GRID, coherent=True, **KWARGS)
     )
 
 
@@ -307,7 +308,7 @@ def test_long_gaussian_bunch_supports_finite_footprint():
     )
     assert segments["crystal_width_ang"] is not None
     assert segments["crystal_height_ang"] is not None
-    actual = mc_spectrum(
+    actual = mc_cxr_spectrum(
         segments,
         E_GRID,
         coherent=True,
@@ -315,7 +316,7 @@ def test_long_gaussian_bunch_supports_finite_footprint():
         **KWARGS,
     )
     grouped_raw = sum(
-        mc_spectrum(
+        mc_cxr_spectrum(
             {**_segments(1), "r_mid": position[None, :]},
             E_GRID,
             coherent=True,
@@ -342,7 +343,7 @@ def test_finite_footprint_partially_coherent_longitudinal_blend():
         initial_t0_ang=np.array([137.0, -412.0]),
         initial_r_ang=np.zeros((2, 3)),
     )
-    actual = mc_spectrum(
+    actual = mc_cxr_spectrum(
         segments,
         energy_grid,
         coherent=True,
@@ -351,7 +352,7 @@ def test_finite_footprint_partially_coherent_longitudinal_blend():
     )
 
     flat_raw = (
-        mc_spectrum(
+        mc_cxr_spectrum(
             {**_segments(2), "r_mid": positions},
             energy_grid,
             coherent=True,
@@ -360,7 +361,7 @@ def test_finite_footprint_partially_coherent_longitudinal_blend():
         * 2.0
     )
     grouped_raw = sum(
-        mc_spectrum(
+        mc_cxr_spectrum(
             {**_segments(1), "r_mid": position[None, :]},
             energy_grid,
             coherent=True,
@@ -393,12 +394,12 @@ def test_finite_footprint_transverse_offsets_need_a_recorded_spot():
         initial_r_ang=np.array([[1.0, 0.0, 0.0], [-2.0, 0.0, 0.0]]),
     )
     with pytest.raises(ValueError, match="recorded Gaussian beam spot"):
-        mc_spectrum(segments, E_GRID, coherent=True, longitudinal_rms_fs=1.0e-3, **KWARGS)
+        mc_cxr_spectrum(segments, E_GRID, coherent=True, longitudinal_rms_fs=1.0e-3, **KWARGS)
 
 
 def test_identical_in_phase_electrons_reach_n_squared_limit():
-    single = mc_spectrum(_segments(), E_GRID, coherent=True, **KWARGS)
-    pair = mc_spectrum(_segments(2), E_GRID, coherent=True, **KWARGS)
+    single = mc_cxr_spectrum(_segments(), E_GRID, coherent=True, **KWARGS)
+    pair = mc_cxr_spectrum(_segments(2), E_GRID, coherent=True, **KWARGS)
 
     # Field doubles, intensity quadruples, then per-electron /Ne normalization
     # leaves twice the one-electron yield.
@@ -417,7 +418,7 @@ SPLIT_RESIDUAL_TOL = max(1e-12, 1000.0 * float(np.finfo(REAL).eps))
 def _split_residual(length, sinc_cutoff):
     energy_grid = np.arange(1050.0, 1400.0, 0.5)
     spectra = [
-        mc_spectrum(
+        mc_cxr_spectrum(
             _straight_flight_segments(split=split, reference=True, length=length),
             energy_grid,
             coherent=True,
@@ -484,8 +485,10 @@ def test_straight_trajectory_segments_are_in_phase_at_resonance(sinc_cutoff):
     single["Ne"] = 1
 
     energy_grid = target_energy + np.array([-1.0, 0.0, 1.0])
-    one_segment = mc_spectrum(single, energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **KWARGS)
-    two_segments = mc_spectrum(
+    one_segment = mc_cxr_spectrum(
+        single, energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **KWARGS
+    )
+    two_segments = mc_cxr_spectrum(
         segments, energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **KWARGS
     )
 
@@ -504,8 +507,8 @@ def test_batched_coherent_matches_legacy_per_hkl_reference():
     """
     segments = _segments(2)
 
-    batched = mc_spectrum(segments, E_GRID, coherent=True, sinc_cutoff=None, **KWARGS)
-    legacy = mc_spectrum(segments, E_GRID, coherent=True, sinc_cutoff=1.0e6, **KWARGS)
+    batched = mc_cxr_spectrum(segments, E_GRID, coherent=True, sinc_cutoff=None, **KWARGS)
+    legacy = mc_cxr_spectrum(segments, E_GRID, coherent=True, sinc_cutoff=1.0e6, **KWARGS)
 
     _assert_batch_close(batched, legacy)
 
@@ -518,7 +521,7 @@ def test_coherent_reflections_remain_incoherent_under_batching():
 
     singles = []
     for hkl in hkls:
-        spec = mc_spectrum(
+        spec = mc_cxr_spectrum(
             segments,
             energy_grid,
             coherent=True,
@@ -527,7 +530,7 @@ def test_coherent_reflections_remain_incoherent_under_batching():
         assert np.max(spec) > 0.0
         singles.append(spec)
 
-    together = mc_spectrum(
+    together = mc_cxr_spectrum(
         segments,
         energy_grid,
         coherent=True,
@@ -539,7 +542,7 @@ def test_coherent_reflections_remain_incoherent_under_batching():
 
 def test_coherent_components_are_rejected():
     with pytest.raises(ValueError, match="incompatible with components"):
-        mc_spectrum(_segments(), E_GRID, coherent=True, components=True, **KWARGS)
+        mc_cxr_spectrum(_segments(), E_GRID, coherent=True, components=True, **KWARGS)
 
 
 def _runner_case(*, coherent=False):
@@ -585,19 +588,19 @@ def test_runner_always_stores_incoherent_spec_and_omits_spec_coherent(monkeypatc
     out = runner._spectrum_case_impl(_runner_case(), tp)
 
     assert "spec_coherent" not in out
-    direct_incoherent = mc_spectrum(segs, E_GRID, coherent=False, **KWARGS)
+    direct_incoherent = mc_cxr_spectrum(segs, E_GRID, coherent=False, **KWARGS)
     np.testing.assert_allclose(out["spec"], direct_incoherent, rtol=RTOL)
 
 
 def test_runner_dual_spectra_from_one_transport(monkeypatch):
     """emission includes coherent: ONE transport (`tp["segs"]`) yields both the
     incoherent `spec` and a `spec_coherent`, each matching a direct
-    `mc_spectrum` on the SAME segments -- the single-transport / dual-kernel
+    `mc_cxr_spectrum` on the SAME segments -- the single-transport / dual-kernel
     invariant."""
     # Both accumulation routes tabulate reflections through `_kernels`, so that
     # is the one place a tabulation counter sees every evaluation.
     import pyrite.montecarlo.runner as runner
-    from pyrite.montecarlo.spectrum.lines import _kernels as line_kernels
+    from pyrite.montecarlo.spectrum.cxr import _kernels as line_kernels
 
     monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
     monkeypatch.setattr(
@@ -621,10 +624,10 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
     # One tabulation covers every reflection and serves both kernels.
     assert tabulated == [len(KWARGS["hkl_list"])]
 
-    direct_incoherent = mc_spectrum(segs, E_GRID, coherent=False, **KWARGS)
+    direct_incoherent = mc_cxr_spectrum(segs, E_GRID, coherent=False, **KWARGS)
     from scipy.constants import elementary_charge
 
-    direct_coherent = mc_spectrum(
+    direct_coherent = mc_cxr_spectrum(
         segs, E_GRID, coherent=True, physical_electrons=1e-12 / elementary_charge, **KWARGS
     )
 

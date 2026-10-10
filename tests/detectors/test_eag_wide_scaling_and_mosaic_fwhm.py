@@ -4,7 +4,7 @@ import numpy as np
 
 from pyrite.detectors import eaglexo_response as eag
 from pyrite.plots.mpl.detectors import _eag_wide_brem, _eag_wide_charge
-from pyrite.results import line_fwhm_eV
+from pyrite.results import cxr_fwhm_eV
 
 
 def _wide_brem_record():
@@ -46,8 +46,8 @@ def test_line_fwhm_eV_adds_capped_mosaic_term_in_quadrature():
         "tilt_deg": 30.0,
     }
 
-    perfect = line_fwhm_eV(case, E_pk=5000.0, mosaic_rad=None)
-    mosaic = line_fwhm_eV(case, E_pk=5000.0, mosaic_rad=np.deg2rad(3.5))
+    perfect = cxr_fwhm_eV(case, E_pk=5000.0, mosaic_rad=None)
+    mosaic = cxr_fwhm_eV(case, E_pk=5000.0, mosaic_rad=np.deg2rad(3.5))
 
     assert perfect > 0
     assert mosaic >= perfect
@@ -63,6 +63,6 @@ def test_line_fwhm_eV_uses_the_explicit_mosaic_grade():
         "tilt_deg": 30.0,
     }
 
-    assert line_fwhm_eV(case, E_pk=5000.0, mosaic_rad=None) < line_fwhm_eV(
+    assert cxr_fwhm_eV(case, E_pk=5000.0, mosaic_rad=None) < cxr_fwhm_eV(
         case, E_pk=5000.0, mosaic_rad=np.deg2rad(0.8)
     )

@@ -11,13 +11,13 @@ import numpy as np
 
 from .._scene_geometry import groove_profile_knots as groove_profile_knots
 from .._scene_geometry import groove_spec as _groove_spec  # noqa: F401
-from .._spectral_components import incident_spectrum, line_spectrum
+from .._spectral_components import cxr_spectrum, incident_spectrum
 from ..detectors import Detector, EagleXO, LegacyEDS, Timepix3
 from ..detectors import eaglexo_response as eag
 from ..detectors import timepix_response as tpx
 from ..montecarlo.groove import surface_depth_ang
 from ..results import detected_background
-from ..results.metrics import _LINE_METRICS_CACHE, _cached_line_metrics  # noqa: F401
+from ..results.metrics import _CXR_METRICS_CACHE, _cached_cxr_metrics  # noqa: F401
 
 # cache of the (expensive) Timepix efficiency-curve response, keyed by hardware +
 # MC settings, so re-running the detector cell with unchanged settings doesn't
@@ -35,7 +35,7 @@ def _mode(settings):
 def _peak_line(r):
     """Response-free source line peak of one record -- the azimuth-selection key
     (strongest line wins)."""
-    return float(np.max(line_spectrum(r)))
+    return float(np.max(cxr_spectrum(r)))
 
 
 def _best_azimuth(grp, collapse_azimuth):
@@ -67,17 +67,17 @@ def _case_title(case, tail="", *, latex=True, e0_keV=None, tilt_fmt="0.1f"):
     return f"{head} -- {tail}" if tail else head
 
 
-def _metrics_map(recs, settings, rel_prominence, line_metric):
-    """``id(rec) -> line_metrics(rec)`` for every record -- the same per-record
+def _metrics_map(recs, settings, rel_prominence, cxr_metric):
+    """``id(rec) -> cxr_metrics(rec)`` for every record -- the same per-record
     metric dict every sweep draw (matplotlib and altair) builds. Computed once
-    per record and cached ACROSS calls (see ``_cached_line_metrics``), so
+    per record and cached ACROSS calls (see ``_cached_cxr_metrics``), so
     re-rendering after a change that doesn't touch these records (e.g. a
     marimo tab re-rendering because an unrelated widget changed) reuses the
     prior peak-finding results instead of redoing them."""
-    return {id(r): _cached_line_metrics(r, settings, rel_prominence, line_metric) for r in recs}
+    return {id(r): _cached_cxr_metrics(r, settings, rel_prominence, cxr_metric) for r in recs}
 
 
-def _line_brem(r, settings, convolve=None):
+def _cxr_brem(r, settings, convolve=None):
     """Detected line and brem densities (per eV, before the unit scale) for one
     record, honoring the QE / brem-source flags. ``convolve`` overrides
     settings.convolve_with_det when given (True/False), so a caller can draw the
@@ -85,9 +85,9 @@ def _line_brem(r, settings, convolve=None):
     side by side."""
     do_conv = getattr(settings, "convolve_with_det", False) if convolve is None else convolve
     detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe, convolve=do_conv))
-    line_det = detector.score(r["E_grid"], line_spectrum(r), fwhm_eV=r["fwhm"])
+    cxr_det = detector.score(r["E_grid"], cxr_spectrum(r), fwhm_eV=r["fwhm"])
     brem_det = detected_background(r, settings, convolve=do_conv) / r["scale"]
-    return line_det, brem_det
+    return cxr_det, brem_det
 
 
 # ---- Timepix3 / Eagle XO detector response prep -------------------------------
@@ -226,3 +226,17 @@ def _beam_phase_space(case):
         transverse_distribution=case.get("transverse_distribution"),
         energy_spread_frac=case.get("energy_spread_frac"),
     )
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {"_line_brem": "_cxr_brem"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

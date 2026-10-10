@@ -219,7 +219,7 @@ def _job_succeeded(jobid: str) -> bool:
     A queue script that hits a failed step does not abort: it continues past
     the failure and records a terminal ``"done with N warning(s) ..."`` state
     (``_queue_scripts._queue_script``/``_chunked_queue_tail``/
-    ``_rebrem_queue_script``/``_reline_queue_script``), distinct from a plain
+    ``_rebrem_queue_script``/``_recxr_queue_script``), distinct from a plain
     ``"done [...]"``. Both start with ``"done"``, so callers gating
     irreversible follow-on work (pulling a cache, installing derived output)
     must not treat a warning-carrying job the same as a fully successful one.

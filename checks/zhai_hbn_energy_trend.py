@@ -19,7 +19,7 @@ from pyrite._backend import BACKEND, REAL
 from pyrite.detectors.response import convolve_detector, detector_efficiency
 from pyrite.materials.crystal import reflection_coupling_tables
 from pyrite.montecarlo import aperture_fwhm_eV, beta_from_keV, eds_fwhm_eV
-from pyrite.montecarlo.spectrum.lines import _kernels, _setup
+from pyrite.montecarlo.spectrum.cxr import _kernels, _setup
 from pyrite.validation import anchor_figures as af
 
 
@@ -74,7 +74,7 @@ def main(argv=None):
     published_conditions = study.conditions_for(921.0)
     study = replace(study, conditions_by_thickness_nm=((args.thickness_nm, published_conditions),))
     conditions = iter(published_conditions)
-    original = af.mc_spectrum
+    original = af.mc_cxr_spectrum
     rows = []
     arrays = {"energy_eV": study.E_grid}
 
@@ -146,7 +146,7 @@ def main(argv=None):
         print(f"{condition.energy_keV:g} keV: factor diagnostics complete", flush=True)
         return variants["baseline"]
 
-    with patch.object(af, "mc_spectrum", measure):
+    with patch.object(af, "mc_cxr_spectrum", measure):
         af.model_coherent_spectra(study, args.thickness_nm, ne=args.ne)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(

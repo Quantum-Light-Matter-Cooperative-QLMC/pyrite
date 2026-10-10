@@ -1,5 +1,5 @@
 """Tests for the many-knob sweep faceting (P3 #9): results.results_dataframe +
-plots.facet_metric. Synthetic results, CPU-only (no mc_spectrum)."""
+plots.facet_metric. Synthetic results, CPU-only (no mc_cxr_spectrum)."""
 
 import matplotlib
 import numpy as np

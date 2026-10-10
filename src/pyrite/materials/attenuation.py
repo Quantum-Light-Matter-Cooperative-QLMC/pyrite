@@ -221,7 +221,7 @@ def _mu_total_inv_ang(comp, E_eV):
 
     The EPDL accessor is CPU-only, so the sum is always computed on the CPU.
     The result is returned on the SAME device as E_eV: a GPU array if the
-    caller passed one (mc_spectrum, mixing it with on-device factors), a numpy
+    caller passed one (mc_cxr_spectrum, mixing it with on-device factors), a numpy
     array otherwise (detector_efficiency, whose output is multiplied into the
     host-side spectra in the notebook). Keying off the input device -- not the
     global _GPU flag -- keeps the CPU post-processing path numpy even when a

@@ -18,15 +18,15 @@ from pyrite.detectors import (
 
 def test_detector_is_frozen_and_owns_acceptance_binning_and_response():
     bins = EnergyBins(
-        line=np.array([75.0, 78.0]),
-        line_by_energy={30.0: np.array([75.0])},
+        cxr=np.array([75.0, 78.0]),
+        cxr_by_energy={30.0: np.array([75.0])},
         brem=np.array([0.0, 100.0]),
     )
     detector = Detector(119.0, 16.6, 0.066, bins, Timepix3(thickness_um=500.0))
 
     payload = asdict(detector)
     assert payload["observation_angle_deg"] == 119.0
-    assert payload["energy_bins"]["line_by_energy"][30.0].tolist() == [75.0]
+    assert payload["energy_bins"]["cxr_by_energy"][30.0].tolist() == [75.0]
     assert payload["response"]["thickness_um"] == 500.0
     for retired in (
         "response_model",

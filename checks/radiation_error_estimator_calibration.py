@@ -26,7 +26,7 @@ from pyrite.montecarlo.spectrum import (
     brem_endpoint_quadrature_error,
     cxr_endpoint_resonance_drift,
     mc_brem_spectrum,
-    mc_spectrum,
+    mc_cxr_spectrum,
 )
 from pyrite.montecarlo.spectrum.diagnostics import _flight_E_end_keV
 from pyrite.montecarlo.transport import simulate_trajectories
@@ -121,8 +121,8 @@ def main():
                     composition=comp,
                     warn_threshold=np.inf,
                 )
-            line_start = mc_spectrum(segments, CXR_GRID, **CXR_KWARGS)
-            line_mid = mc_spectrum(mid, CXR_GRID, **CXR_KWARGS)
+            line_start = mc_cxr_spectrum(segments, CXR_GRID, **CXR_KWARGS)
+            line_mid = mc_cxr_spectrum(mid, CXR_GRID, **CXR_KWARGS)
             cols["drift p50"] = f"{drift['resonance_drift_linewidths']['p50']:.2e}"
             cols["drift p99"] = f"{drift['resonance_drift_linewidths']['p99']:.2e}"
             cols["cxr L1"] = f"{_rel_l1(line_start, line_mid):.2e}"

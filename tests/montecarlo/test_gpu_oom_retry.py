@@ -131,7 +131,7 @@ def test_delayed_runtime_oom_inside_brem_is_phase_tagged(monkeypatch):
     )
     monkeypatch.setattr(
         runner,
-        "_lines_for_segments",
+        "_cxr_for_segments",
         lambda *_args, **_kwargs: np.zeros(2),
     )
     monkeypatch.setattr(
@@ -318,7 +318,7 @@ def test_spectrum_case_emits_nsys_phase_ranges(monkeypatch):
     monkeypatch.setattr(runner, "_nsys_range", record_range)
     monkeypatch.setattr(
         runner,
-        "_lines_for_segments",
+        "_cxr_for_segments",
         lambda *_args, **_kwargs: np.array([1.0, 2.0]),
     )
     monkeypatch.setattr(

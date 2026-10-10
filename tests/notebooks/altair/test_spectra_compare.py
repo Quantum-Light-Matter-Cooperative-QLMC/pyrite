@@ -41,7 +41,7 @@ def _dataset(spec):
 def _settings():
     # apply_detector_qe=False -> no QE table; convolve_with_det=False -> no
     # convolution; brem_source="mc" -> brem reads straight from r["brem"]. This
-    # keeps _line_brem/detected_background on the pure-numpy path.
+    # keeps _cxr_brem/detected_background on the pure-numpy path.
     return SimpleNamespace(
         apply_detector_qe=False,
         convolve_with_det=False,
@@ -183,7 +183,7 @@ def test_selected_components_do_not_expand_dense_chart_payload():
         _settings(),
         hue="E0_keV",
         include_brem=True,
-        include_line=False,
+        include_cxr=False,
         include_characteristic=False,
         sum_components=True,
     )
@@ -192,7 +192,7 @@ def test_selected_components_do_not_expand_dense_chart_payload():
         _settings(),
         hue="E0_keV",
         include_brem=True,
-        include_line=True,
+        include_cxr=True,
         include_characteristic=False,
         sum_components=True,
     )
@@ -216,7 +216,7 @@ def test_selected_components_make_one_additive_spectrum():
             _settings(),
             hue="E0_keV",
             include_brem=brem,
-            include_line=line,
+            include_cxr=line,
             include_characteristic=characteristic,
             sum_components=True,
         )
@@ -240,7 +240,7 @@ def test_case_basket_selected_components_have_one_layer():
         [(record, "HOPG")],
         _settings(),
         include_brem=True,
-        include_line=True,
+        include_cxr=True,
         include_characteristic=False,
         sum_components=True,
     )
@@ -258,7 +258,7 @@ def test_both_emissions_sum_the_same_selected_components():
         _settings(),
         hue="E0_keV",
         include_brem=True,
-        include_line=True,
+        include_cxr=True,
         include_characteristic=True,
         include_coherent=True,
         sum_components=True,
@@ -268,7 +268,7 @@ def test_both_emissions_sum_the_same_selected_components():
         _settings(),
         hue="E0_keV",
         include_brem=False,
-        include_line=True,
+        include_cxr=True,
         include_characteristic=False,
         sum_components=True,
     ).to_dict()

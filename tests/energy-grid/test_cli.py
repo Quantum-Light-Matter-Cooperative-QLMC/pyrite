@@ -316,7 +316,7 @@ def test_click_add_expected_failures_use_stderr(monkeypatch, error, message):
 
 @pytest.mark.parametrize("command_name", ["line", "brem"])
 def test_click_set_expected_domain_failure_uses_stderr(monkeypatch, command_name):
-    target = "set_line_artifact" if command_name == "line" else "set_brem_artifact"
+    target = "set_cxr_artifact" if command_name == "line" else "set_brem_artifact"
     monkeypatch.setattr(
         energy_grid.apply,
         target,
@@ -338,14 +338,14 @@ def test_click_rm_confirmed_repoints_exact_preview(monkeypatch):
     calls = []
     monkeypatch.setattr(_cli_core, "_stdin_is_tty", lambda: True)
 
-    def remove_line_rows(material, energies, **kwargs):
+    def remove_cxr_rows(material, energies, **kwargs):
         calls.append((material, list(energies), kwargs))
         return [30.0, 100.0], "d" * 64
 
     monkeypatch.setattr(
         energy_grid.apply,
-        "remove_line_rows",
-        remove_line_rows,
+        "remove_cxr_rows",
+        remove_cxr_rows,
     )
 
     result = _invoke_grid(
@@ -371,12 +371,12 @@ def test_click_rm_declined_confirmation_aborts(monkeypatch):
 
     def preview_only(_material, _energies, **kwargs):
         if not kwargs.get("dry_run"):
-            pytest.fail("remove_line_rows must not execute when declined")
+            pytest.fail("remove_cxr_rows must not execute when declined")
         return [30.0], "d" * 64
 
     monkeypatch.setattr(
         energy_grid.apply,
-        "remove_line_rows",
+        "remove_cxr_rows",
         preview_only,
     )
 
@@ -395,7 +395,7 @@ def test_click_rm_non_tty_previews_without_mutating(monkeypatch):
         seen.append((material, list(energies), kwargs))
         return [30.0], "d" * 64
 
-    monkeypatch.setattr(energy_grid.apply, "remove_line_rows", preview_only)
+    monkeypatch.setattr(energy_grid.apply, "remove_cxr_rows", preview_only)
 
     result = _invoke_grid(["rm", "hopg", "--energy", "30"])
 
@@ -409,7 +409,7 @@ def test_click_rm_non_tty_previews_without_mutating(monkeypatch):
 def test_click_rm_yes_skips_prompt(monkeypatch):
     monkeypatch.setattr(
         energy_grid.apply,
-        "remove_line_rows",
+        "remove_cxr_rows",
         lambda material, energies, **kw: ([30.0], "d" * 64),
     )
 
@@ -467,7 +467,7 @@ def test_click_rm_dry_run_skips_prompt_and_confirms_via_kwarg(monkeypatch):
     seen = {}
     monkeypatch.setattr(
         energy_grid.apply,
-        "remove_line_rows",
+        "remove_cxr_rows",
         lambda material, energies, **kw: seen.update(kw) or ([30.0], "d" * 64),
     )
 
@@ -498,7 +498,7 @@ def test_click_rm_json_requires_yes():
 def test_click_rm_json_emits_one_envelope(monkeypatch):
     monkeypatch.setattr(
         energy_grid.apply,
-        "remove_line_rows",
+        "remove_cxr_rows",
         lambda material, energies, **kw: ([30.0], "d" * 64),
     )
 
@@ -523,7 +523,7 @@ def test_click_rm_json_emits_one_envelope(monkeypatch):
 def test_click_rm_expected_failure_uses_stderr(monkeypatch):
     monkeypatch.setattr(
         energy_grid.apply,
-        "remove_line_rows",
+        "remove_cxr_rows",
         lambda *_a, **_kw: (_ for _ in ()).throw(
             ValueError("no energy_grids entry for material: bad")
         ),

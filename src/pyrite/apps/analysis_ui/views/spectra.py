@@ -122,7 +122,7 @@ def render_spectra(
             context.settings,
             hue=spec.varying_key,
             include_brem="Bremsstrahlung" in component_values,
-            include_line="Line" in component_values,
+            include_cxr="Line" in component_values,
             include_characteristic="Characteristic" in component_values,
             include_coherent=context.show_both_emissions,
             sum_components=True,

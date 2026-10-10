@@ -51,7 +51,7 @@ def _simulate(
         pr.Beam(30.0),
         pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
         detector,
-        numerics=pr.Numerics(n_electrons=1, n_electrons_brem=1),
+        numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
         filters=(plate,),
         pixel_scorer=pr.PixelScorer(angular_shape, reconstruction),
         acquisition=_acquisition() if acquisition is None else acquisition,
@@ -218,7 +218,7 @@ def test_acquisition_free_simulation_keeps_the_reconstruction_mode() -> None:
         pr.Beam(30.0),
         pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
         detector,
-        numerics=pr.Numerics(n_electrons=1, n_electrons_brem=1),
+        numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
         pixel_scorer=pr.PixelScorer((2, 3), "bilinear_tile"),
     )
 

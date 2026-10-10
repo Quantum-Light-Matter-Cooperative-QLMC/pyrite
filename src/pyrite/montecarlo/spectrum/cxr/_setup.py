@@ -1,0 +1,755 @@
+"""Request validation and one-shot setup for the CXR CXR spectrum.
+
+:class:`SpectrumRequest` is the frozen argument record ``mc_cxr_spectrum`` builds;
+:func:`_prepare_spectrum` turns it into the ``_SpectrumSetup`` every
+accumulation route consumes -- staged segment arrays, tabulation grids,
+observation geometry, and the route-independent scalars.
+
+Validation: line-tabulation-nan-ceiling
+"""
+
+from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
+
+from ...._backend import REAL, _to_cpu, xp
+from ....materials.attenuation import _normalize_composition
+from ....materials.crystal import CRYSTALS, HBARC_EV_ANG, refractive_index
+from ...geometry import _mosaic_quadrature, _orientation_R
+from ...transport import C_ANG_PER_FS, beta_from_keV
+from ..coherent_population import pair_scale
+from ..coherent_transverse import require_footprint_support, transverse_spot
+from ..segment_escape import segment_escape_gradient, segment_escape_pieces
+from ._bin_quadrature import BIN_MEAN_QUADRATURE, bin_axis, validate_cxr_quadrature
+from ._formation import expand_escape_pieces
+from ._kernels import (
+    _clip_segments_to_cutoff,
+    _cxr_table_nan_ceiling,
+    _cxr_tabulation_grid,
+    _elemental_log_mu_table,
+    _matvec3,
+    _observation_direction,
+    _validate_groove_escape_direction,
+)
+from ._temporal import segment_arrival_times
+
+# Generation marker for the line route's photon-escape model, hashed into the
+# dataset and case-content identities like ``characteristic_model``. A
+# constant, not a selector: the incoherent route scores the segment-mean
+# escape since issue #181, and the phased-field routes the exact per-piece
+# formation integral under absorption since its second slice; each move
+# orphans the previous generation's line spectra once.
+CXR_ESCAPE_MODEL = "segment-mean-v3-snell-resonance"
+
+
+#: Size of the most recent line setups' tabulation, for performance telemetry.
+#: The runner clears it before a case and reads it after, when timing is on.
+SETUP_STATS: dict[str, float] = {}
+
+
+@dataclass(frozen=True, eq=False)
+class SpectrumRequest:
+    """The 28 inputs of :func:`mc_cxr_spectrum`, bound into one value.
+
+    Grouping them is what lets the spectrum phases below be module-level
+    functions instead of closures over ``mc_cxr_spectrum``'s locals: a phase takes
+    the request (and the setup derived from it) rather than reaching into an
+    enclosing scope. :func:`mc_cxr_spectrum` keeps its historical keyword signature
+    and builds the request itself, so no caller sees this type.
+
+    Frozen because a phase must not be able to edit the inputs a later phase
+    reads. ``eq=False`` keeps the inherited identity ``__hash__``: several
+    fields (``segments``, ``hkl_list``, the energy grid) are unhashable
+    containers, and the batched path's ``_table_cache`` key is an explicit
+    tuple rather than a hash of this object.
+    """
+
+    segments: Any
+    E_grid_eV: Any
+    crystal: Any
+    hkl_list: Any
+    theta_obs_rad: Any = np.deg2rad(119.0)
+    B_ang2: Any = None
+    use_henke: Any = True
+    absorber_element: Any = "C"
+    chunk: Any = 40000
+    n_hat: Any = None
+    composition: Any = None
+    beam_uvw: Any = None
+    azimuth_rad: Any = 0.0
+    recip_miscut_rad: Any = None
+    sinc_cutoff: Any = None
+    components: Any = False
+    layers: Any = None
+    mosaic_fwhm_rad: Any = None
+    mosaic_nodes: Any = 1
+    surface_hkl: Any = None
+    groove: Any = None
+    coherent: Any = False
+    electron_limit: Any = None
+    E_cut_keV: Any = None
+    _table_cache: Any = None
+    longitudinal_rms_fs: Any = None
+    line_quadrature: Any = "node"
+    truncation_audit: Any = None
+    temporal: Any = None
+    coefficient_capture: Any = None
+    physical_electrons: Any = None
+    coherent_flat_omission_limit: Any = 0.0
+    phase_retention: Any = None
+
+
+@dataclass
+class _SpectrumSetup:
+    """Everything :func:`_prepare_spectrum` derives from a
+    :class:`SpectrumRequest`: resolved geometry, staged device arrays, the
+    energy tabulations, the flight-grouping decision, the coherent and
+    inter-electron decoherence precompute, and the three accumulation buffers.
+
+    This is the state ``mc_cxr_spectrum``'s inner closures used to capture. Passing
+    it explicitly is what makes the accumulation phases module-level functions a
+    test can drive directly.
+
+    Mutable, and deliberately so: ``spec`` / ``spec_pxr`` / ``spec_cbs`` are
+    accumulated into in place by whichever route runs.
+    """
+
+    request: SpectrumRequest
+    info: Any
+    abs_comp: Any
+    segments: Any
+    R_orient: Any
+    thickness: Any
+    Ne: Any
+    n_hat: Any
+    n_hat_d: Any
+    E_grid: Any
+    spec: Any
+    spec_pxr: Any
+    spec_cbs: Any
+    seg_r: Any
+    seg_elec_id: Any
+    cxr_electron: Any
+    v_all: Any
+    v_dot_n_all: Any
+    denom_all: Any
+    gamma_all: Any
+    t_L_all: Any
+    gid_all: Any
+    grouped: Any
+    E_tab: Any
+    E_tab_g: Any
+    log_mu_tab_g: Any
+    n_re_tab_g: Any
+    mosaic_quad: Any
+    finite_footprint: Any
+    cdtype: Any
+    omega_grid: Any
+    delta_omega_grid: Any
+    d_all: Any
+    seg_r_geom: Any
+    d_all_geom: Any
+    decoherence_active: Any
+    finite_footprint_now: Any
+    finite_footprint_F: Any
+    transverse: Any
+    decoherence_A_pop: Any
+    xy0_pop: Any
+    # Incoherent routes only: padded linear escape pieces per segment
+    # (``segment_escape.segment_escape_pieces``), for the segment-mean
+    # transmission. Validation: segment-escape-average
+    escape_pieces: Any = None
+    # Phased-field routes only (coherent, flight-grouped): escape distance at
+    # the start and end of every piece row, ordered along travel, for the
+    # complex formation integral. Validation: coherent-formation-absorption
+    escape_ends: Any = None
+    escape_gradient: Any = None
+    piece_fraction: Any = None
+    # Bin-mean quadrature only: FP64 bin edges and inverse widths on the
+    # accumulation routes' device (``_bin_quadrature.bin_axis``).
+    bin_edges: Any = None
+    bin_inv_width: Any = None
+    # Opt-in temporal profile only: this call's float64 buffer and the
+    # realized / offset-free retarded arrival times per row.
+    # Validation: temporal-intensity-profile
+    temporal_buf: Any = None
+    temporal_tau: Any = None
+    temporal_tau_geo: Any = None
+    # Read-only coefficient observers receive the current row's midpoint
+    # susceptibility phase, aligned with idx/coefs (not all segment rows).
+    capture_phase_rad: Any = None
+    # Production intensity weight for the captured (reflection, orientation).
+    capture_mosaic_weight: float = 1.0
+    # Nonincreasing transverse bound sup F_perp for the row, or None.
+    capture_transverse_envelope: Any = None
+
+
+def _prepare_spectrum(request):
+    """Phase 1: validate the request and build every quantity that depends on
+    neither the reflection nor the crystallite orientation.
+
+    Covers argument compatibility, crystal lookup and orientation, cutoff
+    clipping, device staging of the segment arrays, the physical-flight
+    grouping decision, the edge-resolved chi/U/mu/n tabulation grid, the
+    segment-only kinematics both accumulation routes share, the coherent
+    propagation-phase precompute, and the inter-electron decoherence
+    population terms.
+
+    Returns the :class:`_SpectrumSetup` the accumulation phases consume.
+
+    Validation: coherent-formation-absorption
+    Validation: sinc-bin-integration
+    Validation: transverse-bunch-form-factor
+    """
+    segments = request.segments
+    E_grid_eV = request.E_grid_eV
+    crystal = request.crystal
+    theta_obs_rad = request.theta_obs_rad
+    B_ang2 = request.B_ang2
+    use_henke = request.use_henke
+    absorber_element = request.absorber_element
+    n_hat = request.n_hat
+    composition = request.composition
+    beam_uvw = request.beam_uvw
+    azimuth_rad = request.azimuth_rad
+    recip_miscut_rad = request.recip_miscut_rad
+    components = request.components
+    layers = request.layers
+    mosaic_fwhm_rad = request.mosaic_fwhm_rad
+    mosaic_nodes = request.mosaic_nodes
+    surface_hkl = request.surface_hkl
+    groove = request.groove
+    coherent = request.coherent
+    electron_limit = request.electron_limit
+    E_cut_keV = request.E_cut_keV
+    longitudinal_rms_fs = request.longitudinal_rms_fs
+
+    if coherent and components:
+        raise ValueError(
+            "coherent=True is incompatible with components=True: the PXR/CBS "
+            "split is ambiguous under coherence (the A_PXR*A_CBS cross term "
+            "survives). Request the coherent total, or components incoherently."
+        )
+    if B_ang2 is None:
+        raise ValueError(
+            "mc_spectrum: B_ang2 (Debye-Waller B-factor [Ang^2]) is required; "
+            "pass the material's value (no silent default)."
+        )
+    if coherent and segments.get("track_id") is not None:
+        raise NotImplementedError(
+            "coherent spectra are not supported with secondary transport: the "
+            "coherent sum runs within one electron_id, which would make a whole "
+            "shower one emitter (see shell-soft-hard-transport.md)"
+        )
+    if coherent and layers is not None:
+        raise NotImplementedError(
+            "the in-medium dispersion does not cover the coherent path through "
+            "a LAYERED absorber: the dispersive propagation phase needs a "
+            "per-layer delta accumulated along the escape path -- the real "
+            "partner of _stack_tau's per-layer mu -- which is not modelled. "
+            "Single-slab absorbers (with or without a groove or a finite "
+            "footprint) are supported."
+        )
+    # Precompute that only some routes bind. As a closure these names simply
+    # went unbound on the paths that never read them; as dataclass fields they
+    # need an explicit absent value. Nothing below reads one where the original
+    # would have raised UnboundLocalError.
+    cdtype = omega_grid = delta_omega_grid = d_all = None
+    seg_r_geom = d_all_geom = xy0_pop = None
+    finite_footprint_now = finite_footprint_F = decoherence_A_pop = None
+    transverse = None
+
+    info = CRYSTALS[crystal]
+    n_atoms = len(info["basis"]) / info["V_cell"]
+    abs_comp = _normalize_composition(absorber_element, n_atoms, composition)
+    segments = _clip_segments_to_cutoff(segments, E_cut_keV, abs_comp, layers)
+
+    # crystal orientation: rotation applied to all reciprocal vectors
+    R_orient = _orientation_R(
+        info["lattice"],
+        beam_uvw,
+        azimuth_rad,
+        recip_miscut_rad,
+        surface_hkl=surface_hkl,
+    )
+    thickness = segments["thickness_ang"]
+    if electron_limit is None:
+        Ne = segments["Ne"]
+    else:
+        Ne = electron_limit
+
+    if coherent and request.physical_electrons is not None:
+        pair_scale(request.physical_electrons, Ne)
+
+    n_hat = _observation_direction(theta_obs_rad, n_hat)
+    if groove is not None:
+        if layers is not None:
+            raise ValueError("groove escape is v1 single-slab only (no layers)")
+        _validate_groove_escape_direction(n_hat, groove)
+    # Fail closed on an output grid the working precision cannot resolve. Every
+    # route treats the grid as strictly ascending: window bounds and line-table
+    # interpolation both search its coordinates. A grid whose step is finer
+    # than REAL's spacing at these energies
+    # collapses adjacent nodes on the cast -- a 2.5e-5 eV step at 1600 eV
+    # loses 80% of its nodes to float32's 1.2e-4 eV ulp, making the coordinate
+    # axis non-injective and therefore the spectrum
+    # ambiguous. Checked on the host input, before the upload, so it
+    # costs no device synchronization.
+    E_grid_host = np.asarray(E_grid_eV, dtype=REAL)
+    if E_grid_host.size > 1:
+        collapsed = int(np.count_nonzero(np.diff(E_grid_host) <= 0))
+        if collapsed:
+            raise ValueError(
+                f"E_grid_eV must be strictly increasing in the backend's working "
+                f"precision (REAL={np.dtype(REAL).name}), but {collapsed} of "
+                f"{E_grid_host.size - 1} adjacent nodes are not separated after the "
+                f"cast. Coarsen the grid to at least the precision's spacing at "
+                f"these energies, or run the spectrum on the NumPy backend "
+                f"(PYRITE_MC_BACKEND=cpu) or with PYRITE_FP64=1."
+            )
+    E_grid = xp.asarray(E_grid_host)
+    spec = xp.zeros(E_grid.size, dtype=REAL)
+    spec_pxr = xp.zeros(E_grid.size, dtype=REAL)
+    spec_cbs = xp.zeros(E_grid.size, dtype=REAL)
+
+    n_rows = int(xp.asarray(segments["L_ang"]).shape[0])
+
+    # Physical-flight grouping for the DEFAULT (incoherent) reduction. Numerical
+    # substeps of one flight are integration detail: summing |A_j Q_j|^2 over
+    # them treats each as an independent emitter and divides the line peak by
+    # the substep count (each row carries (t_L/N)^2 where the flight carries
+    # t_L^2), so a tighter energy tolerance would silently destroy the line.
+    # Rows of one flight therefore add COHERENTLY and only whole flights add
+    # incoherently. Groups are keyed by ``(electron_id, flight_id)`` VALUE, not
+    # by adjacency: the lockstep core emits step-major, so one flight's substeps
+    # are separated by every other electron's rows for that step.
+    # Validation: substep-radiation-invariance
+    gid_all = None
+    grouped = False
+    if not coherent and segments.get("flight_id") is not None and n_rows:
+        flight_key = _to_cpu(xp.asarray(segments["flight_id"]))
+        # A secondary-transport shower shares one electron_id; its flights
+        # belong to separate tracks (#94).
+        track = segments.get("track_id")
+        electron_key = _to_cpu(xp.asarray(segments["elec_id"] if track is None else track))
+        order = np.lexsort((flight_key, electron_key))
+        new_group = np.empty(flight_key.size, dtype=bool)
+        new_group[0] = True
+        new_group[1:] = (flight_key[order][1:] != flight_key[order][:-1]) | (
+            electron_key[order][1:] != electron_key[order][:-1]
+        )
+        # All-singleton groups are the one-row-per-flight case, whose grouped
+        # reduction is algebraically the incoherent one; keep the proven path.
+        grouped = not bool(new_group.all())
+        if grouped:
+            gid_all = np.empty(flight_key.size, dtype=np.int64)
+            gid_all[order] = np.cumsum(new_group) - 1
+    if grouped and getattr(xp, "__name__", "") != "numpy":
+        raise ValueError(
+            "flight-grouped incoherent CXR is host-only: the segmented complex "
+            "reduction over numerical substeps has no device port yet. Run the "
+            "spectrum on the NumPy backend, or transport without max_dE_frac."
+        )
+    if grouped and layers is not None:
+        # Same unmodelled per-layer delta as the coherent path: the grouped
+        # reduction carries the dispersive propagation phase too.
+        raise NotImplementedError(
+            "the in-medium dispersion does not cover numerical substeps through "
+            "a LAYERED absorber: the intra-flight coherent sum needs the "
+            "per-layer dispersive propagation phase, which is not modelled."
+        )
+    if grouped and components:
+        raise ValueError(
+            "components=True is incompatible with numerical substeps: the "
+            "PXR/CBS split is ambiguous once a flight's substep fields add "
+            "coherently (the A_PXR*A_CBS cross term survives). Request the "
+            "total, or transport without max_dE_frac."
+        )
+
+    # The phased-field reductions (coherent, flight-grouped) evaluate each
+    # segment's exact complex formation integral under absorption, which needs
+    # the escape path affine along a row. Split every segment at its linear
+    # escape pieces into collinear rows -- each with its own length, midpoint,
+    # and start age -- and carry the escape distance at both ends. The pieces
+    # of a straight flight sum exactly to its field, and grouping keys are
+    # gathered with them so a flight's pieces still add coherently. Incoherent
+    # pieces also need their own face root, but retain the parent duration and
+    # fraction-weighted transmission; layered attenuation is evaluated below.
+    # Validation: coherent-formation-absorption
+    escape_ends = None
+    if n_rows:
+        segments, piece_owner, esc_start, esc_end = expand_escape_pieces(
+            segments, n_hat, layers=layers, groove=groove, xp=xp
+        )
+        if coherent or grouped:
+            escape_ends = (esc_start, esc_end)
+        if gid_all is not None:
+            gid_all = gid_all[np.asarray(_to_cpu(piece_owner))]
+
+    # Every per-row emission coefficient is evaluated at ONE energy along the
+    # row. Under ``energy_model="midpoint"`` transport supplies the propagator's
+    # own representative energy, so the row becomes a midpoint evaluation of its
+    # emission integral rather than a left-endpoint one; the resulting t_L =
+    # L/beta(E_repr) is then exactly the transported flight duration
+    # ``t_end - t_start``, and ``t_ang + t_L/2`` exactly its midpoint age.
+    # Frozen rows carry no representative energy and stay bit-for-bit.
+    # Validation: substep-radiation-invariance
+    E_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
+    seg_E = xp.asarray(segments[E_field], dtype=REAL)
+    seg_v = xp.asarray(segments["v_hat"], dtype=REAL)
+    seg_L = xp.asarray(segments["L_ang"], dtype=REAL)
+    seg_r = xp.asarray(segments["r_mid"], dtype=REAL)
+    seg_elec_id = xp.asarray(segments["elec_id"])
+    cxr_electron = seg_elec_id < Ne
+    beta_all = beta_from_keV(seg_E)  # speed/c per segment
+    v_all = beta_all[:, None] * seg_v  # velocity vectors (c=1)
+
+    # Closed-form bin integration covers the incoherent, per-row intensity sum
+    # only. Each refusal names a reduction whose square is taken after a sum of
+    # amplitudes, or a truncation the bin masses would silently disagree with.
+    # Validation: sinc-bin-integration
+    bin_edges = bin_inv_width = None
+    if validate_cxr_quadrature(request.line_quadrature) == BIN_MEAN_QUADRATURE:
+        if coherent:
+            raise ValueError(
+                "line_quadrature='bin-mean' is incoherent-only: the coherent route "
+                "squares a sum of amplitudes, which has no per-line bin mass (#117)"
+            )
+        if grouped:
+            raise ValueError(
+                "line_quadrature='bin-mean' is incompatible with numerical substeps: "
+                "flight-grouped rows add amplitudes before squaring. Transport "
+                "without max_dE_frac, or use line_quadrature='node'."
+            )
+        if request.sinc_cutoff is not None:
+            raise ValueError(
+                "line_quadrature='bin-mean' integrates each line's whole profile; "
+                "sinc_cutoff truncation is not supported with it"
+            )
+        bin_edges, bin_inv_width = bin_axis(E_grid_eV)
+
+    # chi_g / U_g are smooth in energy AWAY from absorption edges, so evaluate
+    # them on a tabulation grid and interpolate at the per-segment resonance
+    # energies ON THE GPU (step 3) -- a few ms over ~10^3 grid points instead of
+    # ~0.25 s/case over ~10^5 segments, and E_res stays on the device (no
+    # per-reflection GPU->CPU->GPU round-trip; that structure-factor CPU cost was
+    # what capped GPU utilisation on a fast card). The grid is a 1 eV mesh UNION
+    # the basis and absorber elements' native Henke energies, which densely
+    # sample the edges -- a plain uniform mesh mis-resolves the edge jumps (tens
+    # of % at e.g. the C K-edge). Window matches the keep mask below.
+    _pad = 0.2 * (float(E_grid_eV[-1]) - float(E_grid_eV[0]))
+    _lo, _hi = float(E_grid_eV[0]) - _pad, float(E_grid_eV[-1]) + _pad
+    _lo = max(_lo, 1.0)  # keep tabulation energies positive: chi_g/U_g need lambda = HC_EV_ANG / E
+    # Above the atomic tables' end every coupling table is NaN, and a line
+    # there interpolates NaN whichever NaN nodes bracket it. Stop the mesh at
+    # its first node at or above that ceiling: nodes below it are unchanged,
+    # and E_res past the last node clamps to a NaN value, as before. At MeV
+    # beam energies this cuts E_tab from ~1e7-1e8 nodes to ~1e6.
+    # Validation: line-tabulation-nan-ceiling
+    _ceiling = _cxr_table_nan_ceiling(info, abs_comp, use_henke)
+    if _ceiling < _hi:
+        _hi = max(_ceiling, _lo + 1.0)
+    E_tab = _cxr_tabulation_grid(info, abs_comp, _lo, _hi)
+    E_tab_g = xp.asarray(E_tab, dtype=REAL)
+    # chi/U re+im per reflection, log(mu) per absorber, Re n.
+    _table_rows = 4 * len(request.hkl_list) + len(abs_comp) + 1
+    SETUP_STATS["line_tab_points"] = max(SETUP_STATS.get("line_tab_points", 0), int(E_tab.size))
+    SETUP_STATS["line_table_mib"] = max(
+        SETUP_STATS.get("line_table_mib", 0.0),
+        _table_rows * E_tab.size * np.dtype(REAL).itemsize / 2**20,
+    )
+    # Each elemental coefficient is stored as log(mu_i) [log(1/Ang)] and
+    # interpolated linearly against log(E) before summing. This reproduces the
+    # pinned xraydb non-f1 Chantler rule; interpolating the compound total in
+    # either linear or log space does not. Explicit absorber elements contribute
+    # their native nodes to E_tab even when absent from the crystal basis.
+    # Applied only to single-slab/finite-footprint routes. Layered and grooved
+    # escape retain exact per-point mu. No per-segment host/device transfer is
+    # restored. Independently rederived with no physics divergence; human
+    # sign-off remains required.
+    # Validation: line-absorption-tabulation
+    log_mu_tab_g = xp.asarray(_elemental_log_mu_table(abs_comp, E_tab), dtype=REAL)
+
+    # Real part of the crystal's bulk refractive index n(E) = sqrt(1 + chi_0(E)),
+    # tabulated on the SAME edge-resolved grid as chi/U/mu (delta = 1 - Re n has
+    # its own edge structure, from the f1 cusp). The in-medium dispersion is
+    # unconditional, so this table is always built.
+    n_re_tab_g = xp.asarray(
+        np.asarray(refractive_index(crystal, E_tab, use_henke).real), dtype=REAL
+    )
+
+    n_hat_d = xp.asarray(n_hat, dtype=REAL)  # detector dir is g-independent: hoist
+
+    # Segment-only kinematics shared by every reflection/orientation and by both
+    # the batched and compatibility paths. These used to be recomputed inside
+    # ``_accumulate`` for every g row.
+    v_dot_n_all = _matvec3(v_all, n_hat_d)
+    denom_all = 1.0 - v_dot_n_all
+    gamma_all = 1.0 / xp.sqrt(1.0 - beta_all * beta_all)
+    t_L_all = seg_L / beta_all
+    piece_fraction = xp.ones_like(seg_L)
+    if not (coherent or grouped):
+        t_L_all = xp.asarray(segments.get("line_parent_L_ang", seg_L), dtype=REAL) / beta_all
+        piece_fraction = xp.asarray(segments.get("line_piece_fraction", piece_fraction), dtype=REAL)
+    # On each affine piece L(r), grad L = -e/(e.n_hat). Tangential
+    # continuity then gives k_eff/omega = n_hat + delta grad L.
+    # Validation: xray-in-medium-resonance
+    escape_gradient = segment_escape_gradient(segments, n_hat, groove=groove, xp=xp)
+
+    # coherent (phased) sum precompute: the per-segment retardation scalar
+    # d_j = t_abs,j - n_hat.r_j [Ang, c=1] (emission-time phase minus far-field
+    # retardation) and photon wavenumber k_gamma(E) = E / hbar c [1/Ang].
+    # ``t_ang`` remains segment-start age; add half the constant-velocity flight
+    # time so it describes the same midpoint as ``r_mid``. This one d_all feeds
+    # both coherent reduction routes. Validation: coherent-segment-midpoint-time.
+    # Each reflection adds its spatial susceptibility phase -g.r_j inside
+    # _accumulate. All-zero t0_ang leaves the physical trajectory phase.
+    # Inert unless a complex per-row field is actually reduced, i.e. under
+    # coherent=True or the flight-grouped incoherent path.
+    if coherent or grouped:
+        cdtype = xp.result_type(REAL, 1j)
+        seg_t0 = xp.asarray(segments.get("t0_ang", np.zeros(seg_E.size)), dtype=REAL)
+        seg_t = xp.asarray(segments.get("t_ang", np.zeros(seg_E.size)), dtype=REAL)
+        seg_t_mid = seg_t + 0.5 * t_L_all
+        d_all = (seg_t_mid + seg_t0) - _matvec3(seg_r, n_hat_d)
+        omega_grid = E_grid / HBARC_EV_ANG
+
+        # In-medium propagation phase: each segment's field picks up
+        # -delta(E) omega(E) L_esc,j over the SAME in-crystal escape path the
+        # Beer-Lambert factor runs over -- the real partner of that absorption.
+        # Deliberately NOT k(E) n_hat.r_j, which would charge the medium for the
+        # whole flight to the detector. Tabulated on the OUTPUT grid: it is a
+        # propagation phase read across the spectrum, not a coupling frozen at
+        # the line energy. Derivation:
+        # docs/physics/radiation-physics/photon-escape-and-dispersion.md
+        # Validation: xray-in-medium-propagation-phase
+        delta_omega_grid = (
+            xp.asarray(
+                1.0 - np.asarray(refractive_index(crystal, E_grid_eV, use_henke).real),
+                dtype=REAL,
+            )
+            * omega_grid
+        )
+
+    # Empirical inter-electron decoherence for the coherent path. Squaring one
+    # realization of the sampled per-electron offsets is speckle, not shot
+    # noise: it does not shrink with electron count. Blend instead, per (row,
+    # energy), Total = (1-F)*Grouped + F*Flat, where Flat is today's reduction
+    # fed the electron's OFFSET-FREE position/time (hence the
+    # d_all_geom/seg_r_geom swap below, a strict no-op when no offset is
+    # configured), Grouped = sum_e |S_e|^2 groups the same segments by electron,
+    # and F is the empirical characteristic function of the offset population
+    # transport already drew. Derivation and the closed form it converges to:
+    # docs/physics/radiation-physics/coherent-emission.md
+    #
+    # F must be applied PER ROW (reflection x mosaic orientation), before
+    # summing across rows: q_perp depends on g, so a single scalar F(E) on the
+    # row-summed spectrum would be wrong wherever two rows share an energy bin.
+    #
+    # Validation: coherent-inter-electron-decoherence
+    decoherence_active = False
+    flat_omission_limit = float(request.coherent_flat_omission_limit)
+    if request.phase_retention is not None:
+        from ..phase_retention import PhaseRetentionPolicy
+
+        if not isinstance(request.phase_retention, PhaseRetentionPolicy):
+            raise ValueError("phase_retention must be a PhaseRetentionPolicy or None")
+    if not np.isfinite(flat_omission_limit) or flat_omission_limit < 0.0:
+        raise ValueError("coherent_flat_omission_limit must be finite and nonnegative")
+    if coherent:
+        seg_r_geom = seg_r
+        d_all_geom = seg_t_mid - _matvec3(seg_r, n_hat_d)
+        t0_pop = xp.asarray(segments.get("initial_t0_ang", np.zeros(0)), dtype=REAL)[:Ne]
+        xy0_pop = xp.asarray(
+            np.asarray(segments.get("initial_r_ang", np.zeros((0, 3))))[:, :2], dtype=REAL
+        )[:Ne]
+        decoherence_active = bool(
+            (t0_pop.size and xp.any(t0_pop != 0.0)) or (xy0_pop.size and xp.any(xy0_pop != 0.0))
+        )
+        if longitudinal_rms_fs is not None:
+            longitudinal_rms_fs = float(longitudinal_rms_fs)
+            if not np.isfinite(longitudinal_rms_fs) or longitudinal_rms_fs <= 0.0:
+                raise ValueError("longitudinal_rms_fs must be finite and positive")
+        if decoherence_active:
+            finite_footprint_now = (
+                segments.get("crystal_width_ang") is not None
+                and segments.get("crystal_height_ang") is not None
+            )
+            if finite_footprint_now:
+                if longitudinal_rms_fs is None:
+                    raise ValueError(
+                        "coherent emission with a finite crystal footprint and "
+                        "nonzero bunch offsets requires longitudinal_rms_fs; "
+                        "only the fully longitudinally decohered limit is "
+                        "supported"
+                    )
+                sigma_z_ang = longitudinal_rms_fs * C_ANG_PER_FS
+                # Decide support in host float64 so a borderline duration does
+                # not run on float32 CUDA while the CPU rejects it.
+                omega_host = np.asarray(_to_cpu(omega_grid), dtype=float)
+                finite_footprint_F_host = np.exp(-((omega_host * sigma_z_ang) ** 2))
+                finite_footprint_F = xp.asarray(finite_footprint_F_host, dtype=REAL)
+                # Offset-free fields: remove each electron's face point and
+                # full arrival time (bunch offset plus face-arrival delay).
+                # Amplitudes and escape keep the sampled positions. Any
+                # surviving cross term then needs translation invariance: a
+                # recorded Gaussian spot well inside the footprint, averaged
+                # analytically per row as F_z * F_perp. F_z = 0 everywhere
+                # leaves only phase-free self terms, so no spot is needed.
+                # Validation: transverse-bunch-form-factor
+                seg_r_geom = seg_r.copy()
+                seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
+                seg_r_geom[:, :2] = seg_r_geom[:, :2] - xy0_pop[seg_elec_id_clamped]
+                d_all_geom = seg_t_mid - _matvec3(seg_r_geom, n_hat_d)
+                if (
+                    xy0_pop.size
+                    and bool(xp.any(xy0_pop != 0.0))
+                    and bool(np.any(finite_footprint_F_host > 0.0))
+                ):
+                    transverse = transverse_spot(segments.get("beam_entry"))
+                    if transverse is None:
+                        raise ValueError(
+                            "coherent emission with a finite crystal footprint and "
+                            "transverse offsets requires a recorded Gaussian beam "
+                            "spot (transport beam_entry) unless F_z vanishes"
+                        )
+                    if int(segments.get("n_missed", 0) or 0):
+                        raise ValueError(
+                            "finite-footprint coherent transverse average needs every "
+                            "incident electron to hit the footprint"
+                        )
+                    require_footprint_support(
+                        transverse,
+                        seg_r_geom,
+                        n_hat,
+                        segments["thickness_ang"],
+                        segments["crystal_width_ang"],
+                        segments["crystal_height_ang"],
+                        xp=xp,
+                    )
+            else:
+                seg_r_geom = seg_r.copy()
+                seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
+                seg_r_geom[:, :2] = seg_r_geom[:, :2] - xy0_pop[seg_elec_id_clamped]
+                d_all_geom = seg_t_mid - _matvec3(seg_r_geom, n_hat_d)
+                # A_e = t0_e - n_hat_perp . dr_perp,e does not depend on g (the
+                # reciprocal vector varies per row; n_hat is fixed for the whole
+                # call), so hoist it once here; B_e(row) = g_perp . dr_perp,e is
+                # cheap and stays inside the per-row helper below.
+                decoherence_A_pop = t0_pop - xy0_pop @ n_hat_d[:2]
+
+    # mosaic crystallite-orientation quadrature: None -> perfect crystal (default;
+    # today's single-orientation result bit-for-bit). Otherwise a list of
+    # (rotation, weight) tilting g across the Gaussian mosaic cone, summed
+    # incoherently below (docs/physics/materials/crystal-mosaicity.md route 2).
+    mosaic_quad = _mosaic_quadrature(mosaic_fwhm_rad, mosaic_nodes)
+
+    # Finite transverse dimensions make the escape distance a nearest-face
+    # query rather than the plain slab path. It is g-independent either way,
+    # so both routes hoist it out of their per-reflection work.
+    finite_footprint = (
+        segments.get("crystal_width_ang") is not None
+        and segments.get("crystal_height_ang") is not None
+    )
+    # Incoherent emission scores the segment mean of exp(-tau), not its
+    # midpoint value (issue #181, as #176 did for characteristic lines). The
+    # escape pieces are g-independent, so both routes share one pass; mu
+    # varies per (segment, reflection) and is applied by the route. The
+    # coherent route and the flight-grouped reduction -- a coherent sum per
+    # flight -- instead carry ``escape_ends`` on their piece rows (above).
+    escape_pieces = (
+        None
+        if coherent or grouped
+        else segment_escape_pieces(segments, n_hat, layers=layers, groove=groove, xp=xp)
+    )
+
+    if coherent and request.physical_electrons is not None and not finite_footprint_now:
+        # Pair complete electron fields, including their sampled offsets. This
+        # remains unbiased when phase offsets and trajectory fields correlate.
+        # Validation: coherent-physical-bunch-population
+        seg_r_geom = seg_r
+        d_all_geom = d_all
+
+    temporal_buf = temporal_tau = temporal_tau_geo = None
+    if request.temporal is not None:
+        temporal_buf = request.temporal.buffer()
+        temporal_tau, _ = segment_arrival_times(segments, n_hat, xp=xp)
+        temporal_tau_geo = temporal_tau
+        if decoherence_active and (request.physical_electrons is None or finite_footprint_now):
+            # Same offset-free arrival as ``d_all_geom``, in float64.
+            t0_seg = xp.asarray(
+                segments.get("t0_ang", np.zeros(temporal_tau.size)),
+                dtype=np.float64,
+            )
+            temporal_tau_geo = temporal_tau - t0_seg
+            seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
+            xy0 = xp.asarray(xy0_pop, dtype=np.float64)[seg_elec_id_clamped]
+            n64 = xp.asarray(n_hat_d, dtype=np.float64)
+            temporal_tau_geo = temporal_tau_geo + xy0 @ n64[:2]
+
+    return _SpectrumSetup(
+        request=request,
+        info=info,
+        abs_comp=abs_comp,
+        segments=segments,
+        R_orient=R_orient,
+        thickness=thickness,
+        Ne=Ne,
+        n_hat=n_hat,
+        n_hat_d=n_hat_d,
+        E_grid=E_grid,
+        spec=spec,
+        spec_pxr=spec_pxr,
+        spec_cbs=spec_cbs,
+        seg_r=seg_r,
+        seg_elec_id=seg_elec_id,
+        cxr_electron=cxr_electron,
+        v_all=v_all,
+        v_dot_n_all=v_dot_n_all,
+        denom_all=denom_all,
+        gamma_all=gamma_all,
+        t_L_all=t_L_all,
+        gid_all=gid_all,
+        grouped=grouped,
+        E_tab=E_tab,
+        E_tab_g=E_tab_g,
+        log_mu_tab_g=log_mu_tab_g,
+        n_re_tab_g=n_re_tab_g,
+        mosaic_quad=mosaic_quad,
+        finite_footprint=finite_footprint,
+        cdtype=cdtype,
+        omega_grid=omega_grid,
+        delta_omega_grid=delta_omega_grid,
+        d_all=d_all,
+        seg_r_geom=seg_r_geom,
+        d_all_geom=d_all_geom,
+        decoherence_active=decoherence_active,
+        finite_footprint_now=finite_footprint_now,
+        finite_footprint_F=finite_footprint_F,
+        transverse=transverse,
+        decoherence_A_pop=decoherence_A_pop,
+        xy0_pop=xy0_pop,
+        bin_edges=bin_edges,
+        bin_inv_width=bin_inv_width,
+        escape_pieces=escape_pieces,
+        escape_ends=escape_ends,
+        escape_gradient=escape_gradient,
+        piece_fraction=piece_fraction,
+        temporal_buf=temporal_buf,
+        temporal_tau=temporal_tau,
+        temporal_tau_geo=temporal_tau_geo,
+    )
+
+
+_CXR_RENAMED_EXPORTS = {"LINE_ESCAPE_MODEL": "CXR_ESCAPE_MODEL"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

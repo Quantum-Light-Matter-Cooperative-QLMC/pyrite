@@ -457,7 +457,7 @@ def test_shape_only_sweep_and_cpu_clock(tmp_path):
 def test_shared_rate_saved_normalization_and_phase_space(tmp_path, normalization):
     from pyrite.campaign.config import default_settings
     from pyrite.campaign.profiles import case_content_key, dataset_identity
-    from pyrite.results import line_metrics
+    from pyrite.results import cxr_metrics
     from pyrite.results.store import Settings, beam_current_na, store_result
 
     path = write_gdf(tmp_path / "beam.gdf")
@@ -496,7 +496,7 @@ def test_shared_rate_saved_normalization_and_phase_space(tmp_path, normalization
         assert beam_current_na(record, Settings(beam_current_na=999)) == record["source_current_na"]
         assert record["case"]["rep_rate_hz"] == case["rep_rate_hz"]
         records.append(record)
-    metrics = [line_metrics(record, Settings(beam_current_na=999)) for record in records]
+    metrics = [cxr_metrics(record, Settings(beam_current_na=999)) for record in records]
     assert metrics[1]["total_flux"] == pytest.approx(4 * metrics[0]["total_flux"])
     assert metrics[1]["total_flux_per_na"] == metrics[0]["total_flux_per_na"]
 

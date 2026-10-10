@@ -288,7 +288,7 @@ def tilted_geometry(theta_obs_rad, tilt_polar_rad, tilt_azim_rad=0.0):
     (reconciled under ``line-energy-dispersion``, #338).
 
     Returns (beam_dir, n_hat) to pass to simulate_trajectories(beam_dir=...)
-    and mc_spectrum(n_hat=...). For ta = 0 the detector's sample-frame polar
+    and mc_cxr_spectrum(n_hat=...). For ta = 0 the detector's sample-frame polar
     angle is simply theta_obs - tilt_polar; the lab-frame quantity
     1 - v0.n_hat (hence the zero-scattering line energy denominator) is
     tilt-invariant. In the limiting case ``tilt_polar_rad = 0``, the untilted
@@ -445,7 +445,7 @@ def detector_directions(
     Grid of detector directions {n_hat_i} (SAMPLE frame) tiling a flat square
     detector chip of side ``chip_mm`` at distance ``dist_mm`` facing the source,
     with their solid-angle weights -- the geometry input to the solid-angle-
-    INTEGRATED spectrum (mc_spectrum_solid_angle). This replaces the single-n_hat
+    INTEGRATED spectrum (mc_cxr_spectrum_solid_angle). This replaces the single-n_hat
     + flat-Omega + analytic aperture_fwhm_eV approximation
     (docs/physics/detectors/detector-solid-angle.md) with a first-principles tiling of the face.
 
@@ -529,7 +529,7 @@ def _orientation_R(
     one-axis ``surface_hkl`` reduces to its parallel direct axis. Both paths use
     a proper minimal rotation, so handedness is preserved. Returns None for the
     construction-frame default (both orientations are None and azimuth_rad == 0).
-    Shared by mc_spectrum and mosaic_psi_rad so the orientation convention lives
+    Shared by mc_cxr_spectrum and mosaic_psi_rad so the orientation convention lives
     in one place.
 
     Assumptions: Miller indices are expressed in the reciprocal basis owned by
@@ -620,7 +620,7 @@ def _mosaic_quadrature(fwhm_rad, nodes):
     """Gauss-Hermite product quadrature over a 2-D Gaussian mosaic tilt of the
     crystallite normal (per-axis sigma = FWHM / 2.3548 -- the rocking curve is the
     1-D projection). Returns a list of (rotation matrix, weight) with weights
-    summing to 1, used by mc_spectrum to INCOHERENTLY average a reflection's
+    summing to 1, used by mc_cxr_spectrum to INCOHERENTLY average a reflection's
     spectrum over crystallite orientations (the exact mosaic route,
     docs/physics/materials/crystal-mosaicity.md (2)).
 

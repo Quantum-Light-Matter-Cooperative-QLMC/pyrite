@@ -920,7 +920,7 @@ def photons_per_electron(
 
     agree exactly with the integrated finite-segment lineshape used in
 
-    montecarlo.mc_spectrum (validated to <1% by
+    montecarlo.mc_cxr_spectrum (validated to <1% by
     anchor_figures.single_segment_anchor).
 
     Up to ~1.7x at relativistic-ish beta and forward angles.
@@ -1058,11 +1058,11 @@ if __name__ == "__main__":
 
     # diamond (400) example
 
-    E_line = omega_n(d_ang=0.8917, beta=beta, theta_B_normal=np.deg2rad(45), n=1)
+    E_cxr = omega_n(d_ang=0.8917, beta=beta, theta_B_normal=np.deg2rad(45), n=1)
 
-    print("line energy [eV]:", E_line)
+    print("line energy [eV]:", E_cxr)
 
-    dg = delta_g("diamond", [4, 0, 0], E_line)
+    dg = delta_g("diamond", [4, 0, 0], E_cxr)
 
     print("structure factor:", structure_factor("diamond", [4, 0, 0], 4478))
 

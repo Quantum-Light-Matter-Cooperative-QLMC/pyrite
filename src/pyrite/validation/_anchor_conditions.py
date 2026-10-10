@@ -17,7 +17,7 @@ from pyrite.materials.crystal import (
     crystal_absorption_length_ang,
     reciprocal_g_vector,
 )
-from pyrite.montecarlo import Case, beta_from_keV, mc_spectrum
+from pyrite.montecarlo import Case, beta_from_keV, mc_cxr_spectrum
 from pyrite.validation._zhai import (
     ZHAI_CACHE_FORMAT,
     ZHAI_CACHE_SCHEMA,
@@ -303,7 +303,7 @@ def _resolved_case(
         crystal_width_mm=None,
         crystal_height_mm=None,
         allow_normal_incidence=polar_tilt_deg == 0.0,
-        detector=replace(detector, energy_bins=EnergyBins(line=E_grid, brem=E_grid)),
+        detector=replace(detector, energy_bins=EnergyBins(cxr=E_grid, brem=E_grid)),
     )
     case = build_cases(sweep, n_electrons=ne, n_electrons_brem=ne_brem)[0]
     # Literature anchors may intentionally pin a narrower reflection set or
@@ -385,12 +385,12 @@ def feranchuk_line_flux(anchor: ZhaiAnchor, E0_keV: float, thickness_ang: float)
     Validation: closed-form-flux
     """
     beta = beta_from_keV(E0_keV)
-    E_line = line_energy_eV(anchor, E0_keV)
-    L_abs = crystal_absorption_length_ang(anchor.crystal, E_line)
+    E_cxr = line_energy_eV(anchor, E0_keV)
+    L_abs = crystal_absorption_length_ang(anchor.crystal, E_cxr)
     return photons_per_electron(
         anchor.crystal,
         anchor.hkl,
-        E_line,
+        E_cxr,
         anchor.theta_obs_rad,  # geometry="lif": this slot carries theta_obs
         beta,
         L_z_ang=thickness_ang,
@@ -407,13 +407,13 @@ def single_segment_anchor(
     anchor: ZhaiAnchor, E0_keV: float, L_seg_ang: float = 290.0
 ) -> tuple[float, float, float]:
     """The cleanest analytic<->MC anchor. A single straight segment of length
-    L_seg pushed through mc_spectrum, integrated over energy, equals the
+    L_seg pushed through mc_cxr_spectrum, integrated over energy, equals the
     Eq. (12) closed form -- this isolates the finite-segment lineshape
     normalization from electron transport. Returns (mc_integral, closed_form,
     ratio); ratio should be ~1.
     """
     beta = beta_from_keV(E0_keV)
-    E_line = line_energy_eV(anchor, E0_keV)
+    E_cxr = line_energy_eV(anchor, E0_keV)
     # The closed form is absorption-free (L_abs -> infinity). The segment ends
     # on the entrance face, so its escape path is zero all along it; since
     # issue #181 the segment-mean escape would otherwise absorb any part of it
@@ -431,7 +431,7 @@ def single_segment_anchor(
         ),
         "thickness_ang": anchor.thick_bulk_ang,
     }
-    spec = mc_spectrum(
+    spec = mc_cxr_spectrum(
         fake,
         anchor.E_grid,
         crystal=anchor.crystal,
@@ -445,7 +445,7 @@ def single_segment_anchor(
         photons_per_electron(
             anchor.crystal,
             anchor.hkl,
-            E_line,
+            E_cxr,
             anchor.theta_obs_rad,
             beta,
             L_z_ang=L_seg_ang,

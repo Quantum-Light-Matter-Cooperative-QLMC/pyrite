@@ -40,16 +40,14 @@ from .adaptive import _run_adaptive_case_worker, _transport_adaptive_case_worker
 
 def case_runtime_plan(case):
     """Return grid and chunk metrics for one concrete case."""
-    line_grid = decode_energy_grid(case.get("E_grid", []))
+    cxr_grid = decode_energy_grid(case.get("E_grid", []))
     brem_grid = decode_energy_grid(case.get("E_grid_brem", []))
     spec_chunk = (
         _admit_chunk(
-            case.get("spec_chunk")
-            or _RESOURCE_POLICY.spec_chunk
-            or _adaptive_chunk(line_grid.size),
-            line_grid.size,
+            case.get("spec_chunk") or _RESOURCE_POLICY.spec_chunk or _adaptive_chunk(cxr_grid.size),
+            cxr_grid.size,
         )
-        if line_grid.size
+        if cxr_grid.size
         else None
     )
     brem_chunk = (
@@ -66,7 +64,7 @@ def case_runtime_plan(case):
     return {
         "spec_chunk": spec_chunk,
         "brem_chunk": brem_chunk,
-        "line_grid_bins": int(line_grid.size),
+        "line_grid_bins": int(cxr_grid.size),
         "brem_grid_bins": int(brem_grid.size),
         "line_electrons": case.get("Ne"),
         "brem_electrons": case.get("Ne_brem"),

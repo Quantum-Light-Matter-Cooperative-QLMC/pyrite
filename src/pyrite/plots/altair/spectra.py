@@ -7,7 +7,7 @@ sluggish over the fine energy grids; Vega-Lite renders them in the browser and
 pans/zooms interactively at a fraction of the redraw cost.
 
 Non-destructive: this module reuses the exact per-record data prep
-(:func:`pyrite.plots._common._line_brem`) that the matplotlib path uses, so the
+(:func:`pyrite.plots._common._cxr_brem`) that the matplotlib path uses, so the
 physics is identical -- only the renderer and the reported beam-current unit
 differ (these charts report Phs/s/eV/uA; the matplotlib path reports the stored
 per-nA values). The matplotlib ``plots/`` package is left untouched, and these
@@ -38,10 +38,10 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
-from ..._spectral_components import line_spectrum
+from ..._spectral_components import cxr_spectrum
 from ...results import records
 from ...results.store import _detected_background_wide
-from .._common import _best_azimuth, _case_title, _comparison_drop_message, _line_brem
+from .._common import _best_azimuth, _case_title, _comparison_drop_message, _cxr_brem
 from ._typing import _mark_chart
 
 _FRAME_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "component"]
@@ -226,10 +226,10 @@ def _characteristic_view(record, *, include_characteristic):
     return {key: value for key, value in record.items() if key != "spec_characteristic"}
 
 
-def _selected_line_record(record, line_source, *, include_line, include_characteristic):
+def _selected_cxr_record(record, line_source, *, include_cxr, include_characteristic):
     """Score selected line-grid terms without adding characteristic twice."""
     selected = np.zeros_like(np.asarray(line_source, dtype=float))
-    if include_line:
+    if include_cxr:
         selected += np.asarray(line_source, dtype=float)
     if include_characteristic and record.get("spec_characteristic") is not None:
         selected += np.asarray(record["spec_characteristic"], dtype=float)
@@ -243,31 +243,31 @@ def _record_frame(
     settings,
     *,
     include_brem,
-    include_line=False,
+    include_cxr=False,
     include_characteristic=True,
     include_coherent=False,
     sum_components=False,
     meta,
 ):
     if sum_components:
-        scored_record = _selected_line_record(
+        scored_record = _selected_cxr_record(
             r,
             r["spec"],
-            include_line=include_line,
+            include_cxr=include_cxr,
             include_characteristic=include_characteristic,
         )
     else:
         scored_record = _characteristic_view(r, include_characteristic=include_characteristic)
     E = np.asarray(r["E_grid"], dtype=float)
     scale = r["scale"] * _NA_PER_UA
-    line_det, brem_det = _line_brem(scored_record, settings, convolve=False)
-    line_det = np.asarray(line_det, dtype=float)
+    cxr_det, brem_det = _cxr_brem(scored_record, settings, convolve=False)
+    cxr_det = np.asarray(cxr_det, dtype=float)
     brem_det = np.asarray(brem_det, dtype=float)
 
     total_E = E
-    total = (line_det + brem_det) if include_brem else line_det
-    line_basis = total if sum_components else line_det
-    line_grid = np.ones(E.shape, dtype=bool)
+    total = (cxr_det + brem_det) if include_brem else cxr_det
+    cxr_basis = total if sum_components else cxr_det
+    cxr_grid = np.ones(E.shape, dtype=bool)
     brem_E = E
     brem = brem_det
 
@@ -285,8 +285,8 @@ def _record_frame(
             brem_tail = brem_wide[wide_mask]
             total_E = np.concatenate([E, E_tail])
             total = np.concatenate([total, brem_tail])
-            line_basis = np.concatenate([line_det, np.zeros(E_tail.shape, dtype=float)])
-            line_grid = np.concatenate([line_grid, np.zeros(E_tail.shape, dtype=bool)])
+            cxr_basis = np.concatenate([cxr_det, np.zeros(E_tail.shape, dtype=float)])
+            cxr_grid = np.concatenate([cxr_grid, np.zeros(E_tail.shape, dtype=bool)])
             brem_E = np.concatenate([E, E_tail])
             brem = np.concatenate([brem, brem_tail])
 
@@ -295,8 +295,8 @@ def _record_frame(
             {
                 "energy_eV": total_E,
                 "intensity": total * scale,
-                "_line_intensity": line_basis * scale,
-                "_line_grid": line_grid,
+                "_line_intensity": cxr_basis * scale,
+                "_line_grid": cxr_grid,
                 **meta,
                 "component": "total",
             }
@@ -308,21 +308,21 @@ def _record_frame(
                 {
                     "energy_eV": brem_E,
                     "intensity": brem * scale,
-                    "_line_intensity": line_basis * scale,
-                    "_line_grid": line_grid,
+                    "_line_intensity": cxr_basis * scale,
+                    "_line_grid": cxr_grid,
                     **meta,
                     "component": "brem",
                 }
             )
         )
-    if include_line and not sum_components:
+    if include_cxr and not sum_components:
         frames.append(
             pd.DataFrame(
                 {
                     "energy_eV": total_E,
-                    "intensity": line_basis * scale,
-                    "_line_intensity": line_basis * scale,
-                    "_line_grid": line_grid,
+                    "intensity": cxr_basis * scale,
+                    "_line_intensity": cxr_basis * scale,
+                    "_line_grid": cxr_grid,
                     **meta,
                     "component": "line",
                 }
@@ -330,21 +330,21 @@ def _record_frame(
         )
     if include_coherent and r.get("spec_coherent") is not None:
         if sum_components:
-            coherent_record = _selected_line_record(
+            coherent_record = _selected_cxr_record(
                 r,
                 r["spec_coherent"],
-                include_line=include_line,
+                include_cxr=include_cxr,
                 include_characteristic=include_characteristic,
             )
         else:
             coherent_record = {**scored_record, "spec": r["spec_coherent"]}
-        coherent_line, _ = _line_brem(coherent_record, settings, convolve=False)
-        coherent_line = np.asarray(coherent_line, dtype=float)
+        coherent_cxr, _ = _cxr_brem(coherent_record, settings, convolve=False)
+        coherent_cxr = np.asarray(coherent_cxr, dtype=float)
         # The coherent curve shares the total's grid. Its wide tail contains
         # brem in summed mode and zeros in decomposition mode.
         tail_len = total_E.size - E.size
         coherent_total = (
-            coherent_line + brem_det if sum_components and include_brem else coherent_line
+            coherent_cxr + brem_det if sum_components and include_brem else coherent_cxr
         )
         coherent_tail = (
             brem_tail if tail_len and sum_components and include_brem else np.zeros(tail_len)
@@ -358,7 +358,7 @@ def _record_frame(
                     "energy_eV": total_E,
                     "intensity": coherent_basis * scale,
                     "_line_intensity": coherent_basis * scale,
-                    "_line_grid": line_grid,
+                    "_line_grid": cxr_grid,
                     **meta,
                     "component": "coherent",
                 }
@@ -427,15 +427,15 @@ def _decimate_frame(df, max_points):
         tail_positions = np.flatnonzero(~basis["_line_grid"].to_numpy())
         if line_positions.size and tail_positions.size:
             minimum_tail = min(tail_positions.size, max(1, per_trace // _TAIL_BUDGET_DIVISOR))
-            line_budget = min(line_positions.size, per_trace - minimum_tail)
-            tail_budget = min(tail_positions.size, per_trace - line_budget)
+            cxr_budget = min(line_positions.size, per_trace - minimum_tail)
+            tail_budget = min(tail_positions.size, per_trace - cxr_budget)
         elif line_positions.size:
-            line_budget, tail_budget = min(line_positions.size, per_trace), 0
+            cxr_budget, tail_budget = min(line_positions.size, per_trace), 0
         else:
-            line_budget, tail_budget = 0, min(tail_positions.size, per_trace)
+            cxr_budget, tail_budget = 0, min(tail_positions.size, per_trace)
         line_idx = (
-            line_positions[_peak_preserving_indices(basis_intensity[line_positions], line_budget)]
-            if line_budget
+            line_positions[_peak_preserving_indices(basis_intensity[line_positions], cxr_budget)]
+            if cxr_budget
             else np.array([], dtype=int)
         )
         tail_idx = (
@@ -457,11 +457,11 @@ def _compact_component_frame(df):
     return compact
 
 
-def _fold_components(chart, include_brem, include_line=False, include_coherent=False):
+def _fold_components(chart, include_brem, include_cxr=False, include_coherent=False):
     components = ["total"]
     if include_brem:
         components.append("brem")
-    if include_line:
+    if include_cxr:
         components.append("line")
     if include_coherent:
         components.append("coherent")
@@ -473,7 +473,7 @@ def spectrum_frame(
     settings,
     *,
     include_brem=True,
-    include_line=False,
+    include_cxr=False,
     include_characteristic=True,
     include_coherent=False,
     collapse_azimuth=True,
@@ -511,7 +511,7 @@ def spectrum_frame(
                     r,
                     settings,
                     include_brem=include_brem,
-                    include_line=include_line,
+                    include_cxr=include_cxr,
                     include_characteristic=include_characteristic,
                     include_coherent=include_coherent,
                     meta=meta,
@@ -528,7 +528,7 @@ def spectrum_chart(
     *,
     tilt_deg=None,
     include_brem=True,
-    include_line=False,
+    include_cxr=False,
     include_characteristic=True,
     include_coherent=False,
     collapse_azimuth=True,
@@ -560,7 +560,7 @@ def spectrum_chart(
         recs,
         settings,
         include_brem=include_brem,
-        include_line=include_line,
+        include_cxr=include_cxr,
         include_characteristic=include_characteristic,
         include_coherent=include_coherent,
         collapse_azimuth=collapse_azimuth,
@@ -581,9 +581,7 @@ def spectrum_chart(
     )
 
     compact = _compact_component_frame(df)
-    base = _fold_components(
-        alt.Chart(compact), include_brem, include_line, include_coherent
-    ).encode(
+    base = _fold_components(alt.Chart(compact), include_brem, include_cxr, include_coherent).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()),
         y=alt.Y(
             "intensity:Q",
@@ -594,7 +592,7 @@ def spectrum_chart(
         color=alt.Color("E0_keV:N", title="beam energy (keV)", legend=_spectrum_legend()),
         tooltip=["E0_keV:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
-    layers = _component_layers(base, include_brem, include_line, include_coherent)
+    layers = _component_layers(base, include_brem, include_cxr, include_coherent)
     return _style_chart(
         alt.layer(*layers)
         .properties(width=width, height=height, title=_spectrum_title(title))
@@ -602,7 +600,7 @@ def spectrum_chart(
     )
 
 
-def _component_layers(base, include_brem, include_line=False, include_coherent=False):
+def _component_layers(base, include_brem, include_cxr=False, include_coherent=False):
     """Shared component -> mark-style layering for the three spectrum-chart
     builders below: ``total`` is the incoherent (or checkpoint-default) line,
     solid; ``brem`` and ``line`` are decomposition overlays of that SAME trace;
@@ -616,7 +614,7 @@ def _component_layers(base, include_brem, include_line=False, include_coherent=F
                 strokeWidth=1.1, strokeDash=[4, 3], opacity=0.7
             )
         )
-    if include_line:
+    if include_cxr:
         layers.append(
             base.transform_filter(alt.datum.component == "line").mark_line(
                 strokeWidth=1.6, strokeDash=[1, 1], opacity=0.85
@@ -637,7 +635,7 @@ def _compare_frame(
     *,
     hue,
     include_brem=True,
-    include_line=False,
+    include_cxr=False,
     include_characteristic=True,
     include_coherent=False,
     sum_components=False,
@@ -662,7 +660,7 @@ def _compare_frame(
     for grp in groups.values():
         r = max(
             grp,
-            key=lambda rr: float(np.max(line_spectrum(rr, characteristic=include_characteristic))),
+            key=lambda rr: float(np.max(cxr_spectrum(rr, characteristic=include_characteristic))),
         )
         row_meta = {
             "E0_keV": float(r["case"]["E0_keV"]),
@@ -674,7 +672,7 @@ def _compare_frame(
                 r,
                 settings,
                 include_brem=include_brem,
-                include_line=include_line,
+                include_cxr=include_cxr,
                 include_characteristic=include_characteristic,
                 include_coherent=include_coherent,
                 sum_components=sum_components,
@@ -693,7 +691,7 @@ def compare_spectrum_chart(
     *,
     hue,
     include_brem=True,
-    include_line=False,
+    include_cxr=False,
     include_characteristic=True,
     include_coherent=False,
     sum_components=False,
@@ -723,7 +721,7 @@ def compare_spectrum_chart(
         settings,
         hue=hue,
         include_brem=include_brem,
-        include_line=include_line,
+        include_cxr=include_cxr,
         include_characteristic=include_characteristic,
         include_coherent=include_coherent,
         sum_components=sum_components,
@@ -746,9 +744,9 @@ def compare_spectrum_chart(
 
     compact = _compact_component_frame(df)
     show_brem_layer = include_brem and not sum_components
-    show_line_layer = include_line and not sum_components
+    show_cxr_layer = include_cxr and not sum_components
     base = _fold_components(
-        alt.Chart(compact), show_brem_layer, show_line_layer, include_coherent
+        alt.Chart(compact), show_brem_layer, show_cxr_layer, include_coherent
     ).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()),
         y=alt.Y(
@@ -760,7 +758,7 @@ def compare_spectrum_chart(
         color=alt.Color(f"{hue}:N", title=hue_title, legend=_spectrum_legend()),
         tooltip=[f"{hue}:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
-    layers = _component_layers(base, show_brem_layer, show_line_layer, include_coherent)
+    layers = _component_layers(base, show_brem_layer, show_cxr_layer, include_coherent)
     return _style_chart(
         alt.layer(*layers)
         .properties(width=width, height=height, title=_spectrum_title(title))
@@ -773,7 +771,7 @@ def _multi_case_frame(
     settings,
     *,
     include_brem=True,
-    include_line=False,
+    include_cxr=False,
     include_characteristic=True,
     include_coherent=False,
     sum_components=False,
@@ -794,7 +792,7 @@ def _multi_case_frame(
                 r,
                 settings,
                 include_brem=include_brem,
-                include_line=include_line,
+                include_cxr=include_cxr,
                 include_characteristic=include_characteristic,
                 include_coherent=include_coherent,
                 sum_components=sum_components,
@@ -812,7 +810,7 @@ def multi_case_spectrum_chart(
     settings,
     *,
     include_brem=True,
-    include_line=False,
+    include_cxr=False,
     include_characteristic=True,
     include_coherent=False,
     sum_components=False,
@@ -841,7 +839,7 @@ def multi_case_spectrum_chart(
         cases,
         settings,
         include_brem=include_brem,
-        include_line=include_line,
+        include_cxr=include_cxr,
         include_characteristic=include_characteristic,
         include_coherent=include_coherent,
         sum_components=sum_components,
@@ -862,9 +860,9 @@ def multi_case_spectrum_chart(
 
     compact = _compact_component_frame(df)
     show_brem_layer = include_brem and not sum_components
-    show_line_layer = include_line and not sum_components
+    show_cxr_layer = include_cxr and not sum_components
     base = _fold_components(
-        alt.Chart(compact), show_brem_layer, show_line_layer, include_coherent
+        alt.Chart(compact), show_brem_layer, show_cxr_layer, include_coherent
     ).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()),
         y=alt.Y(
@@ -876,7 +874,7 @@ def multi_case_spectrum_chart(
         color=alt.Color("label:N", title="case", legend=_spectrum_legend()),
         tooltip=["label:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
-    layers = _component_layers(base, show_brem_layer, show_line_layer, include_coherent)
+    layers = _component_layers(base, show_brem_layer, show_cxr_layer, include_coherent)
     return _style_chart(
         alt.layer(*layers)
         .properties(width=width, height=height, title=_spectrum_title("Case comparison"))
@@ -898,7 +896,7 @@ def material_comparison_chart(
     dropped,
     select="quality_line",
     beam_energy_keV=None,
-    min_line_quality: float | None = 0.5,
+    min_cxr_quality: float | None = 0.5,
     width=760,
     height=460,
 ):
@@ -929,7 +927,7 @@ def material_comparison_chart(
     energy_scope = (
         "all beam energies" if beam_energy_keV is None else f"{beam_energy_keV:g} keV beam energy"
     )
-    quality_scope = "" if min_line_quality is None else f", line quality >= {min_line_quality:g}"
+    quality_scope = "" if min_cxr_quality is None else f", line quality >= {min_cxr_quality:g}"
     title = f"Cross-material comparison — {selection_title} ({energy_scope}{quality_scope})"
 
     base = alt.Chart(df).encode(
@@ -976,3 +974,17 @@ def material_comparison_chart(
             f"{_comparison_drop_message(dropped)}"
         )
     return _style_chart(chart.interactive(bind_y=False))
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {"_selected_line_record": "_selected_cxr_record"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

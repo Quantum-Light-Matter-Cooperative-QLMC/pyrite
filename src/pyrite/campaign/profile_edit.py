@@ -10,9 +10,9 @@ import difflib
 import tomlkit
 
 from pyrite import DATA_DIR
+from pyrite._cxr_grid_policy import ENVIRONMENT_NAMES as CXR_GRID_ENVIRONMENT_NAMES
+from pyrite._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS, check_selector_combination
 from pyrite._env import env_value
-from pyrite._line_grid_policy import ENVIRONMENT_NAMES as LINE_GRID_ENVIRONMENT_NAMES
-from pyrite._line_grid_policy import PROFILE_LINE_GRID_SELECTORS, check_selector_combination
 from pyrite._numerics import (
     PROFILE_NUMERICS_KEYS,
     SAMPLING_KEYS,
@@ -179,7 +179,7 @@ def set_numerics(document, name, updates):
     validate_profile_numerics(merged)
     for key, value in updates.items():
         target[key] = values_item([value]) if key in SAMPLING_KEYS else value
-    _check_line_grid_policy(target, profile_line_grid_values(target))
+    _check_cxr_grid_policy(target, profile_cxr_grid_values(target))
     return tuple(updates)
 
 
@@ -197,11 +197,11 @@ def reset_numerics(document, name, fields=()):
     return removed
 
 
-class LineGridPolicyConflict(ValueError):
+class CxrGridPolicyConflict(ValueError):
     """A line-grid policy combination no case could resolve."""
 
 
-def profile_line_grid_values(profile):
+def profile_cxr_grid_values(profile):
     """Return the explicit ``line_grid_policy`` table as plain values, or ``None``."""
     table = profile.get("line_grid_policy")
     if table is None:
@@ -211,7 +211,7 @@ def profile_line_grid_values(profile):
     return dict(table.unwrap() if hasattr(table, "unwrap") else table)
 
 
-def line_grid_fields(explicit):
+def cxr_grid_fields(explicit):
     """Explicit, effective and source rows for each profile line-grid selector."""
     explicit = explicit or {}
     return [
@@ -222,23 +222,23 @@ def line_grid_fields(explicit):
             "source": "profile" if key in explicit else "built-in default",
             "choices": list(choices),
         }
-        for key, choices in PROFILE_LINE_GRID_SELECTORS.items()
+        for key, choices in PROFILE_CXR_GRID_SELECTORS.items()
     ]
 
 
-def _check_line_grid_policy(profile, policy):
+def _check_cxr_grid_policy(profile, policy):
     """Refuse a non-empty POLICY that no case of PROFILE could resolve."""
     if not policy:
         return
-    effective = {row["key"]: row["effective"] for row in line_grid_fields(policy)}
+    effective = {row["key"]: row["effective"] for row in cxr_grid_fields(policy)}
     try:
         check_selector_combination(**effective)
     except ValueError as exc:
-        raise LineGridPolicyConflict(str(exc)) from None
+        raise CxrGridPolicyConflict(str(exc)) from None
     # Automatic resolution refuses the coherent route without feature windows
     # (#117); `windows = true` resolves it inside per-line windows (#350).
     if profile.get("emission") in ("coherent", "both") and policy.get("windows") is not True:
-        raise LineGridPolicyConflict(
+        raise CxrGridPolicyConflict(
             "a line-grid policy without feature windows resolves every line grid "
             f"automatically, which the {profile['emission']} emission route does not "
             "support (#117); add 'windows = true' to [line_grid_policy], or keep an "
@@ -246,38 +246,38 @@ def _check_line_grid_policy(profile, policy):
         )
     max_de_frac = profile.get("max_dE_frac", 0.0)
     if effective["quadrature"] == "bin-mean" and max_de_frac > 0.0:
-        raise LineGridPolicyConflict(
+        raise CxrGridPolicyConflict(
             "bin-mean quadrature is incompatible with a positive max_dE_frac; reset it "
             "with 'pyrite profile numerics reset NAME maximum-fractional-energy-loss'"
         )
 
 
-def set_line_grid_policy(document, name, updates):
+def set_cxr_grid_policy(document, name, updates):
     """Validate and stage line-grid selectors; return ``{key: previous}`` for changed keys."""
     target = existing_profile(document, name)
-    current = profile_line_grid_values(target) or {}
+    current = profile_cxr_grid_values(target) or {}
     merged = {**current, **updates}
-    _check_line_grid_policy(target, merged)
+    _check_cxr_grid_policy(target, merged)
     # Edit in place: TOML-only keys (`windows`, `max_points`) stay as written.
     table = target.get("line_grid_policy")
     if table is None:
         table = target["line_grid_policy"] = tomlkit.table()
-    for key in PROFILE_LINE_GRID_SELECTORS:
+    for key in PROFILE_CXR_GRID_SELECTORS:
         if key in updates:
             table[key] = updates[key]
     return {key: current.get(key) for key, value in updates.items() if current.get(key) != value}
 
 
-def reset_line_grid_policy(document, name, fields=()):
+def reset_cxr_grid_policy(document, name, fields=()):
     """Remove selected selectors, or the whole policy when FIELDS is empty."""
     target = existing_profile(document, name)
-    current = profile_line_grid_values(target)
+    current = profile_cxr_grid_values(target)
     if current is None:
         return ()
     selected = tuple(fields) or tuple(current)
     removed = tuple(key for key in selected if key in current)
     remaining = {key: value for key, value in current.items() if key not in selected}
-    _check_line_grid_policy(target, remaining)
+    _check_cxr_grid_policy(target, remaining)
     if remaining:
         for key in removed:
             target["line_grid_policy"].pop(key)
@@ -286,19 +286,19 @@ def reset_line_grid_policy(document, name, fields=()):
     return removed
 
 
-def line_grid_sources(document, profile):
+def cxr_grid_sources(document, profile):
     """Describe which line-grid source this profile's cases use, before resolution.
 
-    Mirrors ``campaign.sweep._line_grid_for_energy``: any profile policy turns
+    Mirrors ``campaign.sweep._cxr_grid_for_energy``: any profile policy turns
     automatic resolution on for every case and outranks explicit and stored
     grids; otherwise explicit ``E_grid_line`` wins, then a stored per-energy row
     (``energy_grid_refs``/``E_grid_line_by_energy``), then automatic resolution
     for uncovered energies. ``PYRITE_ENERGY_GRID_*`` outranks stored rows only.
     """
-    policy = profile_line_grid_values(profile)
+    policy = profile_cxr_grid_values(profile)
     overrides = profile_overrides(profile)
     shared = document.get("energy_grids", {})
-    environment = [name for name in LINE_GRID_ENVIRONMENT_NAMES if env_value(name) is not None]
+    environment = [name for name in CXR_GRID_ENVIRONMENT_NAMES if env_value(name) is not None]
     return {
         "automatic_for_every_case": bool(policy),
         "explicit_line_grid": "E_grid_line" in profile,
@@ -350,12 +350,15 @@ def _precision_table(values):
     table = tomlkit.table()
     for key in Precision.__dataclass_fields__:
         if key in values and values[key] is not None:
-            table[key] = _toml_value(values[key])
+            value = values[key]
+            if key == "observables":
+                value = ["cxr" if name == "line" else name for name in value]
+            table[key] = _toml_value(value)
     return table
 
 
 #: CLI spellings of the fixed electron-count profile keys.
-SAMPLING_FLAGS = {"n_electrons": "line-trials", "n_electrons_brem": "brem-trials"}
+SAMPLING_FLAGS = {"n_electrons": "cxr-trials", "n_electrons_brem": "brem-trials"}
 #: Fields a first policy takes from :data:`DEFAULT_PRECISION` unless supplied.
 _INITIAL_FIELDS = (*REQUIRED_FIELDS, "observables")
 
@@ -653,7 +656,7 @@ def profile_payload(document, name):
         ),
         "emission": profile.get("emission"),
         "temporal_profile": profile.get("temporal_profile") is True,
-        "line_grid_policy": profile_line_grid_values(profile),
+        "line_grid_policy": profile_cxr_grid_values(profile),
         "precision": dict(
             zip(
                 ("explicit", "effective", "source", "fixed_reason"),
@@ -918,7 +921,7 @@ def apply_emission_add(target, coherent, incoherent):
     label = _emission_label(new_modes)
     auto_both = label == "both" and _emission_label(current) != "both"
     target["emission"] = label
-    _check_line_grid_policy(target, profile_line_grid_values(target))
+    _check_cxr_grid_policy(target, profile_cxr_grid_values(target))
     return label, added, auto_both
 
 
@@ -1103,7 +1106,7 @@ def set_profile(
         target["temporal_profile"] = True
     elif temporal_profile is False:
         target.pop("temporal_profile", None)
-    _check_line_grid_policy(target, profile_line_grid_values(target))
+    _check_cxr_grid_policy(target, profile_cxr_grid_values(target))
     return overwriting
 
 
@@ -1135,3 +1138,27 @@ def delete_profile(document, name):
     n_overrides = sum(1 for row in overrides.values() if isinstance(row, dict) and row)
     del profile_rows(document)[name]
     return n_overrides
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {
+    "LineGridPolicyConflict": "CxrGridPolicyConflict",
+    "line_grid_fields": "cxr_grid_fields",
+    "_check_line_grid_policy": "_check_cxr_grid_policy",
+    "set_line_grid_policy": "set_cxr_grid_policy",
+    "reset_line_grid_policy": "reset_cxr_grid_policy",
+    "line_grid_sources": "cxr_grid_sources",
+}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]
+
+
+_CXR_RENAMED_EXPORTS.update({"profile_line_grid_values": "profile_cxr_grid_values"})

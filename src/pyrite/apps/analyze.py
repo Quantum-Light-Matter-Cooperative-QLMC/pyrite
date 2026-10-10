@@ -324,7 +324,7 @@ def apply_characteristic(results, *, include: bool):
     """Return a view with characteristic radiation included or removed.
 
     Records keep ``spec_characteristic`` separate from the line arrays, and
-    consumers add it through :func:`pyrite._spectral_components.line_spectrum`.
+    consumers add it through :func:`pyrite._spectral_components.cxr_spectrum`.
     When ``include`` is false, return shallow record copies without that
     component. Source records are never mutated.
 

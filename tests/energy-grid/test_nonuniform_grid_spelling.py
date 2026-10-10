@@ -29,7 +29,7 @@ E_grid_brem = { logspace = { start = 1.7, stop = 4.5, num = 5 } }
 E_grid_brem = { values = [50.0, 80.0, 200.0, 900.0] }
 
 [energy_grids.graded]
-line_by_energy = [
+cxr_by_energy = [
   { energy_keV = 30.0, grid = { values = [10.0, 20.0, 45.0, 120.0] }, source = "derived" },
 ]
 
@@ -96,7 +96,7 @@ def test_json_show_keeps_uniform_payloads_and_describes_graded_ones(nonuniform_c
     raw, energy_grids, brem_by_material, refs = apply.resolved_show_inputs(
         catalog_path=nonuniform_catalog
     )
-    result = cli_json.line_grid_show(
+    result = cli_json.cxr_grid_show(
         raw["materials"], energy_grids, brem_by_material, {}, artifact_refs=refs
     )
     by_material = {item["material"]: item for item in result.payload["materials"]}
@@ -117,7 +117,7 @@ def test_json_show_uniform_payload_shape_is_unchanged(tmp_path):
     path = tmp_path / "materials.toml"
     path.write_text(BASE_TOML)
     raw, energy_grids, brem_by_material, refs = apply.resolved_show_inputs(catalog_path=path)
-    result = cli_json.line_grid_show(
+    result = cli_json.cxr_grid_show(
         raw["materials"], energy_grids, brem_by_material, {}, artifact_refs=refs
     )
     entry = result.payload["materials"][0]

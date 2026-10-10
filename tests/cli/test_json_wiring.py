@@ -156,7 +156,7 @@ def test_line_grid_show_json_reads_catalog_and_provenance(monkeypatch, tmp_path)
 [materials.hopg]
 
 [energy_grids.hopg]
-line_by_energy = [
+cxr_by_energy = [
   { energy_keV = 30, grid = { linspace = { start = 1, stop = 2, num = 3 } }, source = "derived" },
 ]
 
@@ -191,7 +191,7 @@ def test_line_grid_show_json_resolves_selected_profile_artifact(monkeypatch, tmp
 [materials.hopg]
 
 [energy_grids.hopg]
-line_by_energy = [
+cxr_by_energy = [
   {{ energy_keV = 30, grid = {{ linspace = {{ start = 1, stop = 2, num = 3 }} }}, source = "derived" }},
 ]
 
@@ -275,10 +275,10 @@ def test_blaze_json_suppresses_human_output(monkeypatch):
 
 @pytest.mark.parametrize(
     ("command", "name"),
-    [(recompute_cli.brem_command, "rebrem"), (recompute_cli.line_command, "reline")],
+    [(recompute_cli.brem_command, "rebrem"), (recompute_cli.cxr_command, "reline")],
 )
 def test_recompute_json_uses_status_for_partial_summary(monkeypatch, command, name):
-    target = f"{name}_checkpoints"
+    target = "recxr_checkpoints" if name == "reline" else f"{name}_checkpoints"
 
     def _driver(*_args, summary_status, **_kwargs):
         print("human progress")
@@ -302,7 +302,7 @@ def test_recompute_json_uses_status_for_partial_summary(monkeypatch, command, na
     ("command", "low_level"),
     [
         (recompute_cli.brem_command, "repair_checkpoint"),
-        (recompute_cli.line_command, "reline_checkpoint"),
+        (recompute_cli.cxr_command, "recxr_checkpoint"),
     ],
 )
 def test_recompute_json_marks_low_level_exception_failed(monkeypatch, command, low_level):

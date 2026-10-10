@@ -125,10 +125,10 @@ def stream_spectrum_from_artifact(
     from . import (
         _brem_wide_from_segments,
         _characteristic_from_segments,
-        _lines_for_segments,
+        _cxr_for_segments,
         _segments_on_device,
     )
-    from .line_grid import check_line_truncation, line_truncation_audit
+    from .cxr_grid import check_cxr_truncation, cxr_truncation_audit
 
     artifact = read_trajectory_artifact(path, load_transport=False)
     case, inputs = _checked_case_and_inputs(artifact, case)
@@ -141,7 +141,7 @@ def stream_spectrum_from_artifact(
     E_grid, E_brem, n_hat = inputs["E_grid"], inputs["E_brem"], inputs["n_hat"]
     groove, abs_layers = inputs["groove"], case.get("abs_layers")
     Ne_lines, Ne_brem = inputs["Ne_lines"], inputs["Ne_brem"]
-    audit = line_truncation_audit(case, E_grid, n_electrons=Ne_lines)
+    audit = cxr_truncation_audit(case, E_grid, n_electrons=Ne_lines)
     table_cache: dict = {}
     spec = spec_characteristic = brem_wide = None
     n_segments = 0
@@ -152,7 +152,7 @@ def stream_spectrum_from_artifact(
             continue
         block = _segments_on_device(segs)
         parts = (
-            _lines_for_segments(
+            _cxr_for_segments(
                 block,
                 E_grid,
                 case,
@@ -185,7 +185,7 @@ def stream_spectrum_from_artifact(
         spec_characteristic = np.zeros(E_grid.shape)
         brem_wide = np.zeros(E_brem.shape)
     assert spec_characteristic is not None and brem_wide is not None
-    truncation = None if audit is None else check_line_truncation(case, audit)
+    truncation = None if audit is None else check_cxr_truncation(case, audit)
     out = dict(
         E_grid=E_grid,
         spec=spec,

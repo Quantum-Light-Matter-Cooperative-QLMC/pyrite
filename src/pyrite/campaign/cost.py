@@ -85,23 +85,23 @@ def _mean_segments_per_electron(case):
 def case_cost(case):
     """Estimated RELATIVE matmul-element count for one ``run_case`` dict.
 
-    The dominant runtime is the chunked ``mc_spectrum`` / ``mc_brem_spectrum``
+    The dominant runtime is the chunked ``mc_cxr_spectrum`` / ``mc_brem_spectrum``
     matmuls of shape ``(n_segments, nbins)``, so per case::
 
-        cost ~ N_seg_line * nbins_line  +  N_seg_brem * nbins_brem
+        cost ~ N_seg_line * nbins_cxr  +  N_seg_brem * nbins_brem
 
     with ``N_seg = electrons * segments-per-electron`` (see
-    :func:`_mean_segments_per_electron`) and ``nbins_line`` / ``nbins_brem`` the
+    :func:`_mean_segments_per_electron`) and ``nbins_cxr`` / ``nbins_brem`` the
     evaluated grid widths (both vary by ``E0``). Pure function of the case dict;
     runs no transport. Callers normalize by the sweep total, so the absolute
     scale is meaningless -- only the ordering across cases is used."""
-    nbins_line = decode_energy_grid(case.get("E_grid_line", case["E_grid"])).size
+    nbins_cxr = decode_energy_grid(case.get("E_grid_line", case["E_grid"])).size
     brem = case.get("E_grid_brem")
     nbins_brem = decode_energy_grid(brem).size if brem is not None else 0
     steps = _mean_segments_per_electron(case)
     n_line = float(case.get("Ne", 0) or 0)
     n_brem = float(case.get("Ne_brem", 0) or 0)
-    return steps * (n_line * nbins_line + n_brem * nbins_brem)
+    return steps * (n_line * nbins_cxr + n_brem * nbins_brem)
 
 
 def sweep_cost_weights(cases):

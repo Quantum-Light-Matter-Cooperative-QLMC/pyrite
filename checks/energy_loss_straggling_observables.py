@@ -42,7 +42,7 @@ from pathlib import Path
 import numpy as np
 
 from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
-from pyrite.montecarlo.spectrum import mc_brem_spectrum, mc_spectrum
+from pyrite.montecarlo.spectrum import mc_brem_spectrum, mc_cxr_spectrum
 from pyrite.montecarlo.transport import beta_from_keV, simulate_trajectories
 
 E0_KEV = 25.0
@@ -172,15 +172,15 @@ def _line_grid() -> np.ndarray:
     )
 
 
-def _spectrum_observables(segments: dict, line_grid: np.ndarray) -> dict[str, float]:
+def _spectrum_observables(segments: dict, cxr_grid: np.ndarray) -> dict[str, float]:
     with np.errstate(all="ignore"):
         brem = np.asarray(
             mc_brem_spectrum(segments, BREM_GRID_EV, composition=COMPOSITION), dtype=float
         )
         line = np.asarray(
-            mc_spectrum(
+            mc_cxr_spectrum(
                 segments,
-                line_grid,
+                cxr_grid,
                 crystal="hopg",
                 hkl_list=[HKL],
                 B_ang2=0.8,
@@ -192,9 +192,9 @@ def _spectrum_observables(segments: dict, line_grid: np.ndarray) -> dict[str, fl
         )
     return {
         "brem_yield": float(np.trapezoid(brem, BREM_GRID_EV)),
-        "line_yield": float(np.trapezoid(line, line_grid)),
+        "line_yield": float(np.trapezoid(line, cxr_grid)),
         "line_peak": float(line.max()),
-        "line_peak_energy_eV": float(line_grid[int(np.argmax(line))]),
+        "line_peak_energy_eV": float(cxr_grid[int(np.argmax(line))]),
         "_brem": brem,
     }
 
@@ -250,7 +250,7 @@ def _git_revision() -> str:
 def run(*, quick: bool) -> dict:
     Ne = QUICK_NE if quick else FULL_NE
     seeds = SEEDS[:QUICK_SEEDS] if quick else SEEDS
-    line_grid = _line_grid()
+    cxr_grid = _line_grid()
     thin: dict[bool, list[dict[str, float]]] = {False: [], True: []}
     thick: dict[bool, list[dict[str, float]]] = {False: [], True: []}
     shape_distances = []
@@ -270,7 +270,7 @@ def run(*, quick: bool) -> dict:
             }
             thin_segments = simulate_trajectories(thickness_ang=THIN_ANG, **common)
             thin_metrics = _terminal_observables(thin_segments)
-            spectra[straggling] = _spectrum_observables(thin_segments, line_grid)
+            spectra[straggling] = _spectrum_observables(thin_segments, cxr_grid)
             thin_metrics.update(spectra[straggling])
             thin[straggling].append(thin_metrics)
 

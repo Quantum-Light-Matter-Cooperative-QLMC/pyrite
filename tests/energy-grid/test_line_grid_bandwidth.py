@@ -12,37 +12,37 @@ import numpy as np
 import pytest
 
 from pyrite._backend import _to_cpu, xp
-from pyrite._line_grid_policy import (
+from pyrite._cxr_grid_policy import (
     AUTOMATIC_BANDWIDTH_POLICY,
+    CXR_GRID_POLICY_SCHEMA,
     DEFAULT_BANDWIDTH_TRUNCATION,
-    LINE_GRID_POLICY_SCHEMA,
     RESONANCE_BANDWIDTH_POLICY,
-    RESONANCE_LINE_GRID_POLICY_SCHEMA,
-    LineGridToleranceError,
-    LineGridTruncationWarning,
-    LineYieldStatisticsWarning,
-    resolve_line_grid_policy,
+    RESONANCE_CXR_GRID_POLICY_SCHEMA,
+    CxrGridToleranceError,
+    CxrGridTruncationWarning,
+    CxrYieldStatisticsWarning,
+    resolve_cxr_grid_policy,
     resolved_coordinates,
 )
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import build_cases
 from pyrite.energy_grid.bandwidth_check import reference_axis, shape_and_counts
-from pyrite.montecarlo.runner.line_grid import (
-    LINE_YIELD_RELATIVE_SE_LIMIT,
-    _measured_line_grid,
-    check_line_truncation,
-    line_truncation_audit,
-    line_yield_statistics,
+from pyrite.montecarlo.runner.cxr_grid import (
+    CXR_YIELD_RELATIVE_SE_LIMIT,
+    _measured_cxr_grid,
+    check_cxr_truncation,
+    cxr_truncation_audit,
+    cxr_yield_statistics,
 )
-from pyrite.montecarlo.spectrum.line_seeds import (
+from pyrite.montecarlo.spectrum.cxr._bin_quadrature import sincsq_window_mass
+from pyrite.montecarlo.spectrum.cxr._kernels import _accumulate_edge_truncation
+from pyrite.montecarlo.spectrum.cxr_seeds import (
     ResonancePopulation,
-    case_line_stop_eV,
+    case_cxr_stop_eV,
     characteristic_stop_eV,
     resonance_population_stop_eV,
     sincsq_upper_tail_bound,
 )
-from pyrite.montecarlo.spectrum.lines._bin_quadrature import sincsq_window_mass
-from pyrite.montecarlo.spectrum.lines._kernels import _accumulate_edge_truncation
 
 _RESONANCE = {"bandwidth": RESONANCE_BANDWIDTH_POLICY}
 
@@ -127,9 +127,9 @@ def test_characteristic_stop_bounds_each_lorentzian_tail():
 
 
 def test_default_policy_payload_is_unchanged():
-    policy = resolve_line_grid_policy(start_eV=50.0, stop_eV=1000.0)
+    policy = resolve_cxr_grid_policy(start_eV=50.0, stop_eV=1000.0)
     payload = policy.payload()
-    assert payload["schema"] == LINE_GRID_POLICY_SCHEMA
+    assert payload["schema"] == CXR_GRID_POLICY_SCHEMA
     assert payload["bandwidth"] == {
         "policy": AUTOMATIC_BANDWIDTH_POLICY,
         "start_eV": 50.0,
@@ -139,8 +139,8 @@ def test_default_policy_payload_is_unchanged():
 
 
 def test_resonance_policy_payload_carries_its_share():
-    payload = resolve_line_grid_policy(start_eV=50.0, stop_eV=1000.0, per_call=_RESONANCE).payload()
-    assert payload["schema"] == RESONANCE_LINE_GRID_POLICY_SCHEMA
+    payload = resolve_cxr_grid_policy(start_eV=50.0, stop_eV=1000.0, per_call=_RESONANCE).payload()
+    assert payload["schema"] == RESONANCE_CXR_GRID_POLICY_SCHEMA
     assert payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
     assert payload["bandwidth"]["truncation_limit"] == DEFAULT_BANDWIDTH_TRUNCATION
     assert payload["sources"]["bandwidth"] == "per-call"
@@ -148,15 +148,15 @@ def test_resonance_policy_payload_carries_its_share():
 
 def test_resonance_policy_refuses_windows_and_unknown_names():
     with pytest.raises(ValueError, match="cannot be combined with windows"):
-        resolve_line_grid_policy(
+        resolve_cxr_grid_policy(
             start_eV=50.0, stop_eV=1000.0, per_call={**_RESONANCE, "windows": True}
         )
     with pytest.raises(ValueError, match="bandwidth must be one of"):
-        resolve_line_grid_policy(start_eV=50.0, stop_eV=1000.0, per_call={"bandwidth": "log"})
+        resolve_cxr_grid_policy(start_eV=50.0, stop_eV=1000.0, per_call={"bandwidth": "log"})
 
 
 def test_measured_stop_must_lie_under_the_cap():
-    payload = resolve_line_grid_policy(start_eV=50.0, stop_eV=1000.0, per_call=_RESONANCE).payload()
+    payload = resolve_cxr_grid_policy(start_eV=50.0, stop_eV=1000.0, per_call=_RESONANCE).payload()
     grid, record = resolved_coordinates(payload, 1.0, dtype=np.float64, stop_eV=500.0)
     assert grid[-1] == 500.0 and record["stop_eV"] == 500.0
     with pytest.raises(ValueError, match="outside"):
@@ -166,7 +166,7 @@ def test_measured_stop_must_lie_under_the_cap():
 def test_high_energy_hbn_builds_under_measured_bandwidth(monkeypatch):
     monkeypatch.setenv("PYRITE_ENERGY_GRID_MAX_POINTS", "200000")
     sweep = material_sweep("hbn")
-    sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=5000.0), line_grid_policy=_RESONANCE)
+    sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=5000.0), cxr_grid_policy=_RESONANCE)
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
     bandwidth = case["line_grid_policy"]["bandwidth"]
     assert bandwidth["policy"] == RESONANCE_BANDWIDTH_POLICY
@@ -189,10 +189,10 @@ def _audited_case(limit=1e-4):
 
 
 def test_audit_is_only_built_for_the_measured_bandwidth():
-    assert line_truncation_audit({"line_grid_policy": None}, np.arange(10.0)) is None
+    assert cxr_truncation_audit({"line_grid_policy": None}, np.arange(10.0)) is None
     default = {"line_grid_policy": {"bandwidth": {"policy": AUTOMATIC_BANDWIDTH_POLICY}}}
-    assert line_truncation_audit(default, np.arange(10.0)) is None
-    audit = line_truncation_audit(_audited_case(), np.linspace(50.0, 1000.0, 5))
+    assert cxr_truncation_audit(default, np.arange(10.0)) is None
+    audit = cxr_truncation_audit(_audited_case(), np.linspace(50.0, 1000.0, 5))
     assert audit == {"start_eV": 50.0, "stop_eV": 1000.0}
 
 
@@ -211,11 +211,11 @@ def test_audit_accumulates_and_gates_the_upper_edge():
         + min(1.0, 1.0 / (np.pi * np.pi / 100.0 * 100.0)) * 100.0
     )
     assert float(audit["mass_above"]) == pytest.approx(expected_above)
-    with pytest.raises(LineGridToleranceError, match="above the 0.0001 bandwidth share"):
-        check_line_truncation(case, audit)
+    with pytest.raises(CxrGridToleranceError, match="above the 0.0001 bandwidth share"):
+        check_cxr_truncation(case, audit)
     narrow = {"start_eV": 50.0, "stop_eV": 1000.0}
     _accumulate_edge_truncation(narrow, E_r[:1], xp.asarray([np.pi / 0.01]), weight[:1])
-    record = check_line_truncation(case, narrow)
+    record = check_cxr_truncation(case, narrow)
     assert record["upper_fraction_bound"] <= 1e-4
     assert record["lower_fraction_bound"] > 0.0
 
@@ -229,14 +229,14 @@ def test_audit_at_the_kinematic_ceiling_warns_instead_of_refusing():
     _accumulate_edge_truncation(
         audit, xp.asarray([900.0]), xp.asarray([np.pi / 100.0]), xp.asarray([1.0])
     )
-    with pytest.warns(LineGridTruncationWarning, match="kinematic ceiling"):
-        record = check_line_truncation(case, audit)
+    with pytest.warns(CxrGridTruncationWarning, match="kinematic ceiling"):
+        record = check_cxr_truncation(case, audit)
     assert record["capped_at_ceiling"]
     assert record["upper_fraction_bound"] > 1e-4
 
 
 def test_audit_sums_line_mass_per_electron_when_counted():
-    audit = line_truncation_audit(_audited_case(), np.linspace(50.0, 1000.0, 5), n_electrons=3)
+    audit = cxr_truncation_audit(_audited_case(), np.linspace(50.0, 1000.0, 5), n_electrons=3)
     assert audit["n_electrons"] == 3
     E_r = xp.asarray([500.0, 600.0, 700.0])
     a_width = xp.asarray([np.pi, np.pi, np.pi / 2.0])
@@ -249,11 +249,11 @@ def test_audit_sums_line_mass_per_electron_when_counted():
 
 def test_line_yield_statistics_is_the_relative_standard_error_of_the_mean():
     mass = np.array([1.0, 2.0, 3.0, 0.0])
-    stats = line_yield_statistics(mass)
+    stats = cxr_yield_statistics(mass)
     expected = mass.std(ddof=1) / np.sqrt(mass.size) / mass.mean()
     assert stats["relative_se"] == pytest.approx(expected)
     assert stats["max_electron_share"] == pytest.approx(0.5)
-    assert line_yield_statistics(np.zeros(4))["relative_se"] is None
+    assert cxr_yield_statistics(np.zeros(4))["relative_se"] is None
 
 
 def test_audit_warns_when_a_rare_electron_carries_the_line_yield():
@@ -266,16 +266,16 @@ def test_audit_warns_when_a_rare_electron_carries_the_line_yield():
     ids = xp.arange(400)
     _accumulate_edge_truncation(even, E_r, a_width, xp.ones(400), ids)
     with warnings.catch_warnings():
-        warnings.simplefilter("error", LineYieldStatisticsWarning)
-        record = check_line_truncation(case, even)
-    stats = record["line_yield_statistics"]
-    assert stats["relative_se"] < LINE_YIELD_RELATIVE_SE_LIMIT
+        warnings.simplefilter("error", CxrYieldStatisticsWarning)
+        record = check_cxr_truncation(case, even)
+    stats = record["cxr_yield_statistics"]
+    assert stats["relative_se"] < CXR_YIELD_RELATIVE_SE_LIMIT
     assert not stats["statistics_limited"]
     weights = xp.asarray(np.r_[1.0e3, np.ones(399)])
     _accumulate_edge_truncation(rare, E_r, a_width, weights, ids)
-    with pytest.warns(LineYieldStatisticsWarning, match="relative standard error"):
-        record = check_line_truncation(case, rare)
-    stats = record["line_yield_statistics"]
+    with pytest.warns(CxrYieldStatisticsWarning, match="relative standard error"):
+        record = check_cxr_truncation(case, rare)
+    stats = record["cxr_yield_statistics"]
     assert stats["statistics_limited"]
     assert stats["max_electron_share"] == pytest.approx(1.0e3 / 1399.0)
 
@@ -298,7 +298,7 @@ def test_production_line_collection_retains_resonance_width_and_weight():
 def test_measured_grid_uses_collected_production_weights(monkeypatch):
     from pyrite.montecarlo import runner
 
-    policy = resolve_line_grid_policy(
+    policy = resolve_cxr_grid_policy(
         start_eV=50.0,
         stop_eV=100_000.0,
         per_call={"bandwidth": RESONANCE_BANDWIDTH_POLICY},
@@ -315,11 +315,11 @@ def test_measured_grid_uses_collected_production_weights(monkeypatch):
         kwargs["truncation_audit"]["collect"].append(collected)
         return np.zeros(axis.size)
 
-    monkeypatch.setattr(runner, "_lines_for_segments", collect)
-    grid, _record, bandwidth = _measured_line_grid(
+    monkeypatch.setattr(runner, "_cxr_for_segments", collect)
+    grid, _record, bandwidth = _measured_cxr_grid(
         policy, case, {}, (np.array([0.0, 0.0, 1.0]),), 2, 1.0, None, None
     )
-    expected, _ = case_line_stop_eV(
+    expected, _ = case_cxr_stop_eV(
         case,
         [ResonancePopulation("production lines", collected[0], collected[2], collected[1])],
         start_eV=50.0,
@@ -337,7 +337,7 @@ def test_small_hbn_case_collects_production_lines_before_resolution():
     sweep = replace(
         sweep,
         beam=replace(sweep.beam, energy_keV=5000.0),
-        line_grid_policy=_RESONANCE,
+        cxr_grid_policy=_RESONANCE,
     )
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
     result = _transport_case(case, transport_core="lockstep")
@@ -404,7 +404,7 @@ def test_intrinsic_bins_are_exact_for_a_line_on_a_bin_edge():
     axis: edges snapped to the candidate's cells leave no split artifact (a
     fixed 100 eV lattice misplaces ~17% of the line)."""
     from pyrite.energy_grid.bandwidth_check import _intrinsic_bins
-    from pyrite.montecarlo.spectrum.lines._bin_quadrature import bin_axis, sincsq_bin_lineshape
+    from pyrite.montecarlo.spectrum.cxr._bin_quadrature import bin_axis, sincsq_bin_lineshape
 
     def density(axis):
         cells, inv_width = bin_axis(axis)
