@@ -77,7 +77,7 @@ def test_missing_selected_catalog_fails_without_fallback(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize(
     ("profile", "missing"),
-    [("coh_test", ("beam",)), ("hopg_short", ("detector",)), ("standard", ("beam",))],
+    [("coh_test", ("beam",)), ("hopg_short", ("detector",))],
 )
 def test_selected_catalog_run_rejects_implicit_example_instrument(
     tmp_path, monkeypatch, profile, missing
@@ -99,6 +99,27 @@ def test_selected_catalog_run_rejects_implicit_example_instrument(
     assert result.exit_code == 2, result.output
     assert f"Error: profile '{profile}' names no {' or '.join(missing)};" in result.stderr
     assert "removed in 0.6.0" in result.stderr
+
+
+@pytest.mark.parametrize("profile", ["standard", "quickstart", "trajectory_demo"])
+def test_selected_catalog_runs_bundled_profiles_with_packaged_instrument(
+    tmp_path, monkeypatch, profile
+):
+    from pyrite.runs import scan as runs_scan
+
+    monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
+    monkeypatch.delenv("PYRITE_CATALOG", raising=False)
+    monkeypatch.setattr(runs_scan, "run", lambda args: None)
+    catalog = tmp_path / "catalog"
+    copy_full_catalog(catalog)
+
+    result = CliRunner().invoke(
+        command,
+        ["--catalog", str(catalog), "run", profile, "-m", "hopg"],
+        env={"PYRITE_MC_BACKEND": "cpu"},
+    )
+
+    assert result.exit_code == 0, result.output
 
 
 def test_bundled_catalog_run_does_not_warn_for_example_instrument(tmp_path, monkeypatch):
