@@ -1,0 +1,7 @@
+# Packaged example beam for the bundled profiles that need no special beam.
+# Its fields equal the BeamSpec defaults (no longitudinal profile), so naming
+# it leaves those profiles' case identities unchanged.
+label = "Example beam, not your hardware: 1 mm spot, 5 kHz, 1 pC"
+transverse_fwhm_mm = 1.0
+rep_rate_hz = 5000.0
+bunch_charge_pc = 1.0

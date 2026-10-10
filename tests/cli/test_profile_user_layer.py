@@ -23,7 +23,7 @@ def test_user_profile_edits_never_touch_the_installed_catalog(_isolate_user_cata
     listed = invoke(profile.command, ["list", "-o", "json"])
 
     assert_clean_result(
-        created, stdout="created profile mine from quickstart (inherited: detector)\n"
+        created, stdout="created profile mine from quickstart (inherited: beam, detector)\n"
     )
     assert edited.exit_code == 0
     assert (
