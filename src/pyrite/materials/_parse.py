@@ -39,6 +39,7 @@ from ._schema import (
     _EMISSION_VALUES,
     _PROFILE_SCALAR_NUMERICS_KEYS,
     _SCAN_KEYS,
+    DEFAULT_BREM_GRID,
     CrystalInfo,
     CrystalSpec,
     LayerSpec,
@@ -312,7 +313,9 @@ def _scan(
     has_line = "E_grid_line" in values
     grids: dict[str, np.ndarray | None] = {}
     for key in ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem"):
-        if key not in values:
+        if key == "E_grid_brem" and key not in values:
+            grids[key] = _readonly(np.arange(*DEFAULT_BREM_GRID))
+        elif key not in values:
             errors.add(f"{path}.{key}", "missing required key")
             grids[key] = None
         else:
@@ -537,7 +540,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         has_layers = "thickness_layers" in row
         if has_ang == has_layers:
             errors.add(path, "requires exactly one of thickness_ang or thickness_layers")
-        for name in ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem"):
+        for name in ("energy_keV", "tilt_deg", "tilt_azim_deg"):
             if name not in row:
                 errors.add(f"{path}.{name}", "missing required key")
         for name in _SCAN_KEYS:

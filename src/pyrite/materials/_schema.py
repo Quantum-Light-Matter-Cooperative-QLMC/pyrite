@@ -31,6 +31,8 @@ _SCAN_KEYS = (
 #: CATALOG``.
 _EMISSION_VALUES = ("incoherent", "coherent", "both")
 _PROFILE_SCALAR_NUMERICS_KEYS = (*CONVERGENCE_KEYS, *TRANSPORT_KEYS)
+# Catalog continuum default; case lowering resolves its floor and endpoint.
+DEFAULT_BREM_GRID = (0.0, 30000.0, 25.0)
 _DEFAULT_PROFILE_DETECTOR_SPEC: Mapping[str, object] = MappingProxyType({})
 
 

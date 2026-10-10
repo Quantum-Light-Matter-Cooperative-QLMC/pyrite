@@ -61,7 +61,7 @@ def creation_template(document):
             selected = [name for name in packaged[key] if name in material_rows(document)]
             if selected:
                 target[key] = selected
-        else:
+        elif key in packaged:
             target[key] = clone_grid(packaged[key])
     return target
 
@@ -81,7 +81,7 @@ def member_overrides(document, members):
     ``standard`` itself (``materials/_parse.py``), so its row would be dead.
     A uniform ``E_grid_brem`` row is dropped too: the case grid replaces its
     start with the medium floor and its stop with E0, so only ``step`` would
-    survive, and the profile-level default already carries that (issue #256).
+    survive, and the built-in default already carries that (issue #256).
     """
     known = material_rows(document)
     overrides = tomlkit.table()

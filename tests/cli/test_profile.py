@@ -166,12 +166,14 @@ def test_list_and_show_expose_energy_grid_refs(tmp_path, monkeypatch):
 
     shown = invoke(profile.command, ["show", "sub_100keV"])
     assert_clean_result(shown)
-    assert_table_row(shown.stdout, "hopg", stored.digest)
+    assert_table_row(shown.stdout, "hopg.artifact", stored.digest)
 
-    # A profile with no refs uses inline catalog grids.
+    # A profile with no refs reports inline defaults separately from overrides.
     legacy = invoke(profile.command, ["show", "standard"])
     assert_clean_result(legacy)
-    assert_table_row(legacy.stdout, "storage", "inline (E_grid_brem + material overrides)")
+    assert_table_row(legacy.stdout, "line default", "automatic for uncovered energies (built-in)")
+    assert "uniform 10 eV" in legacy.stdout
+    assert "storage" not in legacy.stdout
 
     machine = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
     assert_clean_result(machine)
@@ -444,7 +446,7 @@ polar_deg = 90.0
     assert_clean_result(created, stdout="created profile fresh\n")
     fresh = tomlkit.parse(catalog.read_text())["profiles"]["fresh"]
     assert fresh["energy_keV"]["values"][0] == 30.0
-    assert fresh["E_grid_brem"]["arange"]["step"] == 25.0
+    assert "E_grid_brem" not in fresh
     # Packaged standard carries no uniform brem override for hopg (issue #256).
     assert "overrides" not in fresh
     assert list(fresh["materials"]) == ["hopg"]
@@ -463,6 +465,7 @@ polar_deg = 90.0
     for key in ("detector", "physical_detector", "filters", "emission", "straggling"):
         assert key in clone
     assert "overrides" not in clone
+    assert clone["E_grid_brem"]["arange"]["step"] == 10.0
 
 
 def test_create_clones_energy_grid_refs_without_copying_artifact_bytes(tmp_path, monkeypatch):
@@ -1778,3 +1781,98 @@ def test_show_wraps_values_and_wide_keeps_them_on_one_line(tmp_path, monkeypatch
     assert members in wide.stdout
     assert "\x1b" not in shown.stdout
     assert all(len(line) <= 80 for line in shown.stdout.splitlines())
+
+
+@pytest.mark.parametrize(
+    ("descriptor", "expected"),
+    [
+        (None, "uniform 25 eV; start = material floor; stop = case beam energy + step (built-in)"),
+        (
+            "{ arange = { start = 500.0, stop = 1000.0, step = 10.0 } }",
+            "uniform 10 eV; start = max(500 eV, material floor); stop = case beam energy + step (profile)",
+        ),
+        ("{ values = [100.0, 300.0, 1000.0] }", "[100, 300, 1000] eV (exact grid) (profile)"),
+        ("250.0", "[250] eV (exact grid) (profile)"),
+    ],
+)
+def test_show_brem_default_and_effective_bounds(tmp_path, monkeypatch, descriptor, expected):
+    declaration = "E_grid_brem = { arange = { start = 0.0, stop = 1000.0, step = 10.0 } }"
+    text = _CATALOG.replace(
+        declaration, "" if descriptor is None else f"E_grid_brem = {descriptor}"
+    )
+    _catalog(tmp_path, monkeypatch, text)
+    shown = invoke(profile.command, ["show", "sub_100keV", "-o", "wide"])
+    assert_clean_result(shown)
+    assert_table_row(shown.stdout, "brem default", expected)
+    assert_table_row(shown.stdout, "line default", "automatic for uncovered energies (built-in)")
+    assert_table_row(shown.stdout, "overrides", "none")
+    assert "E_grid_brem.arange" not in shown.stdout
+    assert "material overrides)" not in shown.stdout
+
+
+def test_show_groups_grid_overrides_with_artifacts_and_keeps_json(tmp_path, monkeypatch):
+    stored = _artifact(tmp_path)
+    text = _artifact_ref_catalog(stored.digest).replace(
+        "[materials.hopg]",
+        "[profiles.sub_100keV.overrides.hopg]\n"
+        "E_grid_brem = { values = [100.0, 300.0, 1000.0] }\n"
+        "E_grid_line = 200.0\n"
+        "thickness_ang = 500.0\n\n[materials.hopg]",
+    )
+    _catalog(tmp_path, monkeypatch, text)
+    shown = invoke(profile.command, ["show", "sub_100keV", "-o", "wide"])
+    assert_clean_result(shown)
+    assert_table_row(
+        shown.stdout,
+        "hopg.brem",
+        "[100, 300, 1000] eV (exact grid) (superseded by stored artifact)",
+    )
+    assert_table_row(
+        shown.stdout, "hopg.line", "[200] eV (exact grid) (superseded by stored artifact)"
+    )
+    assert_table_row(shown.stdout, "hopg.artifact", stored.digest)
+    assert_table_row(shown.stdout, "hopg", "thickness_ang")
+    assert "uniform 10 eV" in shown.stdout  # profile fallback remains visible
+    machine = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
+    assert_clean_result(machine)
+    payload = json.loads(machine.stdout)["payload"]
+    assert payload["overrides"]["hopg"] == ["E_grid_brem", "E_grid_line", "thickness_ang"]
+    assert payload["energy_grid_refs"] == {"hopg": stored.digest}
+
+
+def test_show_line_policy_and_stored_rows(tmp_path, monkeypatch):
+    text = (
+        _CATALOG.replace(
+            "[profiles.sub_100keV]",
+            '[profiles.sub_100keV]\nline_grid_policy = { bandwidth = "kinematic-ceiling" }\nE_grid_line = 200.0',
+        )
+        + "\n[energy_grids.hopg]\nline_by_energy = []\n"
+    )
+    _catalog(tmp_path, monkeypatch, text)
+    shown = invoke(profile.command, ["show", "sub_100keV", "-o", "wide"])
+    assert_clean_result(shown)
+    assert_table_row(shown.stdout, "line default", "automatic for every case (profile policy)")
+    assert_table_row(
+        shown.stdout, "line explicit", "[200] eV (exact grid) (inactive: profile policy)"
+    )
+    assert_table_row(shown.stdout, "shared line rows", "hopg (inactive: profile policy)")
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+def test_show_line_environment_preserves_explicit_grid_precedence(tmp_path, monkeypatch, explicit):
+    text = (
+        _CATALOG.replace("[profiles.sub_100keV]", "[profiles.sub_100keV]\nE_grid_line = 200.0")
+        if explicit
+        else _CATALOG
+    )
+    _catalog(tmp_path, monkeypatch, text)
+    monkeypatch.setenv("PYRITE_ENERGY_GRID_MAX_SPACING_EV", "5")
+    shown = invoke(profile.command, ["show", "sub_100keV", "-o", "wide"])
+    assert_clean_result(shown)
+    expected = "[200] eV (exact grid) (profile)" if explicit else "automatic (environment policy)"
+    assert_table_row(shown.stdout, "line default", expected)
+    assert_table_row(
+        shown.stdout,
+        "line environment",
+        "PYRITE_ENERGY_GRID_MAX_SPACING_EV; automatic ahead of stored rows",
+    )

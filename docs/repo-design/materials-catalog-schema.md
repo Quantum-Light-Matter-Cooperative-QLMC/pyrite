@@ -87,7 +87,7 @@ thickness_ang = 1.0e4
 
 ## Profiles and scan descriptors
 
-`[profiles.NAME]` can define material membership, a named beam, detector, emission policy, X-ray dispersion model, energy-grid references, shared scan descriptors, and `[profiles.NAME.overrides.MATERIAL]` tables. Supported grids decode to immutable float64 arrays. A descriptor uses one of these forms:
+`[profiles.NAME]` can define material membership, a named beam, detector, emission policy, X-ray dispersion model, energy-grid references, shared scan descriptors, and `[profiles.NAME.overrides.MATERIAL]` tables. An omitted `E_grid_brem` resolves to the built-in 25 eV uniform continuum grid; case lowering raises its start to the material floor and replaces its stop with the case beam energy plus one step. Explicit grids, material overrides, and stored artifacts retain their precedence. Supported grids decode to immutable float64 arrays. A descriptor uses one of these forms:
 
 ```toml
 energy_keV = { values = [30.0, 50.0] }

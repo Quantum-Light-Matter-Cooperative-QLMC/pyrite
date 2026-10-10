@@ -232,7 +232,8 @@ def _catalog_with_artifact_ref(digest: str) -> str:
     )
 
 
-def test_profile_artifact_ref_resolves_immutable_grid_and_brem(tmp_path):
+@pytest.mark.parametrize("omit_brem", [False, True])
+def test_profile_artifact_ref_resolves_immutable_grid_and_brem(tmp_path, omit_brem):
     from pyrite import _energy_grid_artifacts as artifacts
     from pyrite.materials import load_material_catalog
 
@@ -247,9 +248,10 @@ def test_profile_artifact_ref_resolves_immutable_grid_and_brem(tmp_path):
         [25, 30, 40],
     )
     stored = artifacts.write_artifact(tmp_path / "energy-grid-artifacts", identity)
-    catalog = load_material_catalog(
-        _write_catalog(tmp_path, _catalog_with_artifact_ref(stored.digest))
-    )
+    text = _catalog_with_artifact_ref(stored.digest)
+    if omit_brem:
+        text = text.replace("E_grid_brem = 0.0\n", "")
+    catalog = load_material_catalog(_write_catalog(tmp_path, text))
     scan = catalog.material("sample").scan
 
     # The profile owns the swept axis and here sweeps a subset of the derived
@@ -2278,3 +2280,34 @@ def test_profile_precision_parses_and_rejects_incompatible_profiles(tmp_path):
     ):
         with pytest.raises(MaterialConfigError, match=match):
             load_material_catalog(_write_catalog(tmp_path, catalog(extra)))
+
+
+def test_omitted_brem_default_and_explicit_override_precedence(tmp_path):
+    from pyrite.materials import load_material_catalog
+
+    text = _minimal_catalog(
+        material_rows="""
+[materials.sample]
+crystal = "mos2"
+[materials.other]
+crystal = "mos2"
+[profiles.custom]
+materials = ["sample"]
+thickness_ang = 1000.0
+energy_keV = 30.0
+tilt_deg = 45.0
+tilt_azim_deg = 135.0
+[profiles.custom.overrides.sample]
+E_grid_brem = { values = [100.0, 300.0, 1000.0] }
+"""
+    ).replace("E_grid_brem = 0.0\n", "")
+    path = _write_catalog(tmp_path, text)
+    standard = load_material_catalog(path)
+    expected = np.arange(0.0, 30000.0, 25.0)
+    np.testing.assert_array_equal(standard.material("sample").scan.E_grid_brem, expected)
+    assert not standard.material("sample").scan.E_grid_brem.flags.writeable
+    custom = load_material_catalog(path, profile="custom")
+    np.testing.assert_array_equal(
+        custom.material("sample").scan.E_grid_brem, [100.0, 300.0, 1000.0]
+    )
+    np.testing.assert_array_equal(custom.material("other").scan.E_grid_brem, expected)

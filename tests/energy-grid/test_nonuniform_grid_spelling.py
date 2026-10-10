@@ -10,6 +10,7 @@ importantly, that the uniform renderings did not move.
 
 import tomllib
 
+import numpy as np
 import pytest
 
 from pyrite.console import json as cli_json
@@ -218,3 +219,22 @@ def test_set_brem_geometric_first_node_is_the_derived_floor(writable_catalog, mo
     monkeypatch.setattr(floor, "photon_continuum_floor_eV", lambda *a, **k: 30.6614)
     band = apply.set_brem_geometric("graded", 40000.0, 12, catalog_path=writable_catalog)
     assert band.startswith("[30.6614, 40000] eV x 12 pts")
+
+
+def test_effective_brem_uses_builtin_default_and_membership_fallback():
+    raw = {
+        "profiles": {
+            "standard": {},
+            "custom": {
+                "materials": ["hopg"],
+                "E_grid_brem": {"arange": {"start": 100.0, "stop": 30000.0, "step": 50.0}},
+            },
+        }
+    }
+    default = apply.effective_brem(raw, "mos2", "custom")
+    assert (default["start"], default["stop"], default["step"]) == (0.0, 30000.0, 25.0)
+    np.testing.assert_array_equal(default["nodes"], np.arange(0.0, 30000.0, 25.0))
+    explicit = apply.effective_brem(raw, "hopg", "custom")
+    assert (explicit["start"], explicit["step"]) == (100.0, 50.0)
+    raw["profiles"]["standard"]["E_grid_brem"] = 0.0
+    assert apply.effective_brem(raw, "mos2", "custom") is None  # explicit scalar is not omission

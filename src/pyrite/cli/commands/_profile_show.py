@@ -5,9 +5,12 @@ import textwrap
 
 import click
 
+from pyrite._energy_grid_encoding import encode_energy_grid
 from pyrite.campaign import profile_edit
 from pyrite.cli import _catalog_io
 from pyrite.console.output import emit_result
+from pyrite.materials._catalog_decode import resolve_grid_descriptor
+from pyrite.materials._schema import DEFAULT_BREM_GRID
 
 
 def _display(value):
@@ -57,7 +60,83 @@ def _table(title, rows):
             emit_result(f"  {label if index == 0 else '':<{width}}  {line}")
 
 
-def emit_show(payload, target, resolution, numerics_names):
+def _grid_summary(value, *, brem=False):
+    grid = resolve_grid_descriptor(value)
+    encoded = encode_energy_grid(grid)
+    if brem and isinstance(encoded, tuple):
+        start, _stop, step = encoded
+        lower = "material floor" if start <= 0 else f"max({start:g} eV, material floor)"
+        return f"uniform {step:g} eV; start = {lower}; stop = case beam energy + step"
+    coordinates = (
+        _display(grid.tolist())
+        if grid.size <= 6
+        else f"{grid.size} nodes, {grid[0]:g}..{grid[-1]:g}"
+    )
+    return f"{coordinates} eV (exact grid)"
+
+
+def energy_grid_rows(document, target):
+    """Report declared sources and case semantics without resolving trajectories."""
+    sources = profile_edit.line_grid_sources(document, target)
+    policy = profile_edit.profile_line_grid_values(target)
+    refs = profile_edit.energy_grid_refs(target)
+    if policy:
+        line = "automatic for every case (profile policy)"
+    elif "E_grid_line" in target:
+        line = _grid_summary(target["E_grid_line"]) + " (profile)"
+    elif sources["environment"]:
+        line = "automatic (environment policy)"
+    else:
+        line = "automatic for uncovered energies (built-in)"
+    rows = [("line default", line)]
+    if "E_grid_brem" in target:
+        brem = _grid_summary(target["E_grid_brem"], brem=True) + " (profile)"
+    else:
+        start, stop, step = DEFAULT_BREM_GRID
+        brem = _grid_summary({"arange": {"start": start, "stop": stop, "step": step}}, brem=True)
+        brem += " (built-in)"
+    rows.append(("brem default", brem))
+    if policy and "E_grid_line" in target:
+        rows.append(
+            ("line explicit", _grid_summary(target["E_grid_line"]) + " (inactive: profile policy)")
+        )
+    for material, override in profile_edit.profile_overrides(target).items():
+        for key, name in (("E_grid_line", "line"), ("E_grid_brem", "brem")):
+            if key not in override:
+                continue
+            suffix = " (material override)"
+            if name == "line" and policy:
+                suffix = " (inactive: profile policy)"
+            elif material in refs:
+                suffix = " (superseded by stored artifact)"
+            rows.append(
+                (f"{material}.{name}", _grid_summary(override[key], brem=name == "brem") + suffix)
+            )
+    for material, digest in refs.items():
+        rows.append((f"{material}.artifact", digest))
+    if refs:
+        rows.append(
+            (
+                "artifact precedence",
+                "supersedes inline brem grids; line uses profile policy"
+                if policy
+                else "supersedes inline grids; stores brem and covered line energies",
+            )
+        )
+    if sources["shared_energy_grids"]:
+        suffix = " (inactive: profile policy)" if policy else " (covered energies only)"
+        rows.append(("shared line rows", ", ".join(sources["shared_energy_grids"]) + suffix))
+    if sources["environment"]:
+        rows.append(
+            (
+                "line environment",
+                ", ".join(sources["environment"]) + "; automatic ahead of stored rows",
+            )
+        )
+    return rows
+
+
+def emit_show(payload, target, resolution, numerics_names, grid_rows):
     emit_result(f"[{payload['name']}]")
     ranges = [
         (row["name"], f"[{_catalog_io.display(row['values'])}]")
@@ -160,26 +239,13 @@ def emit_show(payload, target, resolution, numerics_names):
         else [("policy", "none (explicit, stored or built-in grids)")],
     )
 
-    grids = []
-    for key in ("E_grid_line", "E_grid_brem"):
-        if key in target:
-            grids.extend(_rows(target[key], key + "."))
-    refs = payload["energy_grid_refs"]
+    _table("Energy grids (profile defaults / material energy-grid)", grid_rows)
+    non_grid_overrides = {
+        material: [key for key in labels if key not in {"E_grid_line", "E_grid_brem"}]
+        for material, labels in payload["overrides"].items()
+    }
     _table(
-        "Energy grids (material energy-grid)",
-        [
-            (
-                "storage",
-                "stored per-material artifacts"
-                if refs
-                else "inline (E_grid_brem + material overrides)",
-            ),
-            *grids,
-            *[(material, digest) for material, digest in refs.items()],
-        ],
-    )
-    _table(
-        "Material overrides (catalog TOML)",
-        [(material, ", ".join(labels)) for material, labels in payload["overrides"].items()]
+        "Material overrides (non-grid catalog TOML)",
+        [(material, ", ".join(labels)) for material, labels in non_grid_overrides.items() if labels]
         or [("overrides", "none")],
     )
