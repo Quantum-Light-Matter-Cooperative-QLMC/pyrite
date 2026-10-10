@@ -9,8 +9,7 @@ import pytest
 from pyrite import cli
 from pyrite._catalog_layout import read_text
 from pyrite.cli import _catalog_io
-from pyrite.cli._deprecations import message
-from pyrite.cli.commands import material
+from pyrite.cli.commands import _simulation, material
 from tests.helpers.cli import assert_clean_result, invoke
 
 _CATALOG = """[profiles.standard]
@@ -126,102 +125,11 @@ def test_material_group_lazily_routes_validate_and_blaze():
     assert "blazed-crystal MC sweep" in blaze_help.stdout
 
 
-def test_simulate_formats_result_and_uses_single_scene_api(monkeypatch):
-    calls = []
-    spatial = SimpleNamespace(
-        ray_map=SimpleNamespace(
-            tile_index=np.zeros((1, 1), dtype=int),
-            solid_angle_sr=np.ones((1, 1)),
-            path_length_mm=np.zeros((1, 1, 1)),
-        ),
-        line=SimpleNamespace(
-            intrinsic_by_tile=np.array([[1.0, 2.0]]),
-            mu_by_filter_inv_mm=np.array([[0.0, 0.0]]),
-        ),
-    )
-    result = SimpleNamespace(
-        energy_eV=np.array([100.0, 200.0]),
-        spectrum=np.array([1.0, 2.0]),
-        background_energy_eV=np.array([50.0, 100.0]),
-        background=np.array([0.1, 0.2]),
-        spatial=spatial,
-        provenance={
-            "observation_identity_digest": "abc",
-            "scene": SimpleNamespace(acquisition=None),
-        },
-    )
-    monkeypatch.setattr(_catalog_io, "catalog_text", lambda: ("", object()))
-    monkeypatch.setattr(
-        material,
-        "_simulation_scene",
-        lambda *_args: (
-            "beam",
-            "target",
-            "detector",
-            ("filter",),
-            "scorer",
-            "acquisition",
-            "numerics",
-            "incoherent",
-            "pixel_a",
-        ),
-    )
-
-    import pyrite.api
-
-    def fake_simulate(*args, **kwargs):
-        calls.append((args, kwargs))
-        return result
-
-    monkeypatch.setattr(pyrite.api, "simulate", fake_simulate)
-
-    machine = invoke(material.command, ["simulate", "hopg", "-o", "json"])
-    assert_clean_result(
-        machine,
-        stderr=message(
-            "material simulate", replacement="pyrite run standard -m hopg --ephemeral -o json"
-        )
-        + "\n",
-    )
-    payload = json.loads(machine.stdout)["payload"]
-    assert payload["line"]["energy_eV"] == [100.0, 200.0]
-    assert payload["pixel_grid"]["filter_count"] == 1
-    assert calls[0][0][:3] == ("beam", "target", "detector")
-    assert calls[0][1]["filters"] == ("filter",)
-    assert calls[0][1]["pixel_scorer"] == "scorer"
-    assert calls[0][1]["acquisition"] == "acquisition"
-    assert payload["acquisition"] is None
-    assert payload["detector_id"] == "pixel_a"
-
-    wide = invoke(
-        material.command,
-        ["simulate", "hopg", "--profile", "my profile", "--detector", "pixel_a", "-o", "wide"],
-    )
-    assert wide.exit_code == 0
-    assert wide.stderr.splitlines() == [
-        message(
-            "material simulate",
-            replacement="pyrite run 'my profile' -m hopg --ephemeral --detector pixel_a -o wide",
-        )
-    ]
-    assert "material=hopg" in wide.stdout
-    assert "detector=pixel_a" in wide.stdout
-
-
-def test_simulate_json_reports_resolution_errors(monkeypatch):
-    monkeypatch.setattr(_catalog_io, "catalog_text", lambda: ("", object()))
-    monkeypatch.setattr(
-        material,
-        "_simulation_scene",
-        lambda *_args: (_ for _ in ()).throw(ValueError("physical_detector is required")),
-    )
-
-    result = invoke(material.command, ["simulate", "hopg", "-o", "json"])
-    assert result.exit_code == 1
-    assert result.stderr.count("is deprecated") == 1
-    document = json.loads(result.stdout)
-    assert document["schema"] == "cxr.material.simulate"
-    assert "physical_detector is required" in document["errors"][0]["message"]
+def test_removed_material_simulate_is_refused():
+    result = invoke(material.command, ["simulate", "hopg"])
+    assert result.exit_code == 2
+    assert "No such command 'simulate'" in result.stderr
+    assert result.stdout == ""
 
 
 def _single_scene_catalog(tmp_path, monkeypatch, *, energies="[30.0]", physical_extra=""):
@@ -273,7 +181,7 @@ def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
 
     document = _single_scene_catalog(tmp_path, monkeypatch)
     beam, target, detector, filters, scorer, acquisition, numerics, emission, detector_id = (
-        material._simulation_scene(document, "hopg", "single")
+        _simulation.resolve_scene(document, "hopg", "single")
     )
 
     assert isinstance(beam, Beam)
@@ -310,7 +218,7 @@ measured_edges_eV = [0.0, 100.0, 200.0]
 """,
     )
     _beam, _target, detector, _filters, scorer, acquisition, _numerics, _emission, _id = (
-        material._simulation_scene(document, "hopg", "single")
+        _simulation.resolve_scene(document, "hopg", "single")
     )
 
     assert scorer.angular_shape == (2, 3)
@@ -326,7 +234,7 @@ def test_simulation_scene_rejects_non_singleton_profile_grid(tmp_path, monkeypat
     with np.testing.assert_raises_regex(
         ValueError, "requires profile 'single' to resolve one value"
     ):
-        material._simulation_scene(document, "hopg", "single")
+        _simulation.resolve_scene(document, "hopg", "single")
 
 
 def test_simulation_artifact_uses_exact_suffixless_path_and_never_overwrites(tmp_path):
@@ -350,14 +258,14 @@ def test_simulation_artifact_uses_exact_suffixless_path_and_never_overwrites(tmp
     )
     output = Path(tmp_path) / "spatial-output"
 
-    material._write_simulation_artifact(output, result)
+    _simulation._write_simulation_artifact(output, result)
 
     assert output.is_file()
     assert not output.with_suffix(".npz").exists()
     with np.load(output) as archive:
         np.testing.assert_array_equal(archive["line_energy_eV"], [100.0, 200.0])
     with np.testing.assert_raises_regex(ValueError, "output file already exists"):
-        material._write_simulation_artifact(output, result)
+        _simulation._write_simulation_artifact(output, result)
 
 
 def _spatial_result(acquisition=None):
@@ -387,7 +295,7 @@ def _spatial_result(acquisition=None):
 
 @pytest.mark.parametrize("output_format", ["table", "json", "wide"])
 @pytest.mark.parametrize("counting", [False, True])
-def test_ephemeral_matches_simulate_and_never_enters_sweep(
+def test_ephemeral_formats_result_and_never_enters_sweep(
     tmp_path, monkeypatch, output_format, counting
 ):
     import pyrite.api
@@ -418,18 +326,6 @@ measured_edges_eV = [0.0, 100.0, 200.0]
     monkeypatch.setattr(scan, "run", forbidden)
     monkeypatch.setattr(scan, "_run_json", forbidden)
     before = set(tmp_path.iterdir())
-    legacy = invoke(
-        cli.command,
-        [
-            "material",
-            "simulate",
-            "hopg",
-            "--profile",
-            "single",
-            "-o",
-            output_format,
-        ],
-    )
     ephemeral = invoke(
         cli.command,
         [
@@ -442,21 +338,11 @@ measured_edges_eV = [0.0, 100.0, 200.0]
             output_format,
         ],
     )
-    assert legacy.exit_code == ephemeral.exit_code == 0
-    assert legacy.stdout == ephemeral.stdout
-    warning = message(
-        "material simulate",
-        replacement="pyrite run single -m hopg --ephemeral"
-        + ("" if output_format == "table" else f" -o {output_format}"),
-    )
-    assert legacy.stderr == f"{warning}\n" + ephemeral.stderr
+    assert ephemeral.exit_code == 0
     assert ephemeral.stderr == "transport diagnostic\n"
     assert set(tmp_path.iterdir()) == before
-    assert len(calls) == 2
-    for old, new in zip(calls[0][0], calls[1][0], strict=True):
-        assert repr(old) == repr(new)
-    assert repr(calls[0][1]) == repr(calls[1][1])
-    assert calls[1][1]["filters"][0].name == "half"
+    assert len(calls) == 1
+    assert calls[0][1]["filters"][0].name == "half"
     if output_format == "json":
         envelope = json.loads(ephemeral.stdout)
         assert envelope["schema"] == "cxr.material.simulate"
@@ -466,7 +352,7 @@ measured_edges_eV = [0.0, 100.0, 200.0]
             assert envelope["payload"]["acquisition"]["total_counts"] == 6.0
 
 
-def test_ephemeral_artifact_parity_and_existing_file_preflight(tmp_path, monkeypatch):
+def test_ephemeral_artifact_and_existing_file_preflight(tmp_path, monkeypatch):
     import pyrite.api
 
     _single_scene_catalog(tmp_path, monkeypatch)
@@ -474,19 +360,7 @@ def test_ephemeral_artifact_parity_and_existing_file_preflight(tmp_path, monkeyp
     monkeypatch.setattr(
         pyrite.api, "simulate", lambda *a, **k: calls.append(k) or _spatial_result()
     )
-    old_path, new_path = tmp_path / "simulate", tmp_path / "ephemeral"
-    legacy = invoke(
-        cli.command,
-        [
-            "material",
-            "simulate",
-            "hopg",
-            "--profile",
-            "single",
-            "--output-file",
-            str(old_path),
-        ],
-    )
+    new_path = tmp_path / "ephemeral"
     ephemeral = invoke(
         cli.command,
         [
@@ -499,11 +373,9 @@ def test_ephemeral_artifact_parity_and_existing_file_preflight(tmp_path, monkeyp
             str(new_path),
         ],
     )
-    assert legacy.exit_code == ephemeral.exit_code == 0
-    with np.load(old_path) as old, np.load(new_path) as new:
-        assert old.files == new.files
-        for key in old.files:
-            np.testing.assert_array_equal(old[key], new[key])
+    assert ephemeral.exit_code == 0
+    with np.load(new_path) as artifact:
+        np.testing.assert_array_equal(artifact["line_energy_eV"], [100.0, 200.0])
     original = new_path.read_bytes()
     repeated = invoke(
         cli.command,
@@ -521,7 +393,7 @@ def test_ephemeral_artifact_parity_and_existing_file_preflight(tmp_path, monkeyp
     )
     assert repeated.exit_code == 1
     assert "output file already exists" in json.loads(repeated.stdout)["errors"][0]["message"]
-    assert len(calls) == 2
+    assert len(calls) == 1
     assert new_path.read_bytes() == original
 
 
@@ -708,7 +580,7 @@ def test_single_scene_and_checkpoint_lowering_share_seed_counts_and_explicit_gri
     catalog = load_material_catalog(path, profile="single")
     monkeypatch.setattr(config, "_catalog", lambda *_: catalog)
     beam, target, detector, filters, scorer, acquisition, numerics, emission, _id = (
-        material._simulation_scene(document, "hopg", "single")
+        _simulation.resolve_scene(document, "hopg", "single")
     )
     scene = Scene(beam, target, detector, filters=filters, pixel_scorer=scorer, emission=emission)
     single = api.build_case(scene, numerics)
@@ -730,9 +602,7 @@ def test_single_scene_and_checkpoint_lowering_share_seed_counts_and_explicit_gri
         assert single[key] == checkpoint[key]
 
 
-def test_ephemeral_and_simulate_real_api_have_identical_cases_and_spatial_output(
-    tmp_path, monkeypatch
-):
+def test_ephemeral_real_api_preserves_case_and_spatial_output(tmp_path, monkeypatch):
     from pyrite import api
     from pyrite.observations import plan
 
@@ -756,13 +626,13 @@ def test_ephemeral_and_simulate_real_api_have_identical_cases_and_spatial_output
     monkeypatch.setattr(
         plan, "attenuation_matrix", lambda filters, energy: np.ones((len(filters), len(energy)))
     )
-    legacy = invoke(
-        cli.command, ["material", "simulate", "hopg", "--profile", "single", "-o", "json"]
-    )
     ephemeral = invoke(cli.command, ["run", "single", "-m", "hopg", "--ephemeral", "-o", "json"])
-    assert legacy.exit_code == ephemeral.exit_code == 0, (legacy.output, ephemeral.output)
-    assert legacy.stdout == ephemeral.stdout
-    assert cases[0] == cases[1]
+    assert ephemeral.exit_code == 0, ephemeral.output
+    assert len(cases) == 1
+    assert cases[0]["Ne"] == 7
+    payload = json.loads(ephemeral.stdout)["payload"]
+    assert payload["line"]["energy_eV"] == [100.0, 200.0]
+    assert payload["pixel_grid"]["filter_count"] == 1
 
 
 def test_single_scene_named_gdf_clears_default_spot(tmp_path, monkeypatch):
@@ -781,7 +651,7 @@ def test_single_scene_named_gdf_clears_default_spot(tmp_path, monkeypatch):
     }
     document["profiles"]["single"]["beam"] = "gpt_import"
     _catalog_io.atomic_write(_catalog_io.active_catalog_path(), tomlkit.dumps(document))
-    beam, *_ = material._simulation_scene(document, "hopg", "single")
+    beam, *_ = _simulation.resolve_scene(document, "hopg", "single")
     assert beam.source == "gpt_gdf"
     assert beam.transverse_fwhm_x_mm is None
     assert beam.transverse_fwhm_y_mm is None

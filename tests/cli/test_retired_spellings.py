@@ -116,7 +116,6 @@ RETIRED_OPTIONS = (
     ("material energy-grid line show", "--json"),
     ("material energy-grid show", "--json"),
     ("material show", "--json"),
-    ("material simulate", "--json"),
     ("profile add", "--materials"),
     ("profile create", "--materials"),
     ("profile delete", "--json"),

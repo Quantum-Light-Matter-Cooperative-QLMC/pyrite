@@ -2039,7 +2039,7 @@ def test_rebrem_cli_requires_materials_xor_all(monkeypatch):
     monkeypatch.setattr(recompute, "rebrem_checkpoints", lambda **kw: seen.append(kw) or {})
     runner = CliRunner()
 
-    neither = runner.invoke(brem_command, ["--ne-brem", "1000"], catch_exceptions=False)
+    neither = runner.invoke(brem_command, ["--brem-trials", "1000"], catch_exceptions=False)
     both = runner.invoke(brem_command, ["MoS2", "--all"], catch_exceptions=False)
     assert neither.exit_code == 2
     assert both.exit_code == 2

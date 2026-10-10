@@ -14,7 +14,7 @@ from pyrite.console.output import CLIError, emit_json_result, emit_result
 
 
 def resolve_scene(
-    document, material, profile_name, detector_id=None, *, command_name="material simulate"
+    document, material, profile_name, detector_id=None, *, command_name="run --ephemeral"
 ):
     from pyrite.campaign.single_scene import resolve_pixel_scene
     from pyrite.materials import load_material_catalog

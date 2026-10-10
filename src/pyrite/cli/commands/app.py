@@ -144,7 +144,6 @@ def _launch_validation(
 @canonical_option(
     "--brem-trials",
     "ne_brem",
-    retired=("--ne-brem",),
     type=int,
     default=200,
     show_default=True,

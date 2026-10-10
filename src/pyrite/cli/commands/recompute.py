@@ -203,7 +203,6 @@ def _reject_remote_local_options(ctx: click.Context, json_output: bool) -> None:
 @canonical_option(
     "--brem-trials",
     "ne_brem",
-    retired=("--ne-brem",),
     type=_cli_core.POSITIVE_INT,
     default=None,
     metavar="N",
