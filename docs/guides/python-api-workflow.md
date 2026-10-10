@@ -29,6 +29,20 @@ result = pr.simulate(
 
 `simulate` runs the existing typed-case Monte Carlo path and returns a `pyrite.Result`. It does not read or write the workspace, checkpoint cache, or profile catalog.
 
+## Describe the beam
+
+`Beam` takes exactly one description per kind of property, so an invalid mix cannot be built:
+
+```python
+pr.Beam(energy_keV=30.0)                                     # 1 mm round spot, point bunch
+pr.Beam(energy_keV=30.0, transverse=pr.Spot(0.5, 0.25))      # Gaussian spot FWHM x/y in mm
+pr.Beam(energy_keV=30.0, transverse=pr.Point())              # point source
+pr.Beam(energy_keV=30.0, longitudinal=pr.BunchLength(100.0)) # RMS fs
+pr.Beam.from_gdf("beam.gdf", z_origin_m=0.0, time_s=1e-9)    # GPT snapshot
+```
+
+`transverse` also accepts a Courant–Snyder `TransverseDistribution`, and `longitudinal` accepts `PointBunch`, `Offsets`, or a `LongitudinalDistribution` policy. Divergence is derived: `beam.derived_divergence_mrad(energy_keV)`. Sweep axes address the sub-objects, for example `"beam.transverse": [pr.Spot(0.5), pr.Spot(1.0), pr.Point()]`.
+
 ## Interpret the result
 
 `Result.energy_eV` and `Result.background_energy_eV` are the photon-energy coordinates for `spectrum` and `background`. With a scalar `Detector`, both arrays are response-free source photon density per incident electron per eV per sr. They exclude acceptance scaling, source current, quantum efficiency, and measured-energy redistribution. With a `PlanarDetector`, the scalar arrays are filter-attenuated, solid-angle-weighted observation averages; see the spatial-scoring boundary below.

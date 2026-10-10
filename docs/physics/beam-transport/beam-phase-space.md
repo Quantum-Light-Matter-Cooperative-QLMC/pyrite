@@ -54,16 +54,15 @@ The input units above are the accelerator-conventional ones. The diagnostics mod
 
 Spot FWHM, divergence and emittance are three numbers that over-determine two and drop the correlation entirely. Allowing all three with a precedence rule produces a plausible-looking beam that is not the one the user asked for, with no diagnostic. So:
 
-| spelling                                     | status             | meaning                                           |
-| -------------------------------------------- | ------------------ | ------------------------------------------------- |
-| `transverse` block (Twiss triplet per plane) | canonical          | full three-moment description                     |
-| `transverse_fwhm_x_mm` / `_y_mm`             | legacy convenience | zero-emittance waist:`alpha = 0`, zero divergence |
-| `divergence_mrad`                            | derived, read-only | RMS slope at the case energy                      |
-| `energy_spread_frac`                         | canonical          | longitudinal only; no Twiss equivalent            |
+| `pyrite.Beam(transverse=...)`                | meaning                                           |
+| -------------------------------------------- | ------------------------------------------------- |
+| `TransverseDistribution` (Twiss per plane)   | full three-moment description                     |
+| `Spot(fwhm_x_mm, fwhm_y_mm)`                 | zero-emittance waist: `alpha = 0`, zero divergence |
+| `Point()`                                    | no spot size, no divergence                       |
 
-Setting the `transverse` block **and** a spot FWHM is a hard error, the same rule the `longitudinal` policy applies against the flat legacy bunch fields.
+`Beam` holds exactly one of these, so combining a spot FWHM with a Twiss block is not representable (in profile files, which keep the flat spelling, it is still a hard error). `energy_spread_frac` is a separate canonical field: longitudinal only, no Twiss equivalent.
 
-`divergence_mrad` is a derived property rather than a stored input. A stored value is energy-independent, which contradicts the normalized-emittance argument above: the physical RMS slope of a fixed beam falls as {math}`1/\sqrt(\beta\gamma)`, so a constant `divergence_mrad` across an energy sweep is not one beam.
+Divergence is a derived property (`Beam.derived_divergence_mrad(energy_keV)`) rather than a stored input. A stored value is energy-independent, which contradicts the normalized-emittance argument above: the physical RMS slope of a fixed beam falls as {math}`1/\sqrt(\beta\gamma)`, so a constant `divergence_mrad` across an energy sweep is not one beam.
 
 `energy_spread_frac` is a real input. It is not a transverse quantity and has no Twiss equivalent.
 

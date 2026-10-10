@@ -564,8 +564,6 @@ def _identity_v1(
         sweep_payload["rep_rate_hz"] = beam_payload["rep_rate_hz"]
     if beam_payload["bunch_charge_pc"] != 1.0:
         sweep_payload["bunch_charge_pc"] = beam_payload["bunch_charge_pc"]
-    if beam_payload["divergence_mrad"] is not None:
-        sweep_payload["divergence_mrad"] = beam_payload["divergence_mrad"]
     if beam_payload["energy_spread_frac"] is not None:
         sweep_payload["energy_spread_frac"] = beam_payload["energy_spread_frac"]
     for key in ("n_electrons", "n_electrons_brem", "line_grid_policy"):

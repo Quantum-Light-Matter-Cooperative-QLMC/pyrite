@@ -329,10 +329,17 @@ Simulation core: electron transport, segment-sum PXR+CBS and EEDL characteristic
 
 ### `campaign/model.py`
 
-Supported scalar scene API: `Beam`, `Scene`, path-addressed `Sweep`, `Numerics`, nested `Convergence`, and presentation-only `Analysis`. `Scene` rejects implicit multi-value fields; `Sweep` applies ordered dotted/indexed paths such as `target.layers[1].thickness_ang`, expands Cartesian products, and lowers them through `api.build_sweep_cases`. This `Sweep` is the preferred public object; `campaign.sweep.Sweep` below remains the profile/CLI-compatible campaign implementation.
+Supported scalar scene API: `Scene`, path-addressed `Sweep`, `Numerics`, nested `Convergence`, and presentation-only `Analysis`. `Scene` rejects implicit multi-value fields; `Sweep` applies ordered dotted/indexed paths such as `target.layers[1].thickness_ang`, expands Cartesian products, and lowers them through `api.build_sweep_cases`. This `Sweep` is the preferred public object; `campaign.sweep.Sweep` below remains the profile/CLI-compatible campaign implementation.
 
-- Public: root-lazy `Beam`, `Scene`, `Sweep`, `Numerics`, `Convergence`, `Precision`, `Analysis`.
+- Public: root-lazy `Scene`, `Sweep`, `Numerics`, `Convergence`, `Precision`, `Analysis`.
 - Deps: `campaign.geometry`, `campaign.sweep.BeamSpec`, `detectors`.
+
+### `campaign/beam.py`
+
+Public `Beam`: one sub-object per kind of property (`Spot`/`Point`/`TransverseDistribution`, `PointBunch`/`BunchLength`/`Offsets`/`LongitudinalDistribution`, optional `GdfSource` via `Beam.from_gdf`). `Beam.to_spec()` lowers to the flat `campaign.sweep.BeamSpec`, the internal record behind case payloads and profile files; `Beam.from_spec` is the inverse. `Scene` accepts either and stores a `Beam`.
+
+- Public: root-lazy `Beam`, `Spot`, `Point`, `PointBunch`, `BunchLength`, `Offsets`, `GdfSource`.
+- Deps: `campaign.sweep.BeamSpec`, `campaign.longitudinal`, `montecarlo.transverse`.
 
 ### `campaign/single_scene.py` and `cli/commands/_simulation.py`
 

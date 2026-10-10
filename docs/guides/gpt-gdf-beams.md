@@ -233,11 +233,13 @@ to `gpt_gdf` removes its old analytic distribution fields; explicitly combining
 analytic distribution options with the GDF source is an error. Setting a time
 selector retires a previous screen selector, and conversely.
 
-For the Python API, set `Beam(source="gpt_gdf", energy_keV=30,
-transverse_fwhm_x_mm=None, transverse_fwhm_y_mm=None, gdf_path="beam.gdf",
-gdf_time_s=1e-9, gdf_z_origin_m=...)`. `energy_keV` is a scalar scene placeholder;
-actual initial energies come from the GDF. The other normalization settings
-have the same names as the catalog fields.
+For the Python API, use `Beam.from_gdf("beam.gdf", z_origin_m=..., time_s=1e-9,
+energy_keV=30)`. `energy_keV` is a scalar scene placeholder; actual initial
+energies come from the GDF. The other keyword arguments (`normalization`,
+`shape_only`, `screen_position_m`, the tolerances) match the catalog fields
+without the `gdf_` prefix. The GDF source carries its own phase space, so
+`Beam` rejects it together with `transverse`, `longitudinal` or
+`energy_spread_frac`.
 
 ## Errors and limits
 
