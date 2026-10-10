@@ -362,13 +362,21 @@ def test_run_rejects_removed_selection_and_beam_flags(flag):
 
 class _FakeCatalog:
     """Duck-typed stand-in for ``MaterialCatalog``'s profile surface --
-    ``validate_catalog_profile`` only ever touches ``profile_names`` and
-    ``profile_materials``."""
+    Includes explicit detector geometry for the run boundary."""
 
     def __init__(self, profile_names, memberships, material_keys=("hopg", "mos2")):
         self.profile_names = profile_names
         self._memberships = memberships
         self.material_keys = material_keys
+
+    def profile_detector_set(self, _name):
+        return {
+            "default": {
+                "observation_angle_deg": 90.0,
+                "polar_acceptance_deg": 2.0,
+                "solid_angle_sr": 0.001,
+            }
+        }
 
     def profile_materials(self, name):
         if name not in self.profile_names:

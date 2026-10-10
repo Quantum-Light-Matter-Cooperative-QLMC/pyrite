@@ -51,6 +51,8 @@ from .inelastic_cases import (
     target_shell_materials,
 )
 from .sweep import (
+    TIMEPIX3_DOMEGA_SR,
+    TIMEPIX3_DTHETA_OBS_DEG,
     Sweep,
     beam_replace,
     build_cases,
@@ -489,8 +491,12 @@ def _identity_v1(
     sweep_payload.update(_jsonable(target_flat_fields(sweep.target)))
     detector_payload = sweep_payload.pop("detector")
     sweep_payload["theta_obs_deg"] = detector_payload["observation_angle_deg"]
-    sweep_payload["dtheta_obs_deg"] = detector_payload["polar_acceptance_deg"]
-    sweep_payload["domega_sr"] = detector_payload["solid_angle_sr"]
+    # Explicit reference acceptance has the same historical identity as the
+    # implicit Timepix3 aperture. Cases already resolve these exact values.
+    acceptance = detector_payload["polar_acceptance_deg"]
+    solid_angle = detector_payload["solid_angle_sr"]
+    sweep_payload["dtheta_obs_deg"] = None if acceptance == TIMEPIX3_DTHETA_OBS_DEG else acceptance
+    sweep_payload["domega_sr"] = None if solid_angle == TIMEPIX3_DOMEGA_SR else solid_angle
     energy_bins = detector_payload.pop("energy_bins")
     sweep_payload["E_grid_line"] = energy_bins["line"]
     sweep_payload["E_grid_line_by_energy"] = energy_bins["line_by_energy"]

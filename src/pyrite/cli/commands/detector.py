@@ -128,12 +128,14 @@ def command():
 
     Named detectors currently carry observation angle, full polar acceptance,
     and solid angle. Detector responses and energy bins are runtime objects and
-    are not serialized by these commands.
+    are not serialized by these commands. The bundled reference detector integrates
+    the Timepix3 chip aperture at 400 mm as one scalar detector with ideal
+    response: raw spectra, without pixel binning or count acquisition.
 
     \b
     Examples:
       pyrite detector list
-      pyrite detector show default
+      pyrite detector show reference
       pyrite detector create standard-90 --observation-angle 90
       pyrite detector set standard-90 --solid-angle 0.066
       pyrite detector rename standard-90 eds

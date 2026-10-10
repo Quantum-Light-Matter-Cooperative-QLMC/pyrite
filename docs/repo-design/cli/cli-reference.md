@@ -1495,6 +1495,7 @@ Usage: pyrite profile create [OPTIONS] NAME
   membership; per-material overrides are not cloned. Beam phase space and detector
   geometry are set only through named objects: build them with ``pyrite beam create`` /
   ``pyrite detector create`` and attach them here with --beam NAME / --detector NAME.
+  Use --detector reference for the ideal Timepix3 aperture.
 
 Options:
   --from SOURCE                   Explicitly clone SOURCE, including beam, detector,
@@ -1526,8 +1527,9 @@ Options:
                                   requires midpoint.  [x>=0.0]
   --beam NAME                     Attach a named [beams.NAME] reference; create it with
                                   'pyrite beam create'.
-  --detector NAME                 Attach a named [detectors.NAME] reference; create it
-                                  with 'pyrite detector create'.
+  --detector NAME                 Attach a named detector; reference uses the Timepix3
+                                  aperture with ideal response and raw spectra. Create
+                                  others with 'pyrite detector create'.
   --material KEY,...              Set explicit initial membership (comma-separated
                                   material keys).
   --dry-run                       Print proposed TOML diff; write nothing.
@@ -2288,8 +2290,9 @@ Options:
                                   requires midpoint.  [x>=0.0]
   --beam NAME                     Attach a named [beams.NAME] reference; create it with
                                   'pyrite beam create'.
-  --detector NAME                 Attach a named [detectors.NAME] reference; create it
-                                  with 'pyrite detector create'.
+  --detector NAME                 Attach a named detector; reference uses the Timepix3
+                                  aperture with ideal response and raw spectra. Create
+                                  others with 'pyrite detector create'.
   --material KEY,...              Replace explicit membership with comma-separated
                                   material keys.
   --all-materials                 Restore implicit membership in every catalog material.
@@ -2811,11 +2814,13 @@ Usage: pyrite detector [OPTIONS] COMMAND [ARGS]...
 
   Named detectors currently carry observation angle, full polar acceptance, and solid
   angle. Detector responses and energy bins are runtime objects and are not serialized
-  by these commands.
+  by these commands. The bundled reference detector integrates the Timepix3 chip
+  aperture at 400 mm as one scalar detector with ideal response: raw spectra, without
+  pixel binning or count acquisition.
 
   Examples:
     pyrite detector list
-    pyrite detector show default
+    pyrite detector show reference
     pyrite detector create standard-90 --observation-angle 90
     pyrite detector set standard-90 --solid-angle 0.066
     pyrite detector rename standard-90 eds

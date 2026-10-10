@@ -1,0 +1,6 @@
+# Timepix3 chip aperture at 400 mm, integrated as one scalar detector.
+# Ideal response: checkpoint spectra remain raw source spectra.
+label = "Timepix3 aperture, single ideal scalar detector"
+observation_angle_deg = 90.0
+polar_acceptance_deg = 2.016603235051288
+solid_angle_sr = 0.0012390399999999998

@@ -40,11 +40,13 @@ and run commands. Edits write the selected catalog. An invalid selected path
 fails instead of falling back to bundled definitions. Remote submissions stage
 the selected catalog in the remote checkout and run against that copy.
 
-The bundled `default` beam and detector are examples. Give each lab profile its
-own with `pyrite profile set NAME --beam BEAM --detector DETECTOR`: since 0.6.0 a
-run from a selected catalog whose profile names no beam or no detector is a
-usage error (see
-[Bundled examples and implicit defaults](sweep-profiles.md#bundled-examples-and-implicit-defaults)).
+Give each lab profile its intended beam and detector with
+`pyrite profile set NAME --beam BEAM --detector DETECTOR`. Since 0.6.0 a
+selected-catalog profile with no beam is a usage error. Implicit scalar detector
+acceptance warns in 0.9.0 and becomes a usage error in 0.11.0. To retain the
+historical Timepix3 aperture with ideal response and raw spectra, copy
+`detectors/reference.toml` from the bundle and attach `--detector reference`.
+See [Bundled examples and implicit defaults](sweep-profiles.md#bundled-examples-and-implicit-defaults).
 
 Keep generated output separate from the catalog. Set an external workspace for
 checkpoints, observations, and generated cross-section data:

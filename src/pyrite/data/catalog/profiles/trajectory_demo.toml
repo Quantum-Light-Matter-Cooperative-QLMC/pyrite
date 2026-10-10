@@ -2,7 +2,7 @@
 # permit HDF5 capture; the micron-scale beam keeps the histories close together.
 materials = ["hopg"]
 beam = "trajectory_demo"
-detector = "default"
+detector = "reference"
 thickness_ang = { values = [20000.0] }
 energy_keV = { values = [30.0] }
 tilt_deg = { values = [45.0] }

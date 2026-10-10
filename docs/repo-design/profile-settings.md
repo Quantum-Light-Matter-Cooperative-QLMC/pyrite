@@ -82,17 +82,25 @@ detected counts), `max_spacing_eV` (`PYRITE_ENERGY_GRID_MAX_SPACING_EV`; 3 eV),
 | TOML key | Setter | Notes |
 |---|---|---|
 | `beam` | `profile set --beam NAME`; `profile remove --beam` | named `[beams.NAME]` edited with `pyrite beam`; inline tables are TOML |
-| `detector` | `profile set --detector NAME` | named `[detectors.NAME]` edited with `pyrite detector` |
+| `detector` | `profile set --detector NAME` | named `[detectors.NAME]` edited with `pyrite detector`; use `reference` for ideal Timepix3 aperture and raw spectra |
 | `detectors.ID` | TOML | collection; cannot be combined with `detector`/`physical_detector` |
 | `physical_detector` (+ `scorer`, `response`, `acquisition`) | `profile physical-detector show\|set\|reset` | |
 | `filters` | `profile filter add\|set\|rm\|list\|show` | order is part of identity |
 | `emission` | `profile set --emission`; `profile add\|remove --coherent/--incoherent` | absent = `incoherent` |
 | `temporal_profile` | `profile set --temporal-profile/--no-temporal-profile` | absent = off |
 
+Scalar detector fields must be explicit. Omitted geometry warns in 0.9.0 and
+becomes a usage error in 0.11.0; attach `reference` to preserve the old acceptance
+and checkpoint identity. This bundled object integrates the 14.08 mm Timepix3
+aperture at 400 mm as one ideal scalar detector (90°, 2.016603235051288° full
+polar span, 0.0012390399999999998 sr), exposing raw spectra without pixel/count
+acquisition.
+External complete catalogs need their own copy of the object.
+
 ## Creation and cloning
 
 `profile create NAME` copies the packaged `standard` ranges, bremsstrahlung
-grid, membership and member-material overrides; it copies no instrument,
+grid, membership and member-material overrides; it copies no instrument (pass `--detector reference` for the ideal aperture),
 numerics or line-grid policy. `profile create NAME --from SOURCE` copies every
 SOURCE key except `overrides`, including numerics and `line_grid_policy`, and
 lists the inherited sections.
