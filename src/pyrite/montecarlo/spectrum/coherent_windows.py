@@ -918,6 +918,7 @@ def _dispersion_window_audit(rows, summary, law, decoherence, electron_count):
             {
                 "row": field.label,
                 "leak_bound": leak,
+                "reference_eV": float(reference),
                 "excluded_power_bound_eV": float(fraction * reference),
                 "frozen_reference_fraction": float(fraction),
                 "phase_slope_step_all_eV": float(
