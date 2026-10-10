@@ -232,14 +232,22 @@ def run(args):
         raise RuntimeError("resuming an imported transport requires --transport-record")
     if result["state"] == "done":
         return 0
-    _atomic(output, result)
     caught = []
+
+    def persist():
+        # Every resumable checkpoint carries warnings, even before a slice exits.
+        result["warnings"] = list(
+            dict.fromkeys(result.get("warnings", []) + [str(item.message) for item in caught])
+        )
+        _atomic(output, result)
+
+    persist()
     try:
-        _require_gpu()
-        if "gpu_limits" not in result:
-            result["gpu_limits"] = _gpu_limits()
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
+            _require_gpu()
+            if "gpu_limits" not in result:
+                result["gpu_limits"] = _gpu_limits()
             if snapshot.exists():
                 with snapshot.open("rb") as stream:
                     saved = pickle.load(stream)
@@ -270,7 +278,7 @@ def run(args):
                 t0 = time.perf_counter()
                 result["physical_electrons"] = physical_bunch_electrons(case)
                 result["incident_samples"] = case["Ne"]
-                _atomic(output, result)
+                persist()
                 print(
                     "transport",
                     args.mode,
@@ -329,7 +337,7 @@ def run(args):
                     "min_spacing_eV",
                 )
             }
-            _atomic(output, result)
+            persist()
             automatic = np.asarray(transport["E_grid"], dtype=float)
             if args.mode == "smoke":
                 t0 = time.perf_counter()
@@ -403,7 +411,7 @@ def run(args):
                         if name == "reference"
                         else None,
                     }
-                    _atomic(output, result)
+                    persist()
                     print(name, result["evals"][name], flush=True)
                     BACKEND.release_memory()
                     if (
@@ -411,11 +419,8 @@ def run(args):
                         and time.perf_counter() - started >= args.max_minutes * 60
                     ):
                         result["state"] = "between-rungs"
-                        result["warnings"] = result.get("warnings", []) + [
-                            str(item.message) for item in caught
-                        ]
                         result["peak_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-                        _atomic(output, result)
+                        persist()
                         return 75
                 reference = result["evals"]["reference"]
                 for name in ("auto", "finer"):
@@ -427,12 +432,11 @@ def run(args):
                             raise AssertionError(
                                 f"{name} {key} relative error {error} exceeds 1e-3"
                             )
-        result["warnings"] = result.get("warnings", []) + [str(item.message) for item in caught]
         result["peak_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         result.pop("error", None)
         result.pop("sampling_diagnostics", None)
         result["state"] = "done"
-        _atomic(output, result)
+        persist()
         print("done", output, flush=True)
         return 0
     except Exception as error:
@@ -440,8 +444,7 @@ def run(args):
         result.pop("sampling_diagnostics", None)
         if isinstance(error, CoherentSamplingError) and error.diagnostics is not None:
             result["sampling_diagnostics"] = error.diagnostics
-        result["warnings"] = result.get("warnings", []) + [str(item.message) for item in caught]
-        _atomic(output, result)
+        persist()
         raise
 
 
