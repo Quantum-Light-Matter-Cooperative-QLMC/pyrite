@@ -137,6 +137,7 @@ or two on CPU:
 | `quickstart` | one HOPG case, incoherent PXR lines plus bremsstrahlung |
 | `sweep_demo` | a small two-material energy x tilt sweep for the analysis app |
 | `trajectory_demo` | `--trajectories` capture and VTK export |
+| `coherent_demo` | coherent + incoherent emission in windowed line grids |
 | `detector_demo` | a pixel detector behind a filter, with Poisson counts |
 | `high_energy_demo` | a 1 MeV beam with the measured line-grid policy |
 | `hopg_emittance_demo` | Courant-Snyder transverse beam phase space |

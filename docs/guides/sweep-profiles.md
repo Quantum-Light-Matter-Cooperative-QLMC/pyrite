@@ -117,11 +117,11 @@ Grid-source precedence per case, highest first:
 3. A stored per-energy row from `energy_grid_refs` or the legacy `[energy_grids.MATERIAL]` store. `PYRITE_ENERGY_GRID_*` environment values outrank this layer, not layer 2.
 4. Automatic resolution with the default selectors for energies a stored mapping does not cover; the crystal's built-in `E_grid` where no mapping exists.
 
-Automatic resolution does not support coherent emission (#117), so the editor refuses a policy on a `coherent` or `both` profile. `bin-mean` also refuses a positive `max_dE_frac`. Coherent feature windows are #350.
+Automatic resolution supports coherent emission only inside feature windows (#117, #350), so the editor refuses a policy without `windows = true` on a `coherent` or `both` profile. `bin-mean` also refuses a positive `max_dE_frac`.
 
 The table applies to every case of the profile and joins its dataset identity: editing it gives new checkpoints, and earlier results stay under their old identity. `profile create --from SOURCE` clones it; a fresh `profile create` does not set one. `high_energy` uses the full measured policy. A measured-bandwidth case records its upper-edge truncation audit and the line yield's per-electron relative standard error in `line_grid_resolved`. When a few electrons carry the yield (relative standard error above 0.1, typical at 5 MeV where rare electrons scatter into the detector's radiation cone), the case still runs, is flagged `statistics_limited`, and raises `LineYieldStatisticsWarning`.
 
-Tolerances, maximum spacing, point budget, backend ULPs and feature windows are not profile keys. Set them per call through `Sweep.line_grid_policy` or with `PYRITE_ENERGY_GRID_*`; see the [profile settings reference](../repo-design/profile-settings.md) for names and built-in values.
+Tolerances, maximum spacing, backend ULPs and detailed window maps are not profile keys. Set them per call through `Sweep.line_grid_policy` or with `PYRITE_ENERGY_GRID_*`; see the [profile settings reference](../repo-design/profile-settings.md) for names and built-in values.
 
 For automatic coherent emission, opt in to feature windows in the profile file:
 
@@ -194,7 +194,7 @@ Detector geometry can be declared in `[profiles.NAME.detectors.ID]` tables. Each
 
 ### Bundled examples and implicit defaults
 
-The bundled catalog ships read-only demo profiles (`quickstart`, `sweep_demo`, `trajectory_demo`, `detector_demo`, `high_energy_demo`, `hopg_emittance_demo`) plus `standard`, the base profile every material's default scan ranges resolve from. `pyrite profile` writes the profiles you create to the user catalog layer (`catalog.user`, `PYRITE_USER_CATALOG`; the platform config directory by default) as `profiles/NAME.toml`, read over the bundled catalog; a user profile may not reuse a bundled name. Copy a demo with `pyrite profile create NAME --from DEMO`. Maintainers edit the shipped demos with `pyrite-dev profile`, the same command tree aimed at the bundled catalog. Remote runs ship the layer to the box as `user-catalog/`.
+The bundled catalog ships read-only demo profiles (`quickstart`, `sweep_demo`, `trajectory_demo`, `coherent_demo`, `detector_demo`, `high_energy_demo`, `hopg_emittance_demo`) plus `standard`, the base profile every material's default scan ranges resolve from. `pyrite profile` writes the profiles you create to the user catalog layer (`catalog.user`, `PYRITE_USER_CATALOG`; the platform config directory by default) as `profiles/NAME.toml`, read over the bundled catalog; a user profile may not reuse a bundled name. Copy a demo with `pyrite profile create NAME --from DEMO`. Maintainers edit the shipped demos with `pyrite-dev profile`, the same command tree aimed at the bundled catalog. Remote runs ship the layer to the box as `user-catalog/`.
 
 Releases up to 0.6.1 bundled the research campaigns `sub_100keV`, `high_energy`, `hopg_short`, `hopg_hbn`, and `coh_test`. To keep using one, copy its TOML from the 0.6.1 tree (`src/pyrite/data/catalog/profiles/NAME.toml`) into `profiles/` under your user layer. Unchanged content keeps its dataset identity, so existing checkpoints resume. Like other profiles read with the bundled catalog, they stay exempt from the beam/detector requirement below; attaching an instrument changes their identity.
 
