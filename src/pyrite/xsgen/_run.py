@@ -94,7 +94,7 @@ def _link_dir(source: Path, destination: Path) -> LinkMode:
     """
     try:
         destination.symlink_to(source, target_is_directory=True)
-    except OSError, NotImplementedError:
+    except (OSError, NotImplementedError):
         shutil.copytree(source, destination)
         return "copy"
     return "symlink"

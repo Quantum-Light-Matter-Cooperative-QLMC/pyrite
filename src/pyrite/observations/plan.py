@@ -12,6 +12,8 @@ persistable :class:`~pyrite.observations.StoredObservation` from the runner's
 directional output.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from functools import cached_property

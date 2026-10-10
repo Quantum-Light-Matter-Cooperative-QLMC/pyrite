@@ -20,6 +20,8 @@ verifies and reuses. Readers verify schema, array checksums, and digests, and
 raise :class:`ObservationStoreError` rather than return a corrupt observation.
 """
 
+from __future__ import annotations
+
 import contextlib
 import fcntl
 import hashlib
@@ -541,7 +543,7 @@ class ObservationStore:
                 ).observation_digest
                 == observation.digest
             )
-        except ObservationStoreError, KeyError, TypeError:
+        except (ObservationStoreError, KeyError, TypeError):
             valid = False
         if not valid:
             self._write_record(observation)

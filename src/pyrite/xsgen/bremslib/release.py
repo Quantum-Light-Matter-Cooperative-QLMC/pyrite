@@ -26,6 +26,8 @@ of the key, so a released table and a locally generated one never share a
 key while holding different arrays.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import shutil

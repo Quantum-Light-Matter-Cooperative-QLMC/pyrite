@@ -26,8 +26,9 @@ channeling in crystals below 100 MeV is under investigation.
 
 ## Install
 
-Requires Python ≥ 3.14. PyRITE is not on PyPI yet; install it from GitHub with
-pip or [uv](https://docs.astral.sh/uv/):
+Requires Python ≥ 3.13. Python 3.13 installs `backports.zstd` automatically;
+Python 3.14+ uses the standard-library implementation. PyRITE is not on PyPI
+yet; install it from GitHub with pip or [uv](https://docs.astral.sh/uv/):
 
 ```bash
 # Command-line tool in its own environment (recommended):

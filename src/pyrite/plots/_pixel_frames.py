@@ -7,6 +7,8 @@ built from one pixel's factors only; nothing here materializes a
 pixel-by-energy cube. No plotting-library imports.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Literal
 

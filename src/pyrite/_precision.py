@@ -1,5 +1,7 @@
 """Import-light adaptive sampling policy shared by API, cases, and runners."""
 
+from __future__ import annotations
+
 import math
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass

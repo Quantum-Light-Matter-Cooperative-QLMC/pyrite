@@ -31,7 +31,7 @@ def _section_keys(section: str) -> tuple[str, ...]:
             else selected_catalog()
         )
         keys = object_keys(path, section)
-    except OSError, tomllib.TOMLDecodeError:
+    except (OSError, tomllib.TOMLDecodeError):
         return ()
     return tuple(key for key in keys if SAFE_TOKEN_RE.fullmatch(key))
 

@@ -46,7 +46,7 @@ def _host_rss_mib():
         with open("/proc/self/statm") as handle:
             pages = int(handle.read().split()[1])
         current = pages * os.sysconf("SC_PAGE_SIZE") / 2**20
-    except ImportError, OSError, ValueError, IndexError:
+    except (ImportError, OSError, ValueError, IndexError):
         return {}
     return {"_host_rss_mib": round(current, 1), "_host_rss_peak_mib": round(peak, 1)}
 

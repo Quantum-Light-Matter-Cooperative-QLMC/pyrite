@@ -1,5 +1,7 @@
 """Returned value for the public single-shot simulation API."""
 
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cached_property

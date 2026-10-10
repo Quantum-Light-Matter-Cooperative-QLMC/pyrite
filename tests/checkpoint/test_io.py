@@ -3,14 +3,19 @@
 import gzip
 import io
 import pickle
+import sys
 import time
-from compression import zstd
 from pathlib import Path
 
 import h5py
 import numpy as np
 
 from pyrite.checkpoints import _checkpoint_io as ckio
+
+if sys.version_info >= (3, 14):
+    from compression import zstd
+else:
+    from backports import zstd
 
 _DATA = Path(__file__).parent / "data"
 

@@ -80,7 +80,9 @@ def test_bandwidth_comparison_requires_a_distinct_reference_grid(options):
 
 @pytest.mark.parametrize("value", ["", "5000", "M", "5.5G", "-1M", "5000MB"])
 def test_bandwidth_job_rejects_malformed_memory_requests(value):
-    args = job.build_parser().parse_args(["start-bandwidth", "--mem-per-cpu", value])
+    # Bind negative-looking values explicitly on Python 3.13 too, so this
+    # exercises our memory validator rather than argparse's option parser.
+    args = job.build_parser().parse_args(["start-bandwidth", f"--mem-per-cpu={value}"])
     with pytest.raises(SystemExit, match="--mem-per-cpu"):
         job.start_bandwidth(args)
 

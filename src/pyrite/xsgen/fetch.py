@@ -128,7 +128,7 @@ def _github_token() -> tuple[str, str] | None:
             timeout=15,
             check=False,
         )
-    except OSError, subprocess.SubprocessError:
+    except (OSError, subprocess.SubprocessError):
         return None
     token = completed.stdout.strip()
     return (token, "`gh auth token`") if completed.returncode == 0 and token else None
