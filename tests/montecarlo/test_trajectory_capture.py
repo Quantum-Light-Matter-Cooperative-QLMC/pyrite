@@ -989,7 +989,8 @@ def test_device_row_fields_compact_in_bounded_blocks(tmp_path, monkeypatch):
             self.shape, self.dtype, self.size = host.shape, host.dtype, host.size
 
         def __getitem__(self, index):
-            return FakeDevice(self.host[index])
+            # Under the CUDA backend the writer indexes with device arrays.
+            return FakeDevice(self.host[index.get() if hasattr(index, "get") else index])
 
         def min(self):
             return self.host.min()

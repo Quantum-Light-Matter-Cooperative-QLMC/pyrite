@@ -14,6 +14,8 @@ Schema 3 changes only how row fields (one entry per segment) sit on disk. `read_
 
 ## Benchmarks
 
+### Case (a): CPU sweep case
+
 Case (a) is a 2,000-electron, 30 keV silicon sweep case: 2 µm slab, 30° tilt, midpoint energy model, default coupled radiative fields, lockstep CPU transport. It produced 294,506 segments, and its transport took 1.72 s. Times are the best of three on the development laptop with a warm page cache. "Select 10" selects and reads 10 histories spread across the file.
 
 Filter and chunk choice at 4,096-row chunks, with the schema-2 writer for reference:
@@ -42,7 +44,23 @@ Where the bytes go: in case (a), the eight float64 row fields `r_mid`, `v_hat`, 
 
 Full reads and streaming are about three times slower than schema 2 because of decompression. At under 1 µs per segment they remain small next to transport, which took about 6 µs per segment here.
 
-Case (b), a large real capture on the remote host (the 30,000-electron, 20 µm hopg case that wrote 1.5 GB at schema 2), is not yet measured.
+### Case (b): large GPU capture
+
+Case (b) is the `trajectory_demo` hopg geometry at 30 keV: 45° tilt, 180° azimuth, a 1 µm spot, 30,000 electrons, and a 20 µm (2×10⁵ Å) slab. It ran on the remote GPU box (RTX 5080, 8 CPU cores, shared and time-sliced) with the CUDA transport core and produced 6,869,145 segments. Transport took 2.0 s. Each layout was timed once, so the timings are noisy. "Uncompressed" is the schema-3 writer with filters, ID narrowing and per-history storage turned off, which is the schema-2 row layout.
+
+| Layout | Size | Bytes/segment | Write (share of transport) | Full read | Stream (1 Mi / 64 Ki rows) | Select 10 |
+|---|---|---|---|---|---|---|
+| uncompressed (schema-2-like) | 1.28 GiB | 199.7 | 1.55 s (76%) | 0.69 s | 0.67 / 1.18 s | 10 ms |
+| schema 3, host segments | 0.57 GiB | 89.4 | 7.0 s (345%) | 5.6 s | 5.1 / 3.7 s | 38 ms |
+| schema 3, device-resident segments | 0.57 GiB | 89.4 | 5.7 s (248%) | 3.1 s | 3.5 / 3.2 s | 162 ms |
+
+The size reduction carries over at scale: 55%, from 1.28 to 0.57 GiB. The write budget does not. LZF compresses about 1 million segments per second on this host's CPU, but the CUDA core transports about 3.4 million per second. A schema-3 capture therefore costs several times the GPU transport it records, against about 0.8× uncompressed. Case (a)'s 25% bound holds only for CPU transport. Ways to bring GPU captures back under budget, none adopted here:
+
+- an opt-in uncompressed or lighter filter for GPU-transported cases;
+- compressing on a writer thread that overlaps the spectrum phase;
+- storing floats at lower precision.
+
+Host and device-resident captures both read back equal to the transported arrays.
 
 ## Compatibility
 
