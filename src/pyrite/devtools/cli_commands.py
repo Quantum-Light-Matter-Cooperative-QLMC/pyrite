@@ -19,6 +19,7 @@ from pyrite.cli._groups import LazyGroup
         "rm": "Preview or delete selected local performance artifacts.",
     },
     no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 def performance_command() -> None:
     """List, analyze, or delete local compute-performance artifacts."""
@@ -44,6 +45,7 @@ def performance_command() -> None:
         "gc": "Reclaim unreachable immutable artifacts after the grace window.",
     },
     no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 def energy_grid_command() -> None:
     """Maintain derived detector energy-grid artifacts."""

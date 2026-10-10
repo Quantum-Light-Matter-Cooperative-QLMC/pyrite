@@ -220,6 +220,7 @@ class _ProfileGroup(LazyGroup):
     lazy_commands={"energy-grid": "pyrite.cli.commands.energy_grid_surface.profile_command"},
     lazy_help={"energy-grid": "Manage profile-scoped energy-grid derivation inputs."},
     no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 def command():
     """Manage catalog scan profiles (named campaign defaults).
