@@ -226,7 +226,7 @@ Both fixes are what the live sweep now gets: `run_case` transports on the CUDA c
 ## Reproducing the CPU-side checks
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
+pyrite-dev test \
   tests/montecarlo/test_transport_per_electron.py \
   tests/montecarlo/test_transport_core_default.py \
   tests/montecarlo/test_segment_staging.py

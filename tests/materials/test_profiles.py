@@ -176,6 +176,26 @@ def test_hopg_short_keeps_finite_footprint_and_attosecond_bunch():
     assert longitudinal["rms_duration_fs"] == 0.001
 
 
+def test_trajectory_demo_is_one_fixed_count_case_with_micron_beam():
+    assert CATALOG.profile_materials("trajectory_demo") == ("hopg",)
+    sweep = material_sweep("hopg", catalog_profile="trajectory_demo")
+    settings = profiles.profile_run_settings(
+        default_settings(), "trajectory_demo", "full", sweep=sweep
+    )
+    cases = build_cases(sweep)
+
+    assert len(cases) == 1
+    case = cases[0]
+    assert case["crystal"] == "hopg"
+    assert case["E0_keV"] == 30.0
+    assert case["thickness_ang"] == 20_000.0
+    assert case["tilt_deg"] == 45.0 and case["tilt_azim_deg"] == 180.0
+    assert case["beam_fwhm_mm"] == 0.001  # 1 micrometre, not the default 1 mm spot
+    assert sweep.beam.transverse_fwhm_y_mm == 0.001
+    assert case["Ne"] == case["Ne_brem"] == 100
+    assert settings.precision is None  # trajectory capture requires fixed counts
+
+
 def test_case_content_key_excludes_label_perf_and_flux_scale_fields():
     case = next(iter(_cases_by_key("hopg", "standard").values()))
     base = case_content_key(case)

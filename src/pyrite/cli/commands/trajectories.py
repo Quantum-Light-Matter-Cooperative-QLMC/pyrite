@@ -8,6 +8,15 @@ from ...console import output as _cli_core
 from ...console.outputs import output_default, output_label
 
 
+def _print_paraview_script(ctx, _param, value):
+    if not value or ctx.resilient_parsing:
+        return
+    from importlib.resources import files
+
+    click.echo(files("pyrite") / "data" / "paraview" / "pyrite_trajectories.py")
+    ctx.exit()
+
+
 def _artifacts(paths):
     """Expand directories to ``(artifact, path relative to its root)`` pairs.
 
@@ -36,7 +45,18 @@ def _artifacts(paths):
         "cell data, including electron_id; per-electron arrays, tallies, and "
         "complete transport metadata stay in the authoritative HDF5 artifact. "
         "Opens in ParaView, VisIt, and PyVista. --scene also exports lab-frame "
-        "geometry as separate close-up and instrument scenes."
+        "geometry as separate close-up and instrument scenes.\n\n"
+        "--history, --track, --first, or --sample export only whole selected "
+        "histories (primary electron_id with every secondary of its shower) or "
+        "tracks, reading only their rows; the .vtp then adds a segment_id cell "
+        "array and a FieldData record of the selection. Vacuum legs follow "
+        "selected histories and are omitted from track selections.\n\n"
+        "Examples:\n\n"
+        "  pyrite checkpoint export-trajectories trajectories/hopg/ --first 20\n\n"
+        "  pyrite checkpoint export-trajectories case.h5 --sample 100 --seed 1 --scene\n\n"
+        "ParaView preset (colouring, thresholds, scene views, headless PNG): "
+        '`pvbatch "$(pyrite checkpoint export-trajectories --paraview-script)" '
+        "case.vtp --screenshot case.png`, or import the script as a ParaView macro."
     ),
 )
 @click.argument(
@@ -45,6 +65,14 @@ def _artifacts(paths):
     required=True,
     metavar="ARTIFACT...",
     type=click.Path(exists=True, path_type=Path),
+)
+@click.option(
+    "--paraview-script",
+    is_flag=True,
+    expose_value=False,
+    is_eager=True,
+    callback=_print_paraview_script,
+    help="Print the path of the bundled ParaView preset script and exit.",
 )
 @click.option(
     "--out-dir",
@@ -64,10 +92,61 @@ def _artifacts(paths):
     is_flag=True,
     help="Also write separate .vtm close-up [angstrom] and .instrument.vtm [mm] scenes with private sidecar files; missing recorded geometry is omitted.",
 )
-def command(artifacts, out_dir, no_vacuum, overwrite, scene):
+@click.option(
+    "--history",
+    "histories",
+    multiple=True,
+    type=click.IntRange(min=0),
+    metavar="ID",
+    help="Export this whole history (electron_id); repeatable.",
+)
+@click.option(
+    "--track",
+    "tracks",
+    multiple=True,
+    type=click.IntRange(min=0),
+    metavar="ID",
+    help="Export this whole track (track_id); repeatable; intersects history selection.",
+)
+@click.option(
+    "--first",
+    type=_cli_core.POSITIVE_INT,
+    default=None,
+    metavar="N",
+    help="Export the first N histories that have segments.",
+)
+@click.option(
+    "--sample",
+    type=_cli_core.POSITIVE_INT,
+    default=None,
+    metavar="N",
+    help="Export N histories drawn at random from those with segments (all if fewer).",
+)
+@click.option(
+    "--seed",
+    type=click.IntRange(min=0),
+    default=None,
+    metavar="S",
+    help="Random seed of --sample. [default: 0]",
+)
+def command(
+    artifacts, out_dir, no_vacuum, overwrite, scene, histories, tracks, first, sample, seed
+):
     from ...montecarlo.trajectories import TrajectoryArtifactError
     from ...montecarlo.trajectory_export import export_segments_vtp
     from ...montecarlo.trajectory_scene import export_trajectory_scene, scene_output_paths
+    from ...montecarlo.trajectory_selection import select_trajectories
+
+    chosen = [
+        name
+        for name, value in (("--history", histories), ("--first", first), ("--sample", sample))
+        if value
+    ]
+    if len(chosen) > 1:
+        raise click.UsageError(f"{' and '.join(chosen)} are mutually exclusive")
+    if seed is not None and sample is None:
+        raise click.UsageError("--seed requires --sample")
+    selecting = bool(histories or tracks or first or sample)
 
     paths = _artifacts(artifacts)
     if not paths:
@@ -93,22 +172,43 @@ def command(artifacts, out_dir, no_vacuum, overwrite, scene):
         raise _cli_core.CLIError(
             f"{len(existing)} output(s) already exist, e.g. {existing[0]}; pass --overwrite"
         )
-    for target, path in targets:
+    # Resolve every selection before writing, so an empty one exports nothing.
+    try:
+        selections = [
+            select_trajectories(
+                path,
+                histories=histories,
+                tracks=tracks,
+                first=first,
+                sample=sample,
+                seed=seed or 0,
+            )
+            if selecting
+            else None
+            for _, path in targets
+        ]
+    except (TrajectoryArtifactError, OSError) as error:
+        raise _cli_core.CLIError(str(error)) from error
+    for (target, path), selection in zip(targets, selections, strict=True):
         try:
-            summary = export_segments_vtp(path, target, include_vacuum=not no_vacuum)
+            summary = export_segments_vtp(
+                path, target, include_vacuum=not no_vacuum, selection=selection
+            )
             manifests = (
                 export_trajectory_scene(
                     path,
                     target,
                     include_vacuum=not no_vacuum,
                     overwrite=overwrite,
+                    selection=selection,
                 )
                 if scene
                 else ()
             )
         except (TrajectoryArtifactError, OSError, ValueError, KeyError) as error:
             raise _cli_core.CLIError(str(error)) from error
-        click.echo(f"{target}  {summary['cells']} cells ({summary['vacuum_legs']} vacuum)")
+        chosen = f"; {selection.histories} histories selected" if selection is not None else ""
+        click.echo(f"{target}  {summary['cells']} cells ({summary['vacuum_legs']} vacuum){chosen}")
         for manifest in manifests:
             click.echo(str(manifest))
 

@@ -3822,7 +3822,7 @@ Scripts are in the git-ignored `scratch/` directory. Each script rebuilds the fi
 - **Threshold scan.** One undamped piece, $dd\in[0.3,4]\,M\hbar c/u$, three halos, exact closed form: worst exact/bound is $0.918$.
 - **Phase-aligned trains** of 2–20 pieces with gaps of $1.001$–$3\times$ the threshold, exact closed form: worst ratio $0.584$.
 - **Step and switch.** On a two-electron row, `span_all` (540 Å), `span_electron` (50 Å), the Nyquist step and the eighth step match by hand. `electron_step_from_eV` matches the first 100 eV bin with $F_zN\le10^{-4}$.
-- **Anchor file.** `uv run pyrite-dev test tests/energy-grid/test_coherent_windowed_line_grid.py`: 62 passed (101.7 s). This includes the production-reducer tail, scope guards, budget, gaps, attenuation and the limit anchors.
+- **Anchor file.** `pyrite-dev test tests/energy-grid/test_coherent_windowed_line_grid.py`: 62 passed (101.7 s). This includes the production-reducer tail, scope guards, budget, gaps, attenuation and the limit anchors.
 
 ### Collinear-split limit: holds only inside one cluster
 

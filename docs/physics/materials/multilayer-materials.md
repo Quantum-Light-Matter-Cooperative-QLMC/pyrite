@@ -97,7 +97,7 @@ N-layer stacks live in `data/catalog/materials/`; `substrate = "key"` is two-lay
 
 1. If a crystalline phase is absent, add its bundled CIF under `data/cifs/` and a `crystals/<key>.toml` object. Add amorphous number densities in `media/<key>.toml`.
 2. Add one `materials/<run-key>.toml` object with the film `crystal`, a profile or scan overrides, and either `substrate` or an ordered inline `stack` (never both).
-3. Run `uv run pyrite material validate`. Transport support errors are fatal. Mott tables are not checked here; `elastic_model="mott"` needs user-supplied SRD 64 tables and fails at run time when one is missing.
+3. Run `pyrite material validate`. Transport support errors are fatal. Mott tables are not checked here; `elastic_model="mott"` needs user-supplied SRD 64 tables and fails at run time when one is missing.
 
 The material run key is the CLI/checkpoint name; the film crystal key drives crystallography. No transport, radiation, absorption, or plotting registry edit is required.
 

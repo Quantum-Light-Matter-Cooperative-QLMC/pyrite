@@ -229,7 +229,7 @@ quantify spectral error, or grant human sign-off.
 
 ## Verification commands
 
-`UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/materials/test_kinematic_validity.py tests/scan/test_kinematic_validity.py -k 'not standard_profile'`
+`pyrite-dev test tests/materials/test_kinematic_validity.py tests/scan/test_kinematic_validity.py -k 'not standard_profile'`
 passed: 13 tests, 50 catalog-profile parametrizations deselected. The task owner
-owns the full catalog audit. `UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/dev/test_docs.py`
+owns the full catalog audit. `pyrite-dev test tests/dev/test_docs.py`
 passed: 6 tests.

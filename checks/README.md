@@ -9,7 +9,7 @@ The canonical check-to-ledger mapping is `pyrite.validation.check_records.CHECK_
 Use the collector to preserve normal output and write dated JSONL evidence:
 
 ```bash
-uv run pyrite-dev validation-records -- checks/dans_diffraction_oracle.py
+pyrite-dev validation-records -- checks/dans_diffraction_oracle.py
 ```
 
 On remote workers, use the collector's `--output-dir`; copy reviewed records into

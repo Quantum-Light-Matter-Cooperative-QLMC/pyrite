@@ -10,8 +10,11 @@ PyRITE requires Python 3.13 or newer and [uv](https://docs.astral.sh/uv/).
 git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
 cd pyrite
 uv sync
-uv run pyrite --help
+source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pyrite --help
 ```
+
+Every `pyrite ...` command in these guides assumes `pyrite` is on your `PATH`: either activate the project environment as above in each new shell, or install it once as a tool (`uv tool install .`, see the [shell-completion guide](shell-completion.md)).
 
 The base installation is CPU-only. Accelerator extras and contributor setup are documented in the [project README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#install) and [development workspace guide](../repo-design/development-workspace.md). To expose `pyrite` as a persistent user command and enable tab-completion without activating `.venv`, follow the [shell-completion guide](shell-completion.md).
 
@@ -20,10 +23,10 @@ The base installation is CPU-only. Accelerator extras and contributor setup are 
 Profiles define reusable campaign settings and material membership. Inspect the available configuration before starting compute:
 
 ```bash
-uv run pyrite profile list
-uv run pyrite profile show standard
-uv run pyrite material show hopg
-uv run pyrite config list
+pyrite profile list
+pyrite profile show standard
+pyrite material show hopg
+pyrite config list
 ```
 
 Use the generated [CLI reference](../repo-design/cli/cli-reference.md) when a command's complete option and output contract matters. The [sweep-profile guide](sweep-profiles.md) explains profiles, fidelity, dataset identity, and named beams.
@@ -33,7 +36,7 @@ Use the generated [CLI reference](../repo-design/cli/cli-reference.md) when a co
 Start with one material on the tiny `--quick` grid rather than a production sweep:
 
 ```bash
-uv run pyrite run standard -m hopg --quick
+pyrite run standard -m hopg --quick
 ```
 
 Bundled profiles resolve a conservative case-local line grid automatically; no derivation step is required. Full sweeps are heavy; use the [cluster guide](running-on-a-cluster.md) for GPU or SLURM work.

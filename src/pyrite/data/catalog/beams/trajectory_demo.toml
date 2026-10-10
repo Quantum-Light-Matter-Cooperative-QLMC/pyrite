@@ -1,0 +1,2 @@
+label = "Trajectory demo: round 1 micrometre FWHM spot"
+transverse_fwhm_mm = 0.001

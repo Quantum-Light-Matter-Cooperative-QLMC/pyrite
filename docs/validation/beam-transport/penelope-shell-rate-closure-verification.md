@@ -302,7 +302,7 @@ Run in `/tmp/pyrite-issue-93` with
   §3.2.6–3.2.6.1, §7.1 footnote);
 - `uv run python` running the independent quadrature/closure script (session
   scratchpad, not committed);
-- `uv run pyrite-dev test tests/montecarlo/test_shell_rates.py tests/montecarlo/test_shell_gos.py -q`
+- `pyrite-dev test tests/montecarlo/test_shell_rates.py tests/montecarlo/test_shell_gos.py -q`
   (all pass; 3 strict xfails as designed).
 
 The concurrent uncommitted `shell_gos.py` edit (windowed moments) was present

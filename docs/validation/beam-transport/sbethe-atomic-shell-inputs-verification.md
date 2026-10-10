@@ -164,7 +164,7 @@ curl -sSL -o endf6.pdf https://www.nndc.bnl.gov/endfdocs/ENDF-102-2023.pdf; pdft
 python3 pd.py     # verifier parse of pdatconf.p14
 python3 eedl.py   # verifier raw ENDF parse of EEDL.endf MF=23
 python3 join.py   # verifier join and item-4 numbers
-PYRITE_MC_BACKEND=cpu uv run pyrite-dev test tests/montecarlo/test_shell_configuration.py tests/montecarlo/test_characteristic.py
+PYRITE_MC_BACKEND=cpu pyrite-dev test tests/montecarlo/test_shell_configuration.py tests/montecarlo/test_characteristic.py
   -> 33 passed, 1 warning
 PYRITE_MC_BACKEND=cpu uv run python -c ...  # implementation join over 99 elements
 ```

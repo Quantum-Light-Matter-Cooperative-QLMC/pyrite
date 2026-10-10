@@ -103,7 +103,7 @@ Matches the formula to <0.5% at N=100,000 (independent draw, different seed and 
 Ran on `feature/finite-electron-beam-size` (already checked out, matches described branch):
 
 ```
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_montecarlo.py -k beam_fwhm -v
+pyrite-dev test tests/montecarlo/test_montecarlo.py -k beam_fwhm -v
 ...4 passed in 1.50s
 ```
 

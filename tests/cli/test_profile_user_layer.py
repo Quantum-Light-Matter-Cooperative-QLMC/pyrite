@@ -84,6 +84,6 @@ def test_precision_enable_on_a_bundled_demo_writes_nothing_and_a_clone_switches(
     assert created.exit_code == 0
     enabled = invoke(profile.command, ["precision", "enable", "mine"])
     assert enabled.exit_code == 0, enabled.stderr
-    assert "removed fixed counts: line-trials 200, brem-trials 50" in enabled.stdout
+    assert "removed fixed counts: line-trials 100, brem-trials 100" in enabled.stdout
     assert "n_electrons" not in (_isolate_user_catalog / "profiles" / "mine.toml").read_text()
     assert bundled() == before

@@ -190,7 +190,7 @@ An enumeration over all 26 catalog crystal elements compared the kernel's line s
 
 ### Tests
 
-`uv run pyrite-dev test tests/energy-grid/test_line_seeds.py tests/energy-grid/test_line_windows.py` gives 28 passed. No test covers a secondary shell near a stronger edge, and no test covers the in-medium offset.
+`pyrite-dev test tests/energy-grid/test_line_seeds.py tests/energy-grid/test_line_windows.py` gives 28 passed. No test covers a secondary shell near a stronger edge, and no test covers the in-medium offset.
 
 ## 3. Measured vacuum-to-in-medium offsets
 

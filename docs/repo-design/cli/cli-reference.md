@@ -715,15 +715,38 @@ Usage: pyrite checkpoint export-trajectories [OPTIONS] ARTIFACT...
   HDF5 artifact. Opens in ParaView, VisIt, and PyVista. --scene also exports lab-frame
   geometry as separate close-up and instrument scenes.
 
+  --history, --track, --first, or --sample export only whole selected histories (primary
+  electron_id with every secondary of its shower) or tracks, reading only their rows;
+  the .vtp then adds a segment_id cell array and a FieldData record of the selection.
+  Vacuum legs follow selected histories and are omitted from track selections.
+
+  Examples:
+
+    pyrite checkpoint export-trajectories trajectories/hopg/ --first 20
+
+    pyrite checkpoint export-trajectories case.h5 --sample 100 --seed 1 --scene
+
+  ParaView preset (colouring, thresholds, scene views, headless PNG): `pvbatch "$(pyrite
+  checkpoint export-trajectories --paraview-script)" case.vtp --screenshot case.png`, or
+  import the script as a ParaView macro.
+
 Options:
-  --out-dir DIR  Write .vtp files under DIR, mirroring each ARTIFACT directory (default:
-                 beside each artifact).
-  --no-vacuum    Omit grooved runs' vacuum legs.
-  --overwrite    Replace existing .vtp outputs and, with --scene, scene manifests.
-  --scene        Also write separate .vtm close-up [angstrom] and .instrument.vtm [mm]
-                 scenes with private sidecar files; missing recorded geometry is
-                 omitted.
-  -h, --help     Show this message and exit.
+  --paraview-script  Print the path of the bundled ParaView preset script and exit.
+  --out-dir DIR      Write .vtp files under DIR, mirroring each ARTIFACT directory
+                     (default: beside each artifact).
+  --no-vacuum        Omit grooved runs' vacuum legs.
+  --overwrite        Replace existing .vtp outputs and, with --scene, scene manifests.
+  --scene            Also write separate .vtm close-up [angstrom] and .instrument.vtm
+                     [mm] scenes with private sidecar files; missing recorded geometry
+                     is omitted.
+  --history ID       Export this whole history (electron_id); repeatable.  [x>=0]
+  --track ID         Export this whole track (track_id); repeatable; intersects history
+                     selection.  [x>=0]
+  --first N          Export the first N histories that have segments.
+  --sample N         Export N histories drawn at random from those with segments (all if
+                     fewer).
+  --seed S           Random seed of --sample. [default: 0]  [x>=0]
+  -h, --help         Show this message and exit.
 ```
 
 ## `pyrite checkpoint score-trajectories`

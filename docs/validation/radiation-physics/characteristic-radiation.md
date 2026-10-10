@@ -199,7 +199,7 @@ All computations below used the project runner with `PYRITE_MC_BACKEND=cpu`. No 
 - For a 1000 eV line, FWHM 2 eV and bin edges 998 through 1002 eV, direct analytic integration captures 0.7048327646991335 of the full Lorentzian. The implementation sums to 1, exactly as the declared conditional model requires; its retained-bin density is larger by 1.4187762687605225. The independently computed conditional bin vector matches at relative tolerance $10^{-14}$ with zero absolute tolerance.
 - For carbon at 30 keV, density $0.1\,\mathrm{\mathring A}^{-3}$, one 100 angstrom track, two incident electrons and zero attenuation, direct multiplication of the raw EEDL cross section and XrayDB API yields predicts $3.0156786314065755\times10^{-7}$ photons per sr per incident electron. The integrated output is $3.0156786314065765\times10^{-7}$, agreeing to $4.44\times10^{-16}$ relatively. This also checks that the electron with no segment remains in the normalization.
 - Carbon's API branch intensities sum to 1.0000000972. Using the idealized sum of exactly one initially produced a relative difference of $9.72\times10^{-8}$; retaining the rounded source intensities resolves it. The implementation accepts source sums within 0.99 to 1.01 and does not renormalize them. Thus photon-yield preservation is exact relative to the supplied branch sum, and only approximate relative to $\omega_i$ alone. Carbon K-alpha-1 has API widths $0.0868+0.0045=0.0913$ eV, matching the constructed transition width.
-- The focused command `PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_characteristic.py` passed **7 tests**. These cover parsing/provenance, relaxation joining, line integration, transparent-track subdivision, absorber separation and addition to both emission modes.
+- The focused command `PYRITE_MC_BACKEND=cpu pyrite-dev test tests/montecarlo/test_characteristic.py` passed **7 tests**. These cover parsing/provenance, relaxation joining, line integration, transparent-track subdivision, absorber separation and addition to both emission modes.
 
 The existing carbon cross-section assertion uses `np.isclose` with its default absolute tolerance $10^{-8}\,\mathrm{cm}^2$. That tolerance is much larger than the reference value: even zero passes this particular assertion. It is therefore a weak regression anchor for the numerical cross section. The independent zero-absolute-tolerance check above verifies today's value; it does not repair the persistent test. A separate test improvement is recommended before treating that reference as a strong CI anchor.
 
@@ -221,7 +221,7 @@ Suggested human-applied ledger update: change `characteristic-radiation` from `f
 
 ### Coordinated documentation checks, 2026-09-13
 
-Supplied by the coordinating context after this verification was written. `UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs` builds this page with no new Sphinx warning. `uv run pyrite-dev test tests/dev/test_docs.py tests/dev/test_validation_ledger.py tests/dev/test_doc_blocks.py` passed **68 tests**, covering documentation structure, ledger schema/anchor resolution and doc code blocks. The rendered page carries 63 parsed math nodes, with no unparsed dollar-delimited or backslash-parenthesis math left as literal text in the HTML, so the display and inline math above render.
+Supplied by the coordinating context after this verification was written. `pyrite-dev docs` builds this page with no new Sphinx warning. `pyrite-dev test tests/dev/test_docs.py tests/dev/test_validation_ledger.py tests/dev/test_doc_blocks.py` passed **68 tests**, covering documentation structure, ledger schema/anchor resolution and doc code blocks. The rendered page carries 63 parsed math nodes, with no unparsed dollar-delimited or backslash-parenthesis math left as literal text in the HTML, so the display and inline math above render.
 
 The two documentation corrections requested above were applied to the maintained physics page by the coordinating context: its bin density now reads $Y\widehat q_b/\Delta E_b$ with $\widehat q_b=q_b/\sum_cq_c$ stated explicitly, and its subdivision bullet now carries the fixed-attenuation condition and the optical-depth-2 midpoint-quadrature numbers. No code was changed. The weak `np.isclose` absolute tolerance on the carbon cross-section assertion is left as a recorded ledger finding for a separate test-improvement task.
 
@@ -373,7 +373,7 @@ Minor, not a defect:
 
 ### Test run
 
-`uv run pyrite-dev test tests/montecarlo/test_eadl_relaxation.py tests/montecarlo/test_characteristic.py tests/montecarlo/test_eedl_ionization_consistency.py`: 60 passed.
+`pyrite-dev test tests/montecarlo/test_eadl_relaxation.py tests/montecarlo/test_characteristic.py tests/montecarlo/test_eedl_ionization_consistency.py`: 60 passed.
 
 ### Verdict
 

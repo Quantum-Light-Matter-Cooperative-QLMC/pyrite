@@ -29,7 +29,7 @@ uv tool update-shell
 exec "$SHELL"
 ```
 
-The tool environment is for interactive command availability. Use the locked project environment and canonical `uv run pyrite-dev ...` commands for tests, linting, documentation builds, and other contributor verification.
+The tool environment is for interactive command availability. Use the locked project environment and canonical `pyrite-dev ...` commands for tests, linting, documentation builds, and other contributor verification.
 
 ## Install completion
 

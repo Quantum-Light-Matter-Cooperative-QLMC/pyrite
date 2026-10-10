@@ -105,7 +105,7 @@ Changing its occupancy to 0.5 raises `ValueError`, as required. The focused
 project command
 
 ```text
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/materials/test_crystallography.py -k 'cif or crystals_crystal_to'
+pyrite-dev test tests/materials/test_crystallography.py -k 'cif or crystals_crystal_to'
 ```
 
 checks deterministic P1 mapping, non-P1 inversion expansion, partial-occupancy

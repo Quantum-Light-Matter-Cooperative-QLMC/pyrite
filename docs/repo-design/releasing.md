@@ -40,7 +40,7 @@ them.
 Title and commit: `chore(release): bump version to X.Y.Z`. Produce it with:
 
 ```bash
-uv run pyrite-dev release X.Y.Z --notes-file release-notes.md
+pyrite-dev release X.Y.Z --notes-file release-notes.md
 ```
 
 The command:
@@ -61,7 +61,7 @@ The command:
    `Physics-Changing` body line, so review that list by hand.
 
 `--check` validates and prints notes without editing files. Put the notes in
-the PR description, then run `uv run pyrite-dev verify`. After the PR merges,
+the PR description, then run `pyrite-dev verify`. After the PR merges,
 tag `vX.Y.Z` on the merge commit. Tagging and pushing need explicit human
 authorization. PyPI publishing is out of scope.
 

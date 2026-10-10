@@ -10,6 +10,8 @@ Splitting that namespace between wheels would make installation order decide whi
 
 ## Commands
 
+Commands below assume `pyrite` and `pyrite-dev` are on your `PATH`: activate the project environment (`source .venv/bin/activate`) after `uv sync`, or install them as a tool (`uv tool install .`).
+
 ```bash
 # Normal contributor setup: root package and every dependency group
 # (`tool.uv.default-groups = "all"`; `uv run` syncs the same set).
@@ -19,36 +21,36 @@ uv sync --locked
 uv sync --no-default-groups --locked
 
 # Stable domain partitions. Together these contain every tests/test_*.py once.
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite core
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite core --durations=30 --durations-min=0.5
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite cli
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite apps
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite packaging
+pyrite-dev test-suite core
+pyrite-dev test-suite core --durations=30 --durations-min=0.5
+pyrite-dev test-suite cli
+pyrite-dev test-suite apps
+pyrite-dev test-suite packaging
 
 # One focused test module or selection.
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test path/to/test.py -k test_name
+pyrite-dev test path/to/test.py -k test_name
 
 # Include the opt-in slow tier (CI always does).
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite core --slow
+pyrite-dev test --slow
+pyrite-dev test-suite core --slow
 
 # Fresh-process CPU imports and README simulation; see the startup reference.
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev startup --cache warm --repeats 3
+pyrite-dev startup --cache warm --repeats 3
 
 # Static and formatting checks.
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev lint
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev format
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev precommit
+pyrite-dev lint
+pyrite-dev format
+pyrite-dev typecheck
+pyrite-dev precommit
 
 # Additive cross-boundary sample and release gates.
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite integration
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify --skip-tests
+pyrite-dev test-suite integration
+pyrite-dev docs
+pyrite-dev verify
+pyrite-dev verify --skip-tests
 
 # Clean wheel and editable-install compatibility check.
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev package-smoke
+pyrite-dev package-smoke
 ```
 
 Use the project runner rather than bare `pytest` or an environment-specific Python path. If the project environment is not writable, add `UV_PROJECT_ENVIRONMENT=/tmp/pyrite-venv` instead of switching interpreters.
@@ -58,7 +60,7 @@ profiling, and the recorded baseline.
 
 Suite ownership uses deterministic filename rules in `pyrite._dev`. A regression test requires the four domain suites to cover every test module exactly once, so a new test cannot silently disappear from focused coverage. The integration suite intentionally overlaps domain suites; it exercises public imports/data, exports, CLI contract, remote, sweep/run, and a headless app path. `pyrite-dev docs` performs the clean offline warnings-as-errors Sphinx build; `verify` includes that documentation gate along with skills, imports, generated repository structure, lint, types, and tests. CI runs the four domain suites once each, including the `slow` tier, with adaptive workers (and slow-test timings for core), then uses `verify --skip-tests` for the remaining checks; local `verify` still runs everything.
 
-The suites read hash-pinned fetched data rather than packaged data (ADR-0014): the EPICS2025 EEDL and EADL files, the derived EPDL photon table, SBETHE's `sdbase/` and catalogue stopping tables, and the ELSEPA and BremsLib tables, with the positron SBETHE and ELSEPA pins alongside the electron ones. Install all of it once per machine with `uv run pyrite tables fetch` (about 140 MB; one code with `pyrite tables fetch CODE`, a positron pin with `pyrite tables fetch {sbethe-tables,elsepa} --projectile positron`, or `--archive PATH` from a local copy); a test that needs one fails naming the command. Positron tests check every table their pinned release lists (`tests/helpers/positron_tables.py`): none installed skips, naming the fetch command (fails instead when `CI` is set, so CI never skips a positron anchor silently); some installed fails, naming the command. Tests never see a developer's `PYRITE_HOME` or config store, so they read the default user-data location, `~/.local/share/pyrite/datasets/` on Linux; fetch without `PYRITE_HOME` set. PyRITE's own archives (EPDL, SBETHE tables, ELSEPA, BremsLib, and the EEDL/EADL mirrors) are public GitHub Release assets, so fetching them needs no GitHub token. CI caches the datasets, `xsgen/tables` and `xsgen/reference-data` directories under a key derived from `src/pyrite/datasets.py`, `src/pyrite/xsgen/fetch.py` (the `sdbase/` pin) and `src/pyrite/data/xsgen/*-tables.json`, and runs `pyrite tables fetch`; they verify a cached copy and need no network on a hit. The `elastic_model="mott"` tests read the synthetic SRD 64-format tables in `tests/data/mott_srd64_synthetic/` (regenerate with `uv run python -m tests.helpers.mott_synthetic`).
+The suites read hash-pinned fetched data rather than packaged data (ADR-0014): the EPICS2025 EEDL and EADL files, the derived EPDL photon table, SBETHE's `sdbase/` and catalogue stopping tables, and the ELSEPA and BremsLib tables, with the positron SBETHE and ELSEPA pins alongside the electron ones. Install all of it once per machine with `pyrite tables fetch` (about 140 MB; one code with `pyrite tables fetch CODE`, a positron pin with `pyrite tables fetch {sbethe-tables,elsepa} --projectile positron`, or `--archive PATH` from a local copy); a test that needs one fails naming the command. Positron tests check every table their pinned release lists (`tests/helpers/positron_tables.py`): none installed skips, naming the fetch command (fails instead when `CI` is set, so CI never skips a positron anchor silently); some installed fails, naming the command. Tests never see a developer's `PYRITE_HOME` or config store, so they read the default user-data location, `~/.local/share/pyrite/datasets/` on Linux; fetch without `PYRITE_HOME` set. PyRITE's own archives (EPDL, SBETHE tables, ELSEPA, BremsLib, and the EEDL/EADL mirrors) are public GitHub Release assets, so fetching them needs no GitHub token. CI caches the datasets, `xsgen/tables` and `xsgen/reference-data` directories under a key derived from `src/pyrite/datasets.py`, `src/pyrite/xsgen/fetch.py` (the `sdbase/` pin) and `src/pyrite/data/xsgen/*-tables.json`, and runs `pyrite tables fetch`; they verify a cached copy and need no network on a hit. The `elastic_model="mott"` tests read the synthetic SRD 64-format tables in `tests/data/mott_srd64_synthetic/` (regenerate with `uv run python -m tests.helpers.mott_synthetic`).
 
 `pyrite-dev test`, `test-suite`, and the test step of `verify` use `pytest-xdist` workers by default: `min(CPUs, available memory / 2 GiB, 6)`, since a worker peaks at roughly 1.2–1.8 GiB. Set `PYRITE_TEST_WORKERS=N` to choose the count (`1` runs serially). `test` runs that name test paths remain serial by default; all commands honor explicit `-n`/`--numprocesses` or `-p no:xdist`. Pytest keeps `tmp_path` directories only for failed tests.
 
@@ -67,8 +69,8 @@ Tests marked `slow` are skipped by default. The marker covers tests that take mo
 ## Coverage
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --cov
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --numba --cov
+pyrite-dev test --cov
+pyrite-dev test --numba --cov
 ```
 
 `--cov` is forwarded straight to `pytest-cov`, which reads `[tool.coverage.*]` in `pyproject.toml` for source/branch/report settings; any other `pytest-cov`/`coverage.py` flag (`--cov-report=html`, `-k`, ...) composes the same way. `--numba` must come before other forwarded arguments; it sets `NUMBA_DISABLE_JIT=1` so `@njit` bodies (`montecarlo/transport.py`, `geometry.py`, `groove.py`) run under the Python tracer instead of compiled, at roughly 2x wall clock. Read the resulting totals against the two compiled-code caveats documented next to `[tool.coverage.report]` in `pyproject.toml`: the CuPy kernel modules (`montecarlo/transport/_jit_*.py`, `montecarlo/spectrum/*_jit_kernel.py`) report 0% on any environment without the `nvidia` extra, and `@njit` bodies need `--numba` to be measured at all.

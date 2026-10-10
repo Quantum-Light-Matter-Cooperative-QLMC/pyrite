@@ -202,7 +202,7 @@ Select the array backend before importing PyRITE, for example:
 
 <!-- verify: skip (illustrative script invocation, not a pyrite/pyrite-dev command) -->
 ```bash
-PYRITE_MC_BACKEND=cpu uv run python my_simulation.py
+PYRITE_MC_BACKEND=cpu python my_simulation.py
 ```
 
 An explicit `Numerics.backend` validates the already-active backend; it does not switch an imported process to another device.

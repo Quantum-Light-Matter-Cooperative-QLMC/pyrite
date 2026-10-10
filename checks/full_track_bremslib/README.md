@@ -95,13 +95,13 @@ To repeat one case in a prepared remote PyRITE checkout, set
 `PYRITE_BENCH_ELASTIC` (`mott` or `sr`) and `PYRITE_BENCH_OUTPUT`, then run:
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test checks/full_track_bremslib/test_benchmark.py -s -q
+pyrite-dev test checks/full_track_bremslib/test_benchmark.py -s -q
 ```
 
 Run the comparison after all eleven JSON files are present:
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test checks/full_track_bremslib/test_compare.py -s -q
+pyrite-dev test checks/full_track_bremslib/test_compare.py -s -q
 ```
 
 The comparison asserts three-standard-error screening tolerances on the
@@ -215,7 +215,7 @@ output. Geant4 TestEm5 uses Si at 2.330 g/cm³ and 28.09 g/mol, while PyRITE
 uses 2.329 g/cm³ and 28.085 g/mol (a 0.04 % areal-density difference).
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test checks/full_track_bremslib/test_compare_emission.py -s -q
+pyrite-dev test checks/full_track_bremslib/test_compare_emission.py -s -q
 ```
 
 ### Acceptance tolerances

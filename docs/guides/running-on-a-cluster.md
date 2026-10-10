@@ -14,7 +14,8 @@ git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
 cd pyrite
 uv sync                       # CPU-only base environment
 # or exactly one: --extra nvidia | --extra amd | --extra intel
-uv run pyrite --help          # sanity check
+source .venv/bin/activate
+pyrite --help                 # sanity check
 ```
 
 No GPU stack is installed by default. NVIDIA nodes use `uv sync --extra nvidia` and a CUDA runtime matching `cupy-cuda13x`. Intel nodes use `uv sync --extra intel`. AMD nodes currently require a ROCm toolchain and `CUPY_INSTALL_USE_HIP=1 uv sync --extra amd`; AMD-hosted wheels do not yet support PyRITE's Python version. Keep ROCm deployment provisional until validated on the target cluster.
@@ -38,9 +39,10 @@ Submit with `sbatch run_pyrite.sh mose2`:
 set -euo pipefail
 module load cuda/13.x            # <-- match the cupy-cuda13x wheel (omit for CPU)
 cd "$SLURM_SUBMIT_DIR"
+source .venv/bin/activate        # or install once with `uv tool install .`
 
 MATERIAL="${1:?usage: sbatch run_pyrite.sh <material>}"
-uv run pyrite run standard -m "$MATERIAL"
+pyrite run standard -m "$MATERIAL"
 ```
 
 On an accelerator node one main-process device context handles spectrum/bremsstrahlung while a process pool prepares CPU electron transport, so `--cpus-per-task` supplies those transport workers. For a **CPU-only** partition, drop `--gres` and the CUDA module; `run_cases` uses a full-case worker pool capped by both core count and available memory. Pass `--workers $SLURM_CPUS_PER_TASK` to request the allocation's CPU count; the memory cap still applies. The two pools carry different per-worker RAM budgets: `PYRITE_MC_WORKER_MEM_MB` (default 6144) for full-case CPU workers, `PYRITE_MC_PIPELINE_WORKER_MEM_MB` (default 1536) for the transport-only workers behind a GPU. A pinned `--workers` clamped by either budget now warns.
@@ -63,9 +65,10 @@ One array task per material — they run independently and write their own compo
 set -euo pipefail
 module load cuda/13.x
 cd "$SLURM_SUBMIT_DIR"
+source .venv/bin/activate        # or install once with `uv tool install .`
 
 MATERIALS=(mose2 wse2 mos2 hopg)            # indexed by $SLURM_ARRAY_TASK_ID
-uv run pyrite run standard -m "${MATERIALS[$SLURM_ARRAY_TASK_ID]}"
+pyrite run standard -m "${MATERIALS[$SLURM_ARRAY_TASK_ID]}"
 ```
 
 ## 4. Retrieve and visualize locally
