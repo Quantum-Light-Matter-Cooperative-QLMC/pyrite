@@ -345,14 +345,22 @@ def _grid_summary(descriptor, field: str) -> str:
 
 def effective_brem(raw: dict, material: str, profile: str = "standard"):
     """Effective ``E_grid_brem`` band for MATERIAL: its own
-    profile override, else that profile's default.
+    profile override, else that profile's default or the built-in uniform grid.
 
     Resolves every grid spelling, not only ``arange`` -- see
     :func:`resolved_grid_band` for why the other three used to report nothing.
     """
-    selected = raw.get("profiles", {}).get(profile, {})
+    from pyrite.materials._schema import DEFAULT_BREM_GRID
+
+    profiles = raw.get("profiles", {})
+    selected = profiles.get(profile, {})
+    members = selected.get("materials")
+    if members is not None and material not in members:
+        selected = profiles.get("standard", {})
     override = selected.get("overrides", {}).get(material, {})
-    brem = override.get("E_grid_brem") or selected.get("E_grid_brem")
+    start, stop, step = DEFAULT_BREM_GRID
+    default = {"arange": {"start": start, "stop": stop, "step": step}}
+    brem = override.get("E_grid_brem", selected.get("E_grid_brem", default))
     if not isinstance(brem, dict):
         return None
     return resolved_grid_band(brem, f"profiles.{profile} E_grid_brem")
@@ -914,8 +922,8 @@ def resolved_show_inputs(
     Bremsstrahlung ``start`` is reported as the band a case will actually be
     evaluated over, not as the number the row happens to store: a declared
     start below the medium's derived photon-continuum floor is raised, the same
-    way ``campaign/sweep.py::build_cases`` raises it. A profile-level default
-    stores ``0.0`` precisely because it names no medium, so showing it verbatim
+    way ``campaign/sweep.py::build_cases`` raises it. The built-in default
+    starts at ``0.0`` precisely because it names no medium, so showing it verbatim
     would report a band no case ever gets.
     """
     path = Path(active_catalog_path() if catalog_path is None else catalog_path)

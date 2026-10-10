@@ -2316,9 +2316,11 @@ Usage: pyrite profile show [OPTIONS] NAME
 
   Show PROFILE in tables grouped by CLI settings owner.
 
-  Sweep axes, instruments, numerics, precision, line-grid policy, energy grids and
-  material overrides have separate sections. Trial counts defer to the precision policy
-  in adaptive mode. Use --output json for the stable automation payload.
+  Sweep axes, instruments, numerics, precision, line-grid policy, energy grids and non-
+  grid material overrides have separate sections. Energy grids report defaults,
+  overrides and stored artifacts; uniform bounds resolve per case. Trial counts defer to
+  the precision policy in adaptive mode. Use --output json for the stable automation
+  payload.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation

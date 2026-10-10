@@ -15,6 +15,8 @@ new checkpoint stems and earlier results stay under their old identity.
 `pyrite profile show NAME` presents Setting / Value tables grouped by editing
 command: sweep/membership/emission, beam, detectors, filters, numerics
 (sampling/convergence/transport), precision, line-grid, energy grids and material
+overrides. Energy grids name the profile or built-in defaults, grid overrides
+and stored artifacts together; the last section lists non-grid material
 overrides. Numerics name their value source; adaptive
 sampling delegates `line-trials` and `brem-trials` to the precision policy.
 Long values wrap in the default table output; `--output wide` keeps each value
@@ -28,9 +30,9 @@ on one line. `--output json` retains the stable machine payload.
 | `energy_keV` | grid, keV | `profile set\|add\|remove --energy` | |
 | `tilt_deg` | grid, deg | `profile set\|add\|remove --polar` | |
 | `tilt_azim_deg` | grid, deg | `profile set\|add\|remove --azimuth` | |
-| `E_grid_brem` | grid, eV | TOML (`pyrite-dev energy-grid brem set` stores per-material artifacts instead) | uniform grids keep only `step` |
+| `E_grid_brem` | grid, eV | TOML (`pyrite-dev energy-grid brem set` stores per-material artifacts instead) | absent = built-in 25 eV uniform spacing; uniform bounds resolve per case |
 | `E_grid_line` | grid, eV | TOML (`pyrite-dev energy-grid line` maintains artifacts) | ignored while a line-grid policy is set |
-| `energy_grid_refs` | material -> artifact digest | `pyrite material energy-grid derive`, `pyrite-dev energy-grid add` | ignored while a line-grid policy is set |
+| `energy_grid_refs` | material -> artifact digest | `pyrite material energy-grid derive`, `pyrite-dev energy-grid add` | line rows ignored while a line-grid policy is set; brem still applies |
 | `overrides.MATERIAL.*` | any range/grid key above, plus counts | none: `pyrite material set` was removed in 0.6.0 (#359); use a single-material profile | Remove existing override keys by editing the TOML. Bundled stack rows (`thickness_layers`, sapphire thickness) stay until materials and physical objects are separated |
 
 ## Calculation numerics
@@ -99,8 +101,9 @@ External complete catalogs need their own copy of the object.
 
 ## Creation and cloning
 
-`profile create NAME` copies the packaged `standard` ranges, bremsstrahlung
-grid, membership and member-material overrides; it copies no instrument (pass `--detector reference` for the ideal aperture),
-numerics or line-grid policy. `profile create NAME --from SOURCE` copies every
-SOURCE key except `overrides`, including numerics and `line_grid_policy`, and
-lists the inherited sections.
+`profile create NAME` copies the packaged `standard` ranges, membership and
+member-material overrides. An omitted `E_grid_brem` uses the built-in default.
+Creation copies no instrument (pass `--detector reference` for the ideal
+aperture), numerics or line-grid policy. `profile create NAME --from SOURCE`
+copies every SOURCE key except `overrides`, including numerics and
+`line_grid_policy`, and lists the inherited sections.

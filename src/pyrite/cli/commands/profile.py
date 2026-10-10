@@ -552,7 +552,9 @@ def show_command(name, json_output):
     """Show PROFILE in tables grouped by CLI settings owner.
 
     Sweep axes, instruments, numerics, precision, line-grid policy, energy grids
-    and material overrides have separate sections. Trial counts defer to the
+    and non-grid material overrides have separate sections. Energy grids report
+    defaults, overrides and stored artifacts; uniform bounds resolve per case.
+    Trial counts defer to the
     precision policy in adaptive mode.
     Use --output json for the stable automation payload."""
     try:
@@ -561,6 +563,7 @@ def show_command(name, json_output):
         if not json_output:
             target = _existing_profile(document, name)
             resolution = resolve_numerics(_profile_edit.profile_numerics_values(target))
+            grid_rows = _profile_show.energy_grid_rows(document, target)
     except (OSError, ValueError, ParseError) as exc:
         if json_output:
             emit_json_result(cli_json.failure("cxr.profile.show", {}, str(exc)))
@@ -574,7 +577,7 @@ def show_command(name, json_output):
         for key, value in _NUMERICS_FIELD_NAMES.items()
         if key not in {"line-electrons", "bremsstrahlung-electrons"}
     }
-    _profile_show.emit_show(payload, target, resolution, names)
+    _profile_show.emit_show(payload, target, resolution, names, grid_rows)
     return 0
 
 

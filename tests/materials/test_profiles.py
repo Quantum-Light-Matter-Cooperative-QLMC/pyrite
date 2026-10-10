@@ -1026,6 +1026,7 @@ def test_uniform_case_brem_grid_is_medium_floor_to_e0_at_25_ev(catalog_profile):
 @pytest.mark.parametrize("catalog_profile", _PACKAGED_PROFILES)
 def test_packaged_profiles_store_no_uniform_per_material_brem_override(catalog_profile):
     raw = tomllib.loads((DATA_DIR / "catalog" / "profiles" / f"{catalog_profile}.toml").read_text())
+    assert "E_grid_brem" not in raw
     for material, row in raw.get("overrides", {}).items():
         assert "arange" not in row.get("E_grid_brem", {}), material
 
@@ -1103,3 +1104,24 @@ def test_bundled_profile_display_has_explicit_detector_acceptance():
         assert payload["detector_ref"] == "reference"
         for detector in payload["detectors"].values():
             assert all(value is not None for value in detector["acceptance"].values())
+
+
+@pytest.mark.parametrize("material", ["hopg", "mos2", "mote2_product"])
+def test_implicit_brem_default_preserves_case_keys_and_dataset_identity(material):
+    sweep = material_sweep(material, thickness_ang=1e4, tilt_deg=45.0, tilt_azim_deg=135.0)
+    explicit = replace(
+        sweep,
+        detector=replace(
+            sweep.detector,
+            energy_bins=replace(sweep.detector.energy_bins, brem=np.arange(0.0, 30000.0, 25.0)),
+        ),
+    )
+    settings = default_settings()
+    assert dataset_identity(material, "full", settings, sweep) == dataset_identity(
+        material, "full", settings, explicit
+    )
+    implicit_cases = build_cases(sweep, n_electrons=1, n_electrons_brem=1)
+    explicit_cases = build_cases(explicit, n_electrons=1, n_electrons_brem=1)
+    assert [case_content_key(case) for case in implicit_cases] == [
+        case_content_key(case) for case in explicit_cases
+    ]
