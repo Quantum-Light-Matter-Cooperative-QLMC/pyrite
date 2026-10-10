@@ -6,10 +6,11 @@ PyRITE stores simulation output as component checkpoints, then lets analysis and
 
 Canonical full runs use `pyrite-output/checkpoints/<material>/`. Survey runs and modified profiles use identity-qualified directories so incompatible parameter sets do not silently resume into one another. Each dataset records its resolved input payload and hash in component metadata.
 
-Active datasets are directories beneath the effective `pyrite-output/checkpoints/` root and are offered by the analysis app's dataset selector. `pyrite checkpoint list` does not list them; it lists labels in the long-term archive shelf:
+Active datasets are directories beneath the effective `pyrite-output/checkpoints/` root and are offered by the analysis app's dataset selector. `pyrite checkpoint list` lists them; `pyrite checkpoint archive list` lists labels in the long-term archive shelf:
 
 ```bash
 pyrite checkpoint list
+pyrite checkpoint archive list
 ```
 
 The [sweep-profile guide](sweep-profiles.md) explains how fidelity and profile resolution affect dataset identity. The [checkpoint store design](../repo-design/storage/checkpoint-case-store.md) documents the internal persistence model.
@@ -208,7 +209,7 @@ Use checkpoint commands instead of manually editing checkpoint directories:
 
 ```bash
 pyrite checkpoint --help
-pyrite checkpoint archive --help
+pyrite checkpoint archive --help  # store, list, restore, merge
 pyrite checkpoint slim --help
 ```
 

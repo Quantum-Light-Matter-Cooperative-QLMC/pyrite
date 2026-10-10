@@ -470,7 +470,19 @@ def _provenance_record(value: object) -> dict[str, str | None]:
 
 def archives(root: str | os.PathLike[str], *, loader: Any) -> JsonResult:
     """Inspect archive shelf without printing; unreadable entries are retained."""
-    archive_dir = Path(root) / "archive"
+    result = _inventory(Path(root) / "archive", loader, "unreadable_archive")
+    return JsonResult("cxr.archives", {"archives": result[0]}, result[1])
+
+
+def checkpoints(root: str | os.PathLike[str], *, loader: Any) -> JsonResult:
+    """Inspect active checkpoints without printing; unreadable entries are retained."""
+    result = _inventory(Path(root), loader, "unreadable_checkpoint")
+    return JsonResult("cxr.checkpoints", {"checkpoints": result[0]}, result[1])
+
+
+def _inventory(
+    archive_dir: Path, loader: Any, error_code: str
+) -> tuple[list[dict[str, object]], tuple[dict[str, object], ...]]:
     items: list[dict[str, object]] = []
     errors: list[dict[str, object]] = []
     paths = (
@@ -502,7 +514,7 @@ def archives(root: str | os.PathLike[str], *, loader: Any) -> JsonResult:
             item_error = _text(exc)
             errors.append(
                 _error(
-                    "unreadable_archive",
+                    error_code,
                     item_error,
                     item=path.stem if path.is_file() else path.name,
                 )
@@ -522,7 +534,7 @@ def archives(root: str | os.PathLike[str], *, loader: Any) -> JsonResult:
                 "error": item_error,
             }
         )
-    return JsonResult("cxr.archives", {"archives": items}, tuple(errors))
+    return items, tuple(errors)
 
 
 def operation_summary(

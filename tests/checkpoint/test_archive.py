@@ -291,3 +291,16 @@ def test_union_refuses_pre_archive_collision_with_source_even_with_force(tmp_pat
     archive.union_checkpoint("hopg", predate_label, pre_archive=False, root=str(tmp_path))
     merged = _checkpoint_io.load(str(tmp_path / "hopg.pkl"))
     assert set(merged) == {"cfgA", "cfgB"}
+
+
+def test_list_checkpoints_lists_active_slots_not_shelf(tmp_path, capsys):
+    _write(tmp_path / "hopg.pkl", _store(n_configs=2, n_energies=2))
+    _write(tmp_path / "archive" / "old.pkl", _store())
+
+    assert archive.list_checkpoints(root=str(tmp_path)) == ["hopg"]
+    assert "4 records" in capsys.readouterr().out
+
+
+def test_list_checkpoints_empty(tmp_path, capsys):
+    assert archive.list_checkpoints(root=str(tmp_path)) == []
+    assert "(no checkpoints)" in capsys.readouterr().out

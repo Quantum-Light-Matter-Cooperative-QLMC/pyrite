@@ -237,8 +237,8 @@ def test_local_commands_wire_material_checkpoint_archive_and_choice_completion()
         )
     ]
 
-    assert _callback(archive.archive_command, "stem") is _cli_completion.complete_archive_stem
-    assert _callback(archive.archive_command, "label") is None
+    assert _callback(archive.store_command, "stem") is _cli_completion.complete_archive_stem
+    assert _callback(archive.store_command, "label") is None
     assert _callback(archive.restore_command, "label") is _cli_completion.complete_archive_label
     assert _callback(archive.union_command, "stem") is _cli_completion.complete_archive_stem
     assert _callback(archive.union_command, "label") is _cli_completion.complete_archive_label

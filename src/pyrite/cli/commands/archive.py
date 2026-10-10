@@ -15,6 +15,7 @@ from ...checkpoints import archive as _archive
 from ...checkpoints.archive import (
     archive_checkpoint,
     list_archives,
+    list_checkpoints,
     restore_checkpoint,
     union_checkpoint,
 )
@@ -48,6 +49,23 @@ def _cli_archives(args):
     list_archives()
 
 
+def _cli_checkpoints(args):
+    if getattr(args, "json_output", False):
+
+        def _loader(path):
+            path = Path(path)
+            return (
+                _checkpoint_store.load(path.name, path.parent)
+                if path.is_dir()
+                else _checkpoint_io.load(str(path))
+            )
+
+        result = cli_json.checkpoints(_archive.DEFAULT_ROOT, loader=_loader)
+        _cli_core.emit_json_result(result)
+        return
+    list_checkpoints()
+
+
 def _cli_union(args):
     union_checkpoint(
         args.stem,
@@ -59,7 +77,7 @@ def _cli_union(args):
 
 
 @click.command(
-    "archive",
+    "store",
     help=(
         "Copy an active checkpoint to long-term shelf.\n\n"
         "LABEL defaults to a date-stamped label inferred from STEM. Existing "
@@ -69,7 +87,7 @@ def _cli_union(args):
 @click.argument("stem", shell_complete=_cli_completion.complete_archive_stem)
 @click.argument("label", required=False)
 @click.option("--force", is_flag=True, help="Overwrite existing archive label.")
-def archive_command(stem, label, force):
+def store_command(stem, label, force):
     return _cli_core.invoke_legacy(_cli_archive, stem=stem, label=label, force=force)
 
 
@@ -88,7 +106,15 @@ def restore_command(label, stem, force):
     return _cli_core.invoke_legacy(_cli_restore, label=label, stem=stem, force=force)
 
 
-@click.command("archives", help="List long-term checkpoint shelf.")
+@click.command("list", help="List active local checkpoints.")
+@_cli_core.output_option
+def list_command(json_output):
+    if json_output:
+        return _cli_core.invoke_legacy(_cli_checkpoints, json_output=True)
+    return _cli_core.invoke_legacy(_cli_checkpoints)
+
+
+@click.command("list", help="List long-term checkpoint shelf.")
 @_cli_core.output_option
 def archives_command(json_output):
     if json_output:
@@ -97,7 +123,7 @@ def archives_command(json_output):
 
 
 @click.command(
-    "union",
+    "merge",
     help=(
         "Merge an archived checkpoint into active slot.\n\n"
         "Requires matching materials. Live records win overlaps; source archive "
@@ -128,12 +154,23 @@ def union_command(stem, label, no_archive, delete_archive, force):
     )
 
 
-@click.group("pyrite-archive")
-def standalone_command():
-    """Manage local checkpoint archive shelf."""
+@click.group("archive", no_args_is_help=True)
+def archive_group():
+    """Store, list, restore, and merge long-term archived checkpoints.
+
+    \b
+    Examples:
+      pyrite checkpoint archive store hopg keeper
+      pyrite checkpoint archive list
+      pyrite checkpoint archive restore keeper --as hopg
+    """
 
 
-for _command in (archive_command, restore_command, archives_command, union_command):
+for _command in (store_command, restore_command, archives_command, union_command):
+    archive_group.add_command(_command)
+
+standalone_command = click.Group("pyrite-archive", help="Manage local checkpoint archive shelf.")
+for _command in (store_command, restore_command, archives_command, union_command):
     standalone_command.add_command(_command)
 
 
