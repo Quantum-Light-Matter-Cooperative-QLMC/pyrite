@@ -1,9 +1,10 @@
 """Select whole histories or tracks of a trajectory artifact without loading it.
 
-A selection is a list of stored-row runs. Schema-2 artifacts store rows
-electron-major, so one primary history (``electron_id``, which every secondary
-of its shower keeps) is one contiguous run, found by bisection. ``track_id``
-is not sorted and is matched in bounded blocks. Neither path reads segment
+A selection is a list of stored-row runs. Schema-2 and later artifacts store
+rows electron-major, so one primary history (``electron_id``, which every
+secondary of its shower keeps) is one contiguous run: schema 3 reads it from
+``/electron_index``, schema 2 finds it by bisection. ``track_id`` is not sorted
+and is matched in bounded blocks. Neither path reads segment
 coordinates; :func:`read_selection` and the VTK export read only the selected
 runs.
 
@@ -22,7 +23,12 @@ from typing import Any
 
 import numpy as np
 
-from .trajectories import TrajectoryArtifactError, read_trajectory_header, row_fields
+from .trajectories import (
+    TrajectoryArtifactError,
+    read_trajectory_header,
+    row_fields,
+    transport_view,
+)
 
 _BLOCK = 1 << 16
 # Compatibility aliases are hard links to canonical row fields.
@@ -108,6 +114,16 @@ def _match_runs(dataset, values, within: Iterable[tuple[int, int]]) -> list[tupl
     return found
 
 
+def _indexed_runs(index, histories: Iterable[int]) -> list[tuple[int, int]]:
+    """Stored-row runs of ``histories`` read from ``/electron_index`` (schema 3)."""
+    present, starts, stops = index
+    wanted = np.asarray(list(histories), dtype=np.int64)
+    at = np.searchsorted(present, wanted)
+    found = at < present.size
+    found[found] = present[at[found]] == wanted[found]
+    return [(int(starts[k]), int(stops[k])) for k in at[found]]
+
+
 def _history_ids(ids, *, limit: int | None = None) -> np.ndarray:
     """Distinct history IDs in stored order, stopping after ``limit`` of them."""
     seen: dict[int, None] = {}
@@ -121,14 +137,8 @@ def _history_ids(ids, *, limit: int | None = None) -> np.ndarray:
     return np.fromiter(seen, dtype=np.int64)
 
 
-def _empty_message(path: Path, handle) -> str:
-    ids = handle["transport/electron_id"]
-    present = _history_ids(ids)
-    sampled = (
-        handle["transport/initial_E_keV"].shape[0]
-        if "initial_E_keV" in handle["transport"]
-        else None
-    )
+def _empty_message(path: Path, view, present: np.ndarray) -> str:
+    sampled = view["initial_E_keV"].shape[0] if "initial_E_keV" in view else None
     span = f"IDs {present.min()}..{present.max()}" if present.size else "none"
     total = f" of {sampled} sampled" if sampled is not None else ""
     return (
@@ -190,7 +200,7 @@ def select_trajectories(
         raise ValueError("history and track IDs are non-negative")
     header = read_trajectory_header(path)
     with h5py.File(path, "r") as handle:
-        group = handle["transport"]
+        group = transport_view(handle)
         if "electron_id" not in group:
             raise TrajectoryArtifactError(f"{path} has no electron_id segment field")
         if tracks and "track_id" not in group:
@@ -200,10 +210,16 @@ def select_trajectories(
         ids = group["electron_id"]
         n_rows = int(ids.shape[0])
         sorted_rows = header.get("row_order") == "electron"
+        index = group.electron_index()
+        present = index[0] if index is not None else None
         if first is not None:
-            histories = sorted(_history_ids(ids, limit=first).tolist())
+            histories = sorted(
+                (
+                    present[:first] if present is not None else _history_ids(ids, limit=first)
+                ).tolist()
+            )
         elif sample is not None:
-            present = _history_ids(ids)
+            present = present if present is not None else _history_ids(ids)
             rng = np.random.default_rng(seed)
             histories = sorted(
                 rng.choice(present, size=min(sample, present.size), replace=False).tolist()
@@ -211,6 +227,8 @@ def select_trajectories(
         by_history = bool(histories) or first is not None or sample is not None
         if not by_history:
             ranges: list[tuple[int, int]] = [(0, n_rows)]
+        elif index is not None:
+            ranges = _indexed_runs(index, histories)
         elif sorted_rows:
             ranges = [
                 (_bisect(ids, value, "left"), _bisect(ids, value, "right")) for value in histories
@@ -222,7 +240,8 @@ def select_trajectories(
         merged = _merge(ranges)
         segments = sum(b - a for a, b in merged)
         if not segments:
-            raise TrajectoryArtifactError(_empty_message(path, handle))
+            present = present if present is not None else _history_ids(ids)
+            raise TrajectoryArtifactError(_empty_message(path, group, present))
         vacuum: Ranges = ()
         if by_history and not tracks and "vacuum_elec_id" in group:
             legs = group["vacuum_elec_id"]
@@ -268,7 +287,7 @@ def read_selection(
             f"{max_segments:,}; select fewer histories or tracks"
         )
     with h5py.File(selection.path, "r") as handle:
-        group = handle["transport"]
+        group = transport_view(handle)
         n_rows = int(group["electron_id"].shape[0])
         available = [
             key

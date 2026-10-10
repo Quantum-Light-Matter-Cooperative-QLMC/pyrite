@@ -23,6 +23,7 @@ from .trajectories import (
     TrajectoryArtifactError,
     read_trajectory_header,
     row_fields,
+    transport_view,
 )
 
 _BLOCK = 1 << 16
@@ -143,6 +144,8 @@ def _generation_counts(dataset) -> dict[int, int]:
 
 def _field_record(name: str, node, n_rows: int, n_electrons: int | None) -> dict[str, Any]:
     kind = str(node.attrs.get("pyrite_kind", "array"))
+    if kind == "electron_rows":  # schema 3 stores it per history; it reads as rows
+        kind = "array"
     record: dict[str, Any] = {"name": name, "kind": kind}
     if hasattr(node, "dtype") and kind != "none":
         record["dtype"] = str(node.dtype)
@@ -187,7 +190,7 @@ def describe_artifact(path: str | os.PathLike[str], *, counts: bool = True) -> d
     path = Path(path)
     header = read_trajectory_header(path)
     with h5py.File(path, "r") as handle:
-        group = handle["transport"]
+        group = transport_view(handle)
         ids_name = "electron_id" if "electron_id" in group else "elec_id"
         ids = group[ids_name] if ids_name in group else None
         n_rows = int(ids.shape[0]) if ids is not None else int(header.get("segment_count", 0))

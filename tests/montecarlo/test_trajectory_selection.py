@@ -14,7 +14,12 @@ from pyrite.montecarlo.trajectories import TrajectoryArtifactError, write_trajec
 from pyrite.montecarlo.trajectory_export import export_segments_vtp
 from pyrite.montecarlo.trajectory_scene import export_trajectory_scene
 from pyrite.montecarlo.trajectory_selection import read_selection, select_trajectories
-from tests.montecarlo.test_trajectory_capture import _grooved_transport, _read_vtp
+from tests.helpers.trajectory_schema import downgrade
+from tests.montecarlo.test_trajectory_capture import (
+    _bunched_interleaved_transport,
+    _grooved_transport,
+    _read_vtp,
+)
 
 _CASE = dict(
     name="saved",
@@ -72,18 +77,70 @@ def test_tracks_intersect_histories(capture):
         select_trajectories(capture, histories=(2,))
 
 
-def test_sorted_history_lookup_does_not_scan(capture, monkeypatch):
+@pytest.mark.parametrize("schema", [2, 3])
+def test_sorted_history_lookup_does_not_scan(capture, monkeypatch, schema):
     def _scan(*_args, **_kwargs):
-        raise AssertionError("electron-major artifacts bisect history IDs")
+        raise AssertionError("electron-major artifacts never scan for history IDs")
 
+    if schema == 2:
+        downgrade(capture, 2)
+    else:  # the index answers without touching electron_id
+        monkeypatch.setattr(trajectory_selection, "_bisect", _scan)
+        monkeypatch.setattr(trajectory_selection, "_history_ids", _scan)
     monkeypatch.setattr(trajectory_selection, "_match_runs", _scan)
     assert select_trajectories(capture, histories=(0, 1)).segments == 6
+    assert select_trajectories(capture, first=1).request["history_ids"] == [0]
 
 
 def test_unsorted_legacy_rows_scan_for_histories(capture):
-    with h5py.File(capture, "r+") as handle:
-        del handle.attrs["row_order"]
+    downgrade(capture, 1)
     assert select_trajectories(capture, histories=(0,)).segments == 3
+
+
+def test_ten_histories_read_only_their_rows(tmp_path):
+    segs = _bunched_interleaved_transport()
+    path = write_trajectory_artifact(tmp_path / "h.h5", segs, case=_CASE)
+    histories = np.unique(segs["electron_id"])[::2][:10]
+    assert histories.size == 10
+    expected = read_selection(select_trajectories(path, histories=histories))
+
+    # Overwrite every row and index entry outside the selection with junk:
+    # selecting and reading again must not see any of it.
+    with h5py.File(path, "r+") as handle:
+        index = handle["electron_index"]
+        keep = np.isin(index["electron_id"][()], histories)
+        starts, stops = index["row_start"][()], index["row_stop"][()]
+        transport = handle["transport"]
+        for name in {
+            transport[key].name for key in transport if transport[key].attrs.get("pyrite_row")
+        }:
+            dataset = handle[name]
+            junk = 7 if dataset.dtype.kind in "iu" else np.nan
+            if dataset.attrs["pyrite_kind"] == "electron_rows":
+                dataset[np.flatnonzero(~keep)] = junk
+                continue
+            for a, b in zip(starts[~keep], stops[~keep], strict=True):
+                dataset[a:b] = junk
+    selection = select_trajectories(path, histories=histories)
+    actual = read_selection(selection)
+
+    assert (
+        selection.histories == 10 and sorted(selection.request["history_ids"]) == histories.tolist()
+    )
+    assert actual.transport.keys() == expected.transport.keys()
+    for key, value in expected.transport.items():
+        np.testing.assert_array_equal(actual.transport[key], value, err_msg=key)
+        assert actual.transport[key].dtype == value.dtype, key
+
+
+def test_sample_draws_the_same_histories_from_every_schema(tmp_path):
+    segs = _bunched_interleaved_transport()
+    current = write_trajectory_artifact(tmp_path / "3.h5", segs, case=_CASE)
+    legacy = downgrade(write_trajectory_artifact(tmp_path / "2.h5", segs, case=_CASE), 2)
+
+    for options in ({"sample": 5, "seed": 2}, {"first": 4}, {"histories": (3, 99, 11)}):
+        a, b = select_trajectories(current, **options), select_trajectories(legacy, **options)
+        assert (a.ranges, a.request) == (b.ranges, b.request), options
 
 
 def test_first_and_sample_select_reproducible_whole_histories(capture):

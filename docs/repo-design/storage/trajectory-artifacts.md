@@ -1,0 +1,49 @@
+# Trajectory artifact storage
+
+`pyrite.montecarlo.trajectories` writes one HDF5 file per captured case. The user workflow is in [Working with results](../../guides/working-with-results.md#save-electron-trajectories); the authoritative layout is the module docstring. This page records why schema 3 stores row fields the way it does and what that was measured to cost.
+
+## Schema 3 layout decisions
+
+Schema 3 changes only how row fields (one entry per segment) sit on disk. `read_trajectory_artifact(...).transport` still returns the transported mapping with the same dtype, shape, row order and values. Spectra replayed from a schema-3 artifact equal those from schema 2.
+
+- **Chunked, compressed rows.** Each row dataset uses 4,096-row chunks with the `shuffle` filter and LZF (`_ROW_CHUNK`, `_ROW_FILTERS`). Rows are written in bounded blocks aligned to whole chunks, so device-resident captures still download one block at a time.
+- **Per-electron index.** `/electron_index` holds `electron_id`, `row_start` and `row_stop` for each stored history run. Streaming (`iter_electron_row_blocks`), history selection (`select_trajectories` with histories, `--first` or `--sample`) and export read run boundaries from it instead of scanning or bisecting `electron_id`.
+- **Per-history constants.** `t0_ang` is stored once per index entry (`pyrite_kind = "electron_rows"`). Before choosing that form, the writer checks that the value is bitwise identical across every row of each history. If any history varies, the field stays per-row.
+- **Narrow IDs.** `electron_id`, `track_id`, `parent_id` and `flight_id` are stored as `int32`, and `substep_id` as `int16` (or `int32` when needed). Each narrowing applies only when the field's full range fits; the transported dtype is kept in `pyrite_dtype`. `/transport_order` and the index arrays use `int32` when they fit.
+- **One reader seam.** Raw `/transport` datasets no longer equal the transported arrays, so every reader goes through `transport_view(handle)`. It restores the transported dtype, expands per-history fields to rows, and slices rows like an h5py dataset. Schema 1/2 nodes pass through it unchanged. The view caches node lookups, because h5py attribute and group access cost more than a small selected read.
+
+## Benchmarks
+
+Case (a) is a 2,000-electron, 30 keV silicon sweep case: 2 µm slab, 30° tilt, midpoint energy model, default coupled radiative fields, lockstep CPU transport. It produced 294,506 segments, and its transport took 1.72 s. Times are the best of three on the development laptop with a warm page cache. "Select 10" selects and reads 10 histories spread across the file.
+
+Filter and chunk choice at 4,096-row chunks, with the schema-2 writer for reference:
+
+| Layout | Bytes/segment | Write (share of transport) | Full read | Stream (65,536-row blocks) | Select 10 |
+|---|---|---|---|---|---|
+| schema 2 (uncompressed) | 207.7 | 0.070 s (4%) | 0.063 s | 0.044 s | 24.0 ms |
+| **schema 3, LZF + shuffle** | **89.2** | **0.31 s (18%)** | 0.19 s | 0.16 s | 27.0 ms |
+| schema 3, gzip-1 + shuffle | 84.6 | 0.50 s (29%) | 0.16 s | 0.13 s | 24.6 ms |
+| schema 3, gzip-4 + shuffle | 83.4 | 0.58 s (34%) | 0.17 s | 0.14 s | 26.3 ms |
+
+Effect of chunk size with LZF + shuffle:
+
+| Chunk rows | 2,048 | 4,096 | 8,192 | 16,384 | 65,536 |
+|---|---|---|---|---|---|
+| Bytes/segment | 89.9 | 89.2 | 88.6 | 88.4 | 88.6 |
+| Select 10 | 19 ms | 28 ms | 45 ms | 78 ms | 138 ms |
+
+Decisions:
+
+- **LZF over gzip.** Schema 3 cuts case (a) by 57% (207.7 to 89.2 B/segment). Only LZF keeps the write cost under a quarter of transport time. gzip saves another 5 to 6% of the file but costs 29 to 34% of transport.
+- **Portability cost.** LZF ships with h5py but not with the HDF5 C library. Tools outside h5py, such as `h5dump`, HDFView or MATLAB, need the LZF filter plugin (for example the one in `hdf5plugin`) to read row datasets.
+- **4,096-row chunks.** A selected history decompresses whole chunks, so selection time grows with chunk size, while compression barely improves past 4,096 rows. At 4,096 rows, a 10-history selection costs about the same as schema 2.
+
+Where the bytes go: in case (a), the eight float64 row fields `r_mid`, `v_hat`, `L_ang`, `t_start_ang`, `t_end_ang`, `E_start_keV`, `E_end_keV` and `E_repr_keV` make up 82 of the 89 bytes per segment. Floating-point mantissas compress poorly without loss. Further savings would need a lossy representation, which schema 3 does not adopt. Sparse fields compress almost to nothing (hard-radiative vectors take 0.3 B/segment), as do narrowed IDs and the per-history `t0_ang`.
+
+Full reads and streaming are about three times slower than schema 2 because of decompression. At under 1 µs per segment they remain small next to transport, which took about 6 µs per segment here.
+
+Case (b), a large real capture on the remote host (the 30,000-electron, 20 µm hopg case that wrote 1.5 GB at schema 2), is not yet measured.
+
+## Compatibility
+
+Readers accept schemas 1 to 3. Schema-2 files keep their plain row datasets and have no `/electron_index`. Selection and streaming then fall back to bisection and boundary scans, and give the same selections and blocks. `tests/data/trajectory_artifacts/schema2_hopg_lockstep.h5` is a genuine schema-2 capture. The tests check that it replays bit for bit, both directly and after being rewritten as schema 3. `tests/helpers/trajectory_schema.py` rewrites any new artifact into the schema-1 or schema-2 layout for compatibility tests.

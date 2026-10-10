@@ -16,7 +16,7 @@ from .._scene_geometry import (
     crystal_mesh,
     groove_mesh,
 )
-from .trajectories import TrajectoryArtifactError, read_trajectory_header
+from .trajectories import TrajectoryArtifactError, read_trajectory_header, transport_view
 from .trajectory_export import _BLOCK_ROWS, _field_data, _pieces, export_segments_vtp
 from .trajectory_selection import TrajectorySelection
 
@@ -155,7 +155,8 @@ def export_trajectory_scene(
                 )
             layers = case.get("abs_layers")
             thickness = float(layers[-1][1] if layers else case["thickness_ang"])
-            low, high = _extent(handle["transport"], thickness, selection)
+            transport = transport_view(handle)
+            low, high = _extent(transport, thickness, selection)
             common: dict[str, Any] = {
                 "case_sha256": header["case_sha256"],
                 "parameter_sha256": header.get("parameter_sha256", ""),
@@ -163,7 +164,7 @@ def export_trajectory_scene(
                 "provenance": json.loads(handle["provenance"].attrs["json"]),
                 "field_units": {
                     name: str(node.attrs["units"])
-                    for name, node in handle["transport"].items()
+                    for name, node in transport.items()
                     if "units" in node.attrs
                 },
                 "case_name": case["name"],
