@@ -9,6 +9,7 @@ import pytest
 from pyrite import cli
 from pyrite._catalog_layout import read_text
 from pyrite.cli import _catalog_io
+from pyrite.cli._deprecations import message
 from pyrite.cli.commands import material
 from tests.helpers.cli import assert_clean_result, invoke
 
@@ -175,7 +176,13 @@ def test_simulate_formats_result_and_uses_single_scene_api(monkeypatch):
     monkeypatch.setattr(pyrite.api, "simulate", fake_simulate)
 
     machine = invoke(material.command, ["simulate", "hopg", "-o", "json"])
-    assert_clean_result(machine)
+    assert_clean_result(
+        machine,
+        stderr=message(
+            "material simulate", replacement="pyrite run standard -m hopg --ephemeral -o json"
+        )
+        + "\n",
+    )
     payload = json.loads(machine.stdout)["payload"]
     assert payload["line"]["energy_eV"] == [100.0, 200.0]
     assert payload["pixel_grid"]["filter_count"] == 1
@@ -186,8 +193,17 @@ def test_simulate_formats_result_and_uses_single_scene_api(monkeypatch):
     assert payload["acquisition"] is None
     assert payload["detector_id"] == "pixel_a"
 
-    wide = invoke(material.command, ["simulate", "hopg", "-o", "wide"])
-    assert_clean_result(wide)
+    wide = invoke(
+        material.command,
+        ["simulate", "hopg", "--profile", "my profile", "--detector", "pixel_a", "-o", "wide"],
+    )
+    assert wide.exit_code == 0
+    assert wide.stderr.splitlines() == [
+        message(
+            "material simulate",
+            replacement="pyrite run 'my profile' -m hopg --ephemeral --detector pixel_a -o wide",
+        )
+    ]
     assert "material=hopg" in wide.stdout
     assert "detector=pixel_a" in wide.stdout
 
@@ -202,6 +218,7 @@ def test_simulate_json_reports_resolution_errors(monkeypatch):
 
     result = invoke(material.command, ["simulate", "hopg", "-o", "json"])
     assert result.exit_code == 1
+    assert result.stderr.count("is deprecated") == 1
     document = json.loads(result.stdout)
     assert document["schema"] == "cxr.material.simulate"
     assert "physical_detector is required" in document["errors"][0]["message"]
@@ -427,7 +444,13 @@ measured_edges_eV = [0.0, 100.0, 200.0]
     )
     assert legacy.exit_code == ephemeral.exit_code == 0
     assert legacy.stdout == ephemeral.stdout
-    assert legacy.stderr == ephemeral.stderr == "transport diagnostic\n"
+    warning = message(
+        "material simulate",
+        replacement="pyrite run single -m hopg --ephemeral"
+        + ("" if output_format == "table" else f" -o {output_format}"),
+    )
+    assert legacy.stderr == f"{warning}\n" + ephemeral.stderr
+    assert ephemeral.stderr == "transport diagnostic\n"
     assert set(tmp_path.iterdir()) == before
     assert len(calls) == 2
     for old, new in zip(calls[0][0], calls[1][0], strict=True):

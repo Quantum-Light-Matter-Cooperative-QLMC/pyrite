@@ -1,11 +1,12 @@
-"""Inspect effective material ranges, simulate scenes, and blaze materials."""
+"""Inspect effective material ranges, simulate scenes (deprecated), and blaze materials."""
 
+import shlex
 from pathlib import Path
 
 import click
 from tomlkit.exceptions import ParseError
 
-from pyrite.cli import _catalog_io
+from pyrite.cli import _catalog_io, _deprecations
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli._groups import LazyGroup
 from pyrite.cli.commands._simulation import _write_simulation_artifact as _write_simulation_artifact
@@ -155,7 +156,7 @@ def _show(material, profile_name, json_output, *, schema="cxr.material.show"):
     deprecation_prefix="material",
 )
 def command():
-    """Inspect, validate, simulate, and blaze individual materials.
+    """Inspect, validate, and blaze individual materials.
 
     Profile membership and ranges live under ``pyrite profile``. ``show``
     reports effective ranges and any per-material override that diverges from
@@ -164,7 +165,7 @@ def command():
     """
 
 
-@command.command("simulate")
+@command.command("simulate", hidden=True)
 @click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
     "--profile",
@@ -193,12 +194,22 @@ def command():
     help="Write full factorized spatial arrays as a new compressed .npz file.",
 )
 def simulate_command(material, profile_name, detector_id, output_format, output_file):
-    """Simulate one material/profile scene on a selected pixel detector.
+    """Deprecated: use 'pyrite run PROFILE -m MATERIAL --ephemeral'.
 
-    This is intentionally filesystem-free except for an explicit --output-file:
-    it calls the public single-scene API and does not create a sweep or checkpoint.
+    Simulate one material/profile scene on a selected pixel detector. This is
+    filesystem-free except for an explicit --output-file: it calls the public
+    single-scene API and does not create a sweep or checkpoint.
     """
     from ._simulation import execute_simulation
+
+    replacement = ["pyrite", "run", profile_name, "-m", material, "--ephemeral"]
+    if detector_id is not None:
+        replacement += ["--detector", detector_id]
+    if output_file is not None:
+        replacement += ["--output-file", str(output_file)]
+    if output_format != "table":
+        replacement += ["-o", output_format]
+    _deprecations.warn_self("material simulate", shlex.join(replacement))
 
     return execute_simulation(
         material,
