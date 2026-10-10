@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .._run import run_program
-from ..sources import resolve_source, source_digest
+from ..sources import code_version, resolve_source
 from ..store import (
     ElementTarget,
     MaterialTarget,
@@ -40,10 +40,9 @@ def element_request(
 ) -> tuple[TableRequest, ElsepaDeck]:
     """Return the store request and deck for one free-atom table."""
     deck = ElsepaDeck.free_atom(z, energies_ev, projectile=projectile)
-    source = resolve_source("elsepa", source_path)
     request = TableRequest(
         code="elsepa",
-        code_version=source_digest(source),
+        code_version=code_version("elsepa", source_path),
         target=ElementTarget(deck.z),
         quantity="elastic_dcs",
         model=deck.model_record(),
@@ -77,7 +76,6 @@ def muffin_tin_request(
         absorption_strength=absorption_strength,
         absorption_gap_eV=absorption_gap_eV,
     )
-    source = resolve_source("elsepa", source_path)
     extra: dict[str, float] = {"muffin_tin_radius_cm": float(radius_cm)}
     if absorption_gap_eV is not None:
         extra["absorption_gap_eV"] = float(absorption_gap_eV)
@@ -86,7 +84,7 @@ def muffin_tin_request(
     )
     request = TableRequest(
         code="elsepa",
-        code_version=source_digest(source),
+        code_version=code_version("elsepa", source_path),
         target=MaterialTarget(key=str(name), identity=identity),
         quantity="elastic_dcs",
         model=deck.model_record(),

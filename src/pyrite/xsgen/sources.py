@@ -12,7 +12,8 @@ The vendored trees are generator inputs, not runtime data, so they are not in
 the wheel. They ship in the checkout and the sdist, and ``pyrite remote sync``
 carries ``vendor/`` to the box. Offline generation therefore works from any
 checkout, sdist, or synced box; a bare wheel install needs a configured path
-or a sibling checkout.
+or a sibling checkout to *generate*. Looking up a shipped table needs only the
+tree's digest, which the wheel pins (:func:`code_version`).
 
 Resolution order is explicit override, then configured path, then vendored
 tree, then sibling checkout. Configured beats vendored so a user testing a
@@ -30,12 +31,13 @@ trees, and a table generated from patched sources is a different table.
 """
 
 import hashlib
+import json
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from ..console import config as _config
-from ..paths import user_data_dir
+from ..paths import data_dir, user_data_dir
 from ._errors import SourceUnavailableError
 
 #: Chunk size for hashing Fortran sources. They are small (the largest is
@@ -403,6 +405,45 @@ def source_digest(source: ResolvedSource) -> str:
     return digest.hexdigest()
 
 
+#: Packaged pins of each vendored tree's :func:`source_digest`.
+_PINNED_DIGESTS = "source-digests.json"
+
+
+def pinned_digest(code: str) -> str | None:
+    """Return the digest of ``code``'s vendored tree as pinned in the wheel.
+
+    ``None`` for a code with no pin (BremsLib). A test fails when a pin drifts
+    from the vendored tree, so the pin equals what :func:`source_digest`
+    computes on a checkout.
+    """
+    path = data_dir() / "xsgen" / _PINNED_DIGESTS
+    if not path.is_file():
+        return None
+    return json.loads(path.read_text(encoding="utf-8")).get(code_spec(code).name)
+
+
+def code_version(code: str, override: str | Path | None = None) -> str:
+    """Return the table-key code version for ``code``.
+
+    The digest of the resolved tree when one exists. A wheel install has no
+    vendored tree, but the shipped tables are keyed on exactly the vendored
+    digest, so with nothing configured the pinned digest identifies them.
+    Anything that runs the program still needs :func:`resolve_source`.
+
+    Raises
+    ------
+    SourceUnavailableError
+        If no tree resolves and no digest is pinned, or ``override`` is bad.
+    """
+    try:
+        return source_digest(resolve_source(code, override))
+    except SourceUnavailableError:
+        pinned = None if override is not None else pinned_digest(code)
+        if pinned is None:
+            raise
+        return pinned
+
+
 def missing_data_dirs(source: ResolvedSource) -> tuple[str, ...]:
     """Return the names of required data directories absent from the tree.
 
@@ -435,9 +476,11 @@ __all__ = [
     "ResolvedSource",
     "code_names",
     "code_spec",
+    "code_version",
     "fetched_data_dir",
     "iter_sources",
     "missing_data_dirs",
+    "pinned_digest",
     "resolve_source",
     "source_digest",
     "validate_source_path",

@@ -14,8 +14,10 @@ from pyrite.xsgen._errors import SourceUnavailableError
 from pyrite.xsgen.sources import (
     code_names,
     code_spec,
+    code_version,
     iter_sources,
     missing_data_dirs,
+    pinned_digest,
     resolve_source,
     source_digest,
     vendor_dir,
@@ -197,3 +199,31 @@ def test_generator_sources_are_vendored_in_the_checkout_not_the_package():
         assert root.parent.parent == vendor_dir()
         assert root.is_dir(), f"checkout is missing vendor/xsgen/{code}"
         assert resolve_source(code, root).origin == "explicit path"
+
+
+def test_pinned_digests_match_vendored_trees():
+    """A wheel keys shipped tables on these pins; drift would orphan them.
+
+    Regenerate ``src/pyrite/data/xsgen/source-digests.json`` from
+    ``source_digest(resolve_source(name, vendored_root(name)))`` when a vendored
+    tree changes (which re-keys the released tables anyway).
+    """
+    for name in ("elsepa", "sbethe"):
+        assert pinned_digest(name) == source_digest(resolve_source(name, vendored_root(name)))
+    assert pinned_digest("bremslib") is None
+
+
+def test_code_version_falls_back_to_pin_without_a_tree(tmp_path, monkeypatch):
+    """A wheel install has no tree: lookup uses the pin, an explicit bad path still raises."""
+    monkeypatch.setattr("pyrite.xsgen.sources.vendor_dir", lambda: tmp_path / "none")
+    monkeypatch.setattr(
+        "pyrite.xsgen.sources._config.resolve",
+        lambda key: type("R", (), {"source": "built-in default", "value": str(tmp_path / "x")})(),
+    )
+    with pytest.raises(SourceUnavailableError):
+        resolve_source("sbethe")
+    assert code_version("sbethe") == pinned_digest("sbethe")
+    with pytest.raises(SourceUnavailableError):
+        code_version("sbethe", tmp_path / "missing")
+    with pytest.raises(SourceUnavailableError):
+        code_version("bremslib")

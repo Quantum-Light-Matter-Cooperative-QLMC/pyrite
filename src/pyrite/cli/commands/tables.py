@@ -25,6 +25,13 @@ from ...console.output import (
     emit_result,
     output_option,
 )
+from ...xsgen.install import (
+    BARE_FETCH_STEPS,
+    DATASET_FETCH_CODES,
+    FETCH_CODES,
+    fetch_one,
+    step_name,
+)
 from .._groups import LazyGroup
 
 #: Projectile names accepted by ``--projectile``. Spelled here rather than
@@ -577,55 +584,9 @@ def _emit_table(selected: str, result, *, json_output: bool) -> None:
 
 
 #: Every code ``pyrite tables fetch`` installs.
-FETCH_CODES = ("eedl", "eadl", "epdl", "sbethe", "sbethe-tables", "elsepa", "bremslib")
-_DATASET_FETCH_CODES = ("eedl", "eadl", "epdl")
-_POSITRON_FETCH_CODES = ("sbethe-tables", "elsepa")
-#: ``(code, projectile)`` pins a bare fetch installs, in order: each code, with
-#: its positron pin right after the electron one (#385).
-BARE_FETCH_STEPS = tuple(
-    (code, projectile)
-    for code in FETCH_CODES
-    for projectile in (("electron", "positron") if code in _POSITRON_FETCH_CODES else ("electron",))
-)
-
-
-def _fetch_one(code: str, archive: str | None, *, projectile: str = "electron") -> dict:
-    """Install one code and return its machine-readable outcome."""
-    if code in _DATASET_FETCH_CODES:
-        from ...datasets import fetch_dataset
-
-        fetched = fetch_dataset(code, archive)
-        return {
-            "code": code,
-            "path": str(fetched.path),
-            "archive_sha256": fetched.sha256,
-            "file_count": 1,
-            "installed": fetched.installed,
-        }
-    from ...xsgen.fetch import fetch_bremslib, fetch_elsepa, fetch_sbethe, fetch_sbethe_tables
-
-    if projectile != "electron":
-        fetch_tables = {"elsepa": fetch_elsepa, "sbethe-tables": fetch_sbethe_tables}[code]
-        result = fetch_tables(archive, projectile=projectile)
-    else:
-        fetch = {
-            "bremslib": fetch_bremslib,
-            "elsepa": fetch_elsepa,
-            "sbethe": fetch_sbethe,
-            "sbethe-tables": fetch_sbethe_tables,
-        }[code]
-        result = fetch(archive)
-    return {
-        "code": code,
-        "path": str(result.path),
-        "archive_sha256": result.archive_sha256,
-        "file_count": result.file_count,
-        "installed": result.installed,
-    }
-
-
-def _step_name(code: str, projectile: str) -> str:
-    return code if projectile == "electron" else f"{code} ({projectile})"
+_DATASET_FETCH_CODES = DATASET_FETCH_CODES
+_fetch_one = fetch_one
+_step_name = step_name
 
 
 def _fetch_line(payload: dict) -> str:

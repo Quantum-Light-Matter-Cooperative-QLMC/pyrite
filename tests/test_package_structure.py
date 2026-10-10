@@ -49,6 +49,7 @@ def test_root_exports_stay_frozen() -> None:
         "SpatialResult",
         "SpectralFactors",
         "Sweep",
+        "fetch_tables",
         "simulate",
     ]
 

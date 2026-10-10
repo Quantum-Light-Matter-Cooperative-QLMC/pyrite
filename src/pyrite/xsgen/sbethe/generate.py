@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .._errors import DataFetchError
 from .._run import run_program
-from ..sources import missing_data_dirs, resolve_source, source_digest
+from ..sources import code_version, missing_data_dirs, resolve_source
 from ..store import (
     MaterialTarget,
     StoredTable,
@@ -55,7 +55,6 @@ def material_request(
         band_gap_eV=band_gap_eV,
         projectile=projectile,
     )
-    source = resolve_source("sbethe", source_path)
     identity = material_identity(
         composition=deck.composition,
         density_g_cm3=deck.density_g_cm3,
@@ -64,7 +63,7 @@ def material_request(
     )
     return TableRequest(
         code="sbethe",
-        code_version=source_digest(source),
+        code_version=code_version("sbethe", source_path),
         target=MaterialTarget(key=deck.name, identity=identity),
         quantity="collision_stopping",
         model=deck.model_record(),

@@ -3620,7 +3620,7 @@ wheels = [
 
 [[package]]
 name = "pyrite-mc"
-version = "0.10.0"
+version = "0.10.1"
 source = { editable = "." }
 dependencies = [
     { name = "backports-zstd", marker = "python_full_version < '3.14' or (extra == 'extra-9-pyrite-mc-amd' and extra == 'extra-9-pyrite-mc-intel') or (extra == 'extra-9-pyrite-mc-amd' and extra == 'extra-9-pyrite-mc-nvidia') or (extra == 'extra-9-pyrite-mc-intel' and extra == 'extra-9-pyrite-mc-nvidia')" },

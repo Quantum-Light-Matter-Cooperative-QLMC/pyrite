@@ -53,6 +53,8 @@ pyrite --help
 data from public GitHub Releases; no GitHub token is needed. Run
 `pyrite tables fetch --help` to list the individual datasets, or
 `pyrite tables fetch NAME --archive PATH` to install one from a local archive.
+In a notebook with no terminal (for example molab), call `pyrite.fetch_tables()`,
+which does the same as a bare `pyrite tables fetch`.
 
 For tab completion, run `pyrite config completion install` and restart the
 shell; with `uv tool`, run `uv tool update-shell` first so `pyrite` is on

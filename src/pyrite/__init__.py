@@ -11,12 +11,12 @@ surface, and ``AGENTS.md`` for repository working conventions.
 """
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ._env import env_value
 from .paths import data_dir
 
-__version__ = "0.10.0"
+__version__ = "0.10.1"
 
 # Packaged data (catalog/, cifs/,
 # eaglexo_qe.csv, and the other entries ADR-0014 classifies as in-wheel).
@@ -37,6 +37,93 @@ if env_value("PYRITE_MC_DEBUG"):
     _handler.setFormatter(logging.Formatter("%(name)s: %(message)s"))
     logger.addHandler(_handler)
     logger.setLevel(logging.DEBUG)
+
+if TYPE_CHECKING:
+    # Static view of the lazy exports below, so editors resolve hover docs and types.
+    from pyrite._precision import Precision as Precision
+    from pyrite.api import simulate as simulate
+    from pyrite.campaign.geometry import (
+        BlazedGrooves as BlazedGrooves,
+    )
+    from pyrite.campaign.geometry import (
+        Footprint as Footprint,
+    )
+    from pyrite.campaign.geometry import (
+        Layer as Layer,
+    )
+    from pyrite.campaign.geometry import (
+        Slab as Slab,
+    )
+    from pyrite.campaign.geometry import (
+        Stack as Stack,
+    )
+    from pyrite.campaign.model import (
+        Analysis as Analysis,
+    )
+    from pyrite.campaign.model import (
+        Beam as Beam,
+    )
+    from pyrite.campaign.model import (
+        Convergence as Convergence,
+    )
+    from pyrite.campaign.model import (
+        Numerics as Numerics,
+    )
+    from pyrite.campaign.model import (
+        Scene as Scene,
+    )
+    from pyrite.campaign.model import (
+        Sweep as Sweep,
+    )
+    from pyrite.detectors import (
+        Detector as Detector,
+    )
+    from pyrite.detectors import (
+        EnergyBins as EnergyBins,
+    )
+    from pyrite.detectors import (
+        IdealPhotonCounter as IdealPhotonCounter,
+    )
+    from pyrite.instrument import (
+        Acquisition as Acquisition,
+    )
+    from pyrite.instrument import (
+        AcquisitionBatch as AcquisitionBatch,
+    )
+    from pyrite.instrument import (
+        FilterPlate as FilterPlate,
+    )
+    from pyrite.instrument import (
+        PixelGrid as PixelGrid,
+    )
+    from pyrite.instrument import (
+        PixelScorer as PixelScorer,
+    )
+    from pyrite.instrument import (
+        PlanarDetector as PlanarDetector,
+    )
+    from pyrite.instrument import (
+        PlanarPose as PlanarPose,
+    )
+    from pyrite.instrument import (
+        ResolvedObservation as ResolvedObservation,
+    )
+    from pyrite.results.model import (
+        PixelMetadata as PixelMetadata,
+    )
+    from pyrite.results.model import (
+        PixelRayMap as PixelRayMap,
+    )
+    from pyrite.results.model import (
+        Result as Result,
+    )
+    from pyrite.results.model import (
+        SpatialResult as SpatialResult,
+    )
+    from pyrite.results.model import (
+        SpectralFactors as SpectralFactors,
+    )
+    from pyrite.xsgen.install import fetch_tables as fetch_tables
 
 _PUBLIC_OBJECTS = {
     "Analysis": ("pyrite.campaign.model", "Analysis"),
@@ -67,6 +154,7 @@ _PUBLIC_OBJECTS = {
     "SpatialResult": ("pyrite.results.model", "SpatialResult"),
     "SpectralFactors": ("pyrite.results.model", "SpectralFactors"),
     "Sweep": ("pyrite.campaign.model", "Sweep"),
+    "fetch_tables": ("pyrite.xsgen.install", "fetch_tables"),
     "simulate": ("pyrite.api", "simulate"),
 }
 
