@@ -83,7 +83,7 @@ def _batched_coherent_finalize(
             run_coherent_reduction_kernel,
         )
     if _use_jit_coherent_stream:
-        _nsys_push("cxr.lines.coherent_finalize")
+        _nsys_push("pyrite.lines.coherent_finalize")
         if decoherence_active:
             # The planes now hold |sum_e S_e| per row (the "flat" term);
             # snapshot its magnitude before the grouped passes reuse them.
@@ -141,7 +141,7 @@ def _batched_coherent_finalize(
         # Limiting case: one row, one piece collapses to |A|^2 t_L^2 |F|^2,
         # whose energy integral is the incoherent self-term's
         # (test_coherent_emission.py, test_coherent_formation_absorption.py).
-        _nsys_push("cxr.lines.accum")
+        _nsys_push("pyrite.lines.accum")
         # ONE sync for every block's row lengths, then pure slicing.
         counts = _to_cpu(xp.stack(coh_counts)) if coh_blocks else np.zeros((0, N_g), int)
         starts = np.concatenate(

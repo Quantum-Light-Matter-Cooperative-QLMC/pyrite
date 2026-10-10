@@ -33,9 +33,7 @@ def test_acp_up_stops_bridges_when_interrupted(dev_module, monkeypatch) -> None:
 def test_notebook_commands_only_target_the_legacy_validation_notebook(
     dev_module,
 ) -> None:
-    assert dev_module.iter_notebooks() == [
-        dev_module.ROOT / "checks" / "cxr_analysis_feranchuk.ipynb"
-    ]
+    assert dev_module.iter_notebooks() == [dev_module.ROOT / "checks" / "feranchuk_analysis.ipynb"]
 
 
 def test_nbqa_passes_ruff_subcommand_as_one_shell_command(dev_module, monkeypatch) -> None:
@@ -44,7 +42,7 @@ def test_nbqa_passes_ruff_subcommand_as_one_shell_command(dev_module, monkeypatc
 
     dev_module.cmd_nbqa(Namespace())
 
-    notebook = str(dev_module.ROOT / "checks" / "cxr_analysis_feranchuk.ipynb")
+    notebook = str(dev_module.ROOT / "checks" / "feranchuk_analysis.ipynb")
     assert calls == [("-m", "nbqa", "ruff check", notebook, "--nbqa-shell")]
 
 

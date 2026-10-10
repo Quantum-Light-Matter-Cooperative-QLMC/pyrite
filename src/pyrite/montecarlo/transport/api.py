@@ -546,7 +546,7 @@ def simulate_trajectories(
     # the profiled path. Lazy import: runner imports this module.
     from ..runner import _nsys_pop, _nsys_push
 
-    _nsys_push("cxr.transport.tables")
+    _nsys_push("pyrite.transport.tables")
     z_total = float(layers[-1][1])
     n_layers = len(layers)
     prepared_stopping_tables = prepare_sbethe_stopping_tables(stopping_tables, n_layers)
@@ -572,7 +572,7 @@ def simulate_trajectories(
     internal_bounds = L_bot[:-1].copy()
     _nsys_pop()
 
-    _nsys_push("cxr.transport.sample")
+    _nsys_push("pyrite.transport.sample")
     rng = np.random.default_rng(seed)
     pos, transverse_slopes, beam_entry = initial_beam_positions(
         seed,
@@ -669,7 +669,7 @@ def simulate_trajectories(
         # Checked by validate_inelastic_args, which also requires stopping_tables.
         assert inelastic_materials is not None and inelastic_cutoff_eV is not None
         assert prepared_stopping_tables is not None
-        _nsys_push("cxr.transport.inelastic")
+        _nsys_push("pyrite.transport.inelastic")
         E_range_keV = (table_lo, table_hi)
         if _secondary is not None:  # one table set for every generation
             lo, hi = _secondary.table_range_keV
@@ -743,7 +743,7 @@ def simulate_trajectories(
         and not radiative_mode
         and elastic_model != "elsepa"
     ):
-        _nsys_push("cxr.transport.lut")
+        _nsys_push("pyrite.transport.lut")
         transport_lut = build_transport_energy_lut(
             table_lo,
             table_hi,
@@ -765,7 +765,7 @@ def simulate_trajectories(
         _nsys_pop()
     sbethe_group = pack_sbethe_stopping_tables(prepared_stopping_tables, n_layers)
 
-    _nsys_push("cxr.transport.alloc")
+    _nsys_push("pyrite.transport.alloc")
     # Preallocate fixed-capacity output buffers.  ``max_steps`` is already a
     # conservative safety bound in ordinary runs; groove re-entry events can add
     # material segments without consuming it, so the compiled core raises a
@@ -876,7 +876,7 @@ def simulate_trajectories(
         L_bot,
     )
 
-    _nsys_push("cxr.transport.core")
+    _nsys_push("pyrite.transport.core")
     # Only the grooved core records vacuum crossings; it replaces these.
     nvac = 0
     vac_start = np.empty((0, 3), dtype=float)
@@ -1121,7 +1121,7 @@ def simulate_trajectories(
     if n_step_limited:
         raise TransportStepLimitError(n_step_limited, Ne, max_steps)
 
-    _nsys_push("cxr.transport.output")
+    _nsys_push("pyrite.transport.output")
     if dev_segs is None:
         r_mid = seg_mid[:nseg]
         v_hat = seg_dir[:nseg]

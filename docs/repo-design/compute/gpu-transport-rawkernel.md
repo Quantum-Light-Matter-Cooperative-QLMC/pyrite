@@ -138,7 +138,7 @@ Ne=16000, capacity 2048 so nothing replays, six launches per run. Kernel and dev
 | device-to-host payload | 0.061 s (32%) | 0.146 s (16%) |
 | unattributed host-side remainder | 0.072 s (38%) | 0.485 s (52%) |
 
-The payload is 82 bytes per recorded segment — 0.46 GB for hopg, 1.15 GB for MoSe2 — moved over pageable memory at a measured 7.6–7.9 GB/s. The remainder is scratch allocation, mask construction, and NumPy assembly of the output arrays; it has not been attributed further. Round 5 added the NVTX ranges that split it (`cxr.transport.scratch` / `.compact` / `.join` and siblings); a capture using them is what closes this out.
+The payload is 82 bytes per recorded segment — 0.46 GB for hopg, 1.15 GB for MoSe2 — moved over pageable memory at a measured 7.6–7.9 GB/s. The remainder is scratch allocation, mask construction, and NumPy assembly of the output arrays; it has not been attributed further. Round 5 added the NVTX ranges that split it (`pyrite.transport.scratch` / `.compact` / `.join` and siblings); a capture using them is what closes this out.
 
 **The kernel is no longer the bottleneck; the driver around it is.**
 
@@ -175,7 +175,7 @@ At sweep scale this is now measured rather than argued. Over `coh_test`/hopg —
 
 ## Not done
 
-- **A capture that uses the transport NVTX ranges.** Round 5 added them (`cxr.transport.tables` / `.sample` / `.alloc` / `.core` / `.output`, with `.upload` / `.scratch` / `.launch` / `.capsync` / `.compact` / `.exitcodes` / `.join` nested inside the CUDA driver), replacing the `cxr.transport.line` / `cxr.transport.brem` names Round 1 invented and never shipped. Nothing has been profiled with them yet; that run is what attributes the host-side remainder above.
+- **A capture that uses the transport NVTX ranges.** Round 5 added them (`pyrite.transport.tables` / `.sample` / `.alloc` / `.core` / `.output`, with `.upload` / `.scratch` / `.launch` / `.capsync` / `.compact` / `.exitcodes` / `.join` nested inside the CUDA driver), replacing the `pyrite.transport.line` / `pyrite.transport.brem` names Round 1 invented and never shipped. Nothing has been profiled with them yet; that run is what attributes the host-side remainder above.
 - **`numba.prange` over the per-electron core.** The same restructuring makes the CPU core trivially parallel, which is the cheap answer for the core-starved case the perf doc flagged. Not wired up here.
 - **Grooved transport.**
 

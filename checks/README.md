@@ -68,7 +68,7 @@ run through the collector.
 | `substep_invariance.py` | Measures emitted-radiation invariance under numerical transport substepping. |
 | `transport_core_goldens.py` | Verifies bit-for-bit CPU transport-core golden outputs. |
 | `xraylib_cascade_oracle.py` | Pinned xraylib Kissel full-cascade comparison of EADL vacancy propagation and K/L/M line cross sections for Si, Cu and Au from shared photoionization primaries; gates vacancy enhancement and K-alpha/Au L3 lines (#91). |
-| `cxr_analysis_feranchuk.ipynb`, `cxr_analysis_feranchuk.md` | Legacy paired notebook retained for historical Feranchuk analysis; it emits no records. Keep output-free. |
+| `feranchuk_analysis.ipynb`, `feranchuk_analysis.md` | Legacy paired notebook retained for historical Feranchuk analysis; it emits no records. Keep output-free. |
 
 Run commands are documented in each check. Heavy Monte Carlo or GPU work must
 use `pyrite remote`; do not launch it locally from this directory.

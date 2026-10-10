@@ -349,11 +349,11 @@ def test_spectrum_case_emits_nsys_phase_ranges(monkeypatch):
     runner._spectrum_case(case, tp)
 
     assert entered == [
-        "cxr.spectrum_case:heavy case",
-        "cxr.lines",
-        "cxr.characteristic",
-        "cxr.brem",
-        "cxr.interpolate",
+        "pyrite.spectrum_case:heavy case",
+        "pyrite.lines",
+        "pyrite.characteristic",
+        "pyrite.brem",
+        "pyrite.interpolate",
     ]
 
 

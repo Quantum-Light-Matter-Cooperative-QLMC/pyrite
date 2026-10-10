@@ -59,7 +59,7 @@ from pyrite.devtools import repo_root
 ROOT = repo_root()
 AGENT_SKILLS_DIR = ROOT / ".agents" / "skills"
 CLAUDE_SKILLS_DIR = ROOT / ".claude" / "skills"
-LEGACY_NOTEBOOK = ROOT / "checks" / "cxr_analysis_feranchuk.ipynb"
+LEGACY_NOTEBOOK = ROOT / "checks" / "feranchuk_analysis.ipynb"
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 TEST_SUITE_PATTERNS = {

@@ -430,7 +430,7 @@ def _brem_dsigma_dk_core(T_i, k, Z):
     already-reshaped, mutually broadcasting operands (segments x grid); ``Z`` is
     the scalar atomic number. Split out of ``_brem_dsigma_dk`` so the whole chain
     (sqrt/divide/log/exp/where/maximum -- ~15 CuPy elementwise kernels, each
-    allocating a full [seg, E] temporary and dominating ``cxr.brem`` at 300 keV)
+    allocating a full [seg, E] temporary and dominating ``pyrite.brem`` at 300 keV)
     JIT-fuses to a SINGLE kernel under CuPy (see ``xp.fuse`` wrap below). On NumPy
     it runs eager with the identical ops, so it is bit-for-bit the old inline
     expression and the brem-spectrum golden is unchanged."""

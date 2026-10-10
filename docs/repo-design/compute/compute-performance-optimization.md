@@ -23,7 +23,7 @@ Work on `feature/compute-performance-optimization`. Numbers are from `nsys` prof
 
 ### Method
 
-Profiling drove every change — no speculative optimization. Each candidate was isolated with `nsys` NVTX ranges (`cxr.lines`, `cxr.brem`, `cxr.lines.tab/accum`; **not** `cxr.transport.*` — this round claimed transport ranges that did not exist in the tree, so a transport-side gap in a capture was unlabelled and could not discriminate phases on its own. Round 4's attribution used the `cxr.performance.v1` activity labels instead; Round 5 added the real ranges) plus `cuLaunchKernel` counts from `nsys-stats.txt`, then verified bit-for-bit or tolerance-bounded against the golden suite before landing. See the [performance-profile analysis playbook](../../guides/performance-profile-analysis.md) for the analysis playbook. Guiding rule: **GPU utilization is evidence, not the target — compute-weighted wall time is.**
+Profiling drove every change — no speculative optimization. Each candidate was isolated with `nsys` NVTX ranges (`pyrite.lines`, `pyrite.brem`, `pyrite.lines.tab/accum`; **not** `pyrite.transport.*` — this round claimed transport ranges that did not exist in the tree, so a transport-side gap in a capture was unlabelled and could not discriminate phases on its own. Round 4's attribution used the `cxr.performance.v1` activity labels instead; Round 5 added the real ranges) plus `cuLaunchKernel` counts from `nsys-stats.txt`, then verified bit-for-bit or tolerance-bounded against the golden suite before landing. See the [performance-profile analysis playbook](../../guides/performance-profile-analysis.md) for the analysis playbook. Guiding rule: **GPU utilization is evidence, not the target — compute-weighted wall time is.**
 
 ### Where the time was going
 
@@ -32,7 +32,7 @@ Two dominant, unrelated levers surfaced on the `hopg` profile:
 1. **Launch-bound spectrum kernels.** The batched incoherent line path fired a storm of tiny elementwise CuPy kernels — `cupy_multiply`, `cupy_add`, `take`, `where`, `searchsorted`, `clip` — ~82k `cuLaunchKernel` calls total. At single-digit GPU utilization the wall was dispatch-bound, not compute-bound: the GPU was starved, not busy.
 2. **O(N²) checkpoint I/O.** `run_sweep` re-serialized the *entire growing* per-material store to `line.pkl`/`brem.pkl` on **every** finished config, so total bytes written over a sweep grew quadratically — ~16 s of a ~28 s wall (~55%), all serial CPU I/O with the GPU idle.
 
-`cxr.brem` is genuinely compute-bound and was deliberately left alone.
+`pyrite.brem` is genuinely compute-bound and was deliberately left alone.
 
 ### What landed
 
@@ -44,9 +44,9 @@ Collapsed the batched incoherent line launch-storm into a handful of fused kerne
 - **Shared interpolation index** — `chi`/`U` (real+imag) and `mu` all sample the same `E_res` on the same `E_tab_g` grid, so the bracket is computed **once** and each table is gathered off the shared index. Removes 4× redundant `searchsorted`/`clip`.
 - `_line_weight_core` (`xp.fuse`) — escape factor + PXR prefactor with the absorption term folded in.
 
-**Impact:** `cuLaunchKernel` 82,457 → 63,765 (−23%); `cxr.lines` 4.43 s → 3.61 s on `hopg`. Bigger on high-reflection materials (e.g. `mos2`, where `cxr.lines` was ~18 s). `cxr.brem` unchanged, as expected. No new validation debt — pure kernel-merge, existing `Validation: line-hkl-batch` marker intact.
+**Impact:** `cuLaunchKernel` 82,457 → 63,765 (−23%); `pyrite.lines` 4.43 s → 3.61 s on `hopg`. Bigger on high-reflection materials (e.g. `mos2`, where `pyrite.lines` was ~18 s). `pyrite.brem` unchanged, as expected. No new validation debt — pure kernel-merge, existing `Validation: line-hkl-batch` marker intact.
 
-This builds on the earlier GPU line-absorption tabulation fix (already on `main`), which had already cut `cxr.lines` from ~70 s to ~8 s by ending a per-hkl CPU `xraydb` sync stall.
+This builds on the earlier GPU line-absorption tabulation fix (already on `main`), which had already cut `pyrite.lines` from ~70 s to ~8 s by ending a per-hkl CPU `xraydb` sync stall.
 
 #### 2. Incremental checkpoint shards (`run.py`, `_checkpoint_store.py`)
 
@@ -64,11 +64,11 @@ Crash-safety improves rather than regresses: a hard kill leaves shards behind, a
 
 ### Remaining levers (not yet taken)
 
-- **`cxr.lines.tab`** — per-hkl `chi`/`U` `f1`/`f2` tabulation (~5.5 s on `hopg`). Next target, but carries the `f1` edge cusp + coherent goldens, so trickier than the absorption (`f2`/`mu`-only) fix.
+- **`pyrite.lines.tab`** — per-hkl `chi`/`U` `f1`/`f2` tabulation (~5.5 s on `hopg`). Next target, but carries the `f1` edge cusp + coherent goldens, so trickier than the absorption (`f2`/`mu`-only) fix.
 - **Transport aggregate** — large in wall-clock terms but runs pipelined across the CPU worker pool; watch the memory-aware worker cap on high-beam-energy refine steps (OOM risk on the single-GPU box).
-- **`cxr.brem`** — compute-bound; leave unless the kernel math itself changes.
+- **`pyrite.brem`** — compute-bound; leave unless the kernel math itself changes.
 
-Round 2 supersedes the first two of these: `cxr.lines.tab` was fixed by the stacking prologue (host→device uploads hoisted out of the reflection loop), and the transport/GPU balance is now quantified.
+Round 2 supersedes the first two of these: `pyrite.lines.tab` was fixed by the stacking prologue (host→device uploads hoisted out of the reflection loop), and the transport/GPU balance is now quantified.
 
 ## Round 2: post-rawkernel re-profile (2026-08-06)
 
@@ -267,7 +267,7 @@ That control also caught a defect in the pin: `_worker_init` overwrote `PYRITE_M
 
 ### Corrections to earlier rounds
 
-- Round 1's method section credited NVTX ranges `cxr.transport.line` / `cxr.transport.brem`. **They did not exist**; `transport.py` pushed no `_nsys_push`/`_nsys_range` at all, so a transport-side gap in an `nsys` capture was unlabelled. The MoSe2 attribution used the shipped `cxr.performance.v1` activity labels, which do carry per-tick phase identity. Round 5 added real ranges, under different names than Round 1 invented — see that round below.
+- Round 1's method section credited NVTX ranges `pyrite.transport.line` / `pyrite.transport.brem`. **They did not exist**; `transport.py` pushed no `_nsys_push`/`_nsys_range` at all, so a transport-side gap in an `nsys` capture was unlabelled. The MoSe2 attribution used the shipped `cxr.performance.v1` activity labels, which do carry per-tick phase identity. Round 5 added real ranges, under different names than Round 1 invented — see that round below.
 - Round 2's "single-core transport is ≈1× the GPU phase, so two transport workers hide it" was measured on a 3060 Ti at `N_g = 110`. On an RTX 5080 at `N_g = 66` the GPU phase shrank and transport did not; the ratio flipped. Balance claims do not survive a GPU generation.
 - The MoSe2 `--ne-line=20000` "stall" is **not a stall**: it is the pipeline-fill transient plus compute-bound transport, linear in `n_seg`, with per-segment cost within 3.5% of hopg's. Feed-wait falls 0.530 → 0.299 as cases become available to overlap. Documented as expected; no default was changed for it — Round 4 removes the underlying cost instead.
 
@@ -288,7 +288,7 @@ Instrumentation, bookkeeping, and a plan. No kernel or numerical change: nothing
 
 ### What landed
 
-1. **NVTX ranges in `transport.py`**, closing the oldest correction in this document. Round 1 credited `cxr.transport.line` / `cxr.transport.brem`, which never existed; the real names are per *stage*, not per radiation channel, because that is what the unattributed remainder needed splitting into. `simulate_trajectories` pushes `cxr.transport.tables`, `.sample`, `.alloc`, `.core`, `.output`; inside the CUDA driver, `.core` nests `.upload`, `.scratch`, `.launch`, `.capsync`, `.compact`, `.exitcodes`, `.join`. `.launch` and `.capsync` are deliberately split: on CUDA the core call returns immediately, so `.launch` is host-side dispatch and the batch's device time lands in the `seg_count.max()` read inside `.capsync`. Every range is host-side wall clock, and all are no-ops off a profiled run (`_nsys_push`/`_nsys_pop` from `runner.py`, imported lazily because `runner` imports `transport`). The playbook is corrected in [performance-profile analysis guide](../../guides/performance-profile-analysis.md).
+1. **NVTX ranges in `transport.py`**, closing the oldest correction in this document. Round 1 credited `pyrite.transport.line` / `pyrite.transport.brem`, which never existed; the real names are per *stage*, not per radiation channel, because that is what the unattributed remainder needed splitting into. `simulate_trajectories` pushes `pyrite.transport.tables`, `.sample`, `.alloc`, `.core`, `.output`; inside the CUDA driver, `.core` nests `.upload`, `.scratch`, `.launch`, `.capsync`, `.compact`, `.exitcodes`, `.join`. `.launch` and `.capsync` are deliberately split: on CUDA the core call returns immediately, so `.launch` is host-side dispatch and the batch's device time lands in the `seg_count.max()` read inside `.capsync`. Every range is host-side wall clock, and all are no-ops off a profiled run (`_nsys_push`/`_nsys_pop` from `runner.py`, imported lazily because `runner` imports `transport`). The playbook is corrected in [performance-profile analysis guide](../../guides/performance-profile-analysis.md).
 2. **The four orphan line-path `Validation:` markers are ledgered**: `line-hkl-batch`, `line-amplitude-fusion`, `line-gemv-elementwise` (all `filtered`) and `line-absorption-tabulation` (**`discrepancy`**). The last is a real finding, not bookkeeping: the in-code justification that tabulated `μ` is "at least as accurate as the chi/U interpolation already accepted here" is measurably false near an absorption edge — hopg (002) at the C K-edge is off `2.72e-01` against `5.82e-05` for `χ_g` on the same grid and points, because `μ` depends on `f₂` alone so the edge jump is the whole of its variation. Edge-localized and median `1.6e-6`, but it propagates to `exp(−μL_esc)` at `5.23e-01` for `L_esc = 1e4 Å`. Resolutions are in the ledger row; none is taken here.
 3. **`-c/--cpu` and `--cpu-only` on `pyrite run -R/--remote`.** The CPU-profiling phase existed only on `pyrite remote run`, which is deprecated and hidden with removal at 0.3.0, so the feature would have disappeared silently. Both flags live only on `pyrite-dev perf`, require `-R`, and forward to the same job machinery; validation stays in `start_command`, unduplicated.
 

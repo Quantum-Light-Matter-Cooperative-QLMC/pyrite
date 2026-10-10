@@ -91,4 +91,4 @@ The updated coherent tests include:
 - streaming RawKernel vs pre-existing batched coherent fallback;
 - one internal streaming block vs forced multiple segment blocks.
 
-Then benchmark `hopg_coherent` with NVTX ranges `cxr.lines.coherent_prologue`, `cxr.lines.coherent_field`, and `cxr.lines.coherent_finalize`. Tune `CoherentStreamKernelConfig` and `_JIT_COHERENT_PAIR_TARGET` from measurements rather than assumptions.
+Then benchmark `hopg_coherent` with NVTX ranges `pyrite.lines.coherent_prologue`, `pyrite.lines.coherent_field`, and `pyrite.lines.coherent_finalize`. Tune `CoherentStreamKernelConfig` and `_JIT_COHERENT_PAIR_TARGET` from measurements rather than assumptions.
