@@ -432,6 +432,14 @@ def _parse_profile_precision(row, path, errors) -> None:
                 f"{path}.{key}",
                 "cannot be combined with precision; the adaptive policy owns the count",
             )
+    overrides = row.get("overrides")
+    for material, override in overrides.items() if isinstance(overrides, dict) else ():
+        for key in ("n_electrons", "n_electrons_brem"):
+            if isinstance(override, dict) and key in override:
+                errors.add(
+                    f"{path}.overrides.{material}.{key}",
+                    "cannot be combined with precision; the adaptive policy owns the count",
+                )
     if row.get("emission") in ("coherent", "both"):
         errors.add(f"{path}.precision", "does not support coherent emission; use fixed counts")
 

@@ -2271,6 +2271,10 @@ def test_profile_precision_parses_and_rejects_incompatible_profiles(tmp_path):
         (policy.replace("target_rse = 0.1,", "target_rse = 0.1, spare = 1,"), "unknown"),
         (policy + "n_electrons = { values = [450] }\n", "n_electrons"),
         (policy + 'emission = "both"\n', "coherent emission"),
+        (
+            policy + "overrides = { hopg = { n_electrons_brem = { values = [90] } } }\n",
+            r"overrides\.hopg\.n_electrons_brem",
+        ),
     ):
         with pytest.raises(MaterialConfigError, match=match):
             load_material_catalog(_write_catalog(tmp_path, catalog(extra)))
