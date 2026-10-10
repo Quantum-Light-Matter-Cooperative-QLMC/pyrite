@@ -35,8 +35,4 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 
 ## Implicit defaults
 
-A run that leaves one of these unnamed still resolves the fallback, warns on stderr, and must name it explicitly from the removal release.
-
-| Unnamed | Current fallback | Name it explicitly | Deprecated in | Remove in | Note |
-| --- | --- | --- | --- | --- | --- |
-| profile detector | implicit Timepix3 scalar acceptance | pyrite profile set NAME --detector reference | 0.9.0 | 0.11.0 | Includes omitted scalar acceptance fields; reference uses ideal response and raw spectra. |
+No implicit default is currently deprecated. A run that leaves its profile unnamed, or a user-catalog profile that names no beam or detector, exits as a usage error.

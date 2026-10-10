@@ -450,13 +450,4 @@ class ImplicitDefault:
 
 
 #: Keyed by what the user left unnamed. Rendered into the deprecation reference.
-IMPLICIT_DEFAULTS: dict[str, ImplicitDefault] = {
-    "profile detector": ImplicitDefault(
-        "profile detector",
-        "implicit Timepix3 scalar acceptance",
-        "pyrite profile set NAME --detector reference",
-        "0.9.0",
-        _window("0.9.0"),
-        "Includes omitted scalar acceptance fields; reference uses ideal response and raw spectra.",
-    ),
-}
+IMPLICIT_DEFAULTS: dict[str, ImplicitDefault] = {}

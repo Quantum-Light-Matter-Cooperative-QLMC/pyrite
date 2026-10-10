@@ -91,8 +91,8 @@ detected counts), `max_spacing_eV` (`PYRITE_ENERGY_GRID_MAX_SPACING_EV`; 3 eV),
 | `emission` | `profile set --emission`; `profile add\|remove --coherent/--incoherent` | absent = `incoherent` |
 | `temporal_profile` | `profile set --temporal-profile/--no-temporal-profile` | absent = off |
 
-Scalar detector fields must be explicit. Omitted geometry warns in 0.9.0 and
-becomes a usage error in 0.11.0; attach `reference` to preserve the old acceptance
+Scalar detector fields must be explicit. Since 0.11.0, omitted geometry is a
+usage error; attach `reference` to preserve the old acceptance
 and checkpoint identity. This bundled object integrates the 14.08 mm Timepix3
 aperture at 400 mm as one ideal scalar detector (90°, 2.016603235051288° full
 polar span, 0.0012390399999999998 sr), exposing raw spectra without pixel/count
