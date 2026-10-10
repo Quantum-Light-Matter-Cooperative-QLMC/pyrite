@@ -235,8 +235,9 @@ def test_cli_migration_preserves_json_stream(tmp_path):
     legacy.mkdir()
     (legacy / "old.pkl").write_bytes(b"old")
     result = CliRunner().invoke(command, ["checkpoint", "list", "-o", "json"])
-    assert result.exit_code == 0, result.output
-    json.loads(result.stdout)
+    # The fake pickle is unreadable, so `checkpoint list` reports it and exits 1.
+    assert result.exit_code == 1, result.output
+    assert json.loads(result.stdout)["schema"] == "cxr.checkpoints"
     assert "moved" in result.stderr
     assert (tmp_path / "pyrite-output/checkpoints/old.pkl").read_bytes() == b"old"
 
