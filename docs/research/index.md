@@ -30,6 +30,7 @@ physics/transition-radiation-recommendations
 :caption: Exploratory instrumentation
 
 instrumentation/grazing-grating
+instrumentation/target-filter-bodies
 ```
 
 ```{toctree}
