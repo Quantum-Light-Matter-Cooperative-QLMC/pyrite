@@ -10,7 +10,7 @@ A write-up mixes three different things. Keep them visually distinct:
 
 1. **Abstract physics** (the independent derivation, the source equation, any symbolic expression you'd write on paper) → **LaTeX math**, per the rules below. Never put a physics expression in a plain code span or code fence — `` `r_e = e^2/(mc^2)` `` reads as code, not as the equation it is.
 2. **Literal source excerpts** (pseudocode reproducing the actual implementation, with its exact variable spellings, `**`, `@`, `np.exp`, line continuations) → plain fenced code block (```` ``` ```` or ` ```text `). Do not "clean up" these into LaTeX — they are evidence about what the code says, and their value is being literal.
-3. **Individual code identifiers** referenced in prose (`chi_g`, `photon_E_eV`, `mc_spectrum`, `B_ang2`) → inline code span with the exact spelling from source. Do not convert these to a math symbol even if they name a physical quantity — the point of the backtick is "this is what the code calls it."
+3. **Individual code identifiers** referenced in prose (`chi_g`, `photon_E_eV`, `mc_cxr_spectrum`, `B_ang2`) → inline code span with the exact spelling from source. Do not convert these to a math symbol even if they name a physical quantity — the point of the backtick is "this is what the code calls it."
 
 When prose needs both — the code identifier and the physics symbol it represents — give both: "the docstring's `B_ang2` is the Debye–Waller parameter $B$."
 

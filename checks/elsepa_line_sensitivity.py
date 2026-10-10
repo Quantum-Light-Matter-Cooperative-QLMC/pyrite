@@ -39,7 +39,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-from soft_deflection_line_sensitivity import line_metrics, peak_windows  # noqa: E402
+from soft_deflection_line_sensitivity import cxr_metrics, peak_windows  # noqa: E402
 
 from pyrite.campaign.config import material_sweep  # noqa: E402
 from pyrite.campaign.sweep import build_cases  # noqa: E402
@@ -126,7 +126,7 @@ def run(cfg, coherent):
                 mean_mott = np.mean([np.asarray(o[key]) for o, _ in results["mott"]], axis=0)
                 windows = peak_windows(E, mean_mott)
                 metrics = {
-                    model: [line_metrics(E, np.asarray(o[key]), windows) for o, _ in runs]
+                    model: [cxr_metrics(E, np.asarray(o[key]), windows) for o, _ in runs]
                     for model, runs in results.items()
                 }
                 _compare(

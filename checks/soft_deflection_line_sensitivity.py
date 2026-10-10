@@ -122,7 +122,7 @@ def vertex_variant(segs, soft_rate, scale, rng):
     return v
 
 
-def line_metrics(E, spec, peaks):
+def cxr_metrics(E, spec, peaks):
     """Yield, centroid and rms width per baseline peak window, and total."""
     out = {"total": float(np.trapezoid(spec, E))}
     for i, (lo, hi) in enumerate(peaks):
@@ -204,7 +204,7 @@ def run(cfg, coherent):
             mean_base = np.mean([np.asarray(s["baseline"][key]) for s in per_seed], axis=0)
             windows = peak_windows(E, mean_base)
             metrics = {
-                variant: [line_metrics(E, np.asarray(s[variant][key]), windows) for s in per_seed]
+                variant: [cxr_metrics(E, np.asarray(s[variant][key]), windows) for s in per_seed]
                 for variant in per_seed[0]
             }
             report.append(_summarize(E0, thickness, key, metrics))

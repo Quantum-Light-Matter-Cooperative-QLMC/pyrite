@@ -64,10 +64,10 @@ from ..checkpoints.persistence import (  # noqa: F401 -- compatibility exports
     load_checkpoint,
 )
 from ..checkpoints.recompute import (  # noqa: F401 -- compatibility exports
-    reline_checkpoint,
+    recxr_checkpoint,
     repair_brem_wide,
     repair_checkpoint,
-    repair_line_spec,
+    repair_cxr_spec,
 )
 from ..montecarlo import run_cases, runner
 from ..results import store_result

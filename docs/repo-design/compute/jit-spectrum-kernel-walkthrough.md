@@ -2,7 +2,7 @@
 
 This reference follows the arithmetic and CUDA ownership model of the two segment-reduction kernels used by the line-spectrum path:
 
-- [`line_jit_kernel.py`](../../../src/pyrite/montecarlo/spectrum/line_jit_kernel.py) adds independent segment **intensities**;
+- [`cxr_jit_kernel.py`](../../../src/pyrite/montecarlo/spectrum/cxr_jit_kernel.py) adds independent segment **intensities**;
 - [`coherent_jit_kernel.py`](../../../src/pyrite/montecarlo/spectrum/coherent_jit_kernel.py) adds complex segment **fields** and squares the completed field.
 
 The examples use small, artificial arrays so every operation is visible. They explain evaluation of already-ledgered equations; they do not introduce or independently validate physics. The physical derivations and validation status remain owned by [Validation: `coherent-line-spectrum`](../../validation/radiation-physics/coherent-line-spectrum.md), [Validation: `finite-time-lineshape`](../../validation/radiation-physics/finite-time-lineshape.md), and [Validation: `coherent-emission`](../../validation/radiation-physics/coherent-emission.md). The optional branches described below additionally inherit [Validation: `xray-in-medium-propagation-phase`](../../validation/radiation-physics/xray-in-medium-propagation-phase.md), [Validation: `coherent-inter-electron-decoherence`](../../validation/radiation-physics/coherent-inter-electron-decoherence.md), and the currently filtered [Validation: `cross-reflection-coherence`](../../validation/radiation-physics/cross-reflection-coherence.md) boundary.

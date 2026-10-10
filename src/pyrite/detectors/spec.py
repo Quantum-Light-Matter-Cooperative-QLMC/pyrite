@@ -9,6 +9,8 @@ from typing import Protocol
 
 import numpy as np
 
+from .._api_deprecations import renamed_fields
+
 
 def _number(name: str, value: object, *, minimum: float, maximum: float | None = None) -> float:
     if isinstance(value, bool) or not isinstance(value, Real):
@@ -31,41 +33,40 @@ def _positive_optional(name: str, value: object | None) -> float | None:
     return number
 
 
+@renamed_fields(line="cxr", line_by_energy="cxr_by_energy")
 @dataclass(frozen=True, eq=False)
 class EnergyBins:
-    """The detector's line and bremsstrahlung photon-energy binnings.
+    """The detector's CXR and bremsstrahlung photon-energy binnings.
 
-    ``line`` is fine and narrow because coherent-line evaluation is expensive
+    ``CXR`` is fine and narrow because coherent-CXR evaluation is expensive
     and kinematically bounded. ``brem`` is coarse and wide because the smooth,
-    cheap continuum must extend to the beam energy. ``line_by_energy`` selects
-    a fine line grid per beam energy when one fixed line grid is insufficient.
+    cheap continuum must extend to the beam energy. ``cxr_by_energy`` selects
+    a fine CXR grid per beam energy when one fixed CXR grid is insufficient.
 
     Parameters
     ----------
-    line
-        Optional shared one-dimensional line photon-energy grid in eV.
-    line_by_energy
-        Optional mapping from electron energy in keV to line grids in eV.
-        Mutually exclusive with ``line`` at catalog resolution.
+    CXR
+        Optional shared one-dimensional CXR photon-energy grid in eV.
+    cxr_by_energy
+        Optional mapping from electron energy in keV to CXR grids in eV.
+        Mutually exclusive with ``CXR`` at catalog resolution.
     brem
         Optional one-dimensional bremsstrahlung photon-energy grid in eV.
     """
 
-    line: np.ndarray | None = None
-    line_by_energy: Mapping[float, np.ndarray] | None = None
+    cxr: np.ndarray | None = None
+    cxr_by_energy: Mapping[float, np.ndarray] | None = None
     brem: np.ndarray | None = None
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, EnergyBins):
             return NotImplemented
-        if (self.line is None) != (other.line is None) or (self.brem is None) != (
-            other.brem is None
-        ):
+        if (self.cxr is None) != (other.cxr is None) or (self.brem is None) != (other.brem is None):
             return False
         if (
-            self.line is not None
-            and other.line is not None
-            and not np.array_equal(self.line, other.line)
+            self.cxr is not None
+            and other.cxr is not None
+            and not np.array_equal(self.cxr, other.cxr)
         ):
             return False
         if (
@@ -74,14 +75,14 @@ class EnergyBins:
             and not np.array_equal(self.brem, other.brem)
         ):
             return False
-        if (self.line_by_energy is None) != (other.line_by_energy is None):
+        if (self.cxr_by_energy is None) != (other.cxr_by_energy is None):
             return False
-        if self.line_by_energy is None:
+        if self.cxr_by_energy is None:
             return True
-        assert other.line_by_energy is not None
-        return self.line_by_energy.keys() == other.line_by_energy.keys() and all(
-            np.array_equal(grid, other.line_by_energy[energy])
-            for energy, grid in self.line_by_energy.items()
+        assert other.cxr_by_energy is not None
+        return self.cxr_by_energy.keys() == other.cxr_by_energy.keys() and all(
+            np.array_equal(grid, other.cxr_by_energy[energy])
+            for energy, grid in self.cxr_by_energy.items()
         )
 
 

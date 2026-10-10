@@ -23,7 +23,7 @@ def test_scheduler_slice_reuses_persisted_transport(tmp_path, monkeypatch, warni
     import json
 
     from pyrite._backend import BACKEND, xp
-    from pyrite._line_grid_policy import LineShapePrecisionWarning
+    from pyrite._cxr_grid_policy import LineShapePrecisionWarning
     from pyrite.energy_grid import convergence, convergence_case
     from pyrite.montecarlo import runner
     from pyrite.montecarlo.spectrum.coherent_population import (

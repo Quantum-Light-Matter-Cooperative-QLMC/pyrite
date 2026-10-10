@@ -27,10 +27,10 @@ _rebrem_flags = _queue_scripts._rebrem_flags
 _rebrem_queue_script = _queue_scripts._rebrem_queue_script
 _rebrem_chunked_queue_script = _queue_scripts._rebrem_chunked_queue_script
 _rebrem_queue_metadata = _queue_scripts._rebrem_queue_metadata
-_reline_flags = _queue_scripts._reline_flags
-_reline_queue_script = _queue_scripts._reline_queue_script
-_reline_chunked_queue_script = _queue_scripts._reline_chunked_queue_script
-_reline_queue_metadata = _queue_scripts._reline_queue_metadata
+_recxr_flags = _queue_scripts._recxr_flags
+_recxr_queue_script = _queue_scripts._recxr_queue_script
+_recxr_chunked_queue_script = _queue_scripts._recxr_chunked_queue_script
+_recxr_queue_metadata = _queue_scripts._recxr_queue_metadata
 _queue_metadata = _queue_scripts._queue_metadata
 _zhai_queue_metadata = _queue_scripts._zhai_queue_metadata
 

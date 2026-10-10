@@ -32,7 +32,7 @@ from ..groove import blazed_groove_spec as blazed_groove_spec
 from ..spectrum import (
     _segments_in_layer,
     _segments_on_device,
-    mc_spectrum,
+    mc_cxr_spectrum,
 )
 from ..spectrum import (
     mc_brem_spectrum as mc_brem_spectrum,
@@ -41,8 +41,8 @@ from ..spectrum import (
     mc_characteristic_spectrum as mc_characteristic_spectrum,
 )
 from ..spectrum.coherent_population import physical_bunch_electrons
-from ..spectrum.lines import _setup as _line_setup
-from ..spectrum.lines._temporal import case_temporal_profiles, temporal_outputs
+from ..spectrum.cxr import _setup as _cxr_setup
+from ..spectrum.cxr._temporal import case_temporal_profiles, temporal_outputs
 from ..trajectories import TrajectoryCapture
 from ..transport import (
     TransportLUTConfig,
@@ -107,12 +107,12 @@ from .chunking import (
 from .chunking import (
     _real_itemsize as _real_itemsize,
 )
+from .cxr_grid import check_cxr_truncation, cxr_truncation_audit, resolve_cxr_grid
+from .cxr_grid import coherent_flat_omission_limit as _coherent_flat_omission_limit
+from .cxr_grid import longitudinal_rms_fs as _longitudinal_rms_fs
 from .directions import directional_outputs, validated_directions
 from .host_cpus import _cgroup_cpu_quota as _cgroup_cpu_quota
 from .host_cpus import _usable_cpus
-from .line_grid import check_line_truncation, line_truncation_audit, resolve_line_grid
-from .line_grid import coherent_flat_omission_limit as _coherent_flat_omission_limit
-from .line_grid import longitudinal_rms_fs as _longitudinal_rms_fs
 
 _RESOURCE_POLICY.n_cpus = _usable_cpus()
 
@@ -364,19 +364,19 @@ def _transport_case(
 
     electron_ids = np.arange(Ne_transport)
 
-    line_mask = electron_ids < Ne
+    cxr_mask = electron_ids < Ne
     brem_mask = electron_ids < Ne_brem
 
-    combined_transport_mask = line_mask & brem_mask
-    line_only_transport_mask = line_mask & ~brem_mask
-    brem_only_transport_mask = brem_mask & ~line_mask
+    combined_transport_mask = cxr_mask & brem_mask
+    cxr_only_transport_mask = cxr_mask & ~brem_mask
+    brem_only_transport_mask = brem_mask & ~cxr_mask
 
     E_cut_lines = case.get("E_cut_lines_keV", 5.0)
     E_cut_brem = case.get("E_cut_brem_keV", 1.0)
 
     E_cut_by_electrons = np.empty(Ne_transport, dtype=np.float64)
 
-    E_cut_by_electrons[line_only_transport_mask] = E_cut_lines
+    E_cut_by_electrons[cxr_only_transport_mask] = E_cut_lines
     E_cut_by_electrons[brem_only_transport_mask] = E_cut_brem
     E_cut_by_electrons[combined_transport_mask] = min(E_cut_lines, E_cut_brem)
 
@@ -480,7 +480,7 @@ def _transport_case(
     # Line resolution needs the transport distribution, so it is chosen after
     # the case's own trajectories exist and before the spectrum phase. No second
     # Monte Carlo job is started for either path; see runner/line_grid.py.
-    E_grid, diagnostic_grid_result = resolve_line_grid(
+    E_grid, diagnostic_grid_result = resolve_cxr_grid(
         case, segs_all, n_hat, Ne, E_grid, layers, groove
     )
 
@@ -524,7 +524,7 @@ from .emission import _brem_wide_from_segments as _brem_wide_from_segments
 from .emission import _characteristic_from_segments as _characteristic_from_segments
 
 
-def _lines_for_segments(
+def _cxr_for_segments(
     segs,
     E_grid,
     case,
@@ -539,7 +539,7 @@ def _lines_for_segments(
     temporal=None,
     coefficient_capture=None,
 ):
-    """:func:`_lines_for_segments_once` in electron-aligned device blocks (#192).
+    """:func:`_cxr_for_segments_once` in electron-aligned device blocks (#192).
 
     On a GPU, an incoherent sum whose segments exceed the pool headroom runs in
     disjoint electron blocks whose spectra, audit sums and collected lines add
@@ -549,7 +549,7 @@ def _lines_for_segments(
     sums, which may couple electrons, are never split.
     """
     once = partial(
-        _lines_for_segments_once,
+        _cxr_for_segments_once,
         E_grid=E_grid,
         case=case,
         n_hat=n_hat,
@@ -595,7 +595,7 @@ def _lines_for_segments(
             n_blocks = min(MAX_ELECTRON_BLOCKS, 2 * n_blocks)
 
 
-def _lines_for_segments_once(
+def _cxr_for_segments_once(
     segs,
     E_grid,
     case,
@@ -610,12 +610,12 @@ def _lines_for_segments_once(
     temporal=None,
     coefficient_capture=None,
 ):
-    """Coherent line spectrum on ``E_grid`` from already-transported line
+    """Coherent CXR spectrum on ``E_grid`` from already-transported line
     segments ``segs``. Single slab (``layer_radiators`` absent) radiates from
     all segments via the case's scalar crystal keys; a multilayer stack sums
     each CRYSTALLINE layer's lines incoherently, every line self-absorbing
     through the whole stack. Pure move of _spectrum_case's line block, shared
-    with :func:`_lines_for_case` so a line-only reline reproduces the SAME
+    with :func:`_cxr_for_case` so a line-only reline reproduces the SAME
     spectrum as a live sweep.
 
     ``coherent`` overrides the coherence of the interference kernel: ``None``
@@ -627,7 +627,7 @@ def _lines_for_segments_once(
     Line kinematics always run on the crystal's bulk in-medium dispersion
     ``k = Re n(omega) omega``; there is no vacuum switch.
 
-    ``truncation_audit`` is forwarded to every ``mc_spectrum`` call (#192), and
+    ``truncation_audit`` is forwarded to every ``mc_cxr_spectrum`` call (#192), and
     so is the opt-in ``temporal`` profile, which every layer adds into (#292)."""
     radiators = case.get("layer_radiators")
     mosaic_kw = dict(
@@ -642,7 +642,7 @@ def _lines_for_segments_once(
         coherent = bool(case.get("coherent_emission", False))
     else:
         coherent = bool(coherent)
-    # Divergence-only case key (#116); mc_spectrum refuses it on coherent calls.
+    # Divergence-only case key (#116); mc_cxr_spectrum refuses it on coherent calls.
     line_quadrature = case.get("line_quadrature", "node")
     longitudinal_rms_fs = _longitudinal_rms_fs(case)
     # A coefficient capture (full-axis audit, window seeding) reads the full
@@ -651,7 +651,7 @@ def _lines_for_segments_once(
         0.0 if coefficient_capture is not None else _coherent_flat_omission_limit(case)
     )
     if radiators is None:
-        return mc_spectrum(
+        return mc_cxr_spectrum(
             segs,
             E_grid,
             crystal=case["crystal"],
@@ -690,7 +690,7 @@ def _lines_for_segments_once(
         sL = _segments_in_layer(segs, L)
         if sL["L_ang"].size == 0:
             continue
-        spec = spec + mc_spectrum(
+        spec = spec + mc_cxr_spectrum(
             sL,
             E_grid,
             crystal=rad["crystal"],
@@ -720,7 +720,7 @@ def _lines_for_segments_once(
     return spec
 
 
-def _transport_lines_for_case(case, E_grid=None):
+def _transport_cxr_for_case(case, E_grid=None):
     """Re-run the exact live transport population used by all line emitters.
 
     Characteristic radiation uses the lower-cutoff bremsstrahlung population,
@@ -744,17 +744,17 @@ def _transport_lines_for_case(case, E_grid=None):
     )
 
 
-def _lines_for_case(case, E_grid, *, coherent=None):
-    """Regenerate a case's line spectrum on ``E_grid`` from scratch (re-transport
-    + per-layer line kernel via :func:`_lines_for_segments`). Returns one
+def _cxr_for_case(case, E_grid, *, coherent=None):
+    """Regenerate a case's CXR spectrum on ``E_grid`` from scratch (re-transport
+    + per-layer line kernel via :func:`_cxr_for_segments`). Returns one
     PXR/CBS ``spec``, without characteristic emission. ``coherent`` overrides
     the kernel coherence (``None`` = derive from ``case["coherent_emission"]``). The line half of run_case's transport +
-    spectrum phases factored out so :func:`pyrite.runs.run.repair_line_spec`
+    spectrum phases factored out so :func:`pyrite.runs.run.repair_cxr_spec`
     (``pyrite reline``) reuses the EXACT live-sweep line path rather than
     re-deriving it by hand."""
-    segs, _E_brem, n_hat, abs_layers, groove = _transport_lines_for_case(case, E_grid)
+    segs, _E_brem, n_hat, abs_layers, groove = _transport_cxr_for_case(case, E_grid)
     segs = _segments_on_device(segs)
-    return _lines_for_segments(
+    return _cxr_for_segments(
         segs,
         E_grid,
         case,
@@ -766,7 +766,7 @@ def _lines_for_case(case, E_grid, *, coherent=None):
     )
 
 
-def _line_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=False):
+def _cxr_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=False):
     """Reline mirror of the runner's one-transport / dual-kernel invariant: one
     re-transport of ``case`` yields the incoherent ``spec`` and (when
     ``want_coherent``) a ``spec_coherent`` from the SAME segments, so a
@@ -775,13 +775,13 @@ def _line_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=Fa
     Returns ``(spec, spec_coherent_or_None)``, both PXR/CBS only. With
     ``return_characteristic=True``, append the separate characteristic
     component as a third item."""
-    segs, _E_brem, n_hat, abs_layers, groove = _transport_lines_for_case(case, E_grid)
+    segs, _E_brem, n_hat, abs_layers, groove = _transport_cxr_for_case(case, E_grid)
     # Both kernels read the same segments; stage one device copy as the live
     # sweep does rather than uploading the pair separately.
     segs = _segments_on_device(segs)
     Ne_lines = case["Ne"]
     table_cache = {}
-    spec = _lines_for_segments(
+    spec = _cxr_for_segments(
         segs,
         E_grid,
         case,
@@ -793,7 +793,7 @@ def _line_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=Fa
         table_cache=table_cache,
     )
     spec_coherent = (
-        _lines_for_segments(
+        _cxr_for_segments(
             segs,
             E_grid,
             case,
@@ -897,13 +897,13 @@ def _spectrum_case_retry(
 
 
 def _spectrum_case(case, tp, record_timing=False):
-    """GPU phase of run_case: line spectrum + brem from the already-transported
+    """GPU phase of run_case: CXR spectrum + brem from the already-transported
     segments ``tp`` (from _transport_case). Runs in the main process, so only one
     CUDA context ever touches the device."""
     case = _adaptive.realized_case(case, tp)
     timed = _TIMING or record_timing
     if timed:
-        _line_setup.SETUP_STATS.clear()
+        _cxr_setup.SETUP_STATS.clear()
     with _nsys_range(f"pyrite.spectrum_case:{case.get('name', 'case')}"):
         out = _spectrum_case_impl(case, tp, record_timing)
     if timed:
@@ -954,13 +954,13 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         from .coherent_audit import CoherentGridAudit
 
         coherent_audit = CoherentGridAudit(case)
-    line_table_cache = {}
+    cxr_table_cache = {}
     # Opt-in temporal profile (#292): one accumulator per emission policy.
     temporal, temporal_coherent = case_temporal_profiles(case, tp, want_coherent)
-    truncation_audit = line_truncation_audit(case, E_grid, n_electrons=Ne_lines)
+    truncation_audit = cxr_truncation_audit(case, E_grid, n_electrons=Ne_lines)
     with _nsys_range("pyrite.lines"):
         try:
-            spec = _lines_for_segments(
+            spec = _cxr_for_segments(
                 segs_dev,
                 E_grid,
                 case,
@@ -969,13 +969,13 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 tp.get("groove"),
                 coherent=False,
                 Ne=Ne_lines,
-                table_cache=line_table_cache,
+                table_cache=cxr_table_cache,
                 truncation_audit=truncation_audit,
                 temporal=temporal,
             )
 
             if want_coherent:
-                spec_coherent = _lines_for_segments(
+                spec_coherent = _cxr_for_segments(
                     segs_dev,
                     E_grid,
                     case,
@@ -984,7 +984,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                     tp.get("groove"),
                     coherent=True,
                     Ne=Ne_lines,
-                    table_cache=line_table_cache,
+                    table_cache=cxr_table_cache,
                     temporal=temporal_coherent,
                     coefficient_capture=None if coherent_audit is None else coherent_audit.capture,
                 )
@@ -994,7 +994,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
             raise _SpectrumPhaseOOM("line", error) from error
     # Refuse a truncating measured bandwidth before the other components run.
     truncation_record = (
-        None if truncation_audit is None else check_line_truncation(case, truncation_audit)
+        None if truncation_audit is None else check_cxr_truncation(case, truncation_audit)
     )
     coherent_yield_record = (
         None if coherent_audit is None else coherent_audit.check(E_grid, spec_coherent, Ne_lines)
@@ -1135,7 +1135,7 @@ def _worker_init(force_cpu=False):
 
     force_cpu: when True (the engine="cpu" full-case pool), rebind THIS
     worker process's copy of runner._RESOURCE_POLICY.gpu and spectrum.xp/REAL to their CPU
-    equivalents, so _spectrum_case (via mc_spectrum/mc_brem_spectrum) takes
+    equivalents, so _spectrum_case (via mc_cxr_spectrum/mc_brem_spectrum) takes
     the NumPy path even when cupy is importable and a real GPU is present on
     the box. A no-op fork/spawn-local mutation: it never touches the driver
     process's globals. Harmless when _RESOURCE_POLICY.gpu is already False.
@@ -1194,3 +1194,23 @@ for _exported in (
     _exported.__module__ = __name__
 
 del _exported
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {
+    "_lines_for_segments": "_cxr_for_segments",
+    "_lines_for_segments_once": "_cxr_for_segments_once",
+    "_transport_lines_for_case": "_transport_cxr_for_case",
+    "_lines_for_case": "_cxr_for_case",
+    "_line_pair_for_case": "_cxr_pair_for_case",
+}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

@@ -149,9 +149,9 @@ def mode_summary(metadata):
         return " · ".join(parts)
     if fields.get("kind") == "reline":
         parts = ["line-only recompute"]
-        if fields.get("line_ne") not in (None, "None"):
-            parts.append(f"Ne_line={fields['line_ne']}")
-        bounds = [fields.get("line_start_eV"), fields.get("line_stop_eV")]
+        if fields.get("cxr_ne") not in (None, "None"):
+            parts.append(f"Ne_line={fields['cxr_ne']}")
+        bounds = [fields.get("cxr_start_eV"), fields.get("line_stop_eV")]
         if any(value not in (None, "None") for value in bounds):
             parts.append(f"range {bounds[0]}:{bounds[1]} eV")
         if fields.get("line_step_eV") not in (None, "None"):

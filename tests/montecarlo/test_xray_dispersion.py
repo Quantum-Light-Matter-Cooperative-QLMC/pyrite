@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 
 from pyrite.materials.crystal import CRYSTALS, reciprocal_g_vector, refractive_index
-from pyrite.montecarlo.spectrum import mc_spectrum
-from pyrite.montecarlo.spectrum.lines import _observation_direction
+from pyrite.montecarlo.spectrum import mc_cxr_spectrum
+from pyrite.montecarlo.spectrum.cxr import _observation_direction
 from pyrite.montecarlo.transport import beta_from_keV
 from tests.helpers import requires_resolvable_grid
 
@@ -76,7 +76,7 @@ def _single_layer():
 
 
 def _spectrum(**kwargs):
-    return mc_spectrum(_segments(), E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, **kwargs)
+    return mc_cxr_spectrum(_segments(), E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, **kwargs)
 
 
 def _vacuum_resonance_eV():
@@ -171,7 +171,7 @@ def _relative_phase(z1, z2, i_E, **kwargs):
     """
 
     def run(seg):
-        return mc_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, coherent=True, **kwargs)
+        return mc_cxr_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, coherent=True, **kwargs)
 
     i_1 = run(_one_segment(z1))[i_E]
     i_2 = run(_one_segment(z2))[i_E]
@@ -275,14 +275,16 @@ def test_single_segment_coherent_line_sits_on_the_escape_path_root():
     (Snell) root shared by the incoherent route. Absorption
     keeps ``|F|^2`` even in ``v``, so it does not move the peak.
     """
-    coh = mc_spectrum(_one_segment(9_000.0), E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, coherent=True)
+    coh = mc_cxr_spectrum(
+        _one_segment(9_000.0), E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, coherent=True
+    )
     assert coh.max() > 0.0
     measured = float(E_GRID[coh.argmax()])
     step = float(E_GRID[1] - E_GRID[0])
 
     E_esc = _escape_path_resonance_eV()
     np.testing.assert_allclose(measured, E_esc, atol=2.0 * step)
-    incoh = mc_spectrum(_one_segment(9_000.0), E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2)
+    incoh = mc_cxr_spectrum(_one_segment(9_000.0), E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2)
     np.testing.assert_allclose(E_GRID[incoh.argmax()], measured, rtol=0.0, atol=step)
 
 
@@ -292,7 +294,7 @@ def test_single_segment_coherent_line_sits_on_the_escape_path_root():
 def test_runner_and_cases_carry_no_dispersion_selector():
     """The model is unconditional, so nothing downstream may still select it."""
     from pyrite.campaign.sweep import Sweep, build_cases
-    from pyrite.montecarlo.runner import _lines_for_segments
+    from pyrite.montecarlo.runner import _cxr_for_segments
 
     case = dict(
         crystal=CRYSTAL,
@@ -301,11 +303,11 @@ def test_runner_and_cases_carry_no_dispersion_selector():
         composition=None,
         E_cut_lines_keV=None,
     )
-    lines = _lines_for_segments(
+    lines = _cxr_for_segments(
         _segments(), _COARSE_GRID, case, _observation_direction(np.deg2rad(119.0), None), None, None
     )
     np.testing.assert_array_equal(
-        lines, mc_spectrum(_segments(), _COARSE_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2)
+        lines, mc_cxr_spectrum(_segments(), _COARSE_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2)
     )
 
     built = build_cases(Sweep(material="mose2", thickness_ang=1e4))[0]
@@ -338,7 +340,7 @@ _CYCLE_V_DOT_G = 6.5 * (1.0 - _CYCLE_V_DOT_N) / HBARC_EV_ANG
 
 
 def _root(v_dot_n, v_dot_g):
-    from pyrite.montecarlo.spectrum.lines import _in_medium_kinematics
+    from pyrite.montecarlo.spectrum.cxr import _in_medium_kinematics
 
     denom, n_re = _in_medium_kinematics(
         np.array([v_dot_n]), np.array([v_dot_g]), _CYCLE_N_RE, _CYCLE_E_TAB
@@ -361,7 +363,7 @@ def test_the_rejected_root_would_otherwise_have_passed_the_energy_window():
     returns a keV resonance -- comfortably inside the window -- built on a ``v.g``
     of order 1e-3.
     """
-    from pyrite.montecarlo.spectrum.lines import _interp_gather1d, _interp_index
+    from pyrite.montecarlo.spectrum.cxr import _interp_gather1d, _interp_index
 
     denom = 1.0 - _CYCLE_V_DOT_N
     for _ in range(3):
@@ -408,7 +410,7 @@ def test_the_guard_is_inert_across_the_xray_regime():
     v /= np.linalg.norm(v, axis=1)[:, None]
     v *= beta_from_keV(E_KEV)
 
-    from pyrite.montecarlo.spectrum.lines import _in_medium_kinematics
+    from pyrite.montecarlo.spectrum.cxr import _in_medium_kinematics
 
     v_dot_g = v @ g
     denom, _ = _in_medium_kinematics(v @ N_HAT, v_dot_g, n_re_tab, E_tab)
@@ -429,7 +431,7 @@ def test_side_face_line_uses_its_own_snell_root(per_hkl):
     E_ref = _vacuum_resonance_eV()
     kw = {"sinc_cutoff": 1.0e4} if per_hkl else {}
     for coherent in (False, True):
-        spec = mc_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, coherent=coherent, **kw)
+        spec = mc_cxr_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, coherent=coherent, **kw)
         assert spec.max() > 0.0
         np.testing.assert_allclose(
             E_GRID[spec.argmax()], E_ref, rtol=0.0, atol=float(E_GRID[1] - E_GRID[0])
@@ -437,7 +439,7 @@ def test_side_face_line_uses_its_own_snell_root(per_hkl):
 
 
 def test_normal_exit_snell_root_is_exactly_the_bulk_root():
-    from pyrite.montecarlo.spectrum.lines import _in_medium_kinematics
+    from pyrite.montecarlo.spectrum.cxr import _in_medium_kinematics
 
     table = np.array([1e3, 3e3, 1e4])
     index = np.array([0.9999, 0.99998, 0.999999])
@@ -449,7 +451,7 @@ def test_normal_exit_snell_root_is_exactly_the_bulk_root():
 
 
 def test_critical_angle_snell_root_is_rejected():
-    from pyrite.montecarlo.spectrum.lines import _in_medium_kinematics
+    from pyrite.montecarlo.spectrum.cxr import _in_medium_kinematics
 
     table = np.array([1e3, 2e3, 3e3])
     index = np.full(3, 1.0 - 1e-4)
@@ -467,7 +469,7 @@ def test_dispersive_formation_integral_has_the_derivative_jacobian(inverse_term)
     J=D-E delta' v.gradL differs from the frozen-index width D by B v.gradL/E.
     Parseval predicts the energy-integrated coherent/incoherent ratio D/J.
     """
-    from pyrite.montecarlo.spectrum.lines._formation import formation_profile
+    from pyrite.montecarlo.spectrum.cxr._formation import formation_profile
 
     E0, duration, Dvac, vgrad, A = 1600.0, 1e5, 1.3, -1.0, 1e-4
     B = inverse_term
@@ -504,9 +506,9 @@ def test_dispersive_formation_integral_has_the_derivative_jacobian(inverse_term)
 def test_snell_block_and_fused_amplitudes_match_full_vectors(side_face):
     """Validation: xray-in-medium-resonance. Independent vector dot products."""
     from pyrite._backend import _to_cpu
-    from pyrite.montecarlo.spectrum.lines._batched import _batched_block, _batched_tables
-    from pyrite.montecarlo.spectrum.lines._kernels import _line_amp_sq_core
-    from pyrite.montecarlo.spectrum.lines._setup import SpectrumRequest, _prepare_spectrum
+    from pyrite.montecarlo.spectrum.cxr._batched import _batched_block, _batched_tables
+    from pyrite.montecarlo.spectrum.cxr._kernels import _cxr_amp_sq_core
+    from pyrite.montecarlo.spectrum.cxr._setup import SpectrumRequest, _prepare_spectrum
 
     seg = _one_segment(9000.0)
     if side_face is None:
@@ -540,7 +542,7 @@ def test_snell_block_and_fused_amplitudes_match_full_vectors(side_face):
                 / (gamma * (v @ g))
                 * (g @ e - (v @ g) * (v @ e) + (v @ e) * (k @ g - (k @ v) * (v @ g)) / (v @ g))
             )
-            got = _line_amp_sq_core(
+            got = _cxr_amp_sq_core(
                 chi.real,
                 chi.imag,
                 u.real,

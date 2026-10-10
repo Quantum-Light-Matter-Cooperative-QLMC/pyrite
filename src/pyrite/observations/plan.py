@@ -101,17 +101,17 @@ class PixelSampling:
                 solid_angle_sr=self.rays.solid_angle_sr,
                 path_length_mm=filter_path_lengths(self.rays, filters),
             ),
-            line=SpectralFactors(energy, np.asarray(output["spec_by_direction"]), line_mu),
-            background=SpectralFactors(background_energy, background, background_mu),
+            cxr=SpectralFactors(energy, np.asarray(output["spec_by_direction"]), line_mu),
+            brem=SpectralFactors(background_energy, background, background_mu),
             detector=detector,
-            coherent_line=(
+            coherent_cxr=(
                 None
                 if "spec_coherent_by_direction" not in output
                 else SpectralFactors(
                     energy, np.asarray(output["spec_coherent_by_direction"]), line_mu
                 )
             ),
-            characteristic_line=SpectralFactors(
+            characteristic=SpectralFactors(
                 energy, np.asarray(output["spec_characteristic_by_direction"]), line_mu
             ),
             tile_directions_lab=self.directions_lab,
@@ -199,8 +199,8 @@ class ObservationPlan:
             spatial = stored.spatial
             payload = self._true_payload(
                 (
-                    attenuation_matrix(filters, spatial.line.energy_eV),
-                    attenuation_matrix(filters, spatial.background.energy_eV),
+                    attenuation_matrix(filters, spatial.cxr.energy_eV),
+                    attenuation_matrix(filters, spatial.brem.energy_eV),
                 )
             )
             if payload_digest(payload) == stored.identity.true_spatial_digest:
@@ -235,8 +235,8 @@ class ObservationPlan:
             bunch_charge_pc=self.bunch_charge_pc,
             representative_directions_lab=self._sampling.directions_lab,
             attenuation_arrays=(
-                spatial.line.mu_by_filter_inv_mm,
-                spatial.background.mu_by_filter_inv_mm,
+                spatial.cxr.mu_by_filter_inv_mm,
+                spatial.brem.mu_by_filter_inv_mm,
             ),
         )
         return StoredObservation(

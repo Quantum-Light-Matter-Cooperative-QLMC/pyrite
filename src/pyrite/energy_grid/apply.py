@@ -2,7 +2,7 @@
 
 Owns two regions and edits only those via tomlkit (format-preserving TOML),
 leaving everything else untouched: the shared per-material derived-grid store
-(``[energy_grids.<material>].line_by_energy``, decision 3,
+(``[energy_grids.<material>].cxr_by_energy``, decision 3,
 docs/adr/0005-energy-grid-schema-decisions.md) and ``[profiles.standard]
 energy_keV``. The derived bremsstrahlung band is reported, not stored: a uniform
 case grid resolves its start per medium and its stop per beam energy. Only an
@@ -37,8 +37,10 @@ from pyrite._catalog_layout import (
 from pyrite._catalog_layout import read_text as _read_catalog
 from pyrite._catalog_layout import write_text as _write_catalog
 from pyrite.energy_grid import provenance as _provenance
-from pyrite.energy_grid.bounds import line_start_eV as _line_start_eV
+from pyrite.energy_grid.bounds import cxr_start_eV as _line_start_eV
 from pyrite.energy_grid.bounds import spacing_num
+
+from .._cxr_vocabulary import translate_catalog_text
 
 _CATALOG_PATH = bundled_catalog()
 
@@ -77,7 +79,7 @@ def _positive_int(value, field: str) -> int:
     return parsed
 
 
-def _validated_line_row(row, *, field: str) -> dict:
+def _validated_cxr_row(row, *, field: str) -> dict:
     energy = _positive_float(row["energy_keV"], f"{field}.energy_keV")
     start = _positive_float(row.get("start_eV", _line_start_eV(energy)), f"{field}.start_eV")
     bandwidth = row.get("bandwidth")
@@ -130,7 +132,7 @@ def _validated_combined(combined) -> dict:
         validated[material] = {
             **entry,
             "line_rows": [
-                _validated_line_row(row, field=f"{material}.line_rows[{index}]")
+                _validated_cxr_row(row, field=f"{material}.line_rows[{index}]")
                 for index, row in enumerate(entry["line_rows"])
             ],
             "brem": _validated_brem(entry["brem"], field=f"{material}.brem"),
@@ -158,14 +160,14 @@ def _line_item(row: dict, source: str):
     return item
 
 
-def _line_grid_kind(grid) -> str:
-    """The grid kind of one ``line_by_energy`` row, named even when malformed."""
+def _cxr_grid_kind(grid) -> str:
+    """The grid kind of one ``cxr_by_energy`` row, named even when malformed."""
     from pyrite.materials._catalog_decode import grid_descriptor_kind
 
     return grid_descriptor_kind(grid) or "malformed"
 
 
-def _line_by_energy_array(rows: dict):
+def _cxr_by_energy_array(rows: dict):
     array = tomlkit.array()
     array.multiline(True)
     for energy in sorted(rows):
@@ -173,7 +175,7 @@ def _line_by_energy_array(rows: dict):
     return array
 
 
-def _existing_line_rows(mat_table) -> dict:
+def _existing_cxr_rows(mat_table) -> dict:
     """Seed a merge from stored rows, which the writer can only respell as ``linspace``.
 
     A hand-written ``values``/``logspace`` line row is legal schema but has no
@@ -182,10 +184,10 @@ def _existing_line_rows(mat_table) -> dict:
     such a row is a separate path and does not come through here.
     """
     out = {}
-    for item in mat_table.get("line_by_energy", []):
+    for item in mat_table.get("cxr_by_energy", []):
         energy = float(item["energy_keV"])
         grid = item["grid"]
-        kind = _line_grid_kind(grid)
+        kind = _cxr_grid_kind(grid)
         if kind != "linspace":
             raise ValueError(
                 f"line row @ {energy:g} keV is a {kind} grid; the catalog writer "
@@ -215,8 +217,8 @@ def _energy_grid_table(document, material: str):
     return table
 
 
-def _merge_line_rows(document, material: str, new_rows, force: bool, source: str) -> list[str]:
-    """Merge NEW_ROWS into ``energy_grids.MATERIAL.line_by_energy``, stamping SOURCE.
+def _merge_cxr_rows(document, material: str, new_rows, force: bool, source: str) -> list[str]:
+    """Merge NEW_ROWS into ``energy_grids.MATERIAL.cxr_by_energy``, stamping SOURCE.
 
     A row whose *current* stored ``source`` is ``"manual"`` is preserved
     unless ``force``; the write itself is never consulted against a sidecar
@@ -226,7 +228,7 @@ def _merge_line_rows(document, material: str, new_rows, force: bool, source: str
     grids_root = document.get("energy_grids")
     own_table = grids_root.get(material) if grids_root else None
     if own_table is not None:
-        existing = _existing_line_rows(own_table)
+        existing = _existing_cxr_rows(own_table)
     else:
         existing = {}
     mat_table = _energy_grid_table(document, material)
@@ -245,7 +247,7 @@ def _merge_line_rows(document, material: str, new_rows, force: bool, source: str
             "source": source,
         }
     items = {energy: _line_item(row, row["source"]) for energy, row in merged.items()}
-    mat_table["line_by_energy"] = _line_by_energy_array(items)
+    mat_table["cxr_by_energy"] = _cxr_by_energy_array(items)
     return skipped
 
 
@@ -275,13 +277,13 @@ def _insert_energies(document, energies) -> None:
 
 def apply_bounds(toml_text, combined, *, force=False):
     combined = _validated_combined(combined)
-    document = tomlkit.parse(toml_text)
+    document = tomlkit.parse(translate_catalog_text(toml_text))
     skipped = []
     all_energies = set()
     for material, entry in combined.items():
         rows = entry["line_rows"]
         all_energies.update(float(r["energy_keV"]) for r in rows)
-        skipped.extend(_merge_line_rows(document, material, rows, force, "derived"))
+        skipped.extend(_merge_cxr_rows(document, material, rows, force, "derived"))
         # The derived brem band stays in ``combined`` as a diagnostic only: a
         # case's uniform grid takes its start from the medium floor and its stop
         # from E0 (``campaign/sweep.py::build_cases``), so a stored per-material
@@ -336,7 +338,7 @@ def _grid_summary(descriptor, field: str) -> str:
     """Render one stored line-row grid descriptor for the text report."""
     from pyrite.materials._catalog_decode import resolve_grid_descriptor
 
-    kind = _line_grid_kind(descriptor)
+    kind = _cxr_grid_kind(descriptor)
     if kind == "linspace":
         g = descriptor["linspace"]
         return f"[{g['start']:g}, {g['stop']:g}] eV x {g['num']} pts"
@@ -398,7 +400,7 @@ def _existing_artifact_rows(
                 **row,
                 "source": (
                     "manual"
-                    if _provenance.is_manual_line(
+                    if _provenance.is_manual_cxr(
                         material, float(row["energy_keV"]), profile=profile
                     )
                     else "derived"
@@ -410,7 +412,7 @@ def _existing_artifact_rows(
 
     grids_root = document.get("energy_grids", {})
     own = grids_root.get(material) if isinstance(grids_root, Mapping) else None
-    rows = _existing_line_rows(own) if own is not None else {}
+    rows = _existing_cxr_rows(own) if own is not None else {}
     return rows, None
 
 
@@ -464,7 +466,7 @@ def add_file(
 
     path = Path(active_catalog_path() if catalog_path is None else catalog_path)
     original = _read_catalog(path)
-    document = tomlkit.parse(original)
+    document = tomlkit.parse(translate_catalog_text(original))
     _profile_row(document, profile)
     known_materials = document.get("materials", {})
     unknown = sorted(set(combined) - set(known_materials))
@@ -553,7 +555,7 @@ def add_file(
     return refs
 
 
-def remove_line_rows(
+def remove_cxr_rows(
     material,
     energies,
     *,
@@ -568,7 +570,7 @@ def remove_line_rows(
     original = _read_catalog(path)
     if expected_original is not None and original != expected_original:
         raise ValueError("material catalog changed after preview; rerun command")
-    document = tomlkit.parse(original)
+    document = tomlkit.parse(translate_catalog_text(original))
     if material not in document.get("materials", {}):
         raise ValueError(f"unknown material: {material}")
     store_root = _artifact_store_root(path)
@@ -654,7 +656,7 @@ def _repoint_identity(
     return stored.digest
 
 
-def set_line_artifact(
+def set_cxr_artifact(
     material: str,
     energy,
     stop_eV,
@@ -668,7 +670,7 @@ def set_line_artifact(
     """Set one manual line row by creating an immutable replacement artifact."""
     path = Path(active_catalog_path() if catalog_path is None else catalog_path)
     original = _read_catalog(path)
-    document = tomlkit.parse(original)
+    document = tomlkit.parse(translate_catalog_text(original))
     if material not in document.get("materials", {}):
         raise ValueError(f"unknown material: {material}")
     existing, brem = _current_identity_inputs(document, original, material, profile, path)
@@ -733,7 +735,7 @@ def set_brem_artifact(
 
     path = Path(active_catalog_path() if catalog_path is None else catalog_path)
     original = _read_catalog(path)
-    document = tomlkit.parse(original)
+    document = tomlkit.parse(translate_catalog_text(original))
     if material not in document.get("materials", {}):
         raise ValueError(f"unknown material: {material}")
     existing, current_brem = _current_identity_inputs(document, original, material, profile, path)
@@ -875,7 +877,7 @@ def set_brem_geometric(
 
     path = Path(active_catalog_path() if catalog_path is None else catalog_path)
     original = _read_catalog(path)
-    document = tomlkit.parse(original)
+    document = tomlkit.parse(translate_catalog_text(original))
     if material not in document.get("materials", {}):
         raise ValueError(f"unknown material: {material}")
     digest = _artifact_ref_for(document, material, profile)
@@ -945,7 +947,7 @@ def resolved_show_inputs(
                 f"artifact {digest} material {stored.identity['material']!r} does not match {material!r}"
             )
         energy_grids[material] = {
-            "line_by_energy": [
+            "cxr_by_energy": [
                 {
                     "energy_keV": row["energy_keV"],
                     "grid": {
@@ -958,7 +960,7 @@ def resolved_show_inputs(
                     },
                     "source": (
                         "manual"
-                        if _provenance.is_manual_line(
+                        if _provenance.is_manual_cxr(
                             material, float(row["energy_keV"]), profile=profile
                         )
                         else "artifact"
@@ -1007,21 +1009,21 @@ def show(material=None, band=None, *, profile: str = "standard", catalog_path=No
     if material is not None and material not in mats:
         raise ValueError(f"unknown material: {material}")
     keys = [material] if material else list(mats)
-    show_line = band in (None, "line")
+    show_cxr = band in (None, "line")
     show_brem = band in (None, "brem")
     out = []
     for key in keys:
         out.append(f"=== {key} ===")
         if key in refs:
             out.append(f"  artifact: sha256:{refs[key]}  [profile {profile}]")
-        if show_line:
+        if show_cxr:
             block = energy_grids.get(key, {})
-            if not block.get("line_by_energy"):
+            if not block.get("cxr_by_energy"):
                 out.append("  line grid: no stored per-energy rows")
-            for item in block.get("line_by_energy", []):
+            for item in block.get("cxr_by_energy", []):
                 e = float(item["energy_keV"])
                 source = item.get("source", "derived")
-                note_rec = _provenance.get_line(key, e, profile=profile)
+                note_rec = _provenance.get_cxr(key, e, profile=profile)
                 note = note_rec.get("note") if note_rec else None
                 tag = f"manual: {note}" if source == "manual" and note else source
                 out.append(
@@ -1034,3 +1036,25 @@ def show(material=None, band=None, *, profile: str = "standard", catalog_path=No
                 tag = rec["source"] if rec else "derived"
                 out.append(f"  brem grid: {_band_summary(brem)}  [{tag}]")
     return "\n".join(out)
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {
+    "_validated_line_row": "_validated_cxr_row",
+    "_line_grid_kind": "_cxr_grid_kind",
+    "_line_by_energy_array": "_cxr_by_energy_array",
+    "_existing_line_rows": "_existing_cxr_rows",
+    "_merge_line_rows": "_merge_cxr_rows",
+    "remove_line_rows": "remove_cxr_rows",
+    "set_line_artifact": "set_cxr_artifact",
+}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

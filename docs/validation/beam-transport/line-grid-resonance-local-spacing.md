@@ -64,20 +64,20 @@ So for a narrow line whose halo interior is at one spacing $\le w$, the halo arg
 
 | filter | result |
 | --- | --- |
-| units | pass — $w$, $D$ in eV, $\eta$ dimensionless. The collected width is `pi / a_width` (`_kernels.py::_accumulate_edge_truncation`), i.e. $2\pi\hbar c/(\text{denominator}\,t_L)$ in eV, and it is unpacked in the right `(energy, width, weight)` order in `_measured_line_grid` |
+| units | pass — $w$, $D$ in eV, $\eta$ dimensionless. The collected width is `pi / a_width` (`_kernels.py::_accumulate_edge_truncation`), i.e. $2\pi\hbar c/(\text{denominator}\,t_L)$ in eV, and it is unpacked in the right `(energy, width, weight)` order in `_measured_cxr_grid` |
 | limit: all lines $w\ge$ backbone | pass — `narrow` is empty, no seeds, uniform backbone (numeric: one step value $2.9999$ eV, from `resolution_num` rounding down) |
 | limit: one narrow line | pass — one window $\supseteq[E_i-D,E_i+D]$, rounded out to 100 eV bins, spacing $\le w$ |
 | limit: $w<$ floor | pass as specified — held at the floor (numeric: $w=0.2\to0.25$) |
-| sign/convention | pass — halo symmetric, $\eta$ is a per-side share. Levels satisfy $\text{floor}\cdot2^k\le\max(w,\text{floor})$ (`line_seeds.py:999`); `resolution_num` makes the actual step $\le$ the requested one |
+| sign/convention | pass — halo symmetric, $\eta$ is a per-side share. Levels satisfy $\text{floor}\cdot2^k\le\max(w,\text{floor})$ (`cxr_seeds.py:999`); `resolution_num` makes the actual step $\le$ the requested one |
 
 ### Code comparison
 
-- `line_seeds.py:1000` computes `halo = width / (pi**2 * halo_limit)`, which matches $D=w/(\pi^2\eta)$ per side. Bin indices use `floor` below and `ceil` above, so coverage only grows.
-- `line_seeds.py:993` defines `narrow` as `width < backbone`. Weights are ignored, so zero, NaN or negative-weight lines that the bandwidth pass drops still get halos. This is conservative and costs only points.
+- `cxr_seeds.py:1000` computes `halo = width / (pi**2 * halo_limit)`, which matches $D=w/(\pi^2\eta)$ per side. Bin indices use `floor` below and `ceil` above, so coverage only grows.
+- `cxr_seeds.py:993` defines `narrow` as `width < backbone`. Weights are ignored, so zero, NaN or negative-weight lines that the bandwidth pass drops still get halos. This is conservative and costs only points.
 - Lines outside $[\text{start},\text{stop}]$: bin indices are clipped to $[0,n_{\rm bins}]$ and halos lying fully outside are dropped. A halo that straddles `stop` refines the inside bins. The population is collected up to the ceiling, not the measured `stop`, which is conservative.
-- `line_grid.py:262` sets `floor_spacing_eV=min(target_step, backbone)`, where `target_step` comes from `sinc_feature_spacing`. That uses the vacuum denominator and a $t_L^2$ proxy weight, while the halos use the production in-medium widths. The mismatch only shifts level quantisation.
+- `cxr_grid.py:262` sets `floor_spacing_eV=min(target_step, backbone)`, where `target_step` comes from `sinc_feature_spacing`. That uses the vacuum denominator and a $t_L^2$ proxy weight, while the halos use the production in-medium widths. The mismatch only shifts level quantisation.
 - `build_window_plan` takes the finest covering spacing per elementary interval. Equal adjacent levels merge. The sliver clean-up can only act at the clipped last bin next to `stop`. The plan spans exactly $[\text{start},\text{stop}]$, and `windowed_coordinates` enforces this, so the bandwidth edge is unchanged.
-- Production quadrature is `node` (default, `_line_grid_policy.line_quadrature_from_payload`); the `high_energy` profile sets no `quadrature`. Integrated yield is `sum(density * node_bin_widths)`, which equals the trapezoid at interior nodes and at every join.
+- Production quadrature is `node` (default, `_cxr_grid_policy.cxr_quadrature_from_payload`); the `high_energy` profile sets no `quadrature`. Integrated yield is `sum(density * node_bin_widths)`, which equals the trapezoid at interior nodes and at every join.
 
 ### Numeric checks (CPU, synthetic populations, scratch scripts not committed)
 
@@ -121,9 +121,9 @@ The last two exceed the $10^{-3}$ intrinsic-source total, while the uniform axis
    - keep joins at least a few $w$ away from any significant resonance;
    - bound the join term, for example by requiring every piece within about $10w$ of a resonance to have $h\le w/2$, so that $\sin^2$ averages;
    - measure the term with the identical-trajectory uniform comparison and add a focused regression on a concentrated population straddling a join.
-3. **Budget bookkeeping.** `_line_grid_policy.py:180-182` assigns $\eta=10^{-4}$ as "the quadrature-backbone row … split in two", i.e. $2\eta=2\times10^{-4}$, which is consistent with the per-side bound. But `tbl-line-budget-allocation` (`line-spectrum-error-budget.md:45`) lists that row as controlled by `sinc_feature_spacing` / `DEFAULT_MAX_SPACING_EV`, and it does not mention `resonance-local` or the halo. The row is therefore spent twice. The floor's `aliased_weight_limit` is the strictest rtol ($10^{-3}$), which is a weight fraction, not an error bound: a single aliased line can err by up to about $h/w$ of its mass (table above). The budget page should record the halo share, and the floor term should cite its own share.
-4. **Wording.** The docstring at `line_seeds.py:950` ("keeps at most `halo_limit` of its mass") and the policy comment ("per-line tail share") read as a two-sided share. The bound is per side; state "per side, $\le2\eta$ in total".
-5. Minor: weightless lines still seed halos (`line_seeds.py:993`). This is conservative, so no change is needed; note it in the Assumptions.
+3. **Budget bookkeeping.** `_cxr_grid_policy.py:180-182` assigns $\eta=10^{-4}$ as "the quadrature-backbone row … split in two", i.e. $2\eta=2\times10^{-4}$, which is consistent with the per-side bound. But `tbl-line-budget-allocation` (`line-spectrum-error-budget.md:45`) lists that row as controlled by `sinc_feature_spacing` / `DEFAULT_MAX_SPACING_EV`, and it does not mention `resonance-local` or the halo. The row is therefore spent twice. The floor's `aliased_weight_limit` is the strictest rtol ($10^{-3}$), which is a weight fraction, not an error bound: a single aliased line can err by up to about $h/w$ of its mass (table above). The budget page should record the halo share, and the floor term should cite its own share.
+4. **Wording.** The docstring at `cxr_seeds.py:950` ("keeps at most `halo_limit` of its mass") and the policy comment ("per-line tail share") read as a two-sided share. The bound is per side; state "per side, $\le2\eta$ in total".
+5. Minor: weightless lines still seed halos (`cxr_seeds.py:993`). This is conservative, so no change is needed; note it in the Assumptions.
 
 ## Independent verification (re-check)
 
@@ -157,7 +157,7 @@ for any spacings, joins or levels. The only dependence on the grid is through $e
 | filter | result |
 | --- | --- |
 | units | pass. $w$, $10w$ and $w/2$ are in eV; `core_fraction` and `core_widths` are dimensionless |
-| limit: $w\ge2h_{\rm bb}$ | pass. No core and no halo (`line_seeds.py:1031`; test `test_lines_twice_the_backbone_seed_nothing`). The 3 eV backbone is already $\le w/2$ |
+| limit: $w\ge2h_{\rm bb}$ | pass. No core and no halo (`cxr_seeds.py:1031`; test `test_lines_twice_the_backbone_seed_nothing`). The 3 eV backbone is already $\le w/2$ |
 | limit: $h_{\rm bb}\le w<2h_{\rm bb}$ | pass. Core only, at level $\le w/2$ (test: $w=3\to1.0$ eV on one 100 eV bin) |
 | limit: $w<h_{\rm bb}$ | pass. Halo at level $\le w$ plus core at level $\le w/2$ (test: levels 2, 1, 2 eV) |
 | limit: $w/2<h_{\rm floor}$ | the core is held at the floor. The claim text omits "subject to the floor" for the core |
@@ -212,9 +212,9 @@ Each entry is the worst relative error over 8 grid offsets, against a dense cont
 
 ### Budget bookkeeping
 
-- The resolver refuses `windows` under `resonance-population` (`_line_grid_policy.py:663-668`). Measured-bandwidth cases therefore never spend the feature-window planner's share. Local seeds use only the planner's merge function, not its seeds or its measured campaign. Charging $\epsilon=10^{-4}$ and $2\eta=2\times10^{-4}$ to that row is consistent, and no row is spent twice.
-- Under `bin-mean` the $2\eta$ charge is conservative for yield: the halo moves no mass. The floor-aliasing term also vanishes for yield. The earlier finding that `aliased_weight_limit` is the strictest rtol ($10^{-3}$, `_line_grid_policy.py:596,678`) rather than the backbone share of $2\times10^{-4}$ still stands for `node`.
-- Under `node`, the join term above has no budget row. `resolve_line_grid_policy` accepts `resonance-local` with `node` without comment (`_line_grid_policy.py:656-662`).
+- The resolver refuses `windows` under `resonance-population` (`_cxr_grid_policy.py:663-668`). Measured-bandwidth cases therefore never spend the feature-window planner's share. Local seeds use only the planner's merge function, not its seeds or its measured campaign. Charging $\epsilon=10^{-4}$ and $2\eta=2\times10^{-4}$ to that row is consistent, and no row is spent twice.
+- Under `bin-mean` the $2\eta$ charge is conservative for yield: the halo moves no mass. The floor-aliasing term also vanishes for yield. The earlier finding that `aliased_weight_limit` is the strictest rtol ($10^{-3}$, `_cxr_grid_policy.py:596,678`) rather than the backbone share of $2\times10^{-4}$ still stands for `node`.
+- Under `node`, the join term above has no budget row. `resolve_cxr_grid_policy` accepts `resonance-local` with `node` without comment (`_cxr_grid_policy.py:656-662`).
 - Minor: the budget paragraph (line 106) names `resonance-local`, but the bandwidth share applies to every `resonance-population` case, `sinc-nyquist` included. The table's "Controlled by" cell for the window row (line 54) does not mention the two new shares.
 
 `tests/energy-grid/test_line_grid_local_spacing.py` and `tests/materials/test_profiles.py`: 64 passed.
@@ -225,13 +225,13 @@ Each entry is the worst relative error over 8 grid offsets, against a dense cont
 2. **Non-discriminating regression; unreproduced numbers.** `test_core_bounds_node_error_for_lines_near_a_join` (`tests/energy-grid/test_line_grid_local_spacing.py:281-284`) states "$-1.1\times10^{-3}$ before the core, $\sim1.4\times10^{-4}$ with it". Its own population gives $+3.5\times10^{-5}$ without the core and $-6.6\times10^{-5}$ with it, so the test passes with the core disabled. The page ("Resolution rule") and commit `bdb33e1b` cite the same numbers. A discriminating population, e.g. $w=3.1$, $\sigma=3$, offset $-3$ ($6.3\times10^{-3}\to1.1\times10^{-3}$) or $w=2.0$, $\sigma=0.5$, offset $\pm1$ ($2.5\times10^{-2}\to4.9\times10^{-3}$), should replace it.
 3. **Scope of the node caveat.** "It cannot bound it for lines wider than twice the backbone" understates the residual. Cored lines also exceed $10^{-3}$ under `node`: $w\approx h_{\rm bb}$ at its own core edge ($\le w/(2\pi^2\cdot10)=5\times10^{-3}$ per line), and fine–fine joins inside a core (up to $\approx0.1(h/w)^2$ per line, $5\times10^{-3}$ for a constructed population). Suggested: state that under `node` the core reduces but bounds no join term, and either refuse `resonance-local` with `node` or add a budget row for the join term.
 4. **Shape.** The bin-mean yield identity is proven, and all numeric rows confirm it. The "shape only" statements carry no bound. At $h\le w/2$, smoothing of peak and FWHM is $1$ to $23\%$ depending on resonance spread. The ledger Checks already require a line-shape comparison; until it exists, no shape claim should read as a bound.
-5. Minor: `local_spacing_seeds` returns no seeds when `cored_lines == 0` (`line_seeds.py:1036`). With `core_fraction>1` that would drop narrow-line halos. The value is unreachable at the default of 0.5, but it is not validated. The core parameters are also absent from the policy payload and schema (`RESONANCE_LINE_GRID_POLICY_SCHEMA = 4`), so case identity does not record the core rule, though the run record's `local_spacing` summary does.
+5. Minor: `local_spacing_seeds` returns no seeds when `cored_lines == 0` (`cxr_seeds.py:1036`). With `core_fraction>1` that would drop narrow-line halos. The value is unreachable at the default of 0.5, but it is not validated. The core parameters are also absent from the policy payload and schema (`RESONANCE_CXR_GRID_POLICY_SCHEMA = 4`), so case identity does not record the core rule, though the run record's `local_spacing` summary does.
 
 ## Independent verification (second re-check)
 
 Fresh-context verifier, 2026-09-28, branch `issue-192-high-energy-line-grid` at `5d01f415` (after `b01bc2f2`, which answers the re-check). This section is appended; the author's text, the earlier verifier sections and the ledger status are unchanged. I read the claim, the Notes and the "Resolution rule" section first, derived before reading `b01bc2f2` or the implementation, and only then read the earlier verifier sections.
 
-- **Claim**: `line-grid-resonance-local-spacing` — `montecarlo/spectrum/line_seeds.py::local_spacing_seeds`; `_line_grid_policy.py::resolve_line_grid_policy` — the `finite-time-lineshape` first-zero width and the one-sided $\operatorname{sinc}^2$ tail bound
+- **Claim**: `line-grid-resonance-local-spacing` — `montecarlo/spectrum/cxr_seeds.py::local_spacing_seeds`; `_cxr_grid_policy.py::resolve_cxr_grid_policy` — the `finite-time-lineshape` first-zero width and the one-sided $\operatorname{sinc}^2$ tail bound
 - **Filters**: units pass; limits pass; signs/conventions pass
 - **Re-derivation**: `matches`
 - **Verdict**: `rederived`, for the claim as now worded. The findings below are wording and guard-scope items; none of them changes a factor in the claim.
@@ -257,10 +257,10 @@ The core, as claimed, asks for spacing $\le w_i/2$ on $E_i\pm10w_i$ for every $w
 | filter | result |
 | --- | --- |
 | units | pass. $w$, $D$, $10w$, $w/2$ in eV; $\eta$, `core_fraction`, `core_widths` dimensionless |
-| limit: $w\ge2h_{\rm bb}$ | pass. No halo and no core (`line_seeds.py:1030,1035`) |
-| limit: no cored line but narrow lines present (`core_fraction>1`) | pass. The halo survives (`line_seeds.py:1040`); see the mutation check below |
+| limit: $w\ge2h_{\rm bb}$ | pass. No halo and no core (`cxr_seeds.py:1030,1035`) |
+| limit: no cored line but narrow lines present (`core_fraction>1`) | pass. The halo survives (`cxr_seeds.py:1040`); see the mutation check below |
 | limit: $w/2<h_{\rm floor}$ | pass. The core is held at the floor, as the claim now states |
-| convention: `resonance-local` + `node` | pass. Refused (`_line_grid_policy.py:666-670`). An unspecified quadrature defaults to `node` (`_line_grid_policy.py:616`) and is refused as well |
+| convention: `resonance-local` + `node` | pass. Refused (`_cxr_grid_policy.py:666-670`). An unspecified quadrature defaults to `node` (`_cxr_grid_policy.py:616`) and is refused as well |
 
 ### Reproduced numbers (CPU, scratch scripts not committed)
 
@@ -298,15 +298,15 @@ Profile: I built every `high_energy` case with `build_cases`: hbn 128, mose2 96,
 
 ### Second re-check findings
 
-1. The halo, core, floor quantisation, binning, merge and bandwidth edge match the claim (`line_seeds.py:1027-1041`). No discrepancy.
+1. The halo, core, floor quantisation, binning, merge and bandwidth edge match the claim (`cxr_seeds.py:1027-1041`). No discrepancy.
 2. The bin-mean yield identity holds to every printed digit in the five populations above, and it discriminates node from bin-mean (`tests/energy-grid/test_line_grid_local_spacing.py:320-328`).
-3. **The refusal is resolve-time only.** The runner takes the quadrature from the case key (`montecarlo/runner/__init__.py:642`, default `node`). `_measured_line_grid` (`montecarlo/runner/line_grid.py:274`) and `Case` validation (`montecarlo/case.py:323-336`) do not check that a `resonance-local` payload is paired with `line_quadrature="bin-mean"`. The sweep path derives the key from the payload (`campaign/sweep.py:970-974`), so it stays consistent. A hand-built case, or a payload resolved before `b01bc2f2`, runs `node` without error. The claim "the policy requires `bin-mean`" is true of `resolve_line_grid_policy`. The fix is either a run-time guard or narrower wording.
+3. **The refusal is resolve-time only.** The runner takes the quadrature from the case key (`montecarlo/runner/__init__.py:642`, default `node`). `_measured_cxr_grid` (`montecarlo/runner/cxr_grid.py:274`) and `Case` validation (`montecarlo/case.py:323-336`) do not check that a `resonance-local` payload is paired with `line_quadrature="bin-mean"`. The sweep path derives the key from the payload (`campaign/sweep.py:970-974`), so it stays consistent. A hand-built case, or a payload resolved before `b01bc2f2`, runs `node` without error. The claim "the policy requires `bin-mean`" is true of `resolve_cxr_grid_policy`. The fix is either a run-time guard or narrower wording.
 4. **Stale trapezoid wording.** Three passages still refer to trapezoid error, which no longer exists for integrated yield because `bin-mean` is mandatory:
    - this page, "Resolution rule" paragraph 3: "does not bound nonuniform trapezoid error inside the window. That error needs an identical-trajectory comparison";
    - the ledger Notes' first sentence;
-   - the docstring at `line_seeds.py:980-982`, "the window ladder measures it". The window ladder does not run for measured-bandwidth cases (`_line_grid_policy.py:673-678`).
+   - the docstring at `cxr_seeds.py:980-982`, "the window ladder measures it". The window ladder does not run for measured-bandwidth cases (`_cxr_grid_policy.py:673-678`).
 
    Under `bin-mean` the residual is line shape only.
 5. The budget row's "Controlled by" cell (`line-spectrum-error-budget.md:54`) lists `DEFAULT_LOCAL_HALO_LIMIT` for all measured-bandwidth cases. The paragraph (`:106`) correctly restricts it to `resonance-local`. Minor.
 6. The ledger Notes (`ledger-core-coherent-physics.md:213`) cite `0f78fef1`, which is not an ancestor of HEAD. The profile gained `resonance-local` in `508b7a74` and `bin-mean` in `8c6433f0`. Minor.
-7. `core_fraction` and `core_widths` are not validated (`line_seeds.py:1035`). A non-positive `core_fraction` would hold every line at the floor, which costs only points. There is no reachable caller other than the defaults. Minor.
+7. `core_fraction` and `core_widths` are not validated (`cxr_seeds.py:1035`). A non-positive `core_fraction` would hold every line at the floor, which costs only points. There is no reachable caller other than the defaults. Minor.

@@ -100,8 +100,8 @@ def resolve_pixel_scene(
     detector = replace(
         detector,
         energy_bins=EnergyBins(
-            line=scan.E_grid_line,
-            line_by_energy=scan.E_grid_line_by_energy,
+            cxr=scan.E_grid_line,
+            cxr_by_energy=scan.E_grid_line_by_energy,
             brem=scan.E_grid_brem,
         ),
     )
@@ -134,8 +134,8 @@ def resolve_pixel_scene(
         scorer,
         None if observation is None else observation.acquisition,
         Numerics(
-            n_electrons=n_electrons,
-            n_electrons_brem=n_electrons_brem,
+            cxr_trials=n_electrons,
+            brem_trials=n_electrons_brem,
             straggling=straggling,
             energy_model=cast(Literal["frozen", "midpoint"], energy_model),
             max_dE_frac=float(max_dE_frac),

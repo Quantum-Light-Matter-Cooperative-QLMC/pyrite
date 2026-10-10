@@ -7,7 +7,7 @@ import pytest
 import xraydb
 
 from pyrite._backend import REAL, xp
-from pyrite._spectral_components import line_spectrum
+from pyrite._spectral_components import cxr_spectrum
 from pyrite.montecarlo.spectrum import characteristic
 from tests.helpers import scaled_rtol
 
@@ -90,9 +90,9 @@ def test_packaged_carbon_eedl_values_and_relaxation_join():
     ka1 = table.line_labels.index("Ka1")
     # A Lorentzian transition width is the sum of the initial- and final-hole
     # widths: C K (0.0868 eV) + C L3 (0.0045 eV).
-    assert np.isclose(table.line_fwhm_eV[ka1], 0.0913, atol=0.0)
+    assert np.isclose(table.cxr_fwhm_eV[ka1], 0.0913, atol=0.0)
     assert not table.shell_binding_energy_eV.flags.writeable
-    assert not table.line_fwhm_eV.flags.writeable
+    assert not table.cxr_fwhm_eV.flags.writeable
 
 
 def test_host_shell_ionization_rates_do_not_require_relaxation(monkeypatch):
@@ -130,10 +130,10 @@ def test_characteristic_single_track_matches_n_l_sigma_omega_over_four_pi(monkey
     )
     edges, _widths = characteristic._energy_bin_edges_and_widths(energy)
     captured_yield = sum(
-        table.line_yield_per_vacancy[0, line_index]
+        table.line_yield_per_vacancy[0, cxr_index]
         * characteristic._lorentzian_bin_weights(edges, line_energy, line_fwhm).sum()
-        for line_index, (line_energy, line_fwhm) in enumerate(
-            zip(table.line_energy_eV, table.line_fwhm_eV, strict=True)
+        for cxr_index, (line_energy, line_fwhm) in enumerate(
+            zip(table.line_energy_eV, table.cxr_fwhm_eV, strict=True)
         )
         if line_energy > table.recommended_cutoff_eV
     )
@@ -199,10 +199,10 @@ def test_characteristic_line_is_bin_integrated_physically_truncated_lorentzian(m
     )
     edges, widths = characteristic._energy_bin_edges_and_widths(energy)
     captured_yield = sum(
-        table.line_yield_per_vacancy[0, line_index]
+        table.line_yield_per_vacancy[0, cxr_index]
         * characteristic._lorentzian_bin_weights(edges, line_energy, line_fwhm).sum()
-        for line_index, (line_energy, line_fwhm) in enumerate(
-            zip(table.line_energy_eV, table.line_fwhm_eV, strict=True)
+        for cxr_index, (line_energy, line_fwhm) in enumerate(
+            zip(table.line_energy_eV, table.cxr_fwhm_eV, strict=True)
         )
         if line_energy > table.recommended_cutoff_eV
     )
@@ -247,10 +247,10 @@ def test_off_grid_line_contributes_only_its_physical_tail(monkeypatch):
     edges, widths = characteristic._energy_bin_edges_and_widths(energy)
     wide_edges = np.array([250.0, 300.0])
     narrow_mass = characteristic._lorentzian_bin_weights(
-        edges, table.line_energy_eV[-1], table.line_fwhm_eV[-1]
+        edges, table.line_energy_eV[-1], table.cxr_fwhm_eV[-1]
     ).sum()
     wide_mass = characteristic._lorentzian_bin_weights(
-        wide_edges, table.line_energy_eV[-1], table.line_fwhm_eV[-1]
+        wide_edges, table.line_energy_eV[-1], table.cxr_fwhm_eV[-1]
     ).sum()
     assert 0.0 < narrow_mass < wide_mass < 1.0
     assert np.sum(spectrum * widths) > 0.0
@@ -398,7 +398,7 @@ def test_runner_keeps_characteristic_separate_from_both_line_modes(monkeypatch):
     monkeypatch.setattr(runner, "_segments_on_device", lambda value: value)
     monkeypatch.setattr(
         runner,
-        "_lines_for_segments",
+        "_cxr_for_segments",
         lambda *_args, coherent, **_kwargs: np.full(energy.shape, 2.0 if coherent else 1.0),
     )
     monkeypatch.setattr(
@@ -436,8 +436,8 @@ def test_runner_keeps_characteristic_separate_from_both_line_modes(monkeypatch):
     np.testing.assert_array_equal(output["spec_characteristic"], characteristic_line)
     np.testing.assert_array_equal(output["spec"], np.full(energy.shape, 1.0))
     np.testing.assert_array_equal(output["spec_coherent"], np.full(energy.shape, 2.0))
-    np.testing.assert_array_equal(line_spectrum(output), 1.0 + characteristic_line)
-    np.testing.assert_array_equal(line_spectrum(output, coherent=True), 2.0 + characteristic_line)
+    np.testing.assert_array_equal(cxr_spectrum(output), 1.0 + characteristic_line)
+    np.testing.assert_array_equal(cxr_spectrum(output, coherent=True), 2.0 + characteristic_line)
 
 
 def test_carbon_l_subshells_bound_below_the_cutoff_are_not_primaries():

@@ -36,10 +36,10 @@ from typing import Any
 import numpy as np
 
 from ..._backend import _to_cpu
-from ..._line_grid_policy import LineYieldStatisticsWarning
+from ..._cxr_grid_policy import CxrYieldStatisticsWarning
 from ..._precision import OBSERVABLES as OBSERVABLES
 from ..._precision import Precision
-from ..spectrum.lines._kernels import _SEG_ARRAYS
+from ..spectrum.cxr._kernels import _SEG_ARRAYS
 from .artifacts import _case_geometry
 from .block_transport import electron_blocks
 from .electron_blocks import _take
@@ -258,7 +258,7 @@ def run_stopping_rule(settings: AdaptiveSettings, measure: Measure) -> dict[str,
     return monitor.record()
 
 
-def _line_band(case, E_grid) -> tuple[float, float]:
+def _cxr_band(case, E_grid) -> tuple[float, float]:
     """The case's line band: its policy bandwidth, else its grid end points."""
     payload = case.get("line_grid_policy")
     bandwidth = payload.get("bandwidth") if isinstance(payload, Mapping) else None
@@ -302,7 +302,7 @@ def case_measure(case, settings: AdaptiveSettings) -> Measure:
     from .. import runner
 
     E_grid, E_brem, _beam, n_hat, groove = _case_geometry(case)
-    start_eV, stop_eV = settings.band_eV or _line_band(case, E_grid)
+    start_eV, stop_eV = settings.band_eV or _cxr_band(case, E_grid)
     abs_layers = case.get("abs_layers")
     band_grid = np.array([start_eV, stop_eV])
     brem_q = band_weights(E_brem, start_eV, stop_eV) if "brem" in settings.observables else None
@@ -310,10 +310,10 @@ def case_measure(case, settings: AdaptiveSettings) -> Measure:
     def measure(start, stop, block):
         n = stop - start
         values = {}
-        if "line" in settings.observables:
+        if "cxr" in settings.observables:
             audit: dict[str, Any] = {"start_eV": start_eV, "stop_eV": stop_eV, "n_electrons": n}
             with np.errstate(over="ignore", divide="ignore"):
-                runner._lines_for_segments(
+                runner._cxr_for_segments(
                     block,
                     band_grid,
                     case,
@@ -325,7 +325,7 @@ def case_measure(case, settings: AdaptiveSettings) -> Measure:
                     truncation_audit=audit,
                 )
             mass = audit.get("electron_mass")
-            values["line"] = np.zeros(n) if mass is None else mass
+            values["cxr"] = np.zeros(n) if mass is None else mass
         if "brem" in settings.observables:
             values["brem"] = np.asarray(
                 runner._brem_wide_from_segments(
@@ -379,14 +379,14 @@ def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
     n = int(segs["Ne"])
     blocks = electron_blocks(n, settings.block_electrons)
     E_grid, E_brem = np.asarray(transport["E_grid"]), np.asarray(transport["E_brem"])
-    line_bins = (E_grid >= start_eV) & (E_grid <= stop_eV)
+    cxr_bins = (E_grid >= start_eV) & (E_grid <= stop_eV)
     brem_bins = (E_brem >= start_eV) & (E_brem <= stop_eV)
     abs_layers = case.get("abs_layers")
-    line_batches, brem_batches = [], []
+    cxr_batches, brem_batches = [], []
     for start, stop in blocks:
         rows = _electron_rows(segs, start, stop)
         scale = n / (stop - start)  # Ne = n normalization -> this batch's own mean
-        line = runner._lines_for_segments(
+        line = runner._cxr_for_segments(
             rows,
             E_grid,
             case,
@@ -399,7 +399,7 @@ def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
         brem = runner._brem_wide_from_segments(
             rows, E_brem, case, transport["n_hat"], abs_layers, groove=transport.get("groove"), Ne=n
         )
-        line_batches.append(np.asarray(_to_cpu(line))[line_bins] * scale)
+        cxr_batches.append(np.asarray(_to_cpu(line))[cxr_bins] * scale)
         brem_batches.append(np.asarray(_to_cpu(brem))[brem_bins] * scale)
     k = len(blocks)
 
@@ -422,7 +422,7 @@ def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
         "band_eV": [float(start_eV), float(stop_eV)],
         "n_batches": k,
         "batch_electrons": settings.block_electrons,
-        "spec": summary(E_grid[line_bins], line_batches),
+        "spec": summary(E_grid[cxr_bins], cxr_batches),
         "brem_wide": summary(E_brem[brem_bins], brem_batches),
     }
 
@@ -491,7 +491,7 @@ def transport_case_adaptive(
             f"reached max_electrons={settings.max_electrons} without meeting "
             f"target_rse={settings.target_rse:g} and its guards (relative SE {worst}); "
             "treat the result as statistics-limited.",
-            LineYieldStatisticsWarning,
+            CxrYieldStatisticsWarning,
             stacklevel=2,
         )
     return transport
@@ -615,3 +615,17 @@ def validate_directions(case, directions) -> None:
         raise ValueError(
             "adaptive precision does not support observation directions; use fixed counts"
         )
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {"_line_band": "_cxr_band"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

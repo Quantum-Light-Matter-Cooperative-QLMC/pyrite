@@ -43,8 +43,8 @@ def _counting_spatial() -> SpatialResult:
     )
     return SpatialResult(
         spatial.ray_map,
-        spatial.line,
-        spatial.background,
+        spatial.cxr,
+        spatial.brem,
         detector,
     )
 
@@ -179,8 +179,8 @@ def test_total_components_add_characteristic_to_each_line() -> None:
         base.line,
         base.background,
         base.detector,
-        coherent_line=base.line,
-        characteristic_line=characteristic,
+        coherent_cxr=base.line,
+        characteristic=characteristic,
     )
 
     for total, line in (("line_total", "line"), ("coherent_total", "coherent")):
@@ -197,7 +197,7 @@ def test_total_component_without_characteristic_is_the_line() -> None:
     np.testing.assert_array_equal(
         spatial.average_density("line_total"), spatial.average_density("line")
     )
-    with pytest.raises(ValueError, match="coherent line spectrum is not available"):
+    with pytest.raises(ValueError, match="coherent CXR spectrum is not available"):
         spatial.average_density("coherent_total")
 
 
@@ -229,7 +229,7 @@ def test_filter_coverage_and_transmission_image_use_stored_nodes() -> None:
     with pytest.raises(ValueError, match="finite"):
         spatial.transmission_image(float("nan"))
     # An energy past the grid is refused, not silently snapped to its last node.
-    with pytest.raises(ValueError, match=r"outside the line grid \[1, 3\]"):
+    with pytest.raises(ValueError, match=r"outside the cxr grid \[1, 3\]"):
         spatial.transmission_image(3.5)
 
 
@@ -326,7 +326,7 @@ def test_bilinear_reconstruction_is_the_weighted_tile_blend() -> None:
 
     _, spectra = spatial.spectra(region=region)
 
-    blended = np.einsum("yxk,yxke->yxe", weight, spatial.line.intrinsic_by_tile[tile])
+    blended = np.einsum("yxk,yxke->yxe", weight, spatial.cxr.intrinsic_by_tile[tile])
     expected = (blended * spatial.ray_map.solid_angle_sr[..., None]).reshape(-1, 5)
     np.testing.assert_allclose(spectra, expected, rtol=1.0e-14)
     assert np.all(spectra > 0.0)
@@ -361,8 +361,8 @@ def test_reconstruction_mode_is_validated() -> None:
     with pytest.raises(ValueError, match="reconstruction must be one of"):
         SpatialResult(
             spatial.ray_map,
-            spatial.line,
-            spatial.background,
+            spatial.cxr,
+            spatial.brem,
             spatial.detector,
             tile_directions_lab=spatial.tile_directions_lab,
             reconstruction="cubic",
@@ -370,8 +370,8 @@ def test_reconstruction_mode_is_validated() -> None:
     with pytest.raises(ValueError, match="requires tile_directions_lab"):
         SpatialResult(
             spatial.ray_map,
-            spatial.line,
-            spatial.background,
+            spatial.cxr,
+            spatial.brem,
             spatial.detector,
             reconstruction="bilinear_tile",
         )

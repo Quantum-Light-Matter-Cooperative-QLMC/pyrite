@@ -1,4 +1,4 @@
-"""``pyrite profile line-grid`` against an isolated copy of the bundled catalog."""
+"""``pyrite profile cxr-grid`` against an isolated copy of the bundled catalog."""
 
 import json
 
@@ -31,15 +31,15 @@ def _profile_file(catalog, name):
 
 
 def _stored(catalog, name):
-    return load_material_catalog(catalog, profile=name).profile_line_grid_policy(name)
+    return load_material_catalog(catalog, profile=name).profile_cxr_grid_policy(name)
 
 
 def _line_grid(*args):
-    return invoke(root_command, ["profile", "line-grid", *args])
+    return invoke(root_command, ["profile", "cxr-grid", *args])
 
 
 def test_help_lists_selectors_defaults_combinations_and_identity():
-    group = invoke(root_command, ["profile", "line-grid", "--help"])
+    group = invoke(root_command, ["profile", "cxr-grid", "--help"])
     assert_clean_result(group)
     for text in (
         "kinematic-ceiling | resonance-population",
@@ -50,7 +50,7 @@ def test_help_lists_selectors_defaults_combinations_and_identity():
     ):
         assert text in " ".join(group.stdout.split())
 
-    setting = invoke(root_command, ["profile", "line-grid", "set", "--help"])
+    setting = invoke(root_command, ["profile", "cxr-grid", "set", "--help"])
     assert_clean_result(setting)
     flat = " ".join(setting.stdout.split())
     for default in ("kinematic-ceiling", "sinc-nyquist", "node"):
@@ -87,7 +87,7 @@ def test_show_reports_explicit_effective_and_grid_source(catalog):
     assert_clean_result(profile_json)
     assert json.loads(profile_json.stdout)["payload"]["line_grid_policy"] == _FULL_POLICY
     profile_text = invoke(root_command, ["profile", "show", "sub_100keV"])
-    assert "Line-grid policy (profile line-grid)" in profile_text.stdout
+    assert "CXR-grid policy (profile cxr-grid)" in profile_text.stdout
     assert_table_row(profile_text.stdout, "policy", "none (explicit, stored or built-in grids)")
 
 
@@ -100,12 +100,12 @@ def test_set_dry_run_write_reload_and_case_policy(catalog):
 
     written = _line_grid("set", "sub_100keV", "--quadrature", "bin-mean")
     assert_clean_result(
-        written, stdout="updated line-grid policy for profile sub_100keV: quadrature=bin-mean\n"
+        written, stdout="updated cxr-grid policy for profile sub_100keV: quadrature=bin-mean\n"
     )
     assert _stored(catalog, "sub_100keV") == {"quadrature": "bin-mean"}
 
     again = _line_grid("set", "sub_100keV", "--quadrature", "bin-mean")
-    assert_clean_result(again, stdout="profile sub_100keV: line-grid policy already set\n")
+    assert_clean_result(again, stdout="profile sub_100keV: cxr-grid policy already set\n")
 
     full = _line_grid(
         "set",
@@ -174,7 +174,7 @@ def test_reset_partial_conflict_named_and_whole(catalog):
     assert "reset resolution too" in conflict.stderr
 
     named = _line_grid("reset", "high_energy", "resolution", "-y")
-    assert_clean_result(named, stdout="reset line-grid resolution for profile high_energy\n")
+    assert_clean_result(named, stdout="reset cxr-grid resolution for profile high_energy\n")
     assert _stored(catalog, "high_energy") == {
         "bandwidth": "resonance-population",
         "quadrature": "bin-mean",
@@ -182,12 +182,12 @@ def test_reset_partial_conflict_named_and_whole(catalog):
 
     dry_run = _line_grid("reset", "high_energy", "--dry-run")
     assert_clean_result(dry_run)
-    assert "line_grid_policy]" in dry_run.stdout
+    assert "cxr_grid_policy]" in dry_run.stdout
     assert '-bandwidth = "resonance-population"' in dry_run.stdout
 
     whole = _line_grid("reset", "high_energy", "-y")
-    assert_clean_result(whole, stdout="removed line-grid policy for profile high_energy\n")
-    assert "line_grid_policy" not in _profile_file(catalog, "high_energy")
+    assert_clean_result(whole, stdout="removed cxr-grid policy for profile high_energy\n")
+    assert "cxr_grid_policy" not in _profile_file(catalog, "high_energy")
     assert _stored(catalog, "high_energy") is None
 
     nothing = _line_grid("reset", "high_energy")
@@ -197,11 +197,11 @@ def test_reset_partial_conflict_named_and_whole(catalog):
 def test_standard_edit_prompts_and_clone_carries_policy(catalog):
     declined = invoke(
         root_command,
-        ["profile", "line-grid", "set", "standard", "--quadrature", "bin-mean"],
+        ["profile", "cxr-grid", "set", "standard", "--quadrature", "bin-mean"],
         input="n\n",
     )
     assert declined.exit_code == 1
-    assert "line_grid_policy" not in _profile_file(catalog, "standard")
+    assert "cxr_grid_policy" not in _profile_file(catalog, "standard")
 
     cloned = invoke(root_command, ["profile", "create", "he_copy", "--from", "high_energy"])
     assert_clean_result(cloned)
@@ -224,7 +224,7 @@ def test_profile_policy_reaches_the_sweep(catalog, monkeypatch):
     monkeypatch.setenv("PYRITE_CATALOG", str(catalog))
     load_material_catalog.cache_clear()
     sweep = material_sweep("hopg", catalog_profile="sub_100keV")
-    assert sweep.line_grid_policy == {"quadrature": "bin-mean"}
+    assert sweep.cxr_grid_policy == {"quadrature": "bin-mean"}
 
 
 def test_emission_and_numerics_edits_respect_an_existing_policy(catalog):

@@ -41,16 +41,16 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-from soft_deflection_line_sensitivity import line_metrics, peak_windows  # noqa: E402
+from soft_deflection_line_sensitivity import cxr_metrics, peak_windows  # noqa: E402
 
 from pyrite._backend import REAL, xp  # noqa: E402
 from pyrite.campaign.config import material_sweep  # noqa: E402
 from pyrite.campaign.sweep import build_cases  # noqa: E402
 from pyrite.montecarlo import runner  # noqa: E402
 from pyrite.montecarlo.spectrum import brem, characteristic  # noqa: E402
-from pyrite.montecarlo.spectrum.lines import _batched as lines_batched  # noqa: E402
-from pyrite.montecarlo.spectrum.lines import _kernels  # noqa: E402
-from pyrite.montecarlo.spectrum.lines import _setup as lines_setup  # noqa: E402
+from pyrite.montecarlo.spectrum.cxr import _batched as lines_batched  # noqa: E402
+from pyrite.montecarlo.spectrum.cxr import _kernels  # noqa: E402
+from pyrite.montecarlo.spectrum.cxr import _setup as lines_setup  # noqa: E402
 
 MATERIAL = "hopg"
 E0_KEV = 100.0
@@ -222,7 +222,7 @@ def run(cfg, models, splits, line_control=True):
             windows[key] = peak_windows(E, mean_base)
             peak_labels[key] = {
                 name: f"{key}.{name}@{m['E_eV']:.0f}eV"
-                for name, m in line_metrics(E, mean_base, windows[key]).items()
+                for name, m in cxr_metrics(E, mean_base, windows[key]).items()
                 if name.startswith("peak")
             }
         if line_control:
@@ -237,7 +237,7 @@ def run(cfg, models, splits, line_control=True):
             metrics = {}
             for key in keys:
                 for o in raw[(model, k)]:
-                    m = line_metrics(E, np.asarray(o[key]), windows[key])
+                    m = cxr_metrics(E, np.asarray(o[key]), windows[key])
                     metrics.setdefault(f"{key}.total", []).append(m["total"])
                     for name, label in peak_labels[key].items():
                         metrics.setdefault(label, []).append(m[name]["yield"])

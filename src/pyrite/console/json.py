@@ -304,7 +304,7 @@ def remote_status(sections: Mapping[str, str]) -> JsonResult:
     return JsonResult("cxr.remote.status", payload, tuple(errors))
 
 
-def line_grid_defaults(values: Mapping[str, Any], *, source: str) -> JsonResult:
+def cxr_grid_defaults(values: Mapping[str, Any], *, source: str) -> JsonResult:
     """Build persistent line-grid defaults payload with explicit units."""
 
     def numbers(key: str) -> list[float]:
@@ -322,7 +322,7 @@ def line_grid_defaults(values: Mapping[str, Any], *, source: str) -> JsonResult:
     return JsonResult("cxr.energy-grid.defaults", payload)
 
 
-def line_grid_show(
+def cxr_grid_show(
     materials: Mapping[str, Any],
     energy_grids: Mapping[str, Any],
     brem_by_material: Mapping[str, Any],
@@ -345,10 +345,10 @@ def line_grid_show(
     default). ``provenance`` is the tool-owned sidecar, consulted only for
     optional line-grid notes and for bremsstrahlung's separate manual/derived
     tracking. ``band`` filters the emitted grids: ``"line"`` omits
-    ``brem_grid``, ``"brem"`` omits ``line_grids``, ``None`` (default) keeps
+    ``brem_grid``, ``"brem"`` omits ``cxr_grids``, ``None`` (default) keeps
     both.
     """
-    show_line = band in (None, "line")
+    show_cxr = band in (None, "line")
     show_brem = band in (None, "brem")
     errors: list[dict[str, object]] = []
     output: list[dict[str, object]] = []
@@ -367,7 +367,7 @@ def line_grid_show(
         if not isinstance(block, Mapping):
             block = {}
         lines: list[dict[str, object]] = []
-        for row in block.get("line_by_energy", []) if show_line else []:
+        for row in block.get("cxr_by_energy", []) if show_cxr else []:
             try:
                 energy = float(row["energy_keV"])
                 note_record = line_provenance.get(f"{energy:g}", {})
@@ -376,7 +376,7 @@ def line_grid_show(
                 lines.append(
                     {
                         "energy_keV": energy,
-                        "grid": _line_grid_payload(row["grid"], energy),
+                        "grid": _cxr_grid_payload(row["grid"], energy),
                         "provenance": {
                             "source": _optional_text(row.get("source")) or "derived",
                             "note": _optional_text(note_record.get("note")),
@@ -427,7 +427,7 @@ def _nonuniform_grid_payload(nodes: Any, kind: str, payload: object) -> dict[str
     }
 
 
-def _line_grid_payload(grid: object, energy: float) -> dict[str, object]:
+def _cxr_grid_payload(grid: object, energy: float) -> dict[str, object]:
     """One stored line-row grid as JSON; ``linspace`` keeps its legacy shape."""
     from pyrite.materials._catalog_decode import grid_descriptor_kind, resolve_grid_descriptor
 
@@ -574,3 +574,23 @@ def operation_summary(
         },
     }
     return JsonResult("cxr.operation-summary", payload, errors)
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {
+    "line_grid_show": "cxr_grid_show",
+    "_line_grid_payload": "_cxr_grid_payload",
+}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]
+
+
+_CXR_RENAMED_EXPORTS.update({"line_grid_defaults": "cxr_grid_defaults"})

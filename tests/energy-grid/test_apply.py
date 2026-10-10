@@ -38,7 +38,7 @@ BASE_TOML_NO_GRID = """schema_version = 1
 energy_keV = { values = [30.0, 100.0] }
 
 [energy_grids.hopg]
-line_by_energy = [
+cxr_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2600.0, num = 864, endpoint = true } }, source = "derived" },
 ]
 
@@ -77,7 +77,7 @@ def test_new_material_rows_are_not_seeded_from_shared_grid(tmp_path, monkeypatch
     shared = shared.replace('source = "derived"', 'source = "manual"')
     new_text, skipped = apply.apply_bounds(shared, COMBINED_NO_GRID)
     assert skipped == []
-    rows = tomllib.loads(new_text)["energy_grids"]["hfs2"]["line_by_energy"]
+    rows = tomllib.loads(new_text)["energy_grids"]["hfs2"]["cxr_by_energy"]
     assert len(rows) == 1
     assert rows[0]["grid"]["linspace"]["stop"] == 2800.0
 
@@ -189,7 +189,7 @@ def test_add_file_preserves_manual_row_from_referenced_artifact(tmp_path, monkey
     monkeypatch.setattr(apply, "load_material_catalog", lambda path, **kwargs: None)
     monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *args, **kwargs: False)
     monkeypatch.setattr(
-        apply._provenance, "is_manual_line", lambda material, energy, **kwargs: False
+        apply._provenance, "is_manual_cxr", lambda material, energy, **kwargs: False
     )
     first_ref = apply.add_file(json_path, catalog_path=toml_path)["hopg"]
 
@@ -198,7 +198,7 @@ def test_add_file_preserves_manual_row_from_referenced_artifact(tmp_path, monkey
     json_path.write_text(_json.dumps(changed))
     monkeypatch.setattr(
         apply._provenance,
-        "is_manual_line",
+        "is_manual_cxr",
         lambda material, energy, **kwargs: material == "hopg" and energy == 30.0,
     )
     second_ref = apply.add_file(json_path, catalog_path=toml_path)["hopg"]
@@ -216,7 +216,7 @@ def test_remove_line_rows_repoints_artifact_without_deleting_legacy_rows(tmp_pat
     toml_path.write_text(BASE_TOML)
     monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
 
-    removed, digest = apply.remove_line_rows(
+    removed, digest = apply.remove_cxr_rows(
         "hopg", [30], catalog_path=toml_path, profile="standard"
     )
     parsed = tomllib.loads(toml_path.read_text())
@@ -224,7 +224,7 @@ def test_remove_line_rows_repoints_artifact_without_deleting_legacy_rows(tmp_pat
 
     assert removed == [30.0]
     assert parsed["profiles"]["standard"]["energy_grid_refs"]["hopg"] == digest
-    assert [row["energy_keV"] for row in parsed["energy_grids"]["hopg"]["line_by_energy"]] == [
+    assert [row["energy_keV"] for row in parsed["energy_grids"]["hopg"]["cxr_by_energy"]] == [
         30.0,
         100.0,
     ]
@@ -238,7 +238,7 @@ def test_remove_line_rows_fails_closed_when_catalog_changed_after_preview(tmp_pa
     toml_path.write_text(BASE_TOML + "\n# concurrent edit\n")
 
     with pytest.raises(ValueError, match="changed after preview"):
-        apply.remove_line_rows("hopg", [30], catalog_path=toml_path, expected_original=preview)
+        apply.remove_cxr_rows("hopg", [30], catalog_path=toml_path, expected_original=preview)
 
     assert not (tmp_path / "energy-grid-artifacts").exists()
 
@@ -259,7 +259,7 @@ def test_set_line_artifact_repoints_ref_and_preserves_legacy_payload(tmp_path, m
         ),
     )
 
-    digest = apply.set_line_artifact(
+    digest = apply.set_cxr_artifact(
         "hopg", 30, 2800, profile="standard", note="reviewed", catalog_path=toml_path
     )
 
@@ -315,7 +315,7 @@ def test_set_brem_artifact_repoints_ref_and_preserves_profile_override(tmp_path,
 @pytest.mark.parametrize(
     ("setter", "call"),
     [
-        ("set_line", lambda: apply.set_line_artifact("hopg", 30, 2800)),
+        ("set_line", lambda: apply.set_cxr_artifact("hopg", 30, 2800)),
         ("set_brem", lambda: apply.set_brem_artifact("hopg", 150000)),
     ],
 )
@@ -345,7 +345,7 @@ def test_artifact_setters_restore_catalog_and_provenance_when_stamping_fails(
 def test_validated_line_row_requires_bandwidth_and_resolution_together():
     row = {"energy_keV": 30.0, "start_eV": 10.0, "bandwidth": {"stop_eV": 100.0}}
     with pytest.raises(ValueError, match="bandwidth and resolution together"):
-        apply._validated_line_row(row, field="hopg.line_rows[0]")
+        apply._validated_cxr_row(row, field="hopg.line_rows[0]")
 
 
 def test_validated_line_row_flattens_separate_derived_criteria():
@@ -355,7 +355,7 @@ def test_validated_line_row_flattens_separate_derived_criteria():
         "bandwidth": {"stop_eV": 100.0, "coverage": 0.95},
         "resolution": {"num": 91, "observable_class": "intrinsic_source"},
     }
-    assert apply._validated_line_row(row, field="hopg.line_rows[0]") == {
+    assert apply._validated_cxr_row(row, field="hopg.line_rows[0]") == {
         "energy_keV": 30.0,
         "start_eV": 10.0,
         "stop_eV": 100.0,

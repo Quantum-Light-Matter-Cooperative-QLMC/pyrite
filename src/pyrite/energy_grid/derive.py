@@ -32,11 +32,11 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
-from pyrite._line_grid_policy import AUTOMATIC_RESOLUTION_POLICY, COVERAGE_BANDWIDTH_POLICY
+from pyrite._cxr_grid_policy import AUTOMATIC_RESOLUTION_POLICY, COVERAGE_BANDWIDTH_POLICY
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import _quantized_angles, build_cases
 from pyrite.energy_grid import defaults as lg_defaults
-from pyrite.energy_grid.bounds import coverage_energy, line_start_eV, margined_stop
+from pyrite.energy_grid.bounds import coverage_energy, cxr_start_eV, margined_stop
 from pyrite.energy_grid.floor import floored_lattice_start_eV
 from pyrite.energy_grid.semantics import resolution_num
 from pyrite.materials import CATALOG
@@ -56,7 +56,7 @@ ROUND_TO_EV = 100.0
 # Accuracy tolerance, set independently of COVERAGE and independently per
 # observable. This scan measures the intrinsic-source spectrum only, so it sets
 # that observable's tolerance alone; detector-convolved counts carry their own
-# (pyrite._line_grid_policy.DEFAULT_RTOL) and are never forced onto this one.
+# (pyrite._cxr_grid_policy.DEFAULT_RTOL) and are never forced onto this one.
 # The t_L^2-weighted fraction of sinc features narrower than the step is the
 # first-order proxy for the relative spectral error the step commits.
 ALIASED_WEIGHT_LIMIT = 0.01
@@ -494,8 +494,8 @@ def derive_bounds(
         driver = max(refined, key=lambda c: c.coverage_energy_eV)
         brem_driver = max(refined, key=lambda c: c.incoherent_coverage_energy_eV)
 
-        line_by_energy = reference_scan.E_grid_line_by_energy
-        if line_by_energy is None:
+        cxr_by_energy = reference_scan.E_grid_line_by_energy
+        if cxr_by_energy is None:
             raise ValueError(
                 f"reference material {materials[0]!r} has no E_grid_line_by_energy configured"
             )
@@ -503,8 +503,8 @@ def derive_bounds(
         # material's table (e.g. first-time `energy-grid derive --energy`
         # for it); fall back to the catalog start_eV convention rather than
         # requiring a pre-existing row.
-        existing_row = line_by_energy.get(energy_keV)
-        start_eV = float(existing_row[0]) if existing_row is not None else line_start_eV(energy_keV)
+        existing_row = cxr_by_energy.get(energy_keV)
+        start_eV = float(existing_row[0]) if existing_row is not None else cxr_start_eV(energy_keV)
         stop_eV = margined_stop(driver.coverage_energy_eV, MARGIN, ROUND_TO_EV)
         resolution_driver = min(refined, key=lambda c: c.target_spacing_eV)
         num = resolution_num(start_eV, stop_eV, resolution_driver.target_spacing_eV)

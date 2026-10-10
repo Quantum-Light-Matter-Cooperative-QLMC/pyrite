@@ -1,7 +1,7 @@
 # Independent validation: finite transverse crystal
 
 - **Claim id:** `finite-transverse-crystal`
-- **Code:** `montecarlo/geometry.py::first_prism_exit`; `montecarlo/transport/api.py::simulate_trajectories`; `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum`; and `montecarlo/spectrum/brem.py::mc_brem_spectrum`
+- **Code:** `montecarlo/geometry.py::first_prism_exit`; `montecarlo/transport/api.py::simulate_trajectories`; `montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum`; and `montecarlo/spectrum/brem.py::mc_brem_spectrum`
 - **Source:** rectangular-prism ray intersection and Beer–Lambert attenuation
 - **Quantity:** For the sample-frame prism $[-W/2,W/2] \times [-H/2,H/2] \times [z_{\min},z_{\max}]$, the geometry helper returns the first forward ray-boundary intersection for an origin inside the prism (0 on the exit face; a negative signed distance past it, which escape callers clip to zero). Electron transport uses its own strictly positive helper, so a free flight never takes a zero step. Transport stops there, and each segment's radiation receives its Beer–Lambert escape factor along the fixed photon ray to the same boundary. Public widths and heights are in mm; geometry uses Å.
 - **Assumptions:** escape origins lie inside the prism or on its boundary (origins past an exit face have no in-crystal path); directions are in the sample frame; a finite footprint has two positive dimensions; and the observation direction is fixed in the far field. With both transverse dimensions omitted, the model is the laterally infinite $z$-only slab.

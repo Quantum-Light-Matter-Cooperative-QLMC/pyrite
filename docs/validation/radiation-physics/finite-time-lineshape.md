@@ -72,7 +72,7 @@ The dimensionless phase requires $[P]=T^{-1}$. Thus $[Q]=T$, $[|Q|^2]=T^2$, and 
 
 ## Implementation comparison
 
-`src/pyrite/montecarlo/spectrum/lines.py::mc_spectrum` defines
+`src/pyrite/montecarlo/spectrum/lines.py::mc_cxr_spectrum` defines
 
 $$
 \omega_{\rm res}=\frac{\mathbf v\cdot\mathbf g}

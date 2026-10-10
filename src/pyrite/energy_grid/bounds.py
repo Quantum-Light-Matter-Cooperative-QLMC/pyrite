@@ -1,5 +1,5 @@
 """Pure helpers for pyrite.energy_grid.derive: turn a simulated
-coherent-line spectrum into a coverage energy, and a coverage energy into a
+coherent-CXR spectrum into a coverage energy, and a coverage energy into a
 catalog-ready line-grid ``stop``/``num`` pair.
 
 See docs/adr/0005-energy-grid-schema-decisions.md.
@@ -9,9 +9,9 @@ import numpy as np
 from scipy.constants import physical_constants
 
 # Catalog convention for a line-grid row's ``start_eV``. The implementation
-# moved to ``pyrite._line_grid_policy`` so ``campaign`` and the runner can reach
+# moved to ``pyrite._cxr_grid_policy`` so ``campaign`` and the runner can reach
 # it without importing this driver-side package; re-exported here unchanged.
-from .._line_grid_policy import line_start_eV as line_start_eV
+from .._cxr_grid_policy import cxr_start_eV as cxr_start_eV
 
 _ELECTRON_REST_KEV = physical_constants["electron mass energy equivalent in MeV"][0] * 1.0e3
 
@@ -93,7 +93,7 @@ def line_shift_fraction(
     from where the grid was cut. This says by how much, in units of the line
     energy, so it can be compared against the ``margined_stop`` headroom.
 
-    The PXR resonance (``montecarlo/spectrum/lines.py::_line_kin_core``) is
+    The PXR resonance (``montecarlo/spectrum/lines.py::_cxr_kin_core``) is
     ``omega = v.g / (1 - n.v)``, so at fixed reciprocal-lattice vector ``g`` and
     observation direction ``n``, differentiating in ``beta`` at
     ``n.v = beta cos(theta_obs)`` gives

@@ -47,7 +47,7 @@ The physical slab normal **n** controls electron transport through the slab and 
 
 Current scans assume **g** is parallel to **n** for the reflections of interest. In that symmetric case, tilting the sample moves both together. This corresponds to a crystal cut whose surface is parallel to the diffracting planes.
 
-For an asymmetric cut or intentional miscut, the selected **g** and **n** have a fixed offset. Tilting the mounted sample still rotates the physical slab, beam geometry, and detector geometry. The miscut then applies an additional rotation to the reciprocal lattice only, leaving **n** fixed. The existing hook rotates every reciprocal vector together, as a real crystal cut would; it does not let each reflection acquire an unrelated offset. This is already the meaning of the dormant `recip_miscut_rad` hook in `montecarlo.geometry._orientation_R` and `montecarlo.spectrum.mc_spectrum`.
+For an asymmetric cut or intentional miscut, the selected **g** and **n** have a fixed offset. Tilting the mounted sample still rotates the physical slab, beam geometry, and detector geometry. The miscut then applies an additional rotation to the reciprocal lattice only, leaving **n** fixed. The existing hook rotates every reciprocal vector together, as a real crystal cut would; it does not let each reflection acquire an unrelated offset. This is already the meaning of the dormant `recip_miscut_rad` hook in `montecarlo.geometry._orientation_R` and `montecarlo.spectrum.mc_cxr_spectrum`.
 
 A general three-dimensional miscut needs two numbers:
 
@@ -67,7 +67,7 @@ The existing implementation is a strong base for analysis-first improvements:
 - `Sweep` and `build_cases` generate a regular Cartesian product of thickness, energy, polar tilt, and azimuth.
 - Most material grids contain 540 cases; thickness-heavy grids contain 2,160.
 - Every record retains its case parameters, so analysis can reconstruct the scanned coordinates from a checkpoint.
-- `line_metrics` already computes peak flux, integrated coherent flux, dominant-line flux and energy, background-related ratios, and a line-quality score.
+- `cxr_metrics` already computes peak flux, integrated coherent flux, dominant-line flux and energy, background-related ratios, and a line-quality score.
 - `selection_score` and `top_geometries` already produce quality-aware rankings.
 - The renderer-neutral frame builders already reduce multi-dimensional results into one-dimensional scans and two-dimensional heatmaps.
 - The analysis app already supports heatmap-to-spectrum drill-down and several pinned-parameter comparisons.

@@ -29,15 +29,15 @@ def build_case(scene: Scene, numerics: Numerics) -> Case:
         detector=scalar_detector,
         n_families=convergence.n_families,
         max_reflections=convergence.max_reflections,
-        spec_chunk=numerics.spec_chunk,
+        spec_chunk=numerics.cxr_chunk,
         brem_chunk=numerics.brem_chunk,
         mosaic_route=convergence.mosaic_route,
         mosaic_nodes=convergence.mosaic_nodes,
     )
     cases = build_cases(
         legacy,
-        n_electrons=numerics.n_electrons,
-        n_electrons_brem=numerics.n_electrons_brem,
+        n_electrons=numerics.cxr_trials,
+        n_electrons_brem=numerics.brem_trials,
         coherent_emission=scene.emission in {"coherent", "both"},
         straggling=numerics.straggling,
         energy_model=numerics.energy_model,

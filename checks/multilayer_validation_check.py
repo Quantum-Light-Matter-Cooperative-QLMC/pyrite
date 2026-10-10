@@ -10,10 +10,10 @@ plan"): two self-contained, quantitative checks that need NO measured data.
      factor at the line energy:
 
          integral(line) spec_stack / integral(line) spec_film
-             == exp(-mu_sub(E_line) * t_sub / |n_z|)
+             == exp(-mu_sub(E_cxr) * t_sub / |n_z|)
 
      a closed-form check of the piecewise mu_i*dz_i path integral, end to end
-     through mc_spectrum (not just the _stack_tau helper). [docs validation plan:
+     through mc_cxr_spectrum (not just the _stack_tau helper). [docs validation plan:
      "for a film line at energy E, the integrated flux ratio (with vs without
      substrate) must equal exp(-mu_sub(E) t_sub/|n_z|)".]
 
@@ -43,7 +43,7 @@ from pyrite.campaign.sweep import crystal_params, substrate_composition  # noqa:
 from pyrite.montecarlo import (  # noqa: E402
     TRANSPORT_ELEMENTS,
     _mu_total_inv_ang,
-    mc_spectrum,
+    mc_cxr_spectrum,
     simulate_trajectories,
     tilted_geometry,
 )
@@ -80,7 +80,7 @@ def check_absorption_closed_form():
     # BACK exit (positive tilt): the escape ray runs through the film then the
     # WHOLE substrate, so n_z > 0 and the substrate path length is the full t_sub.
     beam, n_hat = tilted_geometry(np.deg2rad(90.0), np.deg2rad(30.0))
-    n_hat = n_hat / np.linalg.norm(n_hat)  # match mc_spectrum's normalization
+    n_hat = n_hat / np.linalg.norm(n_hat)  # match mc_cxr_spectrum's normalization
     assert n_hat[2] > 0.0, "need a back exit (n_z>0) for this identity"
     segs = simulate_trajectories(
         E0, 600, t_film, composition=comp, E_cut_keV=5.0, seed=1, beam_dir=beam
@@ -88,7 +88,7 @@ def check_absorption_closed_form():
 
     def _spec(layers):
         return np.asarray(
-            mc_spectrum(
+            mc_cxr_spectrum(
                 segs,
                 E_grid,
                 crystal="mose2",

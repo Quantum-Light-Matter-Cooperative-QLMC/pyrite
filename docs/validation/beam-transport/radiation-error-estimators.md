@@ -21,7 +21,7 @@ Both read `E_end_keV` when transport supplied it (`energy_model="midpoint"`) and
 
 ## Governing equations and where they come from
 
-No new physics enters. `E_res` is the kernel's own resonance condition (`mc_spectrum` step 1, Zhai SI Eq. 10); the linewidth is the first-zero scale of the kernel's own `sinc` factor; the brem integrand is the ledgered `brem-spectrum` cross section. The estimators differ from the kernels only in *where along the flight* the same expressions are evaluated. The Joy--Luo end-energy prediction is the rule ledgered under `electron-transport`, applied exactly as in `transport-midpoint-stopping`.
+No new physics enters. `E_res` is the kernel's own resonance condition (`mc_cxr_spectrum` step 1, Zhai SI Eq. 10); the linewidth is the first-zero scale of the kernel's own `sinc` factor; the brem integrand is the ledgered `brem-spectrum` cross section. The estimators differ from the kernels only in *where along the flight* the same expressions are evaluated. The Joy--Luo end-energy prediction is the rule ledgered under `electron-transport`, applied exactly as in `transport-midpoint-stopping`.
 
 ## Assumptions and limits of validity
 
@@ -67,4 +67,4 @@ The thresholds are therefore measured convergence behavior of these spectra, not
 
 ## Independent verification
 
-Fresh-context rederivation (2026-08-11, verifier context separate from the implementation): units, limits, and signs/conventions all `pass`; source-to-code agreement against `mc_spectrum`'s resonance/sinc definitions, `_brem_dsigma_dk`, and the Joy--Luo stopping rule confirmed term by term; calibration-table arithmetic reproduced. Verdict `rederived`; two robustness observations (the grid-window superset above, and single-composition prediction for multi-layer segments) are addressed in this doc and in `_flight_E_end_keV`. `signed-off` remains a human decision.
+Fresh-context rederivation (2026-08-11, verifier context separate from the implementation): units, limits, and signs/conventions all `pass`; source-to-code agreement against `mc_cxr_spectrum`'s resonance/sinc definitions, `_brem_dsigma_dk`, and the Joy--Luo stopping rule confirmed term by term; calibration-table arithmetic reproduced. Verdict `rederived`; two robustness observations (the grid-window superset above, and single-composition prediction for multi-layer segments) are addressed in this doc and in `_flight_E_end_keV`. `signed-off` remains a human decision.

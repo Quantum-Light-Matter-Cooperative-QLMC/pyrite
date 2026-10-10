@@ -48,11 +48,15 @@ def plan(**overrides):
 
 
 def test_start_flags_covers_every_run_option():
-    assert set(DEFAULT_FLAGS) == {parameter.name for parameter in remote_cli.start_command.params}
+    assert set(DEFAULT_FLAGS) == {
+        parameter.name for parameter in remote_cli.start_command.params if parameter.expose_value
+    }
 
 
 def test_run_options_keep_their_documented_order():
-    assert [parameter.name for parameter in remote_cli.start_command.params] == list(DEFAULT_FLAGS)
+    assert [
+        parameter.name for parameter in remote_cli.start_command.params if parameter.expose_value
+    ] == list(DEFAULT_FLAGS)
 
 
 def test_plain_run_profiles_nothing_and_chunks_by_default():
@@ -124,7 +128,7 @@ def test_explicit_chunk_minutes_is_never_overridden():
         ),
         ({"performance_repetitions": 2}, "--perf-reps requires --perf"),
         ({"performance_interval": 2.0}, "--perf-interval requires --perf"),
-        ({"spec_chunk": 4}, "--spec-chunk requires --perf"),
+        ({"spec_chunk": 4}, "--cxr-chunk requires --perf"),
         ({"brem_chunk": 4}, "--brem-chunk requires --perf"),
         ({"nsys": True}, "--nsys requires one explicit -m/--material"),
         (

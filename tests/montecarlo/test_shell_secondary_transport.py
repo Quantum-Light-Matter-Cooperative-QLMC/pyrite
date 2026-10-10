@@ -386,7 +386,7 @@ def test_absorbing_collisions_still_launch():
 
 def test_incoherent_lines_add_tracks_and_coherent_rejects_showers():
     """Flights group by track: a shower's spectrum is the sum over its tracks."""
-    from pyrite.montecarlo.spectrum import mc_spectrum
+    from pyrite.montecarlo.spectrum import mc_cxr_spectrum
 
     result = _run(Ne=12, max_dE_frac=0.05, elastic_model="sr")
     kwargs = {
@@ -409,12 +409,14 @@ def test_incoherent_lines_add_tracks_and_coherent_rejects_showers():
         }
 
     primary = result["generation"] == 0
-    whole = mc_spectrum(result, grid, **kwargs)
+    whole = mc_cxr_spectrum(result, grid, **kwargs)
     assert whole.sum() > 0.0
-    split = mc_spectrum(part(primary), grid, **kwargs) + mc_spectrum(part(~primary), grid, **kwargs)
+    split = mc_cxr_spectrum(part(primary), grid, **kwargs) + mc_cxr_spectrum(
+        part(~primary), grid, **kwargs
+    )
     np.testing.assert_allclose(whole, split, rtol=1e-9, atol=1e-12 * whole.max())
     with pytest.raises(NotImplementedError, match="secondary transport"):
-        mc_spectrum(result, grid, coherent=True, **kwargs)
+        mc_cxr_spectrum(result, grid, coherent=True, **kwargs)
 
 
 def test_case_threshold_reaches_runner_transport():
@@ -425,11 +427,11 @@ def test_case_threshold_reaches_runner_transport():
     from pyrite.montecarlo.runner import _transport_case
 
     detector = pr.Detector(
-        energy_bins=EnergyBins(line=np.linspace(1500, 2000, 20), brem=np.linspace(1500, 9000, 20))
+        energy_bins=EnergyBins(cxr=np.linspace(1500, 2000, 20), brem=np.linspace(1500, 9000, 20))
     )
     numerics = pr.Numerics(
-        n_electrons=8,
-        n_electrons_brem=8,
+        cxr_trials=8,
+        brem_trials=8,
         energy_model="midpoint",
         inelastic_model="shell-soft-hard",
         inelastic_cutoff_eV=50.0,

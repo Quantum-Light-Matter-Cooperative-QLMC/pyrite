@@ -34,7 +34,7 @@ def _entry(data: dict, material: str, profile: str | None) -> dict:
     return data.get("profiles", {}).get(profile, {}).get(material, {})
 
 
-def get_line(material, energy, *, profile: str | None = None):
+def get_cxr(material, energy, *, profile: str | None = None):
     data = load()
     record = _entry(data, material, profile).get("line", {}).get(_energy_key(energy))
     if record is None and profile == "standard":
@@ -50,8 +50,8 @@ def get_brem(material, *, profile: str | None = None):
     return record
 
 
-def is_manual_line(material, energy, *, profile: str | None = None) -> bool:
-    rec = get_line(material, energy, profile=profile)
+def is_manual_cxr(material, energy, *, profile: str | None = None) -> bool:
+    rec = get_cxr(material, energy, profile=profile)
     return bool(rec and rec.get("source") == "manual")
 
 
@@ -155,3 +155,17 @@ def _write(data: dict):
         except OSError:
             pass
         raise
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {"get_line": "get_cxr", "is_manual_line": "is_manual_cxr"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

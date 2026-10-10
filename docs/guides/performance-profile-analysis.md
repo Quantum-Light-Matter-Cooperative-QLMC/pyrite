@@ -71,7 +71,7 @@ After the baseline completes, test a smaller line-spectrum chunk while keeping e
 pyrite-dev perf mos2_heavy -m mos2 --remote \
   -i 1 \
   --workers 6 \
-  --spec-chunk 20000 \
+  --cxr-chunk 20000 \
   --detach
 ```
 
@@ -85,7 +85,7 @@ When one-second telemetry shows a spectrum-dominated run with bursty GPU use, ca
 pyrite-dev perf mos2_heavy -m mos2 --remote \
   -i 1 \
   --workers 6 \
-  --spec-chunk 20000 \
+  --cxr-chunk 20000 \
   --nsys \
   --detach
 

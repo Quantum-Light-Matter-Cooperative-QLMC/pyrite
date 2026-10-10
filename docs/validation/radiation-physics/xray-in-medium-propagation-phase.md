@@ -2,7 +2,7 @@
 
 ## Claim (from the ledger row, before reading the implementation body)
 
-`montecarlo/spectrum/lines.py::mc_spectrum` (`xray_dispersion="refractive"`, `coherent=True`): coherent segment-to-segment propagation phase on the in-medium wavevector. Segment `j` accumulates
+`montecarlo/spectrum/lines.py::mc_cxr_spectrum` (`xray_dispersion="refractive"`, `coherent=True`): coherent segment-to-segment propagation phase on the in-medium wavevector. Segment `j` accumulates
 
 ```
 -delta(E) omega(E) L_esc,j
@@ -42,7 +42,7 @@ and this total geometric length is exactly `L_esc,j + L_vac,j` (the straight pat
 L_esc,j + L_vac,j = R - n_hat . r_j
 ```
 
-which is the path split quoted in the ledger row and matches the "far-field retardation `omega n_hat.r_j`" already used by the vacuum kernel elsewhere in `mc_spectrum`'s docstring (`E_j(omega) ... exp{i[omega t_abs,j - (omega n_hat+g).r_j]}`).
+which is the path split quoted in the ledger row and matches the "far-field retardation `omega n_hat.r_j`" already used by the vacuum kernel elsewhere in `mc_cxr_spectrum`'s docstring (`E_j(omega) ... exp{i[omega t_abs,j - (omega n_hat+g).r_j]}`).
 
 **Assembling and dropping the global phase.** Substituting:
 
@@ -84,13 +84,13 @@ So `Im(n)` and `Re(n)` are the imaginary and real parts of *one* complex exponen
 
 ## Filters
 
-- **Units**: `delta` dimensionless, `omega(E)` and `L_esc,j` both inverse- length/length in the same `c=1`, Ang convention as the rest of `mc_spectrum` (`d_j`, `t_ang`), so `delta*omega*L_esc` is dimensionless (radians). Pass.
+- **Units**: `delta` dimensionless, `omega(E)` and `L_esc,j` both inverse- length/length in the same `c=1`, Ang convention as the rest of `mc_cxr_spectrum` (`d_j`, `t_ang`), so `delta*omega*L_esc` is dimensionless (radians). Pass.
 - **Limiting cases**: `xray_dispersion="vacuum"` forces `delta=0` (`n=1`) identically, so the added term is identically zero and the phase reduces to the pre-existing vacuum `omega d_j`, bit-for-bit — reproduced above by direct substitution `delta=0`. Pass. Normal-exit reduction to the naive `k(E) n_hat.r_j` form up to a global phase, and divergence off the face normal, both reproduced independently above from the escape-distance geometry. Pass.
 - **Sign/convention**: off an absorption edge `delta>0` (`Re n<1`, phase velocity `>c`, standard X-ray regime), so the medium leg's phase lags the vacuum-equivalent phase by `delta*omega*L_esc>0`, i.e. the term subtracts from the accumulated phase relative to a purely-vacuum flight of the same total geometric length — matches `-delta*omega*L_esc,j` with `delta>0`. Convention `n=1-delta-i beta` with time factor `exp(+i omega t)` is the same one used by `xray-refractive-index`/`grazing-optical-constants`, so the sign of the `Im(n)` amplitude term (`exp(-beta omega L)`, decaying, passive medium) is also self-consistent. Pass.
 
 ## Comparison with the implementation (read after the derivation above)
 
-`montecarlo/spectrum/lines.py::mc_spectrum`, `coherent=True` branch (around the `delta_omega_grid` construction and its consumers):
+`montecarlo/spectrum/lines.py::mc_cxr_spectrum`, `coherent=True` branch (around the `delta_omega_grid` construction and its consumers):
 
 ```python
 delta_omega_grid = (1.0 - Re(n(E_grid))) * omega_grid  # = delta(E) * omega(E)
@@ -119,7 +119,7 @@ pyrite-dev test \
 
 The ledger row's notes column states: *"...the streaming route still falls back to the exact array path because its prologue kernel derives the resonance from the vacuum denominator on device and has no in-medium root."*
 
-This is now **stale**. Commit `4d40255` ("solve the in-medium resonance in the CUDA stream prologue", same day as this verification) ports the fixed point into `coherent_stream_jit_kernel.py::run_coherent_prologue_kernel`, which now accepts `v_dot_n`/`n_re_tab` and iterates the same `omega = v.g / (1 - Re n(omega) v.n_hat)` root used by the CPU/NumPy path (`_in_medium_kinematics`). In `mc_spectrum`, the gate
+This is now **stale**. Commit `4d40255` ("solve the in-medium resonance in the CUDA stream prologue", same day as this verification) ports the fixed point into `coherent_stream_jit_kernel.py::run_coherent_prologue_kernel`, which now accepts `v_dot_n`/`n_re_tab` and iterates the same `omega = v.g / (1 - Re n(omega) v.n_hat)` root used by the CPU/NumPy path (`_in_medium_kinematics`). In `mc_cxr_spectrum`, the gate
 
 ```python
 _use_jit_coherent_stream = (

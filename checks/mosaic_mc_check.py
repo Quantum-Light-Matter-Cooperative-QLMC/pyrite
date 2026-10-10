@@ -1,6 +1,6 @@
 """Exact Monte-Carlo crystal-mosaicity validation (docs/physics/materials/crystal-mosaicity.md route 2).
 
-mc_spectrum now averages the line spectrum over crystallite orientations via a 2-D
+mc_cxr_spectrum now averages the line spectrum over crystallite orientations via a 2-D
 Gauss-Hermite product quadrature (mosaic_fwhm_rad / mosaic_nodes). This is the
 design doc's validation plan, on real HOPG transport:
 
@@ -32,7 +32,7 @@ import itertools
 
 from pyrite.campaign.sweep import crystal_params
 from pyrite.montecarlo import (
-    mc_spectrum,
+    mc_cxr_spectrum,
     mosaic_fwhm_eV,
     mosaic_psi_rad,
     simulate_trajectories,
@@ -81,7 +81,7 @@ def main():
 
     def spec(fwhm_deg=None, nodes=1):
         fwhm_rad = None if fwhm_deg is None else np.deg2rad(fwhm_deg)
-        return mc_spectrum(
+        return mc_cxr_spectrum(
             segs,
             E_GRID,
             crystal="hopg",

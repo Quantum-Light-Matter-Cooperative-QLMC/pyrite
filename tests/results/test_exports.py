@@ -21,7 +21,7 @@ FROZEN_EXPORTS = frozenset(
         "EmissionMode",
         "Settings",
         "beam_current_na",
-        "line_fwhm_eV",
+        "cxr_fwhm_eV",
         "store_result",
         "detected_background",
         "Result",
@@ -47,9 +47,9 @@ FROZEN_EXPORTS = frozenset(
         "slim_case_record",
         # metrics
         "_find_peaks_props",
-        "line_index",
-        "line_quality",
-        "line_metrics",
+        "cxr_index",
+        "cxr_quality",
+        "cxr_metrics",
         # scoring
         "SELECTION_MODES",
         "selection_score",
@@ -61,6 +61,58 @@ FROZEN_EXPORTS = frozenset(
         "_CONFIG_COLS",
         "summary_table",
         "show_summary",
+    }
+)
+
+
+FROZEN_EXPORTS = FROZEN_EXPORTS | frozenset(
+    {
+        "_find_peaks_props",
+        "cxr_fwhm_eV",
+        "case_label",
+        "slim_case_record",
+        "_ROUND",
+        "detected_background",
+        "Settings",
+        "summary_table",
+        "slim_results",
+        "line_fwhm_eV",
+        "beam_current_na",
+        "selection_score",
+        "sweep_values",
+        "LINE_RECORD_KEYS",
+        "project_dataset",
+        "Result",
+        "records_for_cases",
+        "BREM_RECORD_KEYS",
+        "_WIDE_BREM_FIELDS",
+        "line_index",
+        "show_top",
+        "results_dataframe",
+        "line_metrics",
+        "show_summary",
+        "select_results",
+        "DEFAULT_BEAM_CURRENT_NA",
+        "case_table_rows",
+        "_CONFIG_COLS",
+        "merge_dataset",
+        "PER_NA",
+        "select_thickness",
+        "store_result",
+        "cxr_quality",
+        "top_geometries",
+        "records",
+        "best_azimuth",
+        "_peak",
+        "CXR_RECORD_KEYS",
+        "thicknesses_by_energy",
+        "_RECORD_ARRAY_FIELDS",
+        "cxr_metrics",
+        "SELECTION_MODES",
+        "line_quality",
+        "cxr_index",
+        "filter_results",
+        "EmissionMode",
     }
 )
 
@@ -79,6 +131,6 @@ def test_public_names_resolve_to_subpackage():
     # leftover top-level results.py
     assert res.store_result.__module__ == "pyrite.results.store"
     assert res.records.__module__ == "pyrite.results.selection"
-    assert res.line_metrics.__module__ == "pyrite.results.metrics"
+    assert res.cxr_metrics.__module__ == "pyrite.results.metrics"
     assert res.selection_score.__module__ == "pyrite.results.scoring"
     assert res.summary_table.__module__ == "pyrite.results.tables"

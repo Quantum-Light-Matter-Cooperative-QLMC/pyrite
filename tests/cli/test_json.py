@@ -69,7 +69,7 @@ def test_remote_status_has_stable_types_sanitized_logs_and_partial_errors():
 
 
 def test_line_grid_defaults_encodes_units_and_source():
-    result = cli_json.line_grid_defaults(
+    result = cli_json.cxr_grid_defaults(
         {
             "energies": [30, 40],
             "tilts": [1],
@@ -96,7 +96,7 @@ def test_line_grid_show_has_grids_brem_and_provenance():
     materials = {"hopg": {}}
     energy_grids = {
         "hopg": {
-            "line_by_energy": [
+            "cxr_by_energy": [
                 {
                     "energy_keV": 30,
                     "grid": {
@@ -120,7 +120,7 @@ def test_line_grid_show_has_grids_brem_and_provenance():
         }
     }
 
-    result = cli_json.line_grid_show(materials, energy_grids, brem_by_material, provenance)
+    result = cli_json.cxr_grid_show(materials, energy_grids, brem_by_material, provenance)
 
     item = result.payload["materials"][0]
     assert item["line_grids"][0]["grid"]["stop_eV"] == 2600.0
@@ -132,7 +132,7 @@ def test_line_grid_show_has_grids_brem_and_provenance():
 
 
 def test_line_grid_show_unknown_material_is_structured_failure():
-    result = cli_json.line_grid_show({}, {}, {}, {}, selected="ghost")
+    result = cli_json.cxr_grid_show({}, {}, {}, {}, selected="ghost")
 
     assert result.payload == {"profile": "standard", "materials": []}
     assert result.errors == (

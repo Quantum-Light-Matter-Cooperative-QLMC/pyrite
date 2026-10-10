@@ -27,7 +27,7 @@ from .._numerics import (
     validate_radiative_numerics,
 )
 from .._precision import Precision
-from .._spectral_components import line_spectrum
+from .._spectral_components import cxr_spectrum
 from ..detectors import Detector, LegacyEDS
 from ..montecarlo import (
     aperture_fwhm_eV,
@@ -154,7 +154,7 @@ class Settings:
     positron_transport: bool = False
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
-    # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_spectrum;
+    # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_cxr_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so
     # dataset_identity joins it into the hash ONLY when it diverges from
     # "incoherent" (divergence-only rule); an incoherent run's parameter_sha256
@@ -211,7 +211,7 @@ class Settings:
         return self.emission in {"coherent", "both"}
 
 
-def line_fwhm_eV(case: dict, E_pk: float, mosaic_rad: float | None) -> float:
+def cxr_fwhm_eV(case: dict, E_pk: float, mosaic_rad: float | None) -> float:
     """Combined EDS, aperture, and optional capped-mosaic line FWHM [eV]."""
     fwhm_sq = (
         eds_fwhm_eV(E_pk) ** 2
@@ -240,13 +240,13 @@ def store_result(results, case, out):
     """Post-process one finished case into ``results[name][E0]`` (in place)."""
     name, E0 = case["name"], case["E0_keV"]
     E_grid = out["E_grid"]
-    E_pk = E_grid[np.argmax(line_spectrum(out))]
+    E_pk = E_grid[np.argmax(cxr_spectrum(out))]
     # crystal mosaicity (analytic): add the mosaic broadening in quadrature when the
     # run enabled it (case["mosaic_fwhm_rad"] from build_cases; None/absent -> skip,
     # an exact no-op so old checkpoints and mosaic=False runs are unchanged). The
     # linearization diverges as psi -> 90 deg, so cap the term at E_pk -- beyond
     # FWHM ~ E the line is washed out and the model is meaningless anyway.
-    fwhm = line_fwhm_eV(case, E_pk, case.get("mosaic_fwhm_rad"))
+    fwhm = cxr_fwhm_eV(case, E_pk, case.get("mosaic_fwhm_rad"))
     results.setdefault(name, {})[E0] = {
         "E_grid": E_grid,
         "spec": out["spec"],
@@ -269,7 +269,7 @@ def store_result(results, case, out):
     # "coherent"/"both" transport (runner attaches out["spec_coherent"] from the
     # SAME segments as ``spec``). Conditional so an incoherent record grows no
     # key at all -- every reader downstream (analyze.emission_menu, the altair
-    # overlay, run.repair_line_spec) gates on its presence.
+    # overlay, run.repair_cxr_spec) gates on its presence.
     if out.get("spec_coherent") is not None:
         results[name][E0]["spec_coherent"] = out["spec_coherent"]
     if out.get("spec_characteristic") is not None:
@@ -335,3 +335,16 @@ def _detected_background_wide(r, settings, convolve=None):
         )
     )
     return E, detector.score(E, b, fwhm_eV=r["fwhm"], scale=r["scale"])
+
+
+_CXR_RENAMED_EXPORTS = {"line_fwhm_eV": "cxr_fwhm_eV"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

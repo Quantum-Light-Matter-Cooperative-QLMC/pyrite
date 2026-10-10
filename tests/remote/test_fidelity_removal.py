@@ -15,7 +15,7 @@ def test_slurm_wrapper_marks_payload_as_generated_invocation():
     assert script.index(export) < script.index("echo payload")
 
 
-@pytest.mark.parametrize("builder", [_queue_scripts._rebrem_flags, _queue_scripts._reline_flags])
+@pytest.mark.parametrize("builder", [_queue_scripts._rebrem_flags, _queue_scripts._recxr_flags])
 def test_remote_recompute_no_longer_forwards_fidelity(builder):
     # The box-side recompute reads fidelity from checkpoint metadata.
     assert "--fidelity" not in builder(None, None, False)

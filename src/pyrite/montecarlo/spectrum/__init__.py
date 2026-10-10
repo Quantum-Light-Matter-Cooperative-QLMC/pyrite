@@ -40,17 +40,17 @@ from .diagnostics import (
     cxr_endpoint_resonance_drift,
     subdivide_flights,
 )
-from .lines import (
-    LINE_ESCAPE_MODEL,
+from .cxr import (
+    CXR_ESCAPE_MODEL,
     REAL,
-    _INTERP_GATHER_LINE_TABLES_F32,
+    _INTERP_GATHER_CXR_TABLES_F32,
     _JIT_COHERENT_PAIR_TARGET,
-    _JIT_LINE_BATCH_TARGET,
+    _JIT_CXR_BATCH_TARGET,
     _PREF_C1,
     _SEG_ARRAYS,
     _USE_JIT_COHERENT_REDUCTION,
     _USE_JIT_COHERENT_STREAM,
-    _USE_JIT_LINE_REDUCTION,
+    _USE_JIT_CXR_REDUCTION,
     _clip_segments_to_cutoff,
     _dot3_core,
     _escape_length,
@@ -59,9 +59,9 @@ from .lines import (
     _interp_gather2d,
     _interp_gather_line_tables,
     _interp_index,
-    _line_amp_sq_core,
-    _line_kin_core,
-    _line_weight_core,
+    _cxr_amp_sq_core,
+    _cxr_kin_core,
+    _cxr_weight_core,
     _matvec3,
     _observation_direction,
     _polarization_pair,
@@ -71,8 +71,8 @@ from .lines import (
     _segments_on_device,
     _sincsq_lineshape,
     _validate_groove_escape_direction,
-    mc_spectrum,
-    mc_spectrum_solid_angle,
+    mc_cxr_spectrum,
+    mc_cxr_spectrum_solid_angle,
     xp,
 )
 
@@ -84,10 +84,38 @@ for _function in (
     load_external_brem,
     mc_brem_spectrum,
     mc_characteristic_spectrum,
-    mc_spectrum,
-    mc_spectrum_solid_angle,
+    mc_cxr_spectrum,
+    mc_cxr_spectrum_solid_angle,
     subdivide_flights,
 ):
     _function.__module__ = __name__
 
 del _function
+
+
+_CXR_RENAMED_EXPORTS = {
+    "_line_amp_sq_core": "_cxr_amp_sq_core",
+    "_line_kin_core": "_cxr_kin_core",
+    "_line_weight_core": "_cxr_weight_core",
+    "_interp_gather_line_tables": "_interp_gather_cxr_tables",
+    "_INTERP_GATHER_LINE_TABLES_F32": "_INTERP_GATHER_CXR_TABLES_F32",
+    "_JIT_LINE_BATCH_TARGET": "_JIT_CXR_BATCH_TARGET",
+    "_USE_JIT_LINE_REDUCTION": "_USE_JIT_CXR_REDUCTION",
+}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]
+
+
+_CXR_RENAMED_EXPORTS.update(
+    {"mc_spectrum": "mc_cxr_spectrum", "mc_spectrum_solid_angle": "mc_cxr_spectrum_solid_angle"}
+)
+
+_CXR_RENAMED_EXPORTS.update({"LINE_ESCAPE_MODEL": "CXR_ESCAPE_MODEL"})

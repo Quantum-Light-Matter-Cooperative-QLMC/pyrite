@@ -651,7 +651,7 @@ def _production_case(kind, tmp_path, monkeypatch):
     """Small production-built typed case of one spectrum-input family."""
     from dataclasses import replace
 
-    from pyrite import _line_grid_policy
+    from pyrite import _cxr_grid_policy
     from pyrite.campaign.config import material_sweep
     from pyrite.campaign.geometry import Stack
     from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
@@ -659,7 +659,7 @@ def _production_case(kind, tmp_path, monkeypatch):
 
     bins = Detector(
         energy_bins=EnergyBins(
-            line=np.arange(100.0, 3500.0, 20.0), brem=np.arange(100.0, 30000.0, 500.0)
+            cxr=np.arange(100.0, 3500.0, 20.0), brem=np.arange(100.0, 30000.0, 500.0)
         )
     )
     if kind == "flat":
@@ -704,7 +704,7 @@ def _production_case(kind, tmp_path, monkeypatch):
         assert "secondary_threshold_eV" in case
         return case
     else:  # an uncovered energy resolves its line grid from the trajectories
-        monkeypatch.setattr(_line_grid_policy, "output_dir", lambda _kind: tmp_path / "grid-cache")
+        monkeypatch.setattr(_cxr_grid_policy, "output_dir", lambda _kind: tmp_path / "grid-cache")
         sweep = material_sweep("hopg")
         sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=77.0))
     case = build_cases(sweep, n_electrons=24, n_electrons_brem=12)[0]

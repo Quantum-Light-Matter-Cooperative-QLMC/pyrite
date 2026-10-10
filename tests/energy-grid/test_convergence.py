@@ -177,7 +177,7 @@ def test_shape_is_gated_at_one_percent_and_reported_at_the_source_tolerance():
 
 
 def test_harness_shape_class_leaves_the_production_policy_tolerances_unchanged():
-    from pyrite._line_grid_policy import DEFAULT_RTOL, OBSERVABLE_CLASSES
+    from pyrite._cxr_grid_policy import DEFAULT_RTOL, OBSERVABLE_CLASSES
 
     assert dict(DEFAULT_RTOL) == {"intrinsic_source": 1e-3, "detected_counts": 1e-2}
     assert OBSERVABLE_CLASSES == ("intrinsic_source", "detected_counts")

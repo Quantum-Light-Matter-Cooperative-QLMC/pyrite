@@ -151,7 +151,7 @@ def test_sweep_produces_each_observation_on_its_scalar_transport(tmp_path, trans
         separate = plan.assemble(runner.run_case_directions(case, plan.directions_sample), {})
         assert stored.digest == separate.digest
         np.testing.assert_array_equal(
-            stored.spatial.line.intrinsic_by_tile, separate.spatial.line.intrinsic_by_tile
+            stored.spatial.cxr.intrinsic_by_tile, separate.spatial.cxr.intrinsic_by_tile
         )
         blob = _checkpoint_store.cas_load("hopg", key, str(cas_root))
         assert "directional" not in blob

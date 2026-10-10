@@ -43,6 +43,6 @@ These are full-model observations for this configuration, not consequences of th
 
 ## The {math}`\hat{n} / \vec{g}` split (written, currently unused)
 
-`_orientation_R` and `mc_spectrum` carry an optional parameter that lets the **reciprocal vector {math}`\vec{g}`** tilt independently of the **physical slab normal {math}`\hat{n}`**. Its default (`None`) is a strict no-op: {math}`\vec{v_0} \cdot \vec{g} \: \| \: \hat{n}`, today's behavior, bit-for-bit.
+`_orientation_R` and `mc_cxr_spectrum` carry an optional parameter that lets the **reciprocal vector {math}`\vec{g}`** tilt independently of the **physical slab normal {math}`\hat{n}`**. Its default (`None`) is a strict no-op: {math}`\vec{v_0} \cdot \vec{g} \: \| \: \hat{n}`, today's behavior, bit-for-bit.
 
 The formula above ({math}`\theta` = angle between {math}`\vec{g}` and the detector direction, via the slab normal) is exact only when {math}`\vec{g} \: \| \: \hat{n}`, which holds for the (00l)-type symmetric reflections PyRITE currently scans (TMD basal plane, HOPG c-axis, h-BN). It stops being exact for an **asymmetric reflection** — a crystal cut or miscut where the diffracting planes are not parallel to the physical surface, so {math}`\vec{g}` and {math}`\hat{n}` differ by a fixed offset. The {math}`\hat{n} \, / \, \vec{g}` split applies an extra rotation to {math}`\vec{g}` only, leaving {math}`\hat{n}` (and therefore transport and beam/detector geometry) fixed. It is not wired into any grid or study today — introducing an asymmetric-reflection material is the trigger to use it.

@@ -3,7 +3,7 @@
 This package-root leaf is shared by ``campaign`` (which resolves a declared
 band against the medium's floor when it builds cases) and by the
 ``energy_grid`` driver package, without making the former depend on the
-latter -- the same reason ``_energy_grid_encoding`` and ``_line_grid_policy``
+latter -- the same reason ``_energy_grid_encoding`` and ``_cxr_grid_policy``
 sit here. :mod:`pyrite.energy_grid.floor` re-exports everything below and
 adds the grid builder that only that package needs.
 

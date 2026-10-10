@@ -15,7 +15,7 @@ flux), collapsing hundreds of azimuth runs to one row/curve each.
 import numpy as np
 
 from .._formatting import fmt_thickness
-from .._spectral_components import line_spectrum
+from .._spectral_components import cxr_spectrum
 
 
 # ---- record selection --------------------------------------------------------
@@ -239,18 +239,18 @@ _WIDE_BREM_FIELDS = ("brem_wide", "E_grid_brem")
 
 # The coherent and characteristic components use the line grid, so a
 # --line-only projection/merge must carry them with ``spec``.
-LINE_RECORD_KEYS = ("spec", "E_grid", "spec_coherent", "spec_characteristic")
+CXR_RECORD_KEYS = ("spec", "E_grid", "spec_coherent", "spec_characteristic")
 BREM_RECORD_KEYS = ("brem_wide", "brem", "E_grid_brem")
 
 
 def project_dataset(results, dataset):
     """Return a NEW results store carrying only ``dataset``'s record arrays
     (plus ``case``) per record -- the wire payload for a dataset-partial pull
-    (``pyrite slim --brem-only/--line-only``). ``dataset`` is ``"line"`` (keeps
+    (``pyrite slim --brem-only/--cxr-only``). ``dataset`` is ``"line"`` (keeps
     :data:`LINE_RECORD_KEYS`) or ``"brem"`` (:data:`BREM_RECORD_KEYS`).
     Delegates to :func:`slim_results`' ``fields`` allow-list so the drop logic
     lives in one place; ``case`` is always kept."""
-    keys = {"line": LINE_RECORD_KEYS, "brem": BREM_RECORD_KEYS}.get(dataset)
+    keys = {"line": CXR_RECORD_KEYS, "brem": BREM_RECORD_KEYS}.get(dataset)
     if keys is None:
         raise ValueError(f"dataset must be 'line' or 'brem', got {dataset!r}")
     return slim_results(results, fields=list(keys))
@@ -268,7 +268,7 @@ def merge_dataset(local, incoming, dataset, force=False):
     which inserts them whole. Mutates ``local``; returns (n_merged, n_skipped)."""
     import numpy as np
 
-    keys = {"line": LINE_RECORD_KEYS, "brem": BREM_RECORD_KEYS}.get(dataset)
+    keys = {"line": CXR_RECORD_KEYS, "brem": BREM_RECORD_KEYS}.get(dataset)
     if keys is None:
         raise ValueError(f"dataset must be 'line' or 'brem', got {dataset!r}")
     n_merged = n_skipped = 0
@@ -378,7 +378,7 @@ def slim_results(
 
 def _peak(r):
     """The selection metric: the highest spectral flux value, max(spectrum)."""
-    return float(np.max(line_spectrum(r)))
+    return float(np.max(cxr_spectrum(r)))
 
 
 def best_azimuth(recs):
@@ -413,7 +413,7 @@ def best_azimuth(recs):
 _LABEL_FIELDS = ("thickness_ang", "tilt_deg", "tilt_azim_deg")
 
 # Record keys a basket entry needs to be plottable by
-# ``plots.altair.spectra._record_frame`` / ``metrics.line_metrics`` -- the same
+# ``plots.altair.spectra._record_frame`` / ``metrics.cxr_metrics`` -- the same
 # spectral-array set ``slim_results`` trims to, minus ``E_pk``/``hit_frac``/
 # ``eta`` which neither consumer reads.
 _BASKET_RECORD_FIELDS = (
@@ -488,7 +488,7 @@ def case_table_rows(results):
 def slim_case_record(record, *, material, label, face="flat"):
     """Standalone, basket-sized copy of one checkpoint ``record``: just the
     spectral arrays :func:`pyrite.plots.altair.spectra._record_frame` and
-    :func:`pyrite.results.metrics.line_metrics` need
+    :func:`pyrite.results.metrics.cxr_metrics` need
     (:data:`_BASKET_RECORD_FIELDS`), plus a ``case`` dict tagged with the
     basket-only identity fields (``material``, ``face``, ``label``) a bare
     checkpoint record has no slot for. Everything else (``eta``, ``hit_frac``,
@@ -498,3 +498,16 @@ def slim_case_record(record, *, material, label, face="flat"):
     slim = {k: record[k] for k in _BASKET_RECORD_FIELDS if k in record}
     slim["case"] = {**record["case"], "material": material, "face": face, "label": label}
     return slim
+
+
+_CXR_RENAMED_EXPORTS = {"LINE_RECORD_KEYS": "CXR_RECORD_KEYS"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

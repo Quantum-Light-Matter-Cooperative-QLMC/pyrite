@@ -564,7 +564,7 @@ def _run_json(args):
     )
 
 
-def _select_quick_energies(by_energy, e_grid_line, *, nominal=(30, 50), count=2):
+def _select_quick_energies(by_energy, e_grid_cxr, *, nominal=(30, 50), count=2):
     """Bounded, deterministic quick beam energies with valid line grids.
 
     ``--quick`` needs a small representative beam-energy subset whose line grids
@@ -582,7 +582,7 @@ def _select_quick_energies(by_energy, e_grid_line, *, nominal=(30, 50), count=2)
       energies runs exactly those; an empty mapping falls through to the nominal
       pair so the strict missing-grid error still fires downstream.
     """
-    if by_energy is None or e_grid_line is not None:
+    if by_energy is None or e_grid_cxr is not None:
         return list(nominal)
     valid = sorted(float(key) for key in by_energy)
     if not valid:
@@ -647,8 +647,8 @@ def _resolved_run(args, material):
             tilt_deg=np.linspace(5.0, 85.0, 5),
             tilt_azim_deg=np.array([10.0, 30.0]),
             energy_keV=_select_quick_energies(
-                probe.detector.energy_bins.line_by_energy,
-                probe.detector.energy_bins.line,
+                probe.detector.energy_bins.cxr_by_energy,
+                probe.detector.energy_bins.cxr,
             ),
         )
     if getattr(args, "n_families", None) is not None:

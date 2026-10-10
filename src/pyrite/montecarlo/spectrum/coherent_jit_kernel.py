@@ -7,7 +7,7 @@ This replaces construction of the dense complex ``SP[segment, energy]`` matrix
 and the two complex GEMV reductions used by the CuPy fallback.
 
 Under absorption each line's finite-time factor is the complex formation factor
-of ``spectrum.lines._formation`` (the NumPy reference) instead of the real sinc.
+of ``spectrum.cxr._formation`` (the NumPy reference) instead of the real sinc.
 Validation: coherent-formation-absorption
 """
 

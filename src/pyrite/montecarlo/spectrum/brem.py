@@ -33,7 +33,7 @@ from .characteristic import CHARACTERISTIC_EEDL_SHA256 as BREMSSTRAHLUNG_EEDL_SH
 from .characteristic import (
     CHARACTERISTIC_ENDF_PARSERPY_VERSION as BREM_ENDF_PARSERPY_VERSION,
 )
-from .lines import (
+from .cxr import (
     _clip_segments_to_cutoff,
     _observation_direction,
     _validate_groove_escape_direction,

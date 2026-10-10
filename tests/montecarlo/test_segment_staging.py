@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from pyrite._backend import REAL, _to_cpu
-from pyrite.montecarlo import mc_brem_spectrum, mc_spectrum
+from pyrite.montecarlo import mc_brem_spectrum, mc_cxr_spectrum
 from pyrite.montecarlo.spectrum import (
     _SEG_ARRAYS,
     _segments_in_layer,
@@ -66,8 +66,10 @@ def test_staged_segments_give_bit_for_bit_identical_lines(coherent):
     """Staging only hoists the cast to REAL each kernel already did."""
     segments = _segments()
 
-    reference = mc_spectrum(segments, E_GRID, coherent=coherent, **LINE_KWARGS)
-    staged = mc_spectrum(_segments_on_device(segments), E_GRID, coherent=coherent, **LINE_KWARGS)
+    reference = mc_cxr_spectrum(segments, E_GRID, coherent=coherent, **LINE_KWARGS)
+    staged = mc_cxr_spectrum(
+        _segments_on_device(segments), E_GRID, coherent=coherent, **LINE_KWARGS
+    )
 
     assert np.max(np.abs(reference)) > 0.0
     np.testing.assert_array_equal(_to_cpu(staged), _to_cpu(reference))
@@ -159,7 +161,7 @@ def test_a_case_stages_once_and_every_kernel_reads_that_copy(monkeypatch):
     monkeypatch.setattr(runner, "_segments_on_device", counting_stage)
     monkeypatch.setattr(
         runner,
-        "_lines_for_segments",
+        "_cxr_for_segments",
         lambda segs, *a, **k: (seen.append(segs), np.zeros_like(E_GRID))[1],
     )
     monkeypatch.setattr(
@@ -205,7 +207,7 @@ def test_a_case_reports_its_segment_counts_from_the_host_set(monkeypatch):
     device array cannot."""
     import pyrite.montecarlo.runner as runner
 
-    monkeypatch.setattr(runner, "_lines_for_segments", lambda *a, **k: np.zeros_like(E_GRID))
+    monkeypatch.setattr(runner, "_cxr_for_segments", lambda *a, **k: np.zeros_like(E_GRID))
     monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
     monkeypatch.setattr(
         runner,
@@ -282,8 +284,8 @@ def test_device_resident_transport_feeds_the_kernels_the_same_spectra():
     assert isinstance(device["L_ang"], cupy.ndarray)
 
     for kernel, kwargs in (
-        (mc_spectrum, {**LINE_KWARGS, "E_grid": E_GRID}),
-        (mc_spectrum, {**LINE_KWARGS, "E_grid": E_GRID, "coherent": True}),
+        (mc_cxr_spectrum, {**LINE_KWARGS, "E_grid": E_GRID}),
+        (mc_cxr_spectrum, {**LINE_KWARGS, "E_grid": E_GRID, "coherent": True}),
         (mc_brem_spectrum, {**BREM_KWARGS, "E_grid": E_GRID}),
     ):
         grid = kwargs.pop("E_grid")

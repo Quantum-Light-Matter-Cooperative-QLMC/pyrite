@@ -7,9 +7,9 @@ import numpy as np
 import pytest
 
 from pyrite.materials.crystal import HBARC_EV_ANG, beta_from_Ee
-from pyrite.montecarlo import mc_spectrum
-from pyrite.montecarlo.spectrum.lines import temporal_profile_for
-from pyrite.montecarlo.spectrum.lines._temporal import (
+from pyrite.montecarlo import mc_cxr_spectrum
+from pyrite.montecarlo.spectrum.cxr import temporal_profile_for
+from pyrite.montecarlo.spectrum.cxr._temporal import (
     TemporalProfile,
     add_boxes,
     segment_arrival_times,
@@ -48,7 +48,7 @@ def _segments(starts, length=2000.0, *, elec_id=None, t0=None, Ne=None):
 
 def _run(segments, *, coherent, grid=E_GRID, **kwargs):
     profile = temporal_profile_for(segments, grid, KWARGS["n_hat"] / np.linalg.norm(N_HAT))
-    spec = mc_spectrum(segments, grid, coherent=coherent, temporal=profile, **KWARGS, **kwargs)
+    spec = mc_cxr_spectrum(segments, grid, coherent=coherent, temporal=profile, **KWARGS, **kwargs)
     out = profile.result()
     return spec, out["t_fs"], out["intensity"]
 
@@ -139,7 +139,7 @@ def test_bunch_offsets_spread_the_envelope():
 def test_temporal_does_not_change_the_spectrum():
     segments = _segments([0.0, 500.0])
     for coherent in (False, True):
-        plain = mc_spectrum(segments, E_GRID, coherent=coherent, **KWARGS)
+        plain = mc_cxr_spectrum(segments, E_GRID, coherent=coherent, **KWARGS)
         with_t, _, _ = _run(segments, coherent=coherent)
         np.testing.assert_allclose(with_t, plain, rtol=1e-6, atol=1e-12 * plain.max())
 
@@ -241,7 +241,7 @@ def test_directions_share_one_time_grid(monkeypatch):
     from pyrite.montecarlo.runner import directions
 
     _stub_continuum(monkeypatch, runner)
-    monkeypatch.setattr(directions, "resolve_observation_line_grid", lambda *a, **k: (E_GRID, None))
+    monkeypatch.setattr(directions, "resolve_observation_cxr_grid", lambda *a, **k: (E_GRID, None))
     case, tp = _runner_inputs(coherent=True, temporal=True)
     n_hats = np.array([N_HAT, [1.0, 0.0, 0.05]])
     n_hats /= np.linalg.norm(n_hats, axis=1)[:, None]

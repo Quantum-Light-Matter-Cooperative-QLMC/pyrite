@@ -164,7 +164,7 @@ def test_high_energy_profile_selects_the_measured_line_grid():
         "quadrature": "bin-mean",
     }
     sweep = material_sweep("hbn", catalog_profile="high_energy")
-    assert sweep.line_grid_policy == policy
+    assert sweep.cxr_grid_policy == policy
     identity = named_profile_identity("hbn", catalog_profile="high_energy")
     assert identity["resolved_parameters"]["sweep"]["line_grid_policy"] == policy
     case = build_cases(sweep, n_electrons=10, n_electrons_brem=10)[-1]
@@ -323,8 +323,8 @@ def test_survey_profile_reduces_configured_expensive_sweep_dimensions():
     assert len(np.atleast_1d(survey_geometry["tilt_azim_deg"])) <= 2
     assert survey.n_families == 2
     assert len(survey.detector.energy_bins.brem) < len(full.detector.energy_bins.brem)
-    assert not survey.detector.energy_bins.line_by_energy
-    assert not full.detector.energy_bins.line_by_energy
+    assert not survey.detector.energy_bins.cxr_by_energy
+    assert not full.detector.energy_bins.cxr_by_energy
     cases = build_cases(survey, settings.n_electrons, settings.n_electrons_brem)
     assert cases
     assert all(len(case["hkl_list"]) <= 4 for case in cases)

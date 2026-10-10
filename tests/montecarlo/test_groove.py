@@ -719,7 +719,7 @@ def test_finite_side_exit_before_reentry_records_no_vacuum_leg():
     assert out["vacuum_start_ang"].shape == (0, 3)
 
 
-from pyrite.montecarlo.spectrum import mc_spectrum
+from pyrite.montecarlo.spectrum import mc_cxr_spectrum
 
 
 def _hopg_spectrum(groove=None, thickness_ang=2.0e5):
@@ -740,7 +740,7 @@ def _hopg_spectrum(groove=None, thickness_ang=2.0e5):
         groove=groove,
     )
     E_grid = np.linspace(500.0, 3000.0, 400)
-    return mc_spectrum(
+    return mc_cxr_spectrum(
         segs,
         E_grid,
         crystal="hopg",
@@ -783,7 +783,7 @@ def test_spectrum_groove_rejects_layers():
         elastic_model="sr",
     )
     with pytest.raises(ValueError):
-        mc_spectrum(
+        mc_cxr_spectrum(
             segs,
             np.linspace(500.0, 3000.0, 50),
             crystal="hopg",

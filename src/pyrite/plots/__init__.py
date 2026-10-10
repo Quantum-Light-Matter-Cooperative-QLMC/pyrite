@@ -22,8 +22,8 @@ from ._common import (
     SI_K_EDGE_EV,
     _beam_detector_basis,
     _case_of,
+    _cxr_brem,
     _eag_detected,
-    _line_brem,
     _mode,
     _thr_keV,
     _tpx_detected,
@@ -115,6 +115,13 @@ _NAME_TO_MODULE = {name: mod for mod, names in _LAZY_MODULES.items() for name in
 
 
 def __getattr__(name: str):
+    aliases = {"_line_brem": "_cxr_brem"}
+    if name in aliases:
+        from .._api_deprecations import warn_renamed
+
+        warn_renamed(f"pyrite.plots.{name}", f"pyrite.plots.{aliases[name]}")
+        replacement = aliases[name]
+        return globals()[replacement] if replacement in globals() else __getattr__(replacement)
     mod_name = _NAME_TO_MODULE.get(name)
     if mod_name is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -201,4 +208,5 @@ __all__ = [
     "plot_timepix_poisson",
     "plot_trajectory_grid",
     "stream_chunk",
+    "_cxr_brem",
 ]

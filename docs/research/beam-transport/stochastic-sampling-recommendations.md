@@ -46,8 +46,8 @@ Tail relevance depends on the response: a rare position may determine aperture l
 
 The coherent path already does more than square one unprocessed random bunch realization:
 
-- Infinite slabs use an empirical longitudinal/transverse characteristic function in `montecarlo/spectrum/lines/_per_hkl.py::_row_decoherence_factor`. That factor still comes from the sampled population and retains finite-sample error.
-- Finite footprints use analytic Gaussian longitudinal averaging in `montecarlo/spectrum/lines/_setup.py`, conditional on the sampled transverse trajectories. Transverse phase, hit/miss behavior, and attenuation remain coupled.
+- Infinite slabs use an empirical longitudinal/transverse characteristic function in `montecarlo/spectrum/cxr/_per_hkl.py::_row_decoherence_factor`. That factor still comes from the sampled population and retains finite-sample error.
+- Finite footprints use analytic Gaussian longitudinal averaging in `montecarlo/spectrum/cxr/_setup.py`, conditional on the sampled transverse trajectories. Transverse phase, hit/miss behavior, and attenuation remain coupled.
 
 The current assumptions and validation status belong to [`coherent-inter-electron-decoherence`](../../validation/ledger-core-coherent-physics.md#coherent-inter-electron-decoherence) and [`finite-footprint-longitudinal-decoherence`](../../validation/ledger-core-coherent-physics.md#finite-footprint-longitudinal-decoherence). This recommendation does not promote their status or independently validate them.
 

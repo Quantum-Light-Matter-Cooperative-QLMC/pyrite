@@ -57,6 +57,13 @@ def _entry(path: str, replacement: str, *, since: str = "0.1.0", note: str = "")
 #: and `material set` (deprecated 0.4.0, issue #359) at 0.6.0 (issue #387).
 #: `material simulate` was removed at 0.8.0; use `run --ephemeral`.
 DEPRECATIONS: dict[str, Deprecation] = {
+    "profile line-grid": _entry("profile line-grid", "pyrite profile cxr-grid", since="0.11.0"),
+    "checkpoint recompute line": _entry(
+        "checkpoint recompute line", "pyrite checkpoint recompute cxr", since="0.11.0"
+    ),
+    "material energy-grid line": _entry(
+        "material energy-grid line", "pyrite material energy-grid cxr", since="0.11.0"
+    ),
     "checkpoint export-trajectories": _entry(
         "checkpoint export-trajectories",
         "pyrite trajectories export",
@@ -232,7 +239,44 @@ def _flag(
 #: `--fidelity` cohort (deprecated in 0.4.0, issue #215) at 0.6.0 (issue #387).
 #: `RetiredOption` and `canonical_option` (renamed spellings) and
 #: `DeprecatedOption` (whole options) stay as the substrate ADR-0002 requires.
-DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {}
+DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
+    ("checkpoint slim", "--line-only"): _flag(
+        "checkpoint slim", "--line-only", "--cxr-only", since="0.11.0"
+    ),
+    ("checkpoint recompute cxr", "--line-ne"): _flag(
+        "checkpoint recompute cxr", "--line-ne", "--cxr-trials", since="0.11.0"
+    ),
+    ("checkpoint recompute cxr", "--line-step"): _flag(
+        "checkpoint recompute cxr", "--line-step", "--cxr-step", since="0.11.0"
+    ),
+    ("checkpoint recompute line", "--line-ne"): _flag(
+        "checkpoint recompute line", "--line-ne", "--cxr-trials", since="0.11.0"
+    ),
+    ("checkpoint recompute line", "--line-step"): _flag(
+        "checkpoint recompute line", "--line-step", "--cxr-step", since="0.11.0"
+    ),
+    ("remote pull", "--line-only"): _flag(
+        "remote pull", "--line-only", "--cxr-only", since="0.11.0"
+    ),
+    ("profile add", "--line-trials"): _flag(
+        "profile add", "--line-trials", "--cxr-trials", since="0.11.0"
+    ),
+    ("profile create", "--line-trials"): _flag(
+        "profile create", "--line-trials", "--cxr-trials", since="0.11.0"
+    ),
+    ("profile numerics set", "--line-trials"): _flag(
+        "profile numerics set", "--line-trials", "--cxr-trials", since="0.11.0"
+    ),
+    ("profile precision disable", "--line-trials"): _flag(
+        "profile precision disable", "--line-trials", "--cxr-trials", since="0.11.0"
+    ),
+    ("profile set", "--line-trials"): _flag(
+        "profile set", "--line-trials", "--cxr-trials", since="0.11.0"
+    ),
+    ("pyrite-dev perf", "--spec-chunk"): _flag(
+        "pyrite-dev perf", "--spec-chunk", "--cxr-chunk", since="0.11.0"
+    ),
+}
 
 
 def flag_message(command: str, flag: str, replacement: str) -> str:

@@ -1,7 +1,7 @@
 """Multilayer slice-3 validation: per-layer COHERENT radiation
 (docs/physics/materials/multilayer-materials.md (2)).
 
-mc_spectrum already radiates one crystal; slice 3 makes _spectrum_case radiate
+mc_cxr_spectrum already radiates one crystal; slice 3 makes _spectrum_case radiate
 EVERY crystalline layer of a film-on-substrate stack and sum them incoherently,
 each self-absorbing through the whole stack. `_spectrum_case`'s returned
 ``spec`` is the per-layer COHERENT (PXR/CBS) sum PLUS the incoherent
@@ -50,7 +50,7 @@ from pyrite.montecarlo import (  # noqa: E402
     _spectrum_case,
     _transport_case,
     mc_characteristic_spectrum,
-    mc_spectrum,
+    mc_cxr_spectrum,
 )
 
 E0 = 30.0
@@ -69,7 +69,7 @@ def _case(substrate):
         thickness_ang=T_FILM,
         substrate=substrate,
         substrate_thickness_ang=T_SUB,
-        detector=Detector(energy_bins=EnergyBins(line=E_LINE, brem=E_BREM)),
+        detector=Detector(energy_bins=EnergyBins(cxr=E_LINE, brem=E_BREM)),
     )
     return build_cases(sw, n_electrons=600, n_electrons_brem=120)[0]
 
@@ -77,7 +77,7 @@ def _case(substrate):
 def _radiate_layer(segs, E_grid, n_hat, case, tp, L):
     """One layer's COHERENT + characteristic spectrum, exactly as
     _spectrum_case computes it (same per-radiator kwargs as
-    runner._lines_for_segments / _characteristic_from_segments): the film and
+    runner._cxr_for_segments / _characteristic_from_segments): the film and
     substrate radiators carry different surface_hkl/beam_uvw, so reproducing
     the pipeline bit-for-bit requires passing them through, not just the
     shared case-level defaults."""
@@ -88,7 +88,7 @@ def _radiate_layer(segs, E_grid, n_hat, case, tp, L):
         return np.zeros(E_grid.shape)
     coherent = np.zeros(E_grid.shape)
     if rad is not None:
-        coherent = mc_spectrum(
+        coherent = mc_cxr_spectrum(
             sL,
             E_grid,
             crystal=rad["crystal"],
@@ -137,7 +137,7 @@ def main():
     spec_sub = _radiate_layer(segs, E_grid, n_hat, case, tp, 1)
 
     # 1. the crystalline substrate radiates its own lines -----------------------
-    sub_coherent = mc_spectrum(
+    sub_coherent = mc_cxr_spectrum(
         _segments_in_layer(segs, 1),
         E_grid,
         crystal=case["layer_radiators"][1]["crystal"],

@@ -100,17 +100,15 @@ def adapt_configured_sweep(old_sweep: Any, settings: Any) -> Sweep:
 
 def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
     """Resolve the first legacy sampling-budget point and all fixed controls."""
-    line = old_sweep.n_electrons
+    cxr = old_sweep.n_electrons
     brem = old_sweep.n_electrons_brem
     return Numerics(
-        n_electrons=int(
-            getattr(settings, "n_electrons", 450) if line is None else _values(line)[0]
-        ),
-        n_electrons_brem=int(
+        cxr_trials=int(getattr(settings, "n_electrons", 450) if cxr is None else _values(cxr)[0]),
+        brem_trials=int(
             getattr(settings, "n_electrons_brem", 100) if brem is None else _values(brem)[0]
         ),
         precision=getattr(settings, "precision", None),
-        spec_chunk=old_sweep.spec_chunk,
+        cxr_chunk=old_sweep.spec_chunk,
         brem_chunk=old_sweep.brem_chunk,
         straggling=getattr(settings, "straggling", False),
         energy_model=getattr(settings, "energy_model", "frozen"),

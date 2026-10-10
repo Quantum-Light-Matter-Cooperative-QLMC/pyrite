@@ -139,9 +139,9 @@ def _catalog(catalog_profile: str = "standard"):
     )
 
 
-def _profile_line_grid_policy(catalog_profile: str) -> dict[str, str] | None:
+def _profile_cxr_grid_policy(catalog_profile: str) -> dict[str, str] | None:
     """The profile's named line-grid policies as a ``Sweep.line_grid_policy``."""
-    policy = _catalog(catalog_profile).profile_line_grid_policy(catalog_profile)
+    policy = _catalog(catalog_profile).profile_cxr_grid_policy(catalog_profile)
     return None if policy is None else dict(policy)
 
 
@@ -263,34 +263,34 @@ def material_sweep(
         resolved_detector = resolved_catalog_detector
     current_bins = resolved_detector.energy_bins
     missing = object()
-    line_override = overrides.pop("E_grid_line", missing)
-    legacy_line_override = overrides.pop("e_grid_eV", missing)
-    if legacy_line_override is not missing:
+    cxr_override = overrides.pop("E_grid_line", missing)
+    legacy_cxr_override = overrides.pop("e_grid_eV", missing)
+    if legacy_cxr_override is not missing:
         warnings.warn(
             "e_grid_eV is deprecated; use detector=Detector(energy_bins=EnergyBins(line=...)) "
             "or E_grid_line= during the D7 compatibility window",
             DeprecationWarning,
             stacklevel=2,
         )
-    line_by_energy_override = overrides.pop("E_grid_line_by_energy", missing)
+    cxr_by_energy_override = overrides.pop("E_grid_line_by_energy", missing)
     brem_override = overrides.pop("E_grid_brem", missing)
     resolved_detector = replace(
         resolved_detector,
         energy_bins=EnergyBins(
-            line=(
-                line_override
-                if line_override is not missing
-                else legacy_line_override
-                if legacy_line_override is not missing
-                else current_bins.line
-                if current_bins.line is not None
+            cxr=(
+                cxr_override
+                if cxr_override is not missing
+                else legacy_cxr_override
+                if legacy_cxr_override is not missing
+                else current_bins.cxr
+                if current_bins.cxr is not None
                 else scan.E_grid_line
             ),
-            line_by_energy=(
-                line_by_energy_override
-                if line_by_energy_override is not missing
-                else current_bins.line_by_energy
-                if current_bins.line_by_energy is not None
+            cxr_by_energy=(
+                cxr_by_energy_override
+                if cxr_by_energy_override is not missing
+                else current_bins.cxr_by_energy
+                if current_bins.cxr_by_energy is not None
                 else scan.E_grid_line_by_energy
             ),
             brem=(
@@ -319,7 +319,7 @@ def material_sweep(
         ),
         n_electrons=scan.n_electrons,
         n_electrons_brem=scan.n_electrons_brem,
-        line_grid_policy=_profile_line_grid_policy(catalog_profile),
+        cxr_grid_policy=_profile_cxr_grid_policy(catalog_profile),
     )
     sweep = get_fidelity_preset(fidelity).apply_sweep(sweep)
     numerics = resolve_numerics(
@@ -336,6 +336,13 @@ def material_sweep(
     beam_over = {k: overrides.pop(k) for k in list(overrides) if k in _BEAM_OVERRIDE_KEYS}
     target_over = {k: overrides.pop(k) for k in list(overrides) if k in _TARGET_OVERRIDE_KEYS}
     if overrides:
+        if "line_grid_policy" in overrides:
+            from .._api_deprecations import warn_renamed
+
+            if "cxr_grid_policy" in overrides:
+                raise TypeError("cannot specify both line_grid_policy and cxr_grid_policy")
+            warn_renamed("material_sweep.line_grid_policy", "material_sweep.cxr_grid_policy")
+            overrides["cxr_grid_policy"] = overrides.pop("line_grid_policy")
         sweep = replace(sweep, **overrides)
     if beam_over.get("source") == "gpt_gdf" and not (
         {"beam_fwhm_mm", "transverse_fwhm_mm"} & beam_over.keys()
@@ -407,8 +414,8 @@ def trajectory_sweep(
         beam=BeamSpec(energy_keV=list(energies)),
         detector=Detector(
             energy_bins=EnergyBins(
-                line=scan.E_grid_line,
-                line_by_energy=scan.E_grid_line_by_energy,
+                cxr=scan.E_grid_line,
+                cxr_by_energy=scan.E_grid_line_by_energy,
                 brem=scan.E_grid_brem,
             )
         ),
@@ -425,7 +432,7 @@ def trajectory_sweep(
             groove_spacing_ang=groove_spacing_ang,
             # Finite 5x5 mm footprint for grooved and ungrooved alike (the groove
             # escape treats the slab as laterally periodic and only the launch
-            # stage sees the footprint -- see montecarlo.spectrum.mc_spectrum), so
+            # stage sees the footprint -- see montecarlo.spectrum.mc_cxr_spectrum), so
             # the penetration figures record the same electron hit/miss as the
             # sweep.
             crystal_width_mm=5.0,
@@ -567,3 +574,17 @@ def format_penetration_watchdog_summary(
         f"{len(dead_energies)} beam energy(ies) "
         f"({energies_str})"
     )
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {"_profile_line_grid_policy": "_profile_cxr_grid_policy"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

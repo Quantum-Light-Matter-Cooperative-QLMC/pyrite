@@ -17,7 +17,7 @@ from pyrite.campaign.sweep import BeamSpec, crystal_params
 from pyrite.montecarlo import (
     TRANSPORT_ELEMENTS,
     _normalize_composition,
-    mc_spectrum,
+    mc_cxr_spectrum,
     simulate_trajectories,
 )
 from pyrite.montecarlo.runner import scheduling
@@ -39,14 +39,14 @@ def test_simulate_trajectories_refuses_silent_default():
 
 def test_mc_spectrum_requires_crystal_and_hkl():
     with pytest.raises(TypeError):
-        mc_spectrum({"E_keV": np.array([30.0])}, np.arange(50.0, 100.0, 1.0))
+        mc_cxr_spectrum({"E_keV": np.array([30.0])}, np.arange(50.0, 100.0, 1.0))
 
 
 def test_mc_spectrum_requires_B_ang2():
     # crystal + hkl supplied, but B_ang2 left at its sentinel -> explicit ValueError
 
     with pytest.raises(ValueError):
-        mc_spectrum({}, np.arange(50.0, 100.0, 1.0), crystal="silicon", hkl_list=[(1, 1, 1)])
+        mc_cxr_spectrum({}, np.arange(50.0, 100.0, 1.0), crystal="silicon", hkl_list=[(1, 1, 1)])
 
 
 def test_tellurium_in_transport_table():
@@ -593,7 +593,7 @@ def test_run_cases_engine_gpu_errors_when_accelerator_unavailable(monkeypatch):
 @pytest.mark.slow
 def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
     """A real (1-worker) engine="cpu" run: proves _worker_init(force_cpu=True)
-    doesn't break the worker, and that mc_spectrum/mc_brem_spectrum's xp/REAL
+    doesn't break the worker, and that mc_cxr_spectrum/mc_brem_spectrum's xp/REAL
     (rebound by force_cpu) still produce a finite spectrum -- the design doc's
     Sec. 2 verification item, covered end-to-end rather than assumed."""
     from pyrite.campaign.sweep import Sweep, build_cases
@@ -607,7 +607,7 @@ def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
         tilt_deg=30.0,
         detector=Detector(
             energy_bins=EnergyBins(
-                line=np.arange(50.0, 300.0, 5.0),
+                cxr=np.arange(50.0, 300.0, 5.0),
                 brem=np.arange(0.0, 1000.0, 100.0),
             )
         ),

@@ -41,7 +41,7 @@ from .montecarlo.spectrum import (
 )
 from .montecarlo.transport import STOPPING_MODEL
 from .observations.plan import ObservationPlan, PixelSampling
-from .results.model import Result
+from .results.model import CxrSpectra, Result, SpectralDensity
 
 
 def _canonical_value(value: Any) -> Any:
@@ -293,12 +293,15 @@ def simulate(
         background = np.zeros_like(background)
     coherent = output.get("spec_coherent")
     characteristic = output.get("spec_characteristic")
-    spectrum = coherent if scene.emission == "coherent" else output["spec"]
     return Result(
-        energy_eV=np.asarray(output["E_grid"]),
-        spectrum=np.asarray(spectrum),
-        background_energy_eV=np.asarray(background_energy),
-        background=np.asarray(background),
+        cxr=CxrSpectra(
+            SpectralDensity(output["E_grid"], output["spec"]),
+            None if coherent is None else SpectralDensity(output["E_grid"], coherent),
+        ),
+        brem=SpectralDensity(background_energy, background),
+        characteristic=(
+            None if characteristic is None else SpectralDensity(output["E_grid"], characteristic)
+        ),
         case=case,
         provenance={
             "scene": scene,
@@ -307,7 +310,7 @@ def simulate(
             # Automatic case-local line grids (issue #101): the policy is what
             # identity hashes, the resolved record is what the run actually
             # sampled. Both absent for an explicit or stored grid.
-            **_line_grid_provenance(case, output),
+            **_cxr_grid_provenance(case, output),
             **(
                 {"adaptive_sampling": output["adaptive_sampling"]}
                 if "adaptive_sampling" in output
@@ -315,8 +318,6 @@ def simulate(
             ),
             **run_provenance(case, xsgen_tables),
         },
-        coherent_spectrum=(None if coherent is None else np.asarray(coherent)),
-        characteristic_spectrum=(None if characteristic is None else np.asarray(characteristic)),
     )
 
 
@@ -375,7 +376,7 @@ def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
     )
 
 
-def _line_grid_provenance(case, output) -> dict[str, object]:
+def _cxr_grid_provenance(case, output) -> dict[str, object]:
     """Resolved line-grid policy and coordinates, when resolution was automatic.
 
     Records the policy, the per-observable tolerances, the configuration source
@@ -425,7 +426,7 @@ def _simulate_planar(
             source_digest,
             scene,
             scorer,
-            (spatial.line.mu_by_filter_inv_mm, spatial.background.mu_by_filter_inv_mm),
+            (spatial.cxr.mu_by_filter_inv_mm, spatial.brem.mu_by_filter_inv_mm),
         )
     else:
         plan = ObservationPlan(
@@ -455,30 +456,33 @@ def _simulate_planar(
             "response_digest": stored.identity.response_digest,
             "acquisition_digest": stored.identity.acquisition_digest,
         }
-    energy = spatial.line.energy_eV
-    background_energy = spatial.background.energy_eV
-    coherent = spatial.coherent_line
-    selected_name = "coherent" if scene.emission == "coherent" else "line"
+    energy = spatial.cxr.energy_eV
+    background_energy = spatial.brem.energy_eV
+    coherent = spatial.coherent_cxr
     coherent_average = None if coherent is None else spatial.average_density("coherent")
     characteristic_average = spatial.average_density("characteristic")
     return Result(
-        energy_eV=energy,
-        spectrum=spatial.average_density(selected_name),
-        background_energy_eV=background_energy,
-        background=spatial.average_density("background"),
+        cxr=CxrSpectra(
+            SpectralDensity(energy, spatial.average_density("cxr"), "observation-average"),
+            None
+            if coherent_average is None
+            else SpectralDensity(energy, coherent_average, "observation-average"),
+        ),
+        brem=SpectralDensity(
+            background_energy, spatial.average_density("brem"), "observation-average"
+        ),
+        characteristic=SpectralDensity(energy, characteristic_average, "observation-average"),
         case=case,
         provenance={
             "scene": scene,
             "numerics": numerics,
             "identity_digest": source_digest,
-            **_line_grid_provenance(case, output),
+            **_cxr_grid_provenance(case, output),
             "observation_identity_digest": observation_digest,
             "observation": observation,
             **identity_provenance,
             **run_provenance(case, xsgen_tables),
         },
-        coherent_spectrum=coherent_average,
-        characteristic_spectrum=characteristic_average,
         spatial=(
             spatial if scene.pixel_scorer is not None or scene.acquisition is not None else None
         ),
@@ -486,3 +490,17 @@ def _simulate_planar(
 
 
 __all__ = ["build_case", "build_configured_cases", "build_sweep_cases", "simulate"]
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {"_line_grid_provenance": "_cxr_grid_provenance"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

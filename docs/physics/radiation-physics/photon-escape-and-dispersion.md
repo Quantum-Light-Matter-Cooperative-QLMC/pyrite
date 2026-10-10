@@ -80,7 +80,7 @@ $$
 
 The detuning remains $g^2+2\mathbf k\cdot\mathbf g$. For a fixed external transverse polarization $\mathbf e_s$, the PXR numerator uses $(\mathbf k+\mathbf g)\cdot\mathbf e_s$, including the nonzero $\mathbf k_{\rm eff}\cdot\mathbf e_s=\omega\delta\mathbf h\cdot\mathbf e_s$. CBS uses its existing braced products with the corrected vector invariants. This is a bulk general-vector amplitude approximation; internal-mode polarization matching and interface normalization remain outside its scope.
 
-Incoherent pieces retain the parent segment's duration in the sinc and weight, multiplied by each piece's length fraction and mean transmission. This preserves the original segment intensity model while allowing different face roots; geometric cuts do not create independent tiny emitters. `LINE_ESCAPE_MODEL = "segment-mean-v3-snell-resonance"` forks affected case and dataset identities.
+Incoherent pieces retain the parent segment's duration in the sinc and weight, multiplied by each piece's length fraction and mean transmission. This preserves the original segment intensity model while allowing different face roots; geometric cuts do not create independent tiny emitters. `CXR_ESCAPE_MODEL = "segment-mean-v3-snell-resonance"` forks affected case and dataset identities.
 
 ### Propagation phase
 
@@ -126,4 +126,4 @@ Ledger rows: `absorption-length` for photoabsorption and `narrow-beam-total-atte
 
 The propagation-phase derivation record still contains a complex-index factorization with an inconsistent attenuation sign; the separate real-phase and transmission factors above match the implementation. That record needs correction before sign-off. Consult the [validation ledger](../../validation/physics-validation-ledger.md) before scientific use.
 
-Implementation owners: `pyrite.materials.crystal.absorption_length_ang`, `pyrite.materials.crystal.chi_0`, `pyrite.materials.crystal.refractive_index`, `pyrite.materials.attenuation`, `pyrite.montecarlo.groove.escape_distance_ang`, and the escape/dispersion helpers in `pyrite.montecarlo.spectrum.lines`.
+Implementation owners: `pyrite.materials.crystal.absorption_length_ang`, `pyrite.materials.crystal.chi_0`, `pyrite.materials.crystal.refractive_index`, `pyrite.materials.attenuation`, `pyrite.montecarlo.groove.escape_distance_ang`, and the escape/dispersion helpers in `pyrite.montecarlo.spectrum.cxr`.

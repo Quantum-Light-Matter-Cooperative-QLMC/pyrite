@@ -12,8 +12,8 @@ import pytest
 
 from pyrite.montecarlo.geometry import tilted_geometry
 from pyrite.montecarlo.groove import blazed_groove_spec
-from pyrite.montecarlo.spectrum import mc_brem_spectrum, mc_spectrum, subdivide_flights
-from pyrite.montecarlo.spectrum.lines import _clip_segments_to_cutoff
+from pyrite.montecarlo.spectrum import mc_brem_spectrum, mc_cxr_spectrum, subdivide_flights
+from pyrite.montecarlo.spectrum.cxr import _clip_segments_to_cutoff
 from pyrite.montecarlo.transport import (
     SegmentEvent,
     TransportLUTConfig,
@@ -278,7 +278,7 @@ def test_numerical_subdivision_alone_does_not_change_the_radiation():
         )
         closing = closes_flight(rows["event_kind"])
         np.testing.assert_array_equal(rows["event_kind"][closing], flights["event_kind"])
-        cxr.append(mc_spectrum(rows, cxr_grid, **kwargs))
+        cxr.append(mc_cxr_spectrum(rows, cxr_grid, **kwargs))
         brem.append(mc_brem_spectrum(rows, brem_grid, composition=CARBON))
 
     def l1(values, ref):

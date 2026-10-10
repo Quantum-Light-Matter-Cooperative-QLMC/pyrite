@@ -20,7 +20,7 @@ from pyrite.plots.altair.spectra import _NA_PER_UA, spectrum_chart, spectrum_fra
 def _settings():
     # apply_detector_qe=False -> no QE table; convolve_with_det=False -> no
     # convolution; brem_source="mc" -> brem reads straight from r["brem"]. This
-    # keeps _line_brem/detected_background on the pure-numpy path.
+    # keeps _cxr_brem/detected_background on the pure-numpy path.
     return SimpleNamespace(
         apply_detector_qe=False,
         convolve_with_det=False,
@@ -160,10 +160,10 @@ def test_spectrum_frame_peak_preserving_decimation_keeps_line_peak():
 def test_spectrum_frame_brem_toggle_preserves_total_sampling_budget():
     rec = _record(30.0, -20.0, 0.0, n=1200)
 
-    line_only = spectrum_frame([rec], _settings(), include_brem=False, max_points=120)
+    cxr_only = spectrum_frame([rec], _settings(), include_brem=False, max_points=120)
     with_brem = spectrum_frame([rec], _settings(), include_brem=True, max_points=120)
 
-    line_energy = line_only.loc[line_only.component == "total", "energy_eV"].to_numpy()
+    line_energy = cxr_only.loc[cxr_only.component == "total", "energy_eV"].to_numpy()
     total_energy = with_brem.loc[with_brem.component == "total", "energy_eV"].to_numpy()
     np.testing.assert_array_equal(total_energy, line_energy)
 
@@ -171,14 +171,14 @@ def test_spectrum_frame_brem_toggle_preserves_total_sampling_budget():
 def test_spectrum_frame_wide_brem_preserves_line_window_resolution():
     rec = _record(30.0, -20.0, 0.0, n=12000, wide_brem=True)
 
-    line_only = spectrum_frame([rec], _settings(), include_brem=False, max_points=500)
+    cxr_only = spectrum_frame([rec], _settings(), include_brem=False, max_points=500)
     with_brem = spectrum_frame([rec], _settings(), include_brem=True, max_points=500)
 
     def _line_window(df):
         total = df[df.component == "total"]
         return total.loc[total.energy_eV.between(2400.0, 2600.0), "energy_eV"].to_numpy()
 
-    line_energy = _line_window(line_only)
+    line_energy = _line_window(cxr_only)
     total_energy = _line_window(with_brem)
     line_shape = np.interp(line_energy, rec["E_grid"], rec["spec"])
     total_shape = np.interp(total_energy, rec["E_grid"], rec["spec"])
@@ -394,7 +394,7 @@ def test_spectrum_chart_none_on_empty():
 
 
 def test_spectrum_frame_adds_line_component_without_touching_brem():
-    df = spectrum_frame([_record(30.0, -20.0, 0.0)], _settings(), include_line=True)
+    df = spectrum_frame([_record(30.0, -20.0, 0.0)], _settings(), include_cxr=True)
     assert set(df["component"]) == {"total", "brem", "line"}
     line = df[df.component == "line"]["intensity"].to_numpy()
     total_no_line = spectrum_frame([_record(30.0, -20.0, 0.0)], _settings())
@@ -406,7 +406,7 @@ def test_spectrum_frame_adds_line_component_without_touching_brem():
 
 
 def test_spectrum_chart_adds_line_layer():
-    chart = spectrum_chart(_store(), _settings(), include_line=True)
+    chart = spectrum_chart(_store(), _settings(), include_cxr=True)
     assert len(chart.to_dict()["layer"]) == 3
 
 
@@ -420,7 +420,7 @@ def test_spectrum_frame_coherent_overlay_present_with_spec_coherent():
     rec["spec_coherent"] = rec["spec"] * 2.0
     df = spectrum_frame([rec], _settings(), include_coherent=True)
     coherent = df[df.component == "coherent"]["intensity"].to_numpy()
-    line = spectrum_frame([rec], _settings(), include_line=True)
+    line = spectrum_frame([rec], _settings(), include_cxr=True)
     line = line[line.component == "line"]["intensity"].to_numpy()
     # spec_coherent is exactly 2x spec, so its detected line is 2x too.
     np.testing.assert_allclose(coherent, line * 2.0)

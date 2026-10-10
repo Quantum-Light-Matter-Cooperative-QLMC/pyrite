@@ -1,7 +1,7 @@
 """Tests for the detector solid-angle tiling (P2 #4).
 
 detector_directions() is pure geometry (numpy), so it is fully tested here. The
-integrated spectrum mc_spectrum_solid_angle() drives the GPU mc_spectrum per
+integrated spectrum mc_cxr_spectrum_solid_angle() drives the GPU mc_cxr_spectrum per
 direction, so its physics regression (n_side=1 == single-angle x Omega; the wide-
 detector asymmetry) lives in checks/detector_solid_angle_check.py; here we only
 check its cheap input validation.
@@ -12,7 +12,7 @@ import pytest
 
 from pyrite.montecarlo import (
     detector_directions,
-    mc_spectrum_solid_angle,
+    mc_cxr_spectrum_solid_angle,
     tilted_geometry,
 )
 
@@ -88,10 +88,10 @@ def test_nside_must_be_positive():
 
 
 def test_solid_angle_spectrum_validates_shapes():
-    """mc_spectrum_solid_angle rejects malformed grids before any GPU work."""
+    """mc_cxr_spectrum_solid_angle rejects malformed grids before any GPU work."""
     segs = {"E_keV": np.array([25.0]), "Ne": 1, "thickness_ang": 1e7}
     with pytest.raises(ValueError):
-        mc_spectrum_solid_angle(
+        mc_cxr_spectrum_solid_angle(
             segs,
             np.arange(500.0, 600.0),
             "hopg",
@@ -101,7 +101,7 @@ def test_solid_angle_spectrum_validates_shapes():
             B_ang2=0.8,
         )
     with pytest.raises(ValueError):
-        mc_spectrum_solid_angle(
+        mc_cxr_spectrum_solid_angle(
             segs,
             np.arange(500.0, 600.0),
             "hopg",

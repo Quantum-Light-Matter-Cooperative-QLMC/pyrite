@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 from scipy.optimize import brentq
 
+from pyrite._cxr_windows import FeatureSeed, build_window_plan
 from pyrite._grid_semantics import validate_backend_coordinates
-from pyrite._line_windows import FeatureSeed, build_window_plan
 from pyrite.materials.atomic import load_henke
 from pyrite.materials.crystal import (
     CRYSTALS,
@@ -19,8 +19,8 @@ from pyrite.materials.crystal import (
     reciprocal_g_vector,
     refractive_index,
 )
-from pyrite.montecarlo.spectrum import line_seeds
-from pyrite.montecarlo.spectrum.line_seeds import (
+from pyrite.montecarlo.spectrum import cxr_seeds
+from pyrite.montecarlo.spectrum.cxr_seeds import (
     CHARACTERISTIC_SOURCE,
     EDGE_MIN_F2_RATIO,
     EDGE_SOURCE,
@@ -29,7 +29,7 @@ from pyrite.montecarlo.spectrum.line_seeds import (
     absorption_edge_seeds,
     characteristic_line_seeds,
     collect_feature_seeds,
-    kinematic_line_seeds,
+    kinematic_cxr_seeds,
     register_seed_provider,
 )
 from pyrite.montecarlo.transport import beta_from_keV
@@ -83,7 +83,7 @@ def test_band_seeds_centre_on_the_in_medium_root_the_kernels_use():
     hkl = (0, 0, 2)
     g_vector, _ = reciprocal_g_vector(hkl, CRYSTALS[_CRYSTAL]["lattice"])
     segments = _flights([30.0], [3000.0], [g_vector])
-    (seed,), _ = kinematic_line_seeds(
+    (seed,), _ = kinematic_cxr_seeds(
         segments,
         _N_HAT,
         crystal=_CRYSTAL,
@@ -103,7 +103,7 @@ def test_single_flight_window_is_centred_on_the_closed_form_resonance():
     hkl = (0, 0, 2)
     g_vector, _ = reciprocal_g_vector(hkl, CRYSTALS[_CRYSTAL]["lattice"])
     segments = _flights([100.0], [2000.0], [g_vector])
-    seeds, summary = kinematic_line_seeds(
+    seeds, summary = kinematic_cxr_seeds(
         segments, _N_HAT, crystal=_CRYSTAL, hkl_list=[hkl], feature_width_eV=0.8
     )
     (seed,) = seeds
@@ -122,7 +122,7 @@ def test_window_covers_the_weighted_band_and_ignores_a_negligible_tail():
     heavy = [g_vector] * 50 + [tilted] * 50
     rare = [g_vector + np.array([0.0, 0.9 * np.linalg.norm(g_vector), 0.0])]
     segments = _flights([100.0] * 101, [1000.0] * 100 + [1.0], heavy + rare)
-    (seed,), _ = kinematic_line_seeds(
+    (seed,), _ = kinematic_cxr_seeds(
         segments,
         _N_HAT,
         crystal=_CRYSTAL,
@@ -141,7 +141,7 @@ def test_window_covers_the_weighted_band_and_ignores_a_negligible_tail():
 def test_a_reflection_that_never_radiates_is_reported_not_seeded():
     g_vector, _ = reciprocal_g_vector((0, 0, 2), CRYSTALS[_CRYSTAL]["lattice"])
     segments = _flights([100.0], [2000.0], [g_vector])
-    seeds, summary = kinematic_line_seeds(
+    seeds, summary = kinematic_cxr_seeds(
         segments, _N_HAT, crystal=_CRYSTAL, hkl_list=[(0, 0, 2), (0, 0, -2)], feature_width_eV=1.0
     )
     assert [seed.label for seed in seeds] == ["(0 0 2)"]
@@ -153,10 +153,10 @@ def test_mosaic_spread_widens_the_window():
     hkl = (0, 0, 2)
     g_vector, _ = reciprocal_g_vector(hkl, CRYSTALS[_CRYSTAL]["lattice"])
     segments = _flights([100.0], [2000.0], [g_vector + np.array([0.2, 0.0, 0.0])])
-    (perfect,), _ = kinematic_line_seeds(
+    (perfect,), _ = kinematic_cxr_seeds(
         segments, _N_HAT, crystal=_CRYSTAL, hkl_list=[hkl], feature_width_eV=0.5, tail_widths=1.0
     )
-    (mosaic,), _ = kinematic_line_seeds(
+    (mosaic,), _ = kinematic_cxr_seeds(
         segments,
         _N_HAT,
         crystal=_CRYSTAL,
@@ -244,8 +244,8 @@ def _context():
 
 
 def test_default_providers_build_a_valid_float32_plan_for_a_carbon_case():
-    seeds, summaries = collect_feature_seeds(_context(), line_seeds.DEFAULT_SEED_PROVIDERS)
-    assert {seed.source for seed in seeds} == set(line_seeds.DEFAULT_SEED_PROVIDERS)
+    seeds, summaries = collect_feature_seeds(_context(), cxr_seeds.DEFAULT_SEED_PROVIDERS)
+    assert {seed.source for seed in seeds} == set(cxr_seeds.DEFAULT_SEED_PROVIDERS)
     assert summaries[KINEMATIC_SOURCE]["seeds"] == 1
     plan = build_window_plan(10.0, 2600.0, 3.0, seeds)
     grid = plan.coordinates()
@@ -254,7 +254,7 @@ def test_default_providers_build_a_valid_float32_plan_for_a_carbon_case():
 
 
 def test_a_registered_non_pxr_component_contributes_windows(monkeypatch):
-    monkeypatch.setattr(line_seeds, "_PROVIDERS", dict(line_seeds._PROVIDERS))
+    monkeypatch.setattr(cxr_seeds, "_PROVIDERS", dict(cxr_seeds._PROVIDERS))
 
     def fringes(context):
         centre = 0.5 * (context.start_eV + context.stop_eV)
@@ -273,7 +273,7 @@ def test_a_registered_non_pxr_component_contributes_windows(monkeypatch):
 
 
 def test_unknown_or_misattributed_providers_are_refused(monkeypatch):
-    monkeypatch.setattr(line_seeds, "_PROVIDERS", dict(line_seeds._PROVIDERS))
+    monkeypatch.setattr(cxr_seeds, "_PROVIDERS", dict(cxr_seeds._PROVIDERS))
     with pytest.raises(ValueError, match="unknown seed provider"):
         collect_feature_seeds(_context(), ["no-such-provider"])
     register_seed_provider(
@@ -291,8 +291,8 @@ def test_kinematic_summary_reports_the_narrowest_feature_not_only_the_quantile()
     the narrowest one. On these cases the two coincide, which is the evidence
     that the ``samples_per_feature`` heuristic means what it says.
     """
-    _seeds, summary = collect_feature_seeds(_context(), [line_seeds.KINEMATIC_SOURCE])
-    kinematic = summary[line_seeds.KINEMATIC_SOURCE]
+    _seeds, summary = collect_feature_seeds(_context(), [cxr_seeds.KINEMATIC_SOURCE])
+    kinematic = summary[cxr_seeds.KINEMATIC_SOURCE]
 
     g_vector, _ = reciprocal_g_vector((0, 0, 2), CRYSTALS[_CRYSTAL]["lattice"])
     t_L = 3000.0 / float(beta_from_keV(30.0))

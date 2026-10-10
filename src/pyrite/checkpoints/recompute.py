@@ -4,7 +4,7 @@ Both rewrite one dataset of existing per-material checkpoints in place and
 leave the other alone, so they are orders of magnitude cheaper than re-running
 the sweep. :func:`rebrem_checkpoints` rewrites the brem background
 (``brem_wide``, ``brem``, ``E_grid_brem`` and the case's ``Ne_brem``);
-:func:`reline_checkpoints` rewrites the line ``spec`` (and ``E_grid``),
+:func:`recxr_checkpoints` rewrites the line ``spec`` (and ``E_grid``),
 re-interpolating the stored brem onto the new line grid.
 
 Typical use is bumping an electron count (brem noise falls as 1/sqrt(Ne_brem))
@@ -235,11 +235,11 @@ def rebrem_checkpoints(
     return out
 
 
-def reline_checkpoints(
+def recxr_checkpoints(
     materials=None,
     checkpoint_dir=None,
-    line_ne=None,
-    line_start_eV=None,
+    cxr_ne=None,
+    cxr_start_eV=None,
     line_stop_eV=None,
     line_step_eV=None,
     fidelity=None,
@@ -252,7 +252,7 @@ def reline_checkpoints(
     max_minutes=None,
     summary_status=None,
 ):
-    """Run :func:`reline_checkpoint` over one or more materials.
+    """Run :func:`recxr_checkpoint` over one or more materials.
     ``materials=None`` sweeps every ``*.pkl`` (excluding ``*.slim.pkl``).
     Returns ``{stem: results}``. ``progress_file`` (single material only) writes
     the same compact JSON progress record ``pyrite rebrem`` does, feeding the remote
@@ -290,7 +290,7 @@ def reline_checkpoints(
             fidelity=fidelity,
             require_identity=require_identity,
         )
-        resolved_ne = line_ne
+        resolved_ne = cxr_ne
         use_profile_defaults = context.identified or fidelity is not None or require_identity
         if use_profile_defaults and resolved_ne is None:
             from .recompute_defaults import settings
@@ -314,13 +314,13 @@ def reline_checkpoints(
         max_seconds = None if deadline is None else max(0.0, deadline - time.monotonic())
         status = {}
         recompute_options = {
-            "line_ne": resolved_ne,
+            "cxr_ne": resolved_ne,
             "line_step_eV": line_step_eV,
             "from_config": from_config,
             "redo_all": redo_all,
         }
-        if line_start_eV is not None:
-            recompute_options["line_start_eV"] = line_start_eV
+        if cxr_start_eV is not None:
+            recompute_options["cxr_start_eV"] = cxr_start_eV
         if line_stop_eV is not None:
             recompute_options["line_stop_eV"] = line_stop_eV
         if use_profile_defaults:
@@ -329,7 +329,7 @@ def reline_checkpoints(
         try:
             if progress_file is not None:
                 progress_timer.start()
-            out[stem] = reline_checkpoint(
+            out[stem] = recxr_checkpoint(
                 path,
                 material=context.material,
                 save_every=save_every,
@@ -403,7 +403,7 @@ def repair_brem_wide(
 ):
     """Regenerate ``brem_wide`` (and the line-grid ``brem``) for cached records
     using the CURRENT ``mc_brem_spectrum`` -- WITHOUT re-running the expensive
-    line spectrum.
+    CXR spectrum.
 
     Records computed before the brem-absorption fix have NaN ``brem_wide`` above
     the Henke ceiling (~30 keV) and at E=0, which the log plots drop (the
@@ -442,7 +442,7 @@ def repair_brem_wide(
         fired once before the loop and after every repaired record -- same shape
         as run_sweep's ``on_progress(completed_new_cases, total, cached_cases)``,
         so ``pyrite rebrem --progress-file`` feeds the remote progress dashboard.
-    max_seconds / status : chunked resubmission (mirror of ``repair_line_spec``).
+    max_seconds / status : chunked resubmission (mirror of ``repair_cxr_spec``).
         When ``max_seconds`` is not ``None`` a ``time.monotonic``-based deadline is
         checked BEFORE each record; on expiry the loop breaks with unprocessed
         records left. When ``status`` is a dict, ``status["complete"]`` is set to
@@ -626,12 +626,12 @@ def repair_checkpoint(checkpoint_path, save_every=100, max_seconds=None, status=
     return results
 
 
-def _target_line_grid(
+def _target_cxr_grid(
     sweep,
     r,
     line_step_eV,
     from_config,
-    line_start_eV=None,
+    cxr_start_eV=None,
     line_stop_eV=None,
 ):
     """The line grid a reline should land on for record ``r``.
@@ -644,35 +644,35 @@ def _target_line_grid(
 
     eg = np.asarray(r["E_grid"], float)
     if from_config and sweep is not None:
-        from ..campaign.sweep import _line_grid_for_energy, sweep_crystal_params
+        from ..campaign.sweep import _cxr_grid_for_energy, sweep_crystal_params
 
         # Coordinates only: a returned policy payload describes a resolution the
         # runner would refine from its own trajectories, and reline pins the
         # explicit coordinates instead (it drops `case["line_grid_policy"]`).
-        coordinates, _policy = _line_grid_for_energy(
+        coordinates, _policy = _cxr_grid_for_energy(
             sweep, sweep_crystal_params(sweep), float(r["case"]["E0_keV"])
         )
         base = np.asarray(coordinates, float)
     else:
         base = eg
-    if any(value is not None for value in (line_start_eV, line_stop_eV, line_step_eV)):
+    if any(value is not None for value in (cxr_start_eV, line_stop_eV, line_step_eV)):
         from ..checkpoints.recompute_defaults import uniform_bounds
 
         start, stop, step = uniform_bounds(base)
         return np.arange(
-            start if line_start_eV is None else float(line_start_eV),
+            start if cxr_start_eV is None else float(cxr_start_eV),
             stop if line_stop_eV is None else float(line_stop_eV),
             step if line_step_eV is None else float(line_step_eV),
         )
     return base
 
 
-def repair_line_spec(
+def repair_cxr_spec(
     results,
     material,
     only_stale=True,
-    line_ne=None,
-    line_start_eV=None,
+    cxr_ne=None,
+    cxr_start_eV=None,
     line_stop_eV=None,
     line_step_eV=None,
     fidelity=None,
@@ -686,17 +686,17 @@ def repair_line_spec(
     status=None,
 ):
     """Regenerate the incoherent line ``spec`` for cached records with the
-    CURRENT line path (:func:`pyrite.montecarlo._line_pair_for_case`) -- the
+    CURRENT line path (:func:`pyrite.montecarlo._cxr_pair_for_case`) -- the
     mirror of :func:`repair_brem_wide`, WITHOUT recomputing the brem background.
     A ``coherent``/``both`` checkpoint (one carrying ``spec_coherent``) has BOTH
     its incoherent ``spec`` and its ``spec_coherent`` refreshed onto the new grid
     from a single re-transport, so the coherent array never drifts off-grid.
 
-    Target line grid per record (see :func:`_target_line_grid`): ``line_step_eV``
+    Target line grid per record (see :func:`_target_cxr_grid`): ``line_step_eV``
     (explicit uniform spacing), else ``from_config`` rebuilds it from
     ``material``'s current ``E_grid_line_by_energy`` at the record's E0 (edit
     the catalog, ``pyrite reline`` re-runs lines on the new grid), else the
-    record's existing grid (pure ``line_ne`` bump). ``line_ne`` overrides
+    record's existing grid (pure ``cxr_ne`` bump). ``cxr_ne`` overrides
     ``case["Ne"]``.
 
     After relining, brem stays consistent: ``r["brem"]`` is re-interpolated from
@@ -739,19 +739,19 @@ def repair_line_spec(
     n_skipped = 0
     for name in results:
         for r in results[name].values():
-            target = _target_line_grid(
+            target = _target_cxr_grid(
                 sweep,
                 r,
                 line_step_eV,
                 from_config,
-                line_start_eV,
+                cxr_start_eV,
                 line_stop_eV,
             )
             eg = np.asarray(r["E_grid"], float)
             spec = r.get("spec")
             finite = spec is not None and np.isfinite(np.asarray(spec)).all()
             grid_ok = eg.shape == target.shape and np.allclose(eg, target)
-            ne_ok = line_ne is None or int(r["case"].get("Ne", -1)) == int(line_ne)
+            ne_ok = cxr_ne is None or int(r["case"].get("Ne", -1)) == int(cxr_ne)
             fidelity_ok = fidelity is None or r["case"].get("line_profile") == fidelity
             at_target = finite and grid_ok and ne_ok and fidelity_ok
             if only_stale and not redo_all and at_target:
@@ -775,8 +775,8 @@ def repair_line_spec(
             broke = True
             break
         c = r["case"]
-        if line_ne is not None:
-            c["Ne"] = int(line_ne)
+        if cxr_ne is not None:
+            c["Ne"] = int(cxr_ne)
         if fidelity is not None:
             c["line_profile"] = fidelity
         # `spec` is always the incoherent line sum; a coherent/both checkpoint
@@ -786,7 +786,7 @@ def repair_line_spec(
         # (no `spec_coherent` key) are orphaned by design -- reline only ever
         # re-derives the incoherent `spec` for those.
         want_coherent = "spec_coherent" in r
-        spec, spec_coherent, spec_characteristic = runner._line_pair_for_case(
+        spec, spec_coherent, spec_characteristic = runner._cxr_pair_for_case(
             c, target, want_coherent=want_coherent, return_characteristic=True
         )
         r["spec"] = spec
@@ -822,14 +822,14 @@ def repair_line_spec(
     return done
 
 
-def reline_checkpoint(
+def recxr_checkpoint(
     checkpoint_path, material, save_every=100, max_seconds=None, status=None, **kw
 ):
     """Load a per-material checkpoint, reline its line ``spec`` (see
-    :func:`repair_line_spec`), and re-pickle it in place (atomic, resumable),
+    :func:`repair_cxr_spec`), and re-pickle it in place (atomic, resumable),
     saving every ``save_every`` records. Mirror of :func:`repair_checkpoint`.
     ``max_seconds``/``status`` thread the chunked-resubmission deadline through
-    to :func:`repair_line_spec`."""
+    to :func:`repair_cxr_spec`."""
     if not _checkpoint_exists(checkpoint_path):
         print(f"no such checkpoint: {checkpoint_path}")
         return {}
@@ -842,7 +842,7 @@ def reline_checkpoint(
             components=("characteristic", "line"),
         )
 
-    n = repair_line_spec(
+    n = repair_cxr_spec(
         results,
         material=material,
         save_every=save_every,
@@ -853,3 +853,22 @@ def reline_checkpoint(
     )
     print(f"re-saved {checkpoint_path}" if n else "checkpoint unchanged")
     return results
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {
+    "reline_checkpoints": "recxr_checkpoints",
+    "_target_line_grid": "_target_cxr_grid",
+    "repair_line_spec": "repair_cxr_spec",
+    "reline_checkpoint": "recxr_checkpoint",
+}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

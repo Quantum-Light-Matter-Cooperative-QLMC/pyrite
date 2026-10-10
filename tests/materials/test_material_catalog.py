@@ -105,10 +105,10 @@ def test_per_beam_line_grids_are_exact_read_only_and_projected(tmp_path, monkeyp
     trajectory = config.trajectory_sweep("sample")
     assert grid["E_grid_line"] is None
     assert grid["E_grid_line_by_energy"] is scan.E_grid_line_by_energy
-    assert sweep.detector.energy_bins.line is None
-    assert sweep.detector.energy_bins.line_by_energy is scan.E_grid_line_by_energy
-    assert trajectory.detector.energy_bins.line is None
-    assert trajectory.detector.energy_bins.line_by_energy is scan.E_grid_line_by_energy
+    assert sweep.detector.energy_bins.cxr is None
+    assert sweep.detector.energy_bins.cxr_by_energy is scan.E_grid_line_by_energy
+    assert trajectory.detector.energy_bins.cxr is None
+    assert trajectory.detector.energy_bins.cxr_by_energy is scan.E_grid_line_by_energy
 
 
 def test_fixed_material_line_grid_overrides_profile_mapping(tmp_path):
@@ -155,7 +155,7 @@ def test_per_beam_line_grid_rejects_duplicate_beam_energies(tmp_path):
     text = _catalog_with_per_beam_line_grids().replace(PER_BEAM_ENTRIES, replacement)
     with pytest.raises(MaterialConfigError) as caught:
         load_material_catalog(_write_catalog(tmp_path, text))
-    assert "energy_grids.sample.line_by_energy[1].energy_keV" in str(caught.value)
+    assert "energy_grids.sample.cxr_by_energy[1].energy_keV" in str(caught.value)
 
 
 def test_partial_store_coverage_loads_and_keeps_only_covered_rows(tmp_path):
@@ -186,11 +186,11 @@ def test_per_beam_line_grid_duplicate_is_reported_after_invalid_grid(tmp_path):
         load_material_catalog(_write_catalog(tmp_path, text))
 
     assert any(
-        "energy_grids.sample.line_by_energy[0].grid: grid must be nonempty" in error
+        "energy_grids.sample.cxr_by_energy[0].grid: grid must be nonempty" in error
         for error in caught.value.errors
     )
     assert any(
-        "energy_grids.sample.line_by_energy[1].energy_keV: duplicates beam energy 25" in error
+        "energy_grids.sample.cxr_by_energy[1].energy_keV: duplicates beam energy 25" in error
         for error in caught.value.errors
     )
 
@@ -202,7 +202,7 @@ def test_energy_grids_row_requires_a_valid_source(tmp_path):
     text = _catalog_with_per_beam_line_grids().replace(PER_BEAM_ENTRIES, replacement)
 
     with pytest.raises(
-        MaterialConfigError, match=r"energy_grids\.sample\.line_by_energy\[0\]\.source"
+        MaterialConfigError, match=r"energy_grids\.sample\.cxr_by_energy\[0\]\.source"
     ):
         load_material_catalog(_write_catalog(tmp_path, text))
 

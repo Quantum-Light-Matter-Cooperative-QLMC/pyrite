@@ -64,7 +64,7 @@ where $B$ is the transient budget in bytes and $w$ is the item size of the worki
 
 As the number of bins grows, the chunk shrinks to stay within the same byte budget. A `float32` working type permits roughly twice as many segments per chunk as `float64` for the same budget.
 
-Precedence runs: an explicit per-case `spec_chunk` / `brem_chunk` wins, then a pinned `PYRITE_MC_SPEC_CHUNK` / `PYRITE_MC_BREM_CHUNK`, then the adaptive size. Whichever wins is capped by device admission.
+Precedence runs: an explicit per-case `spec_chunk` / `brem_chunk` wins, then a pinned `PYRITE_MC_CXR_CHUNK` / `PYRITE_MC_BREM_CHUNK`, then the adaptive size. Whichever wins is capped by device admission.
 
 ### Admission
 

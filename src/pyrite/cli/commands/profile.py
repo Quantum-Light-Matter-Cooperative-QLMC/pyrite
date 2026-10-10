@@ -16,8 +16,8 @@ from pyrite.cli._deprecations import canonical_option
 from pyrite.cli._groups import LazyGroup
 from pyrite.cli.commands import (
     _physical_detector,
+    _profile_cxr_grid,
     _profile_filters,
-    _profile_line_grid,
     _profile_precision,
     _profile_show,
 )
@@ -63,6 +63,7 @@ _PAIR_PRODUCTION_MODEL_VALUES = ("penelope-2024",)
 _ATOMIC_ELECTRON_DEFLECTION_VALUES = ("kawrakow", "none")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
+    "cxr-trials": "n_electrons",
     "line-trials": "n_electrons",
     "brem-trials": "n_electrons_brem",
     "line-electrons": "n_electrons",
@@ -115,11 +116,12 @@ def _ne_cli_options(function):
     )(function)
     function = canonical_option(
         "-l",
-        "--line-trials",
+        "--cxr-trials",
         "ne_line",
+        retired=("--line-trials",),
         type=COUNT_CSV,
         metavar="N,...",
-        help="Monte Carlo electron histories used to estimate the line spectrum; positive integers.",
+        help="Monte Carlo electron histories used to estimate the CXR spectrum; positive integers.",
     )(function)
     return function
 
@@ -247,8 +249,8 @@ def command():
       pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
       pyrite profile create sub_100keV --energy 30:100:10
       pyrite profile set sub_100keV --detector eds
-      pyrite profile numerics set sub_100keV --line-trials 2000
-      pyrite profile line-grid show sub_100keV
+      pyrite profile numerics set sub_100keV --cxr-trials 2000
+      pyrite profile cxr-grid show sub_100keV
       pyrite profile add sub_100keV --energy 75
       pyrite profile set sub_100keV --material hopg,mose2
       pyrite profile rename sub_100keV sub100
@@ -311,11 +313,12 @@ def numerics_show_command(name, json_output):
 @numerics_command.command("set")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @canonical_option(
-    "--line-trials",
+    "--cxr-trials",
     "line_electrons",
+    retired=("--line-trials",),
     type=click.IntRange(min=1),
     metavar="N",
-    help="Monte Carlo electron histories used to estimate the line spectrum.",
+    help="Monte Carlo electron histories used to estimate the CXR spectrum.",
 )
 @canonical_option(
     "--brem-trials",
@@ -491,7 +494,12 @@ def numerics_reset_command(name, fields, yes, dry_run):
     return _write(document, original, dry_run, f"reset numerics for profile {name}")
 
 
-command.add_command(_profile_line_grid.command)
+command.add_command(_profile_cxr_grid.command)
+from copy import copy as _copy_command
+
+_legacy_grid_command = _copy_command(_profile_cxr_grid.command)
+_legacy_grid_command.hidden = True
+command.add_command(_legacy_grid_command, "line-grid")
 command.add_command(_profile_precision.command)
 command.add_command(_physical_detector.command)
 
@@ -576,7 +584,7 @@ def show_command(name, json_output):
     names = {
         value: key
         for key, value in _NUMERICS_FIELD_NAMES.items()
-        if key not in {"line-electrons", "bremsstrahlung-electrons"}
+        if key not in {"line-electrons", "bremsstrahlung-electrons", "line-trials"}
     }
     _profile_show.emit_show(payload, target, resolution, names, grid_rows)
     return 0
@@ -750,7 +758,7 @@ def create_command(
     default=None,
     help=(
         "Also compute the line temporal intensity profile I(t) (photons/sr/electron/fs) "
-        "beside each line spectrum. Off by default; on runs the slower per-reflection "
+        "beside each CXR spectrum. Off by default; on runs the slower per-reflection "
         "line route and changes the dataset identity."
     ),
 )

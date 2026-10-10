@@ -9,7 +9,7 @@ from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import build_cases
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner import electron_blocks as blocks
-from pyrite.montecarlo.spectrum.lines._attribution import merge_line_attribution
+from pyrite.montecarlo.spectrum.cxr._attribution import merge_cxr_attribution
 
 
 def _segments(ids):
@@ -48,7 +48,7 @@ def test_single_electron_is_never_split():
 
 
 def test_block_count_follows_headroom():
-    per = blocks.LINE_DEVICE_BYTES_PER_SEGMENT
+    per = blocks.CXR_DEVICE_BYTES_PER_SEGMENT
     assert blocks.electron_block_count(1_000, None) == 1
     assert blocks.electron_block_count(1_000, 1_000 * per) == 1
     assert blocks.electron_block_count(1_000, 1_000 * per // 3) == 4
@@ -84,7 +84,7 @@ def small_transport():
     return case, runner._transport_case(case, transport_core="lockstep")
 
 
-_LINES_ONCE = runner._lines_for_segments_once
+_LINES_ONCE = runner._cxr_for_segments_once
 
 
 def _once(case, tp, segments, audit=None):
@@ -130,9 +130,9 @@ def test_block_oom_doubles_blocks_and_restores_the_audit(monkeypatch, small_tran
     monkeypatch.setattr(runner, "device_headroom_bytes", lambda: 1)
     monkeypatch.setattr(runner, "electron_block_count", lambda n, headroom: 2)
     monkeypatch.setattr(runner, "_is_gpu_oom", lambda error: isinstance(error, FakeOOM))
-    monkeypatch.setattr(runner, "_lines_for_segments_once", once)
+    monkeypatch.setattr(runner, "_cxr_for_segments_once", once)
     audit = {"start_eV": 50.0}
-    spec = runner._lines_for_segments(
+    spec = runner._cxr_for_segments(
         tp["segs"],
         tp["E_grid"],
         case,
@@ -153,17 +153,15 @@ def test_cpu_and_coherent_sums_are_never_split(monkeypatch, small_transport):
     case, tp = small_transport
     seen = []
     monkeypatch.setattr(
-        runner, "_lines_for_segments_once", lambda segments, **kw: seen.append(segments)
+        runner, "_cxr_for_segments_once", lambda segments, **kw: seen.append(segments)
     )
     monkeypatch.setattr(runner, "electron_block_count", lambda n, headroom: 4)
-    runner._lines_for_segments(
+    runner._cxr_for_segments(
         tp["segs"], tp["E_grid"], case, tp["n_hat"], None, None, coherent=False
     )
     monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
     monkeypatch.setattr(runner, "device_headroom_bytes", lambda: 1)
-    runner._lines_for_segments(
-        tp["segs"], tp["E_grid"], case, tp["n_hat"], None, None, coherent=True
-    )
+    runner._cxr_for_segments(tp["segs"], tp["E_grid"], case, tp["n_hat"], None, None, coherent=True)
     assert seen == [tp["segs"], tp["segs"]]
 
 
@@ -181,7 +179,7 @@ def test_line_attribution_accounts_for_the_whole_line_mass(small_transport):
     }
     spec = np.asarray(_once(case, tp, tp["segs"], audit))
     np.testing.assert_array_equal(spec, np.asarray(_once(case, tp, tp["segs"])))
-    merged = merge_line_attribution(audit["attribution"], 5)
+    merged = merge_cxr_attribution(audit["attribution"], 5)
     np.testing.assert_allclose(merged["electron_mass"].sum(), float(audit["line_mass"]), rtol=1e-9)
     np.testing.assert_allclose(merged["electron_tail"].sum(), float(audit["mass_above"]), rtol=1e-9)
     assert set(merged["electron_ids"]) <= set(range(tp["Ne_lines"]))

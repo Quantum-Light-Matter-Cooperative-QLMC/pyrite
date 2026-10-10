@@ -2,7 +2,7 @@
 
 ## Claim and where it enters
 
-`mc_spectrum` accumulates the coherent segment sum as one complex field per `(reflection, mosaic orientation)` row and squares each row separately, so distinct reflections add as **intensities**. Writing the total far-field amplitude at one photon energy as a sum over the listed reciprocal-lattice vectors,
+`mc_cxr_spectrum` accumulates the coherent segment sum as one complex field per `(reflection, mosaic orientation)` row and squares each row separately, so distinct reflections add as **intensities**. Writing the total far-field amplitude at one photon energy as a sum over the listed reciprocal-lattice vectors,
 
 $$
 F(\omega)=\sum_{\mathbf g}F_{\mathbf g}(\omega),
@@ -19,7 +19,7 @@ $$
 F_{\mathbf g}F_{\mathbf g'}^{*}}_{\text{dropped}} .
 $$
 
-The implementation keeps the first sum. The `mc_spectrum` docstring asserts the second is negligible because "their resonances are spectrally separated"; this record measures what that assertion is worth. The same drop is inherited by `coherent-line-hkl-batch`, which is an evaluation-order claim over an already per-row squaring, and by the incoherent path, where dropping cross terms is the definition of the model rather than an approximation.
+The implementation keeps the first sum. The `mc_cxr_spectrum` docstring asserts the second is negligible because "their resonances are spectrally separated"; this record measures what that assertion is worth. The same drop is inherited by `coherent-line-hkl-batch`, which is an evaluation-order claim over an already per-row squaring, and by the incoherent path, where dropping cross terms is the definition of the model rather than an approximation.
 
 ## Two independent suppression mechanisms
 

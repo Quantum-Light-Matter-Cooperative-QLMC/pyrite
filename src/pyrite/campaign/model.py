@@ -220,6 +220,13 @@ def _replace_path(
     value: Any, parts: tuple[tuple[str, tuple[int, ...]], ...], leaf: Any, path: str
 ) -> Any:
     name, indexes = parts[0]
+    aliases = getattr(type(value), "_field_aliases", {})
+    if name in aliases:
+        from .._api_deprecations import warn_renamed
+
+        replacement_name = aliases[name]
+        warn_renamed(f"{type(value).__name__}.{name}", f"{type(value).__name__}.{replacement_name}")
+        name = replacement_name
     child = _descend(value, name, indexes, path)
     replacement = leaf if len(parts) == 1 else _replace_path(child, parts[1:], leaf, path)
     replacement = _replace_indexes(getattr(value, name), indexes, replacement, path)

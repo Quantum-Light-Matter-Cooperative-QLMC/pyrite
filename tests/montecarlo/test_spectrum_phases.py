@@ -1,6 +1,6 @@
-"""Direct gates on mc_spectrum's phases, driven without calling mc_spectrum.
+"""Direct gates on mc_cxr_spectrum's phases, driven without calling mc_cxr_spectrum.
 
-``mc_spectrum`` used to be one 1,892-line function whose internals were closures
+``mc_cxr_spectrum`` used to be one 1,892-line function whose internals were closures
 over its locals, so nothing inside it could be reached -- or asserted on --
 independently. These tests exercise each phase through its own entry point:
 preparation, both accumulation routes, the route choice, and the final
@@ -10,7 +10,7 @@ reduction. They are the standing guard that the phases stay separable.
 import numpy as np
 import pytest
 
-import pyrite.montecarlo.spectrum.lines._per_hkl as per_hkl_module
+import pyrite.montecarlo.spectrum.cxr._per_hkl as per_hkl_module
 from pyrite._backend import REAL
 from pyrite.materials.crystal import (
     CRYSTALS,
@@ -18,8 +18,8 @@ from pyrite.materials.crystal import (
     reciprocal_g_vector,
     refractive_index,
 )
-from pyrite.montecarlo import mc_spectrum
-from pyrite.montecarlo.spectrum.lines import (
+from pyrite.montecarlo import mc_cxr_spectrum
+from pyrite.montecarlo.spectrum.cxr import (
     SpectrumRequest,
     _accumulate_batched,
     _accumulate_per_hkl,
@@ -29,7 +29,7 @@ from pyrite.montecarlo.spectrum.lines import (
     _needs_per_hkl_route,
     _prepare_spectrum,
 )
-from pyrite.montecarlo.spectrum.lines._per_hkl import _sinc_window_bounds
+from pyrite.montecarlo.spectrum.cxr._per_hkl import _sinc_window_bounds
 from pyrite.montecarlo.transport import beta_from_keV
 from tests.helpers import host_backend_only, scaled_rtol, to_device, to_host
 
@@ -369,10 +369,10 @@ def test_the_two_routes_agree_on_a_case_both_can_run():
 
 def test_batched_route_supports_non_henke_form_factors():
     """The non-anomalous form-factor option reaches the batched route."""
-    batched = mc_spectrum(
+    batched = mc_cxr_spectrum(
         _segments(), E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, n_hat=N_HAT, use_henke=False
     )
-    per_hkl = mc_spectrum(
+    per_hkl = mc_cxr_spectrum(
         _segments(),
         E_GRID,
         CRYSTAL,
@@ -433,7 +433,7 @@ def test_finalize_returns_the_component_split_normalised_alike():
 
 
 def test_the_phases_compose_into_the_documented_pipeline():
-    """prepare -> accumulate -> finalise is the whole contract of mc_spectrum."""
+    """prepare -> accumulate -> finalise is the whole contract of mc_cxr_spectrum."""
     st = _prepare_spectrum(_request())
     assert not _needs_per_hkl_route(st)
     _accumulate_batched(st)

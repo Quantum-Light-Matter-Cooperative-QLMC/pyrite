@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 
-from .line_grid import resolve_observation_line_grid
+from .cxr_grid import resolve_observation_cxr_grid
 
 
 def validated_directions(n_hats) -> np.ndarray:
@@ -28,13 +28,13 @@ def directional_outputs(case, transport, n_hats, spectrum) -> dict[str, Any]:
     """Evaluate every observation direction on one already-run transport.
 
     The line grid covers all directions jointly
-    (:func:`~.line_grid.resolve_observation_line_grid`); it is independent of
+    (:func:`~.line_grid.resolve_observation_cxr_grid`); it is independent of
     the scalar case grid, so adding directions never changes scalar output.
     ``spectrum(case, transport)`` is the runner's spectrum phase (the GPU
     pipeline passes its OOM-retrying variant).
     """
     directions = validated_directions(n_hats)
-    E_grid, grid_record = resolve_observation_line_grid(
+    E_grid, grid_record = resolve_observation_cxr_grid(
         case,
         transport["segs"],
         directions,
@@ -45,7 +45,7 @@ def directional_outputs(case, transport, n_hats, spectrum) -> dict[str, Any]:
     )
     temporal_grid = None
     if case.get("temporal_profile"):
-        from ..spectrum.lines import temporal_profile_for
+        from ..spectrum.cxr import temporal_profile_for
 
         # One time grid for every direction so the profiles stack (#292).
         temporal_grid = temporal_profile_for(transport["segs"], E_grid, directions)

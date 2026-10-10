@@ -186,11 +186,11 @@ def _cli_rebrem(
     lifecycle.pull(completed, dataset="brem")
 
 
-def _cli_reline(
+def _cli_recxr(
     *,
     material,
     all_,
-    line_ne,
+    cxr_ne,
     start,
     stop,
     line_step,
@@ -202,10 +202,10 @@ def _cli_reline(
 ):
     """Submit a line-only checkpoint recompute, follow it, pull what completed."""
     materials = _selected_materials("reline", all_, material)
-    jobid = lifecycle.start_reline_queue(
+    jobid = lifecycle.start_recxr_queue(
         materials,
-        line_ne=line_ne,
-        line_start_eV=start,
+        cxr_ne=cxr_ne,
+        cxr_start_eV=start,
         line_stop_eV=stop,
         line_step_eV=line_step,
         redo_all=redo_all,
@@ -242,11 +242,11 @@ def _cli_pull(
     level9,
     no_sync,
     brem_only,
-    line_only,
+    cxr_only,
     force,
     hash_prefix,
 ):
-    dataset = "brem" if brem_only else ("line" if line_only else None)
+    dataset = "brem" if brem_only else ("line" if cxr_only else None)
     lifecycle.pull(
         _selected_materials(remote_command, all_, material),
         grid=(not full) and dataset is None,
@@ -271,12 +271,12 @@ def _cli_pull_json(
     level9,
     no_sync,
     brem_only,
-    line_only,
+    cxr_only,
     force,
     hash_prefix,
 ):
     materials = _selected_materials(remote_command, all_, material)
-    dataset = "brem" if brem_only else ("line" if line_only else None)
+    dataset = "brem" if brem_only else ("line" if cxr_only else None)
     started = time.monotonic()
     summary = {}
     caught = None
@@ -602,3 +602,17 @@ def _cli_check(
         refresh=refresh,
         no_sync=no_sync,
     )
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {"_cli_reline": "_cli_recxr"}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

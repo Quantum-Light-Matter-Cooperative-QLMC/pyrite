@@ -187,7 +187,7 @@ Characteristic emission is statistically incoherent with PXR/CBS amplitudes. If 
 | Density, path and angular normalization | `mc_characteristic_spectrum` multiplies density by `1.0e24`, path by `1.0e-8`, then divides by bin width, `4*pi`, and incident `Ne` | Matches |
 | Escape evaluated at line centre | `mc_characteristic_spectrum` evaluates material attenuation once per transition and uses the segment-midpoint escape path | Matches the stated quadrature approximation |
 | Each layer emits from its own composition | `_characteristic_from_segments` selects segments by layer and retains the complete absorber stack | Matches |
-| One common additive intensity | `runner/__init__.py` keeps `spec_characteristic` separate from `spec`/`spec_coherent`; `_spectral_components.line_spectrum` adds it once to the selected line spectrum | Matches |
+| One common additive intensity | `runner/__init__.py` keeps `spec_characteristic` separate from `spec`/`spec_coherent`; `_spectral_components.cxr_spectrum` adds it once to the selected line spectrum | Matches |
 
 The EEDL threshold and xraydb line/edge energies originate in different compilations. They are joined by element and shell; this review verifies that join and the direct-emission estimator, not a self-consistent energy-conserving relaxation cascade or the physical accuracy of every atomic datum.
 

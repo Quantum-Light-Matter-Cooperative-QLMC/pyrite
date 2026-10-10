@@ -79,11 +79,11 @@ def _remote_meta_json(stem):
     path = config.remote_output_path("checkpoints", stem, "meta.json")
     path_q = config.shell_arg(path)
     raw = transport._ssh_capture(f"[ -f {path_q} ] || exit 0; stat -c %Y {path_q}; cat {path_q}")
-    mtime_line, _, body = raw.partition("\n")
-    if not mtime_line.strip():
+    mtime_cxr, _, body = raw.partition("\n")
+    if not mtime_cxr.strip():
         return None
     try:
-        mtime = float(mtime_line)
+        mtime = float(mtime_cxr)
         meta = json.loads(body)
     except (ValueError, TypeError, json.JSONDecodeError):
         return None
@@ -245,7 +245,7 @@ def pull(
     A bare material stem also picks up any identity-qualified survey
     checkpoint the box holds for it (``<material>--survey-<hash>/``, see
     :func:`_resolve_survey_stems`) -- skipped for a ``dataset`` merge pull
-    (``--brem-only``/``--line-only``), since those require an existing local
+    (``--brem-only``/``--cxr-only``), since those require an existing local
     checkpoint to merge into and a freshly discovered stem would not have one.
 
     Every pull runs the transfer through ``pyrite checkpoint slim`` on the box, which encodes

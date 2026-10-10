@@ -5,6 +5,7 @@ import click
 from ...checkpoints import _checkpoint_io
 from ...console import output as _cli_core
 from .. import _completion as _cli_completion
+from .._deprecations import canonical_option
 
 
 @click.command(
@@ -13,7 +14,7 @@ from .. import _completion as _cli_completion
         "Shrink a checkpoint dataset for transfer.\n\n"
         "Accepts a component checkpoint directory or legacy pickle and writes one "
         "transfer pickle; input is never modified. --brem-only and "
-        "--line-only are mutually exclusive."
+        "--cxr-only are mutually exclusive."
     ),
 )
 @click.argument("checkpoint", shell_complete=_cli_completion.complete_checkpoint)
@@ -40,10 +41,12 @@ from .. import _completion as _cli_completion
 @click.option(
     "--brem-only",
     is_flag=True,
-    help="Keep only brem arrays; mutually exclusive with --line-only.",
+    help="Keep only brem arrays; mutually exclusive with --cxr-only.",
 )
-@click.option(
-    "--line-only",
+@canonical_option(
+    "--cxr-only",
+    "cxr_only",
+    retired=("--line-only",),
     is_flag=True,
     help="Keep only line arrays; mutually exclusive with --brem-only.",
 )
@@ -55,10 +58,10 @@ def command(
     downcast,
     compresslevel,
     brem_only,
-    line_only,
+    cxr_only,
 ):
-    if brem_only and line_only:
-        raise click.UsageError("--brem-only and --line-only are mutually exclusive")
+    if brem_only and cxr_only:
+        raise click.UsageError("--brem-only and --cxr-only are mutually exclusive")
     # Completion imports this command while enumerating the checkpoint group.
     # Keep the results/Monte Carlo stack out of that path: it selects an
     # accelerator backend and may require an optional GPU package.
@@ -73,5 +76,5 @@ def command(
         downcast=downcast,
         compresslevel=compresslevel,
         brem_only=brem_only,
-        line_only=line_only,
+        cxr_only=cxr_only,
     )

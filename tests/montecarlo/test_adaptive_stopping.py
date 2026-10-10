@@ -28,7 +28,7 @@ import warnings
 import numpy as np
 import pytest
 
-from pyrite._line_grid_policy import LineYieldStatisticsWarning
+from pyrite._cxr_grid_policy import CxrYieldStatisticsWarning
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner.adaptive import (
@@ -48,7 +48,7 @@ _RULE_ONLY = dict(max_electron_share=1.0, min_effective_electrons=0.0, stability
 
 
 def _population_measure(population):
-    return lambda start, stop, _block: {"line": population[start:stop]}
+    return lambda start, stop, _block: {"cxr": population[start:stop]}
 
 
 # ---- estimator ----------------------------------------------------------------
@@ -101,7 +101,7 @@ def test_degenerate_moments_report_no_error():
         dict(stability_blocks=1.5),
         dict(stability_fraction=float("nan")),
         dict(min_effective_electrons=float("inf")),
-        dict(observables=("line", "line")),
+        dict(observables=("cxr", "cxr")),
         dict(band_eV=(2000.0, 1000.0)),
         dict(band_eV=(0.0, 1000.0)),
         dict(batch_means_band_eV=(1000.0, float("inf"))),
@@ -135,7 +135,7 @@ def test_gaussian_population_has_near_nominal_coverage(guards):
         population = np.random.default_rng(seed).normal(1.0, 0.5, 2000)
         record = run_stopping_rule(settings, _population_measure(population))
         assert record["stop_reason"] == "converged"
-        line = record["statistics"]["line"]
+        line = record["statistics"]["cxr"]
         errors.append(line["mean"] - 1.0)
         rses.append(line["relative_se"])
     errors, rses = np.asarray(errors), np.asarray(rses)
@@ -172,9 +172,7 @@ def light_line_masses():
     for seed in _LIGHT_SEEDS:
         case = {**base, "seed": seed, "Ne": _LIGHT_N, "Ne_brem": _LIGHT_N}
         tp = runner._transport_case(case, transport_core="per-electron")
-        populations.append(
-            np.asarray(case_measure(case, settings)(0, _LIGHT_N, tp["segs"])["line"])
-        )
+        populations.append(np.asarray(case_measure(case, settings)(0, _LIGHT_N, tp["segs"])["cxr"]))
     return base, populations
 
 
@@ -196,8 +194,8 @@ def test_light_case_meets_its_target_over_20_seeds(light_line_masses):
     truth = np.concatenate(populations).mean()
     records = [run_stopping_rule(settings, _population_measure(p)) for p in populations]
     assert all(r["stop_reason"] == "converged" for r in records)
-    means = np.array([r["statistics"]["line"]["mean"] for r in records])
-    reported = np.array([r["statistics"]["line"]["relative_se"] for r in records])
+    means = np.array([r["statistics"]["cxr"]["mean"] for r in records])
+    reported = np.array([r["statistics"]["cxr"]["relative_se"] for r in records])
     assert np.all(reported <= target)
     within = np.abs(means / truth - 1.0) <= 1.96 * target
     assert within.sum() >= 17
@@ -231,7 +229,7 @@ def test_pilot_projection_skips_checks_until_the_projected_count():
         AdaptiveSettings(**base, pilot_electrons=100), _population_measure(population)
     )
     pilot = piloted["pilot"]
-    rse = pilot["relative_se"]["line"]
+    rse = pilot["relative_se"]["cxr"]
     assert pilot["projected_electrons"] == 10 * math.ceil(100 * (rse / 0.02) ** 2 / 10)
     assert piloted["realized_electrons"] >= pilot["projected_electrons"]
     assert piloted["checks"] < plain["checks"]
@@ -265,14 +263,14 @@ def test_guards_turn_a_false_early_stop_into_statistics_limited():
     rule = run_stopping_rule(AdaptiveSettings(**base, **_RULE_ONLY), measure)
     assert rule["stop_reason"] == "converged"
     assert rule["realized_electrons"] == 200
-    line = rule["statistics"]["line"]
+    line = rule["statistics"]["cxr"]
     assert abs(line["mean"] / 1.8 - 1.0) > 5 * line["relative_se"]
 
     guarded = run_stopping_rule(AdaptiveSettings(**base, min_effective_electrons=1000.0), measure)
     assert guarded["stop_reason"] == "max_electrons"
     assert guarded["statistics_limited"]
     assert guarded["realized_electrons"] == 4000
-    status = guarded["statistics"]["line"]
+    status = guarded["statistics"]["cxr"]
     assert not status["passes"]["max_electron_share"]
 
 
@@ -288,7 +286,7 @@ def test_guards_suppress_false_stops_across_seeds():
         for seed in range(40):
             population = _heavy_population(np.random.default_rng(seed), 4000, rate=2e-3)
             record = run_stopping_rule(settings, _population_measure(population))
-            line = record["statistics"]["line"]
+            line = record["statistics"]["cxr"]
             if record["stop_reason"] == "converged":
                 assert line["max_electron_share"] <= settings.max_electron_share
                 count += abs(line["mean"] / 1.8 - 1.0) > 3 * line["relative_se"]
@@ -398,7 +396,7 @@ _SETTINGS = AdaptiveSettings(
     min_electrons=40,
     max_electrons=200,
     block_electrons=20,
-    observables=("line", "brem"),
+    observables=("cxr", "brem"),
 )
 
 
@@ -426,7 +424,7 @@ def test_min_equal_max_is_the_fixed_n_run():
         target_rse=0.1, min_electrons=60, max_electrons=60, block_electrons=20
     )
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", LineYieldStatisticsWarning)  # ESS < 100 at 60
+        warnings.simplefilter("ignore", CxrYieldStatisticsWarning)  # ESS < 100 at 60
         result, stats = run_case_adaptive(case, settings, transport_core="per-electron")
     assert stats["realized_electrons"] == 60 and not stats["replayed_transport"]
     _assert_identical(result, _fixed(case, 60))
@@ -436,7 +434,7 @@ def test_unconverged_run_completes_statistics_limited():
     settings = AdaptiveSettings(
         target_rse=1e-4, min_electrons=20, max_electrons=40, block_electrons=20
     )
-    with pytest.warns(LineYieldStatisticsWarning, match="max_electrons=40"):
+    with pytest.warns(CxrYieldStatisticsWarning, match="max_electrons=40"):
         result, stats = run_case_adaptive(_case(), settings, transport_core="per-electron")
     assert stats["statistics_limited"] and stats["stop_reason"] == "max_electrons"
     assert stats["realized_electrons"] == 40
@@ -452,7 +450,7 @@ def test_batch_means_reconstruct_the_band_of_the_final_spectra():
         batch_means_band_eV=(1000.0, 3000.0),
     )
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", LineYieldStatisticsWarning)
+        warnings.simplefilter("ignore", CxrYieldStatisticsWarning)
         result, stats = run_case_adaptive(_case(), settings, transport_core="per-electron")
     batch = stats["batch_means"]
     assert batch["n_batches"] == 3
@@ -489,7 +487,7 @@ def test_energy_range_replay_rechecks_statistics_before_accepting_stop(monkeypat
     from pyrite.montecarlo.runner import block_transport
 
     settings = AdaptiveSettings(0.1, 40, 80, 20, **_RULE_ONLY)
-    monitor = StoppingMonitor(settings, lambda _start, _stop, block: {"line": block})
+    monitor = StoppingMonitor(settings, lambda _start, _stop, block: {"cxr": block})
     calls = []
 
     def run_blocks(_simulate, n, *, block_electrons, on_block=None, should_stop=None, **_kw):
@@ -522,6 +520,6 @@ def test_energy_range_replay_rechecks_statistics_before_accepting_stop(monkeypat
     record = monitor.record()
     assert record["replayed_transport"]
     assert record["realized_electrons"] == 60
-    assert record["statistics"]["line"]["n_electrons"] == 60
-    assert record["statistics"]["line"]["mean"] == 1.0
+    assert record["statistics"]["cxr"]["n_electrons"] == 60
+    assert record["statistics"]["cxr"]["mean"] == 1.0
     assert record["stop_reason"] == "converged"

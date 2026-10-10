@@ -8,7 +8,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 
-from .._line_grid_policy import LOCAL_RESOLUTION_POLICY
+from .._cxr_grid_policy import LOCAL_RESOLUTION_POLICY
 
 type Composition = list[tuple[str, float]]
 type MillerIndex = tuple[int, int, int]

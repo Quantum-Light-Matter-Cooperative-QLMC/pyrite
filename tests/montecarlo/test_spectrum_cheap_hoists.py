@@ -8,7 +8,7 @@ movement explicit and catches accidental changes to the physics formulas.
 import numpy as np
 
 import pyrite.montecarlo.spectrum.brem as brem_mod
-import pyrite.montecarlo.spectrum.lines as lines_mod
+import pyrite.montecarlo.spectrum.cxr as lines_mod
 from tests.helpers import scaled_rtol
 
 
@@ -97,7 +97,7 @@ def test_reduced_line_kinematics_matches_expanded_vector_form():
     xp = lines_mod.xp
     v_x = xp.asarray(v, dtype=lines_mod.REAL)
     g_x = xp.asarray(g, dtype=lines_mod.REAL)
-    out = lines_mod._line_kin_core(
+    out = lines_mod._cxr_kin_core(
         v_x[:, 0][:, None],
         v_x[:, 1][:, None],
         v_x[:, 2][:, None],

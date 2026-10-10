@@ -56,7 +56,7 @@ from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
 from pyrite.montecarlo.spectrum import (
     _observation_direction,
     mc_brem_spectrum,
-    mc_spectrum,
+    mc_cxr_spectrum,
     subdivide_flights,
 )
 from pyrite.montecarlo.transport import beta_from_keV, simulate_trajectories
@@ -147,8 +147,8 @@ def _reductions(rows, composition, cxr_grid):
     }
     if cxr_grid is not None:
         without_flight = {key: value for key, value in rows.items() if key != "flight_id"}
-        out["cxr"] = mc_spectrum(rows, cxr_grid, composition=composition, **CXR_KWARGS)
-        out["cxr_ungr"] = mc_spectrum(
+        out["cxr"] = mc_cxr_spectrum(rows, cxr_grid, composition=composition, **CXR_KWARGS)
+        out["cxr_ungr"] = mc_cxr_spectrum(
             without_flight, cxr_grid, composition=composition, **CXR_KWARGS
         )
     return out

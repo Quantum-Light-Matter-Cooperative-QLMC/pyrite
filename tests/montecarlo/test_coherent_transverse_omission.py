@@ -16,7 +16,7 @@ from mpmath import mp
 
 from pyrite._backend import REAL, xp
 from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
-from pyrite.montecarlo import mc_spectrum
+from pyrite.montecarlo import mc_cxr_spectrum
 from pyrite.montecarlo.geometry import project_beam_entry
 from pyrite.montecarlo.spectrum.coherent_transverse import (
     transverse_form_factor,
@@ -24,7 +24,7 @@ from pyrite.montecarlo.spectrum.coherent_transverse import (
     transverse_slope_sign,
     transverse_spot,
 )
-from pyrite.montecarlo.spectrum.lines._per_hkl import _flat_energy_keep
+from pyrite.montecarlo.spectrum.cxr._per_hkl import _flat_energy_keep
 from pyrite.montecarlo.transport.beam_entry import beam_entry_record, face_arrival_delay_ang
 
 TILT, AZIM = np.deg2rad(45.0), np.deg2rad(135.0)
@@ -204,7 +204,7 @@ def _tilted_identical_tracks(count, fwhm_ang):
 @pytest.fixture(params=["auto", "eager", "jit"] if xp.__name__ == "cupy" else ["auto"])
 def coherent_route(request, monkeypatch):
     """Exercise each CUDA reducer; CPU has one implementation per geometry."""
-    from pyrite.montecarlo.spectrum.lines import _policy
+    from pyrite.montecarlo.spectrum.cxr import _policy
 
     if request.param != "auto":
         monkeypatch.setattr(_policy, "_USE_JIT_COHERENT_STREAM", False)
@@ -225,10 +225,10 @@ def test_short_bunch_omits_where_the_transverse_factor_certifies(extra, coherent
     common = dict(
         coherent=True, longitudinal_rms_fs=1e-12, physical_electrons=population, **KWARGS, **extra
     )
-    full = mc_spectrum(segments, ENERGY, **common)
-    disabled = mc_spectrum(segments, ENERGY, coherent_flat_omission_limit=0, **common)
-    floor = mc_spectrum(segments, ENERGY, coherent_flat_omission_limit=1e300, **common)
-    masked = mc_spectrum(segments, ENERGY, coherent_flat_omission_limit=limit, **common)
+    full = mc_cxr_spectrum(segments, ENERGY, **common)
+    disabled = mc_cxr_spectrum(segments, ENERGY, coherent_flat_omission_limit=0, **common)
+    floor = mc_cxr_spectrum(segments, ENERGY, coherent_flat_omission_limit=1e300, **common)
+    masked = mc_cxr_spectrum(segments, ENERGY, coherent_flat_omission_limit=limit, **common)
     np.testing.assert_array_equal(disabled, full)
     spot = transverse_spot(segments["beam_entry"])
     omega = ENERGY / HBARC_EV_ANG
@@ -251,7 +251,7 @@ def test_underflowed_bound_product_is_never_a_certified_zero():
     Fresh-context counterexample: true ``F W`` 5.75e-315 above a 1e-318 limit.
     """
     from pyrite.montecarlo.spectrum.coherent_transverse import TransverseSpot
-    from pyrite.montecarlo.spectrum.lines._per_hkl import _row_transverse_certified
+    from pyrite.montecarlo.spectrum.cxr._per_hkl import _row_transverse_certified
 
     energy = np.array([1000.0, 1001.0, 1002.0])
     omega = energy / HBARC_EV_ANG

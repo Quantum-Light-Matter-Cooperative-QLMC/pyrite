@@ -27,7 +27,7 @@ def _install_legacy_hopg_row(catalog_path):
     document = tomlkit.parse(catalog_path.read_text())
     document["energy_grids"] = {
         "hopg": {
-            "line_by_energy": [
+            "cxr_by_energy": [
                 {
                     "energy_keV": 30.0,
                     "grid": {"linspace": {"start": 10.0, "stop": 2500.0, "num": 831}},
@@ -132,7 +132,7 @@ def test_changing_hopg_legacy_rows_only_changes_hopg(catalog_path, monkeypatch):
     _install_legacy_hopg_row(catalog_path)
     document = tomlkit.parse(catalog_path.read_text())
     before = load_material_catalog(catalog_path)
-    document["energy_grids"]["hopg"]["line_by_energy"][0]["grid"]["linspace"]["stop"] += 100
+    document["energy_grids"]["hopg"]["cxr_by_energy"][0]["grid"]["linspace"]["stop"] += 100
     catalog_path.write_text(tomlkit.dumps(document))
     after = load_material_catalog(catalog_path)
     old, new = _coordinates(before), _coordinates(after)

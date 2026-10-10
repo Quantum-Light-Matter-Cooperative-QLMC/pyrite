@@ -166,7 +166,7 @@ def simulate_trajectories(
     perturbs the free-path/scattering-angle draws or any returned array
     except r_mid.
 
-    NOT safe with mc_spectrum(coherent=True): the coherent phase reads r_mid
+    NOT safe with mc_cxr_spectrum(coherent=True): the coherent phase reads r_mid
     directly, so the per-electron offset enters every cross-electron term and
     the transverse form factor that should average it away is unimplemented
     (`transverse-bunch-form-factor` discrepancy) -- see

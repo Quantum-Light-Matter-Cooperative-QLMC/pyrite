@@ -6,13 +6,13 @@ Response-free source-spectrum figures: by-energy, full-range, peak-vs-tilt, mosa
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ..._spectral_components import line_spectrum
+from ..._spectral_components import cxr_spectrum
 from ...detectors import Detector, LegacyEDS
 from ...montecarlo import mosaic_psi_rad
 from ...results import (
     beam_current_na,
     best_azimuth,
-    line_fwhm_eV,
+    cxr_fwhm_eV,
     records,
     records_for_cases,
     selection_score,
@@ -21,7 +21,7 @@ from .._common import (
     _best_azimuth,
     _case_title,
     _comparison_drop_message,
-    _line_brem,
+    _cxr_brem,
     _metrics_map,
 )
 from .._style import (
@@ -64,8 +64,8 @@ def plot_tilt_panel(ax, group, settings, include_brem=True, collapse_azimuth=Fal
     for i, r in enumerate(group):
         c = COLORS[i % len(COLORS)]
         az = r["case"]["tilt_azim_deg"]
-        line_det, brem_det = _line_brem(r, settings)
-        y = (line_det + brem_det) if include_brem else line_det
+        cxr_det, brem_det = _cxr_brem(r, settings)
+        y = (cxr_det + brem_det) if include_brem else cxr_det
         ax.plot(
             r["E_grid"] / 1e3,
             y * r["scale"],
@@ -105,8 +105,8 @@ def _draw_by_energy(fig, trecs, settings, include_brem=True, collapse_azimuth=Tr
         for r in sorted(grp, key=lambda r: r["case"]["tilt_azim_deg"]):
             az = r["case"]["tilt_azim_deg"]
             lbl = rf"{E0:g} keV ($\phi={az:0.1f}\degree$)"
-            line_det, brem_det = _line_brem(r, settings, convolve=False)
-            y = (line_det + brem_det) if include_brem else line_det
+            cxr_det, brem_det = _cxr_brem(r, settings, convolve=False)
+            y = (cxr_det + brem_det) if include_brem else cxr_det
             ax.plot(r["E_grid"], y * r["scale"], color=c, lw=1.4, label=lbl)
             if include_brem:
                 ax.plot(r["E_grid"], brem_det * r["scale"], color=c, ls="--", lw=1.0)
@@ -172,8 +172,8 @@ def _draw_full_spectrum(
         detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe))
         brem_wide_det = detector.score(Eb, r["brem_wide"], scale=r["scale"])
         xmax = max(xmax, float(Eb[-1]))  # full brem grid -> beam energy
-        line_det, brem_det = _line_brem(r, settings, convolve=False)
-        total_line = (line_det + brem_det) * r["scale"]
+        cxr_det, brem_det = _cxr_brem(r, settings, convolve=False)
+        total_line = (cxr_det + brem_det) * r["scale"]
         ax.plot(Eb, brem_wide_det, color=c, ls="--", lw=0.7, alpha=0.85)
         ax.plot(r["E_grid"], total_line, color=c, lw=1.2, label=lbl)
         ymax = max(ymax, float(np.nanmax(total_line)) if total_line.size else 0.0)
@@ -248,7 +248,7 @@ def plot_peak_vs_tilt(results, settings):
         rs = sorted(rs, key=lambda r: r["case"]["tilt_deg"])
         tilts = [r["case"]["tilt_deg"] for r in rs]
         peak = [
-            float(np.max(line_spectrum(r))) * r["scale"] * beam_current_na(r, settings) for r in rs
+            float(np.max(cxr_spectrum(r))) * r["scale"] * beam_current_na(r, settings) for r in rs
         ]
         ax.plot(tilts, peak, "o-", color=energy_color(E0, by_E), label=f"{E0:g} keV")
     ax.set_xlabel(r"polar tilt $\theta_\mathrm{tilt}$ (deg)")
@@ -263,7 +263,7 @@ def plot_peak_vs_tilt(results, settings):
 
 # ---- crystal mosaicity (analytic broadening) ---------------------------------
 def plot_mosaic_comparison(r, settings, grades_deg=(None, 0.4, 0.8, 3.5), ax=None):
-    """Detector-convolved line spectrum of ONE record ``r`` overlaid for several
+    """Detector-convolved CXR spectrum of ONE record ``r`` overlaid for several
     crystal mosaic grades -- WITHOUT re-running transport. The analytic mosaic model
     (montecarlo.mosaic_fwhm_eV) only changes the convolution FWHM and leaves the
     response-free source spectrum fixed, so each grade is just a re-convolution of the same
@@ -278,13 +278,13 @@ def plot_mosaic_comparison(r, settings, grades_deg=(None, 0.4, 0.8, 3.5), ax=Non
     curves = []  # (label, fwhm, detected)
     for grade in grades_deg:
         if grade is None:
-            fwhm = line_fwhm_eV(case, E_pk, None)
+            fwhm = cxr_fwhm_eV(case, E_pk, None)
             lbl = "perfect"
         else:
-            fwhm = line_fwhm_eV(case, E_pk, np.deg2rad(grade))
+            fwhm = cxr_fwhm_eV(case, E_pk, np.deg2rad(grade))
             lbl = rf"mosaic {grade:g}$\degree$"
         detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe, convolve=True))
-        det = detector.score(E, line_spectrum(r), fwhm_eV=fwhm, scale=r["scale"])
+        det = detector.score(E, cxr_spectrum(r), fwhm_eV=fwhm, scale=r["scale"])
         curves.append((lbl, fwhm, det))
 
     if ax is None:
@@ -328,20 +328,20 @@ def plot_best_spectra(
     cases=None,
     ncols=3,
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
 ):
     """The top-``top_n`` geometries across the WHOLE sweep, ranked by
     results.selection_score(``select``) -- one response-free source spectrum panel each,
     titled with the geometry, the score components, and the line quality. The
     answer to "thousands of cases, which few do I look at": instead of paging
     every polar tilt, see the best dozen at a glance. ``select`` defaults to
-    line_flux x line_quality (bright AND well-defined), not the sampled peak the
+    line_flux x cxr_quality (bright AND well-defined), not the sampled peak the
     per-tilt browser collapses on -- so spurious tall spikes don't win."""
     recs = records_for_cases(results, cases)
     if not recs:
         print("no results yet")
         return None
-    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
+    metrics = _metrics_map(recs, settings, rel_prominence, cxr_metric)
     ranked = sorted(recs, key=lambda r: selection_score(metrics[id(r)], select), reverse=True)[
         :top_n
     ]
@@ -359,7 +359,7 @@ def plot_best_spectra(
     for k, r in enumerate(ranked):
         ax = axes[k // ncols][k % ncols]
         c, m = r["case"], metrics[id(r)]
-        line_det, brem_det = _line_brem(r, settings, convolve=False)
+        cxr_det, brem_det = _cxr_brem(r, settings, convolve=False)
         E = r["E_grid"] / 1e3
         col = energy_color(c["E0_keV"], all_E)
         # Records store per-nA flux; these panels report per-uA (see the axis
@@ -368,7 +368,7 @@ def plot_best_spectra(
         scale = r["scale"] * _NA_PER_UA
         ax.plot(
             E,
-            (line_det + brem_det if include_brem else line_det) * scale,
+            (cxr_det + brem_det if include_brem else cxr_det) * scale,
             color=col,
             lw=1.1,
         )
@@ -413,7 +413,7 @@ def material_comparison_summary(
     results,
     settings,
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
 ):
     """Compute the small candidate summary shared by all material comparisons.
 
@@ -424,7 +424,7 @@ def material_comparison_summary(
     those controls therefore never reloads the checkpoint.
     """
     recs = records(results)
-    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
+    metrics = _metrics_map(recs, settings, rel_prominence, cxr_metric)
     return tuple(
         {
             "case": {field: r["case"][field] for field in _COMPARISON_CASE_FIELDS},
@@ -444,7 +444,7 @@ def select_material_comparison(
     summary,
     select="quality_line",
     beam_energy_keV=None,
-    min_line_quality: float | None = 0.5,
+    min_cxr_quality: float | None = 0.5,
 ):
     """Select one comparison point and return ``(point, exclusion_reason)``.
 
@@ -465,7 +465,7 @@ def select_material_comparison(
     quality_candidates = [
         candidate
         for candidate in energy_candidates
-        if min_line_quality is None or candidate["line_quality"] >= min_line_quality
+        if min_cxr_quality is None or candidate["line_quality"] >= min_cxr_quality
     ]
     if not quality_candidates:
         return None, "quality_floor"
@@ -490,16 +490,16 @@ def material_comparison_point(
     settings,
     select="quality_line",
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
     beam_energy_keV=None,
-    min_line_quality: float | None = 0.5,
+    min_cxr_quality: float | None = 0.5,
 ):
     """Compatibility wrapper returning one point, ``"dropped"``, or ``None``."""
     point, reason = select_material_comparison(
-        material_comparison_summary(results, settings, rel_prominence, line_metric),
+        material_comparison_summary(results, settings, rel_prominence, cxr_metric),
         select,
         beam_energy_keV,
-        min_line_quality,
+        min_cxr_quality,
     )
     return "dropped" if reason is not None else point
 
@@ -509,7 +509,7 @@ def draw_material_comparison(
     dropped,
     select="quality_line",
     beam_energy_keV=None,
-    min_line_quality: float | None = 0.5,
+    min_cxr_quality: float | None = 0.5,
 ):
     """Draw the cross-material scatter from precomputed ``(label, line_eV,
     line_flux, quality, case)`` points -- the plotting half of
@@ -565,7 +565,7 @@ def draw_material_comparison(
     energy_scope = (
         "all beam energies" if beam_energy_keV is None else f"{beam_energy_keV:g} keV beam energy"
     )
-    quality_scope = "" if min_line_quality is None else f", line quality >= {min_line_quality:g}"
+    quality_scope = "" if min_cxr_quality is None else f", line quality >= {min_cxr_quality:g}"
     ax.set_title(
         f"Cross-material comparison — {selection_title} ({energy_scope}{quality_scope})",
         fontsize=12,
@@ -591,9 +591,9 @@ def plot_material_comparison(
     settings,
     select="quality_line",
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
     beam_energy_keV=None,
-    min_line_quality: float | None = 0.5,
+    min_cxr_quality: float | None = 0.5,
 ):
     """Cross-material headline: for each material's results store, find the single
     BEST geometry/energy (results.selection_score ``select``) and plot its
@@ -605,7 +605,7 @@ def plot_material_comparison(
     ``results_by_material`` : ``{label: results_store}``, e.g. built in the
     notebook with ``{m: load_checkpoint(m) for m in CATALOG.material_keys}``
     (skip empties).  ``beam_energy_keV`` optionally restricts each material to
-    that beam energy before selecting its best geometry. ``min_line_quality``
+    that beam energy before selecting its best geometry. ``min_cxr_quality``
     rejects ill-defined-line candidates before ranking; ``None`` disables that
     gate. A material with records but no candidate clearing the gate is
     dropped from the plot and reported in a printed statement. Labels are
@@ -621,14 +621,14 @@ def plot_material_comparison(
     dropped = {}
     for label, results in results_by_material.items():
         point, reason = select_material_comparison(
-            material_comparison_summary(results, settings, rel_prominence, line_metric),
+            material_comparison_summary(results, settings, rel_prominence, cxr_metric),
             select,
             beam_energy_keV,
-            min_line_quality,
+            min_cxr_quality,
         )
         if point is None:
             if reason is not None:
                 dropped[label] = reason
             continue
         pts.append((label, *point))
-    return draw_material_comparison(pts, dropped, select, beam_energy_keV, min_line_quality)
+    return draw_material_comparison(pts, dropped, select, beam_energy_keV, min_cxr_quality)

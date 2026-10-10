@@ -51,7 +51,23 @@ def current_text(path=None):
 
 def catalog_text(path=None):
     text = current_text(path)
-    return text, tomlkit.parse(text)
+    from .._cxr_vocabulary import translate_catalog_text
+
+    return text, tomlkit.parse(translate_catalog_text(text))
+
+
+def is_unchanged(document, original):
+    """Compare edits in the same vocabulary as the editable catalog view."""
+    from .._cxr_vocabulary import translate_catalog_text
+
+    return document.as_string() == tomlkit.parse(translate_catalog_text(original)).as_string()
+
+
+def render_catalog(document):
+    """Serialize an editable catalog using canonical names in the same order."""
+    from .._cxr_vocabulary import translate_catalog_text
+
+    return translate_catalog_text(document.as_string(), canonical=True)
 
 
 def validated_catalog(path, text, *, profile="standard"):
@@ -82,6 +98,9 @@ def atomic_write(path, text):
     Refusing to change a bundled demo profile is a runtime failure (exit 1)
     naming the ``create --from`` copy, not a traceback.
     """
+    from .._cxr_vocabulary import translate_catalog_text
+
+    text = translate_catalog_text(text, canonical=True)
     try:
         write_text(path, text)
     except BundledProfileError as exc:

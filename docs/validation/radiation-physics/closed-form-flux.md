@@ -8,7 +8,7 @@
 - Signature: `feranchuk_line_flux(anchor: ZhaiAnchor, E0_keV: float, thickness_ang: float) -> float`.
 - Docstring statement of the intended quantity: *"Feranchuk-Spence Eq. (12) closed-form line flux [photons / electron into dOmega], absorption-limited, at the dispersion-relation line energy."*
 
-**Units of the returned quantity (confirmed).** The returned number is **photons per incident electron integrated over the line and into the fixed solid angle** $\Delta\Omega$ carried by `anchor.domega_sr` — a pure dimensionless count. It is **not** per eV and **not** per steradian: the energy integral over the line has already been done analytically (that is what makes it "closed form"), and `dOmega_sr` multiplies rather than divides. This differs from the Monte Carlo spectrum `mc_spectrum`, which returns $d^2N/(dE\,d\Omega)$ in photons / (eV sr electron); the anchor reconciles the two by trapezoid-integrating the MC spectrum over $E$ and evaluating the closed form at $\Delta\Omega = 1\ \mathrm{sr}$.
+**Units of the returned quantity (confirmed).** The returned number is **photons per incident electron integrated over the line and into the fixed solid angle** $\Delta\Omega$ carried by `anchor.domega_sr` — a pure dimensionless count. It is **not** per eV and **not** per steradian: the energy integral over the line has already been done analytically (that is what makes it "closed form"), and `dOmega_sr` multiplies rather than divides. This differs from the Monte Carlo spectrum `mc_cxr_spectrum`, which returns $d^2N/(dE\,d\Omega)$ in photons / (eV sr electron); the anchor reconciles the two by trapezoid-integrating the MC spectrum over $E$ and evaluating the closed form at $\Delta\Omega = 1\ \mathrm{sr}$.
 
 The amplitudes $A_{\rm PXR}$ and $A_{\rm CBS}$ are **out of scope** here — they are separately ledgered as `pxr-amplitude` and `cbs-amplitude`. This write-up verifies the Eq. (12) *wrapper*: the prefactor, the $\alpha$ and $\hbar c$ bookkeeping, the absorption/escape-length treatment, the solid-angle and energy-bin conventions, and the units.
 
@@ -162,7 +162,7 @@ with `omega = photon_E_eV / HBARC_EV_ANG`, `HBARC_EV_ANG = 1973.269804`, `ALPHA_
 The wrapper supplies
 
 ```text
-L_abs = absorption_length_ang("C", E_line, anchor.n_atoms_per_ang3)
+L_abs = absorption_length_ang("C", E_cxr, anchor.n_atoms_per_ang3)
 ```
 
 ### Prefactor — matches exactly
@@ -237,7 +237,7 @@ def _escape_length(z_mid, thickness, n_z):
 
 and folds `T_abs = exp(-(L_esc * mu))` into the per-segment weight, which integrates to precisely the $\lvert\cos\theta_{\rm obs}\rvert L_{\rm abs} [1-\exp(-t/(\lvert\cos\theta_{\rm obs}\rvert L_{\rm abs}))]$ of the independent derivation.
 
-This was confirmed directly. Feeding `mc_spectrum` a contiguous stack of $290\ \mathrm{\AA}$ straight segments spanning a slab of thickness $t$ (HOPG (002), $25\ \mathrm{keV}$, $\theta_{\rm obs}=119^\circ$), integrating the MC spectrum over energy, dividing out the closed form evaluated with absorption disabled, and solving $x\,[1-\exp(-t/x)] = L_{\rm eff}^{\rm MC}$ for $x=\lvert n_z\rvert L_{\rm abs}$:
+This was confirmed directly. Feeding `mc_cxr_spectrum` a contiguous stack of $290\ \mathrm{\AA}$ straight segments spanning a slab of thickness $t$ (HOPG (002), $25\ \mathrm{keV}$, $\theta_{\rm obs}=119^\circ$), integrating the MC spectrum over energy, dividing out the closed form evaluated with absorption disabled, and solving $x\,[1-\exp(-t/x)] = L_{\rm eff}^{\rm MC}$ for $x=\lvert n_z\rvert L_{\rm abs}$:
 
 | $t/L_{\rm abs}$ | MC / closed form | implied $\lvert n_z\rvert$ |
 | --- | --- | --- |

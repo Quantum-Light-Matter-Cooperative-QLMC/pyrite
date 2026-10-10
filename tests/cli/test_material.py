@@ -225,7 +225,7 @@ measured_edges_eV = [0.0, 100.0, 200.0]
     assert acquisition.exposure_s == 2.0
     assert acquisition.measured_edges_eV == (0.0, 100.0, 200.0)
     assert isinstance(detector.response, IdealPhotonCounter)
-    assert detector.energy_bins.line is not None
+    assert detector.energy_bins.cxr is not None
 
 
 def test_simulation_scene_rejects_non_singleton_profile_grid(tmp_path, monkeypatch):
@@ -244,17 +244,23 @@ def test_simulation_artifact_uses_exact_suffixless_path_and_never_overwrites(tmp
             solid_angle_sr=np.ones((1, 1)),
             path_length_mm=np.zeros((1, 1, 1)),
         ),
-        line=SimpleNamespace(
+        cxr=SimpleNamespace(
             intrinsic_by_tile=np.array([[1.0, 2.0]]),
             mu_by_filter_inv_mm=np.array([[0.0, 0.0]]),
         ),
     )
     result = SimpleNamespace(
-        energy_eV=np.array([100.0, 200.0]),
-        spectrum=np.array([1.0, 2.0]),
-        background_energy_eV=np.array([50.0, 100.0]),
-        background=np.array([0.1, 0.2]),
+        cxr=SimpleNamespace(
+            incoherent=SimpleNamespace(
+                photon_energy_eV=np.array([100.0, 200.0]), density=np.array([1.0, 2.0])
+            ),
+            coherent=None,
+        ),
+        brem=SimpleNamespace(
+            photon_energy_eV=np.array([50.0, 100.0]), density=np.array([0.1, 0.2])
+        ),
         spatial=spatial,
+        provenance={},
     )
     output = Path(tmp_path) / "spatial-output"
 
@@ -270,17 +276,22 @@ def test_simulation_artifact_uses_exact_suffixless_path_and_never_overwrites(tmp
 
 def _spatial_result(acquisition=None):
     return SimpleNamespace(
-        energy_eV=np.array([100.0, 200.0]),
-        spectrum=np.array([1.0, 2.0]),
-        background_energy_eV=np.array([50.0, 100.0]),
-        background=np.array([0.1, 0.2]),
+        cxr=SimpleNamespace(
+            incoherent=SimpleNamespace(
+                photon_energy_eV=np.array([100.0, 200.0]), density=np.array([1.0, 2.0])
+            ),
+            coherent=None,
+        ),
+        brem=SimpleNamespace(
+            photon_energy_eV=np.array([50.0, 100.0]), density=np.array([0.1, 0.2])
+        ),
         spatial=SimpleNamespace(
             ray_map=SimpleNamespace(
                 tile_index=np.zeros((2, 3), dtype=int),
                 solid_angle_sr=np.ones((2, 3)),
                 path_length_mm=np.zeros((2, 3, 1)),
             ),
-            line=SimpleNamespace(
+            cxr=SimpleNamespace(
                 intrinsic_by_tile=np.array([[1.0, 2.0]]),
                 mu_by_filter_inv_mm=np.array([[0.0, 0.0]]),
             ),

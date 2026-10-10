@@ -11,14 +11,14 @@ from math import ceil
 import numpy as np
 
 from ..._backend import BACKEND, _to_cpu
-from ..spectrum.lines._kernels import _SEG_ARRAYS
+from ..spectrum.cxr._kernels import _SEG_ARRAYS
 
 #: Peak device bytes one segment costs in an incoherent line sum: resident rows
 #: (~86 B at FP32) plus the per-segment setup arrays that the kernel's
 #: ``(n_block, N_g)`` bound does not cover. SLURM 209 (h-BN 5 MeV, 1 mm,
 #: 22-86 M segments, 11.4 GiB pool): blocks at ~1,000 B of headroom per
 #: segment fit, blocks at ~500 B overran.
-LINE_DEVICE_BYTES_PER_SEGMENT = 1024
+CXR_DEVICE_BYTES_PER_SEGMENT = 1024
 
 #: Largest block count the OOM retry doubles to before re-raising to the
 #: spectrum phase's own chunk-halving retry.
@@ -42,7 +42,7 @@ def device_headroom_bytes():
 
 def electron_block_count(n_segments, headroom_bytes, bytes_per_segment=None):
     """Blocks needed so one block's segments fit ``headroom_bytes``."""
-    per_segment = LINE_DEVICE_BYTES_PER_SEGMENT if bytes_per_segment is None else bytes_per_segment
+    per_segment = CXR_DEVICE_BYTES_PER_SEGMENT if bytes_per_segment is None else bytes_per_segment
     if headroom_bytes is None or n_segments <= 0:
         return 1
     if headroom_bytes <= 0:

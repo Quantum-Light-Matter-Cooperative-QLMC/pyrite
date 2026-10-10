@@ -29,10 +29,10 @@ The maintained descriptions of the current model remain [coherent radiation](../
 | Polarization | `_kernels.py::_polarization_pair` builds two transverse vectors; amplitudes are evaluated for both | Preserve polarization observables in output |
 | PXR/CBS interference | Complex amplitudes are added before squaring within each polarization | Carry the same convention into any replacement diffraction solver |
 | Direction dependence | Resonance, amplitudes and escape depend on arbitrary `n_hat` | Expose detector azimuth and roll through the standard scene |
-| Detector integration | `mc_spectrum_solid_angle` and `run_case_directions` reuse transported trajectories | Integrate acceptance consistently into results, units and response |
+| Detector integration | `mc_cxr_spectrum_solid_angle` and `run_case_directions` reuse transported trajectories | Integrate acceptance consistently into results, units and response |
 | Photon field | First-order diffraction plus bulk dispersion and passive absorption | Coupled modes, extinction and boundary conditions where required |
 
-Source owners: [line kernels](../../../src/pyrite/montecarlo/spectrum/lines/_kernels.py), [per-reflection amplitudes](../../../src/pyrite/montecarlo/spectrum/lines/_per_hkl.py), [batched amplitudes](../../../src/pyrite/montecarlo/spectrum/lines/_batched.py), [geometry](../../../src/pyrite/montecarlo/geometry.py), and [detector specification](../../../src/pyrite/detectors/spec.py).
+Source owners: [line kernels](../../../src/pyrite/montecarlo/spectrum/cxr/_kernels.py), [per-reflection amplitudes](../../../src/pyrite/montecarlo/spectrum/cxr/_per_hkl.py), [batched amplitudes](../../../src/pyrite/montecarlo/spectrum/cxr/_batched.py), [geometry](../../../src/pyrite/montecarlo/geometry.py), and [detector specification](../../../src/pyrite/detectors/spec.py).
 
 ### Polarization summation is not an isotropy assumption
 

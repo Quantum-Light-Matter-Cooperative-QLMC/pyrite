@@ -2,8 +2,8 @@
 the Gauss-Hermite orientation quadrature, the tilt rotation, and the Sweep wiring
 that makes the MC and analytic routes mutually exclusive.
 
-These stay synthetic (no Monte-Carlo transport / mc_spectrum) so the suite remains
-CPU-only and fast; the mc_spectrum-level validation (perfect-crystal bit-for-bit,
+These stay synthetic (no Monte-Carlo transport / mc_cxr_spectrum) so the suite remains
+CPU-only and fast; the mc_cxr_spectrum-level validation (perfect-crystal bit-for-bit,
 broadening, node convergence, yield change) lives in checks/mosaic_mc_check.py."""
 
 import numpy as np
@@ -78,7 +78,7 @@ def _sweep(**kw):
         tilt_deg=30.0,
         detector=Detector(
             energy_bins=EnergyBins(
-                line=E_GRID,
+                cxr=E_GRID,
                 brem=np.arange(0.0, 1000.0, 100.0),
             )
         ),
@@ -109,7 +109,7 @@ def test_route_mc_is_noop_without_mosaic_data():
             tilt_deg=30.0,
             detector=Detector(
                 energy_bins=EnergyBins(
-                    line=E_GRID,
+                    cxr=E_GRID,
                     brem=np.arange(0.0, 1000.0, 100.0),
                 )
             ),

@@ -455,7 +455,7 @@ def test_centroid_preserves_positive_subnormal_source():
 def test_runner_requires_centroid_acceptance_before_returning_provenance(monkeypatch):
     from scipy.constants import elementary_charge
 
-    from pyrite._line_grid_policy import LineGridToleranceError
+    from pyrite._cxr_grid_policy import CxrGridToleranceError
     from pyrite.montecarlo.runner.coherent_audit import CoherentGridAudit
 
     monkeypatch.setattr(
@@ -475,7 +475,7 @@ def test_runner_requires_centroid_acceptance_before_returning_provenance(monkeyp
         }
     )
     audit.collector.rows.append(_row())
-    with pytest.raises(LineGridToleranceError, match="centroid audit failed"):
+    with pytest.raises(CxrGridToleranceError, match="centroid audit failed"):
         audit.check(np.array([990.0, 1000.0, 1010.0]), np.array([0.0, 1.0, 2.0]), 1)
     record = audit.check(np.array([990.0, 1000.0, 1010.0]), np.ones(3), 1)
     assert record["scope"] == "stored-input full finite-axis yield and centroid"

@@ -3,7 +3,7 @@
 Like test_altair_plots.py, these exercise only the NEW rendering layer on
 synthetic records (no GPU, no checkpoint), small enough to stay under Vega-Lite's
 default 5000-row cap so ``chart.to_dict()`` serializes. The metric prep
-(results.line_metrics / selection_score) is shared with the matplotlib path.
+(results.cxr_metrics / selection_score) is shared with the matplotlib path.
 """
 
 from types import SimpleNamespace

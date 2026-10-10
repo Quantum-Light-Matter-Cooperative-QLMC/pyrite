@@ -111,15 +111,15 @@ def test_case_pair_model_reaches_runner_transport(monkeypatch):
     table = prepare_bremslib_table(arrays, atomic_number=14)
     monkeypatch.setattr(case_tables, "_case_bremslib_tables", lambda _case: {"Si": table})
     numerics = pr.Numerics(
-        n_electrons=4,
-        n_electrons_brem=4,
+        cxr_trials=4,
+        brem_trials=4,
         elastic_model="mott",
         **{**SHELL, "secondary_threshold_eV": 5000.0},
         **COUPLED,
         **PAIR,
     )
     detector = pr.Detector(
-        energy_bins=EnergyBins(line=np.linspace(1500, 2000, 20), brem=np.linspace(1500, 9000, 20))
+        energy_bins=EnergyBins(cxr=np.linspace(1500, 2000, 20), brem=np.linspace(1500, 9000, 20))
     )
     scene = pr.Scene(pr.Beam(energy_keV=20.0), pr.Slab("silicon", thickness_ang=5.0e4), detector)
     case = api.build_case(scene, numerics)

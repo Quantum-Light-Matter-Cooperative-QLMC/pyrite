@@ -4,7 +4,7 @@
 
 - **ID:** `segment-escape-average`
 - **Symbols:** `montecarlo/spectrum/segment_escape.py::{segment_escape_paths,mean_transmission,segment_escape_pieces,piece_mean_transmission}`; `montecarlo/spectrum/brem_jit_kernel.py::_transmission_scalar`
-- **Consumers:** `montecarlo/spectrum/characteristic.py::mc_characteristic_spectrum`, `montecarlo/spectrum/brem.py::mc_brem_spectrum` (CPU and fused CUDA reductions); since issue #181 the incoherent PXR/CBS line route, `montecarlo/spectrum/lines/_batched.py::_batched_incoherent_block` and `montecarlo/spectrum/lines/_per_hkl.py::_accumulate_reflection` (CPU, and CUDA through the same array code)
+- **Consumers:** `montecarlo/spectrum/characteristic.py::mc_characteristic_spectrum`, `montecarlo/spectrum/brem.py::mc_brem_spectrum` (CPU and fused CUDA reductions); since issue #181 the incoherent PXR/CBS line route, `montecarlo/spectrum/cxr/_batched.py::_batched_incoherent_block` and `montecarlo/spectrum/cxr/_per_hkl.py::_accumulate_reflection` (CPU, and CUDA through the same array code)
 - **Source:** Beer--Lambert law (`self-absorption`) integrated over a uniform line source; no new physical law
 - **Intended quantity:** the escaping fraction of photons emitted uniformly along one straight transport segment, for incoherent emitters (characteristic lines, bremsstrahlung)
 
@@ -165,10 +165,10 @@ A separate context that did not write the implementation verified the extension.
 - In the batched block, $\mu$ is `mu[..., None]`, shape $(n_b,N_g,1)$, on the single slab (the batched route has no layers).
 - In the per-hkl route, $\mu$ is stacked per layer in the order of `layers`, the same order the paths use. The groove takes the absorber $\mu$ and the single slab the tabulated `mu_i`, as the midpoint code did.
 - Rows align with `idx`, because the incoherent route does not expand pieces and the pieces are cut after `_clip_segments_to_cutoff`.
-- `_line_weight_core` now takes $T$ directly.
+- `_cxr_weight_core` now takes $T$ directly.
 - No incoherent line path still evaluates a midpoint $e^{-\mu L}$.
 
-**Independent oracle** (scratch script, CPU backend). The absorbed-to-transparent ratio of `mc_spectrum` (incoherent; transparent means the piece paths are zeroed) is compared with a separately written $2\times10^6$-point midpoint mean of $e^{-\tau}$ along the segment. The oracle uses its own geometry: slab exit through $z=0$; box minimum over the $z=0$ and $+x$ faces; layered overlap of the exit ray with each layer. $\mu$ is captured from the run.
+**Independent oracle** (scratch script, CPU backend). The absorbed-to-transparent ratio of `mc_cxr_spectrum` (incoherent; transparent means the piece paths are zeroed) is compared with a separately written $2\times10^6$-point midpoint mean of $e^{-\tau}$ along the segment. The oracle uses its own geometry: slab exit through $z=0$; box minimum over the $z=0$ and $+x$ faces; layered overlap of the exit ray with each layer. $\mu$ is captured from the run.
 
 | case | code ratio | brute-force mean | relative difference | shape residual |
 | --- | --- | --- | --- | --- |

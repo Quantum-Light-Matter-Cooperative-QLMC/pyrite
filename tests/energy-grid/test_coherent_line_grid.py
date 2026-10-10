@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from pyrite.materials.crystal import HBARC_EV_ANG
-from pyrite.montecarlo.runner.line_grid import resolve_line_grid
+from pyrite.montecarlo.runner.cxr_grid import resolve_cxr_grid
 from pyrite.montecarlo.spectrum.diagnostics import (
     coherent_fringe_spacing,
     sinc_feature_spacing,
@@ -88,14 +88,14 @@ def test_automatic_resolution_refuses_a_coherent_case():
     segs = _segments()
     case = {"coherent_emission": True, "line_grid_policy": {"resolution": {}}}
     with pytest.raises(ValueError, match="does not support coherent_emission"):
-        resolve_line_grid(case, segs, np.array([0.0, 0.0, 1.0]), 3, None)
+        resolve_cxr_grid(case, segs, np.array([0.0, 0.0, 1.0]), 3, None)
 
 
 def test_refusal_names_both_derived_steps():
     segs = _segments()
     case = {"coherent_emission": True, "line_grid_policy": {"resolution": {}}}
     with pytest.raises(ValueError) as excinfo:
-        resolve_line_grid(case, segs, np.array([0.0, 0.0, 1.0]), 3, None)
+        resolve_cxr_grid(case, segs, np.array([0.0, 0.0, 1.0]), 3, None)
     message = str(excinfo.value)
     assert "decoherence-grouped floor" in message
     assert "E_grid_line" in message
@@ -104,7 +104,7 @@ def test_refusal_names_both_derived_steps():
 def test_an_explicit_grid_is_untouched_on_the_coherent_route():
     """Refusal is scoped to automatic resolution, not to coherent runs."""
     grid = np.linspace(10.0, 100.0, 16)
-    out, record = resolve_line_grid(
+    out, record = resolve_cxr_grid(
         {"coherent_emission": True}, _segments(), np.array([0.0, 0.0, 1.0]), 3, grid
     )
     assert record is None

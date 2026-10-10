@@ -2,7 +2,7 @@
 results.scoring
 ================
 
-Ranking records by their :func:`~pyrite.results.metrics.line_metrics`:
+Ranking records by their :func:`~pyrite.results.metrics.cxr_metrics`:
 :func:`selection_score` is the shared "how good is this geometry" scalar
 behind the heatmap cell reduction, ``plot_metric_vs``, and the top-N browser
 here (:func:`top_geometries` / :func:`show_top`).
@@ -11,11 +11,11 @@ here (:func:`top_geometries` / :func:`show_top`).
 import numpy as np
 import pandas as pd
 
-from .metrics import _cached_line_metrics
+from .metrics import _cached_cxr_metrics
 from .selection import records
 
 # ---- "best geometry" selection -----------------------------------------------
-# Modes for ranking a record by its line_metrics, shared by every "pick the best
+# Modes for ranking a record by its cxr_metrics, shared by every "pick the best
 # case" path (the heatmap cell reduction, plot_metric_vs, the top-N browser), so
 # they all agree on what "best" means.
 SELECTION_MODES = (
@@ -29,18 +29,18 @@ SELECTION_MODES = (
 
 
 def selection_score(m, mode="quality_line"):
-    """Score a line_metrics dict ``m`` for "best geometry" selection. Higher wins.
+    """Score a cxr_metrics dict ``m`` for "best geometry" selection. Higher wins.
 
       "peak"          : sampled peak spectral density (legacy and
                         spacing-dependent; avoid for cross-grid ranking).
       "line_flux"     : integrated flux under the dominant found line.
       "coherent_flux" : integrated flux of ALL coherent lines (no peak finding).
       "line_brem_ratio": dominant-line flux relative to brem in its local peak window.
-      "quality_peak"  : sampled peak density * line_quality (legacy and
+      "quality_peak"  : sampled peak density * cxr_quality (legacy and
                         spacing-dependent).
-      "quality_line"  : line_flux * line_quality (DEFAULT).
+      "quality_line"  : line_flux * cxr_quality (DEFAULT).
 
-    ``m`` is the dict from line_metrics. Non-finite scores sort to the bottom."""
+    ``m`` is the dict from cxr_metrics. Non-finite scores sort to the bottom."""
     q = m.get("line_quality", 1.0)
     if mode == "line_brem_ratio":
         val = m["line_brem_ratio"]
@@ -64,7 +64,7 @@ def top_geometries(
     top_n=15,
     select="quality_line",
     rel_prominence=0.03,
-    line_metric="sharpness",
+    cxr_metric="sharpness",
     names=None,
 ):
     """A compact, ranked table of the BEST geometries across a results store --
@@ -81,7 +81,7 @@ def top_geometries(
         return pd.DataFrame()
     scored = []
     for r in recs:
-        m = _cached_line_metrics(r, settings, rel_prominence, line_metric)
+        m = _cached_cxr_metrics(r, settings, rel_prominence, cxr_metric)
         scored.append((selection_score(m, select), r, m))
     scored.sort(key=lambda t: -t[0])
     rows = []

@@ -37,20 +37,21 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
-from .._energy_grid_encoding import encode_energy_grid
-from .._grid_semantics import resolution_num
-from .._line_grid_policy import (
+from .._api_deprecations import renamed_fields
+from .._cxr_grid_policy import (
     AUTOMATIC_BANDWIDTH_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
     STOP_ROUND_TO_EV,
-    LineGridPolicy,
-    LineGridToleranceError,
+    CxrGridPolicy,
+    CxrGridToleranceError,
+    cxr_quadrature_from_payload,
+    cxr_start_eV,
     environment_overrides_present,
-    kinematic_line_stop_eV,
-    line_quadrature_from_payload,
-    line_start_eV,
-    resolve_line_grid_policy,
+    kinematic_cxr_stop_eV,
+    resolve_cxr_grid_policy,
 )
+from .._energy_grid_encoding import encode_energy_grid
+from .._grid_semantics import resolution_num
 from .._numerics import (
     DEFAULT_INELASTIC_CUTOFF_EV,
     validate_bremsstrahlung_model,
@@ -320,6 +321,7 @@ TIMEPIX3_DTHETA_OBS_DEG = float(
 TIMEPIX3_DOMEGA_SR = float(TIMEPIX3_CHIP_WIDTH_M**2 / TIMEPIX3_DISTANCE_M**2)
 
 
+@renamed_fields(line_grid_policy="cxr_grid_policy")
 @dataclass
 class Sweep:
     """One parameter sweep.
@@ -410,7 +412,7 @@ class Sweep:
     #   "analytic" (default) -> the cheap energy-shift Gaussian added in quadrature
     #       at detector convolution (results.store_result); the response-free source spectrum is
     #       untouched, so one record re-broadens to any grade (plot_mosaic_comparison).
-    #   "mc"                  -> the EXACT per-orientation average INSIDE mc_spectrum
+    #   "mc"                  -> the EXACT per-orientation average INSIDE mc_cxr_spectrum
     #       (broadens PXR+CBS, captures the amplitude variation + asymmetric lineshape
     #       and the mosaic yield change); the analytic term is then suppressed so the
     #       broadening is not double-counted. Costs mosaic_nodes**2 x the line hot loop
@@ -423,7 +425,7 @@ class Sweep:
     # ``max_spacing_eV``, ``backend_safety_ulps``, ``max_points``, and a
     # per-observable ``rtol`` mapping. ``None`` leaves the chain to env > stored
     # artifact > built-in automatic resolution.
-    line_grid_policy: dict[str, Any] | None = None
+    cxr_grid_policy: dict[str, Any] | None = None
     # film-on-substrate stack (optional; multilayer feature, docs/physics/materials/multilayer-materials.md).
     # substrate=None -> free-standing film (unchanged). Otherwise each case gets an
     # abs_layers stack that drives BOTH multilayer electron transport (substrate
@@ -594,7 +596,7 @@ def sweep_crystal_params(sweep: Sweep) -> dict[str, Any]:
 
     :func:`build_cases` and the reline path (:mod:`pyrite.checkpoints.recompute`)
     must agree on this, since it is the ``cp`` argument
-    :func:`_line_grid_for_energy` resolves a line grid against.
+    :func:`_cxr_grid_for_energy` resolves a line grid against.
     """
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     cp = crystal_params(sweep.target.material, sweep.n_families)
@@ -603,10 +605,10 @@ def sweep_crystal_params(sweep: Sweep) -> dict[str, Any]:
     return cp
 
 
-def _automatic_line_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> LineGridPolicy:
+def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> CxrGridPolicy:
     """Resolve the automatic case-local line-grid policy for one beam energy.
 
-    Bandwidth is closed form (:func:`kinematic_line_stop_eV`) and costs a dot
+    Bandwidth is closed form (:func:`kinematic_cxr_stop_eV`) and costs a dot
     product per reflection. Resolution is only *declared* here -- the runner
     measures it from the case's own trajectories -- so building a case starts no
     simulation, reads no checkpoint, and writes nothing to the profile or the
@@ -617,13 +619,13 @@ def _automatic_line_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Li
     """
     spec = CATALOG.crystal(cp["crystal"])
     magnitudes = [reciprocal_g_vector(hkl, spec.lattice)[1] for hkl in cp["hkl_list"]]
-    start = line_start_eV(energy_keV)
-    stop = kinematic_line_stop_eV(magnitudes, energy_keV)
-    policy = resolve_line_grid_policy(
+    start = cxr_start_eV(energy_keV)
+    stop = kinematic_cxr_stop_eV(magnitudes, energy_keV)
+    policy = resolve_cxr_grid_policy(
         start_eV=start,
         stop_eV=stop,
         bandwidth_policy=AUTOMATIC_BANDWIDTH_POLICY,
-        per_call=sweep.line_grid_policy,
+        per_call=sweep.cxr_grid_policy,
     )
     if policy.bandwidth_policy != AUTOMATIC_BANDWIDTH_POLICY:
         # The measured bandwidth keeps the closed-form bound as its cap; its
@@ -635,11 +637,11 @@ def _automatic_line_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Li
     # line kernels drop it. The axis stops at the lowest of the three.
     # Validation: line-grid-emission-ceiling
     from ..materials.crystal import CRYSTALS
-    from ..montecarlo.spectrum.lines import _line_emission_ceiling
+    from ..montecarlo.spectrum.cxr import _cxr_emission_ceiling
 
     limits = {
         "energy conservation": energy_keV * 1.0e3,
-        "atomic data ceiling": _line_emission_ceiling(CRYSTALS[cp["crystal"]], cp["composition"]),
+        "atomic data ceiling": _cxr_emission_ceiling(CRYSTALS[cp["crystal"]], cp["composition"]),
     }
     label, cap = min(limits.items(), key=lambda item: item[1])
     cap = math.ceil(cap / STOP_ROUND_TO_EV) * STOP_ROUND_TO_EV
@@ -649,7 +651,7 @@ def _automatic_line_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Li
     return replace(policy, stop_eV=float(cap), sources=tuple(sorted(sources.items())))
 
 
-def _line_grid_for_energy(
+def _cxr_grid_for_energy(
     sweep: Sweep, cp: dict, energy_keV: float
 ) -> tuple[np.ndarray, dict | None]:
     """Select this beam energy's line grid, and any automatic policy behind it.
@@ -679,23 +681,23 @@ def _line_grid_for_energy(
     assert sweep.detector is not None
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     bins = sweep.detector.energy_bins
-    override = bool(sweep.line_grid_policy) or environment_overrides_present()
-    if bins.line is not None and not sweep.line_grid_policy:
-        return np.asarray(bins.line, dtype=float), None
+    override = bool(sweep.cxr_grid_policy) or environment_overrides_present()
+    if bins.cxr is not None and not sweep.cxr_grid_policy:
+        return np.asarray(bins.cxr, dtype=float), None
     if not override:
-        if bins.line_by_energy is None:
+        if bins.cxr_by_energy is None:
             return np.asarray(cp["E_grid"], dtype=float), None
-        stored = bins.line_by_energy.get(float(energy_keV))
+        stored = bins.cxr_by_energy.get(float(energy_keV))
         if stored is not None:
             return np.asarray(stored, dtype=float), None
-    policy = _automatic_line_grid_policy(sweep, cp, float(energy_keV))
+    policy = _automatic_cxr_grid_policy(sweep, cp, float(energy_keV))
     num = resolution_num(policy.start_eV, policy.stop_eV, policy.max_spacing_eV)
     if policy.bandwidth_policy == RESONANCE_BANDWIDTH_POLICY:
         # The ceiling only caps a measured edge, so it proves nothing about
         # the budget; the runner refuses after transport instead.
         num = min(num, policy.max_points)
     elif num > policy.max_points:
-        raise LineGridToleranceError(
+        raise CxrGridToleranceError(
             f"automatic line grid for {sweep.target.material} at {energy_keV:g} keV "
             f"needs at least {num} coordinates over "
             f"[{policy.start_eV:g}, {policy.stop_eV:g}] eV, even at the "
@@ -784,25 +786,25 @@ def build_cases(
         if gdf is None or sweep.beam.gdf_shape_only
         else np.array([gdf.energy_keV.max()])
     )
-    resolved_line = tuple(_line_grid_for_energy(sweep, cp, float(energy)) for energy in energies)
-    line_grids = tuple(grid for grid, _ in resolved_line)
-    line_policies = tuple(policy for _, policy in resolved_line)
+    resolved_cxr = tuple(_cxr_grid_for_energy(sweep, cp, float(energy)) for energy in energies)
+    cxr_grids = tuple(grid for grid, _ in resolved_cxr)
+    cxr_policies = tuple(policy for _, policy in resolved_cxr)
     assert sweep.detector is not None
     bins = sweep.detector.energy_bins
-    fixed_line_grid = bins.line
+    fixed_cxr_grid = bins.cxr
     if bins.brem is not None:
         brem_grid = np.asarray(bins.brem, float)
     else:
-        if fixed_line_grid is not None:
-            brem_start = float(np.atleast_1d(fixed_line_grid)[0])
-        elif bins.line_by_energy:
-            brem_start = min(float(np.atleast_1d(grid)[0]) for grid in bins.line_by_energy.values())
-        elif bins.line_by_energy is None:
+        if fixed_cxr_grid is not None:
+            brem_start = float(np.atleast_1d(fixed_cxr_grid)[0])
+        elif bins.cxr_by_energy:
+            brem_start = min(float(np.atleast_1d(grid)[0]) for grid in bins.cxr_by_energy.values())
+        elif bins.cxr_by_energy is None:
             brem_start = float(cp["E_grid"][0])
         else:
             # A configured-but-empty mapping: every energy resolved
             # automatically, so the continuum starts where those grids do.
-            brem_start = min(float(np.atleast_1d(grid)[0]) for grid in line_grids)
+            brem_start = min(float(np.atleast_1d(grid)[0]) for grid in cxr_grids)
         brem_grid = np.arange(brem_start, float(energies.max()) * 1e3 + 50.0, 50.0)  # type: ignore[reportArgumentType]
 
     dtheta = (
@@ -901,7 +903,7 @@ def build_cases(
     mosaic_fwhm_rad = float(np.deg2rad(mosaic_deg)) if mosaic_deg else None
     if sweep.mosaic_route not in ("analytic", "mc"):
         raise ValueError(f"mosaic_route must be 'analytic' or 'mc', got {sweep.mosaic_route!r}")
-    # exact MC route: do the broadening INSIDE mc_spectrum and turn the analytic
+    # exact MC route: do the broadening INSIDE mc_cxr_spectrum and turn the analytic
     # store_result term OFF (mutually exclusive -- applying both double-counts).
     # Both are None when there is no mosaic to apply.
     mosaic_mc = mosaic_fwhm_rad is not None and sweep.mosaic_route == "mc"
@@ -968,7 +970,7 @@ def build_cases(
     for i_c, geometry in enumerate(geometries):
         name = geometry.name
         for i_e, E0 in enumerate(energies):
-            line_case_grid = encode_energy_grid(line_grids[i_e])
+            cxr_case_grid = encode_energy_grid(cxr_grids[i_e])
             resolved_transverse = None
             if b.transverse is not None:
                 resolved_transverse = asdict(
@@ -1015,20 +1017,20 @@ def build_cases(
                             if resolved_transverse is not None
                             else {}
                         ),
-                        E_grid=line_case_grid,  # legacy key (== line grid)
-                        E_grid_line=line_case_grid,
+                        E_grid=cxr_case_grid,  # legacy key (== line grid)
+                        E_grid_line=cxr_case_grid,
                         # Automatic resolution only. Absent keeps every
                         # explicit/stored-grid case payload bit-for-bit, so
                         # existing checkpoints stay addressable.
                         **(
-                            {"line_grid_policy": line_policies[i_e]}
-                            if line_policies[i_e] is not None
+                            {"line_grid_policy": cxr_policies[i_e]}
+                            if cxr_policies[i_e] is not None
                             else {}
                         ),
                         # Divergence-only (#116): node sampling keeps its payload.
                         **(
                             {"line_quadrature": "bin-mean"}
-                            if line_quadrature_from_payload(line_policies[i_e]) == "bin-mean"
+                            if cxr_quadrature_from_payload(cxr_policies[i_e]) == "bin-mean"
                             else {}
                         ),
                         E_grid_brem=(
@@ -1111,3 +1113,20 @@ def build_cases(
     for case in cases:
         warn_kinematic_validity(case)
     return cases
+
+
+# Compatibility names for the spectral vocabulary migration (issue #442).
+_CXR_RENAMED_EXPORTS = {
+    "_automatic_line_grid_policy": "_automatic_cxr_grid_policy",
+    "_line_grid_for_energy": "_cxr_grid_for_energy",
+}
+
+
+def __getattr__(name):
+    replacement = _CXR_RENAMED_EXPORTS.get(name)
+    if replacement is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite._api_deprecations import warn_renamed
+
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
+    return globals()[replacement]

@@ -15,9 +15,9 @@ import pytest
 
 from pyrite._backend import REAL, _to_cpu, xp
 from pyrite.materials.crystal import HBARC_EV_ANG
-from pyrite.montecarlo import mc_spectrum
+from pyrite.montecarlo import mc_cxr_spectrum
 from pyrite.montecarlo.case import Case
-from pyrite.montecarlo.runner.line_grid import coherent_flat_omission_limit
+from pyrite.montecarlo.runner.cxr_grid import coherent_flat_omission_limit
 from pyrite.montecarlo.transport import C_ANG_PER_FS
 
 ENERGY_GRID = np.arange(700.0, 1500.0, 2.0)
@@ -101,7 +101,7 @@ SCENARIOS = {
 def _run(name, limit, t0_ang=T0_ANG, *, phase_retention=None):
     seg_kw, kwargs, extra = SCENARIOS[name]
     kwargs = _groove_kwargs() if kwargs is None else kwargs
-    return mc_spectrum(
+    return mc_cxr_spectrum(
         _segments(t0_ang, **seg_kw),
         ENERGY_GRID,
         coherent=True,
@@ -149,7 +149,7 @@ def test_omission_stays_inside_the_cauchy_schwarz_bound(name, limit):
 def test_zero_limit_is_the_unchanged_reducer(name):
     seg_kw, kwargs, extra = SCENARIOS[name]
     kwargs = _groove_kwargs() if kwargs is None else kwargs
-    default = mc_spectrum(
+    default = mc_cxr_spectrum(
         _segments(T0_ANG, **seg_kw), ENERGY_GRID, coherent=True, **kwargs, **extra
     )
     np.testing.assert_array_equal(_run(name, 0.0), default)
@@ -272,10 +272,10 @@ def test_phase_policy_preserves_captured_full_fields():
         **KWARGS,
     )
     segments = _segments(T0_ANG, footprint=True)
-    full = mc_spectrum(segments, ENERGY_GRID, **common)
+    full = mc_cxr_spectrum(segments, ENERGY_GRID, **common)
     full_fields = captures.copy()
     captures.clear()
-    gated = mc_spectrum(
+    gated = mc_cxr_spectrum(
         segments,
         ENERGY_GRID,
         coherent_flat_omission_limit=FLOOR_LIMIT,
@@ -291,7 +291,7 @@ def test_phase_policy_preserves_captured_full_fields():
 
 
 def test_phase_policy_preserves_temporal_output():
-    from pyrite.montecarlo.spectrum.lines import temporal_profile_for
+    from pyrite.montecarlo.spectrum.cxr import temporal_profile_for
     from pyrite.montecarlo.spectrum.phase_retention import PhaseRetentionPolicy
 
     segments = _segments(T0_ANG, footprint=True)
@@ -303,7 +303,7 @@ def test_phase_policy_preserves_temporal_output():
         (FLOOR_LIMIT, PhaseRetentionPolicy(report=decisions.append)),
     ]:
         temporal = temporal_profile_for(segments, ENERGY_GRID, [KWARGS["n_hat"]])
-        spec = mc_spectrum(
+        spec = mc_cxr_spectrum(
             segments,
             ENERGY_GRID,
             temporal=temporal,
@@ -321,8 +321,8 @@ def test_omission_is_inert_without_bunch_offsets():
     segments = _segments(np.zeros(T0_ANG.size), footprint=False)
     segments.pop("initial_t0_ang")
     segments.pop("initial_r_ang")
-    full = mc_spectrum(segments, ENERGY_GRID, coherent=True, **KWARGS)
-    masked = mc_spectrum(
+    full = mc_cxr_spectrum(segments, ENERGY_GRID, coherent=True, **KWARGS)
+    masked = mc_cxr_spectrum(
         segments, ENERGY_GRID, coherent=True, coherent_flat_omission_limit=0.5, **KWARGS
     )
     np.testing.assert_array_equal(masked, full)
@@ -344,13 +344,13 @@ def test_vanishing_form_factor_gives_the_floor():
     """``F -> 0`` (long Gaussian bunch): every energy omits and the spectrum is G."""
     segments = _segments(T0_ANG, footprint=True)
     kw = {**KWARGS, "longitudinal_rms_fs": 200.0}
-    masked = mc_spectrum(
+    masked = mc_cxr_spectrum(
         segments, ENERGY_GRID, coherent=True, coherent_flat_omission_limit=1.0e-4, **kw
     )
-    floor = mc_spectrum(
+    floor = mc_cxr_spectrum(
         segments, ENERGY_GRID, coherent=True, coherent_flat_omission_limit=FLOOR_LIMIT, **kw
     )
-    full = mc_spectrum(segments, ENERGY_GRID, coherent=True, **kw)
+    full = mc_cxr_spectrum(segments, ENERGY_GRID, coherent=True, **kw)
     np.testing.assert_array_equal(masked, floor)
     np.testing.assert_allclose(masked, full, rtol=SUBGRID_RTOL)
 
@@ -397,8 +397,8 @@ def test_bunch_spread_policy_preserves_the_correct_coherence_sector(
     kwargs = KWARGS if route == "batched" else _groove_kwargs()
     extra = {"sinc_cutoff": 4.0} if route == "per-hkl-windowed" else {}
     common = {**kwargs, **extra}
-    floor = mc_spectrum(single, ENERGY_GRID, coherent=True, **common)
-    incoherent = mc_spectrum(segments, ENERGY_GRID, coherent=False, **common)
+    floor = mc_cxr_spectrum(single, ENERGY_GRID, coherent=True, **common)
+    incoherent = mc_cxr_spectrum(segments, ENERGY_GRID, coherent=False, **common)
     population = 1.0e8
     common.update(coherent=True, physical_electrons=population, longitudinal_rms_fs=rms_fs)
     decisions = []
@@ -407,8 +407,8 @@ def test_bunch_spread_policy_preserves_the_correct_coherence_sector(
         return PhaseRetentionCost(scope, 1.0, 0.5, 0.1, "synthetic limit regression")
 
     policy = PhaseRetentionPolicy(estimate=estimate, report=decisions.append)
-    full = mc_spectrum(segments, ENERGY_GRID, **common)
-    reduced = mc_spectrum(
+    full = mc_cxr_spectrum(segments, ENERGY_GRID, **common)
+    reduced = mc_cxr_spectrum(
         segments,
         ENERGY_GRID,
         coherent_flat_omission_limit=1.0e-4,
@@ -446,7 +446,7 @@ def test_bunch_spread_policy_preserves_the_correct_coherence_sector(
 @pytest.mark.parametrize("limit", [-1.0, float("nan"), float("inf")])
 def test_invalid_limit_is_refused(limit):
     with pytest.raises(ValueError, match="coherent_flat_omission_limit"):
-        mc_spectrum(
+        mc_cxr_spectrum(
             _segments(T0_ANG, footprint=False),
             ENERGY_GRID,
             coherent=True,
@@ -456,7 +456,7 @@ def test_invalid_limit_is_refused(limit):
 
 
 def test_runner_limit_defaults_to_policy_and_honours_the_case():
-    from pyrite._line_grid_policy import DEFAULT_COHERENT_FLAT_OMISSION_LIMIT
+    from pyrite._cxr_grid_policy import DEFAULT_COHERENT_FLAT_OMISSION_LIMIT
 
     assert coherent_flat_omission_limit({}) == DEFAULT_COHERENT_FLAT_OMISSION_LIMIT
     assert coherent_flat_omission_limit({"coherent_flat_omission_limit": 0}) == 0.0
@@ -477,7 +477,7 @@ def test_case_validates_the_limit():
 
 
 def test_mask_keeps_uncertified_factors_and_rounds_the_bound_outward():
-    from pyrite.montecarlo.spectrum.lines._per_hkl import _flat_energy_keep
+    from pyrite.montecarlo.spectrum.cxr._per_hkl import _flat_energy_keep
 
     st = SimpleNamespace(
         Ne=3,
@@ -495,7 +495,7 @@ def test_mask_keeps_uncertified_factors_and_rounds_the_bound_outward():
 
 def test_gaussian_mask_refuses_a_rounded_factor_below_the_true_threshold():
     from pyrite.montecarlo.spectrum.coherent_form_factor import gaussian_form_factor_bounds
-    from pyrite.montecarlo.spectrum.lines._per_hkl import _flat_energy_keep
+    from pyrite.montecarlo.spectrum.cxr._per_hkl import _flat_energy_keep
 
     energy = np.array([800.0, 900.0])
     rms = 1e-3
@@ -533,7 +533,7 @@ def test_coherent_capture_refuses_active_omission():
 @pytest.fixture(params=["auto", "eager", "jit"] if xp.__name__ == "cupy" else ["auto"])
 def coherent_route(request, monkeypatch):
     """Exercise each CUDA reducer; CPU has one implementation per geometry."""
-    from pyrite.montecarlo.spectrum.lines import _policy
+    from pyrite.montecarlo.spectrum.cxr import _policy
 
     if request.param != "auto":
         monkeypatch.setattr(_policy, "_USE_JIT_COHERENT_STREAM", False)
@@ -564,10 +564,12 @@ def test_physical_population_bound_on_identical_finite_footprint_fields(
         **extra,
     )
     limit = 0.05 * (population - 1)
-    full = mc_spectrum(segments, ENERGY_GRID, **common)
-    disabled = mc_spectrum(segments, ENERGY_GRID, coherent_flat_omission_limit=0, **common)
-    floor = mc_spectrum(segments, ENERGY_GRID, coherent_flat_omission_limit=FLOOR_LIMIT, **common)
-    masked = mc_spectrum(segments, ENERGY_GRID, coherent_flat_omission_limit=limit, **common)
+    full = mc_cxr_spectrum(segments, ENERGY_GRID, **common)
+    disabled = mc_cxr_spectrum(segments, ENERGY_GRID, coherent_flat_omission_limit=0, **common)
+    floor = mc_cxr_spectrum(
+        segments, ENERGY_GRID, coherent_flat_omission_limit=FLOOR_LIMIT, **common
+    )
+    masked = mc_cxr_spectrum(segments, ENERGY_GRID, coherent_flat_omission_limit=limit, **common)
     np.testing.assert_array_equal(disabled, full)
     factor = np.exp(-((ENERGY_GRID / HBARC_EV_ANG * 1e-3 * C_ANG_PER_FS) ** 2))
     omitted = factor < 0.05
@@ -592,8 +594,8 @@ def test_zero_pair_population_omits_even_without_offsets(population, coherent_ro
     segments.pop("initial_t0_ang")
     segments.pop("initial_r_ang")
     common = dict(coherent=True, physical_electrons=population, **KWARGS)
-    full = mc_spectrum(segments, ENERGY_GRID, **common)
-    masked = mc_spectrum(segments, ENERGY_GRID, coherent_flat_omission_limit=1e-4, **common)
+    full = mc_cxr_spectrum(segments, ENERGY_GRID, **common)
+    masked = mc_cxr_spectrum(segments, ENERGY_GRID, coherent_flat_omission_limit=1e-4, **common)
     np.testing.assert_allclose(masked, full, rtol=SUBGRID_RTOL)
 
 
@@ -604,14 +606,14 @@ def test_physical_slab_uses_complete_fields_not_empirical_factor(route, coherent
     segments = _segments(T0_ANG, footprint=False)
     kwargs = KWARGS if route == "batched" else _groove_kwargs()
     common = dict(coherent=True, physical_electrons=2.0, **kwargs)
-    full = mc_spectrum(segments, ENERGY_GRID, **common)
-    masked = mc_spectrum(segments, ENERGY_GRID, coherent_flat_omission_limit=0.05, **common)
+    full = mc_cxr_spectrum(segments, ENERGY_GRID, **common)
+    masked = mc_cxr_spectrum(segments, ENERGY_GRID, coherent_flat_omission_limit=0.05, **common)
     assert (_empirical_F(T0_ANG) < 0.05).any()
     np.testing.assert_allclose(masked, full, rtol=SUBGRID_RTOL)
 
 
 def test_physical_pair_bound_cannot_use_the_smaller_sample_count():
-    from pyrite.montecarlo.spectrum.lines._per_hkl import _flat_energy_keep
+    from pyrite.montecarlo.spectrum.cxr._per_hkl import _flat_energy_keep
 
     st = SimpleNamespace(
         Ne=3,
@@ -631,7 +633,7 @@ def test_omission_cannot_hide_unresolved_physical_pair_power():
     # Physical slab F=1 and N-1=11 exceed the small omission budget.
     # Preserve #350's refusal of a statistically unresolved signed estimate.
     with pytest.raises(CoherentSamplingError, match="negative or nonfinite pair estimate"):
-        mc_spectrum(
+        mc_cxr_spectrum(
             segments,
             ENERGY_GRID,
             coherent=True,
@@ -649,7 +651,7 @@ def test_gaussian_certification_bisects_instead_of_scanning(monkeypatch):
     from types import SimpleNamespace
 
     from pyrite.montecarlo.spectrum import coherent_form_factor
-    from pyrite.montecarlo.spectrum.lines import _per_hkl
+    from pyrite.montecarlo.spectrum.cxr import _per_hkl
 
     calls = []
     original = coherent_form_factor.gaussian_form_factor_bounds

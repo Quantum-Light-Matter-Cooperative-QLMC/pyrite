@@ -15,7 +15,7 @@ def _mem_worker_cap(per_worker_mb=None):
     """Max workers host RAM allows at ``per_worker_mb`` each.
 
     ``min(MemAvailable, 0.9 * MemTotal) // per_worker_mb``. Binds BOTH worker
-    pools (full-case CPU pool and GPU-pipeline transport pool) so neither can
+    pools (full-case CPU pool and GPU-pipeCXR transport pool) so neither can
     oversubscribe host RAM and re-create the 2026-07-18 remote-host OOM, where the
     kernel killed one worker and ``BrokenProcessPool`` lost the whole run. The
     two pools pass different budgets: ``_WORKER_MEM_MB`` for full-case workers
@@ -57,7 +57,7 @@ def _pipeline_slot_cap():
 
 
 def _gpu_pipeline_workers(max_workers, n):
-    """Size the GPU-pipeline transport pool (transport-only workers feeding the
+    """Size the GPU-pipeCXR transport pool (transport-only workers feeding the
     serial GPU). Auto = ~half the usable cores (transport is the tail); an
     explicit request is honored. BOTH are then clamped by host RAM: the pool
     spawns full worker processes just like the CPU pool, so without a cap

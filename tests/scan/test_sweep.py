@@ -62,11 +62,11 @@ ALL = [
 ]
 
 
-def _detector(*, line=None, line_by_energy=None, brem=None, detector=None):
+def _detector(*, line=None, cxr_by_energy=None, brem=None, detector=None):
     base = Detector() if detector is None else detector
     return replace(
         base,
-        energy_bins=EnergyBins(line=line, line_by_energy=line_by_energy, brem=brem),
+        energy_bins=EnergyBins(cxr=line, cxr_by_energy=cxr_by_energy, brem=brem),
     )
 
 
@@ -156,7 +156,7 @@ def test_standard_sweep_owns_ninety_degree_detector_and_builds_pi_over_two_case(
     case = build_cases(sweep)[0]
 
     assert sweep.detector.observation_angle_deg == 90.0
-    assert sweep.detector.energy_bins.line_by_energy is not None
+    assert sweep.detector.energy_bins.cxr_by_energy is not None
     assert case["theta_obs_rad"] == pytest.approx(np.pi / 2.0)
 
 
@@ -219,7 +219,7 @@ def test_build_cases_selects_and_encodes_line_grid_for_each_beam_energy():
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=[30.0, 50.0]),
             tilt_deg=5.0,
-            detector=_detector(line_by_energy=grids, brem=75.0),
+            detector=_detector(cxr_by_energy=grids, brem=75.0),
         )
     )
 
@@ -253,7 +253,7 @@ def test_fixed_line_grid_takes_precedence_over_per_beam_mapping():
             beam=BeamSpec(energy_keV=[30.0, 50.0]),
             detector=_detector(
                 line=fixed,
-                line_by_energy={30.0: np.array([10.0]), 50.0: np.array([20.0])},
+                cxr_by_energy={30.0: np.array([10.0]), 50.0: np.array([20.0])},
             ),
         )
     )
@@ -270,8 +270,8 @@ def test_material_sweep_grid_overrides_resolve_into_detector_bins():
         E_grid_brem=None,
     )
 
-    np.testing.assert_array_equal(sweep.detector.energy_bins.line, fixed)
-    assert sweep.detector.energy_bins.line_by_energy is None
+    np.testing.assert_array_equal(sweep.detector.energy_bins.cxr, fixed)
+    assert sweep.detector.energy_bins.cxr_by_energy is None
     assert sweep.detector.energy_bins.brem is None
 
 
@@ -279,7 +279,7 @@ def test_dead_e_grid_alias_warns_and_routes_to_detector_bins():
     fixed = np.array([75.0, 78.0])
     with pytest.warns(DeprecationWarning, match="e_grid_eV is deprecated"):
         sweep = material_sweep("mose2", e_grid_eV=fixed)
-    np.testing.assert_array_equal(sweep.detector.energy_bins.line, fixed)
+    np.testing.assert_array_equal(sweep.detector.energy_bins.cxr, fixed)
 
 
 def test_sweep_scene_has_no_energy_grid_fields():
@@ -299,7 +299,7 @@ def test_missing_per_beam_line_grid_resolves_automatically(monkeypatch):
         Sweep(
             material="mose2",
             beam=BeamSpec(energy_keV=[30.0, 50.0]),
-            detector=_detector(line_by_energy={30.0: np.array([10.0])}),
+            detector=_detector(cxr_by_energy={30.0: np.array([10.0])}),
         )
     )
     by_energy = {float(case["E0_keV"]): case for case in cases}
@@ -316,7 +316,7 @@ def test_empty_per_beam_line_grid_resolves_automatically():
         Sweep(
             material="mose2",
             beam=BeamSpec(energy_keV=30.0),
-            detector=_detector(line_by_energy={}),
+            detector=_detector(cxr_by_energy={}),
         )
     )[0]
     assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-nyquist"
@@ -336,7 +336,7 @@ def test_implicit_brem_grid_starts_at_lowest_per_beam_line_grid_start():
             material="mose2",
             beam=BeamSpec(energy_keV=[30.0, 50.0]),
             detector=_detector(
-                line_by_energy={
+                cxr_by_energy={
                     30.0: np.array([25.0, 50.0]),
                     50.0: np.array([10.0, 50.0]),
                 }
@@ -389,14 +389,14 @@ def test_build_cases_quantizes_angles_symmetrically_and_removes_duplicates():
 
 
 @pytest.mark.parametrize(
-    ("line_grid", "brem_grid"),
+    ("cxr_grid", "brem_grid"),
     [
         (np.array([75.0]), np.array([10.0, 100.0, 1000.0])),
         (np.array([10.0, 100.0, 1000.0]), np.array([75.0])),
     ],
 )
 def test_build_cases_and_runner_preserve_exact_nonuniform_and_scalar_energy_grids(
-    monkeypatch, line_grid, brem_grid
+    monkeypatch, cxr_grid, brem_grid
 ):
     case = build_cases(
         Sweep(
@@ -404,7 +404,7 @@ def test_build_cases_and_runner_preserve_exact_nonuniform_and_scalar_energy_grid
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=30.0),
             tilt_deg=5.0,
-            detector=_detector(line=line_grid, brem=brem_grid),
+            detector=_detector(line=cxr_grid, brem=brem_grid),
         ),
         n_electrons=1,
         n_electrons_brem=1,
@@ -416,7 +416,7 @@ def test_build_cases_and_runner_preserve_exact_nonuniform_and_scalar_energy_grid
 
     transport = runner._transport_case(case)
 
-    np.testing.assert_array_equal(transport["E_grid"], line_grid)
+    np.testing.assert_array_equal(transport["E_grid"], cxr_grid)
     np.testing.assert_array_equal(transport["E_brem"], brem_grid)
 
 
@@ -444,14 +444,14 @@ def test_build_cases_keeps_legacy_triples_for_uniform_energy_grids():
 
 
 def test_uniform_linspace_endpoint_grid_roundtrips_through_legacy_triple(monkeypatch):
-    line_grid = np.linspace(0.0, 1.0, 10, endpoint=True)
+    cxr_grid = np.linspace(0.0, 1.0, 10, endpoint=True)
     case = build_cases(
         Sweep(
             material="mose2",
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=30.0),
             tilt_deg=5.0,
-            detector=_detector(line=line_grid, brem=75.0),
+            detector=_detector(line=cxr_grid, brem=75.0),
         ),
         n_electrons=1,
         n_electrons_brem=1,
@@ -462,26 +462,26 @@ def test_uniform_linspace_endpoint_grid_roundtrips_through_legacy_triple(monkeyp
 
     transport = runner._transport_case(case)
 
-    np.testing.assert_array_equal(transport["E_grid"], line_grid)
+    np.testing.assert_array_equal(transport["E_grid"], cxr_grid)
 
 
 @pytest.mark.parametrize(
-    "line_grid",
+    "cxr_grid",
     [
         75.0,
         np.array([75.0, 75.0]),
         np.array([50.0, 51.0, 52.0 + 1e-13]),
     ],
 )
-def test_scalar_constant_and_near_uniform_energy_grids_stay_exact(monkeypatch, line_grid):
-    expected = np.atleast_1d(np.asarray(line_grid, dtype=float))
+def test_scalar_constant_and_near_uniform_energy_grids_stay_exact(monkeypatch, cxr_grid):
+    expected = np.atleast_1d(np.asarray(cxr_grid, dtype=float))
     case = build_cases(
         Sweep(
             material="mose2",
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=[30.0, 40.0]),
             tilt_deg=5.0,
-            detector=_detector(line=line_grid, brem=75.0),
+            detector=_detector(line=cxr_grid, brem=75.0),
         ),
         n_electrons=1,
         n_electrons_brem=1,

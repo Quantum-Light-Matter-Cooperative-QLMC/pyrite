@@ -15,9 +15,9 @@ import numpy as np
 import pytest
 
 from pyrite.materials.crystal import HBARC_EV_ANG
-from pyrite.montecarlo.spectrum import mc_spectrum
-from pyrite.montecarlo.spectrum.lines import _setup as lines_setup
-from pyrite.montecarlo.spectrum.lines._formation import (
+from pyrite.montecarlo.spectrum import mc_cxr_spectrum
+from pyrite.montecarlo.spectrum.cxr import _setup as lines_setup
+from pyrite.montecarlo.spectrum.cxr._formation import (
     formation_coefficients,
     formation_factor,
 )
@@ -130,7 +130,7 @@ def _transparent(monkeypatch):
 
 
 def _spectrum(segments, **kwargs):
-    return mc_spectrum(segments, E_GRID, CRYSTAL, [HKL], B_ang2=0.4, n_hat=N_HAT, **kwargs)
+    return mc_cxr_spectrum(segments, E_GRID, CRYSTAL, [HKL], B_ang2=0.4, n_hat=N_HAT, **kwargs)
 
 
 CASES = {

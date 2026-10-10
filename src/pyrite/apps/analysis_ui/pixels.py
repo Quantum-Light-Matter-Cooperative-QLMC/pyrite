@@ -164,11 +164,11 @@ def _resolve_pixel_image(
 
 def spectrum_components(observation: StoredObservation) -> tuple[str, ...]:
     """True-spectrum components to show for the observation's emission."""
-    line = "coherent" if observation.emission == "coherent" else "line"
-    components = [line]
-    if observation.spatial.characteristic_line is not None:
+    cxr = "coherent" if observation.emission == "coherent" else "cxr"
+    components = [cxr]
+    if observation.spatial.characteristic is not None:
         components.append("characteristic")
-    components.append("background")
+    components.append("brem")
     return tuple(components)
 
 

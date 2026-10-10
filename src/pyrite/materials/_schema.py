@@ -8,9 +8,10 @@ from typing import Literal, cast
 
 import numpy as np
 
+from .._api_deprecations import renamed_fields
 from .._numerics import CONVERGENCE_KEYS, TRANSPORT_KEYS
 from .._precision import Precision
-from ._catalog_decode import LineGridByEnergy, _number
+from ._catalog_decode import CxrGridByEnergy, _number
 from ._identity import CutFrame, MaterialIdentity, hexagonal_setting, reduce_indices
 
 _SCAN_KEYS = (
@@ -283,7 +284,7 @@ class ScanSpec:
     tilt_deg: np.ndarray
     tilt_azim_deg: np.ndarray
     E_grid_line: np.ndarray | None
-    E_grid_line_by_energy: LineGridByEnergy | None
+    E_grid_line_by_energy: CxrGridByEnergy | None
     E_grid_brem: np.ndarray
     thickness_layers: np.ndarray | None = None
     #: Optional electron-count grids (profile settings): None -> the runner's
@@ -405,6 +406,7 @@ class MaterialSpec:
         return self.identity.hexagonal
 
 
+@renamed_fields(profile_line_grid_policies="profile_cxr_grid_policies")
 @dataclass(frozen=True)
 class MaterialCatalog:
     """Expose deeply immutable material and profile registries.
@@ -428,7 +430,7 @@ class MaterialCatalog:
         Per-profile adaptive electron-count policies.
     profile_transport_numerics
         Per-profile result-affecting scalar numerical controls.
-    profile_line_grid_policies
+    profile_cxr_grid_policies
         Per-profile named line-grid bandwidth and resolution policies.
     profile_filters, profile_physical_detectors
         Declarative finite-filter and planar-detector profile data.
@@ -482,7 +484,7 @@ class MaterialCatalog:
     #: Explicit ``profiles.NAME.line_grid_policy`` tables (named bandwidth and
     #: resolution policies, window opt-in and point budget), keyed by profile;
     #: absent means the automatic policy.
-    profile_line_grid_policies: Mapping[str, Mapping[str, object]] = MappingProxyType({})
+    profile_cxr_grid_policies: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Declarative finite filter plates, resolved by the single-scene CLI path.
     #: They intentionally remain plain schema data here: importing instrument
     #: objects would invert the materials -> instrument dependency boundary.
@@ -537,10 +539,19 @@ class MaterialCatalog:
         """Explicit result-affecting transport numerics for ``name``."""
         return self.profile_transport_numerics.get(name)
 
-    def profile_line_grid_policy(self, name: str) -> Mapping[str, object] | None:
+    def profile_cxr_grid_policy(self, name: str) -> Mapping[str, object] | None:
         """Named line-grid policies for ``name``, or ``None`` for the automatic one.
         Consumed by :func:`config.material_sweep` as ``Sweep.line_grid_policy``."""
-        return self.profile_line_grid_policies.get(name)
+        return self.profile_cxr_grid_policies.get(name)
+
+    def profile_line_grid_policy(self, name: str) -> Mapping[str, object] | None:
+        """Deprecated alias for :meth:`profile_cxr_grid_policy`."""
+        from .._api_deprecations import warn_renamed
+
+        warn_renamed(
+            "MaterialCatalog.profile_line_grid_policy", "MaterialCatalog.profile_cxr_grid_policy"
+        )
+        return self.profile_cxr_grid_policy(name)
 
     def profile_detector(self, name: str) -> Mapping[str, object]:
         """Acceptance fields belonging to ``name``, or code defaults.

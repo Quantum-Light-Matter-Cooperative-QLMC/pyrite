@@ -343,7 +343,7 @@ def test_spectrum_case_forwards_groove_to_brem(monkeypatch):
 
     monkeypatch.setattr(
         runner,
-        "_lines_for_segments",
+        "_cxr_for_segments",
         lambda *_args, **_kwargs: np.zeros_like(grid),
     )
     monkeypatch.setattr(
@@ -1025,9 +1025,9 @@ def test_run_sweep_splits_line_and_brem_fields(tmp_path, monkeypatch):
 
     line = _checkpoint_io.load(str(tmp_path / "hopg" / "line.h5"))
     brem = _checkpoint_io.load(str(tmp_path / "hopg" / "brem.h5"))
-    line_record = line["cfg_a"][30.0]
+    cxr_record = line["cfg_a"][30.0]
     brem_record = brem["cfg_a"][30.0]
-    assert "spec" in line_record and "brem_wide" not in line_record
+    assert "spec" in cxr_record and "brem_wide" not in cxr_record
     assert "brem_wide" in brem_record and "spec" not in brem_record
 
 
@@ -1241,7 +1241,7 @@ def _resolved_grid_run_cases(cases, **kwargs):
                 "truncation_audit": {
                     "capped_at_ceiling": True,
                     "upper_bound": 5.0e-5,
-                    "line_yield_statistics": {
+                    "cxr_yield_statistics": {
                         "n": 300,
                         "relative_standard_error": 0.155,
                         "statistics_limited": True,
@@ -1272,7 +1272,7 @@ def test_scan_checkpoint_persists_resolved_line_grid(tmp_path, monkeypatch):
     saved = load_checkpoint("hopg@a-000000000000", checkpoint_dir=str(tmp_path))
     audit = saved["cfg_a"][30.0]["line_grid_resolved"]["truncation_audit"]
     assert audit["capped_at_ceiling"]
-    assert audit["line_yield_statistics"]["statistics_limited"]
+    assert audit["cxr_yield_statistics"]["statistics_limited"]
 
     monkeypatch.setattr("pyrite.runs.run.run_cases", stub_run_cases)
     replayed = {}
@@ -1284,7 +1284,7 @@ def test_scan_checkpoint_persists_resolved_line_grid(tmp_path, monkeypatch):
         progress=False,
     )
     grid = replayed["cfg_a"][30.0]["line_grid_resolved"]
-    assert grid["truncation_audit"]["line_yield_statistics"]["relative_standard_error"] == 0.155
+    assert grid["truncation_audit"]["cxr_yield_statistics"]["relative_standard_error"] == 0.155
 
 
 def test_no_cache_neither_reads_nor_writes(tmp_path, monkeypatch):
@@ -1845,7 +1845,7 @@ def test_repair_brem_wide_skips_pool_free_off_gpu(monkeypatch):
 def test_lines_for_case_matches_spectrum_case_single_slab():
     import numpy as np
 
-    from pyrite.montecarlo import _lines_for_case, runner
+    from pyrite.montecarlo import _cxr_for_case, runner
 
     case = dict(
         E0_keV=30.0,
@@ -1864,7 +1864,7 @@ def test_lines_for_case_matches_spectrum_case_single_slab():
     E_grid = np.linspace(1000.0, 30000.0, 16)
     tp = runner._transport_case({**case, "E_grid": E_grid})
     spec_ref = runner._spectrum_case({**case, "E_grid": E_grid}, tp)["spec"]
-    spec = _lines_for_case(case, E_grid)
+    spec = _cxr_for_case(case, E_grid)
     assert spec.shape == E_grid.shape
     np.testing.assert_allclose(spec, spec_ref, rtol=0, atol=0)
 
@@ -2062,26 +2062,26 @@ def test_reline_cli_requires_materials_xor_all(monkeypatch):
     """`pyrite checkpoint recompute line` preserves brem's exclusive
     material-selection contract."""
     from pyrite.checkpoints import recompute
-    from pyrite.cli.commands.recompute import line_command
+    from pyrite.cli.commands.recompute import cxr_command
 
     seen: list[Any] = []
-    monkeypatch.setattr(recompute, "reline_checkpoints", lambda **kw: seen.append(kw) or {})
+    monkeypatch.setattr(recompute, "recxr_checkpoints", lambda **kw: seen.append(kw) or {})
     runner = CliRunner()
 
-    neither = runner.invoke(line_command, [], catch_exceptions=False)
-    both = runner.invoke(line_command, ["MoS2", "--all"], catch_exceptions=False)
+    neither = runner.invoke(cxr_command, [], catch_exceptions=False)
+    both = runner.invoke(cxr_command, ["MoS2", "--all"], catch_exceptions=False)
     assert neither.exit_code == 2
     assert both.exit_code == 2
     assert "needs material name(s)" in neither.stderr
     assert "--all does not take material names" in both.stderr
     assert seen == []
 
-    material = runner.invoke(line_command, ["MoS2"], catch_exceptions=False)
+    material = runner.invoke(cxr_command, ["MoS2"], catch_exceptions=False)
     assert material.exit_code == 0
     assert material.stderr == ""
     assert seen[-1]["materials"] == ["MoS2"]
 
-    all_materials = runner.invoke(line_command, ["-a"], catch_exceptions=False)
+    all_materials = runner.invoke(cxr_command, ["-a"], catch_exceptions=False)
     assert all_materials.exit_code == 0
     assert all_materials.stderr == ""
     assert seen[-1]["materials"] is None
@@ -2179,7 +2179,7 @@ def test_rebrem_checkpoints_progress_file_marks_failed_and_rejects_multi(monkeyp
 
 
 # ---------------------------------------------------------------------------
-# repair_line_spec / reline_checkpoint
+# repair_cxr_spec / recxr_checkpoint
 # ---------------------------------------------------------------------------
 
 
@@ -2218,7 +2218,7 @@ def test_repair_line_spec_rewrites_spec_and_reinterp_brem_keeps_brem_wide(monkey
 
     monkeypatch.setattr(
         run.runner,
-        "_line_pair_for_case",
+        "_cxr_pair_for_case",
         lambda case, E_grid, *, want_coherent, return_characteristic: (
             np.full(E_grid.shape, 5.0),
             None,
@@ -2228,7 +2228,7 @@ def test_repair_line_spec_rewrites_spec_and_reinterp_brem_keeps_brem_wide(monkey
     results = {"mos2@30": {30.0: _line_record()}}
     r = results["mos2@30"][30.0]
     brem_wide0 = r["brem_wide"].copy()
-    n = run.repair_line_spec(results, material="mos2", line_ne=999, from_config=False)
+    n = run.repair_cxr_spec(results, material="mos2", cxr_ne=999, from_config=False)
     assert n == 1
     assert np.all(r["spec"] == 5.0)
     assert np.all(r["spec_characteristic"] == 1.0)
@@ -2254,14 +2254,14 @@ def test_repair_line_spec_refreshes_both_spec_and_spec_coherent(monkeypatch):
             np.full(E_grid.shape, 1.0),
         )
 
-    monkeypatch.setattr(run.runner, "_line_pair_for_case", fake_pair)
+    monkeypatch.setattr(run.runner, "_cxr_pair_for_case", fake_pair)
 
     both = _line_record()
     both["spec_coherent"] = np.zeros(32)  # stale placeholder to be overwritten
     incoh = _line_record()
     results = {"both@30": {30.0: both}, "incoh@30": {30.0: incoh}}
 
-    n = run.repair_line_spec(results, material="mos2", line_ne=999, from_config=False)
+    n = run.repair_cxr_spec(results, material="mos2", cxr_ne=999, from_config=False)
 
     assert n == 2
     assert np.all(both["spec"] == 5.0)
@@ -2276,7 +2276,7 @@ def test_repair_line_spec_persists_profile_and_explicit_bounds(monkeypatch):
 
     monkeypatch.setattr(
         run.runner,
-        "_line_pair_for_case",
+        "_cxr_pair_for_case",
         lambda _case, grid, *, want_coherent, return_characteristic: (
             np.ones(np.asarray(grid).shape),
             None,
@@ -2286,11 +2286,11 @@ def test_repair_line_spec_persists_profile_and_explicit_bounds(monkeypatch):
     results = {"mos2@30": {30.0: _line_record()}}
     record = results["mos2@30"][30.0]
 
-    n = run.repair_line_spec(
+    n = run.repair_cxr_spec(
         results,
         material="mos2",
-        line_ne=60,
-        line_start_eV=500.0,
+        cxr_ne=60,
+        cxr_start_eV=500.0,
         line_stop_eV=1100.0,
         line_step_eV=200.0,
         fidelity="survey",
@@ -2310,7 +2310,7 @@ def test_repair_line_spec_skips_at_target(monkeypatch):
 
     monkeypatch.setattr(
         run.runner,
-        "_line_pair_for_case",
+        "_cxr_pair_for_case",
         lambda case, E_grid, *, want_coherent, return_characteristic: (
             np.full(E_grid.shape, 5.0),
             None,
@@ -2319,7 +2319,7 @@ def test_repair_line_spec_skips_at_target(monkeypatch):
     )
     results = {"mos2@30": {30.0: _line_record(ne=200)}}
     # same Ne, same grid, finite spec -> nothing to redo
-    n = run.repair_line_spec(results, material="mos2", line_ne=200, from_config=False)
+    n = run.repair_cxr_spec(results, material="mos2", cxr_ne=200, from_config=False)
     assert n == 0
 
 
@@ -2330,18 +2330,18 @@ def test_repair_line_spec_max_seconds_stops_early(monkeypatch):
 
     monkeypatch.setattr(
         run.runner,
-        "_line_pair_for_case",
+        "_cxr_pair_for_case",
         lambda case, E_grid, *, want_coherent, return_characteristic: (
             np.full(E_grid.shape, 5.0),
             None,
             np.full(E_grid.shape, 1.0),
         ),
     )
-    results = {"mos2@30": {30.0: _line_record(ne=200)}}  # 1 stale record (line_ne bump)
-    n = run.repair_line_spec(
+    results = {"mos2@30": {30.0: _line_record(ne=200)}}  # 1 stale record (cxr_ne bump)
+    n = run.repair_cxr_spec(
         results,
         material="mos2",
-        line_ne=999,
+        cxr_ne=999,
         from_config=False,
         max_seconds=0.0,
         status=(s := {}),
@@ -2383,26 +2383,26 @@ def test_repair_line_spec_from_config_targets_the_grid_build_cases_would_use(mon
             base_sweep.detector,
             energy_bins=replace(
                 base_sweep.detector.energy_bins,
-                line_by_energy={stored_keV: stored_grid},
+                cxr_by_energy={stored_keV: stored_grid},
             ),
         ),
     )
-    line_by_energy = sweep.detector.energy_bins.line_by_energy
-    assert stored_keV in line_by_energy and auto_keV not in line_by_energy
+    cxr_by_energy = sweep.detector.energy_bins.cxr_by_energy
+    assert stored_keV in cxr_by_energy and auto_keV not in cxr_by_energy
 
     # what building this material from config would put on each case
     expected = {}
     for E0 in (stored_keV, auto_keV):
         cases = build_cases(replace(sweep, beam=replace(sweep.beam, energy_keV=E0)))
         expected[E0] = decode_energy_grid(cases[0]["E_grid_line"])
-    np.testing.assert_allclose(expected[stored_keV], np.asarray(line_by_energy[stored_keV], float))
+    np.testing.assert_allclose(expected[stored_keV], np.asarray(cxr_by_energy[stored_keV], float))
 
-    # repair_line_spec rebuilds the material's sweep from the catalog itself;
+    # repair_cxr_spec rebuilds the material's sweep from the catalog itself;
     # inject the stored-row sweep in its place rather than editing the catalog.
     monkeypatch.setattr(campaign_config, "material_sweep", lambda *a, **k: sweep)
     monkeypatch.setattr(
         run.runner,
-        "_line_pair_for_case",
+        "_cxr_pair_for_case",
         lambda case, E_grid, *, want_coherent, return_characteristic: (
             np.full(E_grid.shape, 5.0),
             None,
@@ -2412,7 +2412,7 @@ def test_repair_line_spec_from_config_targets_the_grid_build_cases_would_use(mon
     records = {E0: _line_record(E0=E0) for E0 in (stored_keV, auto_keV)}
     results = {"mos2@30": {stored_keV: records[stored_keV], auto_keV: records[auto_keV]}}
 
-    n = run.repair_line_spec(results, material="mos2")
+    n = run.repair_cxr_spec(results, material="mos2")
 
     assert n == 2
     for E0, r in records.items():
@@ -2429,14 +2429,14 @@ def test_reline_checkpoints_forwards_flags(monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr(
         reline,
-        "reline_checkpoint",
+        "recxr_checkpoint",
         lambda path, material, **kw: calls.append((material, kw)) or {},
     )
     (tmp_path / "mos2.pkl").write_bytes(b"x")
-    reline.reline_checkpoints(
+    reline.recxr_checkpoints(
         materials=["mos2"],
         checkpoint_dir=str(tmp_path),
-        line_ne=40000,
+        cxr_ne=40000,
         line_step_eV=5.0,
         redo_all=True,
     )
@@ -2444,7 +2444,7 @@ def test_reline_checkpoints_forwards_flags(monkeypatch, tmp_path):
         (
             "mos2",
             {
-                "line_ne": 40000,
+                "cxr_ne": 40000,
                 "line_step_eV": 5.0,
                 "from_config": True,
                 "redo_all": True,
@@ -2463,17 +2463,17 @@ def test_reline_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
         (tmp_path / f"{material}.pkl").write_bytes(b"")
     calls = []
     monkeypatch.setattr(
-        "pyrite.checkpoints.recompute.reline_checkpoint",
+        "pyrite.checkpoints.recompute.recxr_checkpoint",
         lambda path, material, **kwargs: calls.append((material, kwargs)) or {},
     )
 
-    reline.reline_checkpoints(materials=["hopg", "hbn"], checkpoint_dir=tmp_path, fidelity="survey")
+    reline.recxr_checkpoints(materials=["hopg", "hbn"], checkpoint_dir=tmp_path, fidelity="survey")
     explicit = calls.copy()
     calls.clear()
-    reline.reline_checkpoints(checkpoint_dir=tmp_path, fidelity="survey")
+    reline.recxr_checkpoints(checkpoint_dir=tmp_path, fidelity="survey")
 
     assert {name: kwargs for name, kwargs in calls} == {name: kwargs for name, kwargs in explicit}
-    assert {kwargs["line_ne"] for _, kwargs in calls} == {60}
+    assert {kwargs["cxr_ne"] for _, kwargs in calls} == {60}
     assert {kwargs["fidelity"] for _, kwargs in calls} == {"survey"}
 
 
@@ -2500,11 +2500,11 @@ def test_reline_resolves_variant_material_profile_and_fidelity_from_metadata(mon
     calls = []
     monkeypatch.setattr(
         reline,
-        "reline_checkpoint",
+        "recxr_checkpoint",
         lambda path, material, **kwargs: calls.append((path, material, kwargs)) or {},
     )
 
-    reline.reline_checkpoints(
+    reline.recxr_checkpoints(
         materials=[stem],
         checkpoint_dir=tmp_path,
         require_identity=True,

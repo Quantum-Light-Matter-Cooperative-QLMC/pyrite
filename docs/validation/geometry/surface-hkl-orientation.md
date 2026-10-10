@@ -278,7 +278,7 @@ Term-by-term:
 | $c=-1$ case $\to 2\hat{\mathbf{k}}\hat{\mathbf{k}}^{\mathsf T}-I$, proper | `np.eye(3) + 2.0 * K @ K` with $\hat{\mathbf{k}}\perp\hat{\mathbf{g}}$; for $\hat{\mathbf{g}}=-\hat{\mathbf{z}}$ the tie-break `tmp = x_hat` gives $\hat{\mathbf{k}}=-\hat{\mathbf{y}}$ and $R=\operatorname{diag}(-1,1,-1)$ | yes; $I+2\hat K^2=2\hat{\mathbf{k}}\hat{\mathbf{k}}^{\mathsf T}-I$, and it is **not** $-I$ |
 | $R_z(\psi)$ right-handed about $+z$ | `[[ca,-sa,0],[sa,ca,0],[0,0,1]]` | yes, $+x\to+y$ for $\psi>0$ |
 | composition $R=R_z(\psi)R_{\min}$ | `R = Rz @ R` | yes (left-multiplication, column-vector action) |
-| action on reciprocal vectors | `g_vec = R_orient @ g_vec` in `spectrum/lines/_per_hkl.py:665`, `_batched.py:235`, and `detector.py::mosaic_psi_rad` | yes, consistent column-vector convention everywhere |
+| action on reciprocal vectors | `g_vec = R_orient @ g_vec` in `spectrum/cxr/_per_hkl.py:665`, `_batched.py:235`, and `detector.py::mosaic_psi_rad` | yes, consistent column-vector convention everywhere |
 | `recip_miscut_rad=None` is a no-op | `if recip_miscut_rad is not None:` and then `if mp:` | yes; `(0.0, anything)` also collapses to the `None` path |
 | mutual exclusivity | `raise ValueError("beam_uvw and surface_hkl are mutually exclusive")` | yes |
 
@@ -376,7 +376,7 @@ with $\det R=+1$, $RR^{\mathsf T}-I=0$ exactly, $R\hat{\mathbf{g}}=(0,0,1)$ exac
 
 The consumers apply $R$ identically and on the correct side:
 
-- `montecarlo/spectrum/lines/_per_hkl.py:665` and `_batched.py:235` — `g_vec = R_orient @ g_vec`;
+- `montecarlo/spectrum/cxr/_per_hkl.py:665` and `_batched.py:235` — `g_vec = R_orient @ g_vec`;
 - `montecarlo/detector.py::mosaic_psi_rad` — `g_vec = R @ g_vec`, with `beam_dir`, `n_hat` taken from `tilted_geometry` in the same frame.
 
 Tilt-sign check with a *non-orthogonal* orientation, `gep` with `surface_hkl = (1,0,-1)` and its $(20\bar2)$ reflection, at $\theta_{\rm obs}=119^\circ$:

@@ -9,7 +9,7 @@ Run outputs and result records carry each emission channel as its own array:
 - ``brem`` / ``brem_wide``: bremsstrahlung on ``E_grid`` / ``E_grid_brem``.
 
 No array includes another. Consumers that need a combined view call
-:func:`line_spectrum` or :func:`incident_spectrum` (issue #123).
+:func:`cxr_spectrum` or :func:`incident_spectrum` (issue #123).
 
 Result containers written before this contract stored ``spec`` and
 ``spec_coherent`` as totals that already included ``spec_characteristic``.
@@ -28,7 +28,7 @@ import numpy as np
 COMPONENTS_ATTR = "emission_components"
 SEPARATE_CONTRACT = "separate"
 
-_LINE_KEYS = ("spec", "spec_coherent")
+_CXR_KEYS = ("spec", "spec_coherent")
 
 
 def separate_legacy(obj: Any) -> Any:
@@ -48,14 +48,14 @@ def separate_legacy(obj: Any) -> Any:
     characteristic = obj.get("spec_characteristic")
     if characteristic is not None:
         component = np.asarray(characteristic)
-        for key in _LINE_KEYS:
+        for key in _CXR_KEYS:
             total = obj.get(key)
             if total is not None:
                 obj[key] = np.asarray(total) - component
     return obj
 
 
-def line_spectrum(
+def cxr_spectrum(
     record: Mapping[str, Any],
     *,
     coherent: bool = False,
@@ -66,13 +66,13 @@ def line_spectrum(
     ``coherent`` selects ``spec_coherent`` instead of ``spec`` (``KeyError``
     when the record has none). A record without ``spec_characteristic``
     contributes no characteristic term. Characteristic emission is incoherent
-    with PXR/CBS, so its intensity adds once to either line spectrum.
+    with PXR/CBS, so its intensity adds once to either CXR spectrum.
 
     Validation: characteristic-radiation
     """
-    line = np.asarray(record["spec_coherent" if coherent else "spec"])
+    cxr = np.asarray(record["spec_coherent" if coherent else "spec"])
     component = record.get("spec_characteristic") if characteristic else None
-    return line if component is None else line + np.asarray(component)
+    return cxr if component is None else cxr + np.asarray(component)
 
 
 def incident_spectrum(
@@ -81,8 +81,8 @@ def incident_spectrum(
     coherent: bool = False,
     characteristic: bool = True,
 ) -> np.ndarray:
-    """Every photon source on ``E_grid``: :func:`line_spectrum` plus ``brem``."""
-    return line_spectrum(record, coherent=coherent, characteristic=characteristic) + np.asarray(
+    """Every photon source on ``E_grid``: :func:`cxr_spectrum` plus ``brem``."""
+    return cxr_spectrum(record, coherent=coherent, characteristic=characteristic) + np.asarray(
         record["brem"]
     )
 
@@ -91,6 +91,14 @@ __all__ = [
     "COMPONENTS_ATTR",
     "SEPARATE_CONTRACT",
     "incident_spectrum",
-    "line_spectrum",
+    "cxr_spectrum",
     "separate_legacy",
 ]
+
+
+def line_spectrum(record, *, coherent=False, characteristic=True):
+    """Deprecated alias for :func:`cxr_spectrum`, on the record's CXR grid."""
+    from ._api_deprecations import warn_renamed
+
+    warn_renamed("line_spectrum", "cxr_spectrum")
+    return cxr_spectrum(record, coherent=coherent, characteristic=characteristic)

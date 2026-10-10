@@ -1,6 +1,6 @@
 """Is the single-``n_hat`` coherent spectrum an observable, or one speckle draw?
 
-``mc_spectrum(coherent=True)`` phase-sums segment fields against a single fixed
+``mc_cxr_spectrum(coherent=True)`` phase-sums segment fields against a single fixed
 far-field direction ``n_hat`` and squares once, so the stored spectrum is
 ``|E_tot(E, n_hat)|^2`` at one point in angle.  Two approximations ride on that
 single direction, and this script separates them.
@@ -57,7 +57,7 @@ from pyrite.materials.crystal import CRYSTALS, reciprocal_g_vector
 from pyrite.montecarlo import (
     beta_from_keV,
     detector_directions,
-    mc_spectrum,
+    mc_cxr_spectrum,
     simulate_trajectories,
 )
 
@@ -97,7 +97,7 @@ def _traj(n_electrons, seed, spot_mm, n_atoms):
 
 
 def _spec(segs, n_hat, coherent):
-    return mc_spectrum(segs, E_GRID, "hopg", HKL, n_hat=n_hat, B_ang2=B_ANG2, coherent=coherent)
+    return mc_cxr_spectrum(segs, E_GRID, "hopg", HKL, n_hat=n_hat, B_ang2=B_ANG2, coherent=coherent)
 
 
 def _face_integral(segs, n_side, coherent, dist_mm=DIST_MM):

@@ -12,13 +12,13 @@ import json
 import numpy as np
 import pytest
 
-from pyrite._grid_semantics import resolution_num, validate_backend_coordinates
-from pyrite._line_windows import (
-    LINE_WINDOW_PLAN_SCHEMA,
+from pyrite._cxr_windows import (
+    CXR_WINDOW_PLAN_SCHEMA,
     FeatureSeed,
     build_window_plan,
     window_plan_from_payload,
 )
+from pyrite._grid_semantics import resolution_num, validate_backend_coordinates
 
 
 def _seed(centre, below, above, spacing, *, source="test", label=None, anchor=False):
@@ -141,7 +141,7 @@ def test_payload_round_trips_through_json_bit_for_bit():
     ]
     plan = build_window_plan(10.0, 16400.0, 1.5, seeds)
     payload = json.loads(json.dumps(plan.payload(), sort_keys=True))
-    assert payload["schema"] == LINE_WINDOW_PLAN_SCHEMA
+    assert payload["schema"] == CXR_WINDOW_PLAN_SCHEMA
     rebuilt = window_plan_from_payload(payload)
     assert rebuilt == plan
     np.testing.assert_array_equal(rebuilt.coordinates(), plan.coordinates())
@@ -152,7 +152,7 @@ def test_payload_whose_pieces_disagree_with_its_seeds_is_refused():
     payload["pieces"][1][2] = 0.2
     with pytest.raises(ValueError, match="schema bump"):
         window_plan_from_payload(payload)
-    payload["schema"] = LINE_WINDOW_PLAN_SCHEMA + 1
+    payload["schema"] = CXR_WINDOW_PLAN_SCHEMA + 1
     with pytest.raises(ValueError, match="not supported"):
         window_plan_from_payload(payload)
 

@@ -1,4 +1,4 @@
-"""CUDA-gated CPU-vs-device parity for the coherent line spectrum (#298).
+"""CUDA-gated CPU-vs-device parity for the coherent CXR spectrum (#298).
 
 The backend is fixed at import, so each backend runs this file as a child
 script and writes its spectrum; the test compares them. The input puts segment
@@ -67,10 +67,10 @@ def _segments():
 
 
 def _spectrum():
-    from pyrite.montecarlo.spectrum.lines import mc_spectrum
+    from pyrite.montecarlo.spectrum.cxr import mc_cxr_spectrum
 
     n_hat = np.array([1.0, 0.0, 0.01]) / np.linalg.norm([1.0, 0.0, 0.01])
-    return mc_spectrum(
+    return mc_cxr_spectrum(
         _segments(),
         np.arange(700.0, 1500.0, 0.5),
         "hopg",

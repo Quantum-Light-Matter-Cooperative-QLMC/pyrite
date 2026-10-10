@@ -367,10 +367,24 @@ def write_text(path: Path | str, text: str) -> None:
     def protected(file: Path, relative: str) -> bool:
         return layered and relative.startswith("profiles/") and file.is_relative_to(path.resolve())
 
+    def changed_content(relative: str, content: str) -> bool:
+        if relative not in files:
+            return True
+        original = files[relative].read_text()
+        if original == content:
+            return False
+        from ._cxr_vocabulary import translate_catalog_text
+
+        # A vocabulary adapter must not rewrite an otherwise untouched object,
+        # including read-only bundled profiles or legacy user-layer fragments.
+        return translate_catalog_text(original, canonical=True) != translate_catalog_text(
+            content, canonical=True
+        )
+
     changed = {
         relative: content
         for relative, content in wanted.items()
-        if relative not in files or files[relative].read_bytes() != content.encode("utf-8")
+        if changed_content(relative, content)
     }
     removed = [relative for relative in files if relative not in wanted]
     blocked = sorted(

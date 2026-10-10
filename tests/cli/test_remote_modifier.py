@@ -322,9 +322,9 @@ def test_recompute_remote_modifier_delegates_and_restores_target(monkeypatch, br
 def test_recompute_bare_remote_waits_by_default(monkeypatch):
     seen = {}
     monkeypatch.setattr(remote_config, "HOST", "configured-box")
-    monkeypatch.setattr(remote_cli, "_cli_reline", lambda **kwargs: seen.update(kwargs))
+    monkeypatch.setattr(remote_cli, "_cli_recxr", lambda **kwargs: seen.update(kwargs))
 
-    result = invoke(recompute_cli.line_command, ["hopg", "--remote", "--wait"])
+    result = invoke(recompute_cli.cxr_command, ["hopg", "--remote", "--wait"])
 
     assert_clean_result(result)
     assert seen["material"] == ["hopg"]
@@ -337,13 +337,13 @@ def test_recompute_locality_controls_are_rejected_when_incompatible():
         recompute_cli.brem_command,
         ["hopg", "--remote", "--wait", "--detach"],
     )
-    local_remote_option = invoke(recompute_cli.line_command, ["hopg", "--no-sync"])
+    local_remote_option = invoke(recompute_cli.cxr_command, ["hopg", "--no-sync"])
     remote_local_option = invoke(
-        recompute_cli.line_command,
+        recompute_cli.cxr_command,
         ["hopg", "--remote", "--checkpoint-dir", "elsewhere"],
     )
     remote_json = invoke(
-        recompute_cli.line_command,
+        recompute_cli.cxr_command,
         ["hopg", "--remote", "-o", "json"],
     )
 

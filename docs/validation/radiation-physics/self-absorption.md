@@ -3,7 +3,7 @@
 ## Claim
 
 - **ID:** `self-absorption`
-- **Symbol:** `montecarlo/spectrum/lines.py::mc_spectrum`
+- **Symbol:** `montecarlo/spectrum/lines.py::mc_cxr_spectrum`
 - **Source:** Beer--Lambert law
 - **Intended quantity:** photon survival probability from an emission point through a piecewise-homogeneous absorber stack.
 
@@ -29,15 +29,15 @@ Units: `[mu_i] = Angstrom^-1`, `[ell_i] = Angstrom`, so `tau` and `T` are dimens
 
 ## Implementation comparison
 
-Production computes `tau = sum_i mu_i(E) * ell_i` in `materials.attenuation::_stack_tau`.  For the infinite planar stack it obtains `ell_i = Delta z_i / |n_z|`; for a finite prism it intersects the forward ray with every layer and caps the interval at the first-face exit distance. `mc_spectrum` applies exactly `T_abs = exp(-tau)` at each segment's orientation-dependent resonance energy.  This matches the independent result term-for-term, including the absolute-value convention and lateral-ray branch.
+Production computes `tau = sum_i mu_i(E) * ell_i` in `materials.attenuation::_stack_tau`.  For the infinite planar stack it obtains `ell_i = Delta z_i / |n_z|`; for a finite prism it intersects the forward ray with every layer and caps the interval at the first-face exit distance. `mc_cxr_spectrum` applies exactly `T_abs = exp(-tau)` at each segment's orientation-dependent resonance energy.  This matches the independent result term-for-term, including the absolute-value convention and lateral-ray branch.
 
 Independent numeric point: two layers, `z_mid = [100,300] A`, `n_z=0.6`, `E=1500 eV` matched the manually assembled `mu_film(500-z)/n_z + mu_sub*400/n_z` with maximum absolute difference `0.0`. Focused multilayer, mosaic, and Eagle tests passed together (`36 passed`).
 
-Follow-up applied after independent verification: both `mc_spectrum` and `_stack_tau` now contain `Validation: self-absorption`.
+Follow-up applied after independent verification: both `mc_cxr_spectrum` and `_stack_tau` now contain `Validation: self-absorption`.
 
 ## Verdict
 
-- **Claim**: `self-absorption` — `montecarlo/spectrum/lines.py::mc_spectrum` — Beer--Lambert piecewise path integral
+- **Claim**: `self-absorption` — `montecarlo/spectrum/lines.py::mc_cxr_spectrum` — Beer--Lambert piecewise path integral
 - **Filters**: units `pass`; limits `pass`; signs/conventions `pass`
 - **Re-derivation**: `matches` — no divergent term or convention
 - **Verdict**: `rederived`

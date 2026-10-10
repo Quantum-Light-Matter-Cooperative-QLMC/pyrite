@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 from scipy.constants import elementary_charge
 
-from pyrite.montecarlo import mc_spectrum
-from pyrite.montecarlo.runner import _lines_for_segments
+from pyrite.montecarlo import mc_cxr_spectrum
+from pyrite.montecarlo.runner import _cxr_for_segments
 from pyrite.montecarlo.spectrum.coherent_population import CoherentSamplingError
 
 
@@ -39,7 +39,7 @@ def _source(samples, physical_electrons):
         "coherent_emission": True,
         "bunch_charge_pc": physical_electrons * elementary_charge * 1e12,
     }
-    return _lines_for_segments(
+    return _cxr_for_segments(
         _straight_bunch(samples),
         np.arange(700.0, 1500.0, 2.0),
         case,
@@ -74,7 +74,7 @@ def test_multi_electron_charge_refuses_one_incident_sample():
 
 
 def _direct(segments, population, **kwargs):
-    return mc_spectrum(
+    return mc_cxr_spectrum(
         segments,
         np.arange(700.0, 1500.0, 2.0),
         "hopg",
@@ -246,7 +246,7 @@ def test_yield_audit_captures_physical_pair_weights_above_one():
 
 
 def test_temporal_aligned_fields_have_the_same_physical_enhancement():
-    from pyrite.montecarlo.spectrum.lines import temporal_profile_for
+    from pyrite.montecarlo.spectrum.cxr import temporal_profile_for
 
     n_hat = np.array([1.0, 0.0, 0.1])
     n_hat /= np.linalg.norm(n_hat)
@@ -325,7 +325,7 @@ def test_production_refusal_reports_energy_and_population_before_normalizing():
     from types import SimpleNamespace
 
     from pyrite._backend import _to_cpu, xp
-    from pyrite.montecarlo.spectrum.lines._spectrum import _finalize_spectrum
+    from pyrite.montecarlo.spectrum.cxr._spectrum import _finalize_spectrum
 
     state = SimpleNamespace(
         request=SimpleNamespace(components=False, coherent=True, physical_electrons=12.0),
@@ -361,7 +361,7 @@ def test_temporal_refusal_reports_flat_index_without_committing_buffer():
     from types import SimpleNamespace
 
     from pyrite._backend import _to_cpu, xp
-    from pyrite.montecarlo.spectrum.lines._spectrum import _finalize_spectrum
+    from pyrite.montecarlo.spectrum.cxr._spectrum import _finalize_spectrum
 
     committed = []
     state = SimpleNamespace(

@@ -2,7 +2,7 @@
 
 ## Claim and source equation
 
-`mc_spectrum` stores a material flight by midpoint position `r_mid`, length `L_ang`, constant segment speed `beta`, and segment-start transport age `t_ang`. Its coherent field uses the centered finite-time integral from Feranchuk--Spence (2000), Eqs. (8), (10), (12)--(14), already derived under `coherent-emission`:
+`mc_cxr_spectrum` stores a material flight by midpoint position `r_mid`, length `L_ang`, constant segment speed `beta`, and segment-start transport age `t_ang`. Its coherent field uses the centered finite-time integral from Feranchuk--Spence (2000), Eqs. (8), (10), (12)--(14), already derived under `coherent-emission`:
 
 $$
 \int_{-T/2}^{T/2} e^{i 2P\tau}\,d\tau
@@ -43,7 +43,7 @@ Other limits: `L -> 0` makes the midpoint correction vanish; a single segment's 
 
 ## Implementation and evidence
 
-`montecarlo/spectrum/lines.py::mc_spectrum` derives one shared `seg_t_mid = seg_t + 0.5 * seg_L / beta_all` before constructing `d_all`. Both the batched coherent path (`sinc_cutoff=None`) and the per-reflection compatibility path consume that `d_all`.
+`montecarlo/spectrum/lines.py::mc_cxr_spectrum` derives one shared `seg_t_mid = seg_t + 0.5 * seg_L / beta_all` before constructing `d_all`. Both the batched coherent path (`sinc_cutoff=None`) and the per-reflection compatibility path consume that `d_all`.
 
 `tests/montecarlo/test_coherent_emission.py::test_straight_flight_is_invariant_to_two_half_segments` uses a deterministic 30 keV HOPG flight. Its independently evaluated centered complex field is invariant at `rtol=1e-11`, `atol=1e-12`; the spectrum uses the backend-scaled `BATCH_RTOL`. Before the implementation correction, both spectrum routes fail across every tested energy bin by up to about 96% relative because the split flight interferes incorrectly with the fixed reference emitter.
 

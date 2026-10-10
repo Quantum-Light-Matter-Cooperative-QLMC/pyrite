@@ -2,7 +2,7 @@
 detector_solid_angle_check.py  (checks/)
 
 Validate the solid-angle-integrated spectrum (montecarlo.detector_directions +
-mc_spectrum_solid_angle; docs/physics/detectors/detector-solid-angle.md, TODO P2 #4):
+mc_cxr_spectrum_solid_angle; docs/physics/detectors/detector-solid-angle.md, TODO P2 #4):
 
   1. REGRESSION -- a 1-direction grid reproduces the single-angle ``spec * Omega``
      exactly (the design's n_side=1 anchor; max rel ~ 0).
@@ -29,8 +29,8 @@ from pyrite.montecarlo import (
     aperture_fwhm_eV,
     beta_from_keV,
     detector_directions,
-    mc_spectrum,
-    mc_spectrum_solid_angle,
+    mc_cxr_spectrum,
+    mc_cxr_spectrum_solid_angle,
     simulate_trajectories,
 )
 
@@ -65,10 +65,12 @@ def main():
 
     # --- 1. regression: n_side=1 == single-angle x Omega -----------------------
     nh1, w1 = detector_directions(THETA, n_side=1, domega_sr=OMEGA)
-    spec_int1 = mc_spectrum_solid_angle(
+    spec_int1 = mc_cxr_spectrum_solid_angle(
         segs, E_GRID, "hopg", HKL, n_hats=nh1, weights=w1, B_ang2=B_002
     )
-    spec_single = OMEGA * mc_spectrum(segs, E_GRID, "hopg", HKL, theta_obs_rad=THETA, B_ang2=B_002)
+    spec_single = OMEGA * mc_cxr_spectrum(
+        segs, E_GRID, "hopg", HKL, theta_obs_rad=THETA, B_ang2=B_002
+    )
     rel = float(np.max(np.abs(spec_int1 - spec_single)) / np.max(np.abs(spec_single)))
     ok = rel < 1e-9
     print(
@@ -86,7 +88,7 @@ def main():
         nh, w = detector_directions(
             THETA, n_side=n_side, chip_mm=20.0, dist_mm=30.0, domega_sr=OMEGA
         )
-        spec = mc_spectrum_solid_angle(
+        spec = mc_cxr_spectrum_solid_angle(
             segs, E_GRID, "hopg", HKL, n_hats=nh, weights=w, B_ang2=B_002
         )
         pk = float(E_GRID[np.argmax(spec)])
@@ -115,9 +117,11 @@ def main():
     nh, w = detector_directions(
         THETA, n_side=SMALL_NSIDE, chip_mm=14.0, dist_mm=400.0, domega_sr=9.5e-4
     )
-    spec_tp = mc_spectrum_solid_angle(segs, E_GRID, "hopg", HKL, n_hats=nh, weights=w, B_ang2=B_002)
+    spec_tp = mc_cxr_spectrum_solid_angle(
+        segs, E_GRID, "hopg", HKL, n_hats=nh, weights=w, B_ang2=B_002
+    )
     nh0, w0 = detector_directions(THETA, n_side=1, domega_sr=9.5e-4)
-    spec_tp0 = mc_spectrum_solid_angle(
+    spec_tp0 = mc_cxr_spectrum_solid_angle(
         segs, E_GRID, "hopg", HKL, n_hats=nh0, weights=w0, B_ang2=B_002
     )
     shift = abs(_centroid(E_GRID, spec_tp) - _centroid(E_GRID, spec_tp0))

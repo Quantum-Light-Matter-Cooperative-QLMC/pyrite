@@ -6,6 +6,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 
+from ._api_deprecations import renamed_fields
 from ._precision import Precision
 
 MosaicRoute = Literal["analytic", "mc"]
@@ -61,7 +62,7 @@ PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
 @dataclass(frozen=True)
 class Convergence:
-    """Control numerical convergence and truncation of line calculations.
+    """Control numerical convergence and truncation of CXR calculations.
 
     Parameters
     ----------
@@ -93,21 +94,22 @@ class Convergence:
             raise ValueError("mosaic_route must be 'analytic' or 'mc'")
 
 
+@renamed_fields(n_electrons="cxr_trials", n_electrons_brem="brem_trials", spec_chunk="cxr_chunk")
 @dataclass(frozen=True)
 class Numerics:
     """Configure simulation sampling, transport, and execution.
 
     Parameters
     ----------
-    n_electrons
-        Macro-electron count for line transport.
-    n_electrons_brem
+    cxr_trials
+        Macro-electron trial count for CXR transport.
+    brem_trials
         Macro-electron count for bremsstrahlung transport.
     precision
         Optional :class:`~pyrite.Precision` for adaptive sampling. It replaces
         both fixed counts with one shared realized count. Coherent emission,
         physical detectors, GDF, grooves, and particle cascades are unsupported.
-    spec_chunk, brem_chunk
+    cxr_chunk, brem_chunk
         Optional spectrum-kernel chunk sizes; ``None`` lets runtime choose.
     transport_core
         ``"auto"``, ``"lockstep"``, ``"per-electron"``, or ``"cuda"``.
@@ -174,9 +176,9 @@ class Numerics:
         Reflection and mosaic convergence controls.
     """
 
-    n_electrons: int = 450
-    n_electrons_brem: int = 100
-    spec_chunk: int | None = None
+    cxr_trials: int = 450
+    brem_trials: int = 100
+    cxr_chunk: int | None = None
     brem_chunk: int | None = None
     transport_core: str = "auto"
     backend: str = "auto"
@@ -202,11 +204,11 @@ class Numerics:
                 raise TypeError("precision must be a Precision or None")
             if self.transport_core == "lockstep":
                 raise ValueError("adaptive precision requires the per-electron or CUDA core")
-        for name in ("n_electrons", "n_electrons_brem"):
+        for name in ("cxr_trials", "brem_trials"):
             value = getattr(self, name)
             if type(value) is not int or value <= 0:
                 raise ValueError(f"{name} must be a positive integer")
-        for name in ("spec_chunk", "brem_chunk"):
+        for name in ("cxr_chunk", "brem_chunk"):
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value <= 0):
                 raise ValueError(f"{name} must be a positive integer or None")

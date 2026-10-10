@@ -473,7 +473,7 @@ Usage: pyrite checkpoint [OPTIONS] COMMAND [ARGS]...
   Examples:
     pyrite checkpoint list
     pyrite checkpoint archive store hopg keeper
-    pyrite checkpoint recompute line hopg
+    pyrite checkpoint recompute cxr hopg
     pyrite checkpoint gc --profile standard
     pyrite checkpoint rm --profile standard
 
@@ -497,7 +497,7 @@ Usage: pyrite checkpoint slim [OPTIONS] CHECKPOINT
   Shrink a checkpoint dataset for transfer.
 
   Accepts a component checkpoint directory or legacy pickle and writes one transfer
-  pickle; input is never modified. --brem-only and --line-only are mutually exclusive.
+  pickle; input is never modified. --brem-only and --cxr-only are mutually exclusive.
 
 Options:
   -o, --out TEXT        Transfer pickle path, or - for stdout (default:
@@ -506,8 +506,8 @@ Options:
   --drop-wide-brem      Drop full-range brem arrays.
   --downcast            Store spectral arrays as float32.
   --compresslevel 1-22  zstd compression level.  [default: 3; 1<=x<=22]
-  --brem-only           Keep only brem arrays; mutually exclusive with --line-only.
-  --line-only           Keep only line arrays; mutually exclusive with --brem-only.
+  --brem-only           Keep only brem arrays; mutually exclusive with --cxr-only.
+  --cxr-only            Keep only line arrays; mutually exclusive with --brem-only.
   -h, --help            Show this message and exit.
 ```
 
@@ -523,7 +523,7 @@ Options:
 
 Commands:
   brem  Recompute bremsstrahlung backgrounds.
-  line  Recompute line spectra.
+  cxr   Recompute PXR/CBS spectra.
 ```
 
 ## `pyrite checkpoint recompute brem`
@@ -566,12 +566,12 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite checkpoint recompute line`
+## `pyrite checkpoint recompute cxr`
 
 ```text
-Usage: pyrite checkpoint recompute line [OPTIONS] [MATERIALS]...
+Usage: pyrite checkpoint recompute cxr [OPTIONS] [MATERIALS]...
 
-  Recompute only line spectra in existing checkpoints.
+  Recompute only CXR spectra in existing checkpoints.
 
   Pass MATERIALS or --all, never both. Updates checkpoint files in place and skips
   records already at target unless --redo-all.
@@ -580,12 +580,11 @@ Options:
   -a, --all                       Recompute every checkpoint.
   --profile NAME                  Catalog profile for legacy data; otherwise must match
                                   checkpoint metadata.
-  --line-ne N                     Line-spectrum electron count; overrides profile
-                                  default.
+  --cxr-trials N                  CXR trial count; overrides profile default.
   --start EV                      Line-grid lower bound in eV; overrides profile.
   --stop EV                       Line-grid exclusive upper bound in eV; overrides
                                   profile.
-  --line-step EV                  Uniform line-grid spacing in eV; overrides profile
+  --cxr-step EV                   Uniform line-grid spacing in eV; overrides profile
                                   grid.
   --redo-all                      Recompute records already at target.
   --checkpoint-dir DIR            Root containing component checkpoint directories to
@@ -1255,8 +1254,8 @@ Options:
   --level9                        Recompress remotely at max compression.
   --no-sync                       With grid pull, skip code sync.
   --brem-only                     Merge only brem arrays locally; mutually exclusive
-                                  with --line-only.
-  --line-only                     Merge only line spectra locally; mutually exclusive
+                                  with --cxr-only.
+  --cxr-only                      Merge only CXR spectra locally; mutually exclusive
                                   with --brem-only.
   --force                         With partial merge, insert records absent locally.
   -o, --output [table|json|wide]  Output format; only json is a stable automation
@@ -1523,8 +1522,8 @@ Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...
     pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
     pyrite profile create sub_100keV --energy 30:100:10
     pyrite profile set sub_100keV --detector eds
-    pyrite profile numerics set sub_100keV --line-trials 2000
-    pyrite profile line-grid show sub_100keV
+    pyrite profile numerics set sub_100keV --cxr-trials 2000
+    pyrite profile cxr-grid show sub_100keV
     pyrite profile add sub_100keV --energy 75
     pyrite profile set sub_100keV --material hopg,mose2
     pyrite profile rename sub_100keV sub100
@@ -1536,9 +1535,9 @@ Options:
 Commands:
   add                Incrementally add values to profile grids,...
   create             Create a profile from packaged sweep...
+  cxr-grid           Inspect and edit PROFILE's cxr-grid policy...
   delete             Delete a profile; irreversible.
   filter             Manage finite FilterPlate objects on a...
-  line-grid          Inspect and edit PROFILE's line-grid...
   list               List profiles: source, membership,...
   numerics           Inspect and edit result-affecting...
   physical-detector  Manage a profile's physical pixel detector...
@@ -1578,8 +1577,8 @@ Options:
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges; repeat to
                                   combine.
-  -l, --line-trials N,...         Monte Carlo electron histories used to estimate the
-                                  line spectrum; positive integers.
+  -l, --cxr-trials N,...          Monte Carlo electron histories used to estimate the
+                                  CXR spectrum; positive integers.
   -b, --brem-trials N,...         Monte Carlo electron histories used to estimate
                                   bremsstrahlung; positive integers.
   --material KEY,...              Add comma-separated material keys to explicit
@@ -1627,8 +1626,8 @@ Options:
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges; repeat to
                                   combine.
-  -l, --line-trials N,...         Monte Carlo electron histories used to estimate the
-                                  line spectrum; positive integers.
+  -l, --cxr-trials N,...          Monte Carlo electron histories used to estimate the
+                                  CXR spectrum; positive integers.
   -b, --brem-trials N,...         Monte Carlo electron histories used to estimate
                                   bremsstrahlung; positive integers.
   --straggling / --no-straggling  Enable or disable Urban energy-loss straggling.
@@ -1644,6 +1643,108 @@ Options:
   --material KEY,...              Set explicit initial membership (comma-separated
                                   material keys).
   --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile cxr-grid`
+
+```text
+Usage: pyrite profile cxr-grid [OPTIONS] COMMAND [ARGS]...
+
+  Inspect and edit PROFILE's cxr-grid policy (``[profiles.NAME.cxr_grid_policy]``).
+
+  Three selectors, each defaulting to the first value listed:
+
+    bandwidth   kinematic-ceiling | resonance-population
+                closed-form kinematic bound (no simulation), or the case's
+                measured resonance population capped by that bound
+    resolution  sinc-nyquist | resonance-local
+                uniform measured sinc spacing, or spacing refined locally
+                around measured resonances (3 eV backbone)
+    quadrature  node | bin-mean
+                point samples of the sinc^2 line profile, or bin means that
+                keep integrated line yield exact but smooth peak height/width
+
+  resonance-local requires bandwidth resonance-population and quadrature bin-mean. Any
+  stored selector, even one equal to its default, makes every case of the profile
+  resolve its line grid automatically from its own trajectories, ahead of explicit
+  E_grid_line and stored energy-grid rows; automatic resolution does not support
+  coherent emission (#117), and bin-mean does not support a positive max_dE_frac. The
+  table joins the case and dataset identity: editing it gives new checkpoints, and
+  earlier results stay under their old identity.
+
+  Tolerances, maximum spacing (3 eV), the point budget (600000) and backend ULPs are not
+  profile keys: set them per call (API) or with PYRITE_ENERGY_GRID_* environment
+  variables.
+
+  Examples:
+    pyrite profile cxr-grid show high_energy
+    pyrite profile cxr-grid set my_profile --quadrature bin-mean
+    pyrite profile cxr-grid set my_profile --bandwidth resonance-population \
+        --resolution resonance-local --quadrature bin-mean
+    pyrite profile cxr-grid reset my_profile resolution
+    pyrite profile cxr-grid reset my_profile
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  reset  Remove selected FIELDs, or the whole policy when none are named.
+  set    Set one or more cxr-grid selectors on PROFILE.
+  show   Show explicit and effective PROFILE cxr-grid selectors and the grid source.
+```
+
+## `pyrite profile cxr-grid reset`
+
+```text
+Usage: pyrite profile cxr-grid reset [OPTIONS] NAME [bandwidth|resolution|quadrature]...
+
+  Remove selected FIELDs, or the whole policy when none are named.
+
+  Removing the whole policy returns PROFILE to explicit, stored or built-in line grids.
+  A partial reset that leaves an impossible combination is a usage error.
+
+Options:
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile cxr-grid set`
+
+```text
+Usage: pyrite profile cxr-grid set [OPTIONS] NAME
+
+  Set one or more cxr-grid selectors on PROFILE.
+
+  The merged policy is validated before anything is written; an impossible combination
+  is a usage error.
+
+Options:
+  --bandwidth [kinematic-ceiling|resonance-population]
+                                  Line-axis upper edge policy. Default kinematic-
+                                  ceiling.
+  --resolution [sinc-nyquist|resonance-local]
+                                  Line-axis spacing policy; resonance-local needs
+                                  resonance-population and bin-mean. Default sinc-
+                                  nyquist.
+  --quadrature [node|bin-mean]    sinc^2 line-profile evaluation on the axis. Default
+                                  node.
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile cxr-grid show`
+
+```text
+Usage: pyrite profile cxr-grid show [OPTIONS] NAME
+
+  Show explicit and effective PROFILE cxr-grid selectors and the grid source.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
   -h, --help                      Show this message and exit.
 ```
 
@@ -1768,109 +1869,6 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite profile line-grid`
-
-```text
-Usage: pyrite profile line-grid [OPTIONS] COMMAND [ARGS]...
-
-  Inspect and edit PROFILE's line-grid policy (``[profiles.NAME.line_grid_policy]``).
-
-  Three selectors, each defaulting to the first value listed:
-
-    bandwidth   kinematic-ceiling | resonance-population
-                closed-form kinematic bound (no simulation), or the case's
-                measured resonance population capped by that bound
-    resolution  sinc-nyquist | resonance-local
-                uniform measured sinc spacing, or spacing refined locally
-                around measured resonances (3 eV backbone)
-    quadrature  node | bin-mean
-                point samples of the sinc^2 line profile, or bin means that
-                keep integrated line yield exact but smooth peak height/width
-
-  resonance-local requires bandwidth resonance-population and quadrature bin-mean. Any
-  stored selector, even one equal to its default, makes every case of the profile
-  resolve its line grid automatically from its own trajectories, ahead of explicit
-  E_grid_line and stored energy-grid rows; automatic resolution does not support
-  coherent emission (#117), and bin-mean does not support a positive max_dE_frac. The
-  table joins the case and dataset identity: editing it gives new checkpoints, and
-  earlier results stay under their old identity.
-
-  Tolerances, maximum spacing (3 eV), the point budget (600000) and backend ULPs are not
-  profile keys: set them per call (API) or with PYRITE_ENERGY_GRID_* environment
-  variables.
-
-  Examples:
-    pyrite profile line-grid show high_energy
-    pyrite profile line-grid set my_profile --quadrature bin-mean
-    pyrite profile line-grid set my_profile --bandwidth resonance-population \
-        --resolution resonance-local --quadrature bin-mean
-    pyrite profile line-grid reset my_profile resolution
-    pyrite profile line-grid reset my_profile
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  reset  Remove selected FIELDs, or the whole policy when none are named.
-  set    Set one or more line-grid selectors on PROFILE.
-  show   Show explicit and effective PROFILE line-grid selectors and the grid source.
-```
-
-## `pyrite profile line-grid reset`
-
-```text
-Usage: pyrite profile line-grid reset [OPTIONS] NAME
-                                      [bandwidth|resolution|quadrature]...
-
-  Remove selected FIELDs, or the whole policy when none are named.
-
-  Removing the whole policy returns PROFILE to explicit, stored or built-in line grids.
-  A partial reset that leaves an impossible combination is a usage error.
-
-Options:
-  -y, --yes   Skip the 'standard' confirmation prompt.
-  --dry-run   Print proposed TOML diff; write nothing.
-  -h, --help  Show this message and exit.
-```
-
-## `pyrite profile line-grid set`
-
-```text
-Usage: pyrite profile line-grid set [OPTIONS] NAME
-
-  Set one or more line-grid selectors on PROFILE.
-
-  The merged policy is validated before anything is written; an impossible combination
-  is a usage error.
-
-Options:
-  --bandwidth [kinematic-ceiling|resonance-population]
-                                  Line-axis upper edge policy. Default kinematic-
-                                  ceiling.
-  --resolution [sinc-nyquist|resonance-local]
-                                  Line-axis spacing policy; resonance-local needs
-                                  resonance-population and bin-mean. Default sinc-
-                                  nyquist.
-  --quadrature [node|bin-mean]    sinc^2 line-profile evaluation on the axis. Default
-                                  node.
-  -y, --yes                       Skip the 'standard' confirmation prompt.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite profile line-grid show`
-
-```text
-Usage: pyrite profile line-grid show [OPTIONS] NAME
-
-  Show explicit and effective PROFILE line-grid selectors and the grid source.
-
-Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
-```
-
 ## `pyrite profile list`
 
 ```text
@@ -1903,9 +1901,10 @@ Commands:
 ## `pyrite profile numerics reset`
 
 ```text
-Usage: pyrite profile numerics reset [OPTIONS] NAME [line-trials|brem-trials|line-
-                                     electrons|bremsstrahlung-electrons|reflection-
-                                     families|maximum-reflections|mosaic-nodes|mosaic-
+Usage: pyrite profile numerics reset [OPTIONS] NAME [cxr-trials|line-trials|brem-
+                                     trials|line-electrons|bremsstrahlung-
+                                     electrons|reflection-families|maximum-
+                                     reflections|mosaic-nodes|mosaic-
                                      route|straggling|energy-model|maximum-fractional-
                                      energy-loss|inelastic-model|inelastic-cutoff-
                                      ev|secondary-threshold-ev|elastic-
@@ -1930,8 +1929,8 @@ Usage: pyrite profile numerics set [OPTIONS] NAME
   Set one or more explicit result-affecting controls on PROFILE.
 
 Options:
-  --line-trials N                 Monte Carlo electron histories used to estimate the
-                                  line spectrum.  [x>=1]
+  --cxr-trials N                  Monte Carlo electron histories used to estimate the
+                                  CXR spectrum.  [x>=1]
   --brem-trials N                 Monte Carlo electron histories used to estimate
                                   bremsstrahlung.  [x>=1]
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
@@ -2148,7 +2147,7 @@ Usage: pyrite profile precision [OPTIONS] COMMAND [ARGS]...
     reset    drop customized fields, or the whole table (back to the default)
     disable  opt out: drop any policy and select fixed counts
 
-  Electron sampling is independent of the line grid; see 'pyrite profile line-grid'.
+  Electron sampling is independent of the line grid; see 'pyrite profile cxr-grid'.
 
 Options:
   -h, --help  Show this message and exit.
@@ -2168,13 +2167,13 @@ Usage: pyrite profile precision disable [OPTIONS] NAME
 
   Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
 
-  --line-trials/--brem-trials replace that count. A count the profile already sets is
+  --cxr-trials/--brem-trials replace that count. A count the profile already sets is
   otherwise kept, including a sweep grid. A count it lacks is prompted for on a
   terminal; without a terminal, or with --yes or --dry-run, it takes the full-fidelity
   default (300 line, 150 brem).
 
 Options:
-  --line-trials N  Fixed Monte Carlo electron histories for the line spectrum.  [x>=1]
+  --cxr-trials N   Fixed Monte Carlo electron histories for the CXR spectrum.  [x>=1]
   --brem-trials N  Fixed Monte Carlo electron histories for bremsstrahlung.  [x>=1]
   -y, --yes        Use defaults for missing counts; skip confirmations.
   --dry-run        Print proposed TOML diff; write nothing.
@@ -2204,7 +2203,7 @@ Options:
                                   statistics-limited.  [x>=2]
   --block-electrons N             Electrons per transport block; the rule is checked at
                                   block ends.  [x>=1]
-  --observable [line|brem]        Yield that must converge; repeat for both. Replaces
+  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
                                   the watched set (a new policy watches line and brem).
   --max-electron-share FRACTION   Guard: largest share of a yield one electron may hold
                                   (default 0.05).  [0.0<x<=1.0]
@@ -2267,7 +2266,7 @@ Options:
                                   statistics-limited.  [x>=2]
   --block-electrons N             Electrons per transport block; the rule is checked at
                                   block ends.  [x>=1]
-  --observable [line|brem]        Yield that must converge; repeat for both. Replaces
+  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
                                   the watched set (a new policy watches line and brem).
   --max-electron-share FRACTION   Guard: largest share of a yield one electron may hold
                                   (default 0.05).  [0.0<x<=1.0]
@@ -2390,8 +2389,8 @@ Options:
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges; repeat to
                                   combine.
-  -l, --line-trials N,...         Monte Carlo electron histories used to estimate the
-                                  line spectrum; positive integers.
+  -l, --cxr-trials N,...          Monte Carlo electron histories used to estimate the
+                                  CXR spectrum; positive integers.
   -b, --brem-trials N,...         Monte Carlo electron histories used to estimate
                                   bremsstrahlung; positive integers.
   --straggling / --no-straggling  Enable or disable Urban energy-loss straggling.
@@ -2412,8 +2411,8 @@ Options:
                                   (incoherent/coherent/both).
   --temporal-profile / --no-temporal-profile
                                   Also compute the line temporal intensity profile I(t)
-                                  (photons/sr/electron/fs) beside each line spectrum.
-                                  Off by default; on runs the slower per-reflection line
+                                  (photons/sr/electron/fs) beside each CXR spectrum. Off
+                                  by default; on runs the slower per-reflection line
                                   route and changes the dataset identity.
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
@@ -2559,9 +2558,9 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  derive  Derive line and bremsstrahlung energy-grid bounds.
-  show    Show line and bremsstrahlung grids together.
-  line    Inspect coherent line-energy grids.
+  derive  Derive CXR and bremsstrahlung energy-grid bounds.
+  show    Show CXR and bremsstrahlung grids together.
+  cxr     Inspect PXR/CBS energy grids.
   brem    Inspect bremsstrahlung energy grids.
 ```
 
@@ -2613,24 +2612,24 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite material energy-grid line`
+## `pyrite material energy-grid cxr`
 
 ```text
-Usage: pyrite material energy-grid line [OPTIONS] COMMAND [ARGS]...
+Usage: pyrite material energy-grid cxr [OPTIONS] COMMAND [ARGS]...
 
-  Inspect coherent line-energy grids.
+  Inspect CXR photon-energy grids.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  show  Show coherent line-energy grids.
+  show  Show CXR photon-energy grids.
 ```
 
-## `pyrite material energy-grid line show`
+## `pyrite material energy-grid cxr show`
 
 ```text
-Usage: pyrite material energy-grid line show [OPTIONS] [MATERIAL]
+Usage: pyrite material energy-grid cxr show [OPTIONS] [MATERIAL]
 
   Show coherent line-energy grids.
 

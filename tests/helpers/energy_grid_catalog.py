@@ -6,7 +6,7 @@ BASE_TOML = """schema_version = 1
 energy_keV = { values = [30.0, 100.0] }
 
 [energy_grids.hopg]
-line_by_energy = [
+cxr_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2600.0, num = 864, endpoint = true } }, source = "derived" },
   { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 4600.0, num = 1518, endpoint = true } }, source = "derived" },
 ]

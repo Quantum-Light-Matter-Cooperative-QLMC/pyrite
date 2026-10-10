@@ -25,11 +25,11 @@ def _inputs():
     target = pr.Slab("hopg", thickness_ang=1_000.0, tilt_deg=30.0)
     detector = pr.Detector(
         energy_bins=EnergyBins(
-            line=np.array([1_000.0, 1_050.0]),
+            cxr=np.array([1_000.0, 1_050.0]),
             brem=np.array([1_000.0, 1_050.0]),
         )
     )
-    numerics = pr.Numerics(n_electrons=1, n_electrons_brem=1, bremsstrahlung_model="eedl")
+    numerics = pr.Numerics(cxr_trials=1, brem_trials=1, bremsstrahlung_model="eedl")
     return beam, target, detector, numerics
 
 

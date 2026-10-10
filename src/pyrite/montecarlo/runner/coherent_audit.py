@@ -10,7 +10,7 @@ from time import perf_counter
 import numpy as np
 
 from ..._backend import _to_cpu
-from ..._line_grid_policy import LineGridToleranceError
+from ..._cxr_grid_policy import CxrGridToleranceError
 from ..spectrum.coherent_dispersion import CoherentDispersionLaw
 from ..spectrum.coherent_form_factor import gaussian_form_factor_bounds
 from ..spectrum.coherent_population import pair_scale, physical_bunch_electrons
@@ -21,7 +21,7 @@ from ..spectrum.coherent_spectrum_audit import (
 )
 from ..spectrum.coherent_windows import CoherentRowCollector
 from ..transport.kinematics import C_ANG_PER_FS
-from .line_grid import longitudinal_rms_fs
+from .cxr_grid import longitudinal_rms_fs
 
 
 class CoherentGridAudit:
@@ -118,14 +118,14 @@ class CoherentGridAudit:
         )
         audit = result.yield_audit if isinstance(result, FullAxisCentroidAudit) else result
         if not audit.within_tolerance:
-            raise LineGridToleranceError(
+            raise CxrGridToleranceError(
                 "coherent full-axis yield audit failed: relative error upper "
                 f"{audit.relative_error_upper:.6g} exceeds {audit.spectrum.relative_tolerance:g} "
                 f"on {audit.points} coordinates over [{audit.start_eV:g}, {audit.stop_eV:g}] eV; "
                 "refine the explicit grid or window policy; the grid is not coarsened"
             )
         if isinstance(result, FullAxisCentroidAudit) and not result.within_tolerance:
-            raise LineGridToleranceError(
+            raise CxrGridToleranceError(
                 "coherent full-axis centroid audit failed: relative error upper "
                 f"{result.relative_error_upper:.6g} exceeds {result.relative_tolerance:g} "
                 f"on {audit.points} coordinates over [{audit.start_eV:g}, {audit.stop_eV:g}] eV; "

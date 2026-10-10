@@ -26,13 +26,41 @@ result = pr.simulate(
     beam,
     target,
     detector,
-    numerics=pr.Numerics(n_electrons=450, n_electrons_brem=100),
+    numerics=pr.Numerics(cxr_trials=450, brem_trials=100),
 )
-result.spectrum
+result.cxr.incoherent.density
 result.provenance["identity_digest"]
 ```
 
-For a scalar `Detector`, `Result.spectrum` and `Result.background` are response-free source photon-density arrays per incident electron per eV per sr: they exclude acceptance scaling, source current, quantum efficiency, and measured-energy redistribution. For a `PlanarDetector`, the scalar arrays are instead filter-attenuated, solid-angle-weighted observation averages in the same per-sr units; they still exclude the configured detector response. Their coordinates are `energy_eV` and `background_energy_eV`. `Result.provenance` records the resolved scene, numerics, content identity, backend/device, and library versions. Coherent or `both` emission also exposes `coherent_spectrum`; coherent-only simulation selects that array as `spectrum`. `spectrum` and `coherent_spectrum` are PXR/CBS only; characteristic radiation is the separate `characteristic_spectrum`, and `Result.line_total()` returns their sum (`coherent=True` for the coherent line, `characteristic=False` to omit it). Before issue #123 `spectrum` already included characteristic radiation. The high-level API does not currently accept an external background array, so both `none` and `external` return a zero background on the resolved continuum grid.
+`Result` groups radiation families: `result.cxr.incoherent`, optional
+`result.cxr.coherent`, `result.brem`, and optional `result.characteristic`.
+Each `SpectralDensity` pairs `photon_energy_eV` (eV) with `density` (photons per
+incident electron per eV per sr) and its `normalization`. Brem may use a wider,
+coarser grid than CXR. Characteristic emission uses the CXR grid but stays
+separate from both CXR modes. Requesting coherent emission never changes the
+meaning of `cxr.incoherent`; coherent and `both` requests expose the coherent
+companion as well.
+
+For a scalar `Detector`, normalization is `"source"`: response-free density
+without acceptance, current, quantum efficiency, or measured-energy
+redistribution. For a `PlanarDetector`, it is `"observation-average"`:
+filter-attenuated, solid-angle-weighted density, still per sr and without
+detector response. `result.combined_cxr(mode="incoherent")` returns a
+`SpectralDensity` adding characteristic emission once; set
+`include_characteristic=False` to return only the chosen CXR mode. It does not
+add brem across different grids. `Result.provenance` records the resolved scene,
+numerics, content identity, backend/device, and versions. The high-level API
+does not accept an external brem array: `none` and `external` return zeros on
+the resolved continuum grid.
+
+Old flat Result attributes/constructor keywords and `line_total()` remain
+warning aliases through the two-minor window, deprecated in 0.11.0 and scheduled
+for removal in 0.13.0. The legacy `spectrum` attribute retains selected-mode
+behavior; new code should select a CXR mode explicitly. `Numerics` uses
+`cxr_trials`, `brem_trials`, and `cxr_chunk`; the old `n_electrons`,
+`n_electrons_brem`, and `spec_chunk` keywords/attributes are warning aliases.
+`EnergyBins.cxr`/`cxr_by_energy` and `Precision(observables=("cxr", "brem"))`
+use the same vocabulary. Historical case/checkpoint/hash keys remain unchanged.
 
 For a physical pixel detector, `Acquisition` freezes exposure, explicit half-open measured-energy reporting edges, a post-response hit cut, and expected-versus-seeded-Poisson mode. `Result.acquire()` returns selected-pixel `AcquisitionBatch` records with registered reporting-bin counts and separate underflow, overflow, and below-cut accounting. `Result.acquisition_image()` contracts total or reporting-edge-aligned energy-window images in bounded pixel chunks. Expected counts use exposure, bunch charge, cadence, and the exact elementary charge; optional Poisson realizations are stable under selection and chunk-order changes. `ResolvedObservation` is the profile-lowered detector/scorer/filter/acquisition record. It deliberately projects back to the unchanged scalar `Detector` used by intrinsic transport.
 
@@ -57,7 +85,7 @@ Adaptive sampling replaces both fixed counts with one shared count chosen from a
 numerics = pr.Numerics(
     precision=pr.Precision(
         target_rse=0.1,
-        min_electrons=400,
+        micxr_trials=400,
         max_electrons=10_000,
         block_electrons=100,
         observables=("line", "brem"),
@@ -69,7 +97,7 @@ sampling["realized_electrons"]
 sampling["statistics_limited"]
 ```
 
-All four budget fields are required; the example is an explicit budget, not a default recommendation. Counts must be multiples of the block size. The policy overrides `Numerics.n_electrons` and `n_electrons_brem`; omitting `precision` retains fixed sampling. The requested policy stays in `Result.case["adaptive_precision"]` and its identity, while realized counts, achieved errors, guards, and stop reason stay in `adaptive_sampling`. A run reaching its maximum without convergence completes with `statistics_limited=True` and a `LineYieldStatisticsWarning`.
+All four budget fields are required; the example is an explicit budget, not a default recommendation. Counts must be multiples of the block size. The policy overrides `Numerics.cxr_trials` and `brem_trials`; omitting `precision` retains fixed sampling. The requested policy stays in `Result.case["adaptive_precision"]` and its identity, while realized counts, achieved errors, guards, and stop reason stay in `adaptive_sampling`. A run reaching its maximum without convergence completes with `statistics_limited=True` and a `CxrYieldStatisticsWarning`.
 
 This mode supports incoherent scalar-detector scenes on the per-electron or CUDA core. It rejects coherent emission, physical detectors and observation directions, trajectory capture, GDF beams, grooves, and particle cascades. The two populations share one target and count in this implementation. The [statistical methods](computation/statistical-methods.md#adaptive-electron-counts) describe the observables, guards, and limits of the error estimate.
 
@@ -111,6 +139,8 @@ This mode supports incoherent scalar-detector scenes on the per-electron or CUDA
    pyrite.Precision
    pyrite.Analysis
    pyrite.Result
+   pyrite.CxrSpectra
+   pyrite.SpectralDensity
    pyrite.fetch_tables
    pyrite.simulate
 ```
@@ -158,8 +188,8 @@ These are the supported low-level simulation entry points. Inputs and outputs us
 
    pyrite.montecarlo.Case
    pyrite.montecarlo.transport.simulate_trajectories
-   pyrite.montecarlo.spectrum.mc_spectrum
-   pyrite.montecarlo.spectrum.mc_spectrum_solid_angle
+   pyrite.montecarlo.spectrum.mc_cxr_spectrum
+   pyrite.montecarlo.spectrum.mc_cxr_spectrum_solid_angle
    pyrite.montecarlo.spectrum.mc_brem_spectrum
    pyrite.detectors.response.detector_efficiency
    pyrite.detectors.response.convolve_detector
@@ -202,6 +232,6 @@ Single-shot simulations return `pyrite.Result`. Resumable campaign checkpoints c
    pyrite.results.filter_results
    pyrite.results.select_results
    pyrite.results.best_azimuth
-   pyrite.results.line_metrics
+   pyrite.results.cxr_metrics
    pyrite.results.summary_table
 ```

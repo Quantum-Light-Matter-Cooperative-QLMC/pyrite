@@ -123,7 +123,7 @@ def render_map(
             map_results,
             context.settings,
             cases=context.cases,
-            line_metric="prominence",
+            cxr_metric="prominence",
         )
         charts = [themed_chart(chart, theme) for chart in charts if chart is not None]
         parts.extend(

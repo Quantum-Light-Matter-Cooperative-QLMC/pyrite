@@ -23,7 +23,7 @@ literature equation); facet-choice rationale in
 docs/validation/geometry/blazed-groove-geometry.md.
 Assumptions: profile invariant along y; laterally infinite slab; photons
 travel straight along n_hat (incoherent Beer-Lambert transport -- no wave
-optics, consistent with mc_spectrum).
+optics, consistent with mc_cxr_spectrum).
 
 For arbitrary scattered-electron direction d, later facet crossings use
 ``r(s) = p + s*d`` substituted into both plane families above. A candidate is
@@ -318,7 +318,7 @@ def escape_distance_ang(x, z, spec):
 
     numpy ufuncs only, so cupy arrays dispatch through __array_ufunc__.
     Limiting cases: h -> 0 at fixed z gives L -> z/sin(tp), the flat
-    entrance-face path of mc_spectrum's ``z_mid / (-n_hat[2])`` branch; a
+    entrance-face path of mc_cxr_spectrum's ``z_mid / (-n_hat[2])`` branch; a
     point just inside its own working facet gives L -> 0.
 
     This first working-facet crossing is the complete material path, not a

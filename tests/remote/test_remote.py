@@ -56,7 +56,7 @@ def _remote_main(argv):
     owners = {
         "run": remote_cli.start_command,
         "rebrem": remote_cli.rebrem_command,
-        "reline": remote_cli.reline_command,
+        "reline": remote_cli.recxr_command,
         "validate": remote_cli.check_command,
         "check": remote_cli.check_command,
     }
@@ -488,11 +488,11 @@ def test_remote_home_expansion_fails_closed_when_home_unresolvable(monkeypatch, 
             id="rebrem-chunked",
         ),
         pytest.param(
-            lambda: scripts._reline_queue_script("j", ["hopg"], None, None, False),
+            lambda: scripts._recxr_queue_script("j", ["hopg"], None, None, False),
             id="reline-monolithic",
         ),
         pytest.param(
-            lambda: scripts._reline_chunked_queue_script("j", ["hopg"], None, None, False, 10),
+            lambda: scripts._recxr_chunked_queue_script("j", ["hopg"], None, None, False, 10),
             id="reline-chunked",
         ),
     ],
@@ -569,11 +569,11 @@ def test_every_remote_bash_command_family_quotes_hostile_remote_dir(monkeypatch,
             id="rebrem-chunked",
         ),
         pytest.param(
-            lambda: scripts._reline_queue_script("j", ["hopg"], None, None, False),
+            lambda: scripts._recxr_queue_script("j", ["hopg"], None, None, False),
             id="reline-monolithic",
         ),
         pytest.param(
-            lambda: scripts._reline_chunked_queue_script("j", ["hopg"], None, None, False, 10),
+            lambda: scripts._recxr_chunked_queue_script("j", ["hopg"], None, None, False, 10),
             id="reline-chunked",
         ),
     ],
@@ -706,7 +706,7 @@ def test_queue_script_profiles_uncached_repetitions_with_fixed_runtime_knobs():
         brem_chunk=10_000,
     )
 
-    assert "export PYRITE_MC_SPEC_CHUNK=20000" in script
+    assert "export PYRITE_MC_CXR_CHUNK=20000" in script
     assert "export PYRITE_MC_BREM_CHUNK=10000" in script
     assert "performance_repetitions=3" in script
     assert "repetition<=performance_repetitions" in script
@@ -1803,7 +1803,7 @@ def test_run_performance_runtime_knobs_reach_monolithic_dry_run(capsys):
     assert "#SBATCH --cpus-per-task=6" in output
     assert "--perf-interval 1" in output
     assert "performance_repetitions=3" in output
-    assert "export PYRITE_MC_SPEC_CHUNK=20000" in output
+    assert "export PYRITE_MC_CXR_CHUNK=20000" in output
     assert "export PYRITE_MC_BREM_CHUNK=10000" in output
 
 
@@ -5015,7 +5015,7 @@ def test_chunked_script_marks_hard_failure_and_never_retries(monkeypatch, tmp_pa
     [
         lambda: scripts._chunked_queue_script("j", ["hopg"], False, None, 10),
         lambda: scripts._rebrem_chunked_queue_script("j", ["hopg"], None, None, False, 10),
-        lambda: scripts._reline_chunked_queue_script("j", ["hopg"], None, None, False, 10),
+        lambda: scripts._recxr_chunked_queue_script("j", ["hopg"], None, None, False, 10),
     ],
     ids=["scan", "rebrem", "reline"],
 )
@@ -6236,24 +6236,24 @@ def test_reline_queue_script_and_metadata():
     from pyrite.remote import scripts
 
     # Default remote reline is chunked like `pyrite remote run`.
-    s = scripts._reline_chunked_queue_script(
-        "J1", ["mos2", "w"], line_ne=40000, line_step_eV=None, redo_all=True, chunk_minutes=10.0
+    s = scripts._recxr_chunked_queue_script(
+        "J1", ["mos2", "w"], cxr_ne=40000, line_step_eV=None, redo_all=True, chunk_minutes=10.0
     )
-    assert "pyrite checkpoint recompute line" in s
-    assert "--line-ne 40000" in s
+    assert "pyrite checkpoint recompute cxr" in s
+    assert "--cxr-trials 40000" in s
     assert "--redo-all" in s
     assert "--max-minutes" in s
     assert "--nice=10000" in s
     assert "--progress-file" in s
     # The monolithic (chunk_minutes==0) path still recomputes lines per material.
-    mono = scripts._reline_queue_script("J1", ["mos2", "w"], 40000, None, True)
+    mono = scripts._recxr_queue_script("J1", ["mos2", "w"], 40000, None, True)
     assert (
-        "pyrite checkpoint recompute line" in mono
-        and "--line-ne 40000" in mono
+        "pyrite checkpoint recompute cxr" in mono
+        and "--cxr-trials 40000" in mono
         and "--redo-all" in mono
     )
     assert "--progress-file" in mono
-    meta = scripts._reline_queue_metadata("J1", ["mos2", "w"], 40000, None, True)
+    meta = scripts._recxr_queue_metadata("J1", ["mos2", "w"], 40000, None, True)
     assert "kind: reline" in meta
     assert "line_ne: 40000" in meta
 
@@ -6751,7 +6751,7 @@ def test_live_job_code_reports_each_live_job_recorded_stamp(monkeypatch, tmp_pat
         pytest.param(scripts._queue_metadata("j", ["hopg"], False, None), id="scan"),
         pytest.param(scripts._zhai_queue_metadata("j", 1, 2, 3), id="zhai"),
         pytest.param(scripts._rebrem_queue_metadata("j", ["hopg"], 10, 25.0, False), id="rebrem"),
-        pytest.param(scripts._reline_queue_metadata("j", ["hopg"], 10, 25.0, False), id="reline"),
+        pytest.param(scripts._recxr_queue_metadata("j", ["hopg"], 10, 25.0, False), id="reline"),
     ],
 )
 def test_submitted_job_meta_carries_the_synced_code_stamp(monkeypatch, tmp_path, metadata):

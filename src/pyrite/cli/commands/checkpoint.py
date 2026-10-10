@@ -27,12 +27,13 @@ _COMMAND_HELP = {
 
 _RECOMPUTE_COMMANDS = {
     "brem": "pyrite.cli.commands.recompute.brem_command",
-    "line": "pyrite.cli.commands.recompute.line_command",
+    "cxr": "pyrite.cli.commands.recompute.cxr_command",
+    "line": "pyrite.cli.commands.recompute.cxr_command",
 }
 
 _RECOMPUTE_HELP = {
     "brem": "Recompute bremsstrahlung backgrounds.",
-    "line": "Recompute line spectra.",
+    "cxr": "Recompute PXR/CBS spectra.",
 }
 
 
@@ -41,6 +42,7 @@ _RECOMPUTE_HELP = {
     cls=LazyGroup,
     lazy_commands=_RECOMPUTE_COMMANDS,
     lazy_help=_RECOMPUTE_HELP,
+    lazy_hidden=("line",),
     no_args_is_help=True,
 )
 def recompute_command() -> None:
@@ -62,7 +64,7 @@ def command() -> None:
     Examples:
       pyrite checkpoint list
       pyrite checkpoint archive store hopg keeper
-      pyrite checkpoint recompute line hopg
+      pyrite checkpoint recompute cxr hopg
       pyrite checkpoint gc --profile standard
       pyrite checkpoint rm --profile standard
     """

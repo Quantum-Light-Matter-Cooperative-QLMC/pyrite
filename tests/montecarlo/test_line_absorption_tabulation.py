@@ -6,14 +6,14 @@ import pytest
 from pyrite.materials.attenuation import _mu_total_inv_ang
 from pyrite.materials.crystal import CRYSTALS, reflection_coupling_tables, refractive_index
 from pyrite.materials.photon_cross_sections import EPDL_E_MAX_EV, photoelectric_edges
-from pyrite.montecarlo.spectrum.lines import (
+from pyrite.montecarlo.spectrum.cxr import (
+    _cxr_table_nan_ceiling,
+    _cxr_tabulation_grid,
     _elemental_log_mu_table,
     _interp_elemental_mu,
     _interp_gather1d,
     _interp_gather2d,
     _interp_index,
-    _line_table_nan_ceiling,
-    _line_tabulation_grid,
     _log_interp_fraction,
 )
 
@@ -51,7 +51,7 @@ def test_elemental_log_mu_matches_the_epdl_attenuation(crystal, lo, hi):
     exact, which the second assertion below pins at ``5e-15``.
     """
     composition = _composition(crystal)
-    grid = _line_tabulation_grid(CRYSTALS[crystal], composition, lo, hi)
+    grid = _cxr_tabulation_grid(CRYSTALS[crystal], composition, lo, hi)
     query = np.sqrt(grid[:-1] * grid[1:])
     idx, _linear_frac, below, above = _interp_index(query, grid)
     log_frac = _log_interp_fraction(query, grid, idx)
@@ -81,7 +81,7 @@ def test_elemental_log_mu_matches_the_epdl_attenuation(crystal, lo, hi):
 )
 def test_float32_edge_midpoints_stay_within_backend_tolerance(crystal, lo, hi):
     composition = _composition(crystal)
-    grid64 = _line_tabulation_grid(CRYSTALS[crystal], composition, lo, hi)
+    grid64 = _cxr_tabulation_grid(CRYSTALS[crystal], composition, lo, hi)
     query64 = np.sqrt(grid64[:-1] * grid64[1:])
     grid = grid64.astype(np.float32)
     query = query64.astype(np.float32)
@@ -99,7 +99,7 @@ def test_float32_edge_midpoints_stay_within_backend_tolerance(crystal, lo, hi):
 def test_explicit_absorber_contributes_native_nodes_and_clamps_endpoints():
     composition = [("Si", 0.05)]
     lo, hi = 350.0, 3500.0
-    grid = _line_tabulation_grid(CRYSTALS["hopg"], composition, lo, hi)
+    grid = _cxr_tabulation_grid(CRYSTALS["hopg"], composition, lo, hi)
 
     from pyrite.materials.atomic import load_henke
 
@@ -155,10 +155,10 @@ def test_absorber_mu_outlives_the_chantler_coupling_ceiling(composition):
     composition = composition or _composition(crystal)
     info = CRYSTALS[crystal]
     lo, hi = 700_000.0, 1_150_000.0
-    ceiling = _line_table_nan_ceiling(info, composition, True)
+    ceiling = _cxr_table_nan_ceiling(info, composition, True)
     assert ceiling == np.nextafter(EPDL_E_MAX_EV, np.inf)
 
-    grid = _line_tabulation_grid(info, composition, lo, hi)
+    grid = _cxr_tabulation_grid(info, composition, lo, hi)
     couplings, n_re, log_mu = _line_tables(crystal, composition, grid)
     assert np.all(np.isfinite(log_mu))
     chantler_end = grid >= 1.0e6
@@ -169,4 +169,4 @@ def test_absorber_mu_outlives_the_chantler_coupling_ceiling(composition):
 def test_nan_ceiling_is_inactive_without_anomalous_refraction():
     """Validation: line-tabulation-nan-ceiling"""
     info = CRYSTALS["hopg"]
-    assert _line_table_nan_ceiling(info, _composition("hopg"), False) == np.inf
+    assert _cxr_table_nan_ceiling(info, _composition("hopg"), False) == np.inf

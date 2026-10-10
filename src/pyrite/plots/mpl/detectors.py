@@ -6,7 +6,7 @@ Timepix3 and Eagle XO detector-view figures (efficiency, detected, charge).
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ..._spectral_components import incident_spectrum, line_spectrum
+from ..._spectral_components import cxr_spectrum, incident_spectrum
 from ...detectors import eaglexo_response as eag
 from ...detectors import timepix_response as tpx
 from ...results import (
@@ -430,7 +430,7 @@ def _eag_charge_rate(r, coating="BN"):
     Coherent lines come from the fine line grid; the brem from the wide grid (or
     the line-grid brem as a fallback) so the two don't double-count their overlap."""
     resp = eag.get_response(r["E_grid"], coating=coating)
-    q = resp.integrated_charge(line_spectrum(r) * r["scale"])  # lines [e-/s/nA]
+    q = resp.integrated_charge(cxr_spectrum(r) * r["scale"])  # lines [e-/s/nA]
     if r.get("brem_wide") is not None:
         Eb, cd_b = _eag_wide_charge(r, coating)
         q += float(np.trapezoid(cd_b, Eb))
@@ -461,16 +461,16 @@ def _draw_eaglexo_charge(
             cur = beam_current_na(r, settings)
             resp = eag.get_response(r["E_grid"], coating=coating)
             E = np.asarray(r["E_grid"], dtype=float)
-            cd_line = resp.charge_density(incident_spectrum(r) * r["scale"]) * cur
+            cd_cxr = resp.charge_density(incident_spectrum(r) * r["scale"]) * cur
             xlo, xhi = min(xlo, float(E[0])), max(xhi, float(E[-1]))
-            fin = cd_line[np.isfinite(cd_line)]
+            fin = cd_cxr[np.isfinite(cd_cxr)]
             if fin.size:
                 ymax = max(ymax, float(fin.max()))
             az = r["case"]["tilt_azim_deg"]
             rate = _eag_charge_rate(r, coating) * cur
             ax.plot(
                 E,
-                cd_line,
+                cd_cxr,
                 color=c,
                 lw=1.3,
                 label=rf"{E0:g} keV ($\phi$={az:.1f}$\degree$, {rate:.2g} e$^-$/s)",
@@ -529,7 +529,7 @@ def plot_eaglexo_charge_map(
     panel="E0_keV",
     coating="BN",
     exposure_s=None,
-    auto_lines=True,
+    auto_cxr=True,
 ):
     """Geometry map of the Eagle XO's recorded SIGNAL: the integrated detected
     charge rate [e-/s] (coherent lines + brem, energy-weighted -- see
@@ -542,7 +542,7 @@ def plot_eaglexo_charge_map(
     FULL_WELL_E) for that exposure at each case's pulse current instead -- how
     close the brightest geometry comes to saturating the well. ``cases`` restricts
     to one sweep (cf. plot_heatmaps). Honors the same thin-axis -> line-plot
-    fallback as plot_heatmaps (``auto_lines``): a single-valued x or y becomes a
+    fallback as plot_heatmaps (``auto_cxr``): a single-valued x or y becomes a
     line plot (signal vs the varying axis, one line per the other). A thin
     wrapper around plot_heatmaps' ``value=`` mode -- see there for the shared
     panel/line machinery."""
@@ -569,7 +569,7 @@ def plot_eaglexo_charge_map(
         value=_val,
         value_label=label,
         value_cmap="inferno",
-        auto_lines=auto_lines,
+        auto_cxr=auto_cxr,
         title=f"Eagle XO recorded signal: {label}  ({coating}, best per cell)",
     )
     return figs[0] if figs else None

@@ -13,8 +13,8 @@ import numpy as np
 import pytest
 
 from pyrite.montecarlo.spectrum.characteristic import _energy_bin_edges_and_widths
-from pyrite.montecarlo.spectrum.lines import _bin_quadrature as bq
-from pyrite.montecarlo.spectrum.lines._bin_tree import reduce_host
+from pyrite.montecarlo.spectrum.cxr import _bin_quadrature as bq
+from pyrite.montecarlo.spectrum.cxr._bin_tree import reduce_host
 
 cp = pytest.importorskip("cupy")
 

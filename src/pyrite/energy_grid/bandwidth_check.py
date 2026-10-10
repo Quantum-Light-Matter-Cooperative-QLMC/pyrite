@@ -35,7 +35,7 @@ from typing import Any
 
 import numpy as np
 
-from .._line_grid_policy import RESONANCE_BANDWIDTH_POLICY
+from .._cxr_grid_policy import RESONANCE_BANDWIDTH_POLICY
 
 PAYLOAD_SCHEMA = 1
 #: Largest axis piece evaluated at once; an 11 GiB device refuses 1.4 M nodes.
@@ -80,7 +80,7 @@ def build_case(
         policy["quadrature"] = "bin-mean"
     elif resolution != "uniform":
         raise ValueError(f"unknown bandwidth resolution {resolution!r}")
-    sweep = dataclasses.replace(sweep, line_grid_policy=policy)
+    sweep = dataclasses.replace(sweep, cxr_grid_policy=policy)
     ne = int(config["n_electrons"])
     case = dict(build_cases(sweep, n_electrons=ne, n_electrons_brem=ne)[0])
     case["seed"] = int(seed)
@@ -143,7 +143,7 @@ def _bin_masses(
     within a cell, so a cell straddling a bin edge splits linearly.
     """
     if quadrature == "bin-mean":
-        from ..montecarlo.spectrum.lines._bin_quadrature import bin_axis
+        from ..montecarlo.spectrum.cxr._bin_quadrature import bin_axis
 
         cells = np.asarray(_to_host(bin_axis(E_grid)[0]), dtype=float)
         cumulative = np.concatenate(([0.0], np.cumsum(density * np.diff(cells))))
@@ -180,7 +180,7 @@ def _cells(E_grid: np.ndarray, quadrature: str) -> np.ndarray:
     ``bin-mean``; the nodes themselves (trapezoid cells) under ``node``."""
     if quadrature != "bin-mean":
         return E_grid
-    from ..montecarlo.spectrum.lines._bin_quadrature import bin_axis
+    from ..montecarlo.spectrum.cxr._bin_quadrature import bin_axis
 
     return np.asarray(_to_host(bin_axis(E_grid)[0]), dtype=float)
 
@@ -355,12 +355,12 @@ def _alternate_resolution(args, config, case, ladder, axis, reference_lines):
     resolved grid is a function of the identical trajectories; only the line
     axis differs. Returns ``{"row": report fields, "payload": pickled axes}``.
     """
-    from ..montecarlo.runner.line_grid import resolve_line_grid
+    from ..montecarlo.runner.cxr_grid import resolve_cxr_grid
 
     alt_case = build_case(
         args.material, args.energy, config, seed=args.seed, resolution=args.compare_resolution
     )
-    grid, _record = resolve_line_grid(
+    grid, _record = resolve_cxr_grid(
         alt_case,
         ladder.transport["segs"],
         ladder.transport["n_hat"],
@@ -513,13 +513,13 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
     phase gates on; a refusal is recorded, not raised.
     """
     from .._backend import BACKEND, REAL, _to_cpu
-    from .._line_grid_policy import LineGridToleranceError
+    from .._cxr_grid_policy import CxrGridToleranceError
     from ..montecarlo import runner
-    from ..montecarlo.runner.line_grid import (
+    from ..montecarlo.runner.cxr_grid import (
         _device_mib,
-        check_line_truncation,
-        line_truncation_audit,
-        line_yield_statistics,
+        check_cxr_truncation,
+        cxr_truncation_audit,
+        cxr_yield_statistics,
     )
     from ..montecarlo.runner.oom import _ensure_pool_limit
 
@@ -537,7 +537,7 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
         started = time.perf_counter()
         try:
             transport = runner._transport_case(case, keep_segments_on_device=True)
-        except LineGridToleranceError as error:
+        except CxrGridToleranceError as error:
             row["refused"] = str(error)
             rows.append(row)
             print(json.dumps(row, default=str), flush=True)
@@ -555,10 +555,10 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
         row["segments_on_device"] = not isinstance(transport["segs"]["L_ang"], np.ndarray)
         print(json.dumps({"stage": "transport", **row}, default=str), flush=True)
         grid = np.asarray(transport["E_grid"], dtype=float)
-        audit = line_truncation_audit(case, grid, n_electrons=transport["Ne_lines"])
+        audit = cxr_truncation_audit(case, grid, n_electrons=transport["Ne_lines"])
         started = time.perf_counter()
         try:
-            lines = runner._lines_for_segments(
+            lines = runner._cxr_for_segments(
                 transport["segs"],
                 grid,
                 case,
@@ -581,11 +581,11 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
         row["lines_wall_s"] = time.perf_counter() - started
         row["device_after_lines"] = _device_mib()
         try:
-            row["truncation_audit"] = check_line_truncation(case, audit)
-        except LineGridToleranceError as error:
+            row["truncation_audit"] = check_cxr_truncation(case, audit)
+        except CxrGridToleranceError as error:
             row["refused"] = str(error)
             if "electron_mass" in audit:
-                row["line_yield_statistics"] = line_yield_statistics(audit["electron_mass"])
+                row["cxr_yield_statistics"] = cxr_yield_statistics(audit["electron_mass"])
         record = transport["diagnostic_grid"]
         density = np.asarray(lines, dtype=float)
         total, centroid = _yield_and_centroid(grid, density)
@@ -596,7 +596,7 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
             maximum_spacing_eV=float(np.diff(grid).max()),
             stop_eV=float(grid[-1]),
             measured_bandwidth=record.get("measured_bandwidth"),
-            line_grid_profile=transport["diagnostic_grid"].get("line_grid_profile"),
+            cxr_grid_profile=transport["diagnostic_grid"].get("cxr_grid_profile"),
             line_yield=total,
             line_centroid_eV=centroid,
             device=BACKEND.device.name,
@@ -623,7 +623,7 @@ def attribute(args: argparse.Namespace) -> dict[str, Any]:
     from .._backend import BACKEND, REAL, _to_cpu
     from ..montecarlo import runner
     from ..montecarlo.runner.oom import _ensure_pool_limit
-    from ..montecarlo.spectrum.lines._attribution import merge_line_attribution
+    from ..montecarlo.spectrum.cxr._attribution import merge_cxr_attribution
 
     _ensure_pool_limit()
     rows = []
@@ -645,7 +645,7 @@ def attribute(args: argparse.Namespace) -> dict[str, Any]:
             "attribute": {"top": args.top, "stop_eV": measured_stop},
         }
         started = time.perf_counter()
-        runner._lines_for_segments(
+        runner._cxr_for_segments(
             transport["segs"],
             np.array([start, ceiling]),
             case,
@@ -657,7 +657,7 @@ def attribute(args: argparse.Namespace) -> dict[str, Any]:
             truncation_audit=audit,
         )
         row["attribution_wall_s"] = time.perf_counter() - started
-        merged = merge_line_attribution(audit.get("attribution", []), args.top)
+        merged = merge_cxr_attribution(audit.get("attribution", []), args.top)
         ids, mass = merged["electron_ids"], merged["electron_mass"]
         tail = merged["electron_tail"]
         total = float(mass.sum())

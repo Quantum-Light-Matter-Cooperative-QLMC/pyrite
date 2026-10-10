@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 from altair.utils.schemapi import UndefinedType
 
-from ..._spectral_components import incident_spectrum, line_spectrum
+from ..._spectral_components import cxr_spectrum, incident_spectrum
 from ...detectors import Detector, Timepix3
 from ...detectors import eaglexo_response as eag
 from ...results import beam_current_na
@@ -163,22 +163,22 @@ def _broad_incident(r):
     recorded-energy bin scale, so interpolate only the coherent contribution onto it.
     Outside the line grid the coherent term is zero by construction.
     """
-    E_line = np.asarray(r["E_grid"], dtype=float)
+    E_cxr = np.asarray(r["E_grid"], dtype=float)
     E_brem = r.get("E_grid_brem")
     brem_wide = r.get("brem_wide")
     if E_brem is None or brem_wide is None:
         incident = np.asarray(incident_spectrum(r), dtype=float)
-        return E_line, incident * r["scale"]
+        return E_cxr, incident * r["scale"]
 
     E = np.asarray(E_brem, dtype=float)
     brem = np.asarray(brem_wide, dtype=float)
     # The 0-eV brem bin cannot contribute to a photon-energy spectrum and is
     # below the line grid's modeled band.  Starting at the line-grid floor also
     # keeps the response grid physically meaningful.
-    mask = E >= float(np.nanmin(E_line))
+    mask = E >= float(np.nanmin(E_cxr))
     E = E[mask]
     brem = brem[mask]
-    coherent = np.interp(E, E_line, np.asarray(line_spectrum(r), dtype=float), left=0.0, right=0.0)
+    coherent = np.interp(E, E_cxr, np.asarray(cxr_spectrum(r), dtype=float), left=0.0, right=0.0)
     return E, (coherent + brem) * r["scale"]
 
 
@@ -470,13 +470,13 @@ def eaglexo_charge_frame(recs, settings, *, coating="BN", collapse_azimuth=True,
             cur = beam_current_na(r, settings)
             resp = eag.get_response(r["E_grid"], coating=coating)
             E = np.asarray(r["E_grid"], dtype=float)
-            cd_line = resp.charge_density(incident_spectrum(r) * r["scale"]) * cur
+            cd_cxr = resp.charge_density(incident_spectrum(r) * r["scale"]) * cur
             az = float(r["case"]["tilt_azim_deg"])
             frames.append(
                 pd.DataFrame(
                     {
                         "energy_eV": E,
-                        "charge_density": np.asarray(cd_line, dtype=float),
+                        "charge_density": np.asarray(cd_cxr, dtype=float),
                         "E0_keV": float(E0),
                         "azimuth_deg": az,
                         "band": "line",

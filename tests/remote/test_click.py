@@ -305,8 +305,8 @@ def test_pull_zhai_preset_dispatches_without_checkpoint_selection(monkeypatch):
         ),
         ("rebrem_command", ["hopg", "--ne-brem", "0"], "--ne-brem"),
         ("rebrem_command", ["hopg", "--step", "nan"], "--step"),
-        ("reline_command", ["hopg", "--line-ne", "0"], "--line-ne"),
-        ("reline_command", ["hopg", "--line-step", "inf"], "--line-step"),
+        ("recxr_command", ["hopg", "--cxr-trials", "0"], "--cxr-trials"),
+        ("recxr_command", ["hopg", "--line-step", "inf"], "--line-step"),
         ("check_command", ["--ne", "0"], "--ne"),
         ("check_command", ["--tmd-azimuth", "nan"], "--tmd-azimuth"),
         ("check_command", ["--tmd-azimuth", "-inf"], "--tmd-azimuth"),
@@ -324,7 +324,7 @@ def test_remote_numeric_domains_fail_at_click_boundary(target, argv, option):
 @pytest.mark.parametrize(
     "argv, message",
     [
-        (["pull", "hopg", "--brem-only", "--line-only"], "mutually exclusive"),
+        (["pull", "hopg", "--brem-only", "--cxr-only"], "mutually exclusive"),
         (["rm"], "needs material"),
         (["gc", "--all", "--profile", "sub_100keV"], "cannot be combined"),
     ],
@@ -363,7 +363,7 @@ def test_remote_gc_runs_both_reclamations_with_standard_defaults(monkeypatch):
     ("command_name", "starter"),
     [
         ("rebrem", "start_rebrem_queue"),
-        ("reline", "start_reline_queue"),
+        ("reline", "start_recxr_queue"),
     ],
 )
 def test_remote_recompute_detach_skips_viewer_and_pull(monkeypatch, command_name, starter):
@@ -507,7 +507,7 @@ def test_pull_hash_option_dispatches_and_requires_one_qualified_selector(monkeyp
 
 @pytest.mark.parametrize(
     ("flag", "dataset"),
-    [("--brem-only", "brem"), ("--line-only", "line")],
+    [("--brem-only", "brem"), ("--cxr-only", "line")],
 )
 def test_partial_pull_all_forwards_full_material_list(monkeypatch, tmp_path, flag, dataset):
     import pyrite.materials as materials_pkg

@@ -101,7 +101,7 @@ The target $r_n\le\varepsilon$ therefore implies $\mathrm{ESS}_n\ge 1/(\varepsil
 
 ## Independent verification (2026-10-08)
 
-Fresh-context verifier; did not write the implementation. I read the ledger row and this record's claim, sources, assumptions and limiting cases first, rederived the results below, and only then read `montecarlo/runner/adaptive.py`, `montecarlo/runner/block_transport.py::transport_case_blocks`, `montecarlo/spectrum/brem.py::mc_brem_spectrum` (`electron_band_weights`), `montecarlo/spectrum/lines/_kernels.py::_accumulate_edge_truncation` and `_precision.py::Precision`. The numeric checks use a separate NumPy implementation of {eq}`eq-adaptive-stop-rule`, written from the equations and not from `run_stopping_rule`. The only implementation code reused is `case_measure`, to obtain the hopg per-electron populations.
+Fresh-context verifier; did not write the implementation. I read the ledger row and this record's claim, sources, assumptions and limiting cases first, rederived the results below, and only then read `montecarlo/runner/adaptive.py`, `montecarlo/runner/block_transport.py::transport_case_blocks`, `montecarlo/spectrum/brem.py::mc_brem_spectrum` (`electron_band_weights`), `montecarlo/spectrum/cxr/_kernels.py::_accumulate_edge_truncation` and `_precision.py::Precision`. The numeric checks use a separate NumPy implementation of {eq}`eq-adaptive-stop-rule`, written from the equations and not from `run_stopping_rule`. The only implementation code reused is `case_measure`, to obtain the hopg per-electron populations.
 
 ### Rederivation
 

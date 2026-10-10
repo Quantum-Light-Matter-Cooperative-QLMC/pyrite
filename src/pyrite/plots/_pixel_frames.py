@@ -108,8 +108,8 @@ def observation_image(
         # The continuum grid spans the reporting range; the line grid may not.
         edges = observation.acquisition.measured_edges_eV
         low, high = (edges[0], edges[-1]) if energy_range_eV is None else energy_range_eV
-        node = spatial.energy_node(0.5 * (float(low) + float(high)), component="background")
-        values = spatial.transmission_image(node, component="background")
+        node = spatial.energy_node(0.5 * (float(low) + float(high)), component="brem")
+        values = spatial.transmission_image(node, component="brem")
         return ObservationImage(values, kind, f"{title} at {node:g} eV", "T", reduce)
     if kind == "coverage":
         values = np.count_nonzero(spatial.filter_coverage(), axis=-1)

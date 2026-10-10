@@ -27,7 +27,7 @@ for the derivation, the assumptions, and the limiting case.
 
 Narrow *line* windows and adaptive line-axis refinement are a different problem
 on a different axis and are owned by issue #101
-(:mod:`pyrite._line_windows`); nothing here plans a line grid.
+(:mod:`pyrite._cxr_windows`); nothing here plans a line grid.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -152,7 +152,7 @@ def continuum_refinement_marks(
     """Features of the modelled continuum the geometric baseline under-resolves.
 
     Edge positions are *located*, never listed: they come from
-    :func:`~pyrite.montecarlo.spectrum.line_seeds.absorption_edge_brackets`,
+    :func:`~pyrite.montecarlo.spectrum.cxr_seeds.absorption_edge_brackets`,
     in the table each element is actually read from -- the medium's EPDL2025
     photoionization edges, which its escape ``mu`` contains as exact
     discontinuities, and the detection path's Chantler ``f2`` jumps, which the
@@ -185,7 +185,7 @@ def continuum_refinement_marks(
 
     Validation: continuum-node-refinement
     """
-    from ..montecarlo.spectrum.line_seeds import absorption_edge_brackets
+    from ..montecarlo.spectrum.cxr_seeds import absorption_edge_brackets
 
     floor, stop = float(floor_eV), float(stop_eV)
     if not np.isfinite(floor) or not np.isfinite(stop) or stop <= floor:

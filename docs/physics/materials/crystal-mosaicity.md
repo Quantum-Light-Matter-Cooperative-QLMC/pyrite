@@ -23,7 +23,7 @@ added **in quadrature** with the energy-dispersive spectrometer (EDS) resolution
 ### Where it lives
 
 - `montecarlo.mosaic_fwhm_eV(E, ψ, η_rad)` — the formula above.
-- `montecarlo.mosaic_psi_rad(case, E_pk)` — $\psi$ for the reflection whose nominal (unscattered-beam) resonance is nearest the peak; uses the shared `montecarlo._orientation_R` (extracted from `mc_spectrum`).
+- `montecarlo.mosaic_psi_rad(case, E_pk)` — $\psi$ for the reflection whose nominal (unscattered-beam) resonance is nearest the peak; uses the shared `montecarlo._orientation_R` (extracted from `mc_cxr_spectrum`).
 - `results.store_result` — adds the term in quadrature, gated on `case["mosaic_fwhm_rad"]`, capped at `E_pk`.
 - `data/catalog/crystals/<key>.toml` — optional per-crystal `mosaic_fwhm_deg`; the immutable `materials.CATALOG` and `materials.crystal.load_crystals` surface it.
 - `Scene(target=Slab(…, mosaic=True), …)` → public case lowering → `case["mosaic_fwhm_rad"]`. `mosaic` is target state; the width comes from the catalog crystal. Route and quadrature controls live under `Numerics.convergence`.
@@ -44,7 +44,7 @@ added **in quadrature** with the energy-dispersive spectrometer (EDS) resolution
 
 ### What it does
 
-`mc_spectrum(..., mosaic_fwhm_rad=<rad>, mosaic_nodes=<n>)` replaces the post-hoc Gaussian with a true incoherent average **inside** the spectrum: it sums the per-reflection block over a set of crystallite orientations drawn from the mosaic distribution, recomputing the polarization pair `e_s/e_p`, `E_res`, the amplitudes `A_PXR/A_CBS` and the sinc lineshape at each orientation, weighted by the mosaic PDF. The structure-factor tabulations (`chi_g`/`U_g`) depend on hkl + energy, **not** orientation, so they are computed once per reflection and reused; the self-absorption geometry is mosaic-independent (only its `μ(E_res)` is re-evaluated, cheaply).
+`mc_cxr_spectrum(..., mosaic_fwhm_rad=<rad>, mosaic_nodes=<n>)` replaces the post-hoc Gaussian with a true incoherent average **inside** the spectrum: it sums the per-reflection block over a set of crystallite orientations drawn from the mosaic distribution, recomputing the polarization pair `e_s/e_p`, `E_res`, the amplitudes `A_PXR/A_CBS` and the sinc lineshape at each orientation, weighted by the mosaic PDF. The structure-factor tabulations (`chi_g`/`U_g`) depend on hkl + energy, **not** orientation, so they are computed once per reflection and reused; the self-absorption geometry is mosaic-independent (only its `μ(E_res)` is re-evaluated, cheaply).
 
 `mosaic_fwhm_rad=None` **or** `mosaic_nodes ≤ 1` is the **perfect-crystal fast path**, which returns the single-orientation result bit-for-bit.
 
@@ -63,7 +63,7 @@ The **detailed lineshape converges slowly when the mosaic spread ≫ the unbroad
 ### Where it lives
 
 - `montecarlo._mosaic_quadrature(fwhm_rad, nodes)` / `_small_tilt_R(dx, dy)` — the quadrature and the tilt rotation.
-- `montecarlo.mc_spectrum(..., mosaic_fwhm_rad, mosaic_nodes)` — the orientation loop.
+- `montecarlo.mc_cxr_spectrum(..., mosaic_fwhm_rad, mosaic_nodes)` — the orientation loop.
 - `montecarlo.run_case` / `_spectrum_case` — read `case["mosaic_mc_fwhm_rad"]` / `case["mosaic_mc_nodes"]`.
 - `Scene(target=Slab(…, mosaic=True), …)` with `Numerics(convergence=Convergence(mosaic_route="mc", mosaic_nodes=…))` sets the `mosaic_mc_*` case keys **and turns the analyti `store_result` term off** — the two routes are mutually exclusive (applying both double-counts the broadening).
 - Checks: `checks/mosaic_mc_check.py`; synthetic unit tests (quadrature + wiring): `tests/montecarlo/test_mosaic_mc.py`.

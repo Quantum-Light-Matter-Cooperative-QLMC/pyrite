@@ -2,7 +2,7 @@
 
 ## Claim and where it enters
 
-`mc_spectrum(coherent=True)` phase-sums segment fields against a single fixed far-field direction $\hat{\mathbf n}$ and squares once,
+`mc_cxr_spectrum(coherent=True)` phase-sums segment fields against a single fixed far-field direction $\hat{\mathbf n}$ and squares once,
 
 $$
 E_j=\sqrt{\tfrac{\alpha\omega}{4\pi^2\hbar c}T_{{\rm abs},j}}\;A_jQ_j\,
@@ -210,12 +210,12 @@ isotropic and elliptical spots at 45°/135°; a phase-matched row has
 $\boldsymbol\kappa=0$ and $F_\perp=1$ while $|\mathbf Q_\perp|\sigma>10^3$; zero tilt
 and point-spot limits; the delay equals $s^*/\beta$ and vanishes untilted; tilted
 identical straight tracks on a finite footprint reproduce
-$|S|^2[1+(N-1)F_zF_\perp]$ through `mc_spectrum`; the window envelope is
+$|S|^2[1+(N-1)F_zF_\perp]$ through `mc_cxr_spectrum`; the window envelope is
 nonincreasing and bounds $F_\perp$; unsupported beams and edge-reaching spots are
 refused.
 
 ## Status
 
-`rederived`, as of 2026-08-21. The cross-electron terms are now dropped analytically via the general $\exp[-(q_\perp\sigma_\perp)^2]$ factor for the marginal regime, combined with the longitudinal `coherent-emission` form factor into one joint $F$ — see [`coherent-inter-electron-decoherence`](coherent-inter-electron-decoherence.md) for the combined closed form, its fresh-context re-derivation, and the implementation (an empirical characteristic function of the actual sampled offsets, rather than a closed-form-parametrized $\sigma_\perp$, which extends this row's isotropic-Gaussian scope to elliptical/Courant–Snyder spots for free). The finite-footprint amplitude-coupling case noted above remains excluded, now with an explicit `mc_spectrum` error rather than silent mishandling. Human sign-off remains pending.
+`rederived`, as of 2026-08-21. The cross-electron terms are now dropped analytically via the general $\exp[-(q_\perp\sigma_\perp)^2]$ factor for the marginal regime, combined with the longitudinal `coherent-emission` form factor into one joint $F$ — see [`coherent-inter-electron-decoherence`](coherent-inter-electron-decoherence.md) for the combined closed form, its fresh-context re-derivation, and the implementation (an empirical characteristic function of the actual sampled offsets, rather than a closed-form-parametrized $\sigma_\perp$, which extends this row's isotropic-Gaussian scope to elliptical/Courant–Snyder spots for free). The finite-footprint amplitude-coupling case noted above remains excluded, now with an explicit `mc_cxr_spectrum` error rather than silent mishandling. Human sign-off remains pending.
 
 **2026-10-08 (#370):** amended for tilted faces, the face-arrival delay and finite footprints (section above). A fresh-context verifier independently re-derived the amended claim (match, no divergent factor, sign or unit; 400k-draw Monte Carlo over random tilts within 2.2e-3); status `anchored` on `tests/montecarlo/test_coherent_transverse_tilt.py`. Human sign-off pending (#277).

@@ -97,9 +97,9 @@ def _resolve_runner_resource_policy() -> _RunnerResourcePolicy:
         n_cpus=None,
         total_mem_mb=psutil.virtual_memory().total // 1_000_000,
         available_mem_mb=_available_mem_mb,
-        spec_chunk=_env_chunk("PYRITE_MC_SPEC_CHUNK", 0),
+        spec_chunk=_env_chunk("PYRITE_MC_CXR_CHUNK", 0),
         brem_chunk=_env_chunk("PYRITE_MC_BREM_CHUNK", 0),
-        spec_budget_mb=_env_chunk("PYRITE_MC_SPEC_BUDGET_MB", min(1920, policy_device_mb)),
+        spec_budget_mb=_env_chunk("PYRITE_MC_CXR_BUDGET_MB", min(1920, policy_device_mb)),
         free_every=_env_chunk("PYRITE_MC_FREE_EVERY", resolved.release_every),
         worker_mem_mb=_env_chunk("PYRITE_MC_WORKER_MEM_MB", 6144),
         pipeline_worker_mem_mb=_env_chunk("PYRITE_MC_PIPELINE_WORKER_MEM_MB", 1536),
@@ -119,7 +119,7 @@ _EEDL_BREM_DENSE_INTERMEDIATES = 8
 
 def _adaptive_chunk(nbins, *, intermediates=3):
     """Segments per spectrum matmul sized so the ~3 concurrent (chunk, nbins)
-    intermediates in the mc_spectrum / mc_brem_spectrum chunk loops fit in
+    intermediates in the mc_cxr_spectrum / mc_brem_spectrum chunk loops fit in
     the policy spectrum budget.
 
     Replaces the fixed defaults after the 2026-07-18 remote-host OOMs: widening the

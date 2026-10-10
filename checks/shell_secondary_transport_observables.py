@@ -251,7 +251,7 @@ def main():
         comp = _composition(key)
         for E0, range_multiplier in product(BEAMS_KEV, RANGE_MULTIPLIERS):
             thickness = range_multiplier * _csda_ang(table, E0)
-            line_grid = np.arange(*LINE_GRIDS_EV[key], 2.0)
+            cxr_grid = np.arange(*LINE_GRIDS_EV[key], 2.0)
             brem_grid = np.linspace(1000.0, E0 * 1e3 * 0.95, 200)
             rows = {}
             for threshold in THRESHOLDS_EV:
@@ -294,7 +294,7 @@ def main():
                     acc["char"].append(
                         float(
                             mc_characteristic_spectrum(
-                                r, line_grid, composition=comp, E_cut_keV=E_CUT_KEV
+                                r, cxr_grid, composition=comp, E_cut_keV=E_CUT_KEV
                             ).sum()
                             * 2.0
                         )

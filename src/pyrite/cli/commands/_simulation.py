@@ -41,6 +41,18 @@ def simulation_usage_error(message, output_format):
     raise click.UsageError(message)
 
 
+def _selected_cxr_density(result):
+    scene = result.provenance.get("scene")
+    component = (
+        result.cxr.coherent
+        if getattr(scene, "emission", None) == "coherent"
+        else result.cxr.incoherent
+    )
+    if component is None:
+        raise ValueError("coherent CXR spectrum is not available")
+    return component.density
+
+
 def _simulation_payload(material, profile_name, result):
     spatial = result.spatial
     assert spatial is not None
@@ -48,12 +60,12 @@ def _simulation_payload(material, profile_name, result):
         "material": material,
         "profile": profile_name,
         "line": {
-            "energy_eV": result.energy_eV.tolist(),
-            "density_per_sr": result.spectrum.tolist(),
+            "energy_eV": result.cxr.incoherent.photon_energy_eV.tolist(),
+            "density_per_sr": _selected_cxr_density(result).tolist(),
         },
         "background": {
-            "energy_eV": result.background_energy_eV.tolist(),
-            "density_per_sr": result.background.tolist(),
+            "energy_eV": result.brem.photon_energy_eV.tolist(),
+            "density_per_sr": result.brem.density.tolist(),
         },
         "pixel_grid": {
             "shape": list(spatial.ray_map.tile_index.shape),
@@ -85,15 +97,15 @@ def _write_simulation_artifact(path, result):
         with path.open("xb") as stream:
             np.savez_compressed(
                 stream,
-                line_energy_eV=result.energy_eV,
-                line_density_per_sr=result.spectrum,
-                background_energy_eV=result.background_energy_eV,
-                background_density_per_sr=result.background,
+                line_energy_eV=result.cxr.incoherent.photon_energy_eV,
+                line_density_per_sr=_selected_cxr_density(result),
+                background_energy_eV=result.brem.photon_energy_eV,
+                background_density_per_sr=result.brem.density,
                 tile_index=spatial.ray_map.tile_index,
                 solid_angle_sr=spatial.ray_map.solid_angle_sr,
                 path_length_mm=spatial.ray_map.path_length_mm,
-                line_intrinsic_by_tile=spatial.line.intrinsic_by_tile,
-                line_mu_by_filter_inv_mm=spatial.line.mu_by_filter_inv_mm,
+                line_intrinsic_by_tile=spatial.cxr.intrinsic_by_tile,
+                line_mu_by_filter_inv_mm=spatial.cxr.mu_by_filter_inv_mm,
             )
     except FileExistsError:
         raise ValueError(f"output file already exists: {path}") from None
@@ -157,8 +169,8 @@ def execute_simulation(
     if output_format == "wide":
         emit_result(
             f"material={material}\tprofile={profile_name}\tdetector={selected_id}\t"
-            f"line_samples={len(result.energy_eV)}\t"
-            f"background_samples={len(result.background_energy_eV)}\t"
+            f"line_samples={len(result.cxr.incoherent.photon_energy_eV)}\t"
+            f"background_samples={len(result.brem.photon_energy_eV)}\t"
             f"pixel_shape={tuple(payload['pixel_grid']['shape'])}\t"
             f"filters={payload['pixel_grid']['filter_count']}"
         )
@@ -166,12 +178,12 @@ def execute_simulation(
         emit_result(f"{material}: profile {profile_name}, detector {selected_id}")
         emit_result("  component  samples  energy range (eV)")
         emit_result(
-            f"  line       {len(result.energy_eV):7d}  {result.energy_eV[0]:g} .. {result.energy_eV[-1]:g}"
+            f"  line       {len(result.cxr.incoherent.photon_energy_eV):7d}  {result.cxr.incoherent.photon_energy_eV[0]:g} .. {result.cxr.incoherent.photon_energy_eV[-1]:g}"
         )
         emit_result(
             "  background "
-            f"{len(result.background_energy_eV):7d}  {result.background_energy_eV[0]:g} .. "
-            f"{result.background_energy_eV[-1]:g}"
+            f"{len(result.brem.photon_energy_eV):7d}  {result.brem.photon_energy_eV[0]:g} .. "
+            f"{result.brem.photon_energy_eV[-1]:g}"
         )
         emit_result(
             f"  pixel grid {tuple(payload['pixel_grid']['shape'])}; "

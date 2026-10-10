@@ -19,7 +19,7 @@ import sys
 import numpy as np
 import pytest
 
-from pyrite.montecarlo.spectrum.lines import _RESONANCE_ROOT_RTOL
+from pyrite.montecarlo.spectrum.cxr import _RESONANCE_ROOT_RTOL
 
 cp = pytest.importorskip("cupy")
 
@@ -561,7 +561,7 @@ def _run_prologue_raw(d, *, v_dot_n, n_re_tab, aw_seg):
 # a zeroed buffer, and ``|sum_e S_e|^2`` is the single call these paths already
 # made -- both on the geometric (offset-free) phase, blended outside.
 #
-# Unlike the kernel-level tests above, these drive the whole ``mc_spectrum``
+# Unlike the kernel-level tests above, these drive the whole ``mc_cxr_spectrum``
 # dispatch, so they need the CUDA backend ACTIVE -- and ``tests/conftest.py``
 # pins the session to CPU/NumPy on purpose.  ``test_..._device_suite`` below is
 # the driver: it re-runs this module in a child session with the pin lifted, so
@@ -631,24 +631,24 @@ def _decoh_active_segments():
 
 
 def _decoh_reference(**kwargs):
-    """Closed-form blend built from decoherence-INACTIVE mc_spectrum sub-calls.
+    """Closed-form blend built from decoherence-INACTIVE mc_cxr_spectrum sub-calls.
 
     Both terms come from the already-validated offset-free path: the flat term
     is one Ne=2 call on the geometric positions, the floor is the SUM of two
-    Ne=1 calls (a lone electron is trivially self-coherent).  mc_spectrum
+    Ne=1 calls (a lone electron is trivially self-coherent).  mc_cxr_spectrum
     divides by Ne once, at the very end and AFTER the blend, so the Ne=2 call
     is un-normalized back to that raw scale before blending.  F is the
     empirical characteristic function of the same offsets, computed here.
     """
     from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
-    from pyrite.montecarlo.spectrum import mc_spectrum
+    from pyrite.montecarlo.spectrum import mc_cxr_spectrum
 
     ne = len(_DECOH_R_GEOM)
     flat_raw = (
-        mc_spectrum(_decoh_segments(_DECOH_R_GEOM), _DECOH_E_GRID, coherent=True, **kwargs) * ne
+        mc_cxr_spectrum(_decoh_segments(_DECOH_R_GEOM), _DECOH_E_GRID, coherent=True, **kwargs) * ne
     )
     grouped_raw = sum(
-        mc_spectrum(_decoh_segments(r), _DECOH_E_GRID, coherent=True, **kwargs)
+        mc_cxr_spectrum(_decoh_segments(r), _DECOH_E_GRID, coherent=True, **kwargs)
         for r in _DECOH_R_GEOM
     )
 
@@ -667,7 +667,7 @@ def _decoh_reference(**kwargs):
 def _decoh_route_kwargs(route, monkeypatch):
     """Select which of the three CUDA-JIT coherent fast paths runs."""
     # `_policy` owns the dispatch switches and every route reads them there.
-    from pyrite.montecarlo.spectrum.lines import _policy
+    from pyrite.montecarlo.spectrum.cxr import _policy
 
     if route == "stream":  # batched (n_seg, N_g) streaming field kernel
         return {}
@@ -731,14 +731,14 @@ def test_coherent_decoherence_blend_matches_reference_formula_on_device(route, m
     Validation: coherent-inter-electron-decoherence
     """
     from pyrite._backend import REAL, xp
-    from pyrite.montecarlo.spectrum import mc_spectrum
+    from pyrite.montecarlo.spectrum import mc_cxr_spectrum
 
     assert getattr(xp, "__name__", "") == "cupy"
     assert np.dtype(REAL) == np.dtype(np.float32)
 
     call_kwargs = {**_DECOH_KWARGS, **_decoh_route_kwargs(route, monkeypatch)}
     calls = _count_kernel_calls(monkeypatch, route)
-    actual = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
+    actual = mc_cxr_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
     assert calls[0] > 0, "the CUDA-JIT fast path was not taken"
 
     expected = _decoh_reference(**call_kwargs)
@@ -756,8 +756,8 @@ def test_coherent_decoherence_jit_paths_match_the_generic_fallback(route, monkey
 
     Validation: coherent-inter-electron-decoherence
     """
-    from pyrite.montecarlo.spectrum import mc_spectrum
-    from pyrite.montecarlo.spectrum.lines import _policy
+    from pyrite.montecarlo.spectrum import mc_cxr_spectrum
+    from pyrite.montecarlo.spectrum.cxr import _policy
 
     call_kwargs = {
         **_DECOH_KWARGS,
@@ -766,13 +766,13 @@ def test_coherent_decoherence_jit_paths_match_the_generic_fallback(route, monkey
     }
 
     calls = _count_kernel_calls(monkeypatch, route)
-    fast = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
+    fast = mc_cxr_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
     assert calls[0] > 0, "the CUDA-JIT fast path was not taken"
 
     monkeypatch.setattr(_policy, "_USE_JIT_COHERENT_STREAM", False)
     monkeypatch.setattr(_policy, "_USE_JIT_COHERENT_REDUCTION", False)
     generic_calls = _count_kernel_calls(monkeypatch, route)
-    generic = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
+    generic = mc_cxr_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
     assert generic_calls[0] == 0
 
     peak = float(max(np.max(np.abs(fast)), np.max(np.abs(generic))))
@@ -784,8 +784,8 @@ def test_coherent_decoherence_jit_paths_match_the_generic_fallback(route, monkey
 @pytest.mark.parametrize("route", ["stream", "per-hkl"])
 def test_coherent_decoherence_jit_paths_support_sinc_cutoff(route, monkeypatch):
     """The cutoff applies to both terms in the per-row decoherence blend."""
-    from pyrite.montecarlo.spectrum import mc_spectrum
-    from pyrite.montecarlo.spectrum.lines import _policy
+    from pyrite.montecarlo.spectrum import mc_cxr_spectrum
+    from pyrite.montecarlo.spectrum.cxr import _policy
 
     call_kwargs = {
         **_DECOH_KWARGS,
@@ -795,12 +795,12 @@ def test_coherent_decoherence_jit_paths_support_sinc_cutoff(route, monkeypatch):
     }
 
     calls = _count_kernel_calls(monkeypatch, route)
-    fast = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
+    fast = mc_cxr_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
     assert calls[0] > 0, "the cutoff-aware CUDA-JIT fast path was not taken"
 
     monkeypatch.setattr(_policy, "_USE_JIT_COHERENT_STREAM", False)
     monkeypatch.setattr(_policy, "_USE_JIT_COHERENT_REDUCTION", False)
-    generic = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
+    generic = mc_cxr_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
 
     peak = float(max(np.max(np.abs(fast)), np.max(np.abs(generic))))
     assert peak > 0.0
@@ -819,7 +819,7 @@ def test_coherent_decoherence_gaussian_bunch_finite_footprint_uses_jit_blend(
     Validation: finite-footprint-longitudinal-decoherence
     """
     from pyrite.materials.crystal import HBARC_EV_ANG
-    from pyrite.montecarlo.spectrum import mc_spectrum
+    from pyrite.montecarlo.spectrum import mc_cxr_spectrum
     from pyrite.montecarlo.transport import C_ANG_PER_FS
 
     segments = _decoh_active_segments()
@@ -843,7 +843,7 @@ def test_coherent_decoherence_gaussian_bunch_finite_footprint_uses_jit_blend(
             return original_grouped(*args, **kwargs)
 
         monkeypatch.setattr(stream_mod, "run_coherent_grouped_intensity_kernel", _grouped_spy)
-    actual = mc_spectrum(
+    actual = mc_cxr_spectrum(
         segments,
         _DECOH_E_GRID,
         coherent=True,
@@ -857,12 +857,12 @@ def test_coherent_decoherence_gaussian_bunch_finite_footprint_uses_jit_blend(
     ne = segments["Ne"]
     flat_segments = _decoh_segments(np.asarray(segments["r_mid"]))
     flat_segments.update(crystal_width_ang=200.0, crystal_height_ang=200.0)
-    flat_raw = mc_spectrum(flat_segments, _DECOH_E_GRID, coherent=True, **call_kwargs) * ne
+    flat_raw = mc_cxr_spectrum(flat_segments, _DECOH_E_GRID, coherent=True, **call_kwargs) * ne
     grouped_raw = 0.0
     for position in np.asarray(segments["r_mid"]):
         single = _decoh_segments(position)
         single.update(crystal_width_ang=200.0, crystal_height_ang=200.0)
-        grouped_raw = grouped_raw + mc_spectrum(
+        grouped_raw = grouped_raw + mc_cxr_spectrum(
             single,
             _DECOH_E_GRID,
             coherent=True,
@@ -882,16 +882,18 @@ def test_coherent_decoherence_inactive_device_dispatch_is_bit_for_bit(route, mon
     """An all-zero offset population must leave the fused kernels on their
     pre-existing dispatch: the geometric-phase swap that feeds the blend is a
     no-op there, so the result is bit-for-bit the offset-free one."""
-    from pyrite.montecarlo.spectrum import mc_spectrum
+    from pyrite.montecarlo.spectrum import mc_cxr_spectrum
 
     call_kwargs = {**_DECOH_KWARGS, **_decoh_route_kwargs(route, monkeypatch)}
-    plain = mc_spectrum(_decoh_segments(_DECOH_R_GEOM), _DECOH_E_GRID, coherent=True, **call_kwargs)
+    plain = mc_cxr_spectrum(
+        _decoh_segments(_DECOH_R_GEOM), _DECOH_E_GRID, coherent=True, **call_kwargs
+    )
 
     zeroed = _decoh_segments(_DECOH_R_GEOM)
     zeroed.update(initial_t0_ang=np.zeros(2), initial_r_ang=np.zeros((2, 3)))
     assert float(np.max(np.abs(plain))) > 0.0
     np.testing.assert_array_equal(
-        plain, mc_spectrum(zeroed, _DECOH_E_GRID, coherent=True, **call_kwargs)
+        plain, mc_cxr_spectrum(zeroed, _DECOH_E_GRID, coherent=True, **call_kwargs)
     )
 
 

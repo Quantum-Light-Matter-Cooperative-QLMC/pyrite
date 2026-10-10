@@ -226,7 +226,7 @@ def test_local_commands_wire_material_checkpoint_archive_and_choice_completion()
 
     for command in (scan.command, blaze.command, analyze.command):
         assert _callback(command, "material") is _cli_completion.complete_material
-    for command in (recompute_cli.brem_command, recompute_cli.line_command):
+    for command in (recompute_cli.brem_command, recompute_cli.cxr_command):
         assert _callback(command, "materials") is _cli_completion.complete_checkpoint_stem
 
     assert _callback(slim.command, "checkpoint") is _cli_completion.complete_checkpoint
@@ -250,7 +250,7 @@ def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
     command = cli.start_command
     assert _callback(command, "catalog_profile") is _cli_completion.complete_profile
     assert _callback(command, "material") is _cli_completion.complete_material
-    for name in ("rebrem_command", "reline_command"):
+    for name in ("rebrem_command", "recxr_command"):
         assert _callback(getattr(cli, name), "material") is _cli_completion.complete_material
     assert (
         _callback(cli.command.commands["pull"], "material")
@@ -286,7 +286,7 @@ def test_line_grid_wires_safe_completion_on_its_canonical_owners():
             _callback(getattr(energy_grid, name), "materials")
             is _cli_completion.complete_material_csv
         )
-    for name in ("show_command", "line_show_command", "brem_show_command"):
+    for name in ("show_command", "cxr_show_command", "brem_show_command"):
         assert (
             _callback(getattr(energy_grid, name), "material") is _cli_completion.complete_material
         )

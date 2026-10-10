@@ -15,10 +15,10 @@ import numpy as np
 import pandas as pd
 
 from .._formatting import fmt_thickness
-from .._spectral_components import line_spectrum
+from .._spectral_components import cxr_spectrum
 from ..detectors import Detector, LegacyEDS
 from ..materials import CATALOG
-from .metrics import line_metrics
+from .metrics import cxr_metrics
 from .store import Settings, beam_current_na, detected_background
 
 
@@ -32,7 +32,7 @@ def results_dataframe(
     metric="sharpness",
 ):
     """Tidy long-format ``DataFrame``: one row per (config, beam energy), columns =
-    every swept ``case`` knob + the derived :func:`line_metrics`. This is the
+    every swept ``case`` knob + the derived :func:`cxr_metrics`. This is the
     first-class primitive for slicing/faceting many simultaneously-swept knobs
     (TODO P3 #9) -- ``df.groupby`` / ``df.pivot_table`` / seaborn ``relplot`` /
     plotly over ANY subset of knobs, instead of the heatmap/line auto-pick. See
@@ -40,7 +40,7 @@ def results_dataframe(
 
     metrics : include the line metrics (``peak_flux``, ``coherent_flux``,
         ``line_eV``, ``fwhm_eV``, ``line_flux``, ``line_frac``, ``total_flux``,
-        ``coherent_brem_ratio``, ``line_quality``); needs a :class:`Settings`
+        ``coherent_brem_ratio``, ``cxr_quality``); needs a :class:`Settings`
         (defaults to ``Settings()``). False -> just the case knobs + the cheap
         stored scalars (``E_pk``, ``eta``), skipping the peak-finding.
     """
@@ -54,7 +54,7 @@ def results_dataframe(
             row["E_pk"] = r.get("E_pk")
             row["eta"] = r.get("eta")
             if metrics:
-                row.update(line_metrics(r, settings, rel_prominence, n_fwhm, metric))
+                row.update(cxr_metrics(r, settings, rel_prominence, n_fwhm, metric))
             rows.append(row)
     return pd.DataFrame(rows)
 
@@ -112,12 +112,12 @@ def summary_table(recs, settings):
         c = r["case"]
         cur = beam_current_na(r, settings)
         detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe, convolve=True))
-        line = line_spectrum(r)
-        line_det = detector.score(r["E_grid"], line, fwhm_eV=r["fwhm"])
+        cxr = cxr_spectrum(r)
+        cxr_det = detector.score(r["E_grid"], cxr, fwhm_eV=r["fwhm"])
         brem_det = detected_background(r, settings) / r["scale"]
-        i_pk = np.argmax(line_det)
-        line_cts_per_na = np.trapezoid(line, r["E_grid"]) * r["scale"]
-        line_cts = line_cts_per_na * cur
+        i_pk = np.argmax(cxr_det)
+        cxr_cts_per_na = np.trapezoid(cxr, r["E_grid"]) * r["scale"]
+        cxr_cts = cxr_cts_per_na * cur
         # brem over the FULL measured range (the wide grid) when available, so the
         # total rate reflects the real measurement out to the beam energy; fall
         # back to the line-grid brem if a (stale) wide brem is non-finite
@@ -139,15 +139,15 @@ def summary_table(recs, settings):
                 "azimuth [deg]": c["tilt_azim_deg"],
                 "Ee [keV]": c["E0_keV"],
                 "line [eV]": r["E_grid"][i_pk],
-                "peak [Phs/eV/s/nA]": line_det[i_pk] * r["scale"],
-                "peak [Phs/eV/s]": line_det[i_pk] * r["scale"] * cur,
-                "peak/bg": (line_det[i_pk] / brem_det[i_pk]) if brem_det[i_pk] else np.inf,
-                "line [cts/s/nA]": line_cts_per_na,
-                "line [cts/s]": line_cts,
+                "peak [Phs/eV/s/nA]": cxr_det[i_pk] * r["scale"],
+                "peak [Phs/eV/s]": cxr_det[i_pk] * r["scale"] * cur,
+                "peak/bg": (cxr_det[i_pk] / brem_det[i_pk]) if brem_det[i_pk] else np.inf,
+                "line [cts/s/nA]": cxr_cts_per_na,
+                "line [cts/s]": cxr_cts,
                 "brem [cts/s/nA]": brem_cts_per_na,
                 "brem [cts/s]": brem_cts,
-                "total [cts/s/nA]": line_cts_per_na + brem_cts_per_na,
-                "total [cts/s]": line_cts + brem_cts,
+                "total [cts/s/nA]": cxr_cts_per_na + brem_cts_per_na,
+                "total [cts/s]": cxr_cts + brem_cts,
             }
         )
     df = pd.DataFrame(rows)

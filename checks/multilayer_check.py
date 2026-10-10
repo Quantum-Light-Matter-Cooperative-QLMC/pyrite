@@ -1,4 +1,4 @@
-"""Multilayer first-slice validation: mc_spectrum / mc_brem_spectrum with a
+"""Multilayer first-slice validation: mc_cxr_spectrum / mc_brem_spectrum with a
 film-on-substrate absorber stack (docs/physics/materials/multilayer-materials.md).
 
 Checks, on real MoSe2 transport segments:
@@ -30,7 +30,7 @@ from pyrite.campaign.sweep import (
 )
 from pyrite.montecarlo import (
     mc_brem_spectrum,
-    mc_spectrum,
+    mc_cxr_spectrum,
     run_case,
     simulate_trajectories,
     tilted_geometry,
@@ -58,7 +58,7 @@ def _segments(tilt_deg):
 
 
 def _line(segs, n_hat, layers):
-    return mc_spectrum(
+    return mc_cxr_spectrum(
         segs,
         E_LINE,
         crystal="mose2",

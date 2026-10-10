@@ -216,6 +216,6 @@ def _cli(args):
         grid=args.grid,
         drop_wide_brem=args.drop_wide_brem,
         downcast=args.downcast,
-        dataset="brem" if args.brem_only else ("line" if args.line_only else None),
+        dataset="brem" if args.brem_only else ("line" if args.cxr_only else None),
         compresslevel=args.compresslevel,
     )

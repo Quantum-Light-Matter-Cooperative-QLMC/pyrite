@@ -51,7 +51,7 @@ def test_profile_help_describes_trials(verb):
     result = invoke(profile.command, [verb, "--help"])
 
     assert_clean_result(result)
-    assert "--line-trials" in result.stdout
+    assert "--cxr-trials" in result.stdout
     assert "--brem-trials" in result.stdout
     assert "--ne-line" not in result.stdout
     assert "--ne-brem" not in result.stdout
@@ -74,11 +74,11 @@ def test_trials_preserve_explicit_preset_validation(flag):
             (["profile", verb, "example"], canonical, retired)
             for verb in ("create", "set", "add")
             for canonical, retired in (
-                ("--line-trials", "--ne-line"),
+                ("--cxr-trials", "--ne-line"),
                 ("--brem-trials", "--ne-brem"),
             )
         ),
-        (["profile", "numerics", "set", "example"], "--line-trials", "--line-electrons"),
+        (["profile", "numerics", "set", "example"], "--cxr-trials", "--line-electrons"),
         (["profile", "numerics", "set", "example"], "--brem-trials", "--bremsstrahlung-electrons"),
         (["run", "--preset", "zhai"], "--brem-trials", "--ne-brem"),
         (["app", "validation", "export"], "--brem-trials", "--ne-brem"),

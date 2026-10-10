@@ -61,11 +61,11 @@ output.
 
 | variable | format and unset behavior | owner |
 |---|---|---|
-| `PYRITE_ENERGY_GRID_RTOL` | Positive relative tolerance fallback. Unset uses the per-observable defaults. | `_line_grid_policy` |
-| `PYRITE_ENERGY_GRID_RTOL_<OBSERVABLE>` | Positive relative tolerance for `INTRINSIC_SOURCE` (default `1e-3`) or `DETECTED_COUNTS` (default `1e-2`). This dynamic name outranks the global fallback. | `_line_grid_policy` |
-| `PYRITE_ENERGY_GRID_MAX_SPACING_EV` | Positive maximum spacing in eV; unset is `3.0`. | `_line_grid_policy` |
-| `PYRITE_ENERGY_GRID_ULPS` | Positive backend-coordinate safety factor; unset is `8`. | `_line_grid_policy` |
-| `PYRITE_ENERGY_GRID_MAX_POINTS` | Integer point budget greater than one; unset is `600000`. | `_line_grid_policy` |
+| `PYRITE_ENERGY_GRID_RTOL` | Positive relative tolerance fallback. Unset uses the per-observable defaults. | `_cxr_grid_policy` |
+| `PYRITE_ENERGY_GRID_RTOL_<OBSERVABLE>` | Positive relative tolerance for `INTRINSIC_SOURCE` (default `1e-3`) or `DETECTED_COUNTS` (default `1e-2`). This dynamic name outranks the global fallback. | `_cxr_grid_policy` |
+| `PYRITE_ENERGY_GRID_MAX_SPACING_EV` | Positive maximum spacing in eV; unset is `3.0`. | `_cxr_grid_policy` |
+| `PYRITE_ENERGY_GRID_ULPS` | Positive backend-coordinate safety factor; unset is `8`. | `_cxr_grid_policy` |
+| `PYRITE_ENERGY_GRID_MAX_POINTS` | Integer point budget greater than one; unset is `600000`. | `_cxr_grid_policy` |
 
 ### Remote and external-cross-section configuration
 
@@ -93,9 +93,9 @@ chunking or a backend can alter floating-point reduction order.
 
 | variable | format and unset behavior | owner |
 |---|---|---|
-| `PYRITE_MC_SPEC_CHUNK`, `PYRITE_MC_BREM_CHUNK` | Positive segments-per-spectrum/brems chunk; unset `0` selects adaptive sizing. Explicit CLI chunk options win. | `runner.chunking` |
+| `PYRITE_MC_CXR_CHUNK`, `PYRITE_MC_BREM_CHUNK` | Positive segments-per-spectrum/brems chunk; unset `0` selects adaptive sizing. Explicit CLI chunk options win. | `runner.chunking` |
 | `PYRITE_MC_MIN_CHUNK` | Positive smallest segment chunk the device budget must admit before a case falls back to CPU; unset `1` (chunks follow the budget; only a single segment that cannot fit falls back). Malformed or non-positive values raise. Raise it to force CPU fallback for grids whose chunks would be too small to be efficient. | `montecarlo._resources` |
-| `PYRITE_MC_SPEC_BUDGET_MB` | Positive MiB spectrum working-set budget; unset is `min(1920, resolved device budget)`. | `runner.chunking` |
+| `PYRITE_MC_CXR_BUDGET_MB` | Positive MiB spectrum working-set budget; unset is `min(1920, resolved device budget)`. | `runner.chunking` |
 | `PYRITE_MC_FREE_EVERY` | Positive case cadence for releasing GPU-pool blocks; unset comes from the resource policy. | `runner.chunking` |
 | `PYRITE_MC_FREE_WATERMARK_MB` | Positive MiB free-memory watermark; unset `0` disables the watermark. | `runner.chunking` |
 | `PYRITE_MC_GPU_POOL_FRAC` | Floating-point fraction cap for the CuPy pool; unset uses the resolved device-budget fraction, or `0` without a GPU. | `runner.chunking` |
@@ -117,7 +117,7 @@ owner states it.
 |---|---|---|
 | `PYRITE_MC_NSYS` | `runs.scan` and remote queue scripts set `1` for an Nsight child. | `runner.chunking` enables NVTX ranges; unset disables them. |
 | `PYRITE_LOCAL_DASHBOARD` | `runs.scan` sets `1` while its local dashboard runs, then clears it. | `runner.scheduling` enables dashboard progress only for `1`. |
-| `PYRITE_MC_SPEC_CHUNK`, `PYRITE_MC_BREM_CHUNK`, `PYRITE_MC_GPU_SHARE` | CLI and remote scripts may write these runtime overrides. | See the diagnostic table above. |
+| `PYRITE_MC_CXR_CHUNK`, `PYRITE_MC_BREM_CHUNK`, `PYRITE_MC_GPU_SHARE` | CLI and remote scripts may write these runtime overrides. | See the diagnostic table above. |
 | `PYRITE_MC_TRANSPORT_CORE`, `PYRITE_MC_RESOURCE_POLICY`, `PYRITE_MC_MIN_CHUNK` | Remote queue scripts copy the submitter's values into the job, validated before submission. | See the tables above. |
 
 ### Validation, documentation, and test controls

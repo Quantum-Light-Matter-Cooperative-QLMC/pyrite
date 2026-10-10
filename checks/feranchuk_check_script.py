@@ -72,7 +72,7 @@ beta = beta_from_Ee(Ee_eV)
 
 hkl_LiF = [2, 0, 0]
 
-E_line = E_paper  # use their quoted line energy directly
+E_cxr = E_paper  # use their quoted line energy directly
 
 
 # --- absorption length at the line energy (LiF, F dominates absorption) -----
@@ -83,9 +83,9 @@ n_formula = 4.0 / CRYSTALS["lif"]["V_cell"]
 
 # crude: use F (Z=9) as the dominant absorber near 3.9 keV; refine if needed
 
-L_abs = absorption_length_ang("F", E_line, n_formula)
+L_abs = absorption_length_ang("F", E_cxr, n_formula)
 
-print(f"LiF L_abs at {E_line:.0f} eV: {L_abs:.1f} Angstrom (film L_z = {L_z_ang:.0f} Angstrom)")
+print(f"LiF L_abs at {E_cxr:.0f} eV: {L_abs:.1f} Angstrom (film L_z = {L_z_ang:.0f} Angstrom)")
 
 
 # --- compute flux with current prefactors -----------------------------------
@@ -93,7 +93,7 @@ print(f"LiF L_abs at {E_line:.0f} eV: {L_abs:.1f} Angstrom (film L_z = {L_z_ang:
 N_model = flux_per_second(
     crystal="lif",
     hkl=hkl_LiF,
-    photon_E_eV=E_line,
+    photon_E_eV=E_cxr,
     theta_B_normal=theta_obs,
     beta=beta,
     L_z_ang=L_z_ang,
@@ -123,9 +123,9 @@ print(f"log10 discrepancy: {np.log10(correction):+.2f} decades")
 
 # sanity: report the coupling and ratio used
 
-chi = chi_g("lif", hkl_LiF, E_line, use_henke=True)
+chi = chi_g("lif", hkl_LiF, E_cxr, use_henke=True)
 
-dg = delta_g("lif", hkl_LiF, E_line, use_henke=True)
+dg = delta_g("lif", hkl_LiF, E_cxr, use_henke=True)
 
 print(f"\n|chi_g(LiF 200)| = {abs(chi):.3e}")
 
@@ -135,7 +135,7 @@ print(f"delta_g (A_PXR/A_CBS) = {dg:.3f}")
 A_PXR, A_CBS, omega, g = amplitudes_PXR_CBS(
     "lif",
     hkl_LiF,
-    E_line,
+    E_cxr,
     beta,
     theta_obs,
     polarization="pi",

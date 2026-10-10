@@ -26,7 +26,7 @@ LOCAL_COMMANDS = [
     export.command,
     slim_cli.command,
     recompute_cli.brem_command,
-    recompute_cli.line_command,
+    recompute_cli.cxr_command,
     archive.store_command,
     archive.restore_command,
     archive.archives_command,
@@ -209,10 +209,10 @@ def test_blaze_unknown_option_after_variadic_value_is_not_swallowed():
             slim,
             slim_cli.command,
             "_cli",
-            ["in.pkl", "--line-only"],
+            ["in.pkl", "--cxr-only"],
             {
                 "checkpoint": "in.pkl",
-                "line_only": True,
+                "cxr_only": True,
                 "compresslevel": _checkpoint_io.DEFAULT_LEVEL,
             },
         ),
@@ -225,9 +225,9 @@ def test_blaze_unknown_option_after_variadic_value_is_not_swallowed():
         ),
         (
             recompute_cli,
-            recompute_cli.line_command,
-            "_line_cli",
-            ["--all", "--line-step", "5"],
+            recompute_cli.cxr_command,
+            "_cxr_cli",
+            ["--all", "--cxr-step", "5"],
             {"material": [], "all": True, "line_step": 5.0},
         ),
         (
@@ -303,7 +303,7 @@ def test_archive_click_dispatch(command, handler_name, argv, expected, monkeypat
         (blaze_cli.command, ["hopg", "--energy", "30", "--spacing", "1e-6", "--polar", "90"]),
         (check.command, ["--ne", "0"]),
         (recompute_cli.brem_command, ["hopg", "--save-every", "0"]),
-        (recompute_cli.line_command, ["hopg", "--line-step", "nan"]),
+        (recompute_cli.cxr_command, ["hopg", "--cxr-step", "nan"]),
     ],
 )
 def test_local_click_numeric_domains_are_usage_errors(command, argv):
@@ -314,7 +314,7 @@ def test_local_click_numeric_domains_are_usage_errors(command, argv):
 
 
 def test_slim_dataset_modes_are_mutually_exclusive():
-    result = invoke(slim_cli.command, ["in.pkl", "--brem-only", "--line-only"])
+    result = invoke(slim_cli.command, ["in.pkl", "--brem-only", "--cxr-only"])
     assert result.exit_code == 2
     assert result.stdout == ""
     assert "mutually exclusive" in result.stderr
@@ -324,7 +324,7 @@ def test_slim_dataset_modes_are_mutually_exclusive():
     ("command", "argv", "message"),
     [
         (recompute_cli.brem_command, [], "needs material"),
-        (recompute_cli.line_command, ["hopg", "--all"], "--all does not take"),
+        (recompute_cli.cxr_command, ["hopg", "--all"], "--all does not take"),
         (analyze.command, ["--save-default"], "--save-default requires MATERIAL"),
         (scan_cli.command, ["standard", "-m", "not-a-material"], "not a configured material"),
     ],

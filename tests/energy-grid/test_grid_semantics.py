@@ -31,7 +31,7 @@ from pyrite.energy_grid.semantics import (
     require_uniform_grid,
     spacing_spread,
 )
-from pyrite.results import line_metrics
+from pyrite.results import cxr_metrics
 
 LINEAR_GRID = np.linspace(100.0, 10_000.0, 512)
 LOG_GRID = np.logspace(np.log10(100.0), np.log10(10_000.0), 512)
@@ -225,13 +225,13 @@ def test_timepix_response_uses_an_explicit_zero_energy_detector_edge():
 def test_line_metrics_is_correct_on_a_log_grid():
     """#110 replaced the sample-space ``w_samp * dE`` peak-width conversion with
     physical-energy interpolation (``_sample_energy``, ``_integrate_energy_window``)
-    and grid-coordinate trapezoids, so line_metrics no longer needs the uniform
+    and grid-coordinate trapezoids, so cxr_metrics no longer needs the uniform
     guard -- unlike the sample-space consumers above, a log grid is exact here,
     not merely tolerated."""
     spec = np.exp(-(((LOG_GRID - 3000.0) / 200.0) ** 2))
     brem = np.full_like(LOG_GRID, 1e-3)
     record = {"E_grid": LOG_GRID, "spec": spec, "brem": brem, "scale": 1.0}
-    metrics = line_metrics(record, None)
+    metrics = cxr_metrics(record, None)
     assert metrics["coherent_flux_per_na"] == pytest.approx(float(np.trapezoid(spec, LOG_GRID)))
     assert metrics["total_flux_per_na"] == pytest.approx(
         float(np.trapezoid(spec, LOG_GRID)) + float(np.trapezoid(brem, LOG_GRID))

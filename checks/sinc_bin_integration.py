@@ -50,14 +50,14 @@ def _uniform(start, stop, spacing):
 
 
 def cmd_transport(args):
-    from pyrite._line_windows import build_window_plan
+    from pyrite._cxr_windows import build_window_plan
     from pyrite.energy_grid.convergence_case import CaseLadder, build_ladder_case
-    from pyrite.montecarlo.spectrum.diagnostics import sinc_feature_spacing
-    from pyrite.montecarlo.spectrum.line_seeds import (
+    from pyrite.montecarlo.spectrum.cxr_seeds import (
         DEFAULT_SEED_PROVIDERS,
         SeedContext,
         collect_feature_seeds,
     )
+    from pyrite.montecarlo.spectrum.diagnostics import sinc_feature_spacing
 
     case = build_ladder_case(
         args.material,

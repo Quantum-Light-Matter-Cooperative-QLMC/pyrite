@@ -33,10 +33,11 @@ from .._numerics import (
     validate_bremsstrahlung_model,
     validate_profile_numerics,
 )
+from .._precision import Precision
 from ..detectors import EnergyBins
 from ..materials.photon_cross_sections import ATTENUATION_MODEL
 from ..montecarlo.case import Case
-from ..montecarlo.spectrum import BREMSSTRAHLUNG_MODEL, CHARACTERISTIC_MODEL, LINE_ESCAPE_MODEL
+from ..montecarlo.spectrum import BREMSSTRAHLUNG_MODEL, CHARACTERISTIC_MODEL, CXR_ESCAPE_MODEL
 from ..montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
 from ..montecarlo.spectrum.coherent_population import (
     COHERENT_POPULATION_MODEL,
@@ -248,7 +249,7 @@ class FidelityPreset:
         energy_values = {float(value) for value in np.atleast_1d(energies)}
         assert sweep.detector is not None
         bins = sweep.detector.energy_bins
-        by_energy = bins.line_by_energy
+        by_energy = bins.cxr_by_energy
         if by_energy is not None:
             by_energy = {
                 float(energy): _coarsen_grid(
@@ -257,11 +258,11 @@ class FidelityPreset:
                 for energy, grid in by_energy.items()
                 if float(energy) in energy_values
             }
-        line_grid = (
+        cxr_grid = (
             None
-            if bins.line is None
+            if bins.cxr is None
             else _coarsen_grid(
-                bins.line,
+                bins.cxr,
                 self.photon_grid_stride,
                 self.photon_grid_span_fraction,
             )
@@ -290,7 +291,7 @@ class FidelityPreset:
             max_reflections=self.max_reflections,
             detector=replace(
                 sweep.detector,
-                energy_bins=EnergyBins(line=line_grid, line_by_energy=by_energy, brem=brem_grid),
+                energy_bins=EnergyBins(cxr=cxr_grid, cxr_by_energy=by_energy, brem=brem_grid),
             ),
         )
 
@@ -390,9 +391,13 @@ def resolve_numerics(
 
 
 def _jsonable(value: Any) -> Any:
+    if isinstance(value, Precision):
+        return _jsonable(value.to_dict())
     if dataclasses.is_dataclass(value):
+        names = {"cxr_grid_policy": "line_grid_policy"} if isinstance(value, Sweep) else {}
         return {
-            field.name: _jsonable(getattr(value, field.name)) for field in dataclasses.fields(value)
+            names.get(f.name, f.name): _jsonable(getattr(value, f.name))
+            for f in dataclasses.fields(value)
         }
     if isinstance(value, np.ndarray):
         # A non-object dtype's `.tolist()` is already a plain nested list of
@@ -498,8 +503,8 @@ def _identity_v1(
     sweep_payload["dtheta_obs_deg"] = None if acceptance == TIMEPIX3_DTHETA_OBS_DEG else acceptance
     sweep_payload["domega_sr"] = None if solid_angle == TIMEPIX3_DOMEGA_SR else solid_angle
     energy_bins = detector_payload.pop("energy_bins")
-    sweep_payload["E_grid_line"] = energy_bins["line"]
-    sweep_payload["E_grid_line_by_energy"] = energy_bins["line_by_energy"]
+    sweep_payload["E_grid_line"] = energy_bins["cxr"]
+    sweep_payload["E_grid_line_by_energy"] = energy_bins["cxr_by_energy"]
     sweep_payload["E_grid_brem"] = energy_bins["brem"]
     sweep_payload["e_grid_eV"] = None
     # Response is applied only to response-free source arrays at read time. It must not
@@ -691,7 +696,7 @@ def _identity_v1(
     resolved["characteristic_model"] = CHARACTERISTIC_MODEL
     # The PXR/CBS line route's escape model is unconditional physics too
     # (segment-mean escape since issue #181); same constant-marker rule.
-    resolved["line_escape_model"] = LINE_ESCAPE_MODEL
+    resolved["line_escape_model"] = CXR_ESCAPE_MODEL
     if emission != "incoherent":
         resolved["coherent_population_model"] = COHERENT_POPULATION_MODEL
     # Every photon-escape factor reads the narrow-beam mu, sourced from EPDL2025
@@ -846,7 +851,7 @@ def case_content_key(
         "schema": CASE_CONTENT_KEY_SCHEMA,
         "stopping_model": STOPPING_MODEL,
         "characteristic_model": CHARACTERISTIC_MODEL,
-        "line_escape_model": LINE_ESCAPE_MODEL,
+        "line_escape_model": CXR_ESCAPE_MODEL,
         "attenuation_model": ATTENUATION_MODEL,
         "bremsstrahlung_model": (
             case_bremsstrahlung_marker(case)
