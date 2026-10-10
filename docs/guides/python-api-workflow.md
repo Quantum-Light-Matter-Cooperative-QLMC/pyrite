@@ -59,6 +59,8 @@ device = result.provenance["device"]
 resolved_case = result.case
 ```
 
+`result.to_dataframe()` returns every spectral array as one tidy frame (`component`, `energy_eV`, `density`; each component on its own energy grid), with `provenance`, `case`, and `units` in `df.attrs`. It plots directly: `alt.Chart(df).mark_line().encode(x="energy_eV:Q", y="density:Q", color="component:N")`. Per-pixel `spatial` data is not flattened.
+
 Provenance also contains the resolved scene, numerics, and PyRITE/NumPy versions. Record the digest and software revision with any derived figure or table.
 
 `emission="both"` and `emission="coherent"` expose both CXR modes from the

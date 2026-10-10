@@ -12,6 +12,7 @@ import pytest
 from pyrite.campaign.config import default_settings
 from pyrite.plots import _common
 from pyrite.results import (
+    Result,
     Settings,
     beam_current_na,
     cxr_metrics,
@@ -234,3 +235,28 @@ def test_fwhm_and_line_flux_are_stable_across_resolution_ladder():
     expected_fwhm_eV = 2.0 * np.sqrt(2.0 * np.log(2.0)) * sigma_eV
     assert fwhm_values == pytest.approx([expected_fwhm_eV] * 5, rel=0.02)
     assert max(line_flux_values) / min(line_flux_values) < 1.02
+
+
+def test_result_to_dataframe_is_tidy_with_own_grids_and_metadata():
+    result = Result(
+        energy_eV=np.array([100.0, 200.0, 300.0]),
+        spectrum=np.array([1.0, 2.0, 3.0]),
+        background_energy_eV=np.array([100.0, 400.0]),
+        background=np.array([0.5, 0.25]),
+        case={"crystal": "hopg"},
+        provenance={"identity_digest": "abc"},
+        characteristic_spectrum=np.array([0.0, 0.1, 0.0]),
+    )
+    frame = result.to_dataframe()
+    assert list(frame.columns) == ["component", "energy_eV", "density"]
+    assert frame.groupby("component", observed=True).size().to_dict() == {
+        "line": 3,
+        "characteristic": 3,
+        "background": 2,
+    }
+    assert "coherent" not in set(frame["component"])
+    brem = frame[frame["component"] == "background"]
+    assert brem["energy_eV"].tolist() == [100.0, 400.0]
+    assert brem["density"].tolist() == [0.5, 0.25]
+    assert frame.attrs["provenance"] == {"identity_digest": "abc"}
+    assert frame.attrs["case"] == {"crystal": "hopg"}
