@@ -2,6 +2,8 @@
 # behind a silicon window, ideal response, Poisson counts over 1 s; writes an
 # observation alongside the scalar-detector checkpoint. ~2 min on CPU.
 #   pyrite run detector_demo
+# Fixed electron counts: adaptive precision does not support the physical
+# detector's observation directions.
 
 thickness_ang = {values = [20000.0]}
 energy_keV = {values = [30.0]}

@@ -1,5 +1,8 @@
 # Demo: 1 MeV beam with the measured line-grid policy (resonance-population
-# bandwidth, resonance-local spacing, bin-mean quadrature). ~15 s on CPU.
+# bandwidth, resonance-local spacing, bin-mean quadrature). The line grid is
+# resolved automatically, independently of electron sampling, which uses the
+# default adaptive policy (pyrite profile precision show high_energy_demo).
+# ~1 min on CPU.
 #   pyrite run high_energy_demo
 
 thickness_ang = {values = [10000.0]}
@@ -8,8 +11,6 @@ tilt_deg = {values = [45.0]}
 tilt_azim_deg = {values = [180.0]}
 E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
 materials = ["hopg"]
-n_electrons = {values = [500]}
-n_electrons_brem = {values = [100]}
 detector = "default"
 
 [line_grid_policy]

@@ -2,6 +2,8 @@
 # --trajectories, then inspect or export the HDF5 capture. ~20 s on CPU.
 #   pyrite run trajectory_demo --trajectories trajectories
 #   pyrite checkpoint export-trajectories trajectories   (VTK for ParaView)
+# Fixed electron counts: adaptive precision does not support trajectory
+# capture.
 
 thickness_ang = {values = [20000.0]}
 energy_keV = {values = [30.0]}
