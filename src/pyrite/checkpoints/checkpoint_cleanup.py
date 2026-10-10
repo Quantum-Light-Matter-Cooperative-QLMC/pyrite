@@ -18,11 +18,10 @@ import click
 
 from ..campaign.profiles import _jsonable, named_profile_identity, named_profile_stem
 from ..console import output as _cli_core
-from ..console.config import workspace_root
+from ..console.outputs import output_dir
 from ..materials import CATALOG
 from . import _checkpoint_store
 
-_DEFAULT_CHECKPOINT_DIR = str(workspace_root() / "checkpoints")
 _FIDELITIES = ("full", "survey")
 
 
@@ -144,7 +143,7 @@ def prune_checkpoints(
     all_profiles: bool = False,
     catalog_profile: str | None = None,
     yes: bool = False,
-    checkpoint_dir: str | Path = _DEFAULT_CHECKPOINT_DIR,
+    checkpoint_dir: str | Path | None = None,
 ) -> int:
     """Preview or remove records not exactly reproducible by current profiles.
 
@@ -152,7 +151,7 @@ def prune_checkpoints(
     eligible; custom, quick, high-energy-floor, archived, and unrecognized
     checkpoints remain untouched.
     """
-    root = Path(checkpoint_dir)
+    root = output_dir("checkpoints") if checkpoint_dir is None else Path(checkpoint_dir)
     selected = [
         target
         for target in _targets(all_profiles, catalog_profile)
@@ -337,10 +336,10 @@ def clear_checkpoints(
     catalog_profile: str | None = None,
     all_datasets: bool = False,
     yes: bool = False,
-    checkpoint_dir: str | os.PathLike[str] = "checkpoints",
+    checkpoint_dir: str | os.PathLike[str] | None = None,
 ) -> int:
     """Preview or delete selected active datasets and newly unreachable CAS blobs."""
-    root = Path(checkpoint_dir)
+    root = output_dir("checkpoints") if checkpoint_dir is None else Path(checkpoint_dir)
     active_paths = _active_manifest_paths(root)
     active = {stem: _read_case_manifest(path) for stem, path in active_paths.items()}
     archived = [_read_case_manifest(path) for path in _archive_manifest_paths(root)]

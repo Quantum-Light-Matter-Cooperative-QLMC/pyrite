@@ -5,7 +5,7 @@ from pyrite.apps.analyze import (
 )
 from pyrite.campaign.config import default_settings
 from pyrite.results import filter_results, select_results, select_thickness
-from pyrite.runs.run import DEFAULT_CHECKPOINT_DIR, cases_from_results
+from pyrite.runs.run import cases_from_results, default_checkpoint_dir
 
 from .controls import SLICE_KEYS
 from .models import AnalysisContext
@@ -28,7 +28,7 @@ def selected_checkpoint_stem(checkpoint_widget) -> str | None:
 
 def load_context(material_widget, checkpoint_widget, checkpoint_dir=None) -> AnalysisContext:
     """Resolve the picker selection and load exactly one analysis checkpoint."""
-    root = DEFAULT_CHECKPOINT_DIR if checkpoint_dir is None else checkpoint_dir
+    root = default_checkpoint_dir() if checkpoint_dir is None else checkpoint_dir
     material = _selected_value(material_widget)
     stem = selected_checkpoint_stem(checkpoint_widget) if material is not None else None
     settings = default_settings()

@@ -45,6 +45,7 @@ from .._progress import _electron_progress_fields, _ProgressTimer, _write_progre
 from ..console import dashboard as _dashboard
 from ..console import json as cli_json
 from ..console import output as _cli_core
+from ..console.outputs import output_dir
 
 # Lazy runtime bindings keep help fast while preserving monkeypatchable module
 # seams used by focused driver tests.
@@ -213,12 +214,13 @@ def _profiled_child_command(
     covers real work rather than a fast checkpoint resume. ``material`` is
     optional: when omitted the capture covers the profile's full membership and
     the output/checkpoint stem falls back to the profile name."""
-    perf_root = (
-        Path(performance_dir) if performance_dir is not None else Path("performance-profiles")
-    )
+    perf_root = Path(performance_dir) if performance_dir is not None else output_dir("performance")
     stem = material if material is not None else performance_profile
     trace_base = perf_root / performance_profile / stem
-    checkpoint_dir = perf_root / performance_profile / checkpoint_subdir / stem
+    checkpoint_root = (
+        perf_root if performance_dir is not None else output_dir("checkpoints") / "performance"
+    )
+    checkpoint_dir = checkpoint_root / performance_profile / checkpoint_subdir / stem
     child = [
         sys.executable,
         "-m",
@@ -1057,7 +1059,8 @@ def _run_material(args, material, max_seconds=None):
         from ..campaign.profiles import _jsonable
         from ..perf.performance_profile import PerformanceLogger
 
-        performance_root = Path(getattr(args, "performance_dir", None) or "performance-profiles")
+        performance_dir = getattr(args, "performance_dir", None)
+        performance_root = Path(performance_dir) if performance_dir else output_dir("performance")
         profile_dir = performance_root / performance_profile
         performance_logger = PerformanceLogger(
             profile_dir / f"{material}.ndjson",

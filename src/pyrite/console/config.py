@@ -244,3 +244,17 @@ def fetched_data_root() -> Path:
 def xsgen_data_root() -> Path:
     """Put generated tables beside checkpoints in an explicit workspace."""
     return fetched_data_root() / "xsgen"
+
+
+def output_root(explicit: str | PathLike[str] | None = None) -> Path:
+    """Return the workspace output root; see :mod:`pyrite.console.outputs`."""
+    from .outputs import output_root as resolve_output_root
+
+    return resolve_output_root(explicit)
+
+
+def output_dir(kind: str, explicit: str | PathLike[str] | None = None) -> Path:
+    """Return a generated-output directory in the selected workspace."""
+    from .outputs import output_dir as resolve_output_dir
+
+    return resolve_output_dir(kind, explicit)

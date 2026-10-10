@@ -4,9 +4,9 @@ PyRITE stores simulation output as component checkpoints, then lets analysis and
 
 ## Checkpoint layout and identity
 
-Canonical full runs use `checkpoints/<material>/`. Survey runs and modified profiles use identity-qualified directories so incompatible parameter sets do not silently resume into one another. Each dataset records its resolved input payload and hash in component metadata.
+Canonical full runs use `pyrite-output/checkpoints/<material>/`. Survey runs and modified profiles use identity-qualified directories so incompatible parameter sets do not silently resume into one another. Each dataset records its resolved input payload and hash in component metadata.
 
-Active datasets are directories beneath the effective `checkpoints/` root and are offered by the analysis app's dataset selector. `pyrite checkpoint list` does not list them; it lists labels in the long-term archive shelf:
+Active datasets are directories beneath the effective `pyrite-output/checkpoints/` root and are offered by the analysis app's dataset selector. `pyrite checkpoint list` does not list them; it lists labels in the long-term archive shelf:
 
 ```bash
 uv run pyrite checkpoint list
@@ -56,7 +56,7 @@ Legacy `.pkl` component paths and plain, gzip, and zstd monoliths remain readabl
 
 ## Pixel-detector observations
 
-A profile detector with an acquisition also stores one counting observation per case in `observations/<stem>/`, the sibling of that detector's `checkpoints/<stem>/`. A profile with several detectors has a separate ID-qualified stem for each. Observations hold factorized per-tile spectra, pixel solid angles, and filter paths rather than a pixel-by-energy cube, so reopening one never reruns transport. The [Python workflow](python-api-workflow.md#persist-reopen-and-rescore-an-observation) covers `ObservationStore` and rescoring; `pyrite.observations.observation_inventory(stem)` lists a stem's stored observations by case without opening their factors.
+A profile detector with an acquisition also stores one counting observation per case in `pyrite-output/observations/<stem>/`, the sibling of that detector's `pyrite-output/checkpoints/<stem>/`. A profile with several detectors has a separate ID-qualified stem for each. Observations hold factorized per-tile spectra, pixel solid angles, and filter paths rather than a pixel-by-energy cube, so reopening one never reruns transport. The [Python workflow](python-api-workflow.md#persist-reopen-and-rescore-an-observation) covers `ObservationStore` and rescoring; `pyrite.observations.observation_inventory(stem)` lists a stem's stored observations by case without opening their factors.
 
 The pixel app reads one dataset's observations without loading its checkpoint. Pick the material and checkpoint that name the dataset:
 
@@ -78,10 +78,12 @@ Timepix3 counts are clustered photon events attributed to the incident-ray pixel
 Checkpoints keep spectra, not the electron histories behind them. To keep the complete transport result of a run for later analysis, opt in per run:
 
 ```bash
-uv run pyrite run standard -m hopg --trajectories trajectories/
+uv run pyrite run standard -m hopg --trajectories
 ```
 
-Each case the run transports writes one HDF5 file, `trajectories/<stem>/<config>-<digest>/E0_<energy>keV.h5`, where `<stem>` is the checkpoint stem and the digest keeps configuration names that sanitize alike apart. The file holds the exact mapping the case's spectrum phase consumed: every per-segment array, grooved runs' vacuum legs, the sampled incident phase space, the exit tallies, and whichever optional midpoint, shell, secondary, radiative, straggling, or diagnostic fields the run produced, with dtype, shape, and row order preserved. It also records the resolved case, the seed, the run identity, the resolved transport settings (core, per-electron cutoffs, `n_hat`), and each field's unit. Field meanings are in [transport outputs](../physics/beam-transport/transport-outputs.md).
+Each case the run transports writes one HDF5 file, `pyrite-output/trajectories/<stem>/<config>-<digest>/E0_<energy>keV.h5`, where `<stem>` is the checkpoint stem and the digest keeps configuration names that sanitize alike apart. The file holds the exact mapping the case's spectrum phase consumed: every per-segment array, grooved runs' vacuum legs, the sampled incident phase space, the exit tallies, and whichever optional midpoint, shell, secondary, radiative, straggling, or diagnostic fields the run produced, with dtype, shape, and row order preserved. It also records the resolved case, the seed, the run identity, the resolved transport settings (core, per-electron cutoffs, `n_hat`), and each field's unit. Field meanings are in [transport outputs](../physics/beam-transport/transport-outputs.md).
+
+A bare `--trajectories` writes under `pyrite-output/trajectories/`; `--trajectories DIR` selects an explicit directory. Put the profile before a bare flag.
 
 Capture never changes a result. The file is written after transport and before the spectrum phase, from the arrays that phase then reads, so spectra and checkpoints are identical to the same seeded run without `--trajectories`. Without the option no trajectory file is written.
 
@@ -98,7 +100,7 @@ Reopen a file from Python:
 ```python
 from pyrite.montecarlo.trajectories import read_trajectory_artifact
 
-artifact = read_trajectory_artifact("trajectories/hopg/.../E0_30keV.h5")
+artifact = read_trajectory_artifact("pyrite-output/trajectories/hopg/.../E0_30keV.h5")
 segs = artifact.transport  # same keys and arrays as simulate_trajectories
 artifact.units["r_mid"]  # "angstrom"
 artifact.case["seed"], artifact.settings["transport_core"]
@@ -109,7 +111,7 @@ The HDF5 layout is self-describing and readable with any HDF5 tool: `/transport`
 ### Export segments for visualization
 
 ```bash
-uv run pyrite checkpoint export-trajectories trajectories/hopg/
+uv run pyrite checkpoint export-trajectories pyrite-output/trajectories/hopg/
 ```
 
 Every artifact becomes a VTK XML PolyData (`.vtp`) file beside it, readable by ParaView, VisIt, and PyVista/VTK. Each segment is a two-point line cell from `r_mid - L_ang v_hat / 2` to `r_mid + L_ang v_hat / 2` in the slab frame, in angstrom. All per-segment fields ride along as cell data, so thresholding on `electron_id` (or `track_id` with secondaries) isolates one history. Grooved vacuum legs are extra cells with `is_vacuum = 1`, where only `electron_id`, `E_start_keV`, `t_start_ang`, `t0_ang`, `L_ang`, and `v_hat` are defined and other fields are NaN or -1; `--no-vacuum` drops them.
@@ -119,10 +121,10 @@ VTK PolyData was chosen because it represents disconnected straight segments wit
 ### Score spectra from saved trajectories
 
 ```bash
-uv run pyrite checkpoint score-trajectories trajectories/hopg/
+uv run pyrite checkpoint score-trajectories pyrite-output/trajectories/hopg/
 ```
 
-This replays only the spectrum phase (line, characteristic, and bremsstrahlung spectra) of every captured case and stores each result as an ordinary record of the checkpoint stem and run identity the capturing run recorded, under `--checkpoint-dir` (default `checkpoints/<stem>`). It never transports. Each new record carries `source_trajectory` with the artifact's path and SHA-256. Records that already exist are kept unless `--overwrite`, and records of cases without an artifact are never touched, so re-scoring a run's own checkpoint after a spectrum-phase change replaces exactly the captured cases. The shared per-case cache is neither read nor written.
+This replays only the spectrum phase (line, characteristic, and bremsstrahlung spectra) of every captured case and stores each result as an ordinary record of the checkpoint stem and run identity the capturing run recorded, under `--checkpoint-dir` (default `pyrite-output/checkpoints/<stem>`). It never transports. Each new record carries `source_trajectory` with the artifact's path and SHA-256. Records that already exist are kept unless `--overwrite`, and records of cases without an artifact are never touched, so re-scoring a run's own checkpoint after a spectrum-phase change replaces exactly the captured cases. The shared per-case cache is neither read nor written.
 
 Every artifact is checked before anything is written. The command refuses artifacts from before this schema (re-run the case with `--trajectories`), incomplete or foreign files, artifacts written outside a run, two runs' artifacts for one stem, and a target checkpoint written by a different run. Spectrum inputs that the case alone determines are recomputed and must match what the artifact stored.
 
@@ -133,7 +135,7 @@ Prefer artifact reuse when you redo only the spectrum phase of the same transpor
 ### Export scene geometry
 
 ```bash
-uv run pyrite checkpoint export-trajectories trajectories/hopg/ --scene
+uv run pyrite checkpoint export-trajectories pyrite-output/trajectories/hopg/ --scene
 ```
 
 In addition to each original slab-frame `.vtp`, `--scene` writes two independently viewable scenes:

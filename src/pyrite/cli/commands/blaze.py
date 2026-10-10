@@ -5,6 +5,7 @@ from pathlib import Path
 import click
 
 from ...console import output as _cli_core
+from ...console.outputs import output_default, output_label
 from ...runs import blaze as _blaze
 from .. import _completion as _cli_completion
 from .._deprecations import canonical_option
@@ -114,8 +115,8 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
 )
 @click.option(
     "--checkpoint-dir",
-    default="checkpoints",
-    show_default=True,
+    default=output_default("checkpoints"),
+    show_default=output_label("checkpoints"),
     metavar="DIR",
     help="Read and write blazed component checkpoints in DIR.",
 )

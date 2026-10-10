@@ -8,6 +8,7 @@ tests can substitute them.
 
 import click
 
+from ...console.outputs import output_default, output_label
 from .. import _completion as _cli_completion
 
 
@@ -61,8 +62,8 @@ def gc_command(all_profiles: bool, catalog_profile: str | None, yes: bool) -> No
 @click.option("-y", "--yes", is_flag=True, help="Delete exact previewed targets.")
 @click.option(
     "--checkpoint-dir",
-    default="checkpoints",
-    show_default=True,
+    default=output_default("checkpoints"),
+    show_default=output_label("checkpoints"),
     metavar="DIR",
     help="Checkpoint root containing active datasets, archives, and shared CAS blobs.",
 )

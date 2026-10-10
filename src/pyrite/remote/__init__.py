@@ -3,7 +3,7 @@
 The local machine handles interactive analysis and static-HTML export, while
 the remote host handles GPU-heavy Monte Carlo sweeps. Compute-producing
 subcommands can sync the current code, submit a SLURM batch script (see
-:mod:`pyrite.runs.scan`), and pull results into ``./checkpoints``.
+:mod:`pyrite.runs.scan`), and pull results into ``pyrite-output/checkpoints``.
 
 Optional, dev-only tool. Configure an SSH host alias with
 ``pyrite config set remote.target HOST`` or ``PYRITE_REMOTE_HOST`` before using

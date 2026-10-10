@@ -21,7 +21,7 @@ from pyrite.plots.plotly.trajectories import (
     trajectory_volume_figure_from_data,
 )
 
-from ...paths import cache_dir
+from ...console.outputs import output_dir
 
 _RENDER_SALT = "v2"  # bump on any change to the cache-key inputs or render format
 
@@ -152,8 +152,8 @@ def render_cache_key(
 
 
 def render_cache_dir():
-    """Canonical platform-specific viewer-render cache, created if missing."""
-    out = cache_dir() / "viewer-renders"
+    """Workspace viewer-render cache, created if missing."""
+    out = output_dir("cache") / "viewer-renders"
     out.mkdir(parents=True, exist_ok=True)
     return out
 

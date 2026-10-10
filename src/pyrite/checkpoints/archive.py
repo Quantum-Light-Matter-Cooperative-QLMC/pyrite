@@ -29,12 +29,22 @@ import re
 import shutil
 from pathlib import Path
 
-from ..console.config import workspace_root
+from ..console.outputs import output_dir
 from . import _checkpoint_io, _checkpoint_store
 
-DEFAULT_ROOT = str(workspace_root() / "checkpoints")
 ARCHIVE_SUBDIR = "archive"
 _DATE_SUFFIX_RE = re.compile(r"-\d{8}$")  # a trailing -YYYYMMDD default-label stamp
+
+
+def _default_root():
+    return str(output_dir("checkpoints"))
+
+
+def __getattr__(name):
+    # ``DEFAULT_ROOT`` resolves on access, after ``PYRITE_HOME`` is final.
+    if name == "DEFAULT_ROOT":
+        return _default_root()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _archive_dir(root):
@@ -88,10 +98,11 @@ def _atomic_copytree(src, dst):
     os.replace(tmp, dst)
 
 
-def archive_checkpoint(stem, label=None, *, force=False, root=DEFAULT_ROOT):
+def archive_checkpoint(stem, label=None, *, force=False, root=None):
     """Copy the active slot ``<root>/<stem>.pkl`` to ``<root>/archive/<label>.pkl``.
     ``label`` defaults to ``<stem>-<YYYYMMDD>``. Refuses to overwrite an existing
     label without ``force``. Returns the archive path."""
+    root = _default_root() if root is None else root
     src, is_directory = _active_paths(stem, root)
     if not src.exists():
         raise SystemExit(f"no such active checkpoint: {src}")
@@ -108,11 +119,12 @@ def archive_checkpoint(stem, label=None, *, force=False, root=DEFAULT_ROOT):
     return str(dst)
 
 
-def restore_checkpoint(label, stem=None, *, force=False, root=DEFAULT_ROOT):
+def restore_checkpoint(label, stem=None, *, force=False, root=None):
     """Copy ``<root>/archive/<label>.pkl`` back to the active slot
     ``<root>/<stem>.pkl``. ``stem`` defaults to the label with a trailing
     ``-<YYYYMMDD>`` stripped. Refuses to overwrite an existing active slot without
     ``force``. Returns the active-slot path."""
+    root = _default_root() if root is None else root
     src, is_directory = _archive_paths(label, root)
     if not src.exists():
         raise SystemExit(f"no such archive: {src}")
@@ -161,9 +173,10 @@ def _dataset_identity(path, is_directory):
         return None
 
 
-def list_archives(root=DEFAULT_ROOT):
+def list_archives(root=None):
     """Print the shelf: each label with its size (MB) and record count, sorted by
     label. Returns the list of labels."""
+    root = _default_root() if root is None else root
     adir = _archive_dir(root)
     if not os.path.isdir(adir):
         print("(no archives)")
@@ -224,7 +237,7 @@ def _union_results(live, archived):
 
 
 def union_checkpoint(
-    stem, label, *, pre_archive=True, delete_archive=False, force=False, root=DEFAULT_ROOT
+    stem, label, *, pre_archive=True, delete_archive=False, force=False, root=None
 ):
     """Merge the archived checkpoint ``<root>/archive/<label>.pkl`` into the
     active slot ``<root>/<stem>.pkl``, in place. Live wins on any overlapping
@@ -248,6 +261,7 @@ def union_checkpoint(
     by default). Pass ``pre_archive=False`` to union same-day round-trips like
     this, or archive the live checkpoint under an explicit label first.
     """
+    root = _default_root() if root is None else root
     live_path, live_is_directory = _active_paths(stem, root)
     if not live_path.exists():
         raise SystemExit(f"no such active checkpoint: {live_path}")

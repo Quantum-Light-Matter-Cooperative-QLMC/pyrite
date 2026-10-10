@@ -9,6 +9,7 @@ import click
 from ..._env import set_canonical_env
 from ...console import config as _cli_config
 from ...console import output as _cli_core
+from ...console.outputs import output_default, output_dir, output_label
 from ...runs import scan as _scan
 from .. import _completion as _cli_completion
 from .. import _implicit_defaults
@@ -28,6 +29,24 @@ def _performance_profile(ctx, param, value):
             param=param,
         )
     return value
+
+
+# ``--trajectories`` with no value; NUL can never be a real path.
+_BARE_TRAJECTORIES = "\0"
+
+
+class _TrajectoryPath(click.Path):
+    def convert(self, value, param, ctx):
+        if value == _BARE_TRAJECTORIES:
+            return value
+        return super().convert(value, param, ctx)
+
+
+def _trajectories_dir(ctx, param, value):
+    del ctx, param
+    if value is None:
+        return None
+    return output_dir("trajectories") if str(value) == _BARE_TRAJECTORIES else value
 
 
 def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
@@ -116,8 +135,8 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
 )
 @click.option(
     "--checkpoint-dir",
-    default="checkpoints",
-    show_default=True,
+    default=output_default("checkpoints"),
+    show_default=output_label("checkpoints"),
     metavar="DIR",
     help="Read and write component checkpoints in DIR.",
 )
@@ -135,7 +154,7 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     help=(
         "Sample CPU pressure, RAM/swap, GPU clocks/VRAM, process-tree, phase "
         "timing, queue, case, worker, and chunk metrics for PROFILE's resolved "
-        "membership into performance-profiles/PROFILE/<material>.ndjson "
+        "membership into pyrite-output/performance/PROFILE/<material>.ndjson "
         "(cxr.performance.v1). Combine with -m to profile a single member. Runs "
         "without shared-cache reads or writes unless --recompute is explicit."
     ),
@@ -150,7 +169,7 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
         "Run catalog profile NAME while sampling CPU pressure, RAM/swap, GPU clocks/"
         "VRAM, process-tree, phase timing, queue, case, worker, and chunk metrics "
         "every 5 s into "
-        "performance-profiles/NAME/<material>.ndjson."
+        "pyrite-output/performance/NAME/<material>.ndjson."
     ),
 )
 @click.option(
@@ -238,13 +257,18 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
 )
 @click.option(
     "--trajectories",
-    type=click.Path(file_okay=False, path_type=Path),
+    type=_TrajectoryPath(file_okay=False, path_type=Path),
     default=None,
-    metavar="DIR",
+    is_flag=False,
+    flag_value=_BARE_TRAJECTORIES,
+    callback=_trajectories_dir,
+    metavar="[DIR]",
     help=(
         "Opt in to saving each transported case's full electron-transport result "
-        "as HDF5 under DIR/<stem>/. Files can be much larger than checkpoints; "
-        "cached cases are not re-transported (use --recompute to capture them)."
+        "as HDF5 under DIR/<stem>/ (bare flag: pyrite-output/trajectories). Put "
+        "PROFILE before a bare --trajectories, or use --trajectories=DIR. Files can "
+        "be much larger than checkpoints; cached cases are not re-transported (use "
+        "--recompute to capture them)."
     ),
 )
 @click.option(

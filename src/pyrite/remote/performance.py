@@ -5,18 +5,21 @@ from pathlib import Path
 
 from ..console import dashboard as presentation
 from ..console import output as _cli_core
+from ..console.outputs import output_dir
 from . import config, state, transport
 
 
 def pull_performance_profile(profile: str) -> list[Path]:
     """Pull performance NDJSON plus any Nsight, CPU-profile, and py-spy artifacts."""
     transport._check_shell_tokens([profile])
-    jobs = config.remote_path(config.JOBS_SUBDIR)
+    jobs = config.remote_output_path("performance")
     listing = transport._ssh_capture(
+        f"cd {config.shell_remote_dir()} || exit $?; "
+        f"{config.remote_output_migration_command()}; "
         f"JOBS={config.shell_word(jobs)}; "
         '[ -d "$JOBS" ] || exit 0; '
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
-        f'p="$d/performance/{profile}"; [ -d "$p" ] || continue; '
+        f'p="$d/{profile}"; [ -d "$p" ] || continue; '
         'find "$p" -maxdepth 1 -type f '
         "\\( -name '*.ndjson' -o -name '*.nsys-rep' -o -name '*.sqlite' "
         "-o -name '*.nsys-stats.txt' -o -name '*.cpu.prof' -o -name '*.cpu.txt' "
@@ -49,16 +52,15 @@ def pull_performance_profile(profile: str) -> list[Path]:
     if not artifacts:
         raise SystemExit(f"no remote performance artifacts found for profile {profile!r}")
 
-    local_root = config.LOCAL_ROOT / "performance-profiles" / profile
+    local_root = output_dir("performance") / profile
     pulled = []
     for jobid, filename in artifacts:
         destination = local_root / jobid / filename
         destination.parent.mkdir(parents=True, exist_ok=True)
         temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.part")
-        remote = config.remote_path(
-            config.JOBS_SUBDIR,
-            jobid,
+        remote = config.remote_output_path(
             "performance",
+            jobid,
             profile,
             filename,
         )
@@ -76,11 +78,13 @@ def pull_performance_profile(profile: str) -> list[Path]:
 
 def remote_performance_inventory() -> list[tuple[str, str, int, int]]:
     """Return ``(job, profile, files, bytes)`` for remote performance directories."""
-    jobs = config.remote_path(config.JOBS_SUBDIR)
+    jobs = config.remote_output_path("performance")
     output = transport._ssh_capture(
+        f"cd {config.shell_remote_dir()} || exit $?; "
+        f"{config.remote_output_migration_command()}; "
         f"JOBS={config.shell_word(jobs)}; "
         '[ -d "$JOBS" ] || exit 0; '
-        'for p in "$JOBS"/*/performance/*/; do [ -d "$p" ] || continue; '
+        'for p in "$JOBS"/*/*/; do [ -d "$p" ] || continue; '
         'job=$(basename "$(dirname "$(dirname "$p")")"); profile=$(basename "$p"); '
         'set -- $(find "$p" -maxdepth 1 -type f -printf "%s\\n" | '
         "awk '{n += 1; b += $1} END {print n+0, b+0}'); "
@@ -171,7 +175,7 @@ def prune_remote_performance(profiles=None, *, all_profiles=False, yes=False):
             "refusing performance prune: remote job state or artifact inventory changed"
         )
     targets = [
-        config.remote_path(config.JOBS_SUBDIR, jobid, "performance", profile)
+        config.remote_output_path("performance", jobid, profile)
         for jobid, profile, _files, _size in selected
     ]
     command = " ".join(config.shell_arg(target) for target in targets)

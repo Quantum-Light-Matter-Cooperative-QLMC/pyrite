@@ -1106,6 +1106,7 @@ def _sync_code_locked(entries, digest, *, force):
     stage = f".pyrite-stage.{uuid.uuid4().hex}"
     tar_word = config.shell_single_word(remote_tar)
     stamp_write = (
+        f"{{ {config.remote_output_migration_command()}; }} && "
         f"printf %s {config.shell_arg(stamp.render())} "
         f"> {config.shell_single_word(config.remote_sync_stamp_path())}"
     )

@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from ..checkpoints import archive
+from ..console.outputs import output_dir
 from . import config, scripts, transport
 
 
@@ -42,7 +43,9 @@ def _resolve_survey_stems(stems):
         if name in resolved:
             continue
         resolved.append(name)
-        print(f"also pulling identity-qualified survey checkpoint -> checkpoints/{name}/")
+        print(
+            f"also pulling identity-qualified survey checkpoint -> pyrite-output/checkpoints/{name}/"
+        )
     return resolved
 
 
@@ -73,7 +76,7 @@ def _remote_meta_json(stem):
     ``None`` when the file is absent or unreadable. One ssh round trip: a
     leading ``stat`` line disambiguates "missing" from "empty" without a
     second connection."""
-    path = config.remote_path("checkpoints", stem, "meta.json")
+    path = config.remote_output_path("checkpoints", stem, "meta.json")
     path_q = config.shell_arg(path)
     raw = transport._ssh_capture(f"[ -f {path_q} ] || exit 0; stat -c %Y {path_q}; cat {path_q}")
     mtime_line, _, body = raw.partition("\n")
@@ -287,8 +290,8 @@ def pull(
     if dataset is None:
         stems = _resolve_survey_stems(stems)
         transport._check_shell_tokens(stems)
-    dest = config.LOCAL_ROOT / "checkpoints"
-    dest.mkdir(exist_ok=True)
+    dest = output_dir("checkpoints")
+    dest.mkdir(parents=True, exist_ok=True)
     use_slim = True  # component directories are projected to one transfer pickle
     if use_slim and not no_sync:
         transport.sync_code()  # box must rebuild the grid from the same config.py
@@ -334,7 +337,7 @@ def pull(
                 flags += f" --compresslevel {_checkpoint_io.MAX_LEVEL}"
             if dataset is not None:
                 flags += f" --{dataset}-only"
-            ckpt = config.remote_path("checkpoints", stem)
+            ckpt = config.remote_output_path("checkpoints", stem)
             incoming_local = dest / f".{stem}.incoming.pkl"
             # `-o -` streams the encoded artifact straight down this ssh
             # session's stdout (slim's own report goes to stderr). HDF5 needs
@@ -367,7 +370,9 @@ def pull(
             incoming_local.unlink(missing_ok=True)
             if dataset is not None:
                 if not _checkpoint_store.checkpoint_exists(stem, dest):
-                    raise FileNotFoundError(f"no local checkpoints/{stem}/ to merge into")
+                    raise FileNotFoundError(
+                        f"no local pyrite-output/checkpoints/{stem}/ to merge into"
+                    )
                 archive.archive_checkpoint(stem, force=True)
                 base = _checkpoint_store.load(stem, dest)
                 n_merged, n_skipped = merge_dataset(base, incoming, dataset, force=force)
@@ -375,14 +380,14 @@ def pull(
                 _checkpoint_store.save(stem, dest, base, components=components)
                 _manifest_save(str(local), base, resolved_identity)
                 print(
-                    f"merged {dataset} ({n_merged} rec, skipped {n_skipped}) -> checkpoints/{stem}/"
+                    f"merged {dataset} ({n_merged} rec, skipped {n_skipped}) -> pyrite-output/checkpoints/{stem}/"
                 )
             else:
                 _checkpoint_store.save(stem, dest, incoming)
                 _manifest_save(str(local), incoming, resolved_identity)
                 label = "+".join(filter(None, ["grid" if grid else "", "level9" if level9 else ""]))
                 detail = f" ({label})" if label else ""
-                print(f"pulled{detail} -> checkpoints/{stem}/")
+                print(f"pulled{detail} -> pyrite-output/checkpoints/{stem}/")
             completed.append(stem)
         except (Exception, SystemExit) as exc:
             failed.append(stem)
@@ -402,15 +407,17 @@ def pull(
 
 
 def pull_zhai_cache():
-    """Fetch every cache file under checkpoints/zhai_reproduction/ from the
+    """Fetch every cache file under pyrite-output/cache/zhai_reproduction/ from the
     box.
 
     Lists remote filenames first (like clear_remote's listing step) rather
     than `scp -r`, which double-nests the directory when the local destination
     already exists -- listing + per-file scp is unambiguous either way."""
-    remote_dir = config.remote_path("checkpoints", "zhai_reproduction")
+    remote_dir = config.remote_output_path("cache", "zhai_reproduction")
     remote_dir_word = config.shell_arg(remote_dir)
     listing = (
+        f"cd {config.shell_remote_dir()} || exit $?; "
+        f"{config.remote_output_migration_command()}; "
         f"[ -d {remote_dir_word} ] || exit 0; "
         f"find {remote_dir_word} -maxdepth 1 -type f -name '*.pkl' -printf '%f\\n'"
     )
@@ -418,11 +425,11 @@ def pull_zhai_cache():
     if not names:
         print("(no zhai cache files on the box -- run `pyrite run --preset zhai --remote` first)")
         return
-    dest = config.LOCAL_ROOT / "checkpoints" / "zhai_reproduction"
+    dest = output_dir("cache") / "zhai_reproduction"
     dest.mkdir(parents=True, exist_ok=True)
     for name in names:
         transport._run(
             config.scp_argv(config.scp_remote_path(f"{remote_dir}/{name}"), str(dest / name)),
             label=f"Pulling {name}...",
         )
-    print(f"pulled -> checkpoints/zhai_reproduction/ ({len(names)} cache files)")
+    print(f"pulled -> {dest} ({len(names)} cache files)")

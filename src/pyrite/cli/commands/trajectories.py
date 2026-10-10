@@ -5,6 +5,7 @@ from pathlib import Path
 import click
 
 from ...console import output as _cli_core
+from ...console.outputs import output_default, output_label
 
 
 def _artifacts(paths):
@@ -140,8 +141,8 @@ def command(artifacts, out_dir, no_vacuum, overwrite, scene):
 )
 @click.option(
     "--checkpoint-dir",
-    default="checkpoints",
-    show_default=True,
+    default=output_default("checkpoints"),
+    show_default=output_label("checkpoints"),
     metavar="DIR",
     type=click.Path(file_okay=False, path_type=Path),
     help="Root containing component checkpoint directories to write.",

@@ -11,8 +11,8 @@ from pathlib import Path
 import click
 
 from ...checkpoints import _checkpoint_io, _checkpoint_store
+from ...checkpoints import archive as _archive
 from ...checkpoints.archive import (
-    DEFAULT_ROOT,
     archive_checkpoint,
     list_archives,
     restore_checkpoint,
@@ -42,7 +42,7 @@ def _cli_archives(args):
                 else _checkpoint_io.load(str(path))
             )
 
-        result = cli_json.archives(DEFAULT_ROOT, loader=_loader)
+        result = cli_json.archives(_archive.DEFAULT_ROOT, loader=_loader)
         _cli_core.emit_json_result(result)
         return
     list_archives()

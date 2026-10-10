@@ -9,9 +9,9 @@ artifact that replaces the old PDF. The default output name carries today's
 date so successive exports are self-describing; pass an explicit stem to
 override: ``pyrite app analysis export my_custom_name``.
 
-Run from the repo root (it reads ``src/pyrite/apps/analysis_app.py`` and writes into
-``results/``). The app's material dropdown defaults to hopg; the export renders
-whatever the app computes headlessly.
+Exports use the packaged application and write into
+``pyrite-output/results/`` in the selected workspace. The app's material
+dropdown defaults to hopg; the export renders whatever it computes headlessly.
 """
 
 import datetime
@@ -21,6 +21,7 @@ import sys
 import click
 
 from ...console import output as _cli_core
+from ...console.outputs import output_dir
 from ...paths import app_dir
 
 NOTEBOOK = str(app_dir() / "analysis_app.py")
@@ -41,13 +42,15 @@ def _command(stem):
         "html",
         NOTEBOOK,
         "-o",
-        f"results/{stem}.html",
+        str(output_dir("results") / f"{stem}.html"),
     ]
 
 
 def _export(stem=None):
     stem = stem or _default_stem()
-    print(f"exporting {NOTEBOOK} -> results/{stem}.html")
+    output = output_dir("results") / f"{stem}.html"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    print(f"exporting {NOTEBOOK} -> {output}")
     subprocess.run(_command(stem), check=True)
 
 
@@ -55,7 +58,7 @@ def _export(stem=None):
     "export",
     help=(
         "Render the analysis application to static HTML.\n\n"
-        "Writes results/<stem>.html; STEM defaults to analysis."
+        "Writes pyrite-output/results/<stem>.html; STEM defaults to a dated analysis name."
     ),
 )
 @click.argument("stem", required=False)

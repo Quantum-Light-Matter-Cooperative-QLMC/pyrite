@@ -109,7 +109,7 @@ def _status_remote_command(job_assign, detail):
         "} | emit PROGRESS; "
     )
     performance = (
-        '{ for f in "$D"/performance/*/*.latest.json; do '
+        f'{{ for f in {config.shell_word(config.remote_output_path("performance"))}/"$JOB"/*/*.latest.json; do '
         '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done; '
         "} | emit PERFORMANCE; "
     )

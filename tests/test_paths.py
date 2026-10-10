@@ -89,8 +89,8 @@ def test_checkpoint_defaults_follow_workspace_root():
     from pyrite.cli import _completion
     from pyrite.runs import run
 
-    expected = workspace_root() / "checkpoints"
+    expected = _config.output_dir("checkpoints")
     assert Path(run.DEFAULT_CHECKPOINT_DIR) == expected
     assert Path(archive.DEFAULT_ROOT) == expected
-    assert Path(checkpoint_cleanup._DEFAULT_CHECKPOINT_DIR) == expected
-    assert _completion._ARCHIVE_CHECKPOINT_ROOT == expected
+    assert checkpoint_cleanup.output_dir("checkpoints") == expected
+    assert _completion._default_checkpoint_root() == expected

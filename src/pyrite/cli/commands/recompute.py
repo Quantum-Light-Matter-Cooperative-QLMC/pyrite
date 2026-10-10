@@ -18,6 +18,7 @@ from ...checkpoints import _checkpoint_store
 from ...checkpoints import recompute as _recompute
 from ...console import json as cli_json
 from ...console import output as _cli_core
+from ...console.outputs import output_default, output_label
 from .. import _completion as _cli_completion
 from .._deprecations import canonical_option
 from .._options import remote_option
@@ -232,8 +233,8 @@ def _reject_remote_local_options(ctx: click.Context, json_output: bool) -> None:
 @click.option("--redo-all", is_flag=True, help="Recompute records already at target.")
 @click.option(
     "--checkpoint-dir",
-    default="checkpoints",
-    show_default=True,
+    default=output_default("checkpoints"),
+    show_default=output_label("checkpoints"),
     metavar="DIR",
     help="Root containing component checkpoint directories to update.",
 )
@@ -460,8 +461,8 @@ def _line_cli_json(args):
 @click.option("--redo-all", is_flag=True, help="Recompute records already at target.")
 @click.option(
     "--checkpoint-dir",
-    default="checkpoints",
-    show_default=True,
+    default=output_default("checkpoints"),
+    show_default=output_label("checkpoints"),
     metavar="DIR",
     help="Root containing component checkpoint directories to update.",
 )

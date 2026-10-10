@@ -225,7 +225,7 @@ def test_archives_json_retains_unreadable_entry(monkeypatch, tmp_path):
     with (shelf / "good.pkl").open("wb") as stream:
         pickle.dump({"a": {30.0: {}}}, stream)
     (shelf / "bad.pkl").write_bytes(b"bad")
-    monkeypatch.setattr(archive, "DEFAULT_ROOT", str(tmp_path))
+    monkeypatch.setattr(archive._archive, "DEFAULT_ROOT", str(tmp_path), raising=False)
 
     document = _document(invoke(archive.archives_command, ["-o", "json"]), exit_code=1)
 

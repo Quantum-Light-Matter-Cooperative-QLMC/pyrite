@@ -139,7 +139,7 @@ Every profile-aware scan resolves settings and complete `Sweep` first, converts 
 
 Electron counts, reflection limits, mosaic quadrature, and transport integration settings are part of that resolved identity. Distinct effective numerics cannot resume into one checkpoint; execution-only tuning remains identity-neutral.
 
-Canonical, unmodified `full` runs retain `checkpoints/<material>/` for compatibility. Survey runs and explicitly overridden full runs use `checkpoints/<material>@<label>-<12-char-hash>/`. Older `<material>--<fidelity>-<digest>` stems remain readable. `--quick` retains its historical `<material>_quick` stem but also records resolved identity. Thus variants cannot silently resume into each other.
+Canonical, unmodified `full` runs retain `pyrite-output/checkpoints/<material>/` for compatibility. Survey runs and explicitly overridden full runs use `pyrite-output/checkpoints/<material>@<label>-<12-char-hash>/`. Older `<material>--<fidelity>-<digest>` stems remain readable. `--quick` retains its historical `<material>_quick` stem but also records resolved identity. Thus variants cannot silently resume into each other.
 
 ## Named beams
 
@@ -253,7 +253,7 @@ pyrite profile physical-detector set filter_demo --exposure-s 1 \
   --measured-range-ev 0 20000 --measured-bin-width-ev 400 --hit-threshold-ev 500
 ```
 
-One `pyrite run` invocation executes every detector ID for each selected material. Each detector gets a distinct checkpoint stem containing its ID and parameter digest. With an acquisition, that detector also writes a factorized observation under `observations/<stem>/`, beside its checkpoint. The scalar acceptance used for a pixel detector's source case comes from its geometry, including when there is no acquisition. `profile show` prints that derived acceptance.
+One `pyrite run` invocation executes every detector ID for each selected material. Each detector gets a distinct checkpoint stem containing its ID and parameter digest. With an acquisition, that detector also writes a factorized observation under `pyrite-output/observations/<stem>/`, beside its checkpoint. The scalar acceptance used for a pixel detector's source case comes from its geometry, including when there is no acquisition. `profile show` prints that derived acceptance.
 
 Legacy `detector` becomes ID `default`; legacy `physical_detector` becomes ID `physical`. If both are present, a run executes both, and each gets an ID-qualified checkpoint stem. A profile with neither has one implicit scalar `default` detector. A profile with only one legacy detector keeps its checkpoint identity where its resolved geometry is unchanged.
 

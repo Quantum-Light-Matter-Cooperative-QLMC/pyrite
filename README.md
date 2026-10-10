@@ -99,8 +99,13 @@ the [development workspace guide](docs/repo-design/development-workspace.md).
 
 ## Run
 
+Generated outputs default to `pyrite-output/<kind>/` in the current workspace.
+For a fixed output home, run `pyrite config set workspace.root /path/to/workspace`
+once. Subdirectories reuse the nearest existing output tree; see the
+[output-home and migration rules](docs/guides/configuration-cookbook.md#choose-an-output-home).
+
 `pyrite run` executes a resumable campaign over a named profile and writes
-checkpoints:
+checkpoints under `pyrite-output/checkpoints/`:
 
 ```bash
 # Smallest end-to-end demo (~1 min on CPU); writes component checkpoints.
@@ -269,8 +274,8 @@ and rebuildable caches in `~/.cache/pyrite/` (platform equivalents elsewhere). P
 live in `src/pyrite/data/cifs/`; loading is offline. `pyrite material validate`
 checks the selected catalog.
 
-Each checkpoint is `checkpoints/<stem>/{line,brem,characteristic}.h5` plus a
-`checkpoints/<stem>/meta.json` manifest. Stored source spectra exclude detector
+Each checkpoint is `pyrite-output/checkpoints/<stem>/{line,brem,characteristic}.h5` plus a
+`pyrite-output/checkpoints/<stem>/meta.json` manifest. Stored source spectra exclude detector
 response unless a detector view applies it explicitly.
 
 ## Validation

@@ -4,7 +4,7 @@ This tutorial starts from an existing survey checkpoint and produces an interact
 
 ## 1. Find a dataset
 
-Inspect the effective `checkpoints/` directory or open the analysis app's dataset selector, then choose the identity-qualified stem produced by your run. `pyrite checkpoint list` lists only long-term archive labels, not active datasets. If no active checkpoint exists, complete the [Getting started](getting-started.md) survey first. Check that both line and bremsstrahlung components are present before comparing a total spectrum.
+Inspect the effective `pyrite-output/checkpoints/` directory or open the analysis app's dataset selector, then choose the identity-qualified stem produced by your run. `pyrite checkpoint list` lists only long-term archive labels, not active datasets. If no active checkpoint exists, complete the [Getting started](getting-started.md) survey first. Check that both line and bremsstrahlung components are present before comparing a total spectrum.
 
 ## 2. Launch analysis
 
@@ -28,7 +28,7 @@ Survey fidelity is suitable for workflow checks and qualitative navigation, not 
 pyrite app analysis export hopg-analysis
 ```
 
-This writes `results/hopg-analysis.html`. Record the checkpoint stem, full identity digest, PyRITE revision, selected coordinates, response choice, and any post-processing settings beside exported figures. Static HTML is a presentation artifact, not a replacement for the component checkpoint and its provenance.
+This writes `pyrite-output/results/hopg-analysis.html`. Record the checkpoint stem, full identity digest, PyRITE revision, selected coordinates, response choice, and any post-processing settings beside exported figures. Static HTML is a presentation artifact, not a replacement for the component checkpoint and its provenance.
 
 ## 5. Validate the interpretation
 

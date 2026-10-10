@@ -7,7 +7,7 @@ Use this guide after collecting `pyrite-dev perf PROFILE --remote` logs. Goal: i
 Write analysis artifacts under:
 
 ```text
-performance-profiles/<profile>/analysis/
+pyrite-output/performance/<profile>/analysis/
 ├── sessions.csv
 ├── intervals.csv
 ├── summary.md

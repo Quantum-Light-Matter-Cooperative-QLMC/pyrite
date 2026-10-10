@@ -9,6 +9,7 @@ from functools import cache
 from pathlib import Path, PurePosixPath
 
 from .._env import env_value
+from ..console.outputs import LEGACY_LAYOUT, OUTPUT_DIRNAME
 
 # Compatibility override for tests and callers that historically patched this
 # module global. Normal resolution is dynamic so environment and store changes
@@ -38,7 +39,9 @@ DEFAULT_PARALLEL_MATERIALS = 1
 MAX_PARALLEL_MATERIALS = 4
 # repo root = three levels up from src/pyrite/remote/config.py. The package facade orchestrates
 # the *checkout* (it tars the working tree up to the box), so it resolves paths
-# against the repo root, not its own package dir.
+# against the repo root, not its own package dir. Source-tree inputs only: under
+# an installed package this is inside site-packages, so no output may be written
+# here -- outputs resolve through ``console.outputs.output_dir``.
 LOCAL_ROOT = Path(__file__).resolve().parents[3]
 
 # detached-job bookkeeping lives under <REMOTE_DIR>/jobs/<jobid>/ on the box
@@ -67,7 +70,7 @@ ZHAI_STEM = "zhai"
 # what `sync` ships up: the code that changes (the src/ package now also carries
 # data/, so it travels too, and the box invokes its entry shims via
 # `python -m pyrite._entry.<name>`), plus checks/ and pyproject.toml. Not
-# checkpoints/ (the output we pull back the other way).
+# pyrite-output/ (the output we pull back the other way).
 SYNC_PATHS = [
     "src",
     "checks",
@@ -372,6 +375,46 @@ def remote_path(*parts: str) -> str:
     root = remote_dir().rstrip("/") or "/"
     suffix = "/".join(part.strip("/") for part in parts)
     return f"{root}/{suffix}" if suffix and root != "/" else f"{root}{suffix}"
+
+
+def remote_output_path(kind: str, *parts: str) -> str:
+    """Box output path; jobs run with PYRITE_HOME=<remote dir>, so it mirrors local."""
+    return remote_path(OUTPUT_DIRNAME, kind, *parts)
+
+
+def remote_output_migration_command() -> str:
+    """Shell moving legacy box outputs into the output tree; run from REMOTE_DIR.
+
+    Same rules as :func:`pyrite.console.outputs.migrate_legacy_outputs`: move
+    only a directory holding more than ``.gitkeep`` files, never over an
+    existing destination. Failed moves block further output operations.
+    """
+    moves = " && ".join(
+        f"_pyrite_migrate {shell_arg(legacy)} {shell_arg(f'{OUTPUT_DIRNAME}/{target}')}"
+        for legacy, target in LEGACY_LAYOUT
+    )
+    return (
+        '_pyrite_migrate() { [ -d "$1" ] && [ ! -L "$1" ] || return 0; '
+        '[ -n "$(find "$1" ! -type d ! -name .gitkeep -print -quit)" ] || return 0; '
+        'if [ -e "$2" ] || [ -L "$2" ]; then '
+        'echo "warning: legacy $1 ignored; $2 already exists. Merge or remove the legacy directory." >&2; '
+        "return 0; fi; "
+        'mkdir -p "$(dirname "$2")" || return 1; '
+        'if [ "$(stat -c %d "$1")" = "$(stat -c %d "$(dirname "$2")")" ]; then '
+        'mv -T --no-clobber -- "$1" "$2" && [ ! -e "$1" ] || return 1; '
+        'else _pyrite_tmp=$(mktemp -d "$(dirname "$2")/.pyrite-migrate.XXXXXX") || return 1; '
+        'if cp -a -- "$1" "$_pyrite_tmp/data" '
+        '&& diff -r --no-dereference -- "$1" "$_pyrite_tmp/data" >&2 '
+        '&& mv -T --no-clobber -- "$_pyrite_tmp/data" "$2" '
+        '&& [ ! -e "$_pyrite_tmp/data" ]; then '
+        'rm -rf -- "$1" "$_pyrite_tmp" || return 1; '
+        'else rm -rf -- "$_pyrite_tmp"; return 1; fi; fi; '
+        'echo "moved $1 -> $2" >&2; }; '
+        f"{moves} || exit 1; "
+        'for _pyrite_job in jobs/*; do [ -d "$_pyrite_job" ] || continue; '
+        f'_pyrite_migrate "$_pyrite_job/performance" "{OUTPUT_DIRNAME}/performance/${{_pyrite_job##*/}}" || exit 1; '
+        "done"
+    )
 
 
 def remote_sync_stamp_path() -> str:

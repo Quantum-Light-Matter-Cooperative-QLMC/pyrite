@@ -157,3 +157,16 @@ def test_spectra_selection_frees_only_the_varied_dimension(vary):
         if key != vary:
             assert {case[key] for case in cases} == {value}
     assert {case["thickness_ang"] for case in cases} == {5e3}
+
+
+def test_load_context_resolves_default_after_workspace_change(monkeypatch, tmp_path):
+    loaded = []
+    monkeypatch.setattr(
+        data, "load_analysis_checkpoint", lambda stem, root: loaded.append((stem, root)) or {}
+    )
+    material = SimpleNamespace(value={"value": "hopg"})
+    checkpoint = SimpleNamespace(value={"value": "hopg"})
+    for directory in (tmp_path / "first", tmp_path / "second"):
+        monkeypatch.setenv("PYRITE_HOME", str(directory))
+        data.load_context(material, checkpoint)
+        assert loaded[-1] == ("hopg", str(directory / "pyrite-output/checkpoints"))

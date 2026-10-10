@@ -27,7 +27,7 @@ Each context value resolves independently in this order:
 
 `pyrite config list` shows both effective values and their sources. `config set` writes atomically to Click's platform-specific user configuration directory.
 
-The workspace resolver uses an explicit command path first, then the effective `workspace.root`. Packaged catalog and CIF data remain package-relative and are never redirected into the workspace.
+The workspace resolver uses an explicit command path first, then the effective `workspace.root`. Generated output paths use `<workspace>/pyrite-output/<kind>/`. With no explicit workspace, output resolution searches upward from cwd for an existing `pyrite-output/` tree before falling back to cwd. See the [output-home rules](../guides/configuration-cookbook.md#choose-an-output-home) for migration and cache lifecycle. Packaged catalog and CIF data remain package-relative and are never redirected into the workspace.
 
 ## Environment-variable reference
 

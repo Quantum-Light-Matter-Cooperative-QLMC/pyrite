@@ -35,7 +35,7 @@ Local line windows are opt-in while their convergence is being measured (issue #
 
 ## A run does not resume the checkpoint I expected
 
-Compare each active stem's component metadata beneath the effective `checkpoints/` root. Fidelity, profile-resolved values, overrides, beam/detector values, emission mode, and crystallography can change the digest and stem. This is intentional isolation, not a cache miss bug. `pyrite checkpoint list` lists the archive shelf, not active datasets. Legacy checkpoints without identity are provenance-incomplete.
+Compare each active stem's component metadata beneath the effective `pyrite-output/checkpoints/` root. Fidelity, profile-resolved values, overrides, beam/detector values, emission mode, and crystallography can change the digest and stem. This is intentional isolation, not a cache miss bug. `pyrite checkpoint list` lists the archive shelf, not active datasets. Legacy checkpoints without identity are provenance-incomplete.
 
 ## Analysis cannot find output
 
