@@ -6,8 +6,15 @@ from pathlib import Path
 
 import tomlkit
 
-from pyrite._catalog_layout import bundled_catalog, catalog_root, read_text, write_text
+from pyrite._catalog_layout import (
+    BundledProfileError,
+    bundled_catalog,
+    catalog_root,
+    read_text,
+    write_text,
+)
 from pyrite.console.config import catalog_path
+from pyrite.console.output import CLIError
 from pyrite.energy_grid.apply import _CATALOG_PATH
 from pyrite.materials.catalog import load_material_catalog
 
@@ -53,7 +60,9 @@ def validated_catalog(path, text, *, profile="standard"):
     ``profile`` selects whose energy-grid references are resolved, as a run
     would.
     """
-    fd, temporary = tempfile.mkstemp(dir=catalog_root(path), prefix=".", suffix=".toml.tmp")
+    root = catalog_root(path)
+    root.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(dir=root, prefix=".", suffix=".toml.tmp")
     try:
         with os.fdopen(fd, "w") as stream:
             stream.write(text)
@@ -68,8 +77,15 @@ def validate(path, text):
 
 
 def atomic_write(path, text):
-    """Store ``text``; a directory catalog rewrites only changed object files."""
-    write_text(path, text)
+    """Store ``text``; a directory catalog rewrites only changed object files.
+
+    Refusing to change a bundled demo profile is a runtime failure (exit 1)
+    naming the ``create --from`` copy, not a traceback.
+    """
+    try:
+        write_text(path, text)
+    except BundledProfileError as exc:
+        raise CLIError(str(exc)) from None
 
 
 def values_item(values):

@@ -18,7 +18,7 @@ accessors so tests can retarget one app's state file with
 ``monkeypatch.setattr(_app_defaults, "ANALYSIS_DEFAULT_FILE", tmp_path / ...)``.
 """
 
-from .paths import atomic_write_text, state_dir
+from .paths import atomic_write_text, migrate_legacy_state, state_dir
 
 ANALYSIS_DEFAULT_FILE = state_dir() / "analysis-default"
 VIEWER_DEFAULT_FILE = state_dir() / "viewer-default"
@@ -27,7 +27,7 @@ VIEWER_DEFAULT_FILE = state_dir() / "viewer-default"
 def _read(path):
     """The material recorded in ``path``, or None if absent / blank."""
     try:
-        text = path.read_text().strip()
+        text = migrate_legacy_state(path).read_text().strip()
     except FileNotFoundError:
         return None
     return text or None

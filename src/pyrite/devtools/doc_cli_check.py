@@ -19,6 +19,7 @@ from dataclasses import dataclass
 import click
 
 from pyrite.cli import command as pyrite_command
+from pyrite.cli.commands.profile import command as profile_command
 from pyrite.cli.commands.scan import performance_command as perf_command
 from pyrite.devtools.cli_commands import energy_grid_command, performance_command
 from pyrite.devtools.cli_reference import _walk as _click_walk
@@ -36,6 +37,7 @@ _CLICK_DELEGATES: dict[tuple[str, ...], click.Command] = {
     ("pyrite-dev", "perf"): perf_command,
     ("pyrite-dev", "performance"): performance_command,
     ("pyrite-dev", "energy-grid"): energy_grid_command,
+    ("pyrite-dev", "profile"): profile_command,
 }
 
 

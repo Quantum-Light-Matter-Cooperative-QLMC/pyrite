@@ -28,6 +28,13 @@ os.environ.pop("PYRITE_HOME", None)
 # honor the test-patched path only while the bundled catalog is selected, so an
 # ambient value would let profile/detector tests rewrite the real catalog.
 os.environ.pop("PYRITE_CATALOG", None)
+# The user catalog layer (``catalog.user``) defaults to the developer's config
+# directory and is read over the bundled catalog. Point it at the tracked
+# fixture layer -- the research campaign profiles the suite pins -- before any
+# module loads the catalog singleton; ``_isolate_user_catalog`` then gives each
+# test a writable copy.
+USER_CATALOG_FIXTURE = Path(__file__).parent / "data" / "user_catalog"
+os.environ["PYRITE_USER_CATALOG"] = str(USER_CATALOG_FIXTURE)
 # PyRITE ships no NIST SRD 64 tables (#263); a real user configures
 # ``mott.tables_dir``. Point ``elastic_model="mott"`` at the synthetic
 # SRD 64-format fixture, whose numbers reproduce the analytic Joy/Bishop
@@ -64,6 +71,18 @@ def _isolate_config_store(monkeypatch, tmp_path):
     exercise the store point ``CONFIG_PATH`` at their own file.
     """
     monkeypatch.setattr(_config, "CONFIG_PATH", tmp_path / "pyrite-config" / "config.toml")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_user_catalog(monkeypatch, tmp_path_factory):
+    """Give every test a writable copy of the fixture user catalog layer."""
+    import shutil
+
+    # Not under tmp_path: many tests build a catalog directly in it.
+    layer = tmp_path_factory.mktemp("user-catalog")
+    shutil.copytree(USER_CATALOG_FIXTURE, layer, dirs_exist_ok=True)
+    monkeypatch.setenv("PYRITE_USER_CATALOG", str(layer))
+    return layer
 
 
 @pytest.fixture(autouse=True)
@@ -111,6 +130,7 @@ def _lab_catalog_dir(tmp_path_factory):
 
     root = tmp_path_factory.mktemp("lab_catalog")
     shutil.copytree(DATA_DIR / "catalog", root, dirs_exist_ok=True)
+    shutil.copytree(USER_CATALOG_FIXTURE, root, dirs_exist_ok=True)
     shutil.copytree(Path(__file__).parent / "data" / "lab_overlay", root, dirs_exist_ok=True)
     return root
 

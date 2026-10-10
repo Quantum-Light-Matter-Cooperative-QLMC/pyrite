@@ -1,0 +1,21 @@
+# Demo: coherent plus incoherent PXR emission with the line grid resolved
+# automatically inside per-line feature windows (#350). One thin (0.2 um) HOPG
+# case under an attosecond, 0.1 mm beam (beams/coherent_demo). Electron counts
+# are demo-small; the coherent cost grows steeply with them. Windowed coherent
+# grids warn that full-spectrum dispersion is not yet certified. ~15 s on CPU.
+#   pyrite run coherent_demo
+
+thickness_ang = {values = [2000.0]}
+energy_keV = {values = [30.0]}
+tilt_deg = {values = [45.0]}
+tilt_azim_deg = {values = [180.0]}
+E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
+materials = ["hopg"]
+n_electrons = {values = [50]}
+n_electrons_brem = {values = [50]}
+detector = "default"
+emission = "both"
+beam = "coherent_demo"
+
+[line_grid_policy]
+windows = true

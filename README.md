@@ -103,8 +103,8 @@ the [development workspace guide](docs/repo-design/development-workspace.md).
 checkpoints:
 
 ```bash
-# Small smoke test; writes component checkpoints.
-pyrite run standard -m hopg --quick
+# Smallest end-to-end demo (~1 min on CPU); writes component checkpoints.
+pyrite run quickstart
 
 # Analyze an existing checkpoint.
 pyrite app analysis launch hopg
@@ -128,32 +128,45 @@ as a beam source; see [GDF beam import](docs/guides/gpt-gdf-beams.md).
 ### Profiles
 
 A profile is a named campaign: thickness, energy, and tilt grids, electron
-counts, beam and detector references, and material membership. Inspect the
-bundled ones:
+counts, beam and detector references, and material membership. PyRITE ships
+light demo profiles that each exercise one feature and run locally in a minute
+or two on CPU:
+
+| Demo | Shows |
+|---|---|
+| `quickstart` | one HOPG case, incoherent PXR lines plus bremsstrahlung |
+| `sweep_demo` | a small two-material energy x tilt sweep for the analysis app |
+| `trajectory_demo` | `--trajectories` capture and VTK export |
+| `coherent_demo` | coherent + incoherent emission in windowed line grids |
+| `detector_demo` | a pixel detector behind a filter, with Poisson counts |
+| `high_energy_demo` | a 1 MeV beam with the measured line-grid policy |
+| `hopg_emittance_demo` | Courant-Snyder transverse beam phase space |
+
+`standard` is also bundled: it is the catalog's base profile, which every
+material's default scan ranges resolve from, and a full research-scale sweep.
 
 ```bash
 pyrite profile list
-pyrite profile show hopg_short
-pyrite profile numerics show hopg_short
+pyrite profile show quickstart
+pyrite profile numerics show quickstart
 ```
 
-The bundled catalog ships inside the package, and profile edits write to the
-selected catalog. Copy it elsewhere before creating or changing profiles:
+Bundled profiles are read-only. Profiles you create or edit live in your user
+catalog layer, `profiles/NAME.toml` under the platform config directory
+(`~/.config/pyrite/` on Linux; `pyrite config get catalog.user`), and are read
+over the bundled catalog:
 
 ```bash
-bundled=$(pyrite config get catalog.path)   # before changing catalog.path
-mkdir -p ~/pyrite-lab/catalog
-cp -a "$bundled"/. ~/pyrite-lab/catalog/
-cp -a "$bundled"/../cifs ~/pyrite-lab/catalog/
-pyrite config set catalog.path ~/pyrite-lab/catalog
-
-# Clone a profile, then replace its energy (keV) and thickness (Å) grids.
-pyrite profile create my_scan --from hopg_short --energy 30:60:10 --thickness 5000,20000
+# Clone a demo, then replace its energy (keV) and thickness (Å) grids.
+pyrite profile create my_scan --from quickstart --energy 30:60:10 --thickness 5000,20000
 pyrite profile set my_scan --material hopg,hbn
 pyrite profile numerics set my_scan --line-trials 2000
 pyrite profile show my_scan
 pyrite run my_scan -m hopg
 ```
+
+A complete catalog of your own (materials, beams, detectors) is selected with
+`pyrite config set catalog.path DIR`; profile edits then write there instead.
 
 See [sweep profiles](docs/guides/sweep-profiles.md),
 [external catalogs](docs/guides/external-catalog.md), and the
@@ -248,7 +261,11 @@ Geometry follows the [tilt convention](docs/physics/geometry/tilt-convention.md)
 ## Data and outputs
 
 `src/pyrite/data/catalog/` is the bundled catalog: crystals, media, materials,
-beams, detectors, and profiles, one TOML file per object. Phase-specific CIFs
+beams, detectors, and demo profiles, one TOML file per object. Your own
+profiles and their energy-grid artifacts live in the user catalog layer
+(`catalog.user`). Settings live in `~/.config/pyrite/config.toml`, remembered
+app state in `~/.local/state/pyrite/`, fetched data in `~/.local/share/pyrite/`,
+and rebuildable caches in `~/.cache/pyrite/` (platform equivalents elsewhere). Phase-specific CIFs
 live in `src/pyrite/data/cifs/`; loading is offline. `pyrite material validate`
 checks the selected catalog.
 

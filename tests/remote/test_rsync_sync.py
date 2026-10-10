@@ -16,6 +16,9 @@ import pytest
 from pyrite import _energy_grid_artifacts as artifacts
 from pyrite.remote import config, transport
 
+# Exact payload/argv pins assume no user-layer profiles ride along.
+pytestmark = pytest.mark.usefixtures("empty_user_catalog")
+
 HOST = "box"
 
 
@@ -315,7 +318,7 @@ def test_external_catalog_dir_is_mirrored_through_an_include_filter(tmp_path, mo
     cat_call = next(c for c in calls if c[-1].endswith("/external-catalog/"))
     assert "--delete-excluded" in cat_call and cat_call[-2] == f"{catalog}/"
     assert rules == ["+ /catalog.toml\n+ /cifs/\n+ /cifs/a.cif\n- *\n"]
-    assert "rm -rf external-catalog.toml && printf %s" in calls[-1][-1]
+    assert "rm -rf external-catalog.toml user-catalog && printf %s" in calls[-1][-1]
 
 
 @pytest.mark.parametrize(

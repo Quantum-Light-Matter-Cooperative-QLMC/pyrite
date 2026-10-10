@@ -1,19 +1,17 @@
 """Catalog-editing commands write back to the owning file of a directory catalog."""
 
-import shutil
-
 import pytest
 
-from pyrite._catalog_layout import bundled_catalog
 from pyrite.cli import _catalog_io
 from pyrite.cli.commands import beam, profile
 from tests.helpers.cli import assert_clean_result, invoke
+from tests.helpers.user_catalog import copy_full_catalog
 
 
 @pytest.fixture
 def catalog(tmp_path, monkeypatch):
     root = tmp_path / "catalog"
-    shutil.copytree(bundled_catalog(), root)
+    copy_full_catalog(root)
     monkeypatch.setattr(_catalog_io, "_CATALOG_PATH", root)
     return root
 

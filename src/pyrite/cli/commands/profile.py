@@ -7,6 +7,7 @@ import click
 import tomlkit
 from tomlkit.exceptions import ParseError
 
+from pyrite import _catalog_layout
 from pyrite._numerics import DEFAULT_RADIATIVE_CUTOFF_EV
 from pyrite.campaign import profile_edit as _profile_edit
 from pyrite.campaign.profiles import resolve_numerics
@@ -367,7 +368,8 @@ def command():
     selectors use ``line-grid``; filters and the pixel detector use ``filter``
     and ``physical-detector``; reusable beams and detectors are named objects
     edited with ``pyrite beam`` and ``pyrite detector``. The full map is
-    docs/repo-design/profile-settings.md.
+    docs/repo-design/profile-settings.md. Bundled demos are read-only (copy
+    with ``create NAME --from DEMO``); yours live in ``catalog.user``.
 
     \b
     Examples:
@@ -633,13 +635,15 @@ command.add_command(_profile_filters.command)
 @command.command("list")
 @output_option
 def list_command(json_output):
-    """List catalog profiles with membership, override, and grid-ref counts."""
+    """List profiles: source, membership, override, and grid-ref counts."""
     try:
         _text, document = _catalog_io.catalog_text()
         profiles = _catalog_io.profile_rows(document)
+        sources = _catalog_layout.profile_sources(_catalog_io.active_catalog_path())
         rows = [
             {
                 "name": name,
+                "source": sources.get(name, "catalog"),
                 "materials": (
                     list(materials) if isinstance(materials := row.get("materials"), list) else None
                 ),
@@ -667,10 +671,10 @@ def list_command(json_output):
             else f"{len(row['materials'])} materials"
         )
         override_count = len(row["overrides"] or [])
-        ref_count = len(row["energy_grid_refs"] or {})
+        source = {"bundled": " (bundled)", "user": " (yours)"}.get(row["source"], "")
         emit_result(
             f"{row['name']}: {membership}, {override_count} material overrides, "
-            f"{ref_count} energy-grid refs"
+            f"{len(row['energy_grid_refs'] or {})} energy-grid refs{source}"
         )
     return 0
 

@@ -14,7 +14,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from .console.config import workspace_root
-from .paths import atomic_write_text, state_dir
+from .paths import atomic_write_text, migrate_legacy_state, state_dir
 
 ROOT = workspace_root()
 ACP_STATE_PATH = state_dir() / "acp-servers.json"
@@ -64,7 +64,7 @@ def terminate_process_tree(pid: int) -> None:
 
 def start_acp_servers() -> list[subprocess.Popen[bytes]]:
     """Start both ACP bridges and save their process IDs for ``acp-down``."""
-    read_path = ACP_STATE_PATH
+    read_path = migrate_legacy_state(ACP_STATE_PATH)
     if read_path.exists():
         raise RuntimeError(f"ACP state already exists at {read_path}; run acp-down first.")
 
@@ -82,7 +82,7 @@ def start_acp_servers() -> list[subprocess.Popen[bytes]]:
 
 def stop_acp_servers() -> None:
     """Stop bridges recorded by ``acp-up`` and clear their local state."""
-    read_path = ACP_STATE_PATH
+    read_path = migrate_legacy_state(ACP_STATE_PATH)
     if not read_path.exists():
         print("No ACP bridge state found.")
         return

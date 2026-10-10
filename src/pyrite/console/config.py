@@ -21,9 +21,9 @@ import tomlkit
 from tomlkit.exceptions import ParseError
 
 from .._env import env_value
-from ..paths import data_dir, state_dir, user_data_dir
+from ..paths import config_dir, data_dir, user_data_dir
 
-CONFIG_PATH = state_dir() / "config.toml"
+CONFIG_PATH = config_dir() / "config.toml"
 # The three ``xsgen.*_source`` defaults are the conventional sibling checkout
 # beside the PyRITE checkout, relative to the working directory. They resolve
 # last: :mod:`pyrite.xsgen.sources` prefers a vendored tree over an unmodified
@@ -38,6 +38,7 @@ _SETTINGS = {
     "remote.gres": ("PYRITE_REMOTE_GRES", "gpu:1"),
     "workspace.root": ("PYRITE_HOME", "."),
     "catalog.path": ("PYRITE_CATALOG", str(data_dir() / "catalog")),
+    "catalog.user": ("PYRITE_USER_CATALOG", str(config_dir())),
     "xsgen.bremslib_source": ("PYRITE_XSGEN_BREMSLIB_SOURCE", "../BremsLib_v2.0.8"),
     "xsgen.elsepa_source": ("PYRITE_XSGEN_ELSEPA_SOURCE", "../elsepa-2020"),
     "xsgen.sbethe_source": ("PYRITE_XSGEN_SBETHE_SOURCE", "../sbethe"),
@@ -54,6 +55,7 @@ _DESCRIPTIONS = {
     "remote.gres": "SLURM gres request, e.g. gpu:radeon8060s:1.",
     "workspace.root": "Workspace directory for checkpoints and outputs.",
     "catalog.path": "Material catalog directory or file.",
+    "catalog.user": "Your profiles, layered over the bundled catalog.",
     "xsgen.bremslib_source": "BremsLib source tree for table generation.",
     "xsgen.elsepa_source": "ELSEPA source tree for table generation.",
     "xsgen.sbethe_source": "SBETHE source tree for table generation.",
@@ -65,6 +67,7 @@ _DEFAULT_LABELS = {
     "mott.tables_dir": "unset",
     "workspace.root": "current directory",
     "catalog.path": "bundled catalog",
+    "catalog.user": "platform config directory",
 }
 
 
@@ -214,6 +217,15 @@ def catalog_path(explicit: str | PathLike[str] | None = None) -> Path:
     """Resolve explicit > ``PYRITE_CATALOG`` > config store > bundled catalog."""
     value = resolve("catalog.path", None if explicit is None else str(explicit)).value
     return Path(value).expanduser().resolve()
+
+
+def user_catalog_path() -> Path:
+    """Resolve ``PYRITE_USER_CATALOG`` > config store > platform config directory.
+
+    The user layer holds ``profiles/`` and ``energy-grid-artifacts/`` and is
+    read over the bundled catalog only; an explicit ``catalog.path`` is complete.
+    """
+    return Path(resolve("catalog.user").value).expanduser().resolve()
 
 
 def fetched_data_root() -> Path:

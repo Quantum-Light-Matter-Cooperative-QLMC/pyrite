@@ -106,12 +106,23 @@ def remote_catalog_path() -> str:
     return remote_path(name)
 
 
+# The local user catalog layer (profiles read over the bundled catalog) inside
+# the synced checkout; shipped only while the bundled catalog is selected.
+REMOTE_USER_CATALOG = "user-catalog"
+
+
+def remote_user_catalog_path() -> str:
+    """Return the remote user-layer path; always explicit, so the box's own never wins."""
+    return remote_path(REMOTE_USER_CATALOG)
+
+
 def remote_runtime_env() -> str:
     """Environment assignments for direct remote PyRITE invocations."""
     return " ".join(
         (
             f"PYRITE_HOME={shell_word(remote_dir())}",
             f"PYRITE_CATALOG={shell_word(remote_catalog_path())}",
+            f"PYRITE_USER_CATALOG={shell_word(remote_user_catalog_path())}",
         )
     )
 

@@ -18,7 +18,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from ..paths import app_dir, atomic_write_text, state_dir
+from ..paths import app_dir, atomic_write_text, migrate_legacy_state, state_dir
 from ..remote.config import remote_host
 
 DEFAULTS_PATH = state_dir() / "validation-defaults.json"
@@ -27,7 +27,7 @@ _PACKAGED_DEFAULTS_PATH = app_dir() / "validation_defaults.json"
 
 def load_default_azimuth(path=DEFAULTS_PATH):
     """Load the user override or packaged exploratory TMD azimuth default."""
-    resolved = Path(path)
+    resolved = migrate_legacy_state(Path(path))
     if resolved == DEFAULTS_PATH and not resolved.is_file():
         resolved = _PACKAGED_DEFAULTS_PATH
     data = json.loads(resolved.read_text(encoding="utf-8"))

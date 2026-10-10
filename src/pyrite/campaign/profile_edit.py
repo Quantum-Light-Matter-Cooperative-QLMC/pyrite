@@ -231,11 +231,12 @@ def _check_line_grid_policy(profile, policy):
     except ValueError as exc:
         raise LineGridPolicyConflict(str(exc)) from None
     # Automatic resolution refuses the coherent route without feature windows
-    # (#117); windows are not a profile key until #350 lands.
-    if profile.get("emission") in ("coherent", "both"):
+    # (#117); `windows = true` resolves it inside per-line windows (#350).
+    if profile.get("emission") in ("coherent", "both") and policy.get("windows") is not True:
         raise LineGridPolicyConflict(
-            "a line-grid policy resolves every line grid automatically, which the "
-            f"{profile['emission']} emission route does not support (#117); keep an "
+            "a line-grid policy without feature windows resolves every line grid "
+            f"automatically, which the {profile['emission']} emission route does not "
+            "support (#117); add 'windows = true' to [line_grid_policy], or keep an "
             "explicit or stored line grid for coherent emission"
         )
     max_de_frac = profile.get("max_dE_frac", 0.0)
@@ -252,11 +253,13 @@ def set_line_grid_policy(document, name, updates):
     current = profile_line_grid_values(target) or {}
     merged = {**current, **updates}
     _check_line_grid_policy(target, merged)
-    table = tomlkit.table()
+    # Edit in place: TOML-only keys (`windows`, `max_points`) stay as written.
+    table = target.get("line_grid_policy")
+    if table is None:
+        table = target["line_grid_policy"] = tomlkit.table()
     for key in PROFILE_LINE_GRID_SELECTORS:
-        if key in merged:
-            table[key] = merged[key]
-    target["line_grid_policy"] = table
+        if key in updates:
+            table[key] = updates[key]
     return {key: current.get(key) for key, value in updates.items() if current.get(key) != value}
 
 

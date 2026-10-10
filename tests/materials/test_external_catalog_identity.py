@@ -7,6 +7,7 @@ import pytest
 from pyrite._catalog_layout import bundled_catalog, selected_catalog
 from pyrite.campaign.profiles import named_profile_identity
 from pyrite.console import config
+from tests.helpers.user_catalog import copy_full_catalog
 
 
 @pytest.fixture
@@ -31,7 +32,7 @@ def test_catalog_selection_precedence(isolated_config, monkeypatch):
 
 def test_identity_unchanged_by_catalog_location(isolated_config, monkeypatch):
     copy = isolated_config / "moved" / "catalog"
-    shutil.copytree(bundled_catalog(), copy)
+    copy_full_catalog(copy)
     shutil.copytree(bundled_catalog().parent / "cifs", copy / "cifs")
 
     bundled = named_profile_identity("hopg", "survey", catalog_profile="coh_test")

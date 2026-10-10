@@ -49,6 +49,8 @@ def test_config_set_get_and_list_effective_values(monkeypatch, tmp_path):
             "remote.gres\tgpu:1\tbuilt-in default\n"
             "workspace.root\t.\tbuilt-in default\n"
             f"catalog.path\t{_config.resolve('catalog.path').value}\tbuilt-in default\n"
+            # conftest points the user layer at a per-test copy of the fixture.
+            f"catalog.user\t{_config.resolve('catalog.user').value}\tPYRITE_USER_CATALOG\n"
             # The external-code source trees resolve through the same store
             # and the same precedence, so they list beside everything else.
             "xsgen.bremslib_source\t../BremsLib_v2.0.8\tbuilt-in default\n"

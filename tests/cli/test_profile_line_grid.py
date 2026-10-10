@@ -1,16 +1,15 @@
 """``pyrite profile line-grid`` against an isolated copy of the bundled catalog."""
 
 import json
-import shutil
 
 import pytest
 
-from pyrite._catalog_layout import bundled_catalog
 from pyrite.campaign.config import material_sweep
 from pyrite.cli import _catalog_io
 from pyrite.cli import command as root_command
 from pyrite.materials.catalog import load_material_catalog
 from tests.helpers.cli import assert_clean_result, invoke
+from tests.helpers.user_catalog import copy_full_catalog
 
 _FULL_POLICY = {
     "bandwidth": "resonance-population",
@@ -22,7 +21,7 @@ _FULL_POLICY = {
 @pytest.fixture
 def catalog(tmp_path, monkeypatch):
     root = tmp_path / "catalog"
-    shutil.copytree(bundled_catalog(), root)
+    copy_full_catalog(root)
     monkeypatch.setattr(_catalog_io, "_CATALOG_PATH", root)
     return root
 
@@ -154,6 +153,18 @@ def test_coherent_profile_refuses_any_policy(catalog):
     assert refused.exit_code == 2
     assert "both emission route does not support" in refused.stderr
     assert _profile_file(catalog, "hopg_short") == before
+
+
+def test_coherent_profile_accepts_a_windowed_policy(catalog):
+    """#350: feature windows resolve the coherent route, so the editor allows them."""
+    path = catalog / "profiles" / "hopg_short.toml"
+    path.write_text(path.read_text() + "\n[line_grid_policy]\nwindows = true\n")
+
+    result = _line_grid("set", "hopg_short", "--bandwidth", "kinematic-ceiling")
+
+    assert result.exit_code == 0, result.stderr
+    # Editing a selector keeps the TOML-only window opt-in.
+    assert _stored(catalog, "hopg_short") == {"windows": True, "bandwidth": "kinematic-ceiling"}
 
 
 def test_reset_partial_conflict_named_and_whole(catalog):

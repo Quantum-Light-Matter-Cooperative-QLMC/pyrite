@@ -7,6 +7,7 @@ from pyrite._catalog_layout import read_text
 from pyrite.cli import _catalog_io
 from pyrite.cli.commands import profile
 from tests.helpers.cli import assert_clean_result, invoke
+from tests.helpers.user_catalog import copy_full_catalog
 
 SET = ["physical-detector", "set"]
 ACQUIRE = [
@@ -28,6 +29,7 @@ def catalog(tmp_path, monkeypatch):
 
     data = tmp_path / "data"
     shutil.copytree(DATA_DIR, data)
+    copy_full_catalog(data / "catalog")
     path = data / "materials.toml"
     path.write_text(read_text(data / "catalog"))
     monkeypatch.setattr(_catalog_io, "_CATALOG_PATH", path)

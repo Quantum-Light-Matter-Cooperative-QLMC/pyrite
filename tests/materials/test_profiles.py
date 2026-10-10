@@ -36,6 +36,7 @@ from pyrite.montecarlo.spectrum import (
     CHARACTERISTIC_XRAYDB_VERSION,
 )
 from pyrite.montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
+from tests.helpers.user_catalog import USER_CATALOG_FIXTURE
 
 
 def _resolve_auto_as_installed(model, _elements):
@@ -139,8 +140,8 @@ def test_high_energy_profile_range_is_part_of_dataset_identity():
     np.testing.assert_array_equal(
         material_sweep("mose2", catalog_profile="high_energy").beam.energy_keV, energies
     )
-    bundled = tomllib.loads((DATA_DIR / "catalog/profiles/high_energy.toml").read_text())
-    assert "overrides" not in bundled
+    stored = tomllib.loads((USER_CATALOG_FIXTURE / "profiles/high_energy.toml").read_text())
+    assert "overrides" not in stored
 
 
 def test_high_energy_profile_selects_the_measured_line_grid():

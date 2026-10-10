@@ -51,20 +51,22 @@ explicit value, effective value and source (`profile`, `fidelity`, `built-in`).
 | `bandwidth` | `kinematic-ceiling`, `resonance-population` | `--bandwidth` |
 | `resolution` | `sinc-nyquist`, `resonance-local` | `--resolution` |
 | `quadrature` | `node`, `bin-mean` | `--quadrature` |
+| `windows` | `false`, `true` | TOML; selector edits keep it |
+| `max_points` | integer >= 2 (600000) | TOML; selector edits keep it |
 
 `resonance-local` requires `resonance-population` and `bin-mean`. The editor
-also refuses a policy on `coherent`/`both` emission and `bin-mean` with a
-positive `max_dE_frac`. `coverage-0.95` labels stored energy-grid artifacts and
+also refuses a policy without `windows = true` on `coherent`/`both` emission,
+and `bin-mean` with a positive `max_dE_frac`. `coverage-0.95` labels stored energy-grid artifacts and
 is not a profile value.
 
 Not profile keys (per-call `Sweep.line_grid_policy` in the API, or
 environment): per-observable `rtol` (`PYRITE_ENERGY_GRID_RTOL`,
 `PYRITE_ENERGY_GRID_RTOL_<OBSERVABLE>`; built-in 1e-3 intrinsic source, 1e-2
 detected counts), `max_spacing_eV` (`PYRITE_ENERGY_GRID_MAX_SPACING_EV`; 3 eV),
-`max_points` (`PYRITE_ENERGY_GRID_MAX_POINTS`; 600000), `backend_safety_ulps`
-(`PYRITE_ENERGY_GRID_ULPS`; 8), and feature `windows` (API only; no environment
-layer). Bandwidth truncation (1e-4) and the local halo limit (1e-4) are
-built-in. Coherent feature windows and their profile spelling are #350.
+`backend_safety_ulps` (`PYRITE_ENERGY_GRID_ULPS`; 8), and detailed window maps
+(API only; the profile `windows` boolean takes the resolver defaults).
+`max_points` also reads `PYRITE_ENERGY_GRID_MAX_POINTS`. Bandwidth truncation
+(1e-4) and the local halo limit (1e-4) are built-in.
 
 ## Instruments and emission
 
