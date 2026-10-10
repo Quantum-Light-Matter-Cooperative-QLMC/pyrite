@@ -55,6 +55,8 @@ def run(args):
     tp = ladder.transport
     bandwidth = case["line_grid_policy"]["bandwidth"]
     start, stop = float(bandwidth["start_eV"]), float(bandwidth["stop_eV"])
+    if args.stop_eV is not None:
+        stop = args.stop_eV
     result = {"case": args.case, "start_eV": start, "stop_eV": stop, "rows": []}
     for hkl in case["hkl_list"]:
         row_case = {**case, "hkl_list": [hkl], "coherent_emission": True}
@@ -124,6 +126,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", choices=("anchor", "thick"), required=True)
     parser.add_argument("--max-points", type=int, default=20000000)
+    parser.add_argument(
+        "--stop-eV",
+        type=float,
+        help="axis stop; widen past the case bandwidth so the windows omit a band",
+    )
     parser.add_argument("--out", required=True)
     return run(parser.parse_args())
 

@@ -278,9 +278,20 @@ CPU anchor (HOPG 30 keV, 1 µm, $N_e = 3$, seed 0, 100 fs, lockstep), commit `f3
 
 Only the (0 0 4) lower edge moved. The frozen edge 459.7 eV certified $1.59\times10^{-4}$ dispersively (unsplit $2.26\times10^{-4}$) and widened to 330.6 eV, raising that row's plan from 105 601 to 111 357 points. The former audit reported $183.7$ times the frozen reference for that row. Anchored by `test_production_field_beyond_the_certified_windows_stays_inside_the_dispersive_bound` (slow, 9 s).
 
+### Dispersive certificate on the 1 mm case (2026-10-10, #372)
+
+Remote run (SLURM job 1193, `PYRITE_FP64=1`, 8 GB cap, about 4 min): HOPG 30 keV, 1 mm, tilt 0°, $N_e = 40$, seed 7, 100 fs, axis widened to 10 eV–20 keV with `checks/coherent_window_excluded_dispersion.py --case thick --stop-eV 20000`. At the case's own 3.7 keV bandwidth every window covers the axis and nothing is omitted (first run: empty `sides`); the wider axis leaves an upper gap on three rows. Same method as the anchor above.
+
+| row | omitted band (eV) | points | measured / frozen reference | certified | measured / certified |
+|---|---|---|---|---|---|
+| (0 0 2) | 5640–20000 | 17 231 390 | $5.084\times10^{-5}$ | $8.002\times10^{-5}$ | 0.635 |
+| (0 0 -2) | 11576–20000 | 4 536 434 | $3.250\times10^{-5}$ | $5.537\times10^{-5}$ | 0.587 |
+| (0 0 4) | 5787–20000 | 16 740 472 | $5.384\times10^{-5}$ | $7.812\times10^{-5}$ | 0.689 |
+
+The (0 0 -4) window spans the whole axis and has no omitted band. No lower-side gap exists. Measured power stays below the certificate on every side, which is 1.5–1.7 times the measurement. The run is a measurement, not a regression: it needs a GPU host (the omitted bands take 17 M points).
+
 ## Open
 
-- **Thick-target dispersive measurement (#372).** The 1 mm remote run of `checks/coherent_window_excluded_dispersion.py --case thick` is on hold for GPU availability; the CPU anchor is the only measured window-excluded case.
 - **Re-verification.** The 2026-10-06 re-verification (below) returned a narrowed `discrepancy`; its three items are addressed in "Resolution (task owner, 2026-10-06)". A fresh context re-checks them before the row moves.
 - **Inter-electron term without a closed-form bound.** For a sub-femtosecond bunch the Cauchy–Schwarz switch is conservative by roughly $N_e$: random transverse positions make $|\sum_e S_e|^2 \approx \sum_e|S_e|^2$ on average, so the unresolved term is $\sim F$ of the floor, not $F N_e$. Using that statistical estimate, or the empirical $F$ of infinite slabs, would bring `hopg_short`-class cases under the budget but is a modelling decision outside #350.
 - **Budget.** `hopg_short`-class plans need a `max_points` near $3\times10^6$–$5\times10^6$; the shipped default stays 600 000, so they run on a GPU host with `PYRITE_ENERGY_GRID_MAX_POINTS` raised.
