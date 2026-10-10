@@ -66,3 +66,24 @@ def test_pyrite_dev_profile_targets_the_bundled_catalog(monkeypatch, capsys):
     import os
 
     assert os.environ["PYRITE_CATALOG"] == "/elsewhere"
+
+
+def test_precision_enable_on_a_bundled_demo_writes_nothing_and_a_clone_switches(
+    _isolate_user_catalog,
+):
+    def bundled():
+        return {path: path.read_bytes() for path in bundled_catalog().rglob("*.toml")}
+
+    before = bundled()
+
+    refused = invoke(profile.command, ["precision", "enable", "trajectory_demo"])
+    assert refused.exit_code == 1
+    assert "pyrite profile create NAME --from trajectory_demo" in refused.stderr
+
+    created = invoke(profile.command, ["create", "mine", "--from", "trajectory_demo"])
+    assert created.exit_code == 0
+    enabled = invoke(profile.command, ["precision", "enable", "mine"])
+    assert enabled.exit_code == 0, enabled.stderr
+    assert "removed fixed counts: line-trials 100, brem-trials 100" in enabled.stdout
+    assert "n_electrons" not in (_isolate_user_catalog / "profiles" / "mine.toml").read_text()
+    assert bundled() == before
