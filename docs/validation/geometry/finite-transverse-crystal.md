@@ -3,8 +3,8 @@
 - **Claim id:** `finite-transverse-crystal`
 - **Code:** `montecarlo/geometry.py::first_prism_exit`; `montecarlo/transport/api.py::simulate_trajectories`; `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum`; and `montecarlo/spectrum/brem.py::mc_brem_spectrum`
 - **Source:** rectangular-prism ray intersection and Beer–Lambert attenuation
-- **Quantity:** For the sample-frame prism $[-W/2,W/2] \times [-H/2,H/2] \times [z_{\min},z_{\max}]$, the geometry helper returns the first strictly forward ray-boundary intersection. Transport stops there, and each segment's radiation receives its Beer–Lambert escape factor along the fixed photon ray to the same boundary. Public widths and heights are in mm; geometry uses Å.
-- **Assumptions:** the origin lies inside the prism; directions are in the sample frame; a finite footprint has two positive dimensions; and the observation direction is fixed in the far field. With both transverse dimensions omitted, the model is the laterally infinite $z$-only slab.
+- **Quantity:** For the sample-frame prism $[-W/2,W/2] \times [-H/2,H/2] \times [z_{\min},z_{\max}]$, the geometry helper returns the first forward ray-boundary intersection for an origin inside the prism (0 on the exit face; a negative signed distance past it, which escape callers clip to zero). Electron transport uses its own strictly positive helper, so a free flight never takes a zero step. Transport stops there, and each segment's radiation receives its Beer–Lambert escape factor along the fixed photon ray to the same boundary. Public widths and heights are in mm; geometry uses Å.
+- **Assumptions:** escape origins lie inside the prism or on its boundary (origins past an exit face have no in-crystal path); directions are in the sample frame; a finite footprint has two positive dimensions; and the observation direction is fixed in the far field. With both transverse dimensions omitted, the model is the laterally infinite $z$-only slab.
 
 ## Independent re-derivation (before implementation inspection)
 
@@ -73,7 +73,7 @@ The following focused selections passed:
 * `tests/montecarlo/test_montecarlo.py` finite-footprint/all-missed/omitted-footprint selection: 8 passed.
 * `tests/scan/test_sweep.py -k footprint`: 8 passed; and `tests/scan/test_run.py -k finite_footprint`: 3 passed.
 
-- **Filters**: units **pass**; limits **pass** (all-`None` legacy recovery, misses, lateral residence, and capped z-layer crossings); signs/conventions **pass** (strictly forward minimum, parallel-face exclusion, deterministic lowest-constant ties, and `exp(-tau)`).
+- **Filters**: units **pass**; limits **pass** (all-`None` legacy recovery, misses, lateral residence, and capped z-layer crossings); signs/conventions **pass** (forward minimum over exit-side faces, 0 on the exit face (#298), parallel-face exclusion, deterministic lowest-constant ties, and `exp(-tau)`).
 - **Re-derivation**: **matches** — no divergent factor, sign, exponent, unit, or tie convention found.
 - **Verdict**: **rederived**.
 - **Write-up**: `docs/validation/geometry/finite-transverse-crystal.md`.
