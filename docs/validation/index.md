@@ -37,6 +37,7 @@ beam-transport/gpt-gdf-injection
 beam-transport/coherent-line-grid-fringe-spacing
 beam-transport/coherent-line-grid-windowed-resolution
 beam-transport/coherent-flat-term-omission
+beam-transport/coherent-transverse-flat-omission
 beam-transport/dielectric-bulk-loss
 beam-transport/eedl-material-shell-rates
 beam-transport/elsepa-elastic-sampling

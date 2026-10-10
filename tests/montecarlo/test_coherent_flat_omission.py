@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from pyrite._backend import REAL, xp
+from pyrite._backend import REAL, _to_cpu, xp
 from pyrite.materials.crystal import HBARC_EV_ANG
 from pyrite.montecarlo import mc_spectrum
 from pyrite.montecarlo.case import Case
@@ -98,7 +98,7 @@ SCENARIOS = {
 }
 
 
-def _run(name, limit, t0_ang=T0_ANG):
+def _run(name, limit, t0_ang=T0_ANG, *, phase_retention=None):
     seg_kw, kwargs, extra = SCENARIOS[name]
     kwargs = _groove_kwargs() if kwargs is None else kwargs
     return mc_spectrum(
@@ -106,6 +106,7 @@ def _run(name, limit, t0_ang=T0_ANG):
         ENERGY_GRID,
         coherent=True,
         coherent_flat_omission_limit=limit,
+        phase_retention=phase_retention,
         **kwargs,
         **extra,
     )
@@ -157,6 +158,165 @@ def test_zero_limit_is_the_unchanged_reducer(name):
     np.testing.assert_allclose(_run(name, 1.0e-300), default, rtol=SUBGRID_RTOL, atol=0.0)
 
 
+def test_phase_policy_without_cost_provider_avoids_gaussian_certification(monkeypatch):
+    from pyrite.montecarlo.spectrum import coherent_form_factor
+    from pyrite.montecarlo.spectrum.phase_retention import PhaseRetentionPolicy
+
+    full = _run("footprint-batched", 0.0)
+
+    def unexpected_certificate(*args, **kwargs):
+        pytest.fail("missing cost provider cannot authorize omission; skip its certificate")
+
+    monkeypatch.setattr(coherent_form_factor, "gaussian_form_factor_bounds", unexpected_certificate)
+    decisions = []
+    actual = _run(
+        "footprint-batched", 0.5, phase_retention=PhaseRetentionPolicy(report=decisions.append)
+    )
+    np.testing.assert_array_equal(actual, full)
+    assert decisions and all(d.reason == "missing-cost-evidence" for d in decisions)
+    assert all(d.skipped == 0 for d in decisions)
+
+
+@pytest.mark.parametrize("name", list(SCENARIOS))
+@pytest.mark.parametrize("cost_kind", ["missing", "no-gain", "overhead", "disabled", "gain"])
+def test_phase_policy_requires_accuracy_and_net_saving(name, cost_kind):
+    from pyrite.montecarlo.spectrum.phase_retention import PhaseRetentionCost, PhaseRetentionPolicy
+
+    decisions = []
+
+    def estimate(scope):
+        if cost_kind == "missing":
+            return None
+        return PhaseRetentionCost(
+            scope=scope,
+            full_lower_s=1.0,
+            reduced_upper_s=1.1 if cost_kind == "no-gain" else 0.5,
+            overhead_upper_s=0.6 if cost_kind == "overhead" else 0.1,
+            evidence="synthetic gate test; no production timing claim",
+        )
+
+    policy = PhaseRetentionPolicy(
+        estimate=estimate, enabled=cost_kind != "disabled", report=decisions.append
+    )
+    actual = _run(name, 0.5, phase_retention=policy)
+    expected = _run(name, 0.5 if cost_kind == "gain" else 0.0)
+    np.testing.assert_array_equal(actual, expected)
+    assert decisions
+    assert all(d.simplify == (cost_kind == "gain") for d in decisions)
+    assert all(d.skipped > 0 if d.simplify else d.skipped == 0 for d in decisions)
+    assert all(len(d.scope.row_vectors_inv_ang) == d.scope.rows for d in decisions)
+
+
+@pytest.mark.parametrize(
+    "observable", ["continuous-bin-integral", "detector-yield", "temporal-profile"]
+)
+def test_phase_policy_refuses_uncertified_observable(observable):
+    from pyrite.montecarlo.spectrum.phase_retention import PhaseRetentionPolicy
+
+    decisions = []
+
+    def estimate(scope):
+        pytest.fail("unsupported observable must not consult a cost model")
+
+    policy = PhaseRetentionPolicy(observable=observable, estimate=estimate, report=decisions.append)
+    actual = _run("footprint-batched", FLOOR_LIMIT, phase_retention=policy)
+    np.testing.assert_array_equal(actual, _run("footprint-batched", 0.0))
+    assert decisions and all(d.reason == "unsupported-scope" for d in decisions)
+
+
+@pytest.mark.parametrize(
+    "cost_kind", ["scope", "row", "population", "nan", "negative", "empty", "equal"]
+)
+def test_phase_policy_rejects_unusable_cost_evidence(cost_kind):
+    from dataclasses import replace
+
+    from pyrite.montecarlo.spectrum.phase_retention import PhaseRetentionCost, PhaseRetentionPolicy
+
+    decisions = []
+
+    def estimate(scope):
+        cost_scope = scope
+        if cost_kind == "scope":
+            cost_scope = replace(scope, route="different-route")
+        elif cost_kind == "row":
+            cost_scope = replace(scope, row_vectors_inv_ang=())
+        elif cost_kind == "population":
+            cost_scope = replace(scope, physical_electrons=1.0)
+        return PhaseRetentionCost(
+            scope=cost_scope,
+            full_lower_s=float("nan") if cost_kind == "nan" else 1.0,
+            reduced_upper_s=-1.0 if cost_kind == "negative" else 0.5,
+            overhead_upper_s=0.5 if cost_kind == "equal" else 0.1,
+            evidence="" if cost_kind == "empty" else "synthetic evidence",
+        )
+
+    policy = PhaseRetentionPolicy(estimate=estimate, report=decisions.append)
+    actual = _run("footprint-batched", FLOOR_LIMIT, phase_retention=policy)
+    np.testing.assert_array_equal(actual, _run("footprint-batched", 0.0))
+    assert decisions and all(not d.simplify for d in decisions)
+
+
+def test_phase_policy_preserves_captured_full_fields():
+    from pyrite.montecarlo.spectrum.phase_retention import PhaseRetentionPolicy
+
+    decisions = []
+    captures = []
+
+    def capture(st, idx, coefs, good, lines):
+        captures.append(tuple(np.asarray(_to_cpu(c)).copy() for c in coefs))
+
+    common = dict(
+        coherent=True,
+        longitudinal_rms_fs=1e-3,
+        coefficient_capture=capture,
+        **KWARGS,
+    )
+    segments = _segments(T0_ANG, footprint=True)
+    full = mc_spectrum(segments, ENERGY_GRID, **common)
+    full_fields = captures.copy()
+    captures.clear()
+    gated = mc_spectrum(
+        segments,
+        ENERGY_GRID,
+        coherent_flat_omission_limit=FLOOR_LIMIT,
+        phase_retention=PhaseRetentionPolicy(report=decisions.append),
+        **common,
+    )
+    np.testing.assert_array_equal(gated, full)
+    assert len(captures) == len(full_fields) > 0
+    for actual, expected in zip(captures, full_fields, strict=True):
+        for a, e in zip(actual, expected, strict=True):
+            np.testing.assert_array_equal(a, e)
+    assert decisions and all(d.reason == "unsupported-scope" for d in decisions)
+
+
+def test_phase_policy_preserves_temporal_output():
+    from pyrite.montecarlo.spectrum.lines import temporal_profile_for
+    from pyrite.montecarlo.spectrum.phase_retention import PhaseRetentionPolicy
+
+    segments = _segments(T0_ANG, footprint=True)
+    common = dict(coherent=True, longitudinal_rms_fs=1e-3, **KWARGS)
+    outputs = []
+    decisions = []
+    for limit, policy in [
+        (0.0, None),
+        (FLOOR_LIMIT, PhaseRetentionPolicy(report=decisions.append)),
+    ]:
+        temporal = temporal_profile_for(segments, ENERGY_GRID, [KWARGS["n_hat"]])
+        spec = mc_spectrum(
+            segments,
+            ENERGY_GRID,
+            temporal=temporal,
+            coherent_flat_omission_limit=limit,
+            phase_retention=policy,
+            **common,
+        )
+        outputs.append((spec, temporal.result()["intensity"]))
+    for actual, expected in zip(outputs[1], outputs[0], strict=True):
+        np.testing.assert_array_equal(actual, expected)
+    assert decisions and all(d.reason == "unsupported-scope" for d in decisions)
+
+
 def test_omission_is_inert_without_bunch_offsets():
     segments = _segments(np.zeros(T0_ANG.size), footprint=False)
     segments.pop("initial_t0_ang")
@@ -193,6 +353,94 @@ def test_vanishing_form_factor_gives_the_floor():
     full = mc_spectrum(segments, ENERGY_GRID, coherent=True, **kw)
     np.testing.assert_array_equal(masked, floor)
     np.testing.assert_allclose(masked, full, rtol=SUBGRID_RTOL)
+
+
+@pytest.mark.parametrize("route", ["batched", "per-hkl", "per-hkl-windowed"])
+@pytest.mark.parametrize("flights", [1, 2])
+@pytest.mark.parametrize("rms_fs", [1.0e-6, 200.0])
+def test_bunch_spread_policy_preserves_the_correct_coherence_sector(
+    route, flights, rms_fs, coherent_route
+):
+    """Long arrival spread removes electron pairs, not cross-flight terms.
+
+    The independent floor is an isolated electron's spectrum, since both
+    electrons follow the same path. One flight reaches the incoherent policy;
+    two flights retain interference. Costs are synthetic, not timing evidence.
+
+    Validation: coherent-flat-term-omission
+    """
+    from pyrite.materials.crystal import beta_from_Ee
+    from pyrite.montecarlo.spectrum.phase_retention import PhaseRetentionCost, PhaseRetentionPolicy
+
+    single = _segments(np.zeros(flights), footprint=True)
+    single.update(
+        r_mid=np.array([[0.0, 0.0, 2.0], [0.06, 0.0, 7.0]])[:flights],
+        v_hat=np.array([[0.0, 0.0, 1.0], [0.02, 0.0, np.sqrt(1.0 - 0.02**2)]])[:flights],
+        L_ang=np.array([4.0, 6.0])[:flights],
+        t_ang=np.array([0.0, 4.0 / float(beta_from_Ee(30e3))])[:flights],
+        elec_id=np.zeros(flights, dtype=int),
+        flight_id=np.arange(flights),
+        Ne=1,
+        initial_t0_ang=np.zeros(1),
+        initial_r_ang=np.zeros((1, 3)),
+    )
+    segments = {
+        key: np.concatenate([value, value]) if isinstance(value, np.ndarray) else value
+        for key, value in single.items()
+    }
+    segments.update(
+        Ne=2,
+        elec_id=np.repeat(np.arange(2), flights),
+        initial_t0_ang=np.array([137.0, -412.0]),
+        t0_ang=np.repeat([137.0, -412.0], flights),
+    )
+    kwargs = KWARGS if route == "batched" else _groove_kwargs()
+    extra = {"sinc_cutoff": 4.0} if route == "per-hkl-windowed" else {}
+    common = {**kwargs, **extra}
+    floor = mc_spectrum(single, ENERGY_GRID, coherent=True, **common)
+    incoherent = mc_spectrum(segments, ENERGY_GRID, coherent=False, **common)
+    population = 1.0e8
+    common.update(coherent=True, physical_electrons=population, longitudinal_rms_fs=rms_fs)
+    decisions = []
+
+    def estimate(scope):
+        return PhaseRetentionCost(scope, 1.0, 0.5, 0.1, "synthetic limit regression")
+
+    policy = PhaseRetentionPolicy(estimate=estimate, report=decisions.append)
+    full = mc_spectrum(segments, ENERGY_GRID, **common)
+    reduced = mc_spectrum(
+        segments,
+        ENERGY_GRID,
+        coherent_flat_omission_limit=1.0e-4,
+        phase_retention=policy,
+        **common,
+    )
+    peak = float(np.max(floor))
+    assert peak > 0
+    factor = np.exp(-((ENERGY_GRID / HBARC_EV_ANG * rms_fs * C_ANG_PER_FS) ** 2))
+    reference = (1.0 + factor * (population - 1)) * floor
+    np.testing.assert_allclose(full, reference, rtol=SUBGRID_RTOL)
+    if rms_fs < 1.0:
+        np.testing.assert_array_equal(reduced, full)
+        assert decisions and all(not d.simplify and d.skipped == 0 for d in decisions)
+        assert np.max(full) > 1.0e6 * peak
+        return
+    np.testing.assert_allclose(reduced, floor, rtol=SUBGRID_RTOL, atol=SUBGRID_RTOL * peak)
+    np.testing.assert_allclose(reduced, full, rtol=SUBGRID_RTOL, atol=SUBGRID_RTOL * peak)
+    assert decisions and all(d.simplify for d in decisions)
+    assert all(d.skipped == ENERGY_GRID.size and d.retained == 0 for d in decisions)
+    assert all(d.scope.sector == "inter-electron" for d in decisions)
+    if flights == 1 and route == "batched":
+        # Side-face escape is constant along this flight: both quadratures
+        # agree. Grooved escape compares midpoint versus mean attenuation.
+        np.testing.assert_allclose(
+            reduced,
+            incoherent,
+            rtol=SUBGRID_RTOL,
+            atol=SUBGRID_RTOL * peak,
+        )
+    elif flights == 2:
+        assert np.max(np.abs(reduced - incoherent)) > 1.0e-3 * peak
 
 
 @pytest.mark.parametrize("limit", [-1.0, float("nan"), float("inf")])

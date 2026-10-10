@@ -214,7 +214,45 @@ def _flat_omission_weight(st):
     return 0.0 if weight == 0.0 else np.nextafter(weight, np.inf)
 
 
-def _flat_energy_keep(st, F):
+def _phase_retention_keep(st, keep, F, route, row_vectors):
+    """Gate an existing certified mask without changing its physics bound."""
+    policy = getattr(st.request, "phase_retention", None)
+    if policy is None:
+        return keep
+    from ..phase_retention import PhaseRetentionScope
+
+    observable = policy.observable
+    if st.request.temporal is not None:
+        observable = "temporal-profile"
+    elif st.request.coefficient_capture is not None:
+        observable = "coefficient-capture"
+    scope = PhaseRetentionScope(
+        sector="inter-electron",
+        observable=observable,
+        rule="certified-flat-omission",
+        route=route,
+        backend=xp.__name__,
+        precision=np.dtype(REAL).name,
+        energies=int(st.E_grid.size),
+        retained=int(st.E_grid.size) if keep is None else int(keep.size),
+        rows=int(F.shape[0]) if F is not None and F.ndim > 1 else 1,
+        segments=int(st.seg_r.shape[0]),
+        electrons=int(st.Ne),
+        limit=float(st.request.coherent_flat_omission_limit),
+        row_vectors_inv_ang=(
+            tuple(
+                (float(row[0]), float(row[1]), float(row[2]))
+                for row in np.asarray(_to_cpu(row_vectors)).reshape(-1, 3)
+            )
+            if row_vectors is not None
+            else ()
+        ),
+        physical_electrons=st.request.physical_electrons,
+    )
+    return keep if policy.decide(scope).simplify else None
+
+
+def _flat_energy_keep(st, F, *, route="per-hkl-eager", row_vectors=None):
     """Host indices of the energies whose all-electron term must be evaluated.
 
     ``F`` is the blend's own inter-electron factor, one row ``(n_E,)`` or a
@@ -226,16 +264,26 @@ def _flat_energy_keep(st, F):
     Historical calls without physical N use N=M. Physical infinite slabs
     use F=1 (complete sampled fields); historical slabs use empirical F.
     Finite footprints also certify the analytic Gaussian with directed upper
-    bounds. Invalid F is always kept. Certification uses the actual rounded
+    bounds, then rows with a recorded spot by ``F_z F_perp``
+    (``_transverse_certified``). Invalid F is always kept. Certification uses the actual rounded
     pair weight and outward products at evaluated energies, not bin integrals.
     Source: Cauchy-Schwarz and mixed_row_power. F->0 gives G; physical N<=1
     has no pair excess; sampled M=1 has Flat=G; limit=0 keeps the full reducer.
 
-    Validation: coherent-flat-term-omission
+    Validation: coherent-flat-term-omission, coherent-transverse-flat-omission
     """
     limit = float(st.request.coherent_flat_omission_limit)
+    policy = getattr(st.request, "phase_retention", None)
+    if policy is not None and (
+        not policy.enabled
+        or policy.estimate is None
+        or policy.observable != "evaluated-spectrum"
+        or st.request.temporal is not None
+        or st.request.coefficient_capture is not None
+    ):
+        return _phase_retention_keep(st, None, F, route, row_vectors)
     if F is None or limit <= 0.0:
-        return None
+        return _phase_retention_keep(st, None, F, route, row_vectors)
     F_host = np.asarray(_to_cpu(F), dtype=np.float64)
     weight = _flat_omission_weight(st)
     valid = np.isfinite(F_host) & (F_host >= 0.0) & (F_host <= 1.0)
@@ -278,8 +326,120 @@ def _flat_energy_keep(st, F):
         except ValueError:
             keep[:] = True
         else:
-            keep[candidates[:lo]] = True
-    return np.flatnonzero(keep)
+            residual = candidates[:lo]
+            if ascending and residual.size:
+                certified_rows = _transverse_certified(
+                    st, residual, energy, sigma, weight, limit, row_vectors
+                )
+                residual = residual[~certified_rows]
+            keep[residual] = True
+    return _phase_retention_keep(st, np.flatnonzero(keep), F, route, row_vectors)
+
+
+def _transverse_certified(st, indices, energy, sigma, weight, limit, row_vectors):
+    """Mask of ascending ``indices`` certified for every row by ``F_z F_perp``.
+
+    The reducer's factor is ``F_z F_perp`` per row, so ``F_perp <= 1`` makes
+    the longitudinal certificate conservative. ``F_perp = exp(-q)`` with
+    ``q`` a quadratic in ``omega``: on a side where the affine ``q'`` has a
+    certified sign at both ends, a directed upper bound at one coordinate
+    covers every coordinate beyond it. Above the minimum ``F_z F_perp`` is
+    nonincreasing; below it ``F_perp`` alone (``F_z <= 1``) is nondecreasing.
+    Rows without a recorded spot or row vector certify nothing.
+    Source: coherent-flat-term-omission bound with transverse-bunch-form-factor.
+
+    Validation: coherent-transverse-flat-omission
+    """
+    certified = np.zeros(indices.size, dtype=bool)
+    spot = getattr(st, "transverse", None)
+    if spot is None or row_vectors is None:
+        return certified
+    omega = np.asarray(_to_cpu(st.omega_grid), dtype=np.float64)[indices]
+    if not np.all(np.isfinite(omega)) or omega[0] < 0.0 or np.any(np.diff(omega) < 0.0):
+        return certified
+    certified[:] = True
+    try:
+        for g_vec in np.asarray(_to_cpu(row_vectors), dtype=np.float64).reshape(-1, 3):
+            certified &= _row_transverse_certified(
+                st, spot, g_vec, omega, energy[indices], sigma, weight, limit
+            )
+            if not certified.any():
+                break
+    except ValueError:
+        certified[:] = False
+    return certified
+
+
+def _row_transverse_certified(st, spot, g_vec, omega, energy, sigma, weight, limit):
+    """One row's certified coordinates on its two monotone ``F_perp`` sides.
+
+    Validation: coherent-transverse-flat-omission
+    """
+    from ..coherent_form_factor import gaussian_form_factor_bounds
+    from ..coherent_transverse import transverse_form_factor_upper, transverse_slope_sign
+
+    n = omega.size
+    out = np.zeros(n, dtype=bool)
+    n_hat = np.asarray(_to_cpu(st.n_hat), dtype=np.float64)
+
+    # Every bound is positive; round each product outward, even from an
+    # underflowed zero, so no binary64 product can certify below its value.
+    def passes(bound):
+        return np.nextafter(bound * weight, np.inf) <= limit
+
+    def perp(k):
+        return transverse_form_factor_upper(spot, omega[k], n_hat, g_vec)
+
+    def sign(k):
+        return transverse_slope_sign(spot, omega[k], n_hat, g_vec)
+
+    # One interval enclosure over the whole range covers flat or far-off rows.
+    if passes(transverse_form_factor_upper(spot, (omega[0], omega[-1]), n_hat, g_vec)):
+        out[:] = True
+        return out
+
+    # Floating minimizer only seeds the split; certified signs decide sides.
+    a = n_hat[:2] - spot.beam_xy_over_beta
+    curvature = float(a @ spot.face_covariance @ a)
+    linear = float(a @ spot.face_covariance @ g_vec[:2])
+    with np.errstate(divide="ignore", invalid="ignore"):
+        minimizer = -linear / curvature if curvature > 0.0 else -np.inf
+    split = int(np.searchsorted(omega, minimizer)) if np.isfinite(minimizer) else 0
+    split = min(max(split, 0), n)
+
+    # Nonincreasing side [split, n): F_z(E) and F_perp both decrease.
+    start = split
+    while start < min(split + 2, n) and sign(start) != 1:
+        start += 1
+    if start < n and sign(start) == 1 and sign(n - 1) == 1:
+
+        def descending(k):
+            _, upper_z = gaussian_form_factor_bounds(energy[k], energy[k], sigma_z_ang=sigma)
+            return passes(np.nextafter(upper_z * perp(k), np.inf))
+
+        lo, hi = start, n
+        while lo < hi:
+            middle = (lo + hi) // 2
+            if descending(middle):
+                hi = middle
+            else:
+                lo = middle + 1
+        out[lo:] = True
+
+    # Nondecreasing side [0, split): bound by F_perp alone at the last index.
+    stop = split
+    while stop > max(split - 2, 0) and sign(stop - 1) != -1:
+        stop -= 1
+    if stop > 0 and sign(0) == -1 and sign(stop - 1) == -1:
+        lo, hi = 0, stop
+        while lo < hi:
+            middle = (lo + hi) // 2
+            if passes(perp(middle)):
+                lo = middle + 1
+            else:
+                hi = middle
+        out[:lo] = True
+    return out
 
 
 def _flat_view(st, keep):
@@ -554,7 +714,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
             F_row = keep = None
             if decoherence_active:
                 F_row = _row_decoherence_factor(st, g_vec_d)
-                keep = _flat_energy_keep(st, F_row)
+                keep = _flat_energy_keep(st, F_row, route="per-hkl-jit", row_vectors=g_vec_d)
             flat_st = _flat_view(st, keep)
             E_grid_c = xp.ascontiguousarray(flat_st.E_grid, dtype=REAL)
             dom_c = xp.ascontiguousarray(flat_st.delta_omega_grid, dtype=REAL)
@@ -590,7 +750,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines,
     F_row = keep = None
     if decoherence_active:
         F_row = _row_decoherence_factor(st, g_vec_d)
-        keep = _flat_energy_keep(st, F_row)
+        keep = _flat_energy_keep(st, F_row, row_vectors=g_vec_d)
     # The all-electron term on its kept energies (all of them when inactive).
     flat_st = _flat_view(st, keep)
     E_flat = flat_st.E_grid

@@ -20,6 +20,7 @@ beam-transport/stochastic-sampling-recommendations
 physics/relativistic-electron-transport
 physics/relativistic-pxr-cbs
 physics/superradiant-pxr
+physics/phase-retention
 physics/channeling-radiation-physics
 physics/transition-radiation-recommendations
 ```
