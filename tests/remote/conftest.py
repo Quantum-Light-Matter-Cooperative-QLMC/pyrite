@@ -55,3 +55,11 @@ def _no_remote_sync_lock(monkeypatch):
         transport, "_real_remote_sync_lock", transport._remote_sync_lock, raising=False
     )
     monkeypatch.setattr(transport, "_remote_sync_lock", contextlib.nullcontext)
+
+
+@pytest.fixture
+def empty_user_catalog(monkeypatch, tmp_path_factory):
+    """An empty user layer, for sync tests that pin the exact shipped payload."""
+    layer = tmp_path_factory.mktemp("empty-user-catalog")
+    monkeypatch.setenv("PYRITE_USER_CATALOG", str(layer))
+    return layer

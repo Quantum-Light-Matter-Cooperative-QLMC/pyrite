@@ -1,0 +1,44 @@
+# Demo: physical pixel detector -- a 64 x 64 Timepix-pitch array at 300 mm
+# behind a silicon window, ideal response, Poisson counts over 1 s; writes an
+# observation alongside the scalar-detector checkpoint. ~2 min on CPU.
+#   pyrite run detector_demo
+
+thickness_ang = {values = [20000.0]}
+energy_keV = {values = [30.0]}
+tilt_deg = {values = [45.0]}
+tilt_azim_deg = {values = [180.0]}
+E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
+materials = ["hopg"]
+n_electrons = {values = [500]}
+n_electrons_brem = {values = [100]}
+detector = "default"
+
+[physical_detector]
+distance_mm = 300.0
+polar_deg = 90.0
+shape = [64, 64]
+
+[physical_detector.scorer]
+angular_shape = [2, 2]
+
+[physical_detector.response]
+kind = "ideal"
+
+[physical_detector.acquisition]
+exposure_s = 1.0
+measured_min_eV = 0.0
+measured_max_eV = 30000.0
+measured_bin_width_eV = 100.0
+mode = "poisson"
+seed = 1
+
+[[filters]]
+name = "window"
+material = "silicon"
+thickness_mm = 0.05
+size_mm = [4.0, 4.0]
+distance_mm = 200.0
+polar_deg = 90.0
+azimuth_deg = 0.0
+roll_deg = 0.0
+offset_mm = [0.0, 0.0]

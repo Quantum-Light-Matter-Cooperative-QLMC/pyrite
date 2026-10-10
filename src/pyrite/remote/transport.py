@@ -572,7 +572,31 @@ def _sync_entries() -> list[tuple[str, Path]]:
             entries.append(("external-catalog.toml", catalog))
         else:
             raise SystemExit(f"selected catalog is not a regular file or directory: {catalog}")
+    else:
+        entries.extend(_user_catalog_entries())
     entries.sort(key=lambda entry: entry[0])
+    return entries
+
+
+def _user_catalog_entries() -> list[tuple[str, Path]]:
+    """Ship the user layer's profiles and energy-grid artifacts as ``user-catalog/``."""
+    from .._catalog_layout import ARTIFACT_DIR, user_layer
+
+    layer = user_layer()
+    files = [
+        file
+        for name in ("profiles", ARTIFACT_DIR)
+        if (layer / name).is_dir()
+        for file in (layer / name).rglob("*")
+        if not any(part.startswith(".") for part in file.relative_to(layer).parts)
+    ]
+    entries = []
+    for file in sorted(files):
+        if file.is_symlink() or not file.resolve().is_relative_to(layer):
+            raise SystemExit(f"user catalog contains unsafe symlink: {file}")
+        if file.is_file():
+            arcname = PurePosixPath(config.REMOTE_USER_CATALOG, *file.relative_to(layer).parts)
+            entries.append((arcname.as_posix(), file))
     return entries
 
 
@@ -814,7 +838,9 @@ def _local_rsync_blocker(entries: list[tuple[str, Path]]) -> str | None:
     if shutil.which("rsync") is None:
         return "rsync not found locally"
     for arcname, local in entries:
-        if arcname.startswith("external-catalog/") and _RSYNC_PATTERN_CHARS & set(arcname):
+        if arcname.startswith(("external-catalog/", f"{config.REMOTE_USER_CATALOG}/")) and (
+            _RSYNC_PATTERN_CHARS & set(arcname)
+        ):
             return f"catalog file name not rsync-safe: {arcname}"
         if local.suffix.lower() in config.TEXT_EXTS and b"\r\n" in local.read_bytes():
             return f"CRLF line endings in {arcname}"
@@ -848,6 +874,40 @@ def _rsync_cache_filters() -> list[str]:
     return [f"--filter=-p {name}/" for name in sorted(_SYNC_EXCLUDED_DIRS)] + [
         f"--filter=-p *{suffix}" for suffix in sorted(_SYNC_EXCLUDED_SUFFIXES)
     ]
+
+
+def _rsync_catalog_tree(
+    entries: list[tuple[str, Path]],
+    prefix: str,
+    local_root: Path,
+    workdir: str,
+    stats: tuple[str, ...],
+    label: str | None,
+) -> None:
+    """Mirror the ``prefix/`` entries of a catalog tree, deleting stale files."""
+    catalog = [arc for arc, _ in entries if arc.startswith(f"{prefix}/")]
+    if not catalog:
+        return
+    rules: dict[str, None] = {}
+    for arcname in catalog:
+        parts = PurePosixPath(arcname).parts[1:]
+        for depth in range(1, len(parts)):
+            rules["+ /" + "/".join(parts[:depth]) + "/"] = None
+        rules["+ /" + "/".join(parts)] = None
+    rule_file = Path(workdir) / f"{prefix}.rules"
+    rule_file.write_text("".join(f"{rule}\n" for rule in rules) + "- *\n")
+    _run(
+        config.rsync_argv(
+            *_RSYNC_FLAGS,
+            *stats,
+            "--delete",
+            "--delete-excluded",
+            f"--filter=merge {rule_file}",
+            f"{local_root}/",
+            f"{config.rsync_remote_path(config.remote_path(prefix))}/",
+        ),
+        label=label,
+    )
 
 
 def _rsync_code(entries: list[tuple[str, Path]], workdir: str) -> None:
@@ -886,33 +946,14 @@ def _rsync_code(entries: list[tuple[str, Path]], workdir: str) -> None:
         root = config.rsync_remote_path(config.remote_dir().rstrip("/") or "/")
         _run(config.rsync_argv(*_RSYNC_FLAGS, *stats, "-R", *files, f"{root}/"), label=label)
         label = None
-    catalog = [arc for arc, _ in entries if arc.startswith("external-catalog/")]
-    if catalog:
-        from .._catalog_layout import selected_catalog
+    from .._catalog_layout import selected_catalog, user_layer
 
-        rules: dict[str, None] = {}
-        for arcname in catalog:
-            parts = PurePosixPath(arcname).parts[1:]
-            for depth in range(1, len(parts)):
-                rules["+ /" + "/".join(parts[:depth]) + "/"] = None
-            rules["+ /" + "/".join(parts)] = None
-        rule_file = Path(workdir) / "external-catalog.rules"
-        rule_file.write_text("".join(f"{rule}\n" for rule in rules) + "- *\n")
-        _run(
-            config.rsync_argv(
-                *_RSYNC_FLAGS,
-                *stats,
-                "--delete",
-                "--delete-excluded",
-                f"--filter=merge {rule_file}",
-                f"{selected_catalog()}/",
-                f"{config.rsync_remote_path(config.remote_path('external-catalog'))}/",
-            ),
-            label=label,
-        )
-    elif any(arc == "external-catalog.toml" for arc, _ in entries):
-        from .._catalog_layout import selected_catalog
-
+    for prefix, local_root in (
+        ("external-catalog", selected_catalog()),
+        (config.REMOTE_USER_CATALOG, user_layer()),
+    ):
+        _rsync_catalog_tree(entries, prefix, local_root, workdir, stats, label)
+    if any(arc == "external-catalog.toml" for arc, _ in entries):
         _run(
             config.rsync_argv(
                 *_RSYNC_FLAGS,
@@ -1055,10 +1096,12 @@ def _sync_code_locked(entries, digest, *, force):
     # never landed.
     guaranteed = {**local_table_digests, **local_dataset_digests, **local_sdbase_digests}
     stamp = _sync_stamp(digest, _xsgen_tables_digest(guaranteed) if guaranteed else "")
+    # The tar carries the whole selected catalog tree, so clear stale copies
+    # first: the user layer always (re-shipped while bundled is selected).
     clear_catalog = (
-        "rm -rf external-catalog external-catalog.toml && "
+        f"rm -rf external-catalog external-catalog.toml {config.REMOTE_USER_CATALOG} && "
         if config.external_catalog_selected()
-        else ""
+        else f"rm -rf {config.REMOTE_USER_CATALOG} && "
     )
     stage = f".pyrite-stage.{uuid.uuid4().hex}"
     tar_word = config.shell_single_word(remote_tar)
@@ -1100,7 +1143,10 @@ def _rsync_finish_command(stage: str | None, tar_word: str, stamp_write: str) ->
         from .._catalog_layout import selected_catalog
 
         other = "external-catalog.toml" if selected_catalog().is_dir() else "external-catalog"
-        clear_catalog = f"rm -rf {other} && "
+        clear_catalog = f"rm -rf {other} {config.REMOTE_USER_CATALOG} && "
+    elif not _user_catalog_entries():
+        # rsync mirrors a non-empty layer with --delete; an empty one ships nothing.
+        clear_catalog = f"rm -rf {config.REMOTE_USER_CATALOG} && "
     else:
         clear_catalog = ""
     root = config.shell_remote_dir()

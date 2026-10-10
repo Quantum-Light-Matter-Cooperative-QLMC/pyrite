@@ -37,6 +37,11 @@ User grid derivation and inspection live below `pyrite material energy-grid`;
 profile derivation defaults live below `pyrite profile energy-grid`.
 Artifact mutation and verification use `pyrite-dev energy-grid`.
 
+`pyrite profile` writes your profiles to the user catalog layer
+(`catalog.user`, the platform config directory by default) and treats the
+bundled demo profiles as read-only; `pyrite-dev profile` is the same tree
+for maintainers editing the shipped demos.
+
 Automation contract: usage errors exit 2; runtime failures exit 1;
 interrupted viewers exit 130; resumable compute exits 75. Diagnostics,
 warnings, prompts, and progress use stderr. `-o/--output json` emits one UTF-8
@@ -790,6 +795,8 @@ Commands:
                            PYRITE_HOME; current directory
     catalog.path           Material catalog directory or file.
                            PYRITE_CATALOG; bundled catalog
+    catalog.user           Your profiles, layered over the bundled catalog.
+                           PYRITE_USER_CATALOG; platform config directory
     xsgen.bremslib_source  BremsLib source tree for table generation.
                            PYRITE_XSGEN_BREMSLIB_SOURCE; ../BremsLib_v2.0.8
     xsgen.elsepa_source    ELSEPA source tree for table generation.
@@ -851,6 +858,8 @@ Options:
                            PYRITE_HOME; current directory
     catalog.path           Material catalog directory or file.
                            PYRITE_CATALOG; bundled catalog
+    catalog.user           Your profiles, layered over the bundled catalog.
+                           PYRITE_USER_CATALOG; platform config directory
     xsgen.bremslib_source  BremsLib source tree for table generation.
                            PYRITE_XSGEN_BREMSLIB_SOURCE; ../BremsLib_v2.0.8
     xsgen.elsepa_source    ELSEPA source tree for table generation.
@@ -1264,7 +1273,8 @@ Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...
   transport models) use ``numerics``; the line-grid selectors use ``line-grid``; filters
   and the pixel detector use ``filter`` and ``physical-detector``; reusable beams and
   detectors are named objects edited with ``pyrite beam`` and ``pyrite detector``. The
-  full map is docs/repo-design/profile-settings.md.
+  full map is docs/repo-design/profile-settings.md. Bundled demos are read-only (copy
+  with ``create NAME --from DEMO``); yours live in ``catalog.user``.
 
   Examples:
     pyrite profile list
@@ -1287,7 +1297,7 @@ Commands:
   delete             Delete a profile; irreversible.
   filter             Manage finite FilterPlate objects on a...
   line-grid          Inspect and edit PROFILE's line-grid...
-  list               List catalog profiles with membership,...
+  list               List profiles: source, membership,...
   numerics           Inspect and edit result-affecting...
   physical-detector  Manage a profile's physical pixel detector...
   precision          Inspect and edit PROFILE's adaptive...
@@ -1622,7 +1632,7 @@ Options:
 ```text
 Usage: pyrite profile list [OPTIONS]
 
-  List catalog profiles with membership, override, and grid-ref counts.
+  List profiles: source, membership, override, and grid-ref counts.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation

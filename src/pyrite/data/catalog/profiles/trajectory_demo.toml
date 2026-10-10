@@ -1,0 +1,14 @@
+# Demo: transport-trajectory capture. One cheap HOPG case meant to run with
+# --trajectories, then inspect or export the HDF5 capture. ~20 s on CPU.
+#   pyrite run trajectory_demo --trajectories trajectories
+#   pyrite checkpoint export-trajectories trajectories   (VTK for ParaView)
+
+thickness_ang = {values = [20000.0]}
+energy_keV = {values = [30.0]}
+tilt_deg = {values = [45.0]}
+tilt_azim_deg = {values = [180.0]}
+E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
+materials = ["hopg"]
+n_electrons = {values = [200]}
+n_electrons_brem = {values = [50]}
+detector = "default"

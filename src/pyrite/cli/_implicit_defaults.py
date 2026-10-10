@@ -14,7 +14,7 @@ from ..console import config as _cli_config
 PROFILE_REQUIRED = (
     "this run names no profile; pass PROFILE, set PYRITE_PROFILE, or run "
     "'pyrite config set profile.current NAME' (the implicit 'standard' fallback "
-    "was removed in 0.6.0)"
+    "was removed in 0.6.0); try the bundled demo: pyrite run quickstart"
 )
 
 
@@ -36,6 +36,9 @@ def require_explicit_instrument(profile: str) -> None:
     from .._catalog_layout import bundled_catalog, selected_catalog
     from ..materials import CATALOG
 
+    # Profiles read with the bundled catalog -- demos and user-layer profiles
+    # alike -- stay exempt: the layer holds campaigns that moved out of the
+    # bundle in #403, and attaching an instrument would change their identity.
     if selected_catalog().resolve() == bundled_catalog().resolve():
         return
     if profile not in CATALOG.profile_names:

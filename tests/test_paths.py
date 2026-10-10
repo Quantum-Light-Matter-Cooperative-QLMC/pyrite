@@ -5,7 +5,14 @@ from pathlib import Path
 from pyrite import DATA_DIR
 from pyrite.console import config as _config
 from pyrite.console.config import workspace_root
-from pyrite.paths import cache_dir, data_dir, state_dir, user_data_dir
+from pyrite.paths import (
+    cache_dir,
+    config_dir,
+    data_dir,
+    migrate_legacy_state,
+    state_dir,
+    user_data_dir,
+)
 
 
 def test_data_dir_preserves_public_package_constant():
@@ -42,21 +49,39 @@ def test_workspace_root_uses_store_then_cwd(monkeypatch, tmp_path):
     assert workspace_root() == cwd.resolve()
 
 
-def test_state_dir_matches_config_store_parent():
+def test_config_dir_matches_config_store_parent():
     # conftest redirects CONFIG_PATH in-process; read the shipped default fresh.
     probe = "from pyrite.console.config import CONFIG_PATH; print(CONFIG_PATH.parent)"
     parent = subprocess.run(
         [sys.executable, "-c", probe], capture_output=True, text=True, check=True
     ).stdout.strip()
-    assert Path(parent) == state_dir()
-    assert state_dir().name == "pyrite"
+    assert Path(parent) == config_dir()
+    assert config_dir().name == "pyrite"
+
+
+def test_legacy_state_moves_out_of_config_dir(monkeypatch, tmp_path):
+    monkeypatch.setattr("pyrite.paths.config_dir", lambda: tmp_path / "config")
+    monkeypatch.setattr("pyrite.paths.state_dir", lambda: tmp_path / "state")
+    legacy = tmp_path / "config" / "viewer-default"
+    legacy.parent.mkdir()
+    legacy.write_text("hopg\n")
+    target = tmp_path / "state" / "viewer-default"
+
+    assert migrate_legacy_state(target) == target
+    assert target.read_text() == "hopg\n"
+    assert not legacy.exists()
+    # Elsewhere, or already present: untouched.
+    other = tmp_path / "elsewhere" / "viewer-default"
+    assert migrate_legacy_state(other) == other
 
 
 def test_platform_cache_and_data_use_pyrite(monkeypatch, tmp_path):
     monkeypatch.setattr("pyrite.paths.user_cache_path", lambda *args, **kwargs: tmp_path / "cache")
     monkeypatch.setattr("pyrite.paths.user_data_path", lambda *args, **kwargs: tmp_path / "data")
+    monkeypatch.setattr("pyrite.paths.user_state_path", lambda *args, **kwargs: tmp_path / "state")
     assert cache_dir() == tmp_path / "cache"
     assert user_data_dir() == tmp_path / "data"
+    assert state_dir() == tmp_path / "state"
 
 
 def test_checkpoint_defaults_follow_workspace_root():

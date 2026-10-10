@@ -11,13 +11,14 @@ from pyrite.cli import command
 from pyrite.console import config
 from pyrite.materials._schema import MaterialConfigError
 from pyrite.materials.catalog import load_material_catalog
+from tests.helpers.user_catalog import copy_full_catalog
 
 
 def test_catalog_option_routes_detector_edit_outside_package(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
     monkeypatch.delenv("PYRITE_CATALOG", raising=False)
     catalog = tmp_path / "catalog"
-    shutil.copytree(bundled_catalog(), catalog)
+    copy_full_catalog(catalog)
     shutil.copyfile(
         catalog / "profiles" / "coh_test.toml", catalog / "profiles" / "local_only.toml"
     )
@@ -43,7 +44,7 @@ def test_catalog_option_routes_detector_edit_outside_package(tmp_path, monkeypat
 
 def test_catalog_owned_cif_is_preferred_over_packaged_file(tmp_path):
     catalog = tmp_path / "catalog"
-    shutil.copytree(bundled_catalog(), catalog)
+    copy_full_catalog(catalog)
     local_cif = catalog / "cifs" / "hopg.cif"
     local_cif.parent.mkdir()
     shutil.copyfile(bundled_catalog().parent / "cifs" / "hopg.cif", local_cif)
@@ -55,7 +56,7 @@ def test_catalog_owned_cif_is_preferred_over_packaged_file(tmp_path):
 
 def test_catalog_cifs_symlink_cannot_escape_catalog(tmp_path):
     catalog = tmp_path / "catalog"
-    shutil.copytree(bundled_catalog(), catalog)
+    copy_full_catalog(catalog)
     (catalog / "cifs").symlink_to(bundled_catalog().parent / "cifs", target_is_directory=True)
 
     with pytest.raises(MaterialConfigError, match="must stay inside cifs/"):
@@ -87,7 +88,7 @@ def test_selected_catalog_run_rejects_implicit_example_instrument(
     monkeypatch.delenv("PYRITE_CATALOG", raising=False)
     monkeypatch.setattr(runs_scan, "run", lambda args: None)
     catalog = tmp_path / "catalog"
-    shutil.copytree(bundled_catalog(), catalog)
+    copy_full_catalog(catalog)
 
     result = CliRunner().invoke(
         command,

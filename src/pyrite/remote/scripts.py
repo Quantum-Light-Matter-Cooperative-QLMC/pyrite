@@ -206,6 +206,7 @@ export PYRITE_HOME={config.shell_word(config.remote_dir())}
 # argv below is generated; deprecated options it carries were warned locally.
 export {GENERATED_INVOCATION_ENV}=1
 export PYRITE_CATALOG={config.shell_word(config.remote_catalog_path())}
+export PYRITE_USER_CATALOG={config.shell_word(config.remote_user_catalog_path())}
 JOBDIR={config.shell_word(jobdir)}
 JOBID={config.shell_word(jobid)}
 RESERVATIONS={config.shell_word(reservations)}

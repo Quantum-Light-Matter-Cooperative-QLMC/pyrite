@@ -40,6 +40,7 @@ def test_external_catalog_is_staged_and_exported(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("explicit", [False, True])
+@pytest.mark.usefixtures("empty_user_catalog")
 def test_bundled_catalog_is_exported_explicitly(explicit, monkeypatch):
     """Regression (#290): selecting the bundled catalog must override any
     catalog configured or staged on the box, not fall back to it."""
@@ -59,3 +60,25 @@ def test_bundled_catalog_is_exported_explicitly(explicit, monkeypatch):
     script = scripts._slurm_batch_script("job1", "echo ok", job_name="catalog-test")
     assert f"export PYRITE_CATALOG={bundled}" in script
     assert f"PYRITE_CATALOG={bundled}" in config.remote_runtime_env()
+    user = config.shell_word(config.remote_path("user-catalog"))
+    assert f"export PYRITE_USER_CATALOG={user}" in script
+    assert f"PYRITE_USER_CATALOG={user}" in config.remote_runtime_env()
+
+
+def test_user_profiles_ship_beside_the_bundled_catalog(monkeypatch, empty_user_catalog):
+    """#403: user-layer profiles and artifacts ride the sync as user-catalog/."""
+    from pyrite._catalog_layout import bundled_catalog
+
+    layer = empty_user_catalog
+    (layer / "profiles").mkdir()
+    (layer / "profiles" / "mine.toml").write_text('materials = ["hopg"]\n')
+    (layer / "energy-grid-artifacts" / "ab").mkdir(parents=True)
+    (layer / "energy-grid-artifacts" / "ab" / "abcd.json").write_text("{}\n")
+    (layer / "config.toml").write_text("[remote]\n")  # never shipped
+    monkeypatch.setattr("pyrite._catalog_layout.selected_catalog", bundled_catalog)
+    monkeypatch.setattr(config, "SYNC_PATHS", [])
+
+    assert [arc for arc, _ in transport._sync_entries()] == [
+        "user-catalog/energy-grid-artifacts/ab/abcd.json",
+        "user-catalog/profiles/mine.toml",
+    ]

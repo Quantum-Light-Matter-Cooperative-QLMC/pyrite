@@ -1,0 +1,13 @@
+# Demo: smallest end-to-end run -- one HOPG case, incoherent PXR lines plus
+# bremsstrahlung, scalar default detector. ~1 min on CPU.
+#   pyrite run quickstart
+
+thickness_ang = {values = [20000.0]}
+energy_keV = {values = [30.0]}
+tilt_deg = {values = [45.0]}
+tilt_azim_deg = {values = [180.0]}
+E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
+materials = ["hopg"]
+n_electrons = {values = [1000]}
+n_electrons_brem = {values = [150]}
+detector = "default"

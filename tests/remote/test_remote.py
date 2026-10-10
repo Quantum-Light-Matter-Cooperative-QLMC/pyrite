@@ -192,6 +192,7 @@ def test_sync_rejects_hostile_scp_host_before_transport(monkeypatch):
         transport.sync_code()
 
 
+@pytest.mark.usefixtures("empty_user_catalog")
 def test_sync_excludes_generated_caches(monkeypatch, tmp_path):
     source = tmp_path / "src"
     (source / "pkg" / "__pycache__").mkdir(parents=True)

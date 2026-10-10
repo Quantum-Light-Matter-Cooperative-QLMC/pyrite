@@ -1,3 +1,7 @@
+# Demo: Courant-Snyder transverse beam phase space (beams/emittance_demo) on
+# HOPG at 30 and 100 keV. ~45 s on CPU.
+#   pyrite run hopg_emittance_demo
+
 thickness_ang = {values = [20000.0]}
 energy_keV = {values = [30.0, 100.0]}
 tilt_deg = {values = [45.0]}

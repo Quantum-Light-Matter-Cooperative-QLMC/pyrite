@@ -729,6 +729,28 @@ def cmd_energy_grid(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_profile(args: argparse.Namespace) -> None:
+    """``pyrite profile`` against the bundled catalog's demo profiles.
+
+    The user CLI writes profiles to the user catalog layer and treats bundled
+    demos as read-only; this maintainer twin edits the shipped demos instead,
+    ignoring the user layer and any selected external catalog.
+    """
+    from pyrite._catalog_layout import bundled_catalog, bundled_profile_writes
+    from pyrite.cli.commands.profile import command
+
+    previous = os.environ.get("PYRITE_CATALOG")
+    os.environ["PYRITE_CATALOG"] = str(bundled_catalog())
+    try:
+        with bundled_profile_writes():
+            _run_relocated_click(command, args.command_args, prog_name="pyrite-dev profile")
+    finally:
+        if previous is None:
+            os.environ.pop("PYRITE_CATALOG", None)
+        else:
+            os.environ["PYRITE_CATALOG"] = previous
+
+
 _SLOW_HELP = "also run tests marked slow (sets PYRITE_SLOW_TESTS=1); must precede pytest_args"
 
 
@@ -854,6 +876,13 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     )
     energy_grid.add_argument("command_args", nargs=argparse.REMAINDER)
     energy_grid.set_defaults(func=cmd_energy_grid)
+    profile = sub.add_parser(
+        "profile",
+        add_help=False,
+        help="create and edit the bundled demo profiles (pyrite profile, for maintainers)",
+    )
+    profile.add_argument("command_args", nargs=argparse.REMAINDER)
+    profile.set_defaults(func=cmd_profile)
     cli_deprecations = sub.add_parser("cli-deprecations")
     cli_deprecation_mode = cli_deprecations.add_mutually_exclusive_group()
     cli_deprecation_mode.add_argument("--write", action="store_true")
@@ -895,12 +924,13 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None, *, prog_name: str = "pyrite-dev") -> None:
     raw_args = list(sys.argv[1:] if argv is None else argv)
-    if raw_args and raw_args[0] in {"perf", "performance", "energy-grid"}:
+    if raw_args and raw_args[0] in {"perf", "performance", "energy-grid", "profile"}:
         command = raw_args[0]
         func = {
             "perf": cmd_perf,
             "performance": cmd_performance,
             "energy-grid": cmd_energy_grid,
+            "profile": cmd_profile,
         }[command]
         func(argparse.Namespace(command=command, command_args=raw_args[1:]))
         return

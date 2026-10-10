@@ -14,7 +14,7 @@ pyrite config list
 For a temporary override, use a command option or environment variable. It wins over the persistent store and does not mutate it:
 
 ```bash
-PYRITE_PROFILE=sub_100keV pyrite run -m hopg --quick
+PYRITE_PROFILE=quickstart pyrite run -m hopg --quick
 PYRITE_HOME=/scratch/my-run pyrite checkpoint list  # archive shelf in that workspace
 ```
 

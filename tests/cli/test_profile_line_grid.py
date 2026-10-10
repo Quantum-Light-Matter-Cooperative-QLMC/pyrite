@@ -1,16 +1,15 @@
 """``pyrite profile line-grid`` against an isolated copy of the bundled catalog."""
 
 import json
-import shutil
 
 import pytest
 
-from pyrite._catalog_layout import bundled_catalog
 from pyrite.campaign.config import material_sweep
 from pyrite.cli import _catalog_io
 from pyrite.cli import command as root_command
 from pyrite.materials.catalog import load_material_catalog
 from tests.helpers.cli import assert_clean_result, invoke
+from tests.helpers.user_catalog import copy_full_catalog
 
 _FULL_POLICY = {
     "bandwidth": "resonance-population",
@@ -22,7 +21,7 @@ _FULL_POLICY = {
 @pytest.fixture
 def catalog(tmp_path, monkeypatch):
     root = tmp_path / "catalog"
-    shutil.copytree(bundled_catalog(), root)
+    copy_full_catalog(root)
     monkeypatch.setattr(_catalog_io, "_CATALOG_PATH", root)
     return root
 

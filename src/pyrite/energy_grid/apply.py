@@ -778,7 +778,9 @@ def _validate_catalog_text(path, text, *, profile: str | None = None):
     if loader is None:
         from pyrite.materials import load_material_catalog as loader
 
-    fd, tmp = tempfile.mkstemp(dir=str(catalog_root(path)), prefix=".", suffix=".toml.tmp")
+    root = catalog_root(path)
+    root.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(root), prefix=".", suffix=".toml.tmp")
     try:
         with os.fdopen(fd, "w") as f:
             f.write(text)

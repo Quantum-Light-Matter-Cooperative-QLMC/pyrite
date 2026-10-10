@@ -83,7 +83,7 @@ The dataset and case identities include the requested policy. Realized counts an
 
 A profile's `E_grid_brem` sets the continuum grid for every case. For a uniform `arange` grid only `step` takes effect at full fidelity. Each case raises `start` to the medium's photon-continuum floor, snapped onto the `step` lattice, and replaces `stop` with the beam energy plus one step. A per-material uniform override therefore changes only the step. A nonuniform grid, such as the geometric continuum from `pyrite-dev energy-grid brem set --spacing geometric`, is used as stored and is a real per-material limit.
 
-Earlier releases stored a derived uniform `E_grid_brem` override for each material in the packaged profiles and copied them into new profiles. Those rows are gone. Case grids and case content keys are unchanged. The dataset identity hashes the declared sweep grid, though, so affected materials get a new `parameter_sha256`. Resuming an older checkpoint for one of them reports `checkpoint dataset identity mismatch`: archive it and rerun. Uniform `E_grid_brem` rows in existing user profiles under `~/.pyrite/catalog/profiles/` are harmless. Deleting them has the same identity effect.
+Earlier releases stored a derived uniform `E_grid_brem` override for each material in the packaged profiles and copied them into new profiles. Those rows are gone. Case grids and case content keys are unchanged. The dataset identity hashes the declared sweep grid, though, so affected materials get a new `parameter_sha256`. Resuming an older checkpoint for one of them reports `checkpoint dataset identity mismatch`: archive it and rerun. Uniform `E_grid_brem` rows in existing user profiles are harmless. Deleting them has the same identity effect.
 
 ## Line-grid policy
 
@@ -194,10 +194,14 @@ Detector geometry can be declared in `[profiles.NAME.detectors.ID]` tables. Each
 
 ### Bundled examples and implicit defaults
 
+The bundled catalog ships read-only demo profiles (`quickstart`, `sweep_demo`, `trajectory_demo`, `detector_demo`, `high_energy_demo`, `hopg_emittance_demo`) plus `standard`, the base profile every material's default scan ranges resolve from. `pyrite profile` writes the profiles you create to the user catalog layer (`catalog.user`, `PYRITE_USER_CATALOG`; the platform config directory by default) as `profiles/NAME.toml`, read over the bundled catalog; a user profile may not reuse a bundled name. Copy a demo with `pyrite profile create NAME --from DEMO`. Maintainers edit the shipped demos with `pyrite-dev profile`, the same command tree aimed at the bundled catalog. Remote runs ship the layer to the box as `user-catalog/`.
+
+Releases up to 0.6.1 bundled the research campaigns `sub_100keV`, `high_energy`, `hopg_short`, `hopg_hbn`, and `coh_test`. To keep using one, copy its TOML from the 0.6.1 tree (`src/pyrite/data/catalog/profiles/NAME.toml`) into `profiles/` under your user layer. Unchanged content keeps its dataset identity, so existing checkpoints resume. Like other profiles read with the bundled catalog, they stay exempt from the beam/detector requirement below; attaching an instrument changes their identity.
+
 The bundled `default` beam (200 fs, 5 kHz, 1 pC) and `default` detector (90 degrees) are examples, not a description of your beamline or detector, and the bundled `standard` profile is a 128-line example sweep. Since 0.6.0 PyRITE no longer falls back to them silently; a run that leaves the choice unnamed exits with a usage error (status 2):
 
 - `pyrite run` (locally or with `--remote`) needs `PROFILE`, `PYRITE_PROFILE`, or a saved `profile.current`. Select a profile with `pyrite run NAME` or keep one with `pyrite config set profile.current NAME`.
-- A run from a user-selected catalog (see [External catalogs](external-catalog.md)) whose profile names no `beam`, or names no `detector`, is refused. Attach your own with `pyrite profile set NAME --beam BEAM --detector DETECTOR`. Profiles run from the bundled catalog are examples themselves and stay exempt.
+- A run from a user-selected catalog (see [External catalogs](external-catalog.md)) whose profile names no `beam`, or names no `detector`, is refused. Attach your own with `pyrite profile set NAME --beam BEAM --detector DETECTOR`. Profiles read with the bundled catalog (bundled demos and your user-layer profiles) stay exempt.
 
 A profile that omits `detector` and `physical_detector` resolves the code-default scalar detector and no physical detector; it does not inherit geometry or a counting observation from `standard`. Attach the intended detector explicitly to use other geometry. The `standard` profile itself and profiles with explicit geometry keep their resolved identities.
 
