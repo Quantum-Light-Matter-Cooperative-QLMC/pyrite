@@ -252,7 +252,11 @@ def run_tree_reduction(E_r, aw, w, edges, inv_width, *, out, exact_widths=BIN_ME
     import cupy
 
     global _TREE_KERNEL
-    tree = build_line_tree(E_r, aw, w, exact_widths=exact_widths)
+    # This explicit CUDA entry point may run while the global backend is CPU.
+    # Transfer through CuPy rather than the selected backend's array converter.
+    tree = build_line_tree(
+        cupy.asnumpy(E_r), cupy.asnumpy(aw), cupy.asnumpy(w), exact_widths=exact_widths
+    )
     e, a, wt, first, last, center, half, radius, moments = tree
     if _TREE_KERNEL is None:
         _TREE_KERNEL = cupy.RawKernel(SINCSQ_BIN_PREAMBLE + _TREE_SOURCE, "pyrite_bin_tree_reduce")

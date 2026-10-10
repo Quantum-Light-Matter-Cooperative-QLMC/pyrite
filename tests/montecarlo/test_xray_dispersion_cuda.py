@@ -824,6 +824,11 @@ def test_coherent_decoherence_gaussian_bunch_finite_footprint_uses_jit_blend(
 
     segments = _decoh_active_segments()
     segments.update(crystal_width_ang=200.0, crystal_height_ang=200.0)
+    if longitudinal_rms_fs == 1.0e-3:
+        # The partial blend isolates longitudinal averaging, as in the CPU
+        # reference: transverse offsets require a recorded Gaussian spot and
+        # its additional form factor. Retain offsets in the F_z=0 floor case.
+        segments.update(r_mid=_DECOH_R_GEOM.copy(), initial_r_ang=np.zeros((2, 3)))
     call_kwargs = {**_DECOH_KWARGS, **_decoh_route_kwargs(route, monkeypatch)}
     calls = _count_kernel_calls(monkeypatch, route)
     grouped_calls = None
