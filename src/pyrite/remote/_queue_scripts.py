@@ -277,6 +277,8 @@ def _queue_script(
     no_cache=False,
     recompute=False,
     py_spy=False,
+    trajectories=None,
+    overwrite_trajectories=False,
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
     parallel_materials = _validate_parallel_materials(parallel_materials)
@@ -293,6 +295,10 @@ def _queue_script(
     if no_cache and recompute:
         raise ValueError("no_cache and recompute are mutually exclusive")
     flags = ""
+    if trajectories is not None:
+        flags += f" --trajectories {config.shell_word(trajectories)}"
+        if overwrite_trajectories:
+            flags += " --overwrite-trajectories"
     if quick:
         flags += " --quick"
     if workers is not None:
@@ -321,7 +327,7 @@ def _queue_script(
         if cpu or cpu_only
         else ""
     )
-    runtime_exports = ""
+    runtime_exports = "\nexport PYRITE_TRAJECTORY_SIZE_REPORT=1" if trajectories is not None else ""
     if spec_chunk is not None:
         runtime_exports += f"\nexport PYRITE_MC_SPEC_CHUNK={spec_chunk}"
     if brem_chunk is not None:
@@ -641,6 +647,8 @@ def _chunked_queue_script(
     brem_chunk=None,
     no_cache=False,
     recompute=False,
+    trajectories=None,
+    overwrite_trajectories=False,
 ):
     """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
 
@@ -652,6 +660,10 @@ def _chunked_queue_script(
     the next slice is already pending (spec Component 2 step 4).
     """
     flags = ""
+    if trajectories is not None:
+        flags += f" --trajectories {config.shell_word(trajectories)}"
+        if overwrite_trajectories:
+            flags += " --overwrite-trajectories"
     if quick:
         flags += " --quick"
     if workers is not None:
@@ -666,7 +678,7 @@ def _chunked_queue_script(
         flags += f' --performance-profile {performance_profile} --performance-dir "$PERFDIR"'
         if performance_interval != 5.0:
             flags += f" --perf-interval {performance_interval:g}"
-    runtime_exports = ""
+    runtime_exports = "\nexport PYRITE_TRAJECTORY_SIZE_REPORT=1" if trajectories is not None else ""
     if spec_chunk is not None:
         runtime_exports += f"\nexport PYRITE_MC_SPEC_CHUNK={spec_chunk}"
     if brem_chunk is not None:
@@ -1135,6 +1147,8 @@ def _queue_metadata(
     no_cache: bool = False,
     recompute: bool = False,
     py_spy: bool = False,
+    trajectories=None,
+    overwrite_trajectories=False,
 ):
     """Static metadata persisted before a queue becomes visible to SLURM."""
     return "\n".join(
@@ -1159,6 +1173,14 @@ def _queue_metadata(
             f"cpu_only: {bool(cpu_only)}",
             f"no_cache: {bool(no_cache)}",
             f"recompute: {bool(recompute)}",
+            *(
+                [
+                    f"trajectories: {trajectories}",
+                    f"overwrite_trajectories: {bool(overwrite_trajectories)}",
+                ]
+                if trajectories is not None
+                else []
+            ),
             "progress_dashboard: True",
             "",
         ]

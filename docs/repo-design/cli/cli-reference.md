@@ -144,11 +144,13 @@ Options:
                                   repopulate the shared per-case cache with the results.
   --trajectories [DIR]            Opt in to saving each transported case's full
                                   electron-transport result as HDF5 under DIR/<stem>/
-                                  (bare flag: pyrite-output/trajectories). Put PROFILE
-                                  before a bare --trajectories, or use
-                                  --trajectories=DIR. Files can be much larger than
-                                  checkpoints; cached cases are not re-transported (use
-                                  --recompute to capture them).
+                                  (bare flag: pyrite-output/trajectories). With
+                                  --remote, DIR is on the host, relative to its
+                                  checkout; captures stay remote until `pyrite remote
+                                  trajectories pull`. Put PROFILE before a bare
+                                  --trajectories, or use --trajectories=DIR. Files can
+                                  be much larger than checkpoints; cached cases are not
+                                  re-transported (use --recompute to capture them).
   --overwrite-trajectories        Replace existing trajectory files for cases this run
                                   transports; requires --trajectories.
   --no-progress                   Disable progress bars/dashboard.
@@ -1013,12 +1015,13 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  gc           Reclaim remote records obsolete under current scan profiles and...
-  performance  List, pull, or delete remote performance artifacts.
-  prune-jobs   Delete terminal (done/failed/cancelled) job directories; preview...
-  pull         Fetch existing checkpoints from remote box.
-  rm           Delete remote checkpoints; preview unless --yes.
-  sync         Push current code to remote box.
+  gc            Reclaim remote records obsolete under current scan profiles and...
+  performance   List, pull, or delete remote performance artifacts.
+  prune-jobs    Delete terminal (done/failed/cancelled) job directories; preview...
+  pull          Fetch existing checkpoints from remote box.
+  rm            Delete remote checkpoints; preview unless --yes.
+  sync          Push current code to remote box.
+  trajectories  Inspect remote captures, pull selected cases, or export selected...
 ```
 
 ## `pyrite remote gc`
@@ -1178,6 +1181,107 @@ Options:
   --force        Sync even while a live job is running different code.
   -v, --verbose  Print raw ssh/scp/rsync commands instead of a status line.
   -h, --help     Show this message and exit.
+```
+
+## `pyrite remote trajectories`
+
+```text
+Usage: pyrite remote trajectories [OPTIONS] COMMAND [ARGS]...
+
+  Inspect remote captures, pull selected cases, or export selected histories. No
+  automatic capture transfer.
+
+Options:
+  --root DIR  Remote capture root inside the checkout (default: pyrite-
+              output/trajectories).
+  -h, --help  Show this message and exit.
+
+Commands:
+  export  Export selected whole histories/tracks on the host and pull only .vtp files.
+  info    Show capture headers and sizes as JSON; reads no segment arrays.
+  ls      List complete capture files and sizes per stem; reads headers only.
+  pull    Preview selected complete HDF5 files and bytes.
+  score   Submit spectrum replay from selected captures to SLURM.
+```
+
+## `pyrite remote trajectories export`
+
+```text
+Usage: pyrite remote trajectories export [OPTIONS] [STEM]
+
+  Export selected whole histories/tracks on the host and pull only .vtp files. Requires
+  --history, --track, --first, or --sample; captures remain remote.
+
+Options:
+  --case NAME    Select exact case name; repeatable.
+  --energy KEV   Select exact incident energy in keV; repeatable.
+  --history ID   [x>=0]
+  --track ID     [x>=0]
+  --first N
+  --sample N
+  --seed S       [x>=0]
+  --out-dir DIR  Local VTK root (default: pyrite-output/trajectories-exports).
+  --overwrite    Replace differing local VTK files after verification.
+  -h, --help     Show this message and exit.
+```
+
+## `pyrite remote trajectories info`
+
+```text
+Usage: pyrite remote trajectories info [OPTIONS] [STEM]
+
+  Show capture headers and sizes as JSON; reads no segment arrays.
+
+Options:
+  --case NAME   Select exact case name; repeatable.
+  --energy KEV  Select exact incident energy in keV; repeatable.
+  -h, --help    Show this message and exit.
+```
+
+## `pyrite remote trajectories ls`
+
+```text
+Usage: pyrite remote trajectories ls [OPTIONS] [STEM]
+
+  List complete capture files and sizes per stem; reads headers only.
+
+Options:
+  --case NAME   Select exact case name; repeatable.
+  --energy KEV  Select exact incident energy in keV; repeatable.
+  -h, --help    Show this message and exit.
+```
+
+## `pyrite remote trajectories pull`
+
+```text
+Usage: pyrite remote trajectories pull [OPTIONS] [STEM]
+
+  Preview selected complete HDF5 files and bytes. --yes transfers with rsync resume,
+  SHA-256 and header verification. No history filtering; use export for histories.
+
+Options:
+  --case NAME    Select exact case name; repeatable.
+  --energy KEV   Select exact incident energy in keV; repeatable.
+  --out-dir DIR  Local capture root (default: pyrite-output/trajectories).
+  -y, --yes      Transfer the selected files; without this flag only preview.
+  --overwrite    Replace differing local files after successful verification.
+  -h, --help     Show this message and exit.
+```
+
+## `pyrite remote trajectories score`
+
+```text
+Usage: pyrite remote trajectories score [OPTIONS] [STEM]
+
+  Submit spectrum replay from selected captures to SLURM. Writes remote checkpoints; no
+  transport or capture transfer. Requires one exact STEM. Uses already synced code.
+
+Options:
+  --case NAME       Select exact case name; repeatable.
+  --energy KEV      Select exact incident energy in keV; repeatable.
+  --max-segments N  Segment rows per scoring block; whole histories stay together.
+  --overwrite       Re-score existing checkpoint records.
+  -h, --help        Show this message and exit.
 ```
 
 ## `pyrite job`

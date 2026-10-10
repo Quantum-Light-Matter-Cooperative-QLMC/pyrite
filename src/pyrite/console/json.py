@@ -104,7 +104,7 @@ def job_kind(command: str | None) -> str | None:
         return "run"
     if command in {"grid", "derive", "energy-grid"}:
         return "grid"
-    if command in {"rebrem", "reline", "recompute"}:
+    if command in {"rebrem", "reline", "recompute", "trajectory-score"}:
         return "recompute"
     if command in {"check", "validate", "zhai"}:
         return "validate"

@@ -511,6 +511,11 @@ def run_sweep(
             )
     if on_runtime is not None:
         on_runtime(runner.runtime_plan(todo, max_workers))
+    capture_size_report = None
+    if trajectory_capture is not None and os.environ.get("PYRITE_TRAJECTORY_SIZE_REPORT") == "1":
+        from ._trajectory_capture import CaptureSizeReport
+
+        capture_size_report = CaptureSizeReport(trajectory_capture, todo)
     completed_new_cases = 0
     total_cost = sum(case_cost_fn(c) for c in cases) if case_cost_fn is not None else None
     done_cost = (
@@ -544,6 +549,9 @@ def run_sweep(
 
     def _cb(i, case, out):
         nonlocal completed_new_cases, done_cost
+
+        if capture_size_report is not None:
+            capture_size_report.completed(case)
 
         if transport_only:
             completed_new_cases += 1

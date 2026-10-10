@@ -63,6 +63,8 @@ def start_queue(
     no_cache=False,
     recompute=False,
     py_spy=False,
+    trajectories=None,
+    overwrite_trajectories=False,
 ):
     """Submit a material queue to SLURM. Returns its job id.
 
@@ -96,6 +98,22 @@ def start_queue(
     transport._check_shell_tokens(
         [catalog_profile, *([performance_profile] if performance_profile is not None else [])]
     )
+    capture_options = {}
+    if trajectories is not None:
+        from .trajectories import capture_root
+
+        try:
+            trajectories = capture_root(trajectories)
+        except ValueError as error:
+            raise SystemExit(str(error)) from error
+        if cpu_only or performance_repetitions > 1:
+            raise SystemExit("trajectory capture excludes CPU-only and repeated profiling")
+        capture_options = {
+            "trajectories": trajectories,
+            "overwrite_trajectories": overwrite_trajectories,
+        }
+    elif overwrite_trajectories:
+        raise SystemExit("overwrite-trajectories requires trajectories")
     chunked = chunk_minutes > 0
     if (
         not isinstance(performance_repetitions, int)
@@ -193,6 +211,7 @@ def start_queue(
             brem_chunk,
             no_cache,
             recompute,
+            **capture_options,
         )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
     else:
@@ -219,6 +238,7 @@ def start_queue(
             no_cache,
             recompute,
             py_spy=py_spy,
+            **capture_options,
         )
         time_limit = config.SLURM_TIME
     workers_per_material = config.SLURM_CPUS_PER_MATERIAL if workers is None else max(1, workers)
@@ -255,6 +275,7 @@ def start_queue(
             no_cache,
             recompute,
             py_spy=py_spy,
+            **capture_options,
         ),
     )
     submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)
@@ -314,6 +335,17 @@ def start_queue(
                             recompute,
                         )
                     ),
+                ),
+                *(
+                    [
+                        ("Trajectories", trajectories),
+                        (
+                            "Capture pull",
+                            f"pyrite remote trajectories --root {config.shell_word(trajectories)} pull STEM --yes",
+                        ),
+                    ]
+                    if trajectories is not None
+                    else []
                 ),
                 ("Monitor", f"pyrite job attach {jobid}"),
                 ("Status", f"pyrite job status {jobid} -vv"),

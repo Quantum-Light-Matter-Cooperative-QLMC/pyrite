@@ -43,10 +43,12 @@ class _TrajectoryPath(click.Path):
 
 
 def _trajectories_dir(ctx, param, value):
-    del ctx, param
+    del param
     if value is None:
         return None
-    return output_dir("trajectories") if str(value) == _BARE_TRAJECTORIES else value
+    if str(value) == _BARE_TRAJECTORIES:
+        return _BARE_TRAJECTORIES
+    return value
 
 
 def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
@@ -265,8 +267,10 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     metavar="[DIR]",
     help=(
         "Opt in to saving each transported case's full electron-transport result "
-        "as HDF5 under DIR/<stem>/ (bare flag: pyrite-output/trajectories). Put "
-        "PROFILE before a bare --trajectories, or use --trajectories=DIR. Files can "
+        "as HDF5 under DIR/<stem>/ (bare flag: pyrite-output/trajectories). "
+        "With --remote, DIR is on the host, relative to its checkout; captures stay "
+        "remote until `pyrite remote trajectories pull`. Put PROFILE before a bare "
+        "--trajectories, or use --trajectories=DIR. Files can "
         "be much larger than checkpoints; cached cases are not re-transported (use "
         "--recompute to capture them)."
     ),
@@ -553,8 +557,6 @@ def _command(
             "n_families": "--n-families",
             "checkpoint_dir": "--checkpoint-dir",
             "max_minutes": "--max-minutes",
-            "trajectories": "--trajectories",
-            "overwrite_trajectories": "--overwrite-trajectories",
             "performance_profile": "--performance-profile",
             "performance_dir": "--performance-dir",
             "progress_file": "--progress-file",
@@ -597,6 +599,12 @@ def _command(
                 headless=detach,
                 no_pull=False,
                 chunk_minutes=chunk_minutes,
+                trajectories=(
+                    "pyrite-output/trajectories"
+                    if str(trajectories) == _BARE_TRAJECTORIES
+                    else trajectories
+                ),
+                overwrite_trajectories=overwrite_trajectories,
             )
     if resolved_profile is not None:
         _implicit_defaults.require_explicit_instrument(catalog_profile)
@@ -661,6 +669,8 @@ def _command(
             recompute=recompute,
         )
         return None  # os.execvp already replaced the process; defensive.
+    if str(trajectories) == _BARE_TRAJECTORIES:
+        trajectories = output_dir("trajectories")
     # Trajectory capture is opt-in; ordinary runs keep their exact arguments.
     capture = (
         {}

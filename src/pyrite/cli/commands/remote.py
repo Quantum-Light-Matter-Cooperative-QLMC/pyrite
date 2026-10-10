@@ -261,6 +261,8 @@ class _StartFlags:
     drop_wide_brem: bool
     downcast: bool
     level9: bool
+    trajectories: str | None = None
+    overwrite_trajectories: bool = False
 
 
 @dataclass(frozen=True)
@@ -273,6 +275,10 @@ class _StartPlan:
 
 def _reject_exclusive_start_flags(flags):
     """Reject ``remote run`` flag pairs that cannot describe one session."""
+    if flags.overwrite_trajectories and flags.trajectories is None:
+        raise click.UsageError("--overwrite-trajectories requires --trajectories")
+    if flags.trajectories is not None and (flags.cpu_only or flags.performance_repetitions > 1):
+        raise click.UsageError("--trajectories excludes --cpu-only and --perf-reps greater than 1")
     if flags.cpu and flags.cpu_only:
         raise click.UsageError("--cpu and --cpu-only are mutually exclusive")
     if flags.no_cache and flags.recompute:
@@ -573,6 +579,17 @@ _start_transfer_options = _option_group(
 @_start_performance_options
 @_start_cache_options
 @_start_transfer_options
+@click.option(
+    "--trajectories",
+    default=None,
+    metavar="DIR",
+    help="Remote capture root; relative to the checkout. Captures are never automatically pulled.",
+)
+@click.option(
+    "--overwrite-trajectories",
+    is_flag=True,
+    help="Replace captured cases; requires --trajectories.",
+)
 def start_command(**params):
     from ...console import config as cli_config
     from ...runs.scan import resolve_profile_materials
@@ -616,6 +633,8 @@ def start_command(**params):
         drop_wide_brem=flags.drop_wide_brem,
         downcast=flags.downcast,
         level9=flags.level9,
+        trajectories=flags.trajectories,
+        overwrite_trajectories=flags.overwrite_trajectories,
     )
 
 
@@ -1054,6 +1073,11 @@ def check_command(ctx, ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, deta
         follow=follow,
         pull=pull,
     )
+
+
+from . import remote_trajectories  # noqa: E402
+
+command.add_command(remote_trajectories.command)
 
 
 def main(argv=None):

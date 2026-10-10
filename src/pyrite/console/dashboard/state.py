@@ -17,6 +17,7 @@ _FRAME_SECTIONS = frozenset(
         "QUEUE",
         "PROGRESS",
         "PERFORMANCE",
+        "TRAJECTORIES",
         "RESOURCES",
         "LOG",
     }
