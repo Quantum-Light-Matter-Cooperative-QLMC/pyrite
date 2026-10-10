@@ -35,6 +35,7 @@ run through the collector.
 | `brem_source_comparison.py` | EEDL and BremsLib bremsstrahlung `chi`, hard cross section, and radiative moment against the pinned Seltzer–Berger tables for every catalogue element, 1 keV–30 MeV; gates BremsLib, reports the EEDL interpolation defect (#174). |
 | `coherent_flat_omission.py` | Paired spectrum timing of the coherent Flat-term omission on one immutable transport realization; thin anchors run locally, thick/GPU cases through `pyrite remote` (#362). |
 | `coherent_physical_population_remote.py` | Charge-weighted CUDA float64 limits, same-trajectory 30/60 keV grid ladders, and reduced short-bunch smoke; persists transport across scheduler slices. |
+| `coherent_window_excluded_dispersion.py` | Per-row window-excluded production power against the dispersive window certificate on one transport; `--case anchor` on CPU, `--case thick` (1 mm) on `pyrite remote`. |
 | `coherent_transverse_coherence.py` | Tests whether a single coherent transverse-direction draw is representative of the observable spectrum. |
 | `collision_statistics_refinement.py` | Measures collision-statistics changes under transport substep refinement. |
 | `cross_reflection_coherence.py` | Bounds the coherent-spectrum effect of omitted cross-reflection terms. |
