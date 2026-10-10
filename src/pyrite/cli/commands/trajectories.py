@@ -6,6 +6,7 @@ import click
 
 from ...console import output as _cli_core
 from ...console.outputs import output_default, output_label
+from .. import _completion as _cli_completion
 
 
 def _print_paraview_script(ctx, _param, value):
@@ -39,8 +40,11 @@ def _artifacts(paths):
     "export-trajectories",
     help=(
         "Export captured trajectory segments to VTK PolyData (.vtp).\n\n"
-        "ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, or a "
-        "directory searched recursively for them. Each artifact becomes one .vtp "
+        "ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, a "
+        "directory searched recursively for them, or a checkpoint from "
+        "`pyrite checkpoint list` (exact name, unique prefix, or unique "
+        "fragment such as its hash) naming its local capture directory. "
+        "Each artifact becomes one .vtp "
         "of two-point line cells in the slab frame [angstrom] with per-segment "
         "cell data, including electron_id; per-electron arrays, tallies, and "
         "complete transport metadata stay in the authoritative HDF5 artifact. "
@@ -52,7 +56,7 @@ def _artifacts(paths):
         "array and a FieldData record of the selection. Vacuum legs follow "
         "selected histories and are omitted from track selections.\n\n"
         "Examples:\n\n"
-        "  pyrite checkpoint export-trajectories trajectories/hopg/ --first 20\n\n"
+        "  pyrite checkpoint export-trajectories hopg@trajectory_demo --first 20\n\n"
         "  pyrite checkpoint export-trajectories case.h5 --sample 100 --seed 1 --scene\n\n"
         "ParaView preset (colouring, thresholds, scene views, headless PNG): "
         '`pvbatch "$(pyrite checkpoint export-trajectories --paraview-script)" '
@@ -64,7 +68,7 @@ def _artifacts(paths):
     nargs=-1,
     required=True,
     metavar="ARTIFACT...",
-    type=click.Path(exists=True, path_type=Path),
+    type=_cli_completion.TRAJECTORY_ARTIFACT,
 )
 @click.option(
     "--paraview-script",
@@ -217,8 +221,9 @@ def command(
     "score-trajectories",
     help=(
         "Score checkpoint records from captured trajectories without re-transporting.\n\n"
-        "ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, or a "
-        "directory searched recursively for them. Each artifact's spectrum phase "
+        "ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, a "
+        "directory searched recursively for them, or a checkpoint selector as "
+        "for export-trajectories. Each artifact's spectrum phase "
         "(line, characteristic, and bremsstrahlung spectra) is replayed from its "
         "stored segments and saved as a record of the checkpoint stem and run "
         "identity it was captured under, in DIR/<stem>. Records already present "
@@ -237,7 +242,7 @@ def command(
     nargs=-1,
     required=True,
     metavar="ARTIFACT...",
-    type=click.Path(exists=True, path_type=Path),
+    type=_cli_completion.TRAJECTORY_ARTIFACT,
 )
 @click.option(
     "--checkpoint-dir",

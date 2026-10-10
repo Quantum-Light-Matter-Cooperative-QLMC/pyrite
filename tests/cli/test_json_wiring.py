@@ -219,13 +219,15 @@ energy_grid_refs = {{ hopg = "{stored.digest}" }}
     assert material["brem_grid"]["stop_eV"] == 150000.0
 
 
-def test_archives_json_retains_unreadable_entry(monkeypatch, tmp_path):
-    shelf = tmp_path / "archive"
-    shelf.mkdir()
+def test_archives_json_retains_unreadable_entry(tmp_path):
+    # The autouse workspace fixture roots DEFAULT_ROOT at tmp_path. Never
+    # monkeypatch it: undo writes the lazy value back as a real attribute that
+    # shadows the module __getattr__ for every later test.
+    shelf = tmp_path / "pyrite-output" / "checkpoints" / "archive"
+    shelf.mkdir(parents=True)
     with (shelf / "good.pkl").open("wb") as stream:
         pickle.dump({"a": {30.0: {}}}, stream)
     (shelf / "bad.pkl").write_bytes(b"bad")
-    monkeypatch.setattr(archive._archive, "DEFAULT_ROOT", str(tmp_path), raising=False)
 
     document = _document(invoke(archive.archives_command, ["-o", "json"]), exit_code=1)
 

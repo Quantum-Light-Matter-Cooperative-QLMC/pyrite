@@ -237,10 +237,10 @@ def test_local_commands_wire_material_checkpoint_archive_and_choice_completion()
         )
     ]
 
-    assert _callback(archive.store_command, "stem") is _cli_completion.complete_archive_stem
+    assert _parameter(archive.store_command, "stem").type is _cli_completion.CHECKPOINT_STEM
     assert _callback(archive.store_command, "label") is None
     assert _callback(archive.restore_command, "label") is _cli_completion.complete_archive_label
-    assert _callback(archive.union_command, "stem") is _cli_completion.complete_archive_stem
+    assert _parameter(archive.union_command, "stem").type is _cli_completion.CHECKPOINT_STEM
     assert _callback(archive.union_command, "label") is _cli_completion.complete_archive_label
 
 
@@ -338,3 +338,76 @@ def test_detector_commands_wire_catalog_completion_but_not_new_names():
             _callback(profile.command.commands[name], "detector_name")
             is _cli_completion.complete_detector
         )
+
+
+_DEMO = "hopg@trajectory_demo-02c8858c0430"
+_STEMS = [_DEMO, "hbn@high_energy-1ca2a03dbfd5", "hbn@standard-aaaa00000000"]
+
+
+@pytest.mark.parametrize(
+    ("selector", "expected"),
+    [
+        (_DEMO, [_DEMO]),
+        ("hopg", [_DEMO]),
+        ("hopg@traj", [_DEMO]),
+        ("02c8", [_DEMO]),
+        ("hbn", ["hbn@high_energy-1ca2a03dbfd5", "hbn@standard-aaaa00000000"]),
+        ("mos2", []),
+    ],
+)
+def test_checkpoint_selector_matches_exact_then_prefix_then_fragment(selector, expected):
+    assert _cli_completion.match_checkpoint(selector, _STEMS) == expected
+
+
+def test_exact_stem_wins_over_longer_prefix_matches():
+    assert _cli_completion.match_checkpoint("hopg", ["hopg", "hopg_quick"]) == ["hopg"]
+
+
+def _trajectory_layout(tmp_path):
+    checkpoints = tmp_path / "pyrite-output" / "checkpoints"
+    for stem in _STEMS:
+        (checkpoints / stem).mkdir(parents=True)
+        (checkpoints / stem / "line.h5").write_bytes(b"")
+    captured = tmp_path / "pyrite-output" / "trajectories" / _DEMO
+    captured.mkdir(parents=True)
+    return captured
+
+
+@pytest.mark.parametrize("selector", [_DEMO, "hopg@traj", "02c8858c"])
+def test_trajectory_artifact_resolves_a_checkpoint_to_its_capture(tmp_path, selector):
+    captured = _trajectory_layout(tmp_path)
+    resolved = _cli_completion.TRAJECTORY_ARTIFACT.convert(selector, None, None)
+    assert resolved.resolve() == captured.resolve()
+
+
+def test_trajectory_artifact_prefers_an_existing_path(tmp_path, monkeypatch):
+    _trajectory_layout(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "hopg").mkdir()
+    assert _cli_completion.TRAJECTORY_ARTIFACT.convert("hopg", None, None) == Path("hopg")
+
+
+def test_trajectory_artifact_reports_ambiguous_missing_and_uncaptured(tmp_path):
+    import click
+
+    _trajectory_layout(tmp_path)
+    convert = _cli_completion.TRAJECTORY_ARTIFACT.convert
+    with pytest.raises(click.BadParameter, match="matches 2 checkpoints"):
+        convert("hbn", None, None)
+    with pytest.raises(click.BadParameter, match="pyrite checkpoint list"):
+        convert("mos2", None, None)
+    with pytest.raises(click.BadParameter, match="remote trajectories pull hbn@high_energy"):
+        convert("high_energy", None, None)
+
+
+def test_trajectory_artifact_completes_captured_stems_and_files(tmp_path):
+    _trajectory_layout(tmp_path)
+    items = _cli_completion.TRAJECTORY_ARTIFACT.shell_complete(None, None, "ho")
+    assert [(item.value, item.type) for item in items] == [(_DEMO, "plain"), ("ho", "file")]
+
+
+def test_checkpoint_stem_resolves_prefix_and_passes_unknown_through(tmp_path):
+    _trajectory_layout(tmp_path)
+    convert = _cli_completion.CHECKPOINT_STEM.convert
+    assert convert("hopg", None, None) == _DEMO
+    assert convert("legacy", None, None) == "legacy"

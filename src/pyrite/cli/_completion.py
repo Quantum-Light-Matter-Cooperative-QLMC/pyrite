@@ -223,6 +223,118 @@ def complete_archive_label(ctx: object, param: object, incomplete: str) -> list[
     return _items(_safe_file_stems(archive_dir), incomplete)
 
 
+def _trajectory_root() -> Path:
+    return output_dir("trajectories")
+
+
+def _safe_dir_names(directory: Path) -> list[str]:
+    """Return at most ``MAX_LOCAL_CANDIDATES`` safe subdirectory names."""
+    try:
+        entries = os.scandir(directory)
+    except OSError:
+        return []
+    values: list[str] = []
+    try:
+        with entries:
+            for entry in entries:
+                if len(values) >= MAX_LOCAL_CANDIDATES:
+                    break
+                if entry.is_dir(follow_symlinks=False) and _SAFE_TOKEN_RE.fullmatch(entry.name):
+                    values.append(entry.name)
+    except OSError:
+        return []
+    return values
+
+
+def match_checkpoint(selector: str, stems: Iterable[str]) -> list[str]:
+    """Return stems ``selector`` names: exact, else unique-prefix, else substring.
+
+    ``hopg``, ``hopg@traj``, and a parameter-hash fragment such as ``02c8`` all
+    select ``hopg@trajectory_demo-02c8858c0430`` when nothing else matches. More
+    than one returned stem means the selector is ambiguous.
+    """
+    candidates = sorted(set(stems))
+    if selector in candidates:
+        return [selector]
+    return [stem for stem in candidates if stem.startswith(selector)] or [
+        stem for stem in candidates if selector in stem
+    ]
+
+
+def _resolve_stem(param_type, selector, stems, param, ctx) -> str | None:
+    """Resolve ``selector`` to one stem, ``None`` when nothing matches."""
+    matches = match_checkpoint(selector, stems)
+    if len(matches) > 1:
+        param_type.fail(
+            f"{selector!r} matches {len(matches)} checkpoints: {', '.join(matches)}",
+            param,
+            ctx,
+        )
+    return matches[0] if matches else None
+
+
+class CheckpointStem(click.ParamType):
+    """Active checkpoint stem, selectable by unique prefix or substring.
+
+    An unmatched value passes through unchanged so the command reports its own
+    missing-checkpoint error.
+    """
+
+    name = "checkpoint"
+
+    def convert(self, value, param, ctx):
+        stems = _safe_checkpoint_stems(_default_checkpoint_root())
+        return _resolve_stem(self, str(value), stems, param, ctx) or str(value)
+
+    def shell_complete(self, ctx, param, incomplete):
+        return complete_archive_stem(ctx, param, incomplete)
+
+
+class TrajectoryArtifact(click.ParamType):
+    """Existing artifact path, or a checkpoint selector naming its capture dir.
+
+    A selector resolves against local checkpoint stems and capture directories
+    to ``pyrite-output/trajectories/<stem>/``; existing paths always win.
+    """
+
+    name = "artifact"
+
+    def convert(self, value, param, ctx):
+        if isinstance(value, Path):
+            return value
+        path = Path(value)
+        if path.exists():
+            return path
+        root = _trajectory_root()
+        stems = [*_safe_checkpoint_stems(_default_checkpoint_root()), *_safe_dir_names(root)]
+        stem = _resolve_stem(self, str(value), stems, param, ctx)
+        if stem is None:
+            self.fail(
+                f"{value!r} is neither an existing path nor a local checkpoint; "
+                "see `pyrite checkpoint list`",
+                param,
+                ctx,
+            )
+        captured = root / stem
+        if not captured.is_dir():
+            self.fail(
+                f"checkpoint {stem!r} has no local trajectory capture at {captured}; "
+                f"capture with `pyrite run --trajectories` or fetch with "
+                f"`pyrite remote trajectories pull {stem} --yes`",
+                param,
+                ctx,
+            )
+        return captured
+
+    def shell_complete(self, ctx, param, incomplete):
+        stems = _safe_dir_names(_trajectory_root())
+        return [*_items(stems, incomplete), CompletionItem(incomplete, type="file")]
+
+
+CHECKPOINT_STEM = CheckpointStem()
+TRAJECTORY_ARTIFACT = TrajectoryArtifact()
+
+
 def _query_remote_job_ids() -> Sequence[str]:
     """Read recent remote job-directory names with bounded, prompt-free SSH."""
     from ..remote import config
@@ -285,6 +397,10 @@ def choice_completer(values: Iterable[object]) -> Completion:
 
 
 __all__ = [
+    "CHECKPOINT_STEM",
+    "TRAJECTORY_ARTIFACT",
+    "CheckpointStem",
+    "TrajectoryArtifact",
     "choice_completer",
     "complete_archive_label",
     "complete_archive_stem",
@@ -295,4 +411,5 @@ __all__ = [
     "complete_material",
     "complete_material_csv",
     "complete_profile",
+    "match_checkpoint",
 ]
