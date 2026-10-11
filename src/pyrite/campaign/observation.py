@@ -67,6 +67,7 @@ def physical_detector_from_config(
             pitch_mm=cast(tuple[float, float], row.get("pitch_mm", (0.055, 0.055))),
         ),
         energy_bins=EnergyBins() if energy_bins is None else energy_bins,
+        _energy_bins_explicit=False,
         response=_response_from_config(response),
     )
 
@@ -103,6 +104,7 @@ def resolve_profile_observation(
             pose=detector.pose,
             pixels=detector.pixels,
             energy_bins=detector.energy_bins,
+            _energy_bins_explicit=False,
             response=IdealPhotonCounter(),
         )
     scorer_row = cast(Mapping[str, object], row.get("scorer", {}))

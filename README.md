@@ -185,7 +185,8 @@ See [sweep profiles](docs/guides/sweep-profiles.md),
 
 ### Python API
 
-For a single simulation with no files on disk:
+For a single simulation with no files on disk, `Physics` chooses models and
+`Numerics` controls sampling, energy grids, and execution:
 
 ```python
 import pyrite as pr
@@ -197,6 +198,7 @@ result = pr.simulate(
     beam,
     target,
     detector,
+    physics=pr.Physics(),
     numerics=pr.Numerics(cxr_trials=450, brem_trials=100),
 )
 print(result.provenance["identity_digest"])

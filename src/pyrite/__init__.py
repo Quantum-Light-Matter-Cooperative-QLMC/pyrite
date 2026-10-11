@@ -40,6 +40,8 @@ if env_value("PYRITE_MC_DEBUG"):
 
 if TYPE_CHECKING:
     # Static view of the lazy exports below, so editors resolve hover docs and types.
+    from pyrite._numerics import CxrReflections as CxrReflections
+    from pyrite._numerics import Physics as Physics
     from pyrite._precision import Precision as Precision
     from pyrite.api import simulate as simulate
     from pyrite.campaign.beam import (
@@ -164,6 +166,8 @@ _PUBLIC_OBJECTS = {
     "PointSpot": ("pyrite.campaign.beam", "PointSpot"),
     "Spot": ("pyrite.campaign.beam", "Spot"),
     "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
+    "Physics": ("pyrite._numerics", "Physics"),
+    "CxrReflections": ("pyrite._numerics", "CxrReflections"),
     "Convergence": ("pyrite.campaign.model", "Convergence"),
     "CxrSpectra": ("pyrite.results.model", "CxrSpectra"),
     "Detector": ("pyrite.detectors", "Detector"),

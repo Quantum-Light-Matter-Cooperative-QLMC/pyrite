@@ -159,8 +159,9 @@ def test_old_sweep_axis_path_is_removed():
     )
     with pytest.raises(ValueError, match="line"):
         Sweep(scene, {"detector.energy_bins.line": ([1, 2],)}).expand()
-    expanded = Sweep(scene, {"detector.energy_bins.cxr": ([1, 2],)}).expand()[0][1]
-    np.testing.assert_array_equal(expanded.detector.energy_bins.cxr, [1, 2])
+    with pytest.warns(DeprecationWarning, match="Numerics"):
+        expanded = Sweep(scene, {"detector.energy_bins.cxr": ([1, 2],)}).expand()[0][1]
+    np.testing.assert_array_equal(expanded.numerics.energy_bins.cxr, [1, 2])
 
 
 def test_removed_api_alias_helpers_are_unavailable():

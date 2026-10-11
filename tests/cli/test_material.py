@@ -180,7 +180,7 @@ def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
     from pyrite.instrument import FilterPlate, PlanarDetector
 
     document = _single_scene_catalog(tmp_path, monkeypatch)
-    beam, target, detector, filters, scorer, acquisition, numerics, emission, detector_id = (
+    beam, target, detector, filters, scorer, acquisition, numerics, physics, detector_id = (
         _simulation.resolve_scene(document, "hopg", "single")
     )
 
@@ -194,9 +194,9 @@ def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
     assert isinstance(numerics, Numerics)
     assert numerics.cxr_trials == 7
     assert numerics.brem_trials == 3
-    assert numerics.straggling is True
+    assert physics.straggling is True
     assert numerics.energy_model == "midpoint"
-    assert emission == "incoherent"
+    assert physics.emission == "incoherent"
     assert detector_id == "physical"
     assert scorer.angular_shape == (1, 1)
     assert acquisition is None
@@ -225,7 +225,7 @@ measured_edges_eV = [0.0, 100.0, 200.0]
     assert acquisition.exposure_s == 2.0
     assert acquisition.measured_edges_eV == (0.0, 100.0, 200.0)
     assert isinstance(detector.response, IdealPhotonCounter)
-    assert detector.energy_bins.cxr is not None
+    assert _numerics.energy_bins.cxr is not None
 
 
 def test_simulation_scene_rejects_non_singleton_profile_grid(tmp_path, monkeypatch):
@@ -590,15 +590,15 @@ def test_single_scene_and_checkpoint_lowering_share_seed_counts_and_explicit_gri
     )
     catalog = load_material_catalog(path, profile="single")
     monkeypatch.setattr(config, "_catalog", lambda *_: catalog)
-    beam, target, detector, filters, scorer, acquisition, numerics, emission, _id = (
+    beam, target, detector, filters, scorer, acquisition, numerics, physics, _id = (
         _simulation.resolve_scene(document, "hopg", "single")
     )
     assert detector.scorer == scorer
-    scene = Scene(beam, target, detector, filters=filters, emission=emission)
+    scene = Scene(beam, target, detector, filters=filters, physics=physics)
     single = api.build_case(scene, numerics)
     settings = replace(
         config.default_settings(),
-        straggling=numerics.straggling,
+        straggling=physics.straggling,
         energy_model=numerics.energy_model,
         max_dE_frac=numerics.max_dE_frac,
     )

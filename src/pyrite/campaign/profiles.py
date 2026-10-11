@@ -27,8 +27,9 @@ from .._numerics import (
     PROFILE_NUMERICS_KEYS,
     SAMPLING_KEYS,
     TRANSPORT_KEYS,
-    Convergence,
+    CxrReflections,
     Numerics,
+    Physics,
     electron_counts,
     validate_bremsstrahlung_model,
     validate_profile_numerics,
@@ -333,8 +334,9 @@ def resolve_numerics(
 ) -> NumericsResolution:
     """Resolve run overrides over profile, fidelity, then built-in numerics."""
     preset = get_fidelity_preset(fidelity)
-    convergence = Convergence()
-    numerics = Numerics(convergence=convergence)
+    convergence = CxrReflections()
+    numerics = Numerics(cxr_reflections=convergence)
+    physics = Physics()
     effective: dict[str, object] = {
         "n_electrons": preset.n_electrons,
         "n_electrons_brem": preset.n_electrons_brem,
@@ -342,19 +344,19 @@ def resolve_numerics(
         "max_reflections": preset.max_reflections,
         "mosaic_nodes": convergence.mosaic_nodes,
         "mosaic_route": convergence.mosaic_route,
-        "straggling": numerics.straggling,
+        "straggling": physics.straggling,
         "energy_model": numerics.energy_model,
         "max_dE_frac": numerics.max_dE_frac,
-        "inelastic_model": numerics.inelastic_model,
-        "inelastic_cutoff_eV": numerics.inelastic_cutoff_eV,
-        "secondary_threshold_eV": numerics.secondary_threshold_eV,
-        "elastic_model": numerics.elastic_model,
-        "bremsstrahlung_model": numerics.bremsstrahlung_model,
-        "radiative_model": numerics.radiative_model,
-        "radiative_cutoff_eV": numerics.radiative_cutoff_eV,
-        "pair_production_model": numerics.pair_production_model,
-        "positron_transport": numerics.positron_transport,
-        "atomic_electron_deflection": numerics.atomic_electron_deflection,
+        "inelastic_model": physics.inelastic_model,
+        "inelastic_cutoff_eV": physics.inelastic_cutoff_eV,
+        "secondary_threshold_eV": physics.secondary_threshold_eV,
+        "elastic_model": physics.elastic_model,
+        "bremsstrahlung_model": physics.bremsstrahlung_model,
+        "radiative_model": physics.radiative_model,
+        "radiative_cutoff_eV": physics.radiative_cutoff_eV,
+        "pair_production_model": physics.pair_production_model,
+        "positron_transport": physics.positron_transport,
+        "atomic_electron_deflection": physics.atomic_electron_deflection,
     }
     sources = {
         key: (
@@ -398,6 +400,8 @@ def _jsonable(value: Any) -> Any:
         return {
             names.get(f.name, f.name): _jsonable(getattr(value, f.name))
             for f in dataclasses.fields(value)
+            # Constructor compatibility bookkeeping is not detector physics.
+            if f.name != "_energy_bins_explicit"
         }
     if isinstance(value, np.ndarray):
         # A non-object dtype's `.tolist()` is already a plain nested list of

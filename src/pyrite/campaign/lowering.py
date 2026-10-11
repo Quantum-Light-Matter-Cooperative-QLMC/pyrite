@@ -3,18 +3,30 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
+from .._numerics import Numerics, Physics, resolve_physics
 from ..instrument import PlanarDetector
 from ..montecarlo import Case
 
 if TYPE_CHECKING:
-    from .model import Numerics, Scene, Sweep
+    from .model import Scene, Sweep
 from .sweep import Sweep as LegacySweep
 from .sweep import build_cases
 
 
-def build_case(scene: Scene, numerics: Numerics) -> Case:
+def scene_physics(scene: Scene, numerics: Numerics) -> Physics:
+    """Resolve the scene's model policy and deprecated forwarding inputs."""
+    physics = resolve_physics(scene.physics if scene._physics_explicit else None, numerics)
+    if not scene._physics_explicit and scene._policy_overrides:
+        physics = replace(physics, **dict(scene._policy_overrides))
+    physics.validate_transport(numerics.energy_model)
+    return physics
+
+
+def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
     """Lower one resolved scene to the existing typed transport input."""
-    convergence = numerics.convergence
+    numerics = scene.numerics if numerics is None else numerics
+    physics = scene_physics(scene, numerics)
+    convergence = numerics.cxr_reflections
     if numerics.precision is not None and isinstance(scene.detector, PlanarDetector):
         raise ValueError("adaptive precision does not support physical detectors; use fixed counts")
     scalar_detector = (
@@ -22,6 +34,11 @@ def build_case(scene: Scene, numerics: Numerics) -> Case:
         if isinstance(scene.detector, PlanarDetector)
         else scene.detector
     )
+    bins = numerics.energy_bins
+    if bins is not None:
+        if scene.detector._energy_bins_explicit and scene.detector.energy_bins != bins:
+            raise ValueError("conflicting detector.energy_bins and Numerics.energy_bins")
+        scalar_detector = replace(scalar_detector, energy_bins=bins, _energy_bins_explicit=False)
     legacy = LegacySweep(
         material=scene.target.material,
         beam=scene.beam.to_spec(),
@@ -38,20 +55,20 @@ def build_case(scene: Scene, numerics: Numerics) -> Case:
         legacy,
         n_electrons=numerics.cxr_trials,
         n_electrons_brem=numerics.brem_trials,
-        coherent_emission=scene.emission in {"coherent", "both"},
-        straggling=numerics.straggling,
+        coherent_emission=physics.emission in {"coherent", "both"},
+        straggling=physics.straggling,
         energy_model=numerics.energy_model,
         max_dE_frac=numerics.max_dE_frac,
-        inelastic_model=numerics.inelastic_model,
-        inelastic_cutoff_eV=numerics.inelastic_cutoff_eV,
-        secondary_threshold_eV=numerics.secondary_threshold_eV,
-        elastic_model=numerics.elastic_model,
-        bremsstrahlung_model=numerics.bremsstrahlung_model,
-        radiative_model=numerics.radiative_model,
-        radiative_cutoff_eV=numerics.radiative_cutoff_eV,
-        pair_production_model=numerics.pair_production_model,
-        positron_transport=numerics.positron_transport,
-        atomic_electron_deflection=numerics.atomic_electron_deflection,
+        inelastic_model=physics.inelastic_model,
+        inelastic_cutoff_eV=physics.inelastic_cutoff_eV,
+        secondary_threshold_eV=physics.secondary_threshold_eV,
+        elastic_model=physics.elastic_model,
+        bremsstrahlung_model=physics.bremsstrahlung_model,
+        radiative_model=physics.radiative_model,
+        radiative_cutoff_eV=physics.radiative_cutoff_eV,
+        pair_production_model=physics.pair_production_model,
+        positron_transport=physics.positron_transport,
+        atomic_electron_deflection=physics.atomic_electron_deflection,
         precision=numerics.precision,
     )
     if len(cases) != 1:  # Scene rejects every implicit multi-value field.
@@ -84,10 +101,11 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             atomic_electron_deflection=getattr(settings, "atomic_electron_deflection", "kawrakow"),
             precision=getattr(settings, "precision", None),
         )
-    resolved = Numerics() if numerics is None else numerics
+    if numerics is not None:
+        sweep = replace(sweep, base=replace(sweep.base, numerics=numerics))
     cases = []
     for index, (label, scene) in enumerate(sweep.expand()):
-        case = build_case(scene, resolved)
+        case = build_case(scene)
         if label:
             case = replace(case, name=f"{case.name} {label}")
         cases.append(replace(case, seed=index + 1))

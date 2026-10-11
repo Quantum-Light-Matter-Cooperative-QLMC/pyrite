@@ -371,7 +371,7 @@ class Result:
                 "—"
                 if scene is None
                 else f"{type(scene.target).__name__}, "
-                f"{type(scene.detector).__name__}, {scene.emission}",
+                f"{type(scene.detector).__name__}, {scene.physics.emission}",
                 "resolved inputs",
             ),
             ("case", f"Case, {len(self.case)} keys", "low-level transport input"),
@@ -426,7 +426,7 @@ class Result:
         acquisition, beam, digest, scene = self._acquisition_context()
         assert self.spatial is not None
         selected = (
-            (("coherent", "brem") if scene.emission == "coherent" else ("cxr", "brem"))
+            (("coherent", "brem") if scene.physics.emission == "coherent" else ("cxr", "brem"))
             if components is None
             else components
         )
@@ -451,7 +451,7 @@ class Result:
         acquisition, beam, digest, scene = self._acquisition_context()
         assert self.spatial is not None
         selected = (
-            (("coherent", "brem") if scene.emission == "coherent" else ("cxr", "brem"))
+            (("coherent", "brem") if scene.physics.emission == "coherent" else ("cxr", "brem"))
             if components is None
             else components
         )
