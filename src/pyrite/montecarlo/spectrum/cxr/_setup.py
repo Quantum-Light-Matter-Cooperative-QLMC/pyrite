@@ -152,6 +152,7 @@ class _SpectrumSetup:
     d_all_geom: Any
     decoherence_active: Any
     finite_footprint_now: Any
+    analytic_offsets: Any
     finite_footprint_F: Any
     transverse: Any
     decoherence_A_pop: Any
@@ -258,6 +259,7 @@ def _prepare_spectrum(request):
     cdtype = omega_grid = delta_omega_grid = d_all = None
     seg_r_geom = d_all_geom = xy0_pop = None
     finite_footprint_now = finite_footprint_F = decoherence_A_pop = None
+    analytic_offsets = False
     transverse = None
 
     info = CRYSTALS[crystal]
@@ -569,17 +571,31 @@ def _prepare_spectrum(request):
         )
         if longitudinal_rms_fs is not None:
             longitudinal_rms_fs = float(longitudinal_rms_fs)
-            if not np.isfinite(longitudinal_rms_fs) or longitudinal_rms_fs <= 0.0:
-                raise ValueError("longitudinal_rms_fs must be finite and positive")
+            if (
+                not np.isfinite(longitudinal_rms_fs)
+                or longitudinal_rms_fs < 0.0
+                or (
+                    longitudinal_rms_fs == 0.0
+                    and not (segments.get("beam_entry") or {}).get("bunch_front_gradient")
+                )
+            ):
+                raise ValueError(
+                    "longitudinal_rms_fs must be finite and positive "
+                    "(zero is supported with an imposed bunch front)"
+                )
         if decoherence_active:
             finite_footprint_now = (
                 segments.get("crystal_width_ang") is not None
                 and segments.get("crystal_height_ang") is not None
             )
-            if finite_footprint_now:
+            analytic_offsets = bool(
+                finite_footprint_now
+                or (segments.get("beam_entry") or {}).get("bunch_front_gradient")
+            )
+            if analytic_offsets:
                 if longitudinal_rms_fs is None:
                     raise ValueError(
-                        "coherent emission on a finite crystal footprint with sampled "
+                        "analytic coherent averaging of sampled "
                         "bunch offsets needs a Gaussian bunch length to average them "
                         "analytically: set Beam(longitudinal=BunchLength(rms_fs=...)), "
                         "or use Slab(footprint=None) for a laterally infinite crystal"
@@ -619,15 +635,16 @@ def _prepare_spectrum(request):
                             "finite-footprint coherent transverse average needs every "
                             "incident electron to hit the footprint"
                         )
-                    require_footprint_support(
-                        transverse,
-                        seg_r_geom,
-                        n_hat,
-                        segments["thickness_ang"],
-                        segments["crystal_width_ang"],
-                        segments["crystal_height_ang"],
-                        xp=xp,
-                    )
+                    if finite_footprint_now:
+                        require_footprint_support(
+                            transverse,
+                            seg_r_geom,
+                            n_hat,
+                            segments["thickness_ang"],
+                            segments["crystal_width_ang"],
+                            segments["crystal_height_ang"],
+                            xp=xp,
+                        )
             else:
                 seg_r_geom = seg_r.copy()
                 seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
@@ -664,7 +681,7 @@ def _prepare_spectrum(request):
         else segment_escape_pieces(segments, n_hat, layers=layers, groove=groove, xp=xp)
     )
 
-    if coherent and request.physical_electrons is not None and not finite_footprint_now:
+    if coherent and request.physical_electrons is not None and not analytic_offsets:
         # Pair complete electron fields, including their sampled offsets. This
         # remains unbiased when phase offsets and trajectory fields correlate.
         # Validation: coherent-physical-bunch-population
@@ -676,7 +693,7 @@ def _prepare_spectrum(request):
         temporal_buf = request.temporal.buffer()
         temporal_tau, _ = segment_arrival_times(segments, n_hat, xp=xp)
         temporal_tau_geo = temporal_tau
-        if decoherence_active and (request.physical_electrons is None or finite_footprint_now):
+        if decoherence_active and (request.physical_electrons is None or analytic_offsets):
             # Same offset-free arrival as ``d_all_geom``, in float64.
             t0_seg = xp.asarray(
                 segments.get("t0_ang", np.zeros(temporal_tau.size)),
@@ -726,6 +743,7 @@ def _prepare_spectrum(request):
         d_all_geom=d_all_geom,
         decoherence_active=decoherence_active,
         finite_footprint_now=finite_footprint_now,
+        analytic_offsets=analytic_offsets,
         finite_footprint_F=finite_footprint_F,
         transverse=transverse,
         decoherence_A_pop=decoherence_A_pop,

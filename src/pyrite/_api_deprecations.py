@@ -29,7 +29,7 @@ API_DEPRECATIONS: dict[str, ApiDeprecation] = {
     for entry in (
         _api_entry(
             "Beam() without transverse=",
-            "Beam(transverse=Spot(fwhm_x_mm=1.0)) or Beam(transverse=PointSpot())",
+            "Beam(transverse=TransverseSpot(fwhm_x_mm=1.0)) or Beam(transverse=PointSpot())",
             since="0.12.0",
         ),
         _api_entry(

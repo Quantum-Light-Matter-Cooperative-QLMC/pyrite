@@ -108,7 +108,8 @@ def decoherence_bound(
         segments.get("crystal_width_ang") is not None
         and segments.get("crystal_height_ang") is not None
     )
-    if not finite_footprint or longitudinal_rms_fs is None:
+    tilted_front = bool((segments.get("beam_entry") or {}).get("bunch_front_gradient"))
+    if not (finite_footprint or tilted_front) or longitudinal_rms_fs is None:
         return None
     sigma_z = float(longitudinal_rms_fs) * C_ANG_PER_FS
 

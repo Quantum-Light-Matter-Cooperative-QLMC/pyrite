@@ -153,19 +153,19 @@ def _row_decoherence_factor(st, g_vec_d):
     cdtype = st.cdtype
     omega_grid = st.omega_grid
     decoherence_active = st.decoherence_active
-    finite_footprint_now = st.finite_footprint_now
+    analytic_offsets = st.analytic_offsets
     finite_footprint_F = st.finite_footprint_F
     decoherence_A_pop = st.decoherence_A_pop
     xy0_pop = st.xy0_pop
 
-    if decoherence_active and finite_footprint_now:
+    if decoherence_active and analytic_offsets:
         if st.transverse is None:
             return finite_footprint_F
         omega64 = xp.asarray(omega_grid, dtype=np.float64)
         F_perp = transverse_form_factor(st.transverse, omega64, st.n_hat, g_vec_d, xp=xp)
         return (finite_footprint_F * F_perp.astype(REAL)).astype(REAL)
     if req.physical_electrons is not None:
-        # Physical pairs use complete sampled fields on infinite slabs; no
+        # Physical pairs use complete fields when offsets are sampled; no
         # second empirical F estimator or offset/field independence is needed.
         return xp.ones(E_grid.size, dtype=REAL)
     if not decoherence_active:
@@ -294,7 +294,7 @@ def _flat_energy_keep(st, F, *, route="per-hkl-eager", row_vectors=None):
     keep = ~(valid & (bound <= limit))
     if keep.ndim > 1:
         keep = keep.any(axis=0)
-    if st.finite_footprint_now and weight > 0:
+    if st.analytic_offsets and weight > 0:
         from ...transport.kinematics import C_ANG_PER_FS
         from ..coherent_form_factor import gaussian_form_factor_bounds
 

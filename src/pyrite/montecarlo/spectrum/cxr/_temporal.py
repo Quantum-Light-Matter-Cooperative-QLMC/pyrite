@@ -405,19 +405,19 @@ def coherent_offset_chi(st, profile, g_vec_d):
     """Complex offset characteristic function on the profile's energy grid.
 
     Mirrors ``_row_decoherence_factor``: the empirical
-    ``mean_e exp[i(omega A_e - B_e)]`` for an infinite slab, the analytic
-    Gaussian longitudinal ``exp[-(omega sigma_z)^2 / 2]`` for a finite
-    footprint, times the row's transverse ``exp(-K^T Sigma_f K / 2)`` with a
-    recorded spot. Returns ``None`` without offsets.
+    ``mean_e exp[i(omega A_e - B_e)]`` for sampled offsets; analytic residual
+    Gaussian ``exp[-(omega sigma_z)^2 / 2]`` for a finite footprint or tilted
+    front, times the row's joint transverse factor with a recorded spot.
+    Returns ``None`` without offsets.
 
-    Validation: transverse-bunch-form-factor
+    Validation: transverse-bunch-form-factor, linear-bunch-front-tilt
     """
-    if st.request.physical_electrons is not None and not st.finite_footprint_now:
+    if st.request.physical_electrons is not None and not st.analytic_offsets:
         return None
     if not st.decoherence_active:
         return None
     omega = profile.energy_grid() / HBARC_EV_ANG
-    if st.finite_footprint_now:
+    if st.analytic_offsets:
         sigma_z = float(st.request.longitudinal_rms_fs) * C_ANG_PER_FS
         chi = xp.exp(-0.5 * (omega * sigma_z) ** 2)
         if st.transverse is not None:

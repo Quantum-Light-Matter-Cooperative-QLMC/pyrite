@@ -19,7 +19,9 @@ The root package exposes the preferred high-level API. A `Scene` contains one sc
 ```python
 import pyrite as pr
 
-beam = pr.Beam(energy_keV=30.0, transverse=pr.Spot(fwhm_x_mm=1.0), longitudinal=pr.PointBunch())
+beam = pr.Beam(
+    energy_keV=30.0, transverse=pr.TransverseSpot(fwhm_x_mm=1.0), longitudinal=pr.PointBunch()
+)
 target = pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0))
 detector = pr.Detector()
 result = pr.simulate(
@@ -130,7 +132,8 @@ This mode supports incoherent scalar-detector scenes on the per-electron or CUDA
    :toctree: _autosummary
 
    pyrite.Beam
-   pyrite.Spot
+   pyrite.TransverseSpot
+   pyrite.BunchFrontTilt
    pyrite.PointSpot
    pyrite.PointBunch
    pyrite.BunchLength
@@ -168,6 +171,90 @@ This mode supports incoherent scalar-detector scenes on the per-electron or CUDA
    pyrite.SpectralDensity
    pyrite.fetch_tables
    pyrite.simulate
+```
+
+## Electron bunch-front tilt
+
+`TransverseSpot` is the Gaussian transverse descriptor; `Spot` remains a
+compatibility alias. Compose a front tilt with the existing spot and local
+bunch duration:
+
+```python
+beam = pr.Beam(
+    energy_keV=30.0,
+    transverse=pr.TransverseSpot(fwhm_x_mm=0.001, fwhm_y_mm=0.01),
+    longitudinal=pr.BunchLength(rms_fs=0.001),
+    bunch_front_tilt=pr.BunchFrontTilt(tilt_deg=45.0, azimuth_deg=0.0),
+)
+target = pr.Slab(
+    "hopg", thickness_ang=500.0, tilt_deg=45.0, footprint=pr.Footprint(width_mm=5.0, height_mm=5.0)
+)
+```
+
+The front is tilted from the beam-normal plane, without rotating the beam.
+Matching its tilt and azimuth to the resolved target makes the front **parallel to the
+entrance face**: the imposed incoming time gradient cancels the different
+vacuum flight times to that face. Positive tilt means later arrival along the
+lab transverse direction selected by the azimuth (0 degrees is +x, 90 is +y).
+Angles must be finite and strictly between -90 and 90 degrees.
+
+The RMS duration is conditional on transverse position: it remains the local
+thickness of the tilted front, while the full envelope can be much longer.
+Initially nonzero tilt supports monoenergetic parallel Gaussian/point analytic
+sources with Gaussian timing or `PointBunch()`. GDF, Courant–Snyder, energy
+spread and other longitudinal policies fail explicitly.
+
+Parallel to the target is a geometric convention, not a guarantee of radiation
+phase matching in a chosen direction. The joint position–time Gaussian average
+retains the correlation; the old independent suppression factors cannot simply
+be multiplied unchanged. See the [independent derivation](validation/beam-transport/linear-bunch-front-tilt.md).
+A wide phase-matched source can have a narrow angular lobe: resolve that lobe
+before interpreting central-direction density as detector-integrated flux.
+This source model does not establish experimental feasibility of attosecond
+local bunch durations.
+
+For the notebook's ideal HOPG (002) geometry (30 keV electrons, target tilt
+84.5 degrees, target azimuth zero, observation polar angle 145 degrees),
+the transverse phase-matching choice is:
+
+```python
+from dataclasses import replace
+
+scene = pr.Scene(
+    beam=beam,
+    target=pr.Slab("hopg", thickness_ang=500.0, tilt_deg=84.5, footprint=pr.Footprint(5.0, 5.0)),
+    detector=pr.Detector(observation_angle_deg=145.0),
+)
+front = scene.phase_matched_bunch_front_tilt((0, 0, 2), photon_energy_eV=91.2)
+matched_beam = replace(scene.beam, bunch_front_tilt=front)
+```
+
+This gives an incoming gradient of 135.785 fs/µm. It cancels the transverse
+phase mismatch in that central direction for the c-axis reflection; the
+parallel-face choice would instead be 84.5 degrees. For a finite Gaussian
+spot, the ideal joint intensity factor becomes the residual timing factor
+alone: about 0.981 at 91.2 eV with 0.001 fs local RMS duration. Reversing the
+front restores strong transverse suppression. This is a form-factor example,
+not a prediction of integrated detector gain or a converged transport spectrum.
+
+`Scene.phase_matched_bunch_front_tilt` leaves the scene unchanged and returns a
+`BunchFrontTilt`. The reflection is explicit because different reflections
+can require different fronts. Omitting `photon_energy_eV` uses the vacuum
+zero-scattering line estimate. The scalar detector's central direction is the
+default; pass `observation_direction_lab=(nx, ny, nz)` for another ray or a
+planar detector. This method currently supports a flat single slab and matches
+its mean catalog crystal orientation, rather than every mosaic orientation.
+Target tilt and azimuth follow the existing nearest-half-degree case
+resolution. The helper uses those resolved angles; bunch-front angles retain
+full precision. Thus match the resolved entrance-face angles when setting a
+parallel front manually.
+
+Named or inline profile beam tables use the same descriptor:
+
+```toml
+[profiles.example.beam.bunch_front_tilt]
+tilt_deg = 45.0
+azimuth_deg = 0.0
 ```
 
 ## Materials and crystallography

@@ -62,6 +62,7 @@ from .._precision import Precision
 from ..detectors import Detector
 from ..materials import CATALOG, LayerSpec
 from ..materials.crystal import reciprocal_g_vector
+from ..montecarlo.bunch_front import BunchFrontTilt, resolve_front_tilt, validate_front_source
 from ..montecarlo.case import Case
 from ..montecarlo.transverse import TransverseDistribution, resolve_transverse_distribution
 from .bremsstrahlung_cases import radiative_case_keys, resolve_auto_bremsstrahlung
@@ -189,6 +190,7 @@ class BeamSpec:
     rep_rate_hz: float = 5000.0
     bunch_charge_pc: float = 1.0
     energy_spread_frac: float | None = None
+    bunch_front_tilt: BunchFrontTilt | None = None
     source: str = "analytic"
     gdf_shape_only: bool = False
     gdf_path: str | None = None
@@ -198,6 +200,9 @@ class BeamSpec:
     gdf_screen_tolerance_m: float = 1e-9
     gdf_normalization: str = "pyrite_current"
     gdf_z_origin_m: float | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "bunch_front_tilt", resolve_front_tilt(self.bunch_front_tilt))
 
     def gdf_beam(self) -> GDFBeam | None:
         """Validate source settings and load a GPT snapshot when selected."""
@@ -233,6 +238,7 @@ class BeamSpec:
             or self.long_shape != "gaussian"
             or self.transverse_fwhm_x_mm is not None
             or self.transverse_fwhm_y_mm is not None
+            or self.bunch_front_tilt is not None
         ):
             raise ValueError(
                 "gpt_gdf is incompatible with analytic phase-space fields; clear both spot FWHMs"
@@ -824,9 +830,21 @@ def build_cases(
     # diverge from the point-bunch/default-source configuration, so existing
     # case payloads and checkpoint matching remain stable.
     b = sweep.beam
+    front = validate_front_source(
+        b.bunch_front_tilt,
+        transverse=b.transverse,
+        energy_spread=b.energy_spread_frac,
+        source=b.source,
+        longitudinal=b.longitudinal,
+        offsets=b.long_offsets_fs,
+        shape=b.long_shape,
+        groove=sweep.target._entrance_face(),
+    )
     fwhm_x = None if b.transverse_fwhm_x_mm is None else float(b.transverse_fwhm_x_mm)
     fwhm_y = None if b.transverse_fwhm_y_mm is None else float(b.transverse_fwhm_y_mm)
     beam_case: dict[str, Any] = {"beam_fwhm_mm": fwhm_x}
+    if front is not None:
+        beam_case["bunch_front_tilt"] = asdict(front)
     if gdf is not None:
         beam_case["gdf_source"] = {
             "path": str(b.gdf_path),

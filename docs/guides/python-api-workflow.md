@@ -9,7 +9,9 @@ The root package exposes the supported high-level objects. `simulate` accepts th
 ```python
 import pyrite as pr
 
-beam = pr.Beam(energy_keV=30.0, transverse=pr.Spot(fwhm_x_mm=1.0), longitudinal=pr.PointBunch())
+beam = pr.Beam(
+    energy_keV=30.0, transverse=pr.TransverseSpot(fwhm_x_mm=1.0), longitudinal=pr.PointBunch()
+)
 target = pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0))
 detector = pr.Detector()
 
@@ -35,16 +37,22 @@ result = pr.simulate(
 `Beam` takes exactly one description per kind of property, so an invalid mix cannot be built. Both `transverse` and `longitudinal` are required:
 
 ```python
-pr.Beam(energy_keV=30.0, transverse=pr.Spot(1.0), longitudinal=pr.PointBunch())        # 1 mm round spot
-pr.Beam(energy_keV=30.0, transverse=pr.Spot(0.5, 0.25), longitudinal=pr.PointBunch())  # FWHM x/y in mm
-pr.Beam(energy_keV=30.0, transverse=pr.PointSpot(), longitudinal=pr.PointBunch())      # point source
-pr.Beam(energy_keV=30.0, transverse=pr.Spot(1.0), longitudinal=pr.BunchLength(100.0))  # RMS fs
-pr.Beam.from_gdf("beam.gdf", z_origin_m=0.0, time_s=1e-9)                              # GPT snapshot
+pr.Beam(
+    energy_keV=30.0, transverse=pr.TransverseSpot(1.0), longitudinal=pr.PointBunch()
+)  # 1 mm round spot
+pr.Beam(
+    energy_keV=30.0, transverse=pr.TransverseSpot(0.5, 0.25), longitudinal=pr.PointBunch()
+)  # FWHM x/y in mm
+pr.Beam(energy_keV=30.0, transverse=pr.PointSpot(), longitudinal=pr.PointBunch())  # point source
+pr.Beam(
+    energy_keV=30.0, transverse=pr.TransverseSpot(1.0), longitudinal=pr.BunchLength(100.0)
+)  # RMS fs
+pr.Beam.from_gdf("beam.gdf", z_origin_m=0.0, time_s=1e-9)  # GPT snapshot
 ```
 
-`transverse` also accepts a Courant–Snyder `TransverseDistribution`, and `longitudinal` accepts `Offsets` or a `LongitudinalDistribution` policy. Divergence is derived: `beam.derived_divergence_mrad(energy_keV)`. Sweep axes address the sub-objects, for example `"beam.transverse": [pr.Spot(0.5), pr.Spot(1.0), pr.PointSpot()]`.
+`transverse` also accepts a Courant–Snyder `TransverseDistribution`, and `longitudinal` accepts `Offsets` or a `LongitudinalDistribution` policy. Divergence is derived: `beam.derived_divergence_mrad(energy_keV)`. Sweep axes address the sub-objects, for example `"beam.transverse": [pr.TransverseSpot(0.5), pr.TransverseSpot(1.0), pr.PointSpot()]`.
 
-Targets likewise require `footprint`: a finite `pr.Footprint(width_mm, height_mm)`, or `None` for a laterally infinite crystal. Leaving out any of these three still works through 0.13 with a `DeprecationWarning` and the old default (1 mm `Spot`, `PointBunch`, 5 mm x 5 mm footprint); from 0.14.0 it is an error. `pr.Point` is a deprecated alias of `pr.PointSpot` on the same schedule.
+Targets likewise require `footprint`: a finite `pr.Footprint(width_mm, height_mm)`, or `None` for a laterally infinite crystal. Leaving out any of these three still works through 0.13 with a `DeprecationWarning` and the old default (1 mm `TransverseSpot`, `PointBunch`, 5 mm x 5 mm footprint); from 0.14.0 it is an error. `pr.Point` is a deprecated alias of `pr.PointSpot` on the same schedule.
 
 Coherent emission with physical bunch charge needs offsets the estimator can resolve. On an infinite slab, sampled offsets (a finite `Spot` or `BunchLength`) leave a near-zero cross-electron excess that `cxr_trials` far below the bunch's electron count cannot resolve; bins whose signed estimate goes negative are returned unclipped with a `CoherentSamplingWarning` (nonfinite power still raises `CoherentSamplingError`). Use `PointSpot()` with `PointBunch()`, or a finite footprint with `BunchLength` so offsets are averaged analytically.
 

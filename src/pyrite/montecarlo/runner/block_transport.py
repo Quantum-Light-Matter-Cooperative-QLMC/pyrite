@@ -29,7 +29,11 @@ from typing import Any
 import numpy as np
 
 from ..._backend import BACKEND
-from ..transport.beam_entry import face_arrival_delay_ang, initial_energies_keV
+from ..transport.beam_entry import (
+    bunch_front_delay_ang,
+    face_arrival_delay_ang,
+    initial_energies_keV,
+)
 from ..transport.kinematics import _sample_bunch_offsets
 from .case_tables import _case_radiative_kwargs
 from .step_budget import retry_step_budget
@@ -138,8 +142,11 @@ def finalize_population_fields(
         seed,
         bunch.get("longitudinal_distribution"),
     )
-    # Blocks ran without bunch arguments; restore the face-arrival delay the
-    # single call adds (zeros without tilt or analytic spot).
+    # Blocks ran without bunch arguments; restore imposed front and geometric
+    # face-arrival delays exactly as in a single call.
+    t0_electron = t0_electron + bunch_front_delay_ang(
+        result.get("beam_entry"), result["initial_r_ang"]
+    )
     t0_electron = t0_electron + face_arrival_delay_ang(
         result.get("beam_entry"), result["initial_r_ang"], result["initial_E_keV"]
     )

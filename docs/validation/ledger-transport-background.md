@@ -753,3 +753,14 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** purpose-built GDF fixtures test malformed input, selection, energy/charge anchors, weighted seeded correlations, projection, screen crossing-time correlations, shape-only sweep energy assignment and flight clocks, normalization, and CPU transport
 - **Anchor:** `tests/montecarlo/test_gdf.py`; `tests/cli/test_gdf.py::test_profile_run_persists_imported_normalization`
 - **Notes:** [Independent validation](beam-transport/gpt-gdf-injection.md). The existing independent derivations are pinned by CPU energy/charge, correlated-sampling, projection, screen-clock, and shape-only anchors. Shared `rep_rate_hz` normalization is additionally pinned against selected charge and saved current; fourfold frequency produces fourfold normalized flux without changing seeded phase space. No new equation, human sign-off, or GPU validation claimed.
+
+
+## `linear-bunch-front-tilt`
+
+- **Claim:** signed electron-front angle from the beam-normal plane gives incoming arrival delay `c*t0 = c*epsilon + tan(theta) u.w / beta0`; adding the separate ray-to-face delay once makes matching front and crystal angles parallel to the entrance face. Gaussian position-time correlation shifts the coherent mismatch from `K` to `K - omega J^-T a`.
+- **Code:** `montecarlo/bunch_front.py::BunchFrontTilt`; `::BunchFrontTilt.gradient`; `montecarlo/transport/beam_entry.py::bunch_front_delay_ang`; `campaign/front_matching.py::phase_matched_front_for_scene`
+- **Source:** equal-time plane equation and constant-velocity ray-plane kinematics; Gaussian characteristic function; Artru & Ispirian, *Bunch coherence in parametric X-ray radiation*, arXiv:physics/0208018 Eq. (11); Tadenuma et al., PRAB **25**, 110102 (2022), electron bunch tilt terminology
+- **Status:** anchored
+- **Checks:** degrees/sign/azimuth, dimensionless c*time/position slope, conditional versus marginal RMS; exact matching-face cancellation at signed and grazing angles; zero-front stream compatibility; joint Gaussian factor versus independent ray phases and brute-force averaging; matched/reversed fronts and conservative interval/window bounds
+- **Anchor:** `tests/montecarlo/test_bunch_front_tilt.py`; `tests/scan/test_bunch_front_tilt.py`; `tests/scan/test_bunch_front_matching.py`
+- **Notes:** Monoenergetic parallel Gaussian/point analytic sources, residual Gaussian timing or PointBunch. Front tilt changes timing, not the mean beam direction or target orientation. Fresh-context verifier independently derived the source geometry before inspecting implementation; equations, sign, amplitude/intensity factors and matching-face convention agree. Synthetic complete-reducer tests cover finite and infinite slabs at fixed physical population, and temporal amplitude filtering. No human sign-off claimed. [derivation](beam-transport/linear-bunch-front-tilt.md)
