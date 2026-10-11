@@ -45,15 +45,15 @@ def _simulate(
         pose=pr.PlanarPose.from_observation(100.0, 60.0),
         pixels=pr.PixelGrid((4, 6), (0.5, 0.5)),
         response=pr.IdealPhotonCounter() if response is None else response,
+        scorer=pr.PixelScorer(angular_shape, reconstruction),
     )
     plate = pr.FilterPlate("silicon", 0.05, (1.5, 10.0), pr.PlanarPose.from_observation(50.0, 60.0))
     return pr.simulate(
-        pr.Beam(30.0),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         detector,
         numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
         filters=(plate,),
-        pixel_scorer=pr.PixelScorer(angular_shape, reconstruction),
         acquisition=_acquisition() if acquisition is None else acquisition,
     )
 
@@ -136,12 +136,11 @@ def test_rescoring_reuses_true_factors_and_matches_a_fresh_run(tmp_path) -> None
     store.put(rescored)
     fresh = _simulate(acquisition=new_acquisition)
     fresh = pr.simulate(
-        pr.Beam(30.0, bunch_charge_pc=2.0),
+        pr.Beam(30.0, bunch_charge_pc=2.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
         fresh.provenance["scene"].target,
         fresh.provenance["scene"].detector,
         numerics=fresh.provenance["numerics"],
         filters=fresh.provenance["scene"].filters,
-        pixel_scorer=fresh.provenance["scene"].pixel_scorer,
         acquisition=new_acquisition,
     )
 
@@ -212,14 +211,15 @@ def test_reconstruction_mode_is_a_new_true_object_and_survives_reopen(tmp_path) 
 
 def test_acquisition_free_simulation_keeps_the_reconstruction_mode() -> None:
     detector = pr.PlanarDetector(
-        pose=pr.PlanarPose.from_observation(100.0, 60.0), pixels=pr.PixelGrid((4, 6), (0.5, 0.5))
+        pose=pr.PlanarPose.from_observation(100.0, 60.0),
+        pixels=pr.PixelGrid((4, 6), (0.5, 0.5)),
+        scorer=pr.PixelScorer((2, 3), "bilinear_tile"),
     )
     result = pr.simulate(
-        pr.Beam(30.0),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         detector,
         numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
-        pixel_scorer=pr.PixelScorer((2, 3), "bilinear_tile"),
     )
 
     assert result.spatial is not None
@@ -317,7 +317,6 @@ def test_acquisition_free_results_are_not_persistable() -> None:
         scene.detector,
         numerics=result.provenance["numerics"],
         filters=scene.filters,
-        pixel_scorer=scene.pixel_scorer,
     )
     with pytest.raises(ValueError, match="layered"):
         observation_from_result(legacy)
@@ -369,3 +368,23 @@ def test_reopened_pixel_metadata_matches_the_scoring_geometry(tmp_path) -> None:
     transmission = loaded.spatial.transmission_image(2_000.0)
     np.testing.assert_array_equal(transmission[~covered], 1.0)
     assert np.all((transmission[covered] > 0.0) & (transmission[covered] < 1.0))
+
+
+def test_deprecated_simulate_pixel_scorer_matches_the_detector_scorer() -> None:
+    """Issue #451: the forwarded spelling yields the same observation identity."""
+    current = _simulate()
+    scene = current.provenance["scene"]
+    with pytest.warns(DeprecationWarning, match=r"simulate\(pixel_scorer=\) is deprecated"):
+        legacy = pr.simulate(
+            scene.beam,
+            scene.target,
+            replace(scene.detector, scorer=None),
+            numerics=current.provenance["numerics"],
+            filters=scene.filters,
+            pixel_scorer=scene.detector.scorer,
+            acquisition=scene.acquisition,
+        )
+    assert (
+        legacy.provenance["observation_identity_digest"]
+        == current.provenance["observation_identity_digest"]
+    )

@@ -4,7 +4,7 @@
 description, and an optional GPT/GDF source, each a small frozen object, so an
 invalid mix cannot be constructed and the type hints list what is allowed:
 
-* transverse -- :class:`Spot` (Gaussian entrance spot), :class:`Point`, or a
+* transverse -- :class:`Spot` (Gaussian entrance spot), :class:`PointSpot`, or a
   :class:`~pyrite.montecarlo.transverse.TransverseDistribution`
   (Courant--Snyder);
 * longitudinal -- :class:`PointBunch`, :class:`BunchLength`, :class:`Offsets`,
@@ -17,11 +17,12 @@ record, an internal lowering target that also backs profile files and case
 payloads. :meth:`Beam.to_spec` lowers to it field-for-field.
 """
 
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, cast
 
 import numpy as np
 
+from .._api_deprecations import warn_api
 from ..montecarlo.transverse import TransverseDistribution
 from .longitudinal import LongitudinalDistribution
 from .sweep import BeamSpec
@@ -61,7 +62,7 @@ class Spot:
 
 
 @dataclass(frozen=True)
-class Point:
+class PointSpot:
     """Point-source transverse distribution (no spot size, no divergence)."""
 
 
@@ -156,8 +157,13 @@ class GdfSource:
             raise ValueError("shape_only must be a boolean")
 
 
-Transverse = Spot | Point | TransverseDistribution
+Transverse = Spot | PointSpot | TransverseDistribution
 Longitudinal = PointBunch | BunchLength | Offsets | LongitudinalDistribution
+
+
+#: Placeholder for a beam property the caller left out. Through the #451
+#: deprecation window it resolves, with a warning, to the historical default.
+_UNSET: Any = cast(Any, object())
 
 
 @dataclass(frozen=True)
@@ -167,8 +173,10 @@ class Beam:
     Each kind of beam property takes exactly one description, so the allowed
     combinations are the type signature rather than prose:
 
-    >>> Beam(energy_keV=30.0, transverse=Spot(fwhm_x_mm=0.5))  # doctest: +SKIP
-    >>> Beam(energy_keV=30.0, longitudinal=BunchLength(rms_fs=100.0))  # doctest: +SKIP
+    >>> Beam(energy_keV=30.0, transverse=Spot(fwhm_x_mm=0.5), longitudinal=PointBunch())  # doctest: +SKIP
+    >>> Beam(  # doctest: +SKIP
+    ...     energy_keV=30.0, transverse=PointSpot(), longitudinal=BunchLength(rms_fs=100.0)
+    ... )
     >>> Beam.from_gdf("beam.gdf", z_origin_m=0.0, time_s=1e-9)  # doctest: +SKIP
 
     Parameters
@@ -177,11 +185,13 @@ class Beam:
         Central kinetic energy in keV. A scalar creates one scene; campaign
         builders may expand a sequence.
     transverse
-        :class:`Spot` (default, a 1 mm round spot), :class:`Point`, or a
-        Courant--Snyder :class:`~pyrite.montecarlo.transverse.TransverseDistribution`.
+        Required: :class:`Spot`, :class:`PointSpot`, or a Courant--Snyder
+        :class:`~pyrite.montecarlo.transverse.TransverseDistribution`. Omitting it
+        is deprecated and falls back to a 1 mm round :class:`Spot`.
     longitudinal
-        :class:`PointBunch` (default), :class:`BunchLength`, :class:`Offsets`, or a
+        Required: :class:`PointBunch`, :class:`BunchLength`, :class:`Offsets`, or a
         :class:`~pyrite.campaign.longitudinal.LongitudinalDistribution` policy.
+        Omitting it is deprecated and falls back to :class:`PointBunch`.
     energy_spread_frac
         RMS fractional kinetic-energy spread; ``None`` is monoenergetic.
     rep_rate_hz
@@ -199,16 +209,23 @@ class Beam:
     """
 
     energy_keV: Any = (30.0, 45.0, 60.0)
-    transverse: Transverse = field(default_factory=Spot)
-    longitudinal: Longitudinal = field(default_factory=PointBunch)
+    transverse: Transverse = _UNSET
+    longitudinal: Longitudinal = _UNSET
     energy_spread_frac: float | None = None
     rep_rate_hz: float = 5000.0
     bunch_charge_pc: float = 1.0
     gdf: GdfSource | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.transverse, (Spot, Point, TransverseDistribution)):
-            raise TypeError("Beam.transverse must be a Spot, Point, or TransverseDistribution")
+        # stacklevel 4: warn_api -> __post_init__ -> __init__ -> the caller.
+        if self.transverse is _UNSET:
+            warn_api("Beam() without transverse=", stacklevel=4)
+            object.__setattr__(self, "transverse", Spot())
+        if self.longitudinal is _UNSET:
+            warn_api("Beam() without longitudinal=", stacklevel=4)
+            object.__setattr__(self, "longitudinal", PointBunch())
+        if not isinstance(self.transverse, (Spot, PointSpot, TransverseDistribution)):
+            raise TypeError("Beam.transverse must be a Spot, PointSpot, or TransverseDistribution")
         if not isinstance(
             self.longitudinal, (PointBunch, BunchLength, Offsets, LongitudinalDistribution)
         ):
@@ -220,7 +237,7 @@ class Beam:
             if not isinstance(self.gdf, GdfSource):
                 raise TypeError("Beam.gdf must be a GdfSource")
             if (
-                not isinstance(self.transverse, Point)
+                not isinstance(self.transverse, PointSpot)
                 or not isinstance(self.longitudinal, PointBunch)
                 or self.energy_spread_frac is not None
             ):
@@ -252,7 +269,8 @@ class Beam:
         """Build a beam whose phase space comes from a GPT GDF file."""
         return cls(
             energy_keV=energy_keV,
-            transverse=Point(),
+            transverse=PointSpot(),
+            longitudinal=PointBunch(),
             rep_rate_hz=rep_rate_hz,
             bunch_charge_pc=bunch_charge_pc,
             gdf=GdfSource(
@@ -346,7 +364,8 @@ class Beam:
             )
             return cls(
                 energy_keV=spec.energy_keV,
-                transverse=Point(),
+                transverse=PointSpot(),
+                longitudinal=PointBunch(),
                 rep_rate_hz=spec.rep_rate_hz,
                 bunch_charge_pc=spec.bunch_charge_pc,
                 gdf=gdf,
@@ -360,7 +379,7 @@ class Beam:
                 )
             transverse = spec.transverse
         elif spec.transverse_fwhm_x_mm is None and spec.transverse_fwhm_y_mm is None:
-            transverse = Point()
+            transverse = PointSpot()
         elif spec.transverse_fwhm_x_mm is None or spec.transverse_fwhm_y_mm is None:
             raise ValueError("set both transverse spot FWHMs, or neither for a point source")
         else:
@@ -402,7 +421,15 @@ __all__ = [
     "BunchLength",
     "GdfSource",
     "Offsets",
-    "Point",
     "PointBunch",
+    "PointSpot",
     "Spot",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Serve the deprecated ``Point`` alias of :class:`PointSpot` (issue #451)."""
+    if name == "Point":
+        warn_api("pyrite.campaign.beam.Point")
+        return PointSpot
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

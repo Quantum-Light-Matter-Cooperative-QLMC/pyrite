@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 from click.testing import CliRunner
 
+from pyrite.campaign.geometry import Footprint
 from pyrite.materials import CATALOG
 from pyrite.montecarlo import runner, simulate_trajectories
 from pyrite.montecarlo import trajectories as traj
@@ -684,7 +685,9 @@ def _production_case(kind, tmp_path, monkeypatch):
         sweep = Sweep(
             material="mose2",
             beam=BeamSpec(energy_keV=30.0),
-            target=Stack.on_substrate("mose2", 300.0, "silicon", 3000.0, tilt_deg=-30.0),
+            target=Stack.on_substrate(
+                "mose2", 300.0, "silicon", 3000.0, tilt_deg=-30.0, footprint=Footprint(5.0, 5.0)
+            ),
             detector=bins,
         )
     elif kind == "secondaries":

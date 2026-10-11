@@ -46,6 +46,7 @@ from ..instrument import (
     AcquisitionBatch,
     ObservationIdentity,
     PixelGrid,
+    PixelScorer,
     PlanarDetector,
     PlanarPose,
 )
@@ -287,6 +288,7 @@ def _decode_detector(true_payload: Mapping[str, Any], response: DetectorResponse
     pose = geometry["pose"]
     pixels = geometry["pixels"]
     size = geometry["size_mm"]
+    scorer = true_payload["scorer"]
     return PlanarDetector(
         pose=PlanarPose(
             center_mm=tuple(pose["center_mm"]),
@@ -296,6 +298,10 @@ def _decode_detector(true_payload: Mapping[str, Any], response: DetectorResponse
         size_mm=tuple(size) if size else None,
         pixels=PixelGrid(shape=tuple(pixels["shape"]), pitch_mm=tuple(pixels["pitch_mm"])),
         response=response,
+        scorer=PixelScorer(
+            angular_shape=tuple(scorer["angular_shape"]),
+            reconstruction=scorer.get("reconstruction", "nearest_tile"),
+        ),
     )
 
 

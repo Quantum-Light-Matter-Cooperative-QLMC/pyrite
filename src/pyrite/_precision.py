@@ -12,6 +12,12 @@ from ._api_deprecations import warn_renamed
 OBSERVABLES = ("cxr", "brem")
 REQUIRED_FIELDS = ("target_rse", "min_electrons", "max_electrons", "block_electrons")
 
+#: Default for the counts that follow the now-optional ``min_electrons``; keeps
+#: the positional field order while still refusing an omitted count.
+_REQUIRED: Any = object()
+#: Omitted ``min_electrons``: resolves to one block in ``__post_init__``.
+_ONE_BLOCK: Any = None
+
 
 @dataclass(frozen=True)
 class Precision:
@@ -26,12 +32,14 @@ class Precision:
     target_rse
         Target relative standard error of each observable's mean.
     min_electrons, max_electrons
-        Smallest count at which the rule may stop, and the count at which it
-        stops regardless, flagged ``statistics_limited``.
+        Smallest count at which the rule may stop (default: one block,
+        ``block_electrons``), and the count at which it stops regardless,
+        flagged ``statistics_limited``.
     block_electrons
         Electrons per transport block; the rule is checked at block ends.
     observables
-        Non-empty subset of ``('cxr', 'brem')`` that must all converge.
+        Non-empty subset of ``('cxr', 'brem')`` that must all converge; a single
+        name such as ``"cxr"`` is accepted.
     max_electron_share
         Guard: the largest single-electron value may hold at most this share
         of the observable's sum.
@@ -57,9 +65,9 @@ class Precision:
     """
 
     target_rse: float
-    min_electrons: int
-    max_electrons: int
-    block_electrons: int
+    min_electrons: int = _ONE_BLOCK
+    max_electrons: int = _REQUIRED
+    block_electrons: int = _REQUIRED
     observables: tuple[str, ...] = ("cxr",)
     max_electron_share: float = 0.05
     min_effective_electrons: float = 100.0
@@ -70,8 +78,15 @@ class Precision:
     batch_means_band_eV: tuple[float, float] | None = None
 
     def __post_init__(self) -> None:
-        # Freeze caller-owned sequences as well as the dataclass itself.
-        observables = tuple(self.observables)
+        for name in ("max_electrons", "block_electrons"):
+            if getattr(self, name) is _REQUIRED:
+                raise TypeError(f"Precision requires {name}")
+        if self.min_electrons is None:
+            object.__setattr__(self, "min_electrons", self.block_electrons)
+        # Freeze caller-owned sequences as well as the dataclass itself. A bare
+        # name is one observable, not its characters.
+        raw = self.observables
+        observables = (raw,) if isinstance(raw, str) else tuple(raw)
         if "line" in observables:
             warn_renamed("Precision observable 'line'", "'cxr'")
             observables = tuple("cxr" if value == "line" else value for value in observables)

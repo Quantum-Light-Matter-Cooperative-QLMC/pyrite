@@ -19,8 +19,8 @@ The root package exposes the preferred high-level API. A `Scene` contains one sc
 ```python
 import pyrite as pr
 
-beam = pr.Beam(energy_keV=30.0)
-target = pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0)
+beam = pr.Beam(energy_keV=30.0, transverse=pr.Spot(fwhm_x_mm=1.0), longitudinal=pr.PointBunch())
+target = pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0))
 detector = pr.Detector()
 result = pr.simulate(
     beam,
@@ -103,7 +103,7 @@ sampling["realized_electrons"]
 sampling["statistics_limited"]
 ```
 
-All four budget fields are required; the example is an explicit budget, not a default recommendation. Counts must be multiples of the block size. The policy overrides `Numerics.cxr_trials` and `brem_trials`; omitting `precision` retains fixed sampling. The requested policy stays in `Result.case["adaptive_precision"]` and its identity, while realized counts, achieved errors, guards, and stop reason stay in `adaptive_sampling`. A run reaching its maximum without convergence completes with `statistics_limited=True` and a `CxrYieldStatisticsWarning`.
+`min_electrons` defaults to one block (`block_electrons`); the other three budget fields are required. The example is an explicit budget, not a default recommendation. Counts must be multiples of the block size. The policy overrides `Numerics.cxr_trials` and `brem_trials`; omitting `precision` retains fixed sampling. The requested policy stays in `Result.case["adaptive_precision"]` and its identity, while realized counts, achieved errors, guards, and stop reason stay in `adaptive_sampling`. A run reaching its maximum without convergence completes with `statistics_limited=True` and a `CxrYieldStatisticsWarning`.
 
 This mode supports incoherent scalar-detector scenes on the per-electron or CUDA core. It rejects coherent emission, physical detectors and observation directions, trajectory capture, GDF beams, grooves, and particle cascades. The two populations share one target and count in this implementation. The [statistical methods](computation/statistical-methods.md#adaptive-electron-counts) describe the observables, guards, and limits of the error estimate.
 
@@ -115,7 +115,7 @@ This mode supports incoherent scalar-detector scenes on the per-electron or CUDA
 
    pyrite.Beam
    pyrite.Spot
-   pyrite.Point
+   pyrite.PointSpot
    pyrite.PointBunch
    pyrite.BunchLength
    pyrite.Offsets

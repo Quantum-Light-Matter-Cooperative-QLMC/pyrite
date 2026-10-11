@@ -16,6 +16,7 @@ import pyrite as pr
 from pyrite import api
 from pyrite.campaign import profiles
 from pyrite.campaign.config import default_settings, material_sweep
+from pyrite.campaign.geometry import Footprint
 from pyrite.campaign.profiles import dataset_identity
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.detectors import EnergyBins
@@ -200,8 +201,14 @@ def _coupled_case(target=None, **numerics_overrides):
         **{**COUPLED, **numerics_overrides},
     )
     if target is None:
-        target = pr.Slab("silicon", thickness_ang=2.0e4, tilt_deg=30.0)
-    scene = pr.Scene(pr.Beam(energy_keV=40.0), target, detector)
+        target = pr.Slab(
+            "silicon", thickness_ang=2.0e4, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)
+        )
+    scene = pr.Scene(
+        pr.Beam(energy_keV=40.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        target,
+        detector,
+    )
     # The synthetic table starts at 5 keV, so the electrons stop there.
     return replace(api.build_case(scene, numerics), E_cut_lines_keV=5.0, E_cut_brem_keV=5.0)
 
@@ -270,7 +277,11 @@ def test_layered_stack_scores_each_layer_with_its_own_composition(synthetic_si_t
     from pyrite.campaign.geometry import Layer, Stack
 
     case = _coupled_case(
-        Stack(layers=(Layer("silicon", 5.0e3), Layer("sio2", 2.0e4)), tilt_deg=30.0)
+        Stack(
+            layers=(Layer("silicon", 5.0e3), Layer("sio2", 2.0e4)),
+            tilt_deg=30.0,
+            footprint=Footprint(5.0, 5.0),
+        )
     )
     assert case["abs_layers"] is not None and len(case["abs_layers"]) == 2
     tp = runner._transport_case(case)

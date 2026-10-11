@@ -71,8 +71,8 @@ The **detailed lineshape converges slowly when the mosaic spread ≫ the unbroad
 ```python
 import pyrite as pr
 
-beam = pr.Beam(energy_keV=30.0)
-target = pr.Slab("hopg", thickness_ang=10_000.0, mosaic=True)
+beam = pr.Beam(energy_keV=30.0, transverse=pr.Spot(fwhm_x_mm=1.0), longitudinal=pr.PointBunch())
+target = pr.Slab("hopg", thickness_ang=10_000.0, footprint=None, mosaic=True)
 detector = pr.Detector()
 numerics = pr.Numerics(convergence=pr.Convergence(mosaic_route="mc", mosaic_nodes=35))
 result = pr.simulate(beam, target, detector, numerics=numerics)

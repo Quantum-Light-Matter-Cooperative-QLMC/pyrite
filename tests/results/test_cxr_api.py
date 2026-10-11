@@ -7,6 +7,8 @@ import numpy as np
 import pytest
 
 from pyrite import CxrSpectra, EnergyBins, Numerics, Precision, Result, SpectralDensity
+from pyrite.campaign.beam import PointBunch, Spot
+from pyrite.campaign.geometry import Footprint
 
 
 def _result():
@@ -154,7 +156,11 @@ def test_catalog_aliases_reject_duplicate_spellings():
 def test_old_sweep_axis_path_remains_a_warning_alias():
     from pyrite import Beam, Detector, Scene, Slab, Sweep
 
-    scene = Scene(Beam(energy_keV=30), Slab("hopg", thickness_ang=1000), Detector())
+    scene = Scene(
+        Beam(energy_keV=30, transverse=Spot(), longitudinal=PointBunch()),
+        Slab("hopg", thickness_ang=1000, footprint=Footprint(5.0, 5.0)),
+        Detector(),
+    )
     with pytest.warns(DeprecationWarning, match="EnergyBins.cxr"):
         sweep = Sweep(scene, {"detector.energy_bins.line": ([1, 2],)})
         expanded = sweep.expand()[0][1]

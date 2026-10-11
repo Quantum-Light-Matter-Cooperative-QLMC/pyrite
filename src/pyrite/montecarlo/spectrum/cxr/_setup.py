@@ -579,10 +579,10 @@ def _prepare_spectrum(request):
             if finite_footprint_now:
                 if longitudinal_rms_fs is None:
                     raise ValueError(
-                        "coherent emission with a finite crystal footprint and "
-                        "nonzero bunch offsets requires longitudinal_rms_fs; "
-                        "only the fully longitudinally decohered limit is "
-                        "supported"
+                        "coherent emission on a finite crystal footprint with sampled "
+                        "bunch offsets needs a Gaussian bunch length to average them "
+                        "analytically: set Beam(longitudinal=BunchLength(rms_fs=...)), "
+                        "or use Slab(footprint=None) for a laterally infinite crystal"
                     )
                 sigma_z_ang = longitudinal_rms_fs * C_ANG_PER_FS
                 # Decide support in host float64 so a borderline duration does

@@ -9,8 +9,8 @@ The root package exposes the supported high-level objects. `simulate` accepts th
 ```python
 import pyrite as pr
 
-beam = pr.Beam(energy_keV=30.0)
-target = pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0)
+beam = pr.Beam(energy_keV=30.0, transverse=pr.Spot(fwhm_x_mm=1.0), longitudinal=pr.PointBunch())
+target = pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0))
 detector = pr.Detector()
 
 result = pr.simulate(
@@ -31,17 +31,21 @@ result = pr.simulate(
 
 ## Describe the beam
 
-`Beam` takes exactly one description per kind of property, so an invalid mix cannot be built:
+`Beam` takes exactly one description per kind of property, so an invalid mix cannot be built. Both `transverse` and `longitudinal` are required:
 
 ```python
-pr.Beam(energy_keV=30.0)                                     # 1 mm round spot, point bunch
-pr.Beam(energy_keV=30.0, transverse=pr.Spot(0.5, 0.25))      # Gaussian spot FWHM x/y in mm
-pr.Beam(energy_keV=30.0, transverse=pr.Point())              # point source
-pr.Beam(energy_keV=30.0, longitudinal=pr.BunchLength(100.0)) # RMS fs
-pr.Beam.from_gdf("beam.gdf", z_origin_m=0.0, time_s=1e-9)    # GPT snapshot
+pr.Beam(energy_keV=30.0, transverse=pr.Spot(1.0), longitudinal=pr.PointBunch())        # 1 mm round spot
+pr.Beam(energy_keV=30.0, transverse=pr.Spot(0.5, 0.25), longitudinal=pr.PointBunch())  # FWHM x/y in mm
+pr.Beam(energy_keV=30.0, transverse=pr.PointSpot(), longitudinal=pr.PointBunch())      # point source
+pr.Beam(energy_keV=30.0, transverse=pr.Spot(1.0), longitudinal=pr.BunchLength(100.0))  # RMS fs
+pr.Beam.from_gdf("beam.gdf", z_origin_m=0.0, time_s=1e-9)                              # GPT snapshot
 ```
 
-`transverse` also accepts a Courant–Snyder `TransverseDistribution`, and `longitudinal` accepts `PointBunch`, `Offsets`, or a `LongitudinalDistribution` policy. Divergence is derived: `beam.derived_divergence_mrad(energy_keV)`. Sweep axes address the sub-objects, for example `"beam.transverse": [pr.Spot(0.5), pr.Spot(1.0), pr.Point()]`.
+`transverse` also accepts a Courant–Snyder `TransverseDistribution`, and `longitudinal` accepts `Offsets` or a `LongitudinalDistribution` policy. Divergence is derived: `beam.derived_divergence_mrad(energy_keV)`. Sweep axes address the sub-objects, for example `"beam.transverse": [pr.Spot(0.5), pr.Spot(1.0), pr.PointSpot()]`.
+
+Targets likewise require `footprint`: a finite `pr.Footprint(width_mm, height_mm)`, or `None` for a laterally infinite crystal. Leaving out any of these three still works through 0.13 with a `DeprecationWarning` and the old default (1 mm `Spot`, `PointBunch`, 5 mm x 5 mm footprint); from 0.14.0 it is an error. `pr.Point` is a deprecated alias of `pr.PointSpot` on the same schedule.
+
+Coherent emission with physical bunch charge needs offsets the estimator can resolve. On an infinite slab, sampled offsets (a finite `Spot` or `BunchLength`) leave a near-zero cross-electron excess that `cxr_trials` far below the bunch's electron count cannot resolve, and the run refuses with `CoherentSamplingError`. Use `PointSpot()` with `PointBunch()`, or a finite footprint with `BunchLength` so offsets are averaged analytically.
 
 ## Interpret the result
 
@@ -113,7 +117,7 @@ A physical detector and filter are downstream photon objects. They do not enter 
 
 ```python
 pose = pr.PlanarPose.from_observation(distance_mm=400.0, polar_deg=90.0)
-detector = pr.PlanarDetector.timepix3_chip(pose)
+detector = pr.PlanarDetector.timepix3_chip(pose, scorer=pr.PixelScorer(angular_shape=(2, 2)))
 filter_pose = pr.PlanarPose.from_observation(
     distance_mm=200.0,
     polar_deg=90.0,
@@ -131,7 +135,6 @@ pixel_result = pr.simulate(
     target,
     detector,
     filters=(half_filter,),
-    pixel_scorer=pr.PixelScorer(angular_shape=(2, 2)),
 )
 spatial = pixel_result.spatial
 assert spatial is not None
@@ -145,13 +148,15 @@ metadata = spatial.pixel_metadata(pixels=[(128, 64), (128, 192)])
 shadow = spatial.transmission_image(5_000.0, component="background")
 ```
 
+A pixelated detector always returns `spatial`; its `PlanarDetector.scorer` sets the angular partition and defaults to `PixelScorer()` (one tile). `simulate(pixel_scorer=...)` is deprecated (removed in 0.14.0) and moves the value onto the detector.
+
 Selected spectra include each pixel's solid angle and therefore have units of photons per incident electron per eV. `component="cxr"` and `"coherent"` are PXR/CBS only; `"characteristic"` is the atomic-relaxation component, and `"cxr_total"`/`"coherent_total"` add it to the corresponding line. `Result.cxr.incoherent.density` remains a detector- averaged density per sr. `SpatialResult` stores tile spectra, pixel rays, and attenuation coefficients as separate factors; `spectra` materializes only the selection and `image` works in bounded pixel chunks rather than allocating a full `(row, column, energy)` cube. Pass `measured=True` to either method to apply a configured `PlanarDetector.response` explicitly.
 
 `pixel_metadata` returns, for a selection only, each pixel's detector-local and lab position, unit direction with lab polar/azimuth angles, distance, scored solid angle, angular tile (and its representative direction when retained), and per-filter path length. `filter_coverage()` marks which centre rays cross each plate, and `transmission_image(energy_eV, component=...)` is the primary transmission at the nearest stored node of that component's energy grid (`energy_node` reports it); an energy outside the grid is an error rather than a snap to its end, so use `"background"` for the wide continuum grid. Uncovered pixels are exactly 1.
 
 By default each pixel takes the intrinsic spectrum of the angular tile containing it (`PixelScorer(reconstruction="nearest_tile")`), so a smooth angular gradient such as takeoff-angle self-absorption renders as tile-sized steps. `PixelScorer(angular_shape, reconstruction="bilinear_tile")` instead blends the neighbouring tiles' spectra with convex bilinear weights at the same transport cost. Pixels beyond the outermost tile centres keep the edge tile's spectrum, and because blending mixes spectra at fixed energy, a line whose energy shifts with angle (PXR/coherent) broadens or doubles instead of shifting. Use it for smooth components and raise `angular_shape` for angle-dispersed lines. The mode is part of the true-spatial identity. See the [`pixel-angular-interpolation`](../validation/ledger-detector-forward-models.md#pixel-angular-interpolation) ledger row.
 
-Pixels use centre rays from the target reference point. The plate is a finite oriented box, so translation, distance, rotation, oblique thickness, edge misses, and side escape affect the shadow. The primary model includes only Beer--Lambert attenuation: no filter scatter, fluorescence, diffraction, or secondary photons. A `PlanarDetector` without `PixelGrid` supports one centre ray and scalar output; partial-coverage scoring requires `PixelScorer` and a physical grid.
+Pixels use centre rays from the target reference point. The plate is a finite oriented box, so translation, distance, rotation, oblique thickness, edge misses, and side escape affect the shadow. The primary model includes only Beer--Lambert attenuation: no filter scatter, fluorescence, diffraction, or secondary photons. A `PlanarDetector` without `PixelGrid` supports one centre ray and scalar output; partial-coverage scoring requires a physical `PixelGrid`, whose detector carries the `PixelScorer`.
 
 `provenance["identity_digest"]` remains the source-case digest. Physical observations additionally carry `observation_identity_digest`, which includes ordered geometry, resolved compositions, angular partition, response, and hashes of the coefficient arrays. Plate display names are not identity. An acquisition-enabled observation instead records independent `true_spatial_digest`, `response_digest`, and `acquisition_digest` layers, then links them through `observation_identity_digest`. Changing exposure or reporting edges therefore leaves the intrinsic and true-spatial identities unchanged; changing only the response leaves true-spatial identity unchanged.
 
@@ -159,6 +164,7 @@ Pixels use centre rays from the target reference point. The plate is a finite or
 counting_detector = pr.PlanarDetector.timepix3_chip(
     pose,
     response=pr.IdealPhotonCounter(),
+    scorer=pr.PixelScorer(angular_shape=(2, 2)),
 )
 acquisition = pr.Acquisition.uniform(
     exposure_s=1.0,
@@ -171,7 +177,6 @@ configured = pr.simulate(
     beam,
     target,
     counting_detector,
-    pixel_scorer=pr.PixelScorer(angular_shape=(2, 2)),
     acquisition=acquisition,
 )
 selected = configured.acquire(pixels=[(0, 0), (10, 12)])

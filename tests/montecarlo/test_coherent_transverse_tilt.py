@@ -228,6 +228,24 @@ def test_tilted_finite_footprint_reducer_applies_the_analytic_transverse_factor(
     assert record["face_arrival_delay"]
 
 
+def test_finite_footprint_without_bunch_length_names_user_facing_fixes():
+    segments, _ = _tilted_identical_tracks(4, 2.0)
+    segments.update(crystal_width_ang=1e6, crystal_height_ang=1e6)
+    with pytest.raises(ValueError, match="BunchLength") as caught:
+        mc_cxr_spectrum(
+            segments,
+            np.arange(700.0, 1500.0, 2.0),
+            "hopg",
+            [(0, 0, 2)],
+            B_ang2=0.8,
+            n_hat=np.array([1.0, 0.0, 0.1]) / np.linalg.norm([1.0, 0.0, 0.1]),
+            coherent=True,
+            physical_electrons=50.0,
+        )
+    assert "footprint=None" in str(caught.value)
+    assert "longitudinal_rms_fs" not in str(caught.value)
+
+
 def test_finite_footprint_refuses_a_spot_reaching_the_edge():
     segments, _ = _tilted_identical_tracks(4, 2.0)
     segments.update(crystal_width_ang=100.0, crystal_height_ang=100.0)

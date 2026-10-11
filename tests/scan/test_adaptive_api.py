@@ -21,8 +21,8 @@ from pyrite.results import Settings, store_result
 @pytest.fixture
 def scene():
     return pr.Scene(
-        pr.Beam(energy_keV=30.0),
-        pr.Slab("hopg", thickness_ang=1e4, tilt_deg=30.0),
+        pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Slab("hopg", thickness_ang=1e4, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         pr.Detector(),
     )
 
@@ -348,3 +348,30 @@ def test_precision_cannot_cross_with_electron_count_sweep(scene, precision):
     )
     with pytest.raises(ValueError, match="electron-count sweep grids"):
         build_cases(sweep, precision=precision)
+
+
+def test_precision_accepts_a_bare_observable_name():
+    """A single name is one observable, not its characters (``tuple("cxr")``)."""
+    precision = pr.Precision(
+        target_rse=0.1,
+        min_electrons=10,
+        max_electrons=20,
+        block_electrons=10,
+        observables="brem",
+    )
+    assert precision.observables == ("brem",)
+
+
+def test_precision_min_electrons_defaults_to_one_block():
+    """Issue #443: an omitted minimum is one block, the smallest legal stop."""
+    precision = pr.Precision(target_rse=0.1, max_electrons=60, block_electrons=20)
+    assert precision.min_electrons == 20
+    assert pr.Precision.from_dict(precision.to_dict()) == precision
+
+
+@pytest.mark.parametrize("missing", ["max_electrons", "block_electrons"])
+def test_precision_still_requires_max_and_block_counts(missing):
+    values = {"target_rse": 0.1, "max_electrons": 60, "block_electrons": 20}
+    del values[missing]
+    with pytest.raises(TypeError, match=f"requires {missing}"):
+        pr.Precision(**values)

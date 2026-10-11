@@ -104,6 +104,7 @@ def resolve_pixel_scene(
             cxr_by_energy=scan.E_grid_line_by_energy,
             brem=scan.E_grid_brem,
         ),
+        scorer=scorer,
     )
     filters = tuple(
         filter_from_config(row) for row in catalog.profile_filters.get(profile_name, ())

@@ -79,28 +79,35 @@ def test_blazed_grooves_are_not_sweepable():
 
 def test_slab_rejects_empty_material_and_bad_thickness():
     with pytest.raises(ValueError, match="Slab.material must be a non-empty material key"):
-        Slab("  ")
+        Slab("  ", footprint=Footprint(5.0, 5.0))
     with pytest.raises(ValueError, match="Slab.thickness_ang must be finite and positive"):
-        Slab(MATERIAL, thickness_ang=0.0)
+        Slab(MATERIAL, thickness_ang=0.0, footprint=Footprint(5.0, 5.0))
 
 
 def test_slab_bans_the_degenerate_angles():
     with pytest.raises(ValueError, match="polar tilt_deg == 0 is disallowed"):
-        Slab(MATERIAL, tilt_deg=0.0)
+        Slab(MATERIAL, tilt_deg=0.0, footprint=Footprint(5.0, 5.0))
     with pytest.raises(ValueError, match="tilt_azim_deg == 90 is disallowed"):
-        Slab(MATERIAL, tilt_azim_deg=90.0)
+        Slab(MATERIAL, tilt_azim_deg=90.0, footprint=Footprint(5.0, 5.0))
 
 
 def test_slab_allows_normal_incidence_for_transport_only_studies():
-    assert Slab(MATERIAL, tilt_deg=0.0, allow_normal_incidence=True).tilt_deg == 0.0
+    assert (
+        Slab(
+            MATERIAL, tilt_deg=0.0, allow_normal_incidence=True, footprint=Footprint(5.0, 5.0)
+        ).tilt_deg
+        == 0.0
+    )
     with pytest.raises(ValueError, match="tilt_azim_deg == 90 is disallowed"):
-        Slab(MATERIAL, tilt_azim_deg=90.0, allow_normal_incidence=True)
+        Slab(
+            MATERIAL, tilt_azim_deg=90.0, allow_normal_incidence=True, footprint=Footprint(5.0, 5.0)
+        )
 
 
 def test_angles_are_quantized_before_they_are_validated():
     """0.2 deg quantizes to 0.0, so the tilt ban must fire on the quantized value."""
     with pytest.raises(ValueError, match="polar tilt_deg == 0 is disallowed"):
-        Slab(MATERIAL, tilt_deg=0.2)
+        Slab(MATERIAL, tilt_deg=0.2, footprint=Footprint(5.0, 5.0))
 
 
 @pytest.mark.parametrize(
@@ -112,7 +119,7 @@ def test_angles_are_quantized_before_they_are_validated():
 )
 def test_grooves_require_their_angle_conjunction(kwargs, message):
     with pytest.raises(ValueError, match=message):
-        Slab(MATERIAL, entrance_face=BlazedGrooves(2.0e4), **kwargs)
+        Slab(MATERIAL, entrance_face=BlazedGrooves(2.0e4), footprint=Footprint(5.0, 5.0), **kwargs)
 
 
 def test_grooves_are_compatible_with_a_finite_footprint():
@@ -134,18 +141,27 @@ def test_grooves_forbid_a_stack_by_construction():
         Stack(  # type: ignore[call-arg]
             layers=(Layer(MATERIAL, 2e4), Layer("sio2", 5e6)),
             entrance_face=BlazedGrooves(2.0e4),
+            footprint=Footprint(5.0, 5.0),
         )
 
 
 def test_grooves_require_a_90_degree_observation_angle():
-    target = Slab(MATERIAL, tilt_deg=45.0, tilt_azim_deg=180.0, entrance_face=BlazedGrooves(2.0e4))
+    target = Slab(
+        MATERIAL,
+        tilt_deg=45.0,
+        tilt_azim_deg=180.0,
+        entrance_face=BlazedGrooves(2.0e4),
+        footprint=Footprint(5.0, 5.0),
+    )
     target.validate_against(Detector(observation_angle_deg=90.0))
     with pytest.raises(ValueError, match="theta_obs_deg == 90"):
         target.validate_against(Detector(observation_angle_deg=45.0))
 
 
 def test_ungrooved_target_accepts_any_observation_angle():
-    Slab(MATERIAL).validate_against(Detector(observation_angle_deg=45.0))
+    Slab(MATERIAL, footprint=Footprint(5.0, 5.0)).validate_against(
+        Detector(observation_angle_deg=45.0)
+    )
 
 
 def test_layer_validates_material_and_thickness():
@@ -159,17 +175,24 @@ def test_layer_validates_material_and_thickness():
 
 def test_stack_needs_a_film_plus_something_beneath_it():
     with pytest.raises(ValueError, match="use Slab for a free-standing film"):
-        Stack(layers=(Layer(MATERIAL, 2e4),))
+        Stack(layers=(Layer(MATERIAL, 2e4),), footprint=Footprint(5.0, 5.0))
 
 
 def test_only_the_film_may_sweep_thickness():
     with pytest.raises(ValueError, match="only the film may sweep thickness_ang"):
-        Stack(layers=(Layer(MATERIAL, 2e4), Layer("sio2", [1e6, 5e6])))
-    Stack(layers=(Layer(MATERIAL, [1e4, 2e4]), Layer("sio2", 5e6)))
+        Stack(
+            layers=(Layer(MATERIAL, 2e4), Layer("sio2", [1e6, 5e6])), footprint=Footprint(5.0, 5.0)
+        )
+    Stack(layers=(Layer(MATERIAL, [1e4, 2e4]), Layer("sio2", 5e6)), footprint=Footprint(5.0, 5.0))
 
 
 def test_stack_exposes_the_film_material():
-    assert Stack(layers=(Layer(MATERIAL, 2e4), Layer("sio2", 5e6))).material == MATERIAL
+    assert (
+        Stack(
+            layers=(Layer(MATERIAL, 2e4), Layer("sio2", 5e6)), footprint=Footprint(5.0, 5.0)
+        ).material
+        == MATERIAL
+    )
 
 
 # ---- lowering equivalence with build_cases ----------------------------------
@@ -186,7 +209,7 @@ def _sweep(**kwargs):
     [
         (
             {},
-            Slab(MATERIAL),
+            Slab(MATERIAL, footprint=Footprint(5.0, 5.0)),
         ),
         (
             {"crystal_width_mm": None, "crystal_height_mm": None},
@@ -210,11 +233,11 @@ def _sweep(**kwargs):
         ),
         (
             {"substrate": "sio2"},
-            Stack.on_substrate(MATERIAL, 2e4, "sio2"),
+            Stack.on_substrate(MATERIAL, 2e4, "sio2", footprint=Footprint(5.0, 5.0)),
         ),
         (
             {"substrate": "silicon", "substrate_thickness_ang": 1e6},
-            Stack.on_substrate(MATERIAL, 2e4, "silicon", 1e6),
+            Stack.on_substrate(MATERIAL, 2e4, "silicon", 1e6, footprint=Footprint(5.0, 5.0)),
         ),
         (
             {
@@ -229,7 +252,8 @@ def _sweep(**kwargs):
                     Layer(MATERIAL, [1e4, 2e4]),
                     Layer("sio2", 2850.0),
                     Layer("silicon", 5e6, beam_uvw=(1, 1, 1), azimuth_deg=30.0),
-                )
+                ),
+                footprint=Footprint(5.0, 5.0),
             ),
         ),
         (
@@ -243,6 +267,7 @@ def _sweep(**kwargs):
                 tilt_deg=45.0,
                 tilt_azim_deg=180.0,
                 entrance_face=BlazedGrooves(2.0e4),
+                footprint=Footprint(5.0, 5.0),
             ),
         ),
     ],
@@ -268,7 +293,10 @@ def test_lower_reproduces_the_build_cases_geometry(sweep_kwargs, target):
 
 def test_lower_omits_the_groove_key_for_an_ungrooved_target():
     """The absent key -- not a None -- is what keeps existing case payloads bit-for-bit."""
-    assert "groove_spacing_ang" not in _lower(Slab(MATERIAL))[0].case_keys()
+    assert (
+        "groove_spacing_ang"
+        not in _lower(Slab(MATERIAL, footprint=Footprint(5.0, 5.0)))[0].case_keys()
+    )
 
 
 def test_lower_preserves_the_build_cases_product_order():
@@ -291,13 +319,16 @@ def test_lower_preserves_the_build_cases_product_order():
 
 def test_lower_deduplicates_quantized_angles_like_build_cases():
     """0.1 and 0.2 both quantize to 0.0; stable-unique collapses them to one case."""
-    target = Slab(MATERIAL, tilt_deg=[29.9, 30.1], allow_normal_incidence=False)
+    target = Slab(
+        MATERIAL, tilt_deg=[29.9, 30.1], allow_normal_incidence=False, footprint=Footprint(5.0, 5.0)
+    )
     assert [g.tilt_deg for g in _lower(target)] == [30.0]
 
 
 def test_stack_radiators_align_with_the_absorber_stack():
     target = Stack(
         layers=(Layer(MATERIAL, 2e4), Layer("sio2", 2850.0), Layer("silicon", 5e6)),
+        footprint=Footprint(5.0, 5.0),
     )
     geometry = _lower(target)[0]
     assert len(geometry.abs_layers) == 3
@@ -311,21 +342,25 @@ def test_stack_radiators_align_with_the_absorber_stack():
 
 
 def test_on_substrate_is_the_one_layer_stack():
-    assert Stack.on_substrate(MATERIAL, 2e4, "sio2") == Stack(
-        layers=(Layer(MATERIAL, 2e4), Layer("sio2", 5e6))
+    assert Stack.on_substrate(MATERIAL, 2e4, "sio2", footprint=Footprint(5.0, 5.0)) == Stack(
+        layers=(Layer(MATERIAL, 2e4), Layer("sio2", 5e6)), footprint=Footprint(5.0, 5.0)
     )
 
 
 def test_the_substrate_pair_warns_but_still_builds_the_target():
     with pytest.deprecated_call(match="Stack.on_substrate"):
         sweep = _sweep(substrate="silicon", substrate_thickness_ang=1e6)
-    assert sweep.target == Stack.on_substrate(MATERIAL, 2e4, "silicon", 1e6)
+    assert sweep.target == Stack.on_substrate(
+        MATERIAL, 2e4, "silicon", 1e6, footprint=Footprint(5.0, 5.0)
+    )
 
 
 def test_the_canonical_target_spelling_does_not_warn():
     with warnings.catch_warnings():
         warnings.simplefilter("error", DeprecationWarning)
-        _sweep(target=Stack.on_substrate(MATERIAL, 2e4, "silicon", 1e6))
+        _sweep(
+            target=Stack.on_substrate(MATERIAL, 2e4, "silicon", 1e6, footprint=Footprint(5.0, 5.0))
+        )
 
 
 def test_reading_a_retired_flat_name_raises():
@@ -340,11 +375,31 @@ def test_reading_a_retired_flat_name_raises():
 def test_mosaic_is_target_state():
     assert _sweep().target.mosaic is False
     assert _sweep(mosaic=True).target.mosaic is True
-    assert _sweep(target=Slab(MATERIAL, mosaic=True)).target.mosaic is True
+    assert (
+        _sweep(target=Slab(MATERIAL, mosaic=True, footprint=Footprint(5.0, 5.0))).target.mosaic
+        is True
+    )
 
 
 def test_build_cases_reads_mosaic_from_the_target():
     off = build_cases(_sweep(mosaic_fwhm_deg=0.8))[0]
-    on = build_cases(_sweep(target=Slab(MATERIAL, mosaic=True), mosaic_fwhm_deg=0.8))[0]
+    on = build_cases(
+        _sweep(
+            target=Slab(MATERIAL, mosaic=True, footprint=Footprint(5.0, 5.0)), mosaic_fwhm_deg=0.8
+        )
+    )[0]
     assert off["mosaic_fwhm_rad"] is None
     assert on["mosaic_fwhm_rad"] == pytest.approx(np.deg2rad(0.8))
+
+
+def test_omitted_footprint_warns_and_keeps_the_historical_default():
+    """Issue #451: footprint is required; None stays the explicit infinite slab."""
+    with pytest.warns(DeprecationWarning, match=r"Slab\(\) without footprint="):
+        slab = Slab(MATERIAL)
+    assert slab.footprint == Footprint(5.0, 5.0)
+    with pytest.warns(DeprecationWarning, match=r"Stack\(\) without footprint="):
+        stack = Stack.on_substrate(MATERIAL, 1e3, "si")
+    assert stack.footprint == Footprint(5.0, 5.0)
+    with pytest.warns(DeprecationWarning, match=r"Stack\(\) without footprint="):
+        Stack(layers=stack.layers)
+    assert Slab(MATERIAL, footprint=None).footprint is None

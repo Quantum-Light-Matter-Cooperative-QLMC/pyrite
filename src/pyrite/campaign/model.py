@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 import numpy as np
 
+from .._api_deprecations import warn_api
 from .._numerics import Convergence, Numerics
 from .._numerics import MosaicRoute as MosaicRoute
 from .._precision import Precision
@@ -94,7 +95,8 @@ class Scene:
     filters
         Ordered filter plates between the source and a planar detector.
     pixel_scorer
-        Optional request for factorized spatial scoring on a detector grid.
+        Deprecated: set :attr:`PlanarDetector.scorer` instead. A value given
+        here is moved onto the detector and this field reads ``None``.
     emission
         ``"incoherent"``, ``"coherent"``, or ``"both"``.
     brem_source
@@ -132,26 +134,17 @@ class Scene:
         if any(not isinstance(plate, FilterPlate) for plate in filters):
             raise TypeError("Scene.filters must contain only FilterPlate objects")
         object.__setattr__(self, "filters", filters)
-        if self.pixel_scorer is not None and not isinstance(self.pixel_scorer, PixelScorer):
-            raise TypeError("Scene.pixel_scorer must be a PixelScorer or None")
+        if self.pixel_scorer is not None:
+            # stacklevel 4: warn_api -> __post_init__ -> __init__ -> the caller.
+            warn_api("Scene(pixel_scorer=)", stacklevel=4)
+            object.__setattr__(
+                self, "detector", detector_with_scorer(self.detector, self.pixel_scorer)
+            )
+            object.__setattr__(self, "pixel_scorer", None)
         if self.acquisition is not None and not isinstance(self.acquisition, Acquisition):
             raise TypeError("Scene.acquisition must be an Acquisition or None")
         if filters and not isinstance(self.detector, PlanarDetector):
             raise TypeError("Scene.filters require a physical PlanarDetector")
-        if self.pixel_scorer is not None:
-            if not isinstance(self.detector, PlanarDetector):
-                raise TypeError("Scene.pixel_scorer requires a physical PlanarDetector")
-            if self.detector.pixels is None:
-                raise ValueError("Scene.pixel_scorer requires PlanarDetector.pixels")
-            if any(
-                requested > available
-                for requested, available in zip(
-                    self.pixel_scorer.angular_shape,
-                    self.detector.pixels.shape,
-                    strict=True,
-                )
-            ):
-                raise ValueError("pixel scorer angular shape cannot exceed detector pixel shape")
         if self.acquisition is not None:
             if not isinstance(self.detector, PlanarDetector) or self.detector.pixels is None:
                 raise TypeError("Scene.acquisition requires a physical pixel detector")
@@ -169,6 +162,21 @@ class Scene:
             raise ValueError("emission must be 'incoherent', 'coherent', or 'both'")
         if self.brem_source not in {"mc", "external", "none"}:
             raise ValueError("brem_source must be 'mc', 'external', or 'none'")
+
+
+def detector_with_scorer(detector: Any, scorer: Any) -> PlanarDetector:
+    """Move a deprecated loose ``pixel_scorer`` onto its pixel detector (#451)."""
+    if not isinstance(scorer, PixelScorer):
+        raise TypeError("pixel_scorer must be a PixelScorer or None")
+    if not isinstance(detector, PlanarDetector):
+        raise TypeError("pixel_scorer requires a physical PlanarDetector")
+    if detector.pixels is None:
+        raise ValueError("pixel_scorer requires PlanarDetector.pixels")
+    if detector.scorer not in (None, PixelScorer(), scorer):
+        raise ValueError(
+            "pixel_scorer conflicts with PlanarDetector.scorer; set only PlanarDetector.scorer"
+        )
+    return replace(detector, scorer=scorer)
 
 
 def _parts(path: str) -> tuple[tuple[str, tuple[int, ...]], ...]:

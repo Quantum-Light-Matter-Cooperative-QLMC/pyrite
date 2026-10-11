@@ -28,10 +28,11 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import product
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
+from .._api_deprecations import warn_api
 from .._energy_grid_encoding import decode_energy_grid
 from .._formatting import fmt_thickness
 from ..detectors import Detector
@@ -259,6 +260,11 @@ class Footprint:
 DEFAULT_FOOTPRINT = Footprint(5.0, 5.0)
 """The historical default bounded footprint. Frozen, so one instance is shared."""
 
+#: Placeholder for an omitted ``footprint``. ``None`` already means the infinite
+#: slab, so "not supplied" needs its own value; through the #451 deprecation
+#: window it resolves, with a warning, to :data:`DEFAULT_FOOTPRINT`.
+_UNSET_FOOTPRINT: Any = cast(Any, object())
+
 DEFAULT_SUBSTRATE_THICKNESS_ANG = 5e6
 """The historical ``substrate_thickness_ang`` default: a 0.5 mm wafer."""
 
@@ -401,6 +407,10 @@ class _TargetGeometry:
         return _quantized_angles(self.tilt_deg), _quantized_angles(self.tilt_azim_deg)
 
     def _validate_geometry(self) -> None:
+        if self.footprint is _UNSET_FOOTPRINT:
+            # stacklevel 5: warn_api -> here -> __post_init__ -> __init__ -> caller.
+            warn_api(f"{type(self).__name__}() without footprint=", stacklevel=5)
+            object.__setattr__(self, "footprint", DEFAULT_FOOTPRINT)
         if self.footprint is not None and not isinstance(self.footprint, Footprint):
             raise TypeError("footprint must be a Footprint or None (the infinite slab)")
         tilts, azimuths = self._angles()
@@ -512,7 +522,9 @@ class Slab(_TargetGeometry):
     tilt_deg, tilt_azim_deg
         Polar and azimuthal crystal tilt angles in degrees. Scalars or sequences.
     footprint
-        Finite full width and height. ``None`` selects a laterally infinite slab.
+        Required: a finite :class:`Footprint`, or ``None`` for a laterally
+        infinite slab. Omitting it is deprecated and falls back to a
+        5 mm x 5 mm footprint.
     entrance_face
         Optional supported blazed-groove geometry.
     allow_normal_incidence
@@ -526,7 +538,7 @@ class Slab(_TargetGeometry):
     thickness_ang: ScalarOrSeq = 2e4
     tilt_deg: ScalarOrSeq = 30.0
     tilt_azim_deg: ScalarOrSeq = 0.0
-    footprint: Footprint | None = DEFAULT_FOOTPRINT
+    footprint: Footprint | None = _UNSET_FOOTPRINT
     entrance_face: BlazedGrooves | None = None
     allow_normal_incidence: bool = False
     # Crystal mosaicity is a property of the target crystal, not of the run: True
@@ -569,7 +581,8 @@ class Stack(_TargetGeometry):
     tilt_deg, tilt_azim_deg
         Polar and azimuthal stack tilt angles in degrees. Scalars or sequences.
     footprint
-        Finite full width and height. ``None`` selects infinite lateral extent.
+        Required: a finite :class:`Footprint`, or ``None`` for infinite lateral
+        extent. Omitting it is deprecated and falls back to 5 mm x 5 mm.
     allow_normal_incidence
         Permit normally incident geometry.
     mosaic
@@ -579,7 +592,7 @@ class Stack(_TargetGeometry):
     layers: tuple[Layer, ...]
     tilt_deg: ScalarOrSeq = 30.0
     tilt_azim_deg: ScalarOrSeq = 0.0
-    footprint: Footprint | None = DEFAULT_FOOTPRINT
+    footprint: Footprint | None = _UNSET_FOOTPRINT
     allow_normal_incidence: bool = False
     mosaic: bool = False
 
@@ -613,7 +626,7 @@ class Stack(_TargetGeometry):
         *,
         tilt_deg: ScalarOrSeq = 30.0,
         tilt_azim_deg: ScalarOrSeq = 0.0,
-        footprint: Footprint | None = DEFAULT_FOOTPRINT,
+        footprint: Footprint | None = _UNSET_FOOTPRINT,
         allow_normal_incidence: bool = False,
         mosaic: bool = False,
     ) -> Stack:
@@ -623,6 +636,9 @@ class Stack(_TargetGeometry):
         constructor: :class:`Stack` itself requires the film plus at least one
         layer beneath it, so a caller who wants only a substrate builds it here.
         """
+        if footprint is _UNSET_FOOTPRINT:
+            warn_api("Stack() without footprint=")
+            footprint = DEFAULT_FOOTPRINT
         return cls(
             layers=(
                 Layer(material, thickness_ang),
