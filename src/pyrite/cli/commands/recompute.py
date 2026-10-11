@@ -432,7 +432,6 @@ def _cxr_cli_json(args):
 @canonical_option(
     "--cxr-trials",
     "cxr_ne",
-    retired=("--line-ne",),
     type=_cli_core.POSITIVE_INT,
     default=None,
     metavar="N",
@@ -455,7 +454,6 @@ def _cxr_cli_json(args):
 @canonical_option(
     "--cxr-step",
     "line_step",
-    retired=("--line-step",),
     type=_cli_core.POSITIVE_FLOAT,
     default=None,
     metavar="EV",

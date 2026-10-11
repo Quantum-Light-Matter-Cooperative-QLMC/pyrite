@@ -238,7 +238,7 @@ _RECORD_ARRAY_FIELDS = (
 _WIDE_BREM_FIELDS = ("brem_wide", "E_grid_brem")
 
 # The coherent and characteristic components use the line grid, so a
-# --line-only projection/merge must carry them with ``spec``.
+# --cxr-only projection/merge must carry them with ``spec``.
 CXR_RECORD_KEYS = ("spec", "E_grid", "spec_coherent", "spec_characteristic")
 BREM_RECORD_KEYS = ("brem_wide", "brem", "E_grid_brem")
 

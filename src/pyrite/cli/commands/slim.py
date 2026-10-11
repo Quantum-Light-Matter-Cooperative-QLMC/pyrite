@@ -46,7 +46,6 @@ from .._deprecations import canonical_option
 @canonical_option(
     "--cxr-only",
     "cxr_only",
-    retired=("--line-only",),
     is_flag=True,
     help="Keep only line arrays; mutually exclusive with --brem-only.",
 )

@@ -1511,7 +1511,7 @@ Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...
 
   Where settings live: ranges, membership, beam/detector references and emission use
   ``set|add|remove``; calculation controls (electron counts, reflections, mosaic,
-  transport models) use ``numerics``; the line-grid selectors use ``line-grid``; filters
+  transport models) use ``numerics``; the line-grid selectors use ``cxr-grid``; filters
   and the pixel detector use ``filter`` and ``physical-detector``; reusable beams and
   detectors are named objects edited with ``pyrite beam`` and ``pyrite detector``. The
   full map is docs/repo-design/profile-settings.md. Bundled demos are read-only (copy
@@ -1901,10 +1901,9 @@ Commands:
 ## `pyrite profile numerics reset`
 
 ```text
-Usage: pyrite profile numerics reset [OPTIONS] NAME [cxr-trials|line-trials|brem-
-                                     trials|line-electrons|bremsstrahlung-
-                                     electrons|reflection-families|maximum-
-                                     reflections|mosaic-nodes|mosaic-
+Usage: pyrite profile numerics reset [OPTIONS] NAME [cxr-trials|brem-trials|line-
+                                     electrons|bremsstrahlung-electrons|reflection-
+                                     families|maximum-reflections|mosaic-nodes|mosaic-
                                      route|straggling|energy-model|maximum-fractional-
                                      energy-loss|inelastic-model|inelastic-cutoff-
                                      ev|secondary-threshold-ev|elastic-

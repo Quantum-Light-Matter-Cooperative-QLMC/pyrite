@@ -193,7 +193,6 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
 @canonical_option(
     "--cxr-chunk",
     "spec_chunk",
-    retired=("--spec-chunk",),
     type=_cli_core.POSITIVE_INT,
     default=None,
     metavar="N",
@@ -497,7 +496,7 @@ def _command(
             "performance_profile": "--performance-profile",
             "performance_dir": "--performance-dir",
             "performance_interval": "--perf-interval",
-            "spec_chunk": "--spec-chunk",
+            "spec_chunk": "--cxr-chunk",
             "brem_chunk": "--brem-chunk",
             "nsys": "--nsys",
             "py_spy": "--py-spy",

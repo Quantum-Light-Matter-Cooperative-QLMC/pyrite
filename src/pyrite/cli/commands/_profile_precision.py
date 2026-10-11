@@ -359,7 +359,6 @@ def precision_reset_command(name, fields, yes, dry_run):
 @canonical_option(
     "--cxr-trials",
     "line_trials",
-    retired=("--line-trials",),
     type=click.IntRange(min=1),
     metavar="N",
     help="Fixed Monte Carlo electron histories for the CXR spectrum.",

@@ -248,7 +248,7 @@ def start_recxr_queue(
                 ("Monitor", f"pyrite job attach {jobid}"),
                 ("Status", f"pyrite job status {jobid} -vv"),
                 ("Logs", f"pyrite job logs {jobid} --follow"),
-                ("Pull", f"pyrite remote pull {' '.join(stems)} --line-only  (after completion)"),
+                ("Pull", f"pyrite remote pull {' '.join(stems)} --cxr-only  (after completion)"),
             ]
         )
     )

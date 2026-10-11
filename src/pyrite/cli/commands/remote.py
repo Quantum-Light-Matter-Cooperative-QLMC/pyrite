@@ -192,7 +192,6 @@ def rebrem_command(
 @canonical_option(
     "--cxr-trials",
     "cxr_ne",
-    retired=("--line-ne",),
     type=POSITIVE_INT,
     default=None,
     help="New line electron count.",
@@ -202,7 +201,6 @@ def rebrem_command(
 @canonical_option(
     "--cxr-step",
     "line_step",
-    retired=("--line-step",),
     type=POSITIVE_FLOAT,
     default=None,
     help="Explicit uniform line-grid spacing in eV.",
@@ -469,7 +467,6 @@ _start_performance_options = _option_group(
     canonical_option(
         "--cxr-chunk",
         "spec_chunk",
-        retired=("--spec-chunk",),
         type=POSITIVE_INT,
         default=None,
         metavar="N",
@@ -771,7 +768,6 @@ def performance_rm_command(profiles, all_profiles, yes, ssh_verbose):
 @canonical_option(
     "--cxr-only",
     "cxr_only",
-    retired=("--line-only",),
     is_flag=True,
     help="Merge only CXR spectra locally; mutually exclusive with --brem-only.",
 )

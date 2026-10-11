@@ -394,3 +394,50 @@ def test_partial_custom_detector_error_preserves_configured_geometry():
     assert "keep the configured geometry" in result.stderr
     assert "pyrite detector show reference" in result.stderr
     assert 'detectors.eds = "reference"' not in result.stderr
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "checkpoint recompute line",
+        "material energy-grid line",
+    ],
+)
+def test_removed_cxr_command_spellings_are_usage_errors(path):
+    result = invoke(command, [*path.split(), "--help"])
+    assert result.exit_code == 2
+    assert "No such command" in result.stderr
+
+
+def test_removed_profile_line_grid_does_not_resolve_as_a_command():
+    profile = _resolve_command_path(command, "profile")
+    assert profile.get_command(click.Context(profile), "line-grid") is None
+    # Profile's NAME shorthand still applies to unknown command names.
+    result = invoke(command, ["profile", "line-grid", "show", "standard"])
+    assert result.exit_code == 2
+
+
+@pytest.mark.parametrize(
+    ("path", "flag"),
+    [
+        ("checkpoint slim", "--line-only"),
+        ("checkpoint recompute cxr", "--line-ne"),
+        ("checkpoint recompute cxr", "--line-step"),
+        ("remote pull", "--line-only"),
+        ("profile add", "--line-trials"),
+        ("profile create", "--line-trials"),
+        ("profile numerics set", "--line-trials"),
+        ("profile precision disable", "--line-trials"),
+        ("profile set", "--line-trials"),
+    ],
+)
+def test_removed_cxr_flag_spellings_are_usage_errors(path, flag):
+    result = invoke(command, [*path.split(), flag])
+    assert result.exit_code == 2
+    assert "No such option" in result.stderr
+
+
+def test_removed_perf_chunk_spelling_is_a_usage_error():
+    result = invoke(perf_command, ["--spec-chunk", "8"])
+    assert result.exit_code == 2
+    assert "No such option" in result.stderr

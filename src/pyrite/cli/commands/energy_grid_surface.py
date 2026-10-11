@@ -12,7 +12,6 @@ from .._groups import LazyGroup
         "derive": "pyrite.cli.commands.energy_grid.derive_command",
         "show": "pyrite.cli.commands.energy_grid.show_command",
         "cxr": "pyrite.cli.commands.energy_grid_surface.cxr_command",
-        "line": "pyrite.cli.commands.energy_grid_surface.cxr_command",
         "brem": "pyrite.cli.commands.energy_grid_surface.brem_command",
     },
     lazy_help={
@@ -21,7 +20,6 @@ from .._groups import LazyGroup
         "cxr": "Inspect PXR/CBS energy grids.",
         "brem": "Inspect bremsstrahlung energy grids.",
     },
-    lazy_hidden=("line",),
     no_args_is_help=True,
 )
 def material_command() -> None:

@@ -108,7 +108,7 @@ pyrite trajectories info pyrite-output/trajectories/<stem>/<config>-<digest>/E0_
 
 `ls` lists every file under the capture root (or each `DIR` given): checkpoint stem, case, E0, schema, status, segment rows, histories with segments, highest secondary generation, and size, then totals per stem. Stray `.partial` files, incomplete artifacts, and HDF5 files that are not trajectory artifacts appear with their status rather than failing the listing. `info` prints one artifact's case, seed, provenance, whether a scene was recorded, history ID range, track count, segments per generation, and every `/transport` field with its role (per-segment, per-electron, nested, scalar), dtype, shape, and units; the per-segment names are the cell arrays an export carries. Both read headers, node metadata, and integer ID columns in bounded blocks only, never segment arrays. `-o json` emits one stable JSON envelope. `export` and `score` likewise skip non-artifact files in a directory with a warning.
 
-`pyrite checkpoint export-trajectories` and `score-trajectories` remain as deprecated aliases of `pyrite trajectories export` and `score`; captures are not checkpoints.
+Use `pyrite trajectories export` and `score` for captures; the former checkpoint aliases were removed in 0.13.0.
 
 Reopen a file from Python:
 
