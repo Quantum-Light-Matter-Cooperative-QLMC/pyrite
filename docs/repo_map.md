@@ -555,7 +555,7 @@ Canonical `pyrite detector list|show|create|set|rename|delete` Click layer over 
 Canonical `pyrite job list|status|logs|attach|stop` Click layer. Reuses the remote viewer, JSON envelope, completion, exit, confirmation, and lifecycle owners; normalizes persisted submitter names into the four public job kinds. Retired `remote` and `energy-grid` lifecycle spellings remain hidden warning aliases.
 
 ### `cli/commands/checkpoint.py`
-Canonical `pyrite checkpoint` group. Lazily routes `slim`, component `recompute {brem,line}`, `archive`, `restore`, `list`, `merge`, obsolete-record `gc`, and reachability-safe `rm` to existing checkpoint handlers. The retired `prune`/`clear` spellings and the root-level legacy paths remain hidden aliases.
+Canonical `pyrite checkpoint` group. Lazily routes `slim`, component `recompute {brem,cxr}`, `archive`, `restore`, `list`, `merge`, obsolete-record `gc`, and reachability-safe `rm` to existing checkpoint handlers.
 
 ### `checkpoints/checkpoint_cleanup.py`
 Checkpoint reclamation drivers: `prune_checkpoints` (drops records no longer reproducible under the current catalog scan profiles, rewriting each dataset atomically) and `clear_checkpoints` (deletes explicitly selected datasets plus the CAS blobs they alone kept reachable). Selects by material, profile, or all; previews exact dataset paths and blobs; treats active and archived manifests as reachability roots; revalidates retained manifests before mutation and fails closed on malformed or changed state. Folded from the retired `prune.py`.
@@ -574,7 +574,7 @@ Checkpoint repair and recompute owner for both component datasets. Per-record `r
 - Deps: `checkpoints.persistence`, `checkpoints._checkpoint_store`, `checkpoints.recompute_defaults`, `_progress`, `energy_grid.encoding`, `montecarlo`; imports no run driver package.
 
 ### `cli/commands/recompute.py`
-Click layer for `pyrite checkpoint recompute {brem,line}` (`brem_command`, `cxr_command`), including `--json` envelopes and the exclusive materials-or-`--all` selection contract. Hidden top-level `rebrem`/`reline` aliases resolve here.
+Click layer for `pyrite checkpoint recompute {brem,cxr}` (`brem_command`, `cxr_command`), including `--json` envelopes and the exclusive materials-or-`--all` selection contract.
 
 ### `checkpoints/recompute_defaults.py`
 Fidelity-aware line/bremsstrahlung recompute defaults shared by local, grouped, and remote command paths. Resolves preset settings and material photon grids; keeps a compatibility fallback for older branches.

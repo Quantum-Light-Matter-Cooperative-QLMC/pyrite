@@ -279,8 +279,7 @@ No MCPL or other particle-interchange adapter is currently implemented.
 Use `Numerics(cxr_trials=..., brem_trials=..., cxr_chunk=...)` and
 `EnergyBins(cxr=..., cxr_by_energy=..., brem=...)`. Dataclass introspection and
 `dataclasses.replace` use these canonical field names. Retired constructor and
-attribute names warn; they remain supported from 0.11 through the two-minor
-deprecation window, with removal scheduled for 0.13.
+attribute names were removed in 0.13 after the two-minor deprecation window.
 
 | Retired name | Canonical name |
 | --- | --- |
@@ -300,8 +299,7 @@ current/acceptance scaling and cross-grid totals; see
 flattened.
 
 Runtime controls are `PYRITE_MC_CXR_CHUNK` and `PYRITE_MC_CXR_BUDGET_MB`.
-Their retired `PYRITE_MC_SPEC_*` spellings warn when used as fallbacks; canonical
-values take precedence when both are set.
+The retired `PYRITE_MC_SPEC_*` fallback spellings were removed in 0.13.
 
 Persisted Case/record keys, HDF5 group names, checkpoint filenames, identity
 payload keys, format tags, and RNG stream identifiers retain their historical

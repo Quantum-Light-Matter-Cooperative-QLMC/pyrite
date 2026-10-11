@@ -73,7 +73,7 @@ def test_explicit_labels_must_still_refine_strictly_and_cover_every_grid():
     grid = np.linspace(100.0, 200.0, 11)
 
     def evaluate(E):
-        return SpectrumSample(line=np.zeros(E.size), background=np.zeros(E.size))
+        return SpectrumSample(cxr=np.zeros(E.size), background=np.zeros(E.size))
 
     with pytest.raises(ValueError, match="refine strictly"):
         evaluate_ladder([grid, grid], evaluate, spacings=[1.0, 1.0])

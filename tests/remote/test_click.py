@@ -306,7 +306,7 @@ def test_pull_zhai_preset_dispatches_without_checkpoint_selection(monkeypatch):
         ("rebrem_command", ["hopg", "--ne-brem", "0"], "--ne-brem"),
         ("rebrem_command", ["hopg", "--step", "nan"], "--step"),
         ("recxr_command", ["hopg", "--cxr-trials", "0"], "--cxr-trials"),
-        ("recxr_command", ["hopg", "--line-step", "inf"], "--line-step"),
+        ("recxr_command", ["hopg", "--cxr-step", "inf"], "--cxr-step"),
         ("check_command", ["--ne", "0"], "--ne"),
         ("check_command", ["--tmd-azimuth", "nan"], "--tmd-azimuth"),
         ("check_command", ["--tmd-azimuth", "-inf"], "--tmd-azimuth"),
@@ -363,7 +363,7 @@ def test_remote_gc_runs_both_reclamations_with_standard_defaults(monkeypatch):
     ("command_name", "starter"),
     [
         ("rebrem", "start_rebrem_queue"),
-        ("reline", "start_recxr_queue"),
+        ("recxr", "start_recxr_queue"),
     ],
 )
 def test_remote_recompute_detach_skips_viewer_and_pull(monkeypatch, command_name, starter):

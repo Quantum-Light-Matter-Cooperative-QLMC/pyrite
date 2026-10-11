@@ -63,28 +63,24 @@ def test_component_shape_and_normalization_errors_are_explicit():
         CxrSpectra(SpectralDensity([1], [2]), SpectralDensity([2], [3]))
 
 
-def test_numerics_stores_trial_names_and_supports_old_keywords():
+def test_numerics_uses_canonical_trial_names_and_rejects_old_keywords():
     new = Numerics(cxr_trials=7, brem_trials=3, cxr_chunk=2)
     assert asdict(new)["cxr_trials"] == 7
     assert "n_electrons" not in asdict(new)
     assert replace(new, cxr_trials=9).cxr_trials == 9
-    with pytest.warns(DeprecationWarning, match="trials|chunk"):
-        old = Numerics(n_electrons=7, n_electrons_brem=3, spec_chunk=2)
-    assert old == new
-    with pytest.warns(DeprecationWarning, match="cxr_trials"):
-        assert old.n_electrons == 7
-    with pytest.raises(TypeError, match="both"):
-        Numerics(cxr_trials=7, n_electrons=7)
+    for old in ("n_electrons", "n_electrons_brem", "spec_chunk"):
+        with pytest.raises(TypeError, match="unexpected keyword"):
+            Numerics(**{old: 7})
+        assert not hasattr(new, old)
 
 
-def test_energy_bins_aliases_and_precision_serialization_keep_legacy_contracts():
-    with pytest.warns(DeprecationWarning, match="cxr"):
-        old = EnergyBins(line=np.array([1, 2]))
-    assert old == EnergyBins(cxr=np.array([1, 2]))
+def test_canonical_energy_bins_and_precision_keep_legacy_serialization():
+    with pytest.raises(TypeError, match="unexpected keyword"):
+        EnergyBins(line=np.array([1, 2]))
+    assert not hasattr(EnergyBins(cxr=np.array([1, 2])), "line")
     canonical = Precision(0.1, 20, 40, 10, observables=("cxr", "brem"))
-    with pytest.warns(DeprecationWarning, match="cxr"):
-        legacy = Precision(0.1, 20, 40, 10, observables=("line", "brem"))
-    assert legacy == canonical
+    with pytest.raises(ValueError, match="observables"):
+        Precision(0.1, 20, 40, 10, observables=("line", "brem"))
     assert canonical.to_dict()["observables"] == ("line", "brem")
     assert Precision.from_dict(canonical.to_dict()) == canonical
 
@@ -153,7 +149,7 @@ def test_catalog_aliases_reject_duplicate_spellings():
         translate_catalog_fields({"n_electrons": [7], "cxr_trials": [7]})
 
 
-def test_old_sweep_axis_path_remains_a_warning_alias():
+def test_old_sweep_axis_path_is_removed():
     from pyrite import Beam, Detector, Scene, Slab, Sweep
 
     scene = Scene(
@@ -161,37 +157,47 @@ def test_old_sweep_axis_path_remains_a_warning_alias():
         Slab("hopg", thickness_ang=1000, footprint=Footprint(5.0, 5.0)),
         Detector(),
     )
-    with pytest.warns(DeprecationWarning, match="EnergyBins.cxr"):
-        sweep = Sweep(scene, {"detector.energy_bins.line": ([1, 2],)})
-        expanded = sweep.expand()[0][1]
+    with pytest.raises(ValueError, match="line"):
+        Sweep(scene, {"detector.energy_bins.line": ([1, 2],)}).expand()
+    expanded = Sweep(scene, {"detector.energy_bins.cxr": ([1, 2],)}).expand()[0][1]
     np.testing.assert_array_equal(expanded.detector.energy_bins.cxr, [1, 2])
 
 
-def test_api_alias_cohort_obeys_the_two_minor_removal_window():
-    import pyrite
-    from pyrite._api_deprecations import DEPRECATED_IN, REMOVE_IN
-    from pyrite._module_deprecations import _window
+def test_removed_api_alias_helpers_are_unavailable():
+    from pyrite import _api_deprecations
 
-    assert REMOVE_IN == _window(DEPRECATED_IN)
-    assert tuple(map(int, pyrite.__version__.split(".")[:2])) < tuple(
-        map(int, REMOVE_IN.split(".")[:2])
-    )
+    assert not hasattr(_api_deprecations, "renamed_fields")
+    assert not hasattr(_api_deprecations, "warn_renamed")
 
 
 @pytest.mark.parametrize("suffix", ["CHUNK", "BUDGET_MB"])
 @pytest.mark.parametrize("value", ["", "0", "128"])
-def test_cxr_environment_alias_precedence_and_generated_values(monkeypatch, suffix, value):
+def test_cxr_environment_uses_canonical_names(monkeypatch, suffix, value):
     from pyrite._env import env_value, set_canonical_env
 
     canonical = f"PYRITE_MC_CXR_{suffix}"
     legacy = f"PYRITE_MC_SPEC_{suffix}"
     monkeypatch.delenv(canonical, raising=False)
     monkeypatch.setenv(legacy, value)
-    with pytest.warns(DeprecationWarning, match=canonical):
-        assert env_value(canonical) == value
-    monkeypatch.setenv(canonical, "256")
-    assert env_value(canonical) == "256"
-    assert env_value(legacy) == "256"
-    set_canonical_env(legacy, value)
+    assert env_value(canonical) is None
+    set_canonical_env(canonical, value)
     assert env_value(canonical) == value
-    assert legacy not in os.environ
+    assert os.environ[canonical] == value
+
+
+@pytest.mark.parametrize(
+    ("module", "name"),
+    [
+        ("pyrite.results", "line_metrics"),
+        ("pyrite.results", "LINE_RECORD_KEYS"),
+        ("pyrite.montecarlo", "mc_spectrum"),
+        ("pyrite.montecarlo", "_lines_for_case"),
+        ("pyrite.plots", "_line_brem"),
+        ("pyrite._cxr_grid_policy", "LineGridPolicy"),
+        ("pyrite.energy_grid.apply", "set_line_artifact"),
+    ],
+)
+def test_removed_cxr_function_exports_are_unavailable(module, name):
+    from importlib import import_module
+
+    assert not hasattr(import_module(module), name)

@@ -204,8 +204,6 @@ __all__ = [
     "CharacteristicCrossSectionTable",
     "load_characteristic_cross_sections",
     "mc_characteristic_spectrum",
-    "mc_spectrum",
-    "mc_spectrum_solid_angle",
     "R_E_CM2",
     "_brem_dsigma_dk",
     "_bremsstrahlung_dsigma_dk",
@@ -220,7 +218,6 @@ __all__ = [
     "_transport_case",
     "_spectrum_case",
     "_brem_for_case",
-    "_lines_for_case",
     "_worker_init",
     "run_cases",
     "mc_cxr_spectrum",
@@ -231,17 +228,6 @@ __all__ = [
 
 def __getattr__(name: str) -> Any:
     """Resolve the historical Monte Carlo exports only when requested."""
-    renamed = {
-        "mc_spectrum": "mc_cxr_spectrum",
-        "mc_spectrum_solid_angle": "mc_cxr_spectrum_solid_angle",
-        "_lines_for_case": "_cxr_for_case",
-    }
-    if name in renamed:
-        from .._api_deprecations import warn_renamed
-
-        replacement = renamed[name]
-        warn_renamed(f"pyrite.montecarlo.{name}", f"pyrite.montecarlo.{replacement}")
-        return __getattr__(replacement)
     if name in _EXPORT_MODULES:
         value = getattr(import_module(_EXPORT_MODULES[name], __name__), name)
     else:

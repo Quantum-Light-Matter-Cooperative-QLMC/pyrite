@@ -8,7 +8,6 @@ from typing import Literal, cast
 
 import numpy as np
 
-from .._api_deprecations import renamed_fields
 from .._numerics import CONVERGENCE_KEYS, TRANSPORT_KEYS
 from .._precision import Precision
 from ._catalog_decode import CxrGridByEnergy, _number
@@ -406,7 +405,6 @@ class MaterialSpec:
         return self.identity.hexagonal
 
 
-@renamed_fields(profile_line_grid_policies="profile_cxr_grid_policies")
 @dataclass(frozen=True)
 class MaterialCatalog:
     """Expose deeply immutable material and profile registries.
@@ -541,17 +539,8 @@ class MaterialCatalog:
 
     def profile_cxr_grid_policy(self, name: str) -> Mapping[str, object] | None:
         """Named line-grid policies for ``name``, or ``None`` for the automatic one.
-        Consumed by :func:`config.material_sweep` as ``Sweep.line_grid_policy``."""
+        Consumed by :func:`config.material_sweep` as ``Sweep.cxr_grid_policy``."""
         return self.profile_cxr_grid_policies.get(name)
-
-    def profile_line_grid_policy(self, name: str) -> Mapping[str, object] | None:
-        """Deprecated alias for :meth:`profile_cxr_grid_policy`."""
-        from .._api_deprecations import warn_renamed
-
-        warn_renamed(
-            "MaterialCatalog.profile_line_grid_policy", "MaterialCatalog.profile_cxr_grid_policy"
-        )
-        return self.profile_cxr_grid_policy(name)
 
     def profile_detector(self, name: str) -> Mapping[str, object]:
         """Acceptance fields belonging to ``name``, or code defaults.

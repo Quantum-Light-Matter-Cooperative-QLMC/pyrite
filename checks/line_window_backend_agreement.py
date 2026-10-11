@@ -136,7 +136,7 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
     started = time.perf_counter()
     sample = ladder.evaluate(grid)
     wall = time.perf_counter() - started
-    line = np.asarray(_to_host(sample.line), dtype=float)
+    line = np.asarray(_to_host(sample.cxr), dtype=float)
     background = np.asarray(_to_host(sample.background), dtype=float)
     observables = spectrum_observables(grid, line, background)
     np.savez(

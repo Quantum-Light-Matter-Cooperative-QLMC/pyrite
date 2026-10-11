@@ -153,7 +153,6 @@ FROZEN_EXPORTS = FROZEN_EXPORTS | frozenset(
         "_draw_trajectory_panel",
         "plot_eaglexo_charge_map",
         "plot_timepix_efficiency",
-        "_line_brem",
         "_EXTRA_QUANTITIES",
         "_tilt_browser",
         "plot_tilt_panel",

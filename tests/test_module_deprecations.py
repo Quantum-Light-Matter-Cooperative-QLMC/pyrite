@@ -1,7 +1,10 @@
 """Govern compatibility-module removal metadata against the live package tree."""
 
 import ast
+import importlib.util
 from pathlib import Path
+
+import pytest
 
 from pyrite._module_deprecations import MODULE_DEPRECATIONS, PUBLIC_EXPORT_DEPRECATIONS, _window
 
@@ -35,3 +38,19 @@ def test_public_export_deprecation_support_window() -> None:
     for (module, name), entry in PUBLIC_EXPORT_DEPRECATIONS.items():
         assert (entry.module, entry.name) == (module, name)
         assert entry.remove_in == _window(entry.deprecated_in)
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "pyrite._line_grid_policy",
+        "pyrite._line_windows",
+        "pyrite.cli.commands._profile_line_grid",
+        "pyrite.montecarlo.runner.line_grid",
+        "pyrite.montecarlo.spectrum.line_jit_kernel",
+        "pyrite.montecarlo.spectrum.line_seeds",
+        "pyrite.montecarlo.spectrum.lines",
+    ],
+)
+def test_removed_cxr_module_paths_are_unavailable(module):
+    assert importlib.util.find_spec(module) is None

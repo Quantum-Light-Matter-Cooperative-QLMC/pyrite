@@ -566,11 +566,11 @@ def test_profile_line_grid_policy_is_validated_and_exposed(tmp_path, old, new, m
     )
     path.write_text(text)
     catalog = load_material_catalog(path)
-    assert dict(catalog.profile_line_grid_policy("narrowed")) == {
+    assert dict(catalog.profile_cxr_grid_policy("narrowed")) == {
         "bandwidth": "resonance-population",
         "resolution": "resonance-local",
     }
-    assert catalog.profile_line_grid_policy("standard") is None
+    assert catalog.profile_cxr_grid_policy("standard") is None
 
     bad = text.replace(old, new)
     path.write_text(bad)
@@ -2264,7 +2264,7 @@ def test_profile_precision_parses_and_rejects_incompatible_profiles(tmp_path):
         min_electrons=200,
         max_electrons=2000,
         block_electrons=20,
-        observables=("line", "brem"),
+        observables=("cxr", "brem"),
         band_eV=(100.0, 900.0),
     )
     for extra, match in (

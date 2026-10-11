@@ -359,7 +359,6 @@ def precision_reset_command(name, fields, yes, dry_run):
 @canonical_option(
     "--cxr-trials",
     "line_trials",
-    retired=("--line-trials",),
     type=click.IntRange(min=1),
     metavar="N",
     help="Fixed Monte Carlo electron histories for the CXR spectrum.",
@@ -419,17 +418,3 @@ def precision_disable_command(name, line_trials, brem_trials, yes, dry_run):
             emit_result("  removed precision policy")
         emit_result(f"  counts: {_profile_edit.describe_counts(result)}")
     return status
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {"show_line": "show_cxr", "_mode_line": "_mode_cxr"}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

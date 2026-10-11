@@ -18,7 +18,7 @@ CLICK_COMMANDS = (
     "rm",
     "verify",
     "gc",
-    "line",
+    "cxr",
     "brem",
     "defaults",
     "show",
@@ -34,13 +34,14 @@ def _invoke_grid(argv, **kwargs):
         return invoke(profile_command, argv, **kwargs)
     if head in {"add", "rm", "verify", "gc"}:
         return invoke(dev_energy_grid_command, argv, **kwargs)
-    if head in {"line", "brem"}:
+    if head in {"cxr", "brem"}:
         if len(argv) == 1 or argv[1].startswith("-") or argv[1] == "show":
             return invoke(material_command, argv, **kwargs)
         if argv[1] == "show":
             return invoke(material_command, argv, **kwargs)
         if argv[1] == "set":
-            return invoke(dev_energy_grid_command, argv, **kwargs)
+            dev_argv = ["line", *argv[1:]] if head == "cxr" else argv
+            return invoke(dev_energy_grid_command, dev_argv, **kwargs)
     raise AssertionError(f"no canonical owner for {argv!r}")
 
 
@@ -48,7 +49,7 @@ def _invoke_grid(argv, **kwargs):
     "path",
     [
         *((name,) for name in CLICK_COMMANDS),
-        *(((band, name)) for band in ("line", "brem") for name in ("set", "show")),
+        *(((band, name)) for band in ("cxr", "brem") for name in ("set", "show")),
     ],
 )
 def test_click_help_paths_are_clean(path):
@@ -314,16 +315,16 @@ def test_click_add_expected_failures_use_stderr(monkeypatch, error, message):
     assert "Traceback" not in result.output
 
 
-@pytest.mark.parametrize("command_name", ["line", "brem"])
+@pytest.mark.parametrize("command_name", ["cxr", "brem"])
 def test_click_set_expected_domain_failure_uses_stderr(monkeypatch, command_name):
-    target = "set_cxr_artifact" if command_name == "line" else "set_brem_artifact"
+    target = "set_cxr_artifact" if command_name == "cxr" else "set_brem_artifact"
     monkeypatch.setattr(
         energy_grid.apply,
         target,
         lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("unknown material")),
     )
     argv = [command_name, "set", "bad", "--stop", "100"]
-    if command_name == "line":
+    if command_name == "cxr":
         argv.extend(("--energy", "50"))
 
     result = _invoke_grid(argv)
@@ -619,9 +620,9 @@ def test_click_defaults_rejects_ambiguous_mutations(argv):
 @pytest.mark.parametrize(
     "argv",
     [
-        ["line", "set", "hopg", "--energy", "0", "--stop", "3000"],
-        ["line", "set", "hopg", "--energy", "30", "--stop", "-1"],
-        ["line", "set", "hopg", "--energy", "30", "--stop", "3000", "--num", "0"],
+        ["cxr", "set", "hopg", "--energy", "0", "--stop", "3000"],
+        ["cxr", "set", "hopg", "--energy", "30", "--stop", "-1"],
+        ["cxr", "set", "hopg", "--energy", "30", "--stop", "3000", "--num", "0"],
         ["brem", "set", "hopg", "--stop", "1000", "--step", "0"],
         ["defaults", "--save-default", "--polar", "90"],
         ["defaults", "--save-default", "--azimuth", "361"],

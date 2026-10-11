@@ -248,22 +248,8 @@ def start_recxr_queue(
                 ("Monitor", f"pyrite job attach {jobid}"),
                 ("Status", f"pyrite job status {jobid} -vv"),
                 ("Logs", f"pyrite job logs {jobid} --follow"),
-                ("Pull", f"pyrite remote pull {' '.join(stems)} --line-only  (after completion)"),
+                ("Pull", f"pyrite remote pull {' '.join(stems)} --cxr-only  (after completion)"),
             ]
         )
     )
     return jobid
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {"start_reline_queue": "start_recxr_queue"}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

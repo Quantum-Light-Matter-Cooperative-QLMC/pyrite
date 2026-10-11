@@ -192,7 +192,6 @@ def rebrem_command(
 @canonical_option(
     "--cxr-trials",
     "cxr_ne",
-    retired=("--line-ne",),
     type=POSITIVE_INT,
     default=None,
     help="New line electron count.",
@@ -202,7 +201,6 @@ def rebrem_command(
 @canonical_option(
     "--cxr-step",
     "line_step",
-    retired=("--line-step",),
     type=POSITIVE_FLOAT,
     default=None,
     help="Explicit uniform line-grid spacing in eV.",
@@ -469,7 +467,6 @@ _start_performance_options = _option_group(
     canonical_option(
         "--cxr-chunk",
         "spec_chunk",
-        retired=("--spec-chunk",),
         type=POSITIVE_INT,
         default=None,
         metavar="N",
@@ -771,7 +768,6 @@ def performance_rm_command(profiles, all_profiles, yes, ssh_verbose):
 @canonical_option(
     "--cxr-only",
     "cxr_only",
-    retired=("--line-only",),
     is_flag=True,
     help="Merge only CXR spectra locally; mutually exclusive with --brem-only.",
 )
@@ -1099,17 +1095,3 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {"reline_command": "recxr_command"}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

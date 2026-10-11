@@ -131,7 +131,7 @@ def test_cpu_profile_flag_conflicts_are_rejected_before_submission():
     )
     with_chunk = invoke(
         performance_command,
-        ["standard", "--remote=box-a", "--cpu-only", "--spec-chunk", "8"],
+        ["standard", "--remote=box-a", "--cpu-only", "--cxr-chunk", "8"],
     )
 
     assert both.exit_code == 2

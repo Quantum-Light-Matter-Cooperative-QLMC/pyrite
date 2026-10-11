@@ -117,7 +117,7 @@ def _case(args):
         tilt_deg=45.0 if smoke else 5.0,
         tilt_azim_deg=135.0 if smoke else 0.0,
         **({"transverse_fwhm_mm": 0.1} if smoke else {}),
-        line_grid_policy={"windows": True, "max_points": args.max_points},
+        cxr_grid_policy={"windows": True, "max_points": args.max_points},
         n_electrons=samples,
         n_electrons_brem=samples,
     )

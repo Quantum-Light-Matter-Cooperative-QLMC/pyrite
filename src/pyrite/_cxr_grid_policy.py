@@ -988,39 +988,3 @@ def store_coordinates(key: str, record: Mapping[str, Any]) -> None:
             raise
     except OSError:
         return
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {
-    "LineGridPolicy": "CxrGridPolicy",
-    "resolve_line_grid_policy": "resolve_cxr_grid_policy",
-    "LineGridToleranceError": "CxrGridToleranceError",
-    "LineGridTruncationWarning": "CxrGridTruncationWarning",
-    "LineYieldStatisticsWarning": "CxrYieldStatisticsWarning",
-    "line_quadrature_from_payload": "cxr_quadrature_from_payload",
-}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]
-
-
-_CXR_RENAMED_EXPORTS.update(
-    {"line_start_eV": "cxr_start_eV", "kinematic_line_stop_eV": "kinematic_cxr_stop_eV"}
-)
-
-_CXR_RENAMED_EXPORTS.update(
-    {
-        "LINE_QUADRATURES": "CXR_QUADRATURES",
-        "DEFAULT_LINE_QUADRATURE": "DEFAULT_CXR_QUADRATURE",
-        "PROFILE_LINE_GRID_SELECTORS": "PROFILE_CXR_GRID_SELECTORS",
-    }
-)
-
-__all__ = list(dict.fromkeys([*__all__, *_CXR_RENAMED_EXPORTS]))

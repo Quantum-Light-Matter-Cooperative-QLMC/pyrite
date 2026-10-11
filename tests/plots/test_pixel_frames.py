@@ -72,8 +72,8 @@ def test_observation_images_spectra_histogram_and_metadata() -> None:
     with pytest.raises(ValueError, match="needs energy_range_eV"):
         observation_image(observation, "window")
 
-    spectrum = pixel_spectrum_frame(observation, 1, 2, components=("line", "background"))
-    assert set(spectrum["component"]) == {"line", "background"}
+    spectrum = pixel_spectrum_frame(observation, 1, 2, components=("cxr", "brem"))
+    assert set(spectrum["component"]) == {"cxr", "brem"}
     histogram, accounting = histogram_frame(observation.acquire(pixels=[(1, 2)]))
     assert histogram["counts"].sum() == pytest.approx(total.values[1, 2])
     assert set(accounting) == {"underflow", "overflow", "below_cut"}

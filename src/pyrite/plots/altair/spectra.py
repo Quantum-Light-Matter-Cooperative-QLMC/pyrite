@@ -974,17 +974,3 @@ def material_comparison_chart(
             f"{_comparison_drop_message(dropped)}"
         )
     return _style_chart(chart.interactive(bind_y=False))
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {"_selected_line_record": "_selected_cxr_record"}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

@@ -59,7 +59,7 @@ def test_help_lists_selectors_defaults_combinations_and_identity():
     root = invoke(root_command, ["profile", "--help"])
     assert_clean_result(root)
     assert "--observation-angle" not in root.stdout
-    assert "line-grid" in root.stdout
+    assert "cxr-grid" in root.stdout
 
 
 def test_show_reports_explicit_effective_and_grid_source(catalog):

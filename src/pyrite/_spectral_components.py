@@ -94,11 +94,3 @@ __all__ = [
     "cxr_spectrum",
     "separate_legacy",
 ]
-
-
-def line_spectrum(record, *, coherent=False, characteristic=True):
-    """Deprecated alias for :func:`cxr_spectrum`, on the record's CXR grid."""
-    from ._api_deprecations import warn_renamed
-
-    warn_renamed("line_spectrum", "cxr_spectrum")
-    return cxr_spectrum(record, coherent=coherent, characteristic=characteristic)

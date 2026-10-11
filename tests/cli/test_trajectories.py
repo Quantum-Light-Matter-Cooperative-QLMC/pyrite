@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 
 from pyrite.cli import command as root_command
-from pyrite.cli._deprecations import message
 from pyrite.montecarlo import trajectory_inventory
 from pyrite.montecarlo.trajectories import write_trajectory_artifact
 from tests.helpers.cli import invoke
@@ -194,15 +193,16 @@ def test_export_skips_foreign_files_with_a_warning(root, tmp_path):
     ("old", "new"),
     [("export-trajectories", "export"), ("score-trajectories", "score")],
 )
-def test_checkpoint_aliases_warn_and_keep_help_and_exit_codes(old, new):
+def test_checkpoint_aliases_are_removed_and_canonical_paths_remain(old, new):
     alias_help = invoke(root_command, ["checkpoint", old, "--help"])
     new_help = invoke(root_command, ["trajectories", new, "--help"])
     alias_usage = invoke(root_command, ["checkpoint", old])
     new_usage = invoke(root_command, ["trajectories", new])
 
-    assert alias_help.exit_code == new_help.exit_code == 0
-    assert alias_help.stdout.split("\n", 1)[1] == new_help.stdout.split("\n", 1)[1]
+    assert alias_help.exit_code == 2
+    assert "No such command" in alias_help.stderr
+    assert new_help.exit_code == 0
     assert alias_usage.exit_code == new_usage.exit_code == 2
-    assert message(f"checkpoint {old}") in alias_usage.stderr
+    assert "No such command" in alias_usage.stderr
     assert "is deprecated" not in new_usage.stderr
     assert old not in invoke(root_command, ["checkpoint", "--help"]).stdout

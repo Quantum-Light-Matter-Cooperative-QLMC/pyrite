@@ -20,8 +20,6 @@ def test_checkpoint_group_exposes_resource_oriented_tree():
         "list",
         "gc",
         "rm",
-        "export-trajectories",
-        "score-trajectories",
     ]
 
 

@@ -64,7 +64,6 @@ _ATOMIC_ELECTRON_DEFLECTION_VALUES = ("kawrakow", "none")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
     "cxr-trials": "n_electrons",
-    "line-trials": "n_electrons",
     "brem-trials": "n_electrons_brem",
     "line-electrons": "n_electrons",
     "bremsstrahlung-electrons": "n_electrons_brem",
@@ -118,7 +117,6 @@ def _ne_cli_options(function):
         "-l",
         "--cxr-trials",
         "ne_line",
-        retired=("--line-trials",),
         type=COUNT_CSV,
         metavar="N,...",
         help="Monte Carlo electron histories used to estimate the CXR spectrum; positive integers.",
@@ -237,7 +235,7 @@ def command():
     Where settings live: ranges, membership, beam/detector references and
     emission use ``set|add|remove``; calculation controls (electron counts,
     reflections, mosaic, transport models) use ``numerics``; the line-grid
-    selectors use ``line-grid``; filters and the pixel detector use ``filter``
+    selectors use ``cxr-grid``; filters and the pixel detector use ``filter``
     and ``physical-detector``; reusable beams and detectors are named objects
     edited with ``pyrite beam`` and ``pyrite detector``. The full map is
     docs/repo-design/profile-settings.md. Bundled demos are read-only (copy
@@ -315,7 +313,6 @@ def numerics_show_command(name, json_output):
 @canonical_option(
     "--cxr-trials",
     "line_electrons",
-    retired=("--line-trials",),
     type=click.IntRange(min=1),
     metavar="N",
     help="Monte Carlo electron histories used to estimate the CXR spectrum.",
@@ -495,11 +492,6 @@ def numerics_reset_command(name, fields, yes, dry_run):
 
 
 command.add_command(_profile_cxr_grid.command)
-from copy import copy as _copy_command
-
-_legacy_grid_command = _copy_command(_profile_cxr_grid.command)
-_legacy_grid_command.hidden = True
-command.add_command(_legacy_grid_command, "line-grid")
 command.add_command(_profile_precision.command)
 command.add_command(_physical_detector.command)
 

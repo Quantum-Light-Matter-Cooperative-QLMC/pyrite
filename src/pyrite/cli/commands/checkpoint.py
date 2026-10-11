@@ -12,8 +12,6 @@ _COMMANDS = {
     "list": "pyrite.cli.commands.archive.list_command",
     "gc": "pyrite.cli.commands.cleanup.gc_command",
     "rm": "pyrite.cli.commands.cleanup.rm_command",
-    "export-trajectories": "pyrite.cli.commands.trajectories.export_command",
-    "score-trajectories": "pyrite.cli.commands.trajectories.score_command",
 }
 
 _COMMAND_HELP = {
@@ -28,7 +26,6 @@ _COMMAND_HELP = {
 _RECOMPUTE_COMMANDS = {
     "brem": "pyrite.cli.commands.recompute.brem_command",
     "cxr": "pyrite.cli.commands.recompute.cxr_command",
-    "line": "pyrite.cli.commands.recompute.cxr_command",
 }
 
 _RECOMPUTE_HELP = {
@@ -42,7 +39,6 @@ _RECOMPUTE_HELP = {
     cls=LazyGroup,
     lazy_commands=_RECOMPUTE_COMMANDS,
     lazy_help=_RECOMPUTE_HELP,
-    lazy_hidden=("line",),
     no_args_is_help=True,
 )
 def recompute_command() -> None:
@@ -54,7 +50,6 @@ def recompute_command() -> None:
     cls=LazyGroup,
     lazy_commands=_COMMANDS,
     lazy_help=_COMMAND_HELP,
-    lazy_hidden=("export-trajectories", "score-trajectories"),
     no_args_is_help=True,
 )
 def command() -> None:

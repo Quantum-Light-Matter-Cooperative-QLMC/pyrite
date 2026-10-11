@@ -46,7 +46,7 @@ def test_run_help_keeps_beam_overrides_profile_owned():
         "--performance-profile",
         "--performance-dir",
         "--perf-interval",
-        "--spec-chunk",
+        "--cxr-chunk",
         "--brem-chunk",
         "--nsys",
         "--cpu",
@@ -132,7 +132,7 @@ def test_perf_chunk_pins_exported_before_runtime_import(monkeypatch):
     monkeypatch.delenv("PYRITE_MC_BREM_CHUNK", raising=False)
     result = CliRunner().invoke(
         performance_command,
-        ["sub_100keV", "--spec-chunk", "128", "--brem-chunk", "64"],
+        ["sub_100keV", "--cxr-chunk", "128", "--brem-chunk", "64"],
         catch_exceptions=False,
     )
 

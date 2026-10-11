@@ -238,7 +238,7 @@ _RECORD_ARRAY_FIELDS = (
 _WIDE_BREM_FIELDS = ("brem_wide", "E_grid_brem")
 
 # The coherent and characteristic components use the line grid, so a
-# --line-only projection/merge must carry them with ``spec``.
+# --cxr-only projection/merge must carry them with ``spec``.
 CXR_RECORD_KEYS = ("spec", "E_grid", "spec_coherent", "spec_characteristic")
 BREM_RECORD_KEYS = ("brem_wide", "brem", "E_grid_brem")
 
@@ -498,16 +498,3 @@ def slim_case_record(record, *, material, label, face="flat"):
     slim = {k: record[k] for k in _BASKET_RECORD_FIELDS if k in record}
     slim["case"] = {**record["case"], "material": material, "face": face, "label": label}
     return slim
-
-
-_CXR_RENAMED_EXPORTS = {"LINE_RECORD_KEYS": "CXR_RECORD_KEYS"}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

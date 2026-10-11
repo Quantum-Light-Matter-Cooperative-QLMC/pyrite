@@ -7,8 +7,6 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from ._api_deprecations import warn_renamed
-
 OBSERVABLES = ("cxr", "brem")
 REQUIRED_FIELDS = ("target_rse", "min_electrons", "max_electrons", "block_electrons")
 
@@ -87,9 +85,6 @@ class Precision:
         # name is one observable, not its characters.
         raw = self.observables
         observables = (raw,) if isinstance(raw, str) else tuple(raw)
-        if "line" in observables:
-            warn_renamed("Precision observable 'line'", "'cxr'")
-            observables = tuple("cxr" if value == "line" else value for value in observables)
         object.__setattr__(self, "observables", observables)
         for name in ("band_eV", "batch_means_band_eV"):
             band = getattr(self, name)

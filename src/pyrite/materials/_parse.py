@@ -1002,20 +1002,3 @@ def _parse_energy_grids(raw: object, errors: _Errors) -> dict[str, CxrGridByEner
         if rows is not None:
             out[material_key] = rows
     return out
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {
-    "_parse_profile_line_grid_policy": "_parse_profile_cxr_grid_policy",
-    "_artifact_line_grids": "_artifact_cxr_grids",
-}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

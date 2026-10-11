@@ -909,17 +909,3 @@ def sources_set_command(code: str, path: str) -> None:
     except _config.ConfigError as exc:
         raise CLIError(str(exc)) from exc
     emit_result(f"{key} = {resolved}")
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {"_fetch_line": "_fetch_cxr"}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

@@ -121,7 +121,7 @@ def test_case_refuses_resonance_local_without_bin_mean():
     """A hand-built or pre-refusal payload cannot run the local grid under node
     quadrature, whose spacing joins lose unbounded yield (#192)."""
     payload = _legacy_case(
-        line_grid_policy={
+        cxr_grid_policy={
             "bandwidth": "resonance-population",
             "resolution": "resonance-local",
             "quadrature": "bin-mean",

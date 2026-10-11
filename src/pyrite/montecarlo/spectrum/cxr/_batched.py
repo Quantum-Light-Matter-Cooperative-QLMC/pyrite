@@ -29,7 +29,7 @@ from ._kernels import (
     _cxr_weight_core,
     _escape_length,
     _in_medium_kinematics,
-    _interp_gather_line_tables,
+    _interp_gather_cxr_tables,
     _interp_index,
     _log_interp_fraction,
     _matvec3,
@@ -461,7 +461,7 @@ def _batched_block(st, bt, sb):
     # fourfold-redundant searchsorted/clip. Bit-for-bit vs _batch_interp.
     _ix, _fr, _blw, _abv = _interp_index(E_res, E_tab_g)
     _log_fr = _log_interp_fraction(E_res, E_tab_g, _ix)
-    chi_re, chi_im, u_re, u_im, mu = _interp_gather_line_tables(
+    chi_re, chi_im, u_re, u_im, mu = _interp_gather_cxr_tables(
         _ix,
         _fr,
         _log_fr,
@@ -1057,17 +1057,3 @@ def _accumulate_batched(st):
             stream_F_rows,
             stream_keep,
         )
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {"_LineBatch": "_CxrBatch"}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]
