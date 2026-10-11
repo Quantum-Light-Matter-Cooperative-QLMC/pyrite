@@ -894,32 +894,3 @@ def check_cxr_truncation(case, audit):
             "kinematic-ceiling bandwidth or supply an explicit grid."
         )
     return record
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {
-    "_windowed_line_grid": "_windowed_cxr_grid",
-    "_measured_line_grid": "_measured_cxr_grid",
-    "_resolve_policy_line_grid": "_resolve_policy_cxr_grid",
-    "resolve_observation_line_grid": "resolve_observation_cxr_grid",
-    "resolve_line_grid": "resolve_cxr_grid",
-    "line_yield_statistics": "cxr_yield_statistics",
-}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]
-
-
-_CXR_RENAMED_EXPORTS.update(
-    {
-        "line_truncation_audit": "cxr_truncation_audit",
-        "check_line_truncation": "check_cxr_truncation",
-    }
-)

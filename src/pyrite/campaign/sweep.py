@@ -37,7 +37,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
-from .._api_deprecations import renamed_fields
 from .._cxr_grid_policy import (
     AUTOMATIC_BANDWIDTH_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
@@ -321,7 +320,6 @@ TIMEPIX3_DTHETA_OBS_DEG = float(
 TIMEPIX3_DOMEGA_SR = float(TIMEPIX3_CHIP_WIDTH_M**2 / TIMEPIX3_DISTANCE_M**2)
 
 
-@renamed_fields(line_grid_policy="cxr_grid_policy")
 @dataclass
 class Sweep:
     """One parameter sweep.
@@ -420,7 +418,7 @@ class Sweep:
     mosaic_route: str = "analytic"
     mosaic_nodes: int = 5  # Gauss-Hermite nodes/tilt-axis for mosaic_route="mc" (K=nodes^2)
     # Per-call automatic line-grid policy (issue #101). The TOP of the precedence
-    # chain together with an explicit ``EnergyBins.line``: supplying one here
+    # chain together with an explicit ``EnergyBins.cxr``: supplying one here
     # outranks ``PYRITE_ENERGY_GRID_*`` and any stored catalog row. Accepts
     # ``max_spacing_eV``, ``backend_safety_ulps``, ``max_points``, and a
     # per-observable ``rtol`` mapping. ``None`` leaves the chain to env > stored
@@ -658,7 +656,7 @@ def _cxr_grid_for_energy(
 
     Precedence, highest first (issue #101):
 
-    1. an explicit user grid -- ``EnergyBins.line``, or a per-call
+    1. an explicit user grid -- ``EnergyBins.cxr``, or a per-call
        ``Sweep.line_grid_policy``;
     2. ``PYRITE_ENERGY_GRID_*`` environment policy, which turns automatic
        resolution on even where a stored row exists;
@@ -1113,20 +1111,3 @@ def build_cases(
     for case in cases:
         warn_kinematic_validity(case)
     return cases
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {
-    "_automatic_line_grid_policy": "_automatic_cxr_grid_policy",
-    "_line_grid_for_energy": "_cxr_grid_for_energy",
-}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

@@ -9,8 +9,6 @@ from typing import Protocol
 
 import numpy as np
 
-from .._api_deprecations import renamed_fields
-
 
 def _number(name: str, value: object, *, minimum: float, maximum: float | None = None) -> float:
     if isinstance(value, bool) or not isinstance(value, Real):
@@ -33,7 +31,6 @@ def _positive_optional(name: str, value: object | None) -> float | None:
     return number
 
 
-@renamed_fields(line="cxr", line_by_energy="cxr_by_energy")
 @dataclass(frozen=True, eq=False)
 class EnergyBins:
     """The detector's CXR and bremsstrahlung photon-energy binnings.

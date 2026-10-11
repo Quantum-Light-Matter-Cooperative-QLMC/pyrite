@@ -498,16 +498,3 @@ def slim_case_record(record, *, material, label, face="flat"):
     slim = {k: record[k] for k in _BASKET_RECORD_FIELDS if k in record}
     slim["case"] = {**record["case"], "material": material, "face": face, "label": label}
     return slim
-
-
-_CXR_RENAMED_EXPORTS = {"LINE_RECORD_KEYS": "CXR_RECORD_KEYS"}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

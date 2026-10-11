@@ -1194,23 +1194,3 @@ for _exported in (
     _exported.__module__ = __name__
 
 del _exported
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {
-    "_lines_for_segments": "_cxr_for_segments",
-    "_lines_for_segments_once": "_cxr_for_segments_once",
-    "_transport_lines_for_case": "_transport_cxr_for_case",
-    "_lines_for_case": "_cxr_for_case",
-    "_line_pair_for_case": "_cxr_pair_for_case",
-}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

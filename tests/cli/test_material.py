@@ -192,8 +192,8 @@ def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
     assert isinstance(filters[0], FilterPlate)
     assert filters[0].name == "half"
     assert isinstance(numerics, Numerics)
-    assert numerics.n_electrons == 7
-    assert numerics.n_electrons_brem == 3
+    assert numerics.cxr_trials == 7
+    assert numerics.brem_trials == 3
     assert numerics.straggling is True
     assert numerics.energy_model == "midpoint"
     assert emission == "incoherent"

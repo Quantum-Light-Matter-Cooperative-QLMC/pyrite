@@ -226,17 +226,3 @@ def _beam_phase_space(case):
         transverse_distribution=case.get("transverse_distribution"),
         energy_spread_frac=case.get("energy_spread_frac"),
     )
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {"_line_brem": "_cxr_brem"}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

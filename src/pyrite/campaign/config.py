@@ -267,7 +267,7 @@ def material_sweep(
     legacy_cxr_override = overrides.pop("e_grid_eV", missing)
     if legacy_cxr_override is not missing:
         warnings.warn(
-            "e_grid_eV is deprecated; use detector=Detector(energy_bins=EnergyBins(line=...)) "
+            "e_grid_eV is deprecated; use detector=Detector(energy_bins=EnergyBins(cxr=...)) "
             "or E_grid_line= during the D7 compatibility window",
             DeprecationWarning,
             stacklevel=2,
@@ -336,13 +336,6 @@ def material_sweep(
     beam_over = {k: overrides.pop(k) for k in list(overrides) if k in _BEAM_OVERRIDE_KEYS}
     target_over = {k: overrides.pop(k) for k in list(overrides) if k in _TARGET_OVERRIDE_KEYS}
     if overrides:
-        if "line_grid_policy" in overrides:
-            from .._api_deprecations import warn_renamed
-
-            if "cxr_grid_policy" in overrides:
-                raise TypeError("cannot specify both line_grid_policy and cxr_grid_policy")
-            warn_renamed("material_sweep.line_grid_policy", "material_sweep.cxr_grid_policy")
-            overrides["cxr_grid_policy"] = overrides.pop("line_grid_policy")
         sweep = replace(sweep, **overrides)
     if beam_over.get("source") == "gpt_gdf" and not (
         {"beam_fwhm_mm", "transverse_fwhm_mm"} & beam_over.keys()
@@ -574,17 +567,3 @@ def format_penetration_watchdog_summary(
         f"{len(dead_energies)} beam energy(ies) "
         f"({energies_str})"
     )
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {"_profile_line_grid_policy": "_profile_cxr_grid_policy"}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

@@ -64,7 +64,7 @@ The flat Result attributes (`energy_eV`, `spectrum`, `background_energy_eV`,
 and flat-keyword constructor, and `line_total()` were removed after 0.11; use the
 grouped families and `combined_cxr()`. `Result` takes keyword arguments only. `Numerics` uses
 `cxr_trials`, `brem_trials`, and `cxr_chunk`; the old `n_electrons`,
-`n_electrons_brem`, and `spec_chunk` keywords/attributes are warning aliases.
+`n_electrons_brem`, and `spec_chunk` keywords/attributes were removed in 0.13.
 `EnergyBins.cxr`/`cxr_by_energy` and `Precision(observables=("cxr", "brem"))`
 use the same vocabulary. Historical case/checkpoint/hash keys remain unchanged.
 

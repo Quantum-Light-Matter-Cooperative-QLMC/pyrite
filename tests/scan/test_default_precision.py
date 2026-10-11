@@ -35,7 +35,7 @@ def test_default_policy_matches_the_recorded_decision():
         min_electrons=200,
         max_electrons=20_000,
         block_electrons=100,
-        observables=("line", "brem"),
+        observables=("cxr", "brem"),
     )
 
 

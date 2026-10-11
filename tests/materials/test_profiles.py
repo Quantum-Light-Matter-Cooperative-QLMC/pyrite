@@ -172,7 +172,7 @@ def test_high_energy_profile_selects_the_measured_line_grid():
     assert case["line_grid_policy"]["bandwidth"]["policy"] == "resonance-population"
     assert case["line_grid_policy"]["resolution"]["policy"] == "resonance-local"
     assert case["line_grid_policy"]["quadrature"] == "bin-mean"
-    assert material_sweep("hbn").line_grid_policy is None
+    assert material_sweep("hbn").cxr_grid_policy is None
 
 
 def test_hopg_short_keeps_finite_footprint_and_attosecond_bunch():

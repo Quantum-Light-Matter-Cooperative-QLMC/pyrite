@@ -554,21 +554,3 @@ def cxr_command(
         save_every=save_every,
         json_output=json_output,
     )
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {
-    "_line_cli": "_cxr_cli",
-    "_line_cli_json": "_cxr_cli_json",
-    "line_command": "cxr_command",
-}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

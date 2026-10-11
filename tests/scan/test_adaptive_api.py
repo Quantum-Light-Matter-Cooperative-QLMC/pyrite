@@ -29,7 +29,7 @@ def scene():
 
 @pytest.fixture
 def precision():
-    return pr.Precision(0.1, 40, 60, 20, observables=("line", "brem"))
+    return pr.Precision(0.1, 40, 60, 20, observables=("cxr", "brem"))
 
 
 @pytest.fixture
@@ -152,7 +152,7 @@ def test_early_stop_preserves_requested_case_and_matches_realized_fixed_n(scene,
         40,
         200,
         20,
-        observables=("line", "brem"),
+        observables=("cxr", "brem"),
         max_electron_share=1.0,
         min_effective_electrons=0.0,
         stability_blocks=0,

@@ -517,7 +517,7 @@ if hasattr(xp, "ElementwiseKernel"):
     )
 
 
-def _interp_gather_line_tables(
+def _interp_gather_cxr_tables(
     idx,
     frac,
     log_frac,
@@ -1016,25 +1016,3 @@ def _reflection_tables(crystal, hkl_list, E_tab, B_ang2, use_henke):
     """
     tables = emission_coupling_tables(crystal, hkl_list, E_tab, B_ang2, use_henke, xp=xp)
     return tuple(xp.ascontiguousarray(table, dtype=REAL) for table in tables)
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {
-    "_line_amp_sq_core": "_cxr_amp_sq_core",
-    "_line_tabulation_grid": "_cxr_tabulation_grid",
-    "_line_table_nan_onsets": "_cxr_table_nan_onsets",
-    "_line_table_nan_ceiling": "_cxr_table_nan_ceiling",
-    "_line_emission_ceiling": "_cxr_emission_ceiling",
-    "_line_kin_core": "_cxr_kin_core",
-    "_line_weight_core": "_cxr_weight_core",
-}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

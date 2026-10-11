@@ -740,16 +740,3 @@ def _prepare_spectrum(request):
         temporal_tau=temporal_tau,
         temporal_tau_geo=temporal_tau_geo,
     )
-
-
-_CXR_RENAMED_EXPORTS = {"LINE_ESCAPE_MODEL": "CXR_ESCAPE_MODEL"}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

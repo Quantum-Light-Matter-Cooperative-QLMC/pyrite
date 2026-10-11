@@ -202,7 +202,7 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
     paths = result.spatial.ray_map.path_length_mm[..., 0]
     assert np.any(paths == 0.0)
     assert np.any(paths > 0.0)
-    _, pixel_spectra = result.spatial.spectra(region=(slice(None), slice(None)), component="line")
+    _, pixel_spectra = result.spatial.spectra(region=(slice(None), slice(None)), component="cxr")
     np.testing.assert_allclose(
         result.cxr.incoherent.density,
         np.sum(pixel_spectra, axis=0) / np.sum(result.spatial.ray_map.solid_angle_sr),

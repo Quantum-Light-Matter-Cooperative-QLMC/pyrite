@@ -52,7 +52,7 @@ def _counting_spatial() -> SpatialResult:
 def _materialize_with_chunk(spatial: SpatialResult, method: str, pixel_chunk: Any) -> object:
     if method == "image":
         return spatial.image((1.0, 3.0), pixel_chunk=pixel_chunk)
-    return spatial.average_density("line", pixel_chunk=pixel_chunk)
+    return spatial.average_density("cxr", pixel_chunk=pixel_chunk)
 
 
 def test_selected_spectra_include_solid_angle_and_filter_transmission() -> None:
@@ -91,7 +91,7 @@ def test_average_density_recovers_sum_flux_over_total_solid_angle() -> None:
 
     expected = np.sum(spectra, axis=0) / np.sum(spatial.ray_map.solid_angle_sr)
 
-    np.testing.assert_allclose(spatial.average_density("line"), expected, rtol=1.0e-15)
+    np.testing.assert_allclose(spatial.average_density("cxr"), expected, rtol=1.0e-15)
 
 
 def test_acquisition_image_is_chunk_invariant_and_sums_component_draws(monkeypatch) -> None:
@@ -116,7 +116,7 @@ def test_acquisition_image_is_chunk_invariant_and_sums_component_draws(monkeypat
         rep_rate_hz=1.0,
         bunch_charge_pc=elementary_charge * 1.0e12 * 100.0,
         observation_digest="b" * 64,
-        components=("line", "background"),
+        components=("cxr", "brem"),
     )
 
     one = spatial.acquisition_image(pixel_chunk=1, **kwargs)
@@ -170,20 +170,20 @@ def test_spectra_rejects_ambiguous_or_invalid_selection(kwargs) -> None:
 def test_total_components_add_characteristic_to_each_line() -> None:
     base = _spatial()
     characteristic = SpectralFactors(
-        energy_eV=base.line.energy_eV,
+        energy_eV=base.cxr.energy_eV,
         intrinsic_by_tile=np.array([[0.5, 0.5, 0.5], [1.0, 1.0, 1.0]]),
-        mu_by_filter_inv_mm=base.line.mu_by_filter_inv_mm,
+        mu_by_filter_inv_mm=base.cxr.mu_by_filter_inv_mm,
     )
     spatial = SpatialResult(
         base.ray_map,
-        base.line,
-        base.background,
+        base.cxr,
+        base.brem,
         base.detector,
-        coherent_cxr=base.line,
+        coherent_cxr=base.cxr,
         characteristic=characteristic,
     )
 
-    for total, line in (("line_total", "line"), ("coherent_total", "coherent")):
+    for total, line in (("cxr_total", "cxr"), ("coherent_total", "coherent")):
         np.testing.assert_allclose(
             spatial.average_density(total),
             spatial.average_density(line) + spatial.average_density("characteristic"),
@@ -195,7 +195,7 @@ def test_total_component_without_characteristic_is_the_line() -> None:
     spatial = _spatial()
 
     np.testing.assert_array_equal(
-        spatial.average_density("line_total"), spatial.average_density("line")
+        spatial.average_density("cxr_total"), spatial.average_density("cxr")
     )
     with pytest.raises(ValueError, match="coherent CXR spectrum is not available"):
         spatial.average_density("coherent_total")
@@ -353,7 +353,7 @@ def test_bilinear_reconstruction_equals_nearest_tile_at_full_angular_resolution(
     np.testing.assert_array_equal(
         bilinear.spectra(region=region)[1], nearest.spectra(region=region)[1]
     )
-    np.testing.assert_array_equal(bilinear.average_density("line"), nearest.average_density("line"))
+    np.testing.assert_array_equal(bilinear.average_density("cxr"), nearest.average_density("cxr"))
 
 
 def test_reconstruction_mode_is_validated() -> None:

@@ -40,7 +40,6 @@ from typing import Any
 
 import numpy as np
 
-from .._api_deprecations import renamed_fields
 from .._cxr_grid_policy import DEFAULT_RTOL
 from .._grid_semantics import resolution_num
 from ..detectors.spec import EagleXO, Timepix3
@@ -155,12 +154,11 @@ class SegmentMismatchError(RuntimeError):
     """Two ladder rungs were evaluated on different transport segments."""
 
 
-@renamed_fields(line="cxr")
 @dataclass(frozen=True)
 class SpectrumSample:
     """One spectrum evaluation on one grid.
 
-    ``line`` and ``background`` are densities on the rung's coordinates, in the
+    ``cxr`` and ``background`` are densities on the rung's coordinates, in the
     same per-eV units. ``informational`` carries ungated scalars (for example a
     grid-exact characteristic yield) that a report keeps beside the gated set.
     """

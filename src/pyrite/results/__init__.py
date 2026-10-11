@@ -85,7 +85,6 @@ __all__ = [
     "EmissionMode",
     "Settings",
     "beam_current_na",
-    "line_fwhm_eV",
     "store_result",
     "detected_background",
     "Result",
@@ -103,7 +102,6 @@ __all__ = [
     "slim_results",
     "project_dataset",
     "merge_dataset",
-    "LINE_RECORD_KEYS",
     "BREM_RECORD_KEYS",
     "_peak",
     "best_azimuth",
@@ -111,9 +109,6 @@ __all__ = [
     "case_table_rows",
     "slim_case_record",
     "_find_peaks_props",
-    "line_index",
-    "line_quality",
-    "line_metrics",
     "SELECTION_MODES",
     "selection_score",
     "top_geometries",
@@ -129,31 +124,3 @@ __all__ = [
     "cxr_quality",
     "cxr_metrics",
 ]
-
-
-_CXR_RENAMED_EXPORTS = {"line_metrics": "cxr_metrics"}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]
-
-
-_CXR_RENAMED_EXPORTS.update(
-    {"line_fwhm_eV": "cxr_fwhm_eV", "line_quality": "cxr_quality", "line_index": "cxr_index"}
-)
-
-_CXR_RENAMED_EXPORTS.update(
-    {
-        "line_fwhm_eV": "cxr_fwhm_eV",
-        "LINE_RECORD_KEYS": "CXR_RECORD_KEYS",
-        "line_index": "cxr_index",
-        "line_quality": "cxr_quality",
-        "line_metrics": "cxr_metrics",
-    }
-)

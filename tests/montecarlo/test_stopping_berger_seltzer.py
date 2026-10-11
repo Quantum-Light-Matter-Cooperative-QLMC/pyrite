@@ -380,7 +380,7 @@ def test_stopping_mirrors_agree():
     because they now delegate outright.
     """
     from pyrite._backend import REAL
-    from pyrite.montecarlo.spectrum import lines
+    from pyrite.montecarlo.spectrum import cxr
 
     composition = [("C", 0.1136), ("Si", 0.05)]
     grid = np.linspace(1.0, 300.0, 97)
@@ -389,7 +389,7 @@ def test_stopping_mirrors_agree():
     # The twin exists because its rows may live on the GPU, so drive it with
     # rows that actually do on an accelerator session and read the result back.
     mirrored = to_host(
-        lines._spliced_stopping_magnitude_xp(
+        cxr._spliced_stopping_magnitude_xp(
             to_device(grid, REAL), to_device(layer_index), [composition]
         )
     )

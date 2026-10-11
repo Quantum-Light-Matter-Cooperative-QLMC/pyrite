@@ -79,7 +79,7 @@ def test_spectrum_only_ladder_never_reruns_transport(ladder, monkeypatch):
 
     samples = [ladder.evaluate(grid) for grid in grids]
 
-    assert [sample.line.shape for sample in samples] == [grid.shape for grid in grids]
+    assert [sample.cxr.shape for sample in samples] == [grid.shape for grid in grids]
     assert segment_fingerprint(ladder.segments) == ladder.fingerprint
 
 

@@ -363,7 +363,7 @@ def test_remote_gc_runs_both_reclamations_with_standard_defaults(monkeypatch):
     ("command_name", "starter"),
     [
         ("rebrem", "start_rebrem_queue"),
-        ("reline", "start_recxr_queue"),
+        ("recxr", "start_recxr_queue"),
     ],
 )
 def test_remote_recompute_detach_skips_viewer_and_pull(monkeypatch, command_name, starter):

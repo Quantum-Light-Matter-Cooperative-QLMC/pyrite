@@ -85,7 +85,7 @@ def test_round_trip_reopens_factors_and_counts_without_transport(tmp_path, monke
     np.testing.assert_array_equal(
         loaded.spatial.tile_directions_lab, result.spatial.tile_directions_lab
     )
-    for component in ("line", "background", "characteristic"):
+    for component in ("cxr", "brem", "characteristic"):
         for got, want in zip(
             loaded.spatial.spectra(component=component, region=(slice(None), slice(None))),
             result.spatial.spectra(component=component, region=(slice(None), slice(None))),

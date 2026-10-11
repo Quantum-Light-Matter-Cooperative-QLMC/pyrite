@@ -68,9 +68,9 @@ def test_profile_coherent_window_opt_in_and_budget_reach_the_case(
     assert catalog.profile_emission("hopg_short") == "both"
     assert case["line_grid_policy"]["resolution"]["max_points"] == 5000000
     assert ("windows" in case["line_grid_policy"]) == enabled
-    assert dict(catalog.profile_line_grid_policy("hopg_short")) == policy
+    assert dict(catalog.profile_cxr_grid_policy("hopg_short")) == policy
     plain = config.material_sweep(
-        "hopg", catalog_profile="hopg_short", line_grid_policy={"windows": False}
+        "hopg", catalog_profile="hopg_short", cxr_grid_policy={"windows": False}
     )
     plain_case = build_cases(plain, n_electrons=200, n_electrons_brem=1)[0]
     assert "windows" not in plain_case["line_grid_policy"]

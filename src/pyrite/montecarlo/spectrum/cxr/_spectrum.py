@@ -411,21 +411,3 @@ def mc_cxr_spectrum_solid_angle(
         contrib = float(w_i) * spec_i
         total = contrib if total is None else total + contrib
     return total
-
-
-_CXR_RENAMED_EXPORTS = {"mc_spectrum_solid_angle": "mc_cxr_spectrum_solid_angle"}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]
-
-
-_CXR_RENAMED_EXPORTS.update(
-    {"mc_spectrum": "mc_cxr_spectrum", "mc_spectrum_solid_angle": "mc_cxr_spectrum_solid_angle"}
-)

@@ -293,23 +293,3 @@ def cxr_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness"
         # fraction carried straight from the record. NaN on pre-feature checkpoints.
         "hit_frac": float(r.get("hit_frac", float("nan"))),
     }
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {
-    "_cached_line_metrics": "_cached_cxr_metrics",
-    "line_metrics": "cxr_metrics",
-}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]
-
-
-_CXR_RENAMED_EXPORTS.update({"line_index": "cxr_index", "line_quality": "cxr_quality"})

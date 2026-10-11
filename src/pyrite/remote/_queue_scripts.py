@@ -1204,22 +1204,3 @@ def _zhai_queue_metadata(jobid, ne, ne_brem, ne_supp):
             "",
         ]
     )
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {
-    "_reline_flags": "_recxr_flags",
-    "_reline_queue_script": "_recxr_queue_script",
-    "_reline_chunked_queue_script": "_recxr_chunked_queue_script",
-    "_reline_queue_metadata": "_recxr_queue_metadata",
-}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

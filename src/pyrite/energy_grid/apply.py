@@ -1036,25 +1036,3 @@ def show(material=None, band=None, *, profile: str = "standard", catalog_path=No
                 tag = rec["source"] if rec else "derived"
                 out.append(f"  brem grid: {_band_summary(brem)}  [{tag}]")
     return "\n".join(out)
-
-
-# Compatibility names for the spectral vocabulary migration (issue #442).
-_CXR_RENAMED_EXPORTS = {
-    "_validated_line_row": "_validated_cxr_row",
-    "_line_grid_kind": "_cxr_grid_kind",
-    "_line_by_energy_array": "_cxr_by_energy_array",
-    "_existing_line_rows": "_existing_cxr_rows",
-    "_merge_line_rows": "_merge_cxr_rows",
-    "remove_line_rows": "remove_cxr_rows",
-    "set_line_artifact": "set_cxr_artifact",
-}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]

@@ -57,7 +57,7 @@ from .cxr import (
     _interp1,
     _interp_gather1d,
     _interp_gather2d,
-    _interp_gather_line_tables,
+    _interp_gather_cxr_tables,
     _interp_index,
     _cxr_amp_sq_core,
     _cxr_kin_core,
@@ -91,31 +91,3 @@ for _function in (
     _function.__module__ = __name__
 
 del _function
-
-
-_CXR_RENAMED_EXPORTS = {
-    "_line_amp_sq_core": "_cxr_amp_sq_core",
-    "_line_kin_core": "_cxr_kin_core",
-    "_line_weight_core": "_cxr_weight_core",
-    "_interp_gather_line_tables": "_interp_gather_cxr_tables",
-    "_INTERP_GATHER_LINE_TABLES_F32": "_INTERP_GATHER_CXR_TABLES_F32",
-    "_JIT_LINE_BATCH_TARGET": "_JIT_CXR_BATCH_TARGET",
-    "_USE_JIT_LINE_REDUCTION": "_USE_JIT_CXR_REDUCTION",
-}
-
-
-def __getattr__(name):
-    replacement = _CXR_RENAMED_EXPORTS.get(name)
-    if replacement is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from pyrite._api_deprecations import warn_renamed
-
-    warn_renamed(f"{__name__}.{name}", f"{__name__}.{replacement}")
-    return globals()[replacement]
-
-
-_CXR_RENAMED_EXPORTS.update(
-    {"mc_spectrum": "mc_cxr_spectrum", "mc_spectrum_solid_angle": "mc_cxr_spectrum_solid_angle"}
-)
-
-_CXR_RENAMED_EXPORTS.update({"LINE_ESCAPE_MODEL": "CXR_ESCAPE_MODEL"})

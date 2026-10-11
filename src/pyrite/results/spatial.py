@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .._api_deprecations import renamed_fields, warn_renamed
 from ..instrument import PlanarDetector
 
 if TYPE_CHECKING:
@@ -175,12 +174,6 @@ class PixelMetadata:
                 object.__setattr__(self, name, _readonly_array(value))
 
 
-@renamed_fields(
-    line="cxr",
-    background="brem",
-    coherent_line="coherent_cxr",
-    characteristic_line="characteristic",
-)
 @dataclass(frozen=True)
 class SpatialResult:
     """Provide lazy spatial scoring from factorized planar-detector data.
@@ -189,7 +182,7 @@ class SpatialResult:
     ----------
     ray_map
         Shared pixel solid angles, angular-tile indices, and filter path lengths.
-    line, background
+    cxr, brem
         Pre-filter line and continuum source factors.
     detector
         Physical detector used for geometry and optional measured response.
@@ -376,10 +369,6 @@ class SpatialResult:
         )[..., 0]
 
     def _factor(self, component: str) -> SpectralFactors:
-        aliases = {"line": "cxr", "background": "brem", "line_total": "cxr_total"}
-        if component in aliases:
-            warn_renamed(f"SpatialResult component {component!r}", repr(aliases[component]))
-            component = aliases[component]
         if component == "cxr":
             return self.cxr
         if component == "brem":
@@ -623,8 +612,7 @@ class SpatialResult:
         """Score selected pixels into common reporting bins and count channels."""
         from ..instrument import combine_acquisitions, score_acquisition
 
-        aliases = {"line": "cxr", "background": "brem", "line_total": "cxr_total"}
-        resolved_components = tuple(aliases.get(name, name) for name in components)
+        resolved_components = tuple(components)
         if not resolved_components:
             raise ValueError("components must not be empty")
         if len(set(resolved_components)) != len(resolved_components):

@@ -81,7 +81,7 @@ def test_object_defaults_are_separate_by_lifetime() -> None:
     numerics = Numerics(convergence=Convergence(max_reflections=4))
     analysis = Analysis()
 
-    assert numerics.n_electrons == 450
+    assert numerics.cxr_trials == 450
     assert numerics.convergence.max_reflections == 4
     assert analysis.convolve_with_det is False
 
@@ -101,7 +101,7 @@ def test_legacy_pair_distributes_settings_and_swept_scene_fields() -> None:
 
     assert len(sweep.expand()) == 4
     assert sweep.base.emission == "both"
-    assert numerics_from_legacy(old, settings).n_electrons == 12
+    assert numerics_from_legacy(old, settings).cxr_trials == 12
     assert analysis_from_legacy(settings).beam_current_na == settings.beam_current_na
 
 
