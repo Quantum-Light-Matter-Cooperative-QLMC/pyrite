@@ -152,7 +152,9 @@ To cut or refresh a release (maintainer):
 2. If the digest differs from the pin, use a new tag (`tables-elsepa-<n+1>`);
    never replace an asset under an existing tag, since older indexes pin it.
 3. Publish with
-   `gh release create <tag> build/xsgen-release/elsepa-tables.zip --title ... --notes-file NOTES.md`.
+   `gh release create <tag> build/xsgen-release/elsepa-tables.zip --title ... --notes-file NOTES.md --latest=false`.
+   `--latest=false` keeps the repository's Latest badge on the newest code
+   release ([releasing](releasing.md#publishing)).
    The notes carry the upstream attribution, licence, and a modifications
    statement (see `THIRD-PARTY-NOTICES.md`).
 4. Download the asset back (`gh release download <tag> -p <asset> -O - | sha256sum`)

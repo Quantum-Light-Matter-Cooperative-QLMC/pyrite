@@ -135,6 +135,40 @@ def test_notes_base_falls_back_to_last_release_commit(tmp_path: Path) -> None:
     assert [c.description for c in release.collect_changes(tmp_path, base)] == ["later"]
 
 
+def _repo(tmp_path: Path):
+    def git(*args: str) -> None:
+        subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
+
+    git("init", "-q")
+    return git
+
+
+def test_tag_release_notes_start_at_the_previous_tag(tmp_path: Path) -> None:
+    """The tag-push workflow runs with the new tag on HEAD; it must not be the base."""
+    git = _repo(tmp_path)
+    git("commit", "-q", "--allow-empty", "-m", "feat: old")
+    git("tag", "v0.4.0")
+    git("commit", "-q", "--allow-empty", "-m", "fix(io): crash")
+    git("commit", "-q", "--allow-empty", "-m", "chore(release): bump version to 0.5.0")
+    git("tag", "v0.5.0")
+
+    notes = release.tag_release_notes(tmp_path, "v0.5.0", "0.5.0")
+
+    assert notes.startswith("# PyRITE 0.5.0")
+    assert "Changes since `v0.4.0`" in notes
+    assert "crash" in notes and "old" not in notes
+
+
+def test_tag_release_notes_refuse_a_tag_that_does_not_match_the_version(tmp_path) -> None:
+    with pytest.raises(release.ReleaseError, match="does not match the package version 0.5.0"):
+        release.tag_release_notes(tmp_path, "v0.6.0", "0.5.0")
+
+
 def test_release_command_fails_before_editing_when_removals_are_due(monkeypatch, capsys) -> None:
     from pyrite.devtools import dev_cli
 

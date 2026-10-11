@@ -7,8 +7,12 @@ commits since the last ``v*`` tag.
 
 Usage:
     uv run pyrite-dev release X.Y.Z [--base REV] [--notes-file PATH] [--check]
+    uv run pyrite-dev release-notes vX.Y.Z [--notes-file PATH]
+    python -m pyrite.devtools.release vX.Y.Z [--notes-file PATH]   # tag-push workflow;
+        # runtime dependencies only, unlike pyrite-dev
 """
 
+import argparse
 import re
 import subprocess
 from collections.abc import Mapping
@@ -126,19 +130,20 @@ def _git(root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def notes_base(root: Path, base: str | None = None) -> str:
-    """Resolve the notes base: explicit ``base``, else last ``v*`` tag, else last release commit."""
+def notes_base(root: Path, base: str | None = None, *, rev: str = "HEAD") -> str:
+    """Resolve the notes base: explicit ``base``, else the last ``v*`` tag at or
+    before ``rev``, else the last release commit before it."""
     if base:
         return base
     result = subprocess.run(
-        ["git", "describe", "--tags", "--match", "v*", "--abbrev=0"],
+        ["git", "describe", "--tags", "--match", "v*", "--abbrev=0", rev],
         cwd=root,
         capture_output=True,
         text=True,
     )
     if result.returncode == 0 and result.stdout.strip():
         return result.stdout.strip()
-    found = _git(root, "log", "-1", "--format=%H", "-F", f"--grep={_RELEASE_SUBJECT}")
+    found = _git(root, "log", "-1", "--format=%H", "-F", f"--grep={_RELEASE_SUBJECT}", rev)
     if not found:
         raise ReleaseError("no v* tag or release commit found; pass --base REV")
     return found
@@ -169,8 +174,8 @@ def classify(sha: str, subject: str, body: str) -> Change | None:
     return Change(sha, match.group("type"), scope, match.group("desc"), breaking, physics)
 
 
-def collect_changes(root: Path, base: str) -> list[Change]:
-    out = _git(root, "log", "--no-merges", "--format=%h%x1f%s%x1f%b%x1e", f"{base}..HEAD")
+def collect_changes(root: Path, base: str, head: str = "HEAD") -> list[Change]:
+    out = _git(root, "log", "--no-merges", "--format=%h%x1f%s%x1f%b%x1e", f"{base}..{head}")
     changes = []
     for record in out.split("\x1e"):
         if not record.strip():
@@ -201,3 +206,46 @@ def render_notes(version: str, base: str, changes: list[Change]) -> str:
         if group:
             lines += [f"## {title}", "", *map(line, group), ""]
     return "\n".join(lines).rstrip() + "\n"
+
+
+def tag_release_notes(root: Path, tag: str, version: str) -> str:
+    """Notes for the already-bumped release ``tag``, from the previous ``v*`` tag.
+
+    Run by the tag-push workflow. ``tag`` must be ``v{version}``, so a tag
+    pushed on a commit that was not bumped fails before anything is published.
+    """
+    parse_version(version)
+    if tag != f"v{version}":
+        raise ReleaseError(
+            f"tag {tag!r} does not match the package version {version}; expected 'v{version}'"
+        )
+    # The tag sits on HEAD, so look strictly before it for the previous release.
+    base = notes_base(root, rev=f"{tag}^")
+    return render_notes(version, base, collect_changes(root, base, tag))
+
+
+def write_tag_notes(root: Path, tag: str, notes_file: str | None) -> str:
+    """Render ``tag``'s notes against the installed ``__version__``; optionally save them."""
+    from pyrite import __version__
+
+    notes = tag_release_notes(root, tag, __version__)
+    if notes_file:
+        Path(notes_file).write_text(notes, encoding="utf-8")
+    return notes
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Render notes for a pushed tag without the dev toolchain (release workflow)."""
+    parser = argparse.ArgumentParser(prog="python -m pyrite.devtools.release")
+    parser.add_argument("tag", help="the pushed tag, vX.Y.Z; must match __version__")
+    parser.add_argument("--notes-file", help="also write the release notes to this path")
+    args = parser.parse_args(argv)
+    try:
+        notes = write_tag_notes(Path.cwd(), args.tag, args.notes_file)
+    except ReleaseError as exc:
+        raise SystemExit(f"release-notes: {exc}") from exc
+    print(notes, end="")
+
+
+if __name__ == "__main__":
+    main()
