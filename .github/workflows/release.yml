@@ -1,0 +1,44 @@
+name: Release
+
+# Pushing a vX.Y.Z tag on the merged release commit publishes its GitHub
+# Release (docs/repo-design/releasing.md). The tag must match __version__.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Notes span the previous v* tag, so tags and history are needed.
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.14"
+
+      - name: Render release notes
+        # Runtime dependencies only: pyrite-dev needs the lint toolchain.
+        run: >
+          uv run --locked --no-default-groups
+          python -m pyrite.devtools.release "$GITHUB_REF_NAME" --notes-file release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          --verify-tag
+          --latest
+          --title "PyRITE ${GITHUB_REF_NAME#v}"
+          --notes-file release-notes.md

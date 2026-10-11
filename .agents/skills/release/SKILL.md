@@ -22,4 +22,9 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
 3. Review notes: breaking and physics-changing sections are heuristic.
 4. Commit only those paths as the release commit; notes go in PR body.
 
+After merge, an authorized human (or agent with explicit authorization) tags
+`vX.Y.Z` on the merge commit and pushes the tag; `.github/workflows/release.yml`
+then publishes the GitHub Release as Latest. Data/table releases use
+`gh release create ... --latest=false`.
+
 Never tag or push without explicit human authorization. No PyPI publishing.

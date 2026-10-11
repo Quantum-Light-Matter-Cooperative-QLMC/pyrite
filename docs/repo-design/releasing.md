@@ -62,8 +62,29 @@ The command:
 
 `--check` validates and prints notes without editing files. Put the notes in
 the PR description, then run `pyrite-dev verify`. After the PR merges,
-tag `vX.Y.Z` on the merge commit. Tagging and pushing need explicit human
-authorization. PyPI publishing is out of scope.
+tag `vX.Y.Z` on the merge commit and push the tag. Tagging and pushing need
+explicit human authorization. PyPI publishing is out of scope.
+
+## Publishing
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which publishes the
+GitHub Release for it:
+
+1. It refuses a tag that is not `v{__version__}` for the tagged commit, so a
+   tag on an unbumped commit publishes nothing.
+2. It renders notes with `python -m pyrite.devtools.release vX.Y.Z` (also
+   `pyrite-dev release-notes vX.Y.Z`): the same grouping as above, from the
+   previous `v*` tag to the new one.
+3. It creates the Release titled `PyRITE X.Y.Z` and marks it **Latest**.
+
+Releases for data and table archives (`tables-*`, `mirror-*`) share the
+repository's Releases page. Create them with `--latest=false` (see
+[data distribution](data-distribution-and-repository-size.md)) so the Latest
+badge always points at the newest code release.
+
+`git clone` checks out `main`, not the latest release. To use a released
+version, check out its tag (`git checkout vX.Y.Z`) or pin it when installing
+(`pip install "git+https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite@vX.Y.Z"`).
 
 ## Majors
 

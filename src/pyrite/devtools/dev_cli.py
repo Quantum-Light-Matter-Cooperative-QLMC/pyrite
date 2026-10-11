@@ -32,6 +32,7 @@ Commands:
     performance list, analyze, or delete compute-performance artifacts
     energy-grid maintain derived detector energy-grid artifacts
     release    bump version, gate on due deprecation removals, print release notes
+    release-notes  render notes for a pushed vX.Y.Z tag (release workflow)
     sync-skills mirror .agents/skills into .claude/skills
     check-skills validate the canonical skills and exact mirror
     verify     check skills, docs, imports, generated structure, lint, types, and tests
@@ -623,6 +624,16 @@ def cmd_release(args: argparse.Namespace) -> None:
     print(notes, end="")
 
 
+def cmd_release_notes(args: argparse.Namespace) -> None:
+    from pyrite.devtools import release
+
+    try:
+        notes = release.write_tag_notes(ROOT, args.tag, args.notes_file)
+    except release.ReleaseError as exc:
+        raise SystemExit(f"release-notes: {exc}") from exc
+    print(notes, end="")
+
+
 def cmd_cli_reference(args: argparse.Namespace) -> None:
     from pyrite.devtools.cli_reference import main
 
@@ -900,6 +911,12 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
         "--check", action="store_true", help="validate and print notes without editing files"
     )
     release_cmd.set_defaults(func=cmd_release)
+    release_notes = sub.add_parser(
+        "release-notes", help="render notes for a pushed vX.Y.Z tag (release workflow)"
+    )
+    release_notes.add_argument("tag", help="the pushed tag, vX.Y.Z; must match __version__")
+    release_notes.add_argument("--notes-file", help="also write the release notes to this path")
+    release_notes.set_defaults(func=cmd_release_notes)
     cli_reference = sub.add_parser("cli-reference")
     cli_reference_mode = cli_reference.add_mutually_exclusive_group()
     cli_reference_mode.add_argument("--write", action="store_true")
