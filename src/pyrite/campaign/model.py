@@ -10,7 +10,8 @@ from typing import Any, Literal
 import numpy as np
 
 from .._api_deprecations import _hide_compat_parameters, warn_api
-from .._numerics import Convergence, CxrReflections, Numerics, Physics
+from .._numerics import Convergence, CxrReflections, Numerics, Physics, _emission_selection
+from .._numerics import EmissionMode as EmissionMode
 from .._numerics import MosaicRoute as MosaicRoute
 from .._precision import Precision
 from ..detectors import Detector, EnergyBins
@@ -20,7 +21,6 @@ from .beam import Beam
 from .geometry import Slab, Stack, Target
 from .sweep import BeamSpec
 
-EmissionMode = Literal["incoherent", "coherent", "both"]
 BremSource = Literal["mc", "external", "none"]
 
 _SEGMENT = re.compile(r"(?P<name>[A-Za-z_]\w*)(?P<indexes>(?:\[\d+\])*)\Z")
@@ -104,6 +104,8 @@ def _scene_policy(cls):
         for name in ("emission", "brem_source"):
             if name in kwargs:
                 value = kwargs.pop(name)
+                if name == "emission":
+                    value = _emission_selection(value)
                 policies[name] = value
                 warn_api(f"Scene({name}=)", stacklevel=3)
                 if physics is not None and explicit and getattr(physics, name) != value:
@@ -116,7 +118,7 @@ def _scene_policy(cls):
 
     _hide_compat_parameters(initialize, original)
     cls.__init__ = initialize
-    cls.emission = property(lambda self: self.physics.emission)
+    cls.emission = property(lambda self: self.physics.emission_policy)
     cls.brem_source = property(lambda self: self.physics.brem_source)
     return cls
 

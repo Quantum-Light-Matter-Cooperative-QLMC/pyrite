@@ -196,7 +196,7 @@ def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
     assert numerics.brem_trials == 3
     assert physics.straggling is True
     assert numerics.energy_model == "midpoint"
-    assert physics.emission == "incoherent"
+    assert physics.emission == ("incoherent",)
     assert detector_id == "physical"
     assert scorer.angular_shape == (1, 1)
     assert acquisition is None

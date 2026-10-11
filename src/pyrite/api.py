@@ -15,12 +15,11 @@ import numpy as np
 from . import __version__
 from ._api_deprecations import warn_api
 from ._backend import BACKEND
-from ._numerics import Physics, resolve_physics
+from ._numerics import LegacyEmissionPolicy, Physics, _emission_selection, resolve_physics
 from .campaign.kinematic_validity import case_kinematic_validity
 from .campaign.lowering import build_case, build_sweep_cases, scene_physics
 from .campaign.model import (
     BremSource,
-    EmissionMode,
     Numerics,
     Scene,
     detector_with_scorer,
@@ -219,7 +218,7 @@ def simulate(
     *,
     physics: Physics | None = None,
     numerics: Numerics | None = None,
-    emission: EmissionMode | None = None,
+    emission: LegacyEmissionPolicy | None = None,
     brem_source: BremSource | None = None,
     filters: tuple[FilterPlate, ...] = (),
     pixel_scorer: PixelScorer | None = None,
@@ -279,6 +278,8 @@ def simulate(
     for name, value in (("emission", emission), ("brem_source", brem_source)):
         if value is not None:
             warn_api(f"simulate({name}=)")
+            if name == "emission":
+                value = _emission_selection(value)
             if physics is not None and getattr(physics, name) != value:
                 raise ValueError(f"conflicting simulate({name}=) and Physics.{name}")
             resolved_physics = replace(resolved_physics, **{name: value})
@@ -388,7 +389,7 @@ def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
         tilt_azim_deg=float(case.get("tilt_azim_deg", 0.0)),
         rep_rate_hz=scene.beam.rep_rate_hz,
         bunch_charge_pc=scene.beam.bunch_charge_pc,
-        emission=scene.physics.emission,
+        emission=scene.physics.emission_policy,
         brem_source=scene.physics.brem_source,
     )
 
@@ -463,7 +464,7 @@ def _simulate_planar(
             tilt_azim_deg=tilt_azim_deg,
             rep_rate_hz=scene.beam.rep_rate_hz,
             bunch_charge_pc=scene.beam.bunch_charge_pc,
-            emission=scene.physics.emission,
+            emission=scene.physics.emission_policy,
             brem_source=scene.physics.brem_source,
         )
         output = run_case_directions(

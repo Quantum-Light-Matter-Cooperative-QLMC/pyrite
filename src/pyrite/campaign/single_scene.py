@@ -6,6 +6,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 
+from .._numerics import _emission_selection
 from .observation import filter_from_config, physical_detector_from_config
 
 
@@ -142,7 +143,7 @@ def resolve_pixel_scene(
             precision=catalog.profile_precision(profile_name),
         ),
         Physics(
-            emission=catalog.profile_emission(profile_name) or "incoherent",
+            emission=_emission_selection(catalog.profile_emission(profile_name) or "incoherent"),
             straggling=straggling,
             inelastic_model=cast(
                 Literal["auto", "continuous", "shell-soft-hard"],
