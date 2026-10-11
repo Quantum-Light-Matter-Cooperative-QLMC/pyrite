@@ -625,14 +625,14 @@ def test_physical_pair_bound_cannot_use_the_smaller_sample_count():
 
 
 def test_omission_cannot_hide_unresolved_physical_pair_power():
-    from pyrite.montecarlo.spectrum.coherent_population import CoherentSamplingError
+    from pyrite.montecarlo.spectrum.coherent_population import CoherentSamplingWarning
 
     segments = _segments(np.zeros(2), footprint=False)
     segments["r_mid"][:] = [0.0, 0.0, 5.0]
     segments["t_ang"][:] = [0.0, 5.0]
     # Physical slab F=1 and N-1=11 exceed the small omission budget.
-    # Preserve #350's refusal of a statistically unresolved signed estimate.
-    with pytest.raises(CoherentSamplingError, match="negative or nonfinite pair estimate"):
+    # The unresolved signed estimate is still reported (#350), not hidden.
+    with pytest.warns(CoherentSamplingWarning, match="negative pair estimate"):
         mc_cxr_spectrum(
             segments,
             ENERGY_GRID,

@@ -46,7 +46,7 @@ pr.Beam.from_gdf("beam.gdf", z_origin_m=0.0, time_s=1e-9)                       
 
 Targets likewise require `footprint`: a finite `pr.Footprint(width_mm, height_mm)`, or `None` for a laterally infinite crystal. Leaving out any of these three still works through 0.13 with a `DeprecationWarning` and the old default (1 mm `Spot`, `PointBunch`, 5 mm x 5 mm footprint); from 0.14.0 it is an error. `pr.Point` is a deprecated alias of `pr.PointSpot` on the same schedule.
 
-Coherent emission with physical bunch charge needs offsets the estimator can resolve. On an infinite slab, sampled offsets (a finite `Spot` or `BunchLength`) leave a near-zero cross-electron excess that `cxr_trials` far below the bunch's electron count cannot resolve, and the run refuses with `CoherentSamplingError`. Use `PointSpot()` with `PointBunch()`, or a finite footprint with `BunchLength` so offsets are averaged analytically.
+Coherent emission with physical bunch charge needs offsets the estimator can resolve. On an infinite slab, sampled offsets (a finite `Spot` or `BunchLength`) leave a near-zero cross-electron excess that `cxr_trials` far below the bunch's electron count cannot resolve; bins whose signed estimate goes negative are returned unclipped with a `CoherentSamplingWarning` (nonfinite power still raises `CoherentSamplingError`). Use `PointSpot()` with `PointBunch()`, or a finite footprint with `BunchLength` so offsets are averaged analytically.
 
 ## Interpret the result
 
