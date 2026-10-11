@@ -113,7 +113,7 @@ Flat slabs, finite footprints, blazed grooves, and layered samples reuse the sam
 
 ## Composition, storage, and analysis
 
-Atomic relaxation is incoherent, so one component adds to either the incoherent or the optional coherent PXR/CBS spectrum. It is kept as its own array, `spec_characteristic`; `spec` and `spec_coherent` exclude it, and consumers add it once through `pyrite._spectral_components.cxr_spectrum` (`Result.line_total()` for API results). Checkpoints store it in `characteristic.h5`, separate from the line `line.h5` and continuum `brem.h5` datasets. The analysis app shows characteristic radiation by default and provides a **show characteristic radiation** checkbox that drops the component from displayed records without changing stored results. A missing characteristic file is valid and contributes no characteristic component.
+Atomic relaxation is incoherent, so one component adds to either the incoherent or the optional coherent PXR/CBS spectrum. It is kept as its own array, `spec_characteristic`; `spec` and `spec_coherent` exclude it, and consumers add it once through `pyrite._spectral_components.cxr_spectrum` (`Result.combined_cxr()` for API results). Checkpoints store it in `characteristic.h5`, separate from the line `line.h5` and continuum `brem.h5` datasets. The analysis app shows characteristic radiation by default and provides a **show characteristic radiation** checkbox that drops the component from displayed records without changing stored results. A missing characteristic file is valid and contributes no characteristic component.
 
 ## Limits and validation
 

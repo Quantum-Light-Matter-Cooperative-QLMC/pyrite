@@ -45,7 +45,27 @@ pr.Beam.from_gdf("beam.gdf", z_origin_m=0.0, time_s=1e-9)    # GPT snapshot
 
 ## Interpret the result
 
-`Result.cxr.incoherent.photon_energy_eV` and `Result.brem.photon_energy_eV` are the photon-energy coordinates for `spectrum` and `background`. With a scalar `Detector`, both arrays are response-free source photon density per incident electron per eV per sr. They exclude acceptance scaling, source current, quantum efficiency, and measured-energy redistribution. With a `PlanarDetector`, the scalar arrays are filter-attenuated, solid-angle-weighted observation averages; see the spatial-scoring boundary below.
+A `Result` keeps every radiation family separate, each on its own photon-energy grid, next to the inputs and records that produced it. Displaying `result` in a notebook or REPL prints this layout with grid sizes and energy ranges instead of raw arrays:
+
+```text
+result
+├── cxr.incoherent      SpectralDensity   incoherent PXR/CBS, CXR grid
+├── cxr.coherent        SpectralDensity   coherent companion, or None
+├── characteristic      SpectralDensity   atomic lines on the CXR grid, or None
+├── brem                SpectralDensity   continuum on its own wider grid
+├── scene, numerics     the resolved inputs you asked for
+├── case                low-level resolved transport input (Case)
+├── provenance          Provenance: identity, physics models, diagnostics, environment
+└── spatial             SpatialResult per-pixel factors, or None
+```
+
+Each `SpectralDensity` pairs `photon_energy_eV` (eV) with `density` and a `normalization`. No family includes another: CXR excludes characteristic lines, and nothing includes brem. With a scalar `Detector`, density is response-free source photons per incident electron per eV per sr (`normalization="source"`). It excludes acceptance, beam current, quantum efficiency, and measured-energy redistribution. With a `PlanarDetector`, the arrays are filter-attenuated, solid-angle-weighted observation averages (`"observation-average"`), still per sr; see the spatial-scoring boundary below.
+
+Three derived views cover most analysis:
+
+- `result.spectral_flux(units="detector")` returns a wide polars table on the union of all native grids: `photon_energy_eV`, `photon_energy_keV`, one column per family, and `total`. Each family is exact at its own nodes, linearly interpolated between them, and zero outside its own grid. `units` selects photons/(s eV) into the accepted solid angle (`"detector"`), photons/(s nA eV) (`"nA"`), photons/(s eV sr) (`"sr"`), or the stored per-electron density (`"electron"`); `pyrite.results.FLUX_UNITS` holds the labels. Beam current is the bunch charge times the repetition rate. The accepted solid angle is `result.accepted_solid_angle_sr()`: the case `domega_sr` for a scalar detector, or the summed pixel solid angle for a planar one. For a scalar detector the density is taken at the central observation direction, so `"detector"` assumes it is uniform over the acceptance.
+- `result.to_dataframe()` returns a long polars frame with one row per native node: `component`, `mode`, `photon_energy_eV`, `density`, and `normalization`. It never interpolates or adds totals.
+- `result.combined_cxr(mode="incoherent")` returns CXR plus characteristic emission as one `SpectralDensity` on the CXR grid.
 
 ```python
 cxr_energy_eV = result.cxr.incoherent.photon_energy_eV
@@ -53,13 +73,30 @@ source_cxr = result.cxr.incoherent.density
 continuum_energy_eV = result.brem.photon_energy_eV
 source_continuum = result.brem.density
 
-digest = result.provenance["identity_digest"]
-backend = result.provenance["backend"]
-device = result.provenance["device"]
+flux = result.spectral_flux(units="detector")  # photons / (s eV), with a total column
+native = result.to_dataframe()
+
+digest = result.provenance.identity_digest
+backend = result.provenance.backend
+device = result.provenance.device
 resolved_case = result.case
 ```
 
-Provenance also contains the resolved scene, numerics, and PyRITE/NumPy versions. Record the digest and software revision with any derived figure or table.
+`result.provenance` is a typed, read-only `Provenance` record. Each attribute has a docstring, so editor and notebook hover explain it. It is also a mapping, so `result.provenance["identity_digest"]` and `dict(result.provenance)` keep working. Attributes a run did not record are `None` and absent from the mapping.
+
+| Group | Attributes | Present |
+| --- | --- | --- |
+| Inputs | `scene`, `numerics` (also `result.scene`, `result.numerics`) | always |
+| Identity | `identity_digest` (source content key), `xsgen_tables` | always |
+| | `observation_identity_digest`, `observation` | planar detectors |
+| | `true_spatial_digest`, `response_digest`, `acquisition_digest` | planar detectors with an `Acquisition` |
+| Physics models | `stopping_model`, `characteristic_model`, `attenuation_model`, `bremsstrahlung_model` | always |
+| Diagnostics | `kinematic_validity` (central-ray dynamical/extinction screen) | always |
+| | `adaptive_sampling` (realized electrons, achieved errors, `stop_reason`, `statistics_limited`) | adaptive `Precision` runs |
+| | `line_grid_policy`, `line_grid_resolved` | automatic CXR grids |
+| Environment | `backend`, `device`, `git_sha`, `git_dirty`, `versions` | always; git fields are `None` for an installed wheel |
+
+Use `result.scene` for what you asked for. `result.case` is the lower-level resolved transport input: its keys use internal units and historical names (`E0_keV`, `E_grid_line`, `theta_obs_rad`, `domega_sr`) because they feed content identity. Record the digest and software revision with any derived figure or table.
 
 `emission="both"` and `emission="coherent"` expose both CXR modes from the
 same transport: `result.cxr.incoherent.density` always means incoherent CXR,
@@ -249,13 +286,13 @@ deprecation window, with removal scheduled for 0.13.
 | `Sweep.line_grid_policy` | `Sweep.cxr_grid_policy` |
 | spatial component `line`, `background` | `cxr`, `brem` |
 
-`result.to_dataframe()` returns native-grid rows with `component`, `mode`,
-`photon_energy_eV`, and `density` columns. CXR modes are `incoherent` and
-`coherent`; the other families have no mode. It does not interpolate different
-grids or add totals. Units, normalization, case, and provenance are in
-`DataFrame.attrs`. The frame plots directly, e.g.
-`alt.Chart(df).mark_line().encode(x="photon_energy_eV:Q", y="density:Q", color="component:N", strokeDash="mode:N")`.
-Per-pixel `spatial` data is not flattened.
+Through 0.11, `result.to_dataframe()` returned a pandas frame with units,
+normalization, case, and provenance in `DataFrame.attrs`. It now returns a polars
+frame: units are fixed and documented, `normalization` is a column, and case and
+provenance stay on the result. `result.spectral_flux()` replaces hand-written
+current/acceptance scaling and cross-grid totals; see
+[Interpret the result](#interpret-the-result). Per-pixel `spatial` data is not
+flattened.
 
 Runtime controls are `PYRITE_MC_CXR_CHUNK` and `PYRITE_MC_CXR_BUDGET_MB`.
 Their retired `PYRITE_MC_SPEC_*` spellings warn when used as fallbacks; canonical

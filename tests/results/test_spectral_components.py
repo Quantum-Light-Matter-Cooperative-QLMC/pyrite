@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from pyrite._spectral_components import cxr_spectrum, incident_spectrum, separate_legacy
-from pyrite.results.model import Result
+from pyrite.results.model import CxrSpectra, Result, SpectralDensity
 
 
 def _record():
@@ -44,20 +44,20 @@ def test_separate_legacy_subtracts_once_from_nested_store_totals():
     np.testing.assert_array_equal(store["cfg"][30.0]["spec_characteristic"], [0.5, 0.25])
 
 
-def test_result_line_total_combines_components():
+def test_result_combined_cxr_combines_components():
     record = _record()
     result = Result(
-        energy_eV=record["E_grid"],
-        spectrum=record["spec"],
-        background_energy_eV=record["E_grid"],
-        background=record["brem"],
+        cxr=CxrSpectra(SpectralDensity(record["E_grid"], record["spec"])),
+        brem=SpectralDensity(record["E_grid"], record["brem"]),
+        characteristic=SpectralDensity(record["E_grid"], record["spec_characteristic"]),
         case={},
         provenance={},
-        characteristic_spectrum=record["spec_characteristic"],
     )
 
-    np.testing.assert_array_equal(result.spectrum, [1.0, 2.0])
-    np.testing.assert_array_equal(result.line_total(), [1.5, 2.25])
-    np.testing.assert_array_equal(result.line_total(characteristic=False), [1.0, 2.0])
+    np.testing.assert_array_equal(result.cxr.incoherent.density, [1.0, 2.0])
+    np.testing.assert_array_equal(result.combined_cxr().density, [1.5, 2.25])
+    np.testing.assert_array_equal(
+        result.combined_cxr(include_characteristic=False).density, [1.0, 2.0]
+    )
     with pytest.raises(ValueError, match="coherent spectrum is not available"):
-        result.line_total(coherent=True)
+        result.combined_cxr(mode="coherent")

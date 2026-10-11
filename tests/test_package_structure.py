@@ -48,6 +48,7 @@ def test_root_exports_stay_frozen() -> None:
         "PlanarPose",
         "PixelMetadata",
         "PixelRayMap",
+        "Provenance",
         "Result",
         "ResolvedObservation",
         "Scene",

@@ -32,7 +32,8 @@ from .metrics import (
     cxr_metrics,
     cxr_quality,
 )
-from .model import Result
+from .model import FLUX_UNITS, Result
+from .provenance import Provenance
 from .scoring import (
     SELECTION_MODES,
     selection_score,
@@ -88,6 +89,8 @@ __all__ = [
     "store_result",
     "detected_background",
     "Result",
+    "Provenance",
+    "FLUX_UNITS",
     "records",
     "records_for_cases",
     "filter_results",

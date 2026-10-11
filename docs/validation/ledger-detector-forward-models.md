@@ -35,17 +35,17 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `pixel-acquisition-counting`
 
 - **Claim:** accepted event mass per incident electron scales to expected counts with $N_e=t_{exp}f_{rep}Q_{bunch}10^{-12}/e$; reporting bins plus disjoint underflow, overflow, and below-cut channels conservatively partition native measured event mass
-- **Code:** `instrument/acquisition.py::electron_count`; `instrument/acquisition.py::score_acquisition`
+- **Code:** `instrument/acquisition.py::electron_count`; `instrument/acquisition.py::score_acquisition`; `results/model.py::Result.spectral_flux`
 - **Source:** SI definitions of coulomb, picocoulomb, hertz, and the exact elementary charge; `scipy.constants.elementary_charge`
 - **Status:** unverified
 - **Checks:** units; analytic one-electron-per-bunch normalization; exact zero-charge limit; hand-computed fractional-overlap partition; component-additive totals; fixed-seed selection/chunk invariance
 - **Anchor:** `tests/instrument/test_acquisition_core.py`; `tests/results/test_spatial_model.py`
-- **Notes:** implementation-context review only. Uniform density within each native measured bin is the conservative-rebin assumption. Fresh-context validation remains pending; no hardware calibration claim is made.
+- **Notes:** implementation-context review only. Uniform density within each native measured bin is the conservative-rebin assumption. `Result.spectral_flux` applies the same rate, $\dot N_e = Q_{bunch}[\mathrm{pC}]\,f_{rep}[\mathrm{kHz}]\,10^{-9}/e$, to per-electron density, times the accepted solid angle for `"detector"`/`"nA"` units (case `domega_sr` for a scalar detector, assuming density uniform over the acceptance; summed pixel solid angle for a planar detector, exact for the observation average); `units="electron"` is the identity limit. Anchor: `tests/results/test_result_views.py`. Fresh-context validation remains pending; no hardware calibration claim is made.
 
 ## `pixel-angular-interpolation`
 
 - **Claim:** under `PixelScorer(reconstruction="bilinear_tile")` pixel `p` takes intrinsic density `I_p(E) = Σ_k w_pk I_k(E)` over at most four angular tiles, with separable weights `w_pk = (1-t_y)(1-t_x), (1-t_y)t_x, t_y(1-t_x), t_y t_x`; `t_x = clip((x_p - X_j)/(X_{j+1} - X_j), 0, 1)` (and `t_y` likewise), where `x_p` is pixel `p`'s detector-local centre coordinate and knot `X_j` is the mean over tile rows of the local `x` of tile column `j`'s detector-plane intersections `t d_k`, `t = (c·n)/(d_k·n)`, of the tile representative directions `d_k`; pixel flux is then `F_p(E) = I_p(E) ΔΩ_p T_p(E)` as in `positioned-filter-attenuation`
-- **Code:** `instrument/geometry.py::angular_tile_weights`; `results/model.py::SpatialResult._materialize`
+- **Code:** `instrument/geometry.py::angular_tile_weights`; `results/spatial.py::SpatialResult._materialize`
 - **Source:** tensor-product (bilinear) linear interpolation on a rectilinear grid, Press et al., *Numerical Recipes* 3rd ed. (2007) §3.6.1, Eq. 3.6.5; ray–plane intersection; tile representatives from `instrument/geometry.py::angular_tiles`
 - **Status:** anchored
 - **Checks:** implementation-side: weights non-negative and summing to 1 (oblique, rolled pose, uneven grids); knots strictly increasing; exact one-hot weight at a pixel on a tile centre; bit-identical to `nearest_tile` when `angular_shape` equals the pixel shape and for 1×1; one-tile axis constant; linear field in knot coordinates reproduced to 1e-13 inside the knot hull and clamped outside; store round-trip preserves the mode; default `nearest_tile` identity digests unchanged; **2026-10-05 fresh-context re-derivation matches** (verdict `rederived`): each projected representative is the $r^{-4}$-weighted convex combination of its own pixel centres, so knots are strictly increasing; weights match an independent loop/closed-form numpy reference to ≤2.2e-14 across 6 oblique/rolled/offset cases; write-up [pixel angular interpolation](detectors/pixel-angular-interpolation.md)

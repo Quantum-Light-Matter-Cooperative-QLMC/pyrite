@@ -347,7 +347,7 @@ The CLI singleton-profile resolver lives in `campaign/single_scene.py`, which lo
 
 ### `api.py`
 
-Filesystem-free simulation seam. `simulate` combines scalar beam, target, and detector components into a `Scene` and lowers exactly one typed `Case`. Scalar detectors call the unchanged `montecarlo.run_case`; physical detectors reuse one transport across coarse angular tiles, then attach exact pixel rays and finite-filter attenuation as a factorized `SpatialResult`. Source-case and observation identities remain separate. Combined line totals include atomic characteristic radiation, with the component exposed as `Result.characteristic_spectrum` and in spatial factors. The API never reads or writes campaign checkpoints. `build_case`, `build_sweep_cases`, and legacy lowering helpers are implementation/compatibility seams rather than the root supported surface.
+Filesystem-free simulation seam. `simulate` combines scalar beam, target, and detector components into a `Scene` and lowers exactly one typed `Case`. Scalar detectors call the unchanged `montecarlo.run_case`; physical detectors reuse one transport across coarse angular tiles, then attach exact pixel rays and finite-filter attenuation as a factorized `SpatialResult`. Source-case and observation identities remain separate. Combined line totals include atomic characteristic radiation, with the component exposed as `Result.characteristic` and in spatial factors. The API never reads or writes campaign checkpoints. `build_case`, `build_sweep_cases`, and legacy lowering helpers are implementation/compatibility seams rather than the root supported surface.
 
 - Public: root-lazy `simulate`.
 - Deps: `campaign.model`, `campaign.sweep`, `campaign.profiles`, `detectors`, `montecarlo`, `results`.
@@ -448,7 +448,9 @@ Result records, derived line metrics, ranking/selection. Split from single modul
 - `metrics` — per-record scalars for heatmaps: `cxr_index`, `cxr_quality`, `cxr_metrics`.
 - `scoring` — geometry ranking: `SELECTION_MODES`, `selection_score`, `top_geometries`, `show_top`.
 - `tables` — DataFrame views: `results_dataframe`, `summary_table`, `show_summary`.
-- `model` — in-memory `Result` plus factorized `SpatialResult`, `PixelRayMap`, and `SpectralFactors`; `Result.characteristic_spectrum` and the `"characteristic"` spatial component preserve the separately auditable EEDL line contribution. Selected pixel spectra and images materialize in bounded chunks and are not checkpoint schema fields.
+- `model` — in-memory `Result` with `CxrSpectra`/`SpectralDensity` families; polars views `to_dataframe` (long, native grids) and `spectral_flux` (wide union grid, beam/acceptance-scaled `FLUX_UNITS`, `total` column); re-exports the `spatial` names.
+- `provenance` — `Provenance`: typed read-only `Mapping` of `Result.provenance` (inputs, identity digests, physics-model markers, run diagnostics, environment); unknown keys kept in `extra`.
+- `spatial` — factorized planar-detector data: `SpatialResult`, `PixelRayMap`, `SpectralFactors`, `PixelMetadata`, `COMPONENTS`; the `"characteristic"` component preserves the separately auditable EEDL line contribution. Selected pixel spectra and images materialize in bounded chunks and are not checkpoint schema fields.
 - Deps: `montecarlo`, `sweep`.
 
 ### `observations/` (package)

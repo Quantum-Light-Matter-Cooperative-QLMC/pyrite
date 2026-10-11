@@ -360,7 +360,7 @@ solid_angle = pixel_area_mm2 * obliquity / distance**2
 
 which is the small-pixel $\Delta\Omega_p = A_p\cos\theta_p/D_p^{2}$ of [I.5](#i5-solid-angle-and-the-flux-definition), including the $\cos\theta_p$ projection. `obliquity <= 0` raises. For an unpixelated detector, the same function instead integrates its finite rectangular face exactly; the scalar Eagle path reuses the centred-rectangle specialization.
 
-`results/model.py::SpatialResult._materialize` assembles
+`results/spatial.py::SpatialResult._materialize` assembles
 
 ```text
 factor.intrinsic_by_tile[tile]

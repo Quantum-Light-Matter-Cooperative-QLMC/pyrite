@@ -14,6 +14,7 @@ dependencies = [
     "click>=8.4.1",
     "numpy>=2.4.6",
     "pandas>=3.0.3",
+    "polars>=1.44.2",
     "platformdirs>=4.9",
     "scipy>=1.17.1",
     "mpmath>=1.3,<2",

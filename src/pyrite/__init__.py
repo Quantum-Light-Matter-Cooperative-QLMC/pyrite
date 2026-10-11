@@ -147,6 +147,9 @@ if TYPE_CHECKING:
     from pyrite.results.model import (
         SpectralFactors as SpectralFactors,
     )
+    from pyrite.results.provenance import (
+        Provenance as Provenance,
+    )
     from pyrite.xsgen.install import fetch_tables as fetch_tables
 
 _PUBLIC_OBJECTS = {
@@ -177,6 +180,7 @@ _PUBLIC_OBJECTS = {
     "PlanarPose": ("pyrite.instrument", "PlanarPose"),
     "PixelMetadata": ("pyrite.results.model", "PixelMetadata"),
     "PixelRayMap": ("pyrite.results.model", "PixelRayMap"),
+    "Provenance": ("pyrite.results.provenance", "Provenance"),
     "Result": ("pyrite.results.model", "Result"),
     "ResolvedObservation": ("pyrite.instrument", "ResolvedObservation"),
     "Scene": ("pyrite.campaign.model", "Scene"),

@@ -45,9 +45,17 @@ import json
 import numpy as np
 import numba
 arrays = {}
-for name in ("energy_eV", "spectrum", "background_energy_eV", "background",
-             "coherent_spectrum", "characteristic_spectrum"):
-    value = getattr(result, name)
+# Historical hash keys stay stable so samples compare across revisions.
+coherent = result.cxr.coherent
+atomic = result.characteristic
+for name, value in (
+    ("energy_eV", result.cxr.incoherent.photon_energy_eV),
+    ("spectrum", result.cxr.incoherent.density),
+    ("background_energy_eV", result.brem.photon_energy_eV),
+    ("background", result.brem.density),
+    ("coherent_spectrum", None if coherent is None else coherent.density),
+    ("characteristic_spectrum", None if atomic is None else atomic.density),
+):
     if value is not None:
         arrays[name] = hashlib.sha256(np.ascontiguousarray(value).tobytes()).hexdigest()
 try:

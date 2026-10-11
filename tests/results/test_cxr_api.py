@@ -30,29 +30,26 @@ def test_components_keep_their_own_grids_and_separate_densities():
 
 
 @pytest.mark.parametrize(
-    "name,replacement,expected",
+    "name",
     [
-        ("energy_eV", "photon_energy_eV", [1, 2]),
-        ("spectrum", "cxr", [3, 4]),
-        ("background_energy_eV", "brem", [1, 2, 3]),
-        ("background", "brem", [5, 6, 7]),
-        ("coherent_spectrum", "coherent", [7, 8]),
-        ("characteristic_spectrum", "characteristic", [0.25, 0.5]),
+        "energy_eV",
+        "spectrum",
+        "background_energy_eV",
+        "background",
+        "coherent_spectrum",
+        "characteristic_spectrum",
+        "line_total",
     ],
 )
-def test_flat_result_attributes_warn_with_replacement(name, replacement, expected):
-    with pytest.warns(DeprecationWarning, match=replacement):
-        actual = getattr(_result(), name)
-    np.testing.assert_array_equal(actual, expected)
+def test_removed_flat_result_attributes_are_gone(name):
+    assert not hasattr(_result(), name)
 
 
-def test_legacy_result_constructor_and_total_keep_working():
-    with pytest.warns(DeprecationWarning, match=r"Result\(cxr"):
-        result = Result([1, 2], [3, 4], [1, 2, 3], [5, 6, 7], {}, {})
-    with pytest.warns(DeprecationWarning, match="combined_cxr"):
-        np.testing.assert_array_equal(result.line_total(), [3, 4])
-    with pytest.raises(TypeError, match="combine"):
-        Result(cxr=_result().cxr, energy_eV=[1, 2])
+def test_result_constructor_is_grouped_keyword_only():
+    with pytest.raises(TypeError):
+        Result([1, 2], [3, 4], [1, 2, 3], [5, 6, 7], {}, {})  # type: ignore[misc]
+    with pytest.raises(TypeError):
+        Result(cxr=_result().cxr, energy_eV=[1, 2])  # type: ignore[call-arg]
 
 
 def test_component_shape_and_normalization_errors_are_explicit():
@@ -91,27 +88,29 @@ def test_energy_bins_aliases_and_precision_serialization_keep_legacy_contracts()
 
 
 def test_dataframe_preserves_modes_unequal_grids_and_normalization():
-    result = _result()
-    frame = result.to_dataframe()
-    assert list(frame) == ["component", "mode", "photon_energy_eV", "density"]
-    assert len(frame) == 9
-    np.testing.assert_array_equal(
-        frame.loc[frame.component == "brem", "photon_energy_eV"], [1, 2, 3]
-    )
-    coherent = frame[(frame.component == "cxr") & (frame["mode"] == "coherent")]
-    np.testing.assert_array_equal(coherent.density, [7, 8])
-    assert frame.loc[frame.component == "characteristic", "mode"].isna().all()
-    assert frame.attrs["units"]["photon_energy_eV"] == "eV"
-    assert frame.attrs["normalization"] == {
-        "cxr": "source",
-        "brem": "source",
-        "characteristic": "source",
-    }
-    frame.attrs["provenance"]["added"] = True
-    assert "added" not in result.provenance
+    import polars as pl
+
+    frame = _result().to_dataframe()
+    assert isinstance(frame, pl.DataFrame)
+    assert frame.columns == [
+        "component",
+        "mode",
+        "photon_energy_eV",
+        "density",
+        "normalization",
+    ]
+    assert frame.height == 9
+    brem = frame.filter(pl.col("component") == "brem")
+    np.testing.assert_array_equal(brem["photon_energy_eV"], [1, 2, 3])
+    coherent = frame.filter((pl.col("component") == "cxr") & (pl.col("mode") == "coherent"))
+    np.testing.assert_array_equal(coherent["density"], [7, 8])
+    assert frame.filter(pl.col("component") == "characteristic")["mode"].is_null().all()
+    assert set(frame["normalization"]) == {"source"}
 
 
-def test_dataframe_omits_absent_families_and_carries_case():
+def test_dataframe_omits_absent_families():
+    import polars as pl
+
     result = Result(
         cxr=CxrSpectra(SpectralDensity([100.0, 200.0, 300.0], [1.0, 2.0, 3.0])),
         brem=SpectralDensity([100.0, 400.0], [0.5, 0.25]),
@@ -120,12 +119,10 @@ def test_dataframe_omits_absent_families_and_carries_case():
         provenance={"identity_digest": "abc"},
     )
     frame = result.to_dataframe()
-    assert frame.groupby("component", observed=True).size().to_dict() == {"cxr": 3, "brem": 2}
-    assert set(frame.loc[frame.component == "cxr", "mode"]) == {"incoherent"}
-    assert frame["photon_energy_eV"].dtype == np.float64
-    assert frame.attrs["case"] == {"crystal": "hopg"}
-    assert frame.attrs["provenance"] == {"identity_digest": "abc"}
-    assert frame.attrs["normalization"] == {"cxr": "source", "brem": "source"}
+    counts = dict(frame.group_by("component").len().iter_rows())
+    assert counts == {"cxr": 3, "brem": 2}
+    assert set(frame.filter(pl.col("component") == "cxr")["mode"]) == {"incoherent"}
+    assert frame["photon_energy_eV"].dtype == pl.Float64
 
 
 def test_catalog_key_translation_preserves_literals_order_and_profile_names():
