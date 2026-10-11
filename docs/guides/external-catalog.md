@@ -42,8 +42,8 @@ the selected catalog in the remote checkout and run against that copy.
 
 Give each lab profile its intended beam and detector with
 `pyrite profile set NAME --beam BEAM --detector DETECTOR`. Since 0.6.0 a
-selected-catalog profile with no beam is a usage error. Implicit scalar detector
-acceptance warns in 0.9.0 and becomes a usage error in 0.11.0. To retain the
+selected-catalog profile with no beam is a usage error. Since 0.11.0, implicit
+scalar detector acceptance is also a usage error. To retain the
 historical Timepix3 aperture with ideal response and raw spectra, copy
 `detectors/reference.toml` from the bundle and attach `--detector reference`.
 See [Bundled examples and implicit defaults](sweep-profiles.md#bundled-examples-and-implicit-defaults).

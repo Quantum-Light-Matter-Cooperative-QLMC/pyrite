@@ -85,10 +85,10 @@ Adaptive sampling replaces both fixed counts with one shared count chosen from a
 numerics = pr.Numerics(
     precision=pr.Precision(
         target_rse=0.1,
-        micxr_trials=400,
+        min_electrons=400,
         max_electrons=10_000,
         block_electrons=100,
-        observables=("line", "brem"),
+        observables=("cxr", "brem"),
     ),
 )
 result = pr.simulate(beam, target, detector, numerics=numerics)

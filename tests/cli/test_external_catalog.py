@@ -122,7 +122,7 @@ def test_selected_catalog_runs_bundled_profiles_with_packaged_instrument(
     assert result.exit_code == 0, result.output
 
 
-def test_bundled_catalog_user_profile_warns_for_implicit_detector(tmp_path, monkeypatch):
+def test_bundled_catalog_user_profile_rejects_implicit_detector(tmp_path, monkeypatch):
     from pyrite.runs import scan as runs_scan
 
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
@@ -133,12 +133,12 @@ def test_bundled_catalog_user_profile_warns_for_implicit_detector(tmp_path, monk
         command, ["run", "coh_test", "-m", "hopg"], env={"PYRITE_MC_BACKEND": "cpu"}
     )
 
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 2, result.output
     assert "--detector reference" in result.stderr
-    assert "will be removed in 0.11.0" in result.stderr
+    assert "removed in 0.11.0" in result.stderr
 
 
-def test_selected_catalog_implicit_detector_warns_during_support_window(tmp_path, monkeypatch):
+def test_selected_catalog_rejects_implicit_detector(tmp_path, monkeypatch):
     from pyrite.runs import scan as runs_scan
 
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
@@ -149,6 +149,6 @@ def test_selected_catalog_implicit_detector_warns_during_support_window(tmp_path
         ["--catalog", str(catalog), "run", "hopg_short", "-m", "hopg"],
         env={"PYRITE_MC_BACKEND": "cpu"},
     )
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 2, result.output
     assert "--detector reference" in result.stderr
-    assert "will be removed in 0.11.0" in result.stderr
+    assert "removed in 0.11.0" in result.stderr

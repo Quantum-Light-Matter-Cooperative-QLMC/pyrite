@@ -3,7 +3,7 @@
 Issue #214 deprecated the implicit fallbacks in 0.4.0; issue #387 made them
 errors in 0.6.0. A run that names no profile no longer falls back to
 ``standard``, and a user-selected catalog profile must name a beam.
-Implicit scalar detector acceptance follows the 0.9.0 to 0.11.0 warning window;
+Implicit scalar detector acceptance was removed in 0.11.0;
 use the bundled ``reference`` object to preserve its Timepix3 aperture.
 """
 
@@ -53,10 +53,7 @@ def require_explicit_instrument(profile: str) -> None:
 
 
 def require_explicit_detector(profile: str, detectors: Mapping[str, Mapping[str, object]]) -> None:
-    """Warn, then reject, scalar detectors that inherit unnamed acceptance."""
-    from .. import __version__
-    from ._deprecations import IMPLICIT_DEFAULTS
-
+    """Reject scalar detectors that inherit unnamed acceptance."""
     implicit = [
         name
         for name, spec in detectors.items()
@@ -68,7 +65,6 @@ def require_explicit_detector(profile: str, detectors: Mapping[str, Mapping[str,
     ]
     if not implicit:
         return
-    entry = IMPLICIT_DEFAULTS["profile detector"]
     replacement = f"pyrite profile set {profile} --detector reference"
     if len(detectors) > 1 or tuple(detectors) != ("default",):
         replacement = "; ".join(
@@ -96,14 +92,6 @@ def require_explicit_detector(profile: str, detectors: Mapping[str, Mapping[str,
         f"profile '{profile}' inherits implicit detector acceptance "
         f"({', '.join(implicit)}); use '{replacement}'"
     )
-    version = tuple(int(part) for part in __version__.split(".")[:2])
-    removal = tuple(int(part) for part in entry.remove_in.split(".")[:2])
-    if version >= removal:
-        raise click.UsageError(
-            f"{detail} (implicit detector setup was removed in {entry.remove_in})"
-        )
-    click.echo(
-        f"warning: {detail} (deprecated in {entry.deprecated_in}; "
-        f"will be removed in {entry.remove_in})",
-        err=True,
+    raise click.UsageError(
+        f"{detail} (implicit detector setup was removed in 0.11.0)"
     )

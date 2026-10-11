@@ -341,13 +341,9 @@ def test_deprecated_option_help_does_not_warn() -> None:
     assert result.stderr == ""
 
 
-@pytest.mark.parametrize("version, exit_code", [("0.9.0", 0), ("0.10.0", 0), ("0.11.0", 2)])
 @pytest.mark.parametrize("spec", [{}, {"observation_angle_deg": 90.0}])
-def test_implicit_detector_warning_then_usage_error(monkeypatch, version, exit_code, spec):
-    import pyrite
+def test_implicit_detector_is_usage_error(spec):
     from pyrite.cli._implicit_defaults import require_explicit_detector
-
-    monkeypatch.setattr(pyrite, "__version__", version)
 
     @click.command()
     def probe():
@@ -355,10 +351,10 @@ def test_implicit_detector_warning_then_usage_error(monkeypatch, version, exit_c
         click.echo("raw spectrum")
 
     result = CliRunner().invoke(probe)
-    assert result.exit_code == exit_code, result.output
+    assert result.exit_code == 2, result.output
     assert "pyrite profile set mine --detector reference" in result.stderr
     assert "0.11.0" in result.stderr
-    assert result.stdout == ("raw spectrum\n" if exit_code == 0 else "")
+    assert result.stdout == ""
 
 
 def test_explicit_and_pixel_detectors_have_no_implicit_warning(monkeypatch):
@@ -386,7 +382,7 @@ def test_explicit_and_pixel_detectors_have_no_implicit_warning(monkeypatch):
     assert result.stderr == ""
 
 
-def test_partial_custom_detector_warning_preserves_configured_geometry():
+def test_partial_custom_detector_error_preserves_configured_geometry():
     from pyrite.cli._implicit_defaults import require_explicit_detector
 
     @click.command()
@@ -394,7 +390,7 @@ def test_partial_custom_detector_warning_preserves_configured_geometry():
         require_explicit_detector("mine", {"eds": {"observation_angle_deg": 135.0}})
 
     result = CliRunner().invoke(probe)
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 2, result.output
     assert "keep the configured geometry" in result.stderr
     assert "pyrite detector show reference" in result.stderr
     assert 'detectors.eds = "reference"' not in result.stderr
