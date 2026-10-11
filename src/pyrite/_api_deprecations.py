@@ -47,6 +47,11 @@ API_DEPRECATIONS: dict[str, ApiDeprecation] = {
             "Stack(footprint=Footprint(5.0, 5.0)) or Stack(footprint=None) for infinite extent",
             since="0.12.0",
         ),
+        _api_entry(
+            'Physics(emission="both")',
+            'Physics(emission=("incoherent", "coherent"))',
+            since="0.13.1",
+        ),
         _api_entry("pyrite.Point", "pyrite.PointSpot", since="0.12.0"),
         _api_entry("simulate(pixel_scorer=)", "PlanarDetector(scorer=...)", since="0.12.0"),
         _api_entry("Scene(pixel_scorer=)", "PlanarDetector(scorer=...)", since="0.12.0"),

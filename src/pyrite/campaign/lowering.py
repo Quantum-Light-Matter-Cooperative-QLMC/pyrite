@@ -55,7 +55,7 @@ def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
         legacy,
         n_electrons=numerics.cxr_trials,
         n_electrons_brem=numerics.brem_trials,
-        coherent_emission=physics.emission in {"coherent", "both"},
+        coherent_emission=physics.coherent_emission,
         straggling=physics.straggling,
         energy_model=numerics.energy_model,
         max_dE_frac=numerics.max_dE_frac,

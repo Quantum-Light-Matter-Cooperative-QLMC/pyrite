@@ -12,6 +12,37 @@ from ._energy_bins import EnergyBins
 from ._precision import Precision
 
 MosaicRoute = Literal["analytic", "mc"]
+EmissionMode = Literal["incoherent", "coherent"]
+EmissionSelection = (
+    EmissionMode
+    | tuple[EmissionMode, ...]
+    | list[EmissionMode]
+    | set[EmissionMode]
+    | frozenset[EmissionMode]
+)
+LegacyEmissionPolicy = Literal["incoherent", "coherent", "both"]
+
+
+def _emission_selection(value: object, *, warn_both: bool = False) -> tuple[EmissionMode, ...]:
+    """Normalize API selections or stable legacy policies to ordered modes."""
+    if isinstance(value, str):
+        if value == "both":
+            if warn_both:
+                warn_api('Physics(emission="both")', stacklevel=5)
+            return ("incoherent", "coherent")
+        modes = (value,)
+    elif isinstance(value, (tuple, list, set, frozenset)):
+        modes = tuple(value)
+    else:
+        raise TypeError(
+            "emission must be a mode string or a tuple, list, set, or frozenset of modes"
+        )
+    if not modes or any(
+        not isinstance(mode, str) or mode not in {"incoherent", "coherent"} for mode in modes
+    ):
+        raise ValueError("emission must contain one or both of 'incoherent' and 'coherent'")
+    return tuple(mode for mode in ("incoherent", "coherent") if mode in modes)
+
 
 SAMPLING_KEYS = ("n_electrons", "n_electrons_brem")
 CONVERGENCE_KEYS = ("n_families", "max_reflections", "mosaic_nodes", "mosaic_route")
@@ -100,7 +131,7 @@ class CxrReflections:
 class Physics:
     """Choose emission and particle-interaction models, independently of sampling.
 
-    ``emission`` selects incoherent, coherent, or both CXR spectra; ``brem_source``
+    ``emission`` selects one or both of the incoherent and coherent CXR modes; ``brem_source``
     selects MC, external, or no continuum (the in-memory API has no external
     spectrum and returns zeros for the last two). Transport model defaults and
     cutoff units are identical to the profile schema: cutoffs are in eV.
@@ -109,7 +140,11 @@ class Physics:
     Parameters
     ----------
     emission
-        ``"incoherent"``, ``"coherent"``, or ``"both"`` CXR policy.
+        A mode string (``"incoherent"`` or ``"coherent"``), or a nonempty
+        tuple, list, set, or frozenset of modes. Stored as a deduplicated tuple
+        in incoherent-then-coherent order. Coherent scoring also exposes its
+        incoherent companion from the same transport. The input alias
+        ``"both"`` is deprecated; use ``("incoherent", "coherent")``.
     brem_source
         ``"mc"``, ``"external"``, or ``"none"`` continuum policy.
     straggling
@@ -165,7 +200,7 @@ class Physics:
         ``"none"`` reproduces elastic-only transport bit for bit.
     """
 
-    emission: Literal["incoherent", "coherent", "both"] = "incoherent"
+    emission: EmissionSelection = "incoherent"
     brem_source: Literal["mc", "external", "none"] = "mc"
     straggling: bool = False
     inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "auto"
@@ -180,11 +215,21 @@ class Physics:
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
 
     def __post_init__(self) -> None:
-        if self.emission not in {"incoherent", "coherent", "both"}:
-            raise ValueError("emission must be 'incoherent', 'coherent', or 'both'")
+        object.__setattr__(self, "emission", _emission_selection(self.emission, warn_both=True))
         if self.brem_source not in {"mc", "external", "none"}:
             raise ValueError("brem_source must be 'mc', 'external', or 'none'")
         self.validate_transport("midpoint")
+
+    @property
+    def emission_policy(self) -> LegacyEmissionPolicy:
+        """Stable tri-state policy for CLI, catalog, checkpoint, and observation boundaries."""
+        modes = cast(tuple[EmissionMode, ...], self.emission)
+        return "both" if len(modes) == 2 else modes[0]
+
+    @property
+    def coherent_emission(self) -> bool:
+        """Whether the selection enables coherent scoring alongside its companion."""
+        return "coherent" in self.emission
 
     def validate_transport(self, energy_model: str) -> None:
         """Check model values and their compatibility with the integration scheme."""
@@ -254,7 +299,8 @@ def _legacy_numerics(cls):
         for name in PHYSICS_FIELDS:
             if name in kwargs:
                 warn_api(f"Numerics({name}=)", stacklevel=3)
-                overrides[name] = kwargs.pop(name)
+                value = kwargs.pop(name)
+                overrides[name] = _emission_selection(value) if name == "emission" else value
         if "convergence" in kwargs:
             warn_api("Numerics(convergence=)", stacklevel=3)
             old = kwargs.pop("convergence")
@@ -362,6 +408,8 @@ def resolve_physics(physics: Physics | None, numerics: Numerics) -> Physics:
     overrides = dict(numerics._physics_overrides)
     if physics is not None:
         for name, value in overrides.items():
+            if name == "emission":
+                value = _emission_selection(value)
             if getattr(physics, name) != value:
                 raise ValueError(f"conflicting Numerics.{name} and Physics.{name}")
     resolved = Physics(**overrides) if physics is None else physics

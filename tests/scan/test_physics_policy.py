@@ -56,7 +56,7 @@ def test_every_moved_default_preserves_case_and_digest(name):
             "radiative_model": "uncoupled",
             "atomic_electron_deflection": "none",
         },
-        {"emission": "both", "brem_source": "none"},
+        {"emission": ("incoherent", "coherent"), "brem_source": "none"},
         {
             "bremsstrahlung_model": "bremslib",
             "radiative_model": "bremslib-soft-hard",
@@ -215,8 +215,8 @@ def test_alias_conflicts_and_equal_inputs_are_explicit():
         with pytest.raises(ValueError, match="conflicting"):
             pr.Numerics(convergence=old, cxr_reflections=pr.CxrReflections(n_families=3))
     with pytest.warns(DeprecationWarning):
-        same_scene = scene(physics=pr.Physics(emission="both"), emission="both")
-    assert same_scene.physics.emission == "both"
+        same_scene = scene(physics=pr.Physics(emission=("incoherent", "coherent")), emission="both")
+    assert same_scene.physics.emission == ("incoherent", "coherent")
     with pytest.warns(DeprecationWarning):
         with pytest.raises(ValueError, match="conflicting"):
             scene(physics=pr.Physics(), emission="both")
@@ -240,12 +240,15 @@ def test_simulate_forwards_legacy_policy_once_and_preserves_identity(monkeypatch
         old = pr.simulate(s.beam, s.target, s.detector, emission="both", brem_source="none")
     assert len(caught) == 2
     new = pr.simulate(
-        s.beam, s.target, s.detector, physics=pr.Physics(emission="both", brem_source="none")
+        s.beam,
+        s.target,
+        s.detector,
+        physics=pr.Physics(emission=("incoherent", "coherent"), brem_source="none"),
     )
     assert old.case == new.case
     assert old.provenance["identity_digest"] == new.provenance["identity_digest"]
     np.testing.assert_array_equal(old.brem.density, new.brem.density)
-    assert new.scene.physics.emission == "both"
+    assert new.scene.physics.emission == ("incoherent", "coherent")
     with pytest.warns(DeprecationWarning):
         with pytest.raises(ValueError, match="conflicting"):
             pr.simulate(s.beam, s.target, s.detector, physics=pr.Physics(), emission="both")
@@ -273,9 +276,197 @@ def test_legacy_positionals_and_pickle_paths_stay_usable():
     base = scene()
     with pytest.warns(DeprecationWarning, match="Scene\\(emission="):
         old = pr.Scene(base.beam, base.target, base.detector, (), None, None, "both")
-    assert old.physics.emission == "both"
+    assert old.physics.emission == ("incoherent", "coherent")
     bins = pr.EnergyBins(cxr=np.array([1000.0, 1050.0]))
     assert pickle.loads(pickle.dumps(bins)) == bins
     assert pr.EnergyBins.__module__ == "pyrite.detectors.spec"
     for cls in (pr.Scene, pr.Numerics, pr.Detector, pr.PlanarDetector):
         assert not any(name.startswith("_") for name in inspect.signature(cls).parameters)
+
+
+@pytest.mark.parametrize(
+    ("selection", "expected"),
+    [
+        ("incoherent", ("incoherent",)),
+        ("coherent", ("coherent",)),
+        (("coherent",), ("coherent",)),
+        (["incoherent"], ("incoherent",)),
+        ({"coherent"}, ("coherent",)),
+        (frozenset({"incoherent"}), ("incoherent",)),
+        (("coherent", "incoherent", "coherent"), ("incoherent", "coherent")),
+        (["coherent", "incoherent"], ("incoherent", "coherent")),
+        ({"incoherent", "coherent"}, ("incoherent", "coherent")),
+        (frozenset({"incoherent", "coherent"}), ("incoherent", "coherent")),
+    ],
+)
+def test_emission_selection_normalizes_and_preserves_identity(selection, expected):
+    physics = pr.Physics(emission=selection)
+    canonical = pr.Physics(emission=expected)
+    assert physics.emission == expected
+    assert physics == canonical
+    assert hash(physics) == hash(canonical)
+    assert pickle.loads(pickle.dumps(physics)) == canonical
+    first = api.build_case(scene(physics=physics))
+    second = api.build_case(scene(physics=canonical))
+    assert first == second
+    assert digest(first) == digest(second)
+    assert first.get("coherent_emission", False) == ("coherent" in expected)
+
+
+@pytest.mark.parametrize("selection", [(), [], set(), frozenset(), "unknown", ("both",), [1], [[]]])
+def test_emission_rejects_empty_and_invalid_modes(selection):
+    with pytest.raises(ValueError, match="emission.*one or both"):
+        pr.Physics(emission=selection)
+
+
+@pytest.mark.parametrize("selection", [None, 1, {"coherent": True}, iter(["coherent"])])
+def test_emission_rejects_unsupported_collections(selection):
+    with pytest.raises(TypeError, match="emission.*mode string"):
+        pr.Physics(emission=selection)
+
+
+def test_emission_does_not_retain_mutable_input():
+    selection = ["coherent", "incoherent"]
+    physics = pr.Physics(emission=selection)
+    before = hash(physics)
+    selection.clear()
+    assert physics.emission == ("incoherent", "coherent")
+    assert hash(physics) == before
+    assert replace(physics, straggling=True).emission == physics.emission
+
+
+def test_both_alias_warns_once_and_matches_collection():
+    with pytest.warns(DeprecationWarning, match='Physics\\(emission="both"\\)') as caught:
+        old = pr.Physics(emission="both")
+    assert len(caught) == 1
+    assert "0.15.0" in str(caught[0].message)
+    new = pr.Physics(emission=("incoherent", "coherent"))
+    assert old == new
+    assert hash(old) == hash(new)
+    assert api.build_case(scene(physics=old)) == api.build_case(scene(physics=new))
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        replace(old, straggling=True)
+    assert not caught
+    entry = API_DEPRECATIONS['Physics(emission="both")']
+    assert entry.deprecated_in == "0.13.1"
+    assert entry.remove_in == "0.15.0"
+
+
+@pytest.mark.parametrize("policy", ["incoherent", "coherent", "both"])
+def test_legacy_emission_boundaries_do_not_warn_or_change_policies(policy):
+    from pyrite.campaign.legacy import physics_from_legacy
+    from pyrite.results import Settings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        physics = physics_from_legacy(Settings(emission=policy))
+    assert not caught
+    assert physics.emission_policy == policy
+    assert scene(physics=physics).emission == policy
+    with pytest.warns(DeprecationWarning, match="Numerics\\(emission=") as caught:
+        numerics = pr.Numerics(emission=policy)
+    assert len(caught) == 1
+    assert api.build_case(scene(physics=physics), numerics) == api.build_case(
+        scene(physics=physics)
+    )
+
+
+def test_emission_collection_sweep_paths_normalize_each_selection():
+    selections = ["incoherent", ("coherent",), ["coherent", "incoherent", "coherent"]]
+    sweep = pr.Sweep(scene(), {"physics.emission": selections})
+    assert [s.physics.emission for _, s in sweep.expand()] == [
+        ("incoherent",),
+        ("coherent",),
+        ("incoherent", "coherent"),
+    ]
+    assert [case.get("coherent_emission", False) for case in sweep.cases()] == [False, True, True]
+
+
+@pytest.mark.parametrize("policy", ["incoherent", "coherent", "both"])
+def test_simulate_collection_keeps_legacy_arrays_and_one_transport_run(monkeypatch, policy):
+    from pyrite.campaign.legacy import physics_from_legacy
+    from pyrite.results import Settings
+
+    calls = []
+
+    def run(case, **kwargs):
+        calls.append(case)
+        output = {
+            "E_grid": np.array([1.0, 2.0]),
+            "spec": np.array([3.0, 4.0]),
+            "brem": np.array([5.0, 6.0]),
+        }
+        if case.get("coherent_emission", False):
+            output["spec_coherent"] = np.array([7.0, 8.0])
+        return output
+
+    monkeypatch.setattr(api, "run_case", run)
+    s = scene()
+    physics = physics_from_legacy(Settings(emission=policy))
+    with pytest.warns(DeprecationWarning, match="simulate\\(emission=") as caught:
+        old = pr.simulate(s.beam, s.target, s.detector, physics=physics, emission=policy)
+    assert len(caught) == 1
+    assert len(calls) == 1
+    new = pr.simulate(s.beam, s.target, s.detector, physics=physics)
+    assert len(calls) == 2
+    assert old.case == new.case
+    assert old.provenance.identity_digest == new.provenance.identity_digest
+    assert new.scene.physics == physics
+    np.testing.assert_array_equal(old.cxr.incoherent.density, new.cxr.incoherent.density)
+    np.testing.assert_array_equal(new.cxr.incoherent.density, [3.0, 4.0])
+    np.testing.assert_array_equal(old.brem.density, new.brem.density)
+    if policy != "incoherent":
+        np.testing.assert_array_equal(old.cxr.coherent.density, new.cxr.coherent.density)
+        np.testing.assert_array_equal(new.cxr.coherent.density, [7.0, 8.0])
+    else:
+        assert new.cxr.coherent is None
+
+
+@pytest.mark.parametrize("policy", ["incoherent", "coherent", "both"])
+def test_observation_emission_boundary_keeps_identity_and_acquisition_defaults(monkeypatch, policy):
+    from pyrite.campaign.legacy import physics_from_legacy
+    from pyrite.results import Settings
+
+    detector = pr.PlanarDetector(
+        pr.PlanarPose.from_observation(200.0, 90.0),
+        pixels=pr.PixelGrid((2, 2), (0.1, 0.1)),
+        response=pr.IdealPhotonCounter(),
+    )
+    acquisition = pr.Acquisition(exposure_s=1.0, measured_edges_eV=(0.0, 1000.0, 2000.0))
+    physics = physics_from_legacy(Settings(emission=policy))
+    with pytest.warns(DeprecationWarning, match="Scene\\(emission="):
+        old = scene(detector=detector, acquisition=acquisition, emission=policy)
+    new = scene(detector=detector, acquisition=acquisition, physics=physics)
+    old_plan = api.observation_plan(old, pr.Numerics())
+    new_plan = api.observation_plan(new, pr.Numerics())
+    assert old_plan.emission == new_plan.emission == policy
+    output = {
+        "E_grid": np.array([1000.0, 2000.0]),
+        "E_grid_brem": np.array([1000.0, 2000.0]),
+        "spec_by_direction": np.ones((1, 2)),
+        "spec_coherent_by_direction": np.full((1, 2), 2.0),
+        "spec_characteristic_by_direction": np.zeros((1, 2)),
+        "brem_wide_by_direction": np.ones((1, 2)),
+    }
+    stored = new_plan.assemble(output, {})
+    assert old_plan.assemble(output, {}).identity == stored.identity
+    result = pr.Result(
+        cxr=pr.CxrSpectra(pr.SpectralDensity(output["E_grid"], [1.0, 1.0])),
+        brem=pr.SpectralDensity(output["E_grid_brem"], [1.0, 1.0]),
+        case=api.build_case(new),
+        provenance={"scene": new, "observation_identity_digest": stored.digest},
+        spatial=stored.spatial,
+    )
+    selected = []
+
+    def record_components(self, *args, **kwargs):
+        selected.append(kwargs["components"])
+
+    monkeypatch.setattr(type(stored.spatial), "acquire", record_components)
+    monkeypatch.setattr(type(stored.spatial), "acquisition_image", record_components)
+    result.acquire()
+    result.acquisition_image()
+    expected = ("coherent", "brem") if policy == "coherent" else ("cxr", "brem")
+    assert selected == [expected, expected]
+    assert f", {policy}" in repr(result)

@@ -103,7 +103,15 @@ resolved_case = result.case
 
 Use `result.scene` for what you asked for. `result.case` is the lower-level resolved transport input: its keys use internal units and historical names (`E0_keV`, `E_grid_line`, `theta_obs_rad`, `domega_sr`) because they feed content identity. Record the digest and software revision with any derived figure or table.
 
-`Physics(emission="both")` and `Physics(emission="coherent")` expose both CXR modes from the
+`Physics.emission` accepts a single mode string or a nonempty tuple, list, set,
+or frozenset containing `"incoherent"`, `"coherent"`, or both. It stores a
+deduplicated immutable tuple in incoherent-then-coherent order, so input order
+does not affect hashing or simulation identity. The default is `("incoherent",)`.
+`Physics(emission="both")` is a deprecated input alias (removal in 0.15.0);
+use `Physics(emission=("incoherent", "coherent"))`. CLI, catalog, and checkpoint
+policies retain their existing tri-state format.
+
+`Physics(emission=("incoherent", "coherent"))` and `Physics(emission="coherent")` expose both CXR modes from the
 same transport: `result.cxr.incoherent.density` always means incoherent CXR,
 and `result.cxr.coherent.density` is its coherent companion. Neither includes
 atomic characteristic emission. Use `result.combined_cxr(mode="coherent")`

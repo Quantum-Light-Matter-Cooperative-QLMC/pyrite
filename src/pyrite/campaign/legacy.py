@@ -12,6 +12,7 @@ from typing import Any
 
 import numpy as np
 
+from .._numerics import _emission_selection
 from .geometry import Footprint, Slab, Stack
 from .model import Analysis, CxrReflections, Numerics, Physics, Scene, Sweep
 
@@ -101,7 +102,7 @@ def adapt_configured_sweep(old_sweep: Any, settings: Any) -> Sweep:
 def physics_from_legacy(settings: Any) -> Physics:
     """Resolve profile model choices to the public physics owner."""
     return Physics(
-        emission=getattr(settings, "emission", "incoherent"),
+        emission=_emission_selection(getattr(settings, "emission", "incoherent")),
         brem_source=getattr(settings, "brem_source", "mc"),
         straggling=getattr(settings, "straggling", False),
         inelastic_model=getattr(settings, "inelastic_model", "auto"),
