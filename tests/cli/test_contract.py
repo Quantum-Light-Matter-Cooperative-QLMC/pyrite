@@ -94,6 +94,23 @@ _REMOVED_OPTIONS.update(
 )
 
 
+_REMOVED_OPTIONS.update(
+    (tuple(path.split()), flag)
+    for path, flag in (
+        ("checkpoint slim", "--line-only"),
+        ("remote pull", "--line-only"),
+        ("remote run", "--spec-chunk"),
+        ("remote reline", "--line-ne"),
+        ("remote reline", "--line-step"),
+        ("profile create", "--line-trials"),
+        ("profile set", "--line-trials"),
+        ("profile add", "--line-trials"),
+        ("profile numerics set", "--line-trials"),
+        ("profile precision disable", "--line-trials"),
+    )
+)
+
+
 class _EntryPoint:
     """Adapts ``cli.main``'s argv contract to ``CliRunner.invoke``."""
 
@@ -209,11 +226,14 @@ def test_every_frozen_path_retired_at_0_3_0_is_now_refused(path):
 
 
 @pytest.mark.parametrize(("path", "option"), sorted(_REMOVED_OPTIONS))
-def test_every_frozen_option_removed_at_0_6_0_is_now_refused(path, option):
+def test_every_removed_frozen_option_is_now_refused(path, option):
     completed = _run(*path, option, "full")
 
     assert completed.exit_code == 2
-    assert f"No such option '{option}'" in completed.stderr
+    if _retired(path):
+        assert "No such command" in completed.stderr
+    else:
+        assert f"No such option '{option}'" in completed.stderr
 
 
 @pytest.mark.parametrize(
