@@ -130,6 +130,13 @@ def test_python_api_workflow_executes_as_one_accumulating_namespace():
     assert namespace["device"] == provenance["device"]
     assert namespace["resolved_case"] == result.case
 
+    flux = namespace["flux"]
+    assert flux.columns[-1] == "total"
+    assert set(flux.columns) >= {"photon_energy_eV", "cxr", "brem", "total"}
+    assert namespace["native"].height == cxr.density.size + brem.density.size + (
+        0 if result.characteristic is None else result.characteristic.density.size
+    )
+
     detected_cxr = namespace["detected_cxr"]
     assert np.shape(detected_cxr) == cxr.photon_energy_eV.shape
 

@@ -48,15 +48,21 @@ filter-attenuated, solid-angle-weighted density, still per sr and without
 detector response. `result.combined_cxr(mode="incoherent")` returns a
 `SpectralDensity` adding characteristic emission once; set
 `include_characteristic=False` to return only the chosen CXR mode. It does not
-add brem across different grids. `Result.provenance` records the resolved scene,
-numerics, content identity, backend/device, and versions. The high-level API
+add brem across different grids; `result.spectral_flux(units=...)` does, on the
+union grid, in photons/(s eV) into the accepted solid angle or the other
+`FLUX_UNITS`, with a `total` column. `result.to_dataframe()` returns the native
+grids as a long polars frame. `Result.provenance` is a typed, read-only
+`Provenance` mapping: inputs (`scene`, `numerics`), content identity, physics-model
+markers, run diagnostics, and backend/device/version environment; see
+[Interpret the result](guides/python-api-workflow.md#interpret-the-result).
+The high-level API
 does not accept an external brem array: `none` and `external` return zeros on
 the resolved continuum grid.
 
-Old flat Result attributes/constructor keywords and `line_total()` remain
-warning aliases through the two-minor window, deprecated in 0.11.0 and scheduled
-for removal in 0.13.0. The legacy `spectrum` attribute retains selected-mode
-behavior; new code should select a CXR mode explicitly. `Numerics` uses
+The flat Result attributes (`energy_eV`, `spectrum`, `background_energy_eV`,
+`background`, `coherent_spectrum`, `characteristic_spectrum`), their positional
+and flat-keyword constructor, and `line_total()` were removed after 0.11; use the
+grouped families and `combined_cxr()`. `Result` takes keyword arguments only. `Numerics` uses
 `cxr_trials`, `brem_trials`, and `cxr_chunk`; the old `n_electrons`,
 `n_electrons_brem`, and `spec_chunk` keywords/attributes are warning aliases.
 `EnergyBins.cxr`/`cxr_by_energy` and `Precision(observables=("cxr", "brem"))`
@@ -139,6 +145,7 @@ This mode supports incoherent scalar-detector scenes on the per-electron or CUDA
    pyrite.Precision
    pyrite.Analysis
    pyrite.Result
+   pyrite.Provenance
    pyrite.CxrSpectra
    pyrite.SpectralDensity
    pyrite.fetch_tables

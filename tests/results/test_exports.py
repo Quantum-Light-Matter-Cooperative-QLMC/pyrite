@@ -25,6 +25,8 @@ FROZEN_EXPORTS = frozenset(
         "store_result",
         "detected_background",
         "Result",
+        "Provenance",
+        "FLUX_UNITS",
         # selection
         "records",
         "records_for_cases",

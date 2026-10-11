@@ -51,7 +51,7 @@ Current full checkpoints contain three versioned HDF5 components:
 
 The analysis app merges all available components and shows characteristic radiation by default. Clear **show characteristic radiation** to inspect the smaller PXR/CBS peaks without changing the checkpoint. Omitting `characteristic.h5` is supported: the dataset loads as line-only, which also makes intentional exclusion and transfer straightforward.
 
-In memory, every record keeps `spec`, `spec_coherent`, `spec_characteristic`, and `brem` as separate arrays; none includes another. Code that needs a sum calls `pyrite._spectral_components.cxr_spectrum` or `incident_spectrum`, and `Result.line_total()` gives the same sum for API results.
+In memory, every record keeps `spec`, `spec_coherent`, `spec_characteristic`, and `brem` as separate arrays; none includes another. Code that needs a sum calls `pyrite._spectral_components.cxr_spectrum` or `incident_spectrum`, and `Result.combined_cxr()` gives the same sum for API results.
 
 Legacy `.pkl` component paths and plain, gzip, and zstd monoliths remain readable and migrate to HDF5 on the next normal save. Artifacts written before the separate-component contract stored `spec`/`spec_coherent` as totals including `spec_characteristic`; they are separated once on load. Use the [result schema](../repo-design/storage/result-schema.md) for independent inspection.
 

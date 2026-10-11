@@ -66,9 +66,9 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
 
     result = pr.simulate(beam, target, detector, numerics=numerics)
 
-    np.testing.assert_array_equal(result.spectrum, [3.0, 4.0])
-    np.testing.assert_array_equal(result.characteristic_spectrum, [0.25, 0.5])
-    np.testing.assert_array_equal(result.background, [5.0, 6.0, 7.0])
+    np.testing.assert_array_equal(result.cxr.incoherent.density, [3.0, 4.0])
+    np.testing.assert_array_equal(result.characteristic.density, [0.25, 0.5])
+    np.testing.assert_array_equal(result.brem.density, [5.0, 6.0, 7.0])
     assert result.case is seen["case"]
     assert seen["transport_core"] == "auto"
     assert result.provenance["scene"].target == target
@@ -95,13 +95,13 @@ def test_simulate_is_bit_for_bit_the_existing_single_case_path() -> None:
 
     result = pr.simulate(beam, target, detector, numerics=numerics)
 
-    np.testing.assert_array_equal(result.energy_eV, expected["E_grid"])
-    np.testing.assert_array_equal(result.spectrum, expected["spec"])
+    np.testing.assert_array_equal(result.cxr.incoherent.photon_energy_eV, expected["E_grid"])
+    np.testing.assert_array_equal(result.cxr.incoherent.density, expected["spec"])
     np.testing.assert_array_equal(
-        result.characteristic_spectrum,
+        result.characteristic.density,
         expected["spec_characteristic"],
     )
-    np.testing.assert_array_equal(result.background, expected["brem_wide"])
+    np.testing.assert_array_equal(result.brem.density, expected["brem_wide"])
 
 
 def test_scene_model_switches_select_returned_arrays(monkeypatch) -> None:
@@ -129,9 +129,8 @@ def test_scene_model_switches_select_returned_arrays(monkeypatch) -> None:
         brem_source="none",
     )
 
-    np.testing.assert_array_equal(result.spectrum, [7.0, 8.0])
-    np.testing.assert_array_equal(result.coherent_spectrum, [7.0, 8.0])
-    np.testing.assert_array_equal(result.background, [0.0, 0.0])
+    np.testing.assert_array_equal(result.cxr.coherent.density, [7.0, 8.0])
+    np.testing.assert_array_equal(result.brem.density, [0.0, 0.0])
 
 
 def test_build_sweep_cases_remains_public_from_api():
