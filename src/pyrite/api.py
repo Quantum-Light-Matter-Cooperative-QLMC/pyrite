@@ -4,7 +4,7 @@ import hashlib
 import json
 import subprocess
 from collections.abc import Mapping
-from dataclasses import fields, is_dataclass
+from dataclasses import fields, is_dataclass, replace
 from functools import cache
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -15,8 +15,9 @@ import numpy as np
 from . import __version__
 from ._api_deprecations import warn_api
 from ._backend import BACKEND
+from ._numerics import Physics, resolve_physics
 from .campaign.kinematic_validity import case_kinematic_validity
-from .campaign.lowering import build_case, build_sweep_cases
+from .campaign.lowering import build_case, build_sweep_cases, scene_physics
 from .campaign.model import (
     BremSource,
     EmissionMode,
@@ -216,9 +217,10 @@ def simulate(
     target: Any,
     detector: Detector | PlanarDetector,
     *,
+    physics: Physics | None = None,
     numerics: Numerics | None = None,
-    emission: EmissionMode = "incoherent",
-    brem_source: BremSource = "mc",
+    emission: EmissionMode | None = None,
+    brem_source: BremSource | None = None,
     filters: tuple[FilterPlate, ...] = (),
     pixel_scorer: PixelScorer | None = None,
     acquisition: Acquisition | None = None,
@@ -240,12 +242,14 @@ def simulate(
         Scalar :class:`~pyrite.Slab` or :class:`~pyrite.Stack`.
     detector
         Scalar detector model or physical :class:`~pyrite.PlanarDetector`.
+    physics
+        Emission and interaction models. ``None`` uses :class:`~pyrite.Physics`.
     numerics
         Sampling and execution controls. ``None`` uses :class:`~pyrite.Numerics`.
     emission
-        ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
+        Deprecated: use ``Physics(emission=...)``.
     brem_source
-        ``"mc"``, ``"external"``, or ``"none"`` background policy.
+        Deprecated: use ``Physics(brem_source=...)``.
     filters
         Ordered filter plates; valid only with a physical planar detector.
     pixel_scorer
@@ -271,6 +275,13 @@ def simulate(
     resolved_numerics = Numerics() if numerics is None else numerics
     if not isinstance(resolved_numerics, Numerics):
         raise TypeError("numerics must be a Numerics")
+    resolved_physics = resolve_physics(physics, resolved_numerics)
+    for name, value in (("emission", emission), ("brem_source", brem_source)):
+        if value is not None:
+            warn_api(f"simulate({name}=)")
+            if physics is not None and getattr(physics, name) != value:
+                raise ValueError(f"conflicting simulate({name}=) and Physics.{name}")
+            resolved_physics = replace(resolved_physics, **{name: value})
     if pixel_scorer is not None:
         warn_api("simulate(pixel_scorer=)")
         detector = detector_with_scorer(detector, pixel_scorer)
@@ -280,8 +291,8 @@ def simulate(
         detector=detector,
         filters=filters,
         acquisition=acquisition,
-        emission=emission,
-        brem_source=brem_source,
+        physics=resolved_physics,
+        numerics=resolved_numerics,
     )
     if resolved_numerics.backend not in {"auto", BACKEND.name}:
         raise ValueError(
@@ -294,7 +305,7 @@ def simulate(
     output = run_case(case, transport_core=resolved_numerics.transport_core)
     background_energy = output.get("E_grid_brem", output["E_grid"])
     background = output.get("brem_wide", output["brem"])
-    if scene.brem_source != "mc":
+    if scene.physics.brem_source != "mc":
         background = np.zeros_like(background)
     coherent = output.get("spec_coherent")
     characteristic = output.get("spec_characteristic")
@@ -360,6 +371,7 @@ def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
     ValueError
         If ``scene`` lacks a pixelated detector or an acquisition.
     """
+    scene = replace(scene, physics=scene_physics(scene, numerics), _physics_explicit=True)
     detector = scene.detector
     if not isinstance(detector, PlanarDetector) or scene.acquisition is None:
         raise ValueError("observation production requires a pixelated detector and acquisition")
@@ -376,8 +388,8 @@ def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
         tilt_azim_deg=float(case.get("tilt_azim_deg", 0.0)),
         rep_rate_hz=scene.beam.rep_rate_hz,
         bunch_charge_pc=scene.beam.bunch_charge_pc,
-        emission=scene.emission,
-        brem_source=scene.brem_source,
+        emission=scene.physics.emission,
+        brem_source=scene.physics.brem_source,
     )
 
 
@@ -429,7 +441,7 @@ def _simulate_planar(
             output,
             detector=detector,
             filters=scene.filters,
-            brem_source=scene.brem_source,
+            brem_source=scene.physics.brem_source,
             reconstruction=scorer.reconstruction,
         )
         observation_digest, observation = _observation_provenance(
@@ -451,8 +463,8 @@ def _simulate_planar(
             tilt_azim_deg=tilt_azim_deg,
             rep_rate_hz=scene.beam.rep_rate_hz,
             bunch_charge_pc=scene.beam.bunch_charge_pc,
-            emission=scene.emission,
-            brem_source=scene.brem_source,
+            emission=scene.physics.emission,
+            brem_source=scene.physics.brem_source,
         )
         output = run_case_directions(
             case, plan.directions_sample, transport_core=numerics.transport_core

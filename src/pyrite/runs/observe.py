@@ -65,8 +65,7 @@ def produce_observation(
         scene.target,
         scene.detector,
         numerics=numerics,
-        emission=scene.emission,
-        brem_source=scene.brem_source,
+        physics=api.scene_physics(scene, numerics),
         filters=scene.filters,
         acquisition=scene.acquisition,
     )

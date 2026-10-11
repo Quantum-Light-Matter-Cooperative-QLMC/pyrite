@@ -14,7 +14,7 @@ Named catalog beams clear those inherited defaults during profile resolution.
 
 ## Scene simulation
 
-The root package exposes the preferred high-level API. A `Scene` contains one scalar `Beam`, target, and either the compatibility scalar `Detector` or a physical `PlanarDetector`; `Numerics` contains sampling and execution controls. `simulate` lowers those objects to the established typed `Case` and calls the existing Monte Carlo runner directly. It neither reads nor writes a checkpoint.
+The root package exposes the preferred high-level API. A `Scene` contains one scalar `Beam`, target, and either the compatibility scalar `Detector` or a physical `PlanarDetector`; `Physics` contains emission and particle-interaction model choices. `Numerics` contains sampling, true-photon energy grids, integration, and execution controls. Both can be carried by `Scene` for sweeps. `simulate` lowers those objects to the established typed `Case` and calls the existing Monte Carlo runner directly. It neither reads nor writes a checkpoint.
 
 ```python
 import pyrite as pr
@@ -26,6 +26,7 @@ result = pr.simulate(
     beam,
     target,
     detector,
+    physics=pr.Physics(),
     numerics=pr.Numerics(cxr_trials=450, brem_trials=100),
 )
 result.cxr.incoherent.density
@@ -68,6 +69,21 @@ grouped families and `combined_cxr()`. `Result` takes keyword arguments only. `N
 `EnergyBins.cxr`/`cxr_by_energy` and `Precision(observables=("cxr", "brem"))`
 use the same vocabulary. Historical case/checkpoint/hash keys remain unchanged.
 
+`simulate(..., physics=pr.Physics(emission="both", straggling=True))` separates
+model choices from numerical accuracy. Sampled photon grids belong to
+`pr.Numerics(energy_bins=pr.EnergyBins(cxr=..., brem=...))`; detector geometry
+and read-time response do not own them. `Numerics.cxr_reflections` takes
+`pr.CxrReflections(n_families=..., max_reflections=..., mosaic_nodes=..., mosaic_route=...)`.
+Omitted grids still resolve from the catalog and built-in policy. Profile TOML
+and CLI spellings are unchanged.
+
+Through the D7 window ending in 0.14.0, `Convergence`, `Numerics(convergence=...)`,
+model keywords on `Numerics`, `simulate(emission=..., brem_source=...)`, and
+detector `energy_bins` keywords forward with a deprecation warning. Conflicting
+old and new values raise `ValueError`; equal values are accepted. Sweep paths
+use `physics.<model>`, `numerics.energy_bins`, and `numerics.cxr_reflections`;
+old ownership paths forward with the same warning and removal target.
+
 For a physical pixel detector, `Acquisition` freezes exposure, explicit half-open measured-energy reporting edges, a post-response hit cut, and expected-versus-seeded-Poisson mode. `Result.acquire()` returns selected-pixel `AcquisitionBatch` records with registered reporting-bin counts and separate underflow, overflow, and below-cut accounting. `Result.acquisition_image()` contracts total or reporting-edge-aligned energy-window images in bounded pixel chunks. Expected counts use exposure, bunch charge, cadence, and the exact elementary charge; optional Poisson realizations are stable under selection and chunk-order changes. `ResolvedObservation` is the profile-lowered detector/scorer/filter/acquisition record. It deliberately projects back to the unchanged scalar `Detector` used by intrinsic transport.
 
 `Sweep` expresses a Cartesian product as ordered paths into a scalar base scene. Paths are checked when the sweep is constructed, including indexed segments:
@@ -80,7 +96,7 @@ sweep = pr.Sweep(
         "target.tilt_deg": [15.0, 30.0, 45.0],
     },
 )
-cases = sweep.cases(pr.Numerics())
+cases = sweep.cases()  # uses base.numerics, then applies numerical axes
 ```
 
 For a `Stack`, paths such as `target.layers[1].thickness_ang` address a particular layer. A misspelled field or out-of-range index raises at `Sweep` construction.
@@ -140,6 +156,8 @@ This mode supports incoherent scalar-detector scenes on the per-electron or CUDA
    pyrite.SpatialResult
    pyrite.Scene
    pyrite.Sweep
+   pyrite.Physics
+   pyrite.CxrReflections
    pyrite.Convergence
    pyrite.Numerics
    pyrite.Precision

@@ -17,10 +17,11 @@ result = pr.simulate(
     beam,
     target,
     detector,
+    physics=pr.Physics(),
     numerics=pr.Numerics(
         cxr_trials=450,
         brem_trials=100,
-        convergence=pr.Convergence(n_families=4),
+        cxr_reflections=pr.CxrReflections(n_families=4),
     ),
 )
 ```
@@ -102,7 +103,7 @@ resolved_case = result.case
 
 Use `result.scene` for what you asked for. `result.case` is the lower-level resolved transport input: its keys use internal units and historical names (`E0_keV`, `E_grid_line`, `theta_obs_rad`, `domega_sr`) because they feed content identity. Record the digest and software revision with any derived figure or table.
 
-`emission="both"` and `emission="coherent"` expose both CXR modes from the
+`Physics(emission="both")` and `Physics(emission="coherent")` expose both CXR modes from the
 same transport: `result.cxr.incoherent.density` always means incoherent CXR,
 and `result.cxr.coherent.density` is its coherent companion. Neither includes
 atomic characteristic emission. Use `result.combined_cxr(mode="coherent")`
@@ -245,7 +246,7 @@ sweep = pr.Sweep(
 )
 
 expanded = sweep.expand()  # ordered (label, Scene) pairs
-cases = sweep.cases(pr.Numerics())  # typed Monte Carlo Case records
+cases = sweep.cases()  # base.numerics, then axes; typed Monte Carlo Case records
 ```
 
 Axis insertion order defines Cartesian-product order. Expanded cases receive deterministic one-based seeds in that order. Invalid field names and out-of-range indexes fail when the `Sweep` is constructed.
@@ -254,10 +255,19 @@ Axis insertion order defines Cartesian-product order. Expanded cases receive det
 
 ## Separate physical and execution controls
 
-- `Scene` owns physical configuration and model switches: beam, target, detector, emission mode, X-ray dispersion, and background source.
-- `Numerics` owns electron counts and execution controls. Electron counts affect the computed content identity; backend, chunk, and transport-core choices select execution policy.
-- `Numerics.convergence` owns result-affecting truncation and quadrature controls such as reflection families and mosaic nodes.
+- `Scene` collects beam, target, detector, filters, acquisition, `Physics`, and `Numerics`.
+- `Physics` owns emission, background source, and particle-interaction models, including straggling and collision/radiative cutoffs in eV.
+- `Numerics` owns electron counts, sampled true-energy grids (`energy_bins`), integration, and execution controls. Electron counts affect the computed content identity; backend, chunk, and transport-core choices select execution policy.
+- `Numerics.cxr_reflections` owns result-affecting truncation and quadrature controls such as reflection families and mosaic nodes.
 - `Analysis` is currently a presentation-control value object and a bridge for checkpoint-analysis compatibility. It is not accepted by `simulate`.
+
+Use `physics.straggling` or `physics.elastic_model` for model sweep axes,
+`numerics.energy_bins.cxr` for sampled grids, and
+`numerics.cxr_reflections.n_families` for reflection truncation.
+`Sweep.cases(numerics=...)` replaces the base numerical policy before axes apply.
+Deprecated `numerics.<model>`, `numerics.convergence`, and detector-grid paths
+warn and forward until 0.14.0. Old and new spellings preserve lowered cases and
+content identities; conflicting values raise `ValueError`.
 
 Select the array backend before importing PyRITE, for example:
 

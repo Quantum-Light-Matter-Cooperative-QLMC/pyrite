@@ -2,12 +2,14 @@
 
 import math
 import warnings
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from numbers import Real
 from typing import Protocol
 
 import numpy as np
+
+from .._api_deprecations import deprecated_energy_bins
+from .._energy_bins import EnergyBins as EnergyBins
 
 
 def _number(name: str, value: object, *, minimum: float, maximum: float | None = None) -> float:
@@ -29,58 +31,6 @@ def _positive_optional(name: str, value: object | None) -> float | None:
     if number == 0.0:
         raise ValueError(f"{name} must be positive")
     return number
-
-
-@dataclass(frozen=True, eq=False)
-class EnergyBins:
-    """The detector's CXR and bremsstrahlung photon-energy binnings.
-
-    ``CXR`` is fine and narrow because coherent-CXR evaluation is expensive
-    and kinematically bounded. ``brem`` is coarse and wide because the smooth,
-    cheap continuum must extend to the beam energy. ``cxr_by_energy`` selects
-    a fine CXR grid per beam energy when one fixed CXR grid is insufficient.
-
-    Parameters
-    ----------
-    CXR
-        Optional shared one-dimensional CXR photon-energy grid in eV.
-    cxr_by_energy
-        Optional mapping from electron energy in keV to CXR grids in eV.
-        Mutually exclusive with ``CXR`` at catalog resolution.
-    brem
-        Optional one-dimensional bremsstrahlung photon-energy grid in eV.
-    """
-
-    cxr: np.ndarray | None = None
-    cxr_by_energy: Mapping[float, np.ndarray] | None = None
-    brem: np.ndarray | None = None
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, EnergyBins):
-            return NotImplemented
-        if (self.cxr is None) != (other.cxr is None) or (self.brem is None) != (other.brem is None):
-            return False
-        if (
-            self.cxr is not None
-            and other.cxr is not None
-            and not np.array_equal(self.cxr, other.cxr)
-        ):
-            return False
-        if (
-            self.brem is not None
-            and other.brem is not None
-            and not np.array_equal(self.brem, other.brem)
-        ):
-            return False
-        if (self.cxr_by_energy is None) != (other.cxr_by_energy is None):
-            return False
-        if self.cxr_by_energy is None:
-            return True
-        assert other.cxr_by_energy is not None
-        return self.cxr_by_energy.keys() == other.cxr_by_energy.keys() and all(
-            np.array_equal(grid, other.cxr_by_energy[energy])
-            for energy, grid in self.cxr_by_energy.items()
-        )
 
 
 class DetectorResponse(Protocol):
@@ -286,9 +236,10 @@ class LegacyEDS:
         return scored * scale
 
 
+@deprecated_energy_bins
 @dataclass(frozen=True)
 class Detector:
-    """One detector's acceptance, photon-energy binnings, and response.
+    """One detector's acceptance and read-time response.
 
     Stored source arrays remain response-free. :meth:`score` applies the response
     only when results are read, so the same transport can be rescored. A
@@ -303,7 +254,7 @@ class Detector:
     solid_angle_sr
         Optional accepted solid angle in sr.
     energy_bins
-        Line and bremsstrahlung photon-energy grids.
+        Deprecated forwarding: pass sampled grids to ``Numerics(energy_bins=...)``.
     response
         Optional object implementing read-time ``score``.
     """
@@ -312,6 +263,7 @@ class Detector:
     polar_acceptance_deg: float | None = None
     solid_angle_sr: float | None = None
     energy_bins: EnergyBins = field(default_factory=EnergyBins)
+    _energy_bins_explicit: bool = field(default=False, repr=False, compare=False, kw_only=True)
     response: DetectorResponse | None = None
 
     def __post_init__(self) -> None:

@@ -13,6 +13,7 @@ from typing import Literal
 
 import numpy as np
 
+from .._api_deprecations import deprecated_energy_bins
 from .._planar_geometry import PixelGrid, PlanarPose, _positive_pair, _positive_real
 from ..detectors.spec import Detector, DetectorResponse, EnergyBins
 from ..materials import CATALOG, MediumSpec
@@ -92,6 +93,7 @@ class FilterPlate:
         )
 
 
+@deprecated_energy_bins
 @dataclass(frozen=True)
 class PlanarDetector:
     """Describe physical planar detector geometry and optional response.
@@ -106,7 +108,7 @@ class PlanarDetector:
     pixels
         Optional physical pixel grid used for spatial scoring.
     energy_bins
-        True-energy grids for the line and background source spectra.
+        Deprecated forwarding: pass sampled grids to ``Numerics(energy_bins=...)``.
     response
         Optional read-time detector response implementing ``score``.
     scorer
@@ -124,6 +126,7 @@ class PlanarDetector:
     size_mm: tuple[float, float] | None = None
     pixels: PixelGrid | None = None
     energy_bins: EnergyBins = field(default_factory=EnergyBins)
+    _energy_bins_explicit: bool = field(default=False, repr=False, compare=False, kw_only=True)
     response: DetectorResponse | None = None
     scorer: PixelScorer | None = None
 
@@ -181,10 +184,15 @@ class PlanarDetector:
         scorer: PixelScorer | None = None,
     ) -> PlanarDetector:
         """Construct one physical Timepix3 ASIC without implying a response."""
+        if energy_bins is not None:
+            from .._api_deprecations import warn_api
+
+            warn_api("PlanarDetector(energy_bins=)")
         return cls(
             pose=pose,
             pixels=PixelGrid.timepix3_chip(),
             energy_bins=EnergyBins() if energy_bins is None else energy_bins,
+            _energy_bins_explicit=energy_bins is not None,
             response=response,
             scorer=scorer,
         )
@@ -235,6 +243,7 @@ class PlanarDetector:
             polar_acceptance_deg=max(polar_span_deg, np.finfo(float).eps),
             solid_angle_sr=solid_angle,
             energy_bins=self.energy_bins,
+            _energy_bins_explicit=self._energy_bins_explicit,
             response=self.response,
         )
 

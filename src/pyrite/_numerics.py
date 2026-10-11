@@ -1,12 +1,14 @@
 """Low-level typed calculation-numerics policy and profile validation."""
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
+from functools import wraps
 from typing import Any, Literal, cast
 
 import numpy as np
 
-from ._api_deprecations import warn_api
+from ._api_deprecations import _hide_compat_parameters, warn_api
+from ._energy_bins import EnergyBins
 from ._precision import Precision
 
 MosaicRoute = Literal["analytic", "mc"]
@@ -61,8 +63,8 @@ PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
 
 @dataclass(frozen=True)
-class Convergence:
-    """Control numerical convergence and truncation of CXR calculations.
+class CxrReflections:
+    """Control CXR reflection-family truncation and mosaic quadrature.
 
     Parameters
     ----------
@@ -95,34 +97,23 @@ class Convergence:
 
 
 @dataclass(frozen=True)
-class Numerics:
-    """Configure simulation sampling, transport, and execution.
+class Physics:
+    """Choose emission and particle-interaction models, independently of sampling.
+
+    ``emission`` selects incoherent, coherent, or both CXR spectra; ``brem_source``
+    selects MC, external, or no continuum (the in-memory API has no external
+    spectrum and returns zeros for the last two). Transport model defaults and
+    cutoff units are identical to the profile schema: cutoffs are in eV.
+    Integration compatibility is checked when combined with :class:`Numerics`.
 
     Parameters
     ----------
-    cxr_trials
-        Macro-electron trial count for CXR transport.
-    brem_trials
-        Macro-electron count for bremsstrahlung transport.
-    precision
-        Optional :class:`~pyrite.Precision` for adaptive sampling. It replaces
-        both fixed counts with one shared realized count. Coherent emission,
-        physical detectors, GDF, grooves, and particle cascades are unsupported.
-    cxr_chunk, brem_chunk
-        Optional spectrum-kernel chunk sizes; ``None`` lets runtime choose.
-    transport_core
-        ``"auto"``, ``"lockstep"``, ``"per-electron"``, or ``"cuda"``.
-    backend
-        Deprecated: the array backend is fixed when PyRITE is imported, from
-        ``PYRITE_MC_BACKEND`` (see ``pyrite config setup``). A value other than
-        ``"auto"`` only asserts that choice and warns.
+    emission
+        ``"incoherent"``, ``"coherent"``, or ``"both"`` CXR policy.
+    brem_source
+        ``"mc"``, ``"external"``, or ``"none"`` continuum policy.
     straggling
         Enable stochastic per-flight energy-loss straggling.
-    energy_model
-        ``"frozen"`` left-endpoint energy or ``"midpoint"`` integration.
-    max_dE_frac
-        Maximum predicted fractional mean loss per row. Zero disables
-        substepping; a positive value requires ``energy_model="midpoint"``.
     inelastic_model, inelastic_cutoff_eV
         ``"auto"`` (default) uses the ``"shell-soft-hard"`` mixed scheme with
         explicit hard inelastic collisions for each case whose layers all have
@@ -172,19 +163,11 @@ class Numerics:
         soft/hard transport. A deprecated-``"mott"`` case that resolves to
         shell soft/hard keeps elastic-only deflection, with a warning.
         ``"none"`` reproduces elastic-only transport bit for bit.
-    convergence
-        Reflection and mosaic convergence controls.
     """
 
-    cxr_trials: int = 450
-    brem_trials: int = 100
-    cxr_chunk: int | None = None
-    brem_chunk: int | None = None
-    transport_core: str = "auto"
-    backend: str = "auto"
+    emission: Literal["incoherent", "coherent", "both"] = "incoherent"
+    brem_source: Literal["mc", "external", "none"] = "mc"
     straggling: bool = False
-    energy_model: Literal["frozen", "midpoint"] = "midpoint"
-    max_dE_frac: float = 0.0
     inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "auto"
     inelastic_cutoff_eV: float | None = None
     secondary_threshold_eV: float | None = None
@@ -195,13 +178,151 @@ class Numerics:
     pair_production_model: Literal["penelope-2024"] | None = None
     positron_transport: bool = False
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
-    convergence: Convergence = field(default_factory=Convergence)
-    precision: Precision | None = None
+
+    def __post_init__(self) -> None:
+        if self.emission not in {"incoherent", "coherent", "both"}:
+            raise ValueError("emission must be 'incoherent', 'coherent', or 'both'")
+        if self.brem_source not in {"mc", "external", "none"}:
+            raise ValueError("brem_source must be 'mc', 'external', or 'none'")
+        self.validate_transport("midpoint")
+
+    def validate_transport(self, energy_model: str) -> None:
+        """Check model values and their compatibility with the integration scheme."""
+        if not isinstance(self.straggling, bool):
+            raise TypeError("straggling must be a bool")
+        validate_inelastic_numerics(
+            self.inelastic_model,
+            self.inelastic_cutoff_eV,
+            energy_model,
+            self.secondary_threshold_eV,
+        )
+        validate_elastic_model(self.elastic_model)
+        validate_bremsstrahlung_model(self.bremsstrahlung_model)
+        validate_radiative_numerics(
+            self.radiative_model,
+            self.radiative_cutoff_eV,
+            energy_model,
+            self.straggling,
+            self.bremsstrahlung_model,
+        )
+        validate_pair_production_numerics(
+            self.pair_production_model,
+            self.secondary_threshold_eV,
+            self.radiative_model,
+            self.bremsstrahlung_model,
+            self.positron_transport,
+        )
+        validate_atomic_electron_deflection(self.atomic_electron_deflection)
+
+
+PHYSICS_FIELDS = tuple(f.name for f in fields(Physics))
+
+
+def _legacy_numerics(cls):
+    """Retain explicitly supplied old model choices across dataclass copies."""
+    original = cls.__init__
+
+    @wraps(original)
+    def initialize(self, *args, **kwargs):
+        # Preserve the original dataclass's positional model fields through D7.
+        legacy_tail = (
+            "straggling",
+            "energy_model",
+            "max_dE_frac",
+            "inelastic_model",
+            "inelastic_cutoff_eV",
+            "secondary_threshold_eV",
+            "elastic_model",
+            "bremsstrahlung_model",
+            "radiative_model",
+            "radiative_cutoff_eV",
+            "pair_production_model",
+            "positron_transport",
+            "atomic_electron_deflection",
+            "convergence",
+            "precision",
+        )
+        if len(args) > 6:
+            if len(args) > 6 + len(legacy_tail):
+                raise TypeError("too many positional arguments for Numerics")
+            for name, value in zip(legacy_tail, args[6:], strict=False):
+                if name in kwargs:
+                    raise TypeError(f"multiple values for {name}")
+                kwargs[name] = value
+            args = args[:6]
+        overrides = dict(kwargs.pop("_physics_overrides", ()))
+        for name in PHYSICS_FIELDS:
+            if name in kwargs:
+                warn_api(f"Numerics({name}=)", stacklevel=3)
+                overrides[name] = kwargs.pop(name)
+        if "convergence" in kwargs:
+            warn_api("Numerics(convergence=)", stacklevel=3)
+            old = kwargs.pop("convergence")
+            if "cxr_reflections" in kwargs and any(
+                getattr(kwargs["cxr_reflections"], f.name, None) != getattr(old, f.name, None)
+                for f in fields(CxrReflections)
+            ):
+                raise ValueError("conflicting convergence and cxr_reflections")
+            kwargs["cxr_reflections"] = old
+        kwargs["_physics_overrides"] = tuple(overrides.items())
+        original(self, *args, **kwargs)
+
+    _hide_compat_parameters(initialize, original)
+    cls.__init__ = initialize
+    for name in PHYSICS_FIELDS:
+        setattr(
+            cls,
+            name,
+            property(
+                lambda self, name=name: getattr(Physics(**dict(self._physics_overrides)), name)
+            ),
+        )
+    cls.convergence = property(lambda self: self.cxr_reflections)
+    return cls
+
+
+class Convergence(CxrReflections):
+    """Deprecated alias for :class:`CxrReflections`."""
+
+    def __init__(self, *args, **kwargs):
+        warn_api("Convergence", stacklevel=3)
+        super().__init__(*args, **kwargs)
+
+
+@_legacy_numerics
+@dataclass(frozen=True)
+class Numerics:
+    """Control sampling, integration, CXR truncation, and execution.
+
+    ``cxr_trials`` and ``brem_trials`` count macro-electron trials. Optional
+    ``cxr_chunk`` and ``brem_chunk`` bound spectrum-kernel batches.
+    ``energy_model`` is frozen left-endpoint or midpoint integration;
+    ``max_dE_frac`` limits predicted fractional mean loss per row (zero disables
+    substeps). ``transport_core`` chooses auto, lockstep, per-electron, or CUDA.
+    ``energy_bins`` holds sampled true-photon energies; ``None`` uses catalog
+    defaults, or a deprecated detector grid during the compatibility window.
+    ``cxr_reflections`` controls reflection truncation and mosaic quadrature.
+    ``precision`` requests adaptive sampling instead of the two fixed counts.
+    ``backend`` is deprecated: select ``PYRITE_MC_BACKEND`` before import.
+    Model keywords are deprecated forwarding to :class:`Physics`.
+    """
+
+    cxr_trials: int = 450
+    brem_trials: int = 100
+    cxr_chunk: int | None = None
+    brem_chunk: int | None = None
+    transport_core: str = "auto"
+    backend: str = "auto"
+    energy_model: Literal["frozen", "midpoint"] = field(default="midpoint", kw_only=True)
+    max_dE_frac: float = field(default=0.0, kw_only=True)
+    cxr_reflections: CxrReflections = field(default_factory=CxrReflections, kw_only=True)
+    precision: Precision | None = field(default=None, kw_only=True)
+    energy_bins: EnergyBins | None = field(default=None, kw_only=True)
+    _physics_overrides: tuple[tuple[str, Any], ...] = field(default=(), repr=False, kw_only=True)
 
     def __post_init__(self) -> None:
         if self.backend != "auto":
-            # stacklevel 4: warn_api -> __post_init__ -> __init__ -> caller.
-            warn_api("Numerics(backend=)", stacklevel=4)
+            warn_api("Numerics(backend=)", stacklevel=5)
         if self.precision is not None:
             if not isinstance(self.precision, Precision):
                 raise TypeError("precision must be a Precision or None")
@@ -215,8 +336,10 @@ class Numerics:
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value <= 0):
                 raise ValueError(f"{name} must be a positive integer or None")
-        if not isinstance(self.straggling, bool):
-            raise TypeError("straggling must be a bool")
+        if not isinstance(self.cxr_reflections, CxrReflections):
+            raise TypeError("cxr_reflections must be a CxrReflections")
+        if self.energy_bins is not None and not isinstance(self.energy_bins, EnergyBins):
+            raise TypeError("energy_bins must be an EnergyBins or None")
         if self.energy_model not in {"frozen", "midpoint"}:
             raise ValueError("energy_model must be 'frozen' or 'midpoint'")
         if (
@@ -228,29 +351,22 @@ class Numerics:
             raise ValueError("max_dE_frac must be finite and non-negative")
         if self.max_dE_frac > 0.0 and self.energy_model != "midpoint":
             raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
-        validate_inelastic_numerics(
-            self.inelastic_model,
-            self.inelastic_cutoff_eV,
-            self.energy_model,
-            self.secondary_threshold_eV,
-        )
-        validate_elastic_model(self.elastic_model)
-        validate_bremsstrahlung_model(self.bremsstrahlung_model)
-        validate_radiative_numerics(
-            self.radiative_model,
-            self.radiative_cutoff_eV,
-            self.energy_model,
-            self.straggling,
-            self.bremsstrahlung_model,
-        )
-        validate_pair_production_numerics(
-            self.pair_production_model,
-            self.secondary_threshold_eV,
-            self.radiative_model,
-            self.bremsstrahlung_model,
-            self.positron_transport,
-        )
-        validate_atomic_electron_deflection(self.atomic_electron_deflection)
+        if self._physics_overrides:
+            Physics(**dict(self._physics_overrides)).validate_transport(self.energy_model)
+
+
+def resolve_physics(physics: Physics | None, numerics: Numerics) -> Physics:
+    """Merge deprecated model keywords, rejecting contradictory new choices."""
+    if physics is not None and not isinstance(physics, Physics):
+        raise TypeError("physics must be a Physics or None")
+    overrides = dict(numerics._physics_overrides)
+    if physics is not None:
+        for name, value in overrides.items():
+            if getattr(physics, name) != value:
+                raise ValueError(f"conflicting Numerics.{name} and Physics.{name}")
+    resolved = Physics(**overrides) if physics is None else physics
+    resolved.validate_transport(numerics.energy_model)
+    return resolved
 
 
 def validate_atomic_electron_deflection(model: object) -> None:
@@ -410,8 +526,12 @@ def validate_profile_numerics(values: Mapping[str, object]) -> None:
         key: values[key] for key in CONVERGENCE_KEYS if key in values
     }
     transport_values: dict[str, Any] = {key: values[key] for key in TRANSPORT_KEYS if key in values}
-    convergence = Convergence(**convergence_values)
-    Numerics(
-        **transport_values,
-        convergence=convergence,
+    reflections = CxrReflections(**convergence_values)
+    physics = Physics(
+        **{key: value for key, value in transport_values.items() if key in PHYSICS_FIELDS}
     )
+    numerics = Numerics(
+        **{key: value for key, value in transport_values.items() if key not in PHYSICS_FIELDS},
+        cxr_reflections=reflections,
+    )
+    resolve_physics(physics, numerics)

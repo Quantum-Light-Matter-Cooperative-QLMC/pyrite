@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 
 from .geometry import Footprint, Slab, Stack
-from .model import Analysis, Convergence, Numerics, Scene, Sweep
+from .model import Analysis, CxrReflections, Numerics, Physics, Scene, Sweep
 
 
 def _values(value: Any) -> tuple[Any, ...]:
@@ -85,8 +85,8 @@ def sweep_from_legacy(old_sweep: Any, settings: Any) -> Sweep:
         beam=beam,
         target=target,
         detector=old_sweep.detector,
-        emission=getattr(settings, "emission", "incoherent"),
-        brem_source=getattr(settings, "brem_source", "mc"),
+        physics=physics_from_legacy(settings),
+        numerics=numerics_from_legacy(old_sweep, settings),
     )
     return Sweep(base=scene, axes=axes)
 
@@ -96,6 +96,25 @@ def adapt_configured_sweep(old_sweep: Any, settings: Any) -> Sweep:
     converted = sweep_from_legacy(old_sweep, settings)
     object.__setattr__(converted, "_legacy_source", (old_sweep, settings))
     return converted
+
+
+def physics_from_legacy(settings: Any) -> Physics:
+    """Resolve profile model choices to the public physics owner."""
+    return Physics(
+        emission=getattr(settings, "emission", "incoherent"),
+        brem_source=getattr(settings, "brem_source", "mc"),
+        straggling=getattr(settings, "straggling", False),
+        inelastic_model=getattr(settings, "inelastic_model", "auto"),
+        inelastic_cutoff_eV=getattr(settings, "inelastic_cutoff_eV", None),
+        secondary_threshold_eV=getattr(settings, "secondary_threshold_eV", None),
+        elastic_model=getattr(settings, "elastic_model", "elsepa"),
+        bremsstrahlung_model=getattr(settings, "bremsstrahlung_model", "auto"),
+        radiative_model=getattr(settings, "radiative_model", "uncoupled"),
+        radiative_cutoff_eV=getattr(settings, "radiative_cutoff_eV", None),
+        pair_production_model=getattr(settings, "pair_production_model", None),
+        positron_transport=getattr(settings, "positron_transport", False),
+        atomic_electron_deflection=getattr(settings, "atomic_electron_deflection", "kawrakow"),
+    )
 
 
 def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
@@ -110,20 +129,9 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
         precision=getattr(settings, "precision", None),
         cxr_chunk=old_sweep.spec_chunk,
         brem_chunk=old_sweep.brem_chunk,
-        straggling=getattr(settings, "straggling", False),
         energy_model=getattr(settings, "energy_model", "frozen"),
         max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
-        inelastic_model=getattr(settings, "inelastic_model", "auto"),
-        inelastic_cutoff_eV=getattr(settings, "inelastic_cutoff_eV", None),
-        secondary_threshold_eV=getattr(settings, "secondary_threshold_eV", None),
-        elastic_model=getattr(settings, "elastic_model", "elsepa"),
-        bremsstrahlung_model=getattr(settings, "bremsstrahlung_model", "auto"),
-        radiative_model=getattr(settings, "radiative_model", "uncoupled"),
-        radiative_cutoff_eV=getattr(settings, "radiative_cutoff_eV", None),
-        pair_production_model=getattr(settings, "pair_production_model", None),
-        positron_transport=getattr(settings, "positron_transport", False),
-        atomic_electron_deflection=getattr(settings, "atomic_electron_deflection", "kawrakow"),
-        convergence=Convergence(
+        cxr_reflections=CxrReflections(
             n_families=old_sweep.n_families,
             max_reflections=old_sweep.max_reflections,
             mosaic_nodes=old_sweep.mosaic_nodes,

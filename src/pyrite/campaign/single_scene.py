@@ -24,7 +24,7 @@ def resolve_pixel_scene(
 ):
     """Resolve one profile case without constructing a Sweep or checkpoint."""
     from pyrite.campaign.longitudinal import LongitudinalDistribution
-    from pyrite.campaign.model import Beam, Numerics
+    from pyrite.campaign.model import Beam, Numerics, Physics
     from pyrite.campaign.sweep import BeamSpec, beam_replace, target_from_flat
     from pyrite.detectors import EnergyBins
     from pyrite.instrument import PixelScorer
@@ -99,11 +99,6 @@ def resolve_pixel_scene(
     )
     detector = replace(
         detector,
-        energy_bins=EnergyBins(
-            cxr=scan.E_grid_line,
-            cxr_by_energy=scan.E_grid_line_by_energy,
-            brem=scan.E_grid_brem,
-        ),
         scorer=scorer,
     )
     filters = tuple(
@@ -135,11 +130,20 @@ def resolve_pixel_scene(
         scorer,
         None if observation is None else observation.acquisition,
         Numerics(
+            energy_bins=EnergyBins(
+                cxr=scan.E_grid_line,
+                cxr_by_energy=scan.E_grid_line_by_energy,
+                brem=scan.E_grid_brem,
+            ),
             cxr_trials=n_electrons,
             brem_trials=n_electrons_brem,
-            straggling=straggling,
             energy_model=cast(Literal["frozen", "midpoint"], energy_model),
             max_dE_frac=float(max_dE_frac),
+            precision=catalog.profile_precision(profile_name),
+        ),
+        Physics(
+            emission=catalog.profile_emission(profile_name) or "incoherent",
+            straggling=straggling,
             inelastic_model=cast(
                 Literal["auto", "continuous", "shell-soft-hard"],
                 transport.get("inelastic_model", "auto"),
@@ -163,8 +167,6 @@ def resolve_pixel_scene(
                 Literal["kawrakow", "none"],
                 transport.get("atomic_electron_deflection", "kawrakow"),
             ),
-            precision=catalog.profile_precision(profile_name),
         ),
-        catalog.profile_emission(profile_name) or "incoherent",
         detector_id,
     )

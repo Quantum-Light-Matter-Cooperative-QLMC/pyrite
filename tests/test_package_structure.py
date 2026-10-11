@@ -32,6 +32,8 @@ def test_root_exports_stay_frozen() -> None:
         "PointSpot",
         "Spot",
         "BlazedGrooves",
+        "Physics",
+        "CxrReflections",
         "Convergence",
         "CxrSpectra",
         "Detector",
