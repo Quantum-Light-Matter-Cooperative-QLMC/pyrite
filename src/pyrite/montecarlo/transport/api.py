@@ -103,6 +103,7 @@ def simulate_trajectories(
     _secondary=None,
     _electron_start=0,
     _energy_range_keV=None,
+    bunch_front_tilt=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -176,54 +177,37 @@ def simulate_trajectories(
     docs/validation/geometry/finite-beam-size.md.
     Validation: finite-beam-size
 
-    beam_fwhm_y_mm: optional y-plane spot FWHM [mm] for an ELLIPTICAL beam.
-    None -> equals beam_fwhm_mm (isotropic), which stays BIT-FOR-BIT with the
-    historical scalar-spot path.
+    beam_fwhm_y_mm: y-plane spot FWHM [mm]; None preserves the isotropic path.
 
-    transverse_distribution: the resolved Courant-Snyder policy, mutually
-    exclusive with the spot FWHMs above (a spot fixes <x^2> alone; a Twiss
-    triplet fixes <x^2>, <x x'>, and <x'^2>). Owns both the entry positions
-    and the per-electron directions (via geometry.beam_frame_basis). Unset ->
-    every direction is the shared beam_dir exactly, BIT-FOR-BIT. Limiting
-    case: eps_n -> 0 recovers the collimated point source exactly. See
+    transverse_distribution: Courant-Snyder entrance positions and directions,
+    mutually exclusive with spot FWHMs. Unset preserves the shared beam_dir;
+    eps_n -> 0 recovers the collimated point source. See
     docs/physics/beam-transport/beam-phase-space.md.
     Validation: beam-phase-space-injection
 
-    energy_spread_frac: RMS *relative* energy spread. Each electron starts at
-    E0_keV * (1 + f * u), u ~ Normal(0, 1), drawn uncorrelated with the
-    arrival time. None/0 -> the monoenergetic beam, BIT-FOR-BIT. Raises
-    rather than transporting a non-positive drawn energy. See
+    energy_spread_frac: RMS relative spread; starts at E0_keV * (1 + f * u),
+    u ~ Normal(0, 1), independent of arrival time. None/0 preserves the
+    monoenergetic beam; non-positive drawn energies raise. See
     docs/physics/beam-transport/beam-phase-space.md.
     Validation: beam-energy-spread-injection
 
-    transverse_distribution and energy_spread_frac each use their own
-    SeedSequence child stream, so enabling either never perturbs the
-    free-path/scattering draws.
+    Transverse, energy, and arrival sampling use independent child RNG streams.
 
-    bunch_length_fs, long_shape, long_offsets_fs, longitudinal_distribution:
-    longitudinal bunch sampling via :func:`_sample_bunch_offsets`; each
-    electron gets an arrival offset (its own independent RNG child stream)
-    returned as per-segment t0_ang, kept SEPARATE from relative-age
-    t_ang/clock. No legacy or resolved distribution -> all-zero offsets (the
-    legacy point bunch, BIT-FOR-BIT). See
+    Longitudinal controls sample per-electron offsets via
+    :func:`_sample_bunch_offsets`, returned as t0_ang separately from relative
+    t_ang/clock. Absent controls preserve all-zero offsets. See
     docs/physics/beam-transport/longitudinal-structure.md.
     Validation: longitudinal-bunch-sampling
 
-    crystal_width_mm, crystal_height_mm: optional full transverse dimensions
-    [mm] of a rectangular prism centered at the beam origin; both or neither.
-    An incident entry point outside that footprint is counted in n_missed
-    (no segment, Ne unchanged); side-face exits are counted separately in
-    n_side_exited. All-None -> the original laterally infinite slab, using
-    its legacy free-flight path (BIT-FOR-BIT). See
+    Paired crystal dimensions define a rectangular prism centered at the beam
+    origin. Missed entries count in n_missed (Ne unchanged); side exits count
+    in n_side_exited. All-None preserves the infinite-slab path. See
     docs/validation/geometry/finite-transverse-crystal.md.
     Validation: finite-transverse-crystal
 
-    tilt_polar_rad, tilt_azim_rad: sample tilt (Zhai convention, same angles
-    passed to :func:`geometry.tilted_geometry`), used ONLY to project the
-    beam_fwhm_mm Gaussian spot onto the tilted entrance face via
-    :func:`geometry.project_beam_entry`. Both default to 0 (normal
-    incidence), the identity projection, BIT-FOR-BIT; no effect without
-    beam_fwhm_mm. See docs/validation/geometry/grazing-beam-projection.md.
+    Target tilt (Zhai convention) projects the spot onto the entrance face;
+    zero angles preserve the identity projection. See
+    docs/validation/geometry/grazing-beam-projection.md.
     Validation: grazing-beam-projection
 
     groove: optional :class:`~pyrite.montecarlo.groove.GrooveSpec` describing
@@ -406,6 +390,9 @@ def simulate_trajectories(
         Gaussian entrance-spot FWHM values in mm.
     bunch_length_fs, long_shape, long_offsets_fs, longitudinal_distribution
         Longitudinal bunch sampling controls and resolved policy.
+    bunch_front_tilt
+        Linear lab-frame arrival-time slope as a BunchFrontTilt descriptor.
+        Matching target tilt and azimuth makes the front parallel to its face.
     transverse_distribution
         Resolved Courant--Snyder entrance phase-space policy.
     energy_spread_frac
@@ -574,6 +561,18 @@ def simulate_trajectories(
 
     _nsys_push("pyrite.transport.sample")
     rng = np.random.default_rng(seed)
+    from ..bunch_front import validate_front_source
+
+    bunch_front_tilt = validate_front_source(
+        bunch_front_tilt,
+        transverse=transverse_distribution,
+        energy_spread=energy_spread_frac,
+        source="gpt_gdf" if gdf_source is not None else "analytic",
+        longitudinal=longitudinal_distribution,
+        offsets=long_offsets_fs,
+        shape=long_shape,
+        groove=groove,
+    )
     pos, transverse_slopes, beam_entry = initial_beam_positions(
         seed,
         Ne,
@@ -586,6 +585,7 @@ def simulate_trajectories(
         start=electron_start,
         E0_keV=E0_keV,
         energy_spread_frac=energy_spread_frac,
+        bunch_front_tilt=bunch_front_tilt,
     )
     if beam_dir is None:
         beam_dir = np.array([0.0, 0.0, 1.0])

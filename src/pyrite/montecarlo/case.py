@@ -51,6 +51,7 @@ _CASE_KEY_ORDER = (
     "energy_spread_frac",
     "long_shape",
     "bunch_length_fs",
+    "bunch_front_tilt",
     "long_offsets_fs",
     "longitudinal_distribution",
     "transverse_distribution",
@@ -249,6 +250,7 @@ class Case(Mapping[str, Any]):
     energy_spread_frac: float | _Absent = _ABSENT
     long_shape: str | _Absent = _ABSENT
     bunch_length_fs: float | _Absent = _ABSENT
+    bunch_front_tilt: dict[str, float] | _Absent = _ABSENT
     long_offsets_fs: tuple[float, ...] | _Absent = _ABSENT
     longitudinal_distribution: dict[str, object] | _Absent = _ABSENT
     transverse_distribution: dict[str, object] | _Absent = _ABSENT

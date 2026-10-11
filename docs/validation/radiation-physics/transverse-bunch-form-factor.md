@@ -219,3 +219,23 @@ refused.
 `rederived`, as of 2026-08-21. The cross-electron terms are now dropped analytically via the general $\exp[-(q_\perp\sigma_\perp)^2]$ factor for the marginal regime, combined with the longitudinal `coherent-emission` form factor into one joint $F$ — see [`coherent-inter-electron-decoherence`](coherent-inter-electron-decoherence.md) for the combined closed form, its fresh-context re-derivation, and the implementation (an empirical characteristic function of the actual sampled offsets, rather than a closed-form-parametrized $\sigma_\perp$, which extends this row's isotropic-Gaussian scope to elliptical/Courant–Snyder spots for free). The finite-footprint amplitude-coupling case noted above remains excluded, now with an explicit `mc_cxr_spectrum` error rather than silent mishandling. Human sign-off remains pending.
 
 **2026-10-08 (#370):** amended for tilted faces, the face-arrival delay and finite footprints (section above). A fresh-context verifier independently re-derived the amended claim (match, no divergent factor, sign or unit; 400k-draw Monte Carlo over random tilts within 2.2e-3); status `anchored` on `tests/montecarlo/test_coherent_transverse_tilt.py`. Human sign-off pending (#277).
+
+
+## Linear bunch-front correlation (#465)
+
+An imposed front gives an incoming delay `a.w`, in c=1 units, independent of
+the residual Gaussian timing. The face mismatch is therefore
+$K_{eff}=K-\omega J^{-T}a$, and the joint intensity factor is
+$\exp[-\omega^2\sigma_\epsilon^2-K_{eff}^T\Sigma_f K_{eff}]$.
+The amplitude characteristic function has half this exponent. Matching the
+front and crystal tilt/azimuth makes the front parallel to the entrance face,
+without guaranteeing radiation phase matching at arbitrary observation angle.
+The residual conditional duration remains unchanged.
+
+A fresh-context derivation checked the sign, ray-to-face mapping, covariance,
+matching-face cancellation and spectral/temporal use. See
+[`linear-bunch-front-tilt`](../beam-transport/linear-bunch-front-tilt.md).
+Anchors: `tests/montecarlo/test_bunch_front_tilt.py` includes independent
+ray construction and brute-force averaging, phase-matched/reversed fronts,
+conservative window bounds and the complete finite/infinite-slab reducer.
+The default uncorrelated front keeps its existing behavior.

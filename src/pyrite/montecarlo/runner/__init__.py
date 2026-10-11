@@ -296,6 +296,7 @@ def _beam_kwargs(case):
         longitudinal_distribution=case.get("longitudinal_distribution"),
         transverse_distribution=case.get("transverse_distribution"),
         energy_spread_frac=case.get("energy_spread_frac"),
+        bunch_front_tilt=case.get("bunch_front_tilt"),
         **({"gdf_source": case["gdf_source"]} if "gdf_source" in case else {}),
     )
 

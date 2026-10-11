@@ -13,7 +13,9 @@ from ..._backend import _to_cpu, xp
 # v2 (#370): finite footprints pair offset-free fields with F_z F_perp, and
 # tilted analytic spots carry the face-arrival delay in t0. v3 (#365): the
 # default flat omission certifies finite-footprint rows by F_z F_perp, not F_z.
-COHERENT_POPULATION_MODEL = "physical-distinct-pairs-v3"
+# v4 (#465): linear bunch-front timing shifts the joint transverse factor,
+# including analytic averaging and omission bounds on infinite slabs.
+COHERENT_POPULATION_MODEL = "physical-distinct-pairs-v4"
 
 
 class CoherentSamplingError(ValueError):

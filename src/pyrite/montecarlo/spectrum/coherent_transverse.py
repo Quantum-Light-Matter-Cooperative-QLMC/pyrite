@@ -42,7 +42,12 @@ FOOTPRINT_SUPPORT_SIGMAS = 6.0
 
 @dataclass(frozen=True)
 class TransverseSpot:
-    """Face covariance ``Sigma_f`` [Ang^2] and ``b_xy / beta`` of one beam."""
+    """Face covariance and effective arrival gradient ``b_xy/beta + J^-T a``.
+
+    ``a`` is zero without an imposed front. The extended gradient shifts
+    the transverse mismatch jointly with arrival time, rather than applying
+    an independent suppression factor.
+    """
 
     face_covariance: np.ndarray
     beam_xy_over_beta: np.ndarray
@@ -56,7 +61,11 @@ def transverse_spot(record):
     face, an energy spread: either couples the per-electron field to its
     offset, so the average no longer factorizes.
 
-    Validation: transverse-bunch-form-factor
+    Source: Gaussian characteristic function and ray-plane entry geometry;
+    an imposed incoming gradient a shifts K by -omega J^-T a. Assumes
+    independent residual timing and parallel monoenergetic rays for a tilted
+    bunch front. a=0 recovers the existing transverse factor exactly.
+    Validation: transverse-bunch-form-factor, linear-bunch-front-tilt
     """
     if not record or record.get("spot_covariance_ang2") is None:
         return None
@@ -82,13 +91,18 @@ def transverse_spot(record):
     J = beam_entry_jacobian(tilt, azim)
     _, _, b = beam_entry_basis(tilt, azim)
     beta = beta_from_keV_scalar(float(record["E0_keV"]))
-    return TransverseSpot(J @ covariance @ J.T, b[:2] / beta)
+    time_gradient_face = np.zeros(2)
+    if record.get("bunch_front_gradient") is not None:
+        time_gradient_face = np.linalg.solve(J.T, np.asarray(record["bunch_front_gradient"]))
+    # phi = omega*(epsilon + a.w) - K.p: replace K by K-omega*J^-T a.
+    # Validation: linear-bunch-front-tilt, transverse-bunch-form-factor
+    return TransverseSpot(J @ covariance @ J.T, b[:2] / beta + time_gradient_face)
 
 
 def transverse_form_factor(spot, omega, n_hat, g_vec, *, xp=np, amplitude=False):
     """``exp(-K^T Sigma_f K)`` on ``omega`` [1/Ang]; its square root if ``amplitude``.
 
-    ``K = omega (n_hat - b/beta)_xy + g_xy`` in the sample frame, matching the
+    ``K = omega (n_hat - b/beta - J^-T a)_xy + g_xy`` in the sample frame, matching the
     reducer's phase ``omega d - g . r``. Pass float64 ``omega``; the caller
     casts. The amplitude form is the (real)
     characteristic function ``<exp(i phi)>`` of the zero-mean Gaussian phase.

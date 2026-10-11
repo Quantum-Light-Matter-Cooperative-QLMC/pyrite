@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from pyrite.campaign.beam import (
         Beam as Beam,
     )
+    from pyrite.campaign.beam import BunchFrontTilt as BunchFrontTilt
     from pyrite.campaign.beam import (
         BunchLength as BunchLength,
     )
@@ -65,6 +66,7 @@ if TYPE_CHECKING:
     from pyrite.campaign.beam import (
         Spot as Spot,
     )
+    from pyrite.campaign.beam import TransverseSpot as TransverseSpot
     from pyrite.campaign.geometry import (
         BlazedGrooves as BlazedGrooves,
     )
@@ -165,6 +167,8 @@ _PUBLIC_OBJECTS = {
     "PointBunch": ("pyrite.campaign.beam", "PointBunch"),
     "PointSpot": ("pyrite.campaign.beam", "PointSpot"),
     "Spot": ("pyrite.campaign.beam", "Spot"),
+    "TransverseSpot": ("pyrite.campaign.beam", "TransverseSpot"),
+    "BunchFrontTilt": ("pyrite.campaign.beam", "BunchFrontTilt"),
     "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
     "Physics": ("pyrite._numerics", "Physics"),
     "CxrReflections": ("pyrite._numerics", "CxrReflections"),

@@ -136,3 +136,23 @@ This continuously covers both endpoints: a short bunch retains the sampled finit
 `rederived`. Fresh-context derivation (independent of this implementation) reproduces the boxed result with no divergent sign, factor, or unit, and both limiting cases recover the two rows this one combines exactly. `test_coherent_decoherence_blend_matches_reference_formula` checks the actual implementation against a reference built from already-validated, decoherence-inactive `mc_cxr_spectrum` sub-calls plus an independently-computed `F` — not a self-consistency check against the same code path. `test_coherent_decoherence_inactive_by_default` pins bit-for-bit equality with the pre-existing path whenever no offset population is supplied.
 
 The CUDA paths are pinned by `tests/montecarlo/test_xray_dispersion_cuda.py`: the same closed-form reference on device for the streaming and per-row-reduction routes, a lockstep check of all three routes against the generic CuPy path they used to fall back to (across a 9-row mosaic cone, so each row carries its own $q_\perp$ and therefore its own $F$), and bit-for-bit identity of the offset-free dispatch. Those bodies need the CUDA backend active, which `tests/conftest.py` pins off by design, so `test_coherent_decoherence_device_suite` re-runs them in a child session with the pin lifted; verified on the lab RTX 5080 (8 passed). Human sign-off remains pending.
+
+
+## Linear bunch-front correlation (#465)
+
+An imposed front gives an incoming delay `a.w`, in c=1 units, independent of
+the residual Gaussian timing. The face mismatch is therefore
+$K_{eff}=K-\omega J^{-T}a$, and the joint intensity factor is
+$\exp[-\omega^2\sigma_\epsilon^2-K_{eff}^T\Sigma_f K_{eff}]$.
+The amplitude characteristic function has half this exponent. Matching the
+front and crystal tilt/azimuth makes the front parallel to the entrance face,
+without guaranteeing radiation phase matching at arbitrary observation angle.
+The residual conditional duration remains unchanged.
+
+A fresh-context derivation checked the sign, ray-to-face mapping, covariance,
+matching-face cancellation and spectral/temporal use. See
+[`linear-bunch-front-tilt`](../beam-transport/linear-bunch-front-tilt.md).
+Anchors: `tests/montecarlo/test_bunch_front_tilt.py` includes independent
+ray construction and brute-force averaging, phase-matched/reversed fronts,
+conservative window bounds and the complete finite/infinite-slab reducer.
+The default uncorrelated front keeps its existing behavior.

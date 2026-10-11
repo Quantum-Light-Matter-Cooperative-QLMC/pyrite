@@ -523,14 +523,9 @@ def _identity_v1(
     }
     if reserved_detector:
         sweep_payload["detector"] = reserved_detector
-    # Flat legacy projection of the beam (decision 6). The beam lives on
-    # ``Sweep.beam`` in code, but the hashed payload keeps the HISTORICAL flat
-    # top-level keys -- ``energy_keV`` and ``beam_fwhm_mm`` at their old
-    # positions -- so every pre-existing ``parameter_sha256`` (and therefore its
-    # checkpoint stem) stays bit-for-bit. New beam fields (elliptical y, the
-    # longitudinal bunch, rep-rate/charge, future emittance) join the hash ONLY
-    # when they diverge from their inert defaults -- the same compatibility rule
-    # already used for ``n_electrons`` and ``catalog_profile`` below.
+    # Preserve the historical flat beam keys in the hash and checkpoint stem.
+    # New beam fields join the hash only when they differ from inert defaults,
+    # like ``n_electrons`` and ``catalog_profile`` below (decision 6).
     beam_payload = sweep_payload.pop("beam")
     gdf = sweep.beam.gdf_beam()
     if gdf is not None:
@@ -575,6 +570,8 @@ def _identity_v1(
         sweep_payload["bunch_charge_pc"] = beam_payload["bunch_charge_pc"]
     if beam_payload["energy_spread_frac"] is not None:
         sweep_payload["energy_spread_frac"] = beam_payload["energy_spread_frac"]
+    if beam_payload["bunch_front_tilt"] is not None:
+        sweep_payload["bunch_front_tilt"] = beam_payload["bunch_front_tilt"]
     for key in ("n_electrons", "n_electrons_brem", "line_grid_policy"):
         if sweep_payload.get(key) is None:
             sweep_payload.pop(key, None)

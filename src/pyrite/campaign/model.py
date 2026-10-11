@@ -17,7 +17,7 @@ from .._precision import Precision
 from ..detectors import Detector, EnergyBins
 from ..instrument import Acquisition, FilterPlate, PixelScorer, PlanarDetector
 from ..instrument.model import validate_downstream_scene
-from .beam import Beam
+from .beam import Beam, BunchFrontTilt
 from .geometry import Slab, Stack, Target
 from .sweep import BeamSpec
 
@@ -215,6 +215,38 @@ class Scene:
             replace(self.beam, energy_keV=_one_float("beam.energy_keV", self.beam.energy_keV)),
         )
         object.__setattr__(self, "target", _scalar_target(self.target))
+
+    def phase_matched_bunch_front_tilt(
+        self,
+        hkl: tuple[int, int, int],
+        *,
+        photon_energy_eV: float | None = None,
+        observation_direction_lab: Sequence[float] | None = None,
+    ) -> BunchFrontTilt:
+        """Return the front cancelling transverse phase for one slab reflection.
+
+        Uses the beam energy, resolved target angles and catalog orientation.
+        Target angles follow the existing nearest-half-degree case resolution;
+        the returned bunch-front angles retain full precision.
+        ``hkl`` selects the reflection explicitly. By default the scalar
+        detector's central direction is used; a planar detector requires an
+        explicit lab-frame direction. A supplied direction is normalized.
+        ``photon_energy_eV=None`` uses the vacuum, zero-scattering line estimate;
+        pass the desired photon energy to match a refractively shifted peak.
+
+        Matches the mean crystal orientation at one energy and direction, not
+        every mosaic node or detector ray. Residual timing spread is unchanged.
+        Requires the supported monoenergetic point/Gaussian source and a flat
+        single slab; other source compositions and stacks raise ValueError.
+        The scene is unchanged; assign the returned descriptor to a new Beam.
+
+        Source: joint Gaussian phase mismatch K-omega J^-T a=0, hence
+        a=J.T@(n_xy-b_xy/beta0+g_xy/omega). Zero mismatch gives zero tilt.
+        Validation: linear-bunch-front-tilt, line-energy-dispersion
+        """
+        from .front_matching import phase_matched_front_for_scene
+
+        return phase_matched_front_for_scene(self, hkl, photon_energy_eV, observation_direction_lab)
 
 
 def detector_with_scorer(detector: Any, scorer: Any) -> PlanarDetector:

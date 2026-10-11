@@ -48,6 +48,7 @@ _BEAM_KEYS = (
         "long_offsets_fs",
         "longitudinal",
         "transverse",
+        "bunch_front_tilt",
     }
 )
 _DETECTOR_KEYS = frozenset({"observation_angle_deg", "polar_acceptance_deg", "solid_angle_sr"})
@@ -320,6 +321,19 @@ def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, ob
                 )
             else:
                 out[key] = number
+        elif key == "bunch_front_tilt":
+            front = _table(value, f"{path}.{key}", errors)
+            if front is not None:
+                errors.keys(front, f"{path}.{key}", {"tilt_deg", "azimuth_deg"})
+                tilt = _number(front.get("tilt_deg"))
+                azimuth = _number(front.get("azimuth_deg", 0.0))
+                if tilt is None or not -90 < tilt < 90 or azimuth is None:
+                    errors.add(
+                        f"{path}.{key}",
+                        "requires finite -90 < tilt_deg < 90 and finite azimuth_deg",
+                    )
+                else:
+                    out[key] = MappingProxyType({"tilt_deg": tilt, "azimuth_deg": azimuth})
         elif key == "long_shape":
             if not isinstance(value, str) or value not in _BEAM_LONG_SHAPES:
                 errors.add(f"{path}.long_shape", f"must be one of {sorted(_BEAM_LONG_SHAPES)}")

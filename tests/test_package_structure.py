@@ -31,6 +31,8 @@ def test_root_exports_stay_frozen() -> None:
         "PointBunch",
         "PointSpot",
         "Spot",
+        "TransverseSpot",
+        "BunchFrontTilt",
         "BlazedGrooves",
         "Physics",
         "CxrReflections",

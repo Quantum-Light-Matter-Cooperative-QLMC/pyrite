@@ -555,7 +555,8 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "promising_low_ne",
             "hopg",
-            "7a8dba8798e320dddd6da8a1b1e18a043774cc8b7ffabf457434217b9b69099b",
+            # #465: coherent operator identity advanced to physical-distinct-pairs-v4.
+            "6c27b12d9743c8bc5ccd7fdd98168326d47f9c0f7211c2367f088140617d539c",
         ),
     ],
 )

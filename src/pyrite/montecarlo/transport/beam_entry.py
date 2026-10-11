@@ -8,7 +8,8 @@ counter-addressed per electron inside that namespace (#361).
 
 import numpy as np
 
-from ..geometry import face_arrival_path_ang, project_beam_entry
+from ..bunch_front import resolve_front_tilt
+from ..geometry import beam_entry_jacobian, face_arrival_path_ang, project_beam_entry
 from ..groove import entry_points
 from ..transverse import resolved_from_mapping, sample_transverse
 from .kinematics import beta_from_keV, child_stream_root, counter_normals
@@ -27,6 +28,7 @@ def initial_beam_positions(
     start=0,
     E0_keV=None,
     energy_spread_frac=None,
+    bunch_front_tilt=None,
 ):
     """Return ``(pos, transverse_slopes, beam_entry)`` for electrons ``[start, start + Ne)``.
 
@@ -104,6 +106,7 @@ def initial_beam_positions(
             E0_keV=E0_keV,
             energy_spread_frac=energy_spread_frac,
             groove=groove,
+            bunch_front_tilt=bunch_front_tilt,
         )
     return pos, transverse_slopes, record
 
@@ -118,6 +121,7 @@ def beam_entry_record(
     E0_keV,
     energy_spread_frac,
     groove,
+    bunch_front_tilt=None,
 ):
     """Plain-data description of the analytic incident spot, for coherent averages.
 
@@ -147,7 +151,7 @@ def beam_entry_record(
         sigma_x = float(beam_fwhm_mm or 0.0) * fwhm_to_sigma
         sigma_y = float(fwhm_y or 0.0) * fwhm_to_sigma
         covariance = ((sigma_x**2 * MM2_TO_ANG2, 0.0), (0.0, sigma_y**2 * MM2_TO_ANG2))
-    return {
+    record = {
         "tilt_polar_rad": float(tilt_polar_rad or 0.0),
         "tilt_azim_rad": float(tilt_azim_rad or 0.0),
         "E0_keV": float(E0_keV),
@@ -156,6 +160,27 @@ def beam_entry_record(
         "position_slope_correlated": correlated,
         "face_arrival_delay": covariance is not None and groove is None,
     }
+    front = resolve_front_tilt(bunch_front_tilt)
+    if front is not None:
+        record["bunch_front_gradient"] = tuple(front.gradient(E0_keV))
+    return record
+
+
+def bunch_front_delay_ang(record, initial_r_ang):
+    """Imposed front delay c*t [Ang] at each parallel ray's incoming position.
+
+    Source: equal-time plane kinematics, c*t=a.w, a=tan(theta)u/beta0.
+    Invert the face projection p_xy=Jw; the geometric face-flight delay is
+    added separately exactly once. Assumes monoenergetic parallel rays and
+    the recorded lab gradient. No gradient/point spot gives exact zeros.
+    Validation: linear-bunch-front-tilt
+    """
+    positions = np.asarray(initial_r_ang, dtype=float)
+    if not record or "bunch_front_gradient" not in record:
+        return np.zeros(positions.shape[0])
+    J = beam_entry_jacobian(record["tilt_polar_rad"], record["tilt_azim_rad"])
+    gradient_face = np.linalg.solve(J.T, np.asarray(record["bunch_front_gradient"]))
+    return positions[:, :2] @ gradient_face
 
 
 def face_arrival_delay_ang(record, initial_r_ang, initial_E_keV):
@@ -195,7 +220,11 @@ def resolve_bunch_times(t0_ang, clock, record, pos, E_keV, *, gdf_t0=None, launc
         return gdf_t0, clock, None
     if launch is not None:
         return launch.t0_ang.copy(), launch.t_ang.copy(), None
-    return t0_ang + face_arrival_delay_ang(record, pos, E_keV), clock, record
+    return (
+        (t0_ang + bunch_front_delay_ang(record, pos) + face_arrival_delay_ang(record, pos, E_keV)),
+        clock,
+        record,
+    )
 
 
 def initial_energies_keV(E0_keV, Ne, seed, energy_spread_frac, *, start=0):

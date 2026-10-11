@@ -482,6 +482,7 @@ def test_mask_keeps_uncertified_factors_and_rounds_the_bound_outward():
     st = SimpleNamespace(
         Ne=3,
         finite_footprint_now=False,
+        analytic_offsets=False,
         request=SimpleNamespace(coherent_flat_omission_limit=0.5),
     )
     factors = np.array([np.nan, np.inf, -0.1, 1.1, 0.25, 0.0, 0.1])
@@ -509,6 +510,7 @@ def test_gaussian_mask_refuses_a_rounded_factor_below_the_true_threshold():
     st = SimpleNamespace(
         Ne=2,
         finite_footprint_now=True,
+        analytic_offsets=True,
         E_grid=energy,
         request=SimpleNamespace(
             coherent_flat_omission_limit=upper / 2,
@@ -618,6 +620,7 @@ def test_physical_pair_bound_cannot_use_the_smaller_sample_count():
     st = SimpleNamespace(
         Ne=3,
         finite_footprint_now=False,
+        analytic_offsets=False,
         request=SimpleNamespace(coherent_flat_omission_limit=0.5, physical_electrons=101.0),
     )
     # F=0.01 would pass the old M-1 bound, but exceeds the physical budget.
@@ -669,6 +672,7 @@ def test_gaussian_certification_bisects_instead_of_scanning(monkeypatch):
         Ne=10,
         E_grid=energy,
         finite_footprint_now=True,
+        analytic_offsets=True,
     )
     keep = _per_hkl._flat_energy_keep(st, np.zeros(energy.size))
     assert len(calls) <= 20

@@ -71,6 +71,7 @@ def _stub(spot, omega, limit, population, *, rms_fs=1e-12, row_vectors_known=Tru
         E_grid=omega * HBARC_EV_ANG,
         omega_grid=omega,
         finite_footprint_now=True,
+        analytic_offsets=True,
         transverse=spot,
         n_hat=N_HAT,
     )

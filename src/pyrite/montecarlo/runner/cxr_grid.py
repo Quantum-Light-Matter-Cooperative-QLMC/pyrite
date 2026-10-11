@@ -98,6 +98,7 @@ _RESOLUTION_INPUT_KEYS = (
     "crystal_height_mm",
     "beam_fwhm_mm",
     "beam_fwhm_y_mm",
+    "bunch_front_tilt",
     "energy_spread_frac",
     "longitudinal_distribution",
     "transverse_distribution",
@@ -142,7 +143,7 @@ _WEIGHT_INPUT_KEYS = ("B_ang2",)
 
 #: Bumped whenever the same inputs would seed different coherent windows; it
 #: keys the speed cache of coherent cases only.
-COHERENT_WINDOW_REVISION = 10
+COHERENT_WINDOW_REVISION = 11
 
 
 def _cached_grid(cached):
@@ -350,7 +351,7 @@ def longitudinal_rms_fs(case):
     if kind in {"gaussian", "compressed"}:
         return longitudinal.get("rms_duration_fs")
     if kind is None and case.get("long_shape", "gaussian") == "gaussian":
-        return case.get("bunch_length_fs")
+        return case.get("bunch_length_fs", 0.0 if case.get("bunch_front_tilt") else None)
     return None
 
 
