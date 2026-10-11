@@ -3,6 +3,8 @@
 Validation: coherent-physical-bunch-population
 """
 
+import warnings
+
 import numpy as np
 from scipy.constants import elementary_charge
 
@@ -16,6 +18,14 @@ COHERENT_POPULATION_MODEL = "physical-distinct-pairs-v3"
 
 class CoherentSamplingError(ValueError):
     """A physical coherent estimate is unresolved by its incident sample."""
+
+    def __init__(self, message, *, diagnostics=None):
+        super().__init__(message)
+        self.diagnostics = diagnostics
+
+
+class CoherentSamplingWarning(UserWarning):
+    """A physical coherent estimate has finite negative bins, returned unclipped."""
 
     def __init__(self, message, *, diagnostics=None):
         super().__init__(message)
@@ -100,11 +110,15 @@ def undersampling_ratio(physical_electrons, incident_samples):
 def require_resolved_power(
     power, *, energy_eV=None, incident_samples=None, physical_electrons=None, quantity="power"
 ):
-    """Refuse negative/nonfinite estimates without clipping or changing samples.
+    """Refuse nonfinite estimates; warn on finite negative bins, never clip.
 
     Source: exact intensity is a squared field norm and nonnegative.
     Assumes an unclipped signed Monte Carlo estimate; zero power passes.
-    This is a necessary check, not a statistical convergence certificate.
+    Finite negative bins emit :class:`CoherentSamplingWarning` and the signed
+    estimate is returned unchanged: the refusal is suspended (#462) because
+    it rejected whole spectra over undersampled tail bins far from the band
+    of interest. This is a necessary check, not a statistical convergence
+    certificate.
     Validation: coherent-physical-bunch-population
     """
     finite = xp.isfinite(power)
@@ -152,6 +166,18 @@ def require_resolved_power(
                     "finite Slab footprint with BunchLength so offsets are averaged "
                     "analytically, or raise --cxr-trials toward N"
                 )
+    if not nonfinite_count:
+        warnings.warn(
+            CoherentSamplingWarning(
+                "physical coherent power is unresolved: negative pair estimate; "
+                f"{quantity}: {negative_count} finite negative of {power.size}; "
+                f"first negative index {first}; {remedy}; negative bins are "
+                "returned unclipped",
+                diagnostics=diagnostics,
+            ),
+            stacklevel=2,
+        )
+        return
     raise CoherentSamplingError(
         "physical coherent power is unresolved: negative or nonfinite pair estimate; "
         f"{quantity}: {negative_count} finite negative, {nonfinite_count} nonfinite "

@@ -6,7 +6,10 @@ from scipy.constants import elementary_charge
 
 from pyrite.montecarlo import mc_cxr_spectrum
 from pyrite.montecarlo.runner import _cxr_for_segments
-from pyrite.montecarlo.spectrum.coherent_population import CoherentSamplingError
+from pyrite.montecarlo.spectrum.coherent_population import (
+    CoherentSamplingError,
+    CoherentSamplingWarning,
+)
 
 
 def _straight_bunch(samples):
@@ -99,11 +102,12 @@ def test_distinct_pair_power_matches_two_delayed_fields():
         np.testing.assert_allclose(_direct(segments, 12, **controls), expected, rtol=1e-10)
 
 
-def test_unresolved_negative_pairs_refuse_without_clipping():
+def test_unresolved_negative_pairs_warn_without_clipping():
     segments = _straight_bunch(2)
     segments["t_ang"][1] = 5.0
-    with pytest.raises(CoherentSamplingError, match="negative or nonfinite pair estimate"):
-        _direct(segments, 12)
+    with pytest.warns(CoherentSamplingWarning, match="negative pair estimate"):
+        power = _direct(segments, 12)
+    assert np.any(power < 0.0)
 
 
 def test_empirical_form_factor_excludes_self_pairs():
@@ -311,9 +315,14 @@ def test_unresolved_power_reports_separate_scalar_diagnostics(values, negative, 
     from pyrite.montecarlo.spectrum.coherent_population import require_resolved_power
 
     power = xp.asarray(values)
-    with pytest.raises(CoherentSamplingError) as caught:
-        require_resolved_power(power)
-    diagnostic = caught.value.diagnostics
+    if nonfinite:
+        with pytest.raises(CoherentSamplingError) as caught:
+            require_resolved_power(power)
+        diagnostic = caught.value.diagnostics
+    else:
+        with pytest.warns(CoherentSamplingWarning) as caught:
+            require_resolved_power(power)
+        diagnostic = caught[0].message.diagnostics
     assert diagnostic["negative_count"] == negative
     assert diagnostic["nonfinite_count"] == nonfinite
     assert diagnostic["minimum_finite_raw_power"] == minimum
@@ -321,7 +330,7 @@ def test_unresolved_power_reports_separate_scalar_diagnostics(values, negative, 
     np.testing.assert_array_equal(_to_cpu(power), values)
 
 
-def test_production_refusal_reports_energy_and_population_before_normalizing():
+def test_production_warning_reports_energy_and_population_before_normalizing():
     from types import SimpleNamespace
 
     from pyrite._backend import _to_cpu, xp
@@ -336,9 +345,10 @@ def test_production_refusal_reports_energy_and_population_before_normalizing():
         E_grid=xp.asarray([700.0, 702.0, 704.0]),
         temporal_buf=None,
     )
-    with pytest.raises(CoherentSamplingError) as caught:
-        _finalize_spectrum(state)
-    diagnostic = caught.value.diagnostics
+    with pytest.warns(CoherentSamplingWarning) as caught:
+        normalized = _finalize_spectrum(state)
+    diagnostic = caught[0].message.diagnostics
+    np.testing.assert_allclose(normalized, [1.0 / 3.0, -2.0 / 3.0, 4.0 / 3.0])
     assert diagnostic["first_invalid_index"] == 1
     assert diagnostic["first_invalid_energy_eV"] == 702.0
     assert diagnostic["incident_samples"] == 3
@@ -409,26 +419,26 @@ def test_finite_footprint_audit_preserves_pair_factor_above_one(monkeypatch):
     assert 1.0 < lower <= 11.0 <= upper
 
 
-def test_undersampled_refusal_names_pair_weight_and_practical_remedies():
+def test_undersampled_warning_names_pair_weight_and_practical_remedies():
     from pyrite._backend import xp
     from pyrite.montecarlo.spectrum.coherent_population import require_resolved_power
 
-    with pytest.raises(CoherentSamplingError) as caught:
+    with pytest.warns(CoherentSamplingWarning) as caught:
         require_resolved_power(
             xp.asarray([1.0, -2.0]), incident_samples=101, physical_electrons=6201.0
         )
-    assert caught.value.diagnostics["pair_weight"] == pytest.approx(62.0)
-    message = str(caught.value)
+    assert caught[0].message.diagnostics["pair_weight"] == pytest.approx(62.0)
+    message = str(caught[0].message)
     assert "(N-1)/(M-1) = 62" in message
     assert "PointSpot()" in message and "PointBunch()" in message
     assert "bunch_charge_pc" in message
 
 
-def test_resolved_population_refusal_keeps_generic_trial_remedy():
+def test_resolved_population_warning_keeps_generic_trial_remedy():
     from pyrite._backend import xp
     from pyrite.montecarlo.spectrum.coherent_population import require_resolved_power
 
-    with pytest.raises(CoherentSamplingError, match="increase --cxr-trials") as caught:
+    with pytest.warns(CoherentSamplingWarning, match="increase --cxr-trials") as caught:
         require_resolved_power(xp.asarray([-1.0]), incident_samples=100, physical_electrons=50.0)
-    assert "PointSpot" not in str(caught.value)
-    assert caught.value.diagnostics["pair_weight"] < 1.0
+    assert "PointSpot" not in str(caught[0].message)
+    assert caught[0].message.diagnostics["pair_weight"] < 1.0
