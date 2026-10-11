@@ -5,7 +5,7 @@ import pytest
 
 from pyrite.api import build_sweep_cases
 from pyrite.campaign.config import default_settings, material_sweep
-from pyrite.campaign.geometry import Layer, Slab, Stack
+from pyrite.campaign.geometry import Footprint, Layer, Slab, Stack
 from pyrite.campaign.legacy import (
     adapt_configured_sweep,
     analysis_from_legacy,
@@ -25,6 +25,7 @@ def _scene() -> Scene:
         target=Stack(
             layers=(Layer("mos2", 2_000.0), Layer("sio2", 2_850.0)),
             tilt_deg=30.0,
+            footprint=Footprint(5.0, 5.0),
         ),
         detector=Detector(),
     )
@@ -36,7 +37,10 @@ def _case_bytes(cases) -> list[bytes]:
 
 def test_scene_rejects_implicit_sweep_values() -> None:
     with pytest.raises(ValueError, match="put multiple values in Sweep.axes"):
-        Scene(beam=BeamSpec(energy_keV=[30.0, 60.0]), target=Slab("hopg"))
+        Scene(
+            beam=BeamSpec(energy_keV=[30.0, 60.0]),
+            target=Slab("hopg", footprint=Footprint(5.0, 5.0)),
+        )
 
 
 def test_path_axes_expand_nested_and_indexed_fields_mechanically() -> None:

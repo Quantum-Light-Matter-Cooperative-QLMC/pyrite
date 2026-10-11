@@ -16,6 +16,7 @@ from pyrite.campaign.config import (
     material_sweep,
     trajectory_sweep,
 )
+from pyrite.campaign.geometry import Footprint
 from pyrite.campaign.sweep import (
     MATERIAL_LABELS,
     BeamSpec,
@@ -1310,7 +1311,14 @@ def test_case_cost_walks_a_multilayer_stack():
         Sweep(
             material="hopg",
             beam=BeamSpec(energy_keV=60.0),
-            target=Stack.on_substrate("hopg", 2e4, "silicon", tilt_deg=5.0, tilt_azim_deg=180.0),
+            target=Stack.on_substrate(
+                "hopg",
+                2e4,
+                "silicon",
+                tilt_deg=5.0,
+                tilt_azim_deg=180.0,
+                footprint=Footprint(5.0, 5.0),
+            ),
         )
     )
     assert stacked.get("abs_layers") is not None

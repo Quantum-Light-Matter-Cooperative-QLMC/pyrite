@@ -109,11 +109,15 @@ class PlanarDetector:
         True-energy grids for the line and background source spectra.
     response
         Optional read-time detector response implementing ``score``.
+    scorer
+        Factorized spatial scoring on the pixel grid. Defaults to
+        :class:`PixelScorer` ``()`` when ``pixels`` is set; requires ``pixels``.
 
     Notes
     -----
     Geometry changes source observation and accepted solid angle. ``response``
-    changes only read-time scoring.
+    changes only read-time scoring. A pixelated detector always returns
+    spatial output from :func:`pyrite.simulate`.
     """
 
     pose: PlanarPose
@@ -121,6 +125,7 @@ class PlanarDetector:
     pixels: PixelGrid | None = None
     energy_bins: EnergyBins = field(default_factory=EnergyBins)
     response: DetectorResponse | None = None
+    scorer: PixelScorer | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.pose, PlanarPose):
@@ -143,6 +148,22 @@ class PlanarDetector:
             raise TypeError("PlanarDetector.energy_bins must be an EnergyBins")
         if self.response is not None and not hasattr(self.response, "score"):
             raise TypeError("PlanarDetector.response must implement score()")
+        if self.scorer is not None and not isinstance(self.scorer, PixelScorer):
+            raise TypeError("PlanarDetector.scorer must be a PixelScorer or None")
+        if self.pixels is None:
+            if self.scorer is not None:
+                raise ValueError("PlanarDetector.scorer requires pixels")
+        else:
+            if self.scorer is None:
+                object.__setattr__(self, "scorer", PixelScorer())
+            assert self.scorer is not None
+            if any(
+                requested > available
+                for requested, available in zip(
+                    self.scorer.angular_shape, self.pixels.shape, strict=True
+                )
+            ):
+                raise ValueError("pixel scorer angular shape cannot exceed detector pixel shape")
         center = np.asarray(self.pose.center_mm)
         normal = np.asarray(self.pose.normal)
         if float(center @ normal) <= 0.0:
@@ -157,6 +178,7 @@ class PlanarDetector:
         *,
         energy_bins: EnergyBins | None = None,
         response: DetectorResponse | None = None,
+        scorer: PixelScorer | None = None,
     ) -> PlanarDetector:
         """Construct one physical Timepix3 ASIC without implying a response."""
         return cls(
@@ -164,6 +186,7 @@ class PlanarDetector:
             pixels=PixelGrid.timepix3_chip(),
             energy_bins=EnergyBins() if energy_bins is None else energy_bins,
             response=response,
+            scorer=scorer,
         )
 
     def score(

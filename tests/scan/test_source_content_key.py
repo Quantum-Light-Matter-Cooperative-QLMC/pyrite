@@ -21,8 +21,8 @@ from pyrite.runs import scan
 
 
 def _inputs():
-    beam = pr.Beam(energy_keV=30.0)
-    target = pr.Slab("hopg", thickness_ang=1_000.0, tilt_deg=30.0)
+    beam = pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch())
+    target = pr.Slab("hopg", thickness_ang=1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0))
     detector = pr.Detector(
         energy_bins=EnergyBins(
             cxr=np.array([1_000.0, 1_050.0]),

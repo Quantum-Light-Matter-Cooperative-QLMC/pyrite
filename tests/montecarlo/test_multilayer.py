@@ -17,6 +17,7 @@ import numpy as np
 import pytest
 
 from pyrite._spectral_components import cxr_spectrum
+from pyrite.campaign.geometry import Footprint
 from pyrite.campaign.sweep import (
     BeamSpec,
     LayerSpec,
@@ -216,7 +217,9 @@ def test_build_cases_attaches_abs_layers_only_with_substrate():
         Sweep(
             material="mose2",
             beam=BeamSpec(energy_keV=30.0),
-            target=Stack.on_substrate("mose2", 2e4, "sio2", 1e6, tilt_deg=30.0),
+            target=Stack.on_substrate(
+                "mose2", 2e4, "sio2", 1e6, tilt_deg=30.0, footprint=Footprint(5.0, 5.0)
+            ),
         )
     )
     for c in stacked:
@@ -257,7 +260,9 @@ def test_build_cases_layer_radiators_match_stack():
         Sweep(
             material="mose2",
             beam=BeamSpec(energy_keV=30.0),
-            target=Stack.on_substrate("mose2", 2e4, "sio2", tilt_deg=30.0),
+            target=Stack.on_substrate(
+                "mose2", 2e4, "sio2", tilt_deg=30.0, footprint=Footprint(5.0, 5.0)
+            ),
         )
     )[0]
     film, sub = amorph["layer_radiators"]
@@ -273,7 +278,9 @@ def test_build_cases_layer_radiators_match_stack():
         Sweep(
             material="mose2",
             beam=BeamSpec(energy_keV=30.0),
-            target=Stack.on_substrate("mose2", 2e4, "sapphire", tilt_deg=30.0),
+            target=Stack.on_substrate(
+                "mose2", 2e4, "sapphire", tilt_deg=30.0, footprint=Footprint(5.0, 5.0)
+            ),
         )
     )[0]
     assert cryst["layer_radiators"][1]["crystal"] == "sapphire"
@@ -349,7 +356,9 @@ def test_build_cases_substrate_sugar_matches_single_layer_stack():
         Sweep(
             material="mose2",
             beam=BeamSpec(energy_keV=30.0),
-            target=Stack.on_substrate("mose2", 2e4, "sapphire", 1e6, tilt_deg=30.0),
+            target=Stack.on_substrate(
+                "mose2", 2e4, "sapphire", 1e6, tilt_deg=30.0, footprint=Footprint(5.0, 5.0)
+            ),
         )
     )[0]
     for key in ("abs_layers", "layer_radiators", "name"):
@@ -448,7 +457,9 @@ def _cuda_accumulation_case():
     sweep = Sweep(
         material="mose2",
         beam=BeamSpec(energy_keV=30.0),
-        target=Stack.on_substrate("mose2", 300.0, "silicon", 3000.0, tilt_deg=-30.0),
+        target=Stack.on_substrate(
+            "mose2", 300.0, "silicon", 3000.0, tilt_deg=-30.0, footprint=Footprint(5.0, 5.0)
+        ),
         detector=Detector(energy_bins=EnergyBins(cxr=line, brem=brem)),
     )
     # The manual reference below uses the same bounded launches as the runner;

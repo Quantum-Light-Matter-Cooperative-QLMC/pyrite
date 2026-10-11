@@ -38,15 +38,15 @@ PLATE = pr.FilterPlate("silicon", 0.05, (1.5, 10.0), pr.PlanarPose.from_observat
 
 def _scene(**overrides) -> pr.Scene:
     values = dict(
-        beam=pr.Beam(30.0),
-        target=pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        beam=pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        target=pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         detector=pr.PlanarDetector(
             pose=pr.PlanarPose.from_observation(100.0, 60.0),
             pixels=pr.PixelGrid((4, 6), (0.5, 0.5)),
             response=pr.IdealPhotonCounter(),
+            scorer=pr.PixelScorer((2, 2)),
         ),
         filters=(PLATE,),
-        pixel_scorer=pr.PixelScorer((2, 2)),
         acquisition=pr.Acquisition(exposure_s=1.0, measured_edges_eV=(0.0, 1_500.0, 3_000.0)),
     )
     return pr.Scene(**{**values, **overrides})
@@ -68,7 +68,11 @@ def test_repeat_request_reuses_the_stored_observation(tmp_path, transports) -> N
     "overrides",
     [
         {"acquisition": pr.Acquisition(exposure_s=5.0, measured_edges_eV=(0.0, 3_000.0))},
-        {"beam": pr.Beam(30.0, bunch_charge_pc=3.0)},
+        {
+            "beam": pr.Beam(
+                30.0, bunch_charge_pc=3.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()
+            )
+        },
         {"filters": (replace(PLATE, name="display label only"),)},
     ],
     ids=["acquisition", "normalization", "filter-label"],
@@ -80,7 +84,7 @@ def test_read_time_changes_rescore_without_transport(tmp_path, transports, overr
     expected = api.simulate(
         **{
             key: getattr(_scene(**overrides), key)
-            for key in ("beam", "target", "detector", "filters", "pixel_scorer", "acquisition")
+            for key in ("beam", "target", "detector", "filters", "acquisition")
         },
         numerics=NUMERICS,
     )
@@ -107,10 +111,10 @@ def test_response_change_rescores_without_transport(tmp_path, transports) -> Non
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"pixel_scorer": pr.PixelScorer((1, 3))},
+        {"detector": replace(_scene().detector, scorer=pr.PixelScorer((1, 3)))},
         {"filters": (replace(PLATE, thickness_mm=0.1),)},
         {"filters": ()},
-        {"target": pr.Slab("hopg", 1_000.0, tilt_deg=31.0)},
+        {"target": pr.Slab("hopg", 1_000.0, tilt_deg=31.0, footprint=pr.Footprint(5.0, 5.0))},
     ],
     ids=["angular-shape", "filter-thickness", "no-filter", "source"],
 )

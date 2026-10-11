@@ -84,6 +84,19 @@ def mixed_row_power(st, grouped, flat, factor):
     return grouped + scale * factor * (flat - grouped)
 
 
+def undersampling_ratio(physical_electrons, incident_samples):
+    """Cross-pair weight (N-1)/(M-1) a failed estimate carried, or ``None``.
+
+    Its noise relative to the self term scales with this weight, so a value
+    above one means the sample cannot resolve an excess near zero.
+    """
+    if physical_electrons is None or incident_samples is None or incident_samples < 2:
+        return None
+    if physical_electrons <= 1:
+        return None
+    return pair_scale(physical_electrons, incident_samples)
+
+
 def require_resolved_power(
     power, *, energy_eV=None, incident_samples=None, physical_electrons=None, quantity="power"
 ):
@@ -120,11 +133,25 @@ def require_resolved_power(
     }
     if energy_eV is not None:
         diagnostics["first_invalid_energy_eV"] = float(_to_cpu(energy_eV[first]))
-    remedy = (
-        "check numerical inputs and arithmetic"
-        if nonfinite_count
-        else "increase --cxr-trials and check sampling convergence"
-    )
+    if nonfinite_count:
+        remedy = "check numerical inputs and arithmetic"
+    else:
+        remedy = "increase --cxr-trials and check sampling convergence"
+        ratio = undersampling_ratio(physical_electrons, incident_samples)
+        if ratio is not None:
+            diagnostics["pair_weight"] = ratio
+            if ratio > 1.0:
+                # Cross-pair noise ~ (N-1)/(M-1) x self term, so trials must
+                # approach N before an excess near zero resolves.
+                remedy = (
+                    f"the cross-electron excess is weighted by (N-1)/(M-1) = {ratio:.3g} "
+                    f"(N = {physical_electrons:.4g} bunch electrons, M = {incident_samples} "
+                    "trials), so its sampling noise swamps a near-zero coherent excess; "
+                    "remove sampled offsets (transverse=PointSpot(), "
+                    "longitudinal=PointBunch()), lower bunch_charge_pc until N <= M, use a "
+                    "finite Slab footprint with BunchLength so offsets are averaged "
+                    "analytically, or raise --cxr-trials toward N"
+                )
     raise CoherentSamplingError(
         "physical coherent power is unresolved: negative or nonfinite pair estimate; "
         f"{quantity}: {negative_count} finite negative, {nonfinite_count} nonfinite "

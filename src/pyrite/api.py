@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 
 from . import __version__
+from ._api_deprecations import warn_api
 from ._backend import BACKEND
 from .campaign.kinematic_validity import case_kinematic_validity
 from .campaign.lowering import build_case, build_sweep_cases
@@ -21,6 +22,7 @@ from .campaign.model import (
     EmissionMode,
     Numerics,
     Scene,
+    detector_with_scorer,
 )
 from .campaign.profiles import case_bremsstrahlung_marker, case_content_key
 from .detectors import Detector
@@ -247,7 +249,8 @@ def simulate(
     filters
         Ordered filter plates; valid only with a physical planar detector.
     pixel_scorer
-        Optional factorized spatial-scoring request for a pixelated detector.
+        Deprecated: set :attr:`PlanarDetector.scorer`. A pixelated detector
+        always returns spatial output.
 
     Returns
     -------
@@ -268,12 +271,14 @@ def simulate(
     resolved_numerics = Numerics() if numerics is None else numerics
     if not isinstance(resolved_numerics, Numerics):
         raise TypeError("numerics must be a Numerics")
+    if pixel_scorer is not None:
+        warn_api("simulate(pixel_scorer=)")
+        detector = detector_with_scorer(detector, pixel_scorer)
     scene = Scene(
         beam=beam,
         target=target,
         detector=detector,
         filters=filters,
-        pixel_scorer=pixel_scorer,
         acquisition=acquisition,
         emission=emission,
         brem_source=brem_source,
@@ -362,7 +367,7 @@ def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
     return ObservationPlan(
         ResolvedObservation(
             detector=detector,
-            scorer=PixelScorer() if scene.pixel_scorer is None else scene.pixel_scorer,
+            scorer=_detector_scorer(detector),
             filters=scene.filters,
             acquisition=scene.acquisition,
         ),
@@ -374,6 +379,11 @@ def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
         emission=scene.emission,
         brem_source=scene.brem_source,
     )
+
+
+def _detector_scorer(detector: PlanarDetector) -> PixelScorer:
+    """The detector's scorer; a pixel-free detector scores one whole-face tile."""
+    return PixelScorer() if detector.scorer is None else detector.scorer
 
 
 def _cxr_grid_provenance(case, output) -> dict[str, object]:
@@ -403,7 +413,7 @@ def _simulate_planar(
 ) -> Result:
     detector = scene.detector
     assert isinstance(detector, PlanarDetector)
-    scorer = PixelScorer() if scene.pixel_scorer is None else scene.pixel_scorer
+    scorer = _detector_scorer(detector)
     source_digest = case_content_key(case, xsgen_tables=xsgen_tables)
     tilt_deg = float(case.get("tilt_deg", 0.0))
     tilt_azim_deg = float(case.get("tilt_azim_deg", 0.0))
@@ -483,9 +493,7 @@ def _simulate_planar(
             **identity_provenance,
             **run_provenance(case, xsgen_tables),
         },
-        spatial=(
-            spatial if scene.pixel_scorer is not None or scene.acquisition is not None else None
-        ),
+        spatial=(spatial if detector.pixels is not None or scene.acquisition is not None else None),
     )
 
 

@@ -6,7 +6,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 
-from ._api_deprecations import renamed_fields
+from ._api_deprecations import renamed_fields, warn_api
 from ._precision import Precision
 
 MosaicRoute = Literal["analytic", "mc"]
@@ -114,8 +114,9 @@ class Numerics:
     transport_core
         ``"auto"``, ``"lockstep"``, ``"per-electron"``, or ``"cuda"``.
     backend
-        Requested array backend. An explicit value must match the backend
-        selected when PyRITE was imported.
+        Deprecated: the array backend is fixed when PyRITE is imported, from
+        ``PYRITE_MC_BACKEND`` (see ``pyrite config setup``). A value other than
+        ``"auto"`` only asserts that choice and warns.
     straggling
         Enable stochastic per-flight energy-loss straggling.
     energy_model
@@ -199,6 +200,10 @@ class Numerics:
     precision: Precision | None = None
 
     def __post_init__(self) -> None:
+        if self.backend != "auto":
+            # stacklevel 5: warn_api -> __post_init__ -> __init__ -> the
+            # renamed_fields wrapper -> the caller.
+            warn_api("Numerics(backend=)", stacklevel=5)
         if self.precision is not None:
             if not isinstance(self.precision, Precision):
                 raise TypeError("precision must be a Precision or None")

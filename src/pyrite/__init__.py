@@ -55,10 +55,10 @@ if TYPE_CHECKING:
         Offsets as Offsets,
     )
     from pyrite.campaign.beam import (
-        Point as Point,
+        PointBunch as PointBunch,
     )
     from pyrite.campaign.beam import (
-        PointBunch as PointBunch,
+        PointSpot as PointSpot,
     )
     from pyrite.campaign.beam import (
         Spot as Spot,
@@ -160,8 +160,8 @@ _PUBLIC_OBJECTS = {
     "BunchLength": ("pyrite.campaign.beam", "BunchLength"),
     "GdfSource": ("pyrite.campaign.beam", "GdfSource"),
     "Offsets": ("pyrite.campaign.beam", "Offsets"),
-    "Point": ("pyrite.campaign.beam", "Point"),
     "PointBunch": ("pyrite.campaign.beam", "PointBunch"),
+    "PointSpot": ("pyrite.campaign.beam", "PointSpot"),
     "Spot": ("pyrite.campaign.beam", "Spot"),
     "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
     "Convergence": ("pyrite.campaign.model", "Convergence"),
@@ -197,11 +197,20 @@ _PUBLIC_OBJECTS = {
 
 def __getattr__(name: str) -> Any:
     """Resolve the public simulation surface lazily."""
+    # import_module keeps these resolutions dynamic: a static ``from ... import``
+    # here would make every ``import pyrite`` depend on the whole surface for the
+    # import-linter layer contracts.
+    from importlib import import_module
+
+    if name == "Point":
+        from pyrite._api_deprecations import warn_api
+
+        warn_api("pyrite.Point")
+        return import_module("pyrite.campaign.beam").PointSpot
     try:
         module_name, attribute = _PUBLIC_OBJECTS[name]
     except KeyError as exc:
         raise AttributeError(name) from exc
-    from importlib import import_module
 
     value = getattr(import_module(module_name), attribute)
     globals()[name] = value

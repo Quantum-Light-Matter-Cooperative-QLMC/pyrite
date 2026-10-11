@@ -127,7 +127,7 @@ def execute_simulation(
         _text, document = _catalog_io.catalog_text()
         if resolver is None:
             resolver = resolve_scene
-        beam, target, detector, filters, scorer, acquisition, numerics, emission, selected_id = (
+        beam, target, detector, filters, _scorer, acquisition, numerics, emission, selected_id = (
             resolver(document, material, profile_name, detector_id)
         )
     except (OSError, ValueError, RuntimeError, ParseError) as exc:
@@ -149,7 +149,6 @@ def execute_simulation(
                 numerics=numerics,
                 emission=emission,
                 filters=filters,
-                pixel_scorer=scorer,
                 acquisition=acquisition,
             )
         if output_file is not None:

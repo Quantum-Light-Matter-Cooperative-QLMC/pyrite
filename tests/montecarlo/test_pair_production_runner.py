@@ -121,7 +121,11 @@ def test_case_pair_model_reaches_runner_transport(monkeypatch):
     detector = pr.Detector(
         energy_bins=EnergyBins(cxr=np.linspace(1500, 2000, 20), brem=np.linspace(1500, 9000, 20))
     )
-    scene = pr.Scene(pr.Beam(energy_keV=20.0), pr.Slab("silicon", thickness_ang=5.0e4), detector)
+    scene = pr.Scene(
+        pr.Beam(energy_keV=20.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Slab("silicon", thickness_ang=5.0e4, footprint=pr.Footprint(5.0, 5.0)),
+        detector,
+    )
     case = api.build_case(scene, numerics)
     assert case["pair_production_model"] == "penelope-2024"
     segments = _transport_case(case, transport_core="per-electron")["segs"]

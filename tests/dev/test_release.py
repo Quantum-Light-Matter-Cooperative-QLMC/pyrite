@@ -57,6 +57,7 @@ def test_due_removals_flags_targets_at_or_before_release_minor() -> None:
 def test_removal_targets_reads_every_registry_family(monkeypatch) -> None:
     import types
 
+    from pyrite import _api_deprecations as api_rows
     from pyrite import _module_deprecations as modules
     from pyrite.cli import _deprecations as cli
 
@@ -66,6 +67,7 @@ def test_removal_targets_reads_every_registry_family(monkeypatch) -> None:
     monkeypatch.setattr(cli, "DEPRECATIONS", {"a b": row})
     monkeypatch.setattr(cli, "DEPRECATED_FLAGS", {("run", "--x"): row})
     monkeypatch.setattr(cli, "IMPLICIT_DEFAULTS", {"profile": row})
+    monkeypatch.setattr(api_rows, "API_DEPRECATIONS", {"Beam() without x=": row})
 
     labels = release.removal_targets()
 
@@ -75,6 +77,7 @@ def test_removal_targets_reads_every_registry_family(monkeypatch) -> None:
         "command a b",
         "option run --x",
         "default profile",
+        "api Beam() without x=",
     }
     assert set(labels.values()) == {"0.9.0"}
 

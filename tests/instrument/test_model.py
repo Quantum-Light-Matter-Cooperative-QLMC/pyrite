@@ -8,20 +8,22 @@ from pyrite import api
 from pyrite.materials import MediumSpec
 
 
-def _detector() -> pr.PlanarDetector:
+def _detector(scorer=None) -> pr.PlanarDetector:
     return pr.PlanarDetector(
         pose=pr.PlanarPose.from_observation(100.0, 0.0),
         pixels=pr.PixelGrid(shape=(10, 10), pitch_mm=(1.0, 1.0)),
+        scorer=scorer,
     )
 
 
-def _scene(*, filters=(), pixel_scorer=None) -> pr.Scene:
+def _scene(*, filters=()) -> pr.Scene:
     return pr.Scene(
-        beam=pr.Beam(energy_keV=30.0),
-        target=pr.Slab("hopg", thickness_ang=1_000.0, tilt_deg=30.0),
+        beam=pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        target=pr.Slab(
+            "hopg", thickness_ang=1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)
+        ),
         detector=_detector(),
         filters=filters,
-        pixel_scorer=pixel_scorer,
     )
 
 
@@ -85,7 +87,7 @@ def test_off_centre_filter_is_valid_without_central_ray_intersection() -> None:
         name="right-edge",
     )
 
-    scene = _scene(filters=(plate,), pixel_scorer=pr.PixelScorer())
+    scene = _scene(filters=(plate,))
 
     assert scene.filters == (plate,)
 
@@ -116,19 +118,42 @@ def test_reversed_public_normal_is_rejected_instead_of_hidden_by_absolute_dot() 
 
 
 def test_pixel_scorer_requires_physical_pixels_and_bounded_angular_shape() -> None:
-    detector = pr.PlanarDetector(
-        pose=pr.PlanarPose((0.0, 0.0, 100.0)),
-        size_mm=(10.0, 10.0),
-    )
-    with pytest.raises(ValueError, match="requires PlanarDetector.pixels"):
-        pr.Scene(
-            beam=pr.Beam(30.0),
-            target=pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
-            detector=detector,
-            pixel_scorer=pr.PixelScorer(),
+    with pytest.raises(ValueError, match="scorer requires pixels"):
+        pr.PlanarDetector(
+            pose=pr.PlanarPose((0.0, 0.0, 100.0)),
+            size_mm=(10.0, 10.0),
+            scorer=pr.PixelScorer(),
         )
     with pytest.raises(ValueError, match="cannot exceed"):
-        _scene(pixel_scorer=pr.PixelScorer((11, 1)))
+        _detector(pr.PixelScorer((11, 1)))
+    assert _detector().scorer == pr.PixelScorer()
+    assert pr.PlanarDetector(pr.PlanarPose((0.0, 0.0, 100.0)), size_mm=(1.0, 1.0)).scorer is None
+
+
+def test_loose_pixel_scorer_is_deprecated_and_moves_onto_the_detector() -> None:
+    """Issue #451: the scorer belongs to the pixel detector it scores."""
+    scorer = pr.PixelScorer((2, 2))
+    with pytest.warns(DeprecationWarning, match=r"Scene\(pixel_scorer=\) is deprecated"):
+        scene = pr.Scene(
+            beam=pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+            target=pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+            detector=_detector(),
+            pixel_scorer=scorer,
+        )
+    assert scene.detector == _detector(scorer) and scene.pixel_scorer is None
+    with pytest.raises(ValueError, match="conflicts with PlanarDetector.scorer"):
+        with pytest.warns(DeprecationWarning):
+            pr.Scene(
+                beam=scene.beam,
+                target=scene.target,
+                detector=_detector(pr.PixelScorer((1, 2))),
+                pixel_scorer=scorer,
+            )
+
+
+def test_numerics_backend_is_deprecated() -> None:
+    with pytest.warns(DeprecationWarning, match=r"Numerics\(backend=\).*PYRITE_MC_BACKEND"):
+        pr.Numerics(backend="cpu")
 
 
 def test_physical_detector_projects_to_unchanged_case_schema() -> None:
@@ -163,12 +188,11 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
     monkeypatch.setattr(api, "run_case_directions", fake_directional)
     kwargs = dict(
         filters=(plate,),
-        pixel_scorer=pr.PixelScorer(),
         numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
     )
     result = pr.simulate(
-        pr.Beam(30.0),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         _detector(),
         **kwargs,
     )
@@ -199,8 +223,8 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
         pose=pr.PlanarPose((1.0, 0.0, 50.0)),
     )
     moved_result = pr.simulate(
-        pr.Beam(30.0),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         _detector(),
         **{**kwargs, "filters": (moved,)},
     )
@@ -218,8 +242,8 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
         name="operator label only",
     )
     labeled_result = pr.simulate(
-        pr.Beam(30.0),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         _detector(),
         **{**kwargs, "filters": (labeled,)},
     )
@@ -252,32 +276,31 @@ def test_acquisition_enabled_simulation_exposes_layered_identity(monkeypatch) ->
     )
     kwargs = dict(
         numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
-        pixel_scorer=pr.PixelScorer((1, 1)),
     )
     first = pr.simulate(
-        pr.Beam(30.0),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         detector,
         acquisition=acquisition,
         **kwargs,
     )
     rescored = pr.simulate(
-        pr.Beam(30.0),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         detector,
         acquisition=replace(acquisition, exposure_s=2.0),
         **kwargs,
     )
     implicit_scorer = pr.simulate(
-        pr.Beam(30.0),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         detector,
         acquisition=acquisition,
         numerics=kwargs["numerics"],
     )
     renormalized = pr.simulate(
-        pr.Beam(30.0, bunch_charge_pc=2.0),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        pr.Beam(30.0, bunch_charge_pc=2.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         detector,
         acquisition=acquisition,
         **kwargs,

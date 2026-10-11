@@ -190,8 +190,8 @@ For a single simulation with no files on disk:
 ```python
 import pyrite as pr
 
-beam = pr.Beam(energy_keV=30.0)
-target = pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0)
+beam = pr.Beam(energy_keV=30.0, transverse=pr.Spot(fwhm_x_mm=1.0), longitudinal=pr.PointBunch())
+target = pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0))
 detector = pr.Detector()
 result = pr.simulate(
     beam,

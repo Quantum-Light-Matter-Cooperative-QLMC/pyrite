@@ -593,7 +593,8 @@ def test_single_scene_and_checkpoint_lowering_share_seed_counts_and_explicit_gri
     beam, target, detector, filters, scorer, acquisition, numerics, emission, _id = (
         _simulation.resolve_scene(document, "hopg", "single")
     )
-    scene = Scene(beam, target, detector, filters=filters, pixel_scorer=scorer, emission=emission)
+    assert detector.scorer == scorer
+    scene = Scene(beam, target, detector, filters=filters, emission=emission)
     single = api.build_case(scene, numerics)
     settings = replace(
         config.default_settings(),
@@ -649,7 +650,7 @@ def test_ephemeral_real_api_preserves_case_and_spatial_output(tmp_path, monkeypa
 def test_single_scene_named_gdf_clears_default_spot(tmp_path, monkeypatch):
     import tomlkit
 
-    from pyrite.campaign.beam import Point
+    from pyrite.campaign.beam import PointSpot
     from tests.montecarlo.test_gdf import write_gdf
 
     document = _single_scene_catalog(tmp_path, monkeypatch)
@@ -665,6 +666,6 @@ def test_single_scene_named_gdf_clears_default_spot(tmp_path, monkeypatch):
     _catalog_io.atomic_write(_catalog_io.active_catalog_path(), tomlkit.dumps(document))
     beam, *_ = _simulation.resolve_scene(document, "hopg", "single")
     assert beam.gdf is not None and beam.gdf.normalization == "gdf_charge"
-    assert isinstance(beam.transverse, Point)
+    assert isinstance(beam.transverse, PointSpot)
     assert beam.rep_rate_hz == 3000
     assert beam.to_spec().gdf_beam().absolute_charge_c > 0

@@ -58,7 +58,7 @@ Spot FWHM, divergence and emittance are three numbers that over-determine two an
 | -------------------------------------------- | ------------------------------------------------- |
 | `TransverseDistribution` (Twiss per plane)   | full three-moment description                     |
 | `Spot(fwhm_x_mm, fwhm_y_mm)`                 | zero-emittance waist: `alpha = 0`, zero divergence |
-| `Point()`                                    | no spot size, no divergence                       |
+| `PointSpot()`                                | no spot size, no divergence                       |
 
 `Beam` holds exactly one of these, so combining a spot FWHM with a Twiss block is not representable (in profile files, which keep the flat spelling, it is still a hard error). `energy_spread_frac` is a separate canonical field: longitudinal only, no Twiss equivalent.
 

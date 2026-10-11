@@ -17,6 +17,7 @@ or being conspicuously absent.
 import pytest
 
 from pyrite import __version__
+from pyrite._api_deprecations import API_DEPRECATIONS, _window
 from pyrite._module_deprecations import MODULE_DEPRECATIONS, PUBLIC_EXPORT_DEPRECATIONS
 from pyrite.cli._deprecations import DEPRECATED_FLAGS, DEPRECATIONS, IMPLICIT_DEFAULTS
 
@@ -96,6 +97,18 @@ def test_no_relocated_public_export_is_past_its_removal_target() -> None:
     )
 
 
+def test_no_deprecated_api_spelling_is_past_its_removal_target() -> None:
+    overdue = _overdue({key: entry.remove_in for key, entry in API_DEPRECATIONS.items()})
+
+    assert not overdue, (
+        f"pyrite-mc {__version__} still accepts {len(overdue)} Python API spelling(s) "
+        f"at or past their removal target: {sorted(overdue)}."
+    )
+    for key, entry in API_DEPRECATIONS.items():
+        assert entry.spelling == key
+        assert entry.remove_in == _window(entry.deprecated_in)
+
+
 def test_no_scheduled_removal_is_due_at_the_shipping_version() -> None:
     """The release gate and the shipping version agree: nothing due is left."""
     from pyrite.devtools.release import due_removals
@@ -110,6 +123,7 @@ def test_no_scheduled_removal_is_due_at_the_shipping_version() -> None:
         pytest.param([entry.remove_in for entry in DEPRECATED_FLAGS.values()], id="options"),
         pytest.param([entry.remove_in for entry in MODULE_DEPRECATIONS.values()], id="modules"),
         pytest.param([e.remove_in for e in PUBLIC_EXPORT_DEPRECATIONS.values()], id="exports"),
+        pytest.param([e.remove_in for e in API_DEPRECATIONS.values()], id="api"),
     ],
 )
 def test_every_removal_target_is_a_parseable_version(targets: list[str]) -> None:

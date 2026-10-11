@@ -68,7 +68,6 @@ def produce_observation(
         emission=scene.emission,
         brem_source=scene.brem_source,
         filters=scene.filters,
-        pixel_scorer=scene.pixel_scorer,
         acquisition=scene.acquisition,
     )
     produced = observation_from_result(result)

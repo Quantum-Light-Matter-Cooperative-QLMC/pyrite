@@ -72,6 +72,7 @@ def _minor(version: str) -> tuple[int, int]:
 
 def removal_targets() -> dict[str, str]:
     """Every scheduled removal as ``label -> remove_in`` across all shim families."""
+    from pyrite._api_deprecations import API_DEPRECATIONS
     from pyrite._module_deprecations import MODULE_DEPRECATIONS, PUBLIC_EXPORT_DEPRECATIONS
     from pyrite.cli._deprecations import DEPRECATED_FLAGS, DEPRECATIONS, IMPLICIT_DEFAULTS
 
@@ -87,6 +88,7 @@ def removal_targets() -> dict[str, str]:
             for (mod, name), e in PUBLIC_EXPORT_DEPRECATIONS.items()
         }
     )
+    targets.update({f"api {key}": e.remove_in for key, e in API_DEPRECATIONS.items()})
     return targets
 
 
