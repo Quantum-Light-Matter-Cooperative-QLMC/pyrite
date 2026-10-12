@@ -8,7 +8,7 @@ license-files = ["LICENSE.txt", "THIRD-PARTY-NOTICES.md"]
 classifiers = [
     "License :: Other/Proprietary License",
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "backports.zstd>=1.7; python_version < '3.14'",
     "click>=8.4.1",
@@ -38,7 +38,7 @@ nvidia = [
     "cupy-cuda13x[ctk]>=14.1.1",
 ]
 # AMD's current ``amd-cupy`` wheels are CPython 3.10-only. PyRITE requires
-# Python 3.13+, so this extra builds upstream CuPy against ROCm instead. It must
+# Python 3.14+, so this extra builds upstream CuPy against ROCm instead. It must
 # not be installed beside the CUDA CuPy distribution in one environment.
 amd = [
     "cupy>=13.4.0",
