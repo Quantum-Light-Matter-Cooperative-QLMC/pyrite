@@ -2,6 +2,10 @@
 
 Use the Python API for scalar, in-memory simulations and programmatic case construction. Use `pyrite run` for named profiles, resumable checkpoints, remote execution, and the checkpoint-driven analysis apps.
 
+For comparison curves or heatmaps of vacuum line-centre photon energies across
+materials, beam energies, and angles, use [`pyrite.photon_energies`](../api.md#photon-energy-comparisons).
+It returns arrays without transport; its beam-energy input is in eV.
+
 ## Run one scene in memory
 
 The root package exposes the supported high-level objects. `simulate` accepts the scene's three components as separate arguments; it does not accept a `Scene` object directly.

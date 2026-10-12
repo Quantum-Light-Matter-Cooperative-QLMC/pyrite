@@ -176,3 +176,142 @@ Added by the task owner, not the verifier.
 
 - Finding 1 is closed by `tests/montecarlo/test_line_friedel_pairing.py::test_total_yield_matches_the_unconjugated_native_pairing`. It feeds the kernel the jointly unconjugated native pair $\{\chi(-hkl),U(-hkl)\}$ and requires the production total at `rtol=1e-9`. A mutant returning the mixed $\{\overline{\chi(-hkl)},U(-hkl)\}$ fails it.
 - Finding 2 is fixed: the `line_energy_eV` docstring and the dependent notes now state only the momentum transfer $-\mathbf g$.
+
+## Deterministic photon-energy API: independent derivation (#469)
+
+Fresh-context verifier, 2026-10-12. This section was written from the ledger,
+public signature and derivation docstrings before reading implementation bodies.
+The scope is the vacuum, straight-beam API `materials.emission.photon_energies`,
+not an intensity prediction or an in-medium resonance.
+
+For electron kinetic energy $T$, let $\gamma=1+T/(m_ec^2)$ and
+$\beta=\sqrt{1-\gamma^{-2}}$. Phase matching of a straight electron with the
+outgoing wave and reciprocal transfer $-\mathbf g$ gives
+$\omega=(\omega\hat{\mathbf n}+\mathbf g)\cdot\boldsymbol\beta$.
+Because $1-\beta\cos\theta_{\rm obs}>0$, choosing the positive-projection
+Friedel mate yields
+
+$$
+E_\gamma=\hbar c\,\frac{\beta\lvert\hat{\mathbf z}\cdot\mathbf g_{\rm lab}\rvert}
+{1-\beta\cos\theta_{\rm obs}}.
+$$
+
+Here $\mathbf g$ includes $2\pi$ and carries inverse angstroms; $\hbar c$
+carries eV angstroms. Detector azimuth cancels because the beam is lab $+z$.
+As $T\to0$, $E_\gamma\to0$; zero projection gives no positive-frequency line.
+The API's NaN at zero projection and at $E_\gamma>T$ is a selection policy:
+the classical resonance alone does not enforce recoil or photon energy conservation.
+The absolute value denotes mate selection for energy only; it must not be used
+to infer equal intensities of Bijvoet pairs with anomalous scattering.
+
+Let $O$ carry the catalogue direct cut axis or reciprocal surface normal to
+sample $+z$. For reciprocal cuts, $\mathbf a_i\cdot\mathbf b_j=2\pi\delta_{ij}$
+proves that $\sum h_i\mathbf b_i$ is normal to the Miller plane, including
+nonorthogonal cells. For unit cut normal $\mathbf u$, the minimal proper
+rotation has axis $\mathbf u\times\hat{\mathbf z}$ and angle
+$\arccos(\mathbf u\cdot\hat{\mathbf z})$; the antiparallel case requires a
+proper half-turn, not an inversion. Define the tilted sample rotation
+$S=R_z(\varphi)R_y(\alpha)R_z(-\varphi)$. Then $S\hat{\mathbf z}$ points toward
+positive lab $x$ at positive $\alpha$ and zero $\varphi$, and
+
+$$
+\hat{\mathbf z}\cdot\mathbf g_{\rm lab}
+=-\sin\alpha\cos\varphi\,(O\mathbf g)_x
+-\sin\alpha\sin\varphi\,(O\mathbf g)_y
++\cos\alpha\,(O\mathbf g)_z.
+$$
+
+A normal-aligned reflection therefore gives $\lvert\mathbf g\rvert
+\lvert\cos\alpha\rvert$, independent of tilt azimuth; an off-normal reflection
+retains its azimuth dependence and can distinguish the tilt sign.
+
+For default-plane selection, group fractional basis sites by element:
+
+$$
+P_s(hkl)=\sum_{j\in s}\exp(2\pi i\,hkl\cdot\mathbf R_j),\qquad
+F(hkl,E)=\sum_s f_s(hkl,E)P_s(hkl).
+$$
+
+If every $P_s$ vanishes, extinction is independent of atomic factors and photon
+energy. Cancellation only between different species is not a systematic
+extinction. A per-element relative amplitude tolerance of $10^{-5}$ is a
+numerical policy, not a universal physical threshold. Searching the first 32
+positive harmonics of the primitive cut is finite default-selection policy;
+explicit Miller triples may still give kinematic energies for extinct planes.
+
+### API comparison and evidence
+
+After the independent expression above was recorded, implementation inspection
+found no divergent sign, factor, unit or composition order. `photon_energies`
+uses the derived sample projection and a stable identity for the denominator:
+
+$$
+1-\beta\cos\theta
+=\frac{\gamma^{-2}}{1+\beta}+2\beta\sin^2(\theta/2).
+$$
+
+Its mask implements the stated $10^{-12}$ relative grazing tolerance and
+$0<E_\gamma\leq T$. `_primary_hkl` reduces the cut by its integer gcd, takes
+the lowest squared-index-norm pinned parallel family, or visits harmonics
+1--32 and retains the first with any element-group amplitude greater than
+$10^{-5}$ times that element's site count. This matches the derived
+energy-independent extinction criterion under the stated full-occupancy
+assumption. Pinned families are authoritative and deliberately bypass the
+extinction estimate. Explicit triples bypass default selection.
+`materials.crystal._orientation_R` composes the derived proper minimal rotation
+and right-handed roll; `montecarlo.geometry._orientation_R` forwards every
+argument to it. The half-turn branch of `_rotation_between` is proper.
+
+Independent numeric construction used the catalogue's six cell parameters,
+a Cartesian direct basis, $2\pi A^{-\mathsf T}$, and an independently assembled
+Rodrigues matrix; it used no PyRITE geometry or reciprocal helpers. At 80 keV,
+polar tilt $23^\circ$, tilt azimuth $37^\circ$, and lab observation polar angle
+$119^\circ$, the following results were obtained with `uv run python` through
+the project environment:
+
+| material | reflection | independent energy (eV) | API energy (eV) |
+| --- | --- | --- | --- |
+| HOPG | $(101)$ | 224.404512716 | 224.404512747 |
+| HOPG | $(002)$ | 1374.087449302 | 1374.087449487 |
+| monoclinic GeP | $(101)$ | 111.333920974 | 111.333920989 |
+| monoclinic GeP | $(002)$ | 654.911097203 | 654.911097292 |
+| silicon | $(101)$ | 921.723869507 | 921.723869631 |
+| silicon | $(002)$ | 713.730917372 | 713.730917469 |
+
+All six agree within $1.35\times10^{-10}$ relative; independently supplied
+physical constants account for the common residual. GeP tests the nonorthogonal
+cut rather than a direct-axis approximation. HOPG $(002)$ at grazing tilt gives
+NaN; its 1 eV incident-energy resonance also gives NaN. GeP opposite $(101)$
+Friedel mates return exactly equal energies. The silicon extinct $(002)$
+example deliberately confirms that explicit overrides compute kinematics.
+
+Source access: the [published Zhai article](https://www.nature.com/articles/s41467-025-66063-6)
+directly displays the same vacuum resonance in its main-text Eq. (1).
+The requested Eq. (10) numbering was not independently retrieved in this pass;
+it appears to refer to a supplement or earlier manuscript. The full
+Feranchuk--Spence 2000 paper was not retrieved; its attribution remains inherited
+from the ledger. The independent phase-matching derivation and the accessible
+Zhai expression supply the physics evidence for this scoped API verification.
+
+**Verdict: rederived** for the added API applications of
+`line-energy-dispersion`, `surface-hkl-orientation` and `structure-factor`.
+No physics discrepancy found. Suggested owner-applied ledger edits: add
+`src/pyrite/materials/emission.py::photon_energies` to the line-energy and
+orientation owners; make `src/pyrite/materials/crystal.py::_orientation_R` the
+orientation definition owner, retaining the Monte Carlo wrapper as plumbing;
+add `src/pyrite/materials/emission.py::_primary_hkl` to the structure-factor
+owners with the full-occupancy and tolerance scope. Existing claim statuses
+need not be downgraded; new API anchors belong to the task owner. Human
+sign-off is not conferred by this pass.
+
+Relocation check: AST comparison against the worktree's pre-change `HEAD`
+confirmed the executable body of `_orientation_R` is identical after moving
+from `montecarlo.geometry` to `materials.crystal` (docstrings excluded).
+`pyrite-dev test tests/dev/test_docs.py`: **6 passed**.
+`pyrite-dev test tests/montecarlo/test_surface_orientation.py
+ tests/materials/test_emission.py`: **53 passed** (three existing detector
+argument deprecation warnings). Direct basis-sum probes confirm selected
+HOPG/hBN $(002)$ and silicon $(220)$ have normalized per-element amplitude 1;
+GeP $(20\bar2)$ has Ge/P amplitudes 0.34598/0.08468, both allowed. These
+catalogue probes supplement the independent derivation; they are not independent
+measurements of the atomic positions.

@@ -17,7 +17,7 @@ materials.atomic:
   * photoabsorption length from Henke f2, and the coherent+incoherent
     scattering term that completes the narrow-beam attenuation coefficient,
   * dominant_reflections (rank reflection families by |S| e^{-W} / g^2),
-  * _rotation_between (minimal rotation matrix, used to orient crystals).
+  * _rotation_between and _orientation_R (shared crystal-cut rotations).
 
 Units: energies eV, lengths Angstrom, angles radians.
 
@@ -700,6 +700,49 @@ def _rotation_between(u_hat, t_hat):
     axis = axis / s
     K = np.array([[0.0, -axis[2], axis[1]], [axis[2], 0.0, -axis[0]], [-axis[1], axis[0], 0.0]])
     return np.eye(3) + s * K + (1.0 - c) * (K @ K)
+
+
+def _orientation_R(
+    lattice,
+    beam_uvw,
+    azimuth_rad,
+    recip_miscut_rad: tuple[float, float] | None = None,
+    surface_hkl: tuple[int, int, int] | None = None,
+):
+    """Orient a crystal cut onto sample +z, then apply a right-handed roll.
+
+    Source: reciprocal-lattice geometry and Rodrigues rotation. A direct
+    ``beam_uvw`` axis and a reciprocal ``surface_hkl`` normal are mutually
+    exclusive. Assumes unit sample +z is the slab normal. In an orthogonal
+    one-axis cell both cut spellings give the same rotation; with no cut,
+    azimuth, or miscut the construction-frame default returns ``None``.
+
+    Validation: surface-hkl-orientation
+    """
+    if beam_uvw is not None and surface_hkl is not None:
+        raise ValueError("beam_uvw and surface_hkl are mutually exclusive")
+
+    R = None
+    if beam_uvw is not None:
+        u, v, w = np.asarray(beam_uvw, dtype=float)
+        a1, a2, a3 = _direct_lattice_vectors(lattice)
+        axis = u * a1 + v * a2 + w * a3
+        R = _rotation_between(axis / np.linalg.norm(axis), np.array([0.0, 0.0, 1.0]))
+    elif surface_hkl is not None:
+        axis, axis_norm = reciprocal_g_vector(surface_hkl, lattice)
+        R = _rotation_between(axis / axis_norm, np.array([0.0, 0.0, 1.0]))
+    if azimuth_rad:
+        ca, sa = np.cos(azimuth_rad), np.sin(azimuth_rad)
+        Rz = np.array([[ca, -sa, 0.0], [sa, ca, 0.0], [0.0, 0.0, 1.0]])
+        R = Rz if R is None else Rz @ R
+    if recip_miscut_rad is not None:
+        mp, ma = recip_miscut_rad
+        if mp:
+            st, ct = np.sin(mp), np.cos(mp)
+            miscut_dir = np.array([st * np.cos(ma), st * np.sin(ma), ct])
+            R_miscut = _rotation_between(np.array([0.0, 0.0, 1.0]), miscut_dir)
+            R = R_miscut if R is None else R_miscut @ R
+    return R
 
 
 # ---- reflection ranking -----------------------------------------------------
