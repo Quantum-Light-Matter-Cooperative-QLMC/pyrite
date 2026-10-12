@@ -130,6 +130,7 @@ if TYPE_CHECKING:
     from pyrite.instrument import (
         ResolvedObservation as ResolvedObservation,
     )
+    from pyrite.materials.emission import photon_energies as photon_energies
     from pyrite.results.model import (
         CxrSpectra as CxrSpectra,
     )
@@ -199,6 +200,7 @@ _PUBLIC_OBJECTS = {
     "SpectralFactors": ("pyrite.results.model", "SpectralFactors"),
     "Sweep": ("pyrite.campaign.model", "Sweep"),
     "fetch_tables": ("pyrite.xsgen.install", "fetch_tables"),
+    "photon_energies": ("pyrite.materials.emission", "photon_energies"),
     "simulate": ("pyrite.api", "simulate"),
 }
 

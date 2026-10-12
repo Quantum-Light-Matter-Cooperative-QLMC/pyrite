@@ -2,6 +2,10 @@
 
 Use the Python API for scalar, in-memory simulations and programmatic case construction. Use `pyrite run` for named profiles, resumable checkpoints, remote execution, and the checkpoint-driven analysis apps.
 
+For comparison curves or heatmaps of vacuum line-centre photon energies across
+materials, beam energies, and angles, use [`pyrite.photon_energies`](../api.md#photon-energy-comparisons).
+It returns arrays without transport; its beam-energy input is in eV.
+
 ## Run one scene in memory
 
 The root package exposes the supported high-level objects. `simulate` accepts the scene's three components as separate arguments; it does not accept a `Scene` object directly.
@@ -162,14 +166,14 @@ energy_eV, selected = spatial.spectra(
 )
 line_image = spatial.image((4_000.0, 6_000.0), component="cxr")
 metadata = spatial.pixel_metadata(pixels=[(128, 64), (128, 192)])
-shadow = spatial.transmission_image(5_000.0, component="background")
+shadow = spatial.transmission_image(5_000.0, component="brem")
 ```
 
 A pixelated detector always returns `spatial`; its `PlanarDetector.scorer` sets the angular partition and defaults to `PixelScorer()` (one tile). `simulate(pixel_scorer=...)` is deprecated (removed in 0.14.0) and moves the value onto the detector.
 
 Selected spectra include each pixel's solid angle and therefore have units of photons per incident electron per eV. `component="cxr"` and `"coherent"` are PXR/CBS only; `"characteristic"` is the atomic-relaxation component, and `"cxr_total"`/`"coherent_total"` add it to the corresponding line. `Result.cxr.incoherent.density` remains a detector- averaged density per sr. `SpatialResult` stores tile spectra, pixel rays, and attenuation coefficients as separate factors; `spectra` materializes only the selection and `image` works in bounded pixel chunks rather than allocating a full `(row, column, energy)` cube. Pass `measured=True` to either method to apply a configured `PlanarDetector.response` explicitly.
 
-`pixel_metadata` returns, for a selection only, each pixel's detector-local and lab position, unit direction with lab polar/azimuth angles, distance, scored solid angle, angular tile (and its representative direction when retained), and per-filter path length. `filter_coverage()` marks which centre rays cross each plate, and `transmission_image(energy_eV, component=...)` is the primary transmission at the nearest stored node of that component's energy grid (`energy_node` reports it); an energy outside the grid is an error rather than a snap to its end, so use `"background"` for the wide continuum grid. Uncovered pixels are exactly 1.
+`pixel_metadata` returns, for a selection only, each pixel's detector-local and lab position, unit direction with lab polar/azimuth angles, distance, scored solid angle, angular tile (and its representative direction when retained), and per-filter path length. `filter_coverage()` marks which centre rays cross each plate, and `transmission_image(energy_eV, component=...)` is the primary transmission at the nearest stored node of that component's energy grid (`energy_node` reports it); an energy outside the grid is an error rather than a snap to its end, so use `"brem"` for the wide continuum grid. Uncovered pixels are exactly 1.
 
 By default each pixel takes the intrinsic spectrum of the angular tile containing it (`PixelScorer(reconstruction="nearest_tile")`), so a smooth angular gradient such as takeoff-angle self-absorption renders as tile-sized steps. `PixelScorer(angular_shape, reconstruction="bilinear_tile")` instead blends the neighbouring tiles' spectra with convex bilinear weights at the same transport cost. Pixels beyond the outermost tile centres keep the edge tile's spectrum, and because blending mixes spectra at fixed energy, a line whose energy shifts with angle (PXR/coherent) broadens or doubles instead of shifting. Use it for smooth components and raise `angular_shape` for angle-dispersed lines. The mode is part of the true-spatial identity. See the [`pixel-angular-interpolation`](../validation/ledger-detector-forward-models.md#pixel-angular-interpolation) ledger row.
 

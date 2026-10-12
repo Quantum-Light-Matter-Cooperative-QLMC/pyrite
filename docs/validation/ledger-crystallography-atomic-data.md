@@ -5,12 +5,12 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `structure-factor`
 
 - **Claim:** structure factor `F(g)` + Debye–Waller
-- **Code:** `materials/crystal.py::structure_factor`, `::debye_waller`
+- **Code:** `materials/crystal.py::structure_factor`, `::debye_waller`; `materials/emission.py::_primary_hkl` (element-grouped extinction sums for unpinned cuts)
 - **Source:** standard crystallography
 - **Status:** anchored
 - **Checks:** units, forward/`g→0`/`B→0` limits, phase sign, DW exponent `16π²` normalization; diamond extinct/allowed + pinned DW value anchored green
-- **Anchor:** `tests/materials/test_crystallography.py::test_diamond_structure_factor_extinct`, `::test_diamond_structure_factor_allowed`, `::test_debye_waller_pinned_value`
-- **Notes:** independent derivation matches (three concurring fresh-context passes); phase `exp(2π i hkl·R)`, single amplitude DW `exp(−B g²/16π²)` with `B=8π²⟨u_g²⟩` under `g=2π/d` (factor-4 trap ruled out); diamond `(222)/(200)` extinct, `(111)/(220)/(311)/(400)` allowed pinned by regression test; in-code `Validation:` markers now present on both symbols. Remaining caveat: single scalar `B` per crystal (isotropic approx); [write-up](atomic-physics/structure-factor.md)
+- **Anchor:** `tests/materials/test_crystallography.py::test_diamond_structure_factor_extinct`, `::test_diamond_structure_factor_allowed`, `::test_debye_waller_pinned_value`; `tests/materials/test_emission.py::{test_unpinned_cut_uses_first_nonextinct_harmonic,test_primary_reflection_matches_explicit}`
+- **Notes:** independent derivation matches (three concurring fresh-context passes); phase `exp(2π i hkl·R)`, single amplitude DW `exp(−B g²/16π²)` with `B=8π²⟨u_g²⟩` under `g=2π/d` (factor-4 trap ruled out); diamond `(222)/(200)` extinct, `(111)/(220)/(311)/(400)` allowed pinned by regression test; in-code `Validation:` markers now present on both symbols. Remaining caveat: single scalar `B` per crystal (isotropic approx); [write-up](atomic-physics/structure-factor.md). **2026-10-12 (#469):** fresh-context [API verification](radiation-physics/line-energy-dispersion.md) also matches element-grouped extinction sums for fully occupied sites. Unpinned default selection searches harmonics 1–32 with a relative per-element amplitude tolerance of `1e-5`; pinned parallel families bypass this numerical estimate.
 
 ## `debye-waller-catalog-provenance`
 
@@ -25,12 +25,12 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `surface-hkl-orientation`
 
 - **Claim:** reciprocal cleavage-plane normal `g_hkl = h b1 + k b2 + l b3` is mapped to sample `+z` by a proper minimal rotation, followed by the configured right-handed azimuth about `+z`
-- **Code:** `montecarlo/geometry.py::_orientation_R`; plumbing through `campaign/sweep.py`, `montecarlo/spectrum/cxr/`, `montecarlo/detector.py`, and `montecarlo/runner/__init__.py`
+- **Code:** `materials/crystal.py::_orientation_R`, `materials/emission.py::photon_energies`, `montecarlo/geometry.py::_orientation_R` (compatibility forwarder); plumbing through `campaign/sweep.py`, `montecarlo/spectrum/cxr/`, `montecarlo/detector.py`, and `montecarlo/runner/__init__.py`
 - **Source:** standard reciprocal-lattice geometry and Rodrigues rotation
-- **Status:** rederived
+- **Status:** anchored
 - **Checks:** reciprocal/direct equivalence for orthogonal one-axis cuts; nonorthogonal reciprocal-normal alignment; determinant/azimuth handedness; mutually exclusive parser/API inputs; legacy direct-axis matrix frozen bit-for-bit
-- **Anchor:** `tests/montecarlo/test_surface_orientation.py`; `tests/materials/test_material_catalog.py::test_crystal_requires_exactly_one_orientation`, `::test_crystal_accepts_reciprocal_surface_orientation`
-- **Notes:** Implementation-side record only. Exact reciprocal orientation removes the direct-axis approximation for nonorthogonal cleavage planes; an explicit Sweep/Layer `beam_uvw` override clears the catalog surface orientation.
+- **Anchor:** `tests/montecarlo/test_surface_orientation.py`; `tests/materials/test_material_catalog.py::test_crystal_requires_exactly_one_orientation`, `::test_crystal_accepts_reciprocal_surface_orientation`; `tests/materials/test_emission.py::{test_nonorthogonal_default_is_reciprocal_normal,test_oblique_reflection_full_orientation_and_friedel_pair}`
+- **Notes:** Exact reciprocal orientation removes the direct-axis approximation for nonorthogonal cleavage planes; an explicit Sweep/Layer `beam_uvw` override clears the catalog surface orientation. **2026-10-12 (#469):** fresh-context [API verification](radiation-physics/line-energy-dispersion.md) matches minimal rotation, handedness and the nonorthogonal GeP cut. The shared implementation moved unchanged to `materials.crystal`; existing orientation tests and new API numerical anchors pass. Human sign-off pending.
 
 ## `crystals-cif-adapter`
 

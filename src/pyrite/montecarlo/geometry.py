@@ -19,7 +19,8 @@ import numpy as np
 from numba import njit
 
 from .._planar_geometry import PixelGrid, PlanarPose, planar_rays
-from ..materials.crystal import _direct_lattice_vectors, _rotation_between, reciprocal_g_vector
+from ..materials.crystal import _orientation_R as _crystal_orientation_R
+from ..materials.crystal import _rotation_between
 
 X_MIN = 0
 X_MAX = 1
@@ -553,30 +554,7 @@ def _orientation_R(
     that always passes recip_miscut_rad=(0.0, 0.0) gets the None behavior
     exactly. Not yet wired into any grid/study -- plumbed for a future
     asymmetric-reflection (g not || n) study."""
-    if beam_uvw is not None and surface_hkl is not None:
-        raise ValueError("beam_uvw and surface_hkl are mutually exclusive")
-
-    R = None
-    if beam_uvw is not None:
-        u, v, w = np.asarray(beam_uvw, dtype=float)
-        a1, a2, a3 = _direct_lattice_vectors(lattice)
-        axis = u * a1 + v * a2 + w * a3
-        R = _rotation_between(axis / np.linalg.norm(axis), np.array([0.0, 0.0, 1.0]))
-    elif surface_hkl is not None:
-        axis, axis_norm = reciprocal_g_vector(surface_hkl, lattice)
-        R = _rotation_between(axis / axis_norm, np.array([0.0, 0.0, 1.0]))
-    if azimuth_rad:
-        ca, sa = np.cos(azimuth_rad), np.sin(azimuth_rad)
-        Rz = np.array([[ca, -sa, 0.0], [sa, ca, 0.0], [0.0, 0.0, 1.0]])
-        R = Rz if R is None else Rz @ R
-    if recip_miscut_rad is not None:
-        mp, ma = recip_miscut_rad
-        if mp:
-            st, ct = np.sin(mp), np.cos(mp)
-            miscut_dir = np.array([st * np.cos(ma), st * np.sin(ma), ct])
-            R_miscut = _rotation_between(np.array([0.0, 0.0, 1.0]), miscut_dir)
-            R = R_miscut if R is None else R_miscut @ R
-    return R
+    return _crystal_orientation_R(lattice, beam_uvw, azimuth_rad, recip_miscut_rad, surface_hkl)
 
 
 def _small_tilt_R(dx_rad, dy_rad):

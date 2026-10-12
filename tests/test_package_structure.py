@@ -63,6 +63,7 @@ def test_root_exports_stay_frozen() -> None:
         "SpectralFactors",
         "Sweep",
         "fetch_tables",
+        "photon_energies",
         "simulate",
     ]
 

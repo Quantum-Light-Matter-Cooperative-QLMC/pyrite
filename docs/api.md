@@ -12,6 +12,93 @@ charge from selected records; this replaces configured `bunch_charge_pc`.
 The default rate is 5000 Hz. Clear both analytic spot FWHMs for a GDF `Beam`.
 Named catalog beams clear those inherited defaults during profile resolution.
 
+## Photon-energy comparisons
+
+`pyrite.photon_energies` returns a NumPy array of vacuum CXR line-centre energies
+without running transport. The implementation lives in
+`pyrite.materials.emission`. Beam kinetic energy and returned photon energy are
+in **eV**; sample and detector angles are in degrees. Inputs may be scalars,
+lists, or arrays. The default `mode="broadcast"` pairs numerical inputs using
+NumPy broadcasting and retains a leading material axis; all-scalar inputs
+return `(n_materials,)`.
+
+```python
+import numpy as np
+import pyrite as pr
+from pyrite.materials.crystal import HC_EV_ANG
+
+observation_deg = np.linspace(20.0, 160.0, 141)
+energies_eV = pr.photon_energies(
+    ["hopg", "mos2", "wse2"],
+    beam_energy_eV=30_000.0,
+    tilt_deg=30.0,
+    tilt_azim_deg=15.0,
+    theta_obs_deg=observation_deg,
+)
+# Each row is one material's comparison curve, shape (3, 141).
+wavelengths_nm = HC_EV_ANG / (10.0 * energies_eV)
+```
+
+For a heatmap, either shape independent inputs for broadcasting or request a
+Cartesian product with `mode="grid"`:
+
+```python
+tilts_deg = np.linspace(0.0, 80.0, 81)
+energies_eV = pr.photon_energies(
+    ["hopg", "mos2"],
+    beam_energy_eV=[30_000.0, 100_000.0],
+    tilt_deg=tilts_deg,
+    theta_obs_deg=observation_deg,
+    mode="grid",
+)
+# Axis order: material, beam energy, tilt, tilt azimuth,
+#             detector polar angle, detector azimuth.
+hopg_30keV_heatmap = energies_eV[0, 0, :, 0, :, 0]  # (81, 141)
+
+# The same two-angle map with broadcast inputs:
+paired_map = pr.photon_energies(
+    "hopg",
+    30_000.0,
+    tilt_deg=tilts_deg[:, None],
+    theta_obs_deg=observation_deg[None, :],
+)[0]
+```
+
+Grid mode accepts scalar or 1-D numerical axes. Scalar axes retain size one,
+empty axes retain size zero, and material order and duplicates are preserved.
+Both modes accept `phi_obs_deg`; it participates in shape resolution but does
+not change this straight-beam vacuum energy because the beam points along lab
+`+z`. Sample `tilt_azim_deg` can affect oblique reflections; a reflection
+parallel to the surface normal is azimuth-independent.
+
+The default reflection is the lowest catalogue-pinned family parallel to the
+declared surface normal, or the first non-extinct harmonic (orders 1–32) of its
+primitive reciprocal cut. The unpinned search tests each element's fractional
+basis sum with a relative amplitude tolerance of `1e-5` for CIF rounding; it
+does not rank intensities. Examples include HOPG/MoS₂ `(002)`, black phosphorus
+`(020)`, and GeP `(20-2)`. `hkl=(h, k, l)` overrides all materials;
+`hkl={"hopg": (0, 0, 4)}` overrides just that material. Explicit indices give
+kinematics even for extinct planes and do not promise emission intensity.
+An unresolved cut requires explicit indices. The catalogue surface orientation
+is retained when selecting an oblique reflection; the reflection override does
+not change the crystal cut. `catalog=` accepts a loaded `MaterialCatalog` or a
+complete catalogue path; omission uses the current configured catalogue.
+
+Each reflection denotes its Friedel pair, choosing the member with positive
+beam projection. Grazing projections within `1e-12 * |g|` of zero and energies
+above the electron kinetic energy return `NaN`. Invalid inputs and incompatible
+shapes raise `ValueError`. These are straight-electron, vacuum resonance
+energies, not intensity maxima or broadened spectra. Production in-medium
+dispersion can shift line centres; mosaicity, transport energy loss, and
+detector response require the simulation API.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: _autosummary
+
+   pyrite.photon_energies
+```
+
 ## Scene simulation
 
 The root package exposes the preferred high-level API. A `Scene` contains one scalar `Beam`, target, and either the compatibility scalar `Detector` or a physical `PlanarDetector`; `Physics` contains emission and particle-interaction model choices. `Numerics` contains sampling, true-photon energy grids, integration, and execution controls. Both can be carried by `Scene` for sweeps. `simulate` lowers those objects to the established typed `Case` and calls the existing Monte Carlo runner directly. It neither reads nor writes a checkpoint.
