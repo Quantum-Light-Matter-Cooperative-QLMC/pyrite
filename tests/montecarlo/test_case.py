@@ -131,3 +131,31 @@ def test_case_refuses_resonance_local_without_bin_mean():
     del payload["line_quadrature"]
     with pytest.raises(ValueError, match="needs line_quadrature='bin-mean'"):
         Case(**payload)
+
+
+@pytest.mark.parametrize(
+    "kind", ["legacy", "elsepa", "eedl-fallback", "coupled", "multilayer", "coherent", "cascade"]
+)
+def test_pre_adapter_case_and_identity_baseline(monkeypatch, kind):
+    """Freeze resolved payloads and both cache keys at #485's parent commit."""
+    import json
+    from pathlib import Path
+
+    from pyrite.xsgen._errors import TableNotFoundError
+    from tests.helpers.physics_baseline import resolved_baseline
+
+    def missing(_elements, **_kwargs):
+        raise TableNotFoundError("baseline deliberately has no BremsLib installation")
+
+    monkeypatch.setattr("pyrite.xsgen.bremslib.tables.load_bremsstrahlung_tables", missing)
+    if kind == "eedl-fallback":
+        with pytest.warns(RuntimeWarning, match="bremslib"):
+            actual = resolved_baseline(kind)
+    else:
+        actual = resolved_baseline(kind)
+    expected = json.loads(
+        (Path(__file__).parents[1] / "data/physics-baseline/resolved.json").read_text()
+    )[kind]
+    # JSON conversion preserves field omission while normalizing tuples/arrays.
+    actual = json.loads(json.dumps(actual, default=lambda array: array.tolist()))
+    assert actual == expected

@@ -1083,3 +1083,27 @@ def test_genuine_schema_2_capture_reads_and_replays_as_schema_3(tmp_path):
         runner.stream_spectrum_from_artifact(rewritten.path, max_segments=block),
         runner.stream_spectrum_from_artifact(SCHEMA2_FIXTURE, max_segments=block),
     )
+
+
+@pytest.mark.parametrize("kind", ["legacy", "eedl-fallback", "multilayer", "coherent"])
+def test_pre_adapter_seeded_scoring_baseline(kind):
+    """Pin transport and existing output slots before adapter extraction (#485)."""
+    from pyrite.montecarlo import Case
+    from tests.helpers.physics_baseline import (
+        assert_output_baseline,
+        resolved_baseline,
+        transport_signature,
+    )
+
+    # The resolved fallback is the same EEDL case; resolution itself is tested
+    # in test_case with an absent-table stub.
+    case = Case(**resolved_baseline("legacy" if kind == "eedl-fallback" else kind)["case"])
+    tp = runner._transport_case(case, transport_core="lockstep")
+    output = runner._spectrum_case(case, tp)
+    actual = {"transport": transport_signature(tp["segs"])}
+    actual["spectra"] = {
+        name: output[name].tolist() for name in ("spec", "spec_characteristic", "brem_wide", "brem")
+    }
+    if kind == "coherent":
+        actual["spectra"]["spec_coherent"] = output["spec_coherent"].tolist()
+    assert_output_baseline(kind, actual)

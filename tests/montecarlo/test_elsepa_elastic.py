@@ -281,3 +281,23 @@ def test_cuda_elsepa_agrees_statistically_with_the_cpu_core(reference):
     sigma = np.sqrt(p_cpu * (1 - p_cpu) / n + p_gpu * (1 - p_gpu) / n)
     assert abs(p_cpu - p_gpu) < 4.0 * sigma
     assert gpu["L_ang"].sum() / n == pytest.approx(cpu["L_ang"].sum() / n, rel=0.03)
+
+
+def test_pre_adapter_seeded_elsepa_baseline(reference):
+    from pyrite.montecarlo.transport import simulate_trajectories
+    from tests.helpers.physics_baseline import assert_output_baseline, transport_signature
+
+    table = _sr_table(14.0, np.geomspace(4.0, 40.0, 41), reference.mu)
+    segments = simulate_trajectories(
+        30.0,
+        4,
+        2000.0,
+        element="Si",
+        n_atoms_per_ang3=0.05,
+        seed=485,
+        E_cut_keV=5.0,
+        elastic_model="elsepa",
+        elastic_tables=[[table]],
+        transport_core="lockstep",
+    )
+    assert_output_baseline("elsepa", transport_signature(segments))

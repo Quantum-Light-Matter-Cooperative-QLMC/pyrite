@@ -49,6 +49,7 @@ In other words:
 0014-packaged-data-layout
 0015-xraydb-atomic-scattering-data
 0016-target-filter-body-components
+0017-in-tree-physics-extension-contract
 ```
 
 | ADR                                                 | Title                               | Status                                 |
@@ -68,3 +69,4 @@ In other words:
 | [0014](0014-packaged-data-layout.md)                | Packaged data layout                 | Accepted                               |
 | [0015](0015-xraydb-atomic-scattering-data.md)       | xraydb as the atomic scattering data source | Accepted                         |
 | [0016](0016-target-filter-body-components.md)      | Share descriptions across target and filter roles | Accepted                    |
+| [0017](0017-in-tree-physics-extension-contract.md) | In-tree physics preparation and batch scoring contracts | Proposed |
