@@ -239,8 +239,7 @@ class PlanarDetector:
         solid_angle = area * abs(float(direction @ np.asarray(self.pose.normal))) / distance**2
         return Detector(
             observation_angle_deg=polar_deg,
-            polar_acceptance_deg=max(polar_span_deg, np.finfo(float).eps),
-            solid_angle_sr=solid_angle,
+            _legacy_acceptance=(max(polar_span_deg, np.finfo(float).eps), solid_angle),
             energy_bins=self.energy_bins,
             _energy_bins_explicit=self._energy_bins_explicit,
             response=self.response,

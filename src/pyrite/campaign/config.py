@@ -124,10 +124,14 @@ def catalog_detector(catalog_profile: str = "standard", detector_id: str | None 
         return replace(
             DEFAULT_CATALOG_DETECTOR,
             observation_angle_deg=projection.observation_angle_deg,
-            polar_acceptance_deg=projection.polar_acceptance_deg,
-            solid_angle_sr=projection.solid_angle_sr,
+            _legacy_acceptance=(projection.polar_acceptance_deg, projection.solid_angle_sr),
         )
-    return replace(DEFAULT_CATALOG_DETECTOR, **dict(spec))
+    return Detector(
+        observation_angle_deg=spec.get(
+            "observation_angle_deg", DEFAULT_CATALOG_DETECTOR.observation_angle_deg
+        ),
+        _legacy_acceptance=(spec.get("polar_acceptance_deg"), spec.get("solid_angle_sr")),
+    )
 
 
 def _catalog(catalog_profile: str = "standard"):
@@ -242,7 +246,22 @@ def material_sweep(
                 "conflicting detector= and legacy detector override(s): " + ", ".join(conflicts)
             )
     resolved_detector = (
-        detector if detector is not None else replace(resolved_catalog_detector, **supplied_legacy)
+        detector
+        if detector is not None
+        else Detector(
+            observation_angle_deg=supplied_legacy.get(
+                "observation_angle_deg", resolved_catalog_detector.observation_angle_deg
+            ),
+            _legacy_acceptance=(
+                supplied_legacy.get(
+                    "polar_acceptance_deg", resolved_catalog_detector.polar_acceptance_deg
+                ),
+                supplied_legacy.get("solid_angle_sr", resolved_catalog_detector.solid_angle_sr),
+            ),
+            energy_bins=resolved_catalog_detector.energy_bins,
+            _energy_bins_explicit=resolved_catalog_detector._energy_bins_explicit,
+            response=resolved_catalog_detector.response,
+        )
     )
     observation = resolve_profile_observation(
         _catalog(catalog_profile), catalog_profile, detector_id=detector_id

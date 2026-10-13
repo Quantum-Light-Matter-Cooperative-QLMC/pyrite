@@ -2,6 +2,26 @@
 
 Part of the [physics validation ledger](physics-validation-ledger.md). See the [validation methodology](methodology.md) for the status lifecycle and the [domain inventories](domain-inventories.md) for a claim-by-claim index.
 
+## `detector-angular-acceptance`
+
+- **Claim:** a centred spherical patch has $\Omega=2\Delta\phi\sin\theta\sin(\Delta\theta/2)$, with its missing span or solid angle uniquely resolved from any two specified values
+- **Code:** `detectors/acceptance.py::AngularAcceptance.resolve`
+- **Source:** unit-sphere area element $d\Omega=\sin\vartheta\,d\vartheta\,d\phi$, integrated over constant-polar/constant-azimuth bounds
+- **Status:** anchored
+- **Checks:** positive units, near-pole inversions, full-sphere boundary, unattainable spans rejected, small-patch limit, independent latitude quadrature
+- **Anchor:** `tests/detectors/test_acceptance.py::test_angular_acceptance_round_trip`; `tests/detectors/test_acceptance.py::test_angular_acceptance_analytic_reference_and_small_patch`
+- **Notes:** angles are full spans; polar interval stays in $[0,\pi]$, azimuth spans at most $2\pi$. Positive centred patches at either pole are impossible. Fresh-context source-to-code derivation matches, with independent quadrature and limiting-case regression anchors; [derivation](detectors/detector-angular-acceptance.md).
+
+## `detector-sensor-acceptance`
+
+- **Claim:** a centred source-facing rectangle has exact $\Omega=4\arctan[wh/(2d\sqrt{4d^2+w^2+h^2})]$ and local polar/azimuthal full spans $2\arctan[h/(2d)]$, $2\arctan[w/(2d)]$
+- **Code:** `detectors/acceptance.py::SensorAcceptance.resolve`
+- **Source:** [PNNL-19616](https://digital.library.unt.edu/ark:/67531/metadc829646/m2/1/high_res_d/1023130.pdf), §2.3.2a, p. 9, centred specialization of the four-corner expression; projected-area definition of solid angle
+- **Status:** anchored
+- **Checks:** positive finite lengths, scale invariance, small-sensor limits, cube-face reference, independent projected-area quadrature for large rectangles
+- **Anchor:** `tests/detectors/test_acceptance.py::test_sensor_acceptance_exact_rectangle`; `tests/detectors/test_acceptance.py::test_sensor_acceptance_small_sensor_and_scale_invariance`
+- **Notes:** height is polar, width is along the local azimuthal tangent; local opening angles are not global longitude intervals. Scalar central-direction scoring remains an approximation for nonuniform intensity. The legacy `PlanarDetector.scalar_detector()` approximation is unchanged. Fresh-context source-to-code derivation matches, with independent quadrature and limiting-case regression anchors; [derivation](detectors/detector-sensor-acceptance.md).
+
 ## `positioned-filter-attenuation`
 
 - **Claim:** primary photons reaching pixel centre `p` through finite plates have factor `T_p(E) = exp[-Σ_j μ_j(E)ℓ_pj]`, where each `ℓ_pj` is the exact source-to-pixel ray length inside plate `j`; pixel flux is `F_p(E) = I_q(p)(E) ΔΩ_p T_p(E)`

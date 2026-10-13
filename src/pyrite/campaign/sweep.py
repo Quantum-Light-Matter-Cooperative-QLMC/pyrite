@@ -582,15 +582,14 @@ class Sweep:
                 "not both"
             )
         if nested is None:
-            base = replace(
-                base,
+            base = Detector(
                 observation_angle_deg=(
                     base.observation_angle_deg if theta_obs_deg is None else theta_obs_deg
                 ),
-                polar_acceptance_deg=(
-                    base.polar_acceptance_deg if dtheta_obs_deg is None else dtheta_obs_deg
+                _legacy_acceptance=(
+                    base.polar_acceptance_deg if dtheta_obs_deg is None else dtheta_obs_deg,
+                    base.solid_angle_sr if domega_sr is None else domega_sr,
                 ),
-                solid_angle_sr=base.solid_angle_sr if domega_sr is None else domega_sr,
             )
         self.detector = base
 

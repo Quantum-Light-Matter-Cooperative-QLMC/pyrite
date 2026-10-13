@@ -36,6 +36,49 @@ result = pr.simulate(
 
 `simulate` runs the existing typed-case Monte Carlo path and returns a `pyrite.Result`. It does not read or write the workspace, checkpoint cache, or profile catalog.
 
+## Scalar detector acceptance
+
+Specify any two full angular spans or solid angle:
+
+```python
+detector = pr.Detector(
+    observation_angle_deg=135.0,
+    acceptance=pr.AngularAcceptance(polar_deg=2.0, azimuthal_deg=4.0),
+)
+# Equally valid: polar_deg + solid_angle_sr, or azimuthal_deg + solid_angle_sr.
+print(detector.polar_acceptance_deg, detector.azimuthal_acceptance_deg, detector.solid_angle_sr)
+```
+
+`AngularAcceptance` describes a patch bounded by constant polar and azimuthal
+angles. Its polar interval must stay within 0–180° and its azimuthal span must
+be at most 360°. Resolution uses the detector's observation angle; a positive
+centred patch at either pole is impossible.
+
+For a flat sensor facing the source, specify its radial distance and full size,
+all in millimetres:
+
+```python
+detector = pr.Detector(
+    observation_angle_deg=135.0,
+    acceptance=pr.SensorAcceptance(distance_mm=400.0, width_mm=14.08, height_mm=14.08),
+)
+```
+
+Height runs along the polar direction and width along the local azimuthal
+tangent. The solid angle is exact; the reported spans are local opening angles,
+so they do not define a spherical longitude/latitude patch. Acceptance objects
+and resolved values are immutable. They describe scalar central-direction
+scoring; use `PlanarDetector` for pose, pixels, filters, or face integration.
+See [the acceptance derivation](../physics/detectors/detector-solid-angle.md).
+
+`Detector()` keeps the existing material/profile acceptance defaults.
+`Detector(polar_acceptance_deg=..., solid_angle_sr=...)` remains a deprecated
+spelling through the D7 window (removal in 0.14.0); both values build an
+`AngularAcceptance`. Do not mix flat arguments with `acceptance=`. Legacy
+single-value overrides retain the other material/profile default through that
+window. Equal resolved polar spans and solid angles retain the same lowered
+case and checkpoint identity. Profile TOML and detector CLI fields are unchanged.
+
 ## Describe the beam
 
 `Beam` takes exactly one description per kind of property, so an invalid mix cannot be built. Both `transverse` and `longitudinal` are required:

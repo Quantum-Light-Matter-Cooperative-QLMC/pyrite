@@ -18,7 +18,11 @@ ZHAI_DETECTOR = Detector(
 def detector_metadata(detector: Detector = ZHAI_DETECTOR) -> dict[str, Any]:
     """Return portable detector provenance plus resolved historical case fields."""
     return {
-        "spec": asdict(detector),
+        "spec": {
+            key: value
+            for key, value in asdict(detector).items()
+            if key not in {"acceptance", "azimuthal_acceptance_deg", "_legacy_acceptance"}
+        },
         "case": {
             "theta_obs_rad": radians(detector.observation_angle_deg),
             "dtheta_obs_rad": (

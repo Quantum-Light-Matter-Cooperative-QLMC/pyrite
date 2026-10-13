@@ -8,8 +8,11 @@ from typing import Protocol
 
 import numpy as np
 
-from .._api_deprecations import deprecated_energy_bins
+from .._api_deprecations import deprecated_energy_bins, warn_api
 from .._energy_bins import EnergyBins as EnergyBins
+from .acceptance import AngularAcceptance, SensorAcceptance
+
+_UNSET = object()
 
 
 def _number(name: str, value: object, *, minimum: float, maximum: float | None = None) -> float:
@@ -237,7 +240,7 @@ class LegacyEDS:
 
 
 @deprecated_energy_bins
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class Detector:
     """One detector's acceptance and read-time response.
 
@@ -249,10 +252,12 @@ class Detector:
     ----------
     observation_angle_deg
         Polar observation angle from the beam axis in degrees.
-    polar_acceptance_deg
-        Optional full polar acceptance span in degrees.
-    solid_angle_sr
-        Optional accepted solid angle in sr.
+    acceptance
+        AngularAcceptance or SensorAcceptance. Resolved full spans in degrees
+        and solid angle in sr are available as read-only attributes. None
+        retains the profile/material defaults.
+    polar_acceptance_deg, solid_angle_sr
+        Deprecated flat acceptance spelling (removed in 0.14.0).
     energy_bins
         Deprecated forwarding: pass sampled grids to ``Numerics(energy_bins=...)``.
     response
@@ -260,11 +265,77 @@ class Detector:
     """
 
     observation_angle_deg: float = 90.0
-    polar_acceptance_deg: float | None = None
-    solid_angle_sr: float | None = None
+    polar_acceptance_deg: float | None = field(default=None, init=False)
+    solid_angle_sr: float | None = field(default=None, init=False)
+    azimuthal_acceptance_deg: float | None = field(default=None, init=False, compare=False)
+    acceptance: AngularAcceptance | SensorAcceptance | None = field(
+        default=None, kw_only=True, compare=False
+    )
+    _legacy_acceptance: tuple[float | None, float | None] = field(
+        default=(None, None), repr=False, compare=False, kw_only=True
+    )
     energy_bins: EnergyBins = field(default_factory=EnergyBins)
     _energy_bins_explicit: bool = field(default=False, repr=False, compare=False, kw_only=True)
     response: DetectorResponse | None = None
+
+    def __init__(
+        self,
+        observation_angle_deg: float = 90.0,
+        polar_acceptance_deg: float | None | object = _UNSET,
+        solid_angle_sr: float | None | object = _UNSET,
+        energy_bins: EnergyBins | object = _UNSET,
+        response: DetectorResponse | None = None,
+        *,
+        acceptance: AngularAcceptance | SensorAcceptance | None = None,
+        _energy_bins_explicit: bool = False,
+        _legacy_acceptance: tuple[float | None, float | None] = (None, None),
+    ) -> None:
+        supplied = polar_acceptance_deg is not _UNSET or solid_angle_sr is not _UNSET
+        if supplied and acceptance is not None:
+            raise ValueError(
+                "supply acceptance= or deprecated polar_acceptance_deg/solid_angle_sr, not both"
+            )
+        if acceptance is not None and not isinstance(
+            acceptance, (AngularAcceptance, SensorAcceptance)
+        ):
+            raise TypeError("acceptance must be AngularAcceptance or SensorAcceptance")
+        polar, omega = _legacy_acceptance
+        if supplied:
+            if polar_acceptance_deg is not _UNSET:
+                warn_api("Detector(polar_acceptance_deg=)", stacklevel=4)
+                polar = _positive_optional("polar_acceptance_deg", polar_acceptance_deg)
+            if solid_angle_sr is not _UNSET:
+                warn_api("Detector(solid_angle_sr=)", stacklevel=4)
+                omega = _positive_optional("solid_angle_sr", solid_angle_sr)
+        object.__setattr__(self, "observation_angle_deg", observation_angle_deg)
+        object.__setattr__(self, "polar_acceptance_deg", polar)
+        object.__setattr__(self, "solid_angle_sr", omega)
+        object.__setattr__(self, "azimuthal_acceptance_deg", None)
+        object.__setattr__(self, "acceptance", acceptance)
+        object.__setattr__(
+            self, "_legacy_acceptance", (polar, omega) if acceptance is None else (None, None)
+        )
+        object.__setattr__(
+            self, "energy_bins", EnergyBins() if energy_bins is _UNSET else energy_bins
+        )
+        object.__setattr__(self, "_energy_bins_explicit", _energy_bins_explicit)
+        object.__setattr__(self, "response", response)
+        self.__post_init__()
+        if supplied and polar is not None and omega is not None:
+            angular = AngularAcceptance(polar_deg=polar, solid_angle_sr=omega)
+            self._resolve_acceptance(angular)
+            object.__setattr__(self, "acceptance", angular)
+            object.__setattr__(self, "_legacy_acceptance", (None, None))
+
+    def _resolve_acceptance(self, acceptance: AngularAcceptance | SensorAcceptance) -> None:
+        polar, azimuthal, omega = (
+            acceptance.resolve(self.observation_angle_deg)
+            if isinstance(acceptance, AngularAcceptance)
+            else acceptance.resolve()
+        )
+        object.__setattr__(self, "polar_acceptance_deg", polar)
+        object.__setattr__(self, "azimuthal_acceptance_deg", azimuthal)
+        object.__setattr__(self, "solid_angle_sr", omega)
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -285,6 +356,8 @@ class Detector:
         if solid_angle is not None and solid_angle > 4.0 * math.pi:
             raise ValueError("solid_angle_sr must be <= 4*pi sr")
         object.__setattr__(self, "solid_angle_sr", solid_angle)
+        if self.acceptance is not None:
+            self._resolve_acceptance(self.acceptance)
         if not isinstance(self.energy_bins, EnergyBins):
             raise TypeError("energy_bins must be an EnergyBins")
         if self.response is not None and not hasattr(self.response, "score"):

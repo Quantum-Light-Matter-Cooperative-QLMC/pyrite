@@ -3,6 +3,7 @@
 from importlib import import_module
 from typing import Any
 
+from .acceptance import AngularAcceptance, SensorAcceptance
 from .spec import (
     Detector,
     DetectorResponse,
@@ -16,6 +17,8 @@ from .spec import (
 )
 
 __all__ = [
+    "AngularAcceptance",
+    "SensorAcceptance",
     "Detector",
     "DetectorResponse",
     "DetectorSpec",

@@ -174,6 +174,8 @@ geometry/surface-hkl-orientation
 
 detectors/alexs-charge-diffusion
 detectors/alexs-qe-absorption
+detectors/detector-angular-acceptance
+detectors/detector-sensor-acceptance
 detectors/detector-eaglexo
 detectors/detector-line-broadening
 detectors/detector-timepix

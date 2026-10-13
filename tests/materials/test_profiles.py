@@ -1074,7 +1074,12 @@ def test_reference_detector_migration_preserves_dataset_and_case_identity(name):
     sweep = material_sweep("hopg", catalog_profile=name, detector_id="default")
     # Before #423 bundled scalar objects contained only observation_angle_deg.
     legacy = replace(
-        sweep, detector=replace(sweep.detector, polar_acceptance_deg=None, solid_angle_sr=None)
+        sweep,
+        detector=Detector(
+            observation_angle_deg=sweep.detector.observation_angle_deg,
+            energy_bins=sweep.detector.energy_bins,
+            response=sweep.detector.response,
+        ),
     )
     settings = profiles.profile_run_settings(default_settings(), name, "full")
     assert dataset_identity(

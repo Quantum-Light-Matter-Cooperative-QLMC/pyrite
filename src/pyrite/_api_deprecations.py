@@ -91,6 +91,8 @@ for _old, _new in (
     ("simulate(brem_source=)", "simulate(physics=Physics(brem_source=...))"),
     ("Scene(emission=)", "Scene(physics=Physics(emission=...))"),
     ("Scene(brem_source=)", "Scene(physics=Physics(brem_source=...))"),
+    ("Detector(polar_acceptance_deg=)", "Detector(acceptance=AngularAcceptance(...))"),
+    ("Detector(solid_angle_sr=)", "Detector(acceptance=AngularAcceptance(...))"),
     ("Detector(energy_bins=)", "Numerics(energy_bins=...)"),
     ("PlanarDetector(energy_bins=)", "Numerics(energy_bins=...)"),
 ):

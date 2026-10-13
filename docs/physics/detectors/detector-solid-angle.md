@@ -2,6 +2,75 @@
 
 The line energy `E_res = ħc·(v·g)/(1 − v·n̂)` depends on the observation direction `n̂`. A real detector subtends a finite solid angle, so different parts of its face see slightly different line energies and intensities. This page describes how that finite acceptance is represented.
 
+## Scalar acceptance geometry
+
+`Detector.acceptance` accepts an immutable `AngularAcceptance` or
+`SensorAcceptance`. Both resolve to the existing polar-span and solid-angle
+case fields; no acceptance-description metadata enters checkpoint identity.
+
+### Centred spherical patch
+
+Let $\theta$ be the central polar angle, $\Delta\theta$ the full polar span,
+and $\Delta\phi$ the full azimuthal span (radians). Integrating the unit-sphere
+area element gives
+
+$$
+\Omega=\int_{\phi_0-\Delta\phi/2}^{\phi_0+\Delta\phi/2}
+\int_{\theta-\Delta\theta/2}^{\theta+\Delta\theta/2}
+\sin\vartheta\,d\vartheta\,d\phi
+=2\Delta\phi\sin\theta\sin(\Delta\theta/2).
+$$
+
+Any two of `polar_deg`, `azimuthal_deg`, and `solid_angle_sr` determine the
+third at the detector's observation angle:
+
+$$
+\Delta\phi=\frac{\Omega}{2\sin\theta\sin(\Delta\theta/2)},
+\qquad
+\Delta\theta=2\arcsin\frac{\Omega}{2\Delta\phi\sin\theta}.
+$$
+
+Require $0<\Delta\theta\le2\min(\theta,\pi-\theta)$ and
+$0<\Delta\phi\le2\pi$. These bounds make positive centred patches at either
+pole impossible, and can make a requested solid angle unreachable. For small
+spans, $\Omega\simeq\Delta\theta\Delta\phi\sin\theta$. The API accepts spans
+in degrees and converts to radians for calculation.
+Validation: `detector-angular-acceptance`; [independent derivation](../../validation/detectors/detector-angular-acceptance.md).
+
+### Source-facing rectangle
+
+For a point source a distance $d$ along the normal through a rectangle's
+centre, with full width $w$ and height $h$, integrate projected area:
+
+$$
+\Omega=\int_{-w/2}^{w/2}\int_{-h/2}^{h/2}
+\frac{d\,dy\,dx}{(d^2+x^2+y^2)^{3/2}}
+=4\arctan\frac{wh}{2d\sqrt{4d^2+w^2+h^2}}.
+$$
+
+This is the centred special case of the four-corner expression in
+[PNNL-19616, §2.3.2a, p. 9](https://digital.library.unt.edu/ark:/67531/metadc829646/m2/1/high_res_d/1023130.pdf).
+`SensorAcceptance` uses millimetres for all three positive finite lengths.
+Height runs along the polar tangent and width along the local azimuthal tangent;
+the local full opening angles are
+
+$$
+\Delta\theta=2\arctan\frac{h}{2d},\qquad
+\Delta\phi_{\rm local}=2\arctan\frac{w}{2d}.
+$$
+
+These are local meridional openings, not the longitude bounds of the angular
+patch. In the small-sensor limit, $\Omega\simeq wh/d^2$,
+$\Delta\theta\simeq h/d$, and $\Delta\phi_{\rm local}\simeq w/d$.
+Validation: `detector-sensor-acceptance`; [independent derivation](../../validation/detectors/detector-sensor-acceptance.md).
+
+The legacy `PlanarDetector.scalar_detector()` projection keeps its corner-based
+polar span and $wh|\hat{n}\cdot\hat{r}|/d^2$ solid-angle approximation. Its
+arbitrary pose and corner convention differ from `SensorAcceptance`; replacing
+that projection would change established numerical output and checkpoint
+identity. This API addition leaves it unchanged. Physical face scoring already
+uses its own rectangle/ray geometry.
+
 ## Single-angle treatment
 
 The spectrum is computed at one `n̂` (from `montecarlo.tilted_geometry`). The finite detector enters through two separate approximations:
