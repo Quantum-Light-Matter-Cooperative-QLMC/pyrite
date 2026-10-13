@@ -17,6 +17,7 @@ from .._api_deprecations import deprecated_energy_bins
 from .._planar_geometry import PixelGrid, PlanarPose, _positive_pair, _positive_real
 from ..detectors.spec import Detector, DetectorResponse, EnergyBins
 from ..materials import CATALOG, MediumSpec
+from ..materials._composition import has_positive_number_densities, resolve_composition
 
 
 @dataclass(frozen=True)
@@ -45,17 +46,15 @@ class FilterPlate:
 
     def __post_init__(self) -> None:
         if isinstance(self.material, str):
-            known = CATALOG.media.keys() | CATALOG.crystals.keys()
-            if self.material not in known:
-                raise ValueError(f"unknown FilterPlate material {self.material!r}")
+            try:
+                resolve_composition(self.material, catalog=CATALOG)
+            except KeyError:
+                raise ValueError(f"unknown FilterPlate material {self.material!r}") from None
         elif isinstance(self.material, MediumSpec):
             if not self.material.composition:
                 raise ValueError("FilterPlate MediumSpec composition must not be empty")
-            for element, density in self.material.composition:
-                if not element or not math.isfinite(float(density)) or float(density) <= 0.0:
-                    raise ValueError(
-                        "FilterPlate MediumSpec composition must have positive densities"
-                    )
+            if not has_positive_number_densities(self.material.composition):
+                raise ValueError("FilterPlate MediumSpec composition must have positive densities")
         else:
             raise TypeError("FilterPlate.material must be a catalog key or MediumSpec")
         object.__setattr__(

@@ -37,6 +37,7 @@ from .._energy_grid_encoding import decode_energy_grid
 from .._formatting import fmt_thickness
 from ..detectors import Detector
 from ..materials import CATALOG, LayerSpec
+from ..materials._composition import resolve_composition
 from ..materials.crystal import dominant_reflections
 
 ScalarOrSeq = float | Sequence[float] | np.ndarray
@@ -59,11 +60,14 @@ def substrate_composition(substrate):
     """Number-density composition [(element, n_per_Ang3), ...] for a substrate.
     Amorphous presets ('sio2') come from bulk density; a crystalline
     substrate already in CRYSTALS (e.g. 'silicon') uses its unit-cell density."""
-    key = substrate.lower()
-    if key in CATALOG.media:
-        return list(CATALOG.media[key].composition)
-    if substrate in CATALOG.crystals:
-        return list(CATALOG.crystal(substrate).composition)
+    try:
+        return list(resolve_composition(substrate.lower(), catalog=CATALOG, namespaces=("medium",)))
+    except KeyError:
+        pass
+    try:
+        return list(resolve_composition(substrate, catalog=CATALOG, namespaces=("crystal",)))
+    except KeyError:
+        pass
     raise ValueError(
         f"unknown substrate {substrate!r}; use one of {list(CATALOG.media)} "
         f"or a crystal key in {list(CATALOG.crystals)}"

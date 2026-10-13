@@ -15,6 +15,7 @@ from scipy.constants import epsilon_0 as _EPS_0
 from scipy.constants import hbar as _HBAR
 
 from . import CATALOG, MediumSpec
+from ._composition import has_positive_number_densities, resolve_composition
 from .atomic import Z_TABLE
 from .photon_cross_sections import (
     EPDL_E_MAX_EV,
@@ -91,24 +92,13 @@ def _resolve_composition(material: str | MediumSpec) -> tuple[tuple[str, float],
     Runnable target-material keys are intentionally unreachable: their
     film/stack composition is not a single homogeneous medium.
     """
-    if isinstance(material, str):
-        if material in CATALOG.media:
-            composition = CATALOG.media[material].composition
-        elif material in CATALOG.crystals:
-            composition = CATALOG.crystals[material].composition
-        else:
-            raise ValueError(
-                f"unknown filter material {material!r}; expected a catalog crystal or medium key"
-            )
-    elif isinstance(material, MediumSpec):
-        composition = material.composition
-    else:
-        raise TypeError("material must be a catalog key or MediumSpec")
-
-    if not composition or any(
-        not element or not np.isfinite(float(density)) or float(density) <= 0.0
-        for element, density in composition
-    ):
+    try:
+        composition = resolve_composition(material, catalog=CATALOG)
+    except KeyError:
+        raise ValueError(
+            f"unknown filter material {material!r}; expected a catalog crystal or medium key"
+        ) from None
+    if not has_positive_number_densities(composition):
         raise ValueError("filter composition must contain positive element number densities")
     return composition
 

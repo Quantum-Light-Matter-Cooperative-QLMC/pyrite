@@ -15,6 +15,7 @@ import numpy as np
 
 from ..detectors import IdealPhotonCounter, Timepix3
 from ..materials import CATALOG, MediumSpec
+from ..materials._composition import resolve_composition
 from .model import (
     FilterPlate,
     PixelScorer,
@@ -219,11 +220,7 @@ def payload_digest(payload: Mapping[str, Any]) -> str:
 
 
 def _resolved_composition(material: str | MediumSpec) -> tuple[tuple[str, float], ...]:
-    if isinstance(material, MediumSpec):
-        return material.composition
-    if material in CATALOG.media:
-        return CATALOG.media[material].composition
-    return CATALOG.crystals[material].composition
+    return resolve_composition(material, catalog=CATALOG)
 
 
 def _response_semantics(response: object) -> str:

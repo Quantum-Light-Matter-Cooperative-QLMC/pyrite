@@ -34,6 +34,7 @@ from .instrument import (
     ResolvedObservation,
 )
 from .materials import CATALOG, MediumSpec
+from .materials._composition import resolve_composition
 from .materials.photon_cross_sections import ATTENUATION_MODEL
 from .montecarlo import Case, run_case
 from .montecarlo.runner import cached_case_table_markers, case_table_markers, run_case_directions
@@ -78,11 +79,7 @@ def _array_identity(array: np.ndarray) -> dict[str, Any]:
 
 
 def _resolved_composition(material: str | MediumSpec) -> tuple[tuple[str, float], ...]:
-    if isinstance(material, MediumSpec):
-        return material.composition
-    if material in CATALOG.media:
-        return CATALOG.media[material].composition
-    return CATALOG.crystals[material].composition
+    return resolve_composition(material, catalog=CATALOG)
 
 
 def _observation_provenance(
