@@ -220,25 +220,24 @@ def _sanitize_cost_fields(record):
 
 
 def _sanitize_timing_fields(record):
-    seconds = record.get("active_compute_seconds")
-    if not (
-        isinstance(seconds, (int, float))
-        and not isinstance(seconds, bool)
-        and math.isfinite(seconds)
-        and seconds >= 0
+    for key in (
+        "active_compute_seconds",
+        "measured_new_cost",
+        "sample_compute_seconds",
+        "sample_new_cost",
     ):
-        record.pop("active_compute_seconds", None)
-    cases = record.get("measured_new_cases")
-    if not (isinstance(cases, int) and not isinstance(cases, bool) and cases >= 0):
-        record.pop("measured_new_cases", None)
-    cost = record.get("measured_new_cost")
-    if not (
-        isinstance(cost, (int, float))
-        and not isinstance(cost, bool)
-        and math.isfinite(cost)
-        and cost >= 0
-    ):
-        record.pop("measured_new_cost", None)
+        value = record.get(key)
+        if not (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(value)
+            and value >= 0
+        ):
+            record.pop(key, None)
+    for key in ("measured_new_cases", "sample_new_cases"):
+        value = record.get(key)
+        if not (isinstance(value, int) and not isinstance(value, bool) and value >= 0):
+            record.pop(key, None)
 
 
 def _sanitize_electron_fields(record):

@@ -3844,8 +3844,9 @@ def test_compute_eta_accounts_for_parallel_material_processes_and_unstarted_work
     )
 
     assert estimate["elapsed"] == 20.0
-    assert estimate["remaining"] == 40.0
-    assert estimate["total"] == 60.0
+    # Two 20 s tails finish first; the queued 40 s material then occupies a slot.
+    assert estimate["remaining"] == 60.0
+    assert estimate["total"] == 80.0
 
 
 @pytest.mark.parametrize(
@@ -6895,3 +6896,66 @@ def test_job_reserved_stems_command_filters_by_owner_and_reports_written(monkeyp
     assert 'echo "written $s"' in command and 'echo "unwritten $s"' in command
     with pytest.raises(SystemExit, match="invalid remote shell token"):
         scripts._job_reserved_stems_command("bad id;")
+
+
+def test_compute_eta_uses_completed_sample_time_instead_of_startup_and_inflight_time():
+    # 1000 s startup, followed by 10 s cases. Snapshot is 9 s into case 4.
+    record = _timed_record(total=100, completed=3, seconds=1039, measured=3)
+    record.update(sample_compute_seconds=20.0, sample_new_cases=2)
+    estimate = dashboard_render._compute_time_estimate({"hopg": record}, ["hopg"])
+    assert estimate["remaining"] == pytest.approx(970.0)
+
+
+def test_compute_eta_gates_first_completion_without_a_throughput_sample():
+    record = _timed_record(total=100, completed=1, seconds=1010, measured=1)
+    record.update(sample_compute_seconds=0.0, sample_new_cases=0)
+    assert dashboard_render._compute_time_estimate({"hopg": record})["remaining"] is None
+
+
+def test_compute_eta_parallel_tail_uses_remaining_material_rate():
+    records = {
+        "hopg": _timed_record(completed=10, state="done", seconds=1000, measured=10),
+        "hbn": _timed_record(material="hbn", completed=9, seconds=90, measured=9),
+    }
+    estimate = dashboard_render._compute_time_estimate(records, parallel_materials=2)
+    assert estimate["remaining"] == pytest.approx(10.0)
+
+
+def test_compute_eta_ignores_startup_only_material_when_measuring_rate():
+    records = {
+        "hopg": _timed_record(completed=5, seconds=50, measured=5),
+        "hbn": _timed_record(material="hbn", seconds=1000, measured=0),
+    }
+    estimate = dashboard_render._compute_time_estimate(records, parallel_materials=2)
+    assert estimate["remaining"] == pytest.approx(100.0)
+
+
+@pytest.mark.parametrize("completed", [2, 3, 20, 90])
+@pytest.mark.parametrize("use_cost", [False, True])
+def test_compute_eta_startup_series_matches_known_remaining_work(completed, use_cost):
+    # Synthetic series: 1000 s fixed overhead, ten cached cases, 10 s per case.
+    record = _timed_record(
+        total=100,
+        cached=10,
+        completed=completed,
+        seconds=1000 + 10 * completed,
+        measured=completed,
+        done_cost=(10 + completed) * 5,
+        total_cost=500,
+        measured_cost=completed * 5,
+    )
+    record.update(
+        sample_compute_seconds=(completed - 1) * 10,
+        sample_new_cases=completed - 1,
+        sample_new_cost=(completed - 1) * 5,
+    )
+    records = presentation.parse_progress_records(json.dumps(record))
+    estimate = dashboard_render._compute_time_estimate(records, use_cost=use_cost)
+    assert estimate["remaining"] == pytest.approx((90 - completed) * 10, abs=1e-8)
+
+
+def test_parse_progress_records_drops_invalid_completed_interval_samples():
+    record = _timed_record(seconds=10, measured=1, completed=1)
+    record.update(sample_compute_seconds=float("inf"), sample_new_cases=True, sample_new_cost=-1)
+    parsed = presentation.parse_progress_records(json.dumps(record))["hopg"]
+    assert not any(key.startswith("sample_") for key in parsed)

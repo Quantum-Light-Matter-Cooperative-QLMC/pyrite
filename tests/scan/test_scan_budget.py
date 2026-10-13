@@ -217,6 +217,9 @@ def test_progress_timer_accumulates_active_time_and_work_across_chunk_resume(tmp
         "active_compute_seconds": 20.0,
         "measured_new_cases": 3,
         "measured_new_cost": 7.0,
+        "sample_compute_seconds": 0.0,
+        "sample_new_cases": 0,
+        "sample_new_cost": 0.0,
     }
 
 
@@ -233,6 +236,8 @@ def test_progress_timer_ignores_legacy_or_invalid_prior_timing(tmp_path):
     assert timer.snapshot(completed_new_cases=1) == {
         "active_compute_seconds": 1.0,
         "measured_new_cases": 1,
+        "sample_compute_seconds": 0.0,
+        "sample_new_cases": 0,
     }
 
 
@@ -333,3 +338,32 @@ def test_progress_summary_survives_a_case_the_device_budget_cannot_admit(monkeyp
 
     assert result.exit_code == 75
     assert "cannot admit" in snapshots[0]["current"]["runtime_plan_error"]
+
+
+def test_progress_timer_samples_complete_intervals_and_excludes_restart_overhead(tmp_path):
+    path = tmp_path / "hopg.json"
+    now = [0.0]
+    timer = scan._ProgressTimer(path, time_fn=lambda: now[0])
+    timer.start()
+    now[0] = 1000.0
+    timer.snapshot(completed_new_cases=0, computed_cost=0)
+    now[0] = 1010.0
+    first = timer.snapshot(completed_new_cases=1, computed_cost=5)
+    assert first["sample_new_cases"] == 0
+    now[0] = 1020.0
+    second = timer.snapshot(completed_new_cases=2, computed_cost=10)
+    assert second["sample_compute_seconds"] == 10.0
+    assert second["sample_new_cases"] == 1
+    assert second["sample_new_cost"] == 5.0
+    now[0] = 1029.0
+    assert timer.snapshot(completed_new_cases=2, computed_cost=10)["sample_compute_seconds"] == 10
+    path.write_text(json.dumps(second))
+    resumed = scan._ProgressTimer(path, time_fn=lambda: now[0])
+    resumed.start()
+    now[0] = 2039.0
+    resumed.snapshot(completed_new_cases=1, computed_cost=5)
+    now[0] = 2049.0
+    sample = resumed.snapshot(completed_new_cases=2, computed_cost=10)
+    assert sample["sample_compute_seconds"] == 20.0
+    assert sample["sample_new_cases"] == 2
+    assert sample["sample_new_cost"] == 10.0
