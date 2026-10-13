@@ -515,6 +515,9 @@ def _identity_v1(
     # fork transport/checkpoint identity, which is deliberately reusable by
     # several response models and is the future multi-detector seam.
     detector_payload.pop("response", None)
+    # Acceptance objects describe the same historical resolved geometry.
+    for key in ("acceptance", "azimuthal_acceptance_deg", "_legacy_acceptance"):
+        detector_payload.pop(key, None)
     reserved_detector = {
         key: value
         for key, value in detector_payload.items()

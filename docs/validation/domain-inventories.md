@@ -211,6 +211,8 @@ Generated browsing views of every claim in the [detailed validation ledger] (phy
 
 | ID | Claim | Status |
 |---|---|---|
+| [`detector-angular-acceptance`](ledger-detector-forward-models.md#detector-angular-acceptance) | a centred spherical patch has $\Omega=2\Delta\phi\sin\theta\sin(\Delta\theta/2)$, with its missing span or solid angle uniquely resolved from any two specified values | `anchored` |
+| [`detector-sensor-acceptance`](ledger-detector-forward-models.md#detector-sensor-acceptance) | a centred source-facing rectangle has exact $\Omega=4\arctan[wh/(2d\sqrt{4d^2+w^2+h^2})]$ and local polar/azimuthal full spans $2\arctan[h/(2d)]$, $2\arctan[w/(2d)]$ | `anchored` |
 | [`positioned-filter-attenuation`](ledger-detector-forward-models.md#positioned-filter-attenuation) | primary photons reaching pixel centre `p` through finite plates have factor `T_p(E) = exp[-Σ_j μ_j(E)ℓ_pj]`, where each `ℓ_pj` is the exact source-to-pixel ray length inside plate `j`; pixel flux is `F_p(E) = I_q(p)(E) ΔΩ_p T_p(E)` | `rederived` |
 | [`detector-eaglexo`](ledger-detector-forward-models.md#detector-eaglexo) | `solid_angle(Ω) × QE(E)` CCD operator | `filtered` |
 | [`detector-timepix`](ledger-detector-forward-models.md#detector-timepix) | Si charge model, diffusion, ~1.9 keV counting threshold | `unverified` |

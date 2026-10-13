@@ -101,6 +101,9 @@ if TYPE_CHECKING:
     )
     from pyrite.campaign.target import Target as Target
     from pyrite.detectors import (
+        AngularAcceptance as AngularAcceptance,
+    )
+    from pyrite.detectors import (
         Detector as Detector,
     )
     from pyrite.detectors import (
@@ -108,6 +111,9 @@ if TYPE_CHECKING:
     )
     from pyrite.detectors import (
         IdealPhotonCounter as IdealPhotonCounter,
+    )
+    from pyrite.detectors import (
+        SensorAcceptance as SensorAcceptance,
     )
     from pyrite.instrument import (
         Acquisition as Acquisition,
@@ -179,6 +185,8 @@ _PUBLIC_OBJECTS = {
     "CxrReflections": ("pyrite._numerics", "CxrReflections"),
     "Convergence": ("pyrite.campaign.model", "Convergence"),
     "CxrSpectra": ("pyrite.results.model", "CxrSpectra"),
+    "AngularAcceptance": ("pyrite.detectors", "AngularAcceptance"),
+    "SensorAcceptance": ("pyrite.detectors", "SensorAcceptance"),
     "Detector": ("pyrite.detectors", "Detector"),
     "EnergyBins": ("pyrite.detectors", "EnergyBins"),
     "Footprint": ("pyrite.campaign.geometry", "Footprint"),

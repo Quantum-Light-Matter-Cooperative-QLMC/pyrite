@@ -38,6 +38,8 @@ def test_root_exports_stay_frozen() -> None:
         "CxrReflections",
         "Convergence",
         "CxrSpectra",
+        "AngularAcceptance",
+        "SensorAcceptance",
         "Detector",
         "EnergyBins",
         "Footprint",

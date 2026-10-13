@@ -464,6 +464,8 @@ These are the supported low-level simulation entry points. Inputs and outputs us
    :toctree: _autosummary
 
    pyrite.detectors.Detector
+   pyrite.AngularAcceptance
+   pyrite.SensorAcceptance
    pyrite.detectors.EnergyBins
    pyrite.detectors.NativeSpectrum
    pyrite.detectors.Timepix3
