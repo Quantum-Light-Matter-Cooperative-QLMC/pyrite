@@ -34,7 +34,7 @@ def phase_matched_front_for_scene(
     timing damping; a zero required gradient returns BunchFrontTilt(0).
     Validation: linear-bunch-front-tilt, line-energy-dispersion
     """
-    target = scene.target
+    target = scene.target_spec
     if not isinstance(target, Slab) or target.entrance_face is not None:
         raise ValueError("phase matching requires a flat single Slab")
     # Reuse the public source-composition checks even if this scene is untilted.

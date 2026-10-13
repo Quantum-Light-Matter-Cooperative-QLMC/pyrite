@@ -44,6 +44,8 @@ if TYPE_CHECKING:
     from pyrite._numerics import Physics as Physics
     from pyrite._precision import Precision as Precision
     from pyrite.api import simulate as simulate
+    from pyrite.bodies import RectangularBody as RectangularBody
+    from pyrite.bodies import SubstanceRef as SubstanceRef
     from pyrite.campaign.beam import (
         Beam as Beam,
     )
@@ -97,6 +99,7 @@ if TYPE_CHECKING:
     from pyrite.campaign.model import (
         Sweep as Sweep,
     )
+    from pyrite.campaign.target import Target as Target
     from pyrite.detectors import (
         Detector as Detector,
     )
@@ -130,6 +133,7 @@ if TYPE_CHECKING:
     from pyrite.instrument import (
         ResolvedObservation as ResolvedObservation,
     )
+    from pyrite.instrument.filter import Filter as Filter
     from pyrite.materials.emission import photon_energies as photon_energies
     from pyrite.results.model import (
         CxrSpectra as CxrSpectra,
@@ -178,6 +182,7 @@ _PUBLIC_OBJECTS = {
     "Detector": ("pyrite.detectors", "Detector"),
     "EnergyBins": ("pyrite.detectors", "EnergyBins"),
     "Footprint": ("pyrite.campaign.geometry", "Footprint"),
+    "Filter": ("pyrite.instrument", "Filter"),
     "FilterPlate": ("pyrite.instrument", "FilterPlate"),
     "IdealPhotonCounter": ("pyrite.detectors", "IdealPhotonCounter"),
     "Layer": ("pyrite.campaign.geometry", "Layer"),
@@ -190,6 +195,7 @@ _PUBLIC_OBJECTS = {
     "PixelMetadata": ("pyrite.results.model", "PixelMetadata"),
     "PixelRayMap": ("pyrite.results.model", "PixelRayMap"),
     "Provenance": ("pyrite.results.provenance", "Provenance"),
+    "RectangularBody": ("pyrite.bodies", "RectangularBody"),
     "Result": ("pyrite.results.model", "Result"),
     "ResolvedObservation": ("pyrite.instrument", "ResolvedObservation"),
     "Scene": ("pyrite.campaign.model", "Scene"),
@@ -199,6 +205,8 @@ _PUBLIC_OBJECTS = {
     "SpectralDensity": ("pyrite.results.model", "SpectralDensity"),
     "SpectralFactors": ("pyrite.results.model", "SpectralFactors"),
     "Sweep": ("pyrite.campaign.model", "Sweep"),
+    "SubstanceRef": ("pyrite.bodies", "SubstanceRef"),
+    "Target": ("pyrite.campaign.target", "Target"),
     "fetch_tables": ("pyrite.xsgen.install", "fetch_tables"),
     "photon_energies": ("pyrite.materials.emission", "photon_energies"),
     "simulate": ("pyrite.api", "simulate"),

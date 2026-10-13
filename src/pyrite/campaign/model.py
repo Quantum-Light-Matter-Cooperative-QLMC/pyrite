@@ -15,11 +15,13 @@ from .._numerics import EmissionMode as EmissionMode
 from .._numerics import MosaicRoute as MosaicRoute
 from .._precision import Precision
 from ..detectors import Detector, EnergyBins
-from ..instrument import Acquisition, FilterPlate, PixelScorer, PlanarDetector
+from ..instrument import Acquisition, Filter, FilterPlate, PixelScorer, PlanarDetector
 from ..instrument.model import validate_downstream_scene
 from .beam import Beam, BunchFrontTilt
-from .geometry import Slab, Stack, Target
+from .geometry import Slab, Stack
+from .geometry import Target as LegacyTarget
 from .sweep import BeamSpec
+from .target import Target
 
 BremSource = Literal["mc", "external", "none"]
 
@@ -34,7 +36,9 @@ def _one_float(name: str, value: Any) -> float:
     return float(values[0])
 
 
-def _scalar_target(target: Target) -> Target:
+def _scalar_target(target: LegacyTarget | Target) -> LegacyTarget | Target:
+    if isinstance(target, Target):
+        return target
     if isinstance(target, Slab):
         return replace(
             target,
@@ -58,7 +62,7 @@ def _scalar_target(target: Target) -> Target:
             tilt_deg=_one_float("target.tilt_deg", target.tilt_deg),
             tilt_azim_deg=_one_float("target.tilt_azim_deg", target.tilt_azim_deg),
         )
-    raise TypeError("Scene.target must be a Slab or Stack")
+    raise TypeError("Scene.target must be a Slab or Stack or Target")
 
 
 @dataclass(frozen=True)
@@ -134,11 +138,12 @@ class Scene:
         Scalar electron-beam description. Express varying energies with
         :class:`Sweep`.
     target
-        Scalar :class:`~pyrite.Slab` or :class:`~pyrite.Stack` target.
+        Scalar :class:`~pyrite.Target`, :class:`~pyrite.Slab` or :class:`~pyrite.Stack`.
     detector
         Scalar observation model or physical planar detector.
     filters
-        Ordered filter plates between the source and a planar detector.
+        Ordered :class:`~pyrite.Filter` or :class:`~pyrite.FilterPlate` instances
+        between the source and a planar detector.
     pixel_scorer
         Deprecated: set :attr:`PlanarDetector.scorer` instead. A value given
         here is moved onto the detector and this field reads ``None``.
@@ -157,9 +162,9 @@ class Scene:
     """
 
     beam: Beam
-    target: Target
+    target: LegacyTarget | Target
     detector: Detector | PlanarDetector = field(default_factory=Detector)
-    filters: tuple[FilterPlate, ...] = ()
+    filters: tuple[FilterPlate | Filter, ...] = ()
     pixel_scorer: PixelScorer | None = None
     acquisition: Acquisition | None = None
     physics: Physics = field(default_factory=Physics, kw_only=True)
@@ -188,8 +193,8 @@ class Scene:
             filters = tuple(self.filters)
         except TypeError as exc:
             raise TypeError("Scene.filters must be an iterable of FilterPlate") from exc
-        if any(not isinstance(plate, FilterPlate) for plate in filters):
-            raise TypeError("Scene.filters must contain only FilterPlate objects")
+        if any(not isinstance(plate, (FilterPlate, Filter)) for plate in filters):
+            raise TypeError("Scene.filters must contain only FilterPlate or Filter objects")
         object.__setattr__(self, "filters", filters)
         if self.pixel_scorer is not None:
             # stacklevel 4: warn_api -> __post_init__ -> __init__ -> the caller.
@@ -208,13 +213,25 @@ class Scene:
             if self.detector.response is None:
                 raise ValueError("Scene.acquisition requires an explicit detector response")
         if isinstance(self.detector, PlanarDetector):
-            validate_downstream_scene(filters, self.detector)
+            validate_downstream_scene(self.filter_plates, self.detector)
         object.__setattr__(
             self,
             "beam",
             replace(self.beam, energy_keV=_one_float("beam.energy_keV", self.beam.energy_keV)),
         )
         object.__setattr__(self, "target", _scalar_target(self.target))
+
+    @property
+    def target_spec(self) -> LegacyTarget:
+        """Source geometry lowered after scalar body/sweep resolution."""
+        return self.target.to_slab() if isinstance(self.target, Target) else self.target
+
+    @property
+    def filter_plates(self) -> tuple[FilterPlate, ...]:
+        """Ordered legacy plates for observation and trajectory consumers."""
+        return tuple(
+            plate.to_plate() if isinstance(plate, Filter) else plate for plate in self.filters
+        )
 
     def phase_matched_bunch_front_tilt(
         self,
