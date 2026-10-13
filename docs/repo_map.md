@@ -239,6 +239,16 @@ Frozen catalog record types, schema constants, catalog accessors, and grouped va
 Catalog validation and assembly for materials, crystals, media, profiles, stacks, scan descriptors, energy-grid artifacts, and transport support. Owns phase-specific CIF resolution below the selected catalog's `cifs/` with packaged `data/cifs` fallback, plus pinned-reflection policy; delegates beam/detector blocks to `_beam_detector_parse.py`.
 - Deps: `materials._schema`, `materials._beam_detector_parse`, `materials._catalog_decode`, `materials._cif`, `materials._identity`, `materials._transport_data`, `_energy_grid_artifacts`, `_numerics`, `DATA_DIR`, NumPy.
 
+### `materials/authoring.py`
+
+Validated `build_medium` / `build_crystal` definitions and explicit `save_material`;
+composition + g/cm³ conversion reuses transport weights, CIF import reuses `_parse`,
+and safe publication targets the shared catalog layout. Medium definitions stay
+in `media/`; crystal recipes reference `crystals/` from `materials/`. CLI adapters:
+`cli/commands/material_add.py`, `material_inventory.py`; maintainer route:
+`pyrite-dev material`. User objects and managed CIFs ship through
+`remote/transport.py::_user_catalog_entries`. Workflow: `guides/adding-materials.md`.
+
 ### `materials/_beam_detector_parse.py`
 Beam, detector, filter, and physical-detector catalog parsing. Detector blocks resolve to validated acceptance mappings rather than built `Detector` objects, keeping `materials` below `detectors`; `campaign.config.catalog_detector` constructs the detector. Copied bounds are pinned to `Detector.__post_init__` by `tests/materials/test_material_catalog.py::test_catalog_detector_bounds_match_the_detector_dataclass`.
 - Deps: `materials._catalog_decode`; imports no driver or detector package.

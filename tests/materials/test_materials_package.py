@@ -6,10 +6,14 @@ import sys
 import numpy as np
 
 
-def test_materials_package_exports_only_registry_conveniences():
+def test_materials_package_exports_registry_and_authoring_conveniences():
     from pyrite import materials
 
     assert set(materials.__all__) == {
+        "MaterialDefinition",
+        "build_medium",
+        "build_crystal",
+        "save_material",
         "CRYSTALS",
         "CATALOG",
         "MaterialCatalog",

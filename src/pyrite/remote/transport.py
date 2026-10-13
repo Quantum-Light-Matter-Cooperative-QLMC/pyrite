@@ -579,13 +579,16 @@ def _sync_entries() -> list[tuple[str, Path]]:
 
 
 def _user_catalog_entries() -> list[tuple[str, Path]]:
-    """Ship the user layer's profiles and energy-grid artifacts as ``user-catalog/``."""
-    from .._catalog_layout import ARTIFACT_DIR, user_layer
+    """Ship user objects, managed CIFs, and energy-grid artifacts as ``user-catalog/``."""
+    from .._catalog_layout import ARTIFACT_DIR, LAYERED_TABLES, user_layer
 
     layer = user_layer()
+    for name in (*LAYERED_TABLES, "cifs", ARTIFACT_DIR):
+        if (layer / name).is_symlink():
+            raise SystemExit(f"user catalog contains unsafe symlink: {layer / name}")
     files = [
         file
-        for name in ("profiles", ARTIFACT_DIR)
+        for name in (*LAYERED_TABLES, "cifs", ARTIFACT_DIR)
         if (layer / name).is_dir()
         for file in (layer / name).rglob("*")
         if not any(part.startswith(".") for part in file.relative_to(layer).parts)

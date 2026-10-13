@@ -135,6 +135,22 @@ def resolve_composition_table(
     )
     table = resolve(request.key)
     if table is None:
+        # Anonymous layers carry a case-local label. Prefer a registered medium
+        # of the same composition so the preparation hint names a usable input.
+        if (
+            key not in CATALOG.materials
+            and key not in CATALOG.crystals
+            and key not in CATALOG.media
+        ):
+            expected = tuple(sorted(composition))
+            key = next(
+                (
+                    name
+                    for name, medium in sorted(CATALOG.media.items())
+                    if tuple(sorted(medium.composition)) == expected
+                ),
+                key,
+            )
         species = "" if projectile == "electron" else f" --projectile {projectile}"
         raise TableNotFoundError(
             f"no SBETHE table for material {key!r}; generate the catalog table with "

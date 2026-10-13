@@ -54,7 +54,9 @@ from ._transport_data import TRANSPORT_ELEMENTS
 logger = logging.getLogger(__name__)
 
 
-def _cif_path(value: object, path: str, errors: _Errors, source: Path) -> Path | None:
+def _cif_path(
+    value: object, path: str, errors: _Errors, source: Path, *, owner: Path | None = None
+) -> Path | None:
     if not isinstance(value, str) or not value:
         errors.add(path, "must be a nonempty relative path")
         return None
@@ -62,7 +64,11 @@ def _cif_path(value: object, path: str, errors: _Errors, source: Path) -> Path |
     if relative.is_absolute() or relative.parts[:1] != ("cifs",) or ".." in relative.parts:
         errors.add(path, "must be a relative path inside cifs/")
         return None
-    for root in (catalog_root(source), DATA_DIR):
+    for root in (owner if owner is not None else catalog_root(source), DATA_DIR):
+        unresolved = root / relative
+        if any(part.is_symlink() for part in (unresolved, *unresolved.parents)):
+            errors.add(path, "must stay inside cifs/; unsafe symlink in CIF path")
+            return None
         base = root.resolve()
         cif_root = (base / "cifs").resolve()
         candidate = (base / relative).resolve()
@@ -127,6 +133,15 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
     if table is None:
         return {}
     out: dict[str, CrystalSpec] = {}
+    owners: dict[str, Path] = {}
+    if source.is_dir():
+        from .._catalog_layout import source_files
+
+        owners = {
+            Path(relative).stem: file.parent.parent
+            for relative, file in source_files(source)
+            if relative.startswith("crystals/")
+        }
     allowed = {
         "cif",
         "validation_id",
@@ -153,7 +168,7 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
         errors.keys(row, path, allowed)
         for name in sorted(required - set(row)):
             errors.add(f"{path}.{name}", "missing required key")
-        cif = _cif_path(row.get("cif"), f"{path}.cif", errors, source)
+        cif = _cif_path(row.get("cif"), f"{path}.cif", errors, source, owner=owners.get(key))
         validation_id = row.get("validation_id")
         if not isinstance(validation_id, str) or not validation_id.strip():
             errors.add(f"{path}.validation_id", "must be a nonempty string")

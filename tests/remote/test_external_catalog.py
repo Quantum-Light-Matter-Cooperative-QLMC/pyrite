@@ -3,6 +3,7 @@
 import pytest
 
 from pyrite.remote import config, scripts, transport
+from tests.helpers.material_authoring import preserve_catalog_registry  # noqa: F401
 
 
 def test_external_catalog_is_staged_and_exported(tmp_path, monkeypatch):
@@ -82,3 +83,46 @@ def test_user_profiles_ship_beside_the_bundled_catalog(monkeypatch, empty_user_c
         "user-catalog/energy-grid-artifacts/ab/abcd.json",
         "user-catalog/profiles/mine.toml",
     ]
+
+
+def test_user_materials_cifs_round_trip_with_same_identity(
+    tmp_path, monkeypatch, empty_user_catalog
+):
+    from pyrite import _catalog_layout as layout
+    from pyrite.materials import build_crystal, build_medium, load_material_catalog, save_material
+
+    source = layout.bundled_catalog().parent / "cifs" / "silicon.cif"
+    definition = build_crystal(
+        "remote-si",
+        cif=source,
+        formula="Si",
+        phase="diamond",
+        surface_hkl=(1, 1, 1),
+        B_ang2=0.46,
+        photon_energies_eV=[100, 200],
+    )
+    local = save_material(definition)
+    save_material(build_medium("remote-silica", formula="SiO2", density_g_cm3=2.2))
+    monkeypatch.setattr(config, "SYNC_PATHS", [])
+    entries = transport._sync_entries()
+    arcs = {arc for arc, _ in entries}
+    assert "user-catalog/materials/remote-si.toml" in arcs
+    assert "user-catalog/crystals/remote-si.toml" in arcs
+    assert "user-catalog/media/remote-silica.toml" in arcs
+    assert any(arc.startswith("user-catalog/cifs/") for arc in arcs)
+    remote = tmp_path / "remote-layer"
+    for arc, file in entries:
+        target = remote / arc.removeprefix("user-catalog/")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(file.read_bytes())
+    monkeypatch.setenv("PYRITE_USER_CATALOG", str(remote))
+    loaded = load_material_catalog()
+    assert (
+        loaded.crystals[definition.name].composition == local.crystals[definition.name].composition
+    )
+    assert build_crystal("alias", crystal=definition.name).identity == definition.identity
+    outside = tmp_path / "outside"
+    outside.write_text("secret")
+    (remote / "cifs" / "unsafe.cif").symlink_to(outside)
+    with pytest.raises(SystemExit, match="unsafe symlink"):
+        transport._sync_entries()

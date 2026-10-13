@@ -15,12 +15,16 @@ from pyrite.console.output import (
 )
 
 _COMMANDS = {
+    "add": "pyrite.cli.commands.material_add.command",
+    "list": "pyrite.cli.commands.material_inventory.command",
     "blaze": "pyrite.cli.commands.blaze.command",
     "energy-grid": "pyrite.cli.commands.energy_grid_surface.material_command",
     "validate": "pyrite.cli.commands.check_config.command",
 }
 
 _COMMAND_HELP = {
+    "add": "Add a validated medium or crystal to your catalog.",
+    "list": "List materials and media with their source and composition.",
     "blaze": "Run a grooved-crystal sweep and write a checkpoint.",
     "energy-grid": "Derive and inspect detector energy-grid inputs.",
     "validate": "Validate a material catalog without starting simulation.",
@@ -62,7 +66,7 @@ def _format_cut(identity):
     )
 
 
-def _identity_payload(material):
+def _identity_payload(material, catalog=None):
     """Structured display identity, or ``None`` for a material the catalog cannot resolve.
 
     An edited working catalog can name a material that the loaded (packaged)
@@ -71,7 +75,7 @@ def _identity_payload(material):
     """
     from ...materials import CATALOG
 
-    spec = CATALOG.materials.get(material)
+    spec = (CATALOG if catalog is None else catalog).materials.get(material)
     if spec is None:
         return None
     return {
@@ -86,10 +90,28 @@ def _identity_payload(material):
 
 
 def _payload(document, material, profile_name):
-    if material not in _catalog_io.material_rows(document):
+    medium = document.get("media", {}).get(material)
+    if material not in _catalog_io.material_rows(document) and medium is None:
         _unknown_material(document, material)
     if profile_name not in _catalog_io.profile_rows(document):
         _unknown_profile(document, profile_name)
+    if medium is not None and material not in _catalog_io.material_rows(document):
+        from ..._catalog_layout import object_sources
+        from ...materials.authoring import _density
+
+        composition = dict(medium["composition"])
+        return {
+            "material": material,
+            "profile": profile_name,
+            "identity": None,
+            "ranges": [],
+            "definition": {
+                "kind": "medium",
+                "source": object_sources(_catalog_io.active_catalog_path(), "media")[material],
+                "composition": composition,
+                "density_g_cm3": _density(tuple(composition.items())),
+            },
+        }
     ranges = _catalog_io.effective_ranges(document, material, profile_name)
     return {
         "material": material,
@@ -112,6 +134,17 @@ def _show(material, profile_name, json_output, *, schema="cxr.material.show"):
     try:
         _text, document = _catalog_io.catalog_text()
         payload = _payload(document, material, profile_name)
+        if "definition" not in payload and "schema_version" in document:
+            from ...materials.catalog import load_material_catalog
+            from .material_inventory import entries
+
+            payload["identity"] = _identity_payload(
+                material,
+                load_material_catalog(_catalog_io.active_catalog_path(), profile=profile_name),
+            )
+            payload["definition"] = next(
+                row for row in entries(_catalog_io.active_catalog_path()) if row["name"] == material
+            )
     except (OSError, ValueError, ParseError) as exc:
         if json_output:
             emit_json_result(cli_json.failure(schema, {}, str(exc)))
@@ -132,6 +165,11 @@ def _show(material, profile_name, json_output, *, schema="cxr.material.show"):
         cut = _format_cut(identity)
         if cut is not None:
             emit_result(f"  cut: {cut}")
+    definition = payload.get("definition")
+    if definition is not None:
+        emit_result(f"  source: {definition['source']}")
+        emit_result(f"  density: {definition['density_g_cm3']:g} g/cm³")
+        emit_result(f"  composition (atoms/angstrom³): {definition['composition']}")
     for row in payload["ranges"]:
         emit_result(f"  {row['name']}: [{_catalog_io.display(row['values'])}] ({row['source']})")
     return 0
@@ -146,7 +184,7 @@ def _show(material, profile_name, json_output, *, schema="cxr.material.show"):
     deprecation_prefix="material",
 )
 def command():
-    """Inspect, validate, and blaze individual materials.
+    """Add, inspect, validate, and blaze individual materials.
 
     Profile membership and ranges live under ``pyrite profile``. ``show``
     reports effective ranges and any per-material override that diverges from

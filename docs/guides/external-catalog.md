@@ -6,6 +6,10 @@ directory. The selected catalog is complete: PyRITE does not merge it with the
 bundled catalog. A profile's filter plates and physical pixel detector stay in
 that profile's TOML file.
 
+For additions to the bundled examples, the [material authoring workflow](adding-materials.md)
+writes user objects and managed CIFs to the user layer, without editing packaged
+definitions. Use a complete external catalog when you need an independent set.
+
 To start from the bundled definitions, copy the catalog and its CIF files outside
 the PyRITE checkout, then edit the copy:
 

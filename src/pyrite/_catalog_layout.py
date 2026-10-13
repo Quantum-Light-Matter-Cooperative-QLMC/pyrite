@@ -43,6 +43,7 @@ OBJECT_TABLES = (
     "beams",
     "energy_grids",
 )
+LAYERED_TABLES = OBJECT_TABLES
 _STEM_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 Sources = tuple[tuple[str, bytes], ...]
@@ -82,7 +83,7 @@ _BUNDLED_PROFILE_WRITES: ContextVar[bool] = ContextVar("bundled_profile_writes",
 
 @contextmanager
 def bundled_profile_writes() -> Iterator[None]:
-    """Edit the bundled catalog itself, without the user layer (``pyrite-dev profile``)."""
+    """Maintainer context: edit bundled objects without the user layer."""
     token = _BUNDLED_PROFILE_WRITES.set(True)
     try:
         yield
@@ -91,9 +92,9 @@ def bundled_profile_writes() -> Iterator[None]:
 
 
 def is_layered(path: Path | str) -> bool:
-    """Whether ``path`` is the bundled catalog read with the user layer's profiles.
+    """Whether ``path`` is the bundled catalog read with the user layer's objects.
 
-    False inside :func:`bundled_profile_writes`, where the bundled catalog is
+    False inside :func:`bundled_profile_writes`, where bundled objects are
     edited as a plain directory catalog.
     """
     return not _BUNDLED_PROFILE_WRITES.get() and Path(path).resolve() == bundled_catalog().resolve()
@@ -142,8 +143,8 @@ def _table_files(table_dir: Path, table: str, errors: list[str]) -> list[tuple[s
 def source_files(path: Path | str) -> tuple[tuple[str, Path], ...]:
     """Return ``(relative path, file)`` for every catalog source file.
 
-    For the bundled catalog this includes the user layer's ``profiles/``
-    (:func:`user_layer`); a user profile may not reuse a bundled profile name.
+    For the bundled catalog this includes the user layer's object tables
+    (:func:`user_layer`); user names may not reuse bundled names in the same table.
     Raises :class:`CatalogLayoutError` for layout violations.
     """
     path = Path(path)
@@ -171,19 +172,23 @@ def source_files(path: Path | str) -> tuple[tuple[str, Path], ...]:
         if table_dir.is_dir():
             files.extend(_table_files(table_dir, table, errors))
     if is_layered(path):
-        user_profiles = user_layer() / "profiles"
-        if user_profiles.is_dir():
-            bundled = {
-                relative.casefold(): file
-                for relative, file in files
-                if relative.startswith("profiles/")
-            }
-            for relative, file in _table_files(user_profiles, "profiles", errors):
+        bundled = {relative.casefold(): file for relative, file in files}
+        for table in LAYERED_TABLES:
+            user_table = user_layer() / table
+            if not user_table.is_dir():
+                continue
+            if user_table.is_symlink():
+                errors.append(f"{user_table}: unsafe symlink in user catalog")
+                continue
+            for relative, file in _table_files(user_table, table, errors):
+                if file.is_symlink():
+                    errors.append(f"{file}: unsafe symlink in user catalog")
+                    continue
                 clash = bundled.get(relative.casefold())
                 if clash is not None:
+                    kind = "demo profile" if table == "profiles" else table
                     errors.append(
-                        f"{file}: profile name is reserved by bundled demo profile {clash}; "
-                        "rename your profile"
+                        f"{file}: name is reserved by bundled {kind} {clash}; rename your object"
                     )
                     continue
                 files.append((relative, file))
@@ -192,16 +197,18 @@ def source_files(path: Path | str) -> tuple[tuple[str, Path], ...]:
     return tuple(files)
 
 
-def profile_sources(path: Path | str) -> dict[str, str]:
-    """Map each profile name to ``"bundled"``, ``"user"`` (layer), or ``"catalog"``."""
+def object_sources(path: Path | str, table: str) -> dict[str, str]:
+    """Map object names to ``bundled``, ``user``, or ``catalog`` origins."""
     path = Path(path)
     bundled = path.resolve() == bundled_catalog().resolve()
     layer = user_layer().resolve() if is_layered(path) else None
     sources: dict[str, str] = {}
+    if not path.is_dir():
+        return dict.fromkeys(object_keys(path, table), "catalog")
     for relative, file in source_files(path):
-        if not relative.startswith("profiles/"):
+        if not relative.startswith(f"{table}/"):
             continue
-        name = relative.removeprefix("profiles/").removesuffix(".toml")
+        name = relative.removeprefix(f"{table}/").removesuffix(".toml")
         if layer is not None and file.resolve().is_relative_to(layer):
             sources[name] = "user"
         else:
@@ -209,11 +216,16 @@ def profile_sources(path: Path | str) -> dict[str, str]:
     return sources
 
 
+def profile_sources(path: Path | str) -> dict[str, str]:
+    """Map profile names to ``bundled``, ``user``, or ``catalog`` origins."""
+    return object_sources(path, "profiles")
+
+
 def read_sources(path: Path | str) -> Sources:
     """Return ``(relative path, bytes)`` for every catalog source file.
 
     A single-file catalog yields one entry named after the file; the bundled
-    catalog also yields the user layer's profiles (see :func:`source_files`).
+    catalog also yields the user layer's objects (see :func:`source_files`).
     Raises :class:`CatalogLayoutError` for layout violations and
     :class:`OSError` when a file cannot be read.
     """
@@ -336,7 +348,7 @@ def _atomic_write(path: Path, text: str) -> None:
 
 
 class BundledProfileError(CatalogLayoutError):
-    """A user edit would change a read-only bundled demo profile."""
+    """A user edit would change a bundled object (historic profile error name)."""
 
 
 def write_text(path: Path | str, text: str) -> None:
@@ -345,7 +357,7 @@ def write_text(path: Path | str, text: str) -> None:
     A single-file catalog is replaced whole. A directory catalog rewrites only
     object files whose text changed, creates new objects, and deletes objects
     absent from ``text``; each file replacement is atomic. For the bundled
-    catalog, new profiles go to the user layer and bundled demo profiles are
+    catalog, new objects go to the user layer and bundled objects are
     read-only (edit them inside :func:`bundled_profile_writes`).
     """
     path = Path(path)
@@ -360,12 +372,12 @@ def write_text(path: Path | str, text: str) -> None:
         existing = files.get(relative)
         if existing is not None:
             return existing
-        if layered and relative.startswith("profiles/"):
+        if layered and relative.split("/", 1)[0] in LAYERED_TABLES:
             return user_layer() / relative
         return path / relative
 
     def protected(file: Path, relative: str) -> bool:
-        return layered and relative.startswith("profiles/") and file.is_relative_to(path.resolve())
+        return layered and file.is_relative_to(path.resolve())
 
     def changed_content(relative: str, content: str) -> bool:
         if relative not in files:
@@ -388,18 +400,25 @@ def write_text(path: Path | str, text: str) -> None:
     }
     removed = [relative for relative in files if relative not in wanted]
     blocked = sorted(
-        relative.removeprefix("profiles/").removesuffix(".toml")
+        relative
         for relative in (*changed, *removed)
         if relative in files and protected(files[relative].resolve(), relative)
     )
     if blocked:
-        raise BundledProfileError(
-            tuple(
-                f"profile {name!r} is a bundled demo and is read-only; copy it with "
-                f"'pyrite profile create NAME --from {name}' (maintainers: 'pyrite-dev profile')"
-                for name in blocked
-            )
-        )
+        messages = []
+        for relative in blocked:
+            name = Path(relative).stem
+            if relative.startswith("profiles/"):
+                messages.append(
+                    f"profile {name!r} is a bundled demo and is read-only; copy it with "
+                    f"'pyrite profile create NAME --from {name}' (maintainers: 'pyrite-dev profile')"
+                )
+            else:
+                messages.append(
+                    f"{relative} is bundled and read-only; choose a new user object name "
+                    "or select an independent complete catalog"
+                )
+        raise BundledProfileError(tuple(messages))
     for relative, content in changed.items():
         _atomic_write(target(relative), content)
     for relative in removed:
@@ -411,7 +430,7 @@ def object_keys(path: Path | str, table: str) -> tuple[str, ...]:
     path = Path(path)
     if path.is_dir():
         roots = [path]
-        if table == "profiles" and is_layered(path):
+        if table in LAYERED_TABLES and is_layered(path):
             roots.append(user_layer())
         keys: dict[str, None] = {}
         for root in roots:
@@ -430,6 +449,8 @@ def object_keys(path: Path | str, table: str) -> tuple[str, ...]:
 
 __all__ = [
     "ARTIFACT_DIR",
+    "LAYERED_TABLES",
+    "object_sources",
     "MANIFEST",
     "OBJECT_TABLES",
     "BundledProfileError",

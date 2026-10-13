@@ -73,7 +73,7 @@ def load_material_catalog(
     except OSError as exc:
         raise MaterialConfigError((f"{source}: {exc}",)) from exc
 
-    return _load_material_catalog_cached(source, sources, profile)
+    return _load_material_catalog_cached(source, sources, profile, catalog_root(source).resolve())
 
 
 @functools.lru_cache(maxsize=32)
@@ -81,7 +81,10 @@ def _load_material_catalog_cached(
     source: Path,
     sources: Sources,
     profile: str,
+    _asset_root: Path,
 ) -> MaterialCatalog:
+    # Referenced asset paths depend on the selected user-layer root as well
+    # as source bytes. Keep that root in the parse-cache key.
     errors = _Errors()
 
     try:
@@ -297,6 +300,45 @@ def _get_default_catalog() -> MaterialCatalog:
             if _DEFAULT_CATALOG is None:
                 _DEFAULT_CATALOG = load_material_catalog()
     return _DEFAULT_CATALOG
+
+
+def _refresh_default_catalog(catalog: MaterialCatalog) -> None:
+    """Refresh loaded PyRITE conveniences without mutating immutable snapshots.
+
+    Domain modules retain imported default catalog bindings. Replace only those
+    bindings that still refer to the old singleton, leaving explicit catalogs
+    alone. The mutable compatibility crystal/label registries update in place
+    so existing references to those registries also see newly registered keys.
+    """
+    import sys
+
+    global _DEFAULT_CATALOG
+    with _DEFAULT_CATALOG_LOCK:
+        previous = _DEFAULT_CATALOG
+        _DEFAULT_CATALOG = catalog
+        for name, module in tuple(sys.modules.items()):
+            if name.startswith("pyrite.") and module is not None:
+                namespace = vars(module)
+                if previous is not None and namespace.get("CATALOG") is previous:
+                    namespace["CATALOG"] = catalog
+                if previous is not None and namespace.get("MATERIALS") is previous.material_keys:
+                    namespace["MATERIALS"] = catalog.material_keys
+        package = sys.modules.get("pyrite.materials")
+        if package is not None:
+            namespace = vars(package)
+            namespace["CATALOG"] = catalog
+            if "MATERIALS" in namespace:
+                namespace["MATERIALS"] = catalog.material_keys
+            labels = namespace.get("MATERIAL_LABELS")
+            if isinstance(labels, dict):
+                labels.clear()
+                labels.update({key: spec.label for key, spec in catalog.materials.items()})
+        crystal_module = sys.modules.get("pyrite.materials.crystal")
+        if crystal_module is not None:
+            registry = vars(crystal_module)["CRYSTALS"]
+            registry.clear()
+            registry.update(crystal_module.load_crystals(catalog))
+            vars(crystal_module)["_RECIP_BASIS_CACHE"].clear()
 
 
 __all__ = [

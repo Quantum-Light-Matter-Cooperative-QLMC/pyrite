@@ -112,7 +112,8 @@ def test_root_and_group_help_expose_new_ownership_only():
     assert "\n  set " not in material_help.stdout
     assert "validate" in material_help.stdout
     assert "blaze" in material_help.stdout
-    assert "list" not in material_help.stdout
+    assert "list" in material_help.stdout
+    assert "add" in material_help.stdout
 
 
 def test_material_group_lazily_routes_validate_and_blaze():
