@@ -77,10 +77,9 @@ The `amd` extra builds CuPy from source and needs `CUPY_INSTALL_USE_HIP=1` set
 for the install command; ROCm support is entirely untested as of this writing;
 Intel support is provisional, and FP64 operations are currently unsupported.
 
-```note
-`uv` refuses to combine GPU extras, but `pip` does not check: installing
-two of them leaves conflicting CuPy builds in one environment.
-```
+> [!NOTE]
+> `uv` refuses to combine GPU extras, but `pip` does not check: installing
+> two of them leaves conflicting CuPy builds in one environment.
 
 `PYRITE_MC_BACKEND=auto|cpu|cuda|rocm|sycl` selects the array backend. See
 [execution and acceleration](docs/computation/execution-and-acceleration.md)
