@@ -1,7 +1,8 @@
 # 0016 — Share descriptions across target and filter roles
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-10
+- **Accepted:** 2026-10-13 (human design review)
 - **Issue:** [#401](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/401)
 - **Design:** [Target and filter object semantics](../research/instrumentation/target-filter-bodies.md)
 
@@ -18,13 +19,22 @@ not supply the missing electron navigation or photon production model.
 [ADR-0008](0008-no-arbitrary-target-geometry.md) keeps the target geometry set
 closed and downstream instruments outside electron transport.
 
-## Proposed decision
+## Decision
 
 Retain the specialized target and filter types. Share immutable descriptions
 through explicit adapters, starting with homogeneous substance resolution in
 the material layer. A subsequent bounded adapter may describe a scalar,
 homogeneous rectangular body with separate dimensions, substance, and pose.
 It must lower to the existing specialized types; it is not a new navigator.
+
+Separate role from body description. Explicit `Target(body=...)` and
+`Filter(body=...)` wrappers are a compatible public API direction: each selects
+its solver contract and validates the body's supported geometry, substance
+and placement. Shared descriptions need not have identical support in both
+roles. Current `Slab`/`Stack` constructors remain target-specific compatibility
+interfaces; their fields must not silently acquire role-neutral meanings.
+Final constructor names and any layered-filter adapter remain follow-up API
+design, rather than part of this acceptance.
 
 Keep campaign recipes and sweep expansion outside scalar body descriptions.
 Keep crystal orientation separate from body pose. Assign behavior explicitly
@@ -57,6 +67,7 @@ A filter intersected by electrons requires a separately reviewed transport
 design; unifying navigation requires a superseding decision for ADR-0008.
 Detector response, scoring, and acquisition remain separate.
 
-This record is proposed for design review. It authorizes no implementation,
-new physical claims, numerical changes, or schema migration. The linked study
-defines compatibility gates and bounded follow-up slices.
+The architectural direction is accepted. Implementation remains separately
+scoped by the linked study's compatibility gates and bounded follow-up slices.
+Acceptance does not authorize new physical claims, numerical changes or schema
+migration.

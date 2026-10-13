@@ -67,4 +67,4 @@ In other words:
 | [0013](0013-automatic-line-grids-by-default.md)     | Automatic line grids by default      | Accepted                               |
 | [0014](0014-packaged-data-layout.md)                | Packaged data layout                 | Accepted                               |
 | [0015](0015-xraydb-atomic-scattering-data.md)       | xraydb as the atomic scattering data source | Accepted                         |
-| [0016](0016-target-filter-body-components.md)      | Share descriptions across target and filter roles | Proposed                    |
+| [0016](0016-target-filter-body-components.md)      | Share descriptions across target and filter roles | Accepted                    |

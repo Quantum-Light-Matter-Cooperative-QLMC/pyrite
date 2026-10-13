@@ -1,20 +1,48 @@
 # Target and filter object semantics
 
-**Status:** Proposed design for [#401](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/401).
-No API shown as proposed below exists yet. Implementation requires design review.
+**Status:** Architectural direction approved on 2026-10-13 for
+[#401](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/401).
+No API shown as proposed below exists yet. Constructor spelling and broader
+shape support remain follow-up design; implementation requires a bounded scope.
 
 **Recommendation:** share substance resolution and bounded immutable body
 components, while retaining `Slab`/`Stack` and `FilterPlate` as role-specific
 interfaces. Material is a body parameter; a campaign recipe is a different
 object. Placement constrains a role but does not select its enabled physics.
-[Proposed ADR-0016](../../adr/0016-target-filter-body-components.md) records this
+[Accepted ADR-0016](../../adr/0016-target-filter-body-components.md) records this
 choice without superseding [ADR-0008](../../adr/0008-no-arbitrary-target-geometry.md).
 
 ## Current boundaries and terminology
 
-This study inspected `dfc8a717`, the issue branch's base on `main`. Source links
+This study inspected `6fb6a717`, the issue branch's base on `main`. Source links
 identify owners; the statements below describe that revision, rather than
 assuming that similar field names have identical meaning.
+
+### Compatibility with the current scene API
+
+Reviewed against `main` at `0968a71f` (2026-10-13). The substance namespaces,
+target/filter solver boundary, ordered observation identity and trajectory
+scene payload remain as described below. Subsequent scene API changes affect
+the migration's adapters, rather than the recommended component boundary:
+
+- `Scene.physics` owns emission and particle-interaction models;
+  `Scene.numerics` owns sampling, true-energy grids and execution controls.
+  Body adapters must preserve these independently supplied settings. A
+  scene-wide physics setting does not bring downstream filters into electron
+  transport or enable new interactions in them.
+- `PlanarDetector.scorer` owns pixel scoring. The old scene/simulation
+  `pixel_scorer` arguments are deprecated forwarding inputs; new adapters
+  should use the detector field and preserve existing observation resolution.
+- `Slab` and `Stack` now require an explicit finite `Footprint` or `None`
+  for infinite lateral extent. Omission still supplies the historical default
+  with a deprecation warning. A rectangular adapter must pass its dimensions
+  explicitly and must not depend on that fallback.
+
+Implementation parity means legacy and adapted inputs resolved on the same
+revision, with the same explicit physics, numerics and detector scorer. It
+does not promise that source digests stay equal across intervening model or
+API releases. The later trajectory capture schema is separate from the
+unchanged `pyrite.trajectory-scene.v1` downstream geometry snapshot.
 
 | Concern | Current owner/type | Meaning and constraints |
 | --- | --- | --- |
@@ -97,6 +125,55 @@ adding one would require coordination with #19 and a superseding ADR-0008.
 Issue #341's optional photon transport is separate from this description
 decision; neither scattering nor fluorescence becomes supported by choosing B.
 
+### Explicit Target and Filter wrappers
+
+The public API can express design B as `Target(body=...)` and `Filter(body=...)`.
+The outer object owns the role, its supported placement and interaction
+contract. The inner body owns substance and geometry. A homogeneous body's
+substance can be separate from its slab shape; a stack is an ordered assembly
+with substance and thickness per layer, rather than one substance assigned
+to the whole stack.
+
+For the initial rectangular scope, the spelling could be:
+
+```text
+silicon_plate = RectangularBody(
+    substance=SubstanceRef(kind="crystal", key="silicon"),
+    size_mm=(10, 10), thickness_mm=0.1,
+)
+target = Target(body=silicon_plate, tilt_deg=30, lattice_cut="catalog")
+filter = Filter(body=silicon_plate, pose=downstream_pose, name="window")
+```
+
+These are proposed constructors. The two wrappers create distinct role
+instances from one immutable description. `Target` validates the supported
+entrance crystal and target frame; `Filter` initially selects primary photon
+attenuation and validates finite downstream geometry. Neither wrapper enables
+an unsupported interaction merely by accepting a shared body type.
+
+`Target(body=Slab(...))` and `Filter(body=Slab(...))`, with corresponding stack
+forms, are a useful eventual vocabulary if the inner types become scalar,
+role-neutral descriptions. Today's `Slab` is a target specification with a
+radiator recipe, crystal tilt, mosaic state, grooves and optional sweep
+sequences. Today's `Stack` imposes entrance-film and fixed-substrate rules.
+Wrapping these unchanged would retain those target assumptions inside a
+filter. Keep their public behavior through explicit legacy adapters; do not
+redefine their existing arguments in place. The internal `Target = Slab |
+Stack` alias also needs a deliberate naming migration if `Target` becomes a
+public wrapper class.
+
+Shared shape vocabulary does not require equal solver coverage. A finite
+homogeneous slab can serve either role after checked lowering. A target stack
+has existing specialized lowering; a filter stack needs a separate adapter
+that positions each homogeneous layer and computes its finite chord. Infinite
+or grooved target variants remain unsupported filters until their geometry
+and interaction contracts are explicitly supplied. Additional shapes extend
+the closed set only with an owning solver adapter and focused parity checks.
+
+Prefer these role wrappers over a universal scene-object registry. Introduce
+the rectangular path first; keep final names and the wider slab/stack API as
+follow-up design. This preserves the accepted resolver-first migration.
+
 ### Component contract and concrete examples
 
 The first implementation slice needs no new public body class. After that,
@@ -157,7 +234,7 @@ pose and interaction policy. That reference system is deliberately deferred.
 | --- | --- | --- |
 | Same homogeneous silicon plate as irradiated target or filter | Construct `Slab("silicon", thickness_ang=1_000_000, footprint=Footprint(10, 10))` versus `FilterPlate("silicon", 0.1, (10, 10), pose)`; target also needs its tilt/cut | Reuse the rectangular description; adapters still choose different solvers |
 | Two silicon instances with different poses | Two `FilterPlate` objects share the key/composition and have independent poses/names | Shared immutable substance/body values, separate placed instances; no coupling when one moves |
-| Crystalline film on amorphous substrate | `Stack((Layer("mos2", 1000), Layer("sio2", 2850)))`; film drives entrance crystallography; amorphous layer has no coherent radiator | Keep ordered target layers; no averaged “stack material” |
+| Crystalline film on amorphous substrate | `Stack((Layer("mos2", 1000), Layer("sio2", 2850)), footprint=Footprint(10, 10))`; film drives entrance crystallography; amorphous layer has no coherent radiator | Keep ordered target layers; no averaged “stack material” |
 | Multilayer downstream filter | Adjacent non-overlapping `FilterPlate` boxes, one per homogeneous layer; touching boxes are permitted; `Stack` itself is not a filter | Keep the explicit plate collection initially; a future layer adapter must compute each layer's pose/chord, preserve order and reject overlap |
 | Plate outside the central ray | Valid if its full volume satisfies downstream checks; pixel centre rays determine partial coverage or a complete miss | Preserve finite-box geometry; do not replace it with one infinite attenuator |
 | Nominal filter intersected by electrons | Filters never enter electron transport; downstream validation does not trace electron trajectories | Reject an explicit request for electron interactions; use a supported target stack if appropriate, otherwise require new navigation/physics work |
@@ -291,7 +368,8 @@ define the durable migration contract; they are not a second task tracker.
    silicon example, two independent poses, exact unit conversion, supported
    entrance/cut convention, and clear rejection of unsupported shape,
    material, pose and interaction requests. No general navigator or automatic
-   role inference.
+   role inference. Preserve explicit `Scene.physics`, `Scene.numerics` and
+   detector-owned scoring; pass a target footprint explicitly.
 3. **Catalog/CLI adapters and persistence parity.** Owners:
    `materials/_parse.py`, `_beam_detector_parse.py`, `campaign/observation.py`,
    `campaign/profile_edit.py`, `cli/commands/material.py`, `_profile_filters.py`,
@@ -324,6 +402,7 @@ They are not blockers for the resolver/description study.
 | `tests/observations/test_store.py`, `test_produce.py`, `test_sweep.py` | Old schema reads, unchanged observation reuse, source reuse after filter-only edits |
 | `tests/montecarlo/test_trajectory_scene.py`, `tests/plots/test_trajectory_builders.py` | Stored scene reference/transform, old scene-less capture reads, historical geometry preserved after catalog edits |
 
-Design review must approve the component boundary, adapter limits and parity
-gates before dispatching implementation. It need not approve a universal body
-API, new interaction engine or catalog migration to accept the narrower choice.
+Design review has approved the component boundary, initial adapter limits and
+parity gates. Follow-up dispatch must specify the implementation slice and
+settle any new public constructor contract. This acceptance does not extend
+to a universal body API, new interaction engine or catalog migration.
