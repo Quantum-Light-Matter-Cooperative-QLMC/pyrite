@@ -1,8 +1,8 @@
 [project]
 name = "pyrite-mc"
 version = "0.13.5"
-description = "Coherent X-ray radiation and electron transport in crystals."
-readme = "README.md"
+description = "Monte Carlo electron transport and X-ray emission in crystalline and amorphous solids."
+readme = "PYPI.md"
 license = { file = "LICENSE.txt" }
 license-files = ["LICENSE.txt", "THIRD-PARTY-NOTICES.md"]
 classifiers = [
