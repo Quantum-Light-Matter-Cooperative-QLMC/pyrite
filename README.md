@@ -27,19 +27,17 @@ channeling in crystals below 100 MeV is under investigation.
 ## Install
 
 Requires Python ≥ 3.13. Python 3.13 installs `backports.zstd` automatically;
-Python 3.14+ uses the standard-library implementation. PyRITE is not on PyPI
-yet; install it from GitHub with pip or [uv](https://docs.astral.sh/uv/):
+Python 3.14+ uses the standard-library implementation.
 
 ```bash
 # Command-line tool in its own environment (recommended):
-uv tool install "pyrite-mc @ git+https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git"
+uv tool install pyrite-mc
 
 # Or into the current environment, for use as a library:
-pip install "pyrite-mc @ git+https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git"
+pip install pyrite-mc
+# OR
+uv add pyrite-mc
 ```
-
-Append `@<tag>` to the URL (for example `pyrite.git@v0.5.0`) to pin a release.
-Once PyPI releases exist, `pyrite-mc @ git+…` becomes plain `pyrite-mc`.
 
 Then fetch the reference data and check the install:
 
@@ -53,7 +51,7 @@ pyrite --help
 data from public GitHub Releases; no GitHub token is needed. Run
 `pyrite tables fetch --help` to list the individual datasets, or
 `pyrite tables fetch NAME --archive PATH` to install one from a local archive.
-In a notebook with no terminal (for example molab), call `pyrite.fetch_tables()`,
+In a notebook with no terminal (for example, jupyter), call `pyrite.fetch_tables()`,
 which does the same as a bare `pyrite tables fetch`.
 
 For tab completion, run `pyrite config completion install` and restart the
@@ -72,13 +70,17 @@ adding it in brackets after the package name:
 | Intel    | `intel`  | oneAPI `dpnp` + `dpctl` |
 
 ```bash
-uv tool install "pyrite-mc[nvidia] @ git+https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git"
+uv tool install pyrite-mc[nvidia]
 ```
 
 The `amd` extra builds CuPy from source and needs `CUPY_INSTALL_USE_HIP=1` set
-for the install command; ROCm support is provisional until exercised on AMD
-hardware. uv refuses to combine GPU extras, but pip does not check: installing
+for the install command; ROCm support is entirely untested as of this writing;
+Intel support is provisional, and FP64 operations are currently unsupported.
+
+```note
+`uv` refuses to combine GPU extras, but `pip` does not check: installing
 two of them leaves conflicting CuPy builds in one environment.
+```
 
 `PYRITE_MC_BACKEND=auto|cpu|cuda|rocm|sycl` selects the array backend. See
 [execution and acceleration](docs/computation/execution-and-acceleration.md)
@@ -97,13 +99,12 @@ source .venv/bin/activate     # Windows: .venv\Scripts\activate
 
 Commands in the README and user guides assume `pyrite` is on your `PATH`:
 activate `.venv` in each shell, or install once with `uv tool install .`
-(see the [shell-completion guide](docs/guides/shell-completion.md)). `uv sync` removes extras it is not told about, so
-repeat the same `--extra` on later syncs. Contributor and CI commands are in
-the [development workspace guide](docs/repo-design/development-workspace.md).
+(see the [shell-completion guide](docs/guides/shell-completion.md)).
+Contributor and CI commands are in the [development workspace guide](docs/repo-design/development-workspace.md).
 
 ## Run
 
-Generated outputs default to `pyrite-output/<kind>/` in the current workspace.
+Outputs generated using the CLI default to `pyrite-output/<kind>/` in the current workspace.
 For a fixed output home, run `pyrite config set workspace.root /path/to/workspace`
 once. Subdirectories reuse the nearest existing output tree; see the
 [output-home and migration rules](docs/guides/configuration-cookbook.md#choose-an-output-home).
@@ -142,7 +143,7 @@ light demo profiles that each exercise one feature and run locally in a minute
 or two on CPU:
 
 | Demo | Shows |
-|---|---|
+| --- | --- |
 | `quickstart` | one HOPG case, incoherent PXR lines plus bremsstrahlung |
 | `sweep_demo` | a small two-material energy x tilt sweep for the analysis app |
 | `trajectory_demo` | `--trajectories` capture and VTK export |
