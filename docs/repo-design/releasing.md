@@ -63,12 +63,13 @@ The command:
 `--check` validates and prints notes without editing files. Put the notes in
 the PR description, then run `pyrite-dev verify`. After the PR merges,
 tag `vX.Y.Z` on the merge commit and push the tag. Tagging and pushing need
-explicit human authorization. PyPI publishing is out of scope.
+explicit human authorization. Pushing the tag also authorizes the workflow's
+automatic PyPI publication.
 
 ## Publishing
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`, which publishes the
-GitHub Release for it:
+GitHub Release for it, then publishes the package to PyPI:
 
 1. It refuses a tag that is not `v{__version__}` for the tagged commit, so a
    tag on an unbumped commit publishes nothing.
@@ -76,6 +77,18 @@ GitHub Release for it:
    `pyrite-dev release-notes vX.Y.Z`): the same grouping as above, from the
    previous `v*` tag to the new one.
 3. It creates the Release titled `PyRITE X.Y.Z` and marks it **Latest**.
+4. Only after the release job succeeds, it builds the tagged commit's wheel
+   and source distribution, checks them with Twine, and uploads them as a
+   workflow artifact.
+5. Only after the build job succeeds, it downloads those distributions and
+   publishes them to PyPI using Trusted Publishing in the `pypi` environment.
+
+Configure the `pyrite-mc` project's PyPI Trusted Publisher for this repository,
+workflow filename `release.yml`, and environment `pypi`. When migrating from
+the separate publish workflow, replace the `publish-pypi.yml` publisher with
+`release.yml` before pushing the next release tag. Any required reviewers on
+the GitHub `pypi` environment still gate publication; omit that requirement
+if publication should proceed without manual approval.
 
 Releases for data and table archives (`tables-*`, `mirror-*`) share the
 repository's Releases page. Create them with `--latest=false` (see

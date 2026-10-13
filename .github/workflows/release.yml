@@ -1,22 +1,25 @@
-name: Release
+name: Release and publish to PyPI
 
 # Pushing a vX.Y.Z tag on the merged release commit publishes its GitHub
-# Release (docs/repo-design/releasing.md). The tag must match __version__.
+# Release, then builds and publishes to PyPI (docs/repo-design/releasing.md).
+# The tag must match __version__.
 on:
   push:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  publish:
+  release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -42,3 +45,48 @@ jobs:
           --latest
           --title "PyRITE ${GITHUB_REF_NAME#v}"
           --notes-file release-notes.md
+
+  build:
+    name: Build distributions
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.14"
+
+      - name: Build package
+        run: uv build
+
+      - name: Check distributions
+        run: uvx twine check dist/*
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pyrite-mc
+    permissions:
+      id-token: write
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+
+      - name: Publish distributions
+        uses: pypa/gh-action-pypi-publish@release/v1
