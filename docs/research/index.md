@@ -26,6 +26,7 @@ physics/channeling-radiation-physics
 physics/channeling-materials
 physics/mos2-directional-loss-sources
 physics/transition-radiation-recommendations
+physics/photon-transport
 ```
 
 ```{toctree}
