@@ -111,6 +111,10 @@ For a narrow line with slowly varying $J$, the coherent/incoherent integrated-yi
 
 ## Assumptions and limits
 
+The [optional photon transport design](../../research/physics/photon-transport.md)
+describes the proposed replacement for incoherent continuum and characteristic
+escape. It is not implemented; the limits below still apply.
+
 - straight geometric escape rays with first-order Snell phase/kinematics; no Fresnel reflection or transmission, no diffraction off groove edges;
 - **bulk response only** — grazing observation geometry, where interface optics dominate, is out of scope for the refractive model;
 - passive attenuation: absorbed photons are gone, with no fluorescence, re-emission, or scattering into the detector direction;
