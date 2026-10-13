@@ -146,7 +146,9 @@ class Physics:
         incoherent companion from the same transport. The input alias
         ``"both"`` is deprecated; use ``("incoherent", "coherent")``.
     brem_source
-        ``"mc"``, ``"external"``, or ``"none"`` continuum policy.
+        ``"mc"``, ``"external"``, or ``None`` continuum policy. ``None``
+        disables continuum scoring and is stored as ``"none"`` for case and
+        checkpoint compatibility; the string ``"none"`` is also accepted.
     straggling
         Enable stochastic per-flight energy-loss straggling.
     inelastic_model, inelastic_cutoff_eV
@@ -201,7 +203,7 @@ class Physics:
     """
 
     emission: EmissionSelection = "incoherent"
-    brem_source: Literal["mc", "external", "none"] = "mc"
+    brem_source: Literal["mc", "external", "none"] | None = "mc"
     straggling: bool = False
     inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "auto"
     inelastic_cutoff_eV: float | None = None
@@ -216,8 +218,10 @@ class Physics:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "emission", _emission_selection(self.emission, warn_both=True))
+        if self.brem_source is None:
+            object.__setattr__(self, "brem_source", "none")
         if self.brem_source not in {"mc", "external", "none"}:
-            raise ValueError("brem_source must be 'mc', 'external', or 'none'")
+            raise ValueError("brem_source must be 'mc', 'external', None, or 'none'")
         self.validate_transport("midpoint")
 
     @property

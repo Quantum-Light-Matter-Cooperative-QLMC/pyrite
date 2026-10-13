@@ -103,6 +103,11 @@ detector response require the simulation API.
 
 The root package exposes the preferred high-level API. A `Scene` contains one scalar `Beam`, target, and either the compatibility scalar `Detector` or a physical `PlanarDetector`; `Physics` contains emission and particle-interaction model choices. `Numerics` contains sampling, true-photon energy grids, integration, and execution controls. Both can be carried by `Scene` for sweeps. `simulate` lowers those objects to the established typed `Case` and calls the existing Monte Carlo runner directly. It neither reads nor writes a checkpoint.
 
+Use `pr.Physics(brem_source=None)` to disable continuum scoring. The default is
+`"mc"`; `"external"` selects an external continuum policy. `None` is normalized
+to `"none"` internally, preserving case and checkpoint identity. The string
+`"none"` remains accepted for compatibility.
+
 ```python
 import pyrite as pr
 
