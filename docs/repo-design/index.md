@@ -34,6 +34,7 @@ compute/gpu-transport-rawkernel.md
 compute/jit-spectrum-kernel-walkthrough.md
 compute/straggled-transport-integration.md
 compute/transport-jit-kernel-walkthrough.md
+compute/physics-preparation-adapters.md
 ```
 
 ```{toctree}

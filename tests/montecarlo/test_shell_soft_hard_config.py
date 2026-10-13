@@ -181,3 +181,40 @@ def test_uncovered_material_names_the_covered_set():
 
     with pytest.raises(ValueError, match="'hfs2' has no conduction-band shell data.*silicon"):
         catalog_shell_oscillators("hfs2")
+
+
+def test_direct_shell_cuda_lut_refusal_is_not_runner_exact_fallback(monkeypatch):
+    """CPU preparation reaches the native refusal, before any CUDA factory."""
+    import sys
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.transport import simulate_trajectories
+
+    def forbidden():
+        pytest.fail("unsupported CUDA-LUT shell route must refuse before device construction")
+
+    monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
+    monkeypatch.setitem(
+        sys.modules,
+        "pyrite.montecarlo.transport._jit_launch",
+        SimpleNamespace(make_cuda_transport_core=forbidden, make_cuda_transport_lut_core=forbidden),
+    )
+    case = _case(
+        inelastic_model="shell-soft-hard",
+        inelastic_cutoff_eV=50.0,
+        elastic_model="mott",
+        bremsstrahlung_model="eedl",
+        radiative_model="uncoupled",
+    )
+    with pytest.raises(NotImplementedError, match="CUDA LUT core; disable the LUT"):
+        simulate_trajectories(
+            case["E0_keV"],
+            1,
+            2000.0,
+            composition=case["composition"],
+            energy_model="midpoint",
+            transport_core="cuda",
+            stopping_tables=runner._case_stopping_tables(case),
+            **runner._case_inelastic_kwargs(case),
+            **runner._case_elastic_kwargs(case),
+        )

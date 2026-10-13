@@ -384,6 +384,11 @@ Construction does not load tables, resolve `auto`, probe hardware, dispatch
 adapters, or feed a new payload into identity/persistence. Runtime preparation
 and physical-domain verification remain separate checks.
 
+`runner/case_tables.py` uses the elastic family IDs to select fixed immutable
+Mott/ELSEPA preparation adapters through the existing kwargs/table-entry seams.
+Native tables, model codes and exact/LUT dispatch remain in transport owners;
+see [preparation boundaries](repo-design/compute/physics-preparation-adapters.md).
+
 ### `campaign/beam.py`
 
 Public `Beam`: one sub-object per kind of property (`Spot`/`Point`/`TransverseDistribution`, `PointBunch`/`BunchLength`/`Offsets`/`LongitudinalDistribution`, optional `GdfSource` via `Beam.from_gdf`). `Beam.to_spec()` lowers to the flat `campaign.sweep.BeamSpec`, the internal record behind case payloads and profile files; `Beam.from_spec` is the inverse. `Scene` accepts either and stores a `Beam`.

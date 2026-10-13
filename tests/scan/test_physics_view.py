@@ -219,3 +219,19 @@ def test_unused_descriptor_does_not_enter_view_or_current_identities(baseline_ca
     assert resolved_physics_view(case, table_markers={}) == before
     assert case_content_key(case) == baseline_cases["legacy"]["case_content_key"]
     assert "test/unused" not in before.to_json()
+
+
+def test_descriptors_inventory_existing_native_restrictions():
+    elsepa = BUILTIN_DESCRIPTORS.get("transport.elastic", "elsepa")
+    assert "cuda.exact" in elsepa.implementations
+    assert "cuda.lut" not in elsepa.implementations
+    assert "exact cores even when LUT configuration is enabled" in elsepa.requirements
+    coupled = BUILTIN_DESCRIPTORS.get("transport.radiative", "bremslib-soft-hard")
+    assert "no CUDA LUT" in coupled.requirements
+    assert "photon rows completed on host" in coupled.requirements
+    pair = BUILTIN_DESCRIPTORS.get("transport.pair", "penelope-2024")
+    assert {"coupled hard photons", "shell-soft-hard", "secondary threshold"} <= set(
+        pair.requirements
+    )
+    positron = BUILTIN_DESCRIPTORS.get("transport.positron", "positron")
+    assert "no Mott positron model" in positron.requirements

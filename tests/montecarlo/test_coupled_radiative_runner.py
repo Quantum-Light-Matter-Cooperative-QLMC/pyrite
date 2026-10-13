@@ -305,3 +305,27 @@ def test_pre_adapter_seeded_coupled_baseline(synthetic_si_tables):
     assert_output_baseline(
         "coupled", {"transport": transport_signature(tp["segs"]), "brem_wide": continuum.tolist()}
     )
+
+
+def test_coupled_cuda_factory_bypasses_lut_with_cpu_stub(synthetic_si_tables, monkeypatch):
+    """No GPU execution: coupled rows reach the exact factory, never the LUT."""
+    import sys
+    from types import SimpleNamespace
+
+    class ExactFactoryReached(Exception):
+        pass
+
+    def exact():
+        raise ExactFactoryReached
+
+    def lut():
+        pytest.fail("coupled transport must not reach the CUDA LUT factory")
+
+    monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
+    monkeypatch.setitem(
+        sys.modules,
+        "pyrite.montecarlo.transport._jit_launch",
+        SimpleNamespace(make_cuda_transport_core=exact, make_cuda_transport_lut_core=lut),
+    )
+    with pytest.raises(ExactFactoryReached):
+        runner._transport_case(_coupled_case(), transport_core="cuda")

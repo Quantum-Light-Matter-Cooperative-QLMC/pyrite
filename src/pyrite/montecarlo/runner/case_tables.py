@@ -3,6 +3,38 @@
 Validation: elsepa-elastic-sampling
 """
 
+from types import MappingProxyType
+
+from ..._physics_contract import BUILTIN_DESCRIPTORS
+
+
+def _elastic_descriptor(case):
+    """Look up the resolved family ID; legacy omission remains Mott."""
+    return BUILTIN_DESCRIPTORS.get("transport.elastic", case.get("elastic_model", "mott"))
+
+
+def _prepare_mott_elastic(entries):
+    """Keep SRD64 preparation in the existing native layer-table owner."""
+    return {"elastic_model": "mott"}
+
+
+def _prepare_elsepa_elastic(entries):
+    """Pass existing ordered layer/element arrays directly to native packing."""
+    return dict(
+        elastic_model="elsepa",
+        elastic_tables=[[entry.arrays for entry in layer] for layer in entries],
+    )
+
+
+# Runtime-only adapters; reconstructed by importing this owner in each worker.
+# Select once per preparation, never in native collision/segment/bin loops.
+_ELASTIC_PREPARERS = MappingProxyType(
+    {
+        BUILTIN_DESCRIPTORS.get("transport.elastic", "mott").id: _prepare_mott_elastic,
+        BUILTIN_DESCRIPTORS.get("transport.elastic", "elsepa").id: _prepare_elsepa_elastic,
+    }
+)
+
 
 def case_shell_materials(case):
     """Catalog key of each transport layer for the shell model, ``None`` where absent.
@@ -93,7 +125,7 @@ def _case_layer_compositions(case):
 
 def _case_elastic_entries(case):
     """Per-layer ELSEPA table entries, or ``None`` for a Mott case."""
-    if case.get("elastic_model") != "elsepa":
+    if _elastic_descriptor(case).model == "mott":
         return None
     from ...xsgen.elsepa.catalog import resolve_layer_tables
 
@@ -110,14 +142,8 @@ def _case_elastic_kwargs(case):
     """
     atomic = case.get("atomic_electron_deflection")
     extra = {} if atomic is None else {"atomic_electron_deflection": atomic}
-    entries = _case_elastic_entries(case)
-    if entries is None:
-        return {"elastic_model": "mott", **extra}
-    return dict(
-        elastic_model="elsepa",
-        elastic_tables=[[entry.arrays for entry in layer] for layer in entries],
-        **extra,
-    )
+    prepare = _ELASTIC_PREPARERS[_elastic_descriptor(case).id]
+    return {**prepare(_case_elastic_entries(case)), **extra}
 
 
 def _case_elastic_table_records(case):
