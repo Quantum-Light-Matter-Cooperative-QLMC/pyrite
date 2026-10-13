@@ -26,6 +26,7 @@ core-architecture-rfc
 ../guides/performance-profile-analysis
 compute/coherent-streaming-rawkernel.md
 compute/compute-performance-optimization.md
+compute/cxr-launch-benchmarks.md
 compute/startup-latency.md
 compute/phase-retention.md
 compute/phase-retention-benchmarks.md
