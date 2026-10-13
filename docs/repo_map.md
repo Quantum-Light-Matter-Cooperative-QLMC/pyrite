@@ -371,6 +371,19 @@ sampled true-photon grids; `detectors.spec.EnergyBins` remains its public and
 pickle-compatible re-export. `campaign/lowering.py` merges deprecated inputs,
 checks cross-policy constraints, and projects grids onto the legacy case builder.
 
+### `_physics_contract.py` and `campaign/physics_view.py`
+
+Private in-tree extension metadata ([ADR-0017](adr/0017-in-tree-physics-extension-contract.md)).
+`_physics_contract.py` is a standard-library-only leaf: immutable descriptor
+catalog, applicability/backend evidence, and canonical JSON/pickle-safe resolved
+view. `campaign.physics_view.resolved_physics_view` validates an already resolved
+`Case` through existing case/facade policy, retains historical omissions, and
+snapshots its parameters and existing model markers. Callers supply the per-case
+inventory from `runner.case_tables.case_table_markers`, never a dataset union.
+Construction does not load tables, resolve `auto`, probe hardware, dispatch
+adapters, or feed a new payload into identity/persistence. Runtime preparation
+and physical-domain verification remain separate checks.
+
 ### `campaign/beam.py`
 
 Public `Beam`: one sub-object per kind of property (`Spot`/`Point`/`TransverseDistribution`, `PointBunch`/`BunchLength`/`Offsets`/`LongitudinalDistribution`, optional `GdfSource` via `Beam.from_gdf`). `Beam.to_spec()` lowers to the flat `campaign.sweep.BeamSpec`, the internal record behind case payloads and profile files; `Beam.from_spec` is the inverse. `Scene` accepts either and stores a `Beam`.
