@@ -324,59 +324,91 @@ def _overall_progress_line(records, materials=(), *, use_cost=False, state_overr
 
 
 def _compute_time_estimate(records, materials=(), *, use_cost=False, parallel_materials=1):
-    """Aggregate additive process timing into stable job-wide compute estimates.
+    """Estimate per-material remaining work, then schedule it across job slots.
 
-    Work is normalized per material, so different case-grid sizes remain
-    comparable. Cached work reduces remaining work but never contributes to
-    measured throughput. Concurrent material-process seconds are converted to
-    approximate wall time using the configured parallelism.
+    Completed-interval samples exclude startup and unfinished work. Legacy
+    records retain their cumulative rate. Unknown materials use the pooled
+    normalized rate; their grid and setup costs are not yet available.
     """
     roster = [material for material in materials if material and material != "-"]
     ordered = roster or list(records)
+    unavailable = {"elapsed": None, "remaining": None, "total": None}
     if not ordered:
-        return {"elapsed": None, "remaining": None, "total": None}
+        return unavailable
     try:
         parallel = max(1, int(parallel_materials))
     except (TypeError, ValueError):
         parallel = 1
     seconds = []
-    measured_fraction = 0.0
-    remaining_fraction = 0.0
+    work = []
+    sample_seconds = 0.0
+    sample_fraction = 0.0
     failed = False
-    all_done = True
     for material in ordered:
         record = records.get(material)
         if record is None:
-            remaining_fraction += 1.0
-            all_done = False
+            work.append((1.0, None, False))
             continue
         failed = failed or record["state"] == "failed"
-        all_done = all_done and record["state"] == "done"
         if use_cost:
             done, total = _cost_progress(record)
-            measured = record.get("measured_new_cost")
+            cost_key = (
+                "sample_new_cost" if "sample_compute_seconds" in record else "measured_new_cost"
+            )
+            measured = record.get(cost_key)
             if measured is None and "done_cost" not in record:
-                measured = record.get("measured_new_cases")
+                measured = record.get(
+                    "sample_new_cases"
+                    if "sample_compute_seconds" in record
+                    else "measured_new_cases"
+                )
         else:
             done = float(record["cached_cases"] + record["completed_new_cases"])
             total = float(record["total_cases"])
-            measured = record.get("measured_new_cases")
+            measured = record.get(
+                "sample_new_cases" if "sample_compute_seconds" in record else "measured_new_cases"
+            )
         done_fraction = 1.0 if total == 0 else min(1.0, done / total)
-        remaining_fraction += 1.0 - done_fraction
-        if isinstance(measured, (int, float)) and not isinstance(measured, bool) and total > 0:
-            measured_fraction += min(done_fraction, float(measured) / total)
+        remaining_fraction = 0.0 if record["state"] == "done" else 1.0 - done_fraction
         active = record.get("active_compute_seconds")
         if isinstance(active, (int, float)) and not isinstance(active, bool):
             seconds.append(float(active))
+        duration = record.get("sample_compute_seconds", active)
+        rate = None
+        if (
+            isinstance(measured, (int, float))
+            and not isinstance(measured, bool)
+            and isinstance(duration, (int, float))
+            and not isinstance(duration, bool)
+            and total > 0
+            and measured > 0
+            and duration > 0
+        ):
+            fraction = min(done_fraction, float(measured) / total)
+            if fraction > 0:
+                rate = fraction / duration
+                sample_fraction += fraction
+                sample_seconds += duration
+        work.append((remaining_fraction, rate, True))
     elapsed = max(max(seconds), sum(seconds) / parallel) if seconds else None
     if elapsed is None:
-        return {"elapsed": None, "remaining": None, "total": None}
-    if all_done or remaining_fraction <= 0:
+        return unavailable
+    if not any(fraction > 0 for fraction, _, _ in work):
         return {"elapsed": elapsed, "remaining": 0.0, "total": elapsed}
-    if failed or measured_fraction <= 0 or elapsed <= 0:
+    if failed or sample_fraction <= 0 or sample_seconds <= 0:
         return {"elapsed": elapsed, "remaining": None, "total": None}
-    rate = measured_fraction / elapsed
-    remaining = remaining_fraction / rate
+    pooled_rate = sample_fraction / sample_seconds
+    # Started materials occupy slots before the queued roster. Greedy assignment
+    # includes the serial tail rather than dividing all remaining work by N.
+    slots = [0.0] * min(parallel, len(ordered))
+    for started in (True, False):
+        for fraction, rate, is_started in work:
+            if fraction <= 0 or is_started != started:
+                continue
+            duration = fraction / (rate or pooled_rate)
+            slot = min(range(len(slots)), key=slots.__getitem__)
+            slots[slot] += duration
+    remaining = max(slots)
     if not math.isfinite(remaining) or remaining < 0:
         return {"elapsed": elapsed, "remaining": None, "total": None}
     return {"elapsed": elapsed, "remaining": remaining, "total": elapsed + remaining}
