@@ -764,6 +764,26 @@ def cmd_profile(args: argparse.Namespace) -> None:
             os.environ["PYRITE_CATALOG"] = previous
 
 
+def cmd_material(args: argparse.Namespace) -> None:
+    """Explicit maintainer authoring against the checkout's bundled catalog."""
+    from pyrite._catalog_layout import bundled_catalog, bundled_profile_writes
+    from pyrite.cli.commands.material import command
+
+    checkout = ROOT / "src" / "pyrite" / "data" / "catalog"
+    if not (ROOT / "pyproject.toml").is_file() or checkout.resolve() != bundled_catalog().resolve():
+        raise SystemExit("pyrite-dev material requires a source checkout with its editable install")
+    previous = os.environ.get("PYRITE_CATALOG")
+    os.environ["PYRITE_CATALOG"] = str(checkout)
+    try:
+        with bundled_profile_writes():
+            _run_relocated_click(command, args.command_args, prog_name="pyrite-dev material")
+    finally:
+        if previous is None:
+            os.environ.pop("PYRITE_CATALOG", None)
+        else:
+            os.environ["PYRITE_CATALOG"] = previous
+
+
 _SLOW_HELP = "also run tests marked slow (sets PYRITE_SLOW_TESTS=1); must precede pytest_args"
 
 
@@ -896,6 +916,13 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     )
     profile.add_argument("command_args", nargs=argparse.REMAINDER)
     profile.set_defaults(func=cmd_profile)
+    material = sub.add_parser(
+        "material",
+        add_help=False,
+        help="author bundled materials (checkout maintainers only)",
+    )
+    material.add_argument("command_args", nargs=argparse.REMAINDER)
+    material.set_defaults(func=cmd_material)
     cli_deprecations = sub.add_parser("cli-deprecations")
     cli_deprecation_mode = cli_deprecations.add_mutually_exclusive_group()
     cli_deprecation_mode.add_argument("--write", action="store_true")
@@ -943,13 +970,14 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None, *, prog_name: str = "pyrite-dev") -> None:
     raw_args = list(sys.argv[1:] if argv is None else argv)
-    if raw_args and raw_args[0] in {"perf", "performance", "energy-grid", "profile"}:
+    if raw_args and raw_args[0] in {"perf", "performance", "energy-grid", "profile", "material"}:
         command = raw_args[0]
         func = {
             "perf": cmd_perf,
             "performance": cmd_performance,
             "energy-grid": cmd_energy_grid,
             "profile": cmd_profile,
+            "material": cmd_material,
         }[command]
         func(argparse.Namespace(command=command, command_args=raw_args[1:]))
         return

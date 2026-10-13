@@ -12,6 +12,17 @@ charge from selected records; this replaces configured `bunch_charge_pc`.
 The default rate is 5000 Hz. Clear both analytic spot FWHMs for a GDF `Beam`.
 Named catalog beams clear those inherited defaults during profile resolution.
 
+## Material authoring
+
+`pyrite.materials.MaterialDefinition`, `build_medium`, `build_crystal`, and
+`save_material` are supported authoring APIs. Builders validate without
+registration; save explicitly persists and returns a fresh immutable
+`MaterialCatalog`. Density arguments are in g/cm³, composition values in
+atoms/angstrom³, and crystal photon grids in eV. The returned definition has a
+name-independent physical identity and an inline `MediumSpec` projection.
+See [Adding materials](guides/adding-materials.md) for composition syntax,
+CIF inputs, storage ownership, cache refresh and transport limits.
+
 ## Photon-energy comparisons
 
 `pyrite.photon_energies` returns a NumPy array of vacuum CXR line-centre energies

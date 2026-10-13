@@ -101,3 +101,19 @@ def test_profile_sources_name_each_layer(bundled, user, tmp_path):
     assert layout.profile_sources(external) == {"demo": "catalog"}
     with layout.bundled_profile_writes():
         assert layout.profile_sources(bundled) == {"demo": "bundled"}
+
+
+@pytest.mark.parametrize("table", layout.LAYERED_TABLES)
+def test_all_object_tables_layer_and_protect_bundled_entries(bundled, user, table):
+    (bundled / table).mkdir(exist_ok=True)
+    (bundled / table / "reserved.toml").write_text('value = "bundled"\n')
+    text = layout.read_text(bundled) + f'\n[{table}.mine]\nvalue = "user"\n'
+    layout.write_text(bundled, text)
+    assert (user / table / "mine.toml").is_file()
+    assert "mine" in layout.object_keys(bundled, table)
+    assert layout.object_sources(bundled, table)["mine"] == "user"
+    with pytest.raises(layout.BundledProfileError, match="read-only"):
+        layout.write_text(bundled, text.replace('value = "bundled"', 'value = "changed"'))
+    (user / table / "Reserved.toml").write_text('value = "shadow"\n')
+    with pytest.raises(layout.CatalogLayoutError, match="reserved by bundled"):
+        layout.read_raw(bundled)

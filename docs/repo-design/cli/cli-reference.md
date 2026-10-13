@@ -2486,7 +2486,7 @@ Options:
 ```text
 Usage: pyrite material [OPTIONS] COMMAND [ARGS]...
 
-  Inspect, validate, and blaze individual materials.
+  Add, inspect, validate, and blaze individual materials.
 
   Profile membership and ranges live under ``pyrite profile``. ``show`` reports
   effective ranges and any per-material override that diverges from the profile;
@@ -2497,6 +2497,8 @@ Options:
 
 Commands:
   show         Show MATERIAL's effective ranges and...
+  add          Add a validated medium or crystal to your catalog.
+  list         List materials and media with their source and composition.
   blaze        Run a grooved-crystal sweep and write a checkpoint.
   energy-grid  Derive and inspect detector energy-grid inputs.
   validate     Validate a material catalog without starting simulation.
@@ -2512,6 +2514,62 @@ Usage: pyrite material show [OPTIONS] MATERIAL
 Options:
   --profile TEXT                  Resolve defaults and overrides under profile NAME.
                                   [default: standard]
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite material add`
+
+```text
+Usage: pyrite material add [OPTIONS] NAME
+
+  Add a validated medium or crystal; never overwrite a name.
+
+  Default writes go to the user catalog. An explicitly selected complete catalog writes
+  in place. No tables are generated or data downloaded. Media support
+  transport/layers/filters, not coherent crystal emission. New CIFs require formula,
+  phase, one cut, B and a photon grid. Partial occupancy is unsupported. Existing-
+  crystal configuration is reused intact.
+
+Options:
+  --formula TEXT                  Simple ASCII formula (medium: fractional counts
+                                  allowed).
+  --density-g-cm3 FLOAT           Required bulk density for media, in g/cm³; CIF
+                                  consistency check only.
+  --mass-fraction ELEMENT=VALUE   Repeat for each element; mass fractions must sum to 1.
+  --atomic-fraction ELEMENT=VALUE
+                                  Repeat for each element; atom fractions must sum to 1.
+  --atom-count ELEMENT=VALUE      Repeat for positive stoichiometric ratios.
+  --crystal TEXT                  Reuse an existing crystal with its configured cut and
+                                  physics inputs.
+  --cif FILE                      Local fully occupied CIF; copied into managed catalog
+                                  storage.
+  --phase TEXT                    Required explicit phase identity for a new CIF.
+  --surface-hkl <INTEGER INTEGER INTEGER>...
+                                  New CIF slab normal in reciprocal Miller indices;
+                                  excludes --beam-uvw.
+  --beam-uvw <INTEGER INTEGER INTEGER>...
+                                  New CIF slab normal in direct lattice indices;
+                                  excludes --surface-hkl.
+  --b-ang2 FLOAT                  Required new-CIF isotropic Debye–Waller factor in
+                                  angstrom²; nonnegative.
+  --photon-grid START STOP STEP   Required new-CIF photon grid in eV; stop is exclusive.
+  --mosaic-fwhm-deg FLOAT         Optional positive new-CIF mosaic FWHM in degrees;
+                                  omitted means perfect crystal.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite material list`
+
+```text
+Usage: pyrite material list [OPTIONS]
+
+  List crystal recipes and media; composition units are atoms/angstrom³.
+
+Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.

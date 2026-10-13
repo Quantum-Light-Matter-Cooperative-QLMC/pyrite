@@ -1,7 +1,7 @@
 """Material identity, crystal configuration, and X-ray material physics.
 
-The package-level surface intentionally contains only scan-selection conveniences.
-Import atomic, crystal, or attenuation details from their owning submodules.
+The package-level surface contains registry conveniences and explicit authoring
+operations. Import atomic, crystal, or attenuation details from their owners.
 """
 
 from ._identity import MaterialIdentity
@@ -37,6 +37,10 @@ def __getattr__(name: str):
         value = {key: material.label for key, material in catalog.materials.items()}
     elif name == "MATERIALS":
         value = __getattr__("CATALOG").material_keys
+    elif name in {"MaterialDefinition", "build_medium", "build_crystal", "save_material"}:
+        from . import authoring
+
+        value = getattr(authoring, name)
     else:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     globals()[name] = value
@@ -44,6 +48,10 @@ def __getattr__(name: str):
 
 
 __all__ = [
+    "MaterialDefinition",
+    "build_medium",
+    "build_crystal",
+    "save_material",
     "CRYSTALS",
     "CATALOG",
     "MaterialCatalog",

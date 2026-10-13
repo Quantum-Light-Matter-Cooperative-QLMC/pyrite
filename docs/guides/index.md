@@ -19,6 +19,7 @@ analysis-tutorial
 running-on-a-cluster
 sweep-profiles
 external-catalog
+adding-materials
 gpt-gdf-beams
 troubleshooting
 ```
