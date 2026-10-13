@@ -10,6 +10,7 @@ _EXPORT_MODULES = {
     "electron_count": ".acquisition",
     "score_acquisition": ".acquisition",
     "primary_transmission": ".attenuation",
+    "Filter": ".filter",
     "FilterPlate": ".model",
     "PixelGrid": ".model",
     "PixelScorer": ".model",
@@ -22,6 +23,7 @@ _EXPORT_MODULES = {
 }
 
 __all__ = [
+    "Filter",
     "FilterPlate",
     "Acquisition",
     "AcquisitionBatch",

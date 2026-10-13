@@ -28,6 +28,7 @@ from .campaign.profiles import case_bremsstrahlung_marker, case_content_key
 from .detectors import Detector
 from .instrument import (
     Acquisition,
+    Filter,
     FilterPlate,
     PixelScorer,
     PlanarDetector,
@@ -110,7 +111,7 @@ def _observation_provenance(
             "size_mm": list(plate.size_mm),
             "pose": _canonical_value(plate.pose),
         }
-        for plate in scene.filters
+        for plate in scene.filter_plates
     ]
     payload = {
         "schema": "pyrite.observation.v1",
@@ -217,7 +218,7 @@ def simulate(
     numerics: Numerics | None = None,
     emission: LegacyEmissionPolicy | None = None,
     brem_source: BremSource | None = None,
-    filters: tuple[FilterPlate, ...] = (),
+    filters: tuple[FilterPlate | Filter, ...] = (),
     pixel_scorer: PixelScorer | None = None,
     acquisition: Acquisition | None = None,
 ) -> Result:
@@ -235,7 +236,7 @@ def simulate(
     beam
         Scalar :class:`~pyrite.Beam` description.
     target
-        Scalar :class:`~pyrite.Slab` or :class:`~pyrite.Stack`.
+        Scalar :class:`~pyrite.Target`, :class:`~pyrite.Slab` or :class:`~pyrite.Stack`.
     detector
         Scalar detector model or physical :class:`~pyrite.PlanarDetector`.
     physics
@@ -247,7 +248,7 @@ def simulate(
     brem_source
         Deprecated: use ``Physics(brem_source=...)``.
     filters
-        Ordered filter plates; valid only with a physical planar detector.
+        Ordered ``Filter`` or ``FilterPlate`` values; require a physical planar detector.
     pixel_scorer
         Deprecated: set :attr:`PlanarDetector.scorer`. A pixelated detector
         always returns spatial output.
@@ -378,7 +379,7 @@ def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
         ResolvedObservation(
             detector=detector,
             scorer=_detector_scorer(detector),
-            filters=scene.filters,
+            filters=scene.filter_plates,
             acquisition=scene.acquisition,
         ),
         source_identity_digest=case_content_key(case, xsgen_tables=xsgen_tables),
@@ -438,7 +439,7 @@ def _simulate_planar(
         spatial = sampling.spatial(
             output,
             detector=detector,
-            filters=scene.filters,
+            filters=scene.filter_plates,
             brem_source=cast(str, scene.physics.brem_source),
             reconstruction=scorer.reconstruction,
         )
@@ -453,7 +454,7 @@ def _simulate_planar(
             ResolvedObservation(
                 detector=detector,
                 scorer=scorer,
-                filters=scene.filters,
+                filters=scene.filter_plates,
                 acquisition=scene.acquisition,
             ),
             source_identity_digest=source_digest,

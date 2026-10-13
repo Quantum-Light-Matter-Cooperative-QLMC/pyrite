@@ -219,6 +219,58 @@ This mode supports incoherent scalar-detector scenes on the per-electron or CUDA
 
 `Sweep.expand()` returns ordered `(label, Scene)` pairs; `Sweep.cases()` lowers them to typed cases but does not execute or persist them. `simulate` accepts the separate beam, target, and detector components, not a `Scene` argument. Helpers exported from `pyrite.api` but not listed on this page are provisional lowering or compatibility seams.
 
+### Shared bodies and explicit roles
+
+`RectangularBody` describes one homogeneous finite solid: an explicit substance
+reference, full width/height and thickness in **mm**. `Target` and `Filter`
+assign independent scene roles to that description. Target angles and the
+catalog crystal cut describe source orientation; a filter's `PlanarPose`
+describes its box centre and local axes in lab mm relative to the target
+entrance origin. Reusing a body does not place one in-scene object in two roles.
+
+```python
+plate = pr.RectangularBody(
+    substance=pr.SubstanceRef(kind="crystal", key="silicon"),
+    size_mm=(10.0, 10.0),
+    thickness_mm=0.1,
+)
+target = pr.Target(body=plate, tilt_deg=30.0)
+window = pr.Filter(body=plate, pose=pr.PlanarPose((0.0, 0.0, 50.0)), name="window")
+physical_detector = pr.PlanarDetector(pr.PlanarPose((0.0, 0.0, 100.0)), size_mm=(10.0, 10.0))
+scene = pr.Scene(beam, target, physical_detector, filters=(window,))
+
+body_sweep = pr.Sweep(scene, axes={"target.body.thickness_mm": [0.01, 0.1]})
+```
+
+Bodies and wrappers are frozen scalar records; sweep axes expand before case
+lowering. Filter body and pose axes work similarly, for example
+`filters[0].body.thickness_mm` or `filters[0].pose.center_mm`. Existing
+`Slab`/`Stack` constructors and their Å-based thickness fields retain their
+meaning. `Target.to_slab()` converts mm to Å without rounding and preserves
+the established target angle quantization during case construction.
+`Scene.target_spec` and `Scene.filter_plates` expose the legacy values for
+source, observation and trajectory consumers. `ResolvedObservation` continues
+to take fully lowered plates; use `scene.filter_plates` there.
+
+`SubstanceRef` selects the case-sensitive `crystal` or `medium` namespace;
+runnable target recipes are not homogeneous substances. Inline `MediumSpec`
+compositions are also valid bodies for filters. `Target` requires a crystal
+reference and uses the selected target catalog. A key that would redirect
+through a recipe to a different crystal is rejected. Crystal cuts remain
+catalog-defined (`lattice_cut="catalog"`); arbitrary target poses, layers,
+grooves and amorphous entrances are outside this adapter's supported set.
+Use the existing target variants for their established specialized behavior.
+
+`Filter` supports only `interaction="primary-attenuation-only"`. Other
+requested interactions fail before computation. `Filter.to_plate(catalog=...)`
+can resolve an explicit loaded catalog without fallback; it uses an inline
+medium when legacy string lookup would select a different namespace or catalog.
+Equivalent legacy and adapted inputs retain source cases, observation identities
+and numerical behavior. Standard catalog references also retain their legacy
+trajectory snapshots; explicit external or disambiguated references snapshot
+their resolved inline composition. Catalog tables, stored schema versions and
+CLI commands are unchanged.
+
 ```{eval-rst}
 .. autosummary::
    :toctree: _autosummary
@@ -233,6 +285,10 @@ This mode supports incoherent scalar-detector scenes on the per-electron or CUDA
    pyrite.GdfSource
    pyrite.Slab
    pyrite.Stack
+   pyrite.SubstanceRef
+   pyrite.RectangularBody
+   pyrite.Target
+   pyrite.Filter
    pyrite.Layer
    pyrite.Footprint
    pyrite.BlazedGrooves

@@ -2,8 +2,11 @@
 
 **Status:** Architectural direction approved on 2026-10-13 for
 [#401](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/401).
-No API shown as proposed below exists yet. Constructor spelling and broader
-shape support remain follow-up design; implementation requires a bounded scope.
+The homogeneous resolver and finite rectangular `Target`/`Filter` adapters
+are implemented; see the [supported body API](../../api.md#shared-bodies-and-explicit-roles).
+The discussion below preserves design-stage sketches. Broader slab/stack
+shape sharing, layered-filter adapters and additional interactions remain
+follow-up proposals.
 
 **Recommendation:** share substance resolution and bounded immutable body
 components, while retaining `Slab`/`Stack` and `FilterPlate` as role-specific

@@ -154,7 +154,7 @@ Edges (importer -> imported):
 ## Entry points
 
 - **`pyrite` console script** → `cli:main` (`pyproject.toml [project.scripts]`), lazy Click dispatch for the ten visible user nouns: `run`, `app`, `checkpoint`, `config`, `remote`, `job`, `profile`, `material`, `beam`, and `detector`. Retired top-level setup, completion, performance, energy-grid, scan, analyze/export, and flat checkpoint spellings remain hidden compatibility aliases where the D7 registry documents a replacement. Checked user-facing inventory: [CLI reference](repo-design/cli/cli-reference.md).
-- **`import pyrite`** → `__init__`: lightweight lazy exports for `Beam`, target variants, `Detector`, `Scene`, path-addressed `Sweep`, `Physics`, `Numerics`, `CxrReflections`, deprecated `Convergence`, `Precision`, `Analysis`, `Result`, and `simulate`.
+- **`import pyrite`** → `__init__`: lightweight lazy exports for `Beam`, target variants, shared `SubstanceRef`/`RectangularBody` descriptions and `Target`/`Filter` roles, `Detector`, `Scene`, path-addressed `Sweep`, `Physics`, `Numerics`, `CxrReflections`, deprecated `Convergence`, `Precision`, `Analysis`, `Result`, and `simulate`.
 - **`pyrite.simulate(beam, target, detector, ...)`** → `api:simulate`: lower one scalar scene to the typed `Case`, run it without checkpoint I/O, and return response-free source arrays plus resolved provenance in `Result`.
 - **`pyrite.photon_energies(materials, beam_energy_eV, ...)`** → `materials.emission:photon_energies`: deterministic vacuum line-centre arrays with paired NumPy broadcasting or Cartesian grids; catalogue cut/reflection resolution, no transport or accelerator initialization.
 - **`pyrite profile ...`** → `cli.commands.profile`: manage named campaign defaults and material membership through `set|add|remove`; an absent membership key means all catalog materials. Bundled demo profiles are read-only; edits write to the user catalog layer. **`pyrite-dev profile ...`** → `devtools.dev_cli:cmd_profile`: the same tree against the bundled catalog for maintaining the shipped demos.
@@ -332,7 +332,23 @@ Simulation core: electron transport, segment-sum PXR+CBS and EEDL characteristic
 
 `campaign/` owns resolved campaign inputs; `checkpoints/` owns persistence, repair, archive, and lock lifecycles; `runs/` owns executable local drivers.
 
+### `bodies.py`, `campaign/target.py`, `instrument/filter.py`
+
+`bodies.py` owns frozen scalar `SubstanceRef` and `RectangularBody` descriptions,
+with explicit substance namespaces and dimensions in mm. `campaign.target.Target`
+lowers a crystalline rectangle to `Slab` with the existing target orientation
+and an explicit footprint. `instrument.filter.Filter` lowers a placed rectangle
+to `FilterPlate` for primary attenuation only. Namespace collisions/external
+filter catalogs lower through inline `MediumSpec` when legacy strings cannot
+retain their meaning. Legacy target/filter constructors remain unchanged.
+`materials/_composition.py` owns homogeneous lookup with an explicit catalog;
+legacy wrappers retain their case, namespace and validation rules.
+
 ### `campaign/model.py`
+
+`Scene` retains body role wrappers for dotted sweep paths and exposes
+`target_spec`/`filter_plates` as the lowered legacy geometry. Source lowering,
+observation planning and trajectory consumers use those properties.
 
 Supported scalar scene API: `Scene`, path-addressed `Sweep`, `Physics`, `Numerics`, nested `CxrReflections`, and presentation-only `Analysis`. `Scene` rejects implicit multi-value fields; `Sweep` applies ordered dotted/indexed paths such as `target.layers[1].thickness_ang`, expands Cartesian products, and lowers them through `api.build_sweep_cases`. This `Sweep` is the preferred public object; `campaign.sweep.Sweep` below remains the profile/CLI-compatible campaign implementation.
 

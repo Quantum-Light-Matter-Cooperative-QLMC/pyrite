@@ -39,10 +39,11 @@ def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
         if scene.detector._energy_bins_explicit and scene.detector.energy_bins != bins:
             raise ValueError("conflicting detector.energy_bins and Numerics.energy_bins")
         scalar_detector = replace(scalar_detector, energy_bins=bins, _energy_bins_explicit=False)
+    target = scene.target_spec
     legacy = LegacySweep(
-        material=scene.target.material,
+        material=target.material,
         beam=scene.beam.to_spec(),
-        target=scene.target,
+        target=target,
         detector=scalar_detector,
         n_families=convergence.n_families,
         max_reflections=convergence.max_reflections,
