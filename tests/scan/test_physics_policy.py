@@ -27,6 +27,29 @@ def digest(case):
     return case_content_key(case, xsgen_tables={})
 
 
+def test_none_brem_source_preserves_disabled_policy_and_case_identity():
+    disabled = pr.Physics(brem_source=None)
+    legacy = pr.Physics(brem_source="none")
+    assert disabled == legacy
+    assert disabled.brem_source == "none"
+    before = api.build_case(scene(physics=legacy))
+    after = api.build_case(scene(physics=disabled))
+    assert before == after
+    assert digest(before) == digest(after)
+    assert pickle.loads(pickle.dumps(disabled)) == legacy
+
+
+@pytest.mark.parametrize("source", ["mc", "external", "none", None])
+def test_brem_source_accepts_existing_and_none_policies(source):
+    assert pr.Physics(brem_source=source).brem_source == ("none" if source is None else source)
+
+
+@pytest.mark.parametrize("source", ["invalid", "None", 0, False])
+def test_brem_source_rejects_invalid_policies(source):
+    with pytest.raises(ValueError, match="brem_source"):
+        pr.Physics(brem_source=source)
+
+
 @pytest.mark.parametrize("name", [f.name for f in fields(pr.Physics)])
 def test_every_moved_default_preserves_case_and_digest(name):
     value = getattr(pr.Physics(), name)

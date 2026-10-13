@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import numpy as np
+import pytest
 
 import pyrite as pr
 from pyrite import api
@@ -104,7 +105,8 @@ def test_simulate_is_bit_for_bit_the_existing_single_case_path() -> None:
     np.testing.assert_array_equal(result.brem.density, expected["brem_wide"])
 
 
-def test_scene_model_switches_select_returned_arrays(monkeypatch) -> None:
+@pytest.mark.parametrize("source", [None, "none"])
+def test_scene_model_switches_select_returned_arrays(monkeypatch, source) -> None:
     beam, target, detector, numerics = _inputs()
 
     monkeypatch.setattr(
@@ -125,8 +127,7 @@ def test_scene_model_switches_select_returned_arrays(monkeypatch) -> None:
         target,
         detector,
         numerics=numerics,
-        emission="coherent",
-        brem_source="none",
+        physics=pr.Physics(emission="coherent", brem_source=source),
     )
 
     np.testing.assert_array_equal(result.cxr.coherent.density, [7.0, 8.0])

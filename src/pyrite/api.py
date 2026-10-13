@@ -8,7 +8,7 @@ from dataclasses import fields, is_dataclass, replace
 from functools import cache
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -390,7 +390,7 @@ def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
         rep_rate_hz=scene.beam.rep_rate_hz,
         bunch_charge_pc=scene.beam.bunch_charge_pc,
         emission=scene.physics.emission_policy,
-        brem_source=scene.physics.brem_source,
+        brem_source=cast(str, scene.physics.brem_source),
     )
 
 
@@ -442,7 +442,7 @@ def _simulate_planar(
             output,
             detector=detector,
             filters=scene.filters,
-            brem_source=scene.physics.brem_source,
+            brem_source=cast(str, scene.physics.brem_source),
             reconstruction=scorer.reconstruction,
         )
         observation_digest, observation = _observation_provenance(
@@ -465,7 +465,7 @@ def _simulate_planar(
             rep_rate_hz=scene.beam.rep_rate_hz,
             bunch_charge_pc=scene.beam.bunch_charge_pc,
             emission=scene.physics.emission_policy,
-            brem_source=scene.physics.brem_source,
+            brem_source=cast(str, scene.physics.brem_source),
         )
         output = run_case_directions(
             case, plan.directions_sample, transport_core=numerics.transport_core
