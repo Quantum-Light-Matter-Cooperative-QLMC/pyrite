@@ -187,6 +187,23 @@ def _tables_preflight_block() -> str:
 fi"""
 
 
+def _physics_preflight_block(expected) -> str:
+    """Compare staged resolution on every allocation before checkpoint reuse."""
+    if expected is None:
+        return ""
+    import json
+
+    payload = config.shell_arg(json.dumps(expected, sort_keys=True, separators=(",", ":")))
+    verify = (
+        f"{config.remote_runtime_env()} {config.shell_remote_uv()} run --no-sync "
+        f"python -m pyrite.remote.physics_identity {payload}"
+    )
+    return f"""if ! {verify} >> "$JOBDIR/log" 2>&1; then
+  echo "FAILED (physics identity) $(date -Is)" > "$JOBDIR/state"
+  exit 1
+fi"""
+
+
 def _uv_sync_block(once: bool = False) -> str:
     """Bash that records dependency-sync wall time without changing exit semantics.
 
@@ -279,6 +296,7 @@ def _queue_script(
     py_spy=False,
     trajectories=None,
     overwrite_trajectories=False,
+    expected_physics=None,
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
     parallel_materials = _validate_parallel_materials(parallel_materials)
@@ -348,6 +366,7 @@ mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {_uv_sync_block(once=True)}
 {_tables_preflight_block()}
+{_physics_preflight_block(expected_physics)}
 mats=({mats})
 total=${{#mats[@]}}
 parallel_materials={parallel_materials}
@@ -649,6 +668,7 @@ def _chunked_queue_script(
     recompute=False,
     trajectories=None,
     overwrite_trajectories=False,
+    expected_physics=None,
 ):
     """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
 
@@ -695,6 +715,7 @@ mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {_uv_sync_block(once=True)}
 {_tables_preflight_block()}
+{_physics_preflight_block(expected_physics)}
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}

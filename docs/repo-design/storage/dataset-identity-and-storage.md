@@ -16,6 +16,20 @@ Case arrays live in a content-addressed store (CAS). Component checkpoints refer
 
 Current array leaves use [HDF5 result schema version 2](result-schema.md). Its root records `identity_version = 1` for independent inspection, while the manifest remains authoritative for the full resolved dataset identity.
 
+The resolved physics descriptor view is descriptive provenance, outside both
+canonical hash payloads. Existing model-generation markers, parameters, and
+consumed-table digests remain the cache authority. A dataset records its table
+union; API source keys and per-case CAS keys record only that case's subset.
+Historical omitted selectors retain their historical meaning.
+
+Remote run submissions embed the submitter's resolved dataset digests and table
+unions. Each allocation resolves them through the same scan owner against the
+staged catalog and host tables before running or reading checkpoints. A mismatch
+fails the job as `FAILED (physics identity)` and names the material/detector;
+compare the catalog and tables, sync, and resubmit. This also applies to
+`--no-sync` submissions. Older job scripts without this input retain their
+previous preflight behavior.
+
 ## Workspace layout
 
 ```text

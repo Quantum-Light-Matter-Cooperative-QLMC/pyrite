@@ -371,6 +371,36 @@ sampled true-photon grids; `detectors.spec.EnergyBins` remains its public and
 pickle-compatible re-export. `campaign/lowering.py` merges deprecated inputs,
 checks cross-policy constraints, and projects grids onto the legacy case builder.
 
+### `_physics_contract.py`, `_physics_provenance.py`, and `campaign/physics_view.py`
+
+Private in-tree extension metadata ([ADR-0017](adr/0017-in-tree-physics-extension-contract.md)).
+`_physics_contract.py` is a standard-library-only leaf: immutable descriptor
+catalog, applicability/backend evidence, and canonical JSON/pickle-safe resolved
+view. `_physics_provenance.resolved_physics_view` describes an already resolved
+case through existing facade policy, retains historical mapping omissions, and
+snapshots its parameters and existing model markers. Callers supply the per-case
+inventory from `runner.case_tables.case_table_markers`, never a dataset union.
+Construction does not load tables, resolve `auto`, probe hardware, dispatch
+adapters, or feed a new payload into identity. `campaign.physics_view` re-exports
+the helper; runtime consumers stay below campaign. API provenance and new
+trajectory captures record the descriptive view, and replay checks model/data
+compatibility before scoring or batch writes. Runtime preparation and
+physical-domain verification remain separate checks.
+
+`runner/case_tables.py` uses the elastic family IDs to select fixed immutable
+Mott/ELSEPA preparation adapters through the existing kwargs/table-entry seams.
+Native tables, model codes and exact/LUT dispatch remain in transport owners;
+see [preparation boundaries](repo-design/compute/physics-preparation-adapters.md).
+
+`runner/emission_adapters.py` owns borrowed runtime batch contexts, existing-slot
+outputs and immutable CXR/characteristic/continuum registration. Live scoring
+uses the same staged segments/populations and façade scorer seams; continuum
+wrappers delegate to separate EEDL, BremsLib and coupled producers while native
+layer reductions remain in `runner/emission.py`. Replay, recompute, directional
+and adaptive consumers use the same selections; see
+[batch scoring](repo-design/compute/emission-batch-adapters.md) and the
+[extension guide](repo-design/compute/extending-physics.md).
+
 ### `campaign/beam.py`
 
 Public `Beam`: one sub-object per kind of property (`Spot`/`Point`/`TransverseDistribution`, `PointBunch`/`BunchLength`/`Offsets`/`LongitudinalDistribution`, optional `GdfSource` via `Beam.from_gdf`). `Beam.to_spec()` lowers to the flat `campaign.sweep.BeamSpec`, the internal record behind case payloads and profile files; `Beam.from_spec` is the inverse. `Scene` accepts either and stores a `Beam`.

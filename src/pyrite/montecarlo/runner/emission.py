@@ -3,8 +3,6 @@
 Resolve runner dependencies at call time to preserve the facade test seams.
 """
 
-from typing import Any
-
 import numpy as np
 
 
@@ -42,28 +40,39 @@ def _brem_wide_from_segments(
         E_brem.size,
         intermediates=runner._EEDL_BREM_DENSE_INTERMEDIATES,
     )
-    n_lay = int(segs_b.get("n_layers", 1))
-    if case.get("radiative_model") is not None:
-        return _coupled_brem_from_segments(
-            segs_b,
-            E_brem,
-            case,
-            n_hat,
-            abs_layers,
-            Ne=Ne,
-            brem_chunk=brem_chunk,
-            electron_band_weights=electron_band_weights,
-        )
-    # The case records the resolved continuum: BremsLib gets one table set for
-    # the whole stack (angular weighting per segment from ``v_hat``), and
-    # anything else is pinned to EEDL so mc_brem_spectrum's "auto" never
-    # re-resolves what identity already recorded.
-    bremslib_tables = runner._case_bremslib_tables(case)
-    model_kwargs: dict[str, Any] = (
-        dict(cross_section_model="eedl")
-        if bremslib_tables is None
-        else dict(cross_section_model="bremslib", bremslib_tables=bremslib_tables)
+    from .emission_adapters import EmissionBatch, select_continuum
+
+    batch = EmissionBatch(
+        segs_b,
+        E_brem,
+        case,
+        n_hat,
+        abs_layers,
+        groove,
+        electron_limit=Ne,
+        chunk=brem_chunk,
+        electron_band_weights=electron_band_weights,
     )
+    return select_continuum(case).evaluate(batch, "brem_wide", native=True).values
+
+
+def _uncoupled_brem_from_segments(
+    segs_b,
+    E_brem,
+    case,
+    n_hat,
+    abs_layers,
+    *,
+    groove,
+    Ne,
+    brem_chunk,
+    model_kwargs,
+    electron_band_weights=None,
+):
+    """Existing per-layer reduction with one selected/prepared continuum model."""
+    from .. import runner
+
+    n_lay = int(segs_b.get("n_layers", 1))
     if electron_band_weights is not None:
         model_kwargs["electron_band_weights"] = electron_band_weights
 

@@ -194,6 +194,13 @@ def start_queue(
         if cpu_only
         else scripts._stems(materials, quick, fidelity, high_energy_min_kev, catalog_profile)
     )
+    from .physics_identity import expected_inventory
+
+    physics_options = {
+        "expected_physics": expected_inventory(
+            materials, quick, fidelity, catalog_profile, high_energy_min_kev
+        )
+    }
     if chunked:
         parallel_materials = None
         payload = scripts._chunked_queue_script(
@@ -212,6 +219,7 @@ def start_queue(
             no_cache,
             recompute,
             **capture_options,
+            **physics_options,
         )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
     else:
@@ -239,6 +247,7 @@ def start_queue(
             recompute,
             py_spy=py_spy,
             **capture_options,
+            **physics_options,
         )
         time_limit = config.SLURM_TIME
     workers_per_material = config.SLURM_CPUS_PER_MATERIAL if workers is None else max(1, workers)

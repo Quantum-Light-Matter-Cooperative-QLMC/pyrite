@@ -777,6 +777,51 @@ def _captured(tmp_path):
     return case, capture.path_for(case)
 
 
+@pytest.mark.parametrize("change", ["table", "model"])
+def test_replay_refuses_changed_physics_before_scoring(tmp_path, monkeypatch, change):
+    from dataclasses import replace
+
+    from pyrite.campaign.physics_view import resolved_physics_view
+    from pyrite.montecarlo.runner import case_tables
+
+    legacy = read_trajectory_artifact(SCHEMA2_FIXTURE)
+    markers = {"consumed-table": "a" * 64}
+    view = resolved_physics_view(legacy.case, table_markers=markers)
+    if change == "model":
+        view = replace(view, model_markers=((*view.model_markers, ("future_model", "v2"))))
+    path = tmp_path / "with-physics.h5"
+    write_trajectory_artifact(
+        path,
+        legacy.transport,
+        case=legacy.case,
+        settings={"resolved_physics": view.to_json()},
+        spectrum_inputs=legacy.spectrum_inputs,
+    )
+    current_markers = {"consumed-table": "b" * 64} if change == "table" else markers
+    monkeypatch.setattr(case_tables, "case_table_markers", lambda case: current_markers)
+    monkeypatch.setattr(
+        runner, "_spectrum_case", lambda *a: pytest.fail("must refuse before scoring")
+    )
+    with pytest.raises(TrajectoryArtifactError, match="physics model or table identity changed"):
+        runner.spectrum_from_artifact(read_trajectory_artifact(path))
+    with pytest.raises(TrajectoryArtifactError, match="physics model or table identity changed"):
+        runner.stream_spectrum_from_artifact(path)
+
+
+def test_legacy_capture_without_physics_snapshot_does_not_resolve_current_tables(monkeypatch):
+    from pyrite.montecarlo.runner import artifacts, case_tables
+
+    legacy = read_trajectory_artifact(SCHEMA2_FIXTURE)
+    assert "resolved_physics" not in legacy.settings
+    monkeypatch.setattr(
+        case_tables,
+        "case_table_markers",
+        lambda case: pytest.fail("legacy replay must retain its historical contract"),
+    )
+    case, _ = artifacts._checked_case_and_inputs(legacy, None)
+    assert case == legacy.case
+
+
 def test_schema_1_artifacts_stay_readable_but_cannot_feed_spectra(tmp_path):
     case, path = _captured(tmp_path)
     downgrade(path, 1)
@@ -1083,3 +1128,27 @@ def test_genuine_schema_2_capture_reads_and_replays_as_schema_3(tmp_path):
         runner.stream_spectrum_from_artifact(rewritten.path, max_segments=block),
         runner.stream_spectrum_from_artifact(SCHEMA2_FIXTURE, max_segments=block),
     )
+
+
+@pytest.mark.parametrize("kind", ["legacy", "eedl-fallback", "multilayer", "coherent"])
+def test_pre_adapter_seeded_scoring_baseline(kind):
+    """Pin transport and existing output slots before adapter extraction (#485)."""
+    from pyrite.montecarlo import Case
+    from tests.helpers.physics_baseline import (
+        assert_output_baseline,
+        resolved_baseline,
+        transport_signature,
+    )
+
+    # The resolved fallback is the same EEDL case; resolution itself is tested
+    # in test_case with an absent-table stub.
+    case = Case(**resolved_baseline("legacy" if kind == "eedl-fallback" else kind)["case"])
+    tp = runner._transport_case(case, transport_core="lockstep")
+    output = runner._spectrum_case(case, tp)
+    actual = {"transport": transport_signature(tp["segs"])}
+    actual["spectra"] = {
+        name: output[name].tolist() for name in ("spec", "spec_characteristic", "brem_wide", "brem")
+    }
+    if kind == "coherent":
+        actual["spectra"]["spec_coherent"] = output["spec_coherent"].tolist()
+    assert_output_baseline(kind, actual)

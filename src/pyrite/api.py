@@ -174,8 +174,13 @@ def run_provenance(case: Case | Mapping[str, Any], xsgen_tables: Mapping[str, st
     producer records the same keys. ``git_sha``/``git_dirty`` identify the
     source checkout and are ``None`` outside one (for example an installed wheel).
     """
+    from .campaign.physics_view import resolved_physics_view
+
     git_sha, git_dirty = source_git_state()
     return {
+        "resolved_physics": json.loads(
+            resolved_physics_view(case, table_markers=xsgen_tables or {}).to_json()
+        ),
         "kinematic_validity": case_kinematic_validity(case),
         "xsgen_tables": xsgen_tables,
         "stopping_model": STOPPING_MODEL,

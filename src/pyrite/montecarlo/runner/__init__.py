@@ -339,6 +339,12 @@ def _transport_case(
 
     Validation: grazing-beam-projection
     """
+    from .emission_adapters import select_emission
+
+    # Resolve data-only selectors in this process before transport/capture. A
+    # worker reconstructs adapters locally; no callable or device state travels
+    # in the case payload.
+    select_emission(case)
     if case.get("adaptive_precision") is not None:
         return _adaptive.transport_requested_precision(
             case,
@@ -495,6 +501,9 @@ def _transport_case(
         diagnostic_grid=diagnostic_grid_result,
     )
     if trajectory_capture is not None:
+        from ..._physics_provenance import resolved_physics_view
+        from .case_tables import case_table_markers
+
         # Read-only snapshot of exactly what the spectrum phase consumes, so a
         # later spectrum_from_artifact replays it without re-transporting.
         trajectory_capture.write(
@@ -508,6 +517,9 @@ def _transport_case(
                 "beam_dir": beam,
                 "n_hat": n_hat,
                 "stopping_tables": stopping_tables is not None,
+                "resolved_physics": resolved_physics_view(
+                    case, table_markers=case_table_markers(case)
+                ).to_json(),
             },
             spectrum_inputs=spectrum_inputs,
         )
@@ -753,18 +765,25 @@ def _cxr_for_case(case, E_grid, *, coherent=None):
     spectrum phases factored out so :func:`pyrite.runs.run.repair_cxr_spec`
     (``pyrite reline``) reuses the EXACT live-sweep line path rather than
     re-deriving it by hand."""
+    from .emission_adapters import EmissionBatch, select_emission
+
+    emission = select_emission(case)
     segs, _E_brem, n_hat, abs_layers, groove = _transport_cxr_for_case(case, E_grid)
     segs = _segments_on_device(segs)
-    return _cxr_for_segments(
-        segs,
-        E_grid,
-        case,
-        n_hat,
-        abs_layers,
-        groove,
-        coherent=coherent,
-        Ne=case["Ne"],
-    )
+    coherent = bool(case.get("coherent_emission")) if coherent is None else coherent
+    return emission.cxr.evaluate(
+        EmissionBatch(
+            segs,
+            E_grid,
+            case,
+            n_hat,
+            abs_layers,
+            groove,
+            coherent=coherent,
+            electron_limit=case["Ne"],
+        ),
+        "spec_coherent" if coherent else "spec",
+    ).values
 
 
 def _cxr_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=False):
@@ -776,49 +795,38 @@ def _cxr_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=Fal
     Returns ``(spec, spec_coherent_or_None)``, both PXR/CBS only. With
     ``return_characteristic=True``, append the separate characteristic
     component as a third item."""
+    from dataclasses import replace
+
+    from .emission_adapters import EmissionBatch, select_emission
+
+    emission = select_emission(case)
     segs, _E_brem, n_hat, abs_layers, groove = _transport_cxr_for_case(case, E_grid)
     # Both kernels read the same segments; stage one device copy as the live
     # sweep does rather than uploading the pair separately.
     segs = _segments_on_device(segs)
     Ne_lines = case["Ne"]
     table_cache = {}
-    spec = _cxr_for_segments(
+    batch = EmissionBatch(
         segs,
         E_grid,
         case,
         n_hat,
         abs_layers,
         groove,
-        coherent=False,
-        Ne=Ne_lines,
+        electron_limit=Ne_lines,
         table_cache=table_cache,
     )
+    spec = emission.cxr.evaluate(batch, "spec").values
     spec_coherent = (
-        _cxr_for_segments(
-            segs,
-            E_grid,
-            case,
-            n_hat,
-            abs_layers,
-            groove,
-            coherent=True,
-            Ne=Ne_lines,
-            table_cache=table_cache,
-        )
+        emission.cxr.evaluate(replace(batch, coherent=True), "spec_coherent").values
         if want_coherent
         else None
     )
     if not return_characteristic:
         return spec, spec_coherent
-    characteristic = _characteristic_from_segments(
-        segs,
-        E_grid,
-        case,
-        n_hat,
-        abs_layers,
-        groove=groove,
-        Ne=case["Ne_brem"],
-    )
+    characteristic = emission.characteristic.evaluate(
+        replace(batch, electron_limit=case["Ne_brem"]), "spec_characteristic"
+    ).values
     return spec, spec_coherent, characteristic
 
 
@@ -918,9 +926,14 @@ def _spectrum_case_impl(case, tp, record_timing=False):
 
     Validation: temporal-intensity-profile
     """
+    from dataclasses import replace as batch_replace
+
+    from .emission_adapters import EmissionBatch, select_emission
+
     timed = _TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
     E_grid, E_brem, n_hat = tp["E_grid"], tp["E_brem"], tp["n_hat"]
+    emission = select_emission(case)
     segs = tp["segs"]
     # Every kernel below runs over the SAME segments, and each would otherwise
     # upload its own slice of them: a case pushes ~116 B/segment across the bus
@@ -959,36 +972,34 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # Opt-in temporal profile (#292): one accumulator per emission policy.
     temporal, temporal_coherent = case_temporal_profiles(case, tp, want_coherent)
     truncation_audit = cxr_truncation_audit(case, E_grid, n_electrons=Ne_lines)
+    batch = EmissionBatch(
+        segs_dev,
+        E_grid,
+        case,
+        n_hat,
+        abs_layers,
+        tp.get("groove"),
+        electron_limit=Ne_lines,
+        table_cache=cxr_table_cache,
+        truncation_audit=truncation_audit,
+        temporal=temporal,
+    )
     with _nsys_range("pyrite.lines"):
         try:
-            spec = _cxr_for_segments(
-                segs_dev,
-                E_grid,
-                case,
-                n_hat,
-                abs_layers,
-                tp.get("groove"),
-                coherent=False,
-                Ne=Ne_lines,
-                table_cache=cxr_table_cache,
-                truncation_audit=truncation_audit,
-                temporal=temporal,
-            )
+            spec = emission.cxr.evaluate(batch, "spec").values
 
             if want_coherent:
-                spec_coherent = _cxr_for_segments(
-                    segs_dev,
-                    E_grid,
-                    case,
-                    n_hat,
-                    abs_layers,
-                    tp.get("groove"),
-                    coherent=True,
-                    Ne=Ne_lines,
-                    table_cache=cxr_table_cache,
-                    temporal=temporal_coherent,
-                    coefficient_capture=None if coherent_audit is None else coherent_audit.capture,
-                )
+                spec_coherent = emission.cxr.evaluate(
+                    batch_replace(
+                        batch,
+                        coherent=True,
+                        temporal=temporal_coherent,
+                        coefficient_capture=None
+                        if coherent_audit is None
+                        else coherent_audit.capture,
+                    ),
+                    "spec_coherent",
+                ).values
         except Exception as error:
             if not _is_gpu_oom(error):
                 raise
@@ -1008,15 +1019,9 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # components through pyrite._spectral_components (issue #123).
     with _nsys_range("pyrite.characteristic"):
         try:
-            spec_characteristic = _characteristic_from_segments(
-                segs_dev,
-                E_grid,
-                case,
-                n_hat,
-                abs_layers,
-                groove=tp.get("groove"),
-                Ne=Ne_brem,
-            )
+            spec_characteristic = emission.characteristic.evaluate(
+                batch_replace(batch, electron_limit=Ne_brem), "spec_characteristic"
+            ).values
         except Exception as error:
             if not _is_gpu_oom(error):
                 raise
@@ -1029,15 +1034,9 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # SAME path (via _brem_for_case) and can't drift back to single-slab brem.
     with _nsys_range("pyrite.brem"):
         try:
-            brem_wide = _brem_wide_from_segments(
-                segs_dev,
-                E_brem,
-                case,
-                n_hat,
-                abs_layers,
-                groove=tp.get("groove"),
-                Ne=Ne_brem,
-            )
+            brem_wide = emission.continuum.evaluate(
+                batch_replace(batch, energy_eV=E_brem, electron_limit=Ne_brem), "brem_wide"
+            ).values
         except Exception as error:
             if not _is_gpu_oom(error):
                 raise

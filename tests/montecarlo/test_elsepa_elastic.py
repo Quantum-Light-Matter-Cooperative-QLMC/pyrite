@@ -281,3 +281,94 @@ def test_cuda_elsepa_agrees_statistically_with_the_cpu_core(reference):
     sigma = np.sqrt(p_cpu * (1 - p_cpu) / n + p_gpu * (1 - p_gpu) / n)
     assert abs(p_cpu - p_gpu) < 4.0 * sigma
     assert gpu["L_ang"].sum() / n == pytest.approx(cpu["L_ang"].sum() / n, rel=0.03)
+
+
+def test_pre_adapter_seeded_elsepa_baseline(reference):
+    from pyrite.montecarlo.transport import simulate_trajectories
+    from tests.helpers.physics_baseline import assert_output_baseline, transport_signature
+
+    table = _sr_table(14.0, np.geomspace(4.0, 40.0, 41), reference.mu)
+    segments = simulate_trajectories(
+        30.0,
+        4,
+        2000.0,
+        element="Si",
+        n_atoms_per_ang3=0.05,
+        seed=485,
+        E_cut_keV=5.0,
+        elastic_model="elsepa",
+        elastic_tables=[[table]],
+        transport_core="lockstep",
+    )
+    assert_output_baseline("elsepa", transport_signature(segments))
+
+
+@pytest.mark.parametrize("model,expected", [("mott", "lut"), ("elsepa", "exact")])
+def test_cuda_elastic_factory_selection_with_cpu_stubs(reference, monkeypatch, model, expected):
+    """Factory reachability only: ELSEPA bypasses enabled LUT configuration."""
+    import sys
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.transport import simulate_trajectories
+
+    class ReachedFactory(Exception):
+        pass
+
+    def factory(route):
+        def launch():
+            raise ReachedFactory(route)
+
+        return launch
+
+    monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
+    monkeypatch.setitem(
+        sys.modules,
+        "pyrite.montecarlo.transport._jit_launch",
+        SimpleNamespace(
+            make_cuda_transport_core=factory("exact"),
+            make_cuda_transport_lut_core=factory("lut"),
+        ),
+    )
+    table = _sr_table(14.0, np.geomspace(4.0, 40.0, 41), reference.mu)
+    kwargs = {"elastic_tables": [[table]]} if model == "elsepa" else {}
+    with pytest.raises(ReachedFactory, match=expected):
+        simulate_trajectories(
+            30.0,
+            4,
+            2000.0,
+            element="Si",
+            n_atoms_per_ang3=0.05,
+            seed=485,
+            E_cut_keV=5.0,
+            elastic_model=model,
+            transport_core="cuda",
+            **kwargs,
+        )
+
+
+def test_preparation_adapter_preserves_seeded_elsepa_baseline(reference, monkeypatch):
+    """The new kwargs path reproduces the pre-adapter CPU fixture exactly."""
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.runner.case_tables import _case_elastic_kwargs
+    from pyrite.montecarlo.transport import simulate_trajectories
+    from tests.helpers.physics_baseline import assert_output_baseline, transport_signature
+
+    table = _sr_table(14.0, np.geomspace(4.0, 40.0, 41), reference.mu)
+    monkeypatch.setattr(
+        "pyrite.xsgen.elsepa.catalog.resolve_layer_tables",
+        lambda composition: (SimpleNamespace(arrays=table, tables=()),),
+    )
+    kwargs = _case_elastic_kwargs({"elastic_model": "elsepa", "composition": [("Si", 0.05)]})
+    segments = simulate_trajectories(
+        30.0,
+        4,
+        2000.0,
+        element="Si",
+        n_atoms_per_ang3=0.05,
+        seed=485,
+        E_cut_keV=5.0,
+        transport_core="lockstep",
+        **kwargs,
+    )
+    assert_output_baseline("elsepa", transport_signature(segments))
