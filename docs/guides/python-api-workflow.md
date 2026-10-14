@@ -247,6 +247,36 @@ window_image = configured.acquisition_image((4_000.0, 8_000.0), pixel_chunk=1024
 
 `IdealPhotonCounter` is explicitly unit-efficiency and energy-preserving; it is a mathematical reference response, not calibrated hardware. `selected.expected` contains registered expected counts per reporting bin; `selected.realized` is present only in Poisson mode, and `selected.counts` selects the configured form. Underflow, overflow, and below-cut accounting are separate arrays. `total_counts` sums registered bins; `window_counts` and the image energy range require bounds that match configured reporting edges so an integer realization is never fractionally split. Images process bounded pixel chunks rather than allocating a full pixel-by-energy cube.
 
+For automatic reporting bins, supply exposure and the native policy only:
+
+```python
+native_result = pr.simulate(
+    beam,
+    target,
+    counting_detector,
+    acquisition=pr.Acquisition.native(exposure_s=1.0),
+)
+native_counts = native_result.acquire(pixels=[(0, 0)])
+resolved_edges = native_counts.measured_edges_eV
+policy_source = native_result.provenance["reporting_bins"]
+```
+
+The request is a `NativeAcquisition`; the result freezes one concrete
+`Acquisition` before observation identity or counting. Selection uses the sorted
+union of all component response-output edges, or source midpoint-cell edges for
+`IdealPhotonCounter`. Complete native bounds include broadened response tails;
+the maximum is 65,536 bins, otherwise use explicit edges. Component/pixel
+selection later keeps this same axis. Native and explicit requests with equal
+resolved values share counts, identity and seeded Poisson replay. Policy/source
+metadata is descriptive and excluded from identity. An immutable stored record
+keeps its first writer's provenance when equivalent requests share a digest.
+
+`Numerics.energy_bins` samples true photon energies. Timepix `dE_mc` and `dE_out`
+discretize the response's input and measured-output axes; acquisition edges
+partition that output for reporting. These histograms approximate continuous
+recorded energies and do not model an ADC/ToT quantization law. Ordinary source
+grid sizing and explicit grid artifacts remain independent of reporting bins.
+
 ### Persist, reopen, and rescore an observation
 
 `pyrite.observations.ObservationStore` keeps observations beside, not inside, intrinsic checkpoints; `pyrite run` writes one per case of a counting-observation profile under `pyrite-output/observations/<stem>/`. A true-spatial object stores only factors -- tile map, solid angles, filter paths, representative directions, per-tile spectra, attenuation -- and every response or acquisition over it is a small record, so rescoring never repeats transport:
@@ -272,7 +302,9 @@ store.put(longer)
 longer_image = longer.acquisition_image(pixel_chunk=1024)
 ```
 
-`load` verifies schema, array checksums, and digests and raises `ObservationStoreError` rather than return damaged data. `rescore` accepts a new `acquisition`, `response`, `rep_rate_hz`, or `bunch_charge_pc`; geometry, filters, and angular sampling are fixed by the stored factors and need a new simulation.
+`load` verifies schema, array checksums, and digests and raises `ObservationStoreError` rather than return damaged data. `rescore` retains the concrete reporting edges when only the response changes;
+pass a new `Acquisition.native(...)` request to select native edges again.
+`rescore` accepts a new `acquisition`, `response`, `rep_rate_hz`, or `bunch_charge_pc`; geometry, filters, and angular sampling are fixed by the stored factors and need a new simulation.
 
 ## Apply detector response explicitly
 

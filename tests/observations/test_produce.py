@@ -144,3 +144,16 @@ def test_damaged_stored_observation_is_rebuilt(tmp_path, transports) -> None:
 def test_scalar_detector_scenes_are_rejected(tmp_path) -> None:
     with pytest.raises(ValueError, match="pixelated detector and acquisition"):
         produce_observation(_scene(acquisition=None), NUMERICS, ObservationStore("x", tmp_path))
+
+
+def test_native_request_reuses_and_resolves_before_identity(tmp_path, transports):
+    store = ObservationStore("hopg", root=tmp_path)
+    scene = _scene(acquisition=pr.Acquisition.native(exposure_s=0.001, mode="poisson", seed=5))
+    first = produce_observation(scene, NUMERICS, store)
+    second = produce_observation(scene, NUMERICS, store)
+    assert first.transported and not second.transported
+    assert len(transports) == 1
+    assert first.observation.identity == second.observation.identity
+    np.testing.assert_array_equal(
+        first.observation.acquisition_image(), second.observation.acquisition_image()
+    )

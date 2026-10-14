@@ -271,3 +271,40 @@ def test_deprecated_json_warns_once_and_keeps_schema(catalog):
     assert len([line for line in result.stderr.splitlines() if "is deprecated" in line]) == 1
     assert "profile detector show PROFILE physical" in result.stderr
     assert json.loads(result.stdout)["schema"] == "cxr.profile.physical-detector.show"
+
+
+def test_native_reporting_on_named_detector_and_inline_copy(catalog):
+    from pyrite.campaign.observation import resolve_profile_observation
+    from pyrite.instrument import NativeAcquisition
+    from pyrite.materials import load_material_catalog
+
+    assert_clean_result(
+        invoke(
+            detector.command,
+            [
+                "create",
+                "native_camera",
+                "--distance-mm",
+                "400",
+                "--shape",
+                "2",
+                "3",
+                "--response",
+                "ideal",
+                "--exposure-s",
+                "1",
+                "--reporting-bins",
+                "native",
+            ],
+        )
+    )
+    call("migrate", "standard", "-y")
+    call("set", "standard", "default", "--detector", "native_camera", "-y")
+    resolved = resolve_profile_observation(load_material_catalog(catalog), "standard")
+    assert isinstance(resolved.acquisition, NativeAcquisition)
+    shown = json.loads(invoke(detector.command, ["show", "native_camera", "-o", "json"]).stdout)
+    assert shown["payload"]["acquisition"]["reporting_bins"] == "native"
+    call("set", "standard", "default", "--inline-copy", "--measured-edges-ev", "0,100,200", "-y")
+    resolved = resolve_profile_observation(load_material_catalog(catalog), "standard")
+    assert resolved.acquisition.measured_edges_eV == (0, 100, 200)
+    assert "reporting_bins" not in row(catalog)["detectors"]["default"]["acquisition"]

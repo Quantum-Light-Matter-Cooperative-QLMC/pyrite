@@ -615,11 +615,18 @@ def test_single_scene_and_checkpoint_lowering_share_seed_counts_and_explicit_gri
         assert single[key] == checkpoint[key]
 
 
-def test_ephemeral_real_api_preserves_case_and_spatial_output(tmp_path, monkeypatch):
+@pytest.mark.parametrize("native", [False, True])
+def test_ephemeral_real_api_preserves_case_and_spatial_output(tmp_path, monkeypatch, native):
     from pyrite import api
     from pyrite.observations import plan
 
-    _single_scene_catalog(tmp_path, monkeypatch)
+    acquisition_config = (
+        "[profiles.single.physical_detector.acquisition]\n"
+        'exposure_s = 1.0\nreporting_bins = "native"\n'
+        if native
+        else ""
+    )
+    _single_scene_catalog(tmp_path, monkeypatch, physical_extra=acquisition_config)
     cases = []
 
     def directional(case, n_hats, *, transport_core):
@@ -646,6 +653,13 @@ def test_ephemeral_real_api_preserves_case_and_spatial_output(tmp_path, monkeypa
     payload = json.loads(ephemeral.stdout)["payload"]
     assert payload["line"]["energy_eV"] == [100.0, 200.0]
     assert payload["pixel_grid"]["filter_count"] == 1
+    if native:
+        assert payload["acquisition"]["measured_edges_eV"] == [5, 15, 25, 50, 150, 250]
+        assert payload["acquisition"]["reporting_bins"] == {
+            "policy": "native",
+            "source": "source-midpoint-cells",
+        }
+        assert payload["acquisition"]["total_counts"] > 0
 
 
 def test_single_scene_named_gdf_clears_default_spot(tmp_path, monkeypatch):

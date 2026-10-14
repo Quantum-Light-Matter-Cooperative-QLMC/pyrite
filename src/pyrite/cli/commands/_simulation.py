@@ -82,10 +82,18 @@ def _acquisition_summary(result):
     acquisition = scene.acquisition
     if acquisition is None:
         return None
+    edges = getattr(acquisition, "measured_edges_eV", None)
+    if edges is None:
+        edges = result.provenance["observation"]["acquisition"]["config"]["measured_edges_eV"]
     return {
         "mode": acquisition.mode,
         "exposure_s": acquisition.exposure_s,
-        "measured_edges_eV": list(acquisition.measured_edges_eV),
+        "measured_edges_eV": list(edges),
+        **(
+            {"reporting_bins": result.provenance["reporting_bins"]}
+            if "reporting_bins" in result.provenance
+            else {}
+        ),
         "total_counts": float(result.acquisition_image().sum()),
     }
 

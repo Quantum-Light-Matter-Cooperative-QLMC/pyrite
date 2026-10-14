@@ -13,7 +13,7 @@ from .._numerics import EmissionMode as EmissionMode
 from .._numerics import MosaicRoute as MosaicRoute
 from .._precision import Precision
 from ..detectors import Detector, EnergyBins
-from ..instrument import Acquisition, Filter, FilterPlate, PlanarDetector
+from ..instrument import Acquisition, Filter, FilterPlate, NativeAcquisition, PlanarDetector
 from ..instrument.model import validate_downstream_scene
 from .beam import Beam, BunchFrontTilt
 from .geometry import Slab, Stack
@@ -116,7 +116,7 @@ class Scene:
     target: LegacyTarget | Target
     detector: Detector | PlanarDetector = field(default_factory=Detector)
     filters: tuple[FilterPlate | Filter, ...] = ()
-    acquisition: Acquisition | None = None
+    acquisition: Acquisition | NativeAcquisition | None = None
     physics: Physics = field(default_factory=Physics, kw_only=True)
     numerics: Numerics = field(default_factory=Numerics, kw_only=True)
 
@@ -140,8 +140,10 @@ class Scene:
         if any(not isinstance(plate, (FilterPlate, Filter)) for plate in filters):
             raise TypeError("Scene.filters must contain only FilterPlate or Filter objects")
         object.__setattr__(self, "filters", filters)
-        if self.acquisition is not None and not isinstance(self.acquisition, Acquisition):
-            raise TypeError("Scene.acquisition must be an Acquisition or None")
+        if self.acquisition is not None and not isinstance(
+            self.acquisition, (Acquisition, NativeAcquisition)
+        ):
+            raise TypeError("Scene.acquisition must be an Acquisition, native request, or None")
         if filters and not isinstance(self.detector, PlanarDetector):
             raise TypeError("Scene.filters require a physical PlanarDetector")
         if self.acquisition is not None:

@@ -116,6 +116,7 @@ _OBSERVATION_RESPONSE_KEYS = frozenset(
 )
 _ACQUISITION_KEYS = frozenset(
     {
+        "reporting_bins",
         "exposure_s",
         "measured_edges_eV",
         "measured_min_eV",
@@ -614,7 +615,14 @@ def _parse_acquisition(
     uniform_keys = ("measured_min_eV", "measured_max_eV", "measured_bin_width_eV")
     uniform_count = sum(key in row for key in uniform_keys)
     edges: tuple[float, ...] | None = None
-    if explicit and uniform_count:
+    native = row.get("reporting_bins") == "native"
+    if "reporting_bins" in row and not native:
+        errors.add(f"{path}.reporting_bins", "must be 'native'; omit for explicit bins")
+    if native and (explicit or uniform_count):
+        errors.add(path, "reporting_bins = 'native' conflicts with explicit measured bins")
+    elif native:
+        pass
+    elif explicit and uniform_count:
         errors.add(path, "use measured_edges_eV or min/max/bin-width, not both")
     elif explicit:
         raw_edges = row["measured_edges_eV"]
@@ -651,7 +659,10 @@ def _parse_acquisition(
                 generated = tuple(minimum + index * width for index in range(bins + 1))
                 edges = (*generated[:-1], maximum)
     else:
-        errors.add(path, "requires measured_edges_eV or all of measured min/max/bin-width")
+        errors.add(
+            path,
+            "requires reporting_bins = 'native', measured_edges_eV or all of measured min/max/bin-width",
+        )
 
     threshold = _number(row.get("hit_threshold_eV", 0.0))
     if threshold is None or threshold < 0.0:
@@ -666,14 +677,20 @@ def _parse_acquisition(
         errors.add(f"{path}.seed", "is required for poisson mode")
     if mode == "expected" and seed is not None:
         errors.add(f"{path}.seed", "is not accepted in expected mode")
-    if exposure is None or exposure <= 0.0 or edges is None or threshold is None or threshold < 0:
+    if (
+        exposure is None
+        or exposure <= 0.0
+        or (edges is None and not native)
+        or threshold is None
+        or threshold < 0
+    ):
         return None
     if mode not in {"expected", "poisson"}:
         return None
     return MappingProxyType(
         {
             "exposure_s": exposure,
-            "measured_edges_eV": edges,
+            **({"reporting_bins": "native"} if native else {"measured_edges_eV": edges}),
             "hit_threshold_eV": threshold,
             "mode": mode,
             "seed": seed,

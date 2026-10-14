@@ -413,6 +413,12 @@ class Result:
         digest = self.provenance.get("observation_identity_digest")
         if not isinstance(digest, str):
             raise ValueError("result does not contain an observation identity digest")
+        from ..instrument import Acquisition, NativeAcquisition
+
+        if isinstance(acquisition, NativeAcquisition):
+            acquisition = Acquisition(
+                **dict(self.provenance["observation"]["acquisition"]["config"])
+            )
         return acquisition, beam, digest, scene
 
     def acquire(

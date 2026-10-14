@@ -15,7 +15,7 @@ directional output.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import Any
 
@@ -27,6 +27,7 @@ from ..instrument import (
     ResolvedObservation,
     observation_identity,
 )
+from ..instrument.acquisition import resolve_acquisition
 from ..instrument.attenuation import attenuation_matrix
 from ..instrument.geometry import (
     PixelRays,
@@ -228,6 +229,17 @@ class ObservationPlan:
             brem_source=self.brem_source,
             reconstruction=observation.scorer.reconstruction,
         )
+        axes = [spatial.cxr.energy_eV, spatial.brem.energy_eV]
+        if spatial.characteristic is not None:
+            axes.append(spatial.characteristic.energy_eV)
+        if spatial.coherent_cxr is not None:
+            axes.append(spatial.coherent_cxr.energy_eV)
+        acquisition, reporting = resolve_acquisition(
+            observation.acquisition, spatial.detector.scalar_detector(), axes
+        )
+        observation = replace(observation, acquisition=acquisition)
+        if reporting:
+            provenance = {**provenance, "reporting_bins": reporting}
         identity = observation_identity(
             self.source_identity_digest,
             observation,
@@ -242,7 +254,7 @@ class ObservationPlan:
         return StoredObservation(
             identity=identity,
             spatial=spatial,
-            acquisition=observation.acquisition,
+            acquisition=acquisition,
             rep_rate_hz=float(self.rep_rate_hz),
             bunch_charge_pc=float(self.bunch_charge_pc),
             emission=self.emission,

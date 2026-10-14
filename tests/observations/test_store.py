@@ -384,3 +384,103 @@ def test_simulate_rejects_removed_pixel_scorer_keyword() -> None:
             pixel_scorer=scene.detector.scorer,
             acquisition=scene.acquisition,
         )
+
+
+@pytest.mark.parametrize("mode,seed", [("expected", None), ("poisson", 19)])
+def test_native_reporting_matches_explicit_identity_counts_and_storage(tmp_path, mode, seed):
+    request = pr.Acquisition.native(exposure_s=0.001, mode=mode, seed=seed, hit_threshold_eV=600)
+    result = _simulate(acquisition=request)
+    native = observation_from_result(result)
+    assert isinstance(native.acquisition, pr.Acquisition)
+    assert native.acquisition.measured_edges_eV == (250, 750, 1250, 1750, 2250, 2750, 3250)
+    explicit_result = _simulate(acquisition=native.acquisition)
+    explicit = observation_from_result(explicit_result)
+    assert native.identity == explicit.identity
+    assert native.source_identity_digest == explicit.source_identity_digest
+    assert native.provenance["reporting_bins"]["policy"] == "native"
+    assert "reporting_bins" not in explicit.provenance
+    chosen = [(3, 5), (0, 0)]
+    batch = result.acquire(pixels=chosen, components=("characteristic", "brem", "cxr"))
+    other = explicit_result.acquire(pixels=chosen, components=("characteristic", "brem", "cxr"))
+    np.testing.assert_array_equal(batch.expected, other.expected)
+    np.testing.assert_array_equal(batch.counts, other.counts)
+    reverse = result.acquire(pixels=chosen[::-1], components=("cxr", "brem", "characteristic"))
+    # Reordering floating additions may change a final rounding bit; Poisson
+    # integers replay exactly, while expectations agree at machine precision.
+    if mode == "poisson":
+        np.testing.assert_array_equal(batch.counts, reverse.counts[::-1])
+    else:
+        np.testing.assert_allclose(batch.counts, reverse.counts[::-1], rtol=5e-16, atol=0)
+    store = ObservationStore("hopg", root=tmp_path)
+    loaded = store.load(store.put(native))
+    assert loaded.acquisition == native.acquisition
+    assert loaded.provenance["reporting_bins"] == native.provenance["reporting_bins"]
+    np.testing.assert_array_equal(
+        loaded.acquisition_image(), result.acquisition_image(pixel_chunk=3)
+    )
+    # Equal resolved requests are one immutable object; the first writer's
+    # non-identity provenance remains attached to it.
+    assert store.put(explicit) == native.digest
+    assert store.verify() == ()
+    rescored = explicit.rescore(acquisition=request)
+    assert rescored.identity == native.identity
+    np.testing.assert_array_equal(rescored.acquisition_image(), result.acquisition_image())
+
+
+def test_native_timepix_reporting_covers_mixed_domains_and_broadened_tails(monkeypatch, tmp_path):
+    from pyrite.detectors import timepix_response
+
+    line = np.array([1000.0, 1100.0])
+    continuum = np.array([500.0, 2000.0, 3500.0])
+    used_axes = []
+
+    def directional(case, n_hats, *, transport_core):
+        return {
+            "E_grid": line,
+            "E_grid_brem": continuum,
+            "spec_by_direction": np.ones((len(n_hats), line.size)),
+            "spec_characteristic_by_direction": np.ones((len(n_hats), line.size)),
+            "brem_wide_by_direction": np.ones((len(n_hats), continuum.size)),
+        }
+
+    class DeterministicResponse:
+        def __init__(self, energy):
+            self.out_edges_eV = (
+                np.array([0.0, 1000.0, 2000.0])
+                if energy[-1] < 2000
+                else np.array([0.0, 1500.0, 3000.0, 4500.0])
+            )
+
+        def apply_native(self, density):
+            # Analytic fixture puts equal event mass in each measured bin,
+            # including tails outside the component's source range.
+            mass = np.sum(density, axis=-1, keepdims=True)
+            return np.repeat(mass, self.out_edges_eV.size - 1, axis=-1)
+
+    def get_response(energy, **kwargs):
+        used_axes.append(tuple(energy))
+        return DeterministicResponse(energy)
+
+    monkeypatch.setattr(api, "run_case_directions", directional)
+    monkeypatch.setattr(timepix_response, "get_response", get_response)
+    native = observation_from_result(
+        _simulate(acquisition=pr.Acquisition.native(exposure_s=0.001), response=Timepix3())
+    )
+    assert native.acquisition.measured_edges_eV == (0, 1000, 1500, 2000, 3000, 4500)
+    assert set(used_axes) == {tuple(line), tuple(continuum)}
+    assert native.provenance["reporting_bins"]["source"] == "response-measured-output"
+    batch = native.acquire(pixels=[(0, 0)], components=("cxr", "brem", "characteristic"))
+    assert batch.expected[0, -1] > 0
+    np.testing.assert_array_equal(batch.underflow_expected, [0])
+    np.testing.assert_array_equal(batch.overflow_expected, [0])
+    reordered = native.acquire(pixels=[(0, 0)], components=("characteristic", "brem", "cxr"))
+    np.testing.assert_array_equal(batch.counts, reordered.counts)
+    explicit = native.rescore(acquisition=native.acquisition)
+    assert explicit.identity == native.identity
+    np.testing.assert_array_equal(
+        explicit.acquire(pixels=[(0, 0)]).counts, native.acquire(pixels=[(0, 0)]).counts
+    )
+    loaded = ObservationStore("hopg", root=tmp_path)
+    np.testing.assert_array_equal(
+        loaded.load(loaded.put(native)).acquisition_image(), native.acquisition_image()
+    )

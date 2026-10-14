@@ -54,6 +54,23 @@ class Acquisition:
     mode: AcquisitionMode = "expected"
     seed: int | None = None
 
+    @classmethod
+    def native(
+        cls,
+        *,
+        exposure_s: float,
+        hit_threshold_eV: float = 0.0,
+        mode: AcquisitionMode = "expected",
+        seed: int | None = None,
+    ) -> NativeAcquisition:
+        """Request native reporting bins, resolved over the complete observation.
+
+        The sorted union of response output edges (source midpoint-cell edges
+        for the ideal counter) must contain at most 65,536 bins. Resolution
+        precedes acquisition identity, persistence, and Poisson realization.
+        """
+        return NativeAcquisition(exposure_s, hit_threshold_eV, mode, seed)
+
     def __post_init__(self) -> None:
         object.__setattr__(
             self,
@@ -135,13 +152,37 @@ class Acquisition:
 
 
 @dataclass(frozen=True)
+class NativeAcquisition:
+    """Unresolved native-bin request returned by :meth:`Acquisition.native`.
+
+    This request has no measured edges and cannot enter counting or identity.
+    Observation assembly replaces it with a concrete :class:`Acquisition`.
+    """
+
+    exposure_s: float
+    hit_threshold_eV: float = 0.0
+    mode: AcquisitionMode = "expected"
+    seed: int | None = None
+
+    def __post_init__(self) -> None:
+        validated = Acquisition(
+            self.exposure_s, (0.0, 1.0), self.hit_threshold_eV, self.mode, self.seed
+        )
+        for name in ("exposure_s", "hit_threshold_eV", "mode", "seed"):
+            object.__setattr__(self, name, getattr(validated, name))
+
+
+@dataclass(frozen=True)
 class ResolvedObservation:
-    """Fully lowered physical pixel observation, separate from source transport."""
+    """Lowered pixel geometry and counting policy, separate from source transport.
+
+    A native acquisition request awaits the complete source axes at assembly.
+    """
 
     detector: PlanarDetector
     scorer: PixelScorer
     filters: tuple[FilterPlate, ...]
-    acquisition: Acquisition
+    acquisition: Acquisition | NativeAcquisition
 
     def __post_init__(self) -> None:
         if not isinstance(self.detector, PlanarDetector):
@@ -168,8 +209,10 @@ class ResolvedObservation:
         if any(not isinstance(plate, FilterPlate) for plate in resolved_filters):
             raise TypeError("ResolvedObservation.filters must contain FilterPlate objects")
         object.__setattr__(self, "filters", resolved_filters)
-        if not isinstance(self.acquisition, Acquisition):
-            raise TypeError("ResolvedObservation.acquisition must be an Acquisition")
+        if not isinstance(self.acquisition, (Acquisition, NativeAcquisition)):
+            raise TypeError(
+                "ResolvedObservation.acquisition must be an Acquisition or native request"
+            )
         validate_downstream_scene(resolved_filters, self.detector)
 
     def scalar_detector(self):
@@ -294,6 +337,8 @@ def acquisition_payload(
     bunch_charge_pc: float,
 ) -> dict[str, Any]:
     """Canonical acquisition identity payload, including beam normalization."""
+    if not isinstance(acquisition, Acquisition):
+        raise TypeError("resolve native reporting bins before acquisition identity")
     return {
         "schema": "pyrite.acquisition.v1",
         "config": _canonical_value(acquisition),
@@ -362,6 +407,8 @@ def observation_identity(
     """Build independent true-spatial, response, acquisition, and full digests."""
     response = observation.detector.response
     assert response is not None
+    if not isinstance(observation.acquisition, Acquisition):
+        raise TypeError("resolve native reporting bins before acquisition identity")
     return link_identity(
         true_spatial_payload(
             source_identity_digest,
@@ -380,6 +427,7 @@ def observation_identity(
 
 __all__ = [
     "Acquisition",
+    "NativeAcquisition",
     "AcquisitionMode",
     "ObservationIdentity",
     "REALIZATION_RNG",

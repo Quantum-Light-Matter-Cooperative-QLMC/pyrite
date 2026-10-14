@@ -739,6 +739,7 @@ def remove_filter(document, profile_name, identifier):
 #: Nested ``physical_detector`` sections that ``reset`` can remove one at a time.
 PHYSICAL_SECTIONS = ("scorer", "response", "acquisition")
 _ACQUISITION_AXIS_KEYS = (
+    "reporting_bins",
     "measured_edges_eV",
     "measured_min_eV",
     "measured_max_eV",

@@ -195,7 +195,16 @@ Use `PointSpot`, `PlanarDetector.scorer`, and `Detector(acceptance=...)` in plac
 of the removed `Point`, loose `pixel_scorer`, and flat detector acceptance inputs.
 Select `PYRITE_MC_BACKEND` before import rather than passing `Numerics.backend`.
 
-For a physical pixel detector, `Acquisition` freezes exposure, explicit half-open measured-energy reporting edges, a post-response hit cut, and expected-versus-seeded-Poisson mode. `Result.acquire()` returns selected-pixel `AcquisitionBatch` records with registered reporting-bin counts and separate underflow, overflow, and below-cut accounting. `Result.acquisition_image()` contracts total or reporting-edge-aligned energy-window images in bounded pixel chunks. Expected counts use exposure, bunch charge, cadence, and the exact elementary charge; optional Poisson realizations are stable under selection and chunk-order changes. `ResolvedObservation` is the profile-lowered detector/scorer/filter/acquisition record. It deliberately projects back to the unchanged scalar `Detector` used by intrinsic transport.
+For a physical pixel detector, `Acquisition` freezes exposure, concrete half-open measured-energy reporting edges, a post-response hit cut, and expected-versus-seeded-Poisson mode. `Result.acquire()` returns selected-pixel `AcquisitionBatch` records with registered reporting-bin counts and separate underflow, overflow, and below-cut accounting. `Result.acquisition_image()` contracts total or reporting-edge-aligned energy-window images in bounded pixel chunks. Expected counts use exposure, bunch charge, cadence, and the exact elementary charge; optional Poisson realizations are stable under selection and chunk-order changes. `Acquisition.native(exposure_s=...)` returns a separate `NativeAcquisition`
+request. Observation assembly resolves the sorted union of all component native
+response edges (ideal: source midpoint cells), limited to 65,536 bins, before
+identity, counting or storage. Equal resolved values share the existing identity
+and Poisson replay; policy/source metadata lives in provenance. Explicit edges
+remain authoritative. `Numerics.energy_bins` samples true energies; Timepix
+`dE_mc`/`dE_out` discretize its continuous-energy response; acquisition edges
+select reporting intervals. None implies hardware ADC/ToT quantization.
+
+`ResolvedObservation` is the profile-lowered detector/scorer/filter/acquisition record. It deliberately projects back to the unchanged scalar `Detector` used by intrinsic transport.
 
 `Sweep` expresses a Cartesian product as ordered paths into a scalar base scene. Paths are checked when the sweep is constructed, including indexed segments:
 
@@ -313,6 +322,7 @@ CLI commands are unchanged.
    pyrite.PixelGrid
    pyrite.FilterPlate
    pyrite.Acquisition
+   pyrite.NativeAcquisition
    pyrite.AcquisitionBatch
    pyrite.IdealPhotonCounter
    pyrite.PlanarDetector

@@ -44,12 +44,14 @@ from ..detectors.spec import DetectorResponse
 from ..instrument import (
     Acquisition,
     AcquisitionBatch,
+    NativeAcquisition,
     ObservationIdentity,
     PixelGrid,
     PixelScorer,
     PlanarDetector,
     PlanarPose,
 )
+from ..instrument.acquisition import resolve_acquisition
 from ..instrument.observation import (
     acquisition_payload,
     link_identity,
@@ -72,6 +74,7 @@ _FACTORS = {
 _RAY_ARRAYS = ("tile_index", "solid_angle_sr", "path_length_mm")
 _FACTOR_ARRAYS = ("energy_eV", "intrinsic_by_tile", "mu_by_filter_inv_mm")
 _PROVENANCE_KEYS = (
+    "reporting_bins",
     "versions",
     "backend",
     "device",
@@ -212,7 +215,7 @@ class StoredObservation:
     def rescore(
         self,
         *,
-        acquisition: Acquisition | None = None,
+        acquisition: Acquisition | NativeAcquisition | None = None,
         response: DetectorResponse | None = None,
         rep_rate_hz: float | None = None,
         bunch_charge_pc: float | None = None,
@@ -228,15 +231,28 @@ class StoredObservation:
         new_charge = self.bunch_charge_pc if bunch_charge_pc is None else bunch_charge_pc
         detector = self.spatial.detector
         new_response = detector.response if response is None else response
-        identity = link_identity(
-            self.identity.payload["true_spatial"],
-            response_payload(new_response),
-            acquisition_payload(new_acquisition, rep_rate_hz=new_rate, bunch_charge_pc=new_charge),
-        )
         spatial = (
             self.spatial
             if new_response is detector.response
             else replace(self.spatial, detector=replace(detector, response=new_response))
+        )
+        axes = [spatial.cxr.energy_eV, spatial.brem.energy_eV]
+        if spatial.characteristic is not None:
+            axes.append(spatial.characteristic.energy_eV)
+        if spatial.coherent_cxr is not None:
+            axes.append(spatial.coherent_cxr.energy_eV)
+        new_acquisition, reporting = resolve_acquisition(
+            new_acquisition, spatial.detector.scalar_detector(), axes
+        )
+        provenance = dict(self.provenance)
+        if acquisition is not None:
+            provenance.pop("reporting_bins", None)
+        if reporting:
+            provenance["reporting_bins"] = reporting
+        identity = link_identity(
+            self.identity.payload["true_spatial"],
+            response_payload(new_response),
+            acquisition_payload(new_acquisition, rep_rate_hz=new_rate, bunch_charge_pc=new_charge),
         )
         return StoredObservation(
             identity=identity,
@@ -245,7 +261,7 @@ class StoredObservation:
             rep_rate_hz=float(new_rate),
             bunch_charge_pc=float(new_charge),
             emission=self.emission,
-            provenance=self.provenance,
+            provenance=provenance,
         )
 
 
@@ -273,7 +289,7 @@ def observation_from_result(result: Result) -> StoredObservation:
     return StoredObservation(
         identity=identity,
         spatial=spatial,
-        acquisition=scene.acquisition,
+        acquisition=_decode_acquisition(observation["acquisition"])[0],
         rep_rate_hz=float(scene.beam.rep_rate_hz),
         bunch_charge_pc=float(scene.beam.bunch_charge_pc),
         emission=scene.physics.emission_policy,

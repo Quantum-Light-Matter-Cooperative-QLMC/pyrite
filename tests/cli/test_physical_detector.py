@@ -301,3 +301,53 @@ def test_reset_refuses_a_profile_without_detector(catalog) -> None:
     result = invoke(profile.command, ["physical-detector", "reset", "high_energy", "-y"])
     assert result.exit_code == 2
     assert "has no physical detector" in result.stderr
+
+
+def test_native_reporting_policy_replaces_explicit_and_rejects_conflicts(catalog):
+    from pyrite.campaign.observation import resolve_profile_observation
+    from pyrite.instrument import NativeAcquisition
+    from pyrite.materials import load_material_catalog
+
+    assert _create("standard", *ACQUIRE).exit_code == 0
+    result = invoke(profile.command, [*SET, "standard", "-y", "--reporting-bins", "native"])
+    assert result.exit_code == 0, result.output
+    observation = resolve_profile_observation(load_material_catalog(catalog), "standard")
+    assert isinstance(observation.acquisition, NativeAcquisition)
+    assert _show()["measured_edges_eV"] is None
+    text = invoke(profile.command, ["physical-detector", "show", "standard"])
+    assert text.exit_code == 0
+    assert "native reporting bins (resolved per observation)" in text.stdout
+    for extra in (
+        ["--measured-edges-ev", "0,100,200"],
+        ["--measured-range-ev", "0", "200", "--measured-bin-width-ev", "100"],
+    ):
+        before = catalog.read_text()
+        conflict = invoke(
+            profile.command, [*SET, "standard", "-y", "--reporting-bins", "native", *extra]
+        )
+        assert conflict.exit_code == 2
+        assert "conflicts" in conflict.stderr
+        assert catalog.read_text() == before
+    explicit = invoke(profile.command, [*SET, "standard", "-y", "--measured-edges-ev", "0,100,200"])
+    assert explicit.exit_code == 0, explicit.output
+    assert _show()["measured_edges_eV"] == [0, 100, 200]
+
+
+@pytest.mark.parametrize(
+    "axis",
+    [
+        'reporting_bins = "native"\nmeasured_edges_eV = [0, 1]',
+        'reporting_bins = "native"\nmeasured_min_eV = 0',
+        'reporting_bins = "automatic"',
+    ],
+)
+def test_catalog_rejects_conflicting_or_unknown_reporting_policy(catalog, axis):
+    from pyrite.materials import load_material_catalog
+
+    assert _create().exit_code == 0
+    with catalog.open("a") as stream:
+        stream.write(
+            f"\n[profiles.standard.physical_detector.acquisition]\nexposure_s = 1\n{axis}\n"
+        )
+    with pytest.raises(ValueError, match="reporting_bins"):
+        load_material_catalog(catalog)

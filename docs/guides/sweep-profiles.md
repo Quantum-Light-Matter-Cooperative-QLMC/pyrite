@@ -325,6 +325,24 @@ measured_bin_width_eV = 400.0
 hit_threshold_eV = 500.0
 ```
 
+To select native reporting bins, replace the measured min/max/width fields with
+`reporting_bins = "native"` in the acquisition table:
+
+```toml
+[profiles.survey.detectors.camera.acquisition]
+exposure_s = 1.0
+reporting_bins = "native"
+```
+
+The CLI equivalent is `--exposure-s 1 --reporting-bins native`. Explicit edges,
+uniform min/max/width, and native policy are mutually exclusive. Editing one
+axis form replaces the previous one. Inspection of a profile shows the request;
+concrete edges depend on each case's complete source grids and are exposed in
+stored acquisitions, count batches, and ephemeral simulation JSON. Native bins
+cover every component's response output, including broadened tails, with a
+65,536-bin limit; larger unions require explicit edges. This policy changes
+reporting only, leaving source sampling and transport identity independent.
+
 The pixel pose uses `distance_mm`, `polar_deg`, `azimuth_deg`, `roll_deg`, and `offset_mm`; the grid uses `shape` and `pitch_mm` (default 256 by 256 at 0.055 mm). Optional `scorer`, `response`, and `acquisition` belong to that detector ID. An acquisition produces a factorized counting observation. Profile filters remain shared across the collection.
 
 Use `profile detector list PROFILE` and `show PROFILE ID` to inspect resolved geometry, references and optional sections. Attach a reusable object with `add PROFILE ID --detector REF`; replace a reference with `set PROFILE ID --detector REF`. `set PROFILE ID` also accepts scalar and pixel field options for inline entries. A named entry requires `--inline-copy` before profile-local field edits; this copies all its settings and leaves the shared object unchanged. Use `pyrite detector set REF` to edit a reusable object for all profiles.
