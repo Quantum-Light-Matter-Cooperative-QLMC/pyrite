@@ -64,6 +64,7 @@ def brem_command() -> None:
     lazy_commands={"defaults": "pyrite.cli.commands.energy_grid.defaults_command"},
     lazy_help={"defaults": "Show, update, or clear persistent derivation inputs."},
     deprecation_prefix="profile energy-grid",
+    context_settings={"help_option_names": ["-h", "--help"]},
     no_args_is_help=True,
 )
 def profile_command() -> None:
