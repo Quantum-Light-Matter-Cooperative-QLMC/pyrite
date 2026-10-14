@@ -26,6 +26,29 @@ def test_output_baseline_accepts_fp64_roundoff(legacy_output):
     assert_output_baseline("legacy", legacy_output)
 
 
+def test_output_baseline_accepts_coherent_phase_roundoff():
+    actual = json.loads(
+        (Path(__file__).parents[1] / "data/physics-baseline/outputs.json").read_text()
+    )["coherent"]
+    # Python 3.14 CI at 5b21c9a2, job 116064737035. The other components pass
+    # the ordinary accumulated-roundoff bound; coherent phases amplify it.
+    actual["spectra"]["spec_coherent"] = [
+        3.205073846525819e-09,
+        1.923644409935218e-09,
+        1.7515258903692567e-09,
+    ]
+    assert_output_baseline("coherent", actual)
+
+
+def test_output_baseline_rejects_coherent_numerical_change():
+    actual = json.loads(
+        (Path(__file__).parents[1] / "data/physics-baseline/outputs.json").read_text()
+    )["coherent"]
+    actual["spectra"]["spec_coherent"][0] *= 1 + 1e-8
+    with pytest.raises(AssertionError, match="spec_coherent"):
+        assert_output_baseline("coherent", actual)
+
+
 @pytest.mark.parametrize(
     "field", ["rows", "n_backscattered", "n_transmitted", "electron_id", "event_kind"]
 )
@@ -53,9 +76,9 @@ def test_output_baseline_rejects_broadcastable_shape_change(legacy_output):
 @pytest.mark.parametrize("field", ["path_ang", "brem"])
 def test_output_baseline_rejects_numerical_change(legacy_output, field):
     if field == "path_ang":
-        legacy_output["transport"][field] *= 1 + 1e-8
+        legacy_output["transport"][field] *= 1 + 1e-11
     else:
         # This spectrum is below 1e-8: an absolute tolerance would hide changes.
-        legacy_output["spectra"][field][0] *= 1 + 1e-8
+        legacy_output["spectra"][field][0] *= 1 + 1e-11
     with pytest.raises(AssertionError, match=field):
         assert_output_baseline("legacy", legacy_output)

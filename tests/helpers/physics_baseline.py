@@ -144,6 +144,10 @@ def _assert_output_values(actual, expected, path):
         # These fixtures accumulate up to a few thousand fp64 contributions.
         # Allow accumulated roundoff (roughly thousands of machine epsilons),
         # but no absolute floor that could mask tiny spectra or nonzero output.
+        # Coherent fields also accumulate phases of order 1e5 radians (keV
+        # photons over 1e4-1e5 Ang flights). Their fp64 phase error is of order
+        # 1e5 * eps; intensity/interference needs a separate 1e-10 allowance.
+        rtol = 1e-10 if path.endswith(".spec_coherent") else 1e-12
         np.testing.assert_allclose(
-            actual_array, expected_array, rtol=1e-12, atol=0, equal_nan=False, err_msg=path
+            actual_array, expected_array, rtol=rtol, atol=0, equal_nan=False, err_msg=path
         )

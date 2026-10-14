@@ -52,7 +52,10 @@ says nothing about a physical validity domain.
 Output comparisons require identical component keys, array shapes, event counts
 and integer IDs. Floating-point outputs use `rtol=1e-12`, `atol=0`: these small
 fp64 cases accumulate up to a few thousand contributions, so the allowance is
-of the order of thousands of machine epsilons. CPU math/SIMD implementations
+of the order of thousands of machine epsilons. Only `spec_coherent` uses
+`rtol=1e-10`: keV photons over flights of order 1e4-1e5 angstrom accumulate
+phases of order 1e5 radians, amplifying fp64 error before interference and
+squaring. CPU math/SIMD implementations
 can differ in their final bits even with the same seed and reduction order;
 disabling NumPy's `X86_V3` dispatch reproduces an exact-comparison failure in
 the coherent fixture. A zero absolute tolerance keeps zeros exact and protects
