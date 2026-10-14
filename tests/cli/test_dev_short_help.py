@@ -44,9 +44,10 @@ def test_hidden_profile_grid_short_help_after_standalone_help(monkeypatch, capsy
     capsys.readouterr()
 
     for flag in ("-h", "--help"):
-        assert run(
-            profile_command, ["energy-grid", flag], prog_name="pyrite-dev profile"
-        ) in (0, None)
+        assert run(profile_command, ["energy-grid", flag], prog_name="pyrite-dev profile") in (
+            0,
+            None,
+        )
         captured = capsys.readouterr()
         assert captured.out.startswith("Usage:")
         assert captured.err == ""

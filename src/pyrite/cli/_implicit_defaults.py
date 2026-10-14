@@ -92,6 +92,4 @@ def require_explicit_detector(profile: str, detectors: Mapping[str, Mapping[str,
         f"profile '{profile}' inherits implicit detector acceptance "
         f"({', '.join(implicit)}); use '{replacement}'"
     )
-    raise click.UsageError(
-        f"{detail} (implicit detector setup was removed in 0.11.0)"
-    )
+    raise click.UsageError(f"{detail} (implicit detector setup was removed in 0.11.0)")

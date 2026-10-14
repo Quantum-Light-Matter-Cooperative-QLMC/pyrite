@@ -20,9 +20,7 @@ def test_output_baseline_accepts_fp64_roundoff(legacy_output):
     legacy_output["transport"]["path_ang"] = np.nextafter(
         legacy_output["transport"]["path_ang"], np.inf
     )
-    legacy_output["spectra"]["brem"][0] = np.nextafter(
-        legacy_output["spectra"]["brem"][0], np.inf
-    )
+    legacy_output["spectra"]["brem"][0] = np.nextafter(legacy_output["spectra"]["brem"][0], np.inf)
     assert_output_baseline("legacy", legacy_output)
 
 

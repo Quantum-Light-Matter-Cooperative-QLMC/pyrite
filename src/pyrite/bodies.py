@@ -67,7 +67,9 @@ class RectangularBody:
             not isinstance(element, str) or not isinstance(density, Real)
             for element, density in self.substance.composition
         ):
-            raise TypeError("RectangularBody medium must contain element names and scalar densities")
+            raise TypeError(
+                "RectangularBody medium must contain element names and scalar densities"
+            )
         if isinstance(self.substance, MediumSpec) and not has_positive_number_densities(
             self.substance.composition
         ):
