@@ -142,7 +142,7 @@ def rebrem_checkpoints(
                 # Keep their stored grid while still applying profile Ne/provenance.
                 pass
             else:
-                profile_brem = profile_sweep.detector.energy_bins.brem
+                profile_brem = profile_sweep.energy_bins.brem
                 profile_grid = None if profile_brem is None else np.asarray(profile_brem, float)
                 if (
                     profile_grid is not None

@@ -647,8 +647,8 @@ def _resolved_run(args, material):
             tilt_deg=np.linspace(5.0, 85.0, 5),
             tilt_azim_deg=np.array([10.0, 30.0]),
             energy_keV=_select_quick_energies(
-                probe.detector.energy_bins.cxr_by_energy,
-                probe.detector.energy_bins.cxr,
+                probe.energy_bins.cxr_by_energy,
+                probe.energy_bins.cxr,
             ),
         )
     if getattr(args, "n_families", None) is not None:

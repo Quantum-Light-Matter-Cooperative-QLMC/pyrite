@@ -36,7 +36,6 @@ def test_root_exports_stay_frozen() -> None:
         "BlazedGrooves",
         "Physics",
         "CxrReflections",
-        "Convergence",
         "CxrSpectra",
         "AngularAcceptance",
         "SensorAcceptance",

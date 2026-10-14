@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
-from pyrite.detectors import Detector, EnergyBins
+from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import (
     _mosaic_quadrature,
     _small_tilt_R,
@@ -73,16 +73,11 @@ def test_quadrature_nodes_scale_with_spread():
 def _sweep(**kw):
     return Sweep(
         material="hopg",
-        thickness_ang=1e4,
+        thickness_ang=10000.0,
         beam=BeamSpec(energy_keV=30),
         tilt_deg=30.0,
-        detector=Detector(
-            energy_bins=EnergyBins(
-                cxr=E_GRID,
-                brem=np.arange(0.0, 1000.0, 100.0),
-            )
-        ),
         **kw,
+        energy_bins=EnergyBins(cxr=E_GRID, brem=np.arange(0.0, 1000.0, 100.0)),
     )
 
 
@@ -104,17 +99,12 @@ def test_route_mc_is_noop_without_mosaic_data():
     case = build_cases(
         Sweep(
             material="diamond",
-            thickness_ang=1e4,
+            thickness_ang=10000.0,
             beam=BeamSpec(energy_keV=30),
             tilt_deg=30.0,
-            detector=Detector(
-                energy_bins=EnergyBins(
-                    cxr=E_GRID,
-                    brem=np.arange(0.0, 1000.0, 100.0),
-                )
-            ),
             mosaic=True,
             mosaic_route="mc",
+            energy_bins=EnergyBins(cxr=E_GRID, brem=np.arange(0.0, 1000.0, 100.0)),
         )
     )[0]
     assert case["mosaic_mc_fwhm_rad"] is None

@@ -7,15 +7,14 @@ target geometry and never enter the electron-transport navigator.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from numbers import Integral
 from typing import Literal
 
 import numpy as np
 
-from .._api_deprecations import deprecated_energy_bins
 from .._planar_geometry import PixelGrid, PlanarPose, _positive_pair, _positive_real
-from ..detectors.spec import Detector, DetectorResponse, EnergyBins
+from ..detectors.spec import Detector, DetectorResponse
 from ..materials import CATALOG, MediumSpec
 from ..materials._composition import has_positive_number_densities, resolve_composition
 
@@ -92,7 +91,6 @@ class FilterPlate:
         )
 
 
-@deprecated_energy_bins
 @dataclass(frozen=True)
 class PlanarDetector:
     """Describe physical planar detector geometry and optional response.
@@ -106,8 +104,6 @@ class PlanarDetector:
         when both are given, must match the pixel-grid active size.
     pixels
         Optional physical pixel grid used for spatial scoring.
-    energy_bins
-        Deprecated forwarding: pass sampled grids to ``Numerics(energy_bins=...)``.
     response
         Optional read-time detector response implementing ``score``.
     scorer
@@ -124,8 +120,6 @@ class PlanarDetector:
     pose: PlanarPose
     size_mm: tuple[float, float] | None = None
     pixels: PixelGrid | None = None
-    energy_bins: EnergyBins = field(default_factory=EnergyBins)
-    _energy_bins_explicit: bool = field(default=False, repr=False, compare=False, kw_only=True)
     response: DetectorResponse | None = None
     scorer: PixelScorer | None = None
 
@@ -146,8 +140,6 @@ class PlanarDetector:
             size = pixel_size
         assert size is not None
         object.__setattr__(self, "size_mm", size)
-        if not isinstance(self.energy_bins, EnergyBins):
-            raise TypeError("PlanarDetector.energy_bins must be an EnergyBins")
         if self.response is not None and not hasattr(self.response, "score"):
             raise TypeError("PlanarDetector.response must implement score()")
         if self.scorer is not None and not isinstance(self.scorer, PixelScorer):
@@ -178,20 +170,13 @@ class PlanarDetector:
         cls,
         pose: PlanarPose,
         *,
-        energy_bins: EnergyBins | None = None,
         response: DetectorResponse | None = None,
         scorer: PixelScorer | None = None,
     ) -> PlanarDetector:
         """Construct one physical Timepix3 ASIC without implying a response."""
-        if energy_bins is not None:
-            from .._api_deprecations import warn_api
-
-            warn_api("PlanarDetector(energy_bins=)")
         return cls(
             pose=pose,
             pixels=PixelGrid.timepix3_chip(),
-            energy_bins=EnergyBins() if energy_bins is None else energy_bins,
-            _energy_bins_explicit=energy_bins is not None,
             response=response,
             scorer=scorer,
         )
@@ -240,8 +225,6 @@ class PlanarDetector:
         return Detector(
             observation_angle_deg=polar_deg,
             _legacy_acceptance=(max(polar_span_deg, np.finfo(float).eps), solid_angle),
-            energy_bins=self.energy_bins,
-            _energy_bins_explicit=self._energy_bins_explicit,
             response=self.response,
         )
 

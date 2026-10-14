@@ -58,14 +58,14 @@ Deterministic quadrature is used instead of randomly drawn orientations: it **co
 
 The **moments converge fast.** Integrated yield, mean energy and the second-moment width are converged by `mosaic_nodes ~ 5` (nodes 5 vs 9 agree to a few × 10⁻⁶ on the HOPG ZYH line integral). For a width-vs-rocking-curve comparison this is enough.
 
-The **detailed lineshape converges slowly when the mosaic spread ≫ the unbroadened source-line width.** Each node contributes a shifted copy of the narrow base line; for HOPG (00l) the energy shift is essentially 1-D in the in-plane tilt, so a handful of nodes gives a handful of discrete copies and the summed line is *lumpy* until the node spacing in energy drops below the unbroadened core width. A smooth broad lineshape needs `mosaic_nodes` scaling with (mosaic width / unbroadened source width): HOPG ZYH (3.5°) on a thin film needs ~30–40 nodes/axis for a smooth core; ZYA/ZYB (0.4/0.8°) are smooth by ~9–13. Cost is K = `mosaic_nodes²` evaluations of the line hot loop, **serial under CuPy**, so the broad-lineshape regime is genuinely expensive. The `Convergence` default (`mosaic_nodes=5`) targets converged moments; raise it for a publication-quality broad lineshape.
+The **detailed lineshape converges slowly when the mosaic spread ≫ the unbroadened source-line width.** Each node contributes a shifted copy of the narrow base line; for HOPG (00l) the energy shift is essentially 1-D in the in-plane tilt, so a handful of nodes gives a handful of discrete copies and the summed line is *lumpy* until the node spacing in energy drops below the unbroadened core width. A smooth broad lineshape needs `mosaic_nodes` scaling with (mosaic width / unbroadened source width): HOPG ZYH (3.5°) on a thin film needs ~30–40 nodes/axis for a smooth core; ZYA/ZYB (0.4/0.8°) are smooth by ~9–13. Cost is K = `mosaic_nodes²` evaluations of the line hot loop, **serial under CuPy**, so the broad-lineshape regime is genuinely expensive. The `CxrReflections` default (`mosaic_nodes=5`) targets converged moments; raise it for a publication-quality broad lineshape.
 
 ### Where it lives
 
 - `montecarlo._mosaic_quadrature(fwhm_rad, nodes)` / `_small_tilt_R(dx, dy)` — the quadrature and the tilt rotation.
 - `montecarlo.mc_cxr_spectrum(..., mosaic_fwhm_rad, mosaic_nodes)` — the orientation loop.
 - `montecarlo.run_case` / `_spectrum_case` — read `case["mosaic_mc_fwhm_rad"]` / `case["mosaic_mc_nodes"]`.
-- `Scene(target=Slab(…, mosaic=True), …)` with `Numerics(convergence=Convergence(mosaic_route="mc", mosaic_nodes=…))` sets the `mosaic_mc_*` case keys **and turns the analyti `store_result` term off** — the two routes are mutually exclusive (applying both double-counts the broadening).
+- `Scene(target=Slab(…, mosaic=True), …)` with `Numerics(cxr_reflections=CxrReflections(mosaic_route="mc", mosaic_nodes=…))` sets the `mosaic_mc_*` case keys **and turns the analyti `store_result` term off** — the two routes are mutually exclusive (applying both double-counts the broadening).
 - Checks: `checks/mosaic_mc_check.py`; synthetic unit tests (quadrature + wiring): `tests/montecarlo/test_mosaic_mc.py`.
 
 ```python
@@ -74,7 +74,7 @@ import pyrite as pr
 beam = pr.Beam(energy_keV=30.0, transverse=pr.Spot(fwhm_x_mm=1.0), longitudinal=pr.PointBunch())
 target = pr.Slab("hopg", thickness_ang=10_000.0, footprint=None, mosaic=True)
 detector = pr.Detector()
-numerics = pr.Numerics(convergence=pr.Convergence(mosaic_route="mc", mosaic_nodes=35))
+numerics = pr.Numerics(cxr_reflections=pr.CxrReflections(mosaic_route="mc", mosaic_nodes=35))
 result = pr.simulate(beam, target, detector, numerics=numerics)
 ```
 

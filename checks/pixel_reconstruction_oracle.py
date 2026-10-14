@@ -281,12 +281,13 @@ def _build_scene(
     *,
     timepix_n_mc: int,
 ) -> tuple[pr.Beam, pr.Slab, PlanarDetector, tuple[FilterPlate, ...]]:
-    beam = pr.Beam(energy_keV=30.0)
+    beam = pr.Beam(energy_keV=30.0, transverse=pr.TransverseSpot(), longitudinal=pr.PointBunch())
     target = pr.Slab(
         "hopg",
         thickness_ang=geometry.thickness_ang,
         tilt_deg=geometry.tilt_deg,
         tilt_azim_deg=geometry.tilt_azim_deg,
+        footprint=pr.Footprint(5.0, 5.0),
     )
     pose = PlanarPose.from_observation(
         distance_mm=geometry.distance_mm,

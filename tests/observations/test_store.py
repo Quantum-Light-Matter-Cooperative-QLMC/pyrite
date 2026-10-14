@@ -370,12 +370,12 @@ def test_reopened_pixel_metadata_matches_the_scoring_geometry(tmp_path) -> None:
     assert np.all((transmission[covered] > 0.0) & (transmission[covered] < 1.0))
 
 
-def test_deprecated_simulate_pixel_scorer_matches_the_detector_scorer() -> None:
-    """Issue #451: the forwarded spelling yields the same observation identity."""
+def test_simulate_rejects_removed_pixel_scorer_keyword() -> None:
+    """The scorer belongs to PlanarDetector after the 0.14 API removal."""
     current = _simulate()
     scene = current.provenance["scene"]
-    with pytest.warns(DeprecationWarning, match=r"simulate\(pixel_scorer=\) is deprecated"):
-        legacy = pr.simulate(
+    with pytest.raises(TypeError, match="unexpected keyword argument 'pixel_scorer'"):
+        pr.simulate(
             scene.beam,
             scene.target,
             replace(scene.detector, scorer=None),
@@ -384,7 +384,3 @@ def test_deprecated_simulate_pixel_scorer_matches_the_detector_scorer() -> None:
             pixel_scorer=scene.detector.scorer,
             acquisition=scene.acquisition,
         )
-    assert (
-        legacy.provenance["observation_identity_digest"]
-        == current.provenance["observation_identity_digest"]
-    )

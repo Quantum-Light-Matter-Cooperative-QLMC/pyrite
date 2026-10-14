@@ -68,9 +68,7 @@ def test_determinism_and_bounded_count():
 
 def test_standard_hopg_quick_resolves_30_50():
     sweep = material_sweep("hopg")
-    chosen = _select_quick_energies(
-        sweep.detector.energy_bins.cxr_by_energy, sweep.detector.energy_bins.cxr
-    )
+    chosen = _select_quick_energies(sweep.energy_bins.cxr_by_energy, sweep.energy_bins.cxr)
     assert chosen == [30, 50]
     quick = replace(sweep, beam=beam_replace(sweep.beam, energy_keV=chosen))
     cases = build_cases(quick)
@@ -86,16 +84,8 @@ def test_profile_lacking_50_reaches_valid_bounded_cases():
         for energy in np.asarray(sweep.beam.energy_keV)
         if float(energy) != 50.0
     }
-    lacking = replace(
-        sweep,
-        detector=replace(
-            sweep.detector,
-            energy_bins=replace(sweep.detector.energy_bins, cxr_by_energy=by_energy),
-        ),
-    )
-    chosen = _select_quick_energies(
-        lacking.detector.energy_bins.cxr_by_energy, lacking.detector.energy_bins.cxr
-    )
+    lacking = replace(sweep, energy_bins=replace(sweep.energy_bins, cxr_by_energy=by_energy))
+    chosen = _select_quick_energies(lacking.energy_bins.cxr_by_energy, lacking.energy_bins.cxr)
     assert 50.0 not in chosen
     assert chosen == [30, 40.0]  # tie 40/60 vs 50 breaks low
     quick = replace(lacking, beam=beam_replace(lacking.beam, energy_keV=chosen))
@@ -113,13 +103,7 @@ def test_line_grid_for_energy_resolves_automatically_on_missing():
         for energy in np.asarray(sweep.beam.energy_keV)
         if float(energy) != 50.0
     }
-    lacking = replace(
-        sweep,
-        detector=replace(
-            sweep.detector,
-            energy_bins=replace(sweep.detector.energy_bins, cxr_by_energy=by_energy),
-        ),
-    )
+    lacking = replace(sweep, energy_bins=replace(sweep.energy_bins, cxr_by_energy=by_energy))
     forced = replace(lacking, beam=beam_replace(lacking.beam, energy_keV=[50]))
     case = build_cases(forced)[0]
     policy = case["line_grid_policy"]

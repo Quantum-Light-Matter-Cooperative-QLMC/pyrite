@@ -1,5 +1,4 @@
 import json
-from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -22,13 +21,12 @@ from pyrite.montecarlo.transport import STOPPING_MODEL
 def _inputs():
     beam = pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch())
     target = pr.Slab("hopg", thickness_ang=1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0))
-    detector = pr.Detector(
-        energy_bins=EnergyBins(
-            cxr=np.array([1_000.0, 1_050.0]),
-            brem=np.array([1_000.0, 1_050.0]),
-        )
+    detector = pr.Detector()
+    numerics = pr.Numerics(
+        cxr_trials=1,
+        brem_trials=1,
+        energy_bins=EnergyBins(cxr=np.array([1000.0, 1050.0]), brem=np.array([1000.0, 1050.0])),
     )
-    numerics = pr.Numerics(cxr_trials=1, brem_trials=1)
     return beam, target, detector, numerics
 
 
@@ -38,7 +36,13 @@ def test_build_case_is_the_existing_case_builder_boundary() -> None:
 
     canonical = api.build_case(scene, numerics)
     legacy = build_cases(
-        LegacySweep(material="hopg", beam=beam, target=target, detector=detector),
+        LegacySweep(
+            material="hopg",
+            beam=beam,
+            target=target,
+            detector=detector,
+            energy_bins=_inputs()[3].energy_bins,
+        ),
         n_electrons=1,
         n_electrons_brem=1,
     )[0]
@@ -64,9 +68,9 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
 
     monkeypatch.setattr(api, "run_case", fake_run_case)
 
-    numerics = replace(numerics, bremsstrahlung_model="eedl")
-
-    result = pr.simulate(beam, target, detector, numerics=numerics)
+    result = pr.simulate(
+        beam, target, detector, numerics=numerics, physics=pr.Physics(bremsstrahlung_model="eedl")
+    )
 
     np.testing.assert_array_equal(result.cxr.incoherent.density, [3.0, 4.0])
     np.testing.assert_array_equal(result.characteristic.density, [0.25, 0.5])
@@ -99,9 +103,16 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
 
 def test_simulate_is_bit_for_bit_the_existing_single_case_path() -> None:
     beam, target, detector, numerics = _inputs()
-    expected = run_case(api.build_case(pr.Scene(beam, target, detector), numerics))
+    expected = run_case(
+        api.build_case(
+            pr.Scene(beam, target, detector, physics=pr.Physics(bremsstrahlung_model="eedl")),
+            numerics,
+        )
+    )
 
-    result = pr.simulate(beam, target, detector, numerics=numerics)
+    result = pr.simulate(
+        beam, target, detector, numerics=numerics, physics=pr.Physics(bremsstrahlung_model="eedl")
+    )
 
     np.testing.assert_array_equal(result.cxr.incoherent.photon_energy_eV, expected["E_grid"])
     np.testing.assert_array_equal(result.cxr.incoherent.density, expected["spec"])

@@ -49,6 +49,7 @@ from .._cxr_grid_policy import (
     kinematic_cxr_stop_eV,
     resolve_cxr_grid_policy,
 )
+from .._energy_bins import EnergyBins
 from .._energy_grid_encoding import encode_energy_grid
 from .._grid_semantics import resolution_num
 from .._numerics import (
@@ -458,6 +459,7 @@ class Sweep:
     allow_normal_incidence: InitVar[bool] = retired_flat_input("allow_normal_incidence")
     # Canonical detector owner. Kept after existing fields so legacy positional
     # Sweep construction retains its historical argument order.
+    energy_bins: EnergyBins = field(default_factory=EnergyBins, kw_only=True)
     detector: Detector | None = None
     # Canonical geometry owner. Every flat geometry input above is an InitVar
     # that normalizes onto this field, so the target is the only geometry state
@@ -490,6 +492,8 @@ class Sweep:
         after profile resolution.
         """
         lower = getattr(self.beam, "to_spec", None)
+        if not isinstance(self.energy_bins, EnergyBins):
+            raise TypeError("energy_bins must be an EnergyBins")
         if lower is not None:  # a public Beam lowers to its flat record
             self.beam = lower()
         self._normalize_detector(theta_obs_deg, dtheta_obs_deg, domega_sr)
@@ -683,7 +687,7 @@ def _cxr_grid_for_energy(
     """
     assert sweep.detector is not None
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
-    bins = sweep.detector.energy_bins
+    bins = sweep.energy_bins
     override = bool(sweep.cxr_grid_policy) or environment_overrides_present()
     if bins.cxr is not None and not sweep.cxr_grid_policy:
         return np.asarray(bins.cxr, dtype=float), None
@@ -793,7 +797,7 @@ def build_cases(
     cxr_grids = tuple(grid for grid, _ in resolved_cxr)
     cxr_policies = tuple(policy for _, policy in resolved_cxr)
     assert sweep.detector is not None
-    bins = sweep.detector.energy_bins
+    bins = sweep.energy_bins
     fixed_cxr_grid = bins.cxr
     if bins.brem is not None:
         brem_grid = np.asarray(bins.brem, float)

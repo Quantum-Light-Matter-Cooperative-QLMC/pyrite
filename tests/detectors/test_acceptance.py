@@ -169,32 +169,21 @@ def test_acceptance_and_resolved_detector_are_frozen_and_copies_recompute():
     assert replace(detector, response=None) == detector
 
 
-def test_legacy_forwarding_warns_once_per_spelling_and_rejects_mixes():
-    with pytest.warns(DeprecationWarning) as warnings:
-        legacy = pr.Detector(135, 2, 0.001)
-    assert len(warnings) == 2
-    assert all(
-        "AngularAcceptance" in str(w.message) and "0.14.0" in str(w.message) for w in warnings
-    )
-    assert legacy.acceptance == pr.AngularAcceptance(polar_deg=2, solid_angle_sr=0.001)
+def test_flat_acceptance_keywords_and_positionals_are_removed():
     for keyword in ("polar_acceptance_deg", "solid_angle_sr"):
-        with pytest.raises(ValueError, match="not both"):
-            pr.Detector(acceptance=legacy.acceptance, **{keyword: None})
+        with pytest.raises(TypeError, match=keyword):
+            pr.Detector(**{keyword: 2})
+    with pytest.raises(TypeError):
+        pr.Detector(135, 2, 0.001)
     with pytest.raises(TypeError, match="AngularAcceptance or SensorAcceptance"):
         pr.Detector(acceptance=object())
-    with pytest.warns(DeprecationWarning):
-        partial = pr.Detector(polar_acceptance_deg=2)
-    assert partial.polar_acceptance_deg == 2
-    assert partial.solid_angle_sr is None
-    assert replace(partial, response=None) == partial
     assert pr.Detector().polar_acceptance_deg is None
 
 
 def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     angular = pr.AngularAcceptance(polar_deg=2, solid_angle_sr=0.001)
     modern = pr.Detector(135, acceptance=angular)
-    with pytest.warns(DeprecationWarning):
-        legacy = pr.Detector(135, 2, 0.001)
+    legacy = pr.Detector(135, _legacy_acceptance=(2, 0.001))
     beam = pr.Beam(energy_keV=30, transverse=pr.PointSpot(), longitudinal=pr.PointBunch())
     target = pr.Slab("hopg", thickness_ang=1000, footprint=None)
     numerics = pr.Numerics(cxr_trials=1, brem_trials=1)
@@ -224,8 +213,9 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
 
 def test_sensor_and_equal_flat_acceptance_lower_identically():
     modern = pr.Detector(135, acceptance=pr.SensorAcceptance(400, 14.08, 14.08))
-    with pytest.warns(DeprecationWarning):
-        legacy = pr.Detector(135, modern.polar_acceptance_deg, modern.solid_angle_sr)
+    legacy = pr.Detector(
+        135, _legacy_acceptance=(modern.polar_acceptance_deg, modern.solid_angle_sr)
+    )
     beam = pr.Beam(energy_keV=30, transverse=pr.PointSpot(), longitudinal=pr.PointBunch())
     target = pr.Slab("hopg", thickness_ang=1000, footprint=None)
     cases = [build_case(pr.Scene(beam, target, detector)) for detector in (legacy, modern)]

@@ -23,24 +23,6 @@ def _case(beam):
     return case
 
 
-def test_omitted_distributions_warn_and_keep_the_historical_defaults():
-    """Issue #451: both are required; omission warns through the window."""
-    with pytest.warns(DeprecationWarning, match=r"without transverse=.*an error in 0\.14\.0"):
-        with pytest.warns(DeprecationWarning, match="without longitudinal="):
-            beam = pr.Beam(energy_keV=30.0)
-    assert beam == pr.Beam(energy_keV=30.0, transverse=Spot(1.0), longitudinal=PointBunch())
-    assert beam.to_spec() == BeamSpec(energy_keV=30.0)
-
-
-def test_point_is_a_deprecated_alias_of_point_spot():
-    import pyrite.campaign.beam as beam_module
-
-    with pytest.warns(DeprecationWarning, match=r"pyrite\.Point is deprecated.*PointSpot"):
-        assert pr.Point is PointSpot
-    with pytest.warns(DeprecationWarning, match=r"campaign\.beam\.Point is deprecated"):
-        assert beam_module.Point is PointSpot
-
-
 @pytest.mark.parametrize(
     ("beam", "spec"),
     [
@@ -87,9 +69,11 @@ def test_wrong_types_name_the_allowed_options():
     with pytest.raises(TypeError, match="PointBunch, BunchLength"):
         pr.Beam(transverse=Spot(), longitudinal=100.0)
     with pytest.raises(TypeError):
-        pr.Beam(transverse_fwhm_x_mm=1.0)  # flat spellings are gone
+        pr.Beam(
+            transverse_fwhm_x_mm=1.0, transverse=pr.TransverseSpot(), longitudinal=pr.PointBunch()
+        )  # flat spellings are gone
     with pytest.raises(TypeError):
-        pr.Beam(divergence_mrad=1.0)
+        pr.Beam(divergence_mrad=1.0, transverse=pr.TransverseSpot(), longitudinal=pr.PointBunch())
 
 
 def test_sub_object_validation():
@@ -138,3 +122,16 @@ def test_scene_and_sweep_axes_use_sub_objects():
     with pytest.raises(ValueError, match="no field"):
         pr.Sweep(scene, {"beam.transverse_fwhm_x_mm": [1.0]})
     assert np.isfinite(scene.beam.energy_keV)
+
+
+def test_required_beam_distributions_and_removed_point_alias():
+    import pyrite.campaign.beam as beam_module
+
+    with pytest.raises(TypeError, match="transverse.*longitudinal"):
+        pr.Beam(energy_keV=30.0)
+    with pytest.raises(TypeError, match="longitudinal"):
+        pr.Beam(energy_keV=30.0, transverse=PointSpot())
+    with pytest.raises(TypeError, match="transverse"):
+        pr.Beam(energy_keV=30.0, longitudinal=PointBunch())
+    assert not hasattr(pr, "Point")
+    assert not hasattr(beam_module, "Point")

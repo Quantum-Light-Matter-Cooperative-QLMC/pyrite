@@ -35,18 +35,19 @@ def test_model_names_stay_in_step_with_transport():
     assert _numerics.PAIR_PRODUCTION_MODELS == pair_production.PAIR_PRODUCTION_MODELS
 
 
-def test_numerics_and_settings_validate_pair_requirements():
-    assert pr.Numerics().pair_production_model is None
-    numerics = pr.Numerics(**SHELL, **COUPLED, **PAIR)
-    assert numerics.pair_production_model == "penelope-2024"
+def test_physics_and_settings_validate_pair_requirements():
+    assert pr.Physics().pair_production_model is None
+    shell_physics = {key: value for key, value in SHELL.items() if key != "energy_model"}
+    physics = pr.Physics(**shell_physics, **COUPLED, **PAIR)
+    assert physics.pair_production_model == "penelope-2024"
     with pytest.raises(ValueError, match="requires secondary_threshold_eV"):
-        pr.Numerics(energy_model="midpoint", **COUPLED, **PAIR)
+        pr.Physics(**COUPLED, **PAIR)
     with pytest.raises(ValueError, match="requires coupled BremsLib"):
-        pr.Numerics(**SHELL, radiative_model="uncoupled", **PAIR)
+        pr.Physics(**shell_physics, radiative_model="uncoupled", **PAIR)
     with pytest.raises(ValueError, match="requires coupled BremsLib"):
-        pr.Numerics(**SHELL, bremsstrahlung_model="eedl", **PAIR)
+        pr.Physics(**shell_physics, bremsstrahlung_model="eedl", **PAIR)
     with pytest.raises(ValueError, match="pair_production_model must be one of"):
-        pr.Numerics(**SHELL, pair_production_model="bethe-heitler")
+        pr.Physics(**shell_physics, pair_production_model="bethe-heitler")
     with pytest.raises(ValueError, match="requires secondary_threshold_eV"):
         replace(default_settings(), **PAIR)
 
@@ -94,7 +95,7 @@ def test_identity_forks_only_when_pairs_can_run(monkeypatch, resolved):
 
 
 def test_case_pair_model_reaches_runner_transport(monkeypatch):
-    """A Numerics-built case runs the cascade with pair conversion enabled."""
+    """A Physics-built case runs the cascade with pair conversion enabled."""
     import numpy as np
 
     from pyrite import api
@@ -113,18 +114,25 @@ def test_case_pair_model_reaches_runner_transport(monkeypatch):
     numerics = pr.Numerics(
         cxr_trials=4,
         brem_trials=4,
+        energy_model=SHELL["energy_model"],
+        energy_bins=EnergyBins(cxr=np.linspace(1500, 2000, 20), brem=np.linspace(1500, 9000, 20)),
+    )
+    physics = pr.Physics(
         elastic_model="mott",
-        **{**SHELL, "secondary_threshold_eV": 5000.0},
+        **{
+            key: value
+            for key, value in {**SHELL, "secondary_threshold_eV": 5000.0}.items()
+            if key != "energy_model"
+        },
         **COUPLED,
         **PAIR,
     )
-    detector = pr.Detector(
-        energy_bins=EnergyBins(cxr=np.linspace(1500, 2000, 20), brem=np.linspace(1500, 9000, 20))
-    )
+    detector = pr.Detector()
     scene = pr.Scene(
         pr.Beam(energy_keV=20.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("silicon", thickness_ang=5.0e4, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Slab("silicon", thickness_ang=50000.0, footprint=pr.Footprint(5.0, 5.0)),
         detector,
+        physics=physics,
     )
     case = api.build_case(scene, numerics)
     assert case["pair_production_model"] == "penelope-2024"

@@ -249,7 +249,7 @@ class FidelityPreset:
         energies = _centered_sample(sweep.beam.energy_keV, self.max_energies)
         energy_values = {float(value) for value in np.atleast_1d(energies)}
         assert sweep.detector is not None
-        bins = sweep.detector.energy_bins
+        bins = sweep.energy_bins
         by_energy = bins.cxr_by_energy
         if by_energy is not None:
             by_energy = {
@@ -290,10 +290,7 @@ class FidelityPreset:
             ),
             n_families=self.n_families or sweep.n_families,
             max_reflections=self.max_reflections,
-            detector=replace(
-                sweep.detector,
-                energy_bins=EnergyBins(cxr=cxr_grid, cxr_by_energy=by_energy, brem=brem_grid),
-            ),
+            energy_bins=EnergyBins(cxr=cxr_grid, cxr_by_energy=by_energy, brem=brem_grid),
         )
 
 
@@ -400,8 +397,6 @@ def _jsonable(value: Any) -> Any:
         return {
             names.get(f.name, f.name): _jsonable(getattr(value, f.name))
             for f in dataclasses.fields(value)
-            # Constructor compatibility bookkeeping is not detector physics.
-            if f.name != "_energy_bins_explicit"
         }
     if isinstance(value, np.ndarray):
         # A non-object dtype's `.tolist()` is already a plain nested list of
@@ -506,7 +501,7 @@ def _identity_v1(
     solid_angle = detector_payload["solid_angle_sr"]
     sweep_payload["dtheta_obs_deg"] = None if acceptance == TIMEPIX3_DTHETA_OBS_DEG else acceptance
     sweep_payload["domega_sr"] = None if solid_angle == TIMEPIX3_DOMEGA_SR else solid_angle
-    energy_bins = detector_payload.pop("energy_bins")
+    energy_bins = sweep_payload.pop("energy_bins")
     sweep_payload["E_grid_line"] = energy_bins["cxr"]
     sweep_payload["E_grid_line_by_energy"] = energy_bins["cxr_by_energy"]
     sweep_payload["E_grid_brem"] = energy_bins["brem"]

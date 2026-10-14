@@ -8,7 +8,7 @@ from pyrite.campaign.config import default_settings
 from pyrite.campaign.geometry import Footprint, Stack
 from pyrite.campaign.profiles import case_content_key, dataset_identity
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
-from pyrite.detectors import Detector, EnergyBins
+from pyrite.detectors import EnergyBins
 
 
 def resolved_baseline(kind):
@@ -20,13 +20,10 @@ def resolved_baseline(kind):
     sweep = Sweep(
         material="silicon",
         beam=BeamSpec(energy_keV=40.0),
-        thickness_ang=2e4,
+        thickness_ang=20000.0,
         tilt_deg=30.0,
-        detector=Detector(
-            energy_bins=EnergyBins(
-                cxr=np.array([1500.0, 1750.0, 2000.0]),
-                brem=np.array([5000.0, 10000.0, 15000.0]),
-            )
+        energy_bins=EnergyBins(
+            cxr=np.array([1500.0, 1750.0, 2000.0]), brem=np.array([5000.0, 10000.0, 15000.0])
         ),
     )
     selections = dict(

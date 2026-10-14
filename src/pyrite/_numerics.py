@@ -2,12 +2,11 @@
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, fields
-from functools import wraps
 from typing import Any, Literal, cast
 
 import numpy as np
 
-from ._api_deprecations import _hide_compat_parameters, warn_api
+from ._api_deprecations import warn_api
 from ._energy_bins import EnergyBins
 from ._precision import Precision
 
@@ -267,79 +266,6 @@ class Physics:
 PHYSICS_FIELDS = tuple(f.name for f in fields(Physics))
 
 
-def _legacy_numerics(cls):
-    """Retain explicitly supplied old model choices across dataclass copies."""
-    original = cls.__init__
-
-    @wraps(original)
-    def initialize(self, *args, **kwargs):
-        # Preserve the original dataclass's positional model fields through D7.
-        legacy_tail = (
-            "straggling",
-            "energy_model",
-            "max_dE_frac",
-            "inelastic_model",
-            "inelastic_cutoff_eV",
-            "secondary_threshold_eV",
-            "elastic_model",
-            "bremsstrahlung_model",
-            "radiative_model",
-            "radiative_cutoff_eV",
-            "pair_production_model",
-            "positron_transport",
-            "atomic_electron_deflection",
-            "convergence",
-            "precision",
-        )
-        if len(args) > 6:
-            if len(args) > 6 + len(legacy_tail):
-                raise TypeError("too many positional arguments for Numerics")
-            for name, value in zip(legacy_tail, args[6:], strict=False):
-                if name in kwargs:
-                    raise TypeError(f"multiple values for {name}")
-                kwargs[name] = value
-            args = args[:6]
-        overrides = dict(kwargs.pop("_physics_overrides", ()))
-        for name in PHYSICS_FIELDS:
-            if name in kwargs:
-                warn_api(f"Numerics({name}=)", stacklevel=3)
-                value = kwargs.pop(name)
-                overrides[name] = _emission_selection(value) if name == "emission" else value
-        if "convergence" in kwargs:
-            warn_api("Numerics(convergence=)", stacklevel=3)
-            old = kwargs.pop("convergence")
-            if "cxr_reflections" in kwargs and any(
-                getattr(kwargs["cxr_reflections"], f.name, None) != getattr(old, f.name, None)
-                for f in fields(CxrReflections)
-            ):
-                raise ValueError("conflicting convergence and cxr_reflections")
-            kwargs["cxr_reflections"] = old
-        kwargs["_physics_overrides"] = tuple(overrides.items())
-        original(self, *args, **kwargs)
-
-    _hide_compat_parameters(initialize, original)
-    cls.__init__ = initialize
-    for name in PHYSICS_FIELDS:
-        setattr(
-            cls,
-            name,
-            property(
-                lambda self, name=name: getattr(Physics(**dict(self._physics_overrides)), name)
-            ),
-        )
-    cls.convergence = property(lambda self: self.cxr_reflections)
-    return cls
-
-
-class Convergence(CxrReflections):
-    """Deprecated alias for :class:`CxrReflections`."""
-
-    def __init__(self, *args, **kwargs):
-        warn_api("Convergence", stacklevel=3)
-        super().__init__(*args, **kwargs)
-
-
-@_legacy_numerics
 @dataclass(frozen=True)
 class Numerics:
     """Control sampling, integration, CXR truncation, and execution.
@@ -350,11 +276,10 @@ class Numerics:
     ``max_dE_frac`` limits predicted fractional mean loss per row (zero disables
     substeps). ``transport_core`` chooses auto, lockstep, per-electron, or CUDA.
     ``energy_bins`` holds sampled true-photon energies; ``None`` uses catalog
-    defaults, or a deprecated detector grid during the compatibility window.
+    defaults.
     ``cxr_reflections`` controls reflection truncation and mosaic quadrature.
     ``precision`` requests adaptive sampling instead of the two fixed counts.
-    ``backend`` is deprecated: select ``PYRITE_MC_BACKEND`` before import.
-    Model keywords are deprecated forwarding to :class:`Physics`.
+    Select ``PYRITE_MC_BACKEND`` before import; models belong to :class:`Physics`.
     """
 
     cxr_trials: int = 450
@@ -362,17 +287,13 @@ class Numerics:
     cxr_chunk: int | None = None
     brem_chunk: int | None = None
     transport_core: str = "auto"
-    backend: str = "auto"
     energy_model: Literal["frozen", "midpoint"] = field(default="midpoint", kw_only=True)
     max_dE_frac: float = field(default=0.0, kw_only=True)
     cxr_reflections: CxrReflections = field(default_factory=CxrReflections, kw_only=True)
     precision: Precision | None = field(default=None, kw_only=True)
     energy_bins: EnergyBins | None = field(default=None, kw_only=True)
-    _physics_overrides: tuple[tuple[str, Any], ...] = field(default=(), repr=False, kw_only=True)
 
     def __post_init__(self) -> None:
-        if self.backend != "auto":
-            warn_api("Numerics(backend=)", stacklevel=5)
         if self.precision is not None:
             if not isinstance(self.precision, Precision):
                 raise TypeError("precision must be a Precision or None")
@@ -401,22 +322,13 @@ class Numerics:
             raise ValueError("max_dE_frac must be finite and non-negative")
         if self.max_dE_frac > 0.0 and self.energy_model != "midpoint":
             raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
-        if self._physics_overrides:
-            Physics(**dict(self._physics_overrides)).validate_transport(self.energy_model)
 
 
 def resolve_physics(physics: Physics | None, numerics: Numerics) -> Physics:
-    """Merge deprecated model keywords, rejecting contradictory new choices."""
+    """Resolve model defaults and validate transport integration."""
     if physics is not None and not isinstance(physics, Physics):
         raise TypeError("physics must be a Physics or None")
-    overrides = dict(numerics._physics_overrides)
-    if physics is not None:
-        for name, value in overrides.items():
-            if name == "emission":
-                value = _emission_selection(value)
-            if getattr(physics, name) != value:
-                raise ValueError(f"conflicting Numerics.{name} and Physics.{name}")
-    resolved = Physics(**overrides) if physics is None else physics
+    resolved = Physics() if physics is None else physics
     resolved.validate_transport(numerics.energy_model)
     return resolved
 

@@ -30,7 +30,7 @@ from pyrite.campaign.sweep import (
     sweep_cost_weights,
     target_flat_fields,
 )
-from pyrite.detectors import Detector, EnergyBins, Timepix3
+from pyrite.detectors import AngularAcceptance, Detector, EnergyBins, Timepix3
 from pyrite.energy_grid.encoding import decode_energy_grid
 from pyrite.energy_grid.floor import floored_lattice_start_eV
 from pyrite.materials import (
@@ -63,12 +63,8 @@ ALL = [
 ]
 
 
-def _detector(*, line=None, cxr_by_energy=None, brem=None, detector=None):
-    base = Detector() if detector is None else detector
-    return replace(
-        base,
-        energy_bins=EnergyBins(cxr=line, cxr_by_energy=cxr_by_energy, brem=brem),
-    )
+def _bins(*, line=None, cxr_by_energy=None, brem=None):
+    return EnergyBins(cxr=line, cxr_by_energy=cxr_by_energy, brem=brem)
 
 
 @pytest.mark.parametrize(
@@ -128,7 +124,7 @@ def test_build_cases_is_cartesian_product():
         beam=BeamSpec(energy_keV=[30, 45]),
         tilt_deg=[30, 10],
         tilt_azim_deg=[45],
-        detector=_detector(
+        energy_bins=_bins(
             line=np.arange(50.0, 100.0, 5.0),
             brem=np.arange(0.0, 1000.0, 100.0),
         ),
@@ -157,7 +153,7 @@ def test_standard_sweep_owns_ninety_degree_detector_and_builds_pi_over_two_case(
     case = build_cases(sweep)[0]
 
     assert sweep.detector.observation_angle_deg == 90.0
-    assert sweep.detector.energy_bins.cxr_by_energy is not None
+    assert sweep.energy_bins.cxr_by_energy is not None
     assert case["theta_obs_rad"] == pytest.approx(np.pi / 2.0)
 
 
@@ -172,7 +168,9 @@ def test_legacy_flat_detector_inputs_normalize_to_detector_and_cases():
     )
     case = build_cases(sweep)[0]
 
-    assert sweep.detector == Detector(119.0, 16.6, 0.066)
+    assert sweep.detector == Detector(
+        119.0, acceptance=AngularAcceptance(polar_deg=16.6, solid_angle_sr=0.066)
+    )
     assert case["theta_obs_rad"] == pytest.approx(np.deg2rad(119.0))
     assert case["dtheta_obs_rad"] == pytest.approx(np.deg2rad(16.6))
     assert case["domega_sr"] == pytest.approx(0.066)
@@ -188,7 +186,7 @@ def test_conflicting_nested_and_flat_detector_inputs_fail_actionably():
 
 
 def test_read_time_response_does_not_enter_case_construction():
-    active = Detector(119.0, 16.6, 0.066)
+    active = Detector(119.0, acceptance=AngularAcceptance(polar_deg=16.6, solid_angle_sr=0.066))
     scored = replace(active, response=Timepix3(thickness_um=500.0))
     base = Sweep(
         material="mose2",
@@ -220,7 +218,7 @@ def test_build_cases_selects_and_encodes_line_grid_for_each_beam_energy():
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=[30.0, 50.0]),
             tilt_deg=5.0,
-            detector=_detector(cxr_by_energy=grids, brem=75.0),
+            energy_bins=_bins(cxr_by_energy=grids, brem=75.0),
         )
     )
 
@@ -252,7 +250,7 @@ def test_fixed_line_grid_takes_precedence_over_per_beam_mapping():
         Sweep(
             material="mose2",
             beam=BeamSpec(energy_keV=[30.0, 50.0]),
-            detector=_detector(
+            energy_bins=_bins(
                 line=fixed,
                 cxr_by_energy={30.0: np.array([10.0]), 50.0: np.array([20.0])},
             ),
@@ -271,16 +269,16 @@ def test_material_sweep_grid_overrides_resolve_into_detector_bins():
         E_grid_brem=None,
     )
 
-    np.testing.assert_array_equal(sweep.detector.energy_bins.cxr, fixed)
-    assert sweep.detector.energy_bins.cxr_by_energy is None
-    assert sweep.detector.energy_bins.brem is None
+    np.testing.assert_array_equal(sweep.energy_bins.cxr, fixed)
+    assert sweep.energy_bins.cxr_by_energy is None
+    assert sweep.energy_bins.brem is None
 
 
 def test_dead_e_grid_alias_warns_and_routes_to_detector_bins():
     fixed = np.array([75.0, 78.0])
     with pytest.warns(DeprecationWarning, match="e_grid_eV is deprecated"):
         sweep = material_sweep("mose2", e_grid_eV=fixed)
-    np.testing.assert_array_equal(sweep.detector.energy_bins.cxr, fixed)
+    np.testing.assert_array_equal(sweep.energy_bins.cxr, fixed)
 
 
 def test_sweep_scene_has_no_energy_grid_fields():
@@ -300,7 +298,7 @@ def test_missing_per_beam_line_grid_resolves_automatically(monkeypatch):
         Sweep(
             material="mose2",
             beam=BeamSpec(energy_keV=[30.0, 50.0]),
-            detector=_detector(cxr_by_energy={30.0: np.array([10.0])}),
+            energy_bins=_bins(cxr_by_energy={30.0: np.array([10.0])}),
         )
     )
     by_energy = {float(case["E0_keV"]): case for case in cases}
@@ -317,7 +315,7 @@ def test_empty_per_beam_line_grid_resolves_automatically():
         Sweep(
             material="mose2",
             beam=BeamSpec(energy_keV=30.0),
-            detector=_detector(cxr_by_energy={}),
+            energy_bins=_bins(cxr_by_energy={}),
         )
     )[0]
     assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-nyquist"
@@ -336,7 +334,7 @@ def test_implicit_brem_grid_starts_at_lowest_per_beam_line_grid_start():
         Sweep(
             material="mose2",
             beam=BeamSpec(energy_keV=[30.0, 50.0]),
-            detector=_detector(
+            energy_bins=_bins(
                 cxr_by_energy={
                     30.0: np.array([25.0, 50.0]),
                     50.0: np.array([10.0, 50.0]),
@@ -363,7 +361,7 @@ def test_build_cases_quantizes_angles_symmetrically_and_removes_duplicates():
             tilt_azim_deg=[-1.24, -1.26, -1.25, -1.24],
             crystal_width_mm=None,
             crystal_height_mm=None,
-            detector=_detector(line=np.array([75.0]), brem=np.array([75.0])),
+            energy_bins=_bins(line=np.array([75.0]), brem=np.array([75.0])),
         )
     )
 
@@ -405,7 +403,7 @@ def test_build_cases_and_runner_preserve_exact_nonuniform_and_scalar_energy_grid
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=30.0),
             tilt_deg=5.0,
-            detector=_detector(line=cxr_grid, brem=brem_grid),
+            energy_bins=_bins(line=cxr_grid, brem=brem_grid),
         ),
         n_electrons=1,
         n_electrons_brem=1,
@@ -428,7 +426,7 @@ def test_build_cases_keeps_legacy_triples_for_uniform_energy_grids():
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=30.0),
             tilt_deg=5.0,
-            detector=_detector(
+            energy_bins=_bins(
                 line=np.arange(50.0, 100.0, 5.0),
                 brem=np.arange(0.0, 1000.0, 100.0),
             ),
@@ -452,7 +450,7 @@ def test_uniform_linspace_endpoint_grid_roundtrips_through_legacy_triple(monkeyp
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=30.0),
             tilt_deg=5.0,
-            detector=_detector(line=cxr_grid, brem=75.0),
+            energy_bins=_bins(line=cxr_grid, brem=75.0),
         ),
         n_electrons=1,
         n_electrons_brem=1,
@@ -482,7 +480,7 @@ def test_scalar_constant_and_near_uniform_energy_grids_stay_exact(monkeypatch, c
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=[30.0, 40.0]),
             tilt_deg=5.0,
-            detector=_detector(line=cxr_grid, brem=75.0),
+            energy_bins=_bins(line=cxr_grid, brem=75.0),
         ),
         n_electrons=1,
         n_electrons_brem=1,
@@ -612,7 +610,7 @@ def test_brem_grid_upper_limit_tracks_case_beam_energy():
         beam=BeamSpec(energy_keV=[25, 35]),
         tilt_deg=[10],
         tilt_azim_deg=[0],
-        detector=_detector(
+        energy_bins=_bins(
             line=np.arange(50.0, 100.0, 5.0),
             brem=np.arange(0.0, 60000.0, 5000.0),
         ),
@@ -669,7 +667,7 @@ def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcog
         beam=BeamSpec(energy_keV=30.0),
         tilt_deg=30.0,
         tilt_azim_deg=0.0,
-        detector=_detector(
+        energy_bins=_bins(
             line=np.arange(500.0, 520.0, 5.0),
             brem=np.arange(0.0, 1000.0, 100.0),
         ),
@@ -734,7 +732,7 @@ def test_oriented_materials_are_registered_as_symmetric_cuts(
         beam=BeamSpec(energy_keV=30.0),
         tilt_deg=30.0,
         tilt_azim_deg=0.0,
-        detector=_detector(
+        energy_bins=_bins(
             line=np.arange(500.0, 520.0, 5.0),
             brem=np.arange(0.0, 1000.0, 100.0),
         ),

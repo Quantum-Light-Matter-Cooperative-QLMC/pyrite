@@ -2379,15 +2379,9 @@ def test_repair_line_spec_from_config_targets_the_grid_build_cases_would_use(mon
     base_sweep = material_sweep("mos2")
     sweep = replace(
         base_sweep,
-        detector=replace(
-            base_sweep.detector,
-            energy_bins=replace(
-                base_sweep.detector.energy_bins,
-                cxr_by_energy={stored_keV: stored_grid},
-            ),
-        ),
+        energy_bins=replace(base_sweep.energy_bins, cxr_by_energy={stored_keV: stored_grid}),
     )
-    cxr_by_energy = sweep.detector.energy_bins.cxr_by_energy
+    cxr_by_energy = sweep.energy_bins.cxr_by_energy
     assert stored_keV in cxr_by_energy and auto_keV not in cxr_by_energy
 
     # what building this material from config would put on each case
@@ -2699,7 +2693,7 @@ def test_rebrem_retunes_onto_a_graded_profile_grid(monkeypatch, tmp_path):
         energy_bins = _Bins()
 
     class _Sweep:
-        detector = _Detector()
+        energy_bins = _Bins()
 
     monkeypatch.setattr("pyrite.checkpoints.recompute_defaults.sweep", lambda *a, **k: _Sweep())
     calls = []
@@ -2730,7 +2724,7 @@ def test_rebrem_keeps_the_uniform_triple_for_a_uniform_profile_grid(monkeypatch,
         energy_bins = _Bins()
 
     class _Sweep:
-        detector = _Detector()
+        energy_bins = _Bins()
 
     monkeypatch.setattr("pyrite.checkpoints.recompute_defaults.sweep", lambda *a, **k: _Sweep())
     calls = []

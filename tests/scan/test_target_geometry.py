@@ -392,14 +392,13 @@ def test_build_cases_reads_mosaic_from_the_target():
     assert on["mosaic_fwhm_rad"] == pytest.approx(np.deg2rad(0.8))
 
 
-def test_omitted_footprint_warns_and_keeps_the_historical_default():
-    """Issue #451: footprint is required; None stays the explicit infinite slab."""
-    with pytest.warns(DeprecationWarning, match=r"Slab\(\) without footprint="):
-        slab = Slab(MATERIAL)
-    assert slab.footprint == Footprint(5.0, 5.0)
-    with pytest.warns(DeprecationWarning, match=r"Stack\(\) without footprint="):
-        stack = Stack.on_substrate(MATERIAL, 1e3, "si")
-    assert stack.footprint == Footprint(5.0, 5.0)
-    with pytest.warns(DeprecationWarning, match=r"Stack\(\) without footprint="):
+def test_footprint_is_required_and_none_keeps_infinite_extent():
+    with pytest.raises(TypeError, match="footprint"):
+        Slab(MATERIAL)
+    with pytest.raises(TypeError, match="missing 1 required keyword-only argument: 'footprint'"):
+        Stack.on_substrate(MATERIAL, 1e3, "si")
+    stack = Stack.on_substrate(MATERIAL, 1e3, "si", footprint=None)
+    with pytest.raises(TypeError, match="footprint"):
         Stack(layers=stack.layers)
+    assert stack.footprint is None
     assert Slab(MATERIAL, footprint=None).footprint is None

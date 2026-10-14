@@ -555,6 +555,15 @@ def physical_detector_row(profile):
     return physical
 
 
+def _scalar_detector(values):
+    """Build the scalar ``Detector`` a legacy detector row resolves to."""
+    angle = values.get("observation_angle_deg")
+    return Detector(
+        **({} if angle is None else {"observation_angle_deg": angle}),
+        _legacy_acceptance=(values.get("polar_acceptance_deg"), values.get("solid_angle_sr")),
+    )
+
+
 def profile_payload(document, name):
     profile = existing_profile(document, name)
     overrides = profile_overrides(profile)
@@ -574,9 +583,7 @@ def profile_payload(document, name):
     elif not isinstance(raw_detector, dict):
         raw_detector = {}
     active_detector_keys = {key for key, _label, _unit in ACTIVE_DETECTOR_FIELDS}
-    detector = Detector(
-        **{key: value for key, value in raw_detector.items() if key in active_detector_keys}
-    )
+    detector = _scalar_detector(raw_detector)
     filters = [
         dict(row.unwrap() if hasattr(row, "unwrap") else row) for row in filter_rows(profile)
     ]
@@ -625,9 +632,7 @@ def profile_payload(document, name):
                 "acceptance": {key: getattr(projection, key) for key in active_detector_keys},
             }
         else:
-            resolved = Detector(
-                **{key: value for key, value in values.items() if key in active_detector_keys}
-            )
+            resolved = _scalar_detector(values)
             detector_collection[detector_id] = {
                 "kind": "scalar",
                 "reference": reference,

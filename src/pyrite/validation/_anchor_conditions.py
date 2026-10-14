@@ -303,7 +303,8 @@ def _resolved_case(
         crystal_width_mm=None,
         crystal_height_mm=None,
         allow_normal_incidence=polar_tilt_deg == 0.0,
-        detector=replace(detector, energy_bins=EnergyBins(cxr=E_grid, brem=E_grid)),
+        detector=detector,
+        energy_bins=EnergyBins(cxr=E_grid, brem=E_grid),
     )
     case = build_cases(sweep, n_electrons=ne, n_electrons_brem=ne_brem)[0]
     # Literature anchors may intentionally pin a narrower reflection set or

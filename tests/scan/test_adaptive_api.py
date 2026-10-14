@@ -24,6 +24,7 @@ def scene():
         pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
         pr.Slab("hopg", thickness_ang=1e4, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         pr.Detector(),
+        physics=pr.Physics(bremsstrahlung_model="eedl"),
     )
 
 
@@ -34,9 +35,7 @@ def precision():
 
 @pytest.fixture
 def numerics(precision):
-    return pr.Numerics(
-        precision=precision, bremsstrahlung_model="eedl", transport_core="per-electron"
-    )
+    return pr.Numerics(precision=precision, transport_core="per-electron")
 
 
 def test_precision_roundtrips_json_and_process_pickle(precision):
@@ -157,7 +156,7 @@ def test_early_stop_preserves_requested_case_and_matches_realized_fixed_n(scene,
         min_effective_electrons=0.0,
         stability_blocks=0,
     )
-    case = api.build_case(scene, pr.Numerics(precision=precision, bremsstrahlung_model="eedl"))
+    case = api.build_case(scene, pr.Numerics(precision=precision))
     key = case_content_key(case)
     if split:
         output = runner._spectrum_case(
@@ -252,7 +251,9 @@ def test_unsupported_routes_fail_before_transport(scene, numerics, monkeypatch):
     with pytest.raises(ValueError, match="observation directions"):
         runner.run_case_directions(case, [[0.0, 0.0, 1.0]])
     with pytest.raises(ValueError, match="coherent"):
-        api.build_case(replace(scene, emission="coherent"), numerics)
+        api.build_case(
+            replace(scene, physics=replace(scene.physics, emission="coherent")), numerics
+        )
 
 
 def test_adaptive_case_rejects_count_mismatch(scene, numerics):
@@ -262,9 +263,7 @@ def test_adaptive_case_rejects_count_mismatch(scene, numerics):
 
 
 def test_pre_precision_case_pickle_state_keeps_manual_controls(scene):
-    case = api.build_case(
-        scene, pr.Numerics(cxr_trials=8, brem_trials=4, bremsstrahlung_model="eedl")
-    )
+    case = api.build_case(scene, pr.Numerics(cxr_trials=8, brem_trials=4))
     case = replace(case, E_cut_lines_keV=7.0, E_cut_brem_keV=2.0, brem_step_eV=100.0)
     # Frozen/slotted dataclasses pickle a positional list of field values.
     # Precision was appended after all existing fields, so old state is a prefix.
@@ -306,10 +305,8 @@ def test_mixed_cpu_pool_preserves_fixed_case_and_adaptive_provenance(scene, monk
     precision = pr.Precision(
         1.0, 40, 200, 20, max_electron_share=1.0, min_effective_electrons=0.0, stability_blocks=0
     )
-    adaptive = api.build_case(scene, pr.Numerics(precision=precision, bremsstrahlung_model="eedl"))
-    fixed = api.build_case(
-        scene, pr.Numerics(cxr_trials=8, brem_trials=4, bremsstrahlung_model="eedl")
-    )
+    adaptive = api.build_case(scene, pr.Numerics(precision=precision))
+    fixed = api.build_case(scene, pr.Numerics(cxr_trials=8, brem_trials=4))
     expected_fixed = runner.run_cases([fixed], max_workers=1, progress=False, engine="cpu")[0]
     expected_adaptive = runner.run_case(adaptive, transport_core="per-electron")
     outputs = runner.run_cases([adaptive, fixed], max_workers=1, progress=False, engine="cpu")

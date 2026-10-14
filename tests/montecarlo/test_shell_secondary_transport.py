@@ -426,13 +426,14 @@ def test_case_threshold_reaches_runner_transport():
     from pyrite.detectors import EnergyBins
     from pyrite.montecarlo.runner import _transport_case
 
-    detector = pr.Detector(
-        energy_bins=EnergyBins(cxr=np.linspace(1500, 2000, 20), brem=np.linspace(1500, 9000, 20))
-    )
+    detector = pr.Detector()
     numerics = pr.Numerics(
         cxr_trials=8,
         brem_trials=8,
         energy_model="midpoint",
+        energy_bins=EnergyBins(cxr=np.linspace(1500, 2000, 20), brem=np.linspace(1500, 9000, 20)),
+    )
+    physics = pr.Physics(
         inelastic_model="shell-soft-hard",
         inelastic_cutoff_eV=50.0,
         secondary_threshold_eV=1000.0,
@@ -440,8 +441,9 @@ def test_case_threshold_reaches_runner_transport():
     )
     scene = pr.Scene(
         pr.Beam(energy_keV=20.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("silicon", thickness_ang=5.0e4, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Slab("silicon", thickness_ang=50000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         detector,
+        physics=physics,
     )
     case = api.build_case(scene, numerics)
     assert case["secondary_threshold_eV"] == 1000.0

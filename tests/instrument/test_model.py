@@ -130,29 +130,22 @@ def test_pixel_scorer_requires_physical_pixels_and_bounded_angular_shape() -> No
     assert pr.PlanarDetector(pr.PlanarPose((0.0, 0.0, 100.0)), size_mm=(1.0, 1.0)).scorer is None
 
 
-def test_loose_pixel_scorer_is_deprecated_and_moves_onto_the_detector() -> None:
-    """Issue #451: the scorer belongs to the pixel detector it scores."""
-    scorer = pr.PixelScorer((2, 2))
-    with pytest.warns(DeprecationWarning, match=r"Scene\(pixel_scorer=\) is deprecated"):
-        scene = pr.Scene(
-            beam=pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-            target=pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+def test_loose_pixel_scorer_is_removed() -> None:
+    scene = _scene()
+    with pytest.raises(TypeError, match="pixel_scorer"):
+        pr.Scene(
+            beam=scene.beam,
+            target=scene.target,
             detector=_detector(),
-            pixel_scorer=scorer,
+            pixel_scorer=pr.PixelScorer(),
         )
-    assert scene.detector == _detector(scorer) and scene.pixel_scorer is None
-    with pytest.raises(ValueError, match="conflicts with PlanarDetector.scorer"):
-        with pytest.warns(DeprecationWarning):
-            pr.Scene(
-                beam=scene.beam,
-                target=scene.target,
-                detector=_detector(pr.PixelScorer((1, 2))),
-                pixel_scorer=scorer,
-            )
+    with pytest.raises(TypeError, match="pixel_scorer"):
+        pr.simulate(scene.beam, scene.target, _detector(), pixel_scorer=pr.PixelScorer())
+    assert _detector(pr.PixelScorer((2, 2))).scorer == pr.PixelScorer((2, 2))
 
 
-def test_numerics_backend_is_deprecated() -> None:
-    with pytest.warns(DeprecationWarning, match=r"Numerics\(backend=\).*PYRITE_MC_BACKEND"):
+def test_numerics_backend_is_removed() -> None:
+    with pytest.raises(TypeError, match="backend"):
         pr.Numerics(backend="cpu")
 
 

@@ -11,7 +11,7 @@ from pyrite.campaign.legacy import (
     analysis_from_legacy,
     numerics_from_legacy,
 )
-from pyrite.campaign.model import Analysis, Convergence, Numerics, Scene, Sweep
+from pyrite.campaign.model import Analysis, CxrReflections, Numerics, Scene, Sweep
 from pyrite.campaign.sweep import BeamSpec
 from pyrite.campaign.sweep import build_cases as build_legacy_cases
 from pyrite.detectors import Detector
@@ -78,11 +78,11 @@ def test_axis_paths_fail_at_construction(path: str, message: str) -> None:
 
 
 def test_object_defaults_are_separate_by_lifetime() -> None:
-    numerics = Numerics(convergence=Convergence(max_reflections=4))
+    numerics = Numerics(cxr_reflections=CxrReflections(max_reflections=4))
     analysis = Analysis()
 
     assert numerics.cxr_trials == 450
-    assert numerics.convergence.max_reflections == 4
+    assert numerics.cxr_reflections.max_reflections == 4
     assert analysis.convolve_with_det is False
 
 
@@ -100,7 +100,7 @@ def test_legacy_pair_distributes_settings_and_swept_scene_fields() -> None:
     sweep = adapt_configured_sweep(old, settings)
 
     assert len(sweep.expand()) == 4
-    assert sweep.base.emission == "both"
+    assert sweep.base.physics.emission_policy == "both"
     assert numerics_from_legacy(old, settings).cxr_trials == 12
     assert analysis_from_legacy(settings).beam_current_na == settings.beam_current_na
 

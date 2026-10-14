@@ -318,6 +318,11 @@ detector = pr.Detector(
 )
 ```
 
+Historical proposal below: grid ownership was superseded by #452. Sampled
+true-photon grids now belong to `Numerics.energy_bins`; detector forwarding
+was removed in 0.14.0. #490 also retired persistent derivation batch defaults;
+ordinary runs retain automatic sizing and optional explicit artifacts.
+
 Two structural consequences:
 
 * `DetectorSpec`'s currently inert fields either become live through the `response` object or are deleted. An inert field that never becomes live is a liability in a hashed payload.

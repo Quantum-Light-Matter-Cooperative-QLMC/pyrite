@@ -9,6 +9,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from pyrite.detectors import AngularAcceptance
+
 
 def test_public_schema_types_keep_catalog_pickle_identity():
     from pyrite.materials import MaterialValidationSpec
@@ -105,10 +107,10 @@ def test_per_beam_line_grids_are_exact_read_only_and_projected(tmp_path, monkeyp
     trajectory = config.trajectory_sweep("sample")
     assert grid["E_grid_line"] is None
     assert grid["E_grid_line_by_energy"] is scan.E_grid_line_by_energy
-    assert sweep.detector.energy_bins.cxr is None
-    assert sweep.detector.energy_bins.cxr_by_energy is scan.E_grid_line_by_energy
-    assert trajectory.detector.energy_bins.cxr is None
-    assert trajectory.detector.energy_bins.cxr_by_energy is scan.E_grid_line_by_energy
+    assert sweep.energy_bins.cxr is None
+    assert sweep.energy_bins.cxr_by_energy is scan.E_grid_line_by_energy
+    assert trajectory.energy_bins.cxr is None
+    assert trajectory.energy_bins.cxr_by_energy is scan.E_grid_line_by_energy
 
 
 def test_fixed_material_line_grid_overrides_profile_mapping(tmp_path):
@@ -845,7 +847,9 @@ crystal = "mos2"
     assert dict(ref_catalog.detectors["eds"]) == expected_spec
     assert ref_catalog.detector_labels["eds"] == "SEM EDS"
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": ref_catalog)
-    assert config.catalog_detector("standard") == Detector(119.0, 16.6, 0.066)
+    assert config.catalog_detector("standard") == Detector(
+        119.0, acceptance=AngularAcceptance(polar_deg=16.6, solid_angle_sr=0.066)
+    )
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": ref_catalog)
     ref_sweep = config.material_sweep("mos2")
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": inline_catalog)
@@ -938,10 +942,9 @@ def test_named_beam_renaming_does_not_change_resolved_payload(tmp_path):
 def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
     tmp_path, monkeypatch
 ):
-    from dataclasses import replace
 
     from pyrite.campaign import config
-    from pyrite.detectors import Detector, EnergyBins
+    from pyrite.detectors import Detector
     from pyrite.materials import load_material_catalog
 
     text = (
@@ -959,23 +962,27 @@ def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
     catalog = load_material_catalog(path, profile="narrowed")
 
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": catalog)
-    assert config.catalog_detector("standard") == Detector(91.0, 12.0, 0.05)
-    selected = Detector(119.0, 16.6, 0.066)
+    assert config.catalog_detector("standard") == Detector(
+        91.0, acceptance=AngularAcceptance(polar_deg=12.0, solid_angle_sr=0.05)
+    )
+    selected = Detector(119.0, acceptance=AngularAcceptance(polar_deg=16.6, solid_angle_sr=0.066))
     assert config.catalog_detector("narrowed") == selected
 
     profiled = config.material_sweep("mos2", catalog_profile="narrowed")
     explicit = config.material_sweep(
         "mos2",
         catalog_profile="narrowed",
-        detector=Detector(100.0, 8.0, 0.01),
+        detector=Detector(100.0, acceptance=AngularAcceptance(polar_deg=8.0, solid_angle_sr=0.01)),
     )
-    assert replace(profiled.detector, energy_bins=EnergyBins()) == selected
+    assert profiled.detector == selected
     source_density = np.array([1.0, 2.0, 3.0])
     assert np.array_equal(
         profiled.detector.score(np.array([100.0, 200.0, 300.0]), source_density),
         source_density,
     )
-    assert replace(explicit.detector, energy_bins=EnergyBins()) == Detector(100.0, 8.0, 0.01)
+    assert explicit.detector == Detector(
+        100.0, acceptance=AngularAcceptance(polar_deg=8.0, solid_angle_sr=0.01)
+    )
 
 
 def test_profile_detector_omission_uses_code_default(tmp_path, monkeypatch):
@@ -1050,14 +1057,22 @@ crystal = "mos2"
 def test_catalog_detector_bounds_match_the_detector_dataclass(tmp_path, field, value):
     """The catalog no longer builds a Detector, so its ranges are a copy.
 
-    Hold the copy to the original: every value the dataclass rejects must be
+    Hold the legacy catalog adapter to the original: every value it rejects must be
     rejected at catalog-load time with the same message, on the block's path.
     """
     from pyrite.detectors import Detector
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
     with pytest.raises((TypeError, ValueError)) as dataclass_error:
-        Detector(**{field: value})
+        if field == "observation_angle_deg":
+            Detector(observation_angle_deg=value)
+        else:
+            Detector(
+                _legacy_acceptance=(
+                    value if field == "polar_acceptance_deg" else None,
+                    value if field == "solid_angle_sr" else None,
+                )
+            )
 
     text = (
         _minimal_catalog(

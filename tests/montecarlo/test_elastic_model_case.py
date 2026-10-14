@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from pyrite._numerics import Numerics
+from pyrite._numerics import Physics
 from pyrite.materials import CATALOG
 from pyrite.montecarlo.runner.case_tables import (
     _case_elastic_kwargs,
@@ -14,11 +14,11 @@ from pyrite.montecarlo.runner.case_tables import (
 )
 
 
-def test_numerics_accepts_only_known_elastic_models():
-    assert Numerics().elastic_model == "elsepa"
-    assert Numerics(elastic_model="mott").elastic_model == "mott"
+def test_physics_accepts_only_known_elastic_models():
+    assert Physics().elastic_model == "elsepa"
+    assert Physics(elastic_model="mott").elastic_model == "mott"
     with pytest.raises(ValueError, match="elastic_model"):
-        Numerics(elastic_model="sr")  # type: ignore[arg-type]
+        Physics(elastic_model="sr")  # type: ignore[arg-type]
 
 
 def test_mott_cases_name_mott_and_resolve_no_elastic_tables():
