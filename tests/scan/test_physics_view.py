@@ -235,3 +235,14 @@ def test_descriptors_inventory_existing_native_restrictions():
     )
     positron = BUILTIN_DESCRIPTORS.get("transport.positron", "positron")
     assert "no Mott positron model" in positron.requirements
+
+
+def test_historical_mapping_omissions_survive_descriptive_provenance(baseline_cases):
+    payload = baseline_cases["legacy"]["case"]
+    for field in ("crystal_width_mm", "crystal_height_mm", "beam_fwhm_mm", "surface_hkl"):
+        payload.pop(field)
+    view = resolved_physics_view(payload, table_markers={})
+    assert view.parameters == payload
+    assert "transport.elastic/mott" in view.descriptor_ids
+    assert "emission.continuum/eedl" in view.descriptor_ids
+    assert "crystal_width_mm" not in view.parameters

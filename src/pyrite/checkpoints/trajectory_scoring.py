@@ -61,13 +61,14 @@ def plan_stems(paths: Iterable[Path]) -> dict[str, StemPlan]:
         An artifact cannot feed the spectrum phase, records no run identity,
         disagrees with another artifact of its stem, or duplicates a case.
     """
-    from ..montecarlo.runner.artifacts import STREAM_REFUSED_KEYS
+    from ..montecarlo.runner.artifacts import STREAM_REFUSED_KEYS, _check_physics_provenance
 
     plans: dict[str, StemPlan] = {}
     seen: dict[tuple[str, str, float], Path] = {}
     for path in paths:
         artifact = read_trajectory_artifact(path, load_transport=False)
         artifact_spectrum_inputs(artifact)
+        _check_physics_provenance(artifact)
         for key in STREAM_REFUSED_KEYS:
             if artifact.case.get(key):
                 raise TrajectoryArtifactError(

@@ -501,6 +501,9 @@ def _transport_case(
         diagnostic_grid=diagnostic_grid_result,
     )
     if trajectory_capture is not None:
+        from ..._physics_provenance import resolved_physics_view
+        from .case_tables import case_table_markers
+
         # Read-only snapshot of exactly what the spectrum phase consumes, so a
         # later spectrum_from_artifact replays it without re-transporting.
         trajectory_capture.write(
@@ -514,6 +517,9 @@ def _transport_case(
                 "beam_dir": beam,
                 "n_hat": n_hat,
                 "stopping_tables": stopping_tables is not None,
+                "resolved_physics": resolved_physics_view(
+                    case, table_markers=case_table_markers(case)
+                ).to_json(),
             },
             spectrum_inputs=spectrum_inputs,
         )

@@ -32,7 +32,7 @@ class Provenance(Mapping[str, Any]):
         :attr:`true_spatial_digest`, :attr:`response_digest`,
         :attr:`acquisition_digest`.
     Physics models
-        :attr:`stopping_model`, :attr:`characteristic_model`,
+        :attr:`resolved_physics`, :attr:`stopping_model`, :attr:`characteristic_model`,
         :attr:`attenuation_model`, :attr:`bremsstrahlung_model`.
     Run diagnostics
         :attr:`kinematic_validity`, :attr:`adaptive_sampling`,
@@ -67,6 +67,10 @@ class Provenance(Mapping[str, Any]):
     """Acquisitions only: digest of the exposure/bins/counting layer."""
 
     # Physics models
+    resolved_physics: Mapping[str, Any] | None = None
+    """Data-only descriptor, generation, parameter and per-case table snapshot.
+    Descriptive metadata; source and observation digests remain authoritative.
+    """
     stopping_model: str | None = None
     """Collision-stopping model marker, e.g. ``"sbethe-corrected-v1"``."""
     characteristic_model: str | None = None

@@ -223,6 +223,7 @@ def _checked_case_and_inputs(artifact, case):
             f"trajectory artifact {artifact.path} records a different case than requested"
         )
     case = stored
+    _check_physics_provenance(artifact)
     E_grid, E_brem, _beam, n_hat, groove = _case_geometry(case)
     expected: dict[str, Any] = {
         "E_brem": E_brem,
@@ -240,6 +241,40 @@ def _checked_case_and_inputs(artifact, case):
                 "its case; it was written by an incompatible PyRITE version"
             )
     return case, inputs
+
+
+def _check_physics_provenance(artifact) -> None:
+    """Optional model/data check shared with batch planning before any writes."""
+    snapshot = artifact.settings.get("resolved_physics")
+    if snapshot is not None:
+        from ..._physics_contract import ResolvedPhysicsView
+        from ..._physics_provenance import resolved_physics_view
+        from .case_tables import case_table_markers
+
+        try:
+            recorded = ResolvedPhysicsView.from_json(snapshot)
+            current = resolved_physics_view(
+                artifact.case, table_markers=case_table_markers(artifact.case)
+            )
+        except (ValueError, TypeError, KeyError, OSError) as error:
+            raise TrajectoryArtifactError(
+                f"trajectory artifact {artifact.path} physics provenance cannot be verified: {error}"
+            ) from error
+        if (
+            recorded.descriptor_ids,
+            recorded.model_markers,
+            recorded.table_markers,
+            recorded.parameters_json,
+        ) != (
+            current.descriptor_ids,
+            current.model_markers,
+            current.table_markers,
+            current.parameters_json,
+        ):
+            raise TrajectoryArtifactError(
+                f"trajectory artifact {artifact.path} physics model or table identity changed; "
+                "capture new trajectories before replay"
+            )
 
 
 def _same_input(actual, expected) -> bool:

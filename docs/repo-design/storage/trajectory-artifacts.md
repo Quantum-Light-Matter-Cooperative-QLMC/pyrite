@@ -64,4 +64,17 @@ Host and device-resident captures both read back equal to the transported arrays
 
 ## Compatibility
 
+New runner captures record a data-only resolved physics view in
+`settings.resolved_physics`: descriptor IDs, model-generation markers, original
+case parameters, and per-case consumed-table digests. Full and bounded spectrum
+replay compare this snapshot with current resolution before scoring. Changed
+models or table digests require new trajectories. Backend diagnostics and
+descriptor documentation are outside this comparison.
+
+Captures without this optional snapshot retain their historical replay checks;
+readers do not populate omitted selectors with current defaults or infer past
+table inventories. Geometry-only reading and export remain available regardless
+of current model or table availability. The snapshot does not change the case
+digest or the HDF5 schema version.
+
 Readers accept schemas 1 to 3. Schema-2 files keep their plain row datasets and have no `/electron_index`. Selection and streaming then fall back to bisection and boundary scans, and give the same selections and blocks. `tests/data/trajectory_artifacts/schema2_hopg_lockstep.h5` is a genuine schema-2 capture. The tests check that it replays bit for bit, both directly and after being rewritten as schema 3. `tests/helpers/trajectory_schema.py` rewrites any new artifact into the schema-1 or schema-2 layout for compatibility tests.

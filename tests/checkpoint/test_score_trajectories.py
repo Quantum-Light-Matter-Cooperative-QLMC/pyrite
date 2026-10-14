@@ -57,6 +57,34 @@ def _captured_run(tmp_path, cases=None, identity=_IDENTITY):
     return cases, capture, results
 
 
+def test_changed_physics_in_later_artifact_is_refused_before_any_write(tmp_path, monkeypatch):
+    from pyrite.campaign.physics_view import resolved_physics_view
+    from pyrite.montecarlo.runner import case_tables
+    from pyrite.montecarlo.trajectories import read_trajectory_artifact, write_trajectory_artifact
+    from tests.helpers.trajectory_schema import SCHEMA2_FIXTURE
+
+    legacy = read_trajectory_artifact(SCHEMA2_FIXTURE)
+    source = tmp_path / "captured"
+    source.mkdir()
+    for index, digest in enumerate(("a" * 64, "b" * 64)):
+        case = {**legacy.case, "name": f"case-{index}"}
+        view = resolved_physics_view(case, table_markers={"selected": digest})
+        write_trajectory_artifact(
+            source / f"{index}.h5",
+            legacy.transport,
+            case=case,
+            spectrum_inputs=legacy.spectrum_inputs,
+            settings={"resolved_physics": view.to_json()},
+            provenance={"checkpoint_stem": "hopg", "dataset_identity": _IDENTITY},
+        )
+    monkeypatch.setattr(case_tables, "case_table_markers", lambda case: {"selected": "a" * 64})
+    destination = tmp_path / "scored"
+    result = invoke(score_command, [str(source), "--checkpoint-dir", str(destination)])
+    assert result.exit_code != 0
+    assert "physics model or table identity changed" in result.output
+    assert not destination.exists()
+
+
 def _assert_scored_like(scored, live, cases):
     for case in cases:
         record, reference = scored[case["name"]][case["E0_keV"]], live[case["name"]][case["E0_keV"]]

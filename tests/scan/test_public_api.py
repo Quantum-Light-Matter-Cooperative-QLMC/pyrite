@@ -1,3 +1,4 @@
+import json
 from dataclasses import replace
 
 import numpy as np
@@ -77,6 +78,12 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
     assert result.provenance["kinematic_validity"]["reflections"]
     assert "kinematic_validity" not in result.case
     assert result.provenance["xsgen_tables"]
+    from pyrite._physics_contract import ResolvedPhysicsView
+    from pyrite.campaign.profiles import _jsonable
+
+    view = ResolvedPhysicsView.from_json(json.dumps(result.provenance.resolved_physics))
+    assert dict(view.table_markers) == result.provenance.xsgen_tables
+    assert view.parameters == _jsonable(dict(result.case))
     assert result.provenance["identity_digest"] == api.case_content_key(
         result.case,
         xsgen_tables=result.provenance["xsgen_tables"],
@@ -142,8 +149,9 @@ def test_build_sweep_cases_remains_public_from_api():
 
 def test_run_provenance_records_git_state_in_repo_and_null_outside(monkeypatch, tmp_path) -> None:
     from pyrite import api
+    from tests.helpers.physics_baseline import resolved_baseline
 
-    case = {}
+    case = resolved_baseline("legacy")["case"]
     monkeypatch.setattr(api, "case_kinematic_validity", lambda _case: {})
     monkeypatch.setattr(api, "case_bremsstrahlung_marker", lambda _case: "x")
 

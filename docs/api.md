@@ -161,6 +161,10 @@ grids as a long polars frame. `Result.provenance` is a typed, read-only
 `Provenance` mapping: inputs (`scene`, `numerics`), content identity, physics-model
 markers, run diagnostics, and backend/device/version environment; see
 [Interpret the result](guides/python-api-workflow.md#interpret-the-result).
+`provenance.resolved_physics` records the resolved in-tree descriptor IDs,
+model-generation markers, parameters, and per-case table digests. It is
+descriptive metadata: adding a descriptor does not change source or observation
+identity, and capability declarations do not certify a physical validation domain.
 The high-level API
 does not accept an external brem array: `none` and `external` return zeros on
 the resolved continuum grid.

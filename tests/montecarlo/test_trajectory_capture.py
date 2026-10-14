@@ -777,6 +777,51 @@ def _captured(tmp_path):
     return case, capture.path_for(case)
 
 
+@pytest.mark.parametrize("change", ["table", "model"])
+def test_replay_refuses_changed_physics_before_scoring(tmp_path, monkeypatch, change):
+    from dataclasses import replace
+
+    from pyrite.campaign.physics_view import resolved_physics_view
+    from pyrite.montecarlo.runner import case_tables
+
+    legacy = read_trajectory_artifact(SCHEMA2_FIXTURE)
+    markers = {"consumed-table": "a" * 64}
+    view = resolved_physics_view(legacy.case, table_markers=markers)
+    if change == "model":
+        view = replace(view, model_markers=((*view.model_markers, ("future_model", "v2"))))
+    path = tmp_path / "with-physics.h5"
+    write_trajectory_artifact(
+        path,
+        legacy.transport,
+        case=legacy.case,
+        settings={"resolved_physics": view.to_json()},
+        spectrum_inputs=legacy.spectrum_inputs,
+    )
+    current_markers = {"consumed-table": "b" * 64} if change == "table" else markers
+    monkeypatch.setattr(case_tables, "case_table_markers", lambda case: current_markers)
+    monkeypatch.setattr(
+        runner, "_spectrum_case", lambda *a: pytest.fail("must refuse before scoring")
+    )
+    with pytest.raises(TrajectoryArtifactError, match="physics model or table identity changed"):
+        runner.spectrum_from_artifact(read_trajectory_artifact(path))
+    with pytest.raises(TrajectoryArtifactError, match="physics model or table identity changed"):
+        runner.stream_spectrum_from_artifact(path)
+
+
+def test_legacy_capture_without_physics_snapshot_does_not_resolve_current_tables(monkeypatch):
+    from pyrite.montecarlo.runner import artifacts, case_tables
+
+    legacy = read_trajectory_artifact(SCHEMA2_FIXTURE)
+    assert "resolved_physics" not in legacy.settings
+    monkeypatch.setattr(
+        case_tables,
+        "case_table_markers",
+        lambda case: pytest.fail("legacy replay must retain its historical contract"),
+    )
+    case, _ = artifacts._checked_case_and_inputs(legacy, None)
+    assert case == legacy.case
+
+
 def test_schema_1_artifacts_stay_readable_but_cannot_feed_spectra(tmp_path):
     case, path = _captured(tmp_path)
     downgrade(path, 1)
