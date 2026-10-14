@@ -339,6 +339,12 @@ def _transport_case(
 
     Validation: grazing-beam-projection
     """
+    from .emission_adapters import select_emission
+
+    # Resolve data-only selectors in this process before transport/capture. A
+    # worker reconstructs adapters locally; no callable or device state travels
+    # in the case payload.
+    select_emission(case)
     if case.get("adaptive_precision") is not None:
         return _adaptive.transport_requested_precision(
             case,
@@ -753,18 +759,25 @@ def _cxr_for_case(case, E_grid, *, coherent=None):
     spectrum phases factored out so :func:`pyrite.runs.run.repair_cxr_spec`
     (``pyrite reline``) reuses the EXACT live-sweep line path rather than
     re-deriving it by hand."""
+    from .emission_adapters import EmissionBatch, select_emission
+
+    emission = select_emission(case)
     segs, _E_brem, n_hat, abs_layers, groove = _transport_cxr_for_case(case, E_grid)
     segs = _segments_on_device(segs)
-    return _cxr_for_segments(
-        segs,
-        E_grid,
-        case,
-        n_hat,
-        abs_layers,
-        groove,
-        coherent=coherent,
-        Ne=case["Ne"],
-    )
+    coherent = bool(case.get("coherent_emission")) if coherent is None else coherent
+    return emission.cxr.evaluate(
+        EmissionBatch(
+            segs,
+            E_grid,
+            case,
+            n_hat,
+            abs_layers,
+            groove,
+            coherent=coherent,
+            electron_limit=case["Ne"],
+        ),
+        "spec_coherent" if coherent else "spec",
+    ).values
 
 
 def _cxr_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=False):
@@ -776,49 +789,38 @@ def _cxr_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=Fal
     Returns ``(spec, spec_coherent_or_None)``, both PXR/CBS only. With
     ``return_characteristic=True``, append the separate characteristic
     component as a third item."""
+    from dataclasses import replace
+
+    from .emission_adapters import EmissionBatch, select_emission
+
+    emission = select_emission(case)
     segs, _E_brem, n_hat, abs_layers, groove = _transport_cxr_for_case(case, E_grid)
     # Both kernels read the same segments; stage one device copy as the live
     # sweep does rather than uploading the pair separately.
     segs = _segments_on_device(segs)
     Ne_lines = case["Ne"]
     table_cache = {}
-    spec = _cxr_for_segments(
+    batch = EmissionBatch(
         segs,
         E_grid,
         case,
         n_hat,
         abs_layers,
         groove,
-        coherent=False,
-        Ne=Ne_lines,
+        electron_limit=Ne_lines,
         table_cache=table_cache,
     )
+    spec = emission.cxr.evaluate(batch, "spec").values
     spec_coherent = (
-        _cxr_for_segments(
-            segs,
-            E_grid,
-            case,
-            n_hat,
-            abs_layers,
-            groove,
-            coherent=True,
-            Ne=Ne_lines,
-            table_cache=table_cache,
-        )
+        emission.cxr.evaluate(replace(batch, coherent=True), "spec_coherent").values
         if want_coherent
         else None
     )
     if not return_characteristic:
         return spec, spec_coherent
-    characteristic = _characteristic_from_segments(
-        segs,
-        E_grid,
-        case,
-        n_hat,
-        abs_layers,
-        groove=groove,
-        Ne=case["Ne_brem"],
-    )
+    characteristic = emission.characteristic.evaluate(
+        replace(batch, electron_limit=case["Ne_brem"]), "spec_characteristic"
+    ).values
     return spec, spec_coherent, characteristic
 
 
@@ -925,6 +927,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     timed = _TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
     E_grid, E_brem, n_hat = tp["E_grid"], tp["E_brem"], tp["n_hat"]
+    emission = select_emission(case)
     segs = tp["segs"]
     # Every kernel below runs over the SAME segments, and each would otherwise
     # upload its own slice of them: a case pushes ~116 B/segment across the bus
@@ -936,7 +939,6 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     Ne_brem = tp["Ne_brem"]
     # optional film-on-substrate stack (None -> single slab, unchanged)
     abs_layers = case.get("abs_layers")
-    emission = select_emission(case)
 
     # LINES: each CRYSTALLINE layer radiates its own PXR/CBS lines, summed
     # INCOHERENTLY (separate crystals -> no cross-layer coherence); every line

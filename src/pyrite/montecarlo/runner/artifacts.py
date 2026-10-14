@@ -122,13 +122,11 @@ def stream_spectrum_from_artifact(
         As :func:`spectrum_from_artifact`, or a case that needs every segment
         at once (coherent emission, temporal profile).
     """
-    from . import (
-        _brem_wide_from_segments,
-        _characteristic_from_segments,
-        _cxr_for_segments,
-        _segments_on_device,
-    )
+    from dataclasses import replace
+
+    from . import _segments_on_device
     from .cxr_grid import check_cxr_truncation, cxr_truncation_audit
+    from .emission_adapters import EmissionBatch, select_emission
 
     artifact = read_trajectory_artifact(path, load_transport=False)
     case, inputs = _checked_case_and_inputs(artifact, case)
@@ -138,6 +136,11 @@ def stream_spectrum_from_artifact(
                 f"{key} needs every segment at once; score {artifact.path} with "
                 "spectrum_from_artifact instead"
             )
+    emission = select_emission(case)
+    try:
+        emission.preflight(case, streaming=True)
+    except ValueError as error:
+        raise TrajectoryArtifactError(str(error)) from error
     E_grid, E_brem, n_hat = inputs["E_grid"], inputs["E_brem"], inputs["n_hat"]
     groove, abs_layers = inputs["groove"], case.get("abs_layers")
     Ne_lines, Ne_brem = inputs["Ne_lines"], inputs["Ne_brem"]
@@ -151,25 +154,25 @@ def stream_spectrum_from_artifact(
         if segs["L_ang"].shape[0] == 0:
             continue
         block = _segments_on_device(segs)
+        batch = EmissionBatch(
+            block,
+            E_grid,
+            case,
+            n_hat,
+            abs_layers,
+            groove,
+            electron_limit=Ne_lines,
+            table_cache=table_cache,
+            truncation_audit=audit,
+        )
         parts = (
-            _cxr_for_segments(
-                block,
-                E_grid,
-                case,
-                n_hat,
-                abs_layers,
-                groove,
-                coherent=False,
-                Ne=Ne_lines,
-                table_cache=table_cache,
-                truncation_audit=audit,
-            ),
-            _characteristic_from_segments(
-                block, E_grid, case, n_hat, abs_layers, groove=groove, Ne=Ne_brem
-            ),
-            _brem_wide_from_segments(
-                block, E_brem, case, n_hat, abs_layers, groove=groove, Ne=Ne_brem
-            ),
+            emission.cxr.evaluate(batch, "spec").values,
+            emission.characteristic.evaluate(
+                replace(batch, electron_limit=Ne_brem), "spec_characteristic"
+            ).values,
+            emission.continuum.evaluate(
+                replace(batch, energy_eV=E_brem, electron_limit=Ne_brem), "brem_wide"
+            ).values,
         )
         if spec is None:
             spec, spec_characteristic, brem_wide = parts

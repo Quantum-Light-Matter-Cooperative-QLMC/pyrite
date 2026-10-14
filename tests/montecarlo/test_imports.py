@@ -108,6 +108,20 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
         assert spectrum.xp is np
         assert runner._RESOURCE_POLICY.gpu is False
 
+        # Workers reconstruct the adapter selection from serialized case data.
+        # Selection/preflight must not load tables or initialize device code.
+        import pickle
+        from pyrite.montecarlo.runner.emission_adapters import select_emission
+
+        for payload in (
+            {},
+            {"bremsstrahlung_model": "bremslib"},
+            {"bremsstrahlung_model": "bremslib", "radiative_model": "bremslib-soft-hard"},
+        ):
+            selected = select_emission(pickle.loads(pickle.dumps(payload)))
+            selected.preflight(payload, streaming=True, adaptive_observables=("cxr", "brem"))
+            assert selected.continuum.descriptor.model == payload.get("bremsstrahlung_model", "eedl")
+
         # CUDA-only implementation modules must remain unloaded on CPU.
         cuda_modules = {
             "pyrite.montecarlo.transport._jit_device",

@@ -145,6 +145,37 @@ class EmissionSelection:
     characteristic: EmissionAdapter
     continuum: EmissionAdapter
 
+    def preflight(
+        self,
+        case: Mapping[str, Any],
+        *,
+        streaming: bool = False,
+        adaptive_observables: tuple[str, ...] = (),
+    ) -> None:
+        """Refuse unsupported reductions before transport or segment uploads.
+
+        An empty streaming declaration means unsupported. Unknown requirements
+        fail closed; the supported reduction is additive whole-electron blocks.
+        Adaptive CXR producers must populate ``truncation_audit['electron_mass']``;
+        continuum producers must accept ``electron_band_weights``.
+        """
+        if streaming:
+            known = {"whole-electron blocks", "incoherent", "no temporal profile"}
+            for adapter in (self.cxr, self.characteristic, self.continuum):
+                requirements = set(adapter.descriptor.streaming_requirements)
+                if "whole-electron blocks" not in requirements or requirements - known:
+                    raise ValueError(f"{adapter.descriptor.id} does not support streaming")
+                if "incoherent" in requirements and case.get("coherent_emission"):
+                    raise ValueError("coherent emission does not support streaming")
+                if "no temporal profile" in requirements and case.get("temporal_profile"):
+                    raise ValueError("temporal profile does not support streaming")
+        for observable in adaptive_observables:
+            adapter = {"cxr": self.cxr, "brem": self.continuum}.get(observable)
+            if adapter is None or observable not in adapter.descriptor.adaptive_observables:
+                raise ValueError(
+                    f"selected emission does not support adaptive observable {observable}"
+                )
+
 
 def _cxr(batch: EmissionBatch) -> EmissionOutput:
     from .. import runner

@@ -299,8 +299,10 @@ def case_measure(case, settings: AdaptiveSettings) -> Measure:
 
     Validation: adaptive-sample-size-stopping
     """
-    from .. import runner
+    from .emission_adapters import EmissionBatch, select_emission
 
+    emission = select_emission(case)
+    emission.preflight(case, adaptive_observables=settings.observables)
     E_grid, E_brem, _beam, n_hat, groove = _case_geometry(case)
     start_eV, stop_eV = settings.band_eV or _cxr_band(case, E_grid)
     abs_layers = case.get("abs_layers")
@@ -313,31 +315,36 @@ def case_measure(case, settings: AdaptiveSettings) -> Measure:
         if "cxr" in settings.observables:
             audit: dict[str, Any] = {"start_eV": start_eV, "stop_eV": stop_eV, "n_electrons": n}
             with np.errstate(over="ignore", divide="ignore"):
-                runner._cxr_for_segments(
-                    block,
-                    band_grid,
-                    case,
-                    n_hat,
-                    abs_layers,
-                    groove,
-                    coherent=False,
-                    Ne=n,
-                    truncation_audit=audit,
+                emission.cxr.evaluate(
+                    EmissionBatch(
+                        block,
+                        band_grid,
+                        case,
+                        n_hat,
+                        abs_layers,
+                        groove,
+                        electron_limit=n,
+                        truncation_audit=audit,
+                    ),
+                    "spec",
                 )
             mass = audit.get("electron_mass")
             values["cxr"] = np.zeros(n) if mass is None else mass
         if "brem" in settings.observables:
             values["brem"] = np.asarray(
-                runner._brem_wide_from_segments(
-                    block,
-                    E_brem,
-                    case,
-                    n_hat,
-                    abs_layers,
-                    groove=groove,
-                    Ne=n,
-                    electron_band_weights=brem_q,
-                )
+                emission.continuum.evaluate(
+                    EmissionBatch(
+                        block,
+                        E_brem,
+                        case,
+                        n_hat,
+                        abs_layers,
+                        groove,
+                        electron_limit=n,
+                        electron_band_weights=brem_q,
+                    ),
+                    "brem_wide",
+                ).values
             )
         return values
 
@@ -370,8 +377,12 @@ def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
 
     Validation: adaptive-sample-size-stopping
     """
-    from .. import runner
+    from dataclasses import replace
 
+    from .emission_adapters import EmissionBatch, select_emission
+
+    emission = select_emission(case)
+    emission.preflight(case, streaming=True)
     if settings.batch_means_band_eV is None:
         raise ValueError("batch means need settings.batch_means_band_eV")
     start_eV, stop_eV = settings.batch_means_band_eV
@@ -386,19 +397,17 @@ def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
     for start, stop in blocks:
         rows = _electron_rows(segs, start, stop)
         scale = n / (stop - start)  # Ne = n normalization -> this batch's own mean
-        line = runner._cxr_for_segments(
+        batch = EmissionBatch(
             rows,
             E_grid,
             case,
             transport["n_hat"],
             abs_layers,
             transport.get("groove"),
-            coherent=False,
-            Ne=n,
+            electron_limit=n,
         )
-        brem = runner._brem_wide_from_segments(
-            rows, E_brem, case, transport["n_hat"], abs_layers, groove=transport.get("groove"), Ne=n
-        )
+        line = emission.cxr.evaluate(batch, "spec").values
+        brem = emission.continuum.evaluate(replace(batch, energy_eV=E_brem), "brem_wide").values
         cxr_batches.append(np.asarray(_to_cpu(line))[cxr_bins] * scale)
         brem_batches.append(np.asarray(_to_cpu(brem))[brem_bins] * scale)
     k = len(blocks)
@@ -468,6 +477,10 @@ def transport_case_adaptive(
     from .. import runner
 
     settings.validate_case(case)
+    if settings.batch_means_band_eV is not None:
+        from .emission_adapters import select_emission
+
+        select_emission(case).preflight(case, streaming=True)
     core = adaptive_transport_core(case, settings, transport_core)
     loop_case = {key: value for key, value in case.items() if key != "adaptive_precision"}
     loop_case.update(Ne=settings.max_electrons, Ne_brem=settings.max_electrons)

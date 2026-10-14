@@ -205,3 +205,122 @@ def test_per_electron_wrapper_keeps_native_observable_shape(monkeypatch):
     output = ea.select_continuum(batch.case).evaluate(batch, "brem_wide")
     np.testing.assert_array_equal(output.values, [11.0, 12.0])
     assert seen[0]["electron_band_weights"] is weights and seen[0]["electron_limit"] == 2
+
+
+def _custom_selection(monkeypatch, *, streaming=True, adaptive=True):
+    seen = []
+
+    def producer(batch):
+        seen.append(batch)
+        if batch.truncation_audit is not None:
+            batch.truncation_audit["electron_mass"] = np.full(batch.electron_limit, 7.0)
+        return ea.EmissionOutput(
+            "spec_coherent" if batch.coherent else "spec", np.full(batch.energy_eV.shape, 7.0)
+        )
+
+    descriptor = ModelDescriptor(
+        "emission.cxr",
+        "test",
+        "test",
+        output_slots=("spec", "spec_coherent"),
+        streaming_requirements=("whole-electron blocks",) if streaming else (),
+        adaptive_observables=("cxr",) if adaptive else (),
+    )
+    selection = replace(ea.select_emission({}), cxr=ea.EmissionAdapter(descriptor, producer))
+    monkeypatch.setattr(ea, "select_emission", lambda case: selection)
+    return seen
+
+
+def test_streaming_uses_selected_producer_and_one_upload_per_block(monkeypatch):
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.runner import artifacts, cxr_grid
+
+    batch = _batch()
+    case = {"crystal": "test", "E0_keV": 30.0}
+    inputs = dict(
+        E_grid=batch.energy_eV,
+        E_brem=batch.energy_eV,
+        n_hat=batch.n_hat,
+        groove=None,
+        Ne_lines=2,
+        Ne_brem=3,
+    )
+    artifact = SimpleNamespace(path="test.h5", attrs={"segment_count": 2})
+    monkeypatch.setattr(artifacts, "read_trajectory_artifact", lambda *a, **kw: artifact)
+    monkeypatch.setattr(artifacts, "_checked_case_and_inputs", lambda *a: (case, inputs))
+    blocks = [dict(Ne=3, L_ang=np.ones(1), n_backscattered=0, n_missed=0) for _ in range(2)]
+    monkeypatch.setattr(artifacts, "iter_electron_row_blocks", lambda *a: iter(blocks))
+    monkeypatch.setattr(cxr_grid, "cxr_truncation_audit", lambda *a, **kw: None)
+    uploaded = []
+    monkeypatch.setattr(runner, "_segments_on_device", lambda s: uploaded.append(s) or s)
+    for name in ("_characteristic_from_segments", "_brem_wide_from_segments"):
+        monkeypatch.setattr(runner, name, lambda s, E, *a, **kw: np.zeros(E.shape))
+    seen = _custom_selection(monkeypatch)
+    output = artifacts.stream_spectrum_from_artifact("test.h5", max_segments=1)
+    np.testing.assert_array_equal(output["spec"], 14.0)
+    assert uploaded == blocks
+    assert [b.electron_limit for b in seen] == [2, 2]
+    assert seen[0].table_cache is seen[1].table_cache
+
+    _custom_selection(monkeypatch, streaming=False)
+    uploaded.clear()
+    with pytest.raises(artifacts.TrajectoryArtifactError, match="does not support streaming"):
+        artifacts.stream_spectrum_from_artifact("test.h5")
+    assert uploaded == []
+
+
+def test_recompute_pair_uses_selected_producer_with_shared_segments(monkeypatch):
+    batch = _batch()
+    seen = _custom_selection(monkeypatch)
+    monkeypatch.setattr(
+        runner,
+        "_transport_cxr_for_case",
+        lambda *a: (batch.segments, None, batch.n_hat, None, None),
+    )
+    uploads = []
+    monkeypatch.setattr(runner, "_segments_on_device", lambda s: uploads.append(s) or s)
+    monkeypatch.setattr(
+        runner, "_characteristic_from_segments", lambda s, E, *a, **kw: np.zeros(E.shape)
+    )
+    case = {"Ne": 2, "Ne_brem": 3}
+    output = runner._cxr_pair_for_case(
+        case, batch.energy_eV, want_coherent=True, return_characteristic=True
+    )
+    np.testing.assert_array_equal(output[0], 7.0)
+    np.testing.assert_array_equal(output[1], 7.0)
+    assert uploads == [batch.segments]
+    assert [b.coherent for b in seen] == [False, True]
+    assert seen[0].table_cache is seen[1].table_cache
+
+
+def test_adaptive_observable_uses_selected_producer_and_refuses_unsupported(monkeypatch):
+    from pyrite._numerics import Precision
+    from pyrite.montecarlo.runner import adaptive
+
+    batch = _batch()
+    monkeypatch.setattr(
+        adaptive,
+        "_case_geometry",
+        lambda case: (batch.energy_eV, batch.energy_eV, None, batch.n_hat, None),
+    )
+    settings = Precision(
+        target_rse=0.1,
+        max_electrons=6,
+        block_electrons=3,
+        observables=("cxr",),
+        band_eV=(1000.0, 3000.0),
+    )
+    seen = _custom_selection(monkeypatch)
+    measure = adaptive.case_measure({}, settings)
+    np.testing.assert_array_equal(measure(0, 3, batch.segments)["cxr"], [7.0] * 3)
+    assert len(seen) == 1
+    _custom_selection(monkeypatch, adaptive=False)
+    with pytest.raises(ValueError, match="adaptive observable cxr"):
+        adaptive.case_measure({}, settings)
+
+
+def test_invalid_continuum_is_refused_before_transport_or_capture(monkeypatch):
+    monkeypatch.setattr(runner, "_case_geometry", lambda case: pytest.fail("must preflight first"))
+    with pytest.raises(ValueError, match="coupled radiative scoring requires"):
+        runner._transport_case({"radiative_model": "bremslib-soft-hard"})
