@@ -126,6 +126,8 @@ def test_start_submits_slice_zero_with_nice(monkeypatch):
 
 
 def test_start_dry_run_threads_geometry_and_set_default(monkeypatch, capsys):
+    from pyrite.energy_grid.defaults import LEGACY_WARNING
+
     monkeypatch.setattr(job.remote, "_new_jobid", lambda: "20260719-120000-deadbeef")
 
     job.start(
@@ -137,12 +139,38 @@ def test_start_dry_run_threads_geometry_and_set_default(monkeypatch, capsys):
         dry_run=True,
     )
 
-    script = capsys.readouterr().out
+    captured = capsys.readouterr()
+    script = captured.out
+    assert captured.err == LEGACY_WARNING + "\n"
     assert "--tilts 0,1.5" in script
     assert "--azimuths 45,90" in script
     assert "--thickness 1000,2000" in script
     assert "--set-default" in script
     assert "--brem-step 12.5" in script
+
+
+def test_start_explicit_job_has_same_selected_inputs_without_warning(monkeypatch, capsys):
+    monkeypatch.setattr(job.remote, "_new_jobid", lambda: "20260719-120000-deadbeef")
+    job.start(
+        materials="mose2",
+        energies="60",
+        tilts="5",
+        azimuths="100",
+        thickness="2000",
+        brem_step=12.5,
+        dry_run=True,
+    )
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    for fragment in (
+        "--materials mose2",
+        "--energies 60",
+        "--tilts 5",
+        "--azimuths 100",
+        "--thickness 2000",
+        "--brem-step 12.5",
+    ):
+        assert fragment in captured.out
 
 
 def _run_payload(tmp_path, monkeypatch, analysis_exit):

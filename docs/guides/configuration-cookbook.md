@@ -86,7 +86,7 @@ Add `--yes` only after checking the exact selection.
 If `run` reports missing line bounds:
 
 ```bash
-PYRITE_PROFILE=my-survey pyrite material energy-grid derive --material hopg
+PYRITE_PROFILE=my-survey pyrite material energy-grid derive --material hopg --energy 30,60
 pyrite-dev energy-grid add PATH_FROM_DERIVE --profile my-survey --material hopg
 pyrite-dev energy-grid verify
 ```

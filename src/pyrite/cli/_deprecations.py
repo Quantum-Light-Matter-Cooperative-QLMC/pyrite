@@ -27,6 +27,8 @@ import click
 from click.core import ParameterSource
 
 from .._env import GENERATED_INVOCATION_ENV, env_value
+from ..energy_grid.defaults import DEPRECATED_IN as GRID_DEFAULTS_SINCE
+from ..energy_grid.defaults import REMOVE_IN as GRID_DEFAULTS_REMOVE
 
 SUPPORT_WINDOW_MINORS = 2
 
@@ -40,6 +42,7 @@ class Deprecation:
     deprecated_in: str
     remove_in: str
     note: str = ""
+    warning_note: str = ""
 
 
 def _window(deprecated_in: str, minors: int = SUPPORT_WINDOW_MINORS) -> str:
@@ -47,8 +50,10 @@ def _window(deprecated_in: str, minors: int = SUPPORT_WINDOW_MINORS) -> str:
     return f"{major}.{int(minor) + minors}.0"
 
 
-def _entry(path: str, replacement: str, *, since: str = "0.1.0", note: str = "") -> Deprecation:
-    return Deprecation(path, replacement, since, _window(since), note)
+def _entry(
+    path: str, replacement: str, *, since: str = "0.1.0", note: str = "", warning_note: str = ""
+) -> Deprecation:
+    return Deprecation(path, replacement, since, _window(since), note, warning_note)
 
 
 #: Keyed by full command path as the user types it, minus the ``pyrite`` prefix.
@@ -56,7 +61,16 @@ def _entry(path: str, replacement: str, *, since: str = "0.1.0", note: str = "")
 #: The 0.1.0 cohort of 68 command spellings was removed at 0.3.0 (issue #68),
 #: and `material set` (deprecated 0.4.0, issue #359) at 0.6.0 (issue #387).
 #: `material simulate` was removed at 0.8.0; use `run --ephemeral`.
-DEPRECATIONS: dict[str, Deprecation] = {}
+DEPRECATIONS: dict[str, Deprecation] = {
+    path: _entry(
+        path,
+        "pyrite material energy-grid derive --material KEY --energy KEV",
+        since=GRID_DEFAULTS_SINCE,
+        note="Normal runs size grids automatically; retire global batch presets and their store.",
+        warning_note="normal runs size grids automatically; explicit derivation is optional",
+    )
+    for path in ("profile energy-grid",)
+}
 
 
 #: Paths whose canonical replacement depends on the arguments given, so the
@@ -78,6 +92,7 @@ def message(path: str, *, replacement: str | None = None) -> str:
     return (
         f"warning: 'pyrite {entry.path}' is deprecated and will be removed in "
         f"{entry.remove_in}; use '{replacement or entry.replacement}'"
+        + (f"; {entry.warning_note}" if entry.warning_note else "")
     )
 
 
@@ -219,7 +234,16 @@ def _flag(
 #: `--fidelity` cohort (deprecated in 0.4.0, issue #215) at 0.6.0 (issue #387).
 #: `RetiredOption` and `canonical_option` (renamed spellings) and
 #: `DeprecatedOption` (whole options) stay as the substrate ADR-0002 requires.
-DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {}
+DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
+    ("material energy-grid derive", "--save-default"): _flag(
+        "material energy-grid derive",
+        "--save-default",
+        "pass derivation inputs per invocation; normal runs size grids automatically",
+        since=GRID_DEFAULTS_SINCE,
+        note="Remove defaults.py, line_grid_defaults.toml, --set-default forwarding in derive/job, "
+        "remote DEFAULT_MATERIALS/DEFAULT_ENERGIES and packaging/sync references together.",
+    ),
+}
 
 
 def flag_message(command: str, flag: str, replacement: str) -> str:
@@ -393,4 +417,15 @@ class ImplicitDefault:
 
 
 #: Keyed by what the user left unnamed. Rendered into the deprecation reference.
-IMPLICIT_DEFAULTS: dict[str, ImplicitDefault] = {}
+IMPLICIT_DEFAULTS: dict[str, ImplicitDefault] = {
+    "energy-grid derivation batch inputs": ImplicitDefault(
+        "energy-grid derivation batch inputs",
+        "Saved inputs or historical material/energy/geometry/spacing presets",
+        "--material KEY --energy KEV; per-invocation geometry and spacing",
+        GRID_DEFAULTS_SINCE,
+        GRID_DEFAULTS_REMOVE,
+        "Local and remote derive keep legacy inputs until removal. Then require explicit "
+        "materials and energies; inherit ordinary profile angles and retain built-in "
+        "diagnostic thickness/continuum spacing. Never use first-material energies.",
+    ),
+}

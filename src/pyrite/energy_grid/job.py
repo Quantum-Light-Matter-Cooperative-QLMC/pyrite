@@ -213,11 +213,11 @@ def start(
     *,
     slice_minutes=DEFAULT_SLICE_MINUTES,
     json_out=DEFAULT_JSON_OUT,
-    energies=DEFAULT_ENERGIES,
+    energies=None,
     grid_stop=DEFAULT_GRID_STOP,
     brem_grid_stop=DEFAULT_BREM_GRID_STOP,
     brem_step=None,
-    materials=DEFAULT_MATERIALS,
+    materials=None,
     tilts=None,
     azimuths=None,
     thickness=None,
@@ -226,6 +226,15 @@ def start(
     dry_run=False,
 ):
     """Sync, stage, and submit slice zero. Return remote job-directory ID."""
+    from pyrite.energy_grid import defaults
+
+    with defaults.legacy_warning_scope():
+        if set_default or any(
+            value is None for value in (materials, energies, tilts, azimuths, thickness, brem_step)
+        ):
+            defaults.warn_legacy_defaults()
+    materials = DEFAULT_MATERIALS if materials is None else materials
+    energies = DEFAULT_ENERGIES if energies is None else energies
     if slice_minutes <= 0:
         raise SystemExit("--slice-minutes must be positive")
     jobid = remote._new_jobid()
@@ -274,15 +283,17 @@ def build_parser():
     start_parser = subparsers.add_parser("start")
     start_parser.add_argument("--slice-minutes", type=float, default=DEFAULT_SLICE_MINUTES)
     start_parser.add_argument("--json-out", default=DEFAULT_JSON_OUT)
-    start_parser.add_argument("--energies", default=DEFAULT_ENERGIES)
+    start_parser.add_argument("--energies", default=None, help="required from 0.15.0")
     start_parser.add_argument("--grid-stop", type=float, default=DEFAULT_GRID_STOP)
     start_parser.add_argument("--brem-grid-stop", type=float, default=DEFAULT_BREM_GRID_STOP)
     start_parser.add_argument("--brem-step", type=float, default=None)
-    start_parser.add_argument("--materials", default=DEFAULT_MATERIALS)
+    start_parser.add_argument("--materials", default=None, help="required from 0.15.0")
     start_parser.add_argument("--tilts", default=None)
     start_parser.add_argument("--azimuths", default=None)
     start_parser.add_argument("--thickness", default=None)
-    start_parser.add_argument("--set-default", action="store_true")
+    start_parser.add_argument(
+        "--set-default", action="store_true", help="deprecated; removed in 0.15.0"
+    )
     start_parser.add_argument("--no-sync", action="store_true")
     start_parser.add_argument("--dry-run", action="store_true")
     for command in ("status", "attach", "stop"):

@@ -1,7 +1,8 @@
-"""Tool-owned persistent defaults for `pyrite energy-grid` (NOT the material catalog).
+"""Deprecated derivation batch presets, retained until 0.15.0.
 
 Stored at src/pyrite/data/line_grid_defaults.toml so local/remote derive read a single
-source of standing defaults that `--set-default` / `defaults --set` update. Empty
+source of legacy inputs that `derive --save-default` and
+`profile energy-grid defaults --save-default` update until removal. Empty
 `tilts`/`azimuths` mean "use each material's profile tilt_deg/tilt_azim_deg" --
 today's behavior -- so a missing file reproduces current output exactly.
 """
@@ -10,9 +11,43 @@ import math
 import os
 import tempfile
 import tomllib
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 DEFAULTS_PATH = Path(__file__).resolve().parent.parent / "data" / "line_grid_defaults.toml"
+DEPRECATED_IN = "0.13.6"
+REMOVE_IN = "0.15.0"
+LEGACY_WARNING = (
+    "warning: persistent energy-grid derivation defaults are deprecated and will be "
+    f"removed in {REMOVE_IN}; normal runs size grids automatically. For optional "
+    "derivation, pass --material and --energy explicitly, plus per-invocation "
+    "--polar, --azimuth, --thickness and --brem-step as needed."
+)
+_warned = ContextVar("energy_grid_defaults_warned", default=False)
+
+
+@contextmanager
+def legacy_warning_scope():
+    """Deduplicate warnings across a CLI invocation and its internal forwarding."""
+    token = _warned.set(_warned.get())
+    try:
+        yield
+    finally:
+        _warned.reset(token)
+
+
+def warn_legacy_defaults(*, already_warned=False):
+    """Warn when a derivation consumes or writes the retiring batch presets."""
+    if _warned.get():
+        return
+    _warned.set(True)
+    if already_warned:
+        return
+    from pyrite.console.output import emit_diagnostic
+
+    emit_diagnostic(LEGACY_WARNING)
+
 
 FALLBACK: dict = {
     "tilts": [],
@@ -38,7 +73,11 @@ def _emit(values: dict) -> str:
             return f'"{v}"'
         return repr(v)
 
-    lines = ["# managed by `pyrite energy-grid defaults --set`; edit via CLI, not by hand", ""]
+    lines = [
+        "# Deprecated derivation batch presets; remove in 0.15.0.",
+        "# managed by `pyrite profile energy-grid defaults --save-default`",
+        "",
+    ]
     for key in ("tilts", "azimuths", "thickness_ang", "energies", "materials"):
         items = ", ".join(scalar(x) for x in values[key])
         lines.append(f"{key} = [{items}]")

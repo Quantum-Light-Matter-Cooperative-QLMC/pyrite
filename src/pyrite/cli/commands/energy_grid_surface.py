@@ -20,6 +20,7 @@ from .._groups import LazyGroup
         "cxr": "Inspect PXR/CBS energy grids.",
         "brem": "Inspect bremsstrahlung energy grids.",
     },
+    deprecation_prefix="material energy-grid",
     no_args_is_help=True,
 )
 def material_command() -> None:
@@ -29,6 +30,9 @@ def material_command() -> None:
     Examples:
       pyrite material energy-grid derive --material mose2 --energy 30,60
       pyrite material energy-grid show mose2
+
+    Normal runs size line grids automatically and resolve continuum bounds per
+    case. Explicit derivation and stored artifacts are optional specialist tools.
     """
 
 
@@ -59,7 +63,8 @@ def brem_command() -> None:
     cls=LazyGroup,
     lazy_commands={"defaults": "pyrite.cli.commands.energy_grid.defaults_command"},
     lazy_help={"defaults": "Show, update, or clear persistent derivation inputs."},
+    deprecation_prefix="profile energy-grid",
     no_args_is_help=True,
 )
 def profile_command() -> None:
-    """Manage profile-scoped energy-grid derivation inputs."""
+    """Deprecated global derivation presets; normal runs size grids automatically."""
