@@ -4,8 +4,8 @@ The private contract in [ADR-0017](../../adr/0017-in-tree-physics-extension-cont
 now has an elastic preparation proof at
 `src/pyrite/montecarlo/runner/case_tables.py`. This page describes that current
 boundary. [Emission batch adapters](emission-batch-adapters.md) have their own
-contract; general execution integration remains future work in
-[issue #485](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/485).
+contract. The [extension guide](extending-physics.md) connects preparation,
+execution, replay, identity and validation responsibilities.
 
 ## Current elastic path
 

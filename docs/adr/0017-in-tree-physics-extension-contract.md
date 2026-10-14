@@ -14,9 +14,10 @@ in `montecarlo/transport/api.py`, and scoring in `montecarlo/runner/`.
 These are different boundaries: registering metadata cannot implement a new
 collision scheduler or a persistent spectral channel.
 
-This ADR defines the proposed migration contract. The current implementation
-still uses those owners and their explicit branches. No descriptor catalog or
-adapter runtime is introduced by this record.
+This ADR defines the implemented in-tree migration contract. Immutable metadata,
+elastic preparation and emission batch adapters use those existing owners;
+native kernels and public selection remain authoritative. The decision's status
+remains Proposed pending human review.
 
 ## Decision
 
@@ -30,9 +31,14 @@ Use primitive immutable fields for IDs, capabilities, parameters and data
 markers; keep any type-only `Case` dependency under `TYPE_CHECKING`.
 
 `_numerics.py` may consume metadata while retaining validation policy;
-`campaign/` derives the resolved view from its resolved `Case`. Runtime adapters
-remain in `montecarlo/runner/case_tables.py` and `runner/emission.py` and consume
-that view. They own table loading, arrays and backend resources. Metadata must
+`campaign.physics_view` exposes the resolved view through the shared
+`_physics_provenance.py` runtime helper, keeping Monte Carlo below campaign.
+The helper snapshots original resolved mappings and reuses facade validation;
+it does not decode legacy omissions as today's `Case` schema. Runtime adapters
+remain in `montecarlo/runner/case_tables.py`, `runner/emission_adapters.py` and
+`runner/emission.py`. They select from case model strings without building the
+full provenance view merely to dispatch, and own tables, arrays and backend
+resources. Metadata must
 never reach upward into runner for validation. Identity encoding remains in
 `campaign/profiles.py`; provenance remains in `results/provenance.py`.
 There is no second public selection authority or new public `PhysicsPlan`.
@@ -75,7 +81,9 @@ adding an unused descriptor cannot invalidate a case.
 5. Runtime preparation loads each required table set and selects native
    arguments once; workers reconstruct resources locally from data-only
    selections. Remote staged resolution must agree on model/data digests
-   before checkpoint reuse.
+   before checkpoint reuse. Each allocation compares the submission's existing
+   dataset identities/table unions through the same scan resolver; it does not
+   lower a complete sweep or replace per-case source keys with a dataset union.
 6. Feed unchanged built-ins through the **existing canonical identity
    payloads**. `dataset_identity` hashes a dataset's union of consumed tables;
    `case_content_key` and the API source key hash the case's subset. An additive
@@ -168,8 +176,8 @@ outputs, reduction order, RNG consumption, case omission and cache identities.
 The metadata route introduces no per-segment/collision/bin callback or repeated
 load/upload. The final implementation gate measures warmed transport/scoring
 against the parent on matched hardware (5% median overhead target), with cold
-initialization measured separately; this contract-only slice makes no benchmark
-or GPU-parity claim.
+initialization measured separately. The [overhead evidence](../repo-design/compute/physics-adapter-overhead.md)
+records the measured CPU scope; it makes no GPU performance/parity claim.
 
 ## Baseline evidence
 
@@ -185,6 +193,11 @@ API/sweep source-key parity, table-subset versus dataset-union identity, coupled
 repair, coherent limiting cases, cascade energy closure and artifact round trips.
 They remain necessary: baseline snapshots cannot establish a physical validity
 domain or prove CUDA, remote staging, arbitrary producers or every replay route.
+
+The [developer guide](../repo-design/compute/extending-physics.md) documents the
+current selection, units/shapes/normalization, executable adapter example,
+capability refusals and extension tiers. Execution and remote tests cover the
+integrated consumers with the existing seeded/default compatibility fixtures.
 
 ## Alternatives
 

@@ -324,3 +324,28 @@ def test_invalid_continuum_is_refused_before_transport_or_capture(monkeypatch):
     monkeypatch.setattr(runner, "_case_geometry", lambda case: pytest.fail("must preflight first"))
     with pytest.raises(ValueError, match="coupled radiative scoring requires"):
         runner._transport_case({"radiative_model": "bremslib-soft-hard"})
+
+
+def test_documented_existing_slot_example_is_executable_and_reaches_live_scoring(monkeypatch):
+    from pathlib import Path
+
+    from tests.montecarlo.test_coherent_emission import _runner_case, _runner_tp, _segments
+
+    page = Path(__file__).parents[2] / "docs/repo-design/compute/extending-physics.md"
+    text = page.read_text(encoding="utf-8")
+    example = text.split("<!-- executable-example: existing-slot -->", 1)[1]
+    code = example.split("```python\n", 1)[1].split("```", 1)[0]
+    namespace = {}
+    exec(compile(code, str(page), "exec"), namespace)
+    selection = namespace["selection"]
+    monkeypatch.setattr(ea, "select_emission", lambda case: selection)
+    monkeypatch.setattr(runner, "_cxr_for_segments", lambda s, E, *a, **kw: np.ones(E.shape))
+    monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda s, E, *a, **kw: np.ones(E.shape))
+    monkeypatch.setattr(
+        runner,
+        "_characteristic_from_segments",
+        lambda *a, **kw: pytest.fail("documented producer must supply the existing slot"),
+    )
+    output = runner._spectrum_case_impl(_runner_case(), _runner_tp(_segments(3)))
+    np.testing.assert_array_equal(output["spec_characteristic"], 0.0)
+    np.testing.assert_array_equal(output["spec"], 1.0)

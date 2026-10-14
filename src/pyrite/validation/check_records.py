@@ -45,6 +45,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/pair_conversion_yield.py": (),
     # Native-output/parser inventory (#276), not a transport-physics anchor.
     "checks/positron_table_inventory.py": (),
+    # Dispatch/runtime evidence (#485), not a transport-physics anchor.
+    "checks/physics_adapter_overhead.py": (),
     # Viewer workload evidence for the trajectory backend decision (#205):
     # resource costs, not transport physics, so they emit no records.
     "checks/trajectory_paraview_probe.py": (),

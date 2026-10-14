@@ -36,6 +36,8 @@ compute/straggled-transport-integration.md
 compute/transport-jit-kernel-walkthrough.md
 compute/physics-preparation-adapters.md
 compute/emission-batch-adapters.md
+compute/extending-physics.md
+compute/physics-adapter-overhead.md
 ```
 
 ```{toctree}

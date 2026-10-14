@@ -396,8 +396,10 @@ see [preparation boundaries](repo-design/compute/physics-preparation-adapters.md
 outputs and immutable CXR/characteristic/continuum registration. Live scoring
 uses the same staged segments/populations and façade scorer seams; continuum
 wrappers delegate to separate EEDL, BremsLib and coupled producers while native
-layer reductions remain in `runner/emission.py`. Cross-route adapter integration
-is separate; see [batch scoring](repo-design/compute/emission-batch-adapters.md).
+layer reductions remain in `runner/emission.py`. Replay, recompute, directional
+and adaptive consumers use the same selections; see
+[batch scoring](repo-design/compute/emission-batch-adapters.md) and the
+[extension guide](repo-design/compute/extending-physics.md).
 
 ### `campaign/beam.py`
 

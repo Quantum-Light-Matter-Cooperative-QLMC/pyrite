@@ -61,14 +61,31 @@ per-layer continuum preparation, coupling refusals and closed output slots.
 Seeded pre-adapter fixtures and existing coherent/characteristic/temporal,
 continuum, staging and OOM regressions remain compatibility gates.
 
-## Remaining integration boundary
+## Execution integration and provenance
 
-[Issue #485](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/485)
-still owns adapter selection across full/bounded artifact replay, recompute,
-directional and adaptive dispatch. Existing wrappers continue to work, but
-this slice does not claim that a newly registered test producer reaches every
-one of those routes. Preserve coherent/temporal streaming refusals, whole-electron
-streaming reductions and adaptive observable support when integrating them.
-Identity/provenance/remote shipping and final overhead/hardware gates also remain
-separate work. These adapters introduce no new physics-validity claim and change
-no equations, model-generation markers or saved component schema.
+Ordinary scoring and full artifact replay share `_spectrum_case`; bounded replay
+selects once before reading segment blocks. CXR recompute keeps a single shared
+upload for incoherent/coherent evaluations, and continuum recompute retains the
+same selected wrapper. Directional scoring invokes the spectrum owner at each
+direction over one transport. Adaptive measurement and batch means select the
+same adapters outside electron-block loops.
+
+`EmissionSelection.preflight` refuses unknown/unsupported streaming requirements
+and missing adaptive observable support before transport, uploads or writes.
+Coherent/temporal bounded replay remains refused. Streaming sums whole-electron
+blocks with the original fixed population denominator; adaptive CXR uses
+per-electron audit masses and continuum uses band-weighted electron integrals.
+The existing OOM wrappers and native reduction ordering remain intact.
+
+API provenance and new trajectory captures record the data-only resolved view.
+Replay checks model/data compatibility; batch planning checks every capture
+before any checkpoint write. Historical captures without the optional snapshot
+retain their existing reading/replay contract. Remote allocations compare staged
+dataset/table identities before checkpoint reuse. No new plugin shipping or
+spectral schema is introduced.
+
+The [extension guide](extending-physics.md) contains an executable existing-slot
+example and recipes for alternative models, new events and additive channels.
+See [overhead evidence](physics-adapter-overhead.md) for measured scope. These
+adapters change no equations, generation markers or saved component semantics
+and confer no new physical-validity claim.
