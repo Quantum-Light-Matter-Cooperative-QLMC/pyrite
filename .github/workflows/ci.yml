@@ -3,11 +3,62 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  # Bot commits made with GITHUB_TOKEN need an explicit CI dispatch.
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  format:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    concurrency:
+      group: format-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Format the source commit, not GitHub's synthetic merge commit.
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.14"
+
+      - name: Format code
+        run: uv run --locked pyrite-dev format
+
+      - name: Commit formatting fixes
+        id: commit
+        env:
+          PR_BRANCH: ${{ github.head_ref }}
+        run: |
+          mapfile -d '' paths < <(git diff --name-only -z -- '*.py' '*.pyi' '*.ipynb')
+          if [ "${#paths[@]}" -eq 0 ]; then
+            exit 0
+          fi
+          git add -- "${paths[@]}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'style: apply Ruff formatting'
+          # A normal push refuses to overwrite a branch updated during this job.
+          git push origin "HEAD:refs/heads/$PR_BRANCH"
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+
+      - name: Run CI on the formatting commit
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_BRANCH: ${{ github.head_ref }}
+        run: gh workflow run ci.yml --ref "$PR_BRANCH"
+
   focused:
     strategy:
       fail-fast: false
@@ -65,6 +116,10 @@ jobs:
         with:
           python-version: "3.14"
       - run: uv sync --all-groups --locked
+
+      # Also checks fork PRs, whose token cannot push formatting fixes.
+      - name: Check formatting
+        run: uv run --locked ruff format --check .
 
       - name: Verify non-test gates
         run: uv run pyrite-dev verify --skip-tests

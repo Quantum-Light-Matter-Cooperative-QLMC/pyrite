@@ -744,9 +744,7 @@ def set_brem_artifact(
     existing, current_brem = _current_identity_inputs(document, original, material, profile, path)
     stop = _positive_float(stop_eV, "stop")
     step = _positive_float(
-        step_eV
-        if step_eV is not None
-        else current_brem["step_eV"],
+        step_eV if step_eV is not None else current_brem["step_eV"],
         "step",
     )
     brem = {"start_eV": float(current_brem["start_eV"]), "stop_eV": stop, "step_eV": step}
