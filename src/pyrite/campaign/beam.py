@@ -17,12 +17,11 @@ record, an internal lowering target that also backs profile files and case
 payloads. :meth:`Beam.to_spec` lowers to it field-for-field.
 """
 
-from dataclasses import dataclass
-from typing import Any, cast
+from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 
-from .._api_deprecations import warn_api
 from ..montecarlo.bunch_front import BunchFrontTilt, validate_front_source
 from ..montecarlo.transverse import TransverseDistribution
 from .longitudinal import LongitudinalDistribution
@@ -167,10 +166,6 @@ Longitudinal = PointBunch | BunchLength | Offsets | LongitudinalDistribution
 
 
 #: Placeholder for a beam property the caller left out. Through the #451
-#: deprecation window it resolves, with a warning, to the historical default.
-_UNSET: Any = cast(Any, object())
-
-
 @dataclass(frozen=True)
 class Beam:
     """Describe the electron beam at the crystal entrance plane.
@@ -191,12 +186,10 @@ class Beam:
         builders may expand a sequence.
     transverse
         Required: :class:`TransverseSpot`, :class:`PointSpot`, or a Courant--Snyder
-        :class:`~pyrite.montecarlo.transverse.TransverseDistribution`. Omitting it
-        is deprecated and falls back to a 1 mm round :class:`TransverseSpot`.
+        :class:`~pyrite.montecarlo.transverse.TransverseDistribution`.
     longitudinal
         Required: :class:`PointBunch`, :class:`BunchLength`, :class:`Offsets`, or a
         :class:`~pyrite.campaign.longitudinal.LongitudinalDistribution` policy.
-        Omitting it is deprecated and falls back to :class:`PointBunch`.
     energy_spread_frac
         RMS fractional kinetic-energy spread; ``None`` is monoenergetic.
     rep_rate_hz
@@ -218,8 +211,8 @@ class Beam:
     """
 
     energy_keV: Any = (30.0, 45.0, 60.0)
-    transverse: Transverse = _UNSET
-    longitudinal: Longitudinal = _UNSET
+    transverse: Transverse = field(kw_only=True)
+    longitudinal: Longitudinal = field(kw_only=True)
     energy_spread_frac: float | None = None
     rep_rate_hz: float = 5000.0
     bunch_charge_pc: float = 1.0
@@ -227,13 +220,6 @@ class Beam:
     bunch_front_tilt: BunchFrontTilt | None = None
 
     def __post_init__(self) -> None:
-        # stacklevel 4: warn_api -> __post_init__ -> __init__ -> the caller.
-        if self.transverse is _UNSET:
-            warn_api("Beam() without transverse=", stacklevel=4)
-            object.__setattr__(self, "transverse", TransverseSpot())
-        if self.longitudinal is _UNSET:
-            warn_api("Beam() without longitudinal=", stacklevel=4)
-            object.__setattr__(self, "longitudinal", PointBunch())
         if not isinstance(self.transverse, (TransverseSpot, PointSpot, TransverseDistribution)):
             raise TypeError(
                 "Beam.transverse must be a TransverseSpot, PointSpot, or TransverseDistribution"
@@ -462,11 +448,3 @@ __all__ = [
     "Spot",
     "TransverseSpot",
 ]
-
-
-def __getattr__(name: str) -> Any:
-    """Serve the deprecated ``Point`` alias of :class:`PointSpot` (issue #451)."""
-    if name == "Point":
-        warn_api("pyrite.campaign.beam.Point")
-        return PointSpot
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

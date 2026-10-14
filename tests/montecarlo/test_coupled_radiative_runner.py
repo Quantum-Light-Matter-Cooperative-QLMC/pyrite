@@ -31,23 +31,23 @@ from tests.helpers.bremslib import synthetic_bremslib_arrays
 COUPLED = {"radiative_model": "bremslib-soft-hard", "radiative_cutoff_eV": 1000.0}
 
 
-def test_numerics_validate_coupled_radiative_requirements():
-    assert pr.Numerics().radiative_model == "auto"
+def test_physics_validate_coupled_radiative_requirements():
+    assert pr.Physics().radiative_model == "auto"
     assert pr.Numerics().energy_model == "midpoint"
-    numerics = pr.Numerics(energy_model="midpoint", **COUPLED)
-    assert numerics.radiative_model == "bremslib-soft-hard"
+    physics = pr.Physics(**COUPLED)
+    assert physics.radiative_model == "bremslib-soft-hard"
     with pytest.raises(ValueError, match="radiative_cutoff_eV requires"):
-        pr.Numerics(radiative_model="uncoupled", radiative_cutoff_eV=1000.0)
-    assert pr.Numerics(radiative_model="bremslib-soft-hard").radiative_cutoff_eV is None
+        pr.Physics(radiative_model="uncoupled", radiative_cutoff_eV=1000.0)
+    assert pr.Physics(radiative_model="bremslib-soft-hard").radiative_cutoff_eV is None
     with pytest.raises(ValueError, match="finite positive radiative_cutoff_eV"):
-        pr.Numerics(radiative_cutoff_eV=0.0)
+        pr.Physics(radiative_cutoff_eV=0.0)
     with pytest.raises(ValueError, match="energy_model='midpoint'"):
-        pr.Numerics(energy_model="frozen", **COUPLED)
-    assert pr.Numerics(energy_model="midpoint", straggling=True, **COUPLED).straggling
+        physics.validate_transport("frozen")
+    assert pr.Physics(straggling=True, **COUPLED).straggling
     with pytest.raises(ValueError, match="requires BremsLib"):
-        pr.Numerics(energy_model="midpoint", bremsstrahlung_model="eedl", **COUPLED)
+        pr.Physics(bremsstrahlung_model="eedl", **COUPLED)
     with pytest.raises(ValueError, match="radiative_model must be one of"):
-        pr.Numerics(radiative_model="coupled")
+        pr.Physics(radiative_model="coupled")
 
 
 def test_case_keys_are_divergence_only_and_need_bremslib():
@@ -187,18 +187,17 @@ def synthetic_si_tables(monkeypatch):
 
 
 def _coupled_case(target=None, **numerics_overrides):
-    detector = pr.Detector(
-        energy_bins=EnergyBins(
-            cxr=np.linspace(1500.0, 2000.0, 20), brem=np.arange(5000.0, 40_001.0, 500.0)
-        )
-    )
+    detector = pr.Detector()
     numerics = pr.Numerics(
         cxr_trials=12,
         brem_trials=12,
         energy_model="midpoint",
-        elastic_model="mott",
-        bremsstrahlung_model="bremslib",
-        **{**COUPLED, **numerics_overrides},
+        energy_bins=EnergyBins(
+            cxr=np.linspace(1500.0, 2000.0, 20), brem=np.arange(5000.0, 40001.0, 500.0)
+        ),
+    )
+    physics = pr.Physics(
+        elastic_model="mott", bremsstrahlung_model="bremslib", **{**COUPLED, **numerics_overrides}
     )
     if target is None:
         target = pr.Slab(
@@ -208,6 +207,7 @@ def _coupled_case(target=None, **numerics_overrides):
         pr.Beam(energy_keV=40.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
         target,
         detector,
+        physics=physics,
     )
     # The synthetic table starts at 5 keV, so the electrons stop there.
     return replace(api.build_case(scene, numerics), E_cut_lines_keV=5.0, E_cut_brem_keV=5.0)

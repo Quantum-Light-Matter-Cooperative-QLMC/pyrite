@@ -53,7 +53,7 @@ def _clean_environment(monkeypatch):
 def _uncovered_energy_sweep(energy_keV=77.0):
     """A hopg sweep at a beam energy no stored ``cxr_by_energy`` row covers."""
     sweep = material_sweep("hopg")
-    assert energy_keV not in {float(e) for e in sweep.detector.energy_bins.cxr_by_energy}
+    assert energy_keV not in {float(e) for e in sweep.energy_bins.cxr_by_energy}
     return replace(sweep, beam=replace(sweep.beam, energy_keV=energy_keV))
 
 
@@ -65,13 +65,7 @@ def _stored_energy_sweep():
         replace(
             sweep,
             beam=replace(sweep.beam, energy_keV=30.0),
-            detector=replace(
-                sweep.detector,
-                energy_bins=replace(
-                    sweep.detector.energy_bins,
-                    cxr_by_energy={30.0: stored},
-                ),
-            ),
+            energy_bins=replace(sweep.energy_bins, cxr_by_energy={30.0: stored}),
         ),
         stored,
     )
@@ -321,10 +315,7 @@ def test_explicit_fixed_grid_outranks_environment_policy(monkeypatch):
     sweep = replace(
         sweep,
         beam=replace(sweep.beam, energy_keV=30.0),
-        detector=replace(
-            sweep.detector,
-            energy_bins=replace(sweep.detector.energy_bins, cxr=explicit),
-        ),
+        energy_bins=replace(sweep.energy_bins, cxr=explicit),
     )
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
     assert case.get("line_grid_policy") is None
@@ -385,11 +376,7 @@ def test_changing_resolved_coordinates_changes_case_identity():
     sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=30.0))
     base = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
     shifted = replace(
-        sweep,
-        detector=replace(
-            sweep.detector,
-            energy_bins=replace(sweep.detector.energy_bins, cxr=np.linspace(10.0, 2600.0, 865)),
-        ),
+        sweep, energy_bins=replace(sweep.energy_bins, cxr=np.linspace(10.0, 2600.0, 865))
     )
     other = build_cases(shifted, n_electrons=2, n_electrons_brem=2)[0]
     assert case_content_key(base) != case_content_key(other)

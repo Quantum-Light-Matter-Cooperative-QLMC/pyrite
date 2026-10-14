@@ -23,13 +23,12 @@ from pyrite.runs import scan
 def _inputs():
     beam = pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch())
     target = pr.Slab("hopg", thickness_ang=1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0))
-    detector = pr.Detector(
-        energy_bins=EnergyBins(
-            cxr=np.array([1_000.0, 1_050.0]),
-            brem=np.array([1_000.0, 1_050.0]),
-        )
+    detector = pr.Detector()
+    numerics = pr.Numerics(
+        cxr_trials=1,
+        brem_trials=1,
+        energy_bins=EnergyBins(cxr=np.array([1000.0, 1050.0]), brem=np.array([1000.0, 1050.0])),
     )
-    numerics = pr.Numerics(cxr_trials=1, brem_trials=1, bremsstrahlung_model="eedl")
     return beam, target, detector, numerics
 
 
@@ -47,14 +46,22 @@ def _api_digest(monkeypatch) -> tuple[dict, str]:
         }
 
     monkeypatch.setattr(api, "run_case", fake_run_case)
-    result = pr.simulate(beam, target, detector, numerics=numerics)
+    result = pr.simulate(
+        beam, target, detector, numerics=numerics, physics=pr.Physics(bremsstrahlung_model="eedl")
+    )
     return result.case, result.provenance["identity_digest"]
 
 
 def _sweep_case():
     beam, target, detector, _ = _inputs()
     return build_cases(
-        LegacySweep(material="hopg", beam=beam, target=target, detector=detector),
+        LegacySweep(
+            material="hopg",
+            beam=beam,
+            target=target,
+            detector=detector,
+            energy_bins=_inputs()[3].energy_bins,
+        ),
         n_electrons=1,
         n_electrons_brem=1,
         bremsstrahlung_model="eedl",

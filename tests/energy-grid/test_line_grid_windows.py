@@ -55,7 +55,7 @@ def _isolated(monkeypatch, tmp_path):
 
 def _uncovered_energy_sweep(energy_keV=77.0, **policy):
     sweep = material_sweep("hopg")
-    assert energy_keV not in {float(e) for e in sweep.detector.energy_bins.cxr_by_energy}
+    assert energy_keV not in {float(e) for e in sweep.energy_bins.cxr_by_energy}
     return replace(
         sweep,
         beam=replace(sweep.beam, energy_keV=energy_keV),

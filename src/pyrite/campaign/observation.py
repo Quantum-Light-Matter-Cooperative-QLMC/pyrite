@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, cast
 
-from ..detectors import EnergyBins, IdealPhotonCounter, Timepix3
+from ..detectors import IdealPhotonCounter, Timepix3
 from ..instrument import (
     Acquisition,
     FilterPlate,
@@ -48,8 +48,6 @@ def _response_from_config(row: Mapping[str, object] | None):
 
 def physical_detector_from_config(
     row: Mapping[str, object],
-    *,
-    energy_bins: EnergyBins | None = None,
 ) -> PlanarDetector:
     """Lower validated physical geometry and its explicit response."""
     pose = PlanarPose.from_observation(
@@ -66,8 +64,6 @@ def physical_detector_from_config(
             shape=cast(tuple[int, int], row.get("shape", (256, 256))),
             pitch_mm=cast(tuple[float, float], row.get("pitch_mm", (0.055, 0.055))),
         ),
-        energy_bins=EnergyBins() if energy_bins is None else energy_bins,
-        _energy_bins_explicit=False,
         response=_response_from_config(response),
     )
 
@@ -75,8 +71,6 @@ def physical_detector_from_config(
 def resolve_profile_observation(
     catalog: MaterialCatalog,
     profile_name: str,
-    *,
-    energy_bins: EnergyBins | None = None,
     detector_id: str | None = None,
 ) -> ResolvedObservation | None:
     """Resolve a complete counting observation, or ``None`` for legacy profiles.
@@ -98,13 +92,11 @@ def resolve_profile_observation(
         ) from None
     if row is None or "acquisition" not in row:
         return None
-    detector = physical_detector_from_config(row, energy_bins=energy_bins)
+    detector = physical_detector_from_config(row)
     if detector.response is None:
         detector = PlanarDetector(
             pose=detector.pose,
             pixels=detector.pixels,
-            energy_bins=detector.energy_bins,
-            _energy_bins_explicit=False,
             response=IdealPhotonCounter(),
         )
     scorer_row = cast(Mapping[str, object], row.get("scorer", {}))

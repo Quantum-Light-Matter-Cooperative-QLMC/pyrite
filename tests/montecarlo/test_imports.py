@@ -14,7 +14,11 @@ def test_public_scene_construction_does_not_initialize_execution() -> None:
         """
         import sys
         import pyrite as pr
-        scene = pr.Scene(pr.Beam(energy_keV=30.0), pr.Slab("hopg"), pr.Detector())
+        scene = pr.Scene(
+            pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+            pr.Slab("hopg", footprint=pr.Footprint(1.0, 1.0)),
+            pr.Detector(),
+        )
         assert scene.beam.energy_keV == 30.0
         assert {
             "numba", "pyrite._backend", "pyrite.campaign.lowering",

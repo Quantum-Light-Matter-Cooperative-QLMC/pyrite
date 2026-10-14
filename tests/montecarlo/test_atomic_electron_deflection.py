@@ -245,14 +245,14 @@ def test_correction_shortens_the_elastic_mean_free_path():
     assert ratio == pytest.approx(14.0 / 15.0, rel=1e-9)
 
 
-def test_numerics_models_mirror_transport_plus_opt_out():
+def test_physics_models_mirror_transport_plus_opt_out():
     assert _numerics.ATOMIC_ELECTRON_DEFLECTION_MODELS == (
         *ATOMIC_ELECTRON_DEFLECTION_MODELS,
         "none",
     )
-    assert _numerics.Numerics().atomic_electron_deflection == "kawrakow"
+    assert _numerics.Physics().atomic_electron_deflection == "kawrakow"
     with pytest.raises(ValueError, match="atomic_electron_deflection"):
-        _numerics.Numerics(atomic_electron_deflection="z1")  # type: ignore[arg-type]
+        _numerics.Physics(atomic_electron_deflection="z1")  # type: ignore[arg-type]
 
 
 def test_case_key_reaches_the_transport_kwargs():

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from pyrite._numerics import Numerics
+from pyrite._numerics import Physics
 from pyrite.campaign.profiles import case_bremsstrahlung_marker, case_content_key
 from pyrite.montecarlo.runner.case_tables import (
     _case_bremslib_table_records,
@@ -22,12 +22,12 @@ def _any_case(model="eedl"):
     return build_cases(material_sweep("silicon"), 4, 4, bremsstrahlung_model=model)[0]
 
 
-def test_numerics_accepts_only_known_bremsstrahlung_models():
-    assert Numerics().bremsstrahlung_model == "auto"
-    assert Numerics(bremsstrahlung_model="eedl").bremsstrahlung_model == "eedl"
-    assert Numerics(bremsstrahlung_model="bremslib").bremsstrahlung_model == "bremslib"
+def test_physics_accepts_only_known_bremsstrahlung_models():
+    assert Physics().bremsstrahlung_model == "auto"
+    assert Physics(bremsstrahlung_model="eedl").bremsstrahlung_model == "eedl"
+    assert Physics(bremsstrahlung_model="bremslib").bremsstrahlung_model == "bremslib"
     with pytest.raises(ValueError, match="bremsstrahlung_model"):
-        Numerics(bremsstrahlung_model="bethe-heitler")  # type: ignore[arg-type]
+        Physics(bremsstrahlung_model="bethe-heitler")  # type: ignore[arg-type]
 
 
 def test_default_cases_resolve_no_bremslib_tables():

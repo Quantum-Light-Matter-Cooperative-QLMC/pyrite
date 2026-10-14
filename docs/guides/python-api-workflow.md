@@ -72,11 +72,8 @@ scoring; use `PlanarDetector` for pose, pixels, filters, or face integration.
 See [the acceptance derivation](../physics/detectors/detector-solid-angle.md).
 
 `Detector()` keeps the existing material/profile acceptance defaults.
-`Detector(polar_acceptance_deg=..., solid_angle_sr=...)` remains a deprecated
-spelling through the D7 window (removal in 0.14.0); both values build an
-`AngularAcceptance`. Do not mix flat arguments with `acceptance=`. Legacy
-single-value overrides retain the other material/profile default through that
-window. Equal resolved polar spans and solid angles retain the same lowered
+`Detector(polar_acceptance_deg=..., solid_angle_sr=...)` was removed in 0.14.0;
+use `Detector(acceptance=AngularAcceptance(...))`. Equal resolved polar spans and solid angles retain the same lowered
 case and checkpoint identity. Profile TOML and detector CLI fields are unchanged.
 
 ## Describe the beam
@@ -99,7 +96,7 @@ pr.Beam.from_gdf("beam.gdf", z_origin_m=0.0, time_s=1e-9)  # GPT snapshot
 
 `transverse` also accepts a Courant–Snyder `TransverseDistribution`, and `longitudinal` accepts `Offsets` or a `LongitudinalDistribution` policy. Divergence is derived: `beam.derived_divergence_mrad(energy_keV)`. Sweep axes address the sub-objects, for example `"beam.transverse": [pr.TransverseSpot(0.5), pr.TransverseSpot(1.0), pr.PointSpot()]`.
 
-Targets likewise require `footprint`: a finite `pr.Footprint(width_mm, height_mm)`, or `None` for a laterally infinite crystal. Leaving out any of these three still works through 0.13 with a `DeprecationWarning` and the old default (1 mm `TransverseSpot`, `PointBunch`, 5 mm x 5 mm footprint); from 0.14.0 it is an error. `pr.Point` is a deprecated alias of `pr.PointSpot` on the same schedule.
+Targets likewise require `footprint`: a finite `pr.Footprint(width_mm, height_mm)`, or `None` for a laterally infinite crystal. Leaving out any of these three is an error. Use `pr.PointSpot`; the `pr.Point` alias was removed in 0.14.0.
 
 Coherent emission with physical bunch charge needs offsets the estimator can resolve. On an infinite slab, sampled offsets (a finite `Spot` or `BunchLength`) leave a near-zero cross-electron excess that `cxr_trials` far below the bunch's electron count cannot resolve; bins whose signed estimate goes negative are returned unclipped with a `CoherentSamplingWarning` (nonfinite power still raises `CoherentSamplingError`). Use `PointSpot()` with `PointBunch()`, or a finite footprint with `BunchLength` so offsets are averaged analytically.
 
@@ -212,7 +209,7 @@ metadata = spatial.pixel_metadata(pixels=[(128, 64), (128, 192)])
 shadow = spatial.transmission_image(5_000.0, component="brem")
 ```
 
-A pixelated detector always returns `spatial`; its `PlanarDetector.scorer` sets the angular partition and defaults to `PixelScorer()` (one tile). `simulate(pixel_scorer=...)` is deprecated (removed in 0.14.0) and moves the value onto the detector.
+A pixelated detector always returns `spatial`; its `PlanarDetector.scorer` sets the angular partition and defaults to `PixelScorer()` (one tile). `simulate(pixel_scorer=...)` was removed in 0.14.0; pass the scorer to `PlanarDetector`.
 
 Selected spectra include each pixel's solid angle and therefore have units of photons per incident electron per eV. `component="cxr"` and `"coherent"` are PXR/CBS only; `"characteristic"` is the atomic-relaxation component, and `"cxr_total"`/`"coherent_total"` add it to the corresponding line. `Result.cxr.incoherent.density` remains a detector- averaged density per sr. `SpatialResult` stores tile spectra, pixel rays, and attenuation coefficients as separate factors; `spectra` materializes only the selection and `image` works in bounded pixel chunks rather than allocating a full `(row, column, energy)` cube. Pass `measured=True` to either method to apply a configured `PlanarDetector.response` explicitly.
 
@@ -328,9 +325,9 @@ Use `physics.straggling` or `physics.elastic_model` for model sweep axes,
 `numerics.energy_bins.cxr` for sampled grids, and
 `numerics.cxr_reflections.n_families` for reflection truncation.
 `Sweep.cases(numerics=...)` replaces the base numerical policy before axes apply.
-Deprecated `numerics.<model>`, `numerics.convergence`, and detector-grid paths
-warn and forward until 0.14.0. Old and new spellings preserve lowered cases and
-content identities; conflicting values raise `ValueError`.
+`numerics.<model>`, `numerics.convergence`, and detector-grid paths were removed
+in 0.14.0. Use the canonical paths above; unchanged resolved inputs retain
+their content identities.
 
 Select the array backend before importing PyRITE, for example:
 

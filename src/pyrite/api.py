@@ -13,16 +13,13 @@ from typing import Any, cast
 import numpy as np
 
 from . import __version__
-from ._api_deprecations import warn_api
 from ._backend import BACKEND
-from ._numerics import LegacyEmissionPolicy, Physics, _emission_selection, resolve_physics
+from ._numerics import Physics, resolve_physics
 from .campaign.kinematic_validity import case_kinematic_validity
 from .campaign.lowering import build_case, build_sweep_cases, scene_physics
 from .campaign.model import (
-    BremSource,
     Numerics,
     Scene,
-    detector_with_scorer,
 )
 from .campaign.profiles import case_bremsstrahlung_marker, case_content_key
 from .detectors import Detector
@@ -221,10 +218,7 @@ def simulate(
     *,
     physics: Physics | None = None,
     numerics: Numerics | None = None,
-    emission: LegacyEmissionPolicy | None = None,
-    brem_source: BremSource | None = None,
     filters: tuple[FilterPlate | Filter, ...] = (),
-    pixel_scorer: PixelScorer | None = None,
     acquisition: Acquisition | None = None,
 ) -> Result:
     """Simulate one scene without reading or writing a checkpoint.
@@ -248,16 +242,8 @@ def simulate(
         Emission and interaction models. ``None`` uses :class:`~pyrite.Physics`.
     numerics
         Sampling and execution controls. ``None`` uses :class:`~pyrite.Numerics`.
-    emission
-        Deprecated: use ``Physics(emission=...)``.
-    brem_source
-        Deprecated: use ``Physics(brem_source=...)``.
     filters
         Ordered ``Filter`` or ``FilterPlate`` values; require a physical planar detector.
-    pixel_scorer
-        Deprecated: set :attr:`PlanarDetector.scorer`. A pixelated detector
-        always returns spatial output.
-
     Returns
     -------
     Result
@@ -278,17 +264,6 @@ def simulate(
     if not isinstance(resolved_numerics, Numerics):
         raise TypeError("numerics must be a Numerics")
     resolved_physics = resolve_physics(physics, resolved_numerics)
-    for name, value in (("emission", emission), ("brem_source", brem_source)):
-        if value is not None:
-            warn_api(f"simulate({name}=)")
-            if name == "emission":
-                value = _emission_selection(value)
-            if physics is not None and getattr(physics, name) != value:
-                raise ValueError(f"conflicting simulate({name}=) and Physics.{name}")
-            resolved_physics = replace(resolved_physics, **{name: value})
-    if pixel_scorer is not None:
-        warn_api("simulate(pixel_scorer=)")
-        detector = detector_with_scorer(detector, pixel_scorer)
     scene = Scene(
         beam=beam,
         target=target,
@@ -298,11 +273,6 @@ def simulate(
         physics=resolved_physics,
         numerics=resolved_numerics,
     )
-    if resolved_numerics.backend not in {"auto", BACKEND.name}:
-        raise ValueError(
-            f"Numerics.backend={resolved_numerics.backend!r} does not match the active "
-            f"backend {BACKEND.name!r}; select the backend before importing pyrite"
-        )
     case, xsgen_tables = _source_case(scene, resolved_numerics)
     if isinstance(scene.detector, PlanarDetector):
         return _simulate_planar(scene, resolved_numerics, case, xsgen_tables)
@@ -375,7 +345,7 @@ def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
     ValueError
         If ``scene`` lacks a pixelated detector or an acquisition.
     """
-    scene = replace(scene, physics=scene_physics(scene, numerics), _physics_explicit=True)
+    scene = replace(scene, physics=scene_physics(scene, numerics))
     detector = scene.detector
     if not isinstance(detector, PlanarDetector) or scene.acquisition is None:
         raise ValueError("observation production requires a pixelated detector and acquisition")

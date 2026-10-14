@@ -26,13 +26,12 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import product
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 
-from .._api_deprecations import warn_api
 from .._energy_grid_encoding import decode_energy_grid
 from .._formatting import fmt_thickness
 from ..detectors import Detector
@@ -164,7 +163,7 @@ def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
     """Fixed crystallography for a material: composition, the dominant
     reflections, exactly one direct beam axis [uvw] or reciprocal surface (hkl),
     the isotropic B-factor, and a sensible default photon-energy grid. Override
-    the grid via ``Sweep.detector.energy_bins``."""
+    the grid via ``Sweep.energy_bins``."""
     crystal_key = material
     if material in CATALOG.materials:
         crystal_key = CATALOG.material(material).crystal_key
@@ -267,7 +266,6 @@ DEFAULT_FOOTPRINT = Footprint(5.0, 5.0)
 #: Placeholder for an omitted ``footprint``. ``None`` already means the infinite
 #: slab, so "not supplied" needs its own value; through the #451 deprecation
 #: window it resolves, with a warning, to :data:`DEFAULT_FOOTPRINT`.
-_UNSET_FOOTPRINT: Any = cast(Any, object())
 
 DEFAULT_SUBSTRATE_THICKNESS_ANG = 5e6
 """The historical ``substrate_thickness_ang`` default: a 0.5 mm wafer."""
@@ -411,10 +409,6 @@ class _TargetGeometry:
         return _quantized_angles(self.tilt_deg), _quantized_angles(self.tilt_azim_deg)
 
     def _validate_geometry(self) -> None:
-        if self.footprint is _UNSET_FOOTPRINT:
-            # stacklevel 5: warn_api -> here -> __post_init__ -> __init__ -> caller.
-            warn_api(f"{type(self).__name__}() without footprint=", stacklevel=5)
-            object.__setattr__(self, "footprint", DEFAULT_FOOTPRINT)
         if self.footprint is not None and not isinstance(self.footprint, Footprint):
             raise TypeError("footprint must be a Footprint or None (the infinite slab)")
         tilts, azimuths = self._angles()
@@ -527,8 +521,7 @@ class Slab(_TargetGeometry):
         Polar and azimuthal crystal tilt angles in degrees. Scalars or sequences.
     footprint
         Required: a finite :class:`Footprint`, or ``None`` for a laterally
-        infinite slab. Omitting it is deprecated and falls back to a
-        5 mm x 5 mm footprint.
+        infinite slab.
     entrance_face
         Optional supported blazed-groove geometry.
     allow_normal_incidence
@@ -542,7 +535,7 @@ class Slab(_TargetGeometry):
     thickness_ang: ScalarOrSeq = 2e4
     tilt_deg: ScalarOrSeq = 30.0
     tilt_azim_deg: ScalarOrSeq = 0.0
-    footprint: Footprint | None = _UNSET_FOOTPRINT
+    footprint: Footprint | None = field(kw_only=True)
     entrance_face: BlazedGrooves | None = None
     allow_normal_incidence: bool = False
     # Crystal mosaicity is a property of the target crystal, not of the run: True
@@ -586,7 +579,7 @@ class Stack(_TargetGeometry):
         Polar and azimuthal stack tilt angles in degrees. Scalars or sequences.
     footprint
         Required: a finite :class:`Footprint`, or ``None`` for infinite lateral
-        extent. Omitting it is deprecated and falls back to 5 mm x 5 mm.
+        extent.
     allow_normal_incidence
         Permit normally incident geometry.
     mosaic
@@ -596,7 +589,7 @@ class Stack(_TargetGeometry):
     layers: tuple[Layer, ...]
     tilt_deg: ScalarOrSeq = 30.0
     tilt_azim_deg: ScalarOrSeq = 0.0
-    footprint: Footprint | None = _UNSET_FOOTPRINT
+    footprint: Footprint | None = field(kw_only=True)
     allow_normal_incidence: bool = False
     mosaic: bool = False
 
@@ -630,7 +623,7 @@ class Stack(_TargetGeometry):
         *,
         tilt_deg: ScalarOrSeq = 30.0,
         tilt_azim_deg: ScalarOrSeq = 0.0,
-        footprint: Footprint | None = _UNSET_FOOTPRINT,
+        footprint: Footprint | None,
         allow_normal_incidence: bool = False,
         mosaic: bool = False,
     ) -> Stack:
@@ -640,9 +633,6 @@ class Stack(_TargetGeometry):
         constructor: :class:`Stack` itself requires the film plus at least one
         layer beneath it, so a caller who wants only a substrate builds it here.
         """
-        if footprint is _UNSET_FOOTPRINT:
-            warn_api("Stack() without footprint=")
-            footprint = DEFAULT_FOOTPRINT
         return cls(
             layers=(
                 Layer(material, thickness_ang),

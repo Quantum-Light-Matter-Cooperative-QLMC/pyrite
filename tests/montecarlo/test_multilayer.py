@@ -30,7 +30,7 @@ from pyrite.campaign.sweep import (
     substrate_composition,
     substrate_radiator,
 )
-from pyrite.detectors import Detector, EnergyBins
+from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import (
     _layer_dz,
     _layer_path_length,
@@ -460,7 +460,7 @@ def _cuda_accumulation_case():
         target=Stack.on_substrate(
             "mose2", 300.0, "silicon", 3000.0, tilt_deg=-30.0, footprint=Footprint(5.0, 5.0)
         ),
-        detector=Detector(energy_bins=EnergyBins(cxr=line, brem=brem)),
+        energy_bins=EnergyBins(cxr=line, brem=brem),
     )
     # The manual reference below uses the same bounded launches as the runner;
     # it only changes the association of the four per-layer contributions.

@@ -657,18 +657,14 @@ def _production_case(kind, tmp_path, monkeypatch):
     from pyrite.campaign.config import material_sweep
     from pyrite.campaign.geometry import Stack
     from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
-    from pyrite.detectors import Detector, EnergyBins
+    from pyrite.detectors import EnergyBins
 
-    bins = Detector(
-        energy_bins=EnergyBins(
-            cxr=np.arange(100.0, 3500.0, 20.0), brem=np.arange(100.0, 30000.0, 500.0)
-        )
-    )
+    bins = EnergyBins(cxr=np.arange(100.0, 3500.0, 20.0), brem=np.arange(100.0, 30000.0, 500.0))
     if kind == "flat":
         sweep = Sweep(
             material="hopg", thickness_ang=1e4, beam=BeamSpec(energy_keV=30.0), tilt_deg=30.0
         )
-        sweep = replace(sweep, detector=bins)
+        sweep = replace(sweep, energy_bins=bins)
     elif kind == "grooved":
         sweep = Sweep(
             material="hopg",
@@ -679,7 +675,7 @@ def _production_case(kind, tmp_path, monkeypatch):
             beam=BeamSpec(energy_keV=30.0),
             crystal_width_mm=None,
             crystal_height_mm=None,
-            detector=bins,
+            energy_bins=bins,
         )
     elif kind == "multilayer":
         sweep = Sweep(
@@ -688,7 +684,7 @@ def _production_case(kind, tmp_path, monkeypatch):
             target=Stack.on_substrate(
                 "mose2", 300.0, "silicon", 3000.0, tilt_deg=-30.0, footprint=Footprint(5.0, 5.0)
             ),
-            detector=bins,
+            energy_bins=bins,
         )
     elif kind == "secondaries":
         sweep = Sweep(
@@ -696,7 +692,7 @@ def _production_case(kind, tmp_path, monkeypatch):
             thickness_ang=2e4,
             beam=BeamSpec(energy_keV=30.0),
             tilt_deg=30.0,
-            detector=bins,
+            energy_bins=bins,
         )
         build = dict(
             inelastic_model="shell-soft-hard",

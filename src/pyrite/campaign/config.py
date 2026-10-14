@@ -258,8 +258,6 @@ def material_sweep(
                 ),
                 supplied_legacy.get("solid_angle_sr", resolved_catalog_detector.solid_angle_sr),
             ),
-            energy_bins=resolved_catalog_detector.energy_bins,
-            _energy_bins_explicit=resolved_catalog_detector._energy_bins_explicit,
             response=resolved_catalog_detector.response,
         )
     )
@@ -280,50 +278,48 @@ def material_sweep(
                 "physical detector pose instead"
             )
         resolved_detector = resolved_catalog_detector
-    current_bins = resolved_detector.energy_bins
+    current_bins = EnergyBins()
     missing = object()
     cxr_override = overrides.pop("E_grid_line", missing)
     legacy_cxr_override = overrides.pop("e_grid_eV", missing)
     if legacy_cxr_override is not missing:
         warnings.warn(
-            "e_grid_eV is deprecated; use detector=Detector(energy_bins=EnergyBins(cxr=...)) "
+            "e_grid_eV is deprecated; use E_grid_line= "
             "or E_grid_line= during the D7 compatibility window",
             DeprecationWarning,
             stacklevel=2,
         )
     cxr_by_energy_override = overrides.pop("E_grid_line_by_energy", missing)
     brem_override = overrides.pop("E_grid_brem", missing)
-    resolved_detector = replace(
-        resolved_detector,
-        energy_bins=EnergyBins(
-            cxr=(
-                cxr_override
-                if cxr_override is not missing
-                else legacy_cxr_override
-                if legacy_cxr_override is not missing
-                else current_bins.cxr
-                if current_bins.cxr is not None
-                else scan.E_grid_line
-            ),
-            cxr_by_energy=(
-                cxr_by_energy_override
-                if cxr_by_energy_override is not missing
-                else current_bins.cxr_by_energy
-                if current_bins.cxr_by_energy is not None
-                else scan.E_grid_line_by_energy
-            ),
-            brem=(
-                brem_override
-                if brem_override is not missing
-                else current_bins.brem
-                if current_bins.brem is not None
-                else scan.E_grid_brem
-            ),
+    bins = EnergyBins(
+        cxr=(
+            cxr_override
+            if cxr_override is not missing
+            else legacy_cxr_override
+            if legacy_cxr_override is not missing
+            else current_bins.cxr
+            if current_bins.cxr is not None
+            else scan.E_grid_line
+        ),
+        cxr_by_energy=(
+            cxr_by_energy_override
+            if cxr_by_energy_override is not missing
+            else current_bins.cxr_by_energy
+            if current_bins.cxr_by_energy is not None
+            else scan.E_grid_line_by_energy
+        ),
+        brem=(
+            brem_override
+            if brem_override is not missing
+            else current_bins.brem
+            if current_bins.brem is not None
+            else scan.E_grid_brem
         ),
     )
     sweep = Sweep(
         material=spec.crystal_key,
         detector=resolved_detector,
+        energy_bins=bins,
         beam=beam,
         # The catalog speaks the flat geometry vocabulary, so the scan grid is
         # projected onto the target here rather than handed to Sweep's retired
@@ -424,12 +420,10 @@ def trajectory_sweep(
     return Sweep(
         material=spec.crystal_key,  # named stacks: the film
         beam=BeamSpec(energy_keV=list(energies)),
-        detector=Detector(
-            energy_bins=EnergyBins(
-                cxr=scan.E_grid_line,
-                cxr_by_energy=scan.E_grid_line_by_energy,
-                brem=scan.E_grid_brem,
-            )
+        energy_bins=EnergyBins(
+            cxr=scan.E_grid_line,
+            cxr_by_energy=scan.E_grid_line_by_energy,
+            brem=scan.E_grid_brem,
         ),
         target=target_from_flat(
             spec.crystal_key,

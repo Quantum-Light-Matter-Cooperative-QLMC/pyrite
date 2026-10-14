@@ -88,9 +88,6 @@ if TYPE_CHECKING:
         Analysis as Analysis,
     )
     from pyrite.campaign.model import (
-        Convergence as Convergence,
-    )
-    from pyrite.campaign.model import (
         Numerics as Numerics,
     )
     from pyrite.campaign.model import (
@@ -183,7 +180,6 @@ _PUBLIC_OBJECTS = {
     "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
     "Physics": ("pyrite._numerics", "Physics"),
     "CxrReflections": ("pyrite._numerics", "CxrReflections"),
-    "Convergence": ("pyrite.campaign.model", "Convergence"),
     "CxrSpectra": ("pyrite.results.model", "CxrSpectra"),
     "AngularAcceptance": ("pyrite.detectors", "AngularAcceptance"),
     "SensorAcceptance": ("pyrite.detectors", "SensorAcceptance"),
@@ -228,11 +224,6 @@ def __getattr__(name: str) -> Any:
     # import-linter layer contracts.
     from importlib import import_module
 
-    if name == "Point":
-        from pyrite._api_deprecations import warn_api
-
-        warn_api("pyrite.Point")
-        return import_module("pyrite.campaign.beam").PointSpot
     try:
         module_name, attribute = _PUBLIC_OBJECTS[name]
     except KeyError as exc:

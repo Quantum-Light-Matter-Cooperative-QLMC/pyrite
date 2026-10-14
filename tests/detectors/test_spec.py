@@ -8,7 +8,6 @@ import pytest
 from pyrite.detectors import (
     Detector,
     DetectorSpec,
-    EnergyBins,
     LegacyEDS,
     Timepix3,
     convolve_detector,
@@ -16,27 +15,18 @@ from pyrite.detectors import (
 )
 
 
-def test_detector_is_frozen_and_owns_acceptance_binning_and_response():
-    bins = EnergyBins(
-        cxr=np.array([75.0, 78.0]),
-        cxr_by_energy={30.0: np.array([75.0])},
-        brem=np.array([0.0, 100.0]),
-    )
-    detector = Detector(119.0, 16.6, 0.066, bins, Timepix3(thickness_um=500.0))
+def test_detector_is_frozen_and_owns_acceptance_and_response():
+    from pyrite.detectors import AngularAcceptance
 
+    detector = Detector(
+        119.0,
+        acceptance=AngularAcceptance(polar_deg=16.6, solid_angle_sr=0.066),
+        response=Timepix3(thickness_um=500.0),
+    )
     payload = asdict(detector)
     assert payload["observation_angle_deg"] == 119.0
-    assert payload["energy_bins"]["cxr_by_energy"][30.0].tolist() == [75.0]
     assert payload["response"]["thickness_um"] == 500.0
-    for retired in (
-        "response_model",
-        "qe_curve",
-        "pixel_pitch_um",
-        "sensor_thickness_um",
-        "distance_mm",
-        "threshold_eV",
-    ):
-        assert not hasattr(detector, retired)
+    assert "energy_bins" not in payload
     with pytest.raises(FrozenInstanceError):
         detector.solid_angle_sr = 1.0
 
@@ -73,7 +63,7 @@ def test_legacy_response_is_bit_for_bit_the_historical_read_path():
 
 def test_detector_spec_is_a_deprecated_compatible_detector():
     with pytest.warns(DeprecationWarning, match="DetectorSpec is deprecated"):
-        detector = DetectorSpec(119.0, 16.6, 0.066)
+        detector = DetectorSpec(119.0)
     assert isinstance(detector, Detector)
     assert detector.observation_angle_deg == 119.0
 
@@ -84,11 +74,11 @@ def test_detector_spec_is_a_deprecated_compatible_detector():
         ({"observation_angle_deg": float("nan")}, "must be finite"),
         ({"observation_angle_deg": -1.0}, "must be >= 0 and <= 180"),
         ({"observation_angle_deg": 181.0}, "must be >= 0 and <= 180"),
-        ({"polar_acceptance_deg": 0.0}, "must be positive"),
-        ({"polar_acceptance_deg": 181.0}, "full polar span"),
-        ({"solid_angle_sr": 0.0}, "must be positive"),
-        ({"solid_angle_sr": 13.0}, r"must be <= 4\*pi sr"),
-        ({"energy_bins": object()}, "must be an EnergyBins"),
+        ({"polar_acceptance_deg": 0.0}, "unexpected keyword"),
+        ({"polar_acceptance_deg": 181.0}, "unexpected keyword"),
+        ({"solid_angle_sr": 0.0}, "unexpected keyword"),
+        ({"solid_angle_sr": 13.0}, "unexpected keyword"),
+        ({"energy_bins": object()}, "unexpected keyword"),
         ({"response": object()}, r"must implement score\(\)"),
     ],
 )

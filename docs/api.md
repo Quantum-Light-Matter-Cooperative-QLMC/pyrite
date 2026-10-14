@@ -178,7 +178,7 @@ grouped families and `combined_cxr()`. `Result` takes keyword arguments only. `N
 `EnergyBins.cxr`/`cxr_by_energy` and `Precision(observables=("cxr", "brem"))`
 use the same vocabulary. Historical case/checkpoint/hash keys remain unchanged.
 
-`simulate(..., physics=pr.Physics(emission="both", straggling=True))` separates
+`simulate(..., physics=pr.Physics(emission=("incoherent", "coherent"), straggling=True))` separates
 model choices from numerical accuracy. Sampled photon grids belong to
 `pr.Numerics(energy_bins=pr.EnergyBins(cxr=..., brem=...))`; detector geometry
 and read-time response do not own them. `Numerics.cxr_reflections` takes
@@ -186,12 +186,14 @@ and read-time response do not own them. `Numerics.cxr_reflections` takes
 Omitted grids still resolve from the catalog and built-in policy. Profile TOML
 and CLI spellings are unchanged.
 
-Through the D7 window ending in 0.14.0, `Convergence`, `Numerics(convergence=...)`,
+Removed in 0.14.0: `Convergence`, `Numerics(convergence=...)`,
 model keywords on `Numerics`, `simulate(emission=..., brem_source=...)`, and
-detector `energy_bins` keywords forward with a deprecation warning. Conflicting
-old and new values raise `ValueError`; equal values are accepted. Sweep paths
-use `physics.<model>`, `numerics.energy_bins`, and `numerics.cxr_reflections`;
-old ownership paths forward with the same warning and removal target.
+detector `energy_bins` keywords. Use `physics.<model>`, `numerics.energy_bins`,
+and `numerics.cxr_reflections` for sweep paths; old ownership paths are rejected.
+Beam transverse/longitudinal descriptions and target footprints are required.
+Use `PointSpot`, `PlanarDetector.scorer`, and `Detector(acceptance=...)` in place
+of the removed `Point`, loose `pixel_scorer`, and flat detector acceptance inputs.
+Select `PYRITE_MC_BACKEND` before import rather than passing `Numerics.backend`.
 
 For a physical pixel detector, `Acquisition` freezes exposure, explicit half-open measured-energy reporting edges, a post-response hit cut, and expected-versus-seeded-Poisson mode. `Result.acquire()` returns selected-pixel `AcquisitionBatch` records with registered reporting-bin counts and separate underflow, overflow, and below-cut accounting. `Result.acquisition_image()` contracts total or reporting-edge-aligned energy-window images in bounded pixel chunks. Expected counts use exposure, bunch charge, cadence, and the exact elementary charge; optional Poisson realizations are stable under selection and chunk-order changes. `ResolvedObservation` is the profile-lowered detector/scorer/filter/acquisition record. It deliberately projects back to the unchanged scalar `Detector` used by intrinsic transport.
 
@@ -324,7 +326,6 @@ CLI commands are unchanged.
    pyrite.Sweep
    pyrite.Physics
    pyrite.CxrReflections
-   pyrite.Convergence
    pyrite.Numerics
    pyrite.Precision
    pyrite.Analysis

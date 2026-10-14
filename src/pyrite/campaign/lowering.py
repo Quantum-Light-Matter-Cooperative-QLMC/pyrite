@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
+from .._energy_bins import EnergyBins
 from .._numerics import Numerics, Physics, resolve_physics
 from ..instrument import PlanarDetector
 from ..montecarlo import Case
@@ -14,10 +15,8 @@ from .sweep import build_cases
 
 
 def scene_physics(scene: Scene, numerics: Numerics) -> Physics:
-    """Resolve the scene's model policy and deprecated forwarding inputs."""
-    physics = resolve_physics(scene.physics if scene._physics_explicit else None, numerics)
-    if not scene._physics_explicit and scene._policy_overrides:
-        physics = replace(physics, **dict(scene._policy_overrides))
+    """Resolve the scene's model policy."""
+    physics = resolve_physics(scene.physics, numerics)
     physics.validate_transport(numerics.energy_model)
     return physics
 
@@ -34,17 +33,13 @@ def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
         if isinstance(scene.detector, PlanarDetector)
         else scene.detector
     )
-    bins = numerics.energy_bins
-    if bins is not None:
-        if scene.detector._energy_bins_explicit and scene.detector.energy_bins != bins:
-            raise ValueError("conflicting detector.energy_bins and Numerics.energy_bins")
-        scalar_detector = replace(scalar_detector, energy_bins=bins, _energy_bins_explicit=False)
     target = scene.target_spec
     legacy = LegacySweep(
         material=target.material,
         beam=scene.beam.to_spec(),
         target=target,
         detector=scalar_detector,
+        energy_bins=numerics.energy_bins or EnergyBins(),
         n_families=convergence.n_families,
         max_reflections=convergence.max_reflections,
         spec_chunk=numerics.cxr_chunk,

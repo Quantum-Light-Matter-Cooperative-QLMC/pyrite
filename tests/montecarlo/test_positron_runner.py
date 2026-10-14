@@ -23,13 +23,14 @@ from .test_pair_production_runner import COUPLED, PAIR, SHELL
 POSITRON = {"positron_transport": True}
 
 
-def test_numerics_and_settings_require_pair_conversion():
-    assert pr.Numerics().positron_transport is False
-    assert pr.Numerics(**SHELL, **COUPLED, **PAIR, **POSITRON).positron_transport is True
+def test_physics_and_settings_require_pair_conversion():
+    shell_physics = {key: value for key, value in SHELL.items() if key != "energy_model"}
+    assert pr.Physics().positron_transport is False
+    assert pr.Physics(**shell_physics, **COUPLED, **PAIR, **POSITRON).positron_transport is True
     with pytest.raises(ValueError, match="positron_transport requires pair_production_model"):
-        pr.Numerics(**SHELL, **COUPLED, **POSITRON)
+        pr.Physics(**shell_physics, **COUPLED, **POSITRON)
     with pytest.raises(TypeError, match="must be a bool"):
-        pr.Numerics(**SHELL, **COUPLED, **PAIR, positron_transport="yes")
+        pr.Physics(**shell_physics, **COUPLED, **PAIR, positron_transport="yes")
     with pytest.raises(ValueError, match="positron_transport requires pair_production_model"):
         replace(default_settings(), **SHELL, **COUPLED, **POSITRON)
 

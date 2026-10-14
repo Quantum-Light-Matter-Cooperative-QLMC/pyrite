@@ -175,7 +175,7 @@ def sweep(material: str, fidelity: str, *, catalog_profile: str = "standard"):
             indices = np.linspace(0, array.size - 1, limit, dtype=int)
             return array[indices]
 
-        bins = current.detector.energy_bins
+        bins = current.energy_bins
         cxr_by_energy = bins.cxr_by_energy
         if cxr_by_energy is not None:
             cxr_by_energy = {
@@ -190,10 +190,7 @@ def sweep(material: str, fidelity: str, *, catalog_profile: str = "standard"):
             thickness_ang=reduced(current.thickness_ang, 3),
             tilt_deg=reduced(current.tilt_deg, 5),
             tilt_azim_deg=reduced(current.tilt_azim_deg, 2),
-            detector=replace(
-                current.detector,
-                energy_bins=replace(bins, cxr_by_energy=cxr_by_energy, brem=brem),
-            ),
+            energy_bins=replace(bins, cxr_by_energy=cxr_by_energy, brem=brem),
             n_families=2,
         )
 

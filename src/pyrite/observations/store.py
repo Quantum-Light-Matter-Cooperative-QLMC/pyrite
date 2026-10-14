@@ -276,7 +276,7 @@ def observation_from_result(result: Result) -> StoredObservation:
         acquisition=scene.acquisition,
         rep_rate_hz=float(scene.beam.rep_rate_hz),
         bunch_charge_pc=float(scene.beam.bunch_charge_pc),
-        emission=str(scene.emission),
+        emission=scene.physics.emission_policy,
         provenance=_jsonable(
             {key: result.provenance[key] for key in _PROVENANCE_KEYS if key in result.provenance}
         ),

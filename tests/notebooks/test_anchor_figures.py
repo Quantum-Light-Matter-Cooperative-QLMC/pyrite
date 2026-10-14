@@ -14,6 +14,8 @@ import matplotlib
 import numpy as np
 import pytest
 
+from pyrite.detectors import AngularAcceptance
+
 matplotlib.use("Agg")  # headless; no display in CI
 
 from pyrite.detectors import Detector, LegacyEDS, convolve_detector, detector_efficiency
@@ -67,7 +69,9 @@ def test_zhai_detector_is_canonical_and_survives_current_case_path(anchor):
     )
 
     assert anchor.detector is af.ZHAI_DETECTOR
-    assert anchor.detector == Detector(119.0, 16.6, 0.066)
+    assert anchor.detector == Detector(
+        119.0, acceptance=AngularAcceptance(polar_deg=16.6, solid_angle_sr=0.066)
+    )
     assert case["theta_obs_rad"] == pytest.approx(np.deg2rad(119.0))
     assert case["dtheta_obs_rad"] == pytest.approx(np.deg2rad(16.6))
     assert case["domega_sr"] == pytest.approx(0.066)
@@ -76,7 +80,9 @@ def test_zhai_detector_is_canonical_and_survives_current_case_path(anchor):
 
 
 def test_observation_angle_changes_case_and_line_energy(anchor):
-    changed = af.ZhaiAnchor(detector=Detector(100.0, 16.6, 0.066))
+    changed = af.ZhaiAnchor(
+        detector=Detector(100.0, acceptance=AngularAcceptance(polar_deg=16.6, solid_angle_sr=0.066))
+    )
     case = af.fig1c_case(
         changed,
         25.0,
@@ -91,7 +97,7 @@ def test_observation_angle_changes_case_and_line_energy(anchor):
 
 
 def test_model_routes_resolved_case_geometry_through_all_components(monkeypatch):
-    detector = Detector(101.0, 12.0, 0.02)
+    detector = Detector(101.0, acceptance=AngularAcceptance(polar_deg=12.0, solid_angle_sr=0.02))
     anchor = af.ZhaiAnchor(detector=detector, energies_keV=(25.0,))
     geometry_calls = []
     aperture_calls = []

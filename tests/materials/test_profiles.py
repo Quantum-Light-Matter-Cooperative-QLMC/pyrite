@@ -27,7 +27,7 @@ from pyrite.campaign.profiles import (
 )
 from pyrite.campaign.sweep import BeamSpec, build_cases, target_flat_fields
 from pyrite.checkpoints import _checkpoint_store
-from pyrite.detectors import Detector, EnergyBins, Timepix3
+from pyrite.detectors import AngularAcceptance, Detector, Timepix3
 from pyrite.energy_grid.floor import floored_lattice_start_eV
 from pyrite.materials import CATALOG
 from pyrite.montecarlo.spectrum import (
@@ -322,9 +322,9 @@ def test_survey_profile_reduces_configured_expensive_sweep_dimensions():
     assert len(np.atleast_1d(survey_geometry["tilt_deg"])) <= 5
     assert len(np.atleast_1d(survey_geometry["tilt_azim_deg"])) <= 2
     assert survey.n_families == 2
-    assert len(survey.detector.energy_bins.brem) < len(full.detector.energy_bins.brem)
-    assert not survey.detector.energy_bins.cxr_by_energy
-    assert not full.detector.energy_bins.cxr_by_energy
+    assert len(survey.energy_bins.brem) < len(full.energy_bins.brem)
+    assert not survey.energy_bins.cxr_by_energy
+    assert not full.energy_bins.cxr_by_energy
     cases = build_cases(survey, settings.n_electrons, settings.n_electrons_brem)
     assert cases
     assert all(len(case["hkl_list"]) <= 4 for case in cases)
@@ -603,14 +603,18 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
 def test_nondefault_detector_round_trips_cases_identity_and_stem():
     settings = default_settings()
     standard_sweep = material_sweep("hopg")
-    detector = Detector(119.0, 16.6, 0.066, response=Timepix3(thickness_um=500.0))
+    detector = Detector(
+        119.0,
+        response=Timepix3(thickness_um=500.0),
+        acceptance=AngularAcceptance(polar_deg=16.6, solid_angle_sr=0.066),
+    )
     custom_sweep = material_sweep("hopg", detector=detector)
     standard = dataset_identity("hopg", "full", settings, standard_sweep)
     custom = dataset_identity("hopg", "full", settings, custom_sweep)
     case = build_cases(custom_sweep)[0]
     payload = custom["resolved_parameters"]["sweep"]
 
-    assert replace(custom_sweep.detector, energy_bins=EnergyBins()) == detector
+    assert custom_sweep.detector == detector
     assert case["theta_obs_rad"] == pytest.approx(np.deg2rad(119.0))
     assert case["dtheta_obs_rad"] == pytest.approx(np.deg2rad(16.6))
     assert case["domega_sr"] == pytest.approx(0.066)
@@ -626,8 +630,8 @@ def test_nondefault_detector_round_trips_cases_identity_and_stem():
     "detector",
     [
         Detector(observation_angle_deg=119.0),
-        Detector(polar_acceptance_deg=16.6),
-        Detector(solid_angle_sr=0.066),
+        Detector(_legacy_acceptance=(16.6, None)),
+        Detector(_legacy_acceptance=(None, 0.066)),
     ],
 )
 def test_every_nondefault_detector_acceptance_field_changes_identity(detector):
@@ -1077,9 +1081,9 @@ def test_reference_detector_migration_preserves_dataset_and_case_identity(name):
         sweep,
         detector=Detector(
             observation_angle_deg=sweep.detector.observation_angle_deg,
-            energy_bins=sweep.detector.energy_bins,
             response=sweep.detector.response,
         ),
+        energy_bins=sweep.energy_bins,
     )
     settings = profiles.profile_run_settings(default_settings(), name, "full")
     assert dataset_identity(
@@ -1116,11 +1120,7 @@ def test_bundled_profile_display_has_explicit_detector_acceptance():
 def test_implicit_brem_default_preserves_case_keys_and_dataset_identity(material):
     sweep = material_sweep(material, thickness_ang=1e4, tilt_deg=45.0, tilt_azim_deg=135.0)
     explicit = replace(
-        sweep,
-        detector=replace(
-            sweep.detector,
-            energy_bins=replace(sweep.detector.energy_bins, brem=np.arange(0.0, 30000.0, 25.0)),
-        ),
+        sweep, energy_bins=replace(sweep.energy_bins, brem=np.arange(0.0, 30000.0, 25.0))
     )
     settings = default_settings()
     assert dataset_identity(material, "full", settings, sweep) == dataset_identity(

@@ -157,10 +157,11 @@ def test_old_sweep_axis_path_is_removed():
         Slab("hopg", thickness_ang=1000, footprint=Footprint(5.0, 5.0)),
         Detector(),
     )
-    with pytest.raises(ValueError, match="line"):
+    with pytest.raises(ValueError, match="energy_bins"):
         Sweep(scene, {"detector.energy_bins.line": ([1, 2],)}).expand()
-    with pytest.warns(DeprecationWarning, match="Numerics"):
-        expanded = Sweep(scene, {"detector.energy_bins.cxr": ([1, 2],)}).expand()[0][1]
+    with pytest.raises(ValueError, match="energy_bins"):
+        Sweep(scene, {"detector.energy_bins.cxr": ([1, 2],)})
+    expanded = Sweep(scene, {"numerics.energy_bins.cxr": ([1, 2],)}).expand()[0][1]
     np.testing.assert_array_equal(expanded.numerics.energy_bins.cxr, [1, 2])
 
 

@@ -8,7 +8,7 @@ from dataclasses import replace
 import pytest
 
 from pyrite import _numerics
-from pyrite._numerics import Numerics
+from pyrite._numerics import Numerics, Physics, resolve_physics
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import build_cases
 from pyrite.montecarlo import runner
@@ -21,20 +21,25 @@ def test_numerics_inelastic_models_track_the_transport_constant():
     assert _numerics.INELASTIC_MODELS == ("auto", *INELASTIC_MODELS)
 
 
-@pytest.mark.parametrize("owner", (Numerics, Settings))
+@pytest.mark.parametrize("owner", (Physics, Settings))
 def test_inelastic_settings_validate_coupling(owner):
+    def configured(*, energy_model="midpoint", **kwargs):
+        if owner is Physics:
+            return resolve_physics(Physics(**kwargs), Numerics(energy_model=energy_model))
+        return owner(energy_model=energy_model, **kwargs)
+
     assert owner().inelastic_model == "auto"
     owner(inelastic_cutoff_eV=60.0)
-    owner(energy_model="midpoint", inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
+    configured(energy_model="midpoint", inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
     with pytest.raises(ValueError, match="requires energy_model='midpoint'"):
-        owner(
+        configured(
             energy_model="frozen",
             radiative_model="uncoupled",
             inelastic_model="shell-soft-hard",
             inelastic_cutoff_eV=50.0,
         )
     with pytest.raises(ValueError, match="finite positive inelastic_cutoff_eV"):
-        owner(energy_model="midpoint", inelastic_model="shell-soft-hard")
+        configured(energy_model="midpoint", inelastic_model="shell-soft-hard")
     with pytest.raises(ValueError, match="requires inelastic_model"):
         owner(inelastic_model="continuous", inelastic_cutoff_eV=50.0)
     with pytest.raises(ValueError, match="requires inelastic_model"):
