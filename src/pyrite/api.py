@@ -382,7 +382,7 @@ def _detector_scorer(detector: PlanarDetector) -> PixelScorer:
 
 
 def _cxr_grid_provenance(case, output) -> dict[str, object]:
-    """Resolved line-grid policy and coordinates, when resolution was automatic.
+    """Line-data coverage and any automatically resolved grid provenance.
 
     Records the policy, the per-observable tolerances, the configuration source
     of each, and the resolved coordinate set -- the provenance half of #101's
@@ -390,10 +390,13 @@ def _cxr_grid_provenance(case, output) -> dict[str, object]:
     source". The identity half is that the policy sits in the case payload, so
     ``case_content_key`` already moves when any of it moves.
     """
+    provenance: dict[str, object] = {}
+    if "line_data_coverage" in output:
+        provenance["line_data_coverage"] = output["line_data_coverage"]
     policy = case.get("line_grid_policy")
     if policy is None:
-        return {}
-    provenance: dict[str, object] = {"line_grid_policy": policy}
+        return provenance
+    provenance["line_grid_policy"] = policy
     resolved = output.get("line_grid_resolved")
     if resolved is not None:
         provenance["line_grid_resolved"] = resolved

@@ -64,6 +64,7 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
             "E_grid_brem": np.array([1.0, 2.0, 3.0]),
             "brem_wide": np.array([5.0, 6.0, 7.0]),
             "brem": np.array([5.0, 6.0]),
+            "line_data_coverage": [{"schema": "line-data-coverage.v1", "counts": {"pairs": 2}}],
         }
 
     monkeypatch.setattr(api, "run_case", fake_run_case)
@@ -81,6 +82,8 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
     assert len(result.provenance["identity_digest"]) == 64
     assert result.provenance["kinematic_validity"]["reflections"]
     assert "kinematic_validity" not in result.case
+    assert result.provenance.line_data_coverage[0]["counts"]["pairs"] == 2
+    assert "line_data_coverage" not in result.case
     assert result.provenance["xsgen_tables"]
     from pyrite._physics_contract import ResolvedPhysicsView
     from pyrite.campaign.profiles import _jsonable

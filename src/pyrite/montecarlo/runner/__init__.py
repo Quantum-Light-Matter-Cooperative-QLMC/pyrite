@@ -42,6 +42,7 @@ from ..spectrum import (
 )
 from ..spectrum.coherent_population import physical_bunch_electrons
 from ..spectrum.cxr import _setup as _cxr_setup
+from ..spectrum.cxr._coverage import collect_line_data_coverage
 from ..spectrum.cxr._temporal import case_temporal_profiles, temporal_outputs
 from ..trajectories import TrajectoryCapture
 from ..transport import (
@@ -629,13 +630,14 @@ def _cxr_for_segments(
                 flush=True,
             )
         try:
-            if n_blocks == 1:
-                return once(segs)
-            spec = None
-            for block in iter_electron_blocks(segs, n_blocks):
-                part = once(block)
-                spec = part if spec is None else spec + part
-            return spec
+            with collect_line_data_coverage():
+                if n_blocks == 1:
+                    return once(segs)
+                spec = None
+                for block in iter_electron_blocks(segs, n_blocks):
+                    part = once(block)
+                    spec = part if spec is None else spec + part
+                return spec
         except Exception as error:
             if not _is_gpu_oom(error) or n_blocks >= MAX_ELECTRON_BLOCKS:
                 raise
@@ -1020,7 +1022,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         truncation_audit=truncation_audit,
         temporal=temporal,
     )
-    with _nsys_range("pyrite.lines"):
+    with _nsys_range("pyrite.lines"), collect_line_data_coverage() as line_coverage:
         try:
             spec = emission.cxr.evaluate(batch, "spec").values
 
@@ -1102,6 +1104,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     else:
         out_pool = {}
     out = dict(
+        line_data_coverage=line_coverage,
         E_grid=E_grid,
         spec=spec,
         spec_characteristic=spec_characteristic,

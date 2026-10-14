@@ -187,6 +187,31 @@ Follow those rows in the [validation ledger](../../validation/physics-validation
 
 ## Runtime kinematic screen
 
+The line scorer also screens the transported population for optical-data
+coverage before output-axis masks. `LineOpticalDataWarning` reports positive
+vacuum seeds outside the available optical domain and in-domain seeds whose
+production root lookup encounters missing optical data. This remains visible
+when an automatic axis ends below the missing lines. It does not extrapolate
+Chantler or recover those lines.
+
+`Result.provenance.line_data_coverage` and checkpoint line records retain one
+`line-data-coverage.v1` record per successful spectrum call, direction and
+emission policy. Electron-block execution and emitting layers can produce
+multiple records. Counts are unweighted eligible escape-piece/reflection/mosaic
+pairs: only the selected line-electron population with finite positive duration
+is included. They depend on segmentation and quadrature; they are neither lost
+photon yield nor a fraction of incident electrons. Separate counters describe
+nonpositive/invalid vacuum seeds, missing data, critical-angle rejection,
+nonconvergence and the line-energy floor. `finite_root_outside_grid` is a subset
+of `finite_root`; `vacuum_seed_outside_tabulation` is an additional flag, so
+neither should be added to the mutually exclusive outcome counts.
+
+The vacuum seed screen is independent of the output grid. The subsequent root
+screen reuses the production table and solver, including endpoint clamping
+outside that table; such roots do not establish full-domain optical support.
+The screen leaves spectra and case identity unchanged. Older cached records
+without this field have unknown transported coverage.
+
 Case lowering evaluates selected reflections for each crystalline layer at
 its central incident-ray vacuum resonance. `KinematicValidityWarning` reports
 photon mixing at $D=\omega^2\lvert\chi_g\rvert/\lvert\Delta\rvert\ge0.01$

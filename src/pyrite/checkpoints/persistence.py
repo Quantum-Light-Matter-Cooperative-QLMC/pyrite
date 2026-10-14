@@ -103,6 +103,7 @@ _CAS_OPTIONAL_PAYLOAD_KEYS = frozenset(
         "temporal_intensity",
         "temporal_intensity_coherent",
         "line_grid_resolved",
+        "line_data_coverage",
     }
 )
 

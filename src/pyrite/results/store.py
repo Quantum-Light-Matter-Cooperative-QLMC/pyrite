@@ -312,6 +312,8 @@ def store_result(results, case, out):
     # than only log warnings (#192). Absent for fixed-grid cases.
     if out.get("line_grid_resolved") is not None:
         results[name][E0]["line_grid_resolved"] = out["line_grid_resolved"]
+    if out.get("line_data_coverage") is not None:
+        results[name][E0]["line_data_coverage"] = out["line_data_coverage"]
     if out.get("adaptive_sampling") is not None:
         results[name][E0]["adaptive_sampling"] = out["adaptive_sampling"]
     # Artifact-scored records name the trajectory file they replayed (#186).

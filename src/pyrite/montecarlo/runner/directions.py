@@ -79,6 +79,9 @@ def directional_outputs(case, transport, n_hats, spectrum) -> dict[str, Any]:
         result["line_grid_resolved"] = grid_record
     else:
         result.pop("line_grid_resolved", None)
+    result["line_data_coverage"] = [
+        record for output in outputs for record in output.get("line_data_coverage", [])
+    ]
     result["spec_by_direction"] = np.stack([np.asarray(output["spec"]) for output in outputs])
     result["spec_characteristic_by_direction"] = np.stack(
         [np.asarray(output["spec_characteristic"]) for output in outputs]
