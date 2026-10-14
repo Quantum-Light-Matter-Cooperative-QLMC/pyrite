@@ -9,6 +9,7 @@ import click
 import tomlkit
 from tomlkit.exceptions import ParseError
 
+from pyrite._catalog_layout import object_sources
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli.commands._beam_shared import (
@@ -135,9 +136,15 @@ def command():
     ``[profiles.NAME.beam]`` block, plus an optional display-only ``label``.
     Attach one to a profile with ``pyrite profile set NAME --beam BEAM``.
 
+    With the bundled catalog selected, new beams go to the user catalog
+    layer (catalog.user / PYRITE_USER_CATALOG). Bundled names are read-only;
+    copy one with create NAME --from SOURCE. A complete external catalog is
+    edited in place. list reports bundled, user or catalog sources.
+
     \b
     Examples:
       pyrite beam list
+      pyrite beam create mine --from example
       pyrite beam show rf_gun_200fs
       pyrite beam create rf_gun_200fs --rep-rate-hz 1000 --bunch-charge-pc 2.5
       pyrite beam set rf_gun_200fs --energy-spread 0.001
@@ -149,13 +156,15 @@ def command():
 @command.command("list")
 @output_option
 def list_command(json_output):
-    """List named beams with label and profile-reference counts."""
+    """List named beams with source, label and profile-reference counts."""
     try:
         _text, document = _catalog_io.catalog_text()
         beams = _catalog_io.beam_rows(document)
+        sources = object_sources(_catalog_io.active_catalog_path(), "beams")
         rows = [
             {
                 "name": name,
+                "source": sources[name],
                 "label": row.get("label") if isinstance(row, dict) else None,
                 "referenced_by": _referencing_profiles(document, name),
             }
@@ -171,7 +180,9 @@ def list_command(json_output):
         return 0
     for row in rows:
         label = f" ({row['label']})" if row["label"] else ""
-        emit_result(f"{row['name']}{label}: {len(row['referenced_by'] or [])} profiles")
+        emit_result(
+            f"{row['name']}{label}: {len(row['referenced_by'] or [])} profiles [{row['source']}]"
+        )
     return 0
 
 
@@ -197,11 +208,18 @@ def show_command(name, json_output):
 
 @command.command("create")
 @click.argument("name")
+@click.option(
+    "--from",
+    "source_beam",
+    shell_complete=_cli_completion.complete_beam,
+    help="Copy an existing beam; field options override the copy.",
+)
 @click.option("--label", help="Display-only description; never affects parameter_sha256.")
 @beam_cli_options
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def create_command(
     name,
+    source_beam,
     label,
     transverse_fwhm_mm,
     rep_rate_hz,
@@ -217,8 +235,9 @@ def create_command(
 ):
     """Create a new named beam NAME.
 
-    Requires at least one beam-field option; --label alone does not define a
-    beam. Attach the result to a profile with
+    Use --from BEAM to copy a bundled or user beam. Otherwise requires at
+    least one beam-field option; --label alone does not define a beam.
+    Attach the result to a profile with
     ``pyrite profile set PROFILE --beam NAME``.
     """
     _check_name(name)
@@ -234,14 +253,17 @@ def create_command(
         energy_spread_frac,
         **source_options,
     )
-    if not updates:
+    if not updates and source_beam is None:
         raise click.UsageError("provide at least one beam-field option")
     try:
         original, document = _catalog_io.catalog_text()
         beams = _catalog_io.beam_rows(document)
-        if name in beams:
-            raise ValueError(f"beam {name!r} already exists; edit it with: pyrite beam set {name}")
-        target = tomlkit.table()
+        _catalog_io.require_new_object(beams, "beam", name)
+        target = (
+            deepcopy(_existing_beam(document, source_beam))
+            if source_beam is not None
+            else tomlkit.table()
+        )
         if label is not None:
             target["label"] = label
         write_beam_fields(target, updates)
@@ -296,6 +318,7 @@ def set_command(
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_beam(document, name)
+        _catalog_io.require_writable_object("beams", name)
         proposed_target = deepcopy(target)
         write_beam_fields(proposed_target, updates)
         validate_gdf_fields(proposed_target)
@@ -335,9 +358,9 @@ def rename_command(name, new_name, dry_run):
     try:
         original, document = _catalog_io.catalog_text()
         beams = _catalog_io.beam_rows(document)
-        if new_name in beams:
-            raise ValueError(f"beam {new_name!r} already exists")
+        _catalog_io.require_new_object(beams, "beam", new_name)
         target = _existing_beam(document, name)
+        _catalog_io.require_writable_object("beams", name)
         del beams[name]
         beams[new_name] = target
         for profile_name in _referencing_profiles(document, name):
@@ -368,6 +391,7 @@ def delete_command(name, yes, dry_run, json_output):
     try:
         original, document = _catalog_io.catalog_text()
         _existing_beam(document, name)
+        _catalog_io.require_writable_object("beams", name)
         referents = _referencing_profiles(document, name)
         if referents:
             raise ValueError(

@@ -351,6 +351,27 @@ class BundledProfileError(CatalogLayoutError):
     """A user edit would change a bundled object (historic profile error name)."""
 
 
+def _bundled_object_message(table: str, name: str) -> str:
+    if table in ("profiles", "beams", "detectors"):
+        kind = {"profiles": "profile", "beams": "beam", "detectors": "detector"}[table]
+        description = "a bundled demo" if table == "profiles" else "bundled"
+        return (
+            f"{kind} {name!r} is {description} and is read-only; copy it with "
+            f"'pyrite {kind} create NAME --from {name}' (maintainers: 'pyrite-dev {kind}')"
+        )
+    relative = MANIFEST if table == MANIFEST else f"{table}/{name}.toml"
+    return (
+        f"{relative} is bundled and read-only; choose a new user object name "
+        "or select an independent complete catalog"
+    )
+
+
+def require_writable_object(path: Path | str, table: str, name: str) -> None:
+    """Reject bundled object edits before validation, previews, or prompts."""
+    if is_layered(path) and (Path(path) / table / f"{name}.toml").is_file():
+        raise BundledProfileError((_bundled_object_message(table, name),))
+
+
 def write_text(path: Path | str, text: str) -> None:
     """Atomically store an assembled catalog text at ``path``.
 
@@ -405,20 +426,12 @@ def write_text(path: Path | str, text: str) -> None:
         if relative in files and protected(files[relative].resolve(), relative)
     )
     if blocked:
-        messages = []
-        for relative in blocked:
-            name = Path(relative).stem
-            if relative.startswith("profiles/"):
-                messages.append(
-                    f"profile {name!r} is a bundled demo and is read-only; copy it with "
-                    f"'pyrite profile create NAME --from {name}' (maintainers: 'pyrite-dev profile')"
-                )
-            else:
-                messages.append(
-                    f"{relative} is bundled and read-only; choose a new user object name "
-                    "or select an independent complete catalog"
-                )
-        raise BundledProfileError(tuple(messages))
+        raise BundledProfileError(
+            tuple(
+                _bundled_object_message(relative.split("/", 1)[0], Path(relative).stem)
+                for relative in blocked
+            )
+        )
     for relative, content in changed.items():
         _atomic_write(target(relative), content)
     for relative in removed:
@@ -462,6 +475,7 @@ __all__ = [
     "load_raw",
     "object_keys",
     "profile_sources",
+    "require_writable_object",
     "read_raw",
     "read_sources",
     "read_text",

@@ -2783,8 +2783,14 @@ Usage: pyrite beam [OPTIONS] COMMAND [ARGS]...
   ``[profiles.NAME.beam]`` block, plus an optional display-only ``label``. Attach one to
   a profile with ``pyrite profile set NAME --beam BEAM``.
 
+  With the bundled catalog selected, new beams go to the user catalog layer
+  (catalog.user / PYRITE_USER_CATALOG). Bundled names are read-only; copy one with
+  create NAME --from SOURCE. A complete external catalog is edited in place. list
+  reports bundled, user or catalog sources.
+
   Examples:
     pyrite beam list
+    pyrite beam create mine --from example
     pyrite beam show rf_gun_200fs
     pyrite beam create rf_gun_200fs --rep-rate-hz 1000 --bunch-charge-pc 2.5
     pyrite beam set rf_gun_200fs --energy-spread 0.001
@@ -2799,7 +2805,7 @@ Commands:
   delete       Delete a named beam; irreversible.
   gdf-inspect  List GPT outputs and inspect lab coordinates to choose a target z...
   gdf-times    List GPT time-output times in seconds and particle counts (CPU only).
-  list         List named beams with label and profile-reference counts.
+  list         List named beams with source, label and profile-reference counts.
   rename       Rename beam NAME to NEW_NAME.
   set          Update fields on an existing named beam NAME.
   show         Show one named beam's fields.
@@ -2812,10 +2818,13 @@ Usage: pyrite beam create [OPTIONS] NAME
 
   Create a new named beam NAME.
 
-  Requires at least one beam-field option; --label alone does not define a beam. Attach
-  the result to a profile with ``pyrite profile set PROFILE --beam NAME``.
+  Use --from BEAM to copy a bundled or user beam. Otherwise requires at least one beam-
+  field option; --label alone does not define a beam. Attach the result to a profile
+  with ``pyrite profile set PROFILE --beam NAME``.
 
 Options:
+  --from TEXT                     Copy an existing beam; field options override the
+                                  copy.
   --label TEXT                    Display-only description; never affects
                                   parameter_sha256.
   --emittance MM_MRAD             Normalized transverse emittance in mm*mrad; replaces
@@ -2914,7 +2923,7 @@ Options:
 ```text
 Usage: pyrite beam list [OPTIONS]
 
-  List named beams with label and profile-reference counts.
+  List named beams with source, label and profile-reference counts.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
@@ -3019,8 +3028,14 @@ Usage: pyrite detector [OPTIONS] COMMAND [ARGS]...
   integrates the Timepix3 chip aperture at 400 mm as one scalar detector with ideal
   response: raw spectra, without pixel binning or count acquisition.
 
+  With the bundled catalog selected, new detectors go to the user catalog layer
+  (catalog.user / PYRITE_USER_CATALOG). Bundled names are read-only; copy one with
+  create NAME --from SOURCE. A complete external catalog is edited in place. list
+  reports bundled, user or catalog sources.
+
   Examples:
     pyrite detector list
+    pyrite detector create mine --from reference
     pyrite detector show reference
     pyrite detector create standard-90 --observation-angle 90
     pyrite detector set standard-90 --solid-angle 0.066
@@ -3033,7 +3048,7 @@ Options:
 Commands:
   create  Create a reusable named detector geometry NAME.
   delete  Delete an unreferenced named detector; irreversible.
-  list    List named detectors with labels and profile-reference counts.
+  list    List named detectors with source, labels and profile-reference counts.
   rename  Rename NAME and update every referencing profile atomically.
   reset   Clear optional scorer, response or acquisition sections of a named detector.
   set     Update fields on an existing named detector NAME.
@@ -3047,7 +3062,12 @@ Usage: pyrite detector create [OPTIONS] NAME
 
   Create a reusable named detector geometry NAME.
 
+  Use --from DETECTOR to copy an existing geometry, scorer, response and acquisition.
+  Otherwise requires at least one detector-geometry option.
+
 Options:
+  --from TEXT                     Copy an existing detector; field options override the
+                                  copy.
   --label TEXT                    Display-only description; never affects
                                   parameter_sha256.
   --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
@@ -3118,7 +3138,7 @@ Options:
 ```text
 Usage: pyrite detector list [OPTIONS]
 
-  List named detectors with labels and profile-reference counts.
+  List named detectors with source, labels and profile-reference counts.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation

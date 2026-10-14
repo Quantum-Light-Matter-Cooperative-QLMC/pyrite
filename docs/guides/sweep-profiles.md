@@ -226,6 +226,26 @@ Detector geometry can be declared in `[profiles.NAME.detectors.ID]` tables. Each
 
 The bundled catalog ships read-only demo profiles (`quickstart`, `sweep_demo`, `trajectory_demo`, `coherent_demo`, `detector_demo`, `pixelated_detector_demo`, `two_detector_demo`, `high_energy_demo`, `hopg_emittance_demo`) plus `standard`, the base profile every material's default scan ranges resolve from. Each names a packaged beam and detector (`beams/` and `detectors/` in the catalog): profiles that need no special beam use `example`, a 1 mm FWHM spot at 5 kHz and 1 pC with no bunch profile, and scalar demos use `reference` (90°), with `reference_135` added by `two_detector_demo`. They therefore still run from a copied or external catalog, and `pyrite profile create NAME --from DEMO` inherits both. `pyrite profile` writes the profiles you create to the user catalog layer (`catalog.user`, `PYRITE_USER_CATALOG`; the platform config directory by default) as `profiles/NAME.toml`, read over the bundled catalog; a user profile may not reuse a bundled name. Copy a demo with `pyrite profile create NAME --from DEMO`. Maintainers edit the shipped demos with `pyrite-dev profile`, the same command tree aimed at the bundled catalog. Remote runs ship the layer to the box as `user-catalog/`. The same layer now holds user beams, detectors, media, crystals, materials and energy grids; bundled names in each table are read-only. For composition and CIF creation, see [Adding materials](adding-materials.md).
 
+Copy packaged instrument objects before editing them:
+
+```bash
+pyrite beam create lab-beam --from example --rep-rate-hz 1000
+pyrite detector create lab-detector --from reference --observation-angle 120
+pyrite profile create lab-scan --from quickstart
+pyrite profile set lab-scan --beam lab-beam --detector lab-detector
+```
+
+`beam create --from` and `detector create --from` copy the complete object;
+explicit options override copied fields. Detector copies retain geometry,
+scorer, response and acquisition sections. New objects use `beams/NAME.toml`
+and `detectors/NAME.toml` in the user layer. Names cannot collide with existing
+names, including case-only differences. Bundled `set`, `rename`, `delete` and
+detector `reset` fail with exit 1 and a copy hint before prompting. Maintainers
+use `pyrite-dev beam` and `pyrite-dev detector` to edit packaged examples.
+`beam list` and `detector list` show `[bundled]`, `[user]` or `[catalog]` in text;
+`-o json` adds a `source` field to each row in the existing versioned envelope.
+Remote runs transfer these user objects with their profiles.
+
 Releases up to 0.6.1 bundled the research campaigns `sub_100keV`, `high_energy`, `hopg_short`, `hopg_hbn`, and `coh_test`. To keep using one, copy its TOML from the 0.6.1 tree (`src/pyrite/data/catalog/profiles/NAME.toml`) into `profiles/` under your user layer. Unchanged content keeps its dataset identity, so existing checkpoints resume. Their unnamed scalar detector setup now warns; attach the equivalent `reference` detector to keep the same numerical results and checkpoint identity.
 
 The bundled `reference` detector integrates the Timepix3 chip aperture (14.08 mm square at 400 mm) as one scalar detector at 90°. Its full polar acceptance is 2.016603235051288° and its solid angle is 0.0012390399999999998 sr, the exact existing fallback values. It has ideal response and exposes the raw source spectrum without pixel binning, response broadening or count acquisition. A physical Timepix detector with pixels and counting response is configured separately.

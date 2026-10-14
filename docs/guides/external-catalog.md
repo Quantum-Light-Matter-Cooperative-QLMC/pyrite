@@ -10,6 +10,16 @@ For additions to the bundled examples, the [material authoring workflow](adding-
 writes user objects and managed CIFs to the user layer, without editing packaged
 definitions. Use a complete external catalog when you need an independent set.
 
+With no complete catalog selected, all object tables (`profiles`, `beams`,
+`detectors`, `crystals`, `media`, `materials` and `energy_grids`) read user
+additions from `catalog.user` / `PYRITE_USER_CATALOG` over the bundled catalog.
+Packaged names remain read-only and cannot be reused, even with different case.
+For example, `pyrite beam create lab --from example` and
+`pyrite detector create lab --from reference` make editable user copies.
+Their `list` commands report `bundled`, `user` or `catalog` sources in text and
+JSON. Remote sync ships the user layer as `user-catalog/`. Selecting a complete
+external catalog disables this layering; its objects remain writable in place.
+
 To start from the bundled definitions, copy the catalog and its CIF files outside
 the PyRITE checkout, then edit the copy:
 
