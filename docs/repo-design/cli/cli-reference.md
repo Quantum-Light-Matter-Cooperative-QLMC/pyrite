@@ -34,7 +34,9 @@ Zhai reproduction uses `pyrite run --preset zhai`, which runs locally unless
 Energy-grid job lifecycle uses the top-level `pyrite job ...` paths; the
 former `pyrite energy-grid` job paths were removed at the same time.
 User grid derivation and inspection live below `pyrite material energy-grid`;
-profile derivation defaults live below `pyrite profile energy-grid`.
+normal runs size line grids automatically and resolve continuum bounds per case.
+Global derivation batch presets (`pyrite profile energy-grid`) are deprecated
+until 0.15.0; optional derivation requires explicit material/energy selection then.
 Artifact mutation and verification use `pyrite-dev energy-grid`.
 
 `pyrite profile` writes your profiles to the user catalog layer
@@ -1546,7 +1548,6 @@ Commands:
   rename             Rename profile NAME to NEW_NAME.
   set                Replace range grids, the beam reference,...
   show               Show PROFILE in tables grouped by CLI...
-  energy-grid        Manage profile-scoped energy-grid derivation inputs.
 ```
 
 ## `pyrite profile add`
@@ -2437,50 +2438,6 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite profile energy-grid`
-
-```text
-Usage: pyrite profile energy-grid [OPTIONS] COMMAND [ARGS]...
-
-  Manage profile-scoped energy-grid derivation inputs.
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  defaults  Show, update, or clear persistent derivation inputs.
-```
-
-## `pyrite profile energy-grid defaults`
-
-```text
-Usage: pyrite profile energy-grid defaults [OPTIONS]
-
-  Show, update, or clear persistent derivation inputs.
-
-  These values feed local and remote ``derive`` when matching options are omitted.
-  Geometry searches determine both line and bremsstrahlung upper bounds; ``brem-step``
-  controls only applied bremsstrahlung spacing.
-
-  Empty ``polar`` or ``azimuth`` mean inherit each material's catalog-profile angles.
-  These are not physical scan defaults.
-
-Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  --save-default                  Persist supplied values; otherwise only show defaults.
-  --clear FIELD                   Reset one field to inherited/built-in behavior;
-                                  repeatable. Fields: polar, azimuth, thickness, brem-
-                                  step, energy, material.
-  --reset                         Reset every persistent derivation field to
-                                  inherited/built-in behavior.
-  --polar DEG,...                 Persistent derivation polar tilts in degrees [0, 90).
-  --azimuth DEG,...               Persistent azimuths in degrees [0, 360].
-  --thickness ANGSTROM,...        Persistent positive crystal thicknesses in angstrom.
-  --brem-step EV                  Persistent derivation bremsstrahlung spacing in eV.
-  -h, --help                      Show this message and exit.
-```
-
 ## `pyrite material`
 
 ```text
@@ -2611,6 +2568,9 @@ Usage: pyrite material energy-grid [OPTIONS] COMMAND [ARGS]...
     pyrite material energy-grid derive --material mose2 --energy 30,60
     pyrite material energy-grid show mose2
 
+  Normal runs size line grids automatically and resolve continuum bounds per case.
+  Explicit derivation and stored artifacts are optional specialist tools.
+
 Options:
   -h, --help  Show this message and exit.
 
@@ -2626,20 +2586,26 @@ Commands:
 ```text
 Usage: pyrite material energy-grid derive [OPTIONS]
 
-  Derive and install line and bremsstrahlung grids locally or remotely.
+  Optionally derive and install grids locally or remotely.
+
+  Normal runs size line grids automatically and resolve continuum bounds per case. From
+  0.15.0, this specialist tool requires --material and --energy; persistent batch
+  presets and --save-default retire together. Supply geometry and spacing per
+  invocation; omitted angles inherit ordinary profile geometry. Explicit artifact
+  workflows may optimize nonuniform continuum grids beyond the normal uniform continuum
+  spacing.
 
 Options:
-  --material KEY,...        Material keys; comma-separated. Omit to use persistent
-                            defaults.
-  --energy KEV,...          Beam energies in keV; comma-separated and positive.
+  --material KEY,...        Material keys; comma-separated. Required from 0.15.0; legacy
+                            presets warn.
+  --energy KEV,...          Beam energies in keV; comma-separated and positive. Required
+                            from 0.15.0.
   --polar DEG,...           Polar tilts in degrees [0, 90); comma-separated.
   --azimuth DEG,...         Azimuths in degrees [0, 360]; comma-separated.
   --thickness ANGSTROM,...  Crystal thicknesses in angstrom; comma-separated and
                             positive.
-  --save-default            Persist supplied geometry, energies, and materials as future
-                            defaults.
   --brem-step EV            Derivation bremsstrahlung spacing in eV; overrides
-                            persistent default.
+                            deprecated batch preset.
   --slice-minutes MINUTES   Maximum duration of each self-resubmitting remote slice.
                             [default: 10.0]
   --no-sync                 Skip code upload before remote submission.

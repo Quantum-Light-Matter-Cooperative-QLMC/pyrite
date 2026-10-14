@@ -276,8 +276,18 @@ def test_set_line_artifact_repoints_ref_and_preserves_legacy_payload(tmp_path, m
     assert stamped == [("hopg", 30.0, "manual", "reviewed", "standard")]
 
 
-def test_set_brem_artifact_repoints_ref_and_preserves_profile_override(tmp_path, monkeypatch):
+@pytest.mark.parametrize("step, expected", [(None, 25.0), (12.5, 12.5)])
+def test_set_brem_artifact_repoints_ref_and_preserves_profile_override(
+    tmp_path, monkeypatch, step, expected
+):
     from pyrite import _energy_grid_artifacts as artifacts
+    from pyrite.energy_grid import defaults
+
+    monkeypatch.setattr(
+        defaults,
+        "load_defaults",
+        lambda: pytest.fail("manual artifacts must not read batch presets"),
+    )
 
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
@@ -293,7 +303,12 @@ def test_set_brem_artifact_repoints_ref_and_preserves_profile_override(tmp_path,
     )
 
     digest = apply.set_brem_artifact(
-        "hopg", 150000, profile="standard", note="reviewed", catalog_path=toml_path
+        "hopg",
+        150000,
+        profile="standard",
+        note="reviewed",
+        catalog_path=toml_path,
+        step_eV=step,
     )
 
     updated = tomllib.loads(toml_path.read_text())
@@ -307,9 +322,16 @@ def test_set_brem_artifact_repoints_ref_and_preserves_profile_override(tmp_path,
     assert stored.identity["brem_grid"] == {
         "start_eV": 0.0,
         "stop_eV": 150000.0,
-        "step_eV": 25.0,
+        "step_eV": expected,
     }
     assert stamped == [("hopg", "manual", "reviewed", "standard")]
+
+    # The installed artifact's spacing outranks the original catalog spacing.
+    replacement = apply.set_brem_artifact(
+        "hopg", 160000, profile="standard", catalog_path=toml_path
+    )
+    retained = artifacts.load_artifact(tmp_path / "energy-grid-artifacts", replacement)
+    assert retained.identity["brem_grid"]["step_eV"] == expected
 
 
 @pytest.mark.parametrize(

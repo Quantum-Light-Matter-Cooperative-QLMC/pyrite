@@ -8,12 +8,20 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 
 ## Commands
 
-No command spelling is currently deprecated. Every spelling the CLI accepts is canonical; anything else exits as an unknown command.
+| Deprecated spelling | Replacement | Deprecated in | Remove in | Note |
+| --- | --- | --- | --- | --- |
+| `pyrite profile energy-grid` | `pyrite material energy-grid derive --material KEY --energy KEV` | 0.13.6 | 0.15.0 | Normal runs size grids automatically; retire global batch presets and their store. |
 
 ## Options
 
-No option spelling is currently deprecated. Every option the CLI accepts is canonical; anything else exits as a usage error.
+| Command | Deprecated option | Replacement | Deprecated in | Remove in | Note |
+| --- | --- | --- | --- | --- | --- |
+| `pyrite material energy-grid derive` | `--save-default` | pass derivation inputs per invocation; normal runs size grids automatically | 0.13.6 | 0.15.0 | Remove defaults.py, line_grid_defaults.toml, --set-default forwarding in derive/job, remote DEFAULT_MATERIALS/DEFAULT_ENERGIES and packaging/sync references together. |
 
 ## Implicit defaults
 
-No implicit default is currently deprecated. A run that leaves its profile unnamed, or a user-catalog profile that names no beam or detector, exits as a usage error.
+A run that leaves one of these unnamed still resolves the fallback, warns on stderr, and must name it explicitly from the removal release.
+
+| Unnamed | Current fallback | Name it explicitly | Deprecated in | Remove in | Note |
+| --- | --- | --- | --- | --- | --- |
+| energy-grid derivation batch inputs | Saved inputs or historical material/energy/geometry/spacing presets | --material KEY --energy KEV; per-invocation geometry and spacing | 0.13.6 | 0.15.0 | Local and remote derive keep legacy inputs until removal. Then require explicit materials and energies; inherit ordinary profile angles and retain built-in diagnostic thickness/continuum spacing. Never use first-material energies. |

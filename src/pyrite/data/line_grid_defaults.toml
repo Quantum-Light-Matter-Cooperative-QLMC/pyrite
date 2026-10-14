@@ -1,4 +1,5 @@
-# managed by `pyrite energy-grid defaults --set`; edit via CLI, not by hand
+# Deprecated derivation batch presets; retained until 0.15.0.
+# managed by `pyrite profile energy-grid defaults --save-default`
 
 tilts = []
 azimuths = []

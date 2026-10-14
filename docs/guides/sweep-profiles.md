@@ -130,6 +130,23 @@ Grid-source precedence per case, highest first:
 3. A stored per-energy row from `energy_grid_refs` or the legacy `[energy_grids.MATERIAL]` store. `PYRITE_ENERGY_GRID_*` environment values outrank this layer, not layer 2.
 4. Automatic resolution with the default selectors for energies a stored mapping does not cover; the crystal's built-in `E_grid` where no mapping exists.
 
+Ordinary runs need no grid-preparation batch: line sizing follows the precedence above,
+and continuum bounds resolve per case with built-in 25 eV uniform spacing unless
+overridden. Adaptive electron counts are a separate control. Explicit derivation
+and immutable artifacts remain optional specialist tools; automatic line sizing
+does not automatically refine a nonuniform continuum grid.
+
+For optional derivation, select both materials and beam energies, for example
+`pyrite material energy-grid derive --material mose2 --energy 30,60 --profile NAME`.
+The global historical batch presets under the hidden `pyrite profile energy-grid
+defaults` and `derive --save-default` are deprecated in 0.13.6 and retire in 0.15.0.
+During that window, omitted inputs still use saved presets and warn on stderr.
+At retirement, material and energy selections become required; geometry and
+spacing remain per-invocation controls, with omitted angles inheriting profile
+geometry. Explicit user grids, profile `energy_grid_refs`, and stored artifacts
+remain supported. Manual brem edits preserve resolved artifact/catalog spacing
+unless `--step` is supplied; derivation presets do not control those edits.
+
 Automatic resolution supports coherent emission only inside feature windows (#117, #350), so the editor refuses a policy without `windows = true` on a `coherent` or `both` profile. `bin-mean` also refuses a positive `max_dE_frac`.
 
 The table applies to every case of the profile and joins its dataset identity: editing it gives new checkpoints, and earlier results stay under their old identity. `profile create --from SOURCE` clones it; a fresh `profile create` does not set one. `high_energy` uses the full measured policy. A measured-bandwidth case records its upper-edge truncation audit and the line yield's per-electron relative standard error in `line_grid_resolved`. When a few electrons carry the yield (relative standard error above 0.1, typical at 5 MeV where rare electrons scatter into the detector's radiation cone), the case still runs, is flagged `statistics_limited`, and raises `CxrYieldStatisticsWarning`.

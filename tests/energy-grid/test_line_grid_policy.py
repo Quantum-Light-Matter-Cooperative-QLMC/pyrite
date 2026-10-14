@@ -77,6 +77,21 @@ def _stored_energy_sweep():
     )
 
 
+def test_automatic_case_identity_and_grids_ignore_derivation_presets(monkeypatch):
+    from pyrite.energy_grid import defaults
+
+    before = build_cases(_uncovered_energy_sweep(), n_electrons=2, n_electrons_brem=2)[0]
+    monkeypatch.setattr(
+        defaults,
+        "load_defaults",
+        lambda: pytest.fail("normal runs must not read derivation presets"),
+    )
+    after = build_cases(_uncovered_energy_sweep(), n_electrons=2, n_electrons_brem=2)[0]
+    assert case_content_key(after) == case_content_key(before)
+    np.testing.assert_array_equal(after["E_grid"], before["E_grid"])
+    np.testing.assert_array_equal(after["E_grid_brem"], before["E_grid_brem"])
+
+
 # ---- physics: the kinematic bandwidth bound ---------------------------------
 def test_leaf_constants_match_the_materials_package():
     """The leaf restates hbar*c and m_e c^2 to stay dependency-free; they must

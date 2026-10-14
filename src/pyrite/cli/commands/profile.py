@@ -217,8 +217,10 @@ class _ProfileGroup(LazyGroup):
 @click.group(
     name="profile",
     cls=_ProfileGroup,
+    deprecation_prefix="profile",
     lazy_commands={"energy-grid": "pyrite.cli.commands.energy_grid_surface.profile_command"},
     lazy_help={"energy-grid": "Manage profile-scoped energy-grid derivation inputs."},
+    lazy_hidden={"energy-grid"},
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )

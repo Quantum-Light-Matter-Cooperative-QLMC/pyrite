@@ -3,6 +3,17 @@ import pytest
 import pyrite.energy_grid.defaults as d
 
 
+def test_legacy_warning_is_once_per_invocation_and_repeats_next_time(capsys):
+    for _ in range(2):
+        with d.legacy_warning_scope():
+            d.warn_legacy_defaults()
+            with d.legacy_warning_scope():
+                d.warn_legacy_defaults()
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert captured.err == d.LEGACY_WARNING + "\n"
+
+
 def test_load_missing_file_returns_fallback(tmp_path, monkeypatch):
     monkeypatch.setattr(d, "DEFAULTS_PATH", tmp_path / "absent.toml")
     got = d.load_defaults()

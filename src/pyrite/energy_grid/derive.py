@@ -830,7 +830,7 @@ def build_parser():
     parser.add_argument(
         "--set-default",
         action="store_true",
-        help="persist supplied geometry/energies/materials as new defaults",
+        help="deprecated: persist supplied batch inputs until removal in 0.15.0",
     )
     return parser
 
@@ -839,9 +839,23 @@ def _floats(text):
     return [float(x) for x in text.split(",")] if text else None
 
 
+@lg_defaults.legacy_warning_scope()
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    persisted = lg_defaults.load_defaults()
+    uses_presets = args.set_default or any(
+        value is None
+        for value in (
+            args.materials,
+            args.energies,
+            args.tilts,
+            args.azimuths,
+            args.thickness,
+            args.brem_step,
+        )
+    )
+    if uses_presets:
+        lg_defaults.warn_legacy_defaults()
+    persisted = lg_defaults.load_defaults() if uses_presets else {}
     tilts = _floats(args.tilts) or (persisted["tilts"] or None)
     azimuths = _floats(args.azimuths) or (persisted["azimuths"] or None)
     thicknesses = _floats(args.thickness) or (persisted["thickness_ang"] or None)

@@ -15,7 +15,7 @@ import click
 
 from pyrite import remote
 from pyrite.cli import _completion as _cli_completion
-from pyrite.cli._deprecations import canonical_option
+from pyrite.cli._deprecations import DeprecatedOption, canonical_option
 from pyrite.cli._options import remote_option
 from pyrite.console import config as _cli_config
 from pyrite.console import json as cli_json
@@ -102,11 +102,13 @@ def _derive_options(function):
     argparse handlers in `derive`/`job`, which are internal and not part of the
     surface D5 governs.
     """
-    function = canonical_option(
+    function = click.option(
         "--save-default",
         "set_default",
+        cls=DeprecatedOption,
         is_flag=True,
-        help="Persist supplied geometry, energies, and materials as future defaults.",
+        hidden=True,
+        help="Deprecated: persist supplied derivation batch inputs until 0.15.0.",
     )(function)
     function = click.option(
         "--thickness",
@@ -133,13 +135,13 @@ def _derive_options(function):
         "energies",
         type=ENERGY_CSV_TEXT,
         metavar="KEV,...",
-        help="Beam energies in keV; comma-separated and positive.",
+        help="Beam energies in keV; comma-separated and positive. Required from 0.15.0.",
     )(function)
     return canonical_option(
         "--material",
         "materials",
         metavar="KEY,...",
-        help="Material keys; comma-separated. Omit to use persistent defaults.",
+        help="Material keys; comma-separated. Required from 0.15.0; legacy presets warn.",
         shell_complete=_cli_completion.complete_material_csv,
     )(function)
 
@@ -150,7 +152,7 @@ def _derive_options(function):
     "--brem-step",
     type=POSITIVE_FLOAT,
     metavar="EV",
-    help="Derivation bremsstrahlung spacing in eV; overrides persistent default.",
+    help="Derivation bremsstrahlung spacing in eV; overrides deprecated batch preset.",
 )
 @click.option(
     "--slice-minutes",
@@ -177,6 +179,7 @@ def _derive_options(function):
 )
 @remote_option
 @click.pass_context
+@defaults.legacy_warning_scope()
 def derive_command(
     ctx,
     materials,
@@ -194,7 +197,15 @@ def derive_command(
     catalog_profile,
     remote_target,
 ):
-    """Derive and install line and bremsstrahlung grids locally or remotely."""
+    """Optionally derive and install grids locally or remotely.
+
+    Normal runs size line grids automatically and resolve continuum bounds per
+    case. From 0.15.0, this specialist tool requires --material and --energy;
+    persistent batch presets and --save-default retire together. Supply geometry
+    and spacing per invocation; omitted angles inherit ordinary profile geometry.
+    Explicit artifact workflows may optimize nonuniform continuum grids beyond
+    the normal uniform continuum spacing.
+    """
     if wait and detach:
         raise click.UsageError("--wait and --detach are mutually exclusive")
     remote_only = {
@@ -214,6 +225,13 @@ def derive_command(
             raise click.UsageError(
                 f"remote-only option(s) require -R/--remote: {', '.join(explicit)}"
             )
+    if set_default or any(
+        value is None for value in (materials, energies, tilts, azimuths, thickness, brem_step)
+    ):
+        defaults.warn_legacy_defaults(
+            already_warned=bool(ctx.meta.get("pyrite.deprecated_option_warned:--save-default"))
+        )
+    if remote_target is None:
         return _derive_local(
             materials,
             energies,
@@ -295,7 +313,10 @@ def _derive_remote(
 ):
     from pyrite.remote.config import override_remote_host
 
-    persisted = defaults.load_defaults()
+    uses_presets = set_default or any(
+        value is None for value in (materials, energies, tilts, azimuths, thickness, brem_step)
+    )
+    persisted = defaults.load_defaults() if uses_presets else {}
     if set_default and persist_local:
         persisted = defaults.update_defaults(
             materials=materials.split(",") if materials else None,
@@ -771,7 +792,10 @@ def defaults_command(
     thickness,
     brem_step,
 ):
-    """Show, update, or clear persistent derivation inputs.
+    """Deprecated: show, update, or clear global derivation batch inputs.
+
+    These presets retire in 0.15.0. Normal runs size grids automatically;
+    specialist derivation accepts explicit --material and --energy selections.
 
     These values feed local and remote ``derive`` when matching options are
     omitted. Geometry searches determine both line and bremsstrahlung upper

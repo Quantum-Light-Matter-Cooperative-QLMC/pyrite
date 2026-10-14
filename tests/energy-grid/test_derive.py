@@ -272,7 +272,7 @@ def test_main_returns_tempfail_when_budget_leaves_work(monkeypatch):
     assert analyze.main(["--materials", "hopg", "--energies", "200"]) == 75
 
 
-def test_main_uses_persistent_materials_and_energies(monkeypatch):
+def test_main_uses_persistent_materials_and_energies(monkeypatch, capsys):
     seen = {}
     monkeypatch.setattr(
         analyze.lg_defaults,
@@ -294,6 +294,50 @@ def test_main_uses_persistent_materials_and_energies(monkeypatch):
 
     assert analyze.main([]) == 0
     assert seen == {"materials": ["wse2", "mose2"], "energies": [40.0, 60.0]}
+    assert capsys.readouterr().err == analyze.lg_defaults.LEGACY_WARNING + "\n"
+
+
+def test_main_explicit_inputs_do_not_read_presets(monkeypatch, capsys):
+    seen = {}
+    monkeypatch.setattr(
+        analyze.lg_defaults,
+        "load_defaults",
+        lambda: pytest.fail("explicit derivation must not read presets"),
+    )
+    monkeypatch.setattr(
+        analyze,
+        "derive_all_materials",
+        lambda materials, energies, *args, **kwargs: (
+            seen.update(materials=materials, energies=energies, **kwargs) or {},
+            True,
+        ),
+    )
+    assert (
+        analyze.main(
+            [
+                "--materials",
+                "mose2",
+                "--energies",
+                "60",
+                "--tilts",
+                "5",
+                "--azimuths",
+                "100",
+                "--thickness",
+                "2000",
+                "--brem-step",
+                "12.5",
+            ]
+        )
+        == 0
+    )
+    assert seen["materials"] == ["mose2"]
+    assert seen["energies"] == [60.0]
+    assert seen["tilts"] == [5.0]
+    assert seen["azimuths"] == [100.0]
+    assert seen["thicknesses"] == [2000.0]
+    assert seen["brem_step_eV"] == 12.5
+    assert capsys.readouterr().err == ""
 
 
 def test_build_case_passes_wide_brem_grid_to_diagnostic_sweep(monkeypatch):

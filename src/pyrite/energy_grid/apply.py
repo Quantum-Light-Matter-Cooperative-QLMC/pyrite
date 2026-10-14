@@ -730,8 +730,11 @@ def set_brem_artifact(
     note=None,
     catalog_path=None,
 ) -> str:
-    """Set manual brem bounds by creating an immutable replacement artifact."""
-    from pyrite.energy_grid.defaults import load_defaults
+    """Set manual brem bounds, preserving resolved spacing unless explicitly supplied.
+
+    Resolved spacing comes from the installed artifact or effective catalog grid
+    (including the normal built-in continuum spacing), never derivation presets.
+    """
 
     path = Path(active_catalog_path() if catalog_path is None else catalog_path)
     original = _read_catalog(path)
@@ -743,7 +746,7 @@ def set_brem_artifact(
     step = _positive_float(
         step_eV
         if step_eV is not None
-        else current_brem.get("step_eV", load_defaults()["brem_step_ev"]),
+        else current_brem["step_eV"],
         "step",
     )
     brem = {"start_eV": float(current_brem["start_eV"]), "stop_eV": stop, "step_eV": step}

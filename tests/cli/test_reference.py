@@ -41,7 +41,7 @@ def test_help_documents_examples_units_side_effects_and_incompatibilities():
         ("material", "energy-grid"): ("detector energy-grid inputs", "Examples:"),
         ("material", "energy-grid", "derive"): ("keV", "angstrom", "spacing in eV"),
         ("profile", "energy-grid", "defaults"): (
-            "persistent derivation inputs",
+            "global derivation batch inputs",
             "not physical scan defaults",
         ),
         ("job", "status"): ("defaults to latest", "repeat"),
