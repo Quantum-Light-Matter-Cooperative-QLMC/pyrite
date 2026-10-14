@@ -118,11 +118,32 @@ def transport_signature(segments):
 
 
 def assert_output_baseline(kind, actual):
-    """Exact CPU regression; fixture provenance lives beside the JSON."""
+    """Seeded CPU regression with fp64 roundoff across CPU math implementations."""
     import json
     from pathlib import Path
 
     expected = json.loads(
         (Path(__file__).parents[1] / "data/physics-baseline/outputs.json").read_text()
     )[kind]
-    assert actual == expected
+    _assert_output_values(actual, expected, kind)
+
+
+def _assert_output_values(actual, expected, path):
+    if isinstance(expected, dict):
+        assert actual.keys() == expected.keys(), path
+        for name, value in expected.items():
+            _assert_output_values(actual[name], value, f"{path}.{name}")
+        return
+
+    actual_array = np.asarray(actual)
+    expected_array = np.asarray(expected)
+    assert actual_array.shape == expected_array.shape, path
+    if expected_array.dtype.kind in "iu":
+        np.testing.assert_array_equal(actual_array, expected_array, err_msg=path)
+    else:
+        # These fixtures accumulate up to a few thousand fp64 contributions.
+        # Allow accumulated roundoff (roughly thousands of machine epsilons),
+        # but no absolute floor that could mask tiny spectra or nonzero output.
+        np.testing.assert_allclose(
+            actual_array, expected_array, rtol=1e-12, atol=0, equal_nan=False, err_msg=path
+        )

@@ -49,9 +49,16 @@ analytic Joy/Bishop screening. No licensed NIST tables were fetched or added.
 Coupled/cascade arrays deliberately increase rare-event rates; their success
 says nothing about a physical validity domain.
 
-Output comparisons are exact for the fixed CPU path and unchanged reduction
-order. Existing replay/streaming and backend comparisons retain their documented
-precision tolerances. For a deliberate numerical/model change, review the
+Output comparisons require identical component keys, array shapes, event counts
+and integer IDs. Floating-point outputs use `rtol=1e-12`, `atol=0`: these small
+fp64 cases accumulate up to a few thousand contributions, so the allowance is
+of the order of thousands of machine epsilons. CPU math/SIMD implementations
+can differ in their final bits even with the same seed and reduction order;
+disabling NumPy's `X86_V3` dispatch reproduces an exact-comparison failure in
+the coherent fixture. A zero absolute tolerance keeps zeros exact and protects
+the small spectra. The captured fixtures remain unchanged. Existing
+replay/streaming and backend comparisons retain their documented precision
+tolerances. For a deliberate numerical/model change, review the
 changed expectations and model-generation/validation obligations together;
 these snapshots are not a reason to loosen tolerances.
 
