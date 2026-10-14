@@ -5,6 +5,7 @@ import pytest
 
 from pyrite._catalog_layout import read_text
 from pyrite.cli import _catalog_io
+from pyrite.cli._deprecations import message
 from pyrite.cli.commands import profile
 from tests.helpers.cli import assert_clean_result, assert_table_row, invoke
 from tests.helpers.user_catalog import copy_full_catalog
@@ -38,7 +39,7 @@ def catalog(tmp_path, monkeypatch):
 
 def _show(name="standard"):
     result = invoke(profile.command, ["physical-detector", "show", name, "-o", "json"])
-    assert_clean_result(result)
+    assert_clean_result(result, stderr=message("profile physical-detector show") + "\n")
     document = json.loads(result.stdout)
     assert document["schema"] == "cxr.profile.physical-detector.show"
     return document["payload"]
@@ -65,7 +66,11 @@ def _create(name="standard", *extra):
 
 def test_show_reports_a_profile_without_a_physical_detector(catalog) -> None:
     text = invoke(profile.command, ["physical-detector", "show", "standard"])
-    assert_clean_result(text, stdout="standard: no physical detector\n")
+    assert_clean_result(
+        text,
+        stdout="standard: no physical detector\n",
+        stderr=message("profile physical-detector show") + "\n",
+    )
     assert _show() == {
         "profile": "standard",
         "source": None,
@@ -92,7 +97,11 @@ def test_set_without_fields_is_a_usage_error(catalog) -> None:
 
 def test_geometry_then_acquisition_makes_a_counting_observation(catalog) -> None:
     created = _create()
-    assert_clean_result(created, stdout="updated physical detector for profile standard\n")
+    assert_clean_result(
+        created,
+        stdout="updated physical detector for profile standard\n",
+        stderr=message("profile physical-detector set") + "\n",
+    )
     payload = _show()
     assert payload["source"] == "profile"
     assert payload["physical_detector"]["shape"] == [8, 10]
@@ -110,7 +119,7 @@ def test_geometry_then_acquisition_makes_a_counting_observation(catalog) -> None
     assert payload["physical_detector"]["distance_mm"] == 100.0
 
     human = invoke(profile.command, ["physical-detector", "show", "standard"])
-    assert_clean_result(human)
+    assert_clean_result(human, stderr=message("profile physical-detector show") + "\n")
     assert "counting observation: yes, 5 reporting bins 0-2000 eV" in human.stdout
     assert "response: ideal (default)" in human.stdout
     assert "scalar projection used by sweeps: observation angle 60 deg" in human.stdout
@@ -233,7 +242,11 @@ def test_set_on_profile_without_detector_requires_geometry(catalog) -> None:
         profile.command,
         [*SET, "high_energy", "--distance-mm", "300", "--polar-deg", "45"],
     )
-    assert_clean_result(created, stdout="updated physical detector for profile high_energy\n")
+    assert_clean_result(
+        created,
+        stdout="updated physical detector for profile high_energy\n",
+        stderr=message("profile physical-detector set") + "\n",
+    )
     local = _show("high_energy")
     assert local["source"] == "profile"
     assert local["physical_detector"]["polar_deg"] == 45.0
@@ -255,7 +268,11 @@ def test_reset_sections_then_the_whole_detector(catalog) -> None:
     section = invoke(
         profile.command, ["physical-detector", "reset", "standard", "acquisition", "-y"]
     )
-    assert_clean_result(section, stdout="removed acquisition from profile standard\n")
+    assert_clean_result(
+        section,
+        stdout="removed acquisition from profile standard\n",
+        stderr=message("profile physical-detector reset") + "\n",
+    )
     payload = _show()
     assert not payload["counting_observation"]
     assert payload["physical_detector"]["scorer"]["angular_shape"] == [2, 2]
@@ -271,7 +288,11 @@ def test_reset_sections_then_the_whole_detector(catalog) -> None:
     assert catalog.read_text() == before
 
     whole = invoke(profile.command, ["physical-detector", "reset", "standard", "-y"])
-    assert_clean_result(whole, stdout="removed the physical detector from profile standard\n")
+    assert_clean_result(
+        whole,
+        stdout="removed the physical detector from profile standard\n",
+        stderr=message("profile physical-detector reset") + "\n",
+    )
     assert _show()["physical_detector"] is None
 
 
