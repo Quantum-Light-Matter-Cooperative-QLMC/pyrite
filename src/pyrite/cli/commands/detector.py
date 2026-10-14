@@ -7,13 +7,15 @@ import click
 import tomlkit
 from tomlkit.exceptions import ParseError
 
+from pyrite.campaign.profile_edit import PHYSICAL_SECTIONS
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli.commands._detector_shared import (
+    apply_detector_fields,
     collect_detector_updates,
     detector_cli_options,
-    write_detector_fields,
 )
+from pyrite.cli.commands._pixel_detector_shared import pixel_changes, pixel_cli_options
 from pyrite.console import json as cli_json
 from pyrite.console.output import (
     CLIError,
@@ -126,9 +128,11 @@ def _emit_show(payload):
 def command():
     """Manage named detector geometries, attachable to profiles by name.
 
-    Named detectors currently carry observation angle, full polar acceptance,
-    and solid angle. Detector responses and energy bins are runtime objects and
-    are not serialized by these commands. The bundled reference detector integrates
+    Scalar detectors carry observation angle, full polar acceptance, and solid
+    angle. Pixel detectors use --distance-mm and optional pixel geometry, scorer,
+    response and acquisition fields. Use reset NAME SECTION to clear optional
+    sections. Scalar acceptance and pixel geometry cannot be combined.
+    The bundled reference detector integrates
     the Timepix3 chip aperture at 400 mm as one scalar detector with ideal
     response: raw spectra, without pixel binning or count acquisition.
 
@@ -195,6 +199,7 @@ def show_command(name, json_output):
 @click.argument("name")
 @click.option("--label", help="Display-only description; never affects parameter_sha256.")
 @detector_cli_options
+@pixel_cli_options
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def create_command(
     name,
@@ -203,11 +208,13 @@ def create_command(
     polar_acceptance_deg,
     solid_angle_sr,
     dry_run,
+    **values,
 ):
     """Create a reusable named detector geometry NAME."""
     _check_name(name)
     updates = collect_detector_updates(observation_angle_deg, polar_acceptance_deg, solid_angle_sr)
-    if not updates:
+    pixel = pixel_changes(values)
+    if not updates and not any(pixel):
         raise click.UsageError("provide at least one detector-geometry option")
     try:
         original, document = _catalog_io.catalog_text()
@@ -219,7 +226,7 @@ def create_command(
         target = tomlkit.table()
         if label is not None:
             target["label"] = label
-        write_detector_fields(target, updates)
+        apply_detector_fields(target, updates, pixel)
         _catalog_io.detectors_table(document)[name] = target
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
@@ -230,6 +237,7 @@ def create_command(
 @click.argument("name", shell_complete=_cli_completion.complete_detector)
 @click.option("--label", help="Display-only description; never affects parameter_sha256.")
 @detector_cli_options
+@pixel_cli_options
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip overwrite confirmation.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def set_command(
@@ -240,10 +248,12 @@ def set_command(
     solid_angle_sr,
     yes,
     dry_run,
+    **values,
 ):
     """Update fields on an existing named detector NAME."""
     updates = collect_detector_updates(observation_angle_deg, polar_acceptance_deg, solid_angle_sr)
-    if not updates and label is None:
+    pixel = pixel_changes(values)
+    if not updates and not any(pixel) and label is None:
         raise click.UsageError("provide --label or a detector-geometry option")
     try:
         original, document = _catalog_io.catalog_text()
@@ -261,7 +271,7 @@ def set_command(
         )
     if label is not None:
         target["label"] = label
-    write_detector_fields(target, updates)
+    apply_detector_fields(target, updates, pixel)
     return _write(document, original, dry_run, f"updated detector {name}")
 
 
@@ -347,3 +357,29 @@ def delete_command(name, yes, dry_run, json_output):
         return 0
     emit_result(f"deleted detector {name}")
     return 0
+
+
+@command.command("reset")
+@click.argument("name", shell_complete=_cli_completion.complete_detector)
+@click.argument("sections", nargs=-1, required=True, type=click.Choice(PHYSICAL_SECTIONS))
+@click.option("-y", "--yes", is_flag=True, help="Remove the selected sections without prompting.")
+@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
+def reset_command(name, sections, yes, dry_run):
+    """Clear optional scorer, response or acquisition sections of a named detector.
+
+    Use delete NAME for full removal. Changes affect every referencing profile.
+    """
+    try:
+        original, document = _catalog_io.catalog_text()
+        target = _existing_detector(document, name)
+        for section in sections:
+            if section not in target:
+                raise ValueError(f"detector {name!r} has no {section} section")
+            del target[section]
+    except (OSError, ValueError, ParseError) as exc:
+        raise CLIError(str(exc)) from None
+    if not dry_run and not confirm_destructive(
+        yes, f"Remove {', '.join(sections)} from detector {name}?"
+    ):
+        return 0
+    return _write(document, original, dry_run, f"reset detector {name}")

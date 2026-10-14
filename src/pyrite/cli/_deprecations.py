@@ -62,14 +62,29 @@ def _entry(
 #: and `material set` (deprecated 0.4.0, issue #359) at 0.6.0 (issue #387).
 #: `material simulate` was removed at 0.8.0; use `run --ephemeral`.
 DEPRECATIONS: dict[str, Deprecation] = {
-    path: _entry(
-        path,
+    "profile energy-grid": _entry(
+        "profile energy-grid",
         "pyrite material energy-grid derive --material KEY --energy KEV",
         since=GRID_DEFAULTS_SINCE,
         note="Normal runs size grids automatically; retire global batch presets and their store.",
         warning_note="normal runs size grids automatically; explicit derivation is optional",
-    )
-    for path in ("profile energy-grid",)
+    ),
+    "profile physical-detector": _entry(
+        "profile physical-detector", "pyrite profile detector", since="0.13.0"
+    ),
+    **{
+        f"profile physical-detector {leaf}": _entry(
+            f"profile physical-detector {leaf}", replacement, since="0.13.0"
+        )
+        for leaf, replacement in (
+            ("show", "pyrite profile detector show PROFILE physical"),
+            ("set", "pyrite profile detector set PROFILE physical"),
+            (
+                "reset",
+                "pyrite profile detector reset PROFILE physical SECTIONS; pyrite profile detector rm PROFILE physical",
+            ),
+        )
+    },
 }
 
 
@@ -77,7 +92,7 @@ DEPRECATIONS: dict[str, Deprecation] = {
 #: command computes it and calls `warn_self(path, replacement)` from its own
 #: callback. `DeprecatingGroup` leaves these alone rather than pre-empting them
 #: with the registry's generic replacement.
-SELF_WARNING: frozenset[str] = frozenset()
+SELF_WARNING: frozenset[str] = frozenset({"profile physical-detector"})
 
 
 def message(path: str, *, replacement: str | None = None) -> str:

@@ -17,6 +17,7 @@ from pyrite.cli._groups import LazyGroup
 from pyrite.cli.commands import (
     _physical_detector,
     _profile_cxr_grid,
+    _profile_detectors,
     _profile_filters,
     _profile_precision,
     _profile_show,
@@ -238,7 +239,7 @@ def command():
     emission use ``set|add|remove``; calculation controls (electron counts,
     reflections, mosaic, transport models) use ``numerics``; the line-grid
     selectors use ``cxr-grid``; filters and the pixel detector use ``filter``
-    and ``physical-detector``; reusable beams and detectors are named objects
+    and ``detector``; reusable beams and detectors are named objects
     edited with ``pyrite beam`` and ``pyrite detector``. The full map is
     docs/repo-design/profile-settings.md. Bundled demos are read-only (copy
     with ``create NAME --from DEMO``); yours live in ``catalog.user``.
@@ -496,6 +497,7 @@ def numerics_reset_command(name, fields, yes, dry_run):
 command.add_command(_profile_cxr_grid.command)
 command.add_command(_profile_precision.command)
 command.add_command(_physical_detector.command)
+command.add_command(_profile_detectors.command)
 
 
 command.add_command(_profile_filters.command)
@@ -612,7 +614,7 @@ def show_command(name, json_output):
     metavar="NAME",
     shell_complete=_cli_completion.complete_detector,
     help=(
-        "Attach a named detector; reference uses the Timepix3 aperture with ideal response "
+        "Attach a named detector (one-ID collections update that ID; multiple IDs require profile detector set PROFILE ID); reference uses the Timepix3 aperture with ideal response "
         "and raw spectra. Create others with 'pyrite detector create'."
     ),
 )
@@ -725,7 +727,7 @@ def create_command(
     metavar="NAME",
     shell_complete=_cli_completion.complete_detector,
     help=(
-        "Attach a named detector; reference uses the Timepix3 aperture with ideal response "
+        "Attach a named detector (one-ID collections update that ID; multiple IDs require profile detector set PROFILE ID); reference uses the Timepix3 aperture with ideal response "
         "and raw spectra. Create others with 'pyrite detector create'."
     ),
 )

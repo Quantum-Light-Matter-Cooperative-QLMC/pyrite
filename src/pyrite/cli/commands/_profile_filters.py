@@ -19,7 +19,7 @@ def command():
 
     Plates are validated through the public ``FilterPlate`` dataclass and keep
     their declared order, which is part of an observation's identity. They
-    need a physical detector, set with 'pyrite profile physical-detector set'.
+    need a physical detector, set with 'pyrite profile detector set PROFILE physical'.
     Changing a plate re-evaluates observations on new transport; cached
     scalar records are kept.
     """

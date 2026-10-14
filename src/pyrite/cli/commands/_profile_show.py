@@ -190,7 +190,7 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
             }
             rows.extend(_rows({**defaults, **entry["settings"]}))
         owner = (
-            "profile physical-detector; pyrite detector"
+            "profile detector; pyrite detector"
             if entry["kind"] == "pixel"
             else "profile set --detector; pyrite detector"
         )

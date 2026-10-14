@@ -87,3 +87,19 @@ def test_precision_enable_on_a_bundled_demo_writes_nothing_and_a_clone_switches(
     assert "removed fixed counts: cxr-trials 100, brem-trials 100" in enabled.stdout
     assert "n_electrons" not in (_isolate_user_catalog / "profiles" / "mine.toml").read_text()
     assert bundled() == before
+
+
+def test_detector_collection_edits_preserve_bundled_and_use_user_layer(_isolate_user_catalog):
+    before = {path: path.read_bytes() for path in bundled_catalog().rglob("*.toml")}
+    assert invoke(profile.command, ["create", "mine", "--from", "quickstart"]).exit_code == 0
+    migrated = invoke(profile.command, ["detector", "migrate", "mine", "--yes"])
+    assert migrated.exit_code == 0
+    added = invoke(
+        profile.command, ["detector", "add", "mine", "second", "--detector", "reference"]
+    )
+    assert_clean_result(added)
+    assert 'second = "reference"' in (_isolate_user_catalog / "profiles" / "mine.toml").read_text()
+    refused = invoke(profile.command, ["detector", "migrate", "quickstart", "--yes"])
+    assert refused.exit_code == 1
+    assert "bundled demo and is read-only" in refused.stderr
+    assert {path: path.read_bytes() for path in bundled_catalog().rglob("*.toml")} == before

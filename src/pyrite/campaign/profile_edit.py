@@ -778,6 +778,13 @@ def set_physical_detector(
             )
         table = _toml_value({})
         profile["physical_detector"] = table
+    merge_pixel_detector(
+        table, geometry=geometry, scorer=scorer, response=response, acquisition=acquisition
+    )
+
+
+def merge_pixel_detector(table, *, geometry, scorer=None, response=None, acquisition=None):
+    """Merge supplied pixel fields, replacing incompatible response/bin sections."""
     for key, value in geometry.items():
         table[key] = _toml_value(value)
     if scorer:
@@ -1046,7 +1053,7 @@ def create_profile(
     if beam_name is not None:
         target["beam"] = beam_name
     if detector_name is not None:
-        target["detector"] = detector_name
+        attach_detector_shortcut(target, detector_name)
     _apply_transport_updates(target, transport_updates)
     if materials is not None:
         target["materials"] = validate_materials(document, csv_materials(materials))
@@ -1094,7 +1101,7 @@ def set_profile(
     if beam_name is not None:
         target["beam"] = beam_name
     if detector_name is not None:
-        target["detector"] = detector_name
+        attach_detector_shortcut(target, detector_name)
     _apply_transport_updates(target, transport_updates)
     if material_keys is not None:
         target["materials"] = material_keys
@@ -1138,3 +1145,61 @@ def delete_profile(document, name):
     n_overrides = sum(1 for row in overrides.values() if isinstance(row, dict) and row)
     del profile_rows(document)[name]
     return n_overrides
+
+
+def attach_detector_shortcut(profile, reference):
+    """Replace an unambiguous attachment without discarding a collection."""
+    collection = profile.get("detectors")
+    if collection is None:
+        profile["detector"] = reference
+    elif len(collection) == 1:
+        collection[next(iter(collection))] = reference
+    else:
+        raise ValueError(
+            "multiple detector IDs; use: pyrite profile detector set PROFILE ID --detector REF"
+        )
+
+
+def profile_detector_entries(profile):
+    """Return the existing detector IDs without converting legacy storage."""
+    if "detectors" in profile:
+        return profile["detectors"]
+    entries = {}
+    if "physical_detector" in profile:
+        entries["physical"] = profile["physical_detector"]
+    if "detector" in profile:
+        entries["default"] = profile["detector"]
+    return entries or {"default": {}}
+
+
+def profile_detector_slot(profile, identifier, *, create_physical=False):
+    """Return the owning table/key for one detector, preserving its representation."""
+    if "detectors" in profile:
+        if identifier not in profile["detectors"]:
+            raise ValueError(f"unknown detector ID {identifier!r}")
+        return profile["detectors"], identifier
+    entries = profile_detector_entries(profile)
+    if identifier not in entries and not (create_physical and identifier == "physical"):
+        raise ValueError(f"unknown detector ID {identifier!r}; available: {', '.join(entries)}")
+    return profile, "physical_detector" if identifier == "physical" else "detector"
+
+
+def migrate_profile_detectors(document, name):
+    """Explicitly convert legacy declarations, preserving order and resolved defaults."""
+    profile = existing_profile(document, name)
+    if "detectors" in profile:
+        raise ValueError(f"profile {name!r} already uses a detector collection")
+    collection = tomlkit.table()
+    for identifier, entry in profile_detector_entries(profile).items():
+        # An implicit scalar uses code defaults; collection entries must declare geometry.
+        if not entry:
+            entry = {
+                key: getattr(Detector(), key)
+                for key, _, _ in ACTIVE_DETECTOR_FIELDS
+                if getattr(Detector(), key) is not None
+            }
+        collection[identifier] = clone_grid(entry)
+    profile.pop("detector", None)
+    profile.pop("physical_detector", None)
+    profile["detectors"] = collection
+    return list(collection)

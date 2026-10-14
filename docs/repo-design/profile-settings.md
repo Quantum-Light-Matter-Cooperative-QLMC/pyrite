@@ -85,8 +85,8 @@ detected counts), `max_spacing_eV` (`PYRITE_ENERGY_GRID_MAX_SPACING_EV`; 3 eV),
 |---|---|---|
 | `beam` | `profile set --beam NAME`; `profile remove --beam` | named `[beams.NAME]` edited with `pyrite beam`; inline tables are TOML |
 | `detector` | `profile set --detector NAME` | named `[detectors.NAME]` edited with `pyrite detector`; use `reference` for ideal Timepix3 aperture and raw spectra |
-| `detectors.ID` | TOML | collection; cannot be combined with `detector`/`physical_detector` |
-| `physical_detector` (+ `scorer`, `response`, `acquisition`) | `profile physical-detector show\|set\|reset` | |
+| `detectors.ID` | `profile detector list\|show\|add\|set\|reset\|rm`; `migrate` converts legacy storage | collection; cannot be combined with `detector`/`physical_detector` |
+| `physical_detector` (+ `scorer`, `response`, `acquisition`) | `profile detector show\|set\|reset NAME physical`; `rm NAME physical` | |
 | `filters` | `profile filter add\|set\|rm\|list\|show` | order is part of identity |
 | `emission` | `profile set --emission`; `profile add\|remove --coherent/--incoherent` | absent = `incoherent` |
 | `temporal_profile` | `profile set --temporal-profile/--no-temporal-profile` | absent = off |
@@ -107,3 +107,12 @@ Creation copies no instrument (pass `--detector reference` for the ideal
 aperture), numerics or line-grid policy. `profile create NAME --from SOURCE`
 copies every SOURCE key except `overrides`, including numerics and
 `line_grid_policy`, and lists the inherited sections.
+
+Detector collections are edited with `profile detector list|show|add|set|reset|rm`.
+Named scalar/pixel objects belong to `pyrite detector`; profile-local edits of a
+reference require `set NAME ID --inline-copy`. Legacy `default` and `physical`
+IDs retain their storage until explicit `profile detector migrate NAME`
+(preview/confirmation, including checkpoint variant consequences). The single
+`profile set --detector` shortcut updates one collection entry and rejects
+ambiguous collections. See [detector workflow](../guides/sweep-profiles.md) for
+membership, optional-section resets, migration, and inspection JSON.

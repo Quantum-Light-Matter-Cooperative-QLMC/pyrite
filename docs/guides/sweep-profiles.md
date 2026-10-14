@@ -307,14 +307,33 @@ hit_threshold_eV = 500.0
 
 The pixel pose uses `distance_mm`, `polar_deg`, `azimuth_deg`, `roll_deg`, and `offset_mm`; the grid uses `shape` and `pitch_mm` (default 256 by 256 at 0.055 mm). Optional `scorer`, `response`, and `acquisition` belong to that detector ID. An acquisition produces a factorized counting observation. Profile filters remain shared across the collection.
 
-The older `[profiles.NAME.physical_detector]` table remains editable with `pyrite profile physical-detector show|set|reset`; creating one requires `--distance-mm`. Each `[[profiles.NAME.filters]]` table is one `FilterPlate`, edited in declared order with `pyrite profile filter add|set|rm|list|show`.
+Use `profile detector list PROFILE` and `show PROFILE ID` to inspect resolved geometry, references and optional sections. Attach a reusable object with `add PROFILE ID --detector REF`; replace a reference with `set PROFILE ID --detector REF`. `set PROFILE ID` also accepts scalar and pixel field options for inline entries. A named entry requires `--inline-copy` before profile-local field edits; this copies all its settings and leaves the shared object unchanged. Use `pyrite detector set REF` to edit a reusable object for all profiles.
 
 ```bash
-pyrite profile physical-detector set filter_demo --distance-mm 400 --polar-deg 60 \
+pyrite detector create sensor --distance-mm 400 --shape 256 256 --angular-shape 2 2 \
+  --response ideal --exposure-s 1 --measured-range-ev 0 20000 --measured-bin-width-ev 400
+pyrite profile create survey --detector reference
+pyrite profile detector migrate survey --dry-run
+pyrite profile detector migrate survey --yes
+pyrite profile detector add survey camera --detector sensor
+pyrite profile detector show survey camera -o json
+pyrite profile detector set survey camera --inline-copy --roll-deg 5
+pyrite profile detector reset survey camera acquisition --yes
+pyrite profile detector rm survey camera --yes
+```
+
+`pyrite detector create|set` accepts scalar acceptance or pixel geometry, scorer, response and acquisition fields. Pixel creation requires `--distance-mm`; scalar acceptance cannot be combined with pixel fields. `detector reset REF scorer|response|acquisition` clears named optional sections; `detector delete REF` removes an unreferenced object. `profile detector reset PROFILE ID SECTION...` clears inline sections and `rm PROFILE ID` removes the entry. Collection removal must leave at least one detector. Removal and migration require confirmation (`--yes` for scripts); `--dry-run` previews without writing.
+
+Legacy `detector` and `physical_detector` remain editable as IDs `default` and `physical` without changing storage. `set PROFILE physical --distance-mm MM` can create the legacy inline pixel table. Adding IDs requires explicit `migrate PROFILE`: it previews the exact TOML and checkpoint variants, preserves all detector settings and order, and then requests confirmation. Migrating a single legacy detector changes its checkpoint variant to `detector-ID` and changes the parameter digest because the variant participates in identity; multiple legacy detectors already use those variants. Existing checkpoints remain in place; new identity-qualified variants do not silently resume incompatible data. Profiles with neither declaration preserve their implicit scalar geometry during migration, but still need explicit acceptance to run. `profile create|set --detector REF` updates a single collection entry; multiple entries require the exact ID-targeted command.
+
+`profile detector list` and `show` JSON use the versioned `cxr.profile.detector.list` and `cxr.profile.detector.show` envelopes. List payloads contain `profile` and an ID-keyed `detectors` mapping; show payloads contain `profile`, `id`, `kind`, `reference`, `settings` and projected `acceptance`. The deprecated `profile physical-detector show|set|reset` commands retain their legacy arguments, table mutations and JSON schema through the D7 support window, with a warning on stderr. Each `[[profiles.NAME.filters]]` table is one shared `FilterPlate`, edited in declared order with `pyrite profile filter add|set|rm|list|show`.
+
+```bash
+pyrite profile detector set filter_demo physical --distance-mm 400 --polar-deg 60 \
   --shape 256 256 --angular-shape 5 5
 pyrite profile filter add filter_demo --name half_filter --material silicon \
   --thickness-mm 0.1 --size-mm 7.04 14.08 --distance-mm 200
-pyrite profile physical-detector set filter_demo --exposure-s 1 \
+pyrite profile detector set filter_demo physical --exposure-s 1 \
   --measured-range-ev 0 20000 --measured-bin-width-ev 400 --hit-threshold-ev 500
 ```
 

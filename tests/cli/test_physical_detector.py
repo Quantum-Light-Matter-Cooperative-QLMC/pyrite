@@ -115,7 +115,7 @@ def test_geometry_then_acquisition_makes_a_counting_observation(catalog) -> None
     assert "response: ideal (default)" in human.stdout
     assert "scalar projection used by sweeps: observation angle 60 deg" in human.stdout
     shown = invoke(profile.command, ["show", "standard"])
-    assert "Detector physical (profile physical-detector; pyrite detector)" in shown.stdout
+    assert "Detector physical (profile detector; pyrite detector)" in shown.stdout
     assert_table_row(shown.stdout, "kind", "pixel")
     assert_table_row(shown.stdout, "observation angle", "60 deg")
     assert_table_row(shown.stdout, "acquisition.exposure-s", "2")

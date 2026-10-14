@@ -11,6 +11,10 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | Deprecated spelling | Replacement | Deprecated in | Remove in | Note |
 | --- | --- | --- | --- | --- |
 | `pyrite profile energy-grid` | `pyrite material energy-grid derive --material KEY --energy KEV` | 0.13.6 | 0.15.0 | Normal runs size grids automatically; retire global batch presets and their store. |
+| `pyrite profile physical-detector` | `pyrite profile detector` | 0.13.0 | 0.15.0 |  |
+| `pyrite profile physical-detector reset` | `pyrite profile detector reset PROFILE physical SECTIONS; pyrite profile detector rm PROFILE physical` | 0.13.0 | 0.15.0 |  |
+| `pyrite profile physical-detector set` | `pyrite profile detector set PROFILE physical` | 0.13.0 | 0.15.0 |  |
+| `pyrite profile physical-detector show` | `pyrite profile detector show PROFILE physical` | 0.13.0 | 0.15.0 |  |
 
 ## Options
 

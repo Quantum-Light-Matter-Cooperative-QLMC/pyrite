@@ -1514,10 +1514,10 @@ Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...
   Where settings live: ranges, membership, beam/detector references and emission use
   ``set|add|remove``; calculation controls (electron counts, reflections, mosaic,
   transport models) use ``numerics``; the line-grid selectors use ``cxr-grid``; filters
-  and the pixel detector use ``filter`` and ``physical-detector``; reusable beams and
-  detectors are named objects edited with ``pyrite beam`` and ``pyrite detector``. The
-  full map is docs/repo-design/profile-settings.md. Bundled demos are read-only (copy
-  with ``create NAME --from DEMO``); yours live in ``catalog.user``.
+  and the pixel detector use ``filter`` and ``detector``; reusable beams and detectors
+  are named objects edited with ``pyrite beam`` and ``pyrite detector``. The full map is
+  docs/repo-design/profile-settings.md. Bundled demos are read-only (copy with ``create
+  NAME --from DEMO``); yours live in ``catalog.user``.
 
   Examples:
     pyrite profile list
@@ -1535,19 +1535,19 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  add                Incrementally add values to profile grids,...
-  create             Create a profile from packaged sweep...
-  cxr-grid           Inspect and edit PROFILE's cxr-grid policy...
-  delete             Delete a profile; irreversible.
-  filter             Manage finite FilterPlate objects on a...
-  list               List profiles: source, membership,...
-  numerics           Inspect and edit result-affecting...
-  physical-detector  Manage a profile's physical pixel detector...
-  precision          Inspect and edit PROFILE's electron-count...
-  remove             Remove values from an existing profile's...
-  rename             Rename profile NAME to NEW_NAME.
-  set                Replace range grids, the beam reference,...
-  show               Show PROFILE in tables grouped by CLI...
+  add        Incrementally add values to profile grids,...
+  create     Create a profile from packaged sweep...
+  cxr-grid   Inspect and edit PROFILE's cxr-grid policy...
+  delete     Delete a profile; irreversible.
+  detector   Manage profile detector IDs, references...
+  filter     Manage finite FilterPlate objects on a...
+  list       List profiles: source, membership,...
+  numerics   Inspect and edit result-affecting...
+  precision  Inspect and edit PROFILE's electron-count...
+  remove     Remove values from an existing profile's...
+  rename     Rename profile NAME to NEW_NAME.
+  set        Replace range grids, the beam reference,...
+  show       Show PROFILE in tables grouped by CLI...
 ```
 
 ## `pyrite profile add`
@@ -1638,9 +1638,11 @@ Options:
                                   requires midpoint.  [x>=0.0]
   --beam NAME                     Attach a named [beams.NAME] reference; create it with
                                   'pyrite beam create'.
-  --detector NAME                 Attach a named detector; reference uses the Timepix3
-                                  aperture with ideal response and raw spectra. Create
-                                  others with 'pyrite detector create'.
+  --detector NAME                 Attach a named detector (one-ID collections update
+                                  that ID; multiple IDs require profile detector set
+                                  PROFILE ID); reference uses the Timepix3 aperture with
+                                  ideal response and raw spectra. Create others with
+                                  'pyrite detector create'.
   --material KEY,...              Set explicit initial membership (comma-separated
                                   material keys).
   --dry-run                       Print proposed TOML diff; write nothing.
@@ -1767,6 +1769,178 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
+## `pyrite profile detector`
+
+```text
+Usage: pyrite profile detector [OPTIONS] COMMAND [ARGS]...
+
+  Manage profile detector IDs, references and inline configuration.
+
+  Named objects belong to 'pyrite detector'; local edits require an inline entry or
+  --inline-copy. Legacy default/physical IDs edit existing storage. Use migrate PROFILE
+  --dry-run before adding IDs to a legacy profile. Filters remain shared under 'profile
+  filter'.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  add      Attach a named detector under a new ID; migrate legacy profiles explicitly.
+  list     List PROFILE_NAME's resolved detector IDs and references.
+  migrate  Explicitly convert legacy storage to an ID collection, preserving values.
+  reset    Clear ID's optional sections.
+  rm       Remove one ID; a collection must retain at least one detector.
+  set      Replace ID's reference, or update its inline scalar/pixel settings.
+  show     Show ID's geometry, optional sections and projected scalar acceptance.
+```
+
+## `pyrite profile detector add`
+
+```text
+Usage: pyrite profile detector add [OPTIONS] PROFILE_NAME IDENTIFIER
+
+  Attach a named detector under a new ID; migrate legacy profiles explicitly.
+
+Options:
+  --detector TEXT  Named scalar or pixel detector to attach.  [required]
+  -y, --yes        Skip the standard-profile confirmation.
+  --dry-run        Print proposed TOML diff; write nothing.
+  -h, --help       Show this message and exit.
+```
+
+## `pyrite profile detector list`
+
+```text
+Usage: pyrite profile detector list [OPTIONS] PROFILE_NAME
+
+  List PROFILE_NAME's resolved detector IDs and references.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile detector migrate`
+
+```text
+Usage: pyrite profile detector migrate [OPTIONS] PROFILE_NAME
+
+  Explicitly convert legacy storage to an ID collection, preserving values.
+
+  Collection IDs use detector-ID checkpoint variants. A single legacy detector changes
+  stem; multiple legacy detectors already use those variants. Existing checkpoints are
+  retained; incompatible identities are never silently resumed.
+
+Options:
+  -y, --yes   Confirm the previewed storage and checkpoint changes.
+  --dry-run   Print migration preview; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile detector reset`
+
+```text
+Usage: pyrite profile detector reset [OPTIONS] PROFILE_NAME IDENTIFIER
+                                     {scorer|response|acquisition}...
+
+  Clear ID's optional sections. Use rm for full removal.
+
+Options:
+  -y, --yes   Remove without prompting.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile detector rm`
+
+```text
+Usage: pyrite profile detector rm [OPTIONS] PROFILE_NAME IDENTIFIER
+
+  Remove one ID; a collection must retain at least one detector.
+
+Options:
+  -y, --yes   Remove without prompting.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile detector set`
+
+```text
+Usage: pyrite profile detector set [OPTIONS] PROFILE_NAME IDENTIFIER
+
+  Replace ID's reference, or update its inline scalar/pixel settings.
+
+  Legacy 'physical' may be created with --distance-mm. A shared named object is never
+  edited implicitly. Use --inline-copy for a profile-local copy.
+
+Options:
+  --detector TEXT                 Replace this entry with a named detector reference.
+  --inline-copy                   Copy the current named object into this profile before
+                                  editing.
+  --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
+                                  replacement.  [0.0<=x<=180.0]
+  --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar
+                                  replacement.  [0.0<x<=180.0]
+  --solid-angle SR                Detector solid angle in sr; scalar replacement.
+                                  [0.0<x<=12.566370614359172]
+  --distance-mm MM                Source-to-detector distance in mm; required to create.
+  --polar-deg DEG                 Detector-centre polar angle from the beam axis in
+                                  degrees [0, 180].  [0.0<=x<=180.0]
+  --azimuth-deg DEG               Detector-centre azimuth in degrees.
+  --roll-deg DEG                  Detector roll about its normal in degrees.
+  --offset-mm X Y                 Detector-local x/y offset of the centre in mm.
+  --shape ROWS COLS               Pixel counts; a new table defaults to one 256 x 256
+                                  Timepix3 chip.
+  --pitch-mm Y X                  Pixel pitch (y, x) in mm; a new table defaults to
+                                  0.055 0.055.
+  --angular-shape ROWS COLS       Representative directions evaluated per transport; at
+                                  most --shape.
+  --reconstruction [nearest_tile|bilinear_tile]
+                                  Pixel spectrum from its own tile, or blended from
+                                  neighbouring tiles.
+  --response [ideal|timepix3]     Detector response: unit-efficiency 'ideal' counter or
+                                  uncalibrated 'timepix3'.
+  --timepix-thickness-um UM       Timepix3 sensor thickness in micrometres.
+  --timepix-bias-v V              Timepix3 sensor bias in volts.
+  --timepix-input-bin-ev EV       Timepix3 response-model incident-energy bin width in
+                                  eV.
+  --timepix-output-bin-ev EV      Timepix3 native measured-energy bin width in eV (not
+                                  the reporting bins).
+  --timepix-samples N             Timepix3 response Monte Carlo photons per input bin.
+  --timepix-seed N                Timepix3 response-matrix seed.
+  --exposure-s S                  Exposure (integration) time in s.
+  --measured-edges-ev EV,...      Explicit half-open reporting-bin edges in eV, strictly
+                                  increasing.
+  --measured-range-ev MIN MAX     Uniform reporting range in eV; use with --measured-
+                                  bin-width-ev.
+  --measured-bin-width-ev EV      Uniform reporting-bin width in eV; output binning, not
+                                  detector resolution.
+  --hit-threshold-ev EV           Post-response measured-energy cut in eV; separate from
+                                  the response's discriminator.
+  --realization [expected|poisson]
+                                  Report expected counts, or a seeded Poisson
+                                  realization.
+  --realization-seed N            Seed of the Poisson realization.
+  -y, --yes                       Skip the standard-profile confirmation.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile detector show`
+
+```text
+Usage: pyrite profile detector show [OPTIONS] PROFILE_NAME IDENTIFIER
+
+  Show ID's geometry, optional sections and projected scalar acceptance.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
 ## `pyrite profile filter`
 
 ```text
@@ -1776,8 +1950,8 @@ Usage: pyrite profile filter [OPTIONS] COMMAND [ARGS]...
 
   Plates are validated through the public ``FilterPlate`` dataclass and keep their
   declared order, which is part of an observation's identity. They need a physical
-  detector, set with 'pyrite profile physical-detector set'. Changing a plate re-
-  evaluates observations on new transport; cached scalar records are kept.
+  detector, set with 'pyrite profile detector set PROFILE physical'. Changing a plate
+  re-evaluates observations on new transport; cached scalar records are kept.
 
 Options:
   -h, --help  Show this message and exit.
@@ -2009,117 +2183,6 @@ Options:
 Usage: pyrite profile numerics show [OPTIONS] NAME
 
   Show explicit and effective PROFILE numerics with value sources.
-
-Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite profile physical-detector`
-
-```text
-Usage: pyrite profile physical-detector [OPTIONS] COMMAND [ARGS]...
-
-  Manage a profile's physical pixel detector and counting observation.
-
-  The table holds pose and pixel grid, and optionally the angular scorer, the detector
-  response, and the acquisition. With an acquisition the profile is a counting
-  observation: 'pyrite run' stores per-pixel counts beside its checkpoints, and the
-  sweep's scalar observation angle, polar acceptance, and solid angle come from this
-  detector's projection instead of the profile's scalar detector.
-
-  What an edit costs on the next run: pose and pixel grid change the projection and
-  therefore the dataset; the angular shape, reconstruction, and filters re-evaluate
-  observations on new transport while cached scalar records are kept; response and
-  acquisition only rescore stored observations, with no transport.
-
-  A profile without its own table has no physical detector. Creating one requires
-  --distance-mm.
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  reset  Remove NAME's SECTIONS, or its whole physical detector when none are named.
-  set    Create or update NAME's physical detector; only given fields change.
-  show   Show NAME's effective physical detector and derived scalar projection.
-```
-
-## `pyrite profile physical-detector reset`
-
-```text
-Usage: pyrite profile physical-detector reset [OPTIONS] NAME
-                                              [scorer|response|acquisition]...
-
-  Remove NAME's SECTIONS, or its whole physical detector when none are named.
-
-  Removing the acquisition ends the counting observation; stored observations are kept
-  and become reusable again if it is restored.
-
-Options:
-  -y, --yes   Remove without prompting (required when not a TTY).
-  --dry-run   Print proposed TOML diff; write nothing.
-  -h, --help  Show this message and exit.
-```
-
-## `pyrite profile physical-detector set`
-
-```text
-Usage: pyrite profile physical-detector set [OPTIONS] NAME
-
-  Create or update NAME's physical detector; only given fields change.
-
-Options:
-  --distance-mm MM                Source-to-detector distance in mm; required to create.
-  --polar-deg DEG                 Detector-centre polar angle from the beam axis in
-                                  degrees [0, 180].  [0.0<=x<=180.0]
-  --azimuth-deg DEG               Detector-centre azimuth in degrees.
-  --roll-deg DEG                  Detector roll about its normal in degrees.
-  --offset-mm X Y                 Detector-local x/y offset of the centre in mm.
-  --shape ROWS COLS               Pixel counts; a new table defaults to one 256 x 256
-                                  Timepix3 chip.
-  --pitch-mm Y X                  Pixel pitch (y, x) in mm; a new table defaults to
-                                  0.055 0.055.
-  --angular-shape ROWS COLS       Representative directions evaluated per transport; at
-                                  most --shape.
-  --reconstruction [nearest_tile|bilinear_tile]
-                                  Pixel spectrum from its own tile, or blended from
-                                  neighbouring tiles.
-  --response [ideal|timepix3]     Detector response: unit-efficiency 'ideal' counter or
-                                  uncalibrated 'timepix3'.
-  --timepix-thickness-um UM       Timepix3 sensor thickness in micrometres.
-  --timepix-bias-v V              Timepix3 sensor bias in volts.
-  --timepix-input-bin-ev EV       Timepix3 response-model incident-energy bin width in
-                                  eV.
-  --timepix-output-bin-ev EV      Timepix3 native measured-energy bin width in eV (not
-                                  the reporting bins).
-  --timepix-samples N             Timepix3 response Monte Carlo photons per input bin.
-  --timepix-seed N                Timepix3 response-matrix seed.
-  --exposure-s S                  Exposure (integration) time in s.
-  --measured-edges-ev EV,...      Explicit half-open reporting-bin edges in eV, strictly
-                                  increasing.
-  --measured-range-ev MIN MAX     Uniform reporting range in eV; use with --measured-
-                                  bin-width-ev.
-  --measured-bin-width-ev EV      Uniform reporting-bin width in eV; output binning, not
-                                  detector resolution.
-  --hit-threshold-ev EV           Post-response measured-energy cut in eV; separate from
-                                  the response's discriminator.
-  --realization [expected|poisson]
-                                  Report expected counts, or a seeded Poisson
-                                  realization.
-  --realization-seed N            Seed of the Poisson realization.
-  -y, --yes                       Skip the 'standard' confirmation prompt.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite profile physical-detector show`
-
-```text
-Usage: pyrite profile physical-detector show [OPTIONS] NAME
-
-  Show NAME's effective physical detector and derived scalar projection.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
@@ -2400,9 +2463,11 @@ Options:
                                   requires midpoint.  [x>=0.0]
   --beam NAME                     Attach a named [beams.NAME] reference; create it with
                                   'pyrite beam create'.
-  --detector NAME                 Attach a named detector; reference uses the Timepix3
-                                  aperture with ideal response and raw spectra. Create
-                                  others with 'pyrite detector create'.
+  --detector NAME                 Attach a named detector (one-ID collections update
+                                  that ID; multiple IDs require profile detector set
+                                  PROFILE ID); reference uses the Timepix3 aperture with
+                                  ideal response and raw spectra. Create others with
+                                  'pyrite detector create'.
   --material KEY,...              Replace explicit membership with comma-separated
                                   material keys.
   --all-materials                 Restore implicit membership in every catalog material.
@@ -2947,11 +3012,12 @@ Usage: pyrite detector [OPTIONS] COMMAND [ARGS]...
 
   Manage named detector geometries, attachable to profiles by name.
 
-  Named detectors currently carry observation angle, full polar acceptance, and solid
-  angle. Detector responses and energy bins are runtime objects and are not serialized
-  by these commands. The bundled reference detector integrates the Timepix3 chip
-  aperture at 400 mm as one scalar detector with ideal response: raw spectra, without
-  pixel binning or count acquisition.
+  Scalar detectors carry observation angle, full polar acceptance, and solid angle.
+  Pixel detectors use --distance-mm and optional pixel geometry, scorer, response and
+  acquisition fields. Use reset NAME SECTION to clear optional sections. Scalar
+  acceptance and pixel geometry cannot be combined. The bundled reference detector
+  integrates the Timepix3 chip aperture at 400 mm as one scalar detector with ideal
+  response: raw spectra, without pixel binning or count acquisition.
 
   Examples:
     pyrite detector list
@@ -2969,6 +3035,7 @@ Commands:
   delete  Delete an unreferenced named detector; irreversible.
   list    List named detectors with labels and profile-reference counts.
   rename  Rename NAME and update every referencing profile atomically.
+  reset   Clear optional scorer, response or acquisition sections of a named detector.
   set     Update fields on an existing named detector NAME.
   show    Show one named detector's geometry.
 ```
@@ -2981,15 +3048,54 @@ Usage: pyrite detector create [OPTIONS] NAME
   Create a reusable named detector geometry NAME.
 
 Options:
-  --label TEXT             Display-only description; never affects parameter_sha256.
-  --observation-angle DEG  Detector observation angle in degrees [0, 180]; scalar
-                           replacement.  [0.0<=x<=180.0]
-  --polar-acceptance DEG   Full detector polar acceptance span in degrees; scalar
-                           replacement.  [0.0<x<=180.0]
-  --solid-angle SR         Detector solid angle in sr; scalar replacement.
-                           [0.0<x<=12.566370614359172]
-  --dry-run                Print proposed TOML diff; write nothing.
-  -h, --help               Show this message and exit.
+  --label TEXT                    Display-only description; never affects
+                                  parameter_sha256.
+  --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
+                                  replacement.  [0.0<=x<=180.0]
+  --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar
+                                  replacement.  [0.0<x<=180.0]
+  --solid-angle SR                Detector solid angle in sr; scalar replacement.
+                                  [0.0<x<=12.566370614359172]
+  --distance-mm MM                Source-to-detector distance in mm; required to create.
+  --polar-deg DEG                 Detector-centre polar angle from the beam axis in
+                                  degrees [0, 180].  [0.0<=x<=180.0]
+  --azimuth-deg DEG               Detector-centre azimuth in degrees.
+  --roll-deg DEG                  Detector roll about its normal in degrees.
+  --offset-mm X Y                 Detector-local x/y offset of the centre in mm.
+  --shape ROWS COLS               Pixel counts; a new table defaults to one 256 x 256
+                                  Timepix3 chip.
+  --pitch-mm Y X                  Pixel pitch (y, x) in mm; a new table defaults to
+                                  0.055 0.055.
+  --angular-shape ROWS COLS       Representative directions evaluated per transport; at
+                                  most --shape.
+  --reconstruction [nearest_tile|bilinear_tile]
+                                  Pixel spectrum from its own tile, or blended from
+                                  neighbouring tiles.
+  --response [ideal|timepix3]     Detector response: unit-efficiency 'ideal' counter or
+                                  uncalibrated 'timepix3'.
+  --timepix-thickness-um UM       Timepix3 sensor thickness in micrometres.
+  --timepix-bias-v V              Timepix3 sensor bias in volts.
+  --timepix-input-bin-ev EV       Timepix3 response-model incident-energy bin width in
+                                  eV.
+  --timepix-output-bin-ev EV      Timepix3 native measured-energy bin width in eV (not
+                                  the reporting bins).
+  --timepix-samples N             Timepix3 response Monte Carlo photons per input bin.
+  --timepix-seed N                Timepix3 response-matrix seed.
+  --exposure-s S                  Exposure (integration) time in s.
+  --measured-edges-ev EV,...      Explicit half-open reporting-bin edges in eV, strictly
+                                  increasing.
+  --measured-range-ev MIN MAX     Uniform reporting range in eV; use with --measured-
+                                  bin-width-ev.
+  --measured-bin-width-ev EV      Uniform reporting-bin width in eV; output binning, not
+                                  detector resolution.
+  --hit-threshold-ev EV           Post-response measured-energy cut in eV; separate from
+                                  the response's discriminator.
+  --realization [expected|poisson]
+                                  Report expected counts, or a seeded Poisson
+                                  realization.
+  --realization-seed N            Seed of the Poisson realization.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite detector delete`
@@ -3032,6 +3138,21 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
+## `pyrite detector reset`
+
+```text
+Usage: pyrite detector reset [OPTIONS] NAME {scorer|response|acquisition}...
+
+  Clear optional scorer, response or acquisition sections of a named detector.
+
+  Use delete NAME for full removal. Changes affect every referencing profile.
+
+Options:
+  -y, --yes   Remove the selected sections without prompting.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
 ## `pyrite detector set`
 
 ```text
@@ -3040,16 +3161,55 @@ Usage: pyrite detector set [OPTIONS] NAME
   Update fields on an existing named detector NAME.
 
 Options:
-  --label TEXT             Display-only description; never affects parameter_sha256.
-  --observation-angle DEG  Detector observation angle in degrees [0, 180]; scalar
-                           replacement.  [0.0<=x<=180.0]
-  --polar-acceptance DEG   Full detector polar acceptance span in degrees; scalar
-                           replacement.  [0.0<x<=180.0]
-  --solid-angle SR         Detector solid angle in sr; scalar replacement.
-                           [0.0<x<=12.566370614359172]
-  -y, --yes                Skip overwrite confirmation.
-  --dry-run                Print proposed TOML diff; write nothing.
-  -h, --help               Show this message and exit.
+  --label TEXT                    Display-only description; never affects
+                                  parameter_sha256.
+  --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
+                                  replacement.  [0.0<=x<=180.0]
+  --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar
+                                  replacement.  [0.0<x<=180.0]
+  --solid-angle SR                Detector solid angle in sr; scalar replacement.
+                                  [0.0<x<=12.566370614359172]
+  --distance-mm MM                Source-to-detector distance in mm; required to create.
+  --polar-deg DEG                 Detector-centre polar angle from the beam axis in
+                                  degrees [0, 180].  [0.0<=x<=180.0]
+  --azimuth-deg DEG               Detector-centre azimuth in degrees.
+  --roll-deg DEG                  Detector roll about its normal in degrees.
+  --offset-mm X Y                 Detector-local x/y offset of the centre in mm.
+  --shape ROWS COLS               Pixel counts; a new table defaults to one 256 x 256
+                                  Timepix3 chip.
+  --pitch-mm Y X                  Pixel pitch (y, x) in mm; a new table defaults to
+                                  0.055 0.055.
+  --angular-shape ROWS COLS       Representative directions evaluated per transport; at
+                                  most --shape.
+  --reconstruction [nearest_tile|bilinear_tile]
+                                  Pixel spectrum from its own tile, or blended from
+                                  neighbouring tiles.
+  --response [ideal|timepix3]     Detector response: unit-efficiency 'ideal' counter or
+                                  uncalibrated 'timepix3'.
+  --timepix-thickness-um UM       Timepix3 sensor thickness in micrometres.
+  --timepix-bias-v V              Timepix3 sensor bias in volts.
+  --timepix-input-bin-ev EV       Timepix3 response-model incident-energy bin width in
+                                  eV.
+  --timepix-output-bin-ev EV      Timepix3 native measured-energy bin width in eV (not
+                                  the reporting bins).
+  --timepix-samples N             Timepix3 response Monte Carlo photons per input bin.
+  --timepix-seed N                Timepix3 response-matrix seed.
+  --exposure-s S                  Exposure (integration) time in s.
+  --measured-edges-ev EV,...      Explicit half-open reporting-bin edges in eV, strictly
+                                  increasing.
+  --measured-range-ev MIN MAX     Uniform reporting range in eV; use with --measured-
+                                  bin-width-ev.
+  --measured-bin-width-ev EV      Uniform reporting-bin width in eV; output binning, not
+                                  detector resolution.
+  --hit-threshold-ev EV           Post-response measured-energy cut in eV; separate from
+                                  the response's discriminator.
+  --realization [expected|poisson]
+                                  Report expected counts, or a seeded Poisson
+                                  realization.
+  --realization-seed N            Seed of the Poisson realization.
+  -y, --yes                       Skip overwrite confirmation.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite detector show`
