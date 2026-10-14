@@ -6,6 +6,7 @@ import tomlkit
 from pyrite import _energy_grid_artifacts as artifacts
 from pyrite.cli import _catalog_io
 from pyrite.cli import command as root_command
+from pyrite.cli._deprecations import message
 from pyrite.cli.commands import profile
 from pyrite.console import output as _core
 from tests.helpers.cli import assert_clean_result, assert_table_row, invoke
@@ -258,7 +259,11 @@ def test_filter_crud_exposes_json(tmp_path, monkeypatch):
             "0.2",
         ],
     )
-    assert_clean_result(created, stdout="updated physical detector for profile standard\n")
+    assert_clean_result(
+        created,
+        stdout="updated physical detector for profile standard\n",
+        stderr=message("profile physical-detector set") + "\n",
+    )
 
     added = invoke(profile.command, _FILTER_ADD)
     assert_clean_result(added, stdout="added filter to profile standard\n")
