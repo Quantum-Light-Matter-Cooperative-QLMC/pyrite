@@ -105,6 +105,7 @@ channeling/cr-mean-inner-potential
 channeling/cr-plane-incidence
 channeling/cr-lindblad-jump-operators
 channeling/cr-density-matrix-split-operator
+channeling/cr-mcwf-unravelling
 ```
 
 ```{toctree}

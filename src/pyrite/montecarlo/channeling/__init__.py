@@ -3,10 +3,12 @@
 Incoherent scattering (thermal diffuse and electronic) acts on the transverse
 state as a Lindblad dissipator. :mod:`.operators` builds its position-space
 kernel ``C(x, x')`` and the decoherence diagnostic; :mod:`.density`
-integrates the density matrix with a dechanneling sink. CPU only.
+integrates the density matrix with a dechanneling sink, and :mod:`.mcwf`
+unravels the same equation into per-electron quantum jumps. CPU only.
 """
 
 from .density import DensityMatrixResult, DensityMatrixSolver
+from .mcwf import MCWFResult, MCWFSolver, mcwf_stream_key
 from .operators import (
     DecoherenceRate,
     ElectronicChannels,
@@ -22,9 +24,12 @@ __all__ = [
     "DensityMatrixResult",
     "DensityMatrixSolver",
     "ElectronicChannels",
+    "MCWFResult",
+    "MCWFSolver",
     "ScatteringKernel",
     "decoherence_rate",
     "electronic_channels",
     "electronic_kernel",
+    "mcwf_stream_key",
     "tds_kernel",
 ]
