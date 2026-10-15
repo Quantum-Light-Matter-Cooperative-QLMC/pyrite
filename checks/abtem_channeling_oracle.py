@@ -4,15 +4,18 @@ An independent wave-optics solution of planar channeling with thermal diffuse
 scattering, compared with :class:`~pyrite.montecarlo.channeling.DensityMatrixSolver`
 running the TDS kernel alone (abTEM has no electronic excitation).
 
-**Model.** Off any zone axis, a planar-channeled electron sees each atomic
-plane as a random string of atoms. Each frozen configuration places the
-crystal's atoms on their plane positions ``x`` (one image per coprime plane
-spacing, areal density ``d_c / V`` per basis atom), uniformly at random in
-``y`` and ``z``, and displaces ``x`` by a Gaussian of ``a^2 = B(T)/8 pi^2``
-(the Einstein model the kernel assumes). The supercell spans ``n_cells`` true
-periods in ``x``, so its plane-wave momenta are the solver's Bloch grid
-``kappa_r + h g``. abTEM propagates a normally incident plane wave by
-multislice with the Lobato potential; its interaction constant is checked
+**Model.** The default ``crystal`` model is diamond-structure Si oriented so
+the (110) planes contain the beam, which runs along the high-index in-plane
+direction ``[1, -1, n]``. Lattice row correlations are therefore exact, and
+the in-plane periodic structure diffracts coherently. Each frozen
+configuration displaces every atom by an isotropic Gaussian of
+``a^2 = B(T)/8 pi^2`` per axis, the Einstein model the kernel assumes. The
+supercell spans ``n_cells`` true periods in ``x``, so its plane-wave momenta
+are the solver's Bloch grid ``kappa_r + h g``. The ``random-string`` model
+(planes of atoms uniform in ``y`` and ``z``) is an amorphous-in-plane solid
+whose static disorder adds full ``|f^e|^2`` scattering at ``q_y != 0``. It is
+kept only to show that it overstates small-angle dechanneling. abTEM propagates a
+normally incident plane wave by multislice with the Lobato potential; its interaction constant is checked
 against ``e / (hbar v)``. At each exit plane the wave is projected onto
 PyRITE's transverse Bloch states (``|h| <= max_order``):
 ``P_n(z) = <sum_r |<r n|psi(., y)>|^2>_y``, averaged over configurations.
@@ -61,6 +64,8 @@ def _config(args) -> dict:
         "exit_every_ang": args.exit_every,
         "max_order": args.orders,
         "seed": args.seed,
+        "model": args.model,
+        "axis_index": args.axis_index,
     }
 
 
@@ -81,6 +86,82 @@ def plane_sites(profile, n_cells):
 
 
 def build_atoms(profile, cfg, rng):
+    """Frozen configuration of the selected model."""
+    if cfg["model"] == "crystal":
+        return crystal_atoms(profile, cfg, rng)
+    return random_string_atoms(profile, cfg, rng)
+
+
+def crystal_atoms(profile, cfg, rng):
+    """Diamond-structure Si with (110) planes containing the beam ``[1, -1, n]``.
+
+    Orthogonal cell rows ``[1 1 0]`` (x, plane normal), ``[n -n -2]`` (y) and
+    ``[1 -1 n]`` (z, beam), in cubic lattice units. The beam is an
+    ``n``-indexed in-plane direction, far from low-index axes for large
+    ``n``. Atoms keep the lattice's row correlations; each configuration
+    displaces every atom by an isotropic Gaussian of ``a^2 = B/8 pi^2`` per
+    axis (Einstein model).
+    """
+    from ase import Atoms
+
+    if tuple(profile.hkl) != (1, 1, 0) or profile.crystal != "silicon":
+        raise SystemExit("the crystal model is implemented for Si (110)")
+    n = cfg["axis_index"]
+    rows = np.array([[1, 1, 0], [n, -n, -2], [1, -1, n]], dtype=float)
+    lattice = float(CRYSTALS["silicon"]["lattice"]["a"])
+    lengths = lattice * np.linalg.norm(rows, axis=1)
+    periods_per_cell = int(round(lengths[0] / profile.period_ang))
+    if cfg["n_cells"] % periods_per_cell:
+        raise SystemExit(f"--cells must be a multiple of {periods_per_cell} for the crystal model")
+    repeat = (
+        cfg["n_cells"] // periods_per_cell,
+        1,
+        int(np.ceil(cfg["thickness_ang"] / lengths[2])),
+    )
+    basis = np.array([position for _, position in CRYSTALS["silicon"]["basis"]], dtype=float)
+    # Integer lattice translations covering the orthogonal cell.
+    span = int(np.abs(rows).sum(axis=0).max()) + 1
+    grid = np.stack(np.meshgrid(*[np.arange(-span, span + 1)] * 3, indexing="ij"), -1).reshape(
+        -1, 3
+    )
+    fractional = (grid[:, None, :] + basis[None, :, :]).reshape(-1, 3)
+    # Coordinates along the orthogonal axes, as fractions of each cell length.
+    unit = rows / np.linalg.norm(rows, axis=1)[:, None]
+    cart = fractional @ unit.T * lattice / lengths
+    inside = np.all((cart >= -1e-9) & (cart < 1 - 1e-9), axis=1)
+    cell_positions = cart[inside] * lengths
+    expected = int(round(len(basis) * np.prod(lengths) / lattice**3))
+    if len(cell_positions) != expected:
+        raise SystemExit(f"orthogonal cell holds {len(cell_positions)} atoms, expected {expected}")
+    shifts = (
+        np.stack(np.meshgrid(*[np.arange(k) for k in repeat], indexing="ij"), -1).reshape(-1, 3)
+        * lengths
+    )
+    positions = (shifts[:, None, :] + cell_positions[None, :, :]).reshape(-1, 3)
+    extent = lengths * np.array(repeat)
+    positions = positions[positions[:, 2] < cfg["thickness_ang"]]
+    sigma = np.sqrt(profile.b_factors_ang2["Si"] / (8.0 * np.pi**2))
+    positions = (positions + sigma * rng.standard_normal(positions.shape)) % [
+        extent[0],
+        extent[1],
+        np.inf,
+    ]
+    return Atoms(
+        symbols=["Si"] * len(positions),
+        positions=positions,
+        cell=[extent[0], extent[1], cfg["thickness_ang"]],
+        pbc=True,
+    )
+
+
+def random_string_atoms(profile, cfg, rng):
+    """Random-string planes: atoms on plane positions, uniform in ``y`` and ``z``.
+
+    This is an amorphous-in-plane solid, not a crystal: besides thermal
+    scattering it has static-disorder scattering ``|f^e|^2`` at every
+    ``q_y != 0`` that a crystal's periodic rows diffract coherently. It
+    overstates small-angle scattering and is kept only for that comparison.
+    """
     from ase import Atoms
 
     sites, areal = plane_sites(profile, cfg["n_cells"])
@@ -197,9 +278,10 @@ def compare(args) -> int:
     step = depth[1] - depth[0]
     dz = step / max(1, int(np.ceil(step / args.dz)))
     result = solver.propagate(depth[-1], dz, record_every=int(round(step / dz)))
-    ours = result.band_populations[:, : args.bands]
-    theirs = mean[:, : args.bands]
-    error = sem[:, : args.bands]
+    bands = min(args.bands, result.band_populations.shape[1])  # the solver reports bound bands
+    ours = result.band_populations[:, :bands]
+    theirs = mean[:, :bands]
+    error = sem[:, :bands]
     z_score = (ours - theirs) / np.maximum(error, 1e-12)
     report = {
         "check": "abtem_channeling_oracle",
@@ -240,6 +322,10 @@ def main(argv=None) -> int:
     go.add_argument("--orders", type=int, default=24)
     go.add_argument("--configs", type=int, nargs=2, default=(0, 1), metavar=("START", "STOP"))
     go.add_argument("--seed", type=int, default=504)
+    go.add_argument("--model", choices=("crystal", "random-string"), default="crystal")
+    go.add_argument(
+        "--axis-index", type=int, default=7, help="beam [1, -1, n] for the crystal model"
+    )
     go.add_argument("--out", type=Path, required=True)
     cmp_ = sub.add_parser("compare", help="merge configuration files and compare with PyRITE")
     cmp_.add_argument("files", nargs="+", type=Path)
