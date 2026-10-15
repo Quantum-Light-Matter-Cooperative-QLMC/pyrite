@@ -2,6 +2,26 @@
 
 Part of the [physics validation ledger](physics-validation-ledger.md). See the [validation methodology](methodology.md) for the status lifecycle and the [domain inventories](domain-inventories.md) for a claim-by-claim index.
 
+## `line-recoil-resonance`
+
+- **Claim:** exact vacuum photon root from the relativistic final-electron mass shell with a static crystal taking reciprocal momentum `+hbar*g`; physical roots lie in `(0,T]`, with `T` the incident kinetic energy; stable forward evaluation retains `1-beta` after beta rounds to one
+- **Code:** `materials/recoil.py::{recoil_resonance_eV,_coefficients}`
+- **Source:** Shi et al., *Transverse recoil imprinted on free-electron radiation*, Nature Communications 15, 7803 (2024), DOI `10.1038/s41467-024-52050-w`, exact conservation Eq. (6), with reciprocal label negated relative to the paper; not its small-recoil Eq. (7)
+- **Status:** anchored
+- **Checks:** energy/momentum units; positive final-energy branch; zero/negative/too-transverse transfer forbidden; final electron at rest; forward/backward geometries; soft-transfer classical limit and the additional transverse-lattice-recoil smallness condition; NumPy paired broadcasting
+- **Anchor:** `tests/materials/test_recoil.py::{test_resonance_matches_unsquared_mass_shell,test_hopg_forward_root_no_longer_exceeds_the_beam_energy,test_forbidden_branches_return_nan,test_all_kinetic_energy_endpoint_and_broadcasting,test_forward_denominator_survives_beta_rounding_to_unity,test_classical_limit_requires_small_lattice_recoil_too}` (65-digit unsquared mass-shell bisection)
+- **Notes:** Reference implementation only; production spectra and `photon_energies` still use their existing model. No in-medium or quantum-intensity claim. Fresh-context verification independently rederived the source equation before code inspection, matched implementation and rotated/broadcast high-precision checks, and returned `rederived`; the owner applies `anchored` with the named passing regression tests. [Derivation](radiation-physics/line-recoil-resonance.md). Human sign-off pending.
+
+## `line-recoil-formation`
+
+- **Claim:** vacuum energy mismatch `(E_f+photon-E_i)/(hbar*c)` and its positive derivative `(1-beta_f.n)/(hbar*c)`, setting a fixed-momentum flight's finite-duration time integral and energy Jacobian
+- **Code:** `materials/recoil.py::{recoil_mismatch_inv_ang,recoil_mismatch_slope}`
+- **Source:** Shi et al. (2024), exact conservation Eq. (6) and interaction-picture scattering time integrals in Methods, DOI `10.1038/s41467-024-52050-w`
+- **Status:** anchored
+- **Checks:** mismatch has inverse-length units; age/duration are `c*dt` in angstroms, not spatial flight length; resonance stationarity; derivative against centred differences; positive massive-electron Jacobian; exact sum of constant-momentum time pieces
+- **Anchor:** `tests/materials/test_recoil.py::{test_exact_mismatch_zero_and_derivative_jacobian,test_constant_momentum_flight_factor_is_split_invariant}`
+- **Notes:** Limited to a prescribed straight constant-momentum flight and one vacuum plane-wave final electron mode. Does not certify joining flights with different momenta, inter-electron coherence, absolute intensity, absorption or first-order Snell propagation. Current production formation kernels are unchanged. Fresh-context verification returned `rederived` after deriving before source inspection and matching the implementation, mass-shell derivative and rotated/broadcast checks; owner applies `anchored` with the named passing tests. [Derivation](radiation-physics/line-recoil-formation.md). Human sign-off pending.
+
 ## `tr-interface-energy-scale`
 
 - **Claim:** Relativistic vacuum/material single-interface TR energy scale `W ≈ alpha gamma hbar omega_p / 3` and photon roll-off scale of order `gamma hbar omega_p`

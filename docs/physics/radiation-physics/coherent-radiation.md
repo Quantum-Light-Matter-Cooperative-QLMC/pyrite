@@ -185,6 +185,35 @@ Ledger rows: `coherent-line-spectrum` (how $|A|^2$ is used, summed, and normaliz
 Follow those rows in the [validation ledger](../../validation/physics-validation-ledger.md) before scientific use; no row in this section is human `signed-off` yet. Implementation owners: `pyrite.materials.crystal.chi_g`, `pyrite.materials.crystal.U_g`, and `pyrite.montecarlo.spectrum.cxr.mc_cxr_spectrum`.
 
 
+## Recoil reference and production limits
+
+`pyrite.materials.recoil` supplies a provisional vacuum reference derived from
+the exact electron energy--momentum conservation in Eq. (6) of
+{cite:t}`shi2024recoil`. `recoil_resonance_eV` accepts electron kinetic energy
+in eV, unit electron/photon directions and a signed reciprocal vector in
+inverse angstroms. It returns the physical photon root or NaN for a forbidden
+branch. The crystal takes momentum $+\hbar\mathbf g$; the source paper uses
+the opposite reciprocal label. A 50 MeV forward HOPG (004) root obeys the
+kinetic-energy bound rather than the classical bound above it.
+
+`recoil_mismatch_inv_ang` and `recoil_mismatch_slope` provide the exact vacuum
+energy mismatch and its derivative for one fixed-momentum flight and one
+plane-wave final electron mode. Flight duration means $c\,\Delta t$, in
+angstroms; it is not the spatial flight length. The derivative supplies the
+energy Jacobian. The independent [resonance](../../validation/radiation-physics/line-recoil-resonance.md)
+and [formation](../../validation/radiation-physics/line-recoil-formation.md)
+records state the branch, small-transfer limits and numerical checks.
+
+These references are not selected by `simulate`, production spectrum kernels,
+or the supported `photon_energies` comparison API. A recoil-corrected centre
+does not supply quantum radiation amplitudes or justify the current coherent
+sum over different final electron states. Production integration also needs
+the interface phase and its derivative to be derived in the same convention;
+the existing first-order Snell formula cannot simply be appended to the
+vacuum reference. Those integrations remain part of #249. Small photon energy
+relative to the electron total energy alone is insufficient for the classical
+limit when transverse reciprocal momentum is significant.
+
 ## Runtime kinematic screen
 
 The line scorer also screens the transported population for optical-data

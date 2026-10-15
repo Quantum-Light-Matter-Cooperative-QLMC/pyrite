@@ -8,6 +8,8 @@ Generated browsing views of every claim in the [detailed validation ledger] (phy
 
 | ID | Claim | Status |
 |---|---|---|
+| [`line-recoil-resonance`](ledger-core-coherent-physics.md#line-recoil-resonance) | exact vacuum photon root from the relativistic final-electron mass shell with a static crystal taking reciprocal momentum `+hbar*g`; physical roots lie in `(0,T]`, with `T` the incident kinetic energy; stable forward evaluation retains `1-beta` after beta rounds to one | `anchored` |
+| [`line-recoil-formation`](ledger-core-coherent-physics.md#line-recoil-formation) | vacuum energy mismatch `(E_f+photon-E_i)/(hbar*c)` and its positive derivative `(1-beta_f.n)/(hbar*c)`, setting a fixed-momentum flight's finite-duration time integral and energy Jacobian | `anchored` |
 | [`tr-interface-energy-scale`](ledger-core-coherent-physics.md#tr-interface-energy-scale) | Relativistic vacuum/material single-interface TR energy scale `W ≈ alpha gamma hbar omega_p / 3` and photon roll-off scale of order `gamma hbar omega_p` | `rederived` |
 | [`tr-detected-omission-bound`](ledger-core-coherent-physics.md#tr-detected-omission-bound) | Exact classical TR of a straight, uniform-velocity charge through a planar stack (boundary-value solve of tangential `E`/`H` continuity, any `eps`, speed, incidence, emission direction, layer count) and the per-observable omission bound `b = max_E T(E)/S(E) <= target_rse / 3` for positive linear detector responses | `rederived` |
 | [`coherent-line-spectrum`](ledger-core-coherent-physics.md#coherent-line-spectrum) | `\|A_PXR + A_CBS\|²` segment-sum line spectrum, exact mosaic average | `rederived` |
