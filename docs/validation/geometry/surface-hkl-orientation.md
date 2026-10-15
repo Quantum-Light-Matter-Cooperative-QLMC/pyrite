@@ -396,7 +396,7 @@ The independent derivation reproduces the implementation exactly: the same $\kap
 
 ## 8. Miscut composition extension (#25)
 
-*Implementation-context derivation; awaiting a fresh-context verdict. §§1--7
+*Implementation-context derivation; fresh-context verdict in §9. §§1--7
 above validate the axis and roll terms only; there the miscut was checked
 solely as a `None` no-op.*
 
@@ -456,3 +456,76 @@ construction to $10^{-13}$, and the cut axis lands on $\hat{\mathbf m}$.
 `::test_cut_front_cancels_independent_ray_phases` shows that bunch-front
 matching on a cut target cancels independently evaluated ray phases with the
 same independently rotated $\mathbf g$.
+
+## 9. Fresh-context verdict on the miscut extension (#25)
+
+Verifier: fresh context, Claude Sonnet 5.5, 2026-10-14. Scope: the per-target `CrystalCut` lowering and the continuous miscut term. Independence caveat: the ledger row and the `CrystalCut`/`resolve_crystal_cut`/`_orientation_R` docstrings were read first, but the `_orientation_R` body was displayed together with its docstring by an overly wide line range before the derivation below was written down. The derivation is therefore standard textbook geometry written from the stated claim, and the numerical check in 9.3 uses a separately constructed reference (own reciprocal basis, own Rodrigues routine, no implementation helper) to compensate.
+
+### 9.1 Derivation (from the claim and signatures only)
+
+Lowering of angles: a roll $\psi$ and a miscut $(\theta,\phi)$ in degrees lower to radians, $\psi=\mathrm{radians}(\texttt{roll\_deg})$ and $(\theta,\phi)=\mathrm{radians}(\texttt{miscut\_deg},\texttt{miscut\_azim\_deg})$. Keys are omitted when zero.
+
+Rodrigues: for unit axis $\hat k$ and angle $\alpha$, with $K=[\hat k]_\times$,
+
+$$
+R(\hat k,\alpha)=I+\sin\alpha\,K+(1-\cos\alpha)K^2 .
+$$
+
+Minimal rotation of unit $\hat u$ onto $\hat t$: $\hat k=\hat u\times\hat t/|\hat u\times\hat t|$, $\cos\alpha=\hat u\cdot\hat t$. It is proper, and the identity when $\hat u=\hat t$.
+
+The selected axis is $\hat g_{\rm axis}$ ($\mathbf g=h\mathbf b_1+k\mathbf b_2+l\mathbf b_3$, $\mathbf b_i=2\pi\,\mathbf a_j\times\mathbf a_k/V$) or a direct $u\mathbf a_1+v\mathbf a_2+w\mathbf a_3$. The composition is
+
+$$
+R=R_m\,R_z(\psi)\,R_{\min}(\hat g_{\rm axis}\to\hat z),\qquad
+R_m=R_{\min}(\hat z\to\mathbf m),\ \ \mathbf m=(\sin\theta\cos\phi,\sin\theta\sin\phi,\cos\theta).
+$$
+
+Consequences:
+
+1. $R_{\min}\hat g_{\rm axis}=\hat z$, and $R_z\hat z=\hat z$, so $R\hat g_{\rm axis}=R_m\hat z=\mathbf m$. The face normal $\hat z$ stays fixed, so the lattice plane normal sits at angle $\theta$ from the face normal: a cut $\theta$ off the plane.
+2. $\theta=0$ gives $R_m=I$ exactly (the aligned branch returns the identity), so the result is bit-for-bit the unmiscut rotation. If the lowering omits the key at zero, no extra multiplication occurs.
+3. $\det R=+1$, as every factor is proper.
+4. $R_m$ rotates about $\hat z\times\mathbf m\propto(-\sin\phi,\cos\phi,0)$, so for small $\theta$, $R_m\hat z\approx(\theta\cos\phi,\theta\sin\phi,1)$: toward $+x$ at $\phi=0$. This matches the spherical form $(\sin t\cos a,\sin t\sin a,\cos t)$ used for the tilt in the sample frame.
+5. Order matters. Miscut applied before roll gives $R_z(\psi)R_mR_{\min}$, which differs (the miscut azimuth would be rotated by $\psi$). The claimed order, roll first (lattice-fixed) then miscut (face-fixed azimuth), is the physically sensible one: $\phi$ is a sample-frame azimuth, independent of roll.
+6. The beam, detector and face normal come from `tilted_geometry` with the tilt measured from $\hat z$, so $R$ only reorients reciprocal vectors, $\mathbf g\mapsto R\mathbf g$. Every consumer must apply the same $R$, including front matching.
+
+Cheap filters: units are degrees to radians once, at the lowering boundary, with $0\le\theta<90^\circ$ enforced (so $\mathbf m$ is unique and the minimal rotation is never antiparallel). Limits: $\theta\to0$ is the identity, $\psi=0$ is the plain axis alignment, and an axis already along $\hat z$ with $\psi=0$ gives $R=R_m$. Signs: right-handed roll, and $+x$ at $\phi=0$. All pass.
+
+### 9.2 Comparison with the implementation
+
+- `materials/crystal.py::_orientation_R` (lines 705-745): `R = Rz @ R_axis`, then `R = R_miscut @ R`, with `R_miscut = _rotation_between(z, m)` and `m = (st cos ma, st sin ma, ct)`. The miscut is skipped when `mp` is 0. `Rz` is the right-handed matrix `[[c,-s],[s,c]]`. This is identical to 9.1, including the order. For the axis, `surface_hkl` uses `reciprocal_g_vector` (rows of the reciprocal basis, $2\pi$ convention) and `beam_uvw` uses the direct vectors. The two spellings are mutually exclusive.
+- `campaign/geometry.py::resolve_crystal_cut` (lines 418-452): `azimuth_rad = math.radians(roll_deg)` and `recip_miscut_rad = (radians(miscut_deg), radians(miscut_azim_deg))` only when `miscut_deg != 0`. `ResolvedCut.case_keys` emits `azimuth_rad` only if nonzero and `recip_miscut_rad` only if not `None`. `ResolvedCut.rotation` calls the shared `_orientation_R` with exactly these fields. A cut axis replaces the catalog axis, and the two spellings stay exclusive. `CrystalCut.__post_init__` enforces $0\le\theta<90^\circ$, finiteness and single scalars. Matches.
+- `_TargetGeometry.lower` (geometry.py:606-670): writes `orientation.case_keys()` into each `LoweredTarget.crystal_orientation`, so the keys appear on every geometry point. The label is appended to the case name. Stack layers are built with `azimuth_rad=0.0` for the film radiator, but `CrystalCut` is rejected for substrate/stack (geometry.py:925), so the omission is unreachable.
+- `campaign/sweep.py::build_cases` (lines 840-844, 1019, 1051): a cut axis plus a `Sweep.beam_uvw` override is rejected (so only one axis source). The resolved `beam_uvw`/`surface_hkl` is used for the case, and targeted (non-Gaussian) longitudinal modes are rejected with a miscut because they assume $\mathbf g\parallel\hat z$. This is a conservative guard.
+- `campaign/front_matching.py::phase_matched_front_for_scene` (lines 55-58): calls the same `resolve_crystal_cut(target.cut, crystal.beam_uvw, crystal.surface_hkl).rotation(lattice)` and applies `g = orientation @ g`. It is the identical function and arguments to the case path. (Its beam-axis override semantics: a Sweep-level `beam_uvw` is not visible to the scene helper, an existing pre-#25 limitation, since the helper reads the catalog axis only.)
+- Runtime consumers: `runner/__init__.py:677-678,716-717`, `spectrum/cxr/_setup.py:270-276` (and `_batched.py:218-245`, whose table cache key includes both fields), `spectrum/reflection_rows.py:130-133`, `montecarlo/detector.py:94-100`, `spectrum/cxr_seeds.py:840-841,911-912` and `campaign/kinematic_validity.py:57,191-192` all read `azimuth_rad` and `recip_miscut_rad` from the case, or from the per-radiator override falling back to the case, and pass them positionally in the same order `(lattice, beam_uvw, azimuth, miscut, surface_hkl)` to the single `_orientation_R`. `kinematic_validity` applies `g @ rotation.T`, i.e. $R\mathbf g$ per row. No consumer reconstructs the rotation independently.
+- `materials/emission.py::photon_energies` (line 222) passes only the catalog axis with azimuth 0 and no miscut. It has no cut parameter, so it is a catalog-only estimator, not a consumer of the case keys. Note: it would not reflect a `CrystalCut`. This is a scope note, not a discrepancy. `campaign/model.py:184` documents "catalog orientation", which is also stale after #25 because the code uses the target cut. Minor documentation wording only.
+
+### 9.3 Numerical check (HOPG, nonorthogonal)
+
+HOPG is $a=b=2.461$, $c=6.711$ Å, $\gamma=120^\circ$. The check used `surface_hkl=(1,0,1)`, roll 37 deg, miscut 2.3 deg toward 110 deg. The reference reciprocal basis, Rodrigues routine and composition were written from scratch, with scripts in the scratchpad (not in the repository). Reference $\mathbf g_{101}=(2.5531,1.4740,0.9363)$ Å$^{-1}$ equals `reciprocal_g_vector` to all printed digits.
+
+| Check | Result |
+| --- | --- |
+| lowered keys vs $(\psi,\theta,\phi)$ | exact (difference 0.0) |
+| $\max\lvert R_{\rm impl}-R_{\rm ref}\rvert$ | $4.0\times10^{-16}$ |
+| $\det R$, $\max\lvert RR^T-I\rvert$ | $1.0$, $2.2\times10^{-16}$ |
+| $R\hat g_{101}-\mathbf m$ | $\lesssim1.6\times10^{-16}$ per component |
+| angle of $R\mathbf g_{101}$ to $\hat z$ | $2.300000000000175^\circ$ |
+| 5 reflections, $\max\lvert R\mathbf g-R_{\rm ref}\mathbf g\rvert$ | $2.1\times10^{-15}$ |
+| $\theta=0$ cut vs direct `_orientation_R(roll only)` | `np.array_equal` True, and `recip_miscut_rad is None` |
+| default `CrystalCut()` | rotation `None`, no case keys |
+| roll right-handed: $R(\psi)=R_z(\psi)R(0)$ | difference 0.0 |
+| swapped order (miscut before roll) vs impl | differs by 0.021 (so the order is genuinely tested) |
+| small $\theta=0.01$, $\phi=0$, axis $\|\hat z$ | $R\hat g/|g|=(0.0099998,0,0.99995)$, toward $+x$ |
+| direct `beam_uvw=(1,0,1)` with same roll and miscut | $4.2\times10^{-16}$ from reference, $R\hat a_{\rm axis}=\mathbf m$ |
+
+`tilted_geometry` at tilt 0.5 deg, azimuth 0 returns the beam as $(-\sin t,0,\cos t)$ in the sample frame, i.e. the sample normal leans toward $+x$ in the lab, consistent with the spherical $(\sin\theta\cos\phi,\sin\theta\sin\phi,\cos\theta)$ convention.
+
+### 9.4 Anchor tests
+
+`PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/scan/test_crystal_cut.py tests/montecarlo/test_surface_orientation.py`: 41 passed in 2.4 s. No heavy Monte Carlo was run.
+
+### 9.5 Verdict
+
+Re-derivation matches: **rederived** for the miscut composition $R=R_mR_z(\psi)R_{\min}$, the unit lowering, the zero-angle no-op, $\det R=+1$, the $+x$ at $\phi=0$ convention, and identical use of the resolved rotation in transport, spectrum, detector, kinematic-validity and front matching. No discrepancy in the claimed physics. Non-blocking notes: (i) the stale "catalog orientation" wording in `campaign/model.py:184`; (ii) `photon_energies` takes no cut; (iii) the independence caveat in the preamble. Human sign-off remains pending (#277). Suggested ledger edit: add a note that the #25 miscut term is `rederived` by this write-up (§9), keeping the row at `anchored` and not `signed-off`.

@@ -181,7 +181,8 @@ class Scene:
     ) -> BunchFrontTilt:
         """Return the front cancelling transverse phase for one slab reflection.
 
-        Uses the beam energy, resolved target angles and catalog orientation.
+        Uses the beam energy, resolved target angles and the target crystal cut
+        (catalog orientation unless the slab sets ``cut``).
         Target angles follow the existing nearest-half-degree case resolution;
         the returned bunch-front angles retain full precision.
         ``hkl`` selects the reflection explicitly. By default the scalar
