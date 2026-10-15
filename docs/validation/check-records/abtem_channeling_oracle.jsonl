@@ -1,0 +1,1 @@
+{"check": "checks/abtem_channeling_oracle.py", "ledger_id": "cr-density-matrix-split-operator", "measured_value": null, "recorded_at": "2026-10-15T22:03:19.044026+00:00", "reference_value": null, "revision": "be673d117fe27a82c5f6dcb174071e4e9022094c", "schema_revision": 1, "tolerance": null, "verdict": "pass"}

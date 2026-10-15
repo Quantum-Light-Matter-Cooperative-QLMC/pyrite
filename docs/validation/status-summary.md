@@ -10,18 +10,18 @@ Compact generated view of the [detailed validation ledger] (physics-validation-l
 
 | Verdict | Claims |
 |---|---:|
-| `pass` | 21 |
+| `pass` | 22 |
 | `fail` | 0 |
 | `skip` | 0 |
-| `missing` | 181 |
+| `missing` | 180 |
 
 Oldest current automated evidence: `2026-09-15T15:45:04.640409+00:00` (UTC timestamp; use it to assess evidence age).
 
 | Status | Claims |
 |---|---:|
 | `signed-off` | 0 |
-| `anchored` | 45 |
-| `rederived` | 73 |
+| `anchored` | 46 |
+| `rederived` | 72 |
 | `filtered` | 12 |
 | `unverified` | 68 |
 | `discrepancy` | 4 |

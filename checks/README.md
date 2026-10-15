@@ -40,7 +40,7 @@ run through the collector.
 | `coherent_transverse_coherence.py` | Tests whether a single coherent transverse-direction draw is representative of the observable spectrum. |
 | `collision_statistics_refinement.py` | Measures collision-statistics changes under transport substep refinement. |
 | `cross_reflection_coherence.py` | Bounds the coherent-spectrum effect of omitted cross-reflection terms. |
-| `abtem_channeling_oracle.py` | abTEM frozen-phonon multislice of a random-string planar Si model, projected on PyRITE Bloch states; `P_n(z)` against the TDS-only density solver (#504; `oracle` group; remote). |
+| `abtem_channeling_oracle.py` | abTEM frozen-phonon multislice of oriented Si (beam `[1 −1 n]` in the (110) planes; Einstein displacements), projected on PyRITE Bloch states. Compares `P_n(z)` with the TDS-only density solver and gates on `--tolerance`. Runs on CPU or GPU (`--device gpu`, CuPy) (#504; `oracle` group). |
 | `dans_diffraction_oracle.py` | Pinned external lattice, reciprocal-geometry, and structure-factor comparison. |
 | `kephart_occupation.py` | Kephart et al. (1989) Si occupation lengths from the density solver with the paper's integrated-exponential fit; sweeps collapse margin, band, Bloch grid and depth step (#504; remote). |
 | `detector_solid_angle_check.py` | Solid-angle integration and analytic aperture-width comparison; the integrated-spectrum route is not separately ledgered. |

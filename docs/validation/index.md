@@ -105,6 +105,7 @@ channeling/cr-mean-inner-potential
 channeling/cr-plane-incidence
 channeling/cr-lindblad-jump-operators
 channeling/cr-density-matrix-split-operator
+channeling/cr-density-matrix-split-operator-abtem
 channeling/cr-mcwf-unravelling
 channeling/cr-dechanneling-collapse-kephart
 ```
