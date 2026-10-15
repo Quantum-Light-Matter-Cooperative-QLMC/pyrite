@@ -73,6 +73,9 @@ if TYPE_CHECKING:
         BlazedGrooves as BlazedGrooves,
     )
     from pyrite.campaign.geometry import (
+        CrystalCut as CrystalCut,
+    )
+    from pyrite.campaign.geometry import (
         Footprint as Footprint,
     )
     from pyrite.campaign.geometry import (
@@ -180,6 +183,7 @@ _PUBLIC_OBJECTS = {
     "TransverseSpot": ("pyrite.campaign.beam", "TransverseSpot"),
     "BunchFrontTilt": ("pyrite.campaign.beam", "BunchFrontTilt"),
     "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
+    "CrystalCut": ("pyrite.campaign.geometry", "CrystalCut"),
     "Physics": ("pyrite._numerics", "Physics"),
     "CxrReflections": ("pyrite._numerics", "CxrReflections"),
     "CxrSpectra": ("pyrite.results.model", "CxrSpectra"),

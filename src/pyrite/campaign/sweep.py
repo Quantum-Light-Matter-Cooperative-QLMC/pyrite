@@ -95,6 +95,7 @@ from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is th
     film_on_substrate_layers,
     geometry_table,
     layer_radiator,
+    resolve_crystal_cut,
     retired_flat_input,
     stack_layers,
     substrate_composition,
@@ -678,7 +679,9 @@ def _cxr_grid_for_energy(
     A stored mapping that does not cover this beam energy is no longer an error:
     it falls through to (4). ``pyrite material energy-grid derive`` is an
     inspection and prewarming command, not a prerequisite for running a valid
-    material at a supported beam energy.
+    material at a supported beam energy. Stored rows were derived for the
+    catalog orientation, so a target with a non-catalog ``CrystalCut``
+    skips (3) and resolves automatically.
 
     Returns ``(grid, policy_payload)``. ``policy_payload`` is ``None`` when the
     coordinates are final; otherwise ``grid`` is the coarsest admissible grid
@@ -691,7 +694,10 @@ def _cxr_grid_for_energy(
     override = bool(sweep.cxr_grid_policy) or environment_overrides_present()
     if bins.cxr is not None and not sweep.cxr_grid_policy:
         return np.asarray(bins.cxr, dtype=float), None
-    if not override:
+    reoriented = bool(
+        resolve_crystal_cut(sweep.target._crystal_cut(), cp["beam_uvw"], cp["surface_hkl"]).label
+    )
+    if not override and not reoriented:
         if bins.cxr_by_energy is None:
             return np.asarray(cp["E_grid"], dtype=float), None
         stored = bins.cxr_by_energy.get(float(energy_keV))
@@ -826,6 +832,15 @@ def build_cases(
     )
     beam_uvw = cp["beam_uvw"] if sweep.beam_uvw is None else sweep.beam_uvw
     surface_hkl = cp["surface_hkl"] if sweep.beam_uvw is None else None
+    cut = target._crystal_cut()
+    if (
+        cut is not None
+        and sweep.beam_uvw is not None
+        and (cut.beam_uvw is not None or cut.surface_hkl is not None)
+    ):
+        raise ValueError("give the crystal axis on either Sweep.beam_uvw or Slab.cut, not both")
+    orientation = resolve_crystal_cut(cut, beam_uvw, surface_hkl)
+    beam_uvw, surface_hkl = orientation.beam_uvw, orientation.surface_hkl
     # Beam phase-space fields threaded onto every case (constant across the
     # product). The legacy ``beam_fwhm_mm`` key stays == the x-plane FWHM so a
     # default isotropic spot is bit-for-bit; the elliptical ``beam_fwhm_y_mm``
@@ -969,7 +984,11 @@ def build_cases(
     # geometry, it only spreads what the target produced.
     target.validate_against(sweep.detector)
     geometries = target.lower(
-        cp, name_stem=name_stem, beam_uvw=beam_uvw, n_families=sweep.n_families
+        cp,
+        name_stem=name_stem,
+        beam_uvw=beam_uvw,
+        n_families=sweep.n_families,
+        orientation=orientation,
     )
 
     if radiative and any(g.case_keys().get("groove_spacing_ang") is not None for g in geometries):
@@ -997,6 +1016,11 @@ def build_cases(
                 )
             resolved_longitudinal = None
             if b.longitudinal is not None:
+                if b.longitudinal.kind != "gaussian" and orientation.recip_miscut_rad is not None:
+                    raise ValueError(
+                        "targeted longitudinal modes assume g parallel to the surface "
+                        "normal; a miscut CrystalCut is unsupported"
+                    )
                 crystal_spec = CATALOG.crystal(cp["crystal"])
                 resolved_longitudinal = asdict(
                     resolve_longitudinal_distribution(

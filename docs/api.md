@@ -282,9 +282,11 @@ to take fully lowered plates; use `scene.filter_plates` there.
 runnable target recipes are not homogeneous substances. Inline `MediumSpec`
 compositions are also valid bodies for filters. `Target` requires a crystal
 reference and uses the selected target catalog. A key that would redirect
-through a recipe to a different crystal is rejected. Crystal cuts remain
-catalog-defined (`lattice_cut="catalog"`); arbitrary target poses, layers,
-grooves and amorphous entrances are outside this adapter's supported set.
+through a recipe to a different crystal is rejected. `lattice_cut="catalog"`
+keeps the catalog crystal cut; `lattice_cut=pr.CrystalCut(...)` lowers to
+`Slab(cut=...)` (see "Crystal cuts" below). Arbitrary target poses,
+layers, grooves and amorphous entrances are outside this adapter's supported
+set.
 Use the existing target variants for their established specialized behavior.
 
 `Filter` supports only `interaction="primary-attenuation-only"`. Other
@@ -318,6 +320,7 @@ CLI commands are unchanged.
    pyrite.Layer
    pyrite.Footprint
    pyrite.BlazedGrooves
+   pyrite.CrystalCut
    pyrite.PlanarPose
    pyrite.PixelGrid
    pyrite.FilterPlate
@@ -417,11 +420,51 @@ can require different fronts. Omitting `photon_energy_eV` uses the vacuum
 zero-scattering line estimate. The scalar detector's central direction is the
 default; pass `observation_direction_lab=(nx, ny, nz)` for another ray or a
 planar detector. This method currently supports a flat single slab and matches
-its mean catalog crystal orientation, rather than every mosaic orientation.
+its mean crystal orientation -- the catalog cut or the slab's `CrystalCut`,
+resolved exactly as the simulated case resolves it -- rather than every mosaic
+orientation.
 Target tilt and azimuth follow the existing nearest-half-degree case
 resolution. The helper uses those resolved angles; bunch-front angles retain
 full precision. Thus match the resolved entrance-face angles when setting a
 parallel front manually.
+
+### Crystal cuts
+
+A flat single `Slab` (or `Target`) accepts `cut=pr.CrystalCut(...)` to orient
+the lattice relative to the entrance face. The cut face normal defines the zero
+of `tilt_deg`/`tilt_azim_deg`: `tilt_deg=0` is normal incidence on the cut
+face, and tilting moves face and lattice together. The cut fixes how the
+lattice sits under that face:
+
+```python
+cut = pr.CrystalCut(
+    surface_hkl=(1, 0, 1),  # or beam_uvw=(u, v, w); omit both for the catalog axis
+    roll_deg=17.0,  # right-handed roll about the face normal
+    miscut_deg=5.56512,  # continuous tilt off the face normal, 0 <= miscut < 90
+    miscut_azim_deg=200.0,  # sample-frame azimuth the lattice tilts toward
+)
+target = pr.Slab("hopg", 500.0, tilt_deg=84.5, footprint=None, cut=cut)
+```
+
+The lattice rotation is `R_miscut @ R_roll @ R_axis`. `surface_hkl` and
+`beam_uvw` are mutually exclusive integer axes and are unrelated to the
+reflections being scored. `miscut_deg` cuts the face that far off the selected
+plane (toward `miscut_azim_deg`), giving a continuous orientation, since integer
+surface planes alone rarely give an exact energy match. Target tilts are still
+quantized to half a degree; miscut angles are not.
+
+Omitting the cut, or passing `CrystalCut()` or the catalog axis, leaves the
+case payload and identity unchanged. An explicit cut adds `azimuth_rad` and
+`recip_miscut_rad` keys and a name suffix such as
+`cut=(1,0,1) roll=17 miscut=5.56512@200`, so distinct cuts are distinct
+cases. The catalog is never modified. Stored catalog line grids belong to the
+catalog orientation, so a reoriented cut resolves its line grid automatically
+unless you pass an explicit grid. The cut supports only flat single slabs;
+grooves, substrates and stacks are rejected. A miscut also rejects targeted
+longitudinal timing modes, whose resonance assumes `g` parallel to the face
+normal. `Scene.phase_matched_bunch_front_tilt` uses the same orientation as
+transport and spectrum evaluation. Solving for the cut that cancels the front
+tilt is tracked separately (#509).
 
 Named or inline profile beam tables use the same descriptor:
 

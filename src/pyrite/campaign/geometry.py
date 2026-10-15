@@ -298,6 +298,160 @@ class BlazedGrooves:
             raise ValueError("BlazedGrooves.spacing_ang must be finite and positive")
 
 
+Miller = tuple[int, int, int]
+
+
+def _as_miller(value: Any) -> Miller | None:
+    if value is None:
+        return None
+    h, k, l = (int(i) for i in value)  # noqa: E741
+    return (h, k, l)
+
+
+def _miller(name: str, value: Any) -> Miller | None:
+    if value is None:
+        return None
+    indices = tuple(value) if isinstance(value, (Sequence, np.ndarray)) else None
+    if (
+        indices is None
+        or len(indices) != 3
+        or any(isinstance(i, bool) or not isinstance(i, (int, np.integer)) for i in indices)
+        or not any(indices)
+    ):
+        raise ValueError(f"CrystalCut.{name} must be three integer indices, not all zero")
+    return _as_miller(indices)
+
+
+@dataclass(frozen=True)
+class CrystalCut:
+    """Orient the crystal lattice relative to a slab's entrance face.
+
+    The cut face normal is the sample ``+z`` axis and defines the zero of the
+    target's ``tilt_deg``/``tilt_azim_deg``: ``tilt_deg=0`` is normal
+    incidence on the cut face, and tilting moves face and lattice together.
+    The cut fixes the lattice under that face by the rotation
+    ``R_miscut @ R_roll @ R_axis``: ``R_axis`` takes the selected axis onto the
+    face normal, ``R_roll`` is a right-handed roll about it, and ``R_miscut``
+    tilts the lattice off it, i.e. the face is cut ``miscut_deg`` off the
+    selected plane.
+
+    Parameters
+    ----------
+    surface_hkl, beam_uvw
+        Mutually exclusive integer axis placed along the face normal: a
+        reciprocal ``(hkl)`` plane normal or a direct ``[uvw]`` direction. Both
+        ``None`` keep the catalog crystal's axis. Reflection indices are chosen
+        separately (``Physics``/catalog ``hkl_list``), never from this axis.
+    roll_deg
+        Right-handed in-plane roll about the face normal, degrees.
+    miscut_deg, miscut_azim_deg
+        Continuous lattice tilt off the face normal (``0 <= miscut_deg < 90``)
+        and the sample-frame azimuth it tilts toward, degrees.
+
+    An all-default cut is the catalog orientation; omitting the cut and passing
+    ``CrystalCut()`` lower to identical cases.
+
+    Validation: surface-hkl-orientation
+    """
+
+    surface_hkl: Miller | None = None
+    beam_uvw: Miller | None = None
+    roll_deg: float = 0.0
+    miscut_deg: float = 0.0
+    miscut_azim_deg: float = 0.0
+
+    def __post_init__(self) -> None:
+        surface = _miller("surface_hkl", self.surface_hkl)
+        direct = _miller("beam_uvw", self.beam_uvw)
+        if surface is not None and direct is not None:
+            raise ValueError("CrystalCut.surface_hkl and beam_uvw are mutually exclusive")
+        object.__setattr__(self, "surface_hkl", surface)
+        object.__setattr__(self, "beam_uvw", direct)
+        for name in ("roll_deg", "miscut_deg", "miscut_azim_deg"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, float, np.floating)):
+                raise TypeError(f"CrystalCut.{name} must be a single real angle in degrees")
+            if not math.isfinite(float(value)):
+                raise ValueError(f"CrystalCut.{name} must be finite")
+            object.__setattr__(self, name, float(value))
+        if not 0.0 <= self.miscut_deg < 90.0:
+            raise ValueError("CrystalCut.miscut_deg must satisfy 0 <= miscut_deg < 90")
+
+
+@dataclass(frozen=True)
+class ResolvedCut:
+    """A target's effective lattice orientation, as the case keys carry it.
+
+    ``beam_uvw``/``surface_hkl`` are the axis after catalog fallback;
+    ``azimuth_rad`` and ``recip_miscut_rad`` join a case only when nonzero, so a
+    default orientation keeps its historical payload. ``label`` is the case-name
+    suffix and is empty exactly when the orientation equals the catalog's.
+    """
+
+    beam_uvw: Miller | None
+    surface_hkl: Miller | None
+    azimuth_rad: float = 0.0
+    recip_miscut_rad: tuple[float, float] | None = None
+    label: str = ""
+
+    def case_keys(self) -> dict[str, Any]:
+        keys: dict[str, Any] = {}
+        if self.azimuth_rad:
+            keys["azimuth_rad"] = self.azimuth_rad
+        if self.recip_miscut_rad is not None:
+            keys["recip_miscut_rad"] = self.recip_miscut_rad
+        return keys
+
+    def rotation(self, lattice: Any) -> np.ndarray | None:
+        """The lattice rotation every consumer applies to reciprocal vectors."""
+        from ..materials.crystal import _orientation_R
+
+        return _orientation_R(
+            lattice,
+            self.beam_uvw,
+            self.azimuth_rad,
+            self.recip_miscut_rad,
+            surface_hkl=self.surface_hkl,
+        )
+
+
+def resolve_crystal_cut(
+    cut: CrystalCut | None,
+    beam_uvw: Any,
+    surface_hkl: Any,
+) -> ResolvedCut:
+    """Apply ``cut`` to an already resolved catalog/sweep axis.
+
+    The single resolver shared by case lowering and bunch-front matching, so
+    both see the same lattice orientation.
+
+    Validation: surface-hkl-orientation
+    """
+    base_uvw, base_hkl = _as_miller(beam_uvw), _as_miller(surface_hkl)
+    if cut is None:
+        return ResolvedCut(base_uvw, base_hkl)
+    parts = []
+    if cut.surface_hkl is not None and cut.surface_hkl != base_hkl:
+        parts.append("cut=({})".format(",".join(map(str, cut.surface_hkl))))
+    elif cut.beam_uvw is not None and (cut.beam_uvw != base_uvw or base_hkl is not None):
+        parts.append("cut=[{}]".format(",".join(map(str, cut.beam_uvw))))
+    if cut.surface_hkl is not None or cut.beam_uvw is not None:
+        base_uvw, base_hkl = cut.beam_uvw, cut.surface_hkl
+    if cut.roll_deg:
+        parts.append(f"roll={cut.roll_deg:.12g}")
+    miscut = None
+    if cut.miscut_deg:
+        miscut = (math.radians(cut.miscut_deg), math.radians(cut.miscut_azim_deg))
+        parts.append(f"miscut={cut.miscut_deg:.12g}@{cut.miscut_azim_deg:.12g}")
+    return ResolvedCut(
+        base_uvw,
+        base_hkl,
+        azimuth_rad=math.radians(cut.roll_deg),
+        recip_miscut_rad=miscut,
+        label=" ".join(parts),
+    )
+
+
 @dataclass(frozen=True)
 class Layer:
     """One layer of a :class:`Stack`, in beam-entrance order.
@@ -361,6 +515,7 @@ class LoweredTarget:
     groove_spacing_ang: float | None
     abs_layers: list | None
     layer_radiators: list | None
+    crystal_orientation: dict[str, Any] = field(default_factory=dict)
 
     def case_keys(self) -> dict[str, Any]:
         keys: dict[str, Any] = dict(
@@ -374,6 +529,8 @@ class LoweredTarget:
         )
         if self.groove_spacing_ang is not None:
             keys["groove_spacing_ang"] = self.groove_spacing_ang
+        # Divergence-only: a catalog-oriented target adds nothing.
+        keys.update(self.crystal_orientation)
         return keys
 
 
@@ -393,6 +550,9 @@ class _TargetGeometry:
     # -- variant hooks --------------------------------------------------------
 
     def _entrance_face(self) -> BlazedGrooves | None:
+        return None
+
+    def _crystal_cut(self) -> CrystalCut | None:
         return None
 
     def _film_thickness(self) -> ScalarOrSeq:
@@ -450,6 +610,7 @@ class _TargetGeometry:
         name_stem: str,
         beam_uvw,
         n_families: int = 4,
+        orientation: ResolvedCut | None = None,
     ) -> tuple[LoweredTarget, ...]:
         """Expand the target into its geometry product, in build_cases order.
 
@@ -461,7 +622,9 @@ class _TargetGeometry:
         resolved orientation. Both are passed in rather than looked up: they need
         ``n_families`` and a sweep-level orientation override, which are numerics,
         not geometry, and a target that reached into the catalog would pull the
-        campaign layer into materials at the wrong point.
+        campaign layer into materials at the wrong point. ``orientation`` is the
+        film's :func:`resolve_crystal_cut` result; its nonzero roll/miscut keys
+        and name label join every point.
         """
         tilts, azimuths = self._angles()
         below = self._below_film()
@@ -490,6 +653,8 @@ class _TargetGeometry:
                 name = f"{name} footprint={width:g}x{height:g}mm"
             if groove_spacing_ang is not None:
                 name = f"{name} groove={groove_spacing_ang / 1e4:g}um"
+            if orientation is not None and orientation.label:
+                name = f"{name} {orientation.label}"
             lowered.append(
                 LoweredTarget(
                     name=name,
@@ -501,6 +666,7 @@ class _TargetGeometry:
                     groove_spacing_ang=groove_spacing_ang,
                     abs_layers=abs_layers,
                     layer_radiators=layer_radiators,
+                    crystal_orientation=({} if orientation is None else orientation.case_keys()),
                 )
             )
         return tuple(lowered)
@@ -529,6 +695,9 @@ class Slab(_TargetGeometry):
         likely configuration error.
     mosaic
         Apply the catalog crystal's mosaic spread when one is defined.
+    cut
+        Optional :class:`CrystalCut` orienting the lattice relative to the
+        flat entrance face; ``None`` keeps the catalog orientation.
     """
 
     material: str
@@ -543,10 +712,16 @@ class Slab(_TargetGeometry):
     # stay perfect). The QUADRATURE choices that consume it -- ``mosaic_route``
     # and ``mosaic_nodes`` -- stay on ``Sweep``; they are numerics.
     mosaic: bool = False
+    cut: CrystalCut | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.material, str) or not self.material.strip():
             raise ValueError("Slab.material must be a non-empty material key")
+        if self.cut is not None:
+            if not isinstance(self.cut, CrystalCut):
+                raise TypeError("Slab.cut must be a CrystalCut or None")
+            if self.entrance_face is not None:
+                raise ValueError("Slab.cut requires a flat entrance face (no grooves)")
         _positive_values("Slab.thickness_ang", self.thickness_ang)
         if self.entrance_face is not None and not isinstance(self.entrance_face, BlazedGrooves):
             raise TypeError("Slab.entrance_face must be a BlazedGrooves or None")
@@ -554,6 +729,9 @@ class Slab(_TargetGeometry):
 
     def _entrance_face(self) -> BlazedGrooves | None:
         return self.entrance_face
+
+    def _crystal_cut(self) -> CrystalCut | None:
+        return self.cut
 
     def _film_thickness(self) -> ScalarOrSeq:
         return self.thickness_ang
@@ -722,6 +900,7 @@ def target_from_flat(
     stack: Sequence[LayerSpec] | None = None,
     allow_normal_incidence: bool = False,
     mosaic: bool = False,
+    cut: CrystalCut | None = None,
 ) -> Target:
     """Build the target described by the legacy flat geometry inputs.
 
@@ -743,6 +922,8 @@ def target_from_flat(
         raise ValueError("give either substrate= or stack=, not both")
     if groove_spacing_ang is not None and (substrate is not None or stack is not None):
         raise ValueError("grooves are v1 single-slab only (no substrate/stack)")
+    if cut is not None and (substrate is not None or stack is not None):
+        raise ValueError("a crystal cut is single-slab only (no substrate/stack)")
 
     # the substrate sugar IS the one-layer stack, so it goes through its helper
     if substrate is not None:
@@ -782,6 +963,7 @@ def target_from_flat(
         entrance_face=(None if groove_spacing_ang is None else BlazedGrooves(groove_spacing_ang)),
         allow_normal_incidence=allow_normal_incidence,
         mosaic=mosaic,
+        cut=cut,
     )
 
 
@@ -794,7 +976,8 @@ def target_flat_fields(target: Target) -> dict[str, Any]:
     that IS its definition -- ``substrate="x"`` means
     ``stack=(LayerSpec("x", substrate_thickness_ang),)``. Keeping the sugar makes
     the projection lossless in both directions and lets the legacy identity
-    payload keep the spelling it has always hashed.
+    payload keep the spelling it has always hashed. ``cut`` joins only when set,
+    for the same reason.
     """
     footprint = target.footprint
     face = target._entrance_face()
@@ -808,6 +991,7 @@ def target_flat_fields(target: Target) -> dict[str, Any]:
             substrate = only.material
             substrate_thickness_ang = float(only.thickness_ang)
             stack = None
+    cut = target._crystal_cut()
     return {
         "material": target.material,
         "thickness_ang": target._film_thickness(),
@@ -821,6 +1005,7 @@ def target_flat_fields(target: Target) -> dict[str, Any]:
         "stack": stack,
         "allow_normal_incidence": target.allow_normal_incidence,
         "mosaic": target.mosaic,
+        **({} if cut is None else {"cut": cut}),
     }
 
 
@@ -833,7 +1018,7 @@ def target_replace(target: Target, **changes: Any) -> Target:
     target IS, and a footprint dimension has to merge with the one it keeps.
     """
     flat = target_flat_fields(target)
-    unknown = sorted(set(changes) - set(flat))
+    unknown = sorted(set(changes) - set(flat) - {"cut"})
     if unknown:
         raise TypeError(f"target_replace: unknown geometry override(s): {', '.join(unknown)}")
     if "substrate" in changes or "stack" in changes:

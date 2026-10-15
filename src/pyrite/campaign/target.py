@@ -7,7 +7,7 @@ from typing import Literal
 
 from ..bodies import RectangularBody, SubstanceRef
 from . import geometry
-from .geometry import Footprint, Slab
+from .geometry import CrystalCut, Footprint, Slab
 
 
 @dataclass(frozen=True)
@@ -15,7 +15,9 @@ class Target:
     """Assign a finite homogeneous crystalline body to the source-target role.
 
     ``tilt_deg`` and ``tilt_azim_deg`` are scalar target angles in degrees;
-    ``lattice_cut='catalog'`` retains the selected crystal's existing cut.
+    ``lattice_cut='catalog'`` retains the selected crystal's existing cut; a
+    :class:`~pyrite.CrystalCut` orients the lattice relative to the entrance
+    face instead.
     ``mosaic`` and ``allow_normal_incidence`` have the same meaning as on
     :class:`~pyrite.Slab`. The target reference remains the entrance origin.
     Arbitrary lab poses, amorphous entrances, layers and grooves are unsupported
@@ -26,7 +28,7 @@ class Target:
     body: RectangularBody
     tilt_deg: float = 30.0
     tilt_azim_deg: float = 0.0
-    lattice_cut: Literal["catalog"] = "catalog"
+    lattice_cut: Literal["catalog"] | CrystalCut = "catalog"
     mosaic: bool = False
     allow_normal_incidence: bool = False
 
@@ -38,8 +40,8 @@ class Target:
             or self.body.substance.kind != "crystal"
         ):
             raise ValueError("Target requires an explicit crystalline SubstanceRef")
-        if self.lattice_cut != "catalog":
-            raise ValueError("Target supports only lattice_cut='catalog'")
+        if not isinstance(self.lattice_cut, CrystalCut) and self.lattice_cut != "catalog":
+            raise ValueError("Target.lattice_cut must be 'catalog' or a CrystalCut")
         for name in ("tilt_deg", "tilt_azim_deg"):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, Real):
@@ -74,6 +76,7 @@ class Target:
             footprint=Footprint(*self.body.size_mm),
             mosaic=self.mosaic,
             allow_normal_incidence=self.allow_normal_incidence,
+            cut=self.lattice_cut if isinstance(self.lattice_cut, CrystalCut) else None,
         )
 
 
