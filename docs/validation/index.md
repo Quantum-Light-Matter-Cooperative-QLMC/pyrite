@@ -106,6 +106,7 @@ channeling/cr-plane-incidence
 channeling/cr-lindblad-jump-operators
 channeling/cr-density-matrix-split-operator
 channeling/cr-mcwf-unravelling
+channeling/cr-dechanneling-collapse-kephart
 ```
 
 ```{toctree}
