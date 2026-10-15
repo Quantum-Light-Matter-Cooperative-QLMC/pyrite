@@ -33,6 +33,23 @@ def active_catalog_path() -> Path:
     return _CATALOG_PATH if selected == bundled_catalog().resolve() else selected
 
 
+def require_writable_object(table, name):
+    """Reject bundled mutations before asking for confirmation."""
+    from pyrite._catalog_layout import require_writable_object as check
+
+    check(active_catalog_path(), table, name)
+
+
+def require_new_object(rows, kind, name):
+    """Reserve existing names case-insensitively, matching directory catalogs."""
+    existing = next((key for key in rows if key.casefold() == name.casefold()), None)
+    if existing is not None:
+        raise ValueError(
+            f"{kind} {name!r} already exists as {existing!r}; "
+            f"choose a new name or edit it with: pyrite {kind} set {existing}"
+        )
+
+
 def range_values(row, key):
     value = row.get(key)
     if not isinstance(value, dict) or not isinstance(value.get("values"), list):

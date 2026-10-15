@@ -2,11 +2,13 @@
 
 import difflib
 import re
+from copy import deepcopy
 
 import click
 import tomlkit
 from tomlkit.exceptions import ParseError
 
+from pyrite._catalog_layout import object_sources
 from pyrite.campaign.profile_edit import PHYSICAL_SECTIONS
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
@@ -136,9 +138,15 @@ def command():
     the Timepix3 chip aperture at 400 mm as one scalar detector with ideal
     response: raw spectra, without pixel binning or count acquisition.
 
+    With the bundled catalog selected, new detectors go to the user catalog
+    layer (catalog.user / PYRITE_USER_CATALOG). Bundled names are read-only;
+    copy one with create NAME --from SOURCE. A complete external catalog is
+    edited in place. list reports bundled, user or catalog sources.
+
     \b
     Examples:
       pyrite detector list
+      pyrite detector create mine --from reference
       pyrite detector show reference
       pyrite detector create standard-90 --observation-angle 90
       pyrite detector set standard-90 --solid-angle 0.066
@@ -150,12 +158,14 @@ def command():
 @command.command("list")
 @output_option
 def list_command(json_output):
-    """List named detectors with labels and profile-reference counts."""
+    """List named detectors with source, labels and profile-reference counts."""
     try:
         _text, document = _catalog_io.catalog_text()
+        sources = object_sources(_catalog_io.active_catalog_path(), "detectors")
         rows = [
             {
                 "name": name,
+                "source": sources[name],
                 "label": row.get("label") if isinstance(row, dict) else None,
                 "referenced_by": _referencing_profiles(document, name),
             }
@@ -171,7 +181,9 @@ def list_command(json_output):
         return 0
     for row in rows:
         label = f" ({row['label']})" if row["label"] else ""
-        emit_result(f"{row['name']}{label}: {len(row['referenced_by'] or [])} profiles")
+        emit_result(
+            f"{row['name']}{label}: {len(row['referenced_by'] or [])} profiles [{row['source']}]"
+        )
     return 0
 
 
@@ -197,12 +209,19 @@ def show_command(name, json_output):
 
 @command.command("create")
 @click.argument("name")
+@click.option(
+    "--from",
+    "source",
+    shell_complete=_cli_completion.complete_detector,
+    help="Copy an existing detector; field options override the copy.",
+)
 @click.option("--label", help="Display-only description; never affects parameter_sha256.")
 @detector_cli_options
 @pixel_cli_options
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def create_command(
     name,
+    source,
     label,
     observation_angle_deg,
     polar_acceptance_deg,
@@ -210,20 +229,25 @@ def create_command(
     dry_run,
     **values,
 ):
-    """Create a reusable named detector geometry NAME."""
+    """Create a reusable named detector geometry NAME.
+
+    Use --from DETECTOR to copy an existing geometry, scorer, response and
+    acquisition. Otherwise requires at least one detector-geometry option.
+    """
     _check_name(name)
     updates = collect_detector_updates(observation_angle_deg, polar_acceptance_deg, solid_angle_sr)
     pixel = pixel_changes(values)
-    if not updates and not any(pixel):
+    if not updates and not any(pixel) and source is None:
         raise click.UsageError("provide at least one detector-geometry option")
     try:
         original, document = _catalog_io.catalog_text()
         detectors = _catalog_io.detector_rows(document)
-        if name in detectors:
-            raise ValueError(
-                f"detector {name!r} already exists; edit it with: pyrite detector set {name}"
-            )
-        target = tomlkit.table()
+        _catalog_io.require_new_object(detectors, "detector", name)
+        target = (
+            deepcopy(_existing_detector(document, source))
+            if source is not None
+            else tomlkit.table()
+        )
         if label is not None:
             target["label"] = label
         apply_detector_fields(target, updates, pixel)
@@ -258,6 +282,7 @@ def set_command(
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_detector(document, name)
+        _catalog_io.require_writable_object("detectors", name)
         overwriting = [key for key in updates if key in target]
         if label is not None and "label" in target:
             overwriting.append("label")
@@ -287,9 +312,9 @@ def rename_command(name, new_name, dry_run):
     try:
         original, document = _catalog_io.catalog_text()
         detectors = _catalog_io.detector_rows(document)
-        if new_name in detectors:
-            raise ValueError(f"detector {new_name!r} already exists")
+        _catalog_io.require_new_object(detectors, "detector", new_name)
         target = _existing_detector(document, name)
+        _catalog_io.require_writable_object("detectors", name)
         del detectors[name]
         detectors[new_name] = target
         for profile_name in _referencing_profiles(document, name):
@@ -322,6 +347,7 @@ def delete_command(name, yes, dry_run, json_output):
     try:
         original, document = _catalog_io.catalog_text()
         _existing_detector(document, name)
+        _catalog_io.require_writable_object("detectors", name)
         referents = _referencing_profiles(document, name)
         if referents:
             raise ValueError(
@@ -372,6 +398,7 @@ def reset_command(name, sections, yes, dry_run):
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_detector(document, name)
+        _catalog_io.require_writable_object("detectors", name)
         for section in sections:
             if section not in target:
                 raise ValueError(f"detector {name!r} has no {section} section")

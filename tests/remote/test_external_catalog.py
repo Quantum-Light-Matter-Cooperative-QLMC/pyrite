@@ -85,6 +85,46 @@ def test_user_profiles_ship_beside_the_bundled_catalog(monkeypatch, empty_user_c
     ]
 
 
+def test_user_instruments_resolve_after_remote_transfer(
+    tmp_path, monkeypatch, _isolate_user_catalog
+):
+    from pyrite import _catalog_layout as layout
+    from pyrite.campaign.profiles import named_profile_identity
+
+    bundle = layout.bundled_catalog()
+    layer = _isolate_user_catalog
+    bundled = named_profile_identity("hopg", "survey", catalog_profile="quickstart")
+    existing_user = named_profile_identity("hopg", "survey", catalog_profile="coh_test")
+    for table, source in (("beams", "example"), ("detectors", "reference")):
+        (layer / table).mkdir()
+        (layer / table / "mine.toml").write_bytes((bundle / table / f"{source}.toml").read_bytes())
+    (layer / "profiles").mkdir(exist_ok=True)
+    profile = (bundle / "profiles" / "quickstart.toml").read_text()
+    (layer / "profiles" / "mine.toml").write_text(
+        profile.replace('beam = "example"', 'beam = "mine"').replace(
+            'detector = "reference"', 'detector = "mine"'
+        )
+    )
+    monkeypatch.setattr(config, "SYNC_PATHS", [])
+    local = named_profile_identity("hopg", "survey", catalog_profile="mine")
+    assert named_profile_identity("hopg", "survey", catalog_profile="quickstart") == bundled
+    assert named_profile_identity("hopg", "survey", catalog_profile="coh_test") == existing_user
+    entries = transport._sync_entries()
+    assert {
+        "user-catalog/beams/mine.toml",
+        "user-catalog/detectors/mine.toml",
+        "user-catalog/profiles/mine.toml",
+    } <= {arc for arc, _ in entries}
+    remote = tmp_path / "remote-layer"
+    for arc, file in entries:
+        target = remote / arc.removeprefix("user-catalog/")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(file.read_bytes())
+    monkeypatch.setenv("PYRITE_USER_CATALOG", str(remote))
+    assert named_profile_identity("hopg", "survey", catalog_profile="mine") == local
+    assert named_profile_identity("hopg", "survey", catalog_profile="quickstart") == bundled
+
+
 def test_user_materials_cifs_round_trip_with_same_identity(
     tmp_path, monkeypatch, empty_user_catalog
 ):
