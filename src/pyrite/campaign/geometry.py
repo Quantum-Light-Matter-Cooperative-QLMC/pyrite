@@ -326,13 +326,14 @@ def _miller(name: str, value: Any) -> Miller | None:
 class CrystalCut:
     """Orient the crystal lattice relative to a slab's entrance face.
 
-    The entrance face stays the sample ``+z`` normal, placed in the lab by the
-    target's ``tilt_deg``/``tilt_azim_deg``; this cut rotates only the lattice
-    inside the slab. The lattice rotation is ``R_miscut @ R_roll @ R_axis``:
-    ``R_axis`` takes the selected axis onto the face normal, ``R_roll`` is a
-    right-handed roll about the normal, and ``R_miscut`` tilts the rolled
-    lattice off the normal. To keep the lattice fixed in the lab while cutting a
-    different face, change the target tilt and apply the compensating miscut.
+    The cut face normal is the sample ``+z`` axis and defines the zero of the
+    target's ``tilt_deg``/``tilt_azim_deg``: ``tilt_deg=0`` is normal
+    incidence on the cut face, and tilting moves face and lattice together.
+    The cut fixes the lattice under that face by the rotation
+    ``R_miscut @ R_roll @ R_axis``: ``R_axis`` takes the selected axis onto the
+    face normal, ``R_roll`` is a right-handed roll about it, and ``R_miscut``
+    tilts the lattice off it, i.e. the face is cut ``miscut_deg`` off the
+    selected plane.
 
     Parameters
     ----------

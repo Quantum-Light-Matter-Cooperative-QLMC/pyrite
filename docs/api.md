@@ -431,9 +431,10 @@ parallel front manually.
 ### Crystal cuts
 
 A flat single `Slab` (or `Target`) accepts `cut=pr.CrystalCut(...)` to orient
-the lattice relative to the entrance face. The face stays the sample `+z`
-normal, placed in the lab by `tilt_deg`/`tilt_azim_deg`; the cut rotates only
-the lattice:
+the lattice relative to the entrance face. The cut face normal defines the zero
+of `tilt_deg`/`tilt_azim_deg`: `tilt_deg=0` is normal incidence on the cut
+face, and tilting moves face and lattice together. The cut fixes how the
+lattice sits under that face:
 
 ```python
 cut = pr.CrystalCut(
@@ -447,11 +448,10 @@ target = pr.Slab("hopg", 500.0, tilt_deg=84.5, footprint=None, cut=cut)
 
 The lattice rotation is `R_miscut @ R_roll @ R_axis`. `surface_hkl` and
 `beam_uvw` are mutually exclusive integer axes and are unrelated to the
-reflections being scored. Use `miscut_deg` for a continuous orientation, since
-integer surface planes alone rarely give an exact energy match. To keep the
-lattice fixed in the lab while cutting a different face, change the target tilt
-and apply the compensating miscut. Target tilts are still quantized to half a
-degree; miscut angles are not.
+reflections being scored. `miscut_deg` cuts the face that far off the selected
+plane (toward `miscut_azim_deg`), giving a continuous orientation, since integer
+surface planes alone rarely give an exact energy match. Target tilts are still
+quantized to half a degree; miscut angles are not.
 
 Omitting the cut, or passing `CrystalCut()` or the catalog axis, leaves the
 case payload and identity unchanged. An explicit cut adds `azimuth_rad` and

@@ -226,3 +226,28 @@ def test_uncut_front_is_unchanged():
     assert replace(_scene(), target=_slab(pr.CrystalCut())).phase_matched_bunch_front_tilt(
         (0, 0, 2)
     ) == _scene().phase_matched_bunch_front_tilt((0, 0, 2))
+
+
+@pytest.mark.parametrize("cut", [pr.CrystalCut(surface_hkl=(1, 0, 1)), CUT])
+@pytest.mark.parametrize("tilt", [0.0, 20.0, -35.0])
+def test_tilt_is_measured_from_the_cut_face_normal(cut, tilt):
+    from pyrite.montecarlo.geometry import tilted_geometry
+
+    scene = replace(_scene(), target=_slab(cut, tilt=tilt, allow_normal_incidence=True))
+    case = build_case(scene)
+    beam, n_hat = tilted_geometry(case["theta_obs_rad"], np.deg2rad(case["tilt_deg"]), 0.0)
+    rotation = _orientation_R(
+        HOPG.lattice,
+        case["beam_uvw"],
+        case.get("azimuth_rad", 0.0),
+        case.get("recip_miscut_rad"),
+        surface_hkl=case["surface_hkl"],
+    )
+    axis, norm = reciprocal_g_vector((1, 0, 1), HOPG.lattice)
+    # The beam meets the cut face normal at the target tilt, and the face sits
+    # miscut_deg off the selected (101) plane regardless of tilt.
+    np.testing.assert_allclose(beam @ np.array([0.0, 0.0, 1.0]), np.cos(np.deg2rad(tilt)))
+    face_to_plane = np.rad2deg(np.arccos(np.clip(rotation @ axis / norm @ [0, 0, 1.0], -1, 1)))
+    assert face_to_plane == pytest.approx(cut.miscut_deg, abs=1e-9)
+    if cut.miscut_deg == 0.0:
+        np.testing.assert_allclose(beam @ (rotation @ axis / norm), np.cos(np.deg2rad(tilt)))
