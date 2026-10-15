@@ -104,6 +104,7 @@ channeling/cr-doppler-line-energy
 channeling/cr-mean-inner-potential
 channeling/cr-plane-incidence
 channeling/cr-lindblad-jump-operators
+channeling/cr-density-matrix-split-operator
 ```
 
 ```{toctree}
