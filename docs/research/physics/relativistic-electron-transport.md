@@ -124,7 +124,7 @@ Owned by #439/#440: stopping powers and CSDA ranges against ESTAR, transmitted/b
 
 ### Physics anchors
 
-- reproduce 1–3 MeV silicon planar and axial peak energies from Watson;
+- reproduce 1–3 MeV silicon axial peak energies from Watson, and his null result for planar lines above 1 keV;
 - reproduce 17 MeV silicon occupation lengths;
 - reproduce 54–110 MeV silicon/diamond planar spectra as continuity check;
 - compare 200 MeV and higher planar output with Geant4/Baier–Katkov only as a regime-overlap oracle;

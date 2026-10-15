@@ -18,7 +18,7 @@ from pyrite.materials.channeling import (
     thermal_b_factor,
     transverse_states,
 )
-from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, U_g, reciprocal_g_vector
+from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, M_E_EV, U_g, reciprocal_g_vector
 from pyrite.materials.emission import photon_energies
 
 SI_A = CRYSTALS["silicon"]["lattice"]["a"]
@@ -111,6 +111,25 @@ def test_planar_coefficient_is_negative_cbs_coupling():
     assert profile.potential_eV[1] == pytest.approx(expected, rel=1e-12)
 
 
+def test_si111_coefficient_against_cbed_structure_factors():
+    # Zuo, Microsc. Res. Tech. 46, 220 (1999), Table 1 "Mean" column: Si at room
+    # temperature, 196.7 kV, U(111) = 0.4736(7)e-1 and U(222) = 0.921(50)e-3 A^-2.
+    # U_g = 2 m gamma e V_g / h^2 (Zuo & Spence, Ultramicroscopy 35, 185 (1991),
+    # Eq. 8), so V_g = U_g (2 pi hbar c)^2 / (2 gamma m c^2).
+    gamma = 1.0 + 196.7e3 / M_E_EV
+    volts_per_inv_ang2 = (2 * np.pi * HBARC_EV_ANG) ** 2 / (2 * gamma * M_E_EV)
+    v111 = 0.4736e-1 * volts_per_inv_ang2  # 5.144 V
+    v222 = 0.921e-3 * volts_per_inv_ang2  # 0.100 V
+    profile = planar_profile("silicon", (1, 1, 1), 293.15)
+    # Independent atoms overestimate the bonding-sensitive (111) by ~6%; the
+    # X-ray Pendellosung value in Zuo's Table 2 agrees with the CBED value.
+    assert 1.0 < abs(profile.potential_eV[1]) / v111 < 1.08
+    # (222) is forbidden for spherical harmonic atoms; the measured 0.1 V is
+    # bonding charge the independent-atom potential omits (2% of V_111).
+    assert abs(profile.potential_eV[2]) < 1e-12
+    assert v222 < 0.03 * v111
+
+
 def test_density_means_and_heating(si110):
     volume = CRYSTALS["silicon"]["V_cell"]
     assert si110.nuclear_density[0].real == pytest.approx(8 / volume)
@@ -201,6 +220,27 @@ def test_si110_40mev_matches_azadegan(si110):
     assert states.n_bound == 6
     e10 = 2 * gamma**2 * (states.energies_eV[1] - states.energies_eV[0])
     assert e10 == pytest.approx(76207.1, rel=0.02)
+
+
+@pytest.mark.parametrize("hkl", [(1, 1, 0), (1, 1, 1), (1, 0, 0)])
+def test_si_planar_lines_below_watson_detector_cutoff(hkl):
+    # Watson & Koehler, Phys. Rev. A 24, 861 (1981) and Phys. Rev. B 25, 3079
+    # (1982), Sec. IV B: no planar channeling radiation above the ~1 keV Si(Li)
+    # cutoff for any Si plane up to 3.0 MeV, detector 2.66 deg off the beam.
+    # Every strong (|x_fi| > 0.1 A) bound-bound line must therefore lie below it.
+    profile = planar_profile("silicon", hkl, 293.15)
+    gamma, _ = longitudinal_kinematics(3.0e6)
+    theta = np.deg2rad(2.66)
+    highest = 0.0
+    for k in np.linspace(0.0, profile.g_inv_ang / 2, 5):
+        states = transverse_states(profile, gamma, k_inv_ang=k)
+        energies = states.energies_eV
+        for i in range(1, states.n_bound):
+            for f in range(i):
+                if abs(states.dipole_ang(f, i)) > 0.1:
+                    line = line_energy_eV(energies[i] - energies[f], 3.0e6, theta)
+                    highest = max(highest, line)
+    assert highest < 1.05e3
 
 
 # ---- entry populations (cr-initial-occupation) -------------------------------

@@ -23,10 +23,14 @@ def _p(kinetic_eV):
 # ---- mean inner potential (cr-mean-inner-potential) --------------------------
 
 
-def test_mean_inner_potential_is_attractive_and_plausible():
+def test_mean_inner_potential_matches_independent_atom_and_measured_si():
     u_si = mean_inner_potential_eV("silicon")
-    # Independent-atom Si overestimates the measured ~12.6 V by ~10% (bonding).
-    assert -15.0 < u_si < -12.5
+    # Kruse et al., Ultramicroscopy 106, 105 (2006), Table 2, Si: independent-atom
+    # (Hartree-Fock f_el, Ibers Eq. 1) 13.91 V; electron holography 12.52 V
+    # (+-0.71%); DFT with bonding 12.57 V. Their Sec. 6 attributes the ~10%
+    # independent-atom excess to bonding (7.5%) and correlation (2.5%).
+    assert -u_si == pytest.approx(13.91, rel=0.015)
+    assert 1.05 < -u_si / 12.52 < 1.15
     assert mean_inner_potential_eV("diamond") < u_si  # denser, more electrons per volume
 
 
