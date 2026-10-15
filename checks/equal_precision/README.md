@@ -226,3 +226,88 @@ Download and unpack archives outside this checkout, for example under
 `~/pyrite-evidence/510/`. Remote code sync includes `checks/`, so keep working
 evidence outside that tree as well. Never replace an existing release asset
 with different bytes; publish a new evidence version and update the manifest.
+
+
+## Radiative precision experiment
+
+This opt-in diagnostic leaves production source/defaults unchanged. See the
+[measured report](../../docs/repo-design/compute/transport-precision-experiment.md)
+and frozen `precision-experiment.json` for precision boundaries and limitations.
+`precision_source.py` generates isolated FP64, FP32/52, FP32/24, mixed-cell/24
+and stable-cell FP32/24 helpers; no production precision switch is added.
+
+Stage with maintained `pyrite remote sync`, then use bounded GPU allocations
+from the staged lab checkout (never execute GPU pilots locally):
+
+```bash
+preflight=$(sbatch --parsable --time=00:05:00 checks/equal_precision/precision.sbatch preflight)
+si=$(sbatch --parsable --dependency=afterok:$preflight checks/equal_precision/precision.sbatch si evidence/precision/$preflight)
+sbatch --dependency=afterany:$si checks/equal_precision/precision.sbatch w evidence/precision/$preflight
+```
+
+Pilot stages require six-scene trajectory preflight plus finite/nonnegative/
+support and actual 1 keV-cutoff component checks. Endpoint stress failures remain
+explicit unqualified diagnostics. Each process has a deadline; failures and
+budget deferrals remain in the evidence. Keep raw evidence outside the source
+checkout when linting. After pulling completed job directories, CPU analysis is:
+
+```bash
+uv run python checks/equal_precision/analyze_precision.py \
+  /path/to/1343 /path/to/1344 /path/to/1345 \
+  --output /tmp/precision-summary.json
+```
+
+Do not pool initial failed job 1339 with corrected job 1343. The analyzer rejects
+source/control mismatches and duplicate replica seeds. These diagnostic samples
+use `pyrite.equal-precision.precision-sample.v1`; the standard benchmark analyzer
+does not treat them as production performance evidence. Ratios remain unqualified
+until independent ensemble/endpoint accuracy gates pass.
+
+
+### Endpoint coordinate follow-up
+
+`precision-endpoint.json` freezes FP64, stable FP32 and `rad-boundary64-24`
+comparisons. The new arm retains FP64 coordinate geometry while computing
+radiative SDCS/cell work in FP32. Production precision stays unchanged.
+`precision-endpoint.sbatch` uses the same allocation limits as the original
+experiment, captures the submitted batch script and writes to
+`scratch/endpoint/<job-id>`. Submit preflight with a five-minute limit; pass its
+directory to Si/W jobs. Use `afterok` dependencies between all three stages.
+Preflight fails unless all required variants pass; the boundary arm must also
+pass the complete endpoint stress screen before timing. The stable FP32 arm is
+an explicitly unqualified diagnostic control.
+
+Analyze completed evidence separately from the earlier protocol:
+
+```bash
+uv run python checks/equal_precision/analyze_precision.py \
+  /path/to/preflight /path/to/si /path/to/w \
+  --protocol /path/to/preflight/source/precision-endpoint.json \
+  --output /tmp/endpoint-summary.json
+```
+
+The analyzer verifies the selected protocol hash before pooling. Use the captured
+protocol file for historical results; its byte hash includes line endings. For CPU-only
+arithmetic diagnosis using the retained job-1343 reference probes:
+
+```bash
+uv run python checks/equal_precision/probe_precision_cpu.py rad-boundary64-24 \
+  /path/to/1343 /tmp/endpoint-cpu.json
+```
+
+This NumPy execution removes device decorators/imports, verifies input table and
+reference-source pins, and retains per-case arrays. It does not validate CUDA
+compilation/math, full trajectories, ensemble equivalence or GPU performance.
+
+
+### Selected quotients and paired equivalence
+
+`precision-quotient.json` and `precision-quotient.sbatch` freeze the next study.
+See the [method and reproduction](../../docs/validation/beam-transport/transport-precision-equivalence.md).
+The same block/process-deadline runner supports `heldout-si` and `heldout-w`,
+with explicit `--replica-start` / `--replica-stop` slices. Analyze fixed held-out
+populations separately from pilot diagnostics. `analyze_equivalence.py`
+requires all nine held-out directories, the captured protocol and preflight;
+its paired-primary intervals preserve uncertainty even at zero differences.
+Source/input/provenance mismatches raise errors; missing or failed fixed replicas
+prevent qualification. No production precision option is introduced.

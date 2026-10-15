@@ -34,6 +34,7 @@ compute/gpu-transport-rawkernel.md
 compute/jit-spectrum-kernel-walkthrough.md
 compute/straggled-transport-integration.md
 compute/transport-jit-kernel-walkthrough.md
+compute/transport-precision-experiment.md
 compute/physics-preparation-adapters.md
 compute/emission-batch-adapters.md
 compute/extending-physics.md
