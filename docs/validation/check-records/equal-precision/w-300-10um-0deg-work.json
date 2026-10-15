@@ -1,0 +1,88 @@
+{
+  "schema": "pyrite.equal-precision.work-audit.v1",
+  "interpretation": "First complete request is discarded warmup; second is measured. Returned segments exclude capacity replays. Instrumented run is diagnostic only.",
+  "command": [
+    "checks/equal_precision/audit_transport_work.py",
+    "w-300-10um-0deg",
+    "--histories",
+    "1000",
+    "--seed",
+    "53000",
+    "--core",
+    "cuda",
+    "--batch-histories",
+    "1000",
+    "--scratch-mib",
+    "4096",
+    "--probe-electrons",
+    "0",
+    "--output",
+    "evidence/work-audit/1311/w-300-10um-0deg.json"
+  ],
+  "blocks": [
+    {
+      "primaries": 1000,
+      "segments": 2012151,
+      "segments_per_primary_mean": 2012.151,
+      "segments_per_primary_max": 9872,
+      "segment_count_quantiles": [
+        31.0,
+        1372.5,
+        3941.6000000000004,
+        9655.25,
+        9872.0
+      ],
+      "event_counts": {
+        "0": 2011069,
+        "4": 420,
+        "5": 539,
+        "7": 41,
+        "9": 82
+      },
+      "mean_material_path_um": 23.517214654775955,
+      "returned_array_bytes_sum": 428652163,
+      "scalar_counts": {
+        "n_backscattered": 420,
+        "n_transmitted": 539,
+        "n_side_exited": 0,
+        "n_missed": 0,
+        "n_cutoff_stopped": 41,
+        "n_step_limited": 0,
+        "n_stopped": 41,
+        "n_layers": 1
+      }
+    },
+    {
+      "primaries": 1000,
+      "segments": 1980980,
+      "segments_per_primary_mean": 1980.98,
+      "segments_per_primary_max": 9821,
+      "segment_count_quantiles": [
+        21.0,
+        1426.5,
+        3970.1,
+        9576.26,
+        9821.0
+      ],
+      "event_counts": {
+        "0": 1979896,
+        "4": 434,
+        "5": 538,
+        "7": 28,
+        "9": 84
+      },
+      "mean_material_path_um": 23.53449179030137,
+      "returned_array_bytes_sum": 422012740,
+      "scalar_counts": {
+        "n_backscattered": 434,
+        "n_transmitted": 538,
+        "n_side_exited": 0,
+        "n_missed": 0,
+        "n_cutoff_stopped": 28,
+        "n_step_limited": 0,
+        "n_stopped": 28,
+        "n_layers": 1
+      }
+    }
+  ]
+}

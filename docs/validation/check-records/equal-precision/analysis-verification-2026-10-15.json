@@ -1,0 +1,120 @@
+{
+  "schema": "pyrite.equal-precision.analysis-verification.v1",
+  "date": "2026-10-15",
+  "source_revision": "a3876d6fae690d6f1f8e3145063b2778318f6c66",
+  "source_sync_digest": "3c2c52bd0327211945885fbec3ec3b9122f0882e474d0e0045d2829abb4bfde6",
+  "source_dirty_note": "The sync marker is dirty only because retrieved datasets/ and xsgen/ were untracked staging inputs. Tracked source was clean. Those inputs are now under ignored scratch/lab-inputs locally.",
+  "environment": {
+    "python": "3.14.6",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.35"
+  },
+  "job": {
+    "id": 1335,
+    "host": "DESKTOP-QNIHO3D",
+    "partition": "cpu",
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed_s": 138,
+    "limit_s": 600,
+    "cpus_per_task": 1,
+    "allocated_logical_cpus": 2,
+    "requested_memory_gib": 8,
+    "gpu_requested": false,
+    "peak_memory": "unavailable: Slurm accounting storage disabled"
+  },
+  "checks": {
+    "performance": {
+      "exit_code": 0,
+      "log_sha256": "c2e5c0a0be002863cc7d9358788a8386e1fcd307785a34350c691293984ad1a8"
+    },
+    "lint": {
+      "exit_code": 0,
+      "log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    "typecheck": {
+      "exit_code": 0,
+      "log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    "docs": {
+      "exit_code": 0,
+      "log_sha256": "2d329481639349c90d4fbe79359c1511df5c60656e01bb782407611b9da45acd"
+    },
+    "pilot-analysis": {
+      "exit_code": 0,
+      "log_sha256": "b2f50908b2fbebbcecb9e7139a701b84e34714cec0bab146cea3f47411607d2b"
+    },
+    "scaling-analysis": {
+      "exit_code": 0,
+      "log_sha256": "5133cff8580d40474f04fde6c2c379a8344c867b2bc9a6b4ef3f74117dac02ef"
+    },
+    "single-scattering-analysis": {
+      "exit_code": 0,
+      "log_sha256": "7340b1e6f86a498c02341b2c9031ec6d94d96c34a9df194b8e28e1e3d3776bf3"
+    }
+  },
+  "performance_tests": {
+    "passed": 40,
+    "failed": 0,
+    "skipped": 0,
+    "wall_s": 9.24
+  },
+  "evidence_comparison": {
+    "pilot": {
+      "groups": 36,
+      "successful_samples": 151,
+      "retained_failures": 0,
+      "all_observables_include_all_incident_primaries": true,
+      "existing_metrics_unchanged_except_sum_squares_roundoff": true,
+      "sum_squares_changed_fields": 11,
+      "maximum_relative_sum_squares_difference": 2.7617874072038335e-16,
+      "additive_native_process_timing_fields": 108,
+      "failure_paths_rebased_to_selected_snapshot": false,
+      "summary_sha256": "e1c8aadd0d646d57f8d26bfb147279d139732cc8f69ceb9c8f17cb0407fe9886"
+    },
+    "scaling": {
+      "groups": 4,
+      "successful_samples": 8,
+      "retained_failures": 1,
+      "all_observables_include_all_incident_primaries": true,
+      "existing_metrics_unchanged_except_sum_squares_roundoff": true,
+      "sum_squares_changed_fields": 3,
+      "maximum_relative_sum_squares_difference": 1.859052525850817e-16,
+      "additive_native_process_timing_fields": 12,
+      "failure_paths_rebased_to_selected_snapshot": true,
+      "summary_sha256": "259e9877f327786dcfd36f4e3a4ed9489a442f1e052fb943332ede95419e2096"
+    },
+    "single-scattering": {
+      "groups": 4,
+      "successful_samples": 8,
+      "retained_failures": 0,
+      "all_observables_include_all_incident_primaries": true,
+      "existing_metrics_unchanged_except_sum_squares_roundoff": true,
+      "sum_squares_changed_fields": 2,
+      "maximum_relative_sum_squares_difference": 7.647735043060218e-16,
+      "additive_native_process_timing_fields": 0,
+      "failure_paths_rebased_to_selected_snapshot": false,
+      "summary_sha256": "38c3c58362f18d95716fe611219b6087d354f0508c508c188e481c81b8799577"
+    }
+  },
+  "evidence": {
+    "remote_directory": "/home/aamador/pyrite-510-verify-a3876d6f/evidence/verification/1335",
+    "local_archive": "scratch/remote-verification/verification-1335.tar.gz",
+    "archive_sha256": "c4fe49c4f856d8d1a271d0dd320edc2451b8110c56f21e53310c80a22f85b2a1",
+    "verified_manifest_files": 22,
+    "logs_and_outputs_retained": true
+  },
+  "related_work": {
+    "issue": 200,
+    "revision": "7650913643221aea61e1a92a4399e5e0efccd0fe",
+    "useful_methods": [
+      "Freeze and hash fixtures per actual production route.",
+      "Separate compilation, transfer and synchronized kernel timing; alternate repeated arm order.",
+      "Declare numerical tolerances before selecting configurations; exercise partial final blocks.",
+      "Disclose unavailable Nsight Compute counters (ERR_NVGPUCTRPERM in #200)."
+    ],
+    "scope": "CXR launch defaults were retained in #200. Those kernel timings and launch settings do not transfer to #510 transport; PXR/CBS remain excluded."
+  },
+  "interpretation": "Analysis-integrity and Linux verification only. No new transport samples, numerical convergence, equivalence, T(epsilon), speedup or physics-validation claim."
+}
