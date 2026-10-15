@@ -141,11 +141,10 @@ def crystal_atoms(profile, cfg, rng):
     extent = lengths * np.array(repeat)
     positions = positions[positions[:, 2] < cfg["thickness_ang"]]
     sigma = np.sqrt(profile.b_factors_ang2["Si"] / (8.0 * np.pi**2))
-    positions = (positions + sigma * rng.standard_normal(positions.shape)) % [
-        extent[0],
-        extent[1],
-        np.inf,
-    ]
+    positions = positions + sigma * rng.standard_normal(positions.shape)
+    positions[:, :2] %= extent[:2]
+    # Displacements may push entrance/exit atoms just outside the slab.
+    positions[:, 2] = np.clip(positions[:, 2], 0.0, np.nextafter(cfg["thickness_ang"], 0.0))
     return Atoms(
         symbols=["Si"] * len(positions),
         positions=positions,
@@ -235,9 +234,12 @@ def run(args) -> int:
             parametrization="lobato",
             projection="infinite",
             exit_planes=exit_every,
+            device=args.device,
         )
-        wave = abtem.PlaneWave(energy=args.energy, normalize=False)
+        wave = abtem.PlaneWave(energy=args.energy, normalize=False, device=args.device)
         exit_waves = wave.multislice(potential).compute().array
+        if args.device == "gpu":
+            exit_waves = exit_waves.get()
         exit_waves = np.asarray(exit_waves).reshape(-1, *exit_waves.shape[-2:])
         populations.append(project(exit_waves, args.cells, orders, vectors))
         seconds.append(time.perf_counter() - start)
@@ -303,6 +305,13 @@ def compare(args) -> int:
             f"  PyRITE {np.round(ours[row], 4)}"
         )
     print(f"max |diff| {report['max_abs_difference']:.4f}, max |z| {report['max_abs_z']:.1f}")
+    if args.tolerance is not None:
+        passed = report["max_abs_difference"] <= args.tolerance
+        report["tolerance"] = args.tolerance
+        report["passed"] = passed
+        args.out.write_text(json.dumps(report, indent=1))
+        print(f"tolerance {args.tolerance}: {'pass' if passed else 'FAIL'}")
+        return 0 if passed else 1
     return 0
 
 
@@ -322,6 +331,9 @@ def main(argv=None) -> int:
     go.add_argument("--orders", type=int, default=24)
     go.add_argument("--configs", type=int, nargs=2, default=(0, 1), metavar=("START", "STOP"))
     go.add_argument("--seed", type=int, default=504)
+    go.add_argument(
+        "--device", choices=("cpu", "gpu"), default="cpu", help="abTEM device (gpu needs CuPy)"
+    )
     go.add_argument("--model", choices=("crystal", "random-string"), default="crystal")
     go.add_argument(
         "--axis-index", type=int, default=7, help="beam [1, -1, n] for the crystal model"
@@ -331,6 +343,12 @@ def main(argv=None) -> int:
     cmp_.add_argument("files", nargs="+", type=Path)
     cmp_.add_argument("--bands", type=int, default=6)
     cmp_.add_argument("--dz", type=float, default=25.0)
+    cmp_.add_argument(
+        "--tolerance",
+        type=float,
+        default=None,
+        help="largest allowed absolute band-population difference; exit 1 above it",
+    )
     cmp_.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
     return run(args) if args.command == "run" else compare(args)
