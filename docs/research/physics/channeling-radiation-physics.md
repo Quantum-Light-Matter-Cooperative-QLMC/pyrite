@@ -1,8 +1,8 @@
 # Channeling radiation: physics implementation walkthrough
 
-**Status:** Proposed physics design; not implemented as a production model.
+**Status:** Proposed physics design; not implemented as a production model. The architecture is recorded in [ADR-0018](../../adr/0018-quantum-channeling-zone.md) (Proposed); delivery is tracked in [#56](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/56) and its sub-issues.
 
-Companion to [relativistic electron transport](relativistic-electron-transport.md). That document fixes the architecture (backends, data contracts, validation gates). This one works through the physics itself, step by step, in the order an implementation would build it: continuum potential → transverse quantum states → initial occupation → depth evolution → photon emission → axial extension. It closes with the physics the design document does not mention and an explicit map of where Geant4 does and does not intersect.
+[ADR-0018](../../adr/0018-quantum-channeling-zone.md) fixes the architecture: a quantum entrance zone with one-way handoff to native transport. The earlier Geant4 route in [relativistic electron transport](relativistic-electron-transport.md) is superseded for channeling. This document works through the physics step by step, in the order an implementation would build it: continuum potential → transverse quantum states → initial occupation → depth evolution → photon emission → axial extension. It closes with physics easily missed, and with the ownership map between the channeling zone and native transport.
 
 Conventions used throughout:
 
@@ -33,7 +33,7 @@ Three consequences frame the whole implementation:
 
 1. **A handful of levels.** Spectra are discrete lines from transitions between a few bound states — exactly what Watson observed at 1–3 MeV. The states must come from an explicit eigensolve; there is no continuum approximation to fall back on.
 2. **The photon energies land in or near the PyRITE detector band.** The Doppler upshift $2\gamma^2$ maps eV-scale transverse spacings to 0.1–20 keV photons, overlapping PXR/CBS lines. Channeling radiation is a physical foreground/background for the coherent spectra, not a separate curiosity.
-3. **Electrons dechannel fast.** Because the bound states peak on the atomic planes, channeled electrons sit in the region of maximum nuclear and electronic density. Occupation lengths are of order a micron at these energies (Kephart), so the channeling module governs only the first $\lesssim$ few µm of path — the rest is ordinary transport (Geant4's job).
+3. **Electrons dechannel fast.** Because the bound states peak on the atomic planes, channeled electrons sit in the region of maximum nuclear and electronic density. Occupation lengths are of order a micron at these energies (Kephart), so the channeling module governs only the first $\lesssim$ few µm of path. The rest is ordinary native transport, entered through the handoff of §5.4.
 
 ## 1. Step 1 — Planar continuum potential
 
@@ -71,7 +71,7 @@ giving $f^e$ in Å. This reuses validated atomic data instead of introducing a s
 
 Each coefficient carries the Debye–Waller factor $e^{-B_j s_g^2}$ with $B = 8\pi^2 \langle u_x^2 \rangle$ and $\langle u_x^2 \rangle$ the one-dimensional projected mean-square thermal displacement. Equivalently: the plane's atomic density profile is a Gaussian of width $u_\text{th} = \sqrt{\langle u_x^2 \rangle}$ ($\approx 0.077$ Å for Si at 293 K, $B \approx 0.47$ Å²), and the potential is the static-lattice potential convolved with it.
 
-The design document adds `crystal_temperature_K` but no model behind it. The implementation needs one: a Debye-model $B(T)$,
+Channeling needs an explicit temperature model, because the catalog currently stores one room-temperature isotropic `B_ang2` per crystal. Use a Debye-model $B(T)$,
 
 $$
 B(T) = \frac{6 h^2}{m_a k_B \Theta_D}
@@ -79,7 +79,7 @@ B(T) = \frac{6 h^2}{m_a k_B \Theta_D}
 \qquad x_D = \frac{\Theta_D}{T},
 $$
 
-with $\phi$ the Debye integral and $m_a$ the atomic mass, anchored to the room-temperature $B$ already in the catalog. Well depth and level spacings shift by several percent between 100 K and 400 K, which is comparable to the line-position accuracy the anchors demand — so this is load-bearing, not cosmetic. Note the catalog's placeholder $B = 0.6$ Å² entries (flagged in the validation ledger) are *not* adequate for channeling profiles; the design document's per-material "source-backed thermal vibration amplitude" requirement is exactly right.
+with $\phi$ the Debye integral and $m_a$ the atomic mass, anchored to the room-temperature $B$ already in the catalog. Well depth and level spacings shift by several percent between 100 K and 400 K, which is comparable to the line-position accuracy the anchors demand — so this is load-bearing, not cosmetic. Note the catalog's placeholder $B = 0.6$ Å² entries (flagged in the validation ledger) are *not* adequate for channeling profiles; the catalog therefore gains per-site thermal displacements, a reference temperature and a Debye temperature for eligible crystals (ADR-0018), while existing consumers keep reading the scalar.
 
 ### 1.4 Derived densities
 
@@ -108,7 +108,7 @@ This is the Andersen–Bonderup–Pantell master equation: a Schrödinger proble
 $U(x)$ is periodic with period $d_p$, so eigenstates are Bloch waves $u_k^{(n)}$ with transverse crystal momentum $k \in (-\pi/d_p, \pi/d_p]$ and band index $n$. Practical structure:
 
 - **Deeply bound bands are flat** (negligible inter-well tunneling): solve at a single $k$ and treat levels as isolated-well states.
-- **Near-barrier and above-barrier bands disperse** and must be sampled over the Brillouin zone; they carry the quasi-channeled population and the bound→free edges.
+- **Near-barrier and above-barrier bands disperse** and must be sampled over the Brillouin zone; they carry the quasi-channeled population and the free→bound capture continuum (§9, item 2).
 
 Numerically: plane-wave diagonalization in the $e^{i g_n x}$ basis (64–128 components converges eV-level spacings to well below linewidths) or central finite differences with Bloch boundary conditions. Both are cheap in 1D; run both once as a cross-check, keep one.
 
@@ -158,40 +158,76 @@ Two consistency points with existing code:
 
 ## 5. Step 5 — Depth evolution
 
-### 5.1 Master equation
+The architecture is fixed by [ADR-0018](../../adr/0018-quantum-channeling-zone.md): an open-system evolution of the transverse state with Lindblad jump operators. Planar production uses a deterministic density matrix; axial, keV and two-electron work use Monte Carlo wave-function (MCWF) trajectories on the same operators. The diagonal rate equation of earlier drafts survives only as a limiting case (§5.3).
 
-Populations evolve along depth $z$ by incoherent scattering:
+### 5.1 Lindblad master equation
+
+Incoherent scattering acts on the transverse density matrix $\rho$ along depth $z$:
+
+$$
+\frac{d\rho}{dz}=-\frac{i}{\hbar v}\left[H_\perp,\rho\right]
++\sum_k\left(L_k\rho L_k^\dagger-\tfrac12\left\{L_k^\dagger L_k,\rho\right\}\right),
+$$
+
+with $H_\perp$ the transverse Hamiltonian of §2 and $v=\beta c$.
+
+### 5.2 Jump operators
+
+Each jump operator is built from the *fluctuating* part of the lattice potential (thermal displacements) and from electron-gas excitation:
+
+$$
+L_q^{\rm TDS}=\sqrt{n(x)\,\frac{d\sigma_{\rm TDS}}{dq}}\;e^{iqx},
+\qquad
+L_q^{\rm el}=\sqrt{\rho_e(x)\,\frac{d\sigma_{e}}{dq}}\;e^{iqx}.
+$$
+
+- $n(x)$ and $\rho_e(x)$ are the profiles of §1.4.
+- The thermal diffuse scattering (TDS) cross section uses the Einstein model, $d\sigma_{\rm TDS}/dq\propto|f^e(q)|^2\,(1-e^{-2W(q)})$.
+- The electronic cross section is the transverse-momentum-resolved form of the existing PENELOPE shell and plasmon data, in a local-density approximation.
+
+This form is the Markov limit of the frozen-phonon/QEP treatment that is standard in electron microscopy. The limit is benign here because each atom is passed once and Einstein displacements are independent. Correlated-phonon effects are a recorded refinement.
+
+The imaginary part of $H_{\rm eff}=H_\perp-\tfrac{i\hbar v}{2}\sum_k L_k^\dagger L_k$ reproduces the standard absorptive (Yoshioka) potential. That is a limiting-case check.
+
+**Physical consequences.**
+
+- States localized on the planes, which are the low states for electrons, have the *shortest* lifetimes. Near-barrier states live longer.
+- The total dechanneling length scales roughly like $\gamma$.
+- Small-$q$ (plasmon) jumps barely decohere nearby positions. The decoherence rate of a superposition separated by $\Delta x$ is $\Gamma(\Delta x)\propto\int w(q)\,[1-\cos(q\Delta x)]\,dq$.
+
+Absolute rates are the least first-principles piece of the chain, so anchor them. The Kephart 17 MeV (and 54 MeV) silicon occupation lengths are a direct measurement. If a single global calibration factor proves necessary, it is declared and enters case identity and provenance; it is never buried.
+
+### 5.3 Coherences, backends and the rate-equation limit
+
+A plane wave populates Bloch states *coherently*. The density matrix has off-diagonal elements that oscillate with beat length $\lambda_{nm} = 2\pi \hbar \beta c / \Delta E_{nm}$ (pendellösung-like, tens to hundreds of nm here) and produce depth-oscillating yield in thin crystals. Both backends keep these coherences, so thin crystals stay inside the validity domain.
+
+| Backend | Evolution | Cost and use |
+| --- | --- | --- |
+| Density matrix (planar production) | Split operator: a coherent step $U\rho U^\dagger$ in the eigenbasis, then an elementwise dissipator kernel on $\rho(x,x')$ in position space. | One noise-free solve also covers the beam-divergence ensemble ($\rho_0$ is the divergence-averaged mixed state). |
+| MCWF (axial/keV/two-electron) | Each trajectory evolves under $H_{\rm eff}$ and jumps with probability $\delta z\,\langle L_k^\dagger L_k\rangle$. | $O(M)$ memory per trajectory on a real-space grid. Only ensemble observables are physical. |
+
+When collisional dephasing dominates, the off-diagonal elements vanish, and the populations obey the rate equation
 
 $$
 \frac{dP_n}{dz} = \sum_m \left[ W_{m \to n} P_m - W_{n \to m} P_n \right]
   - W_{n \to \text{free}}\, P_n
-  + \sum_{m > n} \frac{A_{m \to n}}{\beta c}\, P_m - \sum_{m < n} \frac{A_{n \to m}}{\beta c}\, P_n .
+  + \sum_{m > n} \frac{A_{m \to n}}{\beta c}\, P_m - \sum_{m < n} \frac{A_{n \to m}}{\beta c}\, P_n ,
 $$
 
-The last two (radiative cascade) terms are numerically tiny compared with collisional rates but cost nothing and matter for line-ratio anchors.
+with golden-rule rates $W_{n\to m}=\sum_k|\langle u^{(m)}|L_k|u^{(n)}\rangle|^2$. That limit, together with MCWF–density-matrix ensemble equivalence, is a regression test. The radiative-cascade terms ($A$) are tiny compared with collisional rates, but they cost nothing and matter for line-ratio anchors.
 
-### 5.2 Transition rates
+### 5.4 Dechanneling and handoff
 
-Golden-rule rates from the *fluctuating* part of the lattice potential (thermal displacements) plus electron-gas excitation. The practical, defensible form is the projected local-density expression:
+After each jump term, the state is projected onto the bound subspace $\mathcal B$ (bound states plus a declared near-barrier margin) and the free subspace $\mathcal F$. The $\mathcal F$ part leaves the zone:
 
-$$
-W_{n \to m} = \int dq_x\, \left[
-  n_\text{at} \frac{d\sigma_\text{TDS}}{dq_x}
-  + \rho_e \frac{d\sigma_e}{dq_x} \right]_{\text{weighted by } |u|^2 \text{ overlaps}}
-  \left| \langle u^{(m)} | e^{i q_x x} | u^{(n)} \rangle \right|^2 ,
-$$
+- In the density-matrix backend it becomes a recorded flux $dP/dz\,dE_\perp$. Per-electron launch states (depth, angle $\sqrt{2E_\perp/pv}$, time $z/v$, energy) are sampled from that flux with keyed RNG streams.
+- In MCWF the same projection is applied per trajectory.
 
-i.e. amorphous single-atom differential cross sections, weighted by where the state actually samples nuclei ($|u_n(x)|^2$ against the thermal plane profile $n(x)$ from §1.4) and electrons ($\rho_e(x)$). Key qualitative behavior this must reproduce: states localized on planes (low states, for electrons) have the *shortest* lifetimes; near-barrier states live longer; total dechanneling length at a given energy scales roughly like $\gamma$.
+Dechanneled electrons continue in the native transport cores; native multiple scattering is off inside the zone, so nothing is double-counted. Rechanneling of quasi-free electrons is omitted and recorded as a validity limit. Report the sensitivity of results to the near-barrier margin.
 
-Because absolute rates are the least first-principles piece of the chain, anchor them: the Kephart 17 MeV (and 54 MeV) silicon occupation lengths are a direct measurement of $W$ totals, and the natural place for a single global calibration factor if one proves necessary — declared in the profile metadata, not buried.
+### 5.5 Conservation
 
-### 5.3 What is deliberately diagonal
-
-A plane wave populates Bloch states *coherently*; the density matrix has off-diagonal elements that oscillate with beat length $\lambda_{nm} = 2\pi \hbar \beta c / \Delta E_{nm}$ (pendellösung-like, tens to hundreds of nm here) and produce depth-oscillating yield in thin crystals. The module propagates only diagonal populations. Justification: collisional dephasing at electron dechanneling rates kills coherences within a fraction of a micron. The regression test making this honest: for crystals thinner than $\sim \lambda_{nm}$, flag results as outside validity rather than returning silently wrong smooth yields. The design document does not mention this limit; it should live in the profile validity metadata.
-
-### 5.4 Conservation
-
-At every depth: bound + quasi-free + handed-off + radiatively-shifted populations sum to 1 within solver tolerance. This is the channeling analogue of the design document's "conservation across bound, continuum, stopped, and exited populations" test.
+At every depth, bound + handed-off + radiatively-shifted populations, plus the electrons that exited through a face, sum to 1 within solver tolerance. For the density matrix, this is trace + accumulated flux = 1.
 
 ## 6. Step 6 — Radiation emission
 
@@ -204,7 +240,16 @@ A'_{if} = \frac{e^2\, \omega'^3\, |x_{if}|^2}{3 \pi \epsilon_0 \hbar c^3},
 \qquad x_{if} = \langle u^{(f)} | x | u^{(i)} \rangle ,
 $$
 
-with $\omega' = \gamma \Delta E_\perp / \hbar$. Parity gives the selection rule (odd $\Delta n$ between opposite-parity bands for centrosymmetric planes); it must *emerge* from the computed $x_{if}$, not be imposed. Lab rate per unit path: $dN_{if}/dz = A'_{if} / (\gamma \beta c)$ — one factor of $\gamma$ for time dilation, and this quantity multiplies $P_i(z)$ under the depth integral.
+with $\omega' = \gamma \Delta E_\perp / \hbar$. Parity gives the selection rule: odd $\Delta n$ between opposite-parity bands for centrosymmetric planes. The rule must *emerge* from the computed $x_{if}$, not be imposed. The lab rate per unit path is $dN_{if}/dz = A'_{if} / (\gamma \beta c)$, one factor of $\gamma$ for time dilation.
+
+**Estimator.** The dipole rate is the long-wavelength, bound→bound limit of a generic first-order transition operator $\hat A_{\mathbf k,\epsilon}\propto\hat{\mathbf j}\cdot\epsilon^*e^{-i\mathbf k\cdot\mathbf r}$. Implement the general operator, so the same layer can later serve quantum PXR/CBS. Score the expected value on the evolved state:
+$\langle\hat d_\omega^\dagger\hat d_\omega\rangle_{\rho(z)}$ per transition-frequency cluster, where
+$\hat d_\omega=\sum_{E_i-E_f\approx\hbar\omega}x_{fi}\,\lvert f\rangle\langle i\rvert$
+groups transitions that are degenerate within the linewidth.
+
+- For nondegenerate lines, as in anharmonic electron wells, this reduces to $P_i(z)\,dN_{if}/dz$.
+- For an equidistant (harmonic) ladder it stays exact. A harmonic-potential test therefore checks it against the classical dipole limit.
+- Squaring per-trajectory MCWF field amplitudes across trajectories is not a valid estimator.
 
 ### 6.2 Angular distribution and polarization
 
@@ -238,7 +283,7 @@ $$
     e^{-\mu(\omega)\, \ell_\text{exit}(z, \theta)} ,
 $$
 
-normalized to photons/eV/sr/electron at sample exit — the `radiation_components["channeling"]` contract. Photon attenuation reuses the existing Beer–Lambert path machinery; per the design document, photons emitted from a Geant4-transported region must not be attenuated twice.
+normalized to photons/eV/sr/electron at sample exit. In this formula $P_i(z)$ stands for the estimator of §6.1, which equals the population for nondegenerate lines. Photon attenuation reuses the existing stack absorption (`_stack_tau`). The yield is first exposed through a diagnostic API, then persisted as the additive channel `spec_channeling` once anchored (ADR-0018).
 
 ## 7. Axial channeling (experimental tier)
 
@@ -247,45 +292,50 @@ The same six steps with dimension bumped to 2:
 - **Potential:** $U(x, y)$ from summing string potentials (the same $V_\mathbf{g}$ construction keeping all $\mathbf{g} \perp$ axis), thermally smeared in 2D. Axial wells for electrons are several times deeper than planar (order $10^2$ eV) → more states, harder spectra, photon lines a few times higher in energy at the same beam energy.
 - **Eigenproblem:** 2D plane-wave basis over the transverse reciprocal mesh, sparse Lanczos/shift-invert for the lowest ~50 states. For an isolated string the potential is nearly cylindrical, so states classify as $(n, \ell)$ — 2D-atom-like 1s, 2p, 3d… labels with dipole selection rule $\Delta\ell = \pm 1$. The 2D string lattice breaks the symmetry and mixes $\ell$; report the cylindrical labels as *approximate* metadata, let the matrix elements decide the actual rates.
 - **Polarization:** $\Delta\ell = \pm1$ transitions radiate circular polarization about the axis; unpolarized beams average to zero net helicity but the azimuthal pattern differs from planar — store polarization per component rather than assuming linear.
-- **Populations/rates/emission:** identical machinery with 2D overlaps. Doughnut scattering (azimuthal randomization of quasi-free electrons around the axis) is automatically represented by the dense above-barrier spectrum only if the continuum sampling is fine enough — this is the main numerical risk, and a good reason the axial tier stays `experimental` with qualitative peak-order checks only (matching the design document).
+- **Evolution/emission:** the same operator layer, but the MCWF backend runs on a real-space grid (~$64^2$ points). At that size the density matrix ($\sim10^7$ entries) and eigenbasis jump tables become too large. Doughnut scattering (azimuthal randomization of quasi-free electrons around the axis) is represented only if the continuum sampling is fine enough. That is the main numerical risk, and a good reason the axial tier stays `experimental` with qualitative peak-order checks only.
+- **Vortex (OAM) beams:** a vortex centered on a string projects onto states with $\ell'\equiv\ell \pmod m$, where $m$ is the string lattice's rotational order. An atom-sized $\ell=\pm1$ probe couples to on-column 2p states and keeps its helical phase for >50 nm ([Xin & Zheng 2012](https://arxiv.org/abs/1204.0021)). Off-center or wide vortices spread over many $\ell$, and $\langle L_z\rangle$ changes with impact parameter and depth ([Lubk et al.](https://arxiv.org/abs/1111.6050)). Uncontrolled impact-parameter averaging washes the effect out. A surviving $\ell$ imbalance biases $\ell\to\ell\mp1$ decays, giving net circular polarization and photon OAM in specific lines ([Korotchenko & Kunashenko 2024](https://arxiv.org/abs/2403.01930)). Planar potentials do not conserve $L_z$, so planar channeling carries no OAM mode.
 
 Anchor: Watson's 1–3 MeV silicon axial lines (peak energies and ordering).
 
-## 8. Where Geant4 intersects — explicit ownership map
+## 8. Ownership map: channeling zone and native transport
 
 | Physics | Owner | Notes |
 | --- | --- | --- |
-| Amorphous/misaligned e⁻ transport, 0.1–10 MeV | Geant4 (`G4EmStandardPhysics_option4`) | includes MSC, ionization, bremsstrahlung, secondaries |
-| Transverse eigenstates, populations, CR emission | native | this document |
-| Incoherent scattering *of channeled electrons* | native (via $W_{nm}$) | Geant4 MSC must be **off** for the channeled segment — the master equation *is* the multiple scattering model there; running both double-counts |
-| Bremsstrahlung of channeled electrons | native suppresses, Geant4 excluded on segment | close-collision bremsstrahlung during the ~µm channeled path is small; folded into the validity budget rather than modeled |
-| Energy loss on channeled segment | native, as continuous loss | v1: amorphous stopping power over the µm-scale segment (error small because $\Delta T \ll T$); refinement: scale by $\rho_e(x)$ overlap per state |
-| δ-ray production on channeled segment | neither (folded into stopping) | explicit limitation; acceptable because channeled path ≪ total path |
-| Dechanneled / never-channeled electrons | handed to Geant4 mid-volume | phase-space handoff $(\mathbf{r}, \hat{\mathbf{v}}, T)$ at the depth where the population leaves the bound set |
-| Bremsstrahlung + atomic relaxation components | Geant4 | scored into their own `radiation_components` |
-| $\gamma(z)$ drift feeding back into line energies | native, optional | negligible over µm occupation lengths; only matters if thick-crystal quasi-channeled re-feeding is ever modeled |
-| ≥200 MeV channeling | Geant4 `G4ChannelingFastSimModel`/`G4BaierKatkov` | validation oracle only, never in the 1–10 MeV product path (design doc rule) |
+| Amorphous/misaligned e⁻ transport | native transport cores | Includes multiple scattering, ionization, bremsstrahlung and secondaries. Range extension is #439/#440. |
+| Transverse states, evolution, CR emission | channeling zone | This document; ADR-0018. |
+| Incoherent scattering *of channeled electrons* | channeling zone (jump operators $L_k$) | Native multiple scattering is **off** inside the zone. The jump operators *are* the multiple-scattering model there, so running both double-counts. |
+| Bremsstrahlung of channeled electrons | existing scorers on tagged straight zone segments | Close-collision bremsstrahlung during the ~µm channeled path is small. Channeling-enhanced bremsstrahlung is folded into the validity budget rather than modeled. |
+| Energy loss in the channeled zone | channeling zone, as continuous loss | v1: amorphous stopping power over the µm-scale zone (the error is small because $\Delta T \ll T$). Refinement: scale per state by the $\rho_e(x)$ overlap. |
+| δ-ray production in the zone | neither (folded into stopping) | Explicit limitation; acceptable because the channeled path ≪ the total path. |
+| Dechanneled / never-channeled electrons | native transport, entered through the secondaries launch seam | One-way handoff of $(\mathbf r,\hat{\mathbf v},T,t)$ sampled from the dechanneling flux; event code `EVENT_DECHANNEL`. |
+| PXR/CBS during the channeled zone | existing PXR/CBS kernel on tagged straight mean segments | Channeled-state modulation is an omission (§9, item 10). |
+| Characteristic emission | existing scorer | Channeling-modulated (ALCHEMI-type) yields are a research diagnostic (#501). |
+| $\gamma(z)$ drift feeding back into line energies | channeling zone, optional | Negligible over µm occupation lengths. |
+| ≥200 MeV channeling | quasiclassical (Geant4 `G4ChannelingFastSimModel`/`G4BaierKatkov`) | External validation reference only, never a backend. |
 
-The handoff is one-directional in v1: once dechanneled, an electron does not re-enter the bound-state module (rechanneling of near-aligned quasi-free electrons is real but second-order at these dechanneling lengths; record it as a known omission in profile metadata).
+The handoff is one-directional in v1. Once dechanneled, an electron does not re-enter the channeling zone. Rechanneling of near-aligned quasi-free electrons is real but second-order at these dechanneling lengths, and is recorded as a known omission in profile metadata.
 
-## 9. Physics the design document does not mention
+## 9. Physics easily missed
 
 Inventory of effects checked for this walkthrough, with include/exclude decisions to encode in metadata:
 
-1. **Transition radiation at the entry/exit surfaces.** Energy per boundary $\sim \alpha \gamma \hbar\omega_p / 3$ with $\hbar\omega_p \approx 31$ eV for Si: ~1.5 eV at 10 MeV, spectrum extending to $\sim \gamma \hbar\omega_p$ (0.1–0.6 keV). That is $10^{-3}$–$10^{-2}$ photons/electron — the *same order as the CR lines* and sitting exactly on top of the 1–3 MeV planar band. Decision needed: add as a fifth `radiation_components` entry, or compute a bound and document exclusion. Silently omitting it risks a real disagreement with soft-X-ray anchors.
-2. **Free–free coherent radiation double counting.** Radiative transitions between above-barrier (continuum) transverse states *are* coherent bremsstrahlung — already owned by the PXR/CBS amplitude machinery. The channeling module must therefore emit only bound→bound lines and (decision) bound→free edges, and must **not** integrate free→free dipole matrix elements, or CBS is counted twice. This boundary deserves its own regression test (channeling module with zero bound states emits exactly nothing).
-3. **Coherent-population (pendellösung) oscillations** in thin crystals — §5.3; diagonal-only propagation is fine above ~µm thickness, flagged invalid below the beat length.
-4. **Temperature model behind `crystal_temperature_K`** — §1.3; Debye $B(T)$ anchored to catalog values; placeholder $B = 0.6$ Å² materials are ineligible for validated channeling profiles.
+1. **Transition radiation at the entry/exit surfaces.** Energy per boundary $\sim \alpha \gamma \hbar\omega_p / 3$ with $\hbar\omega_p \approx 31$ eV for Si: ~1.5 eV at 10 MeV, spectrum extending to $\sim \gamma \hbar\omega_p$ (0.1–0.6 keV). That is $10^{-3}$–$10^{-2}$ photons/electron — the *same order as the CR lines* and sitting exactly on top of the 1–3 MeV planar band. Decision needed: add it as a separate additive channel, or compute a bound and document the exclusion (tracked as `cr-transition-radiation-bound`). Silently omitting it risks a real disagreement with soft-X-ray anchors.
+2. **Free–free double counting and the free→bound continuum.** Radiative transitions between above-barrier (continuum) transverse states *are* coherent bremsstrahlung, which the PXR/CBS amplitude machinery already produces. The channeling module must **not** integrate free→free matrix elements, or CBS is counted twice. A regression test guards this boundary: a channeling module with zero bound states emits exactly nothing.
+   - Bound→free transitions cannot *emit*. Emission lowers $E_\perp$, and free states lie above every bound level.
+   - The emitting process is **free→bound radiative capture**. It gives a continuum with a low-energy edge near $2\gamma^2(U_{\rm barrier}-E_n)$ (forward), which does not double-count first-Born CBS, whose final states are plane waves.
+   - v1 scores bound→bound lines only. Capture is first estimated as an upper bound, and scored only if it exceeds a few percent of the line yield in an anchor configuration.
+3. **Coherent-population (pendellösung) oscillations** in thin crystals (§5.3). Both evolution backends retain coherences, so thin crystals remain valid. The diagonal rate equation is only a limiting case.
+4. **Temperature model** (§1.3). A Debye $B(T)$ is anchored to per-site catalog values. Materials with the placeholder $B = 0.6$ Å² are ineligible for channeling profiles.
 5. **Beam energy spread** doubles into line width via $\gamma^2$ — §6.3.
 6. **Surface refraction** by the mean inner potential — §3; small reweighting near exact alignment.
 7. **Doppler-denominator convention coupling** to the `line-energy-dispersion` convention (reconciled in #338) — §4; add the cross-module consistency test *before* anchoring line positions, or the same ambiguity infects two subsystems.
 8. **Planar validity requires axis avoidance.** A "planar" run aligned near a low-index axis is silently axial; validate that the beam direction keeps all major axes outside a few times $\psi_c^{axial}$, else refuse/warn.
 9. **Spin and quantum-recoil corrections**: spin-flip rates suppressed by $(\hbar\omega/E)^2 \lesssim 10^{-5}$; recoil handled at first order — both documented as dropped with bounds, satisfying the derivation-docstring assumption rule.
-10. **PXR/CBS from *channeled* electrons.** Channeled states sample the unit cell non-uniformly, which in principle modulates their PXR emission. Out of scope v1 (channeled fraction of path is µm-scale); recorded so the coherent and channeling modules don't silently claim inconsistent electron ensembles.
+10. **PXR/CBS from *channeled* electrons.** Channeled states sample the unit cell non-uniformly, which in principle modulates their PXR emission. v1 scores channeled-zone segments as straight mean segments in the existing PXR/CBS kernel, and records the modulation as an omission. The channeled fraction of the path is µm-scale. Recording the omission keeps the coherent and channeling modules from silently claiming inconsistent electron ensembles.
 
 ## 10. Proposed ledger rows
 
-One row per load-bearing equation, `file::symbol` anchors to be filled at implementation (module split suggestion: `channeling/potential.py`, `channeling/eigensolver.py`, `channeling/populations.py`, `channeling/radiation.py`):
+One row per load-bearing equation. `file::symbol` anchors are filled at implementation. Static physics lives under `materials/channeling/`; evolution, emission and handoff live under `montecarlo/channeling/` (ADR-0018).
 
 | id | claim | source | anchor idea |
 | --- | --- | --- | --- |
@@ -294,8 +344,11 @@ One row per load-bearing equation, `file::symbol` anchors to be filled at implem
 | `cr-debye-b-of-t` | Debye-model $B(T)$ anchored to catalog RT values | standard Debye–Waller theory | published Si $B(T)$ points |
 | `cr-transverse-eigenproblem` | $[-\hbar^2/2\gamma m\, \partial_x^2 + U]u = E_\perp u$, Bloch BCs | ABP 1983; Dirac reduction | free limit; parity; $\sqrt{\gamma}$ level count |
 | `cr-initial-occupation` | plane-wave → Bloch decomposition, divergence convolution | ABP 1983 | unitarity; selective vs flooded population regimes |
-| `cr-population-master-equation` | diagonal transport with collisional + cascade terms | Kephart 1989 methodology | occupation lengths @ 17 MeV |
-| `cr-dechanneling-rates` | overlap-weighted TDS + electronic golden-rule rates | ABP 1983; Uggerhøj 2005 | state-ordering of lifetimes; global calibration declared |
+| `cr-lindblad-jump-operators` | Einstein-model TDS and local-density electronic jump operators | ABP 1983; Uggerhøj 2005; QEP/frozen-phonon limit | imaginary part reproduces the absorptive potential; state-ordering of lifetimes |
+| `cr-density-matrix-split-operator` | coherent eigenbasis step + position-space dissipator | §5.3 derivation | zero-scattering unitarity; trace + flux = 1; frozen-phonon (abTEM) oracle |
+| `cr-mcwf-unravelling` | $H_{\rm eff}$ evolution and jump probabilities | Dalibard–Castin–Mølmer | ensemble mean equals the density-matrix solver |
+| `cr-dechanneling-collapse` | bound/free projection, flux, launch-state sampling | §5.4 | Kephart 17/54 MeV occupation lengths; margin sensitivity; calibration declared |
+| `cr-zone-handoff-accounting` | energy, population and time continuity across the handoff | §5.5 | closure tests |
 | `cr-doppler-line-energy` | $\hbar\omega = \Delta E_\perp / (1-\beta\cos\theta)$ + recoil bound | kinematics | consistency test vs `line-energy-dispersion` denominator |
 | `cr-dipole-rate` | $A' = e^2\omega'^3|x_{if}|^2 / 3\pi\epsilon_0\hbar c^3$, $\omega' = \gamma\Delta E_\perp/\hbar$ | standard QED dipole | emergent parity selection rule |
 | `cr-boosted-dipole-angular` | aberration-mapped $\sin^2\Theta'$ pattern + polarization | relativistic aberration | solid-angle integral returns $A'/\gamma$; $\gamma\to1$ limit |
@@ -310,15 +363,15 @@ One row per load-bearing equation, `file::symbol` anchors to be filled at implem
 per (material, plane/axis, T):                      [cached profile]
   1. V_g from structure_factor machinery + Mott-Bethe f^e + B(T)
   2. U(x) [or U(x,y)], n(x), rho_e(x)
-  3. eigensolve at gamma grid -> {E_perp, u, x_if, W_nm, A_if}
+  3. eigensolve at gamma grid -> {E_perp, u, x_if, A_if}; jump kernels L_k
 
-per electron ensemble (beam E, divergence, tilt):
-  4. initial populations P_n(0)
-  5. integrate master equation over z -> P_n(z), dechanneling flux
-  6. dechanneled phase space -> Geant4 handoff (MSC/brem off before handoff)
-  7. assemble line spectrum -> radiation_components["channeling"]
-  8. Geant4 segments -> "bremsstrahlung", "atomic_relaxation"
-  9. PXR/CBS amplitude machinery -> "pxr_cbs"   (free-free excluded from 7)
+per case (beam E, divergence, tilt):
+  4. initial state rho_0 (divergence-averaged; or psi_0 / product state)
+  5. evolve rho(z) [planar] or MCWF trajectories [axial/keV] -> dechanneling flux
+  6. sample per-electron handoffs -> native transport cores (EVENT_DECHANNEL)
+  7. assemble line spectrum -> diagnostic API, later spec_channeling
+  8. tagged zone segments + native segments -> existing PXR/CBS, brem, characteristic
+     (free-free excluded from 7)
 ```
 
-Steps 1–3 are per-profile and cacheable (the $\gamma$ grid is the only beam dependence); steps 4–7 are cheap per configuration. Nothing in the channeling chain needs Monte Carlo sampling except through the handoff — the quantum module is deterministic given the beam distribution, which keeps it testable to solver tolerance rather than statistical tolerance.
+Steps 1–3 are per-profile and cacheable; the $\gamma$ grid is the only beam dependence. Steps 4–7 are cheap per configuration. For planar channeling, nothing in the chain needs Monte Carlo sampling except the handoff. The density-matrix module is deterministic given the beam distribution, which keeps it testable to solver tolerance rather than statistical tolerance.

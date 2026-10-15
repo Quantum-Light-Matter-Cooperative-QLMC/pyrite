@@ -1,23 +1,30 @@
 # Relativistic 1–10 MeV electron transport and quantum channeling
 
-**Status:** Proposed design; current native transport remains the default.
+**Status:** Partly superseded (2026-10-14). This page retains the source audit, the low-energy anchors and the validation targets. It is not the current plan for transport or channeling.
+
+| Original component | Current disposition |
+| --- | --- |
+| Geant4 electromagnetic transport through `g4ppyy` | **Not pursued.** Native transport is extended instead: 30–100 MeV in [#439](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/439), above 100 MeV in [#440](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/440). Geant4 remains an external validation reference only. |
+| Native low-energy quantum channeling | Redesigned in [ADR-0018](../../adr/0018-quantum-channeling-zone.md) (Proposed) and the [channeling radiation walkthrough](channeling-radiation-physics.md): a quantum entrance zone with Lindblad evolution and one-way handoff to *native* transport. Tracked in [#56](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/56). |
+| Coherent per-electron PXR/CBS amplitude summation | Implemented as the `coherent` emission policy; see [coherent emission](../../physics/radiation-physics/coherent-emission.md). The section below is the original design rationale. |
+| `radiation_components` output schema | Replaced by the existing slots (`spec`, `spec_coherent`, `spec_characteristic`, continuum) plus a future additive `spec_channeling` (ADR-0018). |
 
 ## Summary
 
-This design adds optional Geant4 electromagnetic transport through `g4ppyy`, native low-energy quantum channeling, and coherent per-electron PXR/CBS amplitude summation. Current native transport, output fields, and checkpoints remain the default.
+The original design proposed three things: optional Geant4 electromagnetic transport through `g4ppyy`, native low-energy quantum channeling, and coherent per-electron PXR/CBS amplitude summation. Current native transport, output fields and checkpoints remain the default. The table above records which parts survive.
 
-Target capability:
+Original target capability (historical):
 
-- ordinary electron/photon transport from 0.1 to 10 MeV through Geant4;
-- validated quantum planar channeling from 1 to 10 MeV, initially for silicon and diamond;
+- ordinary electron/photon transport from 0.1 to 10 MeV through Geant4 (*not pursued*);
+- validated quantum planar channeling from 1 to 10 MeV, initially for silicon and diamond (*now 1–100 MeV under ADR-0018*);
 - opt-in experimental axial channeling;
-- PXR, CBS, channeling radiation, bremsstrahlung, and atomic-relaxation output as separately inspectable components.
+- PXR, CBS, channeling radiation, bremsstrahlung and atomic-relaxation output as separately inspectable components.
 
 ## Source audit
 
 ### G4ppyy is a binding layer, not a physics model
 
-[`g4ppyy`](https://pypi.org/project/g4ppyy/) is a `cppyy` loader and helper for a separately installed Geant4. Its current PyPI release is `0.1.0`. It neither ships Geant4 nor adds channeling physics or channeling databases. The integration must therefore pin and validate both G4ppyy and an external Geant4 installation.
+[`g4ppyy`](https://pypi.org/project/g4ppyy/) is a `cppyy` loader and helper for a separately installed Geant4. Its current PyPI release is `0.1.0`. It neither ships Geant4 nor adds channeling physics or channeling databases. An integration would therefore have had to pin and validate both G4ppyy and an external Geant4 installation.
 
 ### Geant4 channeling does not support this regime defensibly
 
@@ -30,7 +37,7 @@ Geant4 11.4.2 contains `G4ChannelingFastSimModel` and `G4BaierKatkov`, but its p
 
 `G4CHANNELING 2.0` contains continuum electric-field, atomic-density, electron-density, and ionization-threshold splines for diamond, silicon, germanium, and tungsten. It contains no quantum eigenstates, occupation probabilities, transition rates, linewidths, or low-energy validation records.
 
-Conclusion: neither G4ppyy, Geant4 channeling classes, nor `G4CHANNELING 2.0` explicitly supports defensible electron channeling below roughly 50–100 MeV. Geant4 remains suitable for ordinary electromagnetic transport, while PyRITE must own low-energy quantum channeling.
+Conclusion: neither G4ppyy, Geant4 channeling classes, nor `G4CHANNELING 2.0` explicitly supports defensible electron channeling below roughly 50–100 MeV. PyRITE must own low-energy quantum channeling. Geant4 is suitable for ordinary electromagnetic transport, but the project extends native transport instead; Geant4 serves only as an external validation reference, as in the existing TestEm5 transport benchmarks.
 
 ### Low-energy theory and validation anchors
 
@@ -44,62 +51,17 @@ Relevant sources include:
 
 ## Interfaces and data contracts
 
-### Sweep configuration
+Superseded by [ADR-0018](../../adr/0018-quantum-channeling-zone.md):
 
-Add central fields to `Sweep`:
+- **Selection:** `Physics.channeling_model` (default `"off"`), with orientation taken from the independent face/lattice orientation of [#25](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/25). There is no `transport_backend` field.
+- **Transport records:** the existing native segment and event records, plus an `EVENT_DECHANNEL` code at the handoff.
+- **Radiation output:** the existing output slots, plus `spec_channeling` once anchored. Characteristic emission and the continuum keep their current owners.
 
-```python
-transport_backend: Literal["native", "geant4"] = "native"
-channeling_model: Literal["off", "quantum-planar", "experimental-axial"] = "off"
-channeling_direction: tuple[int, int, int] | None = None
-crystal_temperature_K: float = 293.15
-```
-
-Validation rules:
-
-- channeling requires an explicit direction and crystalline radiator;
-- `quantum-planar` interprets the direction as a plane;
-- `experimental-axial` interprets it as an axis and marks results experimental;
-- MeV runs using current Browning/Joy transport fail with a validity error instead of silently extrapolating;
-- current defaults remain bit-for-bit compatible.
-
-### Transport result
-
-Introduce a backend-neutral result carrying current segment fields plus:
-
-- absolute segment-start position and time;
-- parent, track, and primary-electron identity;
-- exit state and termination reason;
-- emitted-photon phase-space records;
-- backend version, physics list, datasets, and model-validity metadata.
-
-### Radiation result
-
-Store canonical `radiation_components` arrays:
-
-- `pxr_cbs`;
-- `channeling`;
-- `bremsstrahlung`;
-- `atomic_relaxation`.
-
-Preserve compatibility fields:
-
-```python
-spec = radiation_components["pxr_cbs"] + radiation_components["channeling"]
-brem = radiation_components["bremsstrahlung"] + radiation_components["atomic_relaxation"]
-```
-
-Old records without components retain their current interpretation. All new components represent sample-exit yield in `photons/eV/sr/electron`. Photons already transported through the sample by Geant4 receive no second Beer–Lambert attenuation.
+The remaining validity rules carry over: channeling requires a crystalline radiator; planar runs refuse or warn near low-index axes; the axial tier is marked experimental; current defaults stay bit-for-bit compatible.
 
 ## Geant4 backend through G4ppyy
 
-1. Add an optional locked environment using `g4ppyy==0.1.0`, compatible `cppyy`, and Geant4 11.4.2. Keep default installation Geant4-free.
-2. Add startup probe verifying Geant4 version, required datasets, class loading, compiled callbacks, and one 3 MeV electron slab event. Missing or incompatible installations fail with actionable diagnostics.
-3. Use `G4EmStandardPhysics_option4` for ordinary 0.1–10 MeV electromagnetic transport.
-4. Compile stepping and event collectors through G4ppyy. Avoid Python callback execution for every transport step.
-5. Export primary trajectories, transmitted/backscattered/stopped counts, secondaries, bremsstrahlung photons, and atomic-relaxation photons.
-6. Score photons in the configured detector angular bin and normalize by primary count, energy-bin width, and solid angle.
-7. Never activate `G4ChannelingFastSimModel` or `G4BaierKatkov` below 100 MeV. Permit them only in validation tools at 200 MeV or above.
+Not pursued (decision 2026-10-14, recorded in ADR-0018). Higher-energy native transport is tracked in #439 and #440. The audit above remains the reason Geant4 channeling classes are excluded below 100 MeV; quasiclassical Geant4 channeling at ≥200 MeV is admissible only as an external validation oracle.
 
 ## Coherent relativistic PXR/CBS
 
@@ -120,14 +82,16 @@ Quantum channeling radiation and PXR/CBS remain separate components. Initial imp
 
 ## Native quantum planar channeling
 
-1. Build planar continuum potential from catalog CIF structure, reciprocal vectors, source-backed electron scattering factors, thermal vibration amplitude, and Debye–Waller data. Do not treat `G4CHANNELING` splines as quantum truth.
-2. Solve the relativistic transverse Schrödinger equation for bound and continuum states using converged sparse finite-difference or plane-wave diagonalization.
-3. Calculate incident-state occupation from beam angle, divergence, impact-parameter averaging, and crystal orientation.
-4. Propagate state populations through depth using scattering-induced transition rates. Track dechanneling into continuum states.
-5. Calculate dipole transition energies, angular spectra, polarization, natural and occupation broadening, recoil, and photon attenuation.
-6. Route initially unchanneled and dechanneled phase-space electrons into Geant4 for remaining bulk transport. Native bound-state propagation owns the channeling path, preventing amorphous-scattering and bremsstrahlung double counting.
-7. Add source-backed material profiles recording temperature, RMS thermal displacement, potential model, supported planes, and provenance.
-8. Mark silicon and diamond planar profiles validated only after physics anchors pass. Other catalog crystals remain experimental until independently validated.
+Superseded in detail by the [channeling radiation walkthrough](channeling-radiation-physics.md) and ADR-0018. In outline:
+
+1. Build the planar continuum potential from the catalog CIF structure, reciprocal vectors, Mott–Bethe electron scattering factors, and per-site, temperature-dependent thermal displacements. Do not treat `G4CHANNELING` splines as quantum truth.
+2. Solve the relativistic transverse Schrödinger equation for bound and continuum states.
+3. Build the incident transverse state from beam angle, divergence and crystal orientation.
+4. Evolve the transverse state through depth with Lindblad jump operators (thermal diffuse and electronic scattering): a deterministic density matrix for planar channeling, MCWF for axial/keV. Coherences are retained, and the dechanneling flux is recorded.
+5. Calculate dipole transition energies, angular spectra, polarization, occupation broadening, recoil and photon attenuation. v1 emits bound→bound lines only.
+6. Hand dechanneled electrons, sampled from the flux, one way to the native transport cores. Native multiple scattering is off inside the zone, preventing double counting.
+7. Add source-backed material profiles recording temperature, per-site thermal displacement, potential model, supported planes and provenance.
+8. Mark silicon and diamond planar profiles validated only after physics anchors pass. Other catalog crystals remain ineligible or experimental until independently validated.
 
 ## Experimental axial channeling
 
@@ -143,29 +107,28 @@ Every new physics equation requires a derivation docstring, `Validation: <id>` m
 
 ### Fast regression tests
 
-- backend selection, missing-install diagnostics, case-name separation, serialization, and old-checkpoint compatibility;
+- model selection, refusals, case-identity separation, serialization, and old-checkpoint compatibility;
 - segment identity and monotonic time ordering;
 - one-segment coherent result equals the analytic sinc result;
 - straight-segment subdivision invariance;
 - randomized phases approach the legacy incoherent sum;
 - zero potential yields no bound states or channeling radiation;
 - eigenstate normalization, orthogonality, parity, grid convergence, and dipole selection rules;
-- conservation across bound, continuum, stopped, and exited populations;
+- conservation across bound, handed-off, stopped and exited populations (trace + dechanneling flux = 1);
+- density-matrix/MCWF ensemble equivalence and the rate-equation limit;
 - deterministic adapter normalization using fixture photon/trajectory data.
 
-### Geant4 integration checks
+### Native-transport checks at MeV energies
 
-- compare ESTAR collision/radiative stopping powers and CSDA ranges for carbon and silicon at 0.5, 1, 3, 5, and 10 MeV;
-- compare transmitted, backscattered, and stopped fractions with published thin-target benchmarks;
-- compare bremsstrahlung yield and endpoint with Seltzer–Berger/Geant4 references;
-- enforce electron/photon energy conservation including secondaries.
+Owned by #439/#440: stopping powers and CSDA ranges against ESTAR, transmitted/backscattered/stopped fractions against thin-target benchmarks (including Geant4 TestEm5 as an external reference), bremsstrahlung yield and endpoint, and energy conservation including secondaries.
 
 ### Physics anchors
 
 - reproduce 1–3 MeV silicon planar and axial peak energies from Watson;
 - reproduce 17 MeV silicon occupation lengths;
 - reproduce 54–110 MeV silicon/diamond planar spectra as continuity check;
-- compare 200 MeV and higher planar output with Geant4/Baier–Katkov only as a regime-overlap oracle.
+- compare 200 MeV and higher planar output with Geant4/Baier–Katkov only as a regime-overlap oracle;
+- compare depth-resolved populations with frozen-phonon multislice (abTEM) as an optional external oracle.
 
 Acceptance criteria:
 
@@ -178,10 +141,10 @@ Acceptance criteria:
 
 | Capability | Intended regime | Status |
 | --- | --- | --- |
-| Current native transport | Existing keV regime | Preserved |
-| Geant4 ordinary EM transport | 0.1–10 MeV | Production after anchors |
-| Quantum planar channeling | 1–10 MeV, initially Si/Diamond | Validated per profile |
-| Quantum axial channeling | Initially Si | Experimental |
+| Current native transport | keV–MeV; extensions in #439/#440 | Preserved |
+| Geant4 ordinary EM transport | — | Not pursued; external validation reference only |
+| Quantum planar channeling | 1–100 MeV, initially Si/diamond | Validated per profile (ADR-0018) |
+| Quantum axial channeling, including vortex beams | Initially Si; keV TEM vortex probes | Experimental |
 | Geant4 channeling/Baier–Katkov | 200 MeV and above | Validation oracle only |
 
-Run focused CPU tests first, optional Geant4 integration suite in a pinned container second, then canonical repository verification. Energies below 1 MeV require separate channeling validation before any support claim.
+Run focused CPU tests first, then canonical repository verification. Energies below 1 MeV require separate channeling validation (the keV Bloch-wave tier) before any support claim.
