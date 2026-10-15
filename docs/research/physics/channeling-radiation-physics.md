@@ -269,7 +269,7 @@ Physical widths, convolved in this order:
 
 1. **Occupation (dominant for electrons):** Lorentzian with $\Gamma = \hbar \beta c\, (L_i^{-1} + L_f^{-1})$ from the collisional lifetimes of both states; $L \sim 1$ µm gives $\Gamma \sim 0.2$ eV on eV-to-tens-of-eV transitions — percent-level lifetime widths.
 2. **Doppler-geometric:** the $\theta$-dependence of $\hbar\omega$ across the detector solid angle and beam divergence (reuse the existing detector-solid-angle machinery; this usually dominates the *observed* width).
-3. **Beam energy spread:** $\delta\omega/\omega = 2\,\delta\gamma/\gamma$ — note the factor 2 from $\gamma^2$.
+3. **Beam energy spread:** $\delta\omega/\omega = s\,\delta\gamma/\gamma$ with $s = 2 + d\ln\Delta E_\perp/d\ln\gamma$ forward: the factor 2 from $\gamma^2$, reduced because $\Delta E_\perp$ falls with the transverse mass ($s = 1.5$ harmonic, 1.73 for Si(110) 1→0 at 17 MeV; `cr-line-shape`).
 4. **Band dispersion** for transitions involving dispersive bands: width from the $k$-average of $\Delta E_\perp(k)$.
 5. Natural radiative width: negligible; drop after a one-time estimate.
 
@@ -319,11 +319,11 @@ The handoff is one-directional in v1. Once dechanneled, an electron does not re-
 
 Inventory of effects checked for this walkthrough, with include/exclude decisions to encode in metadata:
 
-1. **Transition radiation at the entry/exit surfaces.** Energy per boundary $\sim \alpha \gamma \hbar\omega_p / 3$ with $\hbar\omega_p \approx 31$ eV for Si: ~1.5 eV at 10 MeV, spectrum extending to $\sim \gamma \hbar\omega_p$ (0.1–0.6 keV). That is $10^{-3}$–$10^{-2}$ photons/electron — the *same order as the CR lines* and sitting exactly on top of the 1–3 MeV planar band. Decision needed: add it as a separate additive channel, or compute a bound and document the exclusion (tracked as `cr-transition-radiation-bound`). Silently omitting it risks a real disagreement with soft-X-ray anchors.
+1. **Transition radiation at the entry/exit surfaces.** Energy per boundary $\sim \alpha \gamma \hbar\omega_p / 3$ with $\hbar\omega_p \approx 31$ eV for Si: ~1.5 eV at 10 MeV, spectrum extending to $\sim \gamma \hbar\omega_p$ (0.1–0.6 keV). That is $10^{-3}$–$10^{-2}$ photons/electron — the *same order as the CR lines* and sitting exactly on top of the 1–3 MeV planar band. Decision needed: add it as a separate additive channel, or compute a bound and document the exclusion (tracked as `cr-transition-radiation-bound`). Silently omitting it risks a real disagreement with soft-X-ray anchors. *#505:* excluded with a bound (`cr-transition-radiation-bound`): a few percent of the strong Si(110) 3 MeV line peaks, but ~10² times their photon count over the band.
 2. **Free–free double counting and the free→bound continuum.** Radiative transitions between above-barrier (continuum) transverse states *are* coherent bremsstrahlung, which the PXR/CBS amplitude machinery already produces. The channeling module must **not** integrate free→free matrix elements, or CBS is counted twice. A regression test guards this boundary: a channeling module with zero bound states emits exactly nothing.
    - Bound→free transitions cannot *emit*. Emission lowers $E_\perp$, and free states lie above every bound level.
    - The emitting process is **free→bound radiative capture**. It gives a continuum with a low-energy edge near $2\gamma^2(U_{\rm barrier}-E_n)$ (forward), which does not double-count first-Born CBS, whose final states are plane waves.
-   - v1 scores bound→bound lines only. Capture is first estimated as an upper bound, and scored only if it exceeds a few percent of the line yield in an anchor configuration.
+   - v1 scores bound→bound lines only. Capture is first estimated as an upper bound, and scored only if it exceeds a few percent of the line yield in an anchor configuration. *#505:* at Kephart's Si(110) 17 MeV, 2.2 mrad the estimate is ~40% of the line yield (`cr-capture-bound`), so the promotion rule fires; scoring awaits a maintainer decision.
 3. **Coherent-population (pendellösung) oscillations** in thin crystals (§5.3). Both evolution backends retain coherences, so thin crystals remain valid. The diagonal rate equation is only a limiting case.
 4. **Temperature model** (§1.3). A Debye $B(T)$ is anchored to per-site catalog values. Materials with the placeholder $B = 0.6$ Å² are ineligible for channeling profiles.
 5. **Beam energy spread** doubles into line width via $\gamma^2$ — §6.3.
