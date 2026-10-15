@@ -1,0 +1,26 @@
+# Per-site thermal displacement data for quantum channeling profiles
+# (ADR-0018, issue #503). Kept outside the crystal catalog: PXR/CBS keep
+# reading the catalog scalar `B_ang2`, and its provenance audit
+# (`debye-waller-catalog-provenance`) defers any catalog schema change.
+#
+# Keys: [<catalog crystal key>.<element>]. `B_ang2[i]` is the isotropic
+# Debye--Waller B = 8 pi^2 <u_x^2> [angstrom^2] at `temperatures_K[i]`, derived
+# from the measured phonon density of states. Rows are transcribed from the
+# source's Table 1 at the temperatures whose values were unambiguous in the
+# published layout (170-280 K). `atomic_weight` uses the 12C = 12 scale of the
+# source's Debye formula, which extrapolates outside the tabulated range.
+# Validation: cr-debye-b-of-t
+
+[silicon.Si]
+atomic_weight = 28.0855
+temperatures_K = [170.0, 180.0, 190.0, 210.0, 220.0, 230.0, 240.0, 260.0, 270.0, 280.0]
+B_ang2 = [0.2814, 0.2979, 0.3145, 0.3476, 0.3641, 0.3807, 0.3972, 0.4303, 0.4469, 0.4634]
+source = "L.-M. Peng, G. Ren, S. L. Dudarev, M. J. Whelan, Acta Cryst. A52, 456 (1996), Table 1 (phonon-DOS derived)"
+doi = "10.1107/S010876739600089X"
+
+[diamond.C]
+atomic_weight = 12.011
+temperatures_K = [170.0, 180.0, 190.0, 210.0, 220.0, 230.0, 240.0, 260.0, 270.0, 280.0]
+B_ang2 = [0.1336, 0.1342, 0.1349, 0.1363, 0.1370, 0.1378, 0.1386, 0.1403, 0.1412, 0.1422]
+source = "L.-M. Peng, G. Ren, S. L. Dudarev, M. J. Whelan, Acta Cryst. A52, 456 (1996), Table 1 (phonon-DOS derived)"
+doi = "10.1107/S010876739600089X"
