@@ -393,3 +393,66 @@ These reproduce the numbers in [tilt-convention](../../physics/geometry/tilt-con
 The independent derivation reproduces the implementation exactly: the same $\kappa=2\pi$ reciprocal basis, the same reciprocal (not direct) plane normal, the same Rodrigues minimal rotation with $R\hat{\mathbf{g}}=\hat{\mathbf{z}}$, the same proper $\det=+1$ antiparallel special case (not $-I$), the same right-handed azimuth, and the same composition order $R=R_z(\psi)R_{\min}$ acting on column vectors. Agreement is $\le7\times10^{-16}$ in every matrix element across four crystal systems including two hexagonal cells and one monoclinic cell with a non-eigenvector Miller index. The convention is consistent with the downstream `tilted_geometry` tilt sign.
 
 **Status: `rederived`** (independent derivation matches; anchors listed in the ledger exist; human sign-off still outstanding).
+
+## 8. Miscut composition extension (#25)
+
+*Implementation-context derivation; awaiting a fresh-context verdict. §§1--7
+above validate the axis and roll terms only; there the miscut was checked
+solely as a `None` no-op.*
+
+`Slab(cut=CrystalCut(...))` now sets `recip_miscut_rad = (θ, φ)` on real
+cases (`campaign/geometry.py::resolve_crystal_cut`), so the miscut term of
+`_orientation_R` is now production physics.
+
+**Claim.** With miscut polar angle $\theta$ and sample-frame azimuth $\phi$
+(radians in the case, degrees at the API), define
+
+$$
+\hat{\mathbf m}=(\sin\theta\cos\phi,\;\sin\theta\sin\phi,\;\cos\theta),
+\qquad
+R_m = \text{minimal rotation } \hat{\mathbf z}\to\hat{\mathbf m}
+    = \text{rotation by } \theta \text{ about } (-\sin\phi,\cos\phi,0).
+$$
+
+The lattice rotation applied to every reciprocal vector is
+
+$$
+R = R_m\,R_z(\psi)\,R_{\min},
+$$
+
+so $R\,\hat{\mathbf g}_{\text{axis}}=\hat{\mathbf m}$. The selected cut axis
+makes the angle $\theta$ with the face normal $+\hat{\mathbf z}$, tilted toward
+azimuth $\phi$. The roll $\psi$ fixes the in-plane lattice orientation before
+the tilt, and $\phi$ is measured in the sample frame independently of $\psi$.
+
+**Assumptions.** The lattice is rigid (one rotation for every reciprocal
+vector) and the face is flat. The face normal, beam and detector directions are
+set separately by `tilted_geometry` and are not moved by $R$. Mosaic rotations
+act after $R$ in the same sample frame. $0\le\theta<90^\circ$ keeps the cut axis
+on the beam-facing hemisphere.
+
+**Units, signs and limits.**
+
+- $R$ is dimensionless; only $\cos$/$\sin$ of the angles enter. A product of
+  proper rotations is proper, so $\det R=+1$.
+- $\theta=0$: $\hat{\mathbf m}=\hat{\mathbf z}$ and $R_m=I$. The code skips
+  the term, so the case keeps its historical payload (`recip_miscut_rad` is
+  absent when `miscut_deg == 0`).
+- For small $\theta$, $R\,\hat{\mathbf g}_{\text{axis}} \approx
+  \hat{\mathbf z}+\theta(\cos\phi,\sin\phi,0)$, which is positive $\theta$
+  toward $+x$ at $\phi=0$. This matches the `tilted_geometry` spherical
+  convention.
+- A vacuum line check: HOPG (002), 30 keV, tilt $30^\circ$, observation
+  $90^\circ$. Uncut, the b–g angle is $30^\circ$ and $E\approx1050.8$ eV.
+  With `miscut_deg=10`, $\phi=0$ the b–g angle is $40^\circ$ and
+  $E\approx929$ eV; a 20-trial `pr.simulate` peaks at 928 eV on the
+  catalog-spaced grid.
+
+**Anchors.**
+`tests/scan/test_crystal_cut.py::test_case_rotation_matches_an_independent_construction`
+covers nonorthogonal HOPG with `surface_hkl=(1,0,1)`, roll and miscut: the
+runtime matrix built from the case keys matches an independent Rodrigues
+construction to $10^{-13}$, and the cut axis lands on $\hat{\mathbf m}$.
+`::test_cut_front_cancels_independent_ray_phases` shows that bunch-front
+matching on a cut target cancels independently evaluated ray phases with the
+same independently rotated $\mathbf g$.

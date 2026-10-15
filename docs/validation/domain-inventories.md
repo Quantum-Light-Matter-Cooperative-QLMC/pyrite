@@ -57,7 +57,7 @@ Generated browsing views of every claim in the [detailed validation ledger] (phy
 |---|---|---|
 | [`structure-factor`](ledger-crystallography-atomic-data.md#structure-factor) | structure factor `F(g)` + Debye–Waller | `anchored` |
 | [`debye-waller-catalog-provenance`](ledger-crystallography-atomic-data.md#debye-waller-catalog-provenance) | every production `B_ang2` is tied to a phase- and temperature-specific primary refinement, with scalar approximation scope stated | `discrepancy` |
-| [`surface-hkl-orientation`](ledger-crystallography-atomic-data.md#surface-hkl-orientation) | reciprocal cleavage-plane normal `g_hkl = h b1 + k b2 + l b3` is mapped to sample `+z` by a proper minimal rotation, followed by the configured right-handed azimuth about `+z` | `anchored` |
+| [`surface-hkl-orientation`](ledger-crystallography-atomic-data.md#surface-hkl-orientation) | reciprocal cleavage-plane normal `g_hkl = h b1 + k b2 + l b3` is mapped to sample `+z` by a proper minimal rotation, followed by the configured right-handed azimuth about `+z`, then (when set) the minimal rotation `+z -> (sinθcosφ, sinθsinφ, cosθ)` of a lattice miscut | `anchored` |
 | [`crystals-cif-adapter`](ledger-crystallography-atomic-data.md#crystals-cif-adapter) | Gemmi/CIF lattice + symmetry-expanded fractional basis conversion into the internal `CRYSTALS` entry shape | `anchored` |
 | [`cod-lattice-catalog-geometry`](ledger-crystallography-atomic-data.md#cod-lattice-catalog-geometry) | six lattice parameters of every COD-pinned catalog crystal agree with the pinned external COD record | `anchored` |
 | [`atomic-form-factor`](ledger-crystallography-atomic-data.md#atomic-form-factor) | `F(g,E) = f0(g) + f'(E) + i·f''(E)` | `rederived` |

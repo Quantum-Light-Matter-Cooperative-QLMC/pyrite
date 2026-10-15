@@ -35,6 +35,7 @@ def test_root_exports_stay_frozen() -> None:
         "TransverseSpot",
         "BunchFrontTilt",
         "BlazedGrooves",
+        "CrystalCut",
         "Physics",
         "CxrReflections",
         "CxrSpectra",

@@ -346,8 +346,11 @@ Simulation core: electron transport, segment-sum PXR+CBS and EEDL characteristic
 
 `bodies.py` owns frozen scalar `SubstanceRef` and `RectangularBody` descriptions,
 with explicit substance namespaces and dimensions in mm. `campaign.target.Target`
-lowers a crystalline rectangle to `Slab` with the existing target orientation
-and an explicit footprint. `instrument.filter.Filter` lowers a placed rectangle
+lowers a crystalline rectangle to `Slab` with the catalog orientation or an
+explicit `lattice_cut=CrystalCut(...)`, and an explicit footprint.
+`campaign.geometry.CrystalCut` (flat `Slab.cut`) orients the lattice relative to
+the entrance face (axis, roll, continuous miscut); `resolve_crystal_cut` is the
+single resolver shared by `build_cases` and `campaign.front_matching`. `instrument.filter.Filter` lowers a placed rectangle
 to `FilterPlate` for primary attenuation only. Namespace collisions/external
 filter catalogs lower through inline `MediumSpec` when legacy strings cannot
 retain their meaning. Legacy target/filter constructors remain unchanged.

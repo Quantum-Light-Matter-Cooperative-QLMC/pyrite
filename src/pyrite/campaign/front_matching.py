@@ -1,6 +1,6 @@
 """Scene geometry for the linear bunch-front phase-matching inverse.
 
-Validation: linear-bunch-front-tilt
+Validation: linear-bunch-front-tilt, surface-hkl-orientation
 """
 
 from collections.abc import Sequence
@@ -13,8 +13,8 @@ from ..detectors import Detector
 from ..materials import CATALOG
 from ..materials.crystal import HBARC_EV_ANG, beta_from_Ee, reciprocal_g_vector
 from ..montecarlo.bunch_front import BunchFrontTilt
-from ..montecarlo.geometry import _orientation_R, beam_entry_jacobian, sample_to_lab_R
-from .geometry import Slab
+from ..montecarlo.geometry import beam_entry_jacobian, sample_to_lab_R
+from .geometry import Slab, resolve_crystal_cut
 
 if TYPE_CHECKING:
     from .model import Scene
@@ -30,9 +30,10 @@ def phase_matched_front_for_scene(
 
     Source: joint phase law in linear-bunch-front-tilt; vacuum line dispersion
     omega=beta*b.g/(1-beta*b.n). Assumes parallel monoenergetic rays and one
-    flat slab's mean crystallite orientation. Matching preserves residual
+    flat slab's mean crystallite orientation, including any ``Slab.cut``
+    resolved exactly as case lowering resolves it. Matching preserves residual
     timing damping; a zero required gradient returns BunchFrontTilt(0).
-    Validation: linear-bunch-front-tilt, line-energy-dispersion
+    Validation: linear-bunch-front-tilt, line-energy-dispersion, surface-hkl-orientation
     """
     target = scene.target_spec
     if not isinstance(target, Slab) or target.entrance_face is not None:
@@ -51,8 +52,8 @@ def phase_matched_front_for_scene(
         raise ValueError("phase matching requires a crystalline target")
     crystal = CATALOG.crystal(crystal_key)
     g, _ = reciprocal_g_vector(indices, crystal.lattice)
-    orientation = _orientation_R(
-        crystal.lattice, crystal.beam_uvw, 0.0, surface_hkl=crystal.surface_hkl
+    orientation = resolve_crystal_cut(target.cut, crystal.beam_uvw, crystal.surface_hkl).rotation(
+        crystal.lattice
     )
     if orientation is not None:
         g = orientation @ g
