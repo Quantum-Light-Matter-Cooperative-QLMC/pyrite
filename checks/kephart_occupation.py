@@ -34,14 +34,20 @@ import os
 import platform
 import subprocess
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
 from scipy.optimize import curve_fit
 
-from pyrite.materials.channeling import planar_profile, transverse_states
-from pyrite.montecarlo.channeling import DensityMatrixSolver, electronic_kernel, tds_kernel
+from pyrite.materials.channeling import longitudinal_kinematics, planar_profile, transverse_states
+from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
+from pyrite.montecarlo.channeling import (
+    DensityMatrixSolver,
+    decoherence_rate,
+    electronic_kernel,
+    tds_kernel,
+)
 
 TEMPERATURE_K = 293.15
 
@@ -151,7 +157,37 @@ def fit_occupation_length(z_um, signal, thickness_range_um):
     return float(length), float(amplitude), residual
 
 
-def run_case_group(keys, margin, orders, cells, dz_ang):
+def detector_acceptance(profile, energy_eV, divergence_rad, z_ang, rate_scale=1.0):
+    """Forward-detector weight ``W(z)`` of the ``y``-angle spread, normalized to ``W(0)``.
+
+    Kephart's detector sits on the beam axis. An electron moving at ``y``-angle
+    ``theta`` (along the planes, perpendicular to the ``x`` oscillation) is
+    seen at photon angle ``theta`` with the boosted-dipole photon density
+    ``w = 1/(1 + gamma^2 theta^2)^2`` relative to forward (``phi = 90 deg``).
+    ``theta`` starts Gaussian with the beam divergence and spreads by every
+    jump's ``q_y / p``. For a rate density uniform in ``y`` its characteristic
+    function is ``exp(-sigma^2 s^2/2 - z Lambda(s))`` with
+    ``Lambda(s) = Gamma(Delta = s / p)``, the decoherence rate of a
+    planar-uniform density (``decoherence_rate`` on a flat electron density).
+    ``W(z) = (1/pi) int_0^inf w~(s) exp(...) ds`` with
+    ``w~(s) = (pi / 2 gamma)(1 + s/gamma) e^{-s/gamma}``. ``rate_scale``
+    multiplies ``Lambda`` to bracket channeled electrons' higher density.
+    Assumptions: point detector, peak areas include the Doppler-shifted
+    lines, ``y`` spreading independent of the transverse ``x`` state.
+    """
+    gamma, beta = longitudinal_kinematics(energy_eV)
+    p_inv_ang = gamma * beta * M_E_EV / HBARC_EV_ANG
+    s = np.linspace(0.0, 40.0 * gamma, 1601)
+    flat = replace(profile, electron_density=profile.electron_density[:1].copy())
+    rate = decoherence_rate(flat, energy_eV, s / p_inv_ang).total * rate_scale
+    kernel = (np.pi / (2 * gamma)) * (1 + s / gamma) * np.exp(-s / gamma)
+    base = kernel * np.exp(-0.5 * (divergence_rad * s) ** 2)
+    z = np.asarray(z_ang, dtype=float)
+    values = np.trapezoid(base[None, :] * np.exp(-np.outer(z, rate)), s, axis=1) / np.pi
+    return values / values[0]
+
+
+def run_case_group(keys, margin, orders, cells, dz_ang, rate_scales=(1.0,)):
     """Solve one (plane, energy) configuration and fit every case sharing it."""
     first = CASES[keys[0]]
     profile = planar_profile("silicon", first.hkl, TEMPERATURE_K)
@@ -169,14 +205,27 @@ def run_case_group(keys, margin, orders, cells, dz_ang):
     )
     solve_s = time.perf_counter() - start - kernel_s
     z_um = result.z_ang / 1e4
+    scales = list(rate_scales)
+    acceptance = {
+        scale: detector_acceptance(profile, energy, first.divergence_rad, result.z_ang, scale)
+        for scale in scales
+    }
     rows = []
     for key in keys:
         case = CASES[key]
         weights = line_weights(case, orders)
         signal = sum(w * result.band_populations[:, band] for band, w in weights.items())
         length, amplitude, residual = fit_occupation_length(z_um, signal, case.thickness_range_um)
+        detector = {
+            str(scale): fit_occupation_length(z_um, signal * weight, case.thickness_range_um)[0]
+            for scale, weight in acceptance.items()
+        }
         rows.append(
             {
+                "detector_occupation_length_um": detector,
+                "detector_ratio": {k: v / case.occupation_length_um for k, v in detector.items()},
+                "z_um": z_um.tolist(),
+                "signal": signal.tolist(),
                 "case": key,
                 "note": case.note,
                 "occupation_length_um": length,
@@ -204,6 +253,7 @@ def run_case_group(keys, margin, orders, cells, dz_ang):
         "balance_defect": float(result.balance_defect[-1]),
         "kernel_seconds": kernel_s,
         "solve_seconds": solve_s,
+        "detector_acceptance": {str(k): v.tolist() for k, v in acceptance.items()},
     }
 
 
@@ -228,6 +278,13 @@ def main(argv=None) -> int:
     parser.add_argument("--orders", nargs="+", type=int, default=[24])
     parser.add_argument("--cells", nargs="+", type=int, default=[16])
     parser.add_argument("--dz", nargs="+", type=float, default=[250.0])
+    parser.add_argument(
+        "--rate-scales",
+        nargs="+",
+        type=float,
+        default=[1.0],
+        help="multipliers of the y-spreading rate for the detector observable",
+    )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
     groups = [GROUPS.get(key, (key,)) for key in args.cases]
@@ -243,10 +300,12 @@ def main(argv=None) -> int:
     for keys, margin, orders, cells, dz in itertools.product(
         groups, margins, args.orders, args.cells, args.dz
     ):
-        run = run_case_group(keys, margin, orders, cells, dz)
+        run = run_case_group(keys, margin, orders, cells, dz, args.rate_scales)
         report["runs"].append(run)
         summary = ", ".join(
             f"{row['case']} L={row['occupation_length_um']:.1f} um (x{row['ratio']:.2f})"
+            + " det "
+            + "/".join(f"{v:.1f}" for v in row["detector_occupation_length_um"].values())
             for row in run["cases"]
         )
         print(
