@@ -66,6 +66,23 @@ def test_ensemble_mean_matches_density_matrix(si110, kernel):
         within(got, expected, sem)
 
 
+def test_energy_loss_ensemble_matches_density_matrix(si110, kernel):
+    density = DensityMatrixSolver(si110, ENERGY_EV, kernel, margin_eV=5.0)
+    options = {"divergence_rad": 1e-3, "stopping_eV_per_ang": 200.0, "reprojection_tolerance": 1e-3}
+    reference = density.propagate(5000.0, 50.0, record_every=20, **options)
+    result = MCWFSolver(density).run(2000, 5000.0, 50.0, seed=8, record_every=20, **options)
+    np.testing.assert_allclose(result.kinetic_energy_eV, reference.kinetic_energy_eV)
+    sem = np.maximum(result.bound_population_sem, 1e-12)
+    assert np.all(np.abs(result.bound_population - reference.bound_population) <= 3.0 * sem)
+    assert reference.reprojection_flux[-1] > 0.01
+    for got, expected in [
+        (result.trace, reference.trace),
+        (result.reprojection_flux, reference.reprojection_flux),
+    ]:
+        sem = np.sqrt(np.clip(expected * (1.0 - expected), 1e-12, None) / 2000)
+        assert np.all(np.abs(got - expected) <= 3.0 * sem)
+
+
 def test_no_scattering_reproduces_unitary_density(si110, kernel):
     silent = replace(
         kernel,

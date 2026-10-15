@@ -33,8 +33,17 @@ physical history: only ensemble observables are physical.
 
 **RNG.** Electron ``i`` owns a Philox stream keyed on ``(seed, i)`` under its own
 salt. Its draws are consumed in a fixed order: entry momentum, entry collapse,
-then per jump a channel, a collapse and the next threshold. Results therefore
-do not depend on batch composition or size.
+then per jump a channel, a collapse and the next threshold, and at each
+re-projection a collapse. Results therefore do not depend on batch
+composition or size.
+
+**Energy loss.** As in the density solver, a constant stopping power lowers
+``gamma``. When it drifts by more than a tolerance, every electron's state is
+re-projected onto the new eigenstates (the kernel rescaled by
+``(beta_0/beta)^2``). It stays channeled with probability
+``||P_S psi'||^2 / ||psi'||^2`` with its norm, and so its jump threshold,
+unchanged; otherwise it is counted as reprojection flux. In expectation this is
+the density solver's ``P_S rho P_S`` re-projection.
 
 Lengths in angstroms, energies in eV.
 """
@@ -45,6 +54,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ...materials.channeling.transverse import longitudinal_kinematics
+from ...materials.crystal import HBARC_EV_ANG
 from ..transport.kinematics import (
     _SM64_GOLDEN,
     _SM64_MIX1,
@@ -98,8 +109,10 @@ class MCWFResult:
         Mean and standard error of the population below the barrier.
     trace
         Fraction of electrons still channeled (in ``S``).
-    free_flux, overflow_flux, entry_flux
+    free_flux, overflow_flux, reprojection_flux, entry_flux
         Cumulative fraction of electrons dechanneled by each channel.
+    kinetic_energy_eV
+        Electron kinetic energy at each recorded depth [eV].
     dechanneled_energy_eV
         ``E_perp`` of every free or entry dechanneling event [eV]; ``nan`` for
         overflow.
@@ -122,6 +135,8 @@ class MCWFResult:
     trace: np.ndarray
     free_flux: np.ndarray
     overflow_flux: np.ndarray
+    reprojection_flux: np.ndarray
+    kinetic_energy_eV: np.ndarray
     entry_flux: float
     dechanneled_energy_eV: np.ndarray
     dechanneled_depth_ang: np.ndarray
@@ -132,9 +147,6 @@ class MCWFResult:
 
 class MCWFSolver:
     """Quantum-jump stepper sharing a :class:`~.density.DensityMatrixSolver`'s operators.
-
-    Energy loss is not modelled here: the solver's entry basis is used
-    throughout.
 
     Validation: cr-mcwf-unravelling
     """
@@ -216,6 +228,8 @@ class MCWFSolver:
         divergence_rad: float = 0.0,
         record_every: int = 1,
         first_electron: int = 0,
+        stopping_eV_per_ang: float = 0.0,
+        reprojection_tolerance: float = 1e-4,
     ) -> MCWFResult:
         """Run ``n_electrons`` trajectories ``first_electron, ...`` to ``thickness_ang``.
 
@@ -237,7 +251,8 @@ class MCWFSolver:
         alive = np.zeros(n_electrons, dtype=bool)
         thresholds = np.zeros(n_electrons)
         energies, depths, owners = [], [], []
-        counts = {"free": 0, "overflow": 0}
+        counts = {"free": 0, "overflow": 0, "reprojection": 0}
+        energy_eV, gamma_basis = solver.energy_eV, solver.gamma0
         entry = 0
         for i, rng in enumerate(streams):
             blocks[i], state, energy = self._entry(rng, lattice, weights)
@@ -249,17 +264,17 @@ class MCWFSolver:
                 continue
             states[i], alive[i] = state, True
             thresholds[i] = rng.random()
-        bound = solver.basis.energies < solver.barrier_eV
-        history = {
-            k: [] for k in ("z", "bands", "bands2", "bound", "bound2", "alive", "free", "over")
-        }
+        keys = ("z", "E", "bands", "bands2", "bound", "bound2", "alive", "free", "over", "repro")
+        history = {k: [] for k in keys}
 
         def record(z: float) -> None:
             norms = np.sum(np.abs(states) ** 2, axis=1)
             pops = np.abs(states) ** 2 / np.where(norms > 0.0, norms, 1.0)[:, None]
             pops[~alive] = 0.0
+            bound = solver.basis.energies < solver.barrier_eV
             b = np.einsum("tn,tn->t", pops, bound[blocks])
             history["z"].append(z)
+            history["E"].append(energy_eV)
             history["bands"].append(pops.mean(axis=0))
             history["bands2"].append(pops.std(axis=0) / np.sqrt(n_electrons))
             history["bound"].append(b.mean())
@@ -267,6 +282,7 @@ class MCWFSolver:
             history["alive"].append(alive.mean())
             history["free"].append(counts["free"] / n_electrons)
             history["over"].append(counts["overflow"] / n_electrons)
+            history["repro"].append(counts["reprojection"] / n_electrons)
 
         jumps = 0
         record(0.0)
@@ -293,6 +309,28 @@ class MCWFSolver:
                 blocks[i] = block
                 states[i] = half[block] @ survivor
                 thresholds[i] = rng.random()
+            if stopping_eV_per_ang:
+                energy_eV = solver.energy_eV - stopping_eV_per_ang * step * dz
+                gamma, beta = longitudinal_kinematics(energy_eV)
+                if abs(gamma / gamma_basis - 1.0) > reprojection_tolerance:
+                    old = solver.basis.vectors
+                    solver.basis = solver._basis(gamma)
+                    solver._scale = (solver.beta0 / beta) ** 2
+                    half = solver._propagators(dz, HBARC_EV_ANG * beta)
+                    gamma_basis = gamma
+                    for i in np.flatnonzero(alive):
+                        state, lost = self._reproject(
+                            blocks[i], old[blocks[i]], states[i], streams[i]
+                        )
+                        if state is None:
+                            alive[i] = False
+                            states[i] = 0.0
+                            counts["reprojection"] += 1
+                            energies.append(lost)
+                            depths.append(step * dz)
+                            owners.append(first_electron + i)
+                        else:
+                            states[i] = state
             if step % record_every == 0 or step == steps:
                 record(step * dz)
         final = np.zeros((self.n_cells, self.size, self.size), dtype=complex)
@@ -308,6 +346,8 @@ class MCWFSolver:
             trace=np.asarray(history["alive"]),
             free_flux=np.asarray(history["free"]),
             overflow_flux=np.asarray(history["over"]),
+            reprojection_flux=np.asarray(history["repro"]),
+            kinetic_energy_eV=np.asarray(history["E"]),
             entry_flux=entry / n_electrons,
             dechanneled_energy_eV=np.asarray(energies, dtype=float),
             dechanneled_depth_ang=np.asarray(depths, dtype=float),
@@ -315,6 +355,24 @@ class MCWFSolver:
             final_density=final / n_electrons,
             jumps=jumps,
         )
+
+    def _reproject(self, block, old_vectors, state, rng):
+        """Move one electron onto the current basis; ``(state | None, E_perp | nan)``.
+
+        The plane-wave content is kept; the electron survives into ``S`` with
+        probability ``||P_S psi'||^2 / ||psi'||^2`` and keeps its norm.
+        """
+        plane = old_vectors @ state
+        basis = self.solver.basis
+        eigen = basis.vectors[block].conj().T @ plane
+        weight = np.abs(eigen) ** 2
+        keep = basis.subspace[block]
+        total, stay = weight.sum(), weight[keep].sum()
+        if rng.random() * total < stay:
+            return np.where(keep, eigen, 0.0) * np.sqrt(total / stay), np.nan
+        free = np.where(keep, 0.0, weight)
+        index = int(np.searchsorted(np.cumsum(free), rng.random() * free.sum(), "right"))
+        return None, float(basis.energies[block, min(index, free.size - 1)])
 
     def _jump(self, block: int, psi: np.ndarray, rng: np.random.Generator):
         """One jump from normalized ``psi``: ``(block, survivor | None, E_perp | nan)``."""
