@@ -18,7 +18,14 @@ from pyrite.materials.channeling import (
     thermal_b_factor,
     transverse_states,
 )
-from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, U_g, reciprocal_g_vector
+from pyrite.materials.crystal import (
+    CRYSTALS,
+    E2_EV_ANG,
+    HBARC_EV_ANG,
+    M_E_EV,
+    U_g,
+    reciprocal_g_vector,
+)
 from pyrite.materials.emission import photon_energies
 
 SI_A = CRYSTALS["silicon"]["lattice"]["a"]
@@ -68,6 +75,15 @@ def test_thermal_rows_reproduced_and_extrapolation_continuous(key):
     assert site.b_factor(80.0) < site.B_ang2[0] < site.B_ang2[-1] < site.b_factor(400.0)
 
 
+def test_diamond_b_factor_matches_xray_measurements():
+    # Takama et al., Acta Cryst. A 46, 514 (1990), abstract: B = 0.142(9) A^2
+    # (Pendelloesung); Bindzus et al. (2014) U_iso = 0.001808(10) A^2, i.e.
+    # B = 0.1427 A^2. The catalog B_ang2 = 0.21 used by PXR/CBS is not.
+    b = thermal_b_factor("diamond", "C", 293.15)
+    assert abs(b - 0.142) < 0.009
+    assert b == pytest.approx(8 * np.pi**2 * 0.001808, rel=0.02)
+
+
 def test_ineligible_crystal_is_refused():
     with pytest.raises(ChannelingDataError, match="eligible crystals"):
         thermal_b_factor("hopg", "C", 293.15)
@@ -109,6 +125,66 @@ def test_planar_coefficient_is_negative_cbs_coupling():
     b = profile.b_factors_ang2["C"]
     expected = -U_g("diamond", (2, 2, 0), 1.0e4, B_ang2=b, use_henke=False)
     assert profile.potential_eV[1] == pytest.approx(expected, rel=1e-12)
+
+
+def test_si111_coefficient_against_cbed_structure_factors():
+    # Zuo, Microsc. Res. Tech. 46, 220 (1999), Table 1 "Mean" column: Si at room
+    # temperature, 196.7 kV, U(111) = 0.4736(7)e-1 and U(222) = 0.921(50)e-3 A^-2.
+    # U_g = 2 m gamma e V_g / h^2 (Zuo & Spence, Ultramicroscopy 35, 185 (1991),
+    # Eq. 8), so V_g = U_g (2 pi hbar c)^2 / (2 gamma m c^2).
+    gamma = 1.0 + 196.7e3 / M_E_EV
+    volts_per_inv_ang2 = (2 * np.pi * HBARC_EV_ANG) ** 2 / (2 * gamma * M_E_EV)
+    v111 = 0.4736e-1 * volts_per_inv_ang2  # 5.144 V
+    v222 = 0.921e-3 * volts_per_inv_ang2  # 0.100 V
+    profile = planar_profile("silicon", (1, 1, 1), 293.15)
+    # Independent atoms overestimate the bonding-sensitive (111) by ~6%; the
+    # X-ray Pendellosung value in Zuo's Table 2 agrees with the CBED value.
+    assert 1.0 < abs(profile.potential_eV[1]) / v111 < 1.08
+    # (222) is forbidden for spherical harmonic atoms; the measured 0.1 V is
+    # bonding charge the independent-atom potential omits (2% of V_111).
+    assert abs(profile.potential_eV[2]) < 1e-12
+    assert v222 < 0.03 * v111
+
+
+def _diamond_structure_modulus(hkl):
+    basis = [(0, 0, 0), (0, 0.5, 0.5), (0.5, 0, 0.5), (0.5, 0.5, 0)]
+    basis += [(x + 0.25, y + 0.25, z + 0.25) for x, y, z in basis]
+    return abs(sum(np.exp(2j * np.pi * np.dot(hkl, r)) for r in basis))
+
+
+@pytest.mark.parametrize(
+    ("plane", "harmonic", "hkl", "f_measured", "ratio"),
+    [
+        ((1, 1, 0), 1, (2, 2, 0), 15.404, (0.99, 1.01)),
+        ((1, 1, 0), 2, (4, 4, 0), 9.659, (0.99, 1.01)),
+        ((1, 1, 0), 3, (6, 6, 0), 5.913, (0.99, 1.01)),
+        ((1, 1, 1), 1, (1, 1, 1), 18.574, (1.05, 1.15)),
+    ],
+)
+def test_diamond_coefficients_against_xray_structure_factors(
+    plane, harmonic, hkl, f_measured, ratio
+):
+    # Bindzus et al., Acta Cryst. A 70, 39 (2014), supporting information
+    # Sec. 1.4 (HC/Rietveld extracted, cubic cell, thermally smeared with
+    # U_iso = 0.001808 A^2, Table 2): F(220) 15.404, F(440) [as 404] 9.659,
+    # F(660) [as 606] 5.913, F(111) 18.574. Mott--Bethe on the measured
+    # charge: |U_g| = 4 pi e^2 (Z |S| T - F) / (V g^2), T = exp(-B s^2).
+    a = 3.566606
+    b = 8 * np.pi**2 * 0.001808
+    g = 2 * np.pi * np.sqrt(sum(np.square(hkl))) / a
+    s = g / (4 * np.pi)
+    debye_waller = np.exp(-b * s**2)
+    measured = (
+        4
+        * np.pi
+        * E2_EV_ANG
+        / (a**3 * g**2)
+        * (6 * _diamond_structure_modulus(hkl) * debye_waller - f_measured)
+    )
+    profile = planar_profile("diamond", plane, 293.15)
+    # The (110) family is independent-atom to within 0.5%; bonding charge
+    # lowers the measured (111) potential by ~10%.
+    assert ratio[0] < abs(profile.potential_eV[harmonic]) / measured < ratio[1]
 
 
 def test_density_means_and_heating(si110):
@@ -201,6 +277,68 @@ def test_si110_40mev_matches_azadegan(si110):
     assert states.n_bound == 6
     e10 = 2 * gamma**2 * (states.energies_eV[1] - states.energies_eV[0])
     assert e10 == pytest.approx(76207.1, rel=0.02)
+
+
+@pytest.mark.parametrize(
+    ("plane", "energy_MeV", "transition", "measured_keV", "rel"),
+    [
+        ((1, 1, 0), 80.23, (1, 0), 313.4, 0.005),
+        ((1, 1, 0), 80.23, (2, 1), 213.9, 0.005),
+        ((1, 1, 0), 80.23, (3, 2), 164.6, 0.005),
+        ((1, 1, 0), 80.23, (4, 3), 130.1, 0.01),
+        ((1, 1, 0), 53.2, (1, 0), 160.0, 0.02),
+        ((1, 1, 0), 53.2, (2, 1), 103.6, 0.02),
+        ((1, 1, 0), 53.2, (3, 2), 78.0, 0.02),
+        ((1, 0, 0), 53.2, (1, 0), 119.8, 0.02),
+        ((1, 0, 0), 80.23, (1, 0), 239.0, 0.02),
+        ((1, 0, 0), 110.2, (1, 0), 405.0, 0.02),
+    ],
+)
+def test_diamond_lines_match_gouanere(plane, energy_MeV, transition, measured_keV, rel):
+    # Gouanere et al., Phys. Rev. B 38, 4352 (1988), Table II column 10:
+    # forward line energies (E^if)_0 at Psi = 0, corrected for multiple
+    # scattering; room temperature, 22 um (110) and 15 um (100) crystals.
+    profile = planar_profile("diamond", plane, 293.15)
+    gamma, _ = longitudinal_kinematics(energy_MeV * 1e6)
+    states = transverse_states(profile, gamma)
+    upper, lower = transition
+    line = line_energy_eV(states.energies_eV[upper] - states.energies_eV[lower], energy_MeV * 1e6)
+    assert line / 1e3 == pytest.approx(measured_keV, rel=rel)
+
+
+def test_diamond110_9mev_line_within_bloch_band():
+    # Genz et al., Phys. Rev. B 53, 8922 (1996), Table VII: (110) 1->0 at
+    # 9.0 MeV is 7.80-7.93 keV (+-0.08) over four crystals, detector at 0 deg.
+    # State 1 sits near the barrier, so the line spans a Bloch band.
+    profile = planar_profile("diamond", (1, 1, 0), 293.15)
+    gamma, _ = longitudinal_kinematics(9.0e6)
+    lines = []
+    for k in np.linspace(0.0, profile.g_inv_ang / 2, 9):
+        energies = transverse_states(profile, gamma, k_inv_ang=k).energies_eV
+        lines.append(line_energy_eV(energies[1] - energies[0], 9.0e6) / 1e3)
+    assert min(lines) < 7.80 and 7.93 < max(lines)
+    assert np.mean(lines) == pytest.approx(7.865, rel=0.02)
+
+
+@pytest.mark.parametrize("hkl", [(1, 1, 0), (1, 1, 1), (1, 0, 0)])
+def test_si_planar_lines_below_watson_detector_cutoff(hkl):
+    # Watson & Koehler, Phys. Rev. A 24, 861 (1981) and Phys. Rev. B 25, 3079
+    # (1982), Sec. IV B: no planar channeling radiation above the ~1 keV Si(Li)
+    # cutoff for any Si plane up to 3.0 MeV, detector 2.66 deg off the beam.
+    # Every strong (|x_fi| > 0.1 A) bound-bound line must therefore lie below it.
+    profile = planar_profile("silicon", hkl, 293.15)
+    gamma, _ = longitudinal_kinematics(3.0e6)
+    theta = np.deg2rad(2.66)
+    highest = 0.0
+    for k in np.linspace(0.0, profile.g_inv_ang / 2, 5):
+        states = transverse_states(profile, gamma, k_inv_ang=k)
+        energies = states.energies_eV
+        for i in range(1, states.n_bound):
+            for f in range(i):
+                if abs(states.dipole_ang(f, i)) > 0.1:
+                    line = line_energy_eV(energies[i] - energies[f], 3.0e6, theta)
+                    highest = max(highest, line)
+    assert highest < 1.05e3
 
 
 # ---- entry populations (cr-initial-occupation) -------------------------------
