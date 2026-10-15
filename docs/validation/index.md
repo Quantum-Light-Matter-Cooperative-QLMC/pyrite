@@ -103,6 +103,7 @@ channeling/cr-initial-occupation
 channeling/cr-doppler-line-energy
 channeling/cr-mean-inner-potential
 channeling/cr-plane-incidence
+channeling/cr-lindblad-jump-operators
 ```
 
 ```{toctree}
