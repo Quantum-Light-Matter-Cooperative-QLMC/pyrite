@@ -45,7 +45,10 @@ def mean_inner_potential_eV(crystal: str) -> float:
     electron gains kinetic energy ``-U_0`` on entering. This is the neutral,
     independent-atom value; bonding lowers measured values by several percent.
     The slope is taken by a two-node difference in ``g^2`` near zero, whose
-    error is ``O(g^2 <r^4>)``, below 1e-4 relative here.
+    error is ``O(g^2 <r^4>)``: about 2e-3 relative (0.03 eV for Si) against
+    the exact Waasmaier--Kirfel slope ``sum a_i b_i / (16 pi^2)``. Using the
+    integer ``Z`` instead would diverge, because the fits do not sum exactly
+    to ``Z`` (Si: 13.9989).
 
     Validation: cr-mean-inner-potential
     """

@@ -101,6 +101,8 @@ channeling/cr-transverse-eigenproblem
 channeling/cr-dipole-matrix-element
 channeling/cr-initial-occupation
 channeling/cr-doppler-line-energy
+channeling/cr-mean-inner-potential
+channeling/cr-plane-incidence
 ```
 
 ```{toctree}
