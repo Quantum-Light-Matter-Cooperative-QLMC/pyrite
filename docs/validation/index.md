@@ -92,6 +92,19 @@ beam-transport/transport-midpoint-stopping
 
 ```{toctree}
 :maxdepth: 1
+:caption: Channeling
+
+channeling/cr-debye-b-of-t
+channeling/cr-mott-bethe-factor
+channeling/cr-planar-continuum-potential
+channeling/cr-transverse-eigenproblem
+channeling/cr-dipole-matrix-element
+channeling/cr-initial-occupation
+channeling/cr-doppler-line-energy
+```
+
+```{toctree}
+:maxdepth: 1
 :caption: Radiation physics
 
 radiation-physics/absorption-length

@@ -101,7 +101,8 @@ class TransverseStates:
         Uses ``[H, x] = -i hbar p / (gamma m)``, so ``x_fi = -i (hbar^2 /
         (gamma m)) sum_m c_f* (k + m g) c_i / (E_f - E_i)``. It is exact for
         Bloch states at the same ``k`` and avoids the ill-defined position
-        operator on periodic functions.
+        operator on periodic functions. The phase follows the arbitrary
+        eigenvector gauge; rates use ``|x_fi|^2``.
 
         Validation: cr-dipole-matrix-element
         """
@@ -197,8 +198,11 @@ def entry_populations(
     complete basis (Andersen et al. 1983; Azadegan 2013, Eq. 17). Averaging over
     the transverse entry point is implicit in the Bloch normalization. A
     Gaussian beam divergence ``sigma`` is integrated by Gauss--Hermite
-    quadrature over ``psi``. Surface refraction is not applied: it depends on
-    the face/lattice geometry and enters through the orientation layer.
+    quadrature over ``psi``. Surface refraction is not applied here: pass the
+    ``effective_rad`` of :func:`~pyrite.materials.channeling.entry.plane_incidence`,
+    which carries the refracted transverse wavevector. Plane-wave orders beyond
+    ``n_plane_waves`` contribute nothing, so ``sum_n P_n < 1`` when
+    ``|k_x| > (M + 1/2) g``; raise ``n_plane_waves`` for large angles.
 
     The band index ``n`` labels states in energy order at each ``k``; deeply
     bound bands are flat, so it identifies the same physical state.
@@ -272,7 +276,7 @@ def line_energy_eV(delta_transverse_eV, kinetic_energy_eV, theta_rad=0.0):
     ``hbar omega = Delta E_perp / (1 - beta cos theta)``, where ``theta`` is the
     photon angle to the electron velocity: the Doppler denominator ``1 - n . v``
     shared with the PXR/CBS resonance (``line-energy-dispersion``). Forward
-    emission gives ``2 gamma^2 Delta E_perp (1 + beta) / 2``. Photon recoil is
+    emission gives ``gamma^2 (1 + beta) Delta E_perp``. Photon recoil is
     neglected; its relative correction is ``O(hbar omega / E)``, below
     ``2.5e-3`` at 10 MeV. ``beta`` is the total speed; the longitudinal speed
     differs by ``O(E_perp / (p v)) < 1e-5``.

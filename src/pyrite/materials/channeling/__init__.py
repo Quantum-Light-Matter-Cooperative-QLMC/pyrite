@@ -5,10 +5,12 @@ temperature-dependent thermal displacement, the planar continuum potential,
 transverse Bloch states, dipole matrix elements, ideal-entry populations and
 Doppler line energies. Everything is in the plane-local frame: ``x`` along
 the plane normal, incidence angle to the plane, photon angle to the beam.
-Mapping these angles from the laboratory/sample orientation belongs to the
-orientation layer (issue #25). Physics: docs/research/physics/channeling-radiation-physics.md.
+:mod:`.entry` maps a sample tilt and a cut crystal's lattice orientation
+(``CrystalCut``) onto the plane-local incidence, with mean-inner-potential
+refraction at the face. Physics: docs/research/physics/channeling-radiation-physics.md.
 """
 
+from .entry import PlaneIncidence, mean_inner_potential_eV, plane_incidence
 from .potential import PlanarProfile, planar_profile
 from .thermal import (
     ChannelingDataError,
@@ -31,6 +33,7 @@ from .transverse import (
 __all__ = [
     "ChannelingDataError",
     "PlanarProfile",
+    "PlaneIncidence",
     "ThermalSite",
     "TransverseStates",
     "debye_b_factor",
@@ -41,7 +44,9 @@ __all__ = [
     "line_energy_eV",
     "load_thermal_sites",
     "longitudinal_kinematics",
+    "mean_inner_potential_eV",
     "planar_profile",
+    "plane_incidence",
     "thermal_b_factor",
     "transverse_states",
 ]
