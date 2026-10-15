@@ -2,6 +2,8 @@
 
 Use this guide after collecting `pyrite-dev perf PROFILE --remote` logs. Goal: identify throughput constraint from measured phase and resource behavior, then test one change at a time. High CPU or GPU utilization is supporting evidence, not optimization target; compute-weighted throughput is target.
 
+For cross-engine equal-precision work, see the bounded [comparator adapter pilot](../validation/beam-transport/equal-precision-pilot.md). Its unresolved accuracy and timing gates preclude a speed ranking.
+
 ## Outputs
 
 Write analysis artifacts under:

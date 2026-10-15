@@ -1,0 +1,568 @@
+{
+  "schema": "pyrite.equal-precision.kernel-summary.v1",
+  "groups": [
+    {
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "variant": "baseline",
+      "repeats": 3,
+      "median_s": 2.985191135900095,
+      "min_s": 2.93789553293027,
+      "max_s": 3.0340616770554334
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "variant": "candidate",
+      "repeats": 3,
+      "median_s": 1.778591001057066,
+      "min_s": 1.7417634130688384,
+      "max_s": 1.8510346020339057
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "histories": 100000,
+      "variant": "baseline",
+      "repeats": 1,
+      "median_s": 60.451129106921144,
+      "min_s": 60.451129106921144,
+      "max_s": 60.451129106921144
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "histories": 100000,
+      "variant": "candidate",
+      "repeats": 1,
+      "median_s": 34.5140328113921,
+      "min_s": 34.5140328113921,
+      "max_s": 34.5140328113921
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "variant": "baseline",
+      "repeats": 3,
+      "median_s": 10.36606892105192,
+      "min_s": 10.335896131931804,
+      "max_s": 10.497052704100497
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "variant": "candidate",
+      "repeats": 3,
+      "median_s": 6.092743773944676,
+      "min_s": 6.068638302036561,
+      "max_s": 6.103566559962928
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "histories": 100000,
+      "variant": "baseline",
+      "repeats": 1,
+      "median_s": 209.20003839873243,
+      "min_s": 209.20003839873243,
+      "max_s": 209.20003839873243
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "histories": 100000,
+      "variant": "candidate",
+      "repeats": 1,
+      "median_s": 122.26664420205634,
+      "min_s": 122.26664420205634,
+      "max_s": 122.26664420205634
+    }
+  ],
+  "samples": [
+    {
+      "file": "evidence/radiative-optimization/1314/si-300-100um-0deg-56001-baseline-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 56001,
+      "variant": "baseline",
+      "transport_s": 3.0340616770554334,
+      "launch_s": 2.4425133318873122,
+      "launches": 2,
+      "replayed_launches": 1,
+      "executed_segments": 10275990,
+      "retained_segments": 5137995,
+      "measured_hashes": [
+        "f3904439350beaa2c20b17e04f01aae02851137815a6eb86718beeed773b94a8"
+      ],
+      "warmup_hashes": [
+        "d4257b4dc7041e1af74c883eb9d24b0dfea5b66732f7035288959fe668820396"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1314/si-300-100um-0deg-56001-candidate-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 56001,
+      "variant": "candidate",
+      "transport_s": 1.7417634130688384,
+      "launch_s": 1.2294414079515263,
+      "launches": 2,
+      "replayed_launches": 1,
+      "executed_segments": 10275990,
+      "retained_segments": 5137995,
+      "measured_hashes": [
+        "f3904439350beaa2c20b17e04f01aae02851137815a6eb86718beeed773b94a8"
+      ],
+      "warmup_hashes": [
+        "d4257b4dc7041e1af74c883eb9d24b0dfea5b66732f7035288959fe668820396"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1314/si-300-100um-0deg-56002-baseline-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 56002,
+      "variant": "baseline",
+      "transport_s": 2.985191135900095,
+      "launch_s": 2.4862872869707644,
+      "launches": 2,
+      "replayed_launches": 1,
+      "executed_segments": 10394124,
+      "retained_segments": 5197062,
+      "measured_hashes": [
+        "41e91d11a23ff4cd1082e87a1caab33fb141bfe2557678f18786eb09712ac9bb"
+      ],
+      "warmup_hashes": [
+        "066b81cbaec5efc305af01be0c9209bd675adb0690a0b360e0ce7c8150edaf9b"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1314/si-300-100um-0deg-56002-candidate-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 56002,
+      "variant": "candidate",
+      "transport_s": 1.8510346020339057,
+      "launch_s": 1.2479526889510453,
+      "launches": 2,
+      "replayed_launches": 1,
+      "executed_segments": 10394124,
+      "retained_segments": 5197062,
+      "measured_hashes": [
+        "41e91d11a23ff4cd1082e87a1caab33fb141bfe2557678f18786eb09712ac9bb"
+      ],
+      "warmup_hashes": [
+        "066b81cbaec5efc305af01be0c9209bd675adb0690a0b360e0ce7c8150edaf9b"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1314/si-300-100um-0deg-56003-baseline-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 56003,
+      "variant": "baseline",
+      "transport_s": 2.93789553293027,
+      "launch_s": 2.465290228021331,
+      "launches": 2,
+      "replayed_launches": 1,
+      "executed_segments": 10291624,
+      "retained_segments": 5145812,
+      "measured_hashes": [
+        "53c07464da76b36bb09ac2c6756d695db001e891dbce8d40bdb444d31daf80bb"
+      ],
+      "warmup_hashes": [
+        "5bb4dbc5a13cfd3c0fb61bcc64bf6471b3e1d61d870fe2b99f248140c27d0931"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1314/si-300-100um-0deg-56003-candidate-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 56003,
+      "variant": "candidate",
+      "transport_s": 1.778591001057066,
+      "launch_s": 1.240664426004514,
+      "launches": 2,
+      "replayed_launches": 1,
+      "executed_segments": 10291624,
+      "retained_segments": 5145812,
+      "measured_hashes": [
+        "53c07464da76b36bb09ac2c6756d695db001e891dbce8d40bdb444d31daf80bb"
+      ],
+      "warmup_hashes": [
+        "5bb4dbc5a13cfd3c0fb61bcc64bf6471b3e1d61d870fe2b99f248140c27d0931"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1314/w-300-10um-0deg-56001-baseline-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 56001,
+      "variant": "baseline",
+      "transport_s": 10.497052704100497,
+      "launch_s": 8.523291772929952,
+      "launches": 3,
+      "replayed_launches": 1,
+      "executed_segments": 19991592,
+      "retained_segments": 9995796,
+      "measured_hashes": [
+        "acc16568d8b3e3fd2304ccc5861593ef14eabd1f801a7eca5c73d8e72b887cd2"
+      ],
+      "warmup_hashes": [
+        "e3630af5e2461f02a4cc575c7db76f183705b1d1b7afa696a0e93f5d3452a24a"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1314/w-300-10um-0deg-56001-candidate-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 56001,
+      "variant": "candidate",
+      "transport_s": 6.092743773944676,
+      "launch_s": 4.299044496961869,
+      "launches": 3,
+      "replayed_launches": 1,
+      "executed_segments": 19991592,
+      "retained_segments": 9995796,
+      "measured_hashes": [
+        "acc16568d8b3e3fd2304ccc5861593ef14eabd1f801a7eca5c73d8e72b887cd2"
+      ],
+      "warmup_hashes": [
+        "e3630af5e2461f02a4cc575c7db76f183705b1d1b7afa696a0e93f5d3452a24a"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1314/w-300-10um-0deg-56002-baseline-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 56002,
+      "variant": "baseline",
+      "transport_s": 10.335896131931804,
+      "launch_s": 8.43126243702136,
+      "launches": 3,
+      "replayed_launches": 1,
+      "executed_segments": 19774568,
+      "retained_segments": 9887284,
+      "measured_hashes": [
+        "6826b10eff38ebb6c79f13a44f25b12fd9f05320327c5445b2adc7f02c8a7725"
+      ],
+      "warmup_hashes": [
+        "9c99d98adf4080d03ffd0dd545e41aacc16e8a4d76c1f349b3deff1ded37d6e0"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1314/w-300-10um-0deg-56002-candidate-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 56002,
+      "variant": "candidate",
+      "transport_s": 6.068638302036561,
+      "launch_s": 4.243514637928456,
+      "launches": 3,
+      "replayed_launches": 1,
+      "executed_segments": 19774568,
+      "retained_segments": 9887284,
+      "measured_hashes": [
+        "6826b10eff38ebb6c79f13a44f25b12fd9f05320327c5445b2adc7f02c8a7725"
+      ],
+      "warmup_hashes": [
+        "9c99d98adf4080d03ffd0dd545e41aacc16e8a4d76c1f349b3deff1ded37d6e0"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1314/w-300-10um-0deg-56003-baseline-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 56003,
+      "variant": "baseline",
+      "transport_s": 10.36606892105192,
+      "launch_s": 8.380641505937092,
+      "launches": 3,
+      "replayed_launches": 1,
+      "executed_segments": 19805402,
+      "retained_segments": 9902701,
+      "measured_hashes": [
+        "19563148b9db06fe3b307d8965f327f15a3027beedff03bab83e6bfc837d506d"
+      ],
+      "warmup_hashes": [
+        "d2eaf4095b5d837ca13bda47db28bbd57f3e01a9f2ab10ba53a863f10d347c4b"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1314/w-300-10um-0deg-56003-candidate-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 56003,
+      "variant": "candidate",
+      "transport_s": 6.103566559962928,
+      "launch_s": 4.214944236911833,
+      "launches": 3,
+      "replayed_launches": 1,
+      "executed_segments": 19805402,
+      "retained_segments": 9902701,
+      "measured_hashes": [
+        "19563148b9db06fe3b307d8965f327f15a3027beedff03bab83e6bfc837d506d"
+      ],
+      "warmup_hashes": [
+        "d2eaf4095b5d837ca13bda47db28bbd57f3e01a9f2ab10ba53a863f10d347c4b"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1315/w-300-10um-0deg-57001-baseline-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 100000,
+      "seed": 57001,
+      "variant": "baseline",
+      "transport_s": 209.20003839873243,
+      "launch_s": 171.08489334082697,
+      "launches": 60,
+      "replayed_launches": 20,
+      "executed_segments": 394745582,
+      "retained_segments": 197372791,
+      "measured_hashes": [
+        "5166c19601b04fdc0942ec9d2b28e7bfc51cce6a961dc8df5b889219e3f216bd",
+        "f9d296fa64b77daa8efe700afac599a45f68f0aa6f6fcfdac596b2df2d7ada8f",
+        "0080ac8174e8f195a4c01c58f6cb68f261162b2a885335fb96853f89ee6c1b3a",
+        "b21ce3c4af2875bfa09ce085ad5cad49c9c6006bc6cbbc4deba9f3e9cb73318d",
+        "d81ccbefa0535fc6b172a7a9af2ccba053cc734bb1947f2396d2c88ed5869430",
+        "8271e67f7d3c527b791444d6236e36f359973f6b068dfe14381490c15ee12cb5",
+        "f36943463abbcdb2f3e08eef71c731af682b64b04f89dfb6351cf0e0ac69005a",
+        "12e7c0e5f210ec40a19122cec7ced2b3ec93f0548ad81d4f21272367646c1252",
+        "dfd3d1d2d29d61a933a7408f2e4cf8808ea8f8fdd27d8b96dade750a23f447d1",
+        "5b73222315112a981619426c0ecc51805f153157c92a79454330f530766f7543",
+        "373074f825a52d399d1cf650bff57be2239fe96fc36a331b14093aab87e31948",
+        "714391d091169a5c6822a79f369a0fd715ced7d0a96c9d47209025b0b2815fa1",
+        "3a316888865738794280fd9a04fc07db144802bf947f4d3ab853d9e76d2ca591",
+        "48c1fafa5166f9eda19ce56dc36c84be101cd81a97e9c02123246f9787b91ede",
+        "32627f3a0125df21207fc0c7d0bf4b334ab40a02e286fdae06cfe9ccd38e670f",
+        "b600b9614647bd02578640860e11018bd1a370545a3c4a28ff02b6bf61327951",
+        "2fd0e2deb3bfa7810db13b482d642d90fb95e8833f49a2bd0362ee83e2ecdc53",
+        "6c6d7e6b40da52a6aecfe283c111851728676ff7383fa940c2ee95e71bbab2b9",
+        "147a0fc946b2c9532af0b93632d37f25c284d64706a0a87317594f4e35747109",
+        "75a55d5d2879f9dc93270a8ffe5d9c973402843c29fc0b708cb3ad894b8354ea"
+      ],
+      "warmup_hashes": [
+        "238b23ba2b78fbb1cb8c5e75cb64f01fabc8200cb9d18e01d05c25a14e3bc3c6",
+        "b3f1025c6d0ab9b989cc04622ff6f8f7096fbbbe1db2dc9c4a6fb8a0c3832a29",
+        "fbd71a89ba0daee9f299cc5bdf5180f27fd42e6c12091b009aa438416cc85a48",
+        "232d6e18e199205f948ec24ce3095034c35d81da5fe0a87dbcc5c92bc8f4d72c",
+        "15a33c44b56aecf7e8d5235bc34cbe68407152f48430654c88e5c20668d71f4a",
+        "691aabf487180772e56198eb55b0955d3cf122f2aee1fb616b4f827b02593e7e",
+        "f6de9e7641d1d0837f4fa3582124fc221c8cbbda97622636abf49b9b2f9d47d9",
+        "8fe92f1b4f9f52d6202acb71af986910a7ee7cb22b45d049ccb45cd18781ff0e",
+        "ec66014997f67a187b5d3e580000e4391ac3bcbeabb7fc6a2f509d444397f3f0",
+        "a4e533bf1f86f313ec96cd02bbc6e5545b7602aff07ebfbd070731d3b6198ba9",
+        "d429eaf12085caf281e6db601b0f9181f8130e1849882a4ace80d369996b323b",
+        "3a9f937d3558bdeb5497a74036578bc9abf5bd05ccfbedadba3af19f12fbbf8e",
+        "327e4eb52b9e167e99a1a7ca41fb824fef32e0d1d20dd850b8688b0b5510355f",
+        "67ff8ddb7257ad43df2a1f303927e59afa7dd77976bc47e7ad6bb33b02cdfcc2",
+        "7defa54bcbf7c08c2aecd94091b7d3af90825244fdfc93378dbe8011ebf506a5",
+        "01aa434fe661374d9a28d018d6dc814198332cc31e57805f7ee1277a6a8206b8",
+        "ea80cd7a0b2abbffdf0941920958ed7f861c4b55a86306fd9698be8ccb99601d",
+        "3db280f0b6684ac72b56af0368c9ddfb61bb32046cba6e0dd970a45198ea8a24",
+        "15e7105484ccaecdc4c0d6cf8732018a4ec54cb6e612b69c683ad76cb5f4c873",
+        "ecb98cecc6cd8b7e1c347e0967bea5e4c82ce87c03e13d861f77e8a97f05317c"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1316/si-300-100um-0deg-57001-baseline-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 100000,
+      "seed": 57001,
+      "variant": "baseline",
+      "transport_s": 60.451129106921144,
+      "launch_s": 49.58249334502034,
+      "launches": 40,
+      "replayed_launches": 20,
+      "executed_segments": 207389986,
+      "retained_segments": 103694993,
+      "measured_hashes": [
+        "fe0f208bd302ccdd2e3b0101e1fc345c51f6a132900ff5eb1c7dbedf6bd097b4",
+        "4e168fa05517480336fa5af1698d30d72ae838a57ba4146d3177684fbae4962f",
+        "4ab203a5fa8fe317fb51170c51825276b6dbac16747e98c08a9264991d842f31",
+        "dbfbe5d358f7ad54c1df6fde27518ed3181c4a87a75942f84883fe6d3d75f095",
+        "2ae700dfe9ee6589d2d70908b6c3ceac51fb94e93afdd68b738b7a7ba042685b",
+        "93b1751b984f9ee6440b9a24390ab12d2af30d5434747842dd2204ae05423ba6",
+        "50168154a25a5b710b0a3a83bc10bbc52e8f1ab78a5f8d224cb52ddd574824dd",
+        "859a5c78de239f091c88a8fbf3a22d0db903beb24c9b11e69878eedb37b286af",
+        "729ec3ca9a7aea589da801161558ba5ef09f90f64382fae6610ddbbf0d915aef",
+        "88eceb5f8642277973d70e7f25e23e8babc176061809722f75758c64534d4cdc",
+        "0bc7121df44838af6e316e6a1d7b70a27e7316b01ebab2adfcfd0407755e8143",
+        "355a1b6a5fa2936d52b2c7d552592f3053832fb3523d798e025b5910be55301a",
+        "1bb9fdc219b837444ef6cb1bca4b90cc5a621f92e366b9b644a986e37618167c",
+        "959f1f973444e7bcea489a5d2415b554a1da7e7e750916e9f465bcebefd733f2",
+        "161ee6b363b6ed9dd56dc1d63702272245dba9854414cf13dc535186a87dec96",
+        "24204c1ea484296a6b51a0e15f634c3a3bbf30264d3d74d228e4d5d4d76126f2",
+        "757c7e82972f303e115314c218c7ccb2e3227c665696420bf45f6d35d10812a2",
+        "729b39561b6479c2e02858c216c7fe0816ce0c0aa13975ba1c1ec2a10fa5ecd8",
+        "ece25df2cf53d774645542cf4f5c1807b4343b776203d15b88622ce2d0387b0d",
+        "1d176b5813ed40d4ab708e88355a11829cce990cdea2aae94aa3159e3d1fcd99"
+      ],
+      "warmup_hashes": [
+        "84103e68f148fa78332c433ad67f6edf26013240fe1c03c4b55c4c43f863229f",
+        "1dbfd61b76d77eec91f60efc0dc90edb4b7f29ef2b5e53cb13ce7088c03fb2b0",
+        "2c676349dc1a888d4ac5ac23ecb115b06e7253c728ba005ed56f8ff21838ab90",
+        "3f8e8a6da83eded0c80da9ecf8953de0cbc1fe51125ae74ba6bc47fa9ef7ef95",
+        "190f4762658f02be8a0fed824d75b98341533104da161a2e3ecc173502888a58",
+        "a8ebd03ac6d0f8e47e92940d2fd12bc9ea1817de48caa2dfe4dd5ead09701351",
+        "04dc8e0dc080c5c07cc28986e1645d88b2284db297edeaa0386639ffd727e961",
+        "738d30baed3c7212ecbe16b6b99af1b4a13d02b526475bfe97a5509d0133dba8",
+        "025d8f0177b9ef03fb6ee2efbce2a0189faed8167f39fb79aae1188c3f2a4fca",
+        "10ab74796c795b0b650661a80fd0cbe9171430b5cc70ea4cdc690ddfff69f369",
+        "24c8f559f52f42bb8b139cd82074506f0cbe56c1f6b37fca36d803a444fb2233",
+        "d5bab1095aca4d04bad9f8913860f97cd8542f27dff9214b09cba184ac823e09",
+        "afe0f415ba280d2f746bd9b1eeb57f6b5d6ff9913a0df6bf5021654204a895c9",
+        "7f753ae223f25a8c4b1b5b30437b41c31f002ecb8659783781cc0dab40380b26",
+        "bb48a0bc5d851192f6d23031c7a80017967c9b2d670e7d7904181e3a8e8b3117",
+        "44848ad4a6cb198aeca592ca7a04345881b3c703e2c68a4eaaebf2067346c027",
+        "c9f36e81f5c3fb70cad74761f2240f1029d9492339f154ce35eccd0c28790583",
+        "e3676dd5922d77a1018dcdfec2347bfb34d60b99fbc36ad572ddc4ba6baf8483",
+        "7cdc0e512e4e0cb13d9414d9b1f23e3f32de5e656a2386eaa17a09b46908730e",
+        "ffed3a5aa0e2c2ee9144ac5441722bb266ab5a70420177deed7855d5fbe65800"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1316/si-300-100um-0deg-57001-candidate-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 100000,
+      "seed": 57001,
+      "variant": "candidate",
+      "transport_s": 34.5140328113921,
+      "launch_s": 24.77070448710583,
+      "launches": 40,
+      "replayed_launches": 20,
+      "executed_segments": 207389986,
+      "retained_segments": 103694993,
+      "measured_hashes": [
+        "fe0f208bd302ccdd2e3b0101e1fc345c51f6a132900ff5eb1c7dbedf6bd097b4",
+        "4e168fa05517480336fa5af1698d30d72ae838a57ba4146d3177684fbae4962f",
+        "4ab203a5fa8fe317fb51170c51825276b6dbac16747e98c08a9264991d842f31",
+        "dbfbe5d358f7ad54c1df6fde27518ed3181c4a87a75942f84883fe6d3d75f095",
+        "2ae700dfe9ee6589d2d70908b6c3ceac51fb94e93afdd68b738b7a7ba042685b",
+        "93b1751b984f9ee6440b9a24390ab12d2af30d5434747842dd2204ae05423ba6",
+        "50168154a25a5b710b0a3a83bc10bbc52e8f1ab78a5f8d224cb52ddd574824dd",
+        "859a5c78de239f091c88a8fbf3a22d0db903beb24c9b11e69878eedb37b286af",
+        "729ec3ca9a7aea589da801161558ba5ef09f90f64382fae6610ddbbf0d915aef",
+        "88eceb5f8642277973d70e7f25e23e8babc176061809722f75758c64534d4cdc",
+        "0bc7121df44838af6e316e6a1d7b70a27e7316b01ebab2adfcfd0407755e8143",
+        "355a1b6a5fa2936d52b2c7d552592f3053832fb3523d798e025b5910be55301a",
+        "1bb9fdc219b837444ef6cb1bca4b90cc5a621f92e366b9b644a986e37618167c",
+        "959f1f973444e7bcea489a5d2415b554a1da7e7e750916e9f465bcebefd733f2",
+        "161ee6b363b6ed9dd56dc1d63702272245dba9854414cf13dc535186a87dec96",
+        "24204c1ea484296a6b51a0e15f634c3a3bbf30264d3d74d228e4d5d4d76126f2",
+        "757c7e82972f303e115314c218c7ccb2e3227c665696420bf45f6d35d10812a2",
+        "729b39561b6479c2e02858c216c7fe0816ce0c0aa13975ba1c1ec2a10fa5ecd8",
+        "ece25df2cf53d774645542cf4f5c1807b4343b776203d15b88622ce2d0387b0d",
+        "1d176b5813ed40d4ab708e88355a11829cce990cdea2aae94aa3159e3d1fcd99"
+      ],
+      "warmup_hashes": [
+        "84103e68f148fa78332c433ad67f6edf26013240fe1c03c4b55c4c43f863229f",
+        "1dbfd61b76d77eec91f60efc0dc90edb4b7f29ef2b5e53cb13ce7088c03fb2b0",
+        "2c676349dc1a888d4ac5ac23ecb115b06e7253c728ba005ed56f8ff21838ab90",
+        "3f8e8a6da83eded0c80da9ecf8953de0cbc1fe51125ae74ba6bc47fa9ef7ef95",
+        "190f4762658f02be8a0fed824d75b98341533104da161a2e3ecc173502888a58",
+        "a8ebd03ac6d0f8e47e92940d2fd12bc9ea1817de48caa2dfe4dd5ead09701351",
+        "04dc8e0dc080c5c07cc28986e1645d88b2284db297edeaa0386639ffd727e961",
+        "738d30baed3c7212ecbe16b6b99af1b4a13d02b526475bfe97a5509d0133dba8",
+        "025d8f0177b9ef03fb6ee2efbce2a0189faed8167f39fb79aae1188c3f2a4fca",
+        "10ab74796c795b0b650661a80fd0cbe9171430b5cc70ea4cdc690ddfff69f369",
+        "24c8f559f52f42bb8b139cd82074506f0cbe56c1f6b37fca36d803a444fb2233",
+        "d5bab1095aca4d04bad9f8913860f97cd8542f27dff9214b09cba184ac823e09",
+        "afe0f415ba280d2f746bd9b1eeb57f6b5d6ff9913a0df6bf5021654204a895c9",
+        "7f753ae223f25a8c4b1b5b30437b41c31f002ecb8659783781cc0dab40380b26",
+        "bb48a0bc5d851192f6d23031c7a80017967c9b2d670e7d7904181e3a8e8b3117",
+        "44848ad4a6cb198aeca592ca7a04345881b3c703e2c68a4eaaebf2067346c027",
+        "c9f36e81f5c3fb70cad74761f2240f1029d9492339f154ce35eccd0c28790583",
+        "e3676dd5922d77a1018dcdfec2347bfb34d60b99fbc36ad572ddc4ba6baf8483",
+        "7cdc0e512e4e0cb13d9414d9b1f23e3f32de5e656a2386eaa17a09b46908730e",
+        "ffed3a5aa0e2c2ee9144ac5441722bb266ab5a70420177deed7855d5fbe65800"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    },
+    {
+      "file": "evidence/radiative-optimization/1316/w-300-10um-0deg-57001-candidate-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 100000,
+      "seed": 57001,
+      "variant": "candidate",
+      "transport_s": 122.26664420205634,
+      "launch_s": 86.0114636940416,
+      "launches": 60,
+      "replayed_launches": 20,
+      "executed_segments": 394745582,
+      "retained_segments": 197372791,
+      "measured_hashes": [
+        "5166c19601b04fdc0942ec9d2b28e7bfc51cce6a961dc8df5b889219e3f216bd",
+        "f9d296fa64b77daa8efe700afac599a45f68f0aa6f6fcfdac596b2df2d7ada8f",
+        "0080ac8174e8f195a4c01c58f6cb68f261162b2a885335fb96853f89ee6c1b3a",
+        "b21ce3c4af2875bfa09ce085ad5cad49c9c6006bc6cbbc4deba9f3e9cb73318d",
+        "d81ccbefa0535fc6b172a7a9af2ccba053cc734bb1947f2396d2c88ed5869430",
+        "8271e67f7d3c527b791444d6236e36f359973f6b068dfe14381490c15ee12cb5",
+        "f36943463abbcdb2f3e08eef71c731af682b64b04f89dfb6351cf0e0ac69005a",
+        "12e7c0e5f210ec40a19122cec7ced2b3ec93f0548ad81d4f21272367646c1252",
+        "dfd3d1d2d29d61a933a7408f2e4cf8808ea8f8fdd27d8b96dade750a23f447d1",
+        "5b73222315112a981619426c0ecc51805f153157c92a79454330f530766f7543",
+        "373074f825a52d399d1cf650bff57be2239fe96fc36a331b14093aab87e31948",
+        "714391d091169a5c6822a79f369a0fd715ced7d0a96c9d47209025b0b2815fa1",
+        "3a316888865738794280fd9a04fc07db144802bf947f4d3ab853d9e76d2ca591",
+        "48c1fafa5166f9eda19ce56dc36c84be101cd81a97e9c02123246f9787b91ede",
+        "32627f3a0125df21207fc0c7d0bf4b334ab40a02e286fdae06cfe9ccd38e670f",
+        "b600b9614647bd02578640860e11018bd1a370545a3c4a28ff02b6bf61327951",
+        "2fd0e2deb3bfa7810db13b482d642d90fb95e8833f49a2bd0362ee83e2ecdc53",
+        "6c6d7e6b40da52a6aecfe283c111851728676ff7383fa940c2ee95e71bbab2b9",
+        "147a0fc946b2c9532af0b93632d37f25c284d64706a0a87317594f4e35747109",
+        "75a55d5d2879f9dc93270a8ffe5d9c973402843c29fc0b708cb3ad894b8354ea"
+      ],
+      "warmup_hashes": [
+        "238b23ba2b78fbb1cb8c5e75cb64f01fabc8200cb9d18e01d05c25a14e3bc3c6",
+        "b3f1025c6d0ab9b989cc04622ff6f8f7096fbbbe1db2dc9c4a6fb8a0c3832a29",
+        "fbd71a89ba0daee9f299cc5bdf5180f27fd42e6c12091b009aa438416cc85a48",
+        "232d6e18e199205f948ec24ce3095034c35d81da5fe0a87dbcc5c92bc8f4d72c",
+        "15a33c44b56aecf7e8d5235bc34cbe68407152f48430654c88e5c20668d71f4a",
+        "691aabf487180772e56198eb55b0955d3cf122f2aee1fb616b4f827b02593e7e",
+        "f6de9e7641d1d0837f4fa3582124fc221c8cbbda97622636abf49b9b2f9d47d9",
+        "8fe92f1b4f9f52d6202acb71af986910a7ee7cb22b45d049ccb45cd18781ff0e",
+        "ec66014997f67a187b5d3e580000e4391ac3bcbeabb7fc6a2f509d444397f3f0",
+        "a4e533bf1f86f313ec96cd02bbc6e5545b7602aff07ebfbd070731d3b6198ba9",
+        "d429eaf12085caf281e6db601b0f9181f8130e1849882a4ace80d369996b323b",
+        "3a9f937d3558bdeb5497a74036578bc9abf5bd05ccfbedadba3af19f12fbbf8e",
+        "327e4eb52b9e167e99a1a7ca41fb824fef32e0d1d20dd850b8688b0b5510355f",
+        "67ff8ddb7257ad43df2a1f303927e59afa7dd77976bc47e7ad6bb33b02cdfcc2",
+        "7defa54bcbf7c08c2aecd94091b7d3af90825244fdfc93378dbe8011ebf506a5",
+        "01aa434fe661374d9a28d018d6dc814198332cc31e57805f7ee1277a6a8206b8",
+        "ea80cd7a0b2abbffdf0941920958ed7f861c4b55a86306fd9698be8ccb99601d",
+        "3db280f0b6684ac72b56af0368c9ddfb61bb32046cba6e0dd970a45198ea8a24",
+        "15e7105484ccaecdc4c0d6cf8732018a4ec54cb6e612b69c683ad76cb5f4c873",
+        "ecb98cecc6cd8b7e1c347e0967bea5e4c82ce87c03e13d861f77e8a97f05317c"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true
+    }
+  ],
+  "interpretation": "Instrumented diagnostic, not a qualified cross-engine speed comparison. Radiation-off changes physical workload. No pooling across population sizes."
+}

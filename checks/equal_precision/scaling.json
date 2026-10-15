@@ -1,0 +1,15 @@
+{
+  "schema": "pyrite.equal-precision.scaling.v1",
+  "base_manifest_sha256": "58c74807dbb80cf425d5f8d9d8d9975cdf37b012c3838d17bea3460e3d73ce2e",
+  "reason": "User requested representative workloads at 100000 or more Geant4 histories and warmed CUDA caches.",
+  "histories": 100000,
+  "batch_histories": 5000,
+  "scratch_mib": 4096,
+  "probe_electrons": 0,
+  "seeds": [53001,53002,53003],
+  "scenes": ["si-300-100um-0deg","w-300-10um-0deg"],
+  "arms": ["geant4","cuda"],
+  "budget": {"allocation_minutes":10,"max_allocations":2,"memory_gb":24,"cpus":1,"gpu":1},
+  "cpu_serial": "Deferred at this population because its measured per-history cost exceeds the bounded scaling budget with repeated full warmups.",
+  "interpretation": "Matched-population scaling diagnostic; achieved uncertainty is measured. No equal-accuracy speed ratio before numerical and equivalence gates."
+}

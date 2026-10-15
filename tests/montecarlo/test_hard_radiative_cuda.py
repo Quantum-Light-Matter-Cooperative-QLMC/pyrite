@@ -79,6 +79,113 @@ def _photon_rows(result):
     )
 
 
+@pytest.mark.parametrize("constant_sdcs", [False, True])
+def test_device_radiative_moments_cover_cutoff_and_table_boundaries(constant_sdcs):
+    """Selected moments agree with CPU quadrature and constant-chi integrals."""
+    from pyrite.montecarlo._cupy_jit import jit
+    from pyrite.montecarlo.transport import _jit_radiative_device as dev
+    from pyrite.montecarlo.transport._jit_radiative import radiative_moments_scalar
+
+    table = _table(1.0)
+    chi = np.ones_like(table.scaled_sdcs_mb) if constant_sdcs else table.scaled_sdcs_mb
+    energies, cutoffs = [], []
+    for energy in [10000.0, 19999.999, 20000.0, 60000.0, 200000.0]:
+        # Both incident-grid and photon-grid boundaries, including coincident
+        # cutoff/tip nodes and rounding on either side of a nominal node.
+        for reduced in [
+            1e-6,
+            np.nextafter(0.1, 0.0),
+            0.1,
+            np.nextafter(0.1, 1.0),
+            0.5,
+            0.975,
+            *table.top_reduced_energy,
+            np.nextafter(1.0, 0.0),
+            1.0,
+        ]:
+            energies.append(energy)
+            cutoffs.append(energy * reduced)
+    energies, cutoffs = np.asarray(energies), np.asarray(cutoffs)
+
+    @jit.rawkernel()
+    def probe(incident, nominal, top, sdcs, n_t, n_red, energy, cutoff, output):
+        i = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
+        if i < energy.size:
+            output[i, 0] = dev._rad_moment(
+                dev.RAD_SOFT,
+                incident,
+                nominal,
+                top,
+                sdcs,
+                np.int32(0),
+                n_t,
+                n_red,
+                n_t,
+                np.float64(6),
+                energy[i],
+                cutoff[i],
+            )
+            output[i, 1] = dev._rad_moment(
+                dev.RAD_HARD_RATE,
+                incident,
+                nominal,
+                top,
+                sdcs,
+                np.int32(0),
+                n_t,
+                n_red,
+                n_t,
+                np.float64(6),
+                energy[i],
+                cutoff[i],
+            )
+
+    output = cupy.empty((energies.size, 2), dtype=cupy.float64)
+    probe(
+        ((energies.size + 127) // 128,),
+        (128,),
+        (
+            cupy.asarray(table.incident_energy_keV),
+            cupy.asarray(table.nominal_reduced_energy),
+            cupy.asarray(table.top_reduced_energy),
+            cupy.asarray(chi.ravel()),
+            np.int32(table.incident_energy_keV.size),
+            np.int32(table.nominal_reduced_energy.size),
+            cupy.asarray(energies),
+            cupy.asarray(cutoffs),
+            output,
+        ),
+    )
+    actual = output.get()
+    expected = np.array(
+        [
+            radiative_moments_scalar(
+                table.incident_energy_keV,
+                table.nominal_reduced_energy,
+                table.top_reduced_energy,
+                chi,
+                6,
+                energy,
+                cutoff,
+            )[:2]
+            for energy, cutoff in zip(energies, cutoffs, strict=True)
+        ]
+    )
+    # FP64 interpolation/quadrature agrees to accumulated libm rounding;
+    # the absolute floor covers vanishing hard integrals at the endpoint.
+    np.testing.assert_allclose(actual[:, 0], expected[:, 0], rtol=2e-13, atol=0)
+    np.testing.assert_allclose(actual[:, 1], expected[:, 1], rtol=2e-13, atol=36e-41)
+    if constant_sdcs:
+        scale = 36e-27
+        np.testing.assert_allclose(actual[:, 0], scale * cutoffs, rtol=2e-13)
+        np.testing.assert_allclose(
+            actual[:, 1],
+            scale * np.log(energies / cutoffs),
+            rtol=2e-13,
+            atol=scale * 1e-14,
+        )
+
+
 @pytest.mark.parametrize("straggling", [False, True])
 def test_cuda_radiative_mode_is_deterministic(straggling):
     a = _run(**CUDA, straggling=straggling)
