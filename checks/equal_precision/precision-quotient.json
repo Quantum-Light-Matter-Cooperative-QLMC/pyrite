@@ -1,0 +1,364 @@
+{
+  "schema": "pyrite.equal-precision.radiative-precision.v1",
+  "purpose": "Narrow selected divisions to FP32 after FP64 subtraction, with fixed-count same-primary finite-sample equivalence.",
+  "variants": [
+    "fp64",
+    "rad-boundary64-24",
+    "rad-quotient32-24"
+  ],
+  "pilot": {
+    "histories": 5000,
+    "batch_histories": 5000,
+    "scratch_mib": 4096,
+    "probe_electrons": 0,
+    "seeds": [
+      61001,
+      61002,
+      61003,
+      61004,
+      61005
+    ],
+    "scenes": [
+      "si-300-100um-0deg",
+      "w-300-10um-0deg"
+    ]
+  },
+  "preflight": {
+    "histories": 64,
+    "seed": 60901,
+    "scenes": "All six scenes in manifest.json",
+    "moment_scaled_error_limit": 0.0002,
+    "moment_relative_floor": 1e-06,
+    "inverse_error_over_incident_energy_limit": 0.0002,
+    "notes": "Component screening, not a validated whole-transport accuracy bound. Failures remain explicit; safe finite arms may still be timed as unqualified diagnostics."
+  },
+  "budget": {
+    "preflight_allocations": 1,
+    "preflight_minutes": 5,
+    "pilot_allocations": 2,
+    "pilot_minutes_each": 10,
+    "cpus_per_task": 1,
+    "gpu": 1,
+    "memory_gib": 24,
+    "heldout_allocations": 9,
+    "heldout_minutes_each": 10,
+    "total_gpu_allocation_cap_minutes": 115,
+    "expected_gpu_minutes": [
+      45,
+      60
+    ]
+  },
+  "timing": "Fresh processes; one full identical-workload warmup, separate seed +1000000; synchronized boundaries. Alternate variant order each replicate. Preserve full request/reduction and transport intervals separately. No new Nsight counters assumed. CXR execution-call profiling is enabled only in small preflight runs and disabled in all timed pilots. Full fresh-process wall time is retained separately from transport/emission.",
+  "invariants": {
+    "max_energy_ledger_error_keV": 1e-07,
+    "max_photon_debit_error_keV": 1e-09,
+    "max_direction_norm_error": 1e-10
+  },
+  "ensemble_screen": {
+    "fraction_absolute_margin": 0.005,
+    "energy_margin_fraction_of_beam": 0.005,
+    "yield_relative_margin": 0.05,
+    "confidence": 0.95,
+    "multiple_comparison": "Approximate normal Bonferroni intervals over all scene/population/variant/observable comparisons. Sum of primary-mean SEs bounds unknown cross-precision seed covariance. Zero variance or fewer than 20 scoring primaries leaves source-yield precision unresolved.",
+    "minimum_nonzero_primaries_for_yield_screen": 20
+  },
+  "exclusions": "No production source/default/model marker/version change. No PXR/CBS, no result reuse in transport timing, no extrapolated 100000-primary gain, no qualified cross-engine speedup. Host photon-angle completion remains unchanged FP64 and is included in transport/emission timing.",
+  "revision": 1,
+  "decisions": [
+    "FP64 differences, photon coordinates and nodes retained. Three selected quotient evaluations use FP32 operands.",
+    "Held-out pairing requires audited per-primary transport/radiation stream fingerprints and ordered incident-primary scores.",
+    "No optional stopping, margin changes, pilot pooling or normal-approximation qualification. Finite-sample bounds retain uncertainty at zero discordance."
+  ],
+  "stable_cell_evaluation": "Algebraically same stable cell integral as revision 2; evaluate delta_chi*(x-log1p(x))/x to avoid double slope. Preserve double coordinate subtraction before casting dimensionless width.",
+  "full_screen_variants": [
+    "rad-boundary64-24",
+    "rad-quotient32-24"
+  ],
+  "required_preflight_variants": [
+    "fp64",
+    "rad-boundary64-24",
+    "rad-quotient32-24"
+  ],
+  "heldout": {
+    "variants": [
+      "fp64",
+      "rad-quotient32-24"
+    ],
+    "histories": {
+      "si": 120000,
+      "w": 25000
+    },
+    "seeds": [
+      62001,
+      62002,
+      62003,
+      62004,
+      62005,
+      62006,
+      62007,
+      62008,
+      62009,
+      62010
+    ],
+    "chunks": {
+      "si": [
+        [
+          0,
+          2
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          8,
+          10
+        ]
+      ],
+      "w": [
+        [
+          0,
+          3
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          8,
+          10
+        ]
+      ]
+    },
+    "policy": "Ten fixed independent replica seeds per scene; aggregate 1.2M Si and250k W histories per arm. Exclude pilots/preflight from inferential family."
+  },
+  "equivalence": {
+    "alpha": 0.05,
+    "comparisons": 32,
+    "reference": "fp64",
+    "candidate": "rad-quotient32-24",
+    "margin_basis": "Existing .005 fraction/.005E0 energy margins; photon absolute margins frozen at .05 times separate prior FP64 seed59001..59005 means. No margin estimated from held-out outcomes.",
+    "inference": "Intersect two-sided Maurer-Pontil empirical Bernstein and exact binomial mismatch bounds, allocating alpha/(2m) to each method and splitting Bernstein over tails. Pseudorandom primary pairs modeled independent. No normal approximation.",
+    "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf",
+    "observables": {
+      "si-300-100um-0deg": {
+        "transmitted": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.84504
+        },
+        "backscattered": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.10936
+        },
+        "side_exited": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.0
+        },
+        "stopped": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.0456
+        },
+        "transmitted_energy_keV_per_primary": {
+          "bound": 300.000001,
+          "margin": 1.5,
+          "kind": "energy",
+          "prior_reference_mean": 198.52605588413658
+        },
+        "photons_ge10kev": {
+          "bound": 30,
+          "margin": 0.00033600000000000004,
+          "kind": "count",
+          "prior_reference_mean": 0.00672
+        },
+        "photons_10_50kev": {
+          "bound": 30,
+          "margin": 0.00022000000000000003,
+          "kind": "count",
+          "prior_reference_mean": 0.0044
+        },
+        "photons_50_100kev": {
+          "bound": 6,
+          "margin": 6.400000000000001e-05,
+          "kind": "count",
+          "prior_reference_mean": 0.00128
+        },
+        "photons_ge100kev": {
+          "bound": 3,
+          "margin": 5.2e-05,
+          "kind": "count",
+          "prior_reference_mean": 0.00104
+        },
+        "photon_energy_keV_per_primary": {
+          "bound": 300.000001,
+          "margin": 1.5,
+          "kind": "energy",
+          "prior_reference_mean": 0.4038063287813588
+        },
+        "continuous_loss_keV_per_primary": {
+          "bound": 300.000001,
+          "margin": 1.5,
+          "kind": "energy",
+          "prior_reference_mean": 81.4911684050617
+        },
+        "terminal_energy_keV_per_primary": {
+          "bound": 300.000001,
+          "margin": 1.5,
+          "kind": "energy",
+          "prior_reference_mean": 218.10502526615693
+        },
+        "transmitted_mu_bin_0": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.11764
+        },
+        "transmitted_mu_bin_1": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.48588
+        },
+        "transmitted_mu_bin_2": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.21452
+        },
+        "transmitted_mu_bin_3": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.027
+        }
+      },
+      "w-300-10um-0deg": {
+        "transmitted": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.54816
+        },
+        "backscattered": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.42396
+        },
+        "side_exited": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.0
+        },
+        "stopped": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.02788
+        },
+        "transmitted_energy_keV_per_primary": {
+          "bound": 300.000001,
+          "margin": 1.5,
+          "kind": "energy",
+          "prior_reference_mean": 133.73370083005995
+        },
+        "photons_ge10kev": {
+          "bound": 30,
+          "margin": 0.001908,
+          "kind": "count",
+          "prior_reference_mean": 0.03816
+        },
+        "photons_10_50kev": {
+          "bound": 30,
+          "margin": 0.001188,
+          "kind": "count",
+          "prior_reference_mean": 0.02376
+        },
+        "photons_50_100kev": {
+          "bound": 6,
+          "margin": 0.00037600000000000003,
+          "kind": "count",
+          "prior_reference_mean": 0.00752
+        },
+        "photons_ge100kev": {
+          "bound": 3,
+          "margin": 0.000344,
+          "kind": "count",
+          "prior_reference_mean": 0.00688
+        },
+        "photon_energy_keV_per_primary": {
+          "bound": 300.000001,
+          "margin": 1.5,
+          "kind": "energy",
+          "prior_reference_mean": 2.357347214250034
+        },
+        "continuous_loss_keV_per_primary": {
+          "bound": 300.000001,
+          "margin": 1.5,
+          "kind": "energy",
+          "prior_reference_mean": 60.84313184862816
+        },
+        "terminal_energy_keV_per_primary": {
+          "bound": 300.000001,
+          "margin": 1.5,
+          "kind": "energy",
+          "prior_reference_mean": 236.7995209371218
+        },
+        "transmitted_mu_bin_0": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.09084
+        },
+        "transmitted_mu_bin_1": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.32664
+        },
+        "transmitted_mu_bin_2": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.11488
+        },
+        "transmitted_mu_bin_3": {
+          "bound": 1,
+          "margin": 0.005,
+          "kind": "indicator",
+          "prior_reference_mean": 0.0158
+        }
+      }
+    },
+    "elements": [
+      "Si",
+      "W"
+    ]
+  },
+  "require_complete_stage": true,
+  "source_sha256": {
+    "fp64": "a5d6090478a27367a98fbe7808494ae2b3304394335076b54de07981df285ef2",
+    "rad-boundary64-24": "70df00784022a3010164aac10d222fe58efb6141819be29805177d9fee58fa37",
+    "rad-quotient32-24": "051ebb410b02aa4b1ad3383d9ba71d92e5c9f90b5a651ff8ca00924d3a9d7b66"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "schema": "pyrite.equal-precision.radiative-precision.v1",
+  "purpose": "Endpoint-safe coordinate/moment precision separation; production unchanged.",
+  "variants": [
+    "fp64",
+    "rad-stable32-24",
+    "rad-boundary64-24"
+  ],
+  "pilot": {
+    "histories": 5000,
+    "batch_histories": 5000,
+    "scratch_mib": 4096,
+    "probe_electrons": 0,
+    "seeds": [
+      59001,
+      59002,
+      59003,
+      59004,
+      59005
+    ],
+    "scenes": [
+      "si-300-100um-0deg",
+      "w-300-10um-0deg"
+    ]
+  },
+  "preflight": {
+    "histories": 64,
+    "seed": 58901,
+    "scenes": "All six scenes in manifest.json",
+    "moment_scaled_error_limit": 0.0002,
+    "moment_relative_floor": 1e-06,
+    "inverse_error_over_incident_energy_limit": 0.0002,
+    "notes": "Component screening, not a validated whole-transport accuracy bound. Failures remain explicit; safe finite arms may still be timed as unqualified diagnostics."
+  },
+  "budget": {
+    "preflight_allocations": 1,
+    "preflight_minutes": 5,
+    "pilot_allocations": 2,
+    "pilot_minutes_each": 10,
+    "cpus_per_task": 1,
+    "gpu": 1,
+    "memory_gib": 24
+  },
+  "timing": "Fresh processes; one full identical-workload warmup, separate seed +1000000; synchronized boundaries. Alternate variant order each replicate. Preserve full request/reduction and transport intervals separately. No new Nsight counters assumed. CXR execution-call profiling is enabled only in small preflight runs and disabled in all timed pilots. Full fresh-process wall time is retained separately from transport/emission.",
+  "invariants": {
+    "max_energy_ledger_error_keV": 1e-07,
+    "max_photon_debit_error_keV": 1e-09,
+    "max_direction_norm_error": 1e-10
+  },
+  "ensemble_screen": {
+    "fraction_absolute_margin": 0.005,
+    "energy_margin_fraction_of_beam": 0.005,
+    "yield_relative_margin": 0.05,
+    "confidence": 0.95,
+    "multiple_comparison": "Approximate normal Bonferroni intervals over all scene/population/variant/observable comparisons. Sum of primary-mean SEs bounds unknown cross-precision seed covariance. Zero variance or fewer than 20 scoring primaries leaves source-yield precision unresolved.",
+    "minimum_nonzero_primaries_for_yield_screen": 20
+  },
+  "exclusions": "No production source/default/model marker/version change. No PXR/CBS, no result reuse in transport timing, no extrapolated 100000-primary gain, no qualified cross-engine speedup. Host photon-angle completion remains unchanged FP64 and is included in transport/emission timing.",
+  "revision": 1,
+  "decisions": [
+    "Keep energy/cutoff and incident/nominal/top coordinates FP64, chi/interpolation and cell transcendental work FP32.",
+    "Require all full endpoint probe reports to pass before timing the boundary arm. Stable32 remains an explicitly unqualified control."
+  ],
+  "stable_cell_evaluation": "Algebraically same stable cell integral as revision 2; evaluate delta_chi*(x-log1p(x))/x to avoid double slope. Preserve double coordinate subtraction before casting dimensionless width.",
+  "full_screen_variants": [
+    "rad-boundary64-24"
+  ],
+  "required_preflight_variants": [
+    "fp64",
+    "rad-stable32-24",
+    "rad-boundary64-24"
+  ]
+}

@@ -1,0 +1,1284 @@
+{
+  "schema": "pyrite.equal-precision.paired-equivalence.v1",
+  "complete_fixed_design": true,
+  "qualified_observable_equivalence": true,
+  "qualified_T_epsilon": false,
+  "protocol_sha256": "867d279b4d5cf7ae5f71f19e18a827706b46dadacc630ad78acb4f9fb1d1ccf0",
+  "source_sha256": {
+    "fp64": "a5d6090478a27367a98fbe7808494ae2b3304394335076b54de07981df285ef2",
+    "rad-boundary64-24": "70df00784022a3010164aac10d222fe58efb6141819be29805177d9fee58fa37",
+    "rad-quotient32-24": "051ebb410b02aa4b1ad3383d9ba71d92e5c9f90b5a651ff8ca00924d3a9d7b66"
+  },
+  "reference": "fp64",
+  "candidate": "rad-quotient32-24",
+  "expected_replicas_per_scene": 10,
+  "histories_per_replica": {
+    "si-300-100um-0deg": 120000,
+    "w-300-10um-0deg": 25000
+  },
+  "comparisons": [
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "transmitted",
+      "reference_standard_error": 0.0003293480071279703,
+      "candidate_standard_error": 0.0003293480071279703,
+      "reference_rse": 0.00038922049910337947,
+      "candidate_rse": 0.00038922049910337947,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 0.8461733333333333,
+      "candidate_mean": 0.8461733333333333,
+      "difference": 0.0,
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 5.962161690338061e-06,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -3.321467658236097e-05,
+        3.321467658236097e-05
+      ],
+      "mismatch_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "backscattered",
+      "reference_standard_error": 0.0002842238260193434,
+      "candidate_standard_error": 0.0002842238260193434,
+      "reference_rse": 0.002613051838522981,
+      "candidate_rse": 0.002613051838522981,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 0.10877083333333333,
+      "candidate_mean": 0.10877083333333333,
+      "difference": 0.0,
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 5.962161690338061e-06,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -3.321467658236097e-05,
+        3.321467658236097e-05
+      ],
+      "mismatch_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "side_exited",
+      "reference_standard_error": 0.0,
+      "candidate_standard_error": 0.0,
+      "reference_rse": null,
+      "candidate_rse": null,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 0.0,
+      "candidate_mean": 0.0,
+      "difference": 0.0,
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 5.962161690338061e-06,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -3.321467658236097e-05,
+        3.321467658236097e-05
+      ],
+      "mismatch_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "stopped",
+      "reference_standard_error": 0.0001893538158026744,
+      "candidate_standard_error": 0.0001893538158026744,
+      "reference_rse": 0.00420264817658108,
+      "candidate_rse": 0.00420264817658108,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 0.04505583333333334,
+      "candidate_mean": 0.04505583333333334,
+      "difference": 0.0,
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 5.962161690338061e-06,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -3.321467658236097e-05,
+        3.321467658236097e-05
+      ],
+      "mismatch_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "transmitted_energy_keV_per_primary",
+      "reference_standard_error": 0.08132024076962024,
+      "candidate_standard_error": 0.0813202407574542,
+      "reference_rse": 0.0004091536980506206,
+      "candidate_rse": 0.000409153697956746,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 198.75230544674017,
+      "candidate_mean": 198.75230546260644,
+      "difference": 1.5866307278824542e-08,
+      "difference_ci": [
+        -0.009964401148230108,
+        0.009964432880844665
+      ],
+      "margin": 1.5,
+      "known_score_bound": 300.000001,
+      "nonzero_pairs": 1015408,
+      "mismatch_probability_upper": 0.8472133948860952,
+      "paired_standard_error": 3.3889574017206062e-09,
+      "empirical_bernstein_ci": [
+        -0.009964401148230108,
+        0.009964432880844665
+      ],
+      "mismatch_ci": [
+        -254.16401931304193,
+        254.16401931304193
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "photons_ge10kev",
+      "reference_standard_error": 7.61856619963605e-05,
+      "candidate_standard_error": 7.61856619963605e-05,
+      "reference_rse": 0.010969857738856803,
+      "candidate_rse": 0.010969857738856803,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 0.006945,
+      "candidate_mean": 0.006945,
+      "difference": 0.0,
+      "difference_ci": [
+        -0.00017886485071014183,
+        0.00017886485071014183
+      ],
+      "margin": 0.00033600000000000004,
+      "known_score_bound": 30,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 5.962161690338061e-06,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.0009964402974708291,
+        0.0009964402974708291
+      ],
+      "mismatch_ci": [
+        -0.00017886485071014183,
+        0.00017886485071014183
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "photons_10_50kev",
+      "reference_standard_error": 6.233379412579758e-05,
+      "candidate_standard_error": 6.233379412579758e-05,
+      "reference_rse": 0.01342195459374791,
+      "candidate_rse": 0.01342195459374791,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 0.004644166666666666,
+      "candidate_mean": 0.004644166666666666,
+      "difference": 0.0,
+      "difference_ci": [
+        -0.00017886485071014183,
+        0.00017886485071014183
+      ],
+      "margin": 0.00022000000000000003,
+      "known_score_bound": 30,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 5.962161690338061e-06,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.0009964402974708291,
+        0.0009964402974708291
+      ],
+      "mismatch_ci": [
+        -0.00017886485071014183,
+        0.00017886485071014183
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "photons_50_100kev",
+      "reference_standard_error": 3.334240154316864e-05,
+      "candidate_standard_error": 3.334240154316864e-05,
+      "reference_rse": 0.02502244018249054,
+      "candidate_rse": 0.02502244018249054,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 0.0013325,
+      "candidate_mean": 0.0013325,
+      "difference": 0.0,
+      "difference_ci": [
+        -3.5772970142028366e-05,
+        3.5772970142028366e-05
+      ],
+      "margin": 6.400000000000001e-05,
+      "known_score_bound": 6,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 5.962161690338061e-06,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.00019928805949416583,
+        0.00019928805949416583
+      ],
+      "mismatch_ci": [
+        -3.5772970142028366e-05,
+        3.5772970142028366e-05
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "photons_ge100kev",
+      "reference_standard_error": 2.8393022471090402e-05,
+      "candidate_standard_error": 2.8393022471090402e-05,
+      "reference_rse": 0.029321537835893703,
+      "candidate_rse": 0.029321537835893703,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 0.0009683333333333333,
+      "candidate_mean": 0.0009683333333333333,
+      "difference": 0.0,
+      "difference_ci": [
+        -1.7886485071014183e-05,
+        1.7886485071014183e-05
+      ],
+      "margin": 5.2e-05,
+      "known_score_bound": 3,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 5.962161690338061e-06,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -9.964402974708291e-05,
+        9.964402974708291e-05
+      ],
+      "mismatch_ci": [
+        -1.7886485071014183e-05,
+        1.7886485071014183e-05
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "photon_energy_keV_per_primary",
+      "reference_standard_error": 0.005392724962202037,
+      "candidate_standard_error": 0.005392724378544618,
+      "reference_rse": 0.014019998955888026,
+      "candidate_rse": 0.01401999830540578,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 0.38464517573571116,
+      "candidate_mean": 0.3846451519516455,
+      "difference": -2.3784065697851814e-08,
+      "difference_ci": [
+        -0.009964453351896467,
+        0.009964405783765071
+      ],
+      "margin": 1.5,
+      "known_score_bound": 300.000001,
+      "nonzero_pairs": 18094,
+      "mismatch_probability_upper": 0.015433442636700679,
+      "paired_standard_error": 6.4262778601045315e-09,
+      "empirical_bernstein_ci": [
+        -0.009964453351896467,
+        0.009964405783765071
+      ],
+      "mismatch_ci": [
+        -4.630032806443646,
+        4.630032806443646
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "continuous_loss_keV_per_primary",
+      "reference_standard_error": 0.0531711445591923,
+      "candidate_standard_error": 0.053171144555768234,
+      "reference_rse": 0.0006552273758025506,
+      "candidate_rse": 0.0006552273757411039,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 81.14914993297708,
+      "candidate_mean": 81.14914993536142,
+      "difference": 2.3843223299217323e-09,
+      "difference_ci": [
+        -0.009964424719289064,
+        0.009964429487933723
+      ],
+      "margin": 1.5,
+      "known_score_bound": 300.000001,
+      "nonzero_pairs": 1198466,
+      "mismatch_probability_upper": 0.9988223426593804,
+      "paired_standard_error": 5.8300499465322845e-09,
+      "empirical_bernstein_ci": [
+        -0.009964424719289064,
+        0.009964429487933723
+      ],
+      "mismatch_ci": [
+        -299.6467037966365,
+        299.6467037966365
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "terminal_energy_keV_per_primary",
+      "reference_standard_error": 0.053638656107530255,
+      "candidate_standard_error": 0.053638656068982625,
+      "reference_rse": 0.0002455238151558583,
+      "candidate_rse": 0.00024552381495536143,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 218.4662048912872,
+      "candidate_mean": 218.46620491268695,
+      "difference": 2.1399743415805675e-08,
+      "difference_ci": [
+        -0.009964398944904604,
+        0.009964441744391437
+      ],
+      "margin": 1.5,
+      "known_score_bound": 300.000001,
+      "nonzero_pairs": 1145984,
+      "mismatch_probability_upper": 0.9555830497784277,
+      "paired_standard_error": 4.194691231830445e-09,
+      "empirical_bernstein_ci": [
+        -0.009964398944904604,
+        0.009964441744391437
+      ],
+      "mismatch_ci": [
+        -286.67491588911133,
+        286.67491588911133
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "transmitted_mu_bin_0",
+      "reference_standard_error": 0.0002926549648486514,
+      "candidate_standard_error": 0.0002926549648486514,
+      "reference_rse": 0.002516325658078299,
+      "candidate_rse": 0.002516325658078299,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 0.1163025,
+      "candidate_mean": 0.1163025,
+      "difference": 0.0,
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 5.962161690338061e-06,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -3.321467658236097e-05,
+        3.321467658236097e-05
+      ],
+      "mismatch_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "transmitted_mu_bin_1",
+      "reference_standard_error": 0.0004562985718717231,
+      "candidate_standard_error": 0.0004562985718717231,
+      "reference_rse": 0.000935523711499938,
+      "candidate_rse": 0.000935523711499938,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 0.48774666666666666,
+      "candidate_mean": 0.48774666666666666,
+      "difference": 0.0,
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 5.962161690338061e-06,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -3.321467658236097e-05,
+        3.321467658236097e-05
+      ],
+      "mismatch_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "transmitted_mu_bin_2",
+      "reference_standard_error": 0.0003747156398029942,
+      "candidate_standard_error": 0.0003747156398029942,
+      "reference_rse": 0.0017468649804924965,
+      "candidate_rse": 0.0017468649804924965,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 0.2145075,
+      "candidate_mean": 0.2145075,
+      "difference": 0.0,
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 5.962161690338061e-06,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -3.321467658236097e-05,
+        3.321467658236097e-05
+      ],
+      "mismatch_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "transmitted_mu_bin_3",
+      "reference_standard_error": 0.00014959391912560465,
+      "candidate_standard_error": 0.00014959391912560465,
+      "reference_rse": 0.005416798519937404,
+      "candidate_rse": 0.005416798519937404,
+      "status": "passed",
+      "n": 1200000,
+      "reference_mean": 0.027616666666666668,
+      "candidate_mean": 0.027616666666666668,
+      "difference": 0.0,
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 5.962161690338061e-06,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -3.321467658236097e-05,
+        3.321467658236097e-05
+      ],
+      "mismatch_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "transmitted",
+      "reference_standard_error": 0.0009958338553575437,
+      "candidate_standard_error": 0.0009958338553575437,
+      "reference_rse": 0.0018251952979771845,
+      "candidate_rse": 0.0018251952979771845,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 0.545604,
+      "candidate_mean": 0.545604,
+      "difference": 0.0,
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 2.8618051923393878e-05,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.0001594309524604362,
+        0.0001594309524604362
+      ],
+      "mismatch_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "backscattered",
+      "reference_standard_error": 0.000988341834378332,
+      "candidate_standard_error": 0.000988341834378332,
+      "reference_rse": 0.0023317208054826786,
+      "candidate_rse": 0.0023317208054826786,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 0.423868,
+      "candidate_mean": 0.423868,
+      "difference": 0.0,
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 2.8618051923393878e-05,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.0001594309524604362,
+        0.0001594309524604362
+      ],
+      "mismatch_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "side_exited",
+      "reference_standard_error": 0.0,
+      "candidate_standard_error": 0.0,
+      "reference_rse": null,
+      "candidate_rse": null,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 0.0,
+      "candidate_mean": 0.0,
+      "difference": 0.0,
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 2.8618051923393878e-05,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.0001594309524604362,
+        0.0001594309524604362
+      ],
+      "mismatch_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "stopped",
+      "reference_standard_error": 0.0003440706880897494,
+      "candidate_standard_error": 0.0003440706880897494,
+      "reference_rse": 0.011270659332080366,
+      "candidate_rse": 0.011270659332080366,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 0.030528,
+      "candidate_mean": 0.030528,
+      "difference": 0.0,
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 2.8618051923393878e-05,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.0001594309524604362,
+        0.0001594309524604362
+      ],
+      "mismatch_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "transmitted_energy_keV_per_primary",
+      "reference_standard_error": 0.249082255681229,
+      "candidate_standard_error": 0.2490822557171621,
+      "reference_rse": 0.0018696293181184552,
+      "candidate_rse": 0.0018696293176181263,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 133.22547590979087,
+      "candidate_mean": 133.22547596466254,
+      "difference": 5.487164185728233e-08,
+      "difference_ci": [
+        -0.04782927442377798,
+        0.04782938416706169
+      ],
+      "margin": 1.5,
+      "known_score_bound": 300.000001,
+      "nonzero_pairs": 136401,
+      "mismatch_probability_upper": 0.5487543218693979,
+      "paired_standard_error": 1.0500288491181982e-08,
+      "empirical_bernstein_ci": [
+        -0.04782927442377798,
+        0.04782938416706169
+      ],
+      "mismatch_ci": [
+        -164.62629710957367,
+        164.62629710957367
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "photons_ge10kev",
+      "reference_standard_error": 0.00039912221544054823,
+      "candidate_standard_error": 0.00039912221544054823,
+      "reference_rse": 0.010320702716191257,
+      "candidate_rse": 0.010320702716191257,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 0.038672,
+      "candidate_mean": 0.038672,
+      "difference": 0.0,
+      "difference_ci": [
+        -0.0008585415577018164,
+        0.0008585415577018164
+      ],
+      "margin": 0.001908,
+      "known_score_bound": 30,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 2.8618051923393878e-05,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.004782928573813085,
+        0.004782928573813085
+      ],
+      "mismatch_ci": [
+        -0.0008585415577018164,
+        0.0008585415577018164
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "photons_10_50kev",
+      "reference_standard_error": 0.00031119856583568885,
+      "candidate_standard_error": 0.00031119856583568885,
+      "reference_rse": 0.0131863799082919,
+      "candidate_rse": 0.0131863799082919,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 0.0236,
+      "candidate_mean": 0.0236,
+      "difference": 0.0,
+      "difference_ci": [
+        -0.0008585415577018164,
+        0.0008585415577018164
+      ],
+      "margin": 0.001188,
+      "known_score_bound": 30,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 2.8618051923393878e-05,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.004782928573813085,
+        0.004782928573813085
+      ],
+      "mismatch_ci": [
+        -0.0008585415577018164,
+        0.0008585415577018164
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "photons_50_100kev",
+      "reference_standard_error": 0.00017911425736570716,
+      "candidate_standard_error": 0.00017911425736570716,
+      "reference_rse": 0.02246791989032955,
+      "candidate_rse": 0.02246791989032955,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 0.007972,
+      "candidate_mean": 0.007972,
+      "difference": 0.0,
+      "difference_ci": [
+        -0.00017170831154036327,
+        0.00017170831154036327
+      ],
+      "margin": 0.00037600000000000003,
+      "known_score_bound": 6,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 2.8618051923393878e-05,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.0009565857147626171,
+        0.0009565857147626171
+      ],
+      "mismatch_ci": [
+        -0.00017170831154036327,
+        0.00017170831154036327
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "photons_ge100kev",
+      "reference_standard_error": 0.00016811446413052088,
+      "candidate_standard_error": 0.00016811446413052088,
+      "reference_rse": 0.023678093539509983,
+      "candidate_rse": 0.023678093539509983,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 0.0071,
+      "candidate_mean": 0.0071,
+      "difference": 0.0,
+      "difference_ci": [
+        -8.585415577018163e-05,
+        8.585415577018163e-05
+      ],
+      "margin": 0.000344,
+      "known_score_bound": 3,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 2.8618051923393878e-05,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.00047829285738130854,
+        0.00047829285738130854
+      ],
+      "mismatch_ci": [
+        -8.585415577018163e-05,
+        8.585415577018163e-05
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "photon_energy_keV_per_primary",
+      "reference_standard_error": 0.032194279839733345,
+      "candidate_standard_error": 0.03219427744023951,
+      "reference_rse": 0.01333415223474852,
+      "candidate_rse": 0.01333415211357334,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 2.4144226999175644,
+      "candidate_mean": 2.414422541907838,
+      "difference": -1.5800972728854745e-07,
+      "difference_ci": [
+        -0.04782954729172808,
+        0.0478292312722735
+      ],
+      "margin": 1.5,
+      "known_score_bound": 300.000001,
+      "nonzero_pairs": 17773,
+      "mismatch_probability_upper": 0.0727315925900821,
+      "paired_standard_error": 2.5014286053284242e-08,
+      "empirical_bernstein_ci": [
+        -0.04782954729172808,
+        0.0478292312722735
+      ],
+      "mismatch_ci": [
+        -21.819477849756225,
+        21.819477849756225
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "continuous_loss_keV_per_primary",
+      "reference_standard_error": 0.10325321074128445,
+      "candidate_standard_error": 0.10325321082284217,
+      "reference_rse": 0.0016879150368404718,
+      "candidate_rse": 0.0016879150368200482,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 61.17204271996963,
+      "candidate_mean": 61.172042769028415,
+      "difference": 4.905879247127842e-08,
+      "difference_ci": [
+        -0.04782932527312131,
+        0.047829423390706255
+      ],
+      "margin": 1.5,
+      "known_score_bound": 300.000001,
+      "nonzero_pairs": 249908,
+      "mismatch_probability_upper": 0.9997414587608577,
+      "paired_standard_error": 2.139705161729712e-08,
+      "empirical_bernstein_ci": [
+        -0.04782932527312131,
+        0.047829423390706255
+      ],
+      "mismatch_ci": [
+        -299.92243862799876,
+        299.92243862799876
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "terminal_energy_keV_per_primary",
+      "reference_standard_error": 0.11164611513801938,
+      "candidate_standard_error": 0.1116461147941555,
+      "reference_rse": 0.00047224925314158,
+      "candidate_rse": 0.0004722492514694427,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 236.4135345801128,
+      "candidate_mean": 236.41353468906377,
+      "difference": 1.0895093463279082e-07,
+      "difference_ci": [
+        -0.04782924191616542,
+        0.04782945981803469
+      ],
+      "margin": 1.5,
+      "known_score_bound": 300.000001,
+      "nonzero_pairs": 242470,
+      "mismatch_probability_upper": 0.9709499980876657,
+      "paired_standard_error": 1.5719644373729277e-08,
+      "empirical_bernstein_ci": [
+        -0.04782924191616542,
+        0.04782945981803469
+      ],
+      "mismatch_ci": [
+        -291.2850003972497,
+        291.2850003972497
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "transmitted_mu_bin_0",
+      "reference_standard_error": 0.0005810789821591674,
+      "candidate_standard_error": 0.0005810789821591674,
+      "reference_rse": 0.006243059243619917,
+      "candidate_rse": 0.006243059243619917,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 0.093076,
+      "candidate_mean": 0.093076,
+      "difference": 0.0,
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 2.8618051923393878e-05,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.0001594309524604362,
+        0.0001594309524604362
+      ],
+      "mismatch_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "transmitted_mu_bin_1",
+      "reference_standard_error": 0.0009334224801525329,
+      "candidate_standard_error": 0.0009334224801525329,
+      "reference_rse": 0.002911413564703728,
+      "candidate_rse": 0.002911413564703728,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 0.320608,
+      "candidate_mean": 0.320608,
+      "difference": 0.0,
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 2.8618051923393878e-05,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.0001594309524604362,
+        0.0001594309524604362
+      ],
+      "mismatch_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "transmitted_mu_bin_2",
+      "reference_standard_error": 0.0006449427214725784,
+      "candidate_standard_error": 0.0006449427214725784,
+      "reference_rse": 0.005470994549494235,
+      "candidate_rse": 0.005470994549494235,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 0.117884,
+      "candidate_mean": 0.117884,
+      "difference": 0.0,
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 2.8618051923393878e-05,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.0001594309524604362,
+        0.0001594309524604362
+      ],
+      "mismatch_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "transmitted_mu_bin_3",
+      "reference_standard_error": 0.00023527894984621327,
+      "candidate_standard_error": 0.00023527894984621327,
+      "reference_rse": 0.016762535611727934,
+      "candidate_rse": 0.016762535611727934,
+      "status": "passed",
+      "n": 250000,
+      "reference_mean": 0.014036,
+      "candidate_mean": 0.014036,
+      "difference": 0.0,
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "margin": 0.005,
+      "known_score_bound": 1,
+      "nonzero_pairs": 0,
+      "mismatch_probability_upper": 2.8618051923393878e-05,
+      "paired_standard_error": 0.0,
+      "empirical_bernstein_ci": [
+        -0.0001594309524604362,
+        0.0001594309524604362
+      ],
+      "mismatch_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "comparisons": 32,
+      "joint_confidence": 0.95,
+      "method": "Two-method Bonferroni intersection; Maurer-Pontil Thm4 two-sided and exact binomial mismatch upper bound.",
+      "source": "https://www.cs.mcgill.ca/~colt2009/papers/012.pdf"
+    }
+  ],
+  "statuses": {
+    "passed": 32
+  },
+  "failures": [],
+  "missing": [],
+  "component_preflight": [
+    {
+      "variant": "fp64",
+      "source": {
+        "reference_sha256": "a5d6090478a27367a98fbe7808494ae2b3304394335076b54de07981df285ef2",
+        "variant_sha256": "a5d6090478a27367a98fbe7808494ae2b3304394335076b54de07981df285ef2"
+      },
+      "reports": [
+        {
+          "element": "Si",
+          "cases": 2000,
+          "table_key": "e0adf1e0df726a399449a1da9e02eb80a0fd5dcc16b72a0eb8d4bd2075298fa2",
+          "table_digest": "7bd17a28f6e0094153971e0531202e14ec6da1f4bf7922264b1022d4ff7990dd",
+          "finite": true,
+          "nonnegative": true,
+          "photon_support": true,
+          "max_scaled_soft_error": 2.5571016289411642e-16,
+          "max_scaled_hard_error": 1.3381630002150757e-15,
+          "max_inverse_error_over_incident_energy": 1.0627216300639286e-15,
+          "screening_passed": true
+        },
+        {
+          "element": "W",
+          "cases": 2000,
+          "table_key": "66519f6617ea19e5975790a5792cb7948ceb48e28958b322f808598b38397ce0",
+          "table_digest": "81855a6a59572b128669101947911ad0f5fea8c173d023733207c8579fadb542",
+          "finite": true,
+          "nonnegative": true,
+          "photon_support": true,
+          "max_scaled_soft_error": 2.6641463793253557e-16,
+          "max_scaled_hard_error": 6.396402789112562e-16,
+          "max_inverse_error_over_incident_energy": 3.637978807091713e-16,
+          "screening_passed": true
+        }
+      ],
+      "interpretation": "Component screening only: error floor is 1e-6 of maximum moment; tolerance 2e-4. This is not a full transport convergence/equivalence gate."
+    },
+    {
+      "variant": "rad-quotient32-24",
+      "source": {
+        "reference_sha256": "a5d6090478a27367a98fbe7808494ae2b3304394335076b54de07981df285ef2",
+        "variant_sha256": "051ebb410b02aa4b1ad3383d9ba71d92e5c9f90b5a651ff8ca00924d3a9d7b66"
+      },
+      "reports": [
+        {
+          "element": "Si",
+          "cases": 2000,
+          "table_key": "e0adf1e0df726a399449a1da9e02eb80a0fd5dcc16b72a0eb8d4bd2075298fa2",
+          "table_digest": "7bd17a28f6e0094153971e0531202e14ec6da1f4bf7922264b1022d4ff7990dd",
+          "finite": true,
+          "nonnegative": true,
+          "photon_support": true,
+          "max_scaled_soft_error": 2.4146130023897504e-07,
+          "max_scaled_hard_error": 2.872599304155004e-07,
+          "max_inverse_error_over_incident_energy": 3.1902859592810275e-06,
+          "screening_passed": true
+        },
+        {
+          "element": "W",
+          "cases": 2000,
+          "table_key": "66519f6617ea19e5975790a5792cb7948ceb48e28958b322f808598b38397ce0",
+          "table_digest": "81855a6a59572b128669101947911ad0f5fea8c173d023733207c8579fadb542",
+          "finite": true,
+          "nonnegative": true,
+          "photon_support": true,
+          "max_scaled_soft_error": 2.1560733310625096e-07,
+          "max_scaled_hard_error": 2.845850802251507e-07,
+          "max_inverse_error_over_incident_energy": 2.09255169184568e-06,
+          "screening_passed": true
+        }
+      ],
+      "interpretation": "Component screening only: error floor is 1e-6 of maximum moment; tolerance 2e-4. This is not a full transport convergence/equivalence gate."
+    }
+  ],
+  "interpretation": "Fixed-count finite-sample numerical mean-equivalence on frozen observables/scenes only, under independent pseudorandom primary-pair assumptions. Not physical sign-off, distributional identity, cross-engine validation or a time-to-precision ranking.",
+  "evidence": {
+    "archive": "scratch/quotient-results/quotient-evidence.tar.gz",
+    "archive_sha256": "3814b9ec2609d0fb1711db4c4087cd153ccc50cc128d2d234e82b2215774e6d2",
+    "remote_archive": "/home/aamador/pyrite-510-precision-20261015/scratch/quotient-evidence.tar.gz",
+    "gpu_jobs": [
+      {
+        "job": 1378,
+        "partition": "gpu",
+        "state": "COMPLETED",
+        "exit_code": "0:0",
+        "wall_seconds": 88
+      },
+      {
+        "job": 1379,
+        "partition": "gpu",
+        "state": "COMPLETED",
+        "exit_code": "0:0",
+        "wall_seconds": 109
+      },
+      {
+        "job": 1380,
+        "partition": "gpu",
+        "state": "COMPLETED",
+        "exit_code": "0:0",
+        "wall_seconds": 267
+      },
+      {
+        "job": 1381,
+        "partition": "gpu",
+        "state": "COMPLETED",
+        "exit_code": "0:0",
+        "wall_seconds": 516
+      },
+      {
+        "job": 1382,
+        "partition": "gpu",
+        "state": "COMPLETED",
+        "exit_code": "0:0",
+        "wall_seconds": 515
+      },
+      {
+        "job": 1383,
+        "partition": "gpu",
+        "state": "COMPLETED",
+        "exit_code": "0:0",
+        "wall_seconds": 519
+      },
+      {
+        "job": 1384,
+        "partition": "gpu",
+        "state": "COMPLETED",
+        "exit_code": "0:0",
+        "wall_seconds": 520
+      },
+      {
+        "job": 1385,
+        "partition": "gpu",
+        "state": "COMPLETED",
+        "exit_code": "0:0",
+        "wall_seconds": 543
+      },
+      {
+        "job": 1386,
+        "partition": "gpu",
+        "state": "COMPLETED",
+        "exit_code": "0:0",
+        "wall_seconds": 507
+      },
+      {
+        "job": 1387,
+        "partition": "gpu",
+        "state": "COMPLETED",
+        "exit_code": "0:0",
+        "wall_seconds": 508
+      },
+      {
+        "job": 1388,
+        "partition": "gpu",
+        "state": "COMPLETED",
+        "exit_code": "0:0",
+        "wall_seconds": 341
+      },
+      {
+        "job": 1389,
+        "partition": "gpu",
+        "state": "COMPLETED",
+        "exit_code": "0:0",
+        "wall_seconds": 339
+      }
+    ],
+    "gpu_allocation_wall_seconds": 4772,
+    "analysis_job": 1393,
+    "checksums": "All 12 GPU directories verified before analysis; downloaded archive SHA256 verified.",
+    "raw_retention": "Raw primary scores, generated CUDA, source snapshots, submitted scripts, allocations and logs retained in ignored archive and remote checkout."
+  }
+}
