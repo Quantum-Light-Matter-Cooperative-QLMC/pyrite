@@ -21,13 +21,13 @@ $$
 
 grows like $\sqrt{\gamma}$. Classical/quasiclassical treatments (Baier–Katkov, `G4ChannelingFastSimModel`) require $n_b \gg 1$; at hundreds of MeV that holds, at 1–10 MeV it does not:
 
-| $T$ | $\gamma$ | $pv$ | $2\gamma^2$ | $\psi_c$ Si(110) | $n_b$ Si(110) | forward $\hbar\omega$ for $\Delta E_\perp = 5{-}20$ eV |
+| $T$ | $\gamma$ | $pv$ | $2\gamma^2$ | $\psi_c$ Si(110) | $n_b$ Si(110), computed | forward $\hbar\omega$ for $\Delta E_\perp = 5{-}20$ eV |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 MeV | 2.96 | 1.34 MeV | 17.5 | 5.7 mrad | ~2 | 0.09–0.35 keV |
-| 3 MeV | 6.87 | 3.44 MeV | 94.4 | 3.6 mrad | ~4 | 0.5–1.9 keV |
-| 10 MeV | 20.6 | 10.5 MeV | 846 | 2.0 mrad | ~7 | 4–17 keV |
+| 1 MeV | 2.96 | 1.34 MeV | 17.5 | 5.7 mrad | 1 | 0.09–0.35 keV |
+| 3 MeV | 6.87 | 3.44 MeV | 94.4 | 3.6 mrad | 2 | 0.5–1.9 keV |
+| 10 MeV | 20.6 | 10.5 MeV | 846 | 2.0 mrad | 3 | 4–17 keV |
 
-using Si(110): $d_p = 1.92$ Å, $U_0 \approx 22$ eV at room temperature, and the critical angle $\psi_c = \sqrt{2 U_0 / pv}$.
+using Si(110): $d_p = 1.92$ Å, $U_0 \approx 21$ eV at 293 K, and the critical angle $\psi_c = \sqrt{2 U_0 / pv}$. The $n_b$ column is the bound-state count from the implemented eigensolve at $k=0$ (`materials.channeling`, ledger `cr-transverse-eigenproblem`); the WKB estimate above overcounts at these energies. It rises to 5 at 30 MeV, 6 at 40 MeV (matching Azadegan 2013) and 9 at 100 MeV.
 
 Three consequences frame the whole implementation:
 

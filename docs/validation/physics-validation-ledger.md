@@ -22,6 +22,7 @@ Each part file is one domain: its `H1` is the domain name and every `H2` is one 
 | [Mosaicity & multilayer](ledger-mosaicity-multilayer.md) | mosaic spread models and multilayer stack reflectivity |
 | [Detector forward models](ledger-detector-forward-models.md) | detector response, efficiency, and readout models |
 | [Grazing-incidence grating spectrometer](ledger-grazing-grating-spectrometer.md) | grating dispersion, efficiency, and grazing optics |
+| [Channeling](ledger-channeling.md) | planar continuum potential, thermal displacement, transverse states and kinematics for quantum channeling |
 
 ```{toctree}
 :maxdepth: 1
@@ -34,4 +35,5 @@ ledger-transport-background
 ledger-mosaicity-multilayer
 ledger-detector-forward-models
 ledger-grazing-grating-spectrometer
+ledger-channeling
 ```

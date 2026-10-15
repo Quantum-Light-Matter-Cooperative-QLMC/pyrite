@@ -11,8 +11,8 @@ Native transport treats every medium as amorphous. It scatters electrons from
 random-atom ELSEPA/Mott tables, and the crystal lattice enters only through the
 PXR/CBS emission kernels. Electrons aligned with a crystal plane or axis instead
 occupy discrete transverse states in the lattice's continuum potential. Below
-roughly 100 MeV those states are few: Si(110) has about 2 at 1 MeV and about 7
-at 10 MeV. Such states need a quantum treatment. Quasiclassical models
+roughly 100 MeV those states are few: Si(110) at room temperature has 1 bound
+state at 1 MeV, 3 at 10 MeV and 9 at 100 MeV. Such states need a quantum treatment. Quasiclassical models
 (Baier–Katkov, Geant4 `G4ChannelingFastSimModel`) are not defensible in that
 regime, and the documented Geant4 production threshold is 200 MeV.
 
