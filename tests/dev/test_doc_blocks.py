@@ -8,7 +8,7 @@ renamed Python API symbol used in a guide. This module is that check:
 - every ``bash`` block is resolved against the live Click (``pyrite``) and
   argparse (``pyrite-dev``) command trees, or carries an explicit
   ``<!-- verify: skip (reason) -->`` marker (never both silently);
-- the 4 ``python`` blocks in ``python-api-workflow.md`` execute in document
+- the 11 ``python`` blocks in ``python-api-workflow.md`` execute in document
   order as one accumulating namespace (measured cost ~2.5s on CPU -- cheap
   enough to run directly here rather than split into a bind-only fast tier
   plus a separate integration-tier execution pass; see Decision 1 in the task
@@ -107,7 +107,7 @@ def _python_blocks() -> list[FencedBlock]:
 @pytest.mark.slow
 def test_python_api_workflow_executes_as_one_accumulating_namespace():
     blocks = _python_blocks()
-    assert len(blocks) == 10
+    assert len(blocks) == 11
 
     namespace: dict[str, object] = {}
     for block in blocks:
@@ -160,7 +160,7 @@ def test_python_api_workflow_executes_as_one_accumulating_namespace():
 def test_sweep_profiles_toml_blocks_are_valid_and_internally_consistent():
     path = GUIDES / "sweep-profiles.md"
     toml_blocks = [b for b in extract_fenced_blocks(path) if b.language == "toml"]
-    assert len(toml_blocks) == 4
+    assert len(toml_blocks) == 5
 
     errors = [error for block in toml_blocks for error in check_toml_block(block)]
     assert not errors, "\n".join(errors)

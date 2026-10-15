@@ -23,6 +23,7 @@ def test_root_exports_stay_frozen() -> None:
         "__version__",
         "Analysis",
         "Acquisition",
+        "NativeAcquisition",
         "AcquisitionBatch",
         "Beam",
         "BunchLength",
