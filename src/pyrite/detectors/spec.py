@@ -131,7 +131,9 @@ class Timepix3:
     bias_v
         Sensor bias in volts; ``None`` uses hardware default.
     dE_mc, dE_out
-        Monte Carlo input and recorded-output bin widths in eV.
+        Numerical response-input and measured-output histogram widths in eV.
+        They approximate continuous recorded energies, not ADC/ToT quantization
+        or the acquisition reporting bins.
     n_mc
         Simulated photons per coarse input energy.
     seed

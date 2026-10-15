@@ -1911,6 +1911,8 @@ Options:
   --timepix-samples N             Timepix3 response Monte Carlo photons per input bin.
   --timepix-seed N                Timepix3 response-matrix seed.
   --exposure-s S                  Exposure (integration) time in s.
+  --reporting-bins [native]       Use the union of component native response bins;
+                                  resolved per observation.
   --measured-edges-ev EV,...      Explicit half-open reporting-bin edges in eV, strictly
                                   increasing.
   --measured-range-ev MIN MAX     Uniform reporting range in eV; use with --measured-
@@ -3102,6 +3104,8 @@ Options:
   --timepix-samples N             Timepix3 response Monte Carlo photons per input bin.
   --timepix-seed N                Timepix3 response-matrix seed.
   --exposure-s S                  Exposure (integration) time in s.
+  --reporting-bins [native]       Use the union of component native response bins;
+                                  resolved per observation.
   --measured-edges-ev EV,...      Explicit half-open reporting-bin edges in eV, strictly
                                   increasing.
   --measured-range-ev MIN MAX     Uniform reporting range in eV; use with --measured-
@@ -3215,6 +3219,8 @@ Options:
   --timepix-samples N             Timepix3 response Monte Carlo photons per input bin.
   --timepix-seed N                Timepix3 response-matrix seed.
   --exposure-s S                  Exposure (integration) time in s.
+  --reporting-bins [native]       Use the union of component native response bins;
+                                  resolved per observation.
   --measured-edges-ev EV,...      Explicit half-open reporting-bin edges in eV, strictly
                                   increasing.
   --measured-range-ev MIN MAX     Uniform reporting range in eV; use with --measured-

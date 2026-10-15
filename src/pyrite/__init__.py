@@ -121,6 +121,7 @@ if TYPE_CHECKING:
     from pyrite.instrument import (
         FilterPlate as FilterPlate,
     )
+    from pyrite.instrument import NativeAcquisition as NativeAcquisition
     from pyrite.instrument import (
         PixelGrid as PixelGrid,
     )
@@ -167,6 +168,7 @@ if TYPE_CHECKING:
 _PUBLIC_OBJECTS = {
     "Analysis": ("pyrite.campaign.model", "Analysis"),
     "Acquisition": ("pyrite.instrument", "Acquisition"),
+    "NativeAcquisition": ("pyrite.instrument", "NativeAcquisition"),
     "AcquisitionBatch": ("pyrite.instrument", "AcquisitionBatch"),
     "Beam": ("pyrite.campaign.beam", "Beam"),
     "BunchLength": ("pyrite.campaign.beam", "BunchLength"),

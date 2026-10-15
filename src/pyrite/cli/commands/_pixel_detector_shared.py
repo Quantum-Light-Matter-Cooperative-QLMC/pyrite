@@ -114,6 +114,11 @@ def pixel_cli_options(function):
         "--exposure-s", type=POSITIVE_FLOAT, metavar="S", help="Exposure (integration) time in s."
     )
     @click.option(
+        "--reporting-bins",
+        type=click.Choice(("native",)),
+        help="Use the union of component native response bins; resolved per observation.",
+    )
+    @click.option(
         "--measured-edges-ev",
         type=MEASURED_EDGES_CSV,
         metavar="EV,...",
@@ -161,6 +166,9 @@ def pixel_cli_options(function):
 def _acquisition_changes(values):
     edges = values["measured_edges_ev"]
     uniform = values["measured_range_ev"], values["measured_bin_width_ev"]
+    native = values.get("reporting_bins")
+    if native is not None and (edges is not None or any(item is not None for item in uniform)):
+        raise click.UsageError("--reporting-bins native conflicts with explicit measured bins")
     if edges is not None and any(item is not None for item in uniform):
         raise click.UsageError(
             "use --measured-edges-ev or --measured-range-ev with --measured-bin-width-ev, not both"
@@ -176,6 +184,8 @@ def _acquisition_changes(values):
     if values["realization"] == "expected" and values["realization_seed"] is not None:
         raise click.UsageError("--realization-seed applies only to --realization poisson")
     changes = {}
+    if native is not None:
+        changes["reporting_bins"] = native
     if values["exposure_s"] is not None:
         changes["exposure_s"] = values["exposure_s"]
     if edges is not None:

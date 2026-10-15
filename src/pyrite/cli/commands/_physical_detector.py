@@ -61,7 +61,9 @@ def _payload(document, text, name):
         "physical_detector": None if effective is None else _plain(effective),
         "counting_observation": observation is not None,
         "measured_edges_eV": (
-            None if observation is None else list(observation.acquisition.measured_edges_eV)
+            None
+            if observation is None or not hasattr(observation.acquisition, "measured_edges_eV")
+            else list(observation.acquisition.measured_edges_eV)
         ),
         "scalar_projection": None if observation is None else _projection(observation),
     }
@@ -128,10 +130,13 @@ def show_command(name, json_output):
         emit_result("  counting observation: no (add an acquisition to enable)")
         return 0
     edges = payload["measured_edges_eV"]
-    emit_result(
-        f"  counting observation: yes, {len(edges) - 1} reporting bins "
-        f"{edges[0]:g}-{edges[-1]:g} eV"
-    )
+    if edges is None:
+        emit_result("  counting observation: yes, native reporting bins (resolved per observation)")
+    else:
+        emit_result(
+            f"  counting observation: yes, {len(edges) - 1} reporting bins "
+            f"{edges[0]:g}-{edges[-1]:g} eV"
+        )
     projection = payload["scalar_projection"]
     emit_result(
         "  scalar projection used by sweeps: "

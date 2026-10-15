@@ -88,6 +88,11 @@ The **divergence-only key rule** compounds this. A run-affecting key is *omitted
 
 ### The detector is not one object
 
+Historical diagnosis: the description below predates the supported scene API.
+Current detectors own acceptance/response, `Numerics.energy_bins` owns sampled
+true photon energies, and acquisitions own reporting intervals. Profiles now
+support detector collections.
+
 Two disjoint notions share the name:
 
 * `DetectorSpec` ({file}`src/pyrite/detectors/spec.py` line 54) supplies `observation_angle_deg`, `polar_acceptance_deg`, and `solid_angle_sr` to the case. Its remaining fields — `response_model`, `qe_curve`, `pixel_pitch_um`, `sensor_thickness_um`, `distance_mm`, `threshold_eV` — are documented as inert and are read by nothing.
@@ -306,7 +311,13 @@ target = pr.Slab(
 
 ### Target state
 
-A `Detector` owns its acceptance, its binning, and its response, and a run may carry more than one:
+Historical proposal (superseded grid ownership): the original `Detector`
+owned acceptance, binning, and response, and a run could carry more than one.
+Current source sampling belongs to `Numerics.energy_bins`; response numerical
+histograms belong to the response; acquisition reporting edges belong to a
+concrete `Acquisition`. Native requests resolve over all component output axes
+before observation identity or storage. No axis implies hardware quantization.
+The following example and migration bullets retain the original proposal:
 
 ```python
 detector = pr.Detector(
@@ -326,7 +337,7 @@ ordinary runs retain automatic sizing and optional explicit artifacts.
 Two structural consequences:
 
 * `DetectorSpec`'s currently inert fields either become live through the `response` object or are deleted. An inert field that never becomes live is a liability in a hashed payload.
-* The photon-energy grid becomes `detector.energy_bins`. Today's separate line and bremsstrahlung grids remain, expressed as two binnings on the detector — the physical reason for the split (fine and narrow for the coherent lines, coarse and wide for the smooth continuum) is unchanged and should be documented on the object.
+* Historical proposal, superseded by #452: the photon-energy grid becomes `detector.energy_bins`. Today's separate line and bremsstrahlung grids remain, expressed as two binnings on the detector — the physical reason for the split (fine and narrow for the coherent lines, coarse and wide for the smooth continuum) is unchanged and should be documented on the object.
 
 ### Effect on `pyrite energy-grid`
 

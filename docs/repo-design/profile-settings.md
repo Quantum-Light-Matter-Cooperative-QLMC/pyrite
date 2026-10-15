@@ -116,3 +116,15 @@ IDs retain their storage until explicit `profile detector migrate NAME`
 `profile set --detector` shortcut updates one collection entry and rejects
 ambiguous collections. See [detector workflow](../guides/sweep-profiles.md) for
 membership, optional-section resets, migration, and inspection JSON.
+
+## Pixel acquisition reporting bins
+
+Within a detector's `acquisition` table, choose exactly one axis form:
+`measured_edges_eV`, uniform `measured_min_eV`/`measured_max_eV`/
+`measured_bin_width_eV`, or `reporting_bins = "native"`. The native form needs
+only `exposure_s`; optional `hit_threshold_eV`, `mode` and `seed` behave as for
+explicit edges. `profile detector set PROFILE ID --reporting-bins native` and
+`detector create|set NAME --reporting-bins native` replace prior axis settings.
+Concrete native edges resolve per complete observation before identity or
+storage, with at most 65,536 reporting bins. See the
+[profile detector workflow](../guides/sweep-profiles.md).

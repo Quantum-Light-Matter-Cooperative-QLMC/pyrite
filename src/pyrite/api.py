@@ -27,6 +27,7 @@ from .instrument import (
     Acquisition,
     Filter,
     FilterPlate,
+    NativeAcquisition,
     PixelScorer,
     PlanarDetector,
     ResolvedObservation,
@@ -219,7 +220,7 @@ def simulate(
     physics: Physics | None = None,
     numerics: Numerics | None = None,
     filters: tuple[FilterPlate | Filter, ...] = (),
-    acquisition: Acquisition | None = None,
+    acquisition: Acquisition | NativeAcquisition | None = None,
 ) -> Result:
     """Simulate one scene without reading or writing a checkpoint.
 
@@ -244,6 +245,10 @@ def simulate(
         Sampling and execution controls. ``None`` uses :class:`~pyrite.Numerics`.
     filters
         Ordered ``Filter`` or ``FilterPlate`` values; require a physical planar detector.
+    acquisition
+        Concrete reporting edges or an ``Acquisition.native(...)`` request;
+        requires a physical pixel detector with native response scoring.
+
     Returns
     -------
     Result
@@ -448,6 +453,7 @@ def _simulate_planar(
         observation_digest = stored.digest
         observation = dict(stored.identity.payload)
         identity_provenance = {
+            **stored.provenance,
             "true_spatial_digest": stored.identity.true_spatial_digest,
             "response_digest": stored.identity.response_digest,
             "acquisition_digest": stored.identity.acquisition_digest,

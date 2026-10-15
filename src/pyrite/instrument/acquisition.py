@@ -13,7 +13,59 @@ import numpy as np
 from scipy.constants import elementary_charge
 
 from ..detectors import Detector, NativeSpectrum
-from .observation import REALIZATION_RNG, Acquisition
+from .observation import REALIZATION_RNG, Acquisition, NativeAcquisition
+
+MAX_NATIVE_REPORTING_BINS = 65_536
+
+
+def resolve_acquisition(
+    request: Acquisition | NativeAcquisition,
+    detector: Detector,
+    energy_axes: Sequence[np.ndarray],
+) -> tuple[Acquisition, dict[str, str]]:
+    """Resolve a request once over all enabled component source axes.
+
+    Native scoring supplies measured-output bounds without projecting onto a
+    source mesh. Exact sorting/deduplication makes the union independent of
+    component order. Policy metadata stays outside the acquisition identity.
+    """
+    if isinstance(request, Acquisition):
+        return request, {}
+    if not isinstance(request, NativeAcquisition):
+        raise TypeError("acquisition must be an Acquisition or native request")
+    axes = []
+    for energy in energy_axes:
+        energy = np.asarray(energy, dtype=float)
+        if not any(np.array_equal(energy, previous) for previous in axes):
+            axes.append(energy)
+    if not axes:
+        raise ValueError("native reporting bins require component energy axes")
+    edges = np.unique(
+        np.concatenate([detector.native_score(axis, np.zeros(axis.size)).edges_eV for axis in axes])
+    )
+    if edges.size - 1 > MAX_NATIVE_REPORTING_BINS:
+        raise ValueError(
+            "native reporting axis exceeds 65,536 bins; supply explicit measured_edges_eV"
+        )
+    from ..detectors import IdealPhotonCounter
+
+    return (
+        Acquisition(
+            exposure_s=request.exposure_s,
+            measured_edges_eV=tuple(edges),
+            hit_threshold_eV=request.hit_threshold_eV,
+            mode=request.mode,
+            seed=request.seed,
+        ),
+        {
+            "policy": "native",
+            "source": (
+                "source-midpoint-cells"
+                if isinstance(detector.response, IdealPhotonCounter)
+                else "response-measured-output"
+            ),
+        },
+    )
 
 
 def _readonly(value: object, *, dtype=None) -> np.ndarray:

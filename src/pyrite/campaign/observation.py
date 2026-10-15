@@ -105,7 +105,10 @@ def resolve_profile_observation(
         reconstruction=cast(Any, scorer_row.get("reconstruction", "nearest_tile")),
     )
     acquisition_row = cast(Mapping[str, object], row["acquisition"])
-    acquisition = Acquisition(**cast(dict[str, Any], dict(acquisition_row)))
+    acquisition_values = dict(acquisition_row)
+    policy = acquisition_values.pop("reporting_bins", None)
+    constructor = Acquisition.native if policy == "native" else Acquisition
+    acquisition = constructor(**cast(dict[str, Any], acquisition_values))
     filters = tuple(
         filter_from_config(filter_row)
         for filter_row in catalog.profile_filters.get(profile_name, ())
