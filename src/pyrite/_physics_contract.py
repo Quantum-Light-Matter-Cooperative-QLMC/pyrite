@@ -215,6 +215,19 @@ BUILTIN_DESCRIPTORS = DescriptorCatalog(
             required_datasets=("channeling_thermal",),
         ),
         ModelDescriptor(
+            "emission.channeling",
+            "planar",
+            "montecarlo.runner.channeling_emission",
+            (
+                "planar channeling entrance zone",
+                "constant-energy expected-value source",
+                "no replay, directions, streaming or adaptive precision",
+            ),
+            implementations=("cpu",),
+            output_slots=("spec_channeling",),
+            required_datasets=("channeling_thermal", "shell-configuration"),
+        ),
+        ModelDescriptor(
             "emission.characteristic",
             "characteristic",
             "montecarlo.runner.emission",

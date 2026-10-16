@@ -55,7 +55,7 @@ import numpy as np
 #: Physics-generation marker of the planar zone and its handoff. It joins
 #: ``case_content_key`` and run provenance only for cases with a ``channeling``
 #: record, so channeling-off identities are unchanged.
-CHANNELING_MODEL = "planar-density-matrix-handoff-v1"
+CHANNELING_MODEL = "planar-density-matrix-emission-v2"
 
 #: Per-electron fates, in sampling order.
 FATE_ENTRY, FATE_FREE, FATE_OVERFLOW, FATE_BOUND = 0, 1, 2, 3
@@ -151,6 +151,28 @@ class ZoneEnsemble:
 
 
 @lru_cache(maxsize=8)
+def zone_solver(
+    crystal: str,
+    plane: tuple[int, int, int],
+    temperature_K: float,
+    kinetic_eV: float,
+    basis_size: int,
+    bloch_cells: int,
+    margin_eV: float,
+):
+    """Cached static profile and dynamics shared by transport and CR scoring."""
+    from ...materials.channeling.potential import planar_profile
+    from .density import DensityMatrixSolver
+    from .operators import electronic_kernel, tds_kernel
+
+    profile = planar_profile(crystal, plane, temperature_K)
+    kernel = tds_kernel(
+        profile, kinetic_eV, n_cells=bloch_cells, max_order=basis_size
+    ) + electronic_kernel(profile, kinetic_eV, n_cells=bloch_cells, max_order=basis_size)
+    return profile, DensityMatrixSolver(profile, kinetic_eV, kernel, margin_eV=margin_eV)
+
+
+@lru_cache(maxsize=8)
 def _solve(
     crystal: str,
     plane: tuple[int, int, int],
@@ -165,15 +187,9 @@ def _solve(
     divergence_rad: float,
     stopping_eV_per_ang: float,
 ):
-    from ...materials.channeling.potential import planar_profile
-    from .density import DensityMatrixSolver
-    from .operators import electronic_kernel, tds_kernel
-
-    profile = planar_profile(crystal, plane, temperature_K)
-    kernel = tds_kernel(
-        profile, kinetic_eV, n_cells=bloch_cells, max_order=basis_size
-    ) + electronic_kernel(profile, kinetic_eV, n_cells=bloch_cells, max_order=basis_size)
-    solver = DensityMatrixSolver(profile, kinetic_eV, kernel, margin_eV=margin_eV)
+    profile, solver = zone_solver(
+        crystal, plane, temperature_K, kinetic_eV, basis_size, bloch_cells, margin_eV
+    )
     p_inv_ang = solver.gamma0 * solver.beta0 * 510998.95 / 1973.269804
     step = profile.g_inv_ang / bloch_cells
     if p_inv_ang * divergence_rad / step < 1.0:
@@ -187,6 +203,28 @@ def _solve(
     )
     minimum, _ = profile.extrema()
     return result, solver, profile, divergence_rad, float(solver.barrier_eV - minimum)
+
+
+def case_plane_incidence(case):
+    """Resolve the case's planes in the same slab frame as native transport."""
+    from ...materials.channeling.entry import plane_incidence
+    from ...materials.crystal import CRYSTALS, _orientation_R
+
+    rotation = _orientation_R(
+        CRYSTALS[case["crystal"]]["lattice"],
+        case.get("beam_uvw"),
+        case.get("azimuth_rad", 0.0),
+        case.get("recip_miscut_rad"),
+        surface_hkl=case.get("surface_hkl"),
+    )
+    return plane_incidence(
+        case["crystal"],
+        tuple(int(v) for v in case["channeling"]["plane_hkl"]),
+        float(case["E0_keV"]) * 1e3,
+        tilt_deg=float(case.get("tilt_deg", 0.0)),
+        tilt_azim_deg=float(case.get("tilt_azim_deg", 0.0)),
+        rotation=np.eye(3) if rotation is None else rotation,
+    )
 
 
 def solve_zone(case, beam_dir: np.ndarray, v_hat: np.ndarray, stopping_keV_per_ang: float):
@@ -203,8 +241,7 @@ def solve_zone(case, beam_dir: np.ndarray, v_hat: np.ndarray, stopping_keV_per_a
 
     Validation: cr-zone-handoff-accounting
     """
-    from ...materials.channeling.entry import plane_incidence
-    from ...materials.crystal import CRYSTALS, HBARC_EV_ANG, _orientation_R
+    from ...materials.crystal import HBARC_EV_ANG
 
     record = case["channeling"]
     path = float(case["thickness_ang"]) / float(beam_dir[2])
@@ -216,21 +253,7 @@ def solve_zone(case, beam_dir: np.ndarray, v_hat: np.ndarray, stopping_keV_per_a
         )
     plane = tuple(int(v) for v in record["plane_hkl"])
     kinetic_eV = float(case["E0_keV"]) * 1e3
-    rotation = _orientation_R(
-        CRYSTALS[case["crystal"]]["lattice"],
-        case.get("beam_uvw"),
-        case.get("azimuth_rad", 0.0),
-        case.get("recip_miscut_rad"),
-        surface_hkl=case.get("surface_hkl"),
-    )
-    incidence = plane_incidence(
-        case["crystal"],
-        plane,
-        kinetic_eV,
-        tilt_deg=float(case.get("tilt_deg", 0.0)),
-        tilt_azim_deg=float(case.get("tilt_azim_deg", 0.0)),
-        rotation=np.eye(3) if rotation is None else rotation,
-    )
+    incidence = case_plane_incidence(case)
     normal = incidence.plane_normal
     psi = np.arcsin(np.clip(np.asarray(v_hat) @ normal, -1.0, 1.0))
     divergence = float(np.std(psi)) if psi.size > 1 else 0.0

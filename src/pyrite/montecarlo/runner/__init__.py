@@ -559,6 +559,8 @@ def _transport_case(
         )
 
     tp: dict[str, Any] = dict(spectrum_inputs, segs=segs_all)
+    if channeling:
+        tp["channeling_beam_dir"] = beam
     if timed:
         tp["_t_transport"] = perf_counter() - t0
         tp["_t_worker_return"] = perf_counter()
@@ -1131,6 +1133,10 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 }
     if spec_coherent is not None:
         out["spec_coherent"] = spec_coherent
+    if case.get("channeling") is not None:
+        from .channeling_emission import case_channeling_spectrum
+
+        out["spec_channeling"] = case_channeling_spectrum(case, tp)
     if coherent_yield_record is not None:
         out["line_grid_coherent_yield_audit"] = coherent_yield_record
     out.update(temporal_outputs(temporal, temporal_coherent))

@@ -537,6 +537,39 @@ class _History:
     z_ang: np.ndarray
     rates: np.ndarray  # (n_z, n_lines) [1/angstrom]
     bound: np.ndarray  # (n_z,)
+    interval_weight: np.ndarray | None = None
+
+    def integrate(self, values: np.ndarray) -> np.ndarray:
+        """Path integral per incident electron; values have depth as axis zero.
+
+        Validation: cr-persisted-channel
+        """
+        if self.interval_weight is None:
+            return np.trapezoid(values, self.z_ang, axis=0)
+        weight = np.diff(self.z_ang) * self.interval_weight
+        weight = weight.reshape((-1,) + (1,) * (values.ndim - 1))
+        return np.sum(0.5 * (values[:-1] + values[1:]) * weight, axis=0)
+
+    def censored(self, path_limits_ang: np.ndarray | Sequence[float]) -> _History:
+        """Interpolate at face/cutoff endpoints and weight surviving entrance paths.
+
+        Each incident primary has one geometric/cutoff limit, including zero
+        for a miss. Quantum dechanneling is already in ``rates`` and must not
+        enter these weights a second time. Piecewise linear rates are the
+        same trapezoid approximation as the uncensored history.
+
+        Validation: cr-persisted-channel
+        """
+        limits = np.asarray(path_limits_ang, dtype=float)
+        if limits.ndim != 1 or not limits.size or np.any(~np.isfinite(limits)):
+            raise ValueError("path_limits_ang must be a nonempty finite one-dimensional array")
+        limits = np.sort(np.clip(limits, 0.0, self.z_ang[-1]))
+        z = np.unique(np.concatenate((self.z_ang, limits)))
+        rates = np.empty((z.size, self.rates.shape[1]))
+        for i in range(self.rates.shape[1]):
+            rates[:, i] = np.interp(z, self.z_ang, self.rates[:, i])
+        weight = (limits.size - np.searchsorted(limits, z[1:], side="left")) / limits.size
+        return _History(z, rates, np.interp(z, self.z_ang, self.bound), weight)
 
 
 def _depth_history(
@@ -658,6 +691,8 @@ def channeling_spectrum(
     cluster_tol_eV: float | None = None,
     n_aperture: int = 6,
     n_divergence: int = 9,
+    surface_normal: np.ndarray | Sequence[float] | None = None,
+    path_limits_ang: np.ndarray | Sequence[float] | None = None,
 ) -> ChannelingSpectrum:
     """Return the channeling-radiation spectrum per electron.
 
@@ -679,8 +714,8 @@ def channeling_spectrum(
     ``s = cos theta_e / (gamma^2 beta D) + d ln Delta E_perp / d ln gamma``
     (``-> 2 + d ln Delta E / d ln gamma`` forward; the walkthrough's
     ``2 delta gamma / gamma`` is its kinematic part). The face normal is the
-    mean beam axis ``z``; photons leave through the exit face along the lab
-    direction ``n``, attenuated by ``_stack_tau`` at each line centre over
+    mean beam axis ``z`` by default; ``surface_normal`` allows a tilted slab.
+    Photons leave along the lab direction ``n``, attenuated by ``_stack_tau`` at each line centre over
     ``layers`` (default: one slab of ``solver.profile.crystal`` over
     ``[0, thickness]``).
 
@@ -690,7 +725,8 @@ def channeling_spectrum(
         Density-matrix solver (profile, entry energy, kernel and margin). The
         margin sets which free states are tracked and can capture.
     thickness_ang
-        Crystal thickness [angstrom].
+        Mean electron path length [angstrom]; the slab-normal thickness is
+        this length times the normalized ``surface_normal`` z component.
     photon_energy_eV
         Photon energy grid [eV].
     theta_rad, phi_rad
@@ -716,6 +752,14 @@ def channeling_spectrum(
     n_aperture, n_divergence
         Quadrature orders of the aperture and in-plane divergence averages;
         raise them when the Doppler spread exceeds the Lorentzian width.
+    surface_normal
+        Slab inward normal in the beam/plane frame (x normal to the planes,
+        z along the mean beam). Default ``(0, 0, 1)``. Layer depths use this
+        normal, rather than the electron path coordinate.
+    path_limits_ang
+        Optional face/cutoff path lengths of all incident primaries, including
+        zeros for misses. Weight the ensemble source by geometric survival;
+        dechanneling must not be included here because it is already in rho.
 
     Returns
     -------
@@ -731,25 +775,39 @@ def channeling_spectrum(
     tracked free states give zero capture; with ``absorption=False`` the
     energy and solid-angle integral of a point detector equals the yields.
 
-    Validation: cr-yield-assembly, cr-line-shape, cr-capture-yield
+    Validation: cr-yield-assembly, cr-line-shape, cr-capture-yield, cr-persisted-channel
     """
     energies = np.asarray(photon_energy_eV, dtype=float)
     theta, phi = np.broadcast_arrays(
         np.asarray(theta_rad, dtype=float), np.asarray(phi_rad, dtype=float)
     )
     shape = theta.shape
+    normal = np.asarray((0.0, 0.0, 1.0) if surface_normal is None else surface_normal, dtype=float)
+    if normal.shape != (3,) or not np.all(np.isfinite(normal)) or np.linalg.norm(normal) == 0:
+        raise ValueError("surface_normal must be a finite nonzero three-vector")
+    normal = normal / np.linalg.norm(normal)
+    if normal[2] <= 0:
+        raise ValueError("surface_normal must point into the slab along the mean beam")
     lines = emission_lines(solver, include_capture=include_capture, cluster_tol_eV=cluster_tol_eV)
     history = _depth_history(
         solver, lines, thickness_ang, dz_ang, sample_ang, incidence_rad, divergence_rad
     )
-    line_yield = np.trapezoid(history.rates, history.z_ang, axis=0)
+    if path_limits_ang is not None:
+        history = history.censored(path_limits_ang)
+    line_yield = history.integrate(history.rates)
     spectrum = np.zeros(shape + (energies.size,))
     capture = np.zeros_like(spectrum)
     q_sum = np.zeros_like(spectrum)
     u_sum = np.zeros_like(spectrum)
     if lines.size and np.any(line_yield > 0.0):
         if absorption and layers is None:
-            layers = [(0.0, float(thickness_ang), _resolve_composition(solver.profile.crystal))]
+            layers = [
+                (
+                    0.0,
+                    float(thickness_ang) * normal[2],
+                    _resolve_composition(solver.profile.crystal),
+                )
+            ]
         gamma = lines.gamma
         sigma_gamma_rel = float(energy_spread_eV) / M_E_EV / gamma
         radius, chi, ap_weight = _direction_nodes(float(aperture_rad), n_aperture)
@@ -766,7 +824,8 @@ def channeling_spectrum(
             t2 = np.array([-np.sin(p0), np.cos(p0), 0.0])
             for r, c, wa in zip(radius, chi, ap_weight, strict=True):
                 n = np.cos(r) * n0 + np.sin(r) * (np.cos(c) * t1 + np.sin(c) * t2)
-                if n[2] <= 0.0:
+                normal_cosine = float(n @ normal)
+                if absorption and abs(normal_cosine) < 1e-12:
                     continue
                 for s, wp in zip(psi, psi_weight, strict=True):
                     ye = n[1] * np.cos(s) - n[2] * np.sin(s)
@@ -776,9 +835,11 @@ def channeling_spectrum(
                     if absorption:
                         centre = lines.delta_eV / float(_denominator(gamma, theta_e))
                         e_grid = np.broadcast_to(centre[:, None], (lines.size, history.z_ang.size))
-                        tau = _stack_tau(layers, history.z_ang[None, :], float(n[2]), e_grid)
+                        tau = _stack_tau(
+                            layers, history.z_ang[None, :] * normal[2], normal_cosine, e_grid
+                        )
                         attenuated = np.exp(-np.asarray(tau, dtype=float))
-                        yields = np.trapezoid(history.rates.T * attenuated, history.z_ang, axis=1)
+                        yields = history.integrate(history.rates * attenuated.T)
                     else:
                         yields = line_yield
                     weight = wa * wp * float(boosted_dipole_pattern(theta_e, phi_e, gamma))
