@@ -72,6 +72,7 @@ def test_planar_adds_one_record_and_the_marker(planar_case):
     view = resolved_physics_view(planar_case, table_markers={})
     assert ("channeling_model", CHANNELING_MODEL) in view.model_markers
     assert "transport.channeling/planar" in view.descriptor_ids
+    assert "emission.channeling/planar" in view.descriptor_ids
 
 
 def test_numerics_fields_enter_the_record_and_key(planar_case):

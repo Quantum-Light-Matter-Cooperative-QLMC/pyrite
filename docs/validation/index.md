@@ -116,6 +116,7 @@ channeling/cr-capture-bound
 channeling/cr-capture-yield
 channeling/cr-transition-radiation-bound
 channeling/cr-zone-handoff-accounting
+channeling/cr-persisted-channel
 ```
 
 ```{toctree}

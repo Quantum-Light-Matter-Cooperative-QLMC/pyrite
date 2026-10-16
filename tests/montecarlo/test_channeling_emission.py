@@ -338,6 +338,27 @@ def test_diamond_peaks_match_gouanere():
         assert nearest == pytest.approx(reference, rel=1e-2)
 
 
+def test_tilted_surface_absorbs_over_the_physical_normal_depth(solver):
+    # A source at path s has slab depth s*m_z. The exit-ray path is
+    # (L-s)*m_z/(n.m), independent of the photon angle relative to the beam.
+    length, theta, phi = 20000.0, 0.1, 0.3
+    normal = np.array([0.3, 0.2, np.sqrt(0.87)])
+    direction = np.array([np.sin(theta) * np.cos(phi), np.sin(theta) * np.sin(phi), np.cos(theta)])
+    grid = np.linspace(1e3, 40e3, 301)
+    actual = channeling_spectrum(
+        solver, length, grid, theta, phi, surface_normal=normal, dz_ang=200.0
+    )
+    lines = actual.lines
+    centres = lines.delta_eV / (1 - lines.beta * np.cos(theta))
+    mu = linear_attenuation_inv_mm("silicon", centres) / 1e7
+    exit_path = (length - actual.z_ang) * normal[2] / (direction @ normal)
+    weights = np.exp(-mu[:, None] * exit_path)
+    yields = np.trapezoid(actual.line_rates.T * weights, actual.z_ang, axis=1)
+    bound, capture = lines.spectrum(grid, yields, theta)
+    reference = boosted_dipole_pattern(theta, phi, lines.gamma) * (bound + capture)
+    np.testing.assert_allclose(actual.spectrum, reference, rtol=1e-10)
+
+
 # -- cr-line-shape --------------------------------------------------------------------
 
 

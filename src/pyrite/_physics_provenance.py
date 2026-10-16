@@ -72,6 +72,7 @@ def resolved_physics_view(
     channeling = resolved.get("channeling")
     if channeling is not None:
         selections["transport.channeling"] = channeling["model"]
+        selections["emission.channeling"] = channeling["model"]
     # Reuse facade policy with legacy defaults, without mutating Case omissions.
     Physics(
         elastic_model=selections["transport.elastic"],

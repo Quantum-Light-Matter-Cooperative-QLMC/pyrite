@@ -107,6 +107,7 @@ whose long-wavelength bound→bound limit is the dipole rate.
 
 CR is first exposed through a diagnostic API. It becomes the persisted additive
 channel `spec_channeling` only after its anchors pass.
+*Outcome (#507):* planar Python runs produce `spec_channeling` separately from PXR/CBS and characteristic emission, on the native line grid. Checkpoints store it in optional `channeling.h5`; common totals and the analysis component selector add it once. `CHANNELING_MODEL` v2 distinguishes enabled output identities, with off unchanged. The source reuses the constant-energy diagnostic estimator, slab-normal attenuation in a laterally infinite photon slab, and independently averaged finite electron path limits. Measured linewidth gaps remain explicit; persistence does not certify them.
 
 Channeled-zone path segments are passed to the existing PXR/CBS and
 bremsstrahlung scorers as straight mean segments. Channeled-state modulation of
