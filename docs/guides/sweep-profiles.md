@@ -65,15 +65,18 @@ pyrite profile numerics set my_scan \
   --channeling-model planar --channeling-plane 1 1 0 \
   --radiative-model uncoupled --energy-model midpoint \
   --cxr-trials 300 --brem-trials 150
-PYRITE_MC_TRANSPORT_CORE=per-electron pyrite run my_scan --remote
+PYRITE_MC_TRANSPORT_CORE=cuda pyrite run my_scan --remote
 ```
 
 Choose the plane relative to the crystal cut and beam alignment; the command
 above selects the Si(110) family, rather than configuring the sample pose.
 Explicit fixed counts are required because adaptive precision has no
-per-electron channeling variance observable. CUDA transport, trajectory
-capture and electron blocks currently refuse channeling. The CPU core
-selection above is forwarded to remote runs.
+per-electron channeling variance observable. The zone solve runs on the CPU;
+its sampled handoff states continue through CUDA transport. Native rows return
+to the host for joining with zone rows before spectrum scoring. The core
+selection above is forwarded to remote runs; use `per-electron` for CPU
+continuation, or leave it at `auto` for the existing count/backend policy.
+Trajectory capture and electron blocks currently refuse channeling.
 
 `--channeling-basis-size`, `--channeling-bloch-cells`, `--channeling-dz-ang`
 and `--channeling-zone-max-ang` control the zone resolution and cap. Enabled

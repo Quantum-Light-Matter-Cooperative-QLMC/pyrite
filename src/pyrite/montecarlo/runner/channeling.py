@@ -139,7 +139,7 @@ def transport_channeling_case(
 
     ``simulate(keep, max_steps, start, stop, block_kw, cut)`` is the runner's
     ``simulate_trajectories`` closure; it is called once for the launched
-    electrons on the per-electron core, with the primaries' table range so
+    electrons on the per-electron CPU or CUDA core, with the primaries' table range so
     every table matches the amorphous run.
 
     Validation: cr-zone-handoff-accounting

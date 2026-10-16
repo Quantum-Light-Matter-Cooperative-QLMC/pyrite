@@ -191,7 +191,6 @@ def test_case_refuses_unsupported_geometry(planar_case, changes, message):
     [
         ({"trajectory_capture": object()}, "trajectory capture"),
         ({"block_electrons": 4}, "electron-block transport"),
-        ({"transport_core": "cuda"}, "CUDA transport"),
     ],
 )
 def test_transport_options_refuse_before_work(planar_case, monkeypatch, options, message):
