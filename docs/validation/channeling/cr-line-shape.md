@@ -122,3 +122,244 @@ The spectrum is $S(\varepsilon)=\tfrac1\pi\mathrm{Re}\int_0^\infty G\,e^{-i\vare
 **Code reading.** The construction and gauge handling match the derivation. `modes` returns `source = yields/conj(a)` and `weight = (conj(a) @ V)(V^{-1} source)`, and `spectrum` uses `Re(conj(w) * profile)`. For each mode, the lab centre and half width are divided by $D$, and $\sigma=\lvert E_m\rvert s\,\sigma_\gamma/\gamma$, with $s$ from a strength-weighted exponent per group. No group mixes kinds on the 4- and 16-cell grids (`capture_width.py`), so `out[kind of first member]` does not misattribute any group there. Clustered capture rows enter the group through their strongest member's $a$ and pair. That is an approximation for capture shapes only (see `cr-capture-yield`).
 
 **Verdict:** `rederived`. The earlier width discrepancy is resolved. A stated limit stays open: no measured linewidth anchor.
+
+
+## Azadegan source audit (2026-10-15, independent context)
+
+This source-first check concerns measured planar linewidth anchors for
+`cr-line-shape`. The source equations and numerical expectations below were
+recorded before inspecting the emission implementation. Sources: Azadegan,
+Wagner & Pawelke, [Phys. Rev. B **74**, 045209 (2006)](https://doi.org/10.1103/PhysRevB.74.045209)
+(Zotero parent `PQZAK23U`, PDF `KLWUGPNH`), and Azadegan,
+Comput. Phys. Commun. **184**, 1064–1069 (2013) (parent `Z93R9VME`, PDF
+`DY8WJ8VL`). Indexed full text was checked against the PDF images, including
+2006 pp. 045209-3, -8, -9 and 2013 p. 1068.
+
+### Source expectations before code comparison
+
+For a coherence decaying as $\exp[-\kappa z+i\Delta z/(\hbar v)]$,
+the one-sided Fourier transform gives a Lorentzian with transverse HWHM
+$h=\hbar v\kappa$. With $D=1-\beta\cos\theta$, the photon centre and
+FWHM are $E_0=\Delta/D$ and $\Gamma=2h/D$. Units are energy; positive
+$\kappa$ gives a positive width. Zero damping gives a delta distribution;
+zero angular spread gives one Lorentzian. For two states with population
+attenuation lengths $l_i,l_f$, loss alone gives
+
+$$
+\kappa=\frac{1}{2}(l_i^{-1}+l_f^{-1}),\qquad
+\Gamma_{\rm loss}=\frac{\hbar v}{D}(l_i^{-1}+l_f^{-1})
+\simeq\frac{2\gamma^2\hbar v}{l},\qquad
+l^{-1}=l_i^{-1}+l_f^{-1}.
+$$
+
+This agrees with 2006 Eqs. (6)–(8), up to the stated ultrarelativistic
+$v\simeq c$ approximation. It does **not** imply that the optical-potential
+loss width equals the linewidth of a trace-preserving scattering model:
+correlated scattering can feed the radiating coherence. Nor does it imply
+that the experimental FWHM is an intrinsic damping width. The 2006 paper
+fits an asymmetric angular convolution, Eq. (23), with independent
+$E_0$, Lorentzian parameter $\Gamma_T$, and
+$\alpha=\gamma\Theta_{\rm ms,ch}$. It explicitly warns against adding all
+partial FWHMs linearly or in quadrature (pp. -6, -9, -10).
+
+**Experimental conditions (2006 Sec. II, pp. -1–2).** Diamond type IIa,
+(110), room-temperature treatment (the potential figures use 300 K).
+Measured thicknesses are $42.5\pm4.0$, $102.2\pm4.7$,
+$168.0\pm3.9$, and $500\pm25$ micrometres. Initial beam divergence is
+about 0.1 mrad, relative energy spread $1.3\times10^{-3}$ (the text does
+not specify RMS versus FWHM), and energy tuning accuracy 0.2–0.3 MeV.
+The detector is on-axis, 3.3 m from the target, behind a 1 mm aperture,
+solid angle $7.2\times10^{-8}$ sr. CdTe calibration FWHM is
+$470\pm2$ eV at 13.93 keV. At 42.5 micrometres Table III gives detector
+FWHM 0.47/0.49/0.60/0.63 keV at 14.6/17/30/34 MeV.
+The fitted effective in-plane multiple-scattering RMS angles are much
+larger than the incoming divergence: Table II gives
+6.03/5.32/2.87/2.60 mrad at those energies and 42.5 micrometres.
+A spectrum using only the incoming 0.1 mrad cannot reproduce that response.
+
+**Measured values, not theoretical targets.** The following are direct
+transcriptions of Table V, p. -9, all for diamond (110), $1\to0$.
+$\Gamma_{\rm exp}$ is the FWHM of the fitted asymmetric experimental
+profile. $\Gamma_T$ is its Lorentzian fit parameter; the authors explicitly
+state that it still incorporates Bloch dispersion and detector resolution
+(p. -6). No errors are supplied for these widths.
+
+| Beam energy (MeV) | Thickness (micrometres) | $\Gamma_{\rm exp}$ (keV) | $\Gamma_T$ (keV) |
+| --- | --- | --- | --- |
+| 14.6 | 42.5 | 1.51 | 1.09 |
+| 14.6 | 168 | 1.80 | 1.07 |
+| 14.6 | 500 | 2.20 | 1.31 |
+| 17 | 42.5 | 2.00 | 1.45 |
+| 17 | 102 | 2.19 | 1.45 |
+| 17 | 168 | 2.47 | 1.44 |
+| 17 | 500 | 2.77 | 1.26 |
+| 30 | 42.5 | 5.88 | 4.25 |
+| 30 | 102 | 7.94 | 5.75 |
+| 30 | 168 | 6.12 | 3.94 |
+| 30 | 500 | 11.98 | 7.99 |
+| 34 | 42.5 | 7.84 | 6.00 |
+
+For the same 42.5 micrometre cases, Table IV (p. -8) separates observed
+peak maximum $E_{\rm exp}$, fitted zero-angle energy $E_0$, and the
+Doyle–Turner calculation $E_{\rm calc}$. These are distinct observables:
+
+| Beam energy (MeV) | $E_{\rm exp}$ (keV) | $E_0$ (keV) | $E_{\rm calc}$ (keV) |
+| --- | --- | --- | --- |
+| 14.6 | 16.58 | 16.76 | 17.06 |
+| 17 | 21.72 | 21.96 | 22.23 |
+| 30 | 56.19 | 56.87 | 59.49 |
+| 34 | 70.02 | 70.96 | 73.78 |
+
+**Internal source discrepancy: do not convert Table VI into a width anchor.**
+At 30 MeV and 42.5 micrometres, Table V has $\Gamma_T=4.25$ keV;
+Table III has detector and Bloch FWHMs 0.60 and 0.02 keV. Even using
+the paper's approximate quadrature correction gives 4.207 keV. Eq. (6)
+then gives $l=0.323$ micrometres with $\gamma=30/0.511$, or
+0.334 micrometres with the kinetic-energy convention
+$\gamma=1+30/0.511$. Table VI instead gives 0.65 micrometres.
+At 17 MeV the analogous values are 0.323 or 0.342 micrometres,
+against Table VI's 0.66. This is approximately a factor of two;
+it cannot be explained by the small detector/Bloch correction or by
+adding the rest energy. In contrast, Table III's *calculated* coherence
+FWHMs and Table I's *calculated* lengths are consistent with Eq. (6):
+1.51 keV with 0.90 micrometres at 30 MeV, using
+$\gamma=30/0.511$. The paper does not expose its inversion procedure,
+so the precise origin of the experimental-length discrepancy is unresolved.
+Use the directly fitted widths with their response model; do not silently
+reinterpret a Table VI length as an independent measured intrinsic width.
+
+**Theoretical example (2013 Sec. 4, p. 1068).** Silicon (110), 40 MeV
+*kinetic* energy, thickness 10 micrometres, incidence 0.3 mrad, and
+Bloch momentum $k=1.3089$ inverse angstroms. The printed example gives
+$E_0(1\to0)=76.2071$ keV, intrinsic FWHM 9.7758 keV, and yield
+0.224692 photons/sr/electron. This is an optical-potential calculation,
+not a measurement; Eq. (7)'s denominator establishes that the quoted
+linewidth is FWHM. Its transverse FWHM target is
+$9.7758\,{\rm keV}/(2\gamma^2)=0.7777$ eV with
+$\gamma=1+40/0.511$, and the relative FWHM is 12.828%.
+The code uses a Doyle–Turner real potential and complex optical potential,
+21 Bloch basis functions, and thermal scattering. Its Sec. 4 statement
+of agreement with the 2006 experiment does not turn this example into
+an experimental linewidth anchor.
+
+
+### Implementation comparison and scope of the verdict
+
+After recording those expectations I read `emission_lines`,
+`EmissionLines.spectrum`, and `channeling_spectrum`. The first constructs
+all-block coherence generators with both loss and jump gain. The second
+divides mode centres and HWHMs by $D$, exactly as derived above.
+The third uses one supplied, depth-independent `divergence_y_rad` in a
+Gaussian quadrature. It does not evolve the in-plane angular distribution
+with depth, and does not convolve the output with a detector energy
+response. Consequently the measured thickness dependence in 2006 Table V
+is not predicted by that API from the quoted *initial* divergence alone.
+Inserting each experimentally fitted effective multiple-scattering angle
+would supply external response information; it would not validate a
+prediction of that angle or its thickness dependence.
+
+I ran bounded CPU points with the project runner
+(`PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python`),
+using `planar_profile(material, (1,1,0), temperature)`,
+`tds_kernel(..., n_cells=8, max_order=16)`,
+`DensityMatrixSolver(..., margin_eV=5)`, and
+`emission_lines(..., include_capture=False)`. The reported values below
+select block zero, upper state 1, lower state 0, with the lab FWHM computed
+as `2 * hwhm_eV / (1 - beta)`. They are intrinsic selected-kernel values,
+not a fit to the observed spectra.
+
+| Material | Energy (MeV) | Temperature (K) | Kernel | Forward energy (keV) | Intrinsic FWHM (keV) |
+| --- | --- | --- | --- | --- | --- |
+| Diamond (110) | 14.6 | 300 | TDS | 17.9454 | 0.27107 |
+| Diamond (110) | 17 | 300 | TDS | 23.1849 | 0.37377 |
+| Diamond (110) | 30 | 300 | TDS | 60.5170 | 1.24914 |
+| Diamond (110) | 34 | 300 | TDS | 74.7133 | 1.62936 |
+| Silicon (110) | 40 | 293.15 | TDS | 76.6893 | 7.99263 |
+| Silicon (110) | 40 | 293.15 | TDS + electronic | 76.6893 | 9.17971 |
+
+For Si the 1→0 band is flat across all eight sampled blocks: centres vary
+by less than $10^{-6}$ keV and widths by less than $10^{-6}$ keV.
+Thus the source's particular $k=1.3089$ inverse angstroms is immaterial
+at the precision of this comparison. Relative to the 2013 theoretical
+example the model centre is 0.63% high, while the TDS and TDS + electronic
+FWHMs are 18.2% and 6.1% low. Different potential/scattering approximations
+prevent an exact reproduction claim. Adding electronic scattering improves
+that one number but cannot make a theoretical example a measurement.
+For diamond, `electronic_kernel` refuses the material because the packaged
+shell data lack the required conduction-band entry. No complete collisional
+prediction was computed; the TDS-only numbers must stay labelled as such.
+
+The task owner's separately source-checked Gouanère et al., Phys. Rev. B
+**38**, 4352 (1988), Table II, p. 4360, provides a cleaner measured
+*intrinsic* benchmark: room-temperature diamond (110), 22 micrometres,
+80.23 MeV. Column 9 gives intrinsic transverse FWHM after Doppler/multiple-
+scattering deconvolution and corrections for finite thickness, detector
+resolution, acceptance and energy binning. Its values are transcribed in
+`tests/data/channeling/gouanere-1988-diamond110.json`. They are not the
+observed photon FWHMs in column 5. The owner reports these CPU convergence
+values for $2h$ (eV), `max_order=16`, at the zero Bloch block:
+
+| Transition | Gouanère intrinsic transverse FWHM (eV) | TDS, 8 cells (eV) | TDS, 16 cells (eV) |
+| --- | --- | --- | --- |
+| 1→0 | 0.32 | 0.197485 | 0.197481 |
+| 2→1 | 0.32 | 0.127327 | 0.127333 |
+| 3→2 | 0.26 | 0.090963 | 0.090973 |
+| 4→3 | 0.31 | 0.070890 | 0.070903 |
+
+Those widths are 38–77% low with TDS alone. The grid refinement does not
+explain the discrepancy. Missing electronic scattering is a concrete
+limitation, but the present evidence does not establish that adding it
+would close the full gap. Accurate peak energies therefore do not validate
+linewidths or peak heights. No tolerance is widened to classify this
+comparison as agreement.
+
+- **Claim:** `cr-line-shape` — `montecarlo/channeling/emission.py::{emission_lines,EmissionLines.spectrum,channeling_spectrum}` — damped-coherence Fourier spectrum, Doppler width transform; Azadegan 2006 Eqs. (6)–(8) and linewidth Tables III–VI; Azadegan 2013 Eq. (7) and p. 1068.
+- **Filters:** units pass; zero-damping/angular-spread limits pass; HWHM/FWHM and Doppler conventions pass. The experimental-length inversion in Azadegan 2006 Table VI has the unresolved approximately factor-two inconsistency documented above.
+- **Re-derivation:** matches the selected-kernel Fourier/Doppler relation. Differs from measured-width reproduction: diamond TDS intrinsic widths are too small, electronic inputs are missing, and the assembled response omits depth-dependent in-plane multiple scattering and detector convolution.
+- **Verdict:** `rederived` for the stated selected-kernel line-shape equation. Physical measured-width reproduction is incomplete and fails for the TDS-only Gouanère comparison; this evidence does not justify `anchored` for linewidths.
+- **Write-up:** `docs/validation/channeling/cr-line-shape.md`.
+- **Suggested ledger change:** retain `rederived`; replace the stale source-unavailable note with these transcribed measured values, source convention caveat, missing diamond electronic inputs, and failed TDS-only intrinsic-width comparison. The task owner applies any ledger edit; no human sign-off is claimed.
+
+Reproduce the Azadegan model comparison from the repository root:
+
+```bash
+PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python - <<'PY'
+from pyrite.materials.channeling import planar_profile
+from pyrite.montecarlo.channeling import (
+    DensityMatrixSolver, electronic_kernel, emission_lines, tds_kernel,
+)
+
+cases = [("diamond", e, 300.0) for e in (14.6, 17, 30, 34)]
+cases += [("silicon", 40, 293.15)]
+for material, mev, temperature in cases:
+    profile = planar_profile(material, (1, 1, 0), temperature)
+    thermal = tds_kernel(profile, mev * 1e6, n_cells=8, max_order=16)
+    kernels = [("TDS", thermal)]
+    if material == "silicon":
+        electronic = electronic_kernel(profile, mev * 1e6, n_cells=8, max_order=16)
+        kernels += [("TDS + electronic", thermal + electronic)]
+    for name, kernel in kernels:
+        solver = DensityMatrixSolver(profile, mev * 1e6, kernel, margin_eV=5)
+        lines = emission_lines(solver, include_capture=False)
+        row = (lines.block == 0) & (lines.upper == 1) & (lines.lower == 0)
+        centre_keV = lines.forward_energy_eV()[row][0] / 1000
+        fwhm_keV = 2 * lines.hwhm_eV[row][0] / (1 - lines.beta) / 1000
+        print(material, mev, name, round(centre_keV, 6), round(fwhm_keV, 6))
+PY
+```
+
+**Additional 2006 energy-convention caveat.** Table III's calculated widths
+numerically use $\gamma=E_e/(mc^2)$: at 17 MeV,
+$2\gamma^2\hbar c/(1.06\,{\rm micrometres})=0.412$ keV, matching
+its 0.41 keV, whereas $\gamma=1+17/0.511$ gives 0.437 keV. The 2006
+experimental section calls its settings electron energies without the
+explicit kinetic-energy definition supplied in the 2013 code paper.
+This leaves a total-versus-kinetic convention ambiguity (or an omitted
+rest-energy correction in the 2006 calculation); it must be resolved
+before interpreting all of the nominal-energy peak offset as a potential
+error. As a diagnostic only, `transverse_states` at
+$\gamma=E_e/(mc^2)$, 300 K, 33 plane waves gives forward 1→0 energies
+16.9098/22.0268/58.7938/72.8383 keV at nominal
+14.6/17/30/34 MeV. These differ from Table IV's fitted $E_0$ by
+0.9%/0.3%/3.4%/2.6%. No beam-energy retuning is assumed in the comparison
+table above, and this diagnostic does not validate any linewidth.
