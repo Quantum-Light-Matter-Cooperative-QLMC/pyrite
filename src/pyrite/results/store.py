@@ -27,7 +27,7 @@ from .._numerics import (
     validate_radiative_numerics,
 )
 from .._precision import Precision
-from .._spectral_components import cxr_spectrum
+from .._spectral_components import LINE_COMPONENT_KEYS, cxr_spectrum
 from ..detectors import Detector, LegacyEDS
 from ..montecarlo import (
     aperture_fwhm_eV,
@@ -272,8 +272,9 @@ def store_result(results, case, out):
     # overlay, run.repair_cxr_spec) gates on its presence.
     if out.get("spec_coherent") is not None:
         results[name][E0]["spec_coherent"] = out["spec_coherent"]
-    if out.get("spec_characteristic") is not None:
-        results[name][E0]["spec_characteristic"] = out["spec_characteristic"]
+    for key in LINE_COMPONENT_KEYS:
+        if out.get(key) is not None:
+            results[name][E0][key] = out[key]
     # Opt-in line temporal intensity profile (#292); absent unless requested.
     for key in TEMPORAL_RECORD_KEYS:
         if out.get(key) is not None:

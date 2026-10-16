@@ -101,6 +101,7 @@ Component stores have the logical shape `{configuration: {E0_keV: record}}`. CAS
 | `spec` | `float64` | `[N]` | incoherent PXR/CBS line spectrum, photons/e/sr/eV; excludes characteristic radiation |
 | `spec_coherent` | `float64` | `[N]` | coherent PXR/CBS companion spectrum; excludes characteristic radiation; key absent when not computed |
 | `spec_characteristic` | `float64` | `[N]` | characteristic spectrum, photons/e/sr/eV; stored in `characteristic.h5`, co-located in CAS blobs and slim stores |
+| `spec_channeling` | `float64` | `[N]` | planar channeling-radiation spectrum (ADR-0018), photons/e/sr/eV; stored in `channeling.h5`, co-located in CAS blobs and slim stores; key absent when channeling is off |
 | `brem` | `float64` | `[N]` | bremsstrahlung interpolated to `E_grid`, photons/e/sr/eV |
 | `E_grid_brem` | `float64` or null | `[M]` | wide bremsstrahlung photon-energy grid, eV |
 | `brem_wide` | `float64` or null | `[M]` | wide bremsstrahlung spectrum, photons/e/sr/eV |

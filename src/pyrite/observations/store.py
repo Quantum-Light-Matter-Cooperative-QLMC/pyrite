@@ -70,6 +70,7 @@ _FACTORS = {
     "background": "brem",
     "coherent_line": "coherent_cxr",
     "characteristic_line": "characteristic",
+    "channeling_line": "channeling",
 }
 _RAY_ARRAYS = ("tile_index", "solid_angle_sr", "path_length_mm")
 _FACTOR_ARRAYS = ("energy_eV", "intrinsic_by_tile", "mu_by_filter_inv_mm")
@@ -237,8 +238,9 @@ class StoredObservation:
             else replace(self.spatial, detector=replace(detector, response=new_response))
         )
         axes = [spatial.cxr.energy_eV, spatial.brem.energy_eV]
-        if spatial.characteristic is not None:
-            axes.append(spatial.characteristic.energy_eV)
+        for extra in (spatial.characteristic, spatial.channeling):
+            if extra is not None:
+                axes.append(extra.energy_eV)
         if spatial.coherent_cxr is not None:
             axes.append(spatial.coherent_cxr.energy_eV)
         new_acquisition, reporting = resolve_acquisition(
@@ -602,6 +604,7 @@ class ObservationStore:
             detector=_decode_detector(layers["true_spatial"], response),
             coherent_cxr=factors.get("coherent_line"),
             characteristic=factors.get("characteristic_line"),
+            channeling=factors.get("channeling_line"),
             tile_directions_lab=directions,
             reconstruction=layers["true_spatial"]["scorer"].get("reconstruction", "nearest_tile"),
         )

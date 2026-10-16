@@ -6,6 +6,8 @@ Run outputs and result records carry each emission channel as its own array:
 - ``spec_coherent``: optional coherent PXR/CBS line density on ``E_grid``;
 - ``spec_characteristic``: characteristic (atomic relaxation) density on
   ``E_grid``;
+- ``spec_channeling``: optional planar channeling-radiation density on
+  ``E_grid`` (ADR-0018), present only when channeling was selected;
 - ``brem`` / ``brem_wide``: bremsstrahlung on ``E_grid`` / ``E_grid_brem``.
 
 No array includes another. Consumers that need a combined view call
@@ -29,6 +31,9 @@ COMPONENTS_ATTR = "emission_components"
 SEPARATE_CONTRACT = "separate"
 
 _CXR_KEYS = ("spec", "spec_coherent")
+
+#: Additive line-grid components summed onto either CXR mode, in order.
+LINE_COMPONENT_KEYS = ("spec_characteristic", "spec_channeling")
 
 
 def separate_legacy(obj: Any) -> Any:
@@ -60,19 +65,24 @@ def cxr_spectrum(
     *,
     coherent: bool = False,
     characteristic: bool = True,
+    channeling: bool = True,
 ) -> np.ndarray:
-    """Line-grid emission density: PXR/CBS plus, optionally, characteristic.
+    """Line-grid emission density: PXR/CBS plus the selected additive components.
 
     ``coherent`` selects ``spec_coherent`` instead of ``spec`` (``KeyError``
-    when the record has none). A record without ``spec_characteristic``
-    contributes no characteristic term. Characteristic emission is incoherent
-    with PXR/CBS, so its intensity adds once to either CXR spectrum.
+    when the record has none). ``characteristic`` and ``channeling`` add
+    ``spec_characteristic`` and ``spec_channeling``; a record without a
+    component contributes no term. Both are incoherent with PXR/CBS, so each
+    intensity adds once to either CXR spectrum.
 
     Validation: characteristic-radiation
     """
-    cxr = np.asarray(record["spec_coherent" if coherent else "spec"])
-    component = record.get("spec_characteristic") if characteristic else None
-    return cxr if component is None else cxr + np.asarray(component)
+    total = np.asarray(record["spec_coherent" if coherent else "spec"])
+    for key, selected in zip(LINE_COMPONENT_KEYS, (characteristic, channeling), strict=True):
+        component = record.get(key) if selected else None
+        if component is not None:
+            total = total + np.asarray(component)
+    return total
 
 
 def incident_spectrum(
@@ -80,15 +90,17 @@ def incident_spectrum(
     *,
     coherent: bool = False,
     characteristic: bool = True,
+    channeling: bool = True,
 ) -> np.ndarray:
     """Every photon source on ``E_grid``: :func:`cxr_spectrum` plus ``brem``."""
-    return cxr_spectrum(record, coherent=coherent, characteristic=characteristic) + np.asarray(
-        record["brem"]
-    )
+    return cxr_spectrum(
+        record, coherent=coherent, characteristic=characteristic, channeling=channeling
+    ) + np.asarray(record["brem"])
 
 
 __all__ = [
     "COMPONENTS_ATTR",
+    "LINE_COMPONENT_KEYS",
     "SEPARATE_CONTRACT",
     "incident_spectrum",
     "cxr_spectrum",

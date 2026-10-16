@@ -43,15 +43,19 @@ Its Material and Checkpoint pickers select the dataset cases are added from; the
 
 For non-interactive use, inspect `pyrite app analysis export --help`; `pyrite app pixels export` and `pyrite app compare export` render the other two apps the same way. The generated [CLI reference](../repo-design/cli/cli-reference.md) is authoritative for accepted arguments and output formats.
 
-Current full checkpoints contain three versioned HDF5 components:
+Current full checkpoints contain three versioned HDF5 components, plus a
+fourth when planar channeling was selected:
 
-- `line.h5` stores PXR/CBS line results without characteristic radiation;
+- `line.h5` stores PXR/CBS line results without characteristic or channeling radiation;
 - `brem.h5` stores the bremsstrahlung continuum;
-- `characteristic.h5` stores `spec_characteristic` on the fine line grid.
+- `characteristic.h5` stores `spec_characteristic` on the fine line grid;
+- `channeling.h5` stores `spec_channeling` on the fine line grid. It is written
+  only when some record carries channeling radiation, so channeling-off datasets
+  keep the three-file layout.
 
 The analysis app merges all available components and shows characteristic radiation by default. Clear **show characteristic radiation** to inspect the smaller PXR/CBS peaks without changing the checkpoint. Omitting `characteristic.h5` is supported: the dataset loads as line-only, which also makes intentional exclusion and transfer straightforward.
 
-In memory, every record keeps `spec`, `spec_coherent`, `spec_characteristic`, and `brem` as separate arrays; none includes another. Code that needs a sum calls `pyrite._spectral_components.cxr_spectrum` or `incident_spectrum`, and `Result.combined_cxr()` gives the same sum for API results.
+In memory, every record keeps `spec`, `spec_coherent`, `spec_characteristic`, the optional `spec_channeling`, and `brem` as separate arrays; none includes another. Code that needs a sum calls `pyrite._spectral_components.cxr_spectrum` or `incident_spectrum`, and `Result.combined_cxr()` gives the same sum for API results. Each additive component enters a total exactly once; the analysis app's **Components** selector adds **Characteristic** and **Channeling** terms independently.
 
 Legacy `.pkl` component paths and plain, gzip, and zstd monoliths remain readable and migrate to HDF5 on the next normal save. Artifacts written before the separate-component contract stored `spec`/`spec_coherent` as totals including `spec_characteristic`; they are separated once on load. Use the [result schema](../repo-design/storage/result-schema.md) for independent inspection.
 

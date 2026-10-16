@@ -489,7 +489,7 @@ Checkpoint persistence owner: paths, load/save, component loaders, thin `cases.j
 - Deps: `checkpoints._checkpoint_store`, `checkpoints._checkpoint_io`, `paths`, `results`.
 
 ### `checkpoints/_checkpoint_store.py`
-Component storage adapter: active datasets live under `checkpoints/<stem>/{line,brem,characteristic}.h5`, merge transparently into historical in-memory result records, treat the characteristic companion as optional, and migrate legacy `checkpoints/<stem>.pkl` stores on next save. Shared case blobs live at `checkpoints/<material>/<first2hex>/<content-key>.pkl` and use atomic writes. The `.pkl` suffix remains a layout token; current bytes use the versioned HDF5 schema.
+Component storage adapter: active datasets live under `checkpoints/<stem>/{line,brem,characteristic}.h5`, merge transparently into historical in-memory result records, treat the characteristic and channeling companions as optional (`channeling.h5` is written only when a record carries `spec_channeling`), and migrate legacy `checkpoints/<stem>.pkl` stores on next save. Shared case blobs live at `checkpoints/<material>/<first2hex>/<content-key>.pkl` and use atomic writes. The `.pkl` suffix remains a layout token; current bytes use the versioned HDF5 schema.
 - Internal: `discover`, `load`, `save`, `signature`, `cas_contains`, `cas_load`, `cas_save`, component/path helpers.
 - Deps: `_checkpoint_io`, NumPy.
 

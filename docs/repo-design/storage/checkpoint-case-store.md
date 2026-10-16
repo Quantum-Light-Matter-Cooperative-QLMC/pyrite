@@ -29,7 +29,7 @@ The `.pkl` suffix is a stable layout token. New component, shard, and CAS leaf f
 
 ## Compatibility and migration
 
-Component checkpoints are materialized under `checkpoints/<stem>/{line,brem,characteristic}.h5`. `line.h5` is the authoritative case index and contains PXR/CBS line spectra; `characteristic.h5` is an optional companion attached on read as its own `spec_characteristic` array, and `brem.h5` carries the continuum. No merged record array includes another component. Analysis, archive, prune, slim, and remote pull retain their merged in-memory contracts; manifest-only consumers belong to the checkpoint-command rework.
+Component checkpoints are materialized under `checkpoints/<stem>/{line,brem,characteristic}.h5`. `line.h5` is the authoritative case index and contains PXR/CBS line spectra; `characteristic.h5` is an optional companion attached on read as its own `spec_characteristic` array, `channeling.h5` likewise carries `spec_channeling` and is written only when a record has it, and `brem.h5` carries the continuum. No merged record array includes another component. Analysis, archive, prune, slim, and remote pull retain their merged in-memory contracts; manifest-only consumers belong to the checkpoint-command rework.
 
 Legacy plain, gzip, and zstd pickle artifacts are never rewritten merely by reading them. Any later normal save uses HDF5, so migration is opportunistic and inherits the existing component/CAS atomic replacement discipline.
 

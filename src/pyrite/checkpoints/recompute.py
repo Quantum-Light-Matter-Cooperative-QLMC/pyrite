@@ -785,6 +785,14 @@ def repair_cxr_spec(
         # stale relative to `spec`/`E_grid`. Old pre-dual coherent checkpoints
         # (no `spec_coherent` key) are orphaned by design -- reline only ever
         # re-derives the incoherent `spec` for those.
+        if r.get("spec_channeling") is not None:
+            # Channeling radiation is scored from the zone density matrix, not
+            # from the re-transported segments; relining would leave it on the
+            # old grid.
+            raise ValueError(
+                f"cannot reline {c.get('name')!r}: records carrying spec_channeling "
+                "need a channeling rescore, which reline does not perform"
+            )
         want_coherent = "spec_coherent" in r
         spec, spec_coherent, spec_characteristic = runner._cxr_pair_for_case(
             c, target, want_coherent=want_coherent, return_characteristic=True
@@ -839,7 +847,7 @@ def recxr_checkpoint(
         _save_recomputed_checkpoint(
             checkpoint_path,
             results,
-            components=("characteristic", "line"),
+            components=("characteristic", "channeling", "line"),
         )
 
     n = repair_cxr_spec(

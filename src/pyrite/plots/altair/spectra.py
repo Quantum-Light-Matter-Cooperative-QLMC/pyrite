@@ -220,21 +220,37 @@ def _narrow_line_domain(records, band, x_domain):
     return max(domains, key=lambda domain: domain[1] - domain[0], default=None)
 
 
-def _characteristic_view(record, *, include_characteristic):
-    if include_characteristic or "spec_characteristic" not in record:
+def _characteristic_view(record, *, include_characteristic, include_channeling=True):
+    """Drop the line-grid components that are not selected."""
+    dropped = {
+        key
+        for key, selected in (
+            ("spec_characteristic", include_characteristic),
+            ("spec_channeling", include_channeling),
+        )
+        if not selected and key in record
+    }
+    if not dropped:
         return record
-    return {key: value for key, value in record.items() if key != "spec_characteristic"}
+    return {key: value for key, value in record.items() if key not in dropped}
 
 
-def _selected_cxr_record(record, line_source, *, include_cxr, include_characteristic):
-    """Score selected line-grid terms without adding characteristic twice."""
+def _selected_cxr_record(
+    record, line_source, *, include_cxr, include_characteristic, include_channeling=True
+):
+    """Score selected line-grid terms without adding a component twice."""
     selected = np.zeros_like(np.asarray(line_source, dtype=float))
     if include_cxr:
         selected += np.asarray(line_source, dtype=float)
-    if include_characteristic and record.get("spec_characteristic") is not None:
-        selected += np.asarray(record["spec_characteristic"], dtype=float)
+    for key, include in (
+        ("spec_characteristic", include_characteristic),
+        ("spec_channeling", include_channeling),
+    ):
+        if include and record.get(key) is not None:
+            selected += np.asarray(record[key], dtype=float)
     scored_record = {**record, "spec": selected}
     scored_record.pop("spec_characteristic", None)
+    scored_record.pop("spec_channeling", None)
     return scored_record
 
 
@@ -245,6 +261,7 @@ def _record_frame(
     include_brem,
     include_cxr=False,
     include_characteristic=True,
+    include_channeling=True,
     include_coherent=False,
     sum_components=False,
     meta,
@@ -255,9 +272,14 @@ def _record_frame(
             r["spec"],
             include_cxr=include_cxr,
             include_characteristic=include_characteristic,
+            include_channeling=include_channeling,
         )
     else:
-        scored_record = _characteristic_view(r, include_characteristic=include_characteristic)
+        scored_record = _characteristic_view(
+            r,
+            include_characteristic=include_characteristic,
+            include_channeling=include_channeling,
+        )
     E = np.asarray(r["E_grid"], dtype=float)
     scale = r["scale"] * _NA_PER_UA
     cxr_det, brem_det = _cxr_brem(scored_record, settings, convolve=False)
@@ -335,6 +357,7 @@ def _record_frame(
                 r["spec_coherent"],
                 include_cxr=include_cxr,
                 include_characteristic=include_characteristic,
+                include_channeling=include_channeling,
             )
         else:
             coherent_record = {**scored_record, "spec": r["spec_coherent"]}
@@ -475,6 +498,7 @@ def spectrum_frame(
     include_brem=True,
     include_cxr=False,
     include_characteristic=True,
+    include_channeling=True,
     include_coherent=False,
     collapse_azimuth=True,
     band="narrow",
@@ -513,6 +537,7 @@ def spectrum_frame(
                     include_brem=include_brem,
                     include_cxr=include_cxr,
                     include_characteristic=include_characteristic,
+                    include_channeling=include_channeling,
                     include_coherent=include_coherent,
                     meta=meta,
                 )
@@ -530,6 +555,7 @@ def spectrum_chart(
     include_brem=True,
     include_cxr=False,
     include_characteristic=True,
+    include_channeling=True,
     include_coherent=False,
     collapse_azimuth=True,
     x_domain=None,
@@ -562,6 +588,7 @@ def spectrum_chart(
         include_brem=include_brem,
         include_cxr=include_cxr,
         include_characteristic=include_characteristic,
+        include_channeling=include_channeling,
         include_coherent=include_coherent,
         collapse_azimuth=collapse_azimuth,
         band=band,
@@ -637,6 +664,7 @@ def _compare_frame(
     include_brem=True,
     include_cxr=False,
     include_characteristic=True,
+    include_channeling=True,
     include_coherent=False,
     sum_components=False,
     band="narrow",
@@ -660,7 +688,13 @@ def _compare_frame(
     for grp in groups.values():
         r = max(
             grp,
-            key=lambda rr: float(np.max(cxr_spectrum(rr, characteristic=include_characteristic))),
+            key=lambda rr: float(
+                np.max(
+                    cxr_spectrum(
+                        rr, characteristic=include_characteristic, channeling=include_channeling
+                    )
+                )
+            ),
         )
         row_meta = {
             "E0_keV": float(r["case"]["E0_keV"]),
@@ -674,6 +708,7 @@ def _compare_frame(
                 include_brem=include_brem,
                 include_cxr=include_cxr,
                 include_characteristic=include_characteristic,
+                include_channeling=include_channeling,
                 include_coherent=include_coherent,
                 sum_components=sum_components,
                 meta=row_meta,
@@ -693,6 +728,7 @@ def compare_spectrum_chart(
     include_brem=True,
     include_cxr=False,
     include_characteristic=True,
+    include_channeling=True,
     include_coherent=False,
     sum_components=False,
     x_domain=None,
@@ -723,6 +759,7 @@ def compare_spectrum_chart(
         include_brem=include_brem,
         include_cxr=include_cxr,
         include_characteristic=include_characteristic,
+        include_channeling=include_channeling,
         include_coherent=include_coherent,
         sum_components=sum_components,
         band=band,
@@ -773,6 +810,7 @@ def _multi_case_frame(
     include_brem=True,
     include_cxr=False,
     include_characteristic=True,
+    include_channeling=True,
     include_coherent=False,
     sum_components=False,
     band="narrow",
@@ -794,6 +832,7 @@ def _multi_case_frame(
                 include_brem=include_brem,
                 include_cxr=include_cxr,
                 include_characteristic=include_characteristic,
+                include_channeling=include_channeling,
                 include_coherent=include_coherent,
                 sum_components=sum_components,
                 meta={"label": str(label)},
@@ -812,6 +851,7 @@ def multi_case_spectrum_chart(
     include_brem=True,
     include_cxr=False,
     include_characteristic=True,
+    include_channeling=True,
     include_coherent=False,
     sum_components=False,
     x_domain=None,
@@ -841,6 +881,7 @@ def multi_case_spectrum_chart(
         include_brem=include_brem,
         include_cxr=include_cxr,
         include_characteristic=include_characteristic,
+        include_channeling=include_channeling,
         include_coherent=include_coherent,
         sum_components=sum_components,
         band=band,

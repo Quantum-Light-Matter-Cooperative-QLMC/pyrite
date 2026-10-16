@@ -68,6 +68,7 @@ def directional_outputs(case, transport, n_hats, spectrum) -> dict[str, Any]:
             "spec",
             "spec_coherent",
             "spec_characteristic",
+            "spec_channeling",
             "brem",
             "brem_wide",
             "temporal_intensity",
@@ -86,6 +87,10 @@ def directional_outputs(case, transport, n_hats, spectrum) -> dict[str, Any]:
     result["brem_wide_by_direction"] = np.stack(
         [np.asarray(output["brem_wide"]) for output in outputs]
     )
+    if first.get("spec_channeling") is not None:
+        result["spec_channeling_by_direction"] = np.stack(
+            [np.asarray(output["spec_channeling"]) for output in outputs]
+        )
     if "spec_coherent" in first:
         result["spec_coherent_by_direction"] = np.stack(
             [np.asarray(output["spec_coherent"]) for output in outputs]

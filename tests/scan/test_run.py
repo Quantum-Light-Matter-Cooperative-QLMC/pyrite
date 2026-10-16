@@ -1155,6 +1155,8 @@ def test_component_and_shard_pkl_payloads_remain_readable(tmp_path):
     _checkpoint_store.save("hopg", tmp_path, record)
     for component in _checkpoint_store.COMPONENTS:
         path = _checkpoint_store.component_path("hopg", component, tmp_path)
+        if component in _checkpoint_store.OPTIONAL_COMPONENTS and not path.is_file():
+            continue
         path.replace(path.with_suffix(".pkl"))
     _checkpoint_store.save_part(
         "hopg",

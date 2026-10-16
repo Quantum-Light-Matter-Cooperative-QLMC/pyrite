@@ -1,6 +1,8 @@
 """Component-aware checkpoint storage.
 
-Active checkpoints live at ``<root>/<stem>/{line,brem,characteristic}.h5``. Callers keep
+Active checkpoints live at ``<root>/<stem>/{line,brem,characteristic}.h5``,
+plus ``channeling.h5`` once any record carries ``spec_channeling`` (ADR-0018 P5;
+stores without channeling keep the historical three-file layout). Callers keep
 using the historical merged ``{name: {E0: record}}`` in-memory shape; this
 module splits records on write and merges them on read.  A legacy
 ``<root>/<stem>.pkl`` remains readable, so migration happens on the next save.
@@ -18,12 +20,21 @@ import numpy as np
 
 from . import _checkpoint_io
 
-COMPONENTS = ("line", "brem", "characteristic")
+COMPONENTS = ("line", "brem", "characteristic", "channeling")
+#: Components whose artifact is written only when non-empty or already present.
+OPTIONAL_COMPONENTS = frozenset({"channeling"})
 _HDF5_SUFFIX = ".h5"
 _LEGACY_SUFFIX = ".pkl"
 _BREM_KEYS = frozenset({"brem", "E_grid_brem", "brem_wide"})
 _BREM_CASE_KEYS = frozenset({"Ne_brem", "E_grid_brem", "brem_chunk", "brem_file"})
 _CHARACTERISTIC_KEYS = frozenset({"spec_characteristic"})
+_CHANNELING_KEYS = frozenset({"spec_channeling"})
+#: Line-grid component key carried by each separately stored component.
+_LINE_COMPONENT_KEY = {
+    "characteristic": "spec_characteristic",
+    "channeling": "spec_channeling",
+}
+_SHARED_KEYS = frozenset({"case", "E_grid", "scale", "adaptive_sampling"})
 
 
 def checkpoint_dir(stem: str, root: str | os.PathLike[str]) -> Path:
@@ -90,23 +101,24 @@ def _component_store(results: dict, component: str) -> dict:
                 selected[energy] = {
                     key: value
                     for key, value in record.items()
-                    if key not in _BREM_KEYS and key not in _CHARACTERISTIC_KEYS
+                    if key not in _BREM_KEYS
+                    and key not in _CHARACTERISTIC_KEYS
+                    and key not in _CHANNELING_KEYS
                 }
             elif component == "brem":
                 selected[energy] = {
                     key: value
                     for key, value in record.items()
-                    if key in _BREM_KEYS or key in {"case", "E_grid", "scale", "adaptive_sampling"}
+                    if key in _BREM_KEYS or key in _SHARED_KEYS
                 }
             else:
-                characteristic = record.get("spec_characteristic")
-                if characteristic is None:
+                component_key = _LINE_COMPONENT_KEY[component]
+                if record.get(component_key) is None:
                     continue
                 selected[energy] = {
                     key: value
                     for key, value in record.items()
-                    if key in _CHARACTERISTIC_KEYS
-                    or key in {"case", "E_grid", "scale", "adaptive_sampling"}
+                    if key == component_key or key in _SHARED_KEYS
                 }
             selected[energy]["case"] = copy.deepcopy(record["case"])
         if selected:
@@ -203,9 +215,11 @@ def save(
 ) -> None:
     """Atomically replace selected component artifacts.
 
-    Components land in background, characteristic, line order. Since line is
-    the authoritative record index, interruption cannot expose a new line
-    record without its matching independently stored companions.
+    Components land in background, characteristic, channeling, line order.
+    Since line is the authoritative record index, interruption cannot expose a
+    new line record without its matching independently stored companions. An
+    optional component (:data:`OPTIONAL_COMPONENTS`) is skipped while it is
+    empty and absent on disk.
     """
     unknown = set(components) - set(COMPONENTS)
     if unknown:
@@ -219,18 +233,46 @@ def save(
                 and not component_read_path(stem, component, root).is_file()
             ):
                 legacy = _checkpoint_io.load(str(old)) if legacy is None else legacy
-                _atomic_dump(
-                    component_path(stem, component, root),
-                    _component_store(legacy, component),
-                )
+                _dump_component(stem, root, component, _component_store(legacy, component))
     order = tuple(
-        component for component in ("brem", "characteristic", "line") if component in components
+        component
+        for component in ("brem", "characteristic", "channeling", "line")
+        if component in components
     )
     for component in order:
-        _atomic_dump(component_path(stem, component, root), _component_store(results, component))
+        _dump_component(stem, root, component, _component_store(results, component))
 
 
-def _merge(cxr: dict, brem: dict, characteristic: dict) -> dict:
+def _dump_component(stem: str, root: str | os.PathLike[str], component: str, store: dict) -> None:
+    path = component_path(stem, component, root)
+    if component in OPTIONAL_COMPONENTS and not store and not path.is_file():
+        return
+    _atomic_dump(path, store)
+
+
+def _attach_line_component(
+    record: dict, component: str, stored: dict | None, *, name: str, energy: object
+) -> None:
+    """Attach one separately stored line-grid component to its line record.
+
+    Line artifacts omit these components; each is attached as its own array.
+    A legacy line artifact that still carries a co-located component was
+    already separated on load, so that one is kept.
+    """
+    key = _LINE_COMPONENT_KEY[component]
+    if record.get(key) is not None or stored is None:
+        return
+    grid = stored.get("E_grid")
+    if grid is not None and not np.array_equal(np.asarray(record.get("E_grid")), np.asarray(grid)):
+        raise ValueError(
+            f"{component} checkpoint grid does not match line grid for {name!r} at {energy!r} keV"
+        )
+    value = stored.get(key)
+    if value is not None:
+        record[key] = value
+
+
+def _merge(cxr: dict, brem: dict, companions: dict[str, dict]) -> dict:
     merged = {}
     for name, by_energy in cxr.items():
         merged[name] = {}
@@ -253,22 +295,10 @@ def _merge(cxr: dict, brem: dict, characteristic: dict) -> dict:
                         np.asarray(wide_grid, float),
                         np.asarray(wide, float),
                     )
-            characteristic_record = characteristic.get(name, {}).get(energy)
-            # Line artifacts omit characteristic radiation; attach it as its own
-            # array. A legacy line artifact that still carries a co-located
-            # component was already separated on load, so keep that one.
-            if record.get("spec_characteristic") is None and characteristic_record is not None:
-                characteristic_grid = characteristic_record.get("E_grid")
-                if characteristic_grid is not None and not np.array_equal(
-                    np.asarray(record.get("E_grid")), np.asarray(characteristic_grid)
-                ):
-                    raise ValueError(
-                        f"characteristic checkpoint grid does not match line grid for {name!r} "
-                        f"at {energy!r} keV"
-                    )
-                component = characteristic_record.get("spec_characteristic")
-                if component is not None:
-                    record["spec_characteristic"] = component
+            for component, store in companions.items():
+                _attach_line_component(
+                    record, component, store.get(name, {}).get(energy), name=name, energy=energy
+                )
             merged[name][energy] = record
     return merged
 
@@ -286,15 +316,18 @@ def load(stem: str, root: str | os.PathLike[str]) -> dict:
             brem = _component_store(legacy, "brem")
         else:
             brem = {}
-        characteristic_path = component_read_path(stem, "characteristic", root)
-        if characteristic_path.is_file():
-            characteristic = _checkpoint_io.load(str(characteristic_path))
-        elif legacy_path(stem, root).is_file():
-            legacy = _checkpoint_io.load(str(legacy_path(stem, root))) if legacy is None else legacy
-            characteristic = _component_store(legacy, "characteristic")
-        else:
-            characteristic = {}
-        merged = _merge(cxr, brem, characteristic)
+        companions = {}
+        for component in ("characteristic", "channeling"):
+            path = component_read_path(stem, component, root)
+            if path.is_file():
+                companions[component] = _checkpoint_io.load(str(path))
+            elif legacy_path(stem, root).is_file():
+                if legacy is None:
+                    legacy = _checkpoint_io.load(str(legacy_path(stem, root)))
+                companions[component] = _component_store(legacy, component)
+            else:
+                companions[component] = {}
+        merged = _merge(cxr, brem, companions)
         return _overlay(merged, load_parts(stem, root))
     old = legacy_path(stem, root)
     if old.is_file():

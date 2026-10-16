@@ -15,8 +15,16 @@ if TYPE_CHECKING:
     from ..instrument import Acquisition, AcquisitionBatch
     from ..instrument.geometry import PixelRays
 
-#: Spatial result components. ``*_total`` adds characteristic radiation.
-COMPONENTS = ("cxr", "brem", "coherent", "characteristic", "cxr_total", "coherent_total")
+#: Spatial result components. ``*_total`` adds characteristic and channeling radiation.
+COMPONENTS = (
+    "cxr",
+    "brem",
+    "coherent",
+    "characteristic",
+    "channeling",
+    "cxr_total",
+    "coherent_total",
+)
 
 
 def _readonly_array(value: object, *, dtype=None) -> np.ndarray:
@@ -192,6 +200,9 @@ class SpatialResult:
         Optional characteristic-radiation factors. ``line`` and
         ``coherent_cxr`` exclude it; the ``"cxr_total"`` and
         ``"coherent_total"`` components add it.
+    channeling
+        Optional planar channeling-radiation factors on the line grid,
+        combined like ``characteristic``.
     tile_directions_lab
         Optional representative unit direction per angular tile with shape
         ``(n_tile, 3)`` in the lab frame; required to persist the result.
@@ -208,6 +219,7 @@ class SpatialResult:
     detector: PlanarDetector
     coherent_cxr: SpectralFactors | None = None
     characteristic: SpectralFactors | None = None
+    channeling: SpectralFactors | None = None
     tile_directions_lab: np.ndarray | None = None
     reconstruction: str = "nearest_tile"
 
@@ -237,10 +249,12 @@ class SpatialResult:
             if not isinstance(self.coherent_cxr, SpectralFactors):
                 raise TypeError("coherent_cxr must be SpectralFactors or None")
             self._validate_factor(self.coherent_cxr)
-        if self.characteristic is not None:
-            if not isinstance(self.characteristic, SpectralFactors):
-                raise TypeError("characteristic must be SpectralFactors or None")
-            self._validate_factor(self.characteristic)
+        for name in ("characteristic", "channeling"):
+            factor = getattr(self, name)
+            if factor is not None:
+                if not isinstance(factor, SpectralFactors):
+                    raise TypeError(f"{name} must be SpectralFactors or None")
+                self._validate_factor(factor)
         if not isinstance(self.detector, PlanarDetector):
             raise TypeError("detector must be a PlanarDetector")
 
@@ -381,18 +395,23 @@ class SpatialResult:
             if self.characteristic is None:
                 raise ValueError("characteristic CXR spectrum is not available")
             return self.characteristic
+        if component == "channeling":
+            if self.channeling is None:
+                raise ValueError("channeling radiation spectrum is not available")
+            return self.channeling
         if component in {"cxr_total", "coherent_total"}:
             base = self._factor(component.removesuffix("_total"))
-            extra = self.characteristic
-            if extra is None:
+            extras = [
+                extra for extra in (self.characteristic, self.channeling) if extra is not None
+            ]
+            if not extras:
                 return base
-            # Both factors share the line grid and attenuation, so the
+            # Every factor shares the line grid and attenuation, so the
             # pre-filter densities add tile by tile.
-            return SpectralFactors(
-                base.energy_eV,
-                base.intrinsic_by_tile + extra.intrinsic_by_tile,
-                base.mu_by_filter_inv_mm,
-            )
+            intrinsic = base.intrinsic_by_tile
+            for extra in extras:
+                intrinsic = intrinsic + extra.intrinsic_by_tile
+            return SpectralFactors(base.energy_eV, intrinsic, base.mu_by_filter_inv_mm)
         raise ValueError(f"component must be one of {', '.join(map(repr, COMPONENTS))}")
 
     def _coordinates(self, *, pixels, region) -> np.ndarray:
@@ -476,8 +495,8 @@ class SpatialResult:
             ``pixels``.
         component
             One of :data:`COMPONENTS`. ``"cxr"`` and ``"coherent"`` exclude
-            characteristic radiation; ``"cxr_total"`` and ``"coherent_total"``
-            include it.
+            characteristic and channeling radiation; ``"cxr_total"`` and
+            ``"coherent_total"`` include both when present.
         measured
             Apply the detector response after geometric scoring.
         fwhm_eV
@@ -522,8 +541,8 @@ class SpatialResult:
             Finite increasing ``(low, high)`` bounds in eV, inclusive.
         component
             One of :data:`COMPONENTS`. ``"cxr"`` and ``"coherent"`` exclude
-            characteristic radiation; ``"cxr_total"`` and ``"coherent_total"``
-            include it.
+            characteristic and channeling radiation; ``"cxr_total"`` and
+            ``"coherent_total"`` include both when present.
         measured
             Apply detector response before integration.
         fwhm_eV
@@ -577,8 +596,8 @@ class SpatialResult:
         ----------
         component
             One of :data:`COMPONENTS`. ``"cxr"`` and ``"coherent"`` exclude
-            characteristic radiation; ``"cxr_total"`` and ``"coherent_total"``
-            include it.
+            characteristic and channeling radiation; ``"cxr_total"`` and
+            ``"coherent_total"`` include both when present.
         pixel_chunk
             Positive maximum pixels materialized per working chunk.
 

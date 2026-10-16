@@ -288,6 +288,7 @@ def simulate(
         background = np.zeros_like(background)
     coherent = output.get("spec_coherent")
     characteristic = output.get("spec_characteristic")
+    channeling = output.get("spec_channeling")
     return Result(
         cxr=CxrSpectra(
             SpectralDensity(output["E_grid"], output["spec"]),
@@ -297,6 +298,7 @@ def simulate(
         characteristic=(
             None if characteristic is None else SpectralDensity(output["E_grid"], characteristic)
         ),
+        channeling=(None if channeling is None else SpectralDensity(output["E_grid"], channeling)),
         case=case,
         provenance={
             "scene": scene,
@@ -463,6 +465,9 @@ def _simulate_planar(
     coherent = spatial.coherent_cxr
     coherent_average = None if coherent is None else spatial.average_density("coherent")
     characteristic_average = spatial.average_density("characteristic")
+    channeling_average = (
+        None if spatial.channeling is None else spatial.average_density("channeling")
+    )
     return Result(
         cxr=CxrSpectra(
             SpectralDensity(energy, spatial.average_density("cxr"), "observation-average"),
@@ -474,6 +479,11 @@ def _simulate_planar(
             background_energy, spatial.average_density("brem"), "observation-average"
         ),
         characteristic=SpectralDensity(energy, characteristic_average, "observation-average"),
+        channeling=(
+            None
+            if channeling_average is None
+            else SpectralDensity(energy, channeling_average, "observation-average")
+        ),
         case=case,
         provenance={
             "scene": scene,

@@ -115,6 +115,13 @@ class PixelSampling:
             characteristic=SpectralFactors(
                 energy, np.asarray(output["spec_characteristic_by_direction"]), line_mu
             ),
+            channeling=(
+                None
+                if "spec_channeling_by_direction" not in output
+                else SpectralFactors(
+                    energy, np.asarray(output["spec_channeling_by_direction"]), line_mu
+                )
+            ),
             tile_directions_lab=self.directions_lab,
             reconstruction=reconstruction,
         )
@@ -230,8 +237,9 @@ class ObservationPlan:
             reconstruction=observation.scorer.reconstruction,
         )
         axes = [spatial.cxr.energy_eV, spatial.brem.energy_eV]
-        if spatial.characteristic is not None:
-            axes.append(spatial.characteristic.energy_eV)
+        for extra in (spatial.characteristic, spatial.channeling):
+            if extra is not None:
+                axes.append(extra.energy_eV)
         if spatial.coherent_cxr is not None:
             axes.append(spatial.coherent_cxr.energy_eV)
         acquisition, reporting = resolve_acquisition(

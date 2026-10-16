@@ -112,6 +112,7 @@ class Result:
         ├── cxr.incoherent      SpectralDensity  PXR/CBS, CXR grid
         ├── cxr.coherent        SpectralDensity | None
         ├── characteristic      SpectralDensity | None   atomic lines, CXR grid
+        ├── channeling          SpectralDensity | None   planar CR, CXR grid
         ├── brem                SpectralDensity  continuum, own wider grid
         ├── scene, numerics     what you asked for (shortcuts into provenance)
         ├── case                low-level resolved transport input (Case)
@@ -122,7 +123,7 @@ class Result:
     on its own grid; no family includes another. Derived views:
     :meth:`to_dataframe` (long, native grids), :meth:`spectral_flux` (wide,
     common grid, beam/acceptance-scaled, with a ``total`` column), and
-    :meth:`combined_cxr` (CXR plus characteristic). Displaying a result in a
+    :meth:`combined_cxr` (CXR plus characteristic and channeling). Displaying a result in a
     notebook renders this layout with grid sizes and ranges.
     """
 
@@ -132,6 +133,8 @@ class Result:
     """Bremsstrahlung continuum on its own (usually wider, coarser) grid."""
     characteristic: SpectralDensity | None
     """Atomic characteristic lines on the CXR grid, excluded from both CXR modes."""
+    channeling: SpectralDensity | None
+    """Planar channeling radiation on the CXR grid (ADR-0018), or ``None`` when off."""
     case: Case
     """Fully resolved low-level transport input; prefer :attr:`scene` for inputs."""
     provenance: Provenance
@@ -145,19 +148,22 @@ class Result:
         cxr: CxrSpectra,
         brem: SpectralDensity,
         characteristic: SpectralDensity | None = None,
+        channeling: SpectralDensity | None = None,
         case: Case,
         provenance: Mapping[str, Any],
         spatial: SpatialResult | None = None,
     ) -> None:
         if not isinstance(cxr, CxrSpectra) or not isinstance(brem, SpectralDensity):
             raise TypeError("Result requires cxr=CxrSpectra and brem=SpectralDensity")
-        if characteristic is not None:
-            if not isinstance(characteristic, SpectralDensity):
-                raise TypeError("characteristic must be a SpectralDensity or None")
-            if not np.array_equal(characteristic.photon_energy_eV, cxr.incoherent.photon_energy_eV):
-                raise ValueError("characteristic must use the CXR photon-energy grid")
-            if characteristic.normalization != cxr.incoherent.normalization:
-                raise ValueError("characteristic and CXR normalization must match")
+        for label, component in (("characteristic", characteristic), ("channeling", channeling)):
+            if component is None:
+                continue
+            if not isinstance(component, SpectralDensity):
+                raise TypeError(f"{label} must be a SpectralDensity or None")
+            if not np.array_equal(component.photon_energy_eV, cxr.incoherent.photon_energy_eV):
+                raise ValueError(f"{label} must use the CXR photon-energy grid")
+            if component.normalization != cxr.incoherent.normalization:
+                raise ValueError(f"{label} and CXR normalization must match")
         if spatial is not None and not isinstance(spatial, SpatialResult):
             raise TypeError("spatial must be a SpatialResult or None")
         if case is None or provenance is None:
@@ -166,6 +172,7 @@ class Result:
             ("cxr", cxr),
             ("brem", brem),
             ("characteristic", characteristic),
+            ("channeling", channeling),
             ("case", case),
             (
                 "provenance",
@@ -176,9 +183,13 @@ class Result:
             object.__setattr__(self, name, value)
 
     def combined_cxr(
-        self, *, mode: str = "incoherent", include_characteristic: bool = True
+        self,
+        *,
+        mode: str = "incoherent",
+        include_characteristic: bool = True,
+        include_channeling: bool = True,
     ) -> SpectralDensity:
-        """Return the selected CXR mode plus optional atomic emission on its grid.
+        """Return the selected CXR mode plus optional atomic and channeling emission.
 
         The returned density is photons / incident electron / eV / sr, with
         the selected mode's source/observation normalization. Brem is excluded
@@ -192,6 +203,8 @@ class Result:
         density = component.density
         if include_characteristic and self.characteristic is not None:
             density = density + self.characteristic.density
+        if include_channeling and self.channeling is not None:
+            density = density + self.channeling.density
         return SpectralDensity(component.photon_energy_eV, density, component.normalization)
 
     @property
@@ -218,13 +231,16 @@ class Result:
                 raise ValueError("coherent spectrum is not available")
         if self.characteristic is not None:
             parts.append(("characteristic", None, self.characteristic))
+        if self.channeling is not None:
+            parts.append(("channeling", None, self.channeling))
         parts.append(("brem", None, self.brem))
         return parts
 
     def to_dataframe(self) -> pl.DataFrame:
         """Return the separate spectral arrays as a tidy long-form polars DataFrame.
 
-        Columns are ``component`` (``cxr``, ``characteristic``, ``brem``),
+        Columns are ``component`` (``cxr``, ``characteristic``, ``channeling``,
+        ``brem``),
         ``mode`` (CXR ``incoherent``/``coherent``, null for other families),
         ``photon_energy_eV`` (eV), ``density`` (photons / incident electron /
         eV / sr), and ``normalization`` (``source`` or ``observation-average``).
@@ -289,8 +305,8 @@ class Result:
         """Return a wide spectrum table on a common grid, in physical units.
 
         Columns are ``photon_energy_eV``, ``photon_energy_keV``, one column per
-        family (``cxr`` in the selected ``mode``, ``characteristic`` when
-        present, ``brem``), and ``total``, their sum. The grid is the union of
+        family (``cxr`` in the selected ``mode``, ``characteristic`` and
+        ``channeling`` when present, ``brem``), and ``total``, their sum. The grid is the union of
         every family's native nodes, so each family is exact at its own nodes
         and linearly interpolated between them. Outside its own grid a family
         is zero; the total therefore omits brem below the brem grid start.
@@ -365,6 +381,7 @@ class Result:
             ("cxr.incoherent", grid(self.cxr.incoherent), "incoherent PXR/CBS"),
             ("cxr.coherent", grid(self.cxr.coherent), "coherent PXR/CBS"),
             ("characteristic", grid(self.characteristic), "atomic lines, CXR grid"),
+            ("channeling", grid(self.channeling), "planar channeling radiation, CXR grid"),
             ("brem", grid(self.brem), "bremsstrahlung continuum"),
             (
                 "scene",

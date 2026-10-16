@@ -234,12 +234,19 @@ _RECORD_ARRAY_FIELDS = (
     "brem_wide",
     "spec_coherent",
     "spec_characteristic",
+    "spec_channeling",
 )
 _WIDE_BREM_FIELDS = ("brem_wide", "E_grid_brem")
 
-# The coherent and characteristic components use the line grid, so a
-# --cxr-only projection/merge must carry them with ``spec``.
-CXR_RECORD_KEYS = ("spec", "E_grid", "spec_coherent", "spec_characteristic")
+# The coherent, characteristic and channeling components use the line grid, so
+# a --cxr-only projection/merge must carry them with ``spec``.
+CXR_RECORD_KEYS = (
+    "spec",
+    "E_grid",
+    "spec_coherent",
+    "spec_characteristic",
+    "spec_channeling",
+)
 BREM_RECORD_KEYS = ("brem_wide", "brem", "E_grid_brem")
 
 
@@ -289,10 +296,10 @@ def merge_dataset(local, incoming, dataset, force=False):
             # A line payload that lacks an optional companion must remove the old
             # one: otherwise a stale, possibly wrong-length array is paired with
             # the incoming line grid.
-            if dataset == "line" and "spec" in inc and "spec_coherent" not in inc:
-                r.pop("spec_coherent", None)
-            if dataset == "line" and "spec" in inc and "spec_characteristic" not in inc:
-                r.pop("spec_characteristic", None)
+            if dataset == "line" and "spec" in inc:
+                for companion in ("spec_coherent", "spec_characteristic", "spec_channeling"):
+                    if companion not in inc:
+                        r.pop(companion, None)
             bw, egb, eg = r.get("brem_wide"), r.get("E_grid_brem"), r.get("E_grid")
             if bw is not None and egb is not None and eg is not None:
                 r["brem"] = np.interp(
@@ -420,6 +427,7 @@ _BASKET_RECORD_FIELDS = (
     "E_grid",
     "spec",
     "spec_characteristic",
+    "spec_channeling",
     "brem",
     "E_grid_brem",
     "brem_wide",

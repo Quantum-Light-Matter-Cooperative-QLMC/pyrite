@@ -168,6 +168,8 @@ def spectrum_components(observation: StoredObservation) -> tuple[str, ...]:
     components = [cxr]
     if observation.spatial.characteristic is not None:
         components.append("characteristic")
+    if observation.spatial.channeling is not None:
+        components.append("channeling")
     components.append("brem")
     return tuple(components)
 

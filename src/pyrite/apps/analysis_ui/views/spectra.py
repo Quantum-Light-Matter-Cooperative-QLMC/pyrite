@@ -124,6 +124,7 @@ def render_spectra(
             include_brem="Bremsstrahlung" in component_values,
             include_cxr="Line" in component_values,
             include_characteristic="Characteristic" in component_values,
+            include_channeling="Channeling" in component_values,
             include_coherent=context.show_both_emissions,
             sum_components=True,
             max_points=2500 if context.show_both_emissions else 5000,

@@ -50,7 +50,7 @@ MCPL remains a strong candidate when the consumer is Geant4, OpenMC, MCNP/PHITS,
 
 ### New writes use `.h5` filenames
 
-Current component, shard, and CAS artifacts use `.h5` filenames, matching their HDF5 encoding. Component stores now contain `line.h5`, `brem.h5`, and the independently removable `characteristic.h5`. The compatibility reader still accepts legacy `.pkl` paths and sniffs their bytes before dispatching across plain-pickle, gzip, zstd, and HDF5 generations.
+Current component, shard, and CAS artifacts use `.h5` filenames, matching their HDF5 encoding. Component stores now contain `line.h5`, `brem.h5`, the independently removable `characteristic.h5`, and, only for channeling datasets (ADR-0018), `channeling.h5`. The compatibility reader still accepts legacy `.pkl` paths and sniffs their bytes before dispatching across plain-pickle, gzip, zstd, and HDF5 generations.
 
 ### Legacy files load forever
 
