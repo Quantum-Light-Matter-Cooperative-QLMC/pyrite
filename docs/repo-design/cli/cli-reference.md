@@ -2087,7 +2087,9 @@ Usage: pyrite profile numerics reset [OPTIONS] NAME [cxr-trials|brem-trials|line
                                      model|bremsstrahlung-model|radiative-
                                      model|radiative-cutoff-ev|pair-production-
                                      model|positron-transport|atomic-electron-
-                                     deflection]...
+                                     deflection|channeling-model|channeling-
+                                     plane|channeling-basis-size|channeling-bloch-
+                                     cells|channeling-dz-ang|channeling-zone-max-ang]...
 
   Reset selected FIELDs, or every explicit numeric when none are named.
 
@@ -2174,6 +2176,23 @@ Options:
                                   share above W_c is removed under shell-soft-hard,
                                   which needs elsepa); none keeps elastic-only
                                   deflection.
+  --channeling-model [off|planar]
+                                  Planar quantum entrance zone (default off); requires
+                                  plane, midpoint, uncoupled radiation and incoherent
+                                  emission. Disable with numerics reset PROFILE
+                                  channeling-model channeling-plane.
+  --channeling-plane H K L        Nonzero Miller indices of the planar channeling
+                                  family; requires planar.
+  --channeling-basis-size INTEGER RANGE
+                                  Transverse plane-wave band |h| <= H (default 16).
+                                  [x>=1]
+  --channeling-bloch-cells INTEGER RANGE
+                                  Bloch-grid supercell size (default 16).  [x>=1]
+  --channeling-dz-ang FLOAT RANGE
+                                  Zone depth step in angstrom (default 250).  [x>0]
+  --channeling-zone-max-ang FLOAT RANGE
+                                  Zone length cap in angstrom (default first layer
+                                  thickness).  [x>0]
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.

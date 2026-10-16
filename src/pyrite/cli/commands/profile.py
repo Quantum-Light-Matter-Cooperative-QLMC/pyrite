@@ -85,6 +85,12 @@ _NUMERICS_FIELD_NAMES = {
     "pair-production-model": "pair_production_model",
     "positron-transport": "positron_transport",
     "atomic-electron-deflection": "atomic_electron_deflection",
+    "channeling-model": "channeling_model",
+    "channeling-plane": "channeling_plane",
+    "channeling-basis-size": "channeling_basis_size",
+    "channeling-bloch-cells": "channeling_bloch_cells",
+    "channeling-dz-ang": "channeling_dz_ang",
+    "channeling-zone-max-ang": "channeling_zone_max_ang",
 }
 _RANGE_OPTIONS = (
     ("thickness", "--thickness", THICKNESS_CSV_RANGE, "ANGSTROM,..."),
@@ -456,6 +462,39 @@ def numerics_show_command(name, json_output):
         "above W_c is removed under shell-soft-hard, which needs elsepa); none keeps "
         "elastic-only deflection."
     ),
+)
+@click.option(
+    "--channeling-model",
+    type=click.Choice(("off", "planar")),
+    help="Planar quantum entrance zone (default off); requires plane, midpoint, uncoupled "
+    "radiation and incoherent emission. Disable with numerics reset PROFILE "
+    "channeling-model channeling-plane.",
+)
+@click.option(
+    "--channeling-plane",
+    type=(int, int, int),
+    metavar="H K L",
+    help="Nonzero Miller indices of the planar channeling family; requires planar.",
+)
+@click.option(
+    "--channeling-basis-size",
+    type=click.IntRange(min=1),
+    help="Transverse plane-wave band |h| <= H (default 16).",
+)
+@click.option(
+    "--channeling-bloch-cells",
+    type=click.IntRange(min=1),
+    help="Bloch-grid supercell size (default 16).",
+)
+@click.option(
+    "--channeling-dz-ang",
+    type=click.FloatRange(min=0, min_open=True),
+    help="Zone depth step in angstrom (default 250).",
+)
+@click.option(
+    "--channeling-zone-max-ang",
+    type=click.FloatRange(min=0, min_open=True),
+    help="Zone length cap in angstrom (default first layer thickness).",
 )
 @click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")

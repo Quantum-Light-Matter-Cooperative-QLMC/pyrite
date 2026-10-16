@@ -234,8 +234,6 @@ def run_case(
         count, resolved crystal, incident energy, and optional timing metrics.
     """
     _adaptive.validate_directions(case, observation_directions)
-    if observation_directions is not None:
-        refuse_channeling(case, "observation-direction scoring")
     transport = _transport_case(
         case,
         record_timing,
@@ -273,7 +271,6 @@ def run_case_directions(
     photon geometry in the electron navigator.
     """
     _adaptive.validate_directions(case, n_hats)
-    refuse_channeling(case, "observation-direction scoring")
     directions = validated_directions(n_hats)
     transport = _transport_case(
         case,
@@ -306,14 +303,12 @@ def _beam_kwargs(case):
     )
 
 
-def _check_channeling_transport(case, transport_core, trajectory_capture, block_electrons):
+def _check_channeling_transport(case, trajectory_capture, block_electrons):
     """Refuse channeling transport options before any work (ADR-0017 tier 3)."""
     if trajectory_capture is not None:
         refuse_channeling(case, "trajectory capture")
     if block_electrons is not None:
         refuse_channeling(case, "electron-block transport")
-    if _case_transport_core(case, transport_core) == "cuda":
-        refuse_channeling(case, "CUDA transport")
 
 
 def _transport_case(
@@ -361,7 +356,7 @@ def _transport_case(
     # in the case payload.
     select_emission(case)
     if case.get("channeling") is not None:
-        _check_channeling_transport(case, transport_core, trajectory_capture, block_electrons)
+        _check_channeling_transport(case, trajectory_capture, block_electrons)
     if case.get("adaptive_precision") is not None:
         return _adaptive.transport_requested_precision(
             case,
@@ -406,10 +401,15 @@ def _transport_case(
 
     core = _case_transport_core(case, transport_core)
     channeling = case.get("channeling") is not None
-    if channeling:  # the zone's launches address per-electron streams
+    if channeling and core != "cuda":  # launches need counter-addressed streams
         core = "per-electron"
-    # Coupled radiative rows complete their photons on the host.
-    resident = keep_segments_on_device and core == "cuda" and "radiative_model" not in case
+    # The zone/native join and coupled radiative completion run on the host.
+    resident = (
+        keep_segments_on_device
+        and core == "cuda"
+        and "radiative_model" not in case
+        and not channeling
+    )
     straggling = bool(case.get("straggling", False))
     # The CUDA LUT kernel has no shell soft/hard mode, so production shell runs
     # select the exact CUDA kernel rather than failing. Direct

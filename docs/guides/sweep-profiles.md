@@ -54,6 +54,41 @@ The old `--ne-line`/`--ne-brem` options and `profile numerics set --line-electro
 
 `pyrite profile create NAME --from SOURCE` explicitly clones SOURCE's ranges, membership, beam, scalar and physical detectors, filters, emission, transport numerics, line-grid policy, and adaptive precision policy. Its output lists any inherited instrument and physics sections. Per-material overrides remain local to SOURCE and are not cloned. Review the cloned profile before running it, especially if SOURCE is a modified `standard`.
 
+## Planar channeling
+
+For an existing single-crystal silicon or diamond profile with incoherent
+emission, disable any explicit precision policy, then enable the entrance
+zone through calculation numerics:
+
+```bash
+pyrite profile numerics set my_scan \
+  --channeling-model planar --channeling-plane 1 1 0 \
+  --radiative-model uncoupled --energy-model midpoint \
+  --cxr-trials 300 --brem-trials 150
+PYRITE_MC_TRANSPORT_CORE=cuda pyrite run my_scan --remote
+```
+
+Choose the plane relative to the crystal cut and beam alignment; the command
+above selects the Si(110) family, rather than configuring the sample pose.
+Explicit fixed counts are required because adaptive precision has no
+per-electron channeling variance observable. The zone solve runs on the CPU;
+its sampled handoff states continue through CUDA transport. Native rows return
+to the host for joining with zone rows before spectrum scoring. The core
+selection above is forwarded to remote runs; use `per-electron` for CPU
+continuation, or leave it at `auto` for the existing count/backend policy.
+Trajectory capture and electron blocks currently refuse channeling.
+
+`--channeling-basis-size`, `--channeling-bloch-cells`, `--channeling-dz-ang`
+and `--channeling-zone-max-ang` control the zone resolution and cap. Enabled
+controls enter dataset identity and checkpoint stems. Channeling defaults to
+off; changing its inactive resolution controls leaves off identities unchanged.
+Disable it with `pyrite profile numerics reset my_scan channeling-model
+channeling-plane`. Checkpoints carry a separate **Channeling** component that
+the analysis app can select; replay and line recompute rescore it on their
+line grid, and bremsstrahlung repair preserves it. See
+[ADR-0018](../adr/0018-quantum-channeling-zone.md) for supported geometry and
+model limits.
+
 ## Adaptive electron counts
 
 Profiles run adaptive electron counts by default. Each incoherent case transports electrons in blocks and stops once the relative standard error of each watched yield meets the target and the heavy-tail guards pass. If the target is not met by the maximum count, the run stops there and is flagged statistics-limited. One count serves both line and bremsstrahlung transport.

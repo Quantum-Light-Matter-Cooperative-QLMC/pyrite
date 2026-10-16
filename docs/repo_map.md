@@ -468,6 +468,11 @@ Named `full`/provisional `survey` fidelity presets, deterministic serialization 
 - Public: `FidelityPreset`, `FIDELITY_NAMES`, `get_fidelity_preset`, `dataset_identity`, `case_content_key`, `variant_stem`.
 - Deps: `results` (`Settings`), `sweep` (`Sweep`), NumPy.
 
+### `campaign/numerics_resolution.py`
+Immutable resolved numerics with value provenance and stable CLI/JSON grouping; re-exported by `campaign/profiles.py`, which owns fidelity resolution.
+- Public: `NumericsResolution`, `NUMERICS_GROUPS`.
+- Deps: `_numerics` (`CHANNELING_KEYS`), standard library.
+
 ### `campaign/profile_edit.py`
 Domain operations over parsed catalog documents for profile creation, updates, membership, overrides, detector settings, beam references, emission policy, rename, and deletion. The Click layer owns prompts and persistence; this module owns validation and mutation semantics.
 - Public: intentionally internal to `cli.commands.profile`.

@@ -19,8 +19,13 @@ EmissionMode = Literal["incoherent", "coherent", "both"]
 import numpy as np
 
 from .._numerics import (
+    PHYSICS_FIELDS,
+    Physics,
+    _emission_selection,
     validate_atomic_electron_deflection,
     validate_bremsstrahlung_model,
+    validate_channeling_numerics,
+    validate_channeling_physics,
     validate_elastic_model,
     validate_inelastic_numerics,
     validate_pair_production_numerics,
@@ -123,6 +128,10 @@ class Settings:
     atomic_electron_deflection
         ``"kawrakow"`` (default) atomic-electron angular deflection as a
         ``Z(Z + xi)`` elastic-rate correction, or ``"none"``.
+    channeling_model, channeling_plane
+        Opt-in planar entrance zone and its Miller indices; defaults to off.
+    channeling_basis_size, channeling_bloch_cells, channeling_dz_ang, channeling_zone_max_ang
+        Zone basis, Bloch grid, depth step and optional length cap, as in Numerics.
     emission
         ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
     temporal_profile
@@ -153,6 +162,12 @@ class Settings:
     pair_production_model: Literal["penelope-2024"] | None = None
     positron_transport: bool = False
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
+    channeling_model: Literal["off", "planar"] = "off"
+    channeling_plane: tuple[int, int, int] | None = None
+    channeling_basis_size: int = 16
+    channeling_bloch_cells: int = 16
+    channeling_dz_ang: float = 250.0
+    channeling_zone_max_ang: float | None = None
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_cxr_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so
@@ -200,6 +215,19 @@ class Settings:
             self.positron_transport,
         )
         validate_atomic_electron_deflection(self.atomic_electron_deflection)
+        if self.channeling_model != "off" or self.channeling_plane is not None:
+            physics = Physics(
+                **{key: getattr(self, key) for key in PHYSICS_FIELDS if key != "emission"},
+                emission=_emission_selection(self.emission),
+            )
+            self.channeling_plane = physics.channeling_plane
+            validate_channeling_physics(physics, self.energy_model)
+        validate_channeling_numerics(
+            self.channeling_basis_size,
+            self.channeling_bloch_cells,
+            self.channeling_dz_ang,
+            self.channeling_zone_max_ang,
+        )
 
     @property
     def coherent_emission(self) -> bool:

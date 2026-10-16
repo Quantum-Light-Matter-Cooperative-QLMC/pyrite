@@ -68,8 +68,8 @@ with a warning above 10%. Stopping is constant at `S(E₀)` in the solve and the
 zone row, and zone caps shorter than the path are refused. The primaries'
 entrance states come from the same seed-pure draws as amorphous transport and
 relaunch with their own stream keys. Mosaic crystals, coupled radiative
-transport, secondaries, coherent emission, stacks, grooves and CUDA are refused
-in v1. The 300 eV margin sets the dechanneled angular distribution (mean
+transport, secondaries, coherent emission, stacks and grooves are refused.
+CUDA native continuation is described under Run surfaces below. The 300 eV margin sets the dechanneled angular distribution (mean
 4.7 `ψ_c` at 5 MeV Si(110)); see `cr-zone-handoff-accounting`.
 
 ### Evolution backends
@@ -131,6 +131,31 @@ PXR/CBS is recorded as an omission.
   observable. Five of six Table I occupation lengths fall within ±20%, and
   Si(100) at 54.5 MeV is a documented 1.35× outlier. Persisted output (#507)
   must carry the cutoff in its identity.
+
+## Run surfaces (#521)
+
+Profiles select `channeling_model = "planar"` and `channeling_plane` in
+`numerics`, alongside the zone resolution controls. Fixed-count CPU/CUDA sweeps,
+physical-detector directions and observations score the same deterministic
+ensemble source. Replay and line recompute rescore it on the requested grid;
+bremsstrahlung repair preserves the stored channel. Channeling-off identities
+and outputs retain their historical layout.
+
+The ensemble zone solve and keyed handoff sampling run on the CPU. Native
+continuation accepts the same `LaunchState` on the per-electron CPU core or
+CUDA core. CUDA rows are downloaded once for the host zone/native join;
+`keep_segments_on_device` therefore does not keep channeling rows resident.
+The deterministic radiation source remains on the CPU. Existing stream keys
+and channeling-off identities are unchanged by the backend choice.
+
+The following consumers refuse channeling before transport or writes:
+
+- Adaptive precision: the channel is a deterministic ensemble expectation,
+  rather than an independent per-electron segment estimate. No CR variance
+  observable is defined for the ADR-0017 stopping contract; use fixed counts.
+- Trajectory capture and electron-block transport: the zone source and initial
+  entrance population are not represented by the current block/capture
+  contract. Use fixed-count execution without capture.
 
 ## Consequences
 

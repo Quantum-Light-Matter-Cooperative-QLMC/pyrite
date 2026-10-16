@@ -140,6 +140,10 @@ def resolve_pixel_scene(
             brem_trials=n_electrons_brem,
             energy_model=cast(Literal["frozen", "midpoint"], energy_model),
             max_dE_frac=float(max_dE_frac),
+            channeling_basis_size=int(transport.get("channeling_basis_size", 16)),
+            channeling_bloch_cells=int(transport.get("channeling_bloch_cells", 16)),
+            channeling_dz_ang=float(transport.get("channeling_dz_ang", 250.0)),
+            channeling_zone_max_ang=cast(float | None, transport.get("channeling_zone_max_ang")),
             precision=catalog.profile_precision(profile_name),
         ),
         Physics(
@@ -163,6 +167,10 @@ def resolve_pixel_scene(
             pair_production_model=cast(
                 Literal["penelope-2024"] | None, transport.get("pair_production_model")
             ),
+            channeling_model=cast(
+                Literal["off", "planar"], transport.get("channeling_model", "off")
+            ),
+            channeling_plane=cast(tuple[int, int, int] | None, transport.get("channeling_plane")),
             positron_transport=bool(transport.get("positron_transport", False)),
             atomic_electron_deflection=cast(
                 Literal["kawrakow", "none"],

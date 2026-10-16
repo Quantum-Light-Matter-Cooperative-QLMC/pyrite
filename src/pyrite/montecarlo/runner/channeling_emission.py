@@ -49,6 +49,8 @@ def case_channeling_spectrum(case, transport) -> np.ndarray:
 
     Validation: cr-persisted-channel
     """
+    if "channeling" not in transport["segs"] or "channeling_beam_dir" not in transport:
+        return rescore_channeling_spectrum(case, transport["E_grid"], transport["n_hat"])
     record = case["channeling"]
     segs = transport["segs"]
     info = segs["channeling"]
@@ -105,3 +107,51 @@ def case_channeling_spectrum(case, transport) -> np.ndarray:
         path_limits_ang=limits,
     )
     return result.spectrum
+
+
+def rescore_channeling_spectrum(case, energy_eV, n_hat=None) -> np.ndarray:
+    """Reconstruct the deterministic CR source from the recorded case.
+
+    Regenerate entrance states and the ensemble zone, without native electron
+    transport or fate sampling. Use the full transport population when resolving
+    entry divergence, then the line population for source censoring, exactly as
+    the live producer does. ``energy_eV`` may be a replacement line grid.
+    """
+    from ..channeling.handoff import solve_zone
+    from ..transport.beam_entry import sample_primary_entry
+    from ..transport.stopping import prepare_sbethe_stopping_table, sbethe_stopping_keV_per_ang
+    from . import _beam_kwargs, _case_stopping_tables
+    from .artifacts import _case_geometry
+
+    _grid, _brem, beam, default_direction, _groove = _case_geometry(case)
+    count = max(int(case["Ne"]), int(case["Ne_brem"]))
+    r, v, energy, _clock, _t0, _record = sample_primary_entry(
+        float(case["E0_keV"]),
+        count,
+        int(case["seed"]),
+        beam_dir=beam,
+        tilt_polar_rad=np.deg2rad(case.get("tilt_deg", 0.0)),
+        tilt_azim_rad=np.deg2rad(case.get("tilt_azim_deg", 0.0)),
+        **_beam_kwargs(case),
+    )
+    log_energy, log_stopping = prepare_sbethe_stopping_table(_case_stopping_tables(case)[0])
+    stopping = -float(sbethe_stopping_keV_per_ang(log_energy, log_stopping, float(case["E0_keV"])))
+    ensemble = solve_zone(case, np.asarray(beam, dtype=float), v, stopping)
+    transport = dict(
+        Ne_lines=int(case["Ne"]),
+        E_grid=np.asarray(energy_eV),
+        n_hat=default_direction if n_hat is None else n_hat,
+        channeling_beam_dir=beam,
+        segs=dict(
+            initial_r_ang=r,
+            initial_v_hat=v,
+            initial_E_keV=energy,
+            channeling=dict(
+                stopping_keV_per_ang=stopping,
+                path_ang=ensemble.path_ang,
+                incidence_rad=ensemble.incidence_rad,
+                divergence_rad=ensemble.divergence_rad,
+            ),
+        ),
+    )
+    return case_channeling_spectrum(case, transport)
