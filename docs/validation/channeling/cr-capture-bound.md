@@ -47,3 +47,25 @@ The estimate is 0.38–0.39 of the line yield, about 13 times the 3% rule, so th
 - Following the maintainer decision of 2026-10-15, capture is now scored (`cr-capture-yield`). Capture transitions into one final state are clustered when their initial energies are unresolved within the widths, and their cross terms are kept. `capture_bound().estimate` is now that scored yield.
 - The upper bound uses `λ_max` of the clustered capture-rate operator over all above-barrier states, instead of the largest diagonal rate.
 - At the Kephart configuration the ratio is unchanged (0.38–0.39). At the entry state the cross terms change the capture rate by less than 2e-9, consistent with ×1.000 above.
+
+## Re-validation (2026-10-15, fresh context, after the resolution)
+
+**Derivation of the new bound.** Let $R=\sum_c d_c^\dagger d_c$ act on the above-barrier states of one block. It is positive semidefinite and vanishes on bound states, so for any $\rho$, including its bound–free coherences, $\mathrm{Tr}[\rho R]=\mathrm{Tr}[\rho_{FF}R]\le\lambda_{\max}(R)\,\mathrm{Tr}\,\rho_{FF}$. The density matrix is block-diagonal over Bloch blocks. Assume a dechanneled electron also sits in above-barrier basis states. Then the capture rate is at most $\max_k\lambda_{\max}(R_k)\,(1-P_{\rm bound})$, and the claimed bound follows. It is valid for the scored estimator when the bound's clusters are *coarser* than the scored ones: the pinching inequality gives $\lambda_{\max}(\text{block-diagonal part})\le\lambda_{\max}(\text{full})$ for a PSD matrix, and a principal submatrix interlaces. It is a model bound. With every free level of a final state in one cluster (no clustering) $\lambda_{\max}$ is 1.9× larger.
+
+**Checks** (`scratch/cr505reval/capture.py`, `bound_struct.py`). Kephart configuration: Si(110), 17 MeV, 2.2 mrad, 2 µm, $dz=100$ Å, sampling every 500 Å, my own amplitudes and my own depth history.
+
+| $n_{\rm cells}$, $H$, margin | estimate impl / own | line yield impl / own | ratio | upper bound (× line) | $\lambda_{\max}$ impl | max over $z$ of rate$/(\lambda(1-P_b))$ |
+| --- | --- | --- | --- | --- | --- | --- |
+| 4, 8, 0 eV | 0 / 0 | 1.6081e-5 / same | 0 | 5.134e-5 (3.19) | 3.0365e-9 | 0 |
+| 4, 8, 30 eV | 8.0537e-6 / same | 2.1171e-5 / same | 0.3804 | 4.810e-5 (2.27) | 3.0365e-9 | 0.207 |
+| 4, 8, 300 eV | 8.6191e-6 / same | 2.2103e-5 / same | 0.3900 | 4.752e-5 (2.15) | 3.0365e-9 | 0.211 |
+| 4, 16, 300 eV | 8.8798e-6 / same | 2.2683e-5 / same | 0.3915 | 4.710e-5 (2.08) | 3.0383e-9 | 0.212 |
+| 16, 8, 30 eV | 8.0052e-6 / same | 2.1093e-5 / same | 0.3795 | 4.830e-5 (2.29) | 3.0466e-9 | 0.206 |
+
+- The estimate equals the scored capture yield (`cr-capture-yield`) and my own diagonal estimator to 5 significant figures.
+- The bound holds pointwise in depth with a factor of about 5 to spare.
+- `bound_struct.py` checks the dominance condition on 4 and 16 cells. No scored capture cluster straddles two runs of `_capture_rate_bound`. $\lambda_{\max}$ of the scored clustered operator is 1.000× (4 cells) and 0.997× (16 cells) of the bound's $\lambda_{\max}$.
+
+**Caveat (no failing case found).** `capture_bound` sets the run tolerance to `lines.hwhm_eV[is_capture].max()`, the maximum of the *rate-weighted cluster means* (`emission.py:1175`). The scored links use the pair tolerance $\tfrac12(h_{\rm last}+h_{\rm item})$ of individual pairs (`emission.py:676–680`). A link between two broad pairs inside a cluster dominated by a narrow strong member could exceed the bound's tolerance, split a scored cluster and break the coarser-cluster condition. The max over pair half widths would make the bound structural. With cross terms below $2\times10^{-4}$ of the yield the numerical effect is nil here.
+
+**Verdict:** `rederived`.

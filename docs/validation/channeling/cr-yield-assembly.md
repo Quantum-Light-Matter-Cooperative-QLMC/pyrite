@@ -49,3 +49,35 @@ The default orders (6 Gauss–Legendre radii × 12 azimuths, 9 Gauss–Hermite) 
 - The peak-height inheritance from `cr-line-shape` is fixed with the all-block coherence-transfer widths. The quadrature-ripple caveat is now recorded in the ledger Notes and in the `n_aperture`/`n_divergence` parameter description.
 - The spectrum is now assembled from the group modes, and capture is reported as a separate component.
 - The integral and absorption anchors were re-pinned against the mode form. Each holds to 1e-6 and 1e-10 respectively.
+
+## Re-validation (2026-10-15, fresh context, after the resolution)
+
+With capture scored and the modes of `cr-line-shape`, the exit spectrum is
+
+$$
+\frac{d^2N}{dE\,d\Omega}=P(\theta_e,\phi_e)\sum_g\mathrm{Re}\sum_m\bar w_m^{(g)}F_m(E),\qquad
+w^{(g)}_m=(a^\dagger V)_m\bigl(V^{-1}s\bigr)_m,\quad s_k=Y_k/\bar a_k,
+$$
+
+$$
+Y_k=\int_0^t dz\,\langle d_k^\dagger d_k\rangle_{\rho(z)}\,e^{-\mu(E_k)(t-z)/n_z}.
+$$
+
+Here $F_m$ is the complex Voigt at lab centre $\varepsilon_m/D$ and half width $h_m/D$. Because the modes are linear in $s$, the absorbed source can replace the unabsorbed one (the absorption is applied at the emission depth, evaluated at the line centre). The units are those of the original derivation: photons/eV/sr/electron.
+
+**Independent assembly** (`scratch/cr505reval/assembly.py`). Si(110), 17 MeV, TDS + electronic, $n_{\rm cells}=4$, $H=8$, margin 30 eV, 2 µm, 2.2 mrad entry divergence. Point detector at $\theta=0.5/\gamma$, $\phi=0.4$, with a 0.4% energy spread, absorption on, on a 3–60 keV grid. I built my own pairs from my own dipoles, my own $K$ per pair from `solver.jump`, my own $\gamma$ exponent from re-solved Hamiltonians, my own history and $\mu$ from `linear_attenuation_inv_mm`, and an unclustered diagonal estimator.
+
+| quantity | independent | implementation |
+| --- | --- | --- |
+| bound→bound yield | 2.11712e-5 | 2.11712e-5 |
+| capture yield | 8.05367e-6 | 8.05366e-6 |
+| total spectrum, max difference / peak | — | 2.1e-4 |
+| capture spectrum, max difference / capture peak | — | 2.4e-3 (cluster representative vs per-pair modes) |
+| absorbed / unabsorbed integral | 0.9840 | 0.9840 |
+| minimum of total spectrum / peak | 3.4e-3 | 3.4e-3 (non-negative) |
+
+- Capture is 0.26 of the energy-integrated spectrum at this direction.
+- With absorption off, $\int dE$ over the 3–60 keV grid is 0.949 of $P\times$(line + capture yields). The rest lies in the Lorentzian tails of mode widths of about 0.7 keV in the lab, outside the grid. The full-range mode weights sum to the yields to $10^{-6}$ (`cr-line-shape`).
+- Margin 0 gives zero capture. The zero-bound-state test is green, and all 31 tests of `tests/montecarlo/test_channeling_emission.py` pass (`--slow`).
+
+**Verdict:** `rederived`. The quadrature-order caveat recorded earlier stands.

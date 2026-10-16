@@ -435,6 +435,9 @@ class EmissionLines:
     hwhm_eV
         All-block secular half width ``hbar v kappa`` [eV] (exact for flat
         bands; the spectrum uses the group modes).
+    max_member_hwhm_eV
+        Largest member pair half width of each line [eV]; it bounds every
+        clustering link, so :func:`capture_bound` clusters at least as coarsely.
     gamma_exponent
         ``d ln Delta E_perp / d ln gamma`` at fixed band indices.
     strength_per_ang
@@ -455,6 +458,7 @@ class EmissionLines:
     lower: np.ndarray
     delta_eV: np.ndarray
     hwhm_eV: np.ndarray
+    max_member_hwhm_eV: np.ndarray
     gamma_exponent: np.ndarray
     strength_per_ang: np.ndarray
     members: tuple[tuple[np.ndarray, np.ndarray, np.ndarray], ...]
@@ -700,6 +704,7 @@ def emission_lines(
                 "amp": strongest["amp"],
                 "delta": mean("delta"),
                 "hwhm": mean("hwhm"),
+                "max_hwhm": max(item["hwhm"] for item in items),
                 "exponent": mean("exponent"),
                 "strength": float(weight.sum()),
                 "members": (
@@ -745,6 +750,7 @@ def emission_lines(
         lower=column("lower", int),
         delta_eV=column("delta"),
         hwhm_eV=column("hwhm"),
+        max_member_hwhm_eV=column("max_hwhm"),
         gamma_exponent=column("exponent"),
         strength_per_ang=column("strength"),
         members=tuple(row["members"] for row in rows),
@@ -1161,7 +1167,7 @@ def capture_bound(
     dechanneled flux, at ``lambda_max`` of the clustered capture-rate
     operator over all above-barrier basis states (clusters: runs of free
     levels within ``cluster_tol_eV``, default the largest tracked capture
-    half width).
+    member half width, which every scored clustering link stays within).
 
     Validation: cr-capture-bound
     """
@@ -1172,7 +1178,9 @@ def capture_bound(
     yields = np.trapezoid(history.rates, history.z_ang, axis=0)
     is_capture = lines.kind == KIND_CAPTURE
     if cluster_tol_eV is None:
-        tol = float(lines.hwhm_eV[is_capture].max()) if is_capture.any() else 0.0
+        # Each scored link joins pairs within half their summed half widths, at
+        # most the largest pair half width: the bound's runs are then coarser.
+        tol = float(lines.max_member_hwhm_eV[is_capture].max()) if is_capture.any() else 0.0
     else:
         tol = float(cluster_tol_eV)
     max_rate = _capture_rate_bound(solver, lines.gamma, tol)

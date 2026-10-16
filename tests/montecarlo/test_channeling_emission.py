@@ -164,6 +164,7 @@ def test_harmonic_coherent_state_is_classical_and_has_no_phase_locked_gain():
         lower=np.array([0]),
         delta_eV=np.array([hbar_omega]),
         hwhm_eV=np.array([0.1]),
+        max_member_hwhm_eV=np.array([0.1]),
         gamma_exponent=np.array([-0.5]),
         strength_per_ang=np.array([rate01]),
         members=((n - 1, n, np.sqrt(rate01 * n).astype(complex)),),
