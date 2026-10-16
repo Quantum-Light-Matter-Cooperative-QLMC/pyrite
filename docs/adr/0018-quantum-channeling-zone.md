@@ -106,6 +106,13 @@ PXR/CBS is recorded as an omission.
 - Crystals without the new fields, or with placeholder `B_ang2`, are refused.
 - A dechanneling-rate calibration factor is allowed only if it is declared and
   carried in identity and provenance.
+  *Outcome (#504, maintainer decision 2026-10-15):* the declared calibration is
+  the dechanneling cutoff `DECHANNELING_MARGIN_EV = 300` eV above the planar
+  barrier, with `DECHANNELING_MARGIN_PROVENANCE` (`montecarlo/channeling/density.py`).
+  It is calibrated on Kephart et al. (1989) through the forward-detector
+  observable. Five of six Table I occupation lengths fall within ±20%, and
+  Si(100) at 54.5 MeV is a documented 1.35× outlier. Persisted output (#507)
+  must carry the cutoff in its identity.
 
 ## Consequences
 

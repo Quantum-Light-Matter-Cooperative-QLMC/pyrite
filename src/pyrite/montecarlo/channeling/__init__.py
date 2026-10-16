@@ -7,7 +7,12 @@ integrates the density matrix with a dechanneling sink, and :mod:`.mcwf`
 unravels the same equation into per-electron quantum jumps. CPU only.
 """
 
-from .density import DensityMatrixResult, DensityMatrixSolver
+from .density import (
+    DECHANNELING_MARGIN_EV,
+    DECHANNELING_MARGIN_PROVENANCE,
+    DensityMatrixResult,
+    DensityMatrixSolver,
+)
 from .mcwf import MCWFResult, MCWFSolver, mcwf_stream_key
 from .operators import (
     DecoherenceRate,
@@ -20,6 +25,8 @@ from .operators import (
 )
 
 __all__ = [
+    "DECHANNELING_MARGIN_EV",
+    "DECHANNELING_MARGIN_PROVENANCE",
     "DecoherenceRate",
     "DensityMatrixResult",
     "DensityMatrixSolver",

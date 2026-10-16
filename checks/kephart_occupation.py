@@ -43,6 +43,7 @@ from scipy.optimize import curve_fit
 from pyrite.materials.channeling import longitudinal_kinematics, planar_profile, transverse_states
 from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
 from pyrite.montecarlo.channeling import (
+    DECHANNELING_MARGIN_EV,
     DensityMatrixSolver,
     decoherence_rate,
     electronic_kernel,
@@ -283,6 +284,83 @@ def run_case_group(keys, margin, orders, cells, dz_ang):
     }
 
 
+def refit(paths, out, tolerance, outliers):
+    """Re-fit stored runs at the declared cutoff with the bound-weighted detector observable.
+
+    Uses each stored run's ``z_um`` and band ``signal``. The bound-state
+    weights are computed on a modest grid (``H = 16``, ``n_cells = 8``), where
+    they are converged to about 1%. Exits nonzero when any case lies outside
+    ``tolerance``, or outside its explicit ``outliers`` bound.
+    """
+    weights_cache = {}
+    rows, failed = [], []
+    for path in paths:
+        report = json.loads(Path(path).read_text())
+        for run in report["runs"]:
+            if not np.isclose(run["margin_eV"], DECHANNELING_MARGIN_EV):
+                continue
+            for row in run["cases"]:
+                case = CASES[row["case"]]
+                key = (case.hkl, case.kinetic_energy_eV)
+                profile = planar_profile("silicon", case.hkl, TEMPERATURE_K)
+                if key not in weights_cache:
+                    tds = tds_kernel(profile, case.kinetic_energy_eV, n_cells=8, max_order=16)
+                    el = electronic_kernel(profile, case.kinetic_energy_eV, n_cells=8, max_order=16)
+                    solver = DensityMatrixSolver(profile, case.kinetic_energy_eV, tds + el)
+                    weights_cache[key] = bound_rate_weights(solver, (tds, el), case.divergence_rad)
+                z_um = np.asarray(row["z_um"])
+                weight = detector_acceptance(
+                    profile,
+                    case.kinetic_energy_eV,
+                    case.divergence_rad,
+                    z_um * 1e4,
+                    weights_cache[key],
+                )
+                length = fit_occupation_length(
+                    z_um, np.asarray(row["signal"]) * weight, case.thickness_range_um
+                )[0]
+                ratio = length / case.occupation_length_um
+                bound = outliers.get(row["case"], tolerance)
+                ok = abs(ratio - 1.0) <= bound
+                rows.append(
+                    {
+                        "case": row["case"],
+                        "occupation_length_um": length,
+                        "kephart_um": case.occupation_length_um,
+                        "ratio": ratio,
+                        "allowed": bound,
+                        "pass": ok,
+                        "max_order": run["max_order"],
+                        "dz_ang": run["dz_ang"],
+                        "source": str(path),
+                        "source_revision": report["revision"],
+                    }
+                )
+                print(
+                    f"{row['case']:12s} L={length:5.1f} um vs {case.occupation_length_um:g} -> x{ratio:.2f} (allowed +-{bound:.0%}) {'pass' if ok else 'FAIL'}"
+                )
+                if not ok:
+                    failed.append(row["case"])
+    Path(out).write_text(
+        json.dumps(
+            {
+                "check": "kephart_occupation refit",
+                "revision": _revision(),
+                "margin_eV": DECHANNELING_MARGIN_EV,
+                "tolerance": tolerance,
+                "outliers": outliers,
+                "y_rate_weights": {f"{k[0]} {k[1]:g}": list(v) for k, v in weights_cache.items()},
+                "rows": rows,
+            },
+            indent=1,
+        )
+    )
+    if not rows:
+        print("no stored run at the declared cutoff")
+        return 1
+    return 1 if failed else 0
+
+
 def _revision() -> str:
     """Git revision, or ``PYRITE_SOURCE_REVISION`` in a synced checkout without ``.git``."""
     if revision := os.environ.get("PYRITE_SOURCE_REVISION"):
@@ -304,8 +382,25 @@ def main(argv=None) -> int:
     parser.add_argument("--orders", nargs="+", type=int, default=[24])
     parser.add_argument("--cells", nargs="+", type=int, default=[16])
     parser.add_argument("--dz", nargs="+", type=float, default=[250.0])
+    parser.add_argument(
+        "--refit",
+        nargs="+",
+        type=Path,
+        help="re-fit stored run JSONs at the declared cutoff and gate on --tolerance",
+    )
+    parser.add_argument("--tolerance", type=float, default=TOLERANCE)
+    parser.add_argument(
+        "--outlier",
+        action="append",
+        default=[],
+        metavar="CASE:BOUND",
+        help="documented outlier with its own allowed relative deviation",
+    )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
+    if args.refit:
+        outliers = {item.split(":")[0]: float(item.split(":")[1]) for item in args.outlier}
+        return refit(args.refit, args.out, args.tolerance, outliers)
     groups = [GROUPS.get(key, (key,)) for key in args.cases]
     margins = [float(m) if m != "inf" else 1e9 for m in args.margins]
     report = {

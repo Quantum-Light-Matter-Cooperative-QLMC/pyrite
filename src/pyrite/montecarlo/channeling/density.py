@@ -50,6 +50,19 @@ from ...materials.channeling.transverse import _hamiltonian, longitudinal_kinema
 from ...materials.crystal import HBARC_EV_ANG, M_E_EV
 from .operators import ScatteringKernel
 
+#: Declared calibration of the dechanneling cutoff: states more than this far
+#: above the planar barrier [eV] are a sink (``cr-dechanneling-collapse``).
+DECHANNELING_MARGIN_EV = 300.0
+#: Provenance of :data:`DECHANNELING_MARGIN_EV`; carried into run identity once
+#: channeling output is persisted (#507).
+DECHANNELING_MARGIN_PROVENANCE = (
+    "Calibrated on Kephart et al., Phys. Rev. B 40, 4249 (1989): Si(110) and Si(100) "
+    "occupation lengths at 16.92 MeV, compared through the forward-detector observable with "
+    "bound-weighted y-spreading (checks/kephart_occupation.py). With 300 eV, 5 of 6 Table I "
+    "values including 54.5 MeV are within +-20%; Si(100) 54.5 MeV is 1.35x. Maintainer-declared "
+    "2026-10-15 (#504)."
+)
+
 
 def _adjoint(matrices: np.ndarray) -> np.ndarray:
     return np.conj(np.swapaxes(matrices, -1, -2))
@@ -146,7 +159,8 @@ class DensityMatrixSolver:
         ``max_order`` the plane-wave band.
     margin_eV
         Subspace cutoff above the barrier [eV]; states below
-        ``barrier + margin`` evolve, the rest are a sink.
+        ``barrier + margin`` evolve, the rest are a sink. Defaults to the
+        declared calibration :data:`DECHANNELING_MARGIN_EV` (300 eV).
     n_grid
         Cell grid for the jump product; defaults to the smallest alias-free
         even size ``>= 3 H + 2``.
@@ -160,7 +174,7 @@ class DensityMatrixSolver:
         kinetic_energy_eV: float,
         kernel: ScatteringKernel,
         *,
-        margin_eV: float = 0.0,
+        margin_eV: float = DECHANNELING_MARGIN_EV,
         n_grid: int | None = None,
     ) -> None:
         if not np.isclose(kernel.period_ang, profile.period_ang):
