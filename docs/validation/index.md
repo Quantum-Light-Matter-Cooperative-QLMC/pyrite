@@ -117,6 +117,8 @@ channeling/cr-capture-yield
 channeling/cr-transition-radiation-bound
 channeling/cr-zone-handoff-accounting
 channeling/cr-persisted-channel
+channeling/quantum-decoherence-budget
+channeling/channeling-modulated-incoherent-emission
 ```
 
 ```{toctree}
@@ -140,6 +142,7 @@ radiation-physics/pair-production-sampling
 radiation-physics/photon-pair-first-interaction
 radiation-physics/coherent-formation-absorption
 radiation-physics/coherent-inter-electron-decoherence
+radiation-physics/quantum-pair-population-normalization
 radiation-physics/coherent-physical-bunch-population
 radiation-physics/coherent-line-spectrum
 radiation-physics/coherent-segment-midpoint-time

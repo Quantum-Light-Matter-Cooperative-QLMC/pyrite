@@ -5,7 +5,7 @@
 The question is whether shaped or entangled free-electron transverse states change crystal X-ray emission (CXR: PXR and CBS, plus channeling radiation, CR) in ways a classical-trajectory kernel cannot represent, and in which regimes. In short:
 
 - A single electron's spontaneous rate cannot depend on its wavefunction shape unless a guard-rail mechanism is present. Every candidate effect below names one.
-- Transverse coherence over $\Delta x \gtrsim 0.3$ Å survives only about **0.07 µm at 30 keV** and **0.4–0.7 µm at ≥ 300 keV** in Si(110). Within one PXR/CBS formation length (≤ 0.3 Å) the decoherence is negligible ($\le 10^{-3}$). The constraint that matters is how much path a coherent effect needs.
+- Transverse coherence over $\Delta x \approx 1$ Å survives only about **0.07 µm at 30 keV** and **0.4–0.7 µm at ≥ 300 keV** in Si(110). Over even the shortest PXR/CBS formation length ($1/\lvert g\rvert$, 0.2–0.3 Å) the decoherence is negligible ($\lesssim 10^{-3}$). The constraint that matters is how much path a coherent effect needs.
 - In bulk Si(110), propagation erodes a shaped state's enhancement of local incoherent emission to factors of order 1–3 within a micron. The planar overlap factor can never exceed 9.8. Nothing here supports a bulk $10^3$ bremsstrahlung gain.
 - **Go (research only):** transverse-recoil-resolved CXR in thin films. **No-go:** entangled-pair super/subradiance without an engineered source; Dicke CR at keV energies in planar Si/diamond; the Shatnev phase-locked harmonic gain.
 
@@ -57,7 +57,7 @@ A d-periodic transverse state with fixed registration to the lattice is a single
 
 ### 3.1 Derivation
 
-`Validation: quantum-decoherence-budget` — research claim, `rederived` (see the [channeling ledger](../../validation/ledger-channeling.md)).
+`Validation: quantum-decoherence-budget` — research claim; status in the ledger (see the [channeling ledger](../../validation/ledger-channeling.md)).
 
 Take a coherence $\rho(x,x+\Delta)$. The dissipator of {eq}`eq-qce-lindblad` multiplies it by the local rate $\tfrac12C(x,x)+\tfrac12C(x+\Delta,x+\Delta)-C(x,x+\Delta)$. The real part of that rate damps the coherence and the imaginary part adds a phase. For a translation-averaged beam, the cell average gives
 
@@ -81,13 +81,13 @@ Limits:
 - $\Gamma(0)=0$.
 - $\Gamma(\Delta\to\infty)$ is the mean loss rate $\langle C(x,x)\rangle$ when $C(x,x+\Delta)\to0$.
 - Small $\Delta$: $\Gamma\simeq\tfrac12D\Delta^2$, logarithmically corrected by the Coulomb $1/q^4$ tail. $D=d\langle q_x^2\rangle/dz$ [Å⁻³] is the transverse momentum-diffusion rate, so $d\langle\theta_x^2\rangle/dz=D/k^2$ with $k=p/\hbar$.
-- Every rate scales as $C\propto1/v^2$, so it is energy independent at $\beta\to1$.
+- The TDS rate scales exactly as $C\propto1/v^2$. The electronic rate does to within 1.4 % between 30 keV and 3 MeV ($\beta^2\Gamma_{\rm el}(1\,\text{Å})$ = 8.53e-5 and 8.65e-5 Å⁻¹). Both are therefore nearly energy independent as $\beta\to1$.
 
-**Budget criterion.** With $H_\perp$ switched off (or for components degenerate in $E_\perp$), $\lvert\rho(x,x+\Delta;z)\rvert\propto e^{-\Gamma(\Delta)z}$. A coherent effect that needs a superposition across $\Delta$ over a path $L$ is suppressed by $e^{-\Gamma(\Delta)L}$. The effect is therefore confined to a length $\ell(\Delta)=1/\Gamma(\Delta)$. With $H_\perp$ on, the coherent dynamics move the separation; the exact bound-state coherence decay comes from the density solver. Assumptions are those of the #504 kernels: first Born approximation, Einstein phonons, quasi-elastic TDS, LDA for the electronic term, and energy loss not fed back.
+**Budget criterion.** With $H_\perp$ switched off (or for components degenerate in $E_\perp$), each $\lvert\rho(x,x+\Delta;z)\rvert$ decays at its local rate $\Gamma_{\rm loc}(x,\Delta)$, whose cell average is $\Gamma(\Delta)$. By Jensen's inequality the cell-averaged surviving coherence is $\ge e^{-\Gamma(\Delta)z}$. A coherent effect that needs a superposition across $\Delta$ over a path $L$ is suppressed by about $e^{-\Gamma(\Delta)L}$, so it is confined to a length of order $\ell(\Delta)=1/\Gamma(\Delta)$; this is conservative in the no-$H_\perp$ case. With $H_\perp$ on, the coherent dynamics move the separation, and $\ell$ is an order-of-magnitude scale, not a bound. The exact bound-state coherence decay comes from the density solver. Assumptions are those of the #504 kernels: first Born approximation, Einstein phonons, quasi-elastic TDS, LDA for the electronic term, and energy loss not fed back.
 
 ### 3.2 Tabulation
 
-`checks/quantum_decoherence_budget.py` evaluates `decoherence_rate` at 293.15 K and runs in under a second. Values for Si(110), $d=1.920$ Å, with TDS + electronic; $\ell=1/\Gamma$:
+`checks/quantum_decoherence_budget.py` evaluates `decoherence_rate` at 293.15 K and runs in a few seconds. Values for Si(110), $d=1.920$ Å, with TDS + electronic; $\ell=1/\Gamma$:
 
 | $T$ | $\Gamma_{\rm TDS}(1\,\text{Å})$ [Å⁻¹] | $\Gamma_{\rm el}(1\,\text{Å})$ | $\ell(d/2)$ | $\ell(1\,\text{Å})$ | $n_b$ at $k=0$ | $L_{\rm CR}=\hbar v/\Delta E_{10}$ | $\Gamma(d/2)L_{\rm CR}$ |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -97,9 +97,9 @@ Limits:
 | 30 MeV | 6.43e-5 | 8.65e-5 | 0.68 µm | 0.66 µm | 5 | 295 Å | 0.044 |
 
 - **Saturation.** $\Gamma_{\rm TDS}$ reaches 90 % of its saturated value by $\Delta\approx0.3$ Å, about four times the 0.077 Å thermal amplitude, and saturates by 1 Å: one TDS event fully decoheres any larger separation. $\Gamma_{\rm el}$ keeps rising to $\Delta\sim10^2$ Å, set by the plasmon localization length $\sim v/\omega_p$. For example, at 3 MeV $\Gamma_{\rm el}$ is 3.88e-4 at 100 Å and 4.20e-4 Å⁻¹ at 1000 Å.
-- **PXR/CBS formation length.** The phase-matched line from reciprocal vector $g$ has $\omega(1-\beta\cos\theta)=vg_\parallel$, so its formation (phase-slip) length is $L_f=1/g_\parallel$. That is ≤ 0.31 Å for Si(110) and ≤ 0.20 Å for diamond(110). Then $\Gamma L_f\le10^{-3}$ in every cell: a single PXR/CBS formation length never decoheres. The relevant length is the coherent path an effect accumulates over, bounded by $\ell$.
+- **PXR/CBS formation length.** The phase-matched line from reciprocal vector $g$ has $\omega(1-\beta\cos\theta)=vg_\parallel$, so its formation (phase-slip) length is $L_f=1/g_\parallel\ge1/\lvert g\rvert$. The shortest case, $1/\lvert g\rvert$, is 0.31 Å for Si(110) and 0.20 Å for diamond(110). There $\Gamma L_f\le1.3\times10^{-3}$ in every cell, and $\le10^{-3}$ for $\Delta\le3$ Å. Geometries with small $g_\parallel$ have proportionally longer $L_f$, scaling $\Gamma L_f$ by $\lvert g\rvert/g_\parallel$. For direct incidence, a single PXR/CBS formation length does not decohere. The relevant length is the coherent path an effect accumulates over, bounded by $\ell$.
 - **CR formation length.** Over one CR formation length the coherence decays by only 2.5–4.4 % at MeV energies. No bound-bound CR exists in planar Si(110) or diamond(110) at 30 or 300 keV: there is only one bound state at $k=0$.
-- **Multiple-scattering consistency.** $D=2\Gamma/\Delta^2$ at $\Delta=0.03$ Å gives $\theta_{\rm rms}(1\,\mu\text{m})=6.8$ mrad at 3 MeV and 0.77 mrad at 30 MeV. The Highland formula (PDG; Si $X_0=9.37$ cm) gives 7.3 and 0.82 mrad. The −7 % difference is small given the logarithmic dependence on $\Delta$, but 1 µm is $x/X_0\approx10^{-5}$, below Highland's stated validity range. It is an order-of-magnitude consistency check, not an anchor.
+- **Multiple-scattering consistency.** The log-sensitive effective $D_{\rm eff}=2\Gamma/\Delta^2$ at $\Delta=0.03$ Å gives $\theta_{\rm rms}(1\,\mu\text{m})=6.8$ mrad at 3 MeV and 0.77 mrad at 30 MeV. The Highland formula (PDG; Si $X_0=9.37$ cm) gives 7.3 and 0.82 mrad. The full-tail $\Gamma''(0)$ with $q_{\max}=10^4$ Å⁻¹ is larger: TDS alone gives 11.8 mrad at 3 MeV. So the −7 % agreement depends on the choice of $\Delta$, and 1 µm is $x/X_0\approx10^{-5}$, below Highland's stated validity range. It is an order-of-magnitude consistency check, not an anchor.
 
 Diamond(110), $d=1.261$ Å: TDS is exact, but the electronic term uses a **graphite-oscillator surrogate**. Diamond has no conduction-band shell data, so the production electronic kernel refuses it.
 
@@ -116,11 +116,11 @@ Diamond(110), $d=1.261$ Å: TDS is exact, but the electronic term uses a **graph
 
 ### 3.3 Reading the budget
 
-At 30 keV, the regime of the Zhai/PyRITE table-top CXR targets, any transverse superposition above about 0.3 Å survives only $\ell\approx0.07$ µm in Si (0.06 µm at 1.7 Å). Shape-dependent effects that need that superposition are confined to the entrance layer, a fraction $\ell/L$ of the emitting path $L$. At ≥ 300 keV, $\ell$ is 0.4–0.7 µm. These are bulk statements: monolayer targets, such as those in Wong 2024, do not face this budget.
+At 30 keV, the regime of the Zhai/PyRITE table-top CXR targets, a transverse superposition across about 1 Å survives only $\ell\approx0.07$ µm in Si: 0.13 µm at 0.3 Å, 0.054 µm at 1.92 Å. Shape-dependent effects that need that superposition are confined to the entrance layer, a fraction $\ell/L$ of the emitting path $L$. At ≥ 300 keV, $\ell$ is 0.4–0.7 µm. These are bulk statements: monolayer targets, such as those in Wong 2024, do not face this budget.
 
 ## 4. Generalized physical-population pair term
 
-`Validation: quantum-pair-population-normalization` — research claim, `rederived` (see the [core coherent-physics ledger](../../validation/ledger-core-coherent-physics.md)).
+`Validation: quantum-pair-population-normalization` — research claim; status in the ledger (see the [core coherent-physics ledger](../../validation/ledger-core-coherent-physics.md)).
 
 Take $N$ electrons with state $\rho_N$ and one photon channel. The first-order one-photon amplitude operator is $\hat A=\sum_{a=1}^N\hat M^{(a)}$, where $\hat M^{(a)}$ acts on electron $a$. The photon number is $\operatorname{Tr}(\rho_N\hat A^\dagger\hat A)$, which splits into reduced density matrices:
 
@@ -140,13 +140,13 @@ Take $N$ electrons with state $\rho_N$ and one photon channel. The first-order o
 \langle n\rangle=N\operatorname{Tr}(\rho\hat M^\dagger\hat M)+N(N-1)\bigl\lvert\operatorname{Tr}(\rho\hat M)\bigr\rvert^2 .
 ```
 
-Here $\rho$ is a classical mixture $\sum_jp_j\lvert j\rangle\langle j\rvert$ of trajectory-like states on which $\hat M$ acts as a c-number field $\mathcal E_j$ (point charge, recoil neglected). Then $\operatorname{Tr}(\rho\hat M)=\langle\mathcal E\rangle$ and $\operatorname{Tr}(\rho\hat M^\dagger\hat M)=\langle\lvert\mathcal E\rvert^2\rangle$, and {eq}`eq-qce-iid` becomes `spxr-physical-population` exactly, with $N=Q/\lvert e\rvert$ ([superradiant PXR](superradiant-pxr.md)).
+Here $\rho$ is a classical mixture $\sum_jp_j\lvert j\rangle\langle j\rvert$ of trajectory wavepackets with $\hat M\lvert j\rangle=\mathcal E_j\lvert j'\rangle$. Then $\operatorname{Tr}(\rho\hat M^\dagger\hat M)=\langle\lvert\mathcal E\rvert^2\rangle$ exactly. However, $\operatorname{Tr}(\rho\hat M)=\sum_jp_j\mathcal E_j\langle j\vert j'\rangle$ equals $\langle\mathcal E\rangle$ only when $\langle j\vert j'\rangle\approx1$. That needs negligible recoil and a wavepacket localized below $1/k$ along $\mathbf k$; otherwise the overlap is the single-electron form factor. Within that point-charge idealization, {eq}`eq-qce-iid` becomes `spxr-physical-population`, with $N=Q/\lvert e\rvert$ ([superradiant PXR](superradiant-pxr.md)).
 
 **Quantum content.** $\operatorname{Tr}(\rho\hat M)$ needs coherence of $\rho$ between the states $\hat M$ connects: an initial state and its recoiled final state. For a free electron this is the density modulation (bunching) of the wavefunction at the photon wavevector, the "modulated QEW" route to $N_e^2$ emission of Zhang et al. (arXiv:2401.05978). A single electron's $\operatorname{Tr}(\rho\hat M)$ depends on its shape, but it enters only the pair term. The guard-rail holds for $N=1$.
 
-**Bounds.** By Cauchy–Schwarz on $\operatorname{Tr}(\rho\,\cdot)$, $\lvert\operatorname{Tr}(\rho\hat M)\rvert^2\le\operatorname{Tr}(\rho\hat M^\dagger\hat M)$. The same bound holds for an entangled $\rho^{(2)}$, since $\lvert\operatorname{Tr}[\rho^{(2)}(\hat M^\dagger\otimes\hat M)]\rvert\le\operatorname{Tr}(\rho^{(1)}\hat M^\dagger\hat M)$ for equal marginals. So for any state, $\langle n\rangle\le N^2\operatorname{Tr}(\rho^{(1)}\hat M^\dagger\hat M)$. Correlations redistribute emission between channels (super/subradiance) up to $N^2$, and no further.
+**Bounds.** By Cauchy–Schwarz on $\operatorname{Tr}(\rho\,\cdot)$, $\lvert\operatorname{Tr}(\rho\hat M)\rvert^2\le\operatorname{Tr}(\rho\hat M^\dagger\hat M)$. The same bound holds for an entangled $\rho^{(2)}$, since $\lvert\operatorname{Tr}[\rho^{(2)}(\hat M^\dagger\otimes\hat M)]\rvert\le\operatorname{Tr}(\rho^{(1)}\hat M^\dagger\hat M)$ for equal marginals. So for any state, $\langle n\rangle\le N^2\operatorname{Tr}(\rho^{(1)}\hat M^\dagger\hat M)$. Unequal marginals give $(\sum_a\sqrt{T_a})^2$ with $T_a=\operatorname{Tr}(\rho^{(1)}_a\hat M^\dagger\hat M)$. The ceiling is per channel: correlations raise (superradiance) or lower (subradiance) a channel's emission up to $N^2$ times the self term, and no further. No cross-channel sum rule is derived here. Reduced matrices are unit-trace labelled marginals over ordered pairs.
 
-**Exchange.** For indistinguishable electrons the antisymmetrized two-body matrix subtracts $\operatorname{Tr}(\rho\hat M^\dagger\rho\hat M)$ per pair. This is bounded by the phase-space overlap (degeneracy) of the one-electron states and vanishes for orthogonal orbitals. Beam degeneracies are $\ll1$, so the exchange term is dropped, and recorded here as an assumption.
+**Exchange.** For indistinguishable electrons in a quasi-free (Slater) state with one-body matrix $\gamma$, the exchange term is $-\operatorname{Tr}(\gamma\hat M^\dagger\gamma\hat M)\le0$ (Pauli antibunching). Its size satisfies $0\le\operatorname{Tr}(\gamma\hat M^\dagger\gamma\hat M)\le\delta\operatorname{Tr}(\gamma\hat M^\dagger\hat M)$, with $\delta=\lVert\gamma\rVert_{\rm op}$ the beam degeneracy. It does not vanish merely for orthogonal orbitals: it needs $\hat M$ to have no matrix elements between distinct occupied orbitals, i.e. a phase-space separation larger than the recoil or emission bandwidth. Beam degeneracies are $\ll1$, so the exchange term is dropped, as an assumption bounded by $\delta$ times the linear term.
 
 **Entangled pairs.** A non-product $\rho^{(2)}$ can give a nonzero pair term while each marginal has $\operatorname{Tr}(\rho^{(1)}\hat M)=0$. This is the Bell-state super/subradiance of {cite:t}`karnieli2021prl`, which the abstract says "cannot be accounted for by a classical mixed state".
 
@@ -154,7 +154,7 @@ Units: $\langle n\rangle$ carries the channel's units; $N$ is dimensionless. Lim
 
 - $N=1$ has no pair term.
 - $\operatorname{Tr}(\rho\hat M)=0$ gives $N\operatorname{Tr}(\rho\hat M^\dagger\hat M)$.
-- Identical pure states with $\hat M\lvert\psi\rangle\propto\lvert\psi'\rangle$ c-number-like give $N^2$.
+- Identical pure states that are eigenvectors of $\hat M$ give $N^2$. Any other pure state gives less than $N^2\lVert\hat M\psi\rVert^2$.
 - For a classical mixture, the classical i.i.d. form is recovered.
 
 **Engine evolution of $\rho^{(2)}$.** Two non-interacting electrons see independent jump operators when their paths are farther apart than the phonon and plasmon correlation lengths: then $\rho^{(2)}(z)=(\Phi_z\otimes\Phi_z)[\rho^{(2)}(0)]$, with $\Phi_z$ the single-electron Lindblad map. If the two electrons pass within a phonon period and a few ångström, they see the same frozen displacement. The pair then needs a collective dissipator, which is not modelled. An operator-Schmidt decomposition $\rho^{(2)}(0)=\sum_kw_kA_k\otimes B_k$ reduces $\Phi_z\otimes\Phi_z$ to single-electron propagations of the Hermitian parts of each $A_k$ and $B_k$. $\Phi_z$ is linear and Hermiticity-preserving, so the existing solver suffices once it is documented to accept Hermitian, non-positive initial operators. A dense product space would be infeasible: 528 states per electron on the production grid ($H=16$, 16 cells) means $\sim10^{11}$ matrix elements.
@@ -178,8 +178,9 @@ with $P_r=V_r\rho_rV_r^\dagger$ the Bloch block in plane waves and $n_m$ the the
 Assumptions:
 
 - The emission is local. The nuclear density stands in for bremsstrahlung.
-- Inner-shell ionization delocalizes over the impact parameter $\sim\hbar v/E_K\approx1$ Å at MeV energies for Si K. Its factor lies between $F_{\rm nuc}$ and the electron-density factor $F_{\rm el}$.
+- Inner-shell ionization delocalizes over the impact parameter $\sim\hbar v/E_K\approx1$ Å at MeV energies for Si K. Its factor lies between $F_{\rm nuc}$ and 1: a kernel about 1 Å wide, against $d=1.92$ Å, can flatten it below the electron-density factor $F_{\rm el}$.
 - The photon is unaffected by channeling.
+- Dechanneled population (removed by the collapse rule) emits at the random-orientation rate, $F=1$. States up to the 300 eV margin above the barrier stay in the subspace and carry their own $F$.
 - The collapse rule of `cr-dechanneling-collapse` applies.
 
 Units: dimensionless. Limits:
@@ -188,7 +189,7 @@ Units: dimensionless. Limits:
 - A uniform density $n$ gives $F\equiv1$.
 - Perfect focusing gives the upper bound $n_{\max}/\bar n=9.81$ for Si(110) at 293 K.
 
-**Prototype.** `checks/channeling_modulated_emission.py` runs Si(110) with TDS + electronic kernels, $H=16$, 16 cells, $dz=100$ Å, sampled every 100 Å. It compares three entry states: an aligned plane wave; a d-periodic Gaussian comb with $\sigma=0.15$ Å centred on the planes; and the same comb between the planes. The comb is a planar analogue of the shaped beams of {cite:t}`wong2024freeelectron`. Its converter is check-local and stands in for the #508 planar projection. It agrees with direct position-space quadrature to $10^{-7}$ when no entry weight is lost. Convergence: at 3 MeV, $dz=50$ Å, $H=20$ and 24 cells move $Y(1\,\mu\text{m})$ by ≤ 0.6 %. The run takes 1.5 min on CPU.
+**Prototype.** `checks/channeling_modulated_emission.py` runs Si(110) with TDS + electronic kernels, $H=16$, 16 cells, $dz=100$ Å, sampled every 100 Å. It compares three entry states: an aligned plane wave; a d-periodic Gaussian comb with $\sigma=0.15$ Å centred on the planes; and the same comb between the planes. The comb is a planar analogue of the shaped beams of {cite:t}`wong2024freeelectron`. Its converter is check-local and stands in for the #508 planar projection. It agrees with direct position-space quadrature to better than $10^{-8}$ when no entry weight is lost; the check gates at $10^{-6}$. Convergence: at 3 MeV, $dz=50$ Å, $H=20$ and 24 cells move $Y(1\,\mu\text{m})$ by ≤ 0.6 %. The run takes 1.5–3 min on CPU.
 
 | $T$ | state | $F_{\rm nuc}(0)$ | $Y(0.1\,\mu\text{m})$ | $Y(1\,\mu\text{m})$ | $Y(2\,\mu\text{m})$ |
 | --- | --- | --- | --- | --- | --- |
@@ -226,7 +227,7 @@ Orientation scan, plane-wave entry, $Y(1\,\mu\text{m})$, tilt in units of $\psi_
 
 **Go (research), regime bounds for Si.** The pathway survives a film of thickness $L$ with probability $e^{-\Gamma L}$, and the beam divergence must stay below $g_\perp/2k$:
 
-| $T$ | $\Gamma(1.73\,\text{Å})$ [Å⁻¹] | $1-e^{-\Gamma\cdot30\,\text{nm}}$ | $L$ for $\Gamma L\le0.3$ | divergence $<g_\perp/2k$ |
+| $T$ | $\Gamma(1.73\,\text{Å})$ [Å⁻¹] (`decoherence_rate`) | $1-e^{-\Gamma\cdot30\,\text{nm}}$ | $L$ for $\Gamma L\le0.3$ | divergence $<g_\perp/2k$ |
 | --- | --- | --- | --- | --- |
 | 30 keV | 1.80e-3 | 0.42 | 17 nm | 6.4 mrad |
 | 300 keV | 3.24e-4 | 0.09 | 93 nm | 1.8 mrad |

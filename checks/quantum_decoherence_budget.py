@@ -12,7 +12,8 @@ must keep a transverse superposition alive:
   = v g_par``;
 - the decoherence lengths ``1 / Gamma`` at ``Delta = d / 2`` and ``1``
   angstrom, and the momentum-diffusion coefficient ``2 Gamma / Delta^2`` at
-  the smallest ``Delta`` (Coulomb-logarithm caveat in the research note).
+  the smallest nonzero ``Delta`` (an effective, log-sensitive value; see the
+  research note).
 
 Cells: Si(110) at 30 keV, 300 keV, 3 MeV and 30 MeV (TDS and electronic);
 diamond(110) at the same energies, TDS exact but electronic only through a
@@ -26,7 +27,7 @@ reported as not computable.
 Exit 0 when the limits hold: ``Gamma(0) = 0``; ``Gamma_TDS(Delta -> inf)``
 saturates (relative change below 1e-3 from 100 to 1000 angstrom); and
 ``beta^2 Gamma_TDS`` is energy independent (``C`` scales as ``1 / v^2``) to
-1e-6. Under a second.
+1e-6. A few seconds.
 
 Validation: quantum-decoherence-budget
 """
