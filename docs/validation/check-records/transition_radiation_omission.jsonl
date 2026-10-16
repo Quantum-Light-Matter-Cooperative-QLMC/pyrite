@@ -1,0 +1,1 @@
+{"check": "checks/transition_radiation_omission.py", "ledger_id": "tr-detected-omission-bound", "measured_value": null, "recorded_at": "2026-10-16T16:06:57.391393+00:00", "reference_value": null, "revision": "1a4b5872f60daa2ad3b0ffeaae6fe8874d888731", "schema_revision": 1, "tolerance": null, "verdict": "pass"}
