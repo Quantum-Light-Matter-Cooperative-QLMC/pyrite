@@ -65,6 +65,8 @@ def test_release_has_one_entry_per_table_and_labels_every_catalogue_key(release)
     labelled = [name for entry in index.tables for name in entry.label.split(",")]
     assert sorted(labelled) == list(catalog_keys())
     assert len({entry.key for entry in index.tables}) == len(index.tables)
+    assert set(index.input_decks) == {entry.key for entry in index.tables}
+    assert load_release_index().input_decks == index.input_decks
     shared = next(entry for entry in index.tables if "mos2-on-sapphire" in entry.label)
     assert shared.key == _request("mos2").key
 
@@ -104,11 +106,11 @@ def test_building_without_every_table_names_the_generation_route(isolated_dirs, 
         release_tables()
 
 
-def test_the_shipped_index_pins_every_catalogue_table_under_its_current_key():
+def test_the_shipped_index_resolves_every_catalogue_table_under_its_published_key():
     index = load_release_index()
 
     assert index is not None
     by_label = {name: entry for entry in index.tables for name in entry.label.split(",")}
     assert sorted(by_label) == list(catalog_keys())
     for key, entry in by_label.items():
-        assert entry.key == _request(key).key, key
+        assert entry.key == resolve_catalog_table(key).key, key

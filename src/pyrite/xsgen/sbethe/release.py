@@ -26,9 +26,10 @@ deck, so a locally generated table under it is an equally valid install.
 import json
 import shutil
 import tempfile
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar, Self
 
 from ...materials import CATALOG
 from ...paths import data_dir
@@ -38,6 +39,7 @@ from ..bremslib.release import file_sha256, write_archive
 from ..elsepa.release import ElsepaReleaseEntry, ElsepaReleaseIndex
 from ..store import StoredTable
 from .catalog import catalog_material, resolve_catalog_table
+from .deck import SbetheDeck
 from .generate import generate_material
 
 #: Schema of the release index.
@@ -50,11 +52,31 @@ UPSTREAM = "SBETHE, Mendeley Data doi:10.17632/7zw25f428t.2"
 SbetheReleaseEntry = ElsepaReleaseEntry
 
 
+@dataclass(frozen=True)
 class SbetheReleaseIndex(ElsepaReleaseIndex):
-    """The pinned description of one released SBETHE table archive."""
+    """Pin a released archive and, optionally, its complete physical input decks.
+
+    Input pins allow lookup across host roundoff in derived material properties
+    when SBETHE receives identical answers. Legacy indexes retain exact-key lookup.
+    """
 
     SCHEMA: ClassVar[str] = RELEASE_SCHEMA
     NAME: ClassVar[str] = "SBETHE"
+
+    input_decks: Mapping[str, str] = field(default_factory=dict)
+
+    def record(self) -> dict[str, Any]:
+        """Include physical-input hashes without changing archive/table pins."""
+        record = super().record()
+        if self.input_decks:
+            record["input_decks"] = dict(self.input_decks)
+        return record
+
+    @classmethod
+    def from_record(cls, record: Mapping[str, Any]) -> Self:
+        """Read legacy indexes; only new input pins permit roundoff fallback."""
+        index = super().from_record(record)
+        return replace(index, input_decks=dict(record.get("input_decks", {})))
 
 
 def release_index_path(*, projectile: str = "electron") -> Path:
@@ -138,11 +160,24 @@ def build_release(
         partial = Path(temp) / archive.name
         write_archive(partial, [table for _, table in labelled])
         shutil.move(partial, archive)
+    input_decks = {}
+    for label, table in labelled:
+        material = catalog_material(label.split(",")[0])
+        deck = SbetheDeck(
+            name=material.key,
+            composition=material.composition,
+            density_g_cm3=material.density_g_cm3,
+            mean_excitation_eV=material.mean_excitation_eV,
+            band_gap_eV=material.band_gap_eV,
+            projectile=projectile,
+        )
+        input_decks[table.key] = deck.input_sha256
     index = SbetheReleaseIndex(
         upstream=UPSTREAM,
         archive_sha256=file_sha256(archive),
         archive_bytes=archive.stat().st_size,
         urls=as_urls(urls),
+        input_decks=input_decks,
         tables=tuple(
             SbetheReleaseEntry(label=label, key=table.key, manifest_sha256=table.digest)
             for label, table in labelled
