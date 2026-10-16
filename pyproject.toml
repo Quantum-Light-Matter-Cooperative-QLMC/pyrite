@@ -62,7 +62,7 @@ plots = [
 apps = [
     "pyrite-mc[plots]",
     "anywidget>=0.11.0",
-    "marimo[recommended]>=0.23.16",
+    "marimo[recommended]>=0.25.1",
     "vegafusion>=2.0.3",
 ]
 
