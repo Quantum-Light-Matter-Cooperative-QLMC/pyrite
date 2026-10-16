@@ -16,10 +16,13 @@ from .density import (
     DensityMatrixSolver,
 )
 from .emission import (
+    KIND_CAPTURE,
+    KIND_LINE,
     CaptureBound,
     ChannelingSpectrum,
     EmissionLines,
     FirstOrderTransition,
+    LineGroup,
     TransitionRadiationBound,
     boosted_dipole_pattern,
     capture_bound,
@@ -49,6 +52,8 @@ from .operators import (
 __all__ = [
     "DECHANNELING_MARGIN_EV",
     "DECHANNELING_MARGIN_PROVENANCE",
+    "KIND_CAPTURE",
+    "KIND_LINE",
     "CaptureBound",
     "ChannelingSpectrum",
     "DecoherenceRate",
@@ -57,6 +62,7 @@ __all__ = [
     "ElectronicChannels",
     "EmissionLines",
     "FirstOrderTransition",
+    "LineGroup",
     "MCWFResult",
     "MCWFSolver",
     "ScatteringKernel",

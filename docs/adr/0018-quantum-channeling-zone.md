@@ -83,6 +83,10 @@ whose long-wavelength bound→bound limit is the dipole rate.
 - v1 scores bound→bound lines only.
 - Free→bound radiative capture is estimated as an upper bound first, and
   scored only if that bound exceeds a few percent of the line yield.
+  *Outcome (#505, maintainer decision 2026-10-15):* the estimate is about 40%
+  of the line yield at Kephart's Si(110) 17 MeV, 2.2 mrad configuration, so
+  capture from the tracked above-barrier states is scored, reported as a
+  separate spectral component (`cr-capture-yield`).
 - Free→free transitions are coherent bremsstrahlung (CBS), which the PXR/CBS
   kernel already produces, so they are never scored here.
 - Squaring per-trajectory field amplitudes across MCWF trajectories is not a

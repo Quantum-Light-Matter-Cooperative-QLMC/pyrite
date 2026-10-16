@@ -18,23 +18,24 @@ the rest-frame pattern ``(3 / 8 pi) sin^2 Theta'`` about the plane normal
 the lab path rate ``A' / (gamma beta c)``.
 
 **Estimator.** Lines are scored as the expectation
-``<d_c^dagger d_c>_rho(z)`` per cluster ``c`` of transitions degenerate
-within their widths, ``d_c = sum a_fi |f><i|`` with ``|a_fi|^2`` the dipole
-path rate. ``rho`` is block-diagonal in Bloch ``k``, so lines of different
-blocks are incoherent; within a block of a 1-D well the bound levels are
-nondegenerate and every cluster reduces to ``P_i |a_fi|^2``. Only bound ->
-bound transitions are scored (v1, maintainer decision 2026-10-14):
-free -> free is coherent bremsstrahlung (PXR/CBS kernel) and free -> bound
-capture is the diagnostic :func:`capture_bound`. Per-trajectory MCWF field
-amplitudes are never squared.
+``<d_c^dagger d_c>_rho(z)`` per cluster ``c`` of transitions that share a
+final state and are degenerate within their widths, ``d_c = sum a_fi
+|f><i|`` with ``|a_fi|^2`` the dipole path rate; cross terms are kept.
+``rho`` is block-diagonal in Bloch ``k``. Scored transitions end on bound
+states: bound -> bound lines and free -> bound radiative capture from the
+above-barrier states the solver tracks (maintainer decision 2026-10-15,
+reversing v1's bound -> bound-only rule for capture). Free -> free is
+coherent bremsstrahlung (PXR/CBS kernel) and is never scored. Per-trajectory
+MCWF field amplitudes are never squared.
 
-**Line shape.** Each line is a Voigt profile: the coherence ``rho_if``
-decays at ``kappa_if = (Gamma_i + Gamma_f)/2 - Re <i|J(|i><f|)|f>`` per unit
-depth (secular Lindblad), a Lorentzian of transverse half width
-``hbar v kappa_if`` scaled by the Doppler factor, convolved with the Gaussian
-of the beam energy spread. The detector aperture and the in-plane beam
-divergence add the Doppler--geometric width by quadrature over directions.
-Photons are attenuated on the way out by
+**Line shape.** The radiating coherences ``<f_k|rho|i_k>`` of one transition
+in all Bloch blocks obey a linear secular equation: phase ``Delta_k /
+hbar v``, loss ``(Gamma_i + Gamma_f)/2`` and coherence transfer between
+blocks by the scattering kernel. Its eigenmodes (quantum regression theorem)
+give complex-weighted Lorentzians, scaled by the Doppler factor and convolved
+with the Gaussian of the beam energy spread. The detector aperture and the
+in-plane beam divergence add the Doppler--geometric width by quadrature over
+directions. Photons are attenuated on the way out by
 :func:`~pyrite.materials.attenuation._stack_tau`.
 
 Lengths in angstroms, energies in eV, angles in radians. CPU only.
@@ -44,10 +45,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from scipy.constants import c as _C_M_PER_S
-from scipy.special import voigt_profile
+from scipy.linalg import eig
+from scipy.special import voigt_profile, wofz
 
 from ...materials.attenuation import _resolve_composition, _stack_tau, plasma_energy_eV
 from ...materials.channeling.potential import PlanarProfile
@@ -318,6 +321,9 @@ def first_order_transition(
 # Line catalog and expected-value estimator on rho(z)
 # ---------------------------------------------------------------------------
 
+KIND_LINE = 0
+KIND_CAPTURE = 1
+
 
 def _block_dipoles(solver: DensityMatrixSolver, block: int, states: np.ndarray) -> np.ndarray:
     """``x_fi`` [angstrom] between eigenstates ``states`` of one block."""
@@ -334,54 +340,117 @@ def _block_dipoles(solver: DensityMatrixSolver, block: int, states: np.ndarray) 
     return dipole
 
 
-def _coherence_decay(solver: DensityMatrixSolver, block: int, upper: int, lower: int) -> float:
-    """Secular decay rate ``kappa_if`` [1/angstrom] of ``rho_if`` in one block."""
-    size = solver.orders.size
-    rho = np.zeros((solver.n_cells, size, size), dtype=complex)
-    rho[block, upper, lower] = 1.0
-    inside, _, _ = solver.jump(rho)
-    gains = inside[block, upper, lower].real
-    losses = []
-    for state in (upper, lower):
-        diag = np.zeros_like(rho)
-        diag[block, state, state] = 1.0
-        losses.append(solver.loss_rate(diag))
-    return 0.5 * (losses[0] + losses[1]) - gains
+def _complex_profile(detuning_eV, hwhm_eV, sigma_eV):
+    """``(i/pi)/(x + i h)`` convolved with a unit Gaussian of RMS ``sigma`` [1/eV].
+
+    Its real part is the Voigt profile; its imaginary part is the matching
+    dispersion profile. Uses the Faddeeva function; ``sigma = 0`` is the
+    complex Lorentzian.
+    """
+    x = np.asarray(detuning_eV, dtype=float)
+    h = np.asarray(hwhm_eV, dtype=float)
+    s = np.asarray(sigma_eV, dtype=float)
+    x, h, s = np.broadcast_arrays(x, h, s)
+    out = np.empty(x.shape, dtype=complex)
+    gauss = s > 0.0
+    root = np.sqrt(2.0) * np.where(gauss, s, 1.0)
+    out[gauss] = (wofz((x + 1j * h) / root) / (root * np.sqrt(np.pi)))[gauss]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        out[~gauss] = (1j / np.pi / (x + 1j * h))[~gauss]
+    return out
+
+
+@dataclass(frozen=True)
+class LineGroup:
+    """One transition ``(upper, lower)`` across the Bloch blocks that carry it.
+
+    The radiating coherences ``sigma^(k) = <f_k|rho|i_k>`` of the group obey
+    ``d sigma / dz = K sigma`` with
+    ``K_kk = i Delta_k / (hbar v) - (Gamma_i + Gamma_f)_k / 2 + J_kk`` and
+    ``K_k'k = <f_k'|J(|f_k><i_k|)|i_k'>``: the scattering kernel transfers
+    coherence between blocks (a momentum kick acting on ket and bra alike).
+    ``K = V diag(mu) V^-1`` gives the line as a sum of complex Lorentzian
+    modes (quantum regression theorem).
+
+    Attributes
+    ----------
+    lines
+        Catalog indices of the group's lines, one per block.
+    amplitude
+        Representative transition amplitude ``a`` of each line (eigenbasis gauge).
+    eigenvalues, right, left
+        ``mu`` [1/angstrom], ``V`` and ``V^-1`` of ``K``.
+    hbar_v_eV_ang
+        ``hbar v`` [eV angstrom].
+    """
+
+    lines: np.ndarray
+    amplitude: np.ndarray
+    eigenvalues: np.ndarray
+    right: np.ndarray
+    left: np.ndarray
+    hbar_v_eV_ang: float
+
+    def modes(self, yields: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Mode centres, half widths [eV, transverse] and complex weights.
+
+        ``yields`` are the (absorbed) photon yields of the group's lines; the
+        source coherence of line ``k`` is ``yield_k / conj(a_k)`` and the
+        weights ``w_m = (a^dagger V)_m (V^-1 s)_m`` sum to the total yield.
+        The transverse spectrum is ``Re sum_m conj(w_m) (i/pi)/(x_m + i h_m)``,
+        ``x_m = E - centre_m``.
+
+        Validation: cr-line-shape
+        """
+        source = np.asarray(yields, dtype=float) / np.conj(self.amplitude)
+        weight = (np.conj(self.amplitude) @ self.right) * (self.left @ source)
+        return (
+            self.hbar_v_eV_ang * self.eigenvalues.imag,
+            -self.hbar_v_eV_ang * self.eigenvalues.real,
+            weight,
+        )
 
 
 @dataclass(frozen=True)
 class EmissionLines:
-    """Bound -> bound dipole lines of a density-matrix solver's basis.
+    """Dipole lines ending on bound states, from a density-matrix solver's basis.
 
-    One entry per cluster of transitions in one Bloch block. Members are the
-    ``(lower, upper, amplitude)`` triples of the cluster; ``|amplitude|^2`` is
-    the dipole path rate [1/angstrom] and its phase follows the eigenvector
-    gauge of the solver's basis (rates use ``rho`` in the same gauge).
+    One entry per cluster of transitions in one Bloch block. ``kind`` is
+    :data:`KIND_LINE` (bound -> bound) or :data:`KIND_CAPTURE` (tracked free
+    -> bound). Members are the ``(lower, upper, amplitude)`` triples of the
+    cluster; ``|amplitude|^2`` is the dipole path rate [1/angstrom] and its
+    phase follows the eigenvector gauge of the solver's basis (rates use
+    ``rho`` in the same gauge).
 
     Attributes
     ----------
     gamma, beta
         Longitudinal kinematics of the basis.
-    block
-        Bloch block of each line.
+    block, kind
+        Bloch block and kind of each line.
     upper, lower
         Band indices of each line's strongest member.
     delta_eV
         Rate-weighted transverse transition energy [eV].
     hwhm_eV
-        Transverse Lorentzian half width ``hbar v kappa_if`` [eV].
+        All-block secular half width ``hbar v kappa`` [eV] (exact for flat
+        bands; the spectrum uses the group modes).
     gamma_exponent
         ``d ln Delta E_perp / d ln gamma`` at fixed band indices.
     strength_per_ang
-        Sum of member path rates ``|a_fi|^2`` [1/angstrom] (rate per unit
-        population of a nondegenerate line).
+        Sum of member path rates ``|a_fi|^2`` [1/angstrom].
     members
         Per line, ``(lower, upper, amplitude)`` arrays.
+    group
+        Index into ``groups`` of each line.
+    groups
+        Coherence-transfer groups (:class:`LineGroup`).
     """
 
     gamma: float
     beta: float
     block: np.ndarray
+    kind: np.ndarray
     upper: np.ndarray
     lower: np.ndarray
     delta_eV: np.ndarray
@@ -389,6 +458,8 @@ class EmissionLines:
     gamma_exponent: np.ndarray
     strength_per_ang: np.ndarray
     members: tuple[tuple[np.ndarray, np.ndarray, np.ndarray], ...]
+    group: np.ndarray
+    groups: tuple[LineGroup, ...]
 
     @property
     def size(self) -> int:
@@ -400,10 +471,11 @@ class EmissionLines:
 
         ``<d_c^dagger d_c> = sum_f sum_{i, i'} a_fi' * a_fi rho_ii'`` over the
         members of each cluster, on a density matrix in the solver's
-        eigenbasis, shape ``(n_cells, N, N)``. It is linear in ``rho``, so it is
-        an unbiased estimator on any ensemble of states.
+        eigenbasis, shape ``(n_cells, N, N)``. Cross terms between initial
+        states of one cluster are kept. It is linear in ``rho``, so it is an
+        unbiased estimator on any ensemble of states.
 
-        Validation: cr-yield-assembly
+        Validation: cr-yield-assembly, cr-capture-yield
         """
         out = np.zeros(self.size)
         for line, (lower, upper, amplitude) in enumerate(self.members):
@@ -416,128 +488,250 @@ class EmissionLines:
         """Forward (``theta = 0``) lab photon energy of each line [eV]."""
         return self.delta_eV / _denominator(self.gamma, 0.0)
 
+    def spectrum(
+        self,
+        photon_energy_eV,
+        yields: np.ndarray,
+        theta_e_rad: float,
+        sigma_gamma_rel: float = 0.0,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Line and capture spectra per unit angular density [photons/eV].
+
+        Each group contributes ``Re sum_m conj(w_m) F(E - E_m)`` with lab
+        centres ``E_m = centre_m / D``, half widths ``h_m / D``
+        (``D = 1 - beta cos theta_e``) and the complex Voigt ``F`` of RMS
+        ``sigma = |E_m| s sigma_gamma_rel`` (``s = d ln E_c / d ln gamma``, see
+        :func:`channeling_spectrum`). Multiply by the angular density
+        :func:`boosted_dipole_pattern` for photons/eV/sr.
+
+        Validation: cr-line-shape, cr-yield-assembly
+        """
+        energies = np.asarray(photon_energy_eV, dtype=float)
+        denom = float(_denominator(self.gamma, theta_e_rad))
+        kinematic = np.cos(theta_e_rad) / (self.gamma**2 * self.beta * denom)
+        out = [np.zeros(energies.shape), np.zeros(energies.shape)]
+        for group in self.groups:
+            members = group.lines
+            centre, hwhm, weight = group.modes(np.asarray(yields)[members])
+            centre, hwhm = centre / denom, hwhm / denom
+            strength = self.strength_per_ang[members]
+            exponent = float(np.dot(strength, self.gamma_exponent[members]) / strength.sum())
+            sigma = np.abs(centre * (kinematic + exponent)) * float(sigma_gamma_rel)
+            if np.any((hwhm <= 0.0) & (sigma <= 0.0)):
+                raise ValueError(
+                    "line has zero width: supply a scattering kernel or a beam energy spread"
+                )
+            profile = _complex_profile(energies[..., None] - centre, hwhm, sigma)
+            out[int(self.kind[members[0]])] += (np.conj(weight) * profile).real.sum(axis=-1)
+        return out[KIND_LINE], out[KIND_CAPTURE]
+
+
+def _gauge(amplitude: Any) -> complex:
+    return complex(amplitude) if amplitude != 0 else 1.0 + 0j
+
 
 def emission_lines(
     solver: DensityMatrixSolver,
     *,
+    include_capture: bool = True,
     cluster_tol_eV: float | None = None,
     gamma_step: float = 1e-4,
     relative_cut: float = 1e-12,
 ) -> EmissionLines:
-    """Build the bound -> bound line catalog of a density-matrix solver.
+    """Build the dipole line catalog of a density-matrix solver.
 
-    In each Bloch block, every pair of bound states (``E < barrier``) with
-    ``E_i > E_f`` contributes ``a_fi = sqrt(dN/dz) x_fi / |x_fi|`` with
-    :func:`dipole_rate_per_ang`; ``x_fi`` comes from the commutator in the
+    In each Bloch block, every bound final state ``f`` (``E < barrier``) and
+    every higher initial state ``i`` contributes
+    ``a_fi = sqrt(dN/dz) x_fi / |x_fi|`` with :func:`dipole_rate_per_ang`.
+    Initial states are bound (lines) and, with ``include_capture``, the
+    above-barrier states the solver tracks (``barrier <= E < barrier +
+    margin``: radiative capture). ``x_fi`` comes from the commutator in the
     solver's eigenbasis, so parity selection emerges; transitions below
-    ``relative_cut`` of the block's strongest (parity-forbidden to rounding)
-    are dropped. Transitions of one block into the same final state are
-    merged into one cluster when their energies differ by at most
-    ``cluster_tol_eV`` (default: half the sum of their Lorentzian half widths,
-    i.e. unresolved within the line width); only such clusters carry cross
-    terms in ``<d^dagger d>``. In a 1-D well the bound levels of one block are
-    nondegenerate, so in practice every cluster is one transition. Widths use the secular coherence
-    decay ``kappa_if = (Gamma_i + Gamma_f)/2 - Re <i|J(|i><f|)|f>`` of the
-    solver's kernel at its entry energy.
+    ``relative_cut`` of the block's strongest of the same kind are dropped.
+    Free -> free (coherent bremsstrahlung) is never scored.
+
+    **Widths.** For each transition ``(upper, lower)`` the coherences of all
+    blocks form a :class:`LineGroup` with generator ``K`` (scattering
+    transfers coherence between blocks). The reported half width is the
+    all-block secular value
+    ``kappa_k = (Gamma_i + Gamma_f)_k / 2 - Re sum_k' a_k'* K^J_k'k a_k / |a_k|^2``,
+    exact when the band energies are flat across blocks; the spectrum uses
+    the modes of ``K``, which also covers dispersive lines.
+
+    **Clusters.** Transitions of one block into the same final state merge
+    when their initial energies differ by at most ``cluster_tol_eV``
+    (default: half the sum of their half widths, i.e. unresolved), and their
+    cross terms are kept in :meth:`EmissionLines.rates`. Bound levels of one
+    block are nondegenerate, so bound lines stay single; above-barrier
+    states come in near-degenerate pairs, whose cross terms vanish by parity
+    only at ``k = 0`` and ``g/2``.
 
     Zero bound states give an empty catalog, hence exactly zero emission.
 
-    Validation: cr-dipole-rate, cr-line-shape
+    Validation: cr-dipole-rate, cr-line-shape, cr-capture-yield
     """
     basis = solver.basis
     gamma = float(basis.gamma)
     beta = float(_beta(gamma))
     hbar_v = HBARC_EV_ANG * beta
+    size = solver.orders.size
     bound = basis.energies < solver.barrier_eV
-    shifted = []
-    for factor in (1.0 + gamma_step, 1.0 - gamma_step):
-        shifted.append(
-            np.array(
-                [
-                    np.linalg.eigvalsh(
-                        _hamiltonian(solver.profile, gamma * factor, kappa, solver.orders)
-                    )
-                    for kappa in solver.kappa
-                ]
-            )
+    initial_ok = bound | (basis.subspace & ~bound) if include_capture else bound
+    shifted = [
+        np.array(
+            [
+                np.linalg.eigvalsh(
+                    _hamiltonian(solver.profile, gamma * factor, kappa, solver.orders)
+                )
+                for kappa in solver.kappa
+            ]
         )
-    rows: list[dict] = []
+        for factor in (1.0 + gamma_step, 1.0 - gamma_step)
+    ]
+    losses: dict[tuple[int, int], float] = {}
+
+    def loss(block: int, state: int) -> float:
+        if (block, state) not in losses:
+            rho = np.zeros((solver.n_cells, size, size), dtype=complex)
+            rho[block, state, state] = 1.0
+            losses[(block, state)] = solver.loss_rate(rho)
+        return losses[(block, state)]
+
+    # 1. transitions per block
+    pairs: list[dict] = []
     for block in range(solver.n_cells):
-        states = np.flatnonzero(bound[block])
-        if states.size < 2:
+        finals = np.flatnonzero(bound[block])
+        states = np.flatnonzero(initial_ok[block])
+        if finals.size == 0 or states.size < 2:
             continue
         dipoles = _block_dipoles(solver, block, states)
         energies = basis.energies[block][states]
-        pairs = []
+        found = []
         for a, upper in enumerate(states):
-            for b, lower in enumerate(states[:a]):
-                delta = energies[a] - energies[b]
+            for b, lower in enumerate(states):
+                if not bound[block, lower] or energies[a] <= energies[b] + 1e-12:
+                    continue
                 x = dipoles[b, a]
-                if delta <= 1e-12 or abs(x) == 0.0:
+                if abs(x) == 0.0:
                     continue
+                delta = float(energies[a] - energies[b])
                 rate = float(dipole_rate_per_ang(delta, abs(x), gamma))
-                if rate == 0.0:
-                    continue
-                kappa = _coherence_decay(solver, block, int(upper), int(lower))
                 up = shifted[0][block, upper] - shifted[0][block, lower]
                 down = shifted[1][block, upper] - shifted[1][block, lower]
-                exponent = (np.log(up) - np.log(down)) / (
-                    np.log1p(gamma_step) - np.log1p(-gamma_step)
-                )
-                pairs.append(
+                found.append(
                     {
+                        "block": block,
+                        "kind": KIND_LINE if bound[block, upper] else KIND_CAPTURE,
                         "upper": int(upper),
                         "lower": int(lower),
-                        "delta": float(delta),
+                        "delta": delta,
                         "amp": np.sqrt(rate) * x / abs(x),
                         "rate": rate,
-                        "hwhm": max(hbar_v * kappa, 0.0),
-                        "exponent": float(exponent),
+                        "exponent": float(
+                            (np.log(up) - np.log(down))
+                            / (np.log1p(gamma_step) - np.log1p(-gamma_step))
+                        ),
                     }
                 )
-        if not pairs:
-            continue
-        floor = relative_cut * max(item["rate"] for item in pairs)
-        pairs = [item for item in pairs if item["rate"] >= floor]
-        # Cross terms of <d^dagger d> need a shared final state and initial
-        # states degenerate within the widths, so clusters never mix finals.
-        pairs.sort(key=lambda item: (item["lower"], item["delta"]))
-        clusters: list[list[dict]] = []
-        for pair in pairs:
-            if clusters and clusters[-1][-1]["lower"] == pair["lower"]:
-                last = clusters[-1][-1]
+        for kind in (KIND_LINE, KIND_CAPTURE):
+            subset = [item for item in found if item["kind"] == kind]
+            if subset:
+                floor = relative_cut * max(item["rate"] for item in subset)
+                pairs.extend(item for item in subset if item["rate"] >= floor)
+
+    # 2. coherence-transfer generator per (upper, lower) across blocks
+    by_pair: dict[tuple[int, int], list[int]] = {}
+    for index, item in enumerate(pairs):
+        by_pair.setdefault((item["upper"], item["lower"]), []).append(index)
+    generators: dict[tuple[int, int], np.ndarray] = {}
+    for key, indices in by_pair.items():
+        upper, lower = key
+        matrix = np.zeros((len(indices), len(indices)), dtype=complex)
+        blocks = [pairs[j]["block"] for j in indices]
+        for col, j in enumerate(indices):
+            rho = np.zeros((solver.n_cells, size, size), dtype=complex)
+            rho[blocks[col], lower, upper] = 1.0
+            inside, _, _ = solver.jump(rho)
+            matrix[:, col] = inside[blocks, lower, upper]
+            matrix[col, col] += 1j * pairs[j]["delta"] / hbar_v - 0.5 * (
+                loss(blocks[col], upper) + loss(blocks[col], lower)
+            )
+        generators[key] = matrix
+        amps = np.array([_gauge(pairs[j]["amp"]) for j in indices])
+        for col, j in enumerate(indices):
+            gain = np.conj(amps) @ matrix[:, col] * amps[col] / abs(amps[col]) ** 2
+            pairs[j]["hwhm"] = max(-hbar_v * float(gain.real), 0.0)
+
+    # 3. clusters within a block (shared final, unresolved initial energies)
+    order = sorted(
+        range(len(pairs)),
+        key=lambda j: (pairs[j]["block"], pairs[j]["lower"], pairs[j]["delta"]),
+    )
+    clusters: list[list[int]] = []
+    for j in order:
+        if clusters:
+            last = pairs[clusters[-1][-1]]
+            item = pairs[j]
+            if last["block"] == item["block"] and last["lower"] == item["lower"]:
                 tol = (
-                    0.5 * (last["hwhm"] + pair["hwhm"])
+                    0.5 * (last["hwhm"] + item["hwhm"])
                     if cluster_tol_eV is None
                     else float(cluster_tol_eV)
                 )
-                if pair["delta"] - last["delta"] <= tol:
-                    clusters[-1].append(pair)
+                if item["delta"] - last["delta"] <= tol:
+                    clusters[-1].append(j)
                     continue
-            clusters.append([pair])
-        for cluster in clusters:
-            weight = np.array([item["rate"] for item in cluster])
-            strongest = cluster[int(np.argmax(weight))]
+        clusters.append([j])
+    rows: list[dict[str, Any]] = []
+    for cluster in clusters:
+        items = [pairs[j] for j in cluster]
+        weight = np.array([item["rate"] for item in items])
+        strongest = items[int(np.argmax(weight))]
 
-            def mean(key, cluster=cluster, weight=weight):
-                return float(np.dot(weight, [item[key] for item in cluster]) / weight.sum())
+        def mean(key, items=items, weight=weight):
+            return float(np.dot(weight, [item[key] for item in items]) / weight.sum())
 
-            rows.append(
-                {
-                    "block": block,
-                    "upper": strongest["upper"],
-                    "lower": strongest["lower"],
-                    "delta": mean("delta"),
-                    "hwhm": mean("hwhm"),
-                    "exponent": mean("exponent"),
-                    "strength": float(weight.sum()),
-                    "members": (
-                        np.array([item["lower"] for item in cluster]),
-                        np.array([item["upper"] for item in cluster]),
-                        np.array([item["amp"] for item in cluster], dtype=complex),
-                    ),
-                }
+        rows.append(
+            {
+                "block": strongest["block"],
+                "kind": strongest["kind"],
+                "upper": strongest["upper"],
+                "lower": strongest["lower"],
+                "amp": strongest["amp"],
+                "delta": mean("delta"),
+                "hwhm": mean("hwhm"),
+                "exponent": mean("exponent"),
+                "strength": float(weight.sum()),
+                "members": (
+                    np.array([item["lower"] for item in items]),
+                    np.array([item["upper"] for item in items]),
+                    np.array([item["amp"] for item in items], dtype=complex),
+                ),
+            }
+        )
+
+    # 4. line groups from the representatives
+    groups: list[LineGroup] = []
+    group_of = np.zeros(len(rows), dtype=int)
+    by_rep: dict[tuple[int, int], list[int]] = {}
+    for line, row in enumerate(rows):
+        by_rep.setdefault((row["upper"], row["lower"]), []).append(line)
+    for key, lines in by_rep.items():
+        pair_blocks = [pairs[j]["block"] for j in by_pair[key]]
+        position = [pair_blocks.index(rows[line]["block"]) for line in lines]
+        matrix = generators[key][np.ix_(position, position)]
+        mu, right = eig(matrix)
+        groups.append(
+            LineGroup(
+                lines=np.array(lines),
+                amplitude=np.array([_gauge(rows[line]["amp"]) for line in lines]),
+                eigenvalues=mu,
+                right=right,
+                left=np.linalg.inv(right),
+                hbar_v_eV_ang=hbar_v,
             )
+        )
+        group_of[lines] = len(groups) - 1
 
     def column(key, dtype=float):
         return np.array([row[key] for row in rows], dtype=dtype)
@@ -546,6 +740,7 @@ def emission_lines(
         gamma=gamma,
         beta=beta,
         block=column("block", int),
+        kind=column("kind", int),
         upper=column("upper", int),
         lower=column("lower", int),
         delta_eV=column("delta"),
@@ -553,6 +748,8 @@ def emission_lines(
         gamma_exponent=column("exponent"),
         strength_per_ang=column("strength"),
         members=tuple(row["members"] for row in rows),
+        group=group_of,
+        groups=tuple(groups),
     )
 
 
@@ -564,11 +761,12 @@ def emission_lines(
 def line_shape(photon_energy_eV, centre_eV, lorentz_hwhm_eV, gaussian_sigma_eV):
     """Return the unit-area Voigt line profile [1/eV].
 
-    Lorentzian of half width ``lorentz_hwhm_eV`` (occupation/coherence
-    lifetime) convolved with a Gaussian of RMS ``gaussian_sigma_eV`` (beam
-    energy spread). The Doppler--geometric width is added by the caller's
-    direction quadrature. A pure Lorentzian or pure Gaussian is the limit of
-    a vanishing other width; both zero is a delta function and is refused.
+    Lorentzian of half width ``lorentz_hwhm_eV`` (coherence decay) convolved
+    with a Gaussian of RMS ``gaussian_sigma_eV`` (beam energy spread). It is
+    the real part of the mode profile used by :meth:`EmissionLines.spectrum`
+    for a single real-weight mode. The Doppler--geometric width is added by
+    the caller's direction quadrature. Both widths zero is a delta function
+    and is refused.
 
     Validation: cr-line-shape
     """
@@ -590,25 +788,6 @@ class _History:
     z_ang: np.ndarray
     rates: np.ndarray  # (n_z, n_lines) [1/angstrom]
     bound: np.ndarray  # (n_z,)
-    capture: np.ndarray  # (n_z,) diagonal free -> bound rate [1/angstrom]
-
-
-def _capture_rates(solver: DensityMatrixSolver, gamma: float) -> np.ndarray:
-    """Diagonal free -> bound capture rate of every basis state [1/angstrom]."""
-    basis = solver.basis
-    out = np.zeros(basis.energies.shape)
-    for block in range(solver.n_cells):
-        bound = np.flatnonzero(basis.energies[block] < solver.barrier_eV)
-        free = np.flatnonzero(basis.energies[block] >= solver.barrier_eV)
-        if bound.size == 0 or free.size == 0:
-            continue
-        states = np.concatenate([bound, free])
-        dipoles = _block_dipoles(solver, block, states)
-        energies = basis.energies[block][states]
-        delta = energies[None, bound.size :] - energies[: bound.size, None]
-        rate = dipole_rate_per_ang(delta, dipoles[: bound.size, bound.size :], gamma)
-        out[block, free] = rate.sum(axis=0)
-    return out
 
 
 def _depth_history(
@@ -626,27 +805,19 @@ def _depth_history(
     segments = max(1, int(np.ceil(thickness_ang / (inner * dz_ang))))
     seg = thickness_ang / segments
     step = seg / inner
-    capture = _capture_rates(solver, lines.gamma)
     rho, free, outside = solver.entry_state(incidence_rad, divergence_rad)
     entry = float(free.sum()) + outside
-    z, rates, bound, caps = [0.0], [lines.rates(rho)], [solver.bound_population(rho)], []
-
-    def capture_rate(matrix):
-        return float(np.sum(np.einsum("rnn->rn", matrix).real * capture))
-
-    caps.append(capture_rate(rho))
+    z, rates, bound = [0.0], [lines.rates(rho)], [solver.bound_population(rho)]
     for index in range(1, segments + 1):
         result = solver.propagate(seg, step, initial=(rho, entry))
         rho, entry = result.final_density, result.total_flux[-1]
         z.append(index * seg)
         rates.append(lines.rates(rho))
         bound.append(float(result.bound_population[-1]))
-        caps.append(capture_rate(rho))
     return _History(
         z_ang=np.asarray(z),
         rates=np.asarray(rates).reshape(len(z), lines.size),
         bound=np.asarray(bound),
-        capture=np.asarray(caps),
     )
 
 
@@ -662,26 +833,30 @@ class ChannelingSpectrum:
         Detector directions (polar angle to the beam axis, azimuth from the
         plane normal), broadcast shape ``S``.
     spectrum
-        ``d^2N / dE dOmega`` [photons/eV/sr/electron], shape ``S + (n_E,)``.
+        Total ``d^2N / dE dOmega`` [photons/eV/sr/electron], bound -> bound
+        lines plus capture, shape ``S + (n_E,)``.
+    capture_spectrum
+        The free -> bound capture component of ``spectrum``.
     stokes
-        Intensity-weighted normalized Stokes ``(Q, U)``, shape
-        ``S + (n_E, 2)``; NaN where the spectrum is zero.
+        Intensity-weighted normalized Stokes ``(Q, U)`` of ``spectrum``,
+        shape ``S + (n_E, 2)``; NaN where the spectrum is zero.
     lines
-        Line catalog.
+        Line catalog (``lines.kind`` separates lines from capture).
     z_ang, line_rates
-        Sampled depths [angstrom] and the estimator per line [1/angstrom],
-        shape ``(n_z, n_lines)``.
+        Sampled depths [angstrom] and the estimator per catalog entry
+        [1/angstrom], shape ``(n_z, n_lines)``.
     bound_population
         Channeled (bound) population at each sampled depth.
     line_yield
-        Depth-integrated photons per electron per line over ``4 pi``, before
-        absorption.
+        Depth-integrated photons per electron per catalog entry over
+        ``4 pi``, before absorption.
     """
 
     photon_energy_eV: np.ndarray
     theta_rad: np.ndarray
     phi_rad: np.ndarray
     spectrum: np.ndarray
+    capture_spectrum: np.ndarray
     stokes: np.ndarray
     lines: EmissionLines
     z_ang: np.ndarray
@@ -691,8 +866,13 @@ class ChannelingSpectrum:
 
     @property
     def total_line_yield(self) -> float:
-        """Photons per electron summed over every line (``4 pi``, unabsorbed)."""
-        return float(self.line_yield.sum())
+        """Bound -> bound photons per electron (``4 pi``, unabsorbed)."""
+        return float(self.line_yield[self.lines.kind == KIND_LINE].sum())
+
+    @property
+    def total_capture_yield(self) -> float:
+        """Free -> bound capture photons per electron (``4 pi``, unabsorbed)."""
+        return float(self.line_yield[self.lines.kind == KIND_CAPTURE].sum())
 
 
 def _direction_nodes(aperture_rad: float, n_aperture: int):
@@ -725,35 +905,41 @@ def channeling_spectrum(
     sample_ang: float = 500.0,
     absorption: bool = True,
     layers: Sequence | None = None,
+    include_capture: bool = True,
     cluster_tol_eV: float | None = None,
     n_aperture: int = 6,
     n_divergence: int = 9,
 ) -> ChannelingSpectrum:
-    """Return the bound -> bound channeling-radiation spectrum per electron.
+    """Return the channeling-radiation spectrum per electron.
 
-    ``d^2N/dE dOmega = sum_lines int_0^t dz <d_c^dagger d_c>_rho(z)
-    P(n_e) L_c(E - E_c(theta_e)) exp(-tau(z, E_c, n))``,
+    ``d^2N/dE dOmega = sum_groups Re sum_m conj(w_m(z-integrated)) P(n_e)
+    F_m(E)``, with ``w_m`` built from the absorbed line yields
+    ``Y_c = int_0^t dz <d_c^dagger d_c>_rho(z) exp(-tau(z, E_c, n))``,
 
     averaged over the detector cone (``aperture_rad``) and the in-plane
-    (``y``) beam divergence. ``rho(z)`` is propagated by ``solver`` from the
-    divergence-averaged entry state at constant energy, sampled every
-    ``sample_ang`` and integrated by the trapezoid rule; ``P`` is
-    :func:`boosted_dipole_pattern` in the electron frame (photon angle
-    ``theta_e`` to the electron velocity), ``E_c = Delta E_perp / (1 - beta cos
-    theta_e)`` and ``L_c`` the :func:`line_shape` with Lorentzian half width
-    ``hbar v kappa / (1 - beta cos theta_e)`` and Gaussian
-    ``sigma = E_c s sigma_gamma / gamma``, where
+    (``y``) beam divergence. Lines end on bound states: bound -> bound, plus
+    radiative capture from the tracked above-barrier states when
+    ``include_capture`` (reported separately as ``capture_spectrum``).
+    ``rho(z)`` is propagated by ``solver`` from the divergence-averaged entry
+    state at constant energy, sampled every ``sample_ang`` and integrated by
+    the trapezoid rule; ``P`` is :func:`boosted_dipole_pattern` in the
+    electron frame (photon angle ``theta_e`` to the electron velocity) and
+    ``F_m`` the complex Voigt mode profile of :meth:`EmissionLines.spectrum`:
+    centres ``/ (1 - beta cos theta_e)``, half widths likewise, Gaussian
+    ``sigma = |E_m| s sigma_gamma / gamma`` with
     ``s = cos theta_e / (gamma^2 beta D) + d ln Delta E_perp / d ln gamma``
     (``-> 2 + d ln Delta E / d ln gamma`` forward; the walkthrough's
     ``2 delta gamma / gamma`` is its kinematic part). The face normal is the
     mean beam axis ``z``; photons leave through the exit face along the lab
-    direction ``n``, attenuated by ``_stack_tau`` over ``layers`` (default:
-    one slab of ``solver.profile.crystal`` over ``[0, thickness]``).
+    direction ``n``, attenuated by ``_stack_tau`` at each line centre over
+    ``layers`` (default: one slab of ``solver.profile.crystal`` over
+    ``[0, thickness]``).
 
     Parameters
     ----------
     solver
-        Density-matrix solver (profile, entry energy, kernel and margin).
+        Density-matrix solver (profile, entry energy, kernel and margin). The
+        margin sets which free states are tracked and can capture.
     thickness_ang
         Crystal thickness [angstrom].
     photon_energy_eV
@@ -774,44 +960,49 @@ def channeling_spectrum(
         Apply exit attenuation.
     layers
         ``_stack_tau`` layers ``[(z_top, z_bot, composition), ...]``.
+    include_capture
+        Score free -> bound capture from the tracked free states.
     cluster_tol_eV
         Override the cluster tolerance of :func:`emission_lines`.
     n_aperture, n_divergence
-        Quadrature orders of the aperture and in-plane divergence averages.
+        Quadrature orders of the aperture and in-plane divergence averages;
+        raise them when the Doppler spread exceeds the Lorentzian width.
 
     Returns
     -------
     ChannelingSpectrum
         Spectrum in photons/eV/sr/electron with line diagnostics.
 
-    Assumptions: bound -> bound dipole lines only; constant electron energy
-    in the zone (no ``gamma(z)`` drift, ``Delta T / T << 1``); recoil
-    ``O(hbar omega / E)`` and the radiative natural width neglected; the
-    estimator is scored on the solver's subspace (dechanneled electrons
-    emit no lines). Limits: zero bound states give exactly zero; with
-    ``absorption=False`` the energy and solid-angle integral of a point
-    detector equals ``line_yield``.
+    Assumptions: dipole lines ending on bound states; free -> free is
+    coherent bremsstrahlung and is excluded; constant electron energy in the
+    zone (no ``gamma(z)`` drift, ``Delta T / T << 1``); recoil
+    ``O(hbar omega / E)`` and the radiative natural width neglected;
+    dechanneled (sink) flux emits nothing, so capture depends on the
+    collapse margin. Limits: zero bound states give exactly zero; zero
+    tracked free states give zero capture; with ``absorption=False`` the
+    energy and solid-angle integral of a point detector equals the yields.
 
-    Validation: cr-yield-assembly, cr-line-shape
+    Validation: cr-yield-assembly, cr-line-shape, cr-capture-yield
     """
     energies = np.asarray(photon_energy_eV, dtype=float)
     theta, phi = np.broadcast_arrays(
         np.asarray(theta_rad, dtype=float), np.asarray(phi_rad, dtype=float)
     )
     shape = theta.shape
-    lines = emission_lines(solver, cluster_tol_eV=cluster_tol_eV)
+    lines = emission_lines(solver, include_capture=include_capture, cluster_tol_eV=cluster_tol_eV)
     history = _depth_history(
         solver, lines, thickness_ang, dz_ang, sample_ang, incidence_rad, divergence_rad
     )
     line_yield = np.trapezoid(history.rates, history.z_ang, axis=0)
     spectrum = np.zeros(shape + (energies.size,))
+    capture = np.zeros_like(spectrum)
     q_sum = np.zeros_like(spectrum)
     u_sum = np.zeros_like(spectrum)
     if lines.size and np.any(line_yield > 0.0):
         if absorption and layers is None:
             layers = [(0.0, float(thickness_ang), _resolve_composition(solver.profile.crystal))]
-        gamma, beta = lines.gamma, lines.beta
-        sigma_gamma = float(energy_spread_eV) / M_E_EV
+        gamma = lines.gamma
+        sigma_gamma_rel = float(energy_spread_eV) / M_E_EV / gamma
         radius, chi, ap_weight = _direction_nodes(float(aperture_rad), n_aperture)
         if divergence_y_rad > 0.0:
             nodes, psi_weight = np.polynomial.hermite_e.hermegauss(n_divergence)
@@ -819,11 +1010,8 @@ def channeling_spectrum(
             psi_weight = psi_weight / psi_weight.sum()
         else:
             psi, psi_weight = np.zeros(1), np.ones(1)
-        flat_theta, flat_phi = theta.ravel(), phi.ravel()
-        flat_spec = spectrum.reshape(-1, energies.size)
-        flat_q = q_sum.reshape(-1, energies.size)
-        flat_u = u_sum.reshape(-1, energies.size)
-        for d, (t0, p0) in enumerate(zip(flat_theta, flat_phi, strict=True)):
+        flat = [a.reshape(-1, energies.size) for a in (spectrum, capture, q_sum, u_sum)]
+        for d, (t0, p0) in enumerate(zip(theta.ravel(), phi.ravel(), strict=True)):
             n0 = np.array([np.sin(t0) * np.cos(p0), np.sin(t0) * np.sin(p0), np.cos(t0)])
             t1 = np.array([np.cos(t0) * np.cos(p0), np.cos(t0) * np.sin(p0), -np.sin(t0)])
             t2 = np.array([-np.sin(p0), np.cos(p0), 0.0])
@@ -836,29 +1024,24 @@ def channeling_spectrum(
                     ze = n[1] * np.sin(s) + n[2] * np.cos(s)
                     theta_e = float(np.arctan2(np.hypot(n[0], ye), ze))
                     phi_e = float(np.arctan2(ye, n[0]))
-                    denom = float(_denominator(gamma, theta_e))
-                    centre = lines.delta_eV / denom
-                    pattern = float(boosted_dipole_pattern(theta_e, phi_e, gamma))
                     if absorption:
+                        centre = lines.delta_eV / float(_denominator(gamma, theta_e))
                         e_grid = np.broadcast_to(centre[:, None], (lines.size, history.z_ang.size))
                         tau = _stack_tau(layers, history.z_ang[None, :], float(n[2]), e_grid)
                         attenuated = np.exp(-np.asarray(tau, dtype=float))
                         yields = np.trapezoid(history.rates.T * attenuated, history.z_ang, axis=1)
                     else:
                         yields = line_yield
-                    slope = np.cos(theta_e) / (gamma**2 * beta * denom) + lines.gamma_exponent
-                    sigma = np.abs(centre * slope) * sigma_gamma / gamma
-                    profile = line_shape(
-                        energies[None, :],
-                        centre[:, None],
-                        (lines.hwhm_eV / denom)[:, None],
-                        sigma[:, None],
+                    weight = wa * wp * float(boosted_dipole_pattern(theta_e, phi_e, gamma))
+                    bound_part, capture_part = lines.spectrum(
+                        energies, yields, theta_e, sigma_gamma_rel
                     )
-                    contribution = wa * wp * pattern * (yields[:, None] * profile).sum(axis=0)
+                    total = weight * (bound_part + capture_part)
                     stokes = dipole_stokes(theta_e, phi_e, gamma)
-                    flat_spec[d] += contribution
-                    flat_q[d] += contribution * stokes[0]
-                    flat_u[d] += contribution * stokes[1]
+                    flat[0][d] += total
+                    flat[1][d] += weight * capture_part
+                    flat[2][d] += total * stokes[0]
+                    flat[3][d] += total * stokes[1]
     with np.errstate(divide="ignore", invalid="ignore"):
         stokes_out = np.stack([q_sum / spectrum, u_sum / spectrum], axis=-1)
     return ChannelingSpectrum(
@@ -866,6 +1049,7 @@ def channeling_spectrum(
         theta_rad=theta,
         phi_rad=phi,
         spectrum=spectrum,
+        capture_spectrum=capture,
         stokes=stokes_out,
         lines=lines,
         z_ang=history.z_ang,
@@ -882,26 +1066,27 @@ def channeling_spectrum(
 
 @dataclass(frozen=True)
 class CaptureBound:
-    """Free -> bound radiative-capture diagnostic (not scored in v1).
+    """Free -> bound radiative-capture diagnostic against the line yield.
 
     Attributes
     ----------
     estimate
-        ``int dz sum_i rho_ii(z) Gamma_i^cap`` over above-barrier states kept
-        in the solver's subspace [photons/electron, ``4 pi``].
+        Scored capture yield of the tracked free states, the
+        ``cr-capture-yield`` estimator (cross terms kept)
+        [photons/electron, ``4 pi``].
     upper_bound
-        ``max_i Gamma_i^cap int dz (1 - P_bound(z))`` over every above-barrier
-        basis state [photons/electron]: every unbound electron, dechanneled
-        or not, captures at most at the fastest rate.
+        ``lambda_max(R) int dz (1 - P_bound(z))``: every unbound electron,
+        dechanneled or not, captures at most at the largest eigenvalue of the
+        clustered capture-rate operator ``R = sum_c d_c^dagger d_c`` over every
+        above-barrier basis state [photons/electron].
     line_yield
         Bound -> bound yield of the same solve [photons/electron].
     max_rate_per_ang
-        Largest diagonal capture rate ``Gamma_i^cap`` [1/angstrom].
+        ``lambda_max(R)`` [1/angstrom].
     edge_eV
-        Forward capture edge ``(barrier - E_0) / (1 - beta)`` per block [eV];
-        the continuum starts near it.
+        Forward capture edge ``(barrier - E_0) / (1 - beta)`` per block [eV].
     threshold
-        Fraction of the line yield above which capture should be scored.
+        Fraction of the line yield above which capture must be scored.
     """
 
     estimate: float
@@ -927,6 +1112,31 @@ class CaptureBound:
         return self.estimate_ratio > self.threshold
 
 
+def _capture_rate_bound(solver: DensityMatrixSolver, gamma: float, tol_eV: float) -> float:
+    """Largest eigenvalue of the clustered capture-rate operator [1/angstrom]."""
+    basis = solver.basis
+    best = 0.0
+    for block in range(solver.n_cells):
+        energies = basis.energies[block]
+        bound = np.flatnonzero(energies < solver.barrier_eV)
+        free = np.flatnonzero(energies >= solver.barrier_eV)
+        if bound.size == 0 or free.size == 0:
+            continue
+        states = np.concatenate([bound, free])
+        dipoles = _block_dipoles(solver, block, states)
+        delta = energies[free][None, :] - energies[bound][:, None]
+        x = dipoles[: bound.size, bound.size :]
+        amp = np.sqrt(dipole_rate_per_ang(delta, np.abs(x), gamma)) * np.exp(1j * np.angle(x))
+        # free states sorted by energy; clusters are runs with gaps <= tol
+        label = np.concatenate([[0], np.cumsum(np.diff(energies[free]) > tol_eV)])
+        same = label[:, None] == label[None, :]
+        rate = np.zeros((free.size, free.size), dtype=complex)
+        for row in amp:
+            rate += same * np.conj(row)[:, None] * row[None, :]
+        best = max(best, float(np.linalg.eigvalsh(rate).max()))
+    return best
+
+
 def capture_bound(
     solver: DensityMatrixSolver,
     thickness_ang: float,
@@ -936,37 +1146,43 @@ def capture_bound(
     dz_ang: float = 50.0,
     sample_ang: float = 500.0,
     threshold: float = DEFAULT_CAPTURE_THRESHOLD,
+    cluster_tol_eV: float | None = None,
 ) -> CaptureBound:
     """Bound the free -> bound radiative-capture yield against the line yield.
 
     Capture of an above-barrier state ``i`` into bound ``f`` is the same
-    dipole emission as a line, ``Gamma_i^cap = sum_f dN_fi/dz``
-    (:func:`dipole_rate_per_ang`), at ``hbar omega >= (barrier - E_f)/(1 - beta
-    cos theta)``. Above-barrier Bloch states at one ``k`` are nondegenerate,
-    so the expected value is diagonal. The *estimate* scores the free states
-    the solver keeps (``barrier <= E < barrier + margin``); build the solver
-    with a large ``margin_eV`` for the most inclusive value. The *upper bound*
-    charges every unbound electron, including dechanneled flux, at the
-    fastest capture rate in the basis. Maintainer rule (issue #505): score
-    capture only if it exceeds a few percent (``threshold``) of the line
-    yield in an anchor configuration.
+    dipole emission as a line, at ``hbar omega >= (barrier - E_f)/(1 - beta
+    cos theta)``. The *estimate* is the scored capture yield of
+    :func:`emission_lines` on the tracked free states
+    (``barrier <= E < barrier + margin``), cross terms between near-degenerate
+    free pairs kept. The diagonal form would hold by parity only at the
+    symmetric blocks ``k = 0, g/2``; on finer Bloch grids that protection is
+    lost. The *upper bound* charges every unbound electron, including
+    dechanneled flux, at ``lambda_max`` of the clustered capture-rate
+    operator over all above-barrier basis states (clusters: runs of free
+    levels within ``cluster_tol_eV``, default the largest tracked capture
+    half width).
 
     Validation: cr-capture-bound
     """
-    lines = emission_lines(solver)
+    lines = emission_lines(solver, include_capture=True, cluster_tol_eV=cluster_tol_eV)
     history = _depth_history(
         solver, lines, thickness_ang, dz_ang, sample_ang, incidence_rad, divergence_rad
     )
-    rates = _capture_rates(solver, lines.gamma)
-    estimate = float(np.trapezoid(history.capture, history.z_ang))
-    max_rate = float(rates.max()) if rates.size else 0.0
+    yields = np.trapezoid(history.rates, history.z_ang, axis=0)
+    is_capture = lines.kind == KIND_CAPTURE
+    if cluster_tol_eV is None:
+        tol = float(lines.hwhm_eV[is_capture].max()) if is_capture.any() else 0.0
+    else:
+        tol = float(cluster_tol_eV)
+    max_rate = _capture_rate_bound(solver, lines.gamma, tol)
     unbound = float(np.trapezoid(1.0 - history.bound, history.z_ang))
     ground = solver.basis.energies[:, 0]
     edge = (solver.barrier_eV - ground) / _denominator(lines.gamma, 0.0)
     return CaptureBound(
-        estimate=estimate,
+        estimate=float(yields[is_capture].sum()),
         upper_bound=max_rate * unbound,
-        line_yield=float(np.trapezoid(history.rates, history.z_ang, axis=0).sum()),
+        line_yield=float(yields[~is_capture].sum()),
         max_rate_per_ang=max_rate,
         edge_eV=np.asarray(edge),
         threshold=float(threshold),
@@ -1033,12 +1249,14 @@ class TransitionRadiationBound:
         one boundary, the maximum of the entrance--exit interference
         ``|1 - e^{i phi}|^2`` with no absorption of the entrance radiation.
     peak_density
-        Two-boundary bound on ``d^2N/dE dOmega`` at each line's forward
-        energy and ``theta = 0..aperture`` maximum [photons/eV/sr].
+        Two-boundary bound on ``d^2N/dE dOmega`` at each bound -> bound
+        line's forward energy, maximized over ``0 <= theta <= theta_max``
+        [photons/eV/sr].
     line_density
-        Peak of the channeling spectrum at each line [photons/eV/sr].
+        Peak of the channeling spectrum (lines plus capture) at each bound ->
+        bound line [photons/eV/sr].
     ratio
-        ``peak_density / line_density`` per line.
+        ``peak_density / line_density`` per bound -> bound line.
     energy_eV
         Single-boundary emitted energy ``alpha gamma hbar omega_p / 3`` [eV].
     """
@@ -1077,14 +1295,15 @@ def transition_radiation_bound(
         np.trapezoid(transition_radiation_per_eV(material, kinetic_energy_eV, grid), grid)
     )
     angles = np.linspace(0.0, theta_max, 400)
-    forward = spectrum.lines.forward_energy_eV()
+    is_line = spectrum.lines.kind == KIND_LINE
+    forward = spectrum.lines.forward_energy_eV()[is_line]
     peak = np.array(
         [4.0 * transition_radiation(material, kinetic_energy_eV, e, angles).max() for e in forward]
     )
     energies = spectrum.photon_energy_eV
     flat = spectrum.spectrum.reshape(-1, energies.size)
     step = float(np.min(np.diff(energies))) if energies.size > 1 else 0.0
-    width = np.maximum(spectrum.lines.hwhm_eV / _denominator(gamma, 0.0), step)
+    width = np.maximum(spectrum.lines.hwhm_eV[is_line] / _denominator(gamma, 0.0), step)
     line = np.array(
         [
             flat[:, np.abs(energies - e) <= w].max(initial=0.0)
