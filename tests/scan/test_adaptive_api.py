@@ -215,6 +215,10 @@ def test_checkpoint_components_and_cas_roundtrip_realized_provenance(tmp_path, a
     assert restored["adaptive_sampling"] == output["adaptive_sampling"]
     for component in _checkpoint_store.COMPONENTS:
         artifact = _checkpoint_store.component_path("adaptive", component, tmp_path)
+        if component in _checkpoint_store.OPTIONAL_COMPONENTS:
+            # Channeling-off adaptive checkpoints retain the three-file layout.
+            assert not artifact.exists()
+            continue
         record = _checkpoint_io.load(str(artifact))[case.name][case.E0_keV]
         assert record["adaptive_sampling"] == output["adaptive_sampling"]
         assert record["case"]["adaptive_precision"] == case.adaptive_precision
