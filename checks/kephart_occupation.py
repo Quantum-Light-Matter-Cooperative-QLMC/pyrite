@@ -157,7 +157,7 @@ def fit_occupation_length(z_um, signal, thickness_range_um):
     return float(length), float(amplitude), residual
 
 
-def detector_acceptance(profile, energy_eV, divergence_rad, z_ang, rate_scale=1.0):
+def detector_acceptance(profile, energy_eV, divergence_rad, z_ang, weights=(1.0, 1.0)):
     """Forward-detector weight ``W(z)`` of the ``y``-angle spread, normalized to ``W(0)``.
 
     Kephart's detector sits on the beam axis. An electron moving at ``y``-angle
@@ -170,8 +170,9 @@ def detector_acceptance(profile, energy_eV, divergence_rad, z_ang, rate_scale=1.
     ``Lambda(s) = Gamma(Delta = s / p)``, the decoherence rate of a
     planar-uniform density (``decoherence_rate`` on a flat electron density).
     ``W(z) = (1/pi) int_0^inf w~(s) exp(...) ds`` with
-    ``w~(s) = (pi / 2 gamma)(1 + s/gamma) e^{-s/gamma}``. ``rate_scale``
-    multiplies ``Lambda`` to bracket channeled electrons' higher density.
+    ``w~(s) = (pi / 2 gamma)(1 + s/gamma) e^{-s/gamma}``. ``weights =
+    (f_TDS, f_el)`` scale the TDS and electronic parts of ``Lambda`` for the
+    density the channeled electrons sample (see :func:`bound_rate_weights`).
     Assumptions: point detector, peak areas include the Doppler-shifted
     lines, ``y`` spreading independent of the transverse ``x`` state.
     """
@@ -179,7 +180,8 @@ def detector_acceptance(profile, energy_eV, divergence_rad, z_ang, rate_scale=1.
     p_inv_ang = gamma * beta * M_E_EV / HBARC_EV_ANG
     s = np.linspace(0.0, 40.0 * gamma, 1601)
     flat = replace(profile, electron_density=profile.electron_density[:1].copy())
-    rate = decoherence_rate(flat, energy_eV, s / p_inv_ang).total * rate_scale
+    parts = decoherence_rate(flat, energy_eV, s / p_inv_ang)
+    rate = weights[0] * parts.tds + weights[1] * parts.electronic
     kernel = (np.pi / (2 * gamma)) * (1 + s / gamma) * np.exp(-s / gamma)
     base = kernel * np.exp(-0.5 * (divergence_rad * s) ** 2)
     z = np.asarray(z_ang, dtype=float)
@@ -187,15 +189,35 @@ def detector_acceptance(profile, energy_eV, divergence_rad, z_ang, rate_scale=1.
     return values / values[0]
 
 
-def run_case_group(keys, margin, orders, cells, dz_ang, rate_scales=(1.0,)):
+def bound_rate_weights(solver, kernels, divergence_rad):
+    """Bound-state-weighted rate over the mean, ``<C_m(x,x)>_bound / C_m,0``, per kernel.
+
+    Uses the entry state's bound-band density matrix: channeled electrons sit
+    on the planes, so they sample the TDS (nuclear) rate about twice the mean
+    and the electronic rate near the mean.
+    """
+    rho, _, _ = solver.entry_state(0.0, divergence_rad)
+    bound = solver.basis.energies < solver.barrier_eV
+    rho = rho * (bound[:, :, None] & bound[:, None, :])
+    plane = solver.basis.vectors @ rho @ np.conj(np.swapaxes(solver.basis.vectors, 1, 2))
+    population = float(np.einsum("rnn->", rho).real)
+    out = []
+    for kernel in kernels:
+        toeplitz = solver._toeplitz(kernel.diagonal_coefficients)
+        mean_loss = float(np.einsum("hk,rkh->", toeplitz, plane).real) / population
+        out.append(mean_loss / kernel.diagonal_coefficients[0].real)
+    return tuple(out)
+
+
+def run_case_group(keys, margin, orders, cells, dz_ang):
     """Solve one (plane, energy) configuration and fit every case sharing it."""
     first = CASES[keys[0]]
     profile = planar_profile("silicon", first.hkl, TEMPERATURE_K)
     energy = first.kinetic_energy_eV
     start = time.perf_counter()
-    kernel = tds_kernel(profile, energy, n_cells=cells, max_order=orders) + electronic_kernel(
-        profile, energy, n_cells=cells, max_order=orders
-    )
+    tds = tds_kernel(profile, energy, n_cells=cells, max_order=orders)
+    electronic = electronic_kernel(profile, energy, n_cells=cells, max_order=orders)
+    kernel = tds + electronic
     kernel_s = time.perf_counter() - start
     solver = DensityMatrixSolver(profile, energy, kernel, margin_eV=margin)
     thickness_um = max(CASES[k].thickness_range_um[1] for k in keys)
@@ -205,10 +227,13 @@ def run_case_group(keys, margin, orders, cells, dz_ang, rate_scales=(1.0,)):
     )
     solve_s = time.perf_counter() - start - kernel_s
     z_um = result.z_ang / 1e4
-    scales = list(rate_scales)
+    weighting = {
+        "bound": bound_rate_weights(solver, (tds, electronic), first.divergence_rad),
+        "mean": (1.0, 1.0),
+    }
     acceptance = {
-        scale: detector_acceptance(profile, energy, first.divergence_rad, result.z_ang, scale)
-        for scale in scales
+        name: detector_acceptance(profile, energy, first.divergence_rad, result.z_ang, pair)
+        for name, pair in weighting.items()
     }
     rows = []
     for key in keys:
@@ -254,6 +279,7 @@ def run_case_group(keys, margin, orders, cells, dz_ang, rate_scales=(1.0,)):
         "kernel_seconds": kernel_s,
         "solve_seconds": solve_s,
         "detector_acceptance": {str(k): v.tolist() for k, v in acceptance.items()},
+        "y_rate_weights": {k: list(v) for k, v in weighting.items()},
     }
 
 
@@ -278,13 +304,6 @@ def main(argv=None) -> int:
     parser.add_argument("--orders", nargs="+", type=int, default=[24])
     parser.add_argument("--cells", nargs="+", type=int, default=[16])
     parser.add_argument("--dz", nargs="+", type=float, default=[250.0])
-    parser.add_argument(
-        "--rate-scales",
-        nargs="+",
-        type=float,
-        default=[1.0],
-        help="multipliers of the y-spreading rate for the detector observable",
-    )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
     groups = [GROUPS.get(key, (key,)) for key in args.cases]
@@ -300,7 +319,7 @@ def main(argv=None) -> int:
     for keys, margin, orders, cells, dz in itertools.product(
         groups, margins, args.orders, args.cells, args.dz
     ):
-        run = run_case_group(keys, margin, orders, cells, dz, args.rate_scales)
+        run = run_case_group(keys, margin, orders, cells, dz)
         report["runs"].append(run)
         summary = ", ".join(
             f"{row['case']} L={row['occupation_length_um']:.1f} um (x{row['ratio']:.2f})"

@@ -55,6 +55,23 @@ Kephart's detector sits on the beam axis. `checks/kephart_occupation.py` weights
 
 Populations alone at the same settings give 18.7 / 18.6 / 18.5 / 18.6 µm (300 eV) and 44.9 / 43.2 / 41.9 / 43.2 µm (∞). With the detector observable and a 300 eV cutoff, every 17 MeV value is within ±20% at ×1. At ×4 all are within ±20% except Si(110) n=1 (0.73). Without a near-barrier cutoff, the detector observable still leaves `L` 1.3–2.1× too long.
 
+### Bound-weighted `y` rate (parameter-free)
+
+Channeled electrons sample the planes. The bound bands' expected loss rates, relative to the mean, give the weights directly (`bound_rate_weights` in the harness): TDS ×1.86 / 1.89 / 1.84 / 1.69 and electronic ×1.05 / 1.03 / 1.05 / 1.02, for Si(110) 17 MeV, Si(100) 17 MeV, Si(110) 54 MeV and Si(100) 54 MeV. With `Λ = f_TDS Λ_TDS + f_el Λ_el` and a 300 eV cutoff:
+
+| Case | `L` [µm] | Kephart [µm] | ratio |
+|---|---|---|---|
+| Si(110) 17 MeV n=1 | 16.2 | 20 | 0.81 |
+| Si(110) 17 MeV n=2 | 16.1 | 17 | 0.94 |
+| Si(110) 17 MeV n=3 | 16.0 | 17 | 0.94 |
+| Si(100) 17 MeV | 16.1 | 16 | 1.01 |
+| Si(110) 54 MeV | 32.1 | 36 | 0.89 |
+| Si(100) 54 MeV | 32.4 | 24 | **1.35** |
+
+Settings are `H = 56` (17 MeV) or `H = 64` (54 MeV), `n_cells = 16`, `dz = 62.5 Å`. These were refitted from the stored band signals with the same formulas the harness now uses. At 54 MeV the 300 eV result is converged in `H` (`H = 64` and `80` both give 41.1 µm for populations alone); `dz` 62.5 → 31.25 Å moves `L` by about 3%.
+
+Five of the six values are within ±20%. The outlier is Si(100) at 54 MeV, at 1.35. With the cutoff dominating, the model gives nearly equal `L` for both 54 MeV planes (32.1 and 32.4 µm), whereas Kephart measured 24 and 36 µm. Without a cutoff, the bound-weighted detector observable gives 1.6–2.75×.
+
 ## Interpretation
 
 - **The occupation length is not set by the kernel alone.** It depends on where electrons stop counting as channeled. Planar rechanneling is a one-dimensional random walk in transverse angle, which keeps returning to the bound band. With a band-edge sink only, `L` converges in `H`, but to roughly twice the measured value.
