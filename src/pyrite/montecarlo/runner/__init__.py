@@ -26,7 +26,7 @@ from ..._backend import BACKEND
 from ..._energy_grid_encoding import decode_energy_grid as decode_energy_grid
 from ..._env import env_value, set_canonical_env
 from .. import spectrum as _spectrum_mod
-from ..case import Case
+from ..case import Case, refuse_channeling
 from ..geometry import tilted_geometry as tilted_geometry
 from ..groove import blazed_groove_spec as blazed_groove_spec
 from ..spectrum import (
@@ -234,6 +234,8 @@ def run_case(
         count, resolved crystal, incident energy, and optional timing metrics.
     """
     _adaptive.validate_directions(case, observation_directions)
+    if observation_directions is not None:
+        refuse_channeling(case, "observation-direction scoring")
     transport = _transport_case(
         case,
         record_timing,
@@ -269,6 +271,7 @@ def run_case_directions(
     photon geometry in the electron navigator.
     """
     _adaptive.validate_directions(case, n_hats)
+    refuse_channeling(case, "observation-direction scoring")
     directions = validated_directions(n_hats)
     transport = _transport_case(
         case,
@@ -299,6 +302,18 @@ def _beam_kwargs(case):
         bunch_front_tilt=case.get("bunch_front_tilt"),
         **({"gdf_source": case["gdf_source"]} if "gdf_source" in case else {}),
     )
+
+
+def _check_channeling_transport(case, transport_core, trajectory_capture, block_electrons):
+    """Refuse channeling transport options before any work (ADR-0017 tier 3)."""
+    if trajectory_capture is not None:
+        refuse_channeling(case, "trajectory capture")
+    if block_electrons is not None:
+        refuse_channeling(case, "electron-block transport")
+    if _case_transport_core(case, transport_core) == "cuda":
+        refuse_channeling(case, "CUDA transport")
+    # Until the zone handoff lands, never run a channeling case as amorphous.
+    raise NotImplementedError("the planar channeling transport handoff is not implemented yet")
 
 
 def _transport_case(
@@ -345,6 +360,8 @@ def _transport_case(
     # worker reconstructs adapters locally; no callable or device state travels
     # in the case payload.
     select_emission(case)
+    if case.get("channeling") is not None:
+        _check_channeling_transport(case, transport_core, trajectory_capture, block_electrons)
     if case.get("adaptive_precision") is not None:
         return _adaptive.transport_requested_precision(
             case,

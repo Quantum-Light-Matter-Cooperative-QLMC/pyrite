@@ -148,3 +148,46 @@ def _assert_output_values(actual, expected, path):
         np.testing.assert_allclose(
             actual_array, expected_array, rtol=rtol, atol=0, equal_nan=False, err_msg=path
         )
+
+
+def resolved_channeling_baseline():
+    """Return the planar channeling family (#506): resolved mapping and content key.
+
+    Built through the public Scene path, the only one that can select
+    channeling (profiles and checkpoints cannot, #507). Every selector is
+    explicit so no installed table inventory participates. The beam lies in
+    the Si (1-10) planes, 3 deg from the (110) face normal and far from a
+    low-index axis, so the gates neither refuse nor warn.
+    """
+    import pyrite as pr
+    from pyrite.api import build_case
+
+    physics = pr.Physics(
+        elastic_model="mott",
+        inelastic_model="continuous",
+        bremsstrahlung_model="eedl",
+        radiative_model="uncoupled",
+        channeling_model="planar",
+        channeling_plane=(1, -1, 0),
+    )
+    scene = pr.Scene(
+        pr.Beam(energy_keV=5000.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Slab(
+            "silicon",
+            thickness_ang=20000.0,
+            tilt_deg=3.0,
+            tilt_azim_deg=45.0,
+            footprint=Footprint(5.0, 5.0),
+        ),
+        pr.Detector(),
+        physics=physics,
+    )
+    numerics = pr.Numerics(
+        cxr_trials=4,
+        brem_trials=4,
+        energy_bins=EnergyBins(
+            cxr=np.array([1500.0, 1750.0, 2000.0]), brem=np.array([5000.0, 10000.0, 15000.0])
+        ),
+    )
+    case = build_case(scene, numerics)
+    return {"case": case.to_dict(), "case_content_key": case_content_key(case)}

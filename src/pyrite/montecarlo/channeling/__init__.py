@@ -37,6 +37,7 @@ from .emission import (
     emission_lines,
     line_shape,
 )
+from .handoff import CHANNELING_MODEL
 from .mcwf import MCWFResult, MCWFSolver, mcwf_stream_key
 from .operators import (
     DecoherenceRate,
@@ -55,6 +56,7 @@ from .transition_radiation import (
 )
 
 __all__ = [
+    "CHANNELING_MODEL",
     "DECHANNELING_MARGIN_EV",
     "DECHANNELING_MARGIN_PROVENANCE",
     "KIND_CAPTURE",

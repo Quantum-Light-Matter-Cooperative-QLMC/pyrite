@@ -135,6 +135,11 @@ Every midpoint row records, in `event_kind` (`int8`), the event that ended it. T
   - physical interaction, terminal
   - yes
   - —
+* - 12
+  - `DECHANNEL`
+  - physical interaction (channeling zone)
+  - yes
+  - handoff direction
 ```
 
 **Physical segment boundaries.** Elastic collisions, hard inelastic collisions, and hard radiative events are the physical interactions. Each one closes the flight: the next row opens `flight_id + 1` at `substep_id = 0`, and the default radiation reductions add the two flights incoherently. A hard radiative event keeps the electron's direction, following the PENELOPE-2024 convention (NEA/MBDAV/R(2024)1, §3.3), which leaves the photon recoil unmodelled and assigns the angular deflection to the elastic model; its discrete energy loss still ends the flight, because the emission resonance and phase velocity jump with the energy. Geometry events and the cutoff also close the flight. They are bookkeeping boundaries rather than interactions: the collision budget is redrawn after them, which the memoryless free-path law makes exact.
@@ -148,7 +153,10 @@ Every midpoint row records, in `event_kind` (`int8`), the event that ended it. T
 - energy is continuous across every event except the hard events, where it may only fall;
 - direction is unchanged across `SUBSTEP`, `DELTA`, `LAYER_BOUNDARY`, `GROOVE_SURFACE`, and `HARD_RADIATIVE`;
 - clock and position are continuous across every event except a groove surface, whose vacuum leg advances both;
-- a terminal event is its electron's last row, and every electron's last row is terminal or a groove surface through which it escaped.
+- a terminal event is its electron's last row, and every electron's last row is terminal or a groove surface through which it escaped;
+- a `DECHANNEL` row is its electron's first row and never its last.
+
+`DECHANNEL` is emitted only by the opt-in planar channeling zone (`Physics(channeling_model="planar")`, ADR-0018, #506), never by a native core. Its row is the electron's straight mean segment through the zone; the next row starts native transport from the handoff state, with position, clock and energy continuous and a new direction. A still-channeled electron that reaches the exit face ends its zone row with `EXIT_BOTTOM` instead.
 
 The exit codes tally one-to-one against `n_backscattered`, `n_transmitted`, `n_side_exited`, and `n_cutoff_stopped`; `ANNIHILATION` ends a transported positron annihilated in flight and tallies against the positron generation's `n_annihilated` (see [positron transport](positron-transport.md#annihilation)). The coupled radiative exact cores emit `HARD_RADIATIVE`; the uncoupled cores retain their existing event behavior.
 

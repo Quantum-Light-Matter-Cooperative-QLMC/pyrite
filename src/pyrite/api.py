@@ -36,6 +36,7 @@ from .materials import CATALOG, MediumSpec
 from .materials._composition import resolve_composition
 from .materials.photon_cross_sections import ATTENUATION_MODEL
 from .montecarlo import Case, run_case
+from .montecarlo.case import refuse_channeling
 from .montecarlo.runner import cached_case_table_markers, case_table_markers, run_case_directions
 from .montecarlo.spectrum import (
     BREM_ENDF_PARSERPY_VERSION,
@@ -280,6 +281,7 @@ def simulate(
     )
     case, xsgen_tables = _source_case(scene, resolved_numerics)
     if isinstance(scene.detector, PlanarDetector):
+        refuse_channeling(case, "physical-detector observation")
         return _simulate_planar(scene, resolved_numerics, case, xsgen_tables)
     output = run_case(case, transport_core=resolved_numerics.transport_core)
     background_energy = output.get("E_grid_brem", output["E_grid"])
@@ -357,6 +359,7 @@ def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
     if not isinstance(detector, PlanarDetector) or scene.acquisition is None:
         raise ValueError("observation production requires a pixelated detector and acquisition")
     case, xsgen_tables = _source_case(scene, numerics)
+    refuse_channeling(case, "observation production")
     return ObservationPlan(
         ResolvedObservation(
             detector=detector,

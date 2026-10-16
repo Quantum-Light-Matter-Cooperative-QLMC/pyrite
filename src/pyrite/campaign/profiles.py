@@ -38,6 +38,7 @@ from .._precision import Precision
 from ..detectors import EnergyBins
 from ..materials.photon_cross_sections import ATTENUATION_MODEL
 from ..montecarlo.case import Case
+from ..montecarlo.channeling.handoff import CHANNELING_MODEL
 from ..montecarlo.spectrum import BREMSSTRAHLUNG_MODEL, CHARACTERISTIC_MODEL, CXR_ESCAPE_MODEL
 from ..montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
 from ..montecarlo.spectrum.coherent_population import (
@@ -864,6 +865,10 @@ def case_content_key(
     if case.get("coherent_emission", False):
         payload["coherent_population_model"] = COHERENT_POPULATION_MODEL
         payload["physical_bunch_electrons"] = physical_bunch_electrons(case)
+    # Planar channeling zone (#506): divergence-only, so channeling-off keys
+    # are unchanged. The record itself (plane, margin, numerics) is in "case".
+    if case.get("channeling") is not None:
+        payload["channeling_model"] = CHANNELING_MODEL
     if xsgen_tables:
         payload["xsgen_tables"] = {str(key): str(value) for key, value in xsgen_tables.items()}
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()

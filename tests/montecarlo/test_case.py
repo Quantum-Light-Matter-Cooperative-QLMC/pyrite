@@ -159,3 +159,20 @@ def test_pre_adapter_case_and_identity_baseline(monkeypatch, kind):
     # JSON conversion preserves field omission while normalizing tuples/arrays.
     actual = json.loads(json.dumps(actual, default=lambda array: array.tolist()))
     assert actual == expected
+
+
+def test_channeling_case_and_identity_baseline():
+    """Freeze the planar channeling family's resolved payload and content key (#506)."""
+    import json
+    import warnings
+    from pathlib import Path
+
+    from tests.helpers.physics_baseline import resolved_channeling_baseline
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)  # the fixture geometry passes every gate
+        actual = resolved_channeling_baseline()
+    expected = json.loads(
+        (Path(__file__).parents[1] / "data/physics-baseline/channeling.json").read_text()
+    )
+    assert json.loads(json.dumps(actual, default=lambda array: array.tolist())) == expected
