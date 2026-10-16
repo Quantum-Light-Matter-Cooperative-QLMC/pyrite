@@ -24,6 +24,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/dans_diffraction_oracle.py": ("dans-diffraction-oracle",),
     "checks/kephart_occupation.py": ("cr-dechanneling-collapse",),
     "checks/channeling_handoff.py": ("cr-zone-handoff-accounting",),
+    "checks/quantum_decoherence_budget.py": ("quantum-decoherence-budget",),
+    "checks/channeling_modulated_emission.py": ("channeling-modulated-incoherent-emission",),
     "checks/xraylib_cascade_oracle.py": ("characteristic-radiation",),
     "checks/detector_solid_angle_check.py": (
         "detector-eaglexo",

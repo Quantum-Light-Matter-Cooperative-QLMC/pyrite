@@ -426,6 +426,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** —
 - **Notes:** research-only normalization requirement, not validation of current coherent output. Finite-sample pair-estimator bias, correlated bunches and physical-charge convergence remain to be independently derived and tested. No existing coherence claim is advanced; human sign-off remains required.
 
+## `quantum-pair-population-normalization`
+
+- **Claim:** research claim (#501). For N electrons with reduced density matrices `ρ⁽¹⁾`, `ρ⁽²⁾` and the first-order one-photon channel operator `M̂` acting on one electron, the photon number is `⟨n⟩ = Σ_a Tr[ρ⁽¹⁾_a M̂†M̂] + Σ_{a≠b} Tr[ρ⁽²⁾_{ab}(M̂† ⊗ M̂)]`. For separable i.i.d. pairs (`ρ⁽²⁾ = ρ ⊗ ρ`) this is `N Tr(ρM̂†M̂) + N(N−1)|Tr(ρM̂)|²`. For a classical mixture of c-number-field (trajectory) states it reduces to `spxr-physical-population`. For any state `|Tr[ρ⁽²⁾(M̂†⊗M̂)]| ≤ Tr(ρ⁽¹⁾M̂†M̂)` (equal marginals), so `⟨n⟩ ≤ N² Tr(ρ⁽¹⁾M̂†M̂)`. The fermion exchange term is dropped for beam degeneracy ≪ 1.
+- **Code:** `docs/research/physics/quantum-coherent-emission.md` (research claim; no production implementation)
+- **Source:** expansion of `Â†Â` with `Â = Σ_a M̂⁽ᵃ⁾`; [research derivation](../research/physics/quantum-coherent-emission.md) §4; i.i.d. limit of `spxr-physical-population`; entangled-pair case, Karnieli et al., Phys. Rev. Lett. 127, 060403 (2021); modulated-wavepacket N² term, Zhang et al., arXiv:2401.05978
+- **Status:** unverified
+- **Checks:** implementation-context algebra. Units: `⟨n⟩` in the channel's units, N dimensionless. Limits: N = 1 has no pair term; `Tr(ρM̂) = 0` leaves the linear term; identical c-number-like pure states give N²; a classical mixture recovers `N⟨|E|²⟩ + N(N−1)|⟨E⟩|²`.
+- **Anchor:** —
+- **Notes:** Research-only normalization generalization. No estimator or production channel. Two-body evolution as `(Φ_z ⊗ Φ_z)` of independent single-electron Lindblad maps assumes uncorrelated environments (paths farther apart than the phonon/plasmon correlation lengths). Human sign-off pending.
+
 ## `zhai-material-screen-reconstruction`
 
 - **Claim:** material/plane mapping and 30/100/150 keV coherent-to-bremsstrahlung ratios reconstructed from the deposited Zhai Figure 2a arrays
