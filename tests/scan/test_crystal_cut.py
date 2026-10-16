@@ -247,7 +247,12 @@ def test_tilt_is_measured_from_the_cut_face_normal(cut, tilt):
     # The beam meets the cut face normal at the target tilt, and the face sits
     # miscut_deg off the selected (101) plane regardless of tilt.
     np.testing.assert_allclose(beam @ np.array([0.0, 0.0, 1.0]), np.cos(np.deg2rad(tilt)))
-    face_to_plane = np.rad2deg(np.arccos(np.clip(rotation @ axis / norm @ [0, 0, 1.0], -1, 1)))
+    plane_normal = rotation @ axis / norm
+    face_normal = np.array([0.0, 0.0, 1.0])
+    # atan2 stays conditioned at zero miscut; acos amplifies dot-product roundoff.
+    face_to_plane = np.rad2deg(
+        np.arctan2(np.linalg.norm(np.cross(plane_normal, face_normal)), plane_normal @ face_normal)
+    )
     assert face_to_plane == pytest.approx(cut.miscut_deg, abs=1e-9)
     if cut.miscut_deg == 0.0:
         np.testing.assert_allclose(beam @ (rotation @ axis / norm), np.cos(np.deg2rad(tilt)))

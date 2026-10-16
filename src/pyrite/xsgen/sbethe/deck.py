@@ -12,6 +12,7 @@ both catalogues happen to contain, which is the second identity namespace D2
 exists to prevent.
 """
 
+import hashlib
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -125,6 +126,17 @@ class SbetheDeck:
         )
         object.__setattr__(self, "density_g_cm3", _positive(self.density_g_cm3, "density"))
         object.__setattr__(self, "mean_excitation_eV", excitation)
+
+    @property
+    def input_sha256(self) -> str:
+        """Hash formatted physical inputs, excluding the display-only name.
+
+        SBETHE consumes eight decimal places in scientific notation. Hashing
+        these exact answers allows a released table to be reused when platform
+        roundoff changes its material digest without changing generator input.
+        """
+        answers = self.render().partition("\n")[2]
+        return hashlib.sha256(answers.encode("ascii")).hexdigest()
 
     def model_record(self) -> dict[str, Any]:
         """Return every deck input that can change the generated numbers."""

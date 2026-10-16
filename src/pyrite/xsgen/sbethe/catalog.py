@@ -9,7 +9,8 @@ from scipy.constants import Avogadro
 from ...materials import CATALOG
 from ...materials._transport_data import TRANSPORT_ELEMENTS
 from .._errors import TableNotFoundError
-from ..store import StoredTable, resolve
+from ..store import MANIFEST_SCHEMA, StoredTable, TableRequest, manifest_digest, resolve
+from .deck import SbetheDeck
 
 
 @dataclass(frozen=True)
@@ -85,7 +86,8 @@ def material_inputs_from_composition(
     # ``math``, not ``np``: this value is hashed into the table key, and
     # numpy's log/exp pick CPU-dependent kernels that differ in the last bit
     # (``pdse2`` re-keyed on the CI runner), whereas glibc's are the same on
-    # every x86-64 Linux host. Locally both agree for every catalogue key.
+    # every x86-64 Linux host. Cross-architecture drift can still occur;
+    # released input-deck pins handle it when formatted physical inputs agree.
     mean_excitation_eV = math.exp(log_i_sum / electron_sum)
     return CatalogMaterial(
         key=str(key),
@@ -121,6 +123,8 @@ def resolve_composition_table(
 
     The default selects the existing electron table. ``projectile="positron"``
     selects the separately keyed SBETHE positron output for the same material.
+    If host roundoff changes the request key, an authenticated release pin may
+    resolve the published key only when its complete physical input deck agrees.
     """
     from .generate import material_request
 
@@ -134,6 +138,8 @@ def resolve_composition_table(
         projectile=projectile,
     )
     table = resolve(request.key)
+    if table is None:
+        table = _released_table_for_inputs(material, request, projectile)
     if table is None:
         # Anonymous layers carry a case-local label. Prefer a registered medium
         # of the same composition so the preparation hint names a usable input.
@@ -157,6 +163,50 @@ def resolve_composition_table(
             f"'pyrite tables generate --code sbethe --material {key}{species}'"
         )
     return table
+
+
+def _released_table_for_inputs(
+    material: CatalogMaterial, request: TableRequest, projectile: str
+) -> StoredTable | None:
+    """Accept a pinned legacy key only for identical formatted physical input."""
+    from .release import load_release_index
+
+    index = load_release_index(projectile=projectile)
+    if index is None or not index.input_decks:
+        return None
+    deck = SbetheDeck(
+        name=material.key,
+        composition=material.composition,
+        density_g_cm3=material.density_g_cm3,
+        mean_excitation_eV=material.mean_excitation_eV,
+        band_gap_eV=material.band_gap_eV,
+        projectile=projectile,
+    )
+    expected = request.record()
+    input_sha256 = deck.input_sha256
+    for entry in index.tables:
+        if index.input_decks.get(entry.key) != input_sha256:
+            continue
+        table = resolve(entry.key)
+        if table is None:
+            continue
+        manifest = table.manifest
+        if (
+            manifest.get("manifest_sha256") != entry.manifest_sha256
+            or manifest_digest(manifest) != entry.manifest_sha256
+            or manifest.get("key") != entry.key
+            or manifest.get("schema") != MANIFEST_SCHEMA
+        ):
+            continue
+        if (
+            all(
+                manifest.get(key) == expected[key]
+                for key in ("code", "code_version", "quantity", "model")
+            )
+            and manifest.get("target", {}).get("kind") == "material"
+        ):
+            return table
+    return None
 
 
 def resolve_catalog_table(key: str, *, projectile: str = "electron") -> StoredTable:
