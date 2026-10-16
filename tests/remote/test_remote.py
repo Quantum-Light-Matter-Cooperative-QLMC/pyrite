@@ -6002,6 +6002,7 @@ def test_sync_paths_ship_checks_entry_shims_and_build_metadata():
     assert "src" in remote.SYNC_PATHS
     assert "pyproject.toml" in remote.SYNC_PATHS
     assert "README.md" in remote.SYNC_PATHS
+    assert "PYPI.md" in remote.SYNC_PATHS
     assert "LICENSE.txt" in remote.SYNC_PATHS
     assert "THIRD-PARTY-NOTICES.md" in remote.SYNC_PATHS
     assert "vendor" in remote.SYNC_PATHS

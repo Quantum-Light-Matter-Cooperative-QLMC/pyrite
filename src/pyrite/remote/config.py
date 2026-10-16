@@ -77,6 +77,7 @@ SYNC_PATHS = [
     "pyproject.toml",
     "uv.lock",
     "README.md",
+    "PYPI.md",
     "LICENSE.txt",
     "THIRD-PARTY-NOTICES.md",
     # Generator sources (ADR-0014): lets the box run `pyrite tables generate`.
