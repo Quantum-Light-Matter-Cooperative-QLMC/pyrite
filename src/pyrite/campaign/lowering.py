@@ -78,7 +78,7 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
     """Lower a public sweep; preserve exact D7 expansion for converted sweeps."""
     if sweep._legacy_source is not None:
         old_sweep, settings = sweep._legacy_source
-        return build_cases(
+        cases = build_cases(
             old_sweep,
             n_electrons=settings.n_electrons,
             n_electrons_brem=settings.n_electrons_brem,
@@ -98,6 +98,11 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             positron_transport=getattr(settings, "positron_transport", False),
             atomic_electron_deflection=getattr(settings, "atomic_electron_deflection", "kawrakow"),
             precision=getattr(settings, "precision", None),
+        )
+        from .legacy import numerics_from_legacy, physics_from_legacy
+
+        return resolve_channeling(
+            cases, physics_from_legacy(settings), numerics_from_legacy(old_sweep, settings)
         )
     if numerics is not None:
         sweep = replace(sweep, base=replace(sweep.base, numerics=numerics))

@@ -45,7 +45,16 @@ def _emission_selection(value: object, *, warn_both: bool = False) -> tuple[Emis
 
 SAMPLING_KEYS = ("n_electrons", "n_electrons_brem")
 CONVERGENCE_KEYS = ("n_families", "max_reflections", "mosaic_nodes", "mosaic_route")
+CHANNELING_KEYS = (
+    "channeling_model",
+    "channeling_plane",
+    "channeling_basis_size",
+    "channeling_bloch_cells",
+    "channeling_dz_ang",
+    "channeling_zone_max_ang",
+)
 TRANSPORT_KEYS = (
+    *CHANNELING_KEYS,
     "straggling",
     "energy_model",
     "max_dE_frac",

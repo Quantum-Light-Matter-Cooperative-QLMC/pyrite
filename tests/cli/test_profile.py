@@ -1881,3 +1881,51 @@ def test_show_line_environment_preserves_explicit_grid_precedence(tmp_path, monk
         "line environment",
         "PYRITE_ENERGY_GRID_MAX_SPACING_EV; automatic ahead of stored rows",
     )
+
+
+def test_channeling_numerics_round_trip_and_reset(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    arguments = [
+        "numerics",
+        "set",
+        "sub_100keV",
+        "--channeling-model",
+        "planar",
+        "--channeling-plane",
+        "1",
+        "-1",
+        "0",
+        "--radiative-model",
+        "uncoupled",
+        "--channeling-basis-size",
+        "12",
+        "--channeling-bloch-cells",
+        "4",
+        "--channeling-dz-ang",
+        "500",
+        "--channeling-zone-max-ang",
+        "10000",
+    ]
+    result = invoke(profile.command, arguments)
+    assert_clean_result(result, stdout="updated numerics for profile sub_100keV\n")
+    values = tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]
+    assert values["channeling_plane"] == [1, -1, 0]
+    assert values["channeling_basis_size"] == 12
+    shown = invoke(profile.command, ["numerics", "show", "sub_100keV", "-o", "json"])
+    assert_clean_result(shown)
+    fields = {
+        row["key"]: row
+        for group in json.loads(shown.stdout)["payload"]["groups"]
+        for row in group["fields"]
+    }
+    assert fields["channeling_model"]["effective"] == "planar"
+    invalid = invoke(
+        profile.command, ["numerics", "set", "sub_100keV", "--channeling-plane", "0", "0", "0"]
+    )
+    assert invalid.exit_code != 0
+    assert "nonzero" in invalid.stderr
+    reset = invoke(
+        profile.command, ["numerics", "reset", "sub_100keV", "channeling-model", "channeling-plane"]
+    )
+    assert_clean_result(reset)
+    assert "channeling_model" not in tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]

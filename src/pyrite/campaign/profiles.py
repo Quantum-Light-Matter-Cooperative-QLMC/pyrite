@@ -22,8 +22,10 @@ from typing import Any, Literal, cast
 import numpy as np
 
 from .._numerics import (
+    CHANNELING_KEYS,
     DEFAULT_INELASTIC_CUTOFF_EV,
     DEFAULT_RADIATIVE_CUTOFF_EV,
+    PHYSICS_FIELDS,
     PROFILE_NUMERICS_KEYS,
     SAMPLING_KEYS,
     TRANSPORT_KEYS,
@@ -53,6 +55,8 @@ from .inelastic_cases import (
     shell_fallback_reason,
     target_shell_materials,
 )
+from .numerics_resolution import NUMERICS_GROUPS as NUMERICS_GROUPS
+from .numerics_resolution import NumericsResolution
 from .sweep import (
     TIMEPIX3_DOMEGA_SR,
     TIMEPIX3_DTHETA_OBS_DEG,
@@ -68,73 +72,6 @@ FIDELITY_NAMES = ("full", "survey")
 DATASET_IDENTITY_SCHEMA = "cxr.dataset-identity.v1"
 CASE_CONTENT_KEY_SCHEMA = "cxr.case-content-key.v1"
 CURRENT_IDENTITY_VERSION = 1
-
-NUMERICS_GROUPS = (
-    (
-        "sampling",
-        (
-            ("n_electrons", "line electrons"),
-            ("n_electrons_brem", "bremsstrahlung electrons"),
-        ),
-    ),
-    (
-        "convergence",
-        (
-            ("n_families", "reflection families"),
-            ("max_reflections", "maximum reflections"),
-            ("mosaic_nodes", "mosaic nodes"),
-            ("mosaic_route", "mosaic route"),
-        ),
-    ),
-    (
-        "transport",
-        (
-            ("energy_model", "energy model"),
-            ("max_dE_frac", "maximum fractional energy loss"),
-            ("straggling", "straggling"),
-            ("inelastic_model", "inelastic model"),
-            ("inelastic_cutoff_eV", "inelastic cutoff (eV)"),
-            ("secondary_threshold_eV", "secondary threshold (eV)"),
-            ("elastic_model", "elastic model"),
-            ("bremsstrahlung_model", "bremsstrahlung model"),
-            ("radiative_model", "radiative model"),
-            ("radiative_cutoff_eV", "radiative cutoff (eV)"),
-            ("pair_production_model", "pair production model"),
-            ("positron_transport", "positron transport"),
-            ("atomic_electron_deflection", "atomic-electron deflection"),
-        ),
-    ),
-)
-
-
-@dataclass(frozen=True)
-class NumericsResolution:
-    """Explicit and effective result-affecting numerics with provenance."""
-
-    fidelity: str
-    explicit: Mapping[str, object]
-    effective: Mapping[str, object]
-    sources: Mapping[str, str]
-
-    def groups(self) -> list[dict[str, object]]:
-        """Return stable, user-facing groups for CLI and JSON output."""
-        return [
-            {
-                "name": group,
-                "fields": [
-                    {
-                        "key": key,
-                        "label": label,
-                        "explicit": self.explicit.get(key),
-                        "effective": self.effective[key],
-                        "source": self.sources[key],
-                    }
-                    for key, label in fields
-                ],
-            }
-            for group, fields in NUMERICS_GROUPS
-        ]
-
 
 # Case-dict fields excluded from the per-case content key. EVERYTHING else in a
 # resolved ``build_cases`` case dict determines the stored spec/brem arrays and
@@ -356,6 +293,12 @@ def resolve_numerics(
         "positron_transport": physics.positron_transport,
         "atomic_electron_deflection": physics.atomic_electron_deflection,
     }
+    effective.update(
+        {
+            key: getattr(physics if key in PHYSICS_FIELDS else numerics, key)
+            for key in CHANNELING_KEYS
+        }
+    )
     sources = {
         key: (
             "fidelity"
@@ -590,6 +533,11 @@ def _identity_v1(
     # coherent checkpoints are intentionally orphaned (rev-and-re-run). The bunch
     # fields (bunch_length_fs etc.) keep their own divergence rule above.
     settings_payload = resolved["settings"]
+    # Channeling is opt-in: strip every new inert field before hashing.
+    channeling = {key: settings_payload.pop(key, None) for key in CHANNELING_KEYS}
+    if channeling["channeling_model"] not in (None, "off"):
+        resolved["channeling"] = channeling
+        resolved["channeling_model"] = CHANNELING_MODEL
     # Fixed-N payloads retain their exact historical bytes. In adaptive mode
     # the requested policy owns the budget; the unused fixed defaults and the
     # realized count do not participate in dataset identity.

@@ -115,6 +115,8 @@ def physics_from_legacy(settings: Any) -> Physics:
         pair_production_model=getattr(settings, "pair_production_model", None),
         positron_transport=getattr(settings, "positron_transport", False),
         atomic_electron_deflection=getattr(settings, "atomic_electron_deflection", "kawrakow"),
+        channeling_model=getattr(settings, "channeling_model", "off"),
+        channeling_plane=getattr(settings, "channeling_plane", None),
     )
 
 
@@ -127,6 +129,10 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
         brem_trials=int(
             getattr(settings, "n_electrons_brem", 100) if brem is None else _values(brem)[0]
         ),
+        channeling_basis_size=getattr(settings, "channeling_basis_size", 16),
+        channeling_bloch_cells=getattr(settings, "channeling_bloch_cells", 16),
+        channeling_dz_ang=getattr(settings, "channeling_dz_ang", 250.0),
+        channeling_zone_max_ang=getattr(settings, "channeling_zone_max_ang", None),
         precision=getattr(settings, "precision", None),
         energy_bins=old_sweep.energy_bins,
         cxr_chunk=old_sweep.spec_chunk,
