@@ -47,6 +47,24 @@ intel = [
     "dpctl>=0.22.1",
     "dpnp>=0.20.0",
 ]
+# Runtime of ``pyrite.plots`` (and lazy matplotlib figures in ``perf``/``validation``).
+plots = [
+    "altair>=6.2.2",
+    "datashader>=0.19.1",
+    "imageio>=2.37.4",
+    "imageio-ffmpeg>=0.6.0",
+    "kaleido>=1.3.0",
+    "matplotlib>=3.11.0",
+    "plotly>=6.8.0",
+    "vl-convert-python>=1.9.0.post1",
+]
+# Runtime of the shipped marimo apps (``pyrite app ... launch|export``).
+apps = [
+    "pyrite-mc[plots]",
+    "anywidget>=0.11.0",
+    "marimo[recommended]>=0.23.16",
+    "vegafusion>=2.0.3",
+]
 
 [project.scripts]
 pyrite = "pyrite.cli:main"
@@ -105,20 +123,12 @@ dev = [
     { include-group = "test" },
     { include-group = "lint" },
 ]
+# Contributor checkout: the shipped app/plot extras plus notebook conversion
+# tools nothing in ``src/`` imports.
 notebooks = [
-    "altair>=6.2.2",
-    "anywidget>=0.11.0",
-    "datashader>=0.19.1",
-    "imageio>=2.37.4",
-    "imageio-ffmpeg>=0.6.0",
-    "kaleido>=1.3.0",
-    "marimo[recommended]>=0.23.16",
-    "matplotlib>=3.11.0",
+    "pyrite-mc[apps]",
     "nbconvert>=7.17.1",
     "pandoc>=2.4",
-    "plotly>=6.8.0",
-    "vegafusion>=2.0.3",
-    "vl-convert-python>=1.9.0.post1",
 ]
 
 [tool.pytest.ini_options]
@@ -508,8 +518,8 @@ indent-style = "space"
 [tool.uv]
 cache-dir = "/tmp/pyrite-uv-cache"
 # Every `uv run`/`uv sync` (including a fresh worktree's first `uv run`) gets
-# all contributor groups; tests import notebook-group packages such as plotly.
-# Runtime-only installs pass `--no-default-groups`.
+# all contributor groups; the `notebooks` group pulls `pyrite-mc[apps]`, which
+# tests need (plotly, marimo). Runtime-only installs pass `--no-default-groups`.
 default-groups = "all"
 conflicts = [
     [

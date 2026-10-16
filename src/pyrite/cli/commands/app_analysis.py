@@ -40,6 +40,7 @@ from ...console import output as _cli_core
 from ...paths import app_dir
 from .. import _completion as _cli_completion
 from .._deprecations import canonical_option
+from .._extras import require_cli_extra
 
 NOTEBOOK = str(app_dir() / "analysis_app.py")
 TUNNEL_PORT = 2718
@@ -85,6 +86,7 @@ def _smoke_command(material, output):
 def _launch(
     material, *, edit=False, watch=False, smoke=False, acp=False, tunnel=False, no_token=False
 ):
+    require_cli_extra("apps", feature="pyrite app analysis launch")
     cmd = _command(material, edit=edit, watch=watch, tunnel=tunnel, no_token=no_token)
     print(f"launching {NOTEBOOK} ({'edit' if edit else 'run'}) with material={material}")
     if tunnel:

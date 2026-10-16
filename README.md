@@ -85,6 +85,23 @@ Intel support is provisional, and FP64 operations are currently unsupported.
 [execution and acceleration](docs/computation/execution-and-acceleration.md)
 for backend, precision, transport-core, and memory-policy controls.
 
+### Plotting and interactive apps
+
+The base package runs simulations and the CLI without any plotting stack. Two
+extras add it; combine them with a GPU extra as `pyrite-mc[apps,nvidia]`:
+
+| Extra   | Adds                                                     |
+| ------- | -------------------------------------------------------- |
+| `plots` | `pyrite.plots` (matplotlib, Altair, Plotly, datashader)  |
+| `apps`  | `plots` plus marimo for the `pyrite app` commands        |
+
+```bash
+uv tool install "pyrite-mc[apps]"
+```
+
+Without the extra, `pyrite app` commands and `pyrite.plots` backends exit with
+an install hint naming it. A checkout's plain `uv sync` already includes both.
+
 ### From a checkout
 
 To work from source:

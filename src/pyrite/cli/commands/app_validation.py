@@ -26,6 +26,7 @@ import click
 from ..._acp import running_acp
 from ...console import output as _cli_core
 from ...paths import app_dir
+from .._extras import require_cli_extra
 
 NOTEBOOK = str(app_dir() / "validation_app.py")
 TUNNEL_PORT = 2718
@@ -48,6 +49,7 @@ def _command(*, edit=False, watch=False, tunnel=False):
 
 
 def _launch(*, edit=False, watch=False, acp=False, tunnel=False):
+    require_cli_extra("apps", feature="pyrite app validation launch")
     cmd = _command(edit=edit, watch=watch, tunnel=tunnel)
     if tunnel:
         print(f"launching {NOTEBOOK} ({'edit' if edit else 'run'})")
@@ -67,6 +69,7 @@ def _launch(*, edit=False, watch=False, acp=False, tunnel=False):
 
 
 def _export(outdir=None, ne=20_000, ne_brem=200, ne_supp=200):
+    require_cli_extra("plots", "matplotlib", feature="pyrite app validation export")
     af = importlib.import_module("pyrite.validation.anchor_figures")
 
     try:
