@@ -4,13 +4,23 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 
 ## `tr-interface-energy-scale`
 
-- **Claim:** Relativistic vacuum/material single-interface TR energy scale `W ≈ alpha gamma hbar omega_p / 3` and photon roll-off scale of order `gamma hbar omega_p`; illustrative research estimate only
+- **Claim:** Relativistic vacuum/material single-interface TR energy scale `W ≈ alpha gamma hbar omega_p / 3` and photon roll-off scale of order `gamma hbar omega_p`
 - **Code:** `docs/research/physics/transition-radiation-recommendations.md` (research claim; no production implementation)
 - **Source:** PDG 2020, Passage of Particles Through Matter, §34.7.3, Eq. (34.45)
 - **Status:** unverified
-- **Checks:** Required: relativistic assumptions, units, vacuum/matched-medium limit, distinction from finite-foil interference and detected photon yield; low-energy extrapolation explicitly excluded
-- **Anchor:** None; not independently validated or a production acceptance bound
-- **Notes:** [Recommendation and assumptions](../research/physics/transition-radiation-recommendations.md). Does not close the proposed `cr-transition-radiation-bound` item: that requires an application-specific spectral-angular calculation through detector acceptance. Human sign-off pending.
+- **Checks:** Exact single-interface emission (`tr-detected-omission-bound` solver) with Drude `eps`, integrated over the forward hemisphere and all photon energies: `W / (alpha gamma hbar omega_p / 3)` = 0.955 at `gamma = 40`, 0.990 at `gamma = 197` (deficit ~`2/gamma`); matched medium (`omega_p -> 0`) gives zero
+- **Anchor:** `tests/montecarlo/test_transition_radiation.py::test_interface_energy_scale_from_the_exact_solution` (consistency with the exact solution, not an external reference)
+- **Notes:** Relativistic estimate with an `O(1/gamma)` correction; must not be extrapolated to `T -> 0`. A total-energy scale only: not a photon count and not a bound on any detected band (see [Transition radiation](../physics/radiation-physics/transition-radiation.md)). Truncating the band at `3 hbar omega_p` loses ~40% at `gamma = 40`. Human sign-off pending.
+
+## `tr-detected-omission-bound`
+
+- **Claim:** Exact classical TR of a straight, uniform-velocity charge through a planar stack (boundary-value solve of tangential `E`/`H` continuity, any `eps`, speed, incidence, emission direction, layer count) and the per-observable omission bound `b = max_E T(E)/S(E) <= target_rse / 3` for positive linear detector responses
+- **Code:** `montecarlo/spectrum/transition_radiation.py::planar_transition_radiation`, `ginzburg_frank_interface`, `medium_dielectric`, `omission_tolerance`, `transition_radiation_omission`; study `checks/transition_radiation_omission.py`
+- **Source:** Ginzburg & Tsytovich 1990, Ch. 2 (Ginzburg–Frank boundary problem); Jackson 3rd ed. §13.7, Eqs. 13.91–13.92; DeRaad, Tsai & Erber, Phys. Rev. D 18, 2152 (1978)
+- **Status:** unverified
+- **Checks:** Required: field normalization (`phi`, `E_p`, `H_p`, `1/|v_z|`), far-field factor `omega cos^2 theta |a|^2 / (16 pi^4)`, `eps` sign convention vs `chi_0`; limits: closed Ginzburg–Frank form at normal incidence (both senses), conductor image charge at oblique incidence, zero contrast, vanishing/opaque/transparent film, Jackson 13.91 limit; positivity argument for the bound and the `rse/3` rule
+- **Anchor:** `tests/montecarlo/test_transition_radiation.py` (analytic limits); decision evidence `checks/transition_radiation_omission.py`
+- **Notes:** Issue #102. Decisions per application row are in [Transition radiation](../physics/radiation-physics/transition-radiation.md): keV X-rays from tens-of-keV beams omitted (`b <= 1.5e-4`); EUV, forward MeV soft X-ray, 100 MeV and multilayer radiators escalated to #103. The DTR/PXR amplitude ratio on that page is a screening estimate outside this claim. Human sign-off pending.
 
 ## `coherent-line-spectrum`
 
