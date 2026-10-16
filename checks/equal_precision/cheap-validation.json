@@ -1,0 +1,124 @@
+{
+  "schema": "pyrite.equal-precision.cheap-validation-protocol.v1",
+  "purpose": "Bounded production-FP64 step/hard-cutoff sensitivity and CPU/GPU bookkeeping; not final convergence or T(epsilon).",
+  "scenes": [
+    "si-300-100um-0deg",
+    "w-300-10um-0deg",
+    "si-800-100um-0deg",
+    "w-800-10um-0deg",
+    "si-100-1um-0deg",
+    "w-100-100um-75deg"
+  ],
+  "manifest_text_sha256": "58c74807dbb80cf425d5f8d9d8d9975cdf37b012c3838d17bea3460e3d73ce2e",
+  "arms": {
+    "baseline": {
+      "max_de_frac": 0.05,
+      "cutoff_eV": 1000
+    },
+    "half-step": {
+      "max_de_frac": 0.025,
+      "cutoff_eV": 1000
+    },
+    "half-hard-cutoff": {
+      "max_de_frac": 0.05,
+      "cutoff_eV": 500
+    }
+  },
+  "convergence": {
+    "histories": 500,
+    "seeds": [
+      65001,
+      65002
+    ]
+  },
+  "backend": {
+    "histories": 64,
+    "seeds": [
+      66001,
+      66002
+    ]
+  },
+  "geant4": {
+    "histories": 64,
+    "seed": 67001,
+    "physics": "empenelope",
+    "executable": "/home/aamador/pyrite-510-benchmarks/benchmark-geant4-v2/build/TestEm5",
+    "executable_sha256": "fde4584d62bcc7839dda5a15a6dc52c1fdb925f0d2beaa892f15d3ff91c4b544",
+    "role": "configuration/threshold refresh only; no cross-engine equivalence inference"
+  },
+  "comparisons": {
+    "joint_confidence": 0.95,
+    "family_size": 288,
+    "fraction_absolute_margin": 0.005,
+    "energy_margin_fraction_of_beam": 0.005,
+    "photon_absolute_margins": {
+      "photons_ge10kev": 0.000336,
+      "photons_10_50kev": 0.00022,
+      "photons_50_100kev": 6.4e-05,
+      "photons_ge100kev": 5.2e-05
+    },
+    "interpretation": "Diagnostic fixed tolerances only; not one-third target-RSE qualification. Reused Si planning absolute photon tolerances for all six scenes before outcomes."
+  },
+  "budget": {
+    "gpu_allocations": 1,
+    "gpu_minutes": 10,
+    "cpu_allocations": 1,
+    "cpu_minutes": 5,
+    "analysis_docs_minutes": 5,
+    "cpus_per_task": 1,
+    "gpu_memory_gib": 24,
+    "cpu_memory_gib": 8,
+    "per_process_timeout_seconds": 90,
+    "no_automatic_retries": true
+  },
+  "validation_sources": {
+    "__init__.py": "6cfde3d35ddd05b6a3fecb1ccd2d66b7e7a9f8eb4c2ae687962ff2a5eb0e9424",
+    "_jit_annihilation.py": "dc86491712be2d8cf7c8173cce4a93259112fd1f2f225d01fbc1e89332ea9514",
+    "_jit_device.py": "0047232fd8b1d89c94ad0d73626a76cde9d7a563eecf3392dce787fb23694af6",
+    "_jit_kernel.py": "7e5698666553877362c4a839b1ed55950e095287a79d2e5a74e3620563371796",
+    "_jit_launch.py": "f13d26755f87dda05d455c71c2c038b0aa472615eb312064000a2893d25370ca",
+    "_jit_lut_kernel.py": "0af7c39ff5649ab0263dcabf70d635e86c07d3f9c018b0de39cecc68f60d0fd9",
+    "_jit_radiative.py": "dd007f2e351dd9c9fb78e4c20819ec0be12a98379e271bf32682a304529322b4",
+    "_jit_radiative_device.py": "a5d6090478a27367a98fbe7808494ae2b3304394335076b54de07981df285ef2",
+    "_jit_shell_device.py": "e2334192e1311de27188f634c3f2861b58b06ecb9ddc6af48b61d11e925b6866",
+    "annihilation.py": "a415c2b933f7d0b09337027ad7b4e825d20c81b066f22817ff60597c9571caa3",
+    "api.py": "7f30367dc504d2045d35115701814ae83ea5d27e979a7442c23b548f88acfa2f",
+    "arguments.py": "0a55f7213f1fcfaf7fb61314b88d2d0186513899cac7ef54263a11ef5184ff59",
+    "atomic_electrons.py": "94eb2de98d56204bafa81c899c4e8a7bff6a3d7058505c81c2a1334edd843680",
+    "batching.py": "f0c0ed8cee9aaebdb915d892037b276400f68eeb443b88ba54896dcb5007fb22",
+    "beam_entry.py": "d66c167da12c1f7ee431ad2acc63fcffab3e299a9db82651f5361f665caa98c8",
+    "core_geometry.py": "7ee41b3fdcaab0d704c7b1a62d1f07c16e8738268b1e296ebd1f82524b10a1d0",
+    "cores.py": "04bbfb85d24567b9da35a92c121c6078c18e004abac1a93780833788af74ebad",
+    "dielectric.py": "cfb02874fe15bf45af0c372e3269a4bddec4a729e00b2862679691c4043187da",
+    "events.py": "ba2a68a2df4156043051d4a0639b4263b284b04a14f8e2ceed66adc99380ead1",
+    "hard_inelastic.py": "b96ed1bd9bf6849f8c2aab01872405f266d6d1d362fe2451438d30647ba5cca0",
+    "hard_radiative.py": "ddffe839cdc7ad6e0218836e37d6ac349c2c7739fdbc545a2bcaaab56ff043b5",
+    "inelastic.py": "7d6a407d05b60515cd0b561910e124e2dcb9e3fd2ce3e709a8b27dadaf891fcf",
+    "kinematics.py": "0faf3257f555679e033a37b5a70c2cc8d3b999ba1d5da7775d3a3099fdea962a",
+    "layer_tables.py": "841f13be42b4bad0c748ada7afd16afab44d386e84eedba19232d9189d092c75",
+    "lut.py": "ecb28037156893437587351a42634c695bcd029f8fda1bf33b0df8250513f616",
+    "pair_production.py": "82a394f92d1534089332fc1f628f352524f3e5b28f6a89be6f22c3c50bec8e39",
+    "scattering.py": "4afbc7646ba865cc048f8d683d81ac14414fcf7881d893b28718836f46f6a529",
+    "secondaries.py": "6b1d351b53f7974cef5f1331577ec47df12baa8cf52673a6af24e166da154347",
+    "shell_gos.py": "f7e975bfc65c37bfd0c9d502ee800a7a973a46ffd2c69b711d0840fa68c20dae",
+    "shell_oscillators.py": "cf3ba416bfd4c7a2aee3d2faa5e4cf6a87f99cbbe5b5cf9a919c16e6d23d4d07",
+    "shell_partition.py": "9a3da5000bff7fb78be95e0a95f4476af14305f6a393a8d4193ddf704d48b3c3",
+    "shell_rates.py": "6ac81f8486f62044930eff4922e394cbf69d69e82b39362d889d49e3cc66eec1",
+    "shell_sampling.py": "dc40deab9bf91679f7fcdfdedb0054ce3bd033633cbc349015bf504715942523",
+    "shell_transport.py": "548763e7466163580eae4f80ba54bb1b38e1623c664250943cbb514defe804c5",
+    "stopping.py": "dd450ff890f9ad6912e528b435488c2110c3aaea8ff65441fd3846bad81a6d3b",
+    "straggling.py": "52c9767bca9af7c5d6c4a345ac95ba62f9116e8c1d937bb98cb89841c0ae8a45",
+    "benchmark_validation.py": "c98be2397138d1a76588c0495685ab8ef392fcdc1bcbfb1690be85a40ec5b84a",
+    "paired_equivalence.py": "fe1afade61bf85687d477aee69694ee569fe4f410cf256fddc78b79920acb24a",
+    "precision_checks.py": "beb725cf4cfbe5b06d6d6bf2f1ddad8b21dd7dc420e1da52f6c06ca909b74933",
+    "pyrite_adapter.py": "5a167e6339fdd9f8da5b47c3a09ed99a65ad245a6933af15781394bc34da1c3f"
+  },
+  "limitations": [
+    "Only two step/hard-cutoff levels; no asymptotic convergence claim.",
+    "Electron tracking threshold remains10keV; no electron-cutoff sweep.",
+    "Table grids audited for domain only; no table-density/quadrature convergence.",
+    "CPU/GPU uses productionFP64 only; quotient32 held-out family remains separate.",
+    "All PyRITE runs include full-workload warmup and CXR-call/trajectory audit; times diagnostic only.",
+    "Do not match Geant4 and PyRITE trajectories by integer seed."
+  ]
+}
