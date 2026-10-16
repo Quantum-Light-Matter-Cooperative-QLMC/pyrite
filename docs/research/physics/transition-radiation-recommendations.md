@@ -31,7 +31,7 @@ W_{\mathrm{TR}} \simeq \frac{\alpha}{3}\gamma\hbar\omega_p,
 
 Here $T$ is electron kinetic energy, $m_e c^2$ its rest energy, $\alpha$ the fine-structure constant, and $\hbar\omega_p$ the material plasma energy. The associated photon roll-off scale is of order $\gamma\hbar\omega_p$, not a sharp cutoff. The simple plasma description suppresses detailed dielectric structure and absorption edges; a finite foil also requires interference between its two surfaces.
 
-`Validation: tr-interface-energy-scale` — research claim, ledgered in the [core physics ledger](../../validation/ledger-core-coherent-physics.md) and checked against the exact single-interface solution (deficit about $2/\gamma$). The expression applies to a relativistic interface estimate, not to the nonrelativistic limit. In the matched-medium limit the boundary contribution must vanish; the corresponding material-vacuum estimate vanishes as the plasma energy tends to zero. Do not extrapolate this formula to $T\to0$.
+`Validation: tr-interface-energy-scale` — research claim, ledgered in the [core physics ledger](../../validation/ledger-core-coherent-physics.md) and checked against the exact single-interface solution (deficit about $1.8/\gamma$). The expression applies to a relativistic interface estimate, not to the nonrelativistic limit. In the matched-medium limit the boundary contribution must vanish; the corresponding material-vacuum estimate vanishes as the plasma energy tends to zero. Do not extrapolate this formula to $T\to0$.
 
 Using an illustrative Si-like plasma energy of 31 eV and $m_ec^2=0.51099895$ MeV:
 
@@ -70,9 +70,9 @@ The priority is conditional:
 
 | Application | Recommended TR priority | Decision (#102) |
 | --- | --- | --- |
-| Current tens-of-keV transport / typical keV X-rays | Omission study first; implementation can wait if the bound passes | Omitted for observables ≥ 1 keV (bias ≤ 1.5e-4); 0.3--1 keV per scene |
+| Current tens-of-keV transport / typical keV X-rays | Omission study first; implementation can wait if the bound passes | Omitted for observables ≥ 1 keV (bias ≤ 2.5e-4); 0.3--1 keV per scene |
 | Optical/EUV radiation at the same electron energy | Reassess immediately | EUV down to the continuum floor escalated to #103; optical is below the modelled band |
-| MeV thin-film soft-X-ray or channeling-line studies | Include or demonstrate a detector-specific exclusion | Escalated to #103 below the scene's crossover (1.8 keV at 3 MeV, 6.2 keV at 10 MeV, forward); channeling lines bounded by `cr-transition-radiation-bound` |
+| MeV thin-film soft-X-ray or channeling-line studies | Include or demonstrate a detector-specific exclusion | Escalated to #103 below the scene's crossover (1.8 keV at 3 MeV, 7.3 keV at 10 MeV, forward); channeling lines bounded by `cr-transition-radiation-bound` |
 | General transport approaching 100 MeV | Address major bulk transport deficiencies first; assess TR alongside spectral observables | Escalated to #103, gated on #439/#440 |
 | Purpose-built multilayer radiator | Essential source physics | Escalated to #103 |
 

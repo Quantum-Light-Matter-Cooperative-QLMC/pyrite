@@ -140,14 +140,14 @@ def ginzburg_frank_interface(eps, beta, theta_rad, photon_energy_eV) -> np.ndarr
     )
 
 
-def _outgoing_root(value):
-    root = np.sqrt(value)
+def _outgoing_root(value, xp=np):
+    root = xp.sqrt(value)
     flip = (root.imag < 0) | ((root.imag == 0) & (root.real < 0))
-    return np.where(flip, -root, root)
+    return xp.where(flip, -root, root)
 
 
-def _cross(a, b):
-    return np.stack(
+def _cross(a, b, xp=np):
+    return xp.stack(
         (
             a[..., 1] * b[..., 2] - a[..., 2] * b[..., 1],
             a[..., 2] * b[..., 0] - a[..., 0] * b[..., 2],
@@ -163,7 +163,9 @@ def planar_transition_radiation(
     velocity,
     layers: Sequence[tuple[complex | np.ndarray, float]],
     substrate_eps=1.0,
-) -> np.ndarray:
+    *,
+    xp=np,
+):
     """Transition radiation into the vacuum above a planar stack [photons/eV/sr].
 
     Parameters
@@ -184,10 +186,14 @@ def planar_transition_radiation(
     substrate_eps
         Permittivity of the semi-infinite medium below the stack; ``1`` for a
         free-standing film.
+    xp
+        Array module for the solve (NumPy, or CuPy for the CUDA backend). The
+        arithmetic is complex128 on every backend; inputs are validated on the
+        host.
 
     Returns
     -------
-    numpy.ndarray
+    xp.ndarray
         Spectral-angular yield per crossing electron, broadcast over the
         energy, direction and velocity shapes, summed over polarization.
 
@@ -204,19 +210,23 @@ def planar_transition_radiation(
     speed = np.linalg.norm(v, axis=-1)
     if np.any(speed >= 1.0) or np.any(v[..., 2] == 0.0):
         raise ValueError("velocity must satisfy |v| < 1 and v_z != 0")
-    omega = np.broadcast_to(energy, shape).ravel()
-    n = np.broadcast_to(n, (*shape, 3)).reshape(-1, 3)
-    v = np.broadcast_to(v, (*shape, 3)).reshape(-1, 3)
+    omega = xp.asarray(np.broadcast_to(energy, shape).ravel())
+    n = xp.asarray(np.broadcast_to(n, (*shape, 3)).reshape(-1, 3))
+    v = xp.asarray(np.broadcast_to(v, (*shape, 3)).reshape(-1, 3))
     batch = omega.size
-    media = [np.broadcast_to(np.asarray(substrate_eps, dtype=complex), shape).ravel()]
-    media += [np.broadcast_to(np.asarray(e, dtype=complex), shape).ravel() for e, _ in layers]
-    media.append(np.ones(batch, dtype=complex))
+
+    def _medium(eps):
+        host = eps.get() if hasattr(eps, "get") else eps  # CuPy -> host for broadcasting
+        return xp.asarray(np.broadcast_to(np.asarray(host, dtype=complex), shape).ravel())
+
+    media = [_medium(substrate_eps)] + [_medium(e) for e, _ in layers]
+    media.append(xp.ones(batch, dtype=complex))
     # Interface heights in 1/eV (hbar = c = 1).
     z_if = np.concatenate([[0.0], np.cumsum([float(d) for _, d in layers])]) / HBARC_EV_ANG
     n_media = len(media)
     k_perp = omega[:, None] * n[:, :2]
-    k_perp2 = np.sum(k_perp**2, axis=-1)
-    q = (omega - np.sum(k_perp * v[:, :2], axis=-1)) / v[:, 2]
+    k_perp2 = xp.sum(k_perp**2, axis=-1)
+    q = (omega - xp.sum(k_perp * v[:, :2], axis=-1)) / v[:, 2]
     charge = np.sqrt(ALPHA_FS)
 
     columns: dict[tuple[int, int], int] = {}
@@ -225,29 +235,30 @@ def planar_transition_radiation(
             if (wave == +1 and j > 0) or (wave == -1 and j < n_media - 1):
                 columns[(j, wave)] = 2 * len(columns)
     size = 2 * len(columns)
-    matrix = np.zeros((batch, size, size), dtype=complex)
-    rhs = np.zeros((batch, size), dtype=complex)
+    matrix = xp.zeros((batch, size, size), dtype=complex)
+    rhs = xp.zeros((batch, size), dtype=complex)
 
-    lam = [_outgoing_root(eps * omega**2 - k_perp2) for eps in media]
+    lam = [_outgoing_root(eps * omega**2 - k_perp2, xp) for eps in media]
     unit = np.eye(2)
     free = {}
     for (j, wave), _ in columns.items():
         kz = wave * lam[j]
-        wavevector = np.concatenate([k_perp, kz[:, None]], axis=-1)
+        wavevector = xp.concatenate([k_perp, kz[:, None]], axis=-1)
         fields = []
         for comp in range(2):
-            e_t = np.broadcast_to(unit[comp], (batch, 2)).astype(complex)
-            e_z = -np.sum(k_perp * e_t, axis=-1) / kz
-            e_vec = np.concatenate([e_t, e_z[:, None]], axis=-1)
-            fields.append((e_vec, _cross(wavevector, e_vec) / omega[:, None]))
+            e_t = xp.broadcast_to(xp.asarray(unit[comp], dtype=complex), (batch, 2))
+            e_z = -xp.sum(k_perp * e_t, axis=-1) / kz
+            e_vec = xp.concatenate([e_t, e_z[:, None]], axis=-1)
+            fields.append((e_vec, _cross(wavevector, e_vec, xp) / omega[:, None]))
         free[(j, wave)] = fields
     particular = []
+    v_complex = v.astype(complex)
     for eps in media:
-        wavevector = np.concatenate([k_perp, q[:, None].astype(complex)], axis=-1)
-        denom = np.sum(wavevector**2, axis=-1) - eps * omega**2
-        phi = 4.0 * np.pi * charge / (np.abs(v[:, 2]) * eps * denom)
-        e_vec = 1j * phi[:, None] * (eps[:, None] * omega[:, None] * v - wavevector)
-        h_vec = 1j * (eps * phi)[:, None] * _cross(wavevector, v.astype(complex))
+        wavevector = xp.concatenate([k_perp, q[:, None]], axis=-1).astype(complex)
+        denom = xp.sum(wavevector**2, axis=-1) - eps * omega**2
+        phi = 4.0 * np.pi * charge / (xp.abs(v[:, 2]) * eps * denom)
+        e_vec = 1j * phi[:, None] * (eps[:, None] * omega[:, None] * v_complex - wavevector)
+        h_vec = 1j * (eps * phi)[:, None] * _cross(wavevector, v_complex, xp)
         particular.append((e_vec, h_vec))
 
     for i, z0 in enumerate(z_if):
@@ -257,21 +268,21 @@ def planar_transition_radiation(
                 if (j, wave) not in columns:
                     continue
                 z_ref = z_if[j - 1] if wave == +1 else z_if[j]
-                phase = np.exp(1j * wave * lam[j] * (z0 - z_ref))
+                phase = xp.exp(1j * wave * lam[j] * (z0 - z_ref))
                 for comp, (e_vec, h_vec) in enumerate(free[(j, wave)]):
                     col = columns[(j, wave)] + comp
                     matrix[:, row : row + 2, col] += side * e_vec[:, :2] * phase[:, None]
                     matrix[:, row + 2 : row + 4, col] += side * h_vec[:, :2] * phase[:, None]
             e_vec, h_vec = particular[j]
-            phase = np.exp(1j * q * z0)[:, None]
+            phase = xp.exp(1j * q * z0)[:, None]
             rhs[:, row : row + 2] -= side * e_vec[:, :2] * phase
             rhs[:, row + 2 : row + 4] -= side * h_vec[:, :2] * phase
 
-    solution = np.linalg.solve(matrix, rhs[..., None])[..., 0]
+    solution = xp.linalg.solve(matrix, rhs[..., None])[..., 0]
     top = columns[(n_media - 1, +1)]
     e_t = solution[:, top : top + 2]
-    e_z = -np.sum(k_perp * e_t, axis=-1) / lam[-1]
-    power = np.sum(np.abs(e_t) ** 2, axis=-1) + np.abs(e_z) ** 2
+    e_z = -xp.sum(k_perp * e_t, axis=-1) / lam[-1]
+    power = xp.sum(xp.abs(e_t) ** 2, axis=-1) + xp.abs(e_z) ** 2
     yield_ = omega * n[:, 2] ** 2 * power / (16.0 * np.pi**4)
     return yield_.reshape(shape)
 
@@ -346,7 +357,8 @@ def transition_radiation_omission(
     maximum to the source energies the observable can draw on.
 
     A net line after sideband subtraction is not non-negative in this sense:
-    its bias is at most ``c B / L`` for window background ``B`` and net line
+    with a continuum-only ``source_density`` its bias is at most ``c B / L``
+    (otherwise only ``c (1 + B / L)``) for window background ``B`` and net line
     ``L``. A coherent signal is not covered: the TR amplitude can interfere
     with it (see the physics page).
 
@@ -355,13 +367,16 @@ def transition_radiation_omission(
     energy = np.asarray(photon_energy_eV, dtype=float)
     source = np.asarray(source_density, dtype=float)
     tr = np.broadcast_to(np.asarray(transition_radiation, dtype=float), energy.shape)
-    keep = np.isfinite(source) & (source > 0.0)
+    keep = np.ones(energy.shape, dtype=bool)
     if band_eV is not None:
         keep &= (energy >= band_eV[0]) & (energy <= band_eV[1])
     if not np.any(keep):
-        raise ValueError("no positive source density in the band")
-    ratio = np.full(energy.shape, np.nan)
-    ratio[keep] = tr[keep] / source[keep]
+        raise ValueError("no energies in the band")
+    # A non-positive or undefined source with any TR left is an unbounded bias.
+    ratio = np.full(energy.shape, np.inf)
+    positive = np.isfinite(source) & (source > 0.0)
+    ratio[positive] = tr[positive] / source[positive]
+    ratio[~positive & (tr == 0.0)] = 0.0
     bound = float(np.max(ratio[keep]))
     tolerance = omission_tolerance(target_rse)
     return TransitionRadiationOmission(

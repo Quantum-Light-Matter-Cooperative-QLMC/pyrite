@@ -41,17 +41,17 @@ summed over polarization. Interference between interfaces, formation zones, abso
 
 `Validation: tr-interface-energy-scale`
 
-Integrated over the forward hemisphere and all photon energies with the Drude $\varepsilon=1-(\omega_p/\omega)^2$, the exact single-interface emission gives $W/(\alpha\gamma\hbar\omega_p/3)=0.955$ at $\gamma=40$ and $0.990$ at $\gamma=197$: the PDG estimate {cite:p}`zyla2020passage` holds with an $O(1/\gamma)$ deficit (about $2/\gamma$) from large-angle, low-frequency emission. Truncating the photon band at $3\hbar\omega_p$ loses about 40% at $\gamma=40$, because the spectrum $E\,dN/dE\simeq(\alpha/\pi)\ln(\gamma^2\omega_p^2/\omega^2)$ is logarithmic below $\gamma\hbar\omega_p$. The scale is a total-energy statement only: it is not a photon count and not a bound on any detected band.
+Integrated over the forward hemisphere and all photon energies with the Drude $\varepsilon=1-(\omega_p/\omega)^2$, the exact single-interface emission gives $W/(\alpha\gamma\hbar\omega_p/3)=0.955$ at $\gamma=40$ and $0.991$ at $\gamma=197$: the PDG estimate {cite:p}`zyla2020passage` holds with an $O(1/\gamma)$ deficit (about $1.8/\gamma$) from large-angle, low-frequency emission. Emission below $3\hbar\omega_p$ carries about 35% of $W$ at $\gamma=40$, because the spectrum $E\,dN/dE\simeq(\alpha/\pi)\ln(\gamma^2\omega_p^2/\omega^2)$ is logarithmic below $\gamma\hbar\omega_p$. The scale is a total-energy statement only: it is not a photon count and not a bound on any detected band.
 
 ## Omission bound for a detected observable
 
 Let $S(E)$ be the production density the detector scores at the observation direction and $T(E)$ an upper bound on the TR density over the acceptance. If $T(E)\le c\,S(E)$ at every energy an observable can draw on, then any positive linear response $R$ (filters, quantum efficiency, resolution and redistribution, solid-angle integration) gives $R[T]\le c\,R[S]$ pointwise. The relative change of every non-negative observable (window counts, sidebands, totals, a line/background ratio's background) is therefore at most $c$. The study takes $S$ as the bremsstrahlung continuum alone; lines and CXR only lower $c$.
 
-$T$ is $3\times$ the maximum single-crossing TR over speeds $\le\beta_0$, crossing directions, and five acceptance directions (centre and half the 16.6° polar span in polar angle and azimuth). The factor 3 counts entry, at most one exit per primary through a flat face, and escaping secondaries (fewer than one per primary above the photon energy). Where transport is diffusive (tens of keV), every crossing direction up to 88° from the normal and both senses are allowed, together with the facing layer alone (reversing electrons) and the whole stack (straight-through electrons). For MeV films the crossing directions stay within $3\theta_0$ (Highland) of the beam.
+$T$ is $5\times$ the maximum single-crossing TR over speeds $\le\beta_0$, crossing directions, and five acceptance directions (centre and half the 16.6° polar span in polar angle and azimuth). A primary crosses a flat face at most twice; an entry and an exit through the same face add as amplitudes, at most $4\times$ one crossing; escaping secondaries above the photon energy add fewer than one more crossing per primary (asserted, not computed). TR rises monotonically with speed, so the maximum over speeds is the top of the sampled range. The angle grids are sampled: a finer grid raises the maximum by 3.7% at most in the fresh-context check, inside every margin quoted below. Where transport is diffusive (tens of keV), every crossing direction up to 88° from the normal and both senses are allowed, together with the facing layer alone (reversing electrons) and the whole stack (straight-through electrons). For MeV films the crossing directions stay within $3\theta_0$ (Highland) of the beam.
 
 Two cases are outside this argument:
 
-- a net line after sideband subtraction is not non-negative; its bias is at most $c\,B/L$ for window background $B$ and net line $L$;
+- a net line after sideband subtraction is not non-negative; with the continuum-only $S$ used here its bias is at most $c\,B/L$ for window background $B$ and net line $L$ (with a total $S$, only $c\,(1+B/L)$);
 - a coherent signal can interfere with a TR amplitude; see [diffracted TR](#diffracted-tr-and-pxr).
 
 **Tolerance.** Omission is a deterministic bias $b$ added to a statistical error. It is accepted when $b\le\text{target\_rse}/3$, so that $\sqrt{\text{rse}^2+b^2}\le1.054\,\text{rse}$ (`omission_tolerance`). With the catalog adaptive-precision default `target_rse = 0.05` the tolerance is $b\le1.67\%$. A fixed-count run uses the observable's realized relative standard error instead; coherent-emission and physical-detector routes, which refuse adaptive precision, must do so. Bounds below are functions of the scene, so a tighter target is re-checked by rerunning the study.
@@ -67,19 +67,19 @@ Two statements the bound does **not** rely on, and which are false in general:
 
 | Scene | Detector faces | EUV (< 300 eV) | 0.3--1 keV | ≥ 1 keV | $E^\ast$ |
 | --- | --- | --- | --- | --- | --- |
-| Si, 10 keV, 10 µm | entrance | **0.84** | 5.2e-4 | 5.2e-7 | 213 eV |
-| Si, 30 keV, 2 µm | exit | **8.8** | 9.1e-3 | 5.4e-6 | 307 eV |
-| Si, 30 keV, 10 µm | entrance | **7.8** | 8.1e-3 | 2.0e-6 | 307 eV |
-| Si, 60 keV, 2 µm | exit | **51** | **5.0e-2** | 4.0e-5 | 368 eV |
-| HOPG, 30 keV, 2 µm | exit | **830** | **1.9e-2** | 1.9e-5 | 363 eV |
-| MoS₂, 30 keV, 2 µm | exit | **37** | **1.8e-2** | 1.5e-5 | 386 eV |
-| WSe₂, 30 keV, 2 µm | exit | **120** | **0.80** | 1.5e-4 | 633 eV |
-| MoS₂ 0.2 µm on sapphire 50 µm, 30 keV | entrance | **15** | 7.5e-3 | 1.7e-5 | 234 eV |
-| Si, 3 MeV, 2 µm, detector 90° | exit | **930** | **0.62** | 4.8e-4 | 625 eV |
-| Si, 3 MeV, 2 µm, detector 1° | exit | **1.5e3** | **40** | **0.11** | 1.8 keV |
-| Si, 10 MeV, 2 µm, detector 1° | exit | **3.9e3** | **610** | **8.8** | 6.2 keV |
+| Si, 10 keV, 10 µm | entrance | **1.4** | 8.7e-4 | 8.7e-7 | 213 eV |
+| Si, 30 keV, 2 µm | exit | **15** | 1.5e-2 | 9.1e-6 | 307 eV |
+| Si, 30 keV, 10 µm | entrance | **13** | 1.3e-2 | 3.3e-6 | 307 eV |
+| Si, 60 keV, 2 µm | exit | **85** | **8.3e-2** | 6.6e-5 | 439 eV |
+| HOPG, 30 keV, 2 µm | exit | **1.4e3** | **3.1e-2** | 3.2e-5 | 363 eV |
+| MoS₂, 30 keV, 2 µm | exit | **61** | **3.0e-2** | 2.5e-5 | 386 eV |
+| WSe₂, 30 keV, 2 µm | exit | **200** | **1.3** | 2.5e-4 | 743 eV |
+| MoS₂ 0.2 µm on sapphire 50 µm, 30 keV | entrance | **26** | 1.3e-2 | 2.8e-5 | 327 eV |
+| Si, 3 MeV, 2 µm, detector 90° | exit | **1.6e3** | **1.0** | 8.0e-4 | 625 eV |
+| Si, 3 MeV, 2 µm, detector 1° | exit | **2.6e3** | **67** | **0.18** | 1.8 keV |
+| Si, 10 MeV, 2 µm, detector 1° | exit | **6.5e3** | **1.0e3** | **15** | 7.3 keV |
 
-The bound is conservative by construction (worst crossing direction and speed, factor 3, continuum-only denominator). The 30 keV Si scene at the actual beam exit direction gives TR/brem ≈ 0.73 at 32 eV, 0.03 at 50 eV and 0.03 at 150 eV, so the EUV failures are physical, not an artefact of the bound. Near the floor TR is a surface source, unattenuated, while the bremsstrahlung escaping at the same energy comes from the last tens of nanometres.
+The bound is conservative by construction (worst crossing direction and speed, factor 5, continuum-only denominator). The 30 keV Si scene at the actual beam exit direction gives TR/brem ≈ 0.73 at 32 eV, 0.03 at 50 eV and 0.03 at 150 eV, so the EUV failures are physical, not an artefact of the bound. Near the floor TR is a surface source, unattenuated, while the bremsstrahlung escaping at the same energy comes from the last tens of nanometres.
 
 For 30--100 MeV, beyond supported transport (#439, #440), the analytic comparison of $2\,dN_{\rm TR}/dE$ (Jackson Eq. 13.92 per photon, Si) with thin-target complete-screening bremsstrahlung $(4/3)(t/X_0)/E$ puts the 1.67% crossover at 39 keV (100 MeV, 2 µm), 14 keV (100 µm) and 7 keV (1 mm), and at 12/4/2 keV for 30 MeV. This is a screening estimate (angle-integrated, no self-absorption of the bremsstrahlung), not a bound.
 
@@ -93,17 +93,31 @@ $$
 
 using $k^2-\omega^2\ge\omega^2/(\beta^2\gamma^2)$ for any virtual photon with $\mathbf k\cdot\mathbf v=\omega$. For tens-of-keV beams at keV lines ($\beta^2\gamma^2\approx0.1$, $|\chi_0|\lesssim10^{-4}$) the cross term is below $10^{-4}$ of the line, so additive PXR/CBS without DTR is consistent with the decisions below. At MeV energies and soft-X-ray lines ($\gamma^{-2}\sim|\chi_0|$) DTR is comparable to PXR and its cross term must be kept: that is #103 scope. This is an amplitude-ratio screening estimate, not a rigorous bound, and is not part of the ledgered claim.
 
+## Coherent bunches (CTR)
+
+Every bound on this page is per electron and incoherent. A bunch of $N$ electrons on identical trajectories radiates TR amplitudes whose phases differ only by arrival time and position. The spectrum is then $[N+N(N-1)|F(\omega)|^2]$ times the single-electron yield, with $|F|^2$ the bunch form factor the [coherent-emission](coherent-emission.md) path already uses ($e^{-(\omega\sigma_t)^2}$ for a Gaussian bunch). Relative to the incoherent yield used above, coherent TR (CTR) is enhanced by about $N|F(\omega)|^2$. Bremsstrahlung stays incoherent, so a bremsstrahlung-referenced bound fails as soon as $N|F|^2\gtrsim1$. Coherent PXR and CBS get the same longitudinal enhancement, so CTR relative to coherent lines is set by the incoherent ratio and the different angular spreads.
+
+For the catalog beams at 1 pC ($N=6.2\times10^6$):
+
+| Beam | $\sigma_t$ | $\omega\sigma_t$ at 31 eV | at 1 keV | $N\lvert F\rvert^2$ at 31 eV / 1 keV |
+| --- | --- | --- | --- | --- |
+| `default`, `gaussian_200fs` | 200 fs | $9.4\times10^3$ | $3.0\times10^5$ | 0 / 0 |
+| `1_atto`, `coherent_demo` | 1 as | 0.047 | 1.5 | $6.2\times10^6$ / $6.2\times10^5$ |
+
+So the omission decisions hold for incoherent emission and for bunches long compared with the photon period. They do **not** hold for `emission = coherent` (or `both`) runs whose form factor is non-negligible in the band: today the attosecond catalog beams across the whole EUV and soft-X-ray range. CTR there is escalated to #103, which carries each crossing's complex amplitude, sums it through the coherent form-factor machinery, and keeps the CTR/PXR/CBS cross terms. CTR at optical and infrared wavelengths, where it is used as a bunch-length diagnostic, is below the modelled band; its requirements are tracked in #533.
+
 ## Decisions
 
 | Application (research-note priority table) | Decision | Bound and validity |
 | --- | --- | --- |
-| Tens-of-keV transport, keV X-rays (≥ 1 keV) | **Omit** | $b\le1.5\times10^{-4}$ over 10--60 keV, Si/HOPG/MoS₂/WSe₂, films, bulk, film-on-substrate, both faces; $\le4\times10^{-5}$ for every scene but WSe₂. Holds for observables whose source band starts ≥ 1 keV. |
+| Tens-of-keV transport, keV X-rays (≥ 1 keV) | **Omit** | $b\le2.5\times10^{-4}$ over 10--60 keV, Si/HOPG/MoS₂/WSe₂, films, bulk, film-on-substrate, both faces; $\le7\times10^{-5}$ for every scene but WSe₂. Holds for observables whose source band starts ≥ 1 keV. |
 | Tens-of-keV, soft X-ray 0.3--1 keV | **Per scene** | Passes for Si up to 30 keV and for the film-on-substrate scene; fails for HOPG, MoS₂, WSe₂ and Si at 60 keV. Use $E^\ast$ from the study, or escalate. |
-| EUV / soft X-ray down to the continuum floor (any beam energy) | **Escalate to #103** | $b$ from 0.84 to 830 below 300 eV in every scene. PyRITE models photons from $\max(\hbar\omega_p, 12~\text{eV})$, so this band cannot be scoped out. Below the floor (optical) is outside the model; optical TR is measured at 30 keV {cite:p}`coenen2011` and belongs to a future optical model. |
-| MeV thin-film soft X-ray (outside channeling) | **Escalate to #103** below $E^\ast$; omit above | Off-axis 90° at 3 MeV: omit ≥ 625 eV ($b\le4.8\times10^{-4}$ for ≥ 1 keV). Forward detectors: fails to 1.8 keV (3 MeV) and 6.2 keV (10 MeV). The channeling row is decided separately (`cr-transition-radiation-bound`). |
+| EUV / soft X-ray down to the continuum floor (any beam energy) | **Escalate to #103** | $b$ from 1.4 to 1400 below 300 eV in every scene. PyRITE models photons from $\max(\hbar\omega_p, 12~\text{eV})$, so this band cannot be scoped out. Below the floor (optical) is outside the model; optical TR is measured at 30 keV {cite:p}`coenen2011` and belongs to a future optical model. |
+| MeV thin-film soft X-ray (outside channeling) | **Escalate to #103** below $E^\ast$; omit above | Off-axis 90° at 3 MeV: omit ≥ 625 eV ($b\le8.0\times10^{-4}$ for ≥ 1 keV). Forward detectors: fails to 1.8 keV (3 MeV) and 7.3 keV (10 MeV). The channeling row is decided separately (`cr-transition-radiation-bound`). |
 | General transport approaching 100 MeV | **Escalate to #103**, gated on #439/#440 | No supported transport to compare against; analytic crossover 7--39 keV for Si, thin films worst. Address bulk transport first, then rerun the study. |
 | Purpose-built multilayer radiator | **Escalate to #103** | Essential source physics; coherent gain exceeds summed-interface estimates (above). |
+| Coherent bunches (CTR) with non-negligible form factor | **Escalate to #103** | Enhancement $N\lvert F\rvert^2$ up to $6\times10^6$ for the 1 as catalog beams; incoherent bounds do not apply. Optical/IR CTR: #533. |
 
 ## Validity boundary
 
-The omission decisions hold for planar slabs and stacks, straight crossings at the stated speeds, the catalog media's independent-atom $\varepsilon$, and bremsstrahlung as the comparison floor. They do not cover grooved or rough entrance faces, laterally finite targets whose side faces the detector sees, coherent (`emission = coherent`) observables, or a tighter precision target than 0.05 without rerunning the study. Stopping still omits radiative feedback, transported delta rays and density-effect corrections, and the Browning elastic fit ends at 30 keV; these limitations are independent of TR.
+The omission decisions hold for planar slabs and stacks, straight crossings at the stated speeds, the catalog media's independent-atom $\varepsilon$, and bremsstrahlung as the comparison floor. They do not cover grooved or rough entrance faces, laterally finite targets whose side faces the detector sees, coherent (`emission = coherent`) observables with a non-negligible bunch form factor (CTR, above), or a tighter precision target than 0.05 without rerunning the study. Stopping still omits radiative feedback, transported delta rays and density-effect corrections, and the Browning elastic fit ends at 30 keV; these limitations are independent of TR.

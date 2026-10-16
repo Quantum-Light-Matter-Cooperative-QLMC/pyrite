@@ -115,7 +115,7 @@ def test_interface_energy_scale_from_the_exact_solution(energy):
     )
     per_eV = np.trapezoid(2 * np.pi * np.sin(theta) * yield_, theta, axis=1)
     ratio = np.trapezoid(per_eV * photon, photon) / (ALPHA_FS * gamma * plasma / 3)
-    # Measured deficit ~2/gamma: 0.955 at gamma = 40, 0.990 at gamma = 197.
+    # Deficit ~1.8/gamma: 0.955 at gamma = 40, 0.991 at gamma = 197 (adaptive quadrature).
     assert 1 - 2.5 / gamma < ratio < 1.0
 
 
@@ -164,3 +164,11 @@ def test_coherent_multilayer_exceeds_summed_interface_estimates():
     stack = [(eps, 15848.9), (1.0, 199526.2)] * (foils - 1) + [(eps, 15848.9)]
     peak = np.max(planar_transition_radiation(photon, n, np.array([0, 0, beta]), stack))
     assert peak > 3 * (4 * foils) * single
+
+
+def test_missing_source_with_tr_is_an_unbounded_bias():
+    energy = np.array([50.0, 100.0, 1000.0])
+    tr = np.array([1e-12, 1e-12, 0.0])
+    result = transition_radiation_omission(energy, np.array([0.0, 1e-8, 0.0]), tr, target_rse=0.05)
+    assert result.bias_bound == np.inf and not result.omit
+    assert result.ratio[2] == 0.0

@@ -5,7 +5,8 @@ crossing that can reach the detector and compare it with the production
 bremsstrahlung density the detector already scores (the continuum alone, so
 lines and CXR only make the comparison more favourable). The decision rule is
 ``bias <= target_rse / 3`` (``omission_tolerance``) on every band an
-observable can draw from. Small CPU runs only; no remote compute needed.
+observable can draw from. Small runs; the TR solve follows PYRITE_MC_BACKEND
+(NumPy or CuPy, complex128 on both). No remote compute needed.
 
     PYRITE_MC_BACKEND=cpu uv run python checks/transition_radiation_omission.py \
         [--trials 100] [--json out.json]
@@ -23,6 +24,7 @@ from dataclasses import dataclass
 import numpy as np
 
 import pyrite as pr
+from pyrite._backend import xp
 from pyrite._photon_continuum_floor import continuum_medium_key, photon_continuum_floor_eV
 from pyrite.montecarlo.geometry import sample_to_lab_R
 from pyrite.montecarlo.spectrum.transition_radiation import (
@@ -33,7 +35,9 @@ from pyrite.montecarlo.spectrum.transition_radiation import (
 )
 
 TARGET_RSE = 0.05  # catalog adaptive-precision default
-CROSSINGS = 3.0  # entry + at most one exit per primary + escaping secondaries (< 1)
+# A primary crosses a flat face at most twice; entry and exit through the same
+# face add as amplitudes (<= 4x one crossing), plus escaping secondaries (< 1).
+CROSSINGS = 5.0
 HALF_SPAN_DEG = 8.3  # half the 16.6 deg EDS polar span used by the reference detector
 BANDS = {"euv": (0.0, 300.0), "soft": (300.0, 1000.0), "kev": (1000.0, math.inf)}
 # Documented decisions (docs/physics/radiation-physics/transition-radiation.md):
@@ -174,9 +178,9 @@ def transition_radiation_bound(scene: Scene, energy: np.ndarray) -> np.ndarray:
         best = 0.0
         for stack, substrate in stacks:
             tr = planar_transition_radiation(
-                e, cone[None, :, :], velocities[:, None, :], stack, substrate
+                e, cone[None, :, :], velocities[:, None, :], stack, substrate, xp=xp
             )
-            best = max(best, float(np.max(tr)))
+            best = max(best, float(tr.max()))
         out[i] = CROSSINGS * best
     return out
 
@@ -184,7 +188,7 @@ def transition_radiation_bound(scene: Scene, energy: np.ndarray) -> np.ndarray:
 def _band_bounds(energy, ratio, tol):
     bands = {}
     for name, (lo, hi) in BANDS.items():
-        keep = (energy >= lo) & (energy < hi) & np.isfinite(ratio)
+        keep = (energy >= lo) & (energy < hi)
         if np.any(keep):
             bound = float(np.max(ratio[keep]))
             bands[name] = {"bias_bound": bound, "omit": bound <= tol}
