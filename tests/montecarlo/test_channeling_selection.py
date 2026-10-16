@@ -13,7 +13,6 @@ import pytest
 
 import pyrite as pr
 from pyrite import api
-from pyrite._numerics import validate_profile_numerics
 from pyrite.campaign.profiles import case_content_key
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.case import Case, channeling_case_record
@@ -127,12 +126,6 @@ def test_numerics_validates_channeling_controls(field, value):
         pr.Numerics(**{field: value})
 
 
-def test_profile_numerics_cannot_select_channeling():
-    # Profiles, catalogs, checkpoints and recompute stay channeling-free (#507).
-    with pytest.raises(ValueError, match="unknown numerics field"):
-        validate_profile_numerics({"channeling_model": "planar"})
-
-
 # -- gates -------------------------------------------------------------------
 
 
@@ -193,18 +186,6 @@ def test_case_refuses_unsupported_geometry(planar_case, changes, message):
 # -- consumer refusals -------------------------------------------------------
 
 
-def test_direction_scoring_refuses_before_transport(planar_case, monkeypatch):
-    def forbidden(*_args, **_kwargs):
-        raise AssertionError("transport started")
-
-    monkeypatch.setattr(runner, "_transport_case", forbidden)
-    directions = np.array([[0.0, 0.0, -1.0]])
-    with pytest.raises(ValueError, match="observation-direction scoring"):
-        runner.run_case_directions(planar_case, directions)
-    with pytest.raises(ValueError, match="observation-direction scoring"):
-        runner.run_case(planar_case, observation_directions=directions)
-
-
 @pytest.mark.parametrize(
     "options, message",
     [
@@ -228,29 +209,6 @@ def test_adaptive_refuses_before_work(planar_case):
 
     with pytest.raises(ValueError, match="adaptive precision"):
         transport_case_adaptive(planar_case, pr.Precision(0.1, 40, 60, 20))
-
-
-def test_artifact_replay_refuses(planar_case, monkeypatch):
-    from pyrite.montecarlo.runner import artifacts
-    from pyrite.montecarlo.trajectories import case_digest
-
-    class Artifact:
-        path = "fake.h5"
-        case = planar_case
-        attrs = {"case_sha256": case_digest(planar_case)}
-
-    monkeypatch.setattr(artifacts, "artifact_spectrum_inputs", lambda artifact: {})
-    with pytest.raises(ValueError, match="trajectory-artifact replay"):
-        artifacts._checked_case_and_inputs(Artifact(), None)
-
-
-def test_observation_production_refuses():
-    detector = pr.PlanarDetector(pr.PlanarPose((0.0, 0.0, 50.0)), size_mm=(1.0, 1.0))
-    scene = replace(_scene(pr.Physics(**PLANAR)), detector=detector)
-    with pytest.raises(ValueError, match="physical-detector observation"):
-        api.simulate(
-            scene.beam, scene.target, detector, physics=scene.physics, numerics=pr.Numerics()
-        )
 
 
 # -- event contract ------------------------------------------------------------

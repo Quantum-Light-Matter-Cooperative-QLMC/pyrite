@@ -234,8 +234,6 @@ def run_case(
         count, resolved crystal, incident energy, and optional timing metrics.
     """
     _adaptive.validate_directions(case, observation_directions)
-    if observation_directions is not None:
-        refuse_channeling(case, "observation-direction scoring")
     transport = _transport_case(
         case,
         record_timing,
@@ -273,7 +271,6 @@ def run_case_directions(
     photon geometry in the electron navigator.
     """
     _adaptive.validate_directions(case, n_hats)
-    refuse_channeling(case, "observation-direction scoring")
     directions = validated_directions(n_hats)
     transport = _transport_case(
         case,

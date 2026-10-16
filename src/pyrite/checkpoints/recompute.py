@@ -31,7 +31,6 @@ from .._grid_semantics import is_uniform_grid
 from .._progress import _ProgressTimer, _write_progress_record
 from ..console.outputs import output_dir
 from ..montecarlo import runner
-from ..montecarlo.case import refuse_channeling
 from . import _checkpoint_store
 from .persistence import (
     _checkpoint_exists,
@@ -524,8 +523,6 @@ def repair_brem_wide(
                     n_skipped += 1
                     continue
             todo.append(r)
-    for r in todo:
-        refuse_channeling(r["case"], "checkpoint recompute")
     if on_progress is not None:
         on_progress(0, len(todo), n_skipped)
     if not todo:
@@ -694,6 +691,8 @@ def repair_cxr_spec(
     A ``coherent``/``both`` checkpoint (one carrying ``spec_coherent``) has BOTH
     its incoherent ``spec`` and its ``spec_coherent`` refreshed onto the new grid
     from a single re-transport, so the coherent array never drifts off-grid.
+    Planar ``spec_channeling`` is independently rescored from the case on the
+    target grid; brem repair preserves this separate component.
 
     Target line grid per record (see :func:`_target_cxr_grid`): ``line_step_eV``
     (explicit uniform spacing), else ``from_config`` rebuilds it from
@@ -753,6 +752,14 @@ def repair_cxr_spec(
             eg = np.asarray(r["E_grid"], float)
             spec = r.get("spec")
             finite = spec is not None and np.isfinite(np.asarray(spec)).all()
+            if r["case"].get("channeling") is not None:
+                channeling = r.get("spec_channeling")
+                finite = finite and channeling is not None
+                if channeling is not None:
+                    channeling = np.asarray(channeling)
+                    finite = (
+                        finite and channeling.shape == eg.shape and np.isfinite(channeling).all()
+                    )
             grid_ok = eg.shape == target.shape and np.allclose(eg, target)
             ne_ok = cxr_ne is None or int(r["case"].get("Ne", -1)) == int(cxr_ne)
             fidelity_ok = fidelity is None or r["case"].get("line_profile") == fidelity
@@ -762,7 +769,8 @@ def repair_cxr_spec(
                 continue
             todo.append((r, target))
     for r, _ in todo:
-        refuse_channeling(r["case"], "checkpoint recompute")
+        if r.get("spec_channeling") is not None and r["case"].get("channeling") is None:
+            raise ValueError("cannot reline spec_channeling without its case channeling metadata")
     if on_progress is not None:
         on_progress(0, len(todo), n_skipped)
     if not todo:
@@ -790,18 +798,14 @@ def repair_cxr_spec(
         # stale relative to `spec`/`E_grid`. Old pre-dual coherent checkpoints
         # (no `spec_coherent` key) are orphaned by design -- reline only ever
         # re-derives the incoherent `spec` for those.
-        if r.get("spec_channeling") is not None:
-            # Channeling radiation is scored from the zone density matrix, not
-            # from the re-transported segments; relining would leave it on the
-            # old grid.
-            raise ValueError(
-                f"cannot reline {c.get('name')!r}: records carrying spec_channeling "
-                "need a channeling rescore, which reline does not perform"
-            )
         want_coherent = "spec_coherent" in r
         spec, spec_coherent, spec_characteristic = runner._cxr_pair_for_case(
             c, target, want_coherent=want_coherent, return_characteristic=True
         )
+        if c.get("channeling") is not None:
+            from ..montecarlo.runner.channeling_emission import rescore_channeling_spectrum
+
+            r["spec_channeling"] = rescore_channeling_spectrum(c, target)
         r["spec"] = spec
         r["spec_characteristic"] = spec_characteristic
         if want_coherent:

@@ -132,6 +132,27 @@ PXR/CBS is recorded as an omission.
   Si(100) at 54.5 MeV is a documented 1.35× outlier. Persisted output (#507)
   must carry the cutoff in its identity.
 
+## Run surfaces (#521)
+
+Profiles select `channeling_model = "planar"` and `channeling_plane` in
+`numerics`, alongside the zone resolution controls. Fixed-count CPU sweeps,
+physical-detector directions and observations score the same deterministic
+ensemble source. Replay and line recompute rescore it on the requested grid;
+bremsstrahlung repair preserves the stored channel. Channeling-off identities
+and outputs retain their historical layout.
+
+The following consumers refuse channeling before transport or writes:
+
+- CUDA: the zone/native `LaunchState` handoff has CPU-only integration. The
+  density solve remains on the host; device handoff needs separate parity
+  coverage before enabling CUDA transport.
+- Adaptive precision: the channel is a deterministic ensemble expectation,
+  rather than an independent per-electron segment estimate. No CR variance
+  observable is defined for the ADR-0017 stopping contract; use fixed counts.
+- Trajectory capture and electron-block transport: the zone source and initial
+  entrance population are not represented by the current block/capture
+  contract. Use fixed-count CPU execution without capture.
+
 ## Consequences
 
 - Default outputs, RNG consumption and cache identities are unchanged.
