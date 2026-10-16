@@ -1,0 +1,1394 @@
+{
+  "schema": "pyrite.equal-precision.numerical-budget-audit.v1",
+  "protocol_sha256": "867d279b4d5cf7ae5f71f19e18a827706b46dadacc630ad78acb4f9fb1d1ccf0",
+  "comparisons": 32,
+  "joint_confidence": 0.95,
+  "target_rse": [
+    0.05,
+    0.02,
+    0.01
+  ],
+  "numerical_budget_fraction": 0.3333333333333333,
+  "results": [
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "transmitted",
+      "n": 1200000,
+      "prior_scale": 0.84504,
+      "kind": "indicator",
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.014084000000000001,
+          "status": "passed",
+          "zero_discordance_planning_n": 505,
+          "reason": null,
+          "reference_observed_rse": 0.00038922049910337947,
+          "candidate_observed_rse": 0.00038922049910337947,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.0056336,
+          "status": "passed",
+          "zero_discordance_planning_n": 1267,
+          "reason": null,
+          "reference_observed_rse": 0.00038922049910337947,
+          "candidate_observed_rse": 0.00038922049910337947,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.0028168,
+          "status": "passed",
+          "zero_discordance_planning_n": 2537,
+          "reason": null,
+          "reference_observed_rse": 0.00038922049910337947,
+          "candidate_observed_rse": 0.00038922049910337947,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "backscattered",
+      "n": 1200000,
+      "prior_scale": 0.10936,
+      "kind": "indicator",
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.0018226666666666669,
+          "status": "passed",
+          "zero_discordance_planning_n": 3922,
+          "reason": null,
+          "reference_observed_rse": 0.002613051838522981,
+          "candidate_observed_rse": 0.002613051838522981,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.0007290666666666666,
+          "status": "passed",
+          "zero_discordance_planning_n": 9810,
+          "reason": null,
+          "reference_observed_rse": 0.002613051838522981,
+          "candidate_observed_rse": 0.002613051838522981,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.0003645333333333333,
+          "status": "passed",
+          "zero_discordance_planning_n": 19624,
+          "reason": null,
+          "reference_observed_rse": 0.002613051838522981,
+          "candidate_observed_rse": 0.002613051838522981,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "side_exited",
+      "n": 1200000,
+      "prior_scale": 0.0,
+      "kind": "indicator",
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": null,
+          "status": "unresolved",
+          "zero_discordance_planning_n": null,
+          "reason": "No positive prior mean / no frozen absolute floor",
+          "reference_observed_rse": null,
+          "candidate_observed_rse": null,
+          "observed_rse_within_target": false
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": null,
+          "status": "unresolved",
+          "zero_discordance_planning_n": null,
+          "reason": "No positive prior mean / no frozen absolute floor",
+          "reference_observed_rse": null,
+          "candidate_observed_rse": null,
+          "observed_rse_within_target": false
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": null,
+          "status": "unresolved",
+          "zero_discordance_planning_n": null,
+          "reason": "No positive prior mean / no frozen absolute floor",
+          "reference_observed_rse": null,
+          "candidate_observed_rse": null,
+          "observed_rse_within_target": false
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "stopped",
+      "n": 1200000,
+      "prior_scale": 0.0456,
+      "kind": "indicator",
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.0007600000000000002,
+          "status": "passed",
+          "zero_discordance_planning_n": 9411,
+          "reason": null,
+          "reference_observed_rse": 0.00420264817658108,
+          "candidate_observed_rse": 0.00420264817658108,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.000304,
+          "status": "passed",
+          "zero_discordance_planning_n": 23532,
+          "reason": null,
+          "reference_observed_rse": 0.00420264817658108,
+          "candidate_observed_rse": 0.00420264817658108,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.000152,
+          "status": "passed",
+          "zero_discordance_planning_n": 47067,
+          "reason": null,
+          "reference_observed_rse": 0.00420264817658108,
+          "candidate_observed_rse": 0.00420264817658108,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "transmitted_energy_keV_per_primary",
+      "n": 1200000,
+      "prior_scale": 198.52605588413658,
+      "kind": "energy",
+      "difference_ci": [
+        -0.009964401148230108,
+        0.009964432880844665
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 3.3087675980689433,
+          "status": "passed",
+          "zero_discordance_planning_n": 646,
+          "reason": null,
+          "reference_observed_rse": 0.0004091536980506206,
+          "candidate_observed_rse": 0.000409153697956746,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 1.3235070392275772,
+          "status": "passed",
+          "zero_discordance_planning_n": 1619,
+          "reason": null,
+          "reference_observed_rse": 0.0004091536980506206,
+          "candidate_observed_rse": 0.000409153697956746,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.6617535196137886,
+          "status": "passed",
+          "zero_discordance_planning_n": 3240,
+          "reason": null,
+          "reference_observed_rse": 0.0004091536980506206,
+          "candidate_observed_rse": 0.000409153697956746,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "photons_ge10kev",
+      "n": 1200000,
+      "prior_scale": 0.00672,
+      "kind": "count",
+      "difference_ci": [
+        -0.00017886485071014183,
+        0.00017886485071014183
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.00011200000000000001,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 1916412,
+          "reason": null,
+          "reference_observed_rse": 0.010969857738856803,
+          "candidate_observed_rse": 0.010969857738856803,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 4.4800000000000005e-05,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 4791034,
+          "reason": null,
+          "reference_observed_rse": 0.010969857738856803,
+          "candidate_observed_rse": 0.010969857738856803,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 2.2400000000000002e-05,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 9582071,
+          "reason": null,
+          "reference_observed_rse": 0.010969857738856803,
+          "candidate_observed_rse": 0.010969857738856803,
+          "observed_rse_within_target": false
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "photons_10_50kev",
+      "n": 1200000,
+      "prior_scale": 0.0044,
+      "kind": "count",
+      "difference_ci": [
+        -0.00017886485071014183,
+        0.00017886485071014183
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 7.333333333333334e-05,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 2926885,
+          "reason": null,
+          "reference_observed_rse": 0.01342195459374791,
+          "candidate_observed_rse": 0.01342195459374791,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 2.9333333333333336e-05,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 7317217,
+          "reason": null,
+          "reference_observed_rse": 0.01342195459374791,
+          "candidate_observed_rse": 0.01342195459374791,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 1.4666666666666668e-05,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 14634437,
+          "reason": null,
+          "reference_observed_rse": 0.01342195459374791,
+          "candidate_observed_rse": 0.01342195459374791,
+          "observed_rse_within_target": false
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "photons_50_100kev",
+      "n": 1200000,
+      "prior_scale": 0.00128,
+      "kind": "count",
+      "difference_ci": [
+        -3.5772970142028366e-05,
+        3.5772970142028366e-05
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 2.1333333333333338e-05,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 2012232,
+          "reason": null,
+          "reference_observed_rse": 0.02502244018249054,
+          "candidate_observed_rse": 0.02502244018249054,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 8.533333333333334e-06,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 5030586,
+          "reason": null,
+          "reference_observed_rse": 0.02502244018249054,
+          "candidate_observed_rse": 0.02502244018249054,
+          "observed_rse_within_target": false
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 4.266666666666667e-06,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 10061175,
+          "reason": null,
+          "reference_observed_rse": 0.02502244018249054,
+          "candidate_observed_rse": 0.02502244018249054,
+          "observed_rse_within_target": false
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "photons_ge100kev",
+      "n": 1200000,
+      "prior_scale": 0.00104,
+      "kind": "count",
+      "difference_ci": [
+        -1.7886485071014183e-05,
+        1.7886485071014183e-05
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 1.7333333333333332e-05,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 1238296,
+          "reason": null,
+          "reference_observed_rse": 0.029321537835893703,
+          "candidate_observed_rse": 0.029321537835893703,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 6.933333333333333e-06,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 3095744,
+          "reason": null,
+          "reference_observed_rse": 0.029321537835893703,
+          "candidate_observed_rse": 0.029321537835893703,
+          "observed_rse_within_target": false
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 3.4666666666666664e-06,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 6191491,
+          "reason": null,
+          "reference_observed_rse": 0.029321537835893703,
+          "candidate_observed_rse": 0.029321537835893703,
+          "observed_rse_within_target": false
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "photon_energy_keV_per_primary",
+      "n": 1200000,
+      "prior_scale": 0.4038063287813588,
+      "kind": "energy",
+      "difference_ci": [
+        -0.009964453351896467,
+        0.009964405783765071
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.0067301054796893136,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 318920,
+          "reason": null,
+          "reference_observed_rse": 0.014019998955888026,
+          "candidate_observed_rse": 0.01401999830540578,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.0026920421918757253,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 797304,
+          "reason": null,
+          "reference_observed_rse": 0.014019998955888026,
+          "candidate_observed_rse": 0.01401999830540578,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.0013460210959378627,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 1594611,
+          "reason": null,
+          "reference_observed_rse": 0.014019998955888026,
+          "candidate_observed_rse": 0.01401999830540578,
+          "observed_rse_within_target": false
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "continuous_loss_keV_per_primary",
+      "n": 1200000,
+      "prior_scale": 81.4911684050617,
+      "kind": "energy",
+      "difference_ci": [
+        -0.009964424719289064,
+        0.009964429487933723
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 1.3581861400843618,
+          "status": "passed",
+          "zero_discordance_planning_n": 1577,
+          "reason": null,
+          "reference_observed_rse": 0.0006552273758025506,
+          "candidate_observed_rse": 0.0006552273757411039,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.5432744560337447,
+          "status": "passed",
+          "zero_discordance_planning_n": 3948,
+          "reason": null,
+          "reference_observed_rse": 0.0006552273758025506,
+          "candidate_observed_rse": 0.0006552273757411039,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.27163722801687235,
+          "status": "passed",
+          "zero_discordance_planning_n": 7899,
+          "reason": null,
+          "reference_observed_rse": 0.0006552273758025506,
+          "candidate_observed_rse": 0.0006552273757411039,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "terminal_energy_keV_per_primary",
+      "n": 1200000,
+      "prior_scale": 218.10502526615693,
+      "kind": "energy",
+      "difference_ci": [
+        -0.009964398944904604,
+        0.009964441744391437
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 3.6350837544359487,
+          "status": "passed",
+          "zero_discordance_planning_n": 587,
+          "reason": null,
+          "reference_observed_rse": 0.0002455238151558583,
+          "candidate_observed_rse": 0.00024552381495536143,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 1.4540335017743795,
+          "status": "passed",
+          "zero_discordance_planning_n": 1473,
+          "reason": null,
+          "reference_observed_rse": 0.0002455238151558583,
+          "candidate_observed_rse": 0.00024552381495536143,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.7270167508871898,
+          "status": "passed",
+          "zero_discordance_planning_n": 2949,
+          "reason": null,
+          "reference_observed_rse": 0.0002455238151558583,
+          "candidate_observed_rse": 0.00024552381495536143,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "transmitted_mu_bin_0",
+      "n": 1200000,
+      "prior_scale": 0.11764,
+      "kind": "indicator",
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.0019606666666666665,
+          "status": "passed",
+          "zero_discordance_planning_n": 3646,
+          "reason": null,
+          "reference_observed_rse": 0.002516325658078299,
+          "candidate_observed_rse": 0.002516325658078299,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.0007842666666666667,
+          "status": "passed",
+          "zero_discordance_planning_n": 9120,
+          "reason": null,
+          "reference_observed_rse": 0.002516325658078299,
+          "candidate_observed_rse": 0.002516325658078299,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.00039213333333333334,
+          "status": "passed",
+          "zero_discordance_planning_n": 18242,
+          "reason": null,
+          "reference_observed_rse": 0.002516325658078299,
+          "candidate_observed_rse": 0.002516325658078299,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "transmitted_mu_bin_1",
+      "n": 1200000,
+      "prior_scale": 0.48588,
+      "kind": "indicator",
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.008098,
+          "status": "passed",
+          "zero_discordance_planning_n": 880,
+          "reason": null,
+          "reference_observed_rse": 0.000935523711499938,
+          "candidate_observed_rse": 0.000935523711499938,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.0032392,
+          "status": "passed",
+          "zero_discordance_planning_n": 2206,
+          "reason": null,
+          "reference_observed_rse": 0.000935523711499938,
+          "candidate_observed_rse": 0.000935523711499938,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.0016196,
+          "status": "passed",
+          "zero_discordance_planning_n": 4414,
+          "reason": null,
+          "reference_observed_rse": 0.000935523711499938,
+          "candidate_observed_rse": 0.000935523711499938,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "transmitted_mu_bin_2",
+      "n": 1200000,
+      "prior_scale": 0.21452,
+      "kind": "indicator",
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.003575333333333333,
+          "status": "passed",
+          "zero_discordance_planning_n": 1998,
+          "reason": null,
+          "reference_observed_rse": 0.0017468649804924965,
+          "candidate_observed_rse": 0.0017468649804924965,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.0014301333333333333,
+          "status": "passed",
+          "zero_discordance_planning_n": 5000,
+          "reason": null,
+          "reference_observed_rse": 0.0017468649804924965,
+          "candidate_observed_rse": 0.0017468649804924965,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.0007150666666666666,
+          "status": "passed",
+          "zero_discordance_planning_n": 10002,
+          "reason": null,
+          "reference_observed_rse": 0.0017468649804924965,
+          "candidate_observed_rse": 0.0017468649804924965,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "observable": "transmitted_mu_bin_3",
+      "n": 1200000,
+      "prior_scale": 0.027,
+      "kind": "indicator",
+      "difference_ci": [
+        -5.962161690338061e-06,
+        5.962161690338061e-06
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.00045000000000000004,
+          "status": "passed",
+          "zero_discordance_planning_n": 15896,
+          "reason": null,
+          "reference_observed_rse": 0.005416798519937404,
+          "candidate_observed_rse": 0.005416798519937404,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.00018,
+          "status": "passed",
+          "zero_discordance_planning_n": 39745,
+          "reason": null,
+          "reference_observed_rse": 0.005416798519937404,
+          "candidate_observed_rse": 0.005416798519937404,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 9e-05,
+          "status": "passed",
+          "zero_discordance_planning_n": 79493,
+          "reason": null,
+          "reference_observed_rse": 0.005416798519937404,
+          "candidate_observed_rse": 0.005416798519937404,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "transmitted",
+      "n": 250000,
+      "prior_scale": 0.54816,
+      "kind": "indicator",
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.009136,
+          "status": "passed",
+          "zero_discordance_planning_n": 780,
+          "reason": null,
+          "reference_observed_rse": 0.0018251952979771845,
+          "candidate_observed_rse": 0.0018251952979771845,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.0036544,
+          "status": "passed",
+          "zero_discordance_planning_n": 1955,
+          "reason": null,
+          "reference_observed_rse": 0.0018251952979771845,
+          "candidate_observed_rse": 0.0018251952979771845,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.0018272,
+          "status": "passed",
+          "zero_discordance_planning_n": 3913,
+          "reason": null,
+          "reference_observed_rse": 0.0018251952979771845,
+          "candidate_observed_rse": 0.0018251952979771845,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "backscattered",
+      "n": 250000,
+      "prior_scale": 0.42396,
+      "kind": "indicator",
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.007066,
+          "status": "passed",
+          "zero_discordance_planning_n": 1009,
+          "reason": null,
+          "reference_observed_rse": 0.0023317208054826786,
+          "candidate_observed_rse": 0.0023317208054826786,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.0028264,
+          "status": "passed",
+          "zero_discordance_planning_n": 2528,
+          "reason": null,
+          "reference_observed_rse": 0.0023317208054826786,
+          "candidate_observed_rse": 0.0023317208054826786,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.0014132,
+          "status": "passed",
+          "zero_discordance_planning_n": 5060,
+          "reason": null,
+          "reference_observed_rse": 0.0023317208054826786,
+          "candidate_observed_rse": 0.0023317208054826786,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "side_exited",
+      "n": 250000,
+      "prior_scale": 0.0,
+      "kind": "indicator",
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": null,
+          "status": "unresolved",
+          "zero_discordance_planning_n": null,
+          "reason": "No positive prior mean / no frozen absolute floor",
+          "reference_observed_rse": null,
+          "candidate_observed_rse": null,
+          "observed_rse_within_target": false
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": null,
+          "status": "unresolved",
+          "zero_discordance_planning_n": null,
+          "reason": "No positive prior mean / no frozen absolute floor",
+          "reference_observed_rse": null,
+          "candidate_observed_rse": null,
+          "observed_rse_within_target": false
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": null,
+          "status": "unresolved",
+          "zero_discordance_planning_n": null,
+          "reason": "No positive prior mean / no frozen absolute floor",
+          "reference_observed_rse": null,
+          "candidate_observed_rse": null,
+          "observed_rse_within_target": false
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "stopped",
+      "n": 250000,
+      "prior_scale": 0.02788,
+      "kind": "indicator",
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.00046466666666666667,
+          "status": "passed",
+          "zero_discordance_planning_n": 15394,
+          "reason": null,
+          "reference_observed_rse": 0.011270659332080366,
+          "candidate_observed_rse": 0.011270659332080366,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.00018586666666666667,
+          "status": "passed",
+          "zero_discordance_planning_n": 38490,
+          "reason": null,
+          "reference_observed_rse": 0.011270659332080366,
+          "candidate_observed_rse": 0.011270659332080366,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 9.293333333333333e-05,
+          "status": "passed",
+          "zero_discordance_planning_n": 76983,
+          "reason": null,
+          "reference_observed_rse": 0.011270659332080366,
+          "candidate_observed_rse": 0.011270659332080366,
+          "observed_rse_within_target": false
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "transmitted_energy_keV_per_primary",
+      "n": 250000,
+      "prior_scale": 133.73370083005995,
+      "kind": "energy",
+      "difference_ci": [
+        -0.04782927442377798,
+        0.04782938416706169
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 2.2288950138343324,
+          "status": "passed",
+          "zero_discordance_planning_n": 960,
+          "reason": null,
+          "reference_observed_rse": 0.0018696293181184552,
+          "candidate_observed_rse": 0.0018696293176181263,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.891558005533733,
+          "status": "passed",
+          "zero_discordance_planning_n": 2404,
+          "reason": null,
+          "reference_observed_rse": 0.0018696293181184552,
+          "candidate_observed_rse": 0.0018696293176181263,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.4457790027668665,
+          "status": "passed",
+          "zero_discordance_planning_n": 4812,
+          "reason": null,
+          "reference_observed_rse": 0.0018696293181184552,
+          "candidate_observed_rse": 0.0018696293176181263,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "photons_ge10kev",
+      "n": 250000,
+      "prior_scale": 0.03816,
+      "kind": "count",
+      "difference_ci": [
+        -0.0008585415577018164,
+        0.0008585415577018164
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.000636,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 337479,
+          "reason": null,
+          "reference_observed_rse": 0.010320702716191257,
+          "candidate_observed_rse": 0.010320702716191257,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.0002544,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 843702,
+          "reason": null,
+          "reference_observed_rse": 0.010320702716191257,
+          "candidate_observed_rse": 0.010320702716191257,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.0001272,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 1687406,
+          "reason": null,
+          "reference_observed_rse": 0.010320702716191257,
+          "candidate_observed_rse": 0.010320702716191257,
+          "observed_rse_within_target": false
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "photons_10_50kev",
+      "n": 250000,
+      "prior_scale": 0.02376,
+      "kind": "count",
+      "difference_ci": [
+        -0.0008585415577018164,
+        0.0008585415577018164
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.00039600000000000003,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 542013,
+          "reason": null,
+          "reference_observed_rse": 0.0131863799082919,
+          "candidate_observed_rse": 0.0131863799082919,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.0001584,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 1355038,
+          "reason": null,
+          "reference_observed_rse": 0.0131863799082919,
+          "candidate_observed_rse": 0.0131863799082919,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 7.92e-05,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 2710078,
+          "reason": null,
+          "reference_observed_rse": 0.0131863799082919,
+          "candidate_observed_rse": 0.0131863799082919,
+          "observed_rse_within_target": false
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "photons_50_100kev",
+      "n": 250000,
+      "prior_scale": 0.00752,
+      "kind": "count",
+      "difference_ci": [
+        -0.00017170831154036327,
+        0.00017170831154036327
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.00012533333333333334,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 342505,
+          "reason": null,
+          "reference_observed_rse": 0.02246791989032955,
+          "candidate_observed_rse": 0.02246791989032955,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 5.013333333333333e-05,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 856267,
+          "reason": null,
+          "reference_observed_rse": 0.02246791989032955,
+          "candidate_observed_rse": 0.02246791989032955,
+          "observed_rse_within_target": false
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 2.5066666666666665e-05,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 1712538,
+          "reason": null,
+          "reference_observed_rse": 0.02246791989032955,
+          "candidate_observed_rse": 0.02246791989032955,
+          "observed_rse_within_target": false
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "photons_ge100kev",
+      "n": 250000,
+      "prior_scale": 0.00688,
+      "kind": "count",
+      "difference_ci": [
+        -8.585415577018163e-05,
+        8.585415577018163e-05
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.00011466666666666667,
+          "status": "passed",
+          "zero_discordance_planning_n": 187182,
+          "reason": null,
+          "reference_observed_rse": 0.023678093539509983,
+          "candidate_observed_rse": 0.023678093539509983,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 4.586666666666667e-05,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 467959,
+          "reason": null,
+          "reference_observed_rse": 0.023678093539509983,
+          "candidate_observed_rse": 0.023678093539509983,
+          "observed_rse_within_target": false
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 2.2933333333333336e-05,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 935920,
+          "reason": null,
+          "reference_observed_rse": 0.023678093539509983,
+          "candidate_observed_rse": 0.023678093539509983,
+          "observed_rse_within_target": false
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "photon_energy_keV_per_primary",
+      "n": 250000,
+      "prior_scale": 2.357347214250034,
+      "kind": "energy",
+      "difference_ci": [
+        -0.04782954729172808,
+        0.0478292312722735
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.039289120237500565,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 54627,
+          "reason": null,
+          "reference_observed_rse": 0.01333415223474852,
+          "candidate_observed_rse": 0.01333415211357334,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.015715648095000225,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 136573,
+          "reason": null,
+          "reference_observed_rse": 0.01333415223474852,
+          "candidate_observed_rse": 0.01333415211357334,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.007857824047500113,
+          "status": "unresolved",
+          "zero_discordance_planning_n": 273149,
+          "reason": null,
+          "reference_observed_rse": 0.01333415223474852,
+          "candidate_observed_rse": 0.01333415211357334,
+          "observed_rse_within_target": false
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "continuous_loss_keV_per_primary",
+      "n": 250000,
+      "prior_scale": 60.84313184862816,
+      "kind": "energy",
+      "difference_ci": [
+        -0.04782932527312131,
+        0.047829423390706255
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 1.0140521974771362,
+          "status": "passed",
+          "zero_discordance_planning_n": 2114,
+          "reason": null,
+          "reference_observed_rse": 0.0016879150368404718,
+          "candidate_observed_rse": 0.0016879150368200482,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.4056208789908544,
+          "status": "passed",
+          "zero_discordance_planning_n": 5289,
+          "reason": null,
+          "reference_observed_rse": 0.0016879150368404718,
+          "candidate_observed_rse": 0.0016879150368200482,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.2028104394954272,
+          "status": "passed",
+          "zero_discordance_planning_n": 10580,
+          "reason": null,
+          "reference_observed_rse": 0.0016879150368404718,
+          "candidate_observed_rse": 0.0016879150368200482,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "terminal_energy_keV_per_primary",
+      "n": 250000,
+      "prior_scale": 236.7995209371218,
+      "kind": "energy",
+      "difference_ci": [
+        -0.04782924191616542,
+        0.04782945981803469
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 3.9466586822853635,
+          "status": "passed",
+          "zero_discordance_planning_n": 541,
+          "reason": null,
+          "reference_observed_rse": 0.00047224925314158,
+          "candidate_observed_rse": 0.0004722492514694427,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 1.5786634729141455,
+          "status": "passed",
+          "zero_discordance_planning_n": 1357,
+          "reason": null,
+          "reference_observed_rse": 0.00047224925314158,
+          "candidate_observed_rse": 0.0004722492514694427,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.7893317364570728,
+          "status": "passed",
+          "zero_discordance_planning_n": 2716,
+          "reason": null,
+          "reference_observed_rse": 0.00047224925314158,
+          "candidate_observed_rse": 0.0004722492514694427,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "transmitted_mu_bin_0",
+      "n": 250000,
+      "prior_scale": 0.09084,
+      "kind": "indicator",
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.001514,
+          "status": "passed",
+          "zero_discordance_planning_n": 4723,
+          "reason": null,
+          "reference_observed_rse": 0.006243059243619917,
+          "candidate_observed_rse": 0.006243059243619917,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.0006056000000000001,
+          "status": "passed",
+          "zero_discordance_planning_n": 11811,
+          "reason": null,
+          "reference_observed_rse": 0.006243059243619917,
+          "candidate_observed_rse": 0.006243059243619917,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.00030280000000000004,
+          "status": "passed",
+          "zero_discordance_planning_n": 23625,
+          "reason": null,
+          "reference_observed_rse": 0.006243059243619917,
+          "candidate_observed_rse": 0.006243059243619917,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "transmitted_mu_bin_1",
+      "n": 250000,
+      "prior_scale": 0.32664,
+      "kind": "indicator",
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.005444,
+          "status": "passed",
+          "zero_discordance_planning_n": 1311,
+          "reason": null,
+          "reference_observed_rse": 0.002911413564703728,
+          "candidate_observed_rse": 0.002911413564703728,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.0021776,
+          "status": "passed",
+          "zero_discordance_planning_n": 3282,
+          "reason": null,
+          "reference_observed_rse": 0.002911413564703728,
+          "candidate_observed_rse": 0.002911413564703728,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.0010888,
+          "status": "passed",
+          "zero_discordance_planning_n": 6568,
+          "reason": null,
+          "reference_observed_rse": 0.002911413564703728,
+          "candidate_observed_rse": 0.002911413564703728,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "transmitted_mu_bin_2",
+      "n": 250000,
+      "prior_scale": 0.11488,
+      "kind": "indicator",
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.0019146666666666667,
+          "status": "passed",
+          "zero_discordance_planning_n": 3734,
+          "reason": null,
+          "reference_observed_rse": 0.005470994549494235,
+          "candidate_observed_rse": 0.005470994549494235,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.0007658666666666667,
+          "status": "passed",
+          "zero_discordance_planning_n": 9339,
+          "reason": null,
+          "reference_observed_rse": 0.005470994549494235,
+          "candidate_observed_rse": 0.005470994549494235,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 0.00038293333333333334,
+          "status": "passed",
+          "zero_discordance_planning_n": 18681,
+          "reason": null,
+          "reference_observed_rse": 0.005470994549494235,
+          "candidate_observed_rse": 0.005470994549494235,
+          "observed_rse_within_target": true
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "observable": "transmitted_mu_bin_3",
+      "n": 250000,
+      "prior_scale": 0.0158,
+      "kind": "indicator",
+      "difference_ci": [
+        -2.8618051923393878e-05,
+        2.8618051923393878e-05
+      ],
+      "targets": [
+        {
+          "target_rse": 0.05,
+          "numerical_budget": 0.00026333333333333336,
+          "status": "passed",
+          "zero_discordance_planning_n": 27166,
+          "reason": null,
+          "reference_observed_rse": 0.016762535611727934,
+          "candidate_observed_rse": 0.016762535611727934,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.02,
+          "numerical_budget": 0.00010533333333333335,
+          "status": "passed",
+          "zero_discordance_planning_n": 67920,
+          "reason": null,
+          "reference_observed_rse": 0.016762535611727934,
+          "candidate_observed_rse": 0.016762535611727934,
+          "observed_rse_within_target": true
+        },
+        {
+          "target_rse": 0.01,
+          "numerical_budget": 5.2666666666666675e-05,
+          "status": "passed",
+          "zero_discordance_planning_n": 135844,
+          "reason": null,
+          "reference_observed_rse": 0.016762535611727934,
+          "candidate_observed_rse": 0.016762535611727934,
+          "observed_rse_within_target": false
+        }
+      ]
+    }
+  ],
+  "qualified_T_epsilon": false,
+  "interpretation": "Reuse of the original 32 simultaneous intervals at nested tolerances; no new confidence family or data. Relative tolerances use frozen independent planning means, not confidence bounds on unknown physical means. Observed RSE is descriptive; zero/undefined RSE does not qualify precision. Zero-discordance counts are planning floors under that exact scenario, not sufficient populations or authorization for additional sampling. Step/cutoff/table/quadrature and cross-engine gates remain separate.",
+  "input_summary_sha256": "e07412864b0bed69885a98ed8f9060c2c29670d9c0750ee72d944b2af3ccbcfb",
+  "audit_source_sha256": "42fbf842bb835a9448c9dda72ce0cb622f9514f58a9b34a275046834f18bdf11"
+}

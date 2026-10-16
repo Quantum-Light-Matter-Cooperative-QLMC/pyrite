@@ -212,3 +212,63 @@ This completes the bounded quotient-precision experiment. Production remains
 unchanged. Other energies, materials, detector scores, cutoff/step convergence,
 full distribution comparisons and cross-engine time-to-precision remain outside
 this result and require their own acceptance checks under issue #510.
+
+## Stricter numerical-budget audit
+
+The 5% relative photon-yield margins above are equivalence tolerances. Issue
+#510 separately requires each numerical change to fit within one-third of the
+statistical-error budget at target RSEs of 5%, 2% and 1%. Reusing the same
+simultaneous intervals against these nested budgets gives:
+
+| Target RSE | Numerical intervals inside budget | Unresolved | Failed |
+| --- | ---: | ---: | ---: |
+| 5% | 21 / 32 | 11 | 0 |
+| 2% | 20 / 32 | 12 | 0 |
+| 1% | 20 / 32 | 12 | 0 |
+
+The audit uses `prior_reference_mean × target_RSE / 3` as the absolute numerical
+budget. These are the independently frozen planning means, not current held-out
+means or confidence bounds on unknown physical means. It reuses the original
+32-interval family, so evaluating three nested budgets adds no comparisons or
+new inference. Two side-exit scores have zero planning means and no declared
+absolute floor for this stricter gate; they remain unresolved at every target.
+An interval crossing a budget is unresolved, not evidence of a discrepancy.
+
+At 5%, seven photon-count comparisons and both photon-energy comparisons are
+unresolved in addition to those two side-exit scores. W photons above 100 keV
+pass this budget at 5%, but remain unresolved at 2% and 1%. The diagnostic
+observed RSEs are recorded separately and never stand in for numerical accuracy;
+zero/undefined RSE does not establish precision.
+
+The Si 10–50 keV budget at the 5% target is 0.0000733333 photons per primary.
+Its current interval is ±0.000178865. For the exact zero-discordance mismatch
+bound alone to fit that budget requires at least 2926885 paired Si primaries;
+the corresponding W planning floor is 542013. At the 2% and 1% targets these
+Si floors rise to 7317217 and 14634437. These calculations assume zero future
+count differences, the same confidence family and unchanged physical support.
+They are neither guaranteed sufficient populations nor permission for optional
+stopping or pooling a later study into this one. Photon-energy scores already
+differ and require their own variance-based planning.
+
+The [machine-readable budget audit](../check-records/equal-precision/quotient-budget-summary.json)
+preserves every interval, budget, descriptive RSE and zero-discordance planning
+floor. Reproduce from the completed study without running transport:
+
+```bash
+uv run python checks/equal_precision/audit_precision_budget.py \
+  docs/validation/check-records/equal-precision/quotient-equivalence-summary.json \
+  --protocol scratch/quotient/1378/source/precision-quotient.json \
+  --output /tmp/quotient-budget-summary.json
+```
+
+Use the captured protocol's original bytes from the evidence archive. The tool
+rejects incomplete families, mismatched protocol/source pins, duplicate scores,
+invalid intervals and changed confidence/support pins. Boundary arithmetic,
+nested-budget outcomes, zero scales and corrupt-family rejection have focused
+regression checks. No extra GPU samples were collected for this audit. A later
+fixed design needs its own population/seed plan and must also address step,
+cutoff, table and quadrature convergence before any time-to-precision ranking.
+
+The [small numerical/backend follow-up](cheap-numerical-validation.md) audits
+table coverage, active step controls, cutoff sensitivity and comparator thresholds
+without extending this precision study.

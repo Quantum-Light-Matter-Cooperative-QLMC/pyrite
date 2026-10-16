@@ -1,0 +1,498 @@
+{
+  "schema": "pyrite.equal-precision.step-activity-summary.v1",
+  "job": 1413,
+  "partition": "cpu",
+  "wall_seconds": 67,
+  "complete_fixed_probe": true,
+  "results": [
+    {
+      "scene": "si-100-1um-0deg",
+      "cap": 0.001,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 975,
+          "energy_limited_rows": 198,
+          "primaries_with_energy_substeps": 64,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 1.1102230246251565e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 975,
+          "energy_limited_rows": 220,
+          "primaries_with_energy_substeps": 64,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "si-100-1um-0deg",
+      "cap": 0.025,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 776,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 1.1102230246251565e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 754,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 1.1102230246251565e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "si-100-1um-0deg",
+      "cap": 0.05,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 776,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 1.1102230246251565e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 754,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 1.1102230246251565e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "cap": 0.001,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 73493,
+          "energy_limited_rows": 8397,
+          "primaries_with_energy_substeps": 64,
+          "energy_ledger_max_error_keV": 8.526512829121202e-13,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 68427,
+          "energy_limited_rows": 5589,
+          "primaries_with_energy_substeps": 64,
+          "energy_ledger_max_error_keV": 3.979039320256561e-13,
+          "photon_debit_max_error_keV": 1.1546319456101628e-14,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "cap": 0.025,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 65094,
+          "energy_limited_rows": 2,
+          "primaries_with_energy_substeps": 2,
+          "energy_ledger_max_error_keV": 9.663381206337363e-13,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 62835,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 7.958078640513122e-13,
+          "photon_debit_max_error_keV": 5.329070518200751e-15,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "cap": 0.05,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 65092,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 9.663381206337363e-13,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 62835,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 7.958078640513122e-13,
+          "photon_debit_max_error_keV": 5.329070518200751e-15,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "si-800-100um-0deg",
+      "cap": 0.001,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 26896,
+          "energy_limited_rows": 15,
+          "primaries_with_energy_substeps": 12,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 26055,
+          "energy_limited_rows": 4,
+          "primaries_with_energy_substeps": 4,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 8.881784197001252e-15,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "si-800-100um-0deg",
+      "cap": 0.025,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 26881,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 26051,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 8.881784197001252e-15,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "si-800-100um-0deg",
+      "cap": 0.05,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 26881,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 26051,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 8.881784197001252e-15,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "w-100-100um-75deg",
+      "cap": 0.001,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 96303,
+          "energy_limited_rows": 23742,
+          "primaries_with_energy_substeps": 57,
+          "energy_ledger_max_error_keV": 4.547473508864641e-13,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 83265,
+          "energy_limited_rows": 19712,
+          "primaries_with_energy_substeps": 60,
+          "energy_ledger_max_error_keV": 4.831690603168681e-13,
+          "photon_debit_max_error_keV": 6.217248937900877e-15,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "w-100-100um-75deg",
+      "cap": 0.025,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 72547,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 2.1316282072803006e-13,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 63543,
+          "energy_limited_rows": 1,
+          "primaries_with_energy_substeps": 1,
+          "energy_ledger_max_error_keV": 1.5631940186722204e-13,
+          "photon_debit_max_error_keV": 5.329070518200751e-15,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "w-100-100um-75deg",
+      "cap": 0.05,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 72547,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 2.1316282072803006e-13,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 63542,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 1.5631940186722204e-13,
+          "photon_debit_max_error_keV": 5.329070518200751e-15,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "cap": 0.001,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 120555,
+          "energy_limited_rows": 2527,
+          "primaries_with_energy_substeps": 20,
+          "energy_ledger_max_error_keV": 3.979039320256561e-13,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 138265,
+          "energy_limited_rows": 2063,
+          "primaries_with_energy_substeps": 20,
+          "energy_ledger_max_error_keV": 6.821210263296962e-13,
+          "photon_debit_max_error_keV": 2.1316282072803006e-14,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "cap": 0.025,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 118027,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 1.1937117960769683e-12,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 136202,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 3.979039320256561e-13,
+          "photon_debit_max_error_keV": 2.1316282072803006e-14,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "cap": 0.05,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 118027,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 1.1937117960769683e-12,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 136202,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 3.979039320256561e-13,
+          "photon_debit_max_error_keV": 2.1316282072803006e-14,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "w-800-10um-0deg",
+      "cap": 0.001,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 51002,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 47561,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 5.684341886080802e-14,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "w-800-10um-0deg",
+      "cap": 0.025,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 51002,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 47561,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 5.684341886080802e-14,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    },
+    {
+      "scene": "w-800-10um-0deg",
+      "cap": 0.05,
+      "seed": 68001,
+      "histories": 64,
+      "activity": {
+        "warmup": {
+          "primaries": 64,
+          "rows": 51002,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 0.0,
+          "direction_norm_max_error": 2.220446049250313e-16
+        },
+        "measurement": {
+          "primaries": 64,
+          "rows": 47561,
+          "energy_limited_rows": 0,
+          "primaries_with_energy_substeps": 0,
+          "energy_ledger_max_error_keV": 0.0,
+          "photon_debit_max_error_keV": 5.684341886080802e-14,
+          "direction_norm_max_error": 2.220446049250313e-16
+        }
+      },
+      "probe_source_sha256": "1d468e3c876ec421051fd58ccf56d304821eeac1c2579a40239488789d3e09ae"
+    }
+  ],
+  "archive": "scratch/cheap-validation-results/activity-evidence.tar.gz",
+  "archive_sha256": "605b62ac1613cd0c53909034834cfc9e5b3ddc541d2aa578fe2eaa06b04e3bc4",
+  "interpretation": "Separate fresh CPU probe, not pooled into the 288 comparison family; counts indicate cap activity, not numerical accuracy."
+}

@@ -311,3 +311,21 @@ requires all nine held-out directories, the captured protocol and preflight;
 its paired-primary intervals preserve uncertainty even at zero differences.
 Source/input/provenance mismatches raise errors; missing or failed fixed replicas
 prevent qualification. No production precision option is introduced.
+
+The completed interval family can also be audited against issue #510's stricter
+one-third numerical budget without rerunning transport. `audit_precision_budget.py`
+uses the independent frozen planning scales at 5%, 2% and 1% target RSE, keeps
+observed RSE separate, and leaves zero planning means without absolute floors
+unresolved. See the method page for the command, outcomes and planning limits.
+
+### Small numerical/backend validation
+
+`cheap-validation.json` freezes the small production-FP64 step/cutoff and CPU/GPU
+pilot. `cheap-validation.sbatch` separates CPU/GPU allocations with explicit
+5/10-minute submission limits. `benchmark_validation.py` wraps the unchanged
+adapter with trajectory/domain/control audits; `analyze_cheap_validation.py`
+requires the complete fixed grid before issuing paired intervals. A separate
+`probe_step_activity.py` / `step-activity.sbatch` measures actual energy-limited
+substeps with a two-minute CPU cap. See the
+[method, results and commands](../../docs/validation/beam-transport/cheap-numerical-validation.md).
+Small samples and inactive controls must not be reported as convergence.
