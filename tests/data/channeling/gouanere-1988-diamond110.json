@@ -1,0 +1,29 @@
+{
+  "source": {
+    "doi": "10.1103/PhysRevB.38.4352",
+    "zotero_item": "JH6GS3ZP",
+    "zotero_attachment": "PTCL75Q7",
+    "page": 4360,
+    "table": "II",
+    "verified": "2026-10-15",
+    "method": "Visual transcription of PDF page 9; columns 3, 4, 5, 9 and 10"
+  },
+  "material": "diamond",
+  "plane_hkl": [1, 1, 0],
+  "kinetic_energy_MeV": 80.23,
+  "thickness_um": 22.0,
+  "temperature": "room temperature",
+  "incidence_rad": 0.0,
+  "columns": {
+    "observed_peak_keV": "4: experimental maximum, before multiple-scattering shift correction",
+    "observed_fwhm_keV": "5: experimental FWHM, includes broadening",
+    "intrinsic_transverse_fwhm_eV": "9: Gamma_I/(2 gamma^2), corrected intrinsic FWHM; not HWHM",
+    "forward_energy_keV": "10: experimental forward energy, corrected for multiple scattering"
+  },
+  "lines": [
+    {"upper": 1, "lower": 0, "observed_peak_keV": 310.2, "observed_fwhm_keV": 27.8, "intrinsic_transverse_fwhm_eV": 0.32, "forward_energy_keV": 313.4},
+    {"upper": 2, "lower": 1, "observed_peak_keV": 211.7, "observed_fwhm_keV": 19.7, "intrinsic_transverse_fwhm_eV": 0.32, "forward_energy_keV": 213.9},
+    {"upper": 3, "lower": 2, "observed_peak_keV": 162.8, "observed_fwhm_keV": 16.7, "intrinsic_transverse_fwhm_eV": 0.26, "forward_energy_keV": 164.6},
+    {"upper": 4, "lower": 3, "observed_peak_keV": 128.8, "observed_fwhm_keV": 16.3, "intrinsic_transverse_fwhm_eV": 0.31, "forward_energy_keV": 130.1}
+  ]
+}

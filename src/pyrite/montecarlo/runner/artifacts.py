@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 
 from ..._energy_grid_encoding import decode_energy_grid
-from ..case import Case
+from ..case import Case, refuse_channeling
 from ..geometry import tilted_geometry
 from ..groove import blazed_groove_spec
 from ..trajectories import (
@@ -223,6 +223,7 @@ def _checked_case_and_inputs(artifact, case):
             f"trajectory artifact {artifact.path} records a different case than requested"
         )
     case = stored
+    refuse_channeling(case, "trajectory-artifact replay")
     _check_physics_provenance(artifact)
     E_grid, E_brem, _beam, n_hat, groove = _case_geometry(case)
     expected: dict[str, Any] = {

@@ -108,6 +108,14 @@ channeling/cr-density-matrix-split-operator
 channeling/cr-density-matrix-split-operator-abtem
 channeling/cr-mcwf-unravelling
 channeling/cr-dechanneling-collapse-kephart
+channeling/cr-dipole-rate
+channeling/cr-boosted-dipole-angular
+channeling/cr-line-shape
+channeling/cr-yield-assembly
+channeling/cr-capture-bound
+channeling/cr-capture-yield
+channeling/cr-transition-radiation-bound
+channeling/cr-zone-handoff-accounting
 ```
 
 ```{toctree}

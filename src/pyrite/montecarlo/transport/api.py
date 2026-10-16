@@ -8,7 +8,7 @@ import logging
 import numpy as np
 
 from ..._numerics import DEFAULT_RADIATIVE_CUTOFF_EV
-from ..geometry import beam_frame_basis, validate_transverse_dimensions
+from ..geometry import validate_transverse_dimensions
 from .arguments import resolve_cutoffs_by_electron, resolve_layers_and_elastic
 from .batching import (
     DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
@@ -22,6 +22,8 @@ from .beam_entry import (
     check_electron_block,
     initial_beam_positions,
     initial_energies_keV,
+    normalized_beam_dir,
+    primary_directions,
     resolve_bunch_times,
     table_energy_range,
 )
@@ -587,28 +589,8 @@ def simulate_trajectories(
         energy_spread_frac=energy_spread_frac,
         bunch_front_tilt=bunch_front_tilt,
     )
-    if beam_dir is None:
-        beam_dir = np.array([0.0, 0.0, 1.0])
-    beam_dir = np.asarray(beam_dir, dtype=float)
-    if beam_dir.shape != (3,) or not np.all(np.isfinite(beam_dir)):
-        raise ValueError("beam_dir must be a finite three-vector")
-    beam_norm = np.linalg.norm(beam_dir)
-    if not np.isfinite(beam_norm) or beam_norm == 0.0:
-        raise ValueError("beam_dir must be nonzero")
-    beam_dir = beam_dir / beam_norm
-    if beam_dir[2] <= 1e-6:
-        raise ValueError("beam_dir must point into the slab (z component > 0)")
-    if transverse_slopes is None:
-        dirs = np.tile(beam_dir, (Ne, 1))
-    else:
-        # Slopes are dx/dz, dy/dz about the beam axis, so the per-electron
-        # direction is (x', y', 1) in the beam frame. Zero emittance gives
-        # exactly `beam_dir` back, which is what makes the collimated limit
-        # bit-for-bit rather than merely close.
-        x_prime, y_prime = transverse_slopes
-        basis = beam_frame_basis(beam_dir)
-        dirs = x_prime[:, None] * basis[:, 0] + y_prime[:, None] * basis[:, 1] + beam_dir
-        dirs /= np.linalg.norm(dirs, axis=1, keepdims=True)
+    beam_dir = normalized_beam_dir(beam_dir)
+    dirs = primary_directions(beam_dir, transverse_slopes, Ne)
     E_keV = initial_energies_keV(E0_keV, Ne, seed, energy_spread_frac, start=electron_start)
     gdf_t0 = None
     if gdf_source is not None:

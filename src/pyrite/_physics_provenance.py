@@ -69,6 +69,9 @@ def resolved_physics_view(
         selections["transport.pair"] = resolved["pair_production_model"]
     if resolved.get("positron_transport"):
         selections["transport.positron"] = "positron"
+    channeling = resolved.get("channeling")
+    if channeling is not None:
+        selections["transport.channeling"] = channeling["model"]
     # Reuse facade policy with legacy defaults, without mutating Case omissions.
     Physics(
         elastic_model=selections["transport.elastic"],
@@ -99,6 +102,10 @@ def resolved_physics_view(
     }
     if resolved.get("coherent_emission", False):
         markers["coherent_population_model"] = COHERENT_POPULATION_MODEL
+    if channeling is not None:
+        from .montecarlo.channeling.handoff import CHANNELING_MODEL
+
+        markers["channeling_model"] = CHANNELING_MODEL
     return ResolvedPhysicsView(
         descriptor_ids=tuple(descriptor.id for descriptor in descriptors),
         model_markers=tuple(markers.items()),

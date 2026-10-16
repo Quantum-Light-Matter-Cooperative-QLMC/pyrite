@@ -31,6 +31,7 @@ from .._grid_semantics import is_uniform_grid
 from .._progress import _ProgressTimer, _write_progress_record
 from ..console.outputs import output_dir
 from ..montecarlo import runner
+from ..montecarlo.case import refuse_channeling
 from . import _checkpoint_store
 from .persistence import (
     _checkpoint_exists,
@@ -523,6 +524,8 @@ def repair_brem_wide(
                     n_skipped += 1
                     continue
             todo.append(r)
+    for r in todo:
+        refuse_channeling(r["case"], "checkpoint recompute")
     if on_progress is not None:
         on_progress(0, len(todo), n_skipped)
     if not todo:
@@ -758,6 +761,8 @@ def repair_cxr_spec(
                 n_skipped += 1
                 continue
             todo.append((r, target))
+    for r, _ in todo:
+        refuse_channeling(r["case"], "checkpoint recompute")
     if on_progress is not None:
         on_progress(0, len(todo), n_skipped)
     if not todo:

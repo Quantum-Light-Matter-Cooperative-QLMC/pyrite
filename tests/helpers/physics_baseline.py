@@ -148,3 +148,97 @@ def _assert_output_values(actual, expected, path):
         np.testing.assert_allclose(
             actual_array, expected_array, rtol=rtol, atol=0, equal_nan=False, err_msg=path
         )
+
+
+def _channeling_scene(physics_kwargs=None):
+    import pyrite as pr
+
+    physics = pr.Physics(
+        elastic_model="mott",
+        inelastic_model="continuous",
+        bremsstrahlung_model="eedl",
+        radiative_model="uncoupled",
+        channeling_model="planar",
+        channeling_plane=(1, -1, 0),
+        **(physics_kwargs or {}),
+    )
+    return pr.Scene(
+        pr.Beam(energy_keV=5000.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Slab(
+            "silicon",
+            thickness_ang=20000.0,
+            tilt_deg=3.0,
+            tilt_azim_deg=45.0,
+            footprint=Footprint(5.0, 5.0),
+        ),
+        pr.Detector(),
+        physics=physics,
+    )
+
+
+_CHANNELING_BINS = dict(
+    cxr=np.array([1500.0, 1750.0, 2000.0]), brem=np.array([5000.0, 10000.0, 15000.0])
+)
+
+
+def channeling_output_baseline():
+    """Seeded CPU transport and spectra of the channeling family on a small zone grid.
+
+    Sixteen electrons, ``H = 12``, four Bloch cells, ``dz = 500`` angstrom, the
+    per-electron core. Pins the joined zone + native rows, the sampled fates and
+    the small spectra (#506).
+    """
+    import warnings
+
+    import pyrite as pr
+    from pyrite.api import build_case
+    from pyrite.montecarlo import runner
+
+    numerics = pr.Numerics(
+        cxr_trials=16,
+        brem_trials=16,
+        energy_bins=EnergyBins(**_CHANNELING_BINS),
+        channeling_basis_size=12,
+        channeling_bloch_cells=4,
+        channeling_dz_ang=500.0,
+    )
+    case = build_case(_channeling_scene(), numerics)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)  # small basis: overflow warning
+        transport = runner._transport_case(case, transport_core="per-electron")
+        out = runner._spectrum_case(case, transport)
+    segments = transport["segs"]
+    return {
+        "transport": {
+            **transport_signature(segments),
+            "zone_rows": int(np.count_nonzero(segments["channeling_zone"])),
+        },
+        "fates": {key: int(value) for key, value in segments["channeling"]["fates"].items()},
+        "spectra": {
+            "spec": out["spec"],
+            "spec_characteristic": out["spec_characteristic"],
+            "brem": out["brem"],
+        },
+    }
+
+
+def resolved_channeling_baseline():
+    """Return the planar channeling family (#506): resolved mapping and content key.
+
+    Built through the public Scene path, the only one that can select
+    channeling (profiles and checkpoints cannot, #507). Every selector is
+    explicit so no installed table inventory participates. The beam lies in
+    the Si (1-10) planes, 3 deg from the (110) face normal and far from a
+    low-index axis, so the gates neither refuse nor warn.
+    """
+    import pyrite as pr
+    from pyrite.api import build_case
+
+    scene = _channeling_scene()
+    numerics = pr.Numerics(
+        cxr_trials=4,
+        brem_trials=4,
+        energy_bins=EnergyBins(**_CHANNELING_BINS),
+    )
+    case = build_case(scene, numerics)
+    return {"case": case.to_dict(), "case_content_key": case_content_key(case)}

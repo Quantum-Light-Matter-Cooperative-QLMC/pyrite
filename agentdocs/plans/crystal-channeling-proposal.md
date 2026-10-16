@@ -610,7 +610,7 @@ engine.
    P0 removes the Geant4 ownership map from both research docs.
 3. **Orientation depends on #25** (D7-a). P1 is blocked by #25's independent
    face/lattice orientation.
-4. **Emission between free and bound states: (a) chosen** (bound→bound lines in v1, plus a P3 capture bound).
+4. **Emission between free and bound states: (a) chosen** (bound→bound lines in v1, plus a P3 capture bound). *Superseded for capture (maintainer, 2026-10-15):* the P3 bound came out at ~40% of the line yield (Kephart 17 MeV), so #505 scores free→bound capture from the tracked above-barrier states, option (b) with margin sensitivity reported (`cr-capture-yield`).
    - *Correction to the walkthrough:* bound→free cannot *emit*. Photon emission
      lowers $E_\perp$, and free states lie above the barrier, above every bound
      level. The emitting process is **free→bound radiative capture**. It gives a

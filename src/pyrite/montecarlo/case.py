@@ -80,6 +80,7 @@ _CASE_KEY_ORDER = (
     "pair_production_model",
     "positron_transport",
     "atomic_electron_deflection",
+    "channeling",
     "beam_uvw",
     "surface_hkl",
     "mosaic_fwhm_rad",
@@ -200,6 +201,14 @@ class Case(Mapping[str, Any]):
         elastic-rate correction, which :class:`~pyrite.Numerics` lowers to by
         default; absent is elastic-only deflection, so earlier case keys stay
         valid. Shell soft/hard transport needs ``elastic_model``.
+    channeling
+        Opt-in planar quantum channeling zone (ADR-0018, #506): the resolved
+        record ``{"model": "planar", "plane_hkl", "temperature_K",
+        "margin_eV", "basis_size", "bloch_cells", "dz_ang", "zone_max_ang"}``
+        (see :func:`channeling_case_record`). Absent is amorphous transport,
+        so every pre-channeling case key stays valid. Requires
+        ``energy_model``; excludes coupled radiative transport, secondaries,
+        coherent emission, grooves, multilayer stacks, mosaic and GDF beams.
     E_cut_lines_keV, E_cut_brem_keV, sinc_cutoff, brem_step_eV
         Legacy/manual cutoff, truncation, and grid controls.
     coherent_flat_omission_limit
@@ -293,6 +302,7 @@ class Case(Mapping[str, Any]):
     # Append slots to preserve the positional state of older Case pickles.
     adaptive_precision: dict[str, object] | _Absent = _ABSENT
     coherent_flat_omission_limit: float | _Absent = _ABSENT
+    channeling: dict[str, object] | _Absent = _ABSENT
 
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
@@ -404,6 +414,8 @@ class Case(Mapping[str, Any]):
                     "the resonance-local line grid needs line_quadrature='bin-mean': node "
                     "quadrature loses unbounded yield at its spacing joins (#192)"
                 )
+        if self.channeling is not _ABSENT:
+            self._validate_channeling()
         if self.coherent_flat_omission_limit is not _ABSENT:
             _positive(
                 "coherent_flat_omission_limit", self.coherent_flat_omission_limit, allow_zero=True
@@ -422,6 +434,46 @@ class Case(Mapping[str, Any]):
                     "line_quadrature='bin-mean' is incompatible with max_dE_frac: "
                     "numerical substeps add amplitudes before squaring"
                 )
+
+    def _validate_channeling(self) -> None:
+        record = self.channeling
+        if not isinstance(record, Mapping) or set(record) != set(CHANNELING_RECORD_KEYS):
+            raise ValueError(
+                "channeling must be a record with keys " + ", ".join(CHANNELING_RECORD_KEYS)
+            )
+        if record["model"] != "planar":
+            raise ValueError("channeling model must be 'planar'")
+        hkl = record["plane_hkl"]
+        if (
+            not isinstance(hkl, tuple)
+            or len(hkl) != 3
+            or any(isinstance(v, bool) or not isinstance(v, int) for v in hkl)
+            or hkl == (0, 0, 0)
+        ):
+            raise ValueError("channeling plane_hkl must be a nonzero integer triple")
+        for key in ("temperature_K", "margin_eV", "dz_ang"):
+            _positive(f"channeling {key}", record[key])
+        for key in ("basis_size", "bloch_cells"):
+            _positive_int(f"channeling {key}", record[key])
+        _positive_optional("channeling zone_max_ang", record["zone_max_ang"])
+        if self.energy_model != "midpoint":
+            raise ValueError("channeling requires energy_model='midpoint'")
+        refused = {
+            "radiative_model": "coupled radiative transport",
+            "secondary_threshold_eV": "secondary transport",
+            "coherent_emission": "coherent emission",
+            "temporal_profile": "temporal profiles",
+            "groove_spacing_ang": "a grooved entrance face",
+            "gdf_source": "GDF beams",
+            "adaptive_precision": "adaptive precision",
+        }
+        for key, what in refused.items():
+            if getattr(self, key) is not _ABSENT:
+                raise ValueError(f"channeling does not support {what}")
+        if self.abs_layers is not None:
+            raise ValueError("channeling supports a single-layer slab only")
+        if self.mosaic_fwhm_rad or self.mosaic_mc_fwhm_rad:
+            raise ValueError("channeling does not support mosaic crystals")
 
     def _validate_radiative(self) -> None:
         if self.radiative_model != "bremslib-soft-hard":
@@ -472,6 +524,52 @@ class Case(Mapping[str, Any]):
 
     def __len__(self) -> int:
         return sum(getattr(self, key) is not _ABSENT for key in _CASE_KEY_ORDER)
+
+
+#: Keys of the resolved ``Case.channeling`` record, in canonical order.
+CHANNELING_RECORD_KEYS = (
+    "model",
+    "plane_hkl",
+    "temperature_K",
+    "margin_eV",
+    "basis_size",
+    "bloch_cells",
+    "dz_ang",
+    "zone_max_ang",
+)
+
+
+def refuse_channeling(case: Mapping[str, Any], consumer: str) -> None:
+    """Raise before any work when ``consumer`` cannot run a channeling case.
+
+    ADR-0017 tier-3 rule: every consumer path either supports the planar
+    channeling zone (#506) or refuses it before transport or output writes.
+    """
+    if case.get("channeling") is not None:
+        raise ValueError(f"{consumer} does not support channeling cases (#506)")
+
+
+def channeling_case_record(
+    plane_hkl: tuple[int, int, int],
+    *,
+    temperature_K: float,
+    margin_eV: float,
+    basis_size: int,
+    bloch_cells: int,
+    dz_ang: float,
+    zone_max_ang: float | None,
+) -> dict[str, object]:
+    """Return the canonical ``Case.channeling`` record for a planar zone."""
+    return {
+        "model": "planar",
+        "plane_hkl": tuple(int(v) for v in plane_hkl),
+        "temperature_K": float(temperature_K),
+        "margin_eV": float(margin_eV),
+        "basis_size": int(basis_size),
+        "bloch_cells": int(bloch_cells),
+        "dz_ang": float(dz_ang),
+        "zone_max_ang": None if zone_max_ang is None else float(zone_max_ang),
+    }
 
 
 def _finite(name: str, value: object) -> None:

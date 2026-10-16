@@ -47,6 +47,11 @@ EVENT_HARD_RADIATIVE = np.int8(9)
 EVENT_DELTA = np.int8(10)
 # A transported positron annihilated in flight (#295); always its track's last row.
 EVENT_ANNIHILATION = np.int8(11)
+# The electron left the planar channeling zone (#506): the row is its straight
+# mean zone segment, and the next row is native transport from the handoff
+# state. Position, clock and energy are continuous across it; direction is not.
+# Native cores never emit it.
+EVENT_DECHANNEL = np.int8(12)
 
 
 class SegmentEvent(IntEnum):
@@ -64,6 +69,7 @@ class SegmentEvent(IntEnum):
     HARD_RADIATIVE = int(EVENT_HARD_RADIATIVE)
     DELTA = int(EVENT_DELTA)
     ANNIHILATION = int(EVENT_ANNIHILATION)
+    DECHANNEL = int(EVENT_DECHANNEL)
 
 
 RESERVED_EVENTS = frozenset(
@@ -73,7 +79,12 @@ RESERVED_EVENTS = frozenset(
 # boundary: it closes the flight, and default radiation reductions add the
 # flights on either side incoherently.
 PHYSICAL_INTERACTIONS = frozenset(
-    {SegmentEvent.ELASTIC, SegmentEvent.HARD_INELASTIC, SegmentEvent.HARD_RADIATIVE}
+    {
+        SegmentEvent.ELASTIC,
+        SegmentEvent.HARD_INELASTIC,
+        SegmentEvent.HARD_RADIATIVE,
+        SegmentEvent.DECHANNEL,
+    }
 )
 GEOMETRY_EVENTS = frozenset(
     {
@@ -154,7 +165,9 @@ def check_segment_event_contract(segments, *, rtol=1e-12, atol_ang=1e-5):
       and clock and position continuous except across a groove surface, whose
       vacuum leg moves both forward;
     - a terminal event is its electron's last row, and every electron's last
-      row is terminal or a groove surface (escape through a facet).
+      row is terminal or a groove surface (escape through a facet);
+    - a dechanneling row is its electron's first row (the channeling zone
+      precedes native transport) and never its last.
 
     ``atol_ang`` absorbs the interface nudge transport applies after a layer
     crossing. Frozen rows have no ``event_kind``; the check requires midpoint
@@ -244,6 +257,7 @@ def check_segment_event_contract(segments, *, rtol=1e-12, atol_ang=1e-5):
     last[-1] = True
     last[:-1] = first[1:]
     fail(first & ((fid != 0) | (sid != 0)), "electron does not open at flight 0 substep 0")
+    fail((kind == SegmentEvent.DECHANNEL) & ~first, "dechanneling row is not the electron's first")
 
     terminal = np.isin(kind, [int(k) for k in TERMINAL_EVENTS])
     fail(terminal & ~last, "terminal event is not the electron's last row")

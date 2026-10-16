@@ -202,6 +202,19 @@ BUILTIN_DESCRIPTORS = DescriptorCatalog(
             adaptive_observables=("cxr",),
         ),
         ModelDescriptor(
+            "transport.channeling",
+            "planar",
+            "montecarlo.channeling",
+            (
+                "channeling thermal data for the crystal",
+                "at least one bound planar state at the beam energy",
+                "single-layer ungrooved slab without mosaic",
+                "midpoint integration, uncoupled radiative scoring, no secondaries",
+            ),
+            implementations=("cpu.per-electron",),
+            required_datasets=("channeling_thermal",),
+        ),
+        ModelDescriptor(
             "emission.characteristic",
             "characteristic",
             "montecarlo.runner.emission",

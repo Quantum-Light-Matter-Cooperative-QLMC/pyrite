@@ -7,6 +7,7 @@ from .._energy_bins import EnergyBins
 from .._numerics import Numerics, Physics, resolve_physics
 from ..instrument import PlanarDetector
 from ..montecarlo import Case
+from .channeling_cases import resolve_channeling
 
 if TYPE_CHECKING:
     from .model import Scene, Sweep
@@ -69,7 +70,8 @@ def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
     )
     if len(cases) != 1:  # Scene rejects every implicit multi-value field.
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
-    return cases[0]
+    # Opt-in channeling zone (#506): "off" returns the case unchanged.
+    return resolve_channeling(cases, physics, numerics)[0]
 
 
 def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Case]:
