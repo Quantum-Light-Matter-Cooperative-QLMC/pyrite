@@ -5,8 +5,9 @@ state as a Lindblad dissipator. :mod:`.operators` builds its position-space
 kernel ``C(x, x')`` and the decoherence diagnostic; :mod:`.density`
 integrates the density matrix with a dechanneling sink, and :mod:`.mcwf`
 unravels the same equation into per-electron quantum jumps. :mod:`.emission`
-scores bound -> bound channeling radiation on ``rho(z)`` as a diagnostic
-spectrum (P3). CPU only.
+scores channeling radiation on ``rho(z)`` as a diagnostic spectrum (P3) from
+the photon transition primitives of :mod:`.dipole`; :mod:`.transition_radiation`
+bounds the excluded transition-radiation background. CPU only.
 """
 
 from .density import (
@@ -15,28 +16,26 @@ from .density import (
     DensityMatrixResult,
     DensityMatrixSolver,
 )
+from .dipole import (
+    FirstOrderTransition,
+    boosted_dipole_pattern,
+    dipole_rate_per_ang,
+    dipole_stokes,
+    first_order_transition,
+    rest_frame_dipole_rate_inv_s,
+    transition_operator,
+)
 from .emission import (
     KIND_CAPTURE,
     KIND_LINE,
     CaptureBound,
     ChannelingSpectrum,
     EmissionLines,
-    FirstOrderTransition,
     LineGroup,
-    TransitionRadiationBound,
-    boosted_dipole_pattern,
     capture_bound,
     channeling_spectrum,
-    dipole_rate_per_ang,
-    dipole_stokes,
     emission_lines,
-    first_order_transition,
     line_shape,
-    rest_frame_dipole_rate_inv_s,
-    transition_operator,
-    transition_radiation,
-    transition_radiation_bound,
-    transition_radiation_per_eV,
 )
 from .mcwf import MCWFResult, MCWFSolver, mcwf_stream_key
 from .operators import (
@@ -47,6 +46,12 @@ from .operators import (
     electronic_channels,
     electronic_kernel,
     tds_kernel,
+)
+from .transition_radiation import (
+    TransitionRadiationBound,
+    transition_radiation,
+    transition_radiation_bound,
+    transition_radiation_per_eV,
 )
 
 __all__ = [
