@@ -23,6 +23,7 @@ import click
 from ...console import output as _cli_core
 from ...console.outputs import output_dir
 from ...paths import app_dir
+from .._extras import require_cli_extra
 
 NOTEBOOK = str(app_dir() / "analysis_app.py")
 
@@ -47,6 +48,7 @@ def _command(stem):
 
 
 def _export(stem=None):
+    require_cli_extra("apps", feature="pyrite app analysis export")
     stem = stem or _default_stem()
     output = output_dir("results") / f"{stem}.html"
     output.parent.mkdir(parents=True, exist_ok=True)

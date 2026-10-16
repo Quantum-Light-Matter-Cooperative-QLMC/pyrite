@@ -35,6 +35,7 @@ from ..._app_defaults import get_analysis_default
 from ...console.outputs import output_dir
 from ...paths import app_dir
 from .. import _completion as _cli_completion
+from .._extras import require_cli_extra
 
 
 @dataclass(frozen=True)
@@ -106,6 +107,7 @@ def _launch(
     tunnel=False,
     no_token=False,
 ):
+    require_cli_extra("apps", feature=f"pyrite app {app.name} launch")
     cmd = _command(app, material, edit=edit, watch=watch, tunnel=tunnel, no_token=no_token)
     click.echo(f"launching {app.notebook} ({'edit' if edit else 'run'}) with material={material}")
     if tunnel:
@@ -126,6 +128,7 @@ def _launch(
 
 def _export(app, stem: str | None, material: str | None) -> None:
     """Export the app's HTML without starting a marimo server or browser."""
+    require_cli_extra("apps", feature=f"pyrite app {app.name} export")
     resolved = resolve_material(material)
     stem = stem or f"pyrite_{app.name}_{resolved}"
     output = output_dir("results") / f"{stem}.html"

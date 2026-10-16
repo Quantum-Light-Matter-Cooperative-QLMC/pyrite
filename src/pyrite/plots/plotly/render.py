@@ -7,7 +7,7 @@ fixed-camera video (arbitrary frame count, no payload ceiling) for the viewer's
 Carlo transport, no new physics, so no validation-ledger marker is needed here.
 
 Heavy deps (``kaleido``, ``imageio``, ``imageio-ffmpeg``) are optional (extra
-``viz-render``) and imported lazily inside :func:`render_reveal_animation` so
+``plots``) and imported lazily inside :func:`render_reveal_animation` so
 importing this module never requires them.
 """
 
@@ -21,6 +21,7 @@ from pyrite.plots.plotly.trajectories import (
     trajectory_volume_figure_from_data,
 )
 
+from ..._extras import require_extra
 from ...console.outputs import output_dir
 
 _RENDER_SALT = "v2"  # bump on any change to the cache-key inputs or render format
@@ -60,25 +61,11 @@ def render_reveal_animation(
     ``progress_cb(k, n_frames)``, if given, is called once per frame after that
     frame's PNG has been rendered.
 
-    Returns ``Path(out_path)``. Raises ``RuntimeError`` naming the
-    ``viz-render`` install extra if kaleido/imageio are not installed.
+    Returns ``Path(out_path)``. Raises :class:`~pyrite._extras.MissingExtraError`
+    naming the ``plots`` install extra if kaleido/imageio are not installed.
     """
-    try:
-        import imageio.v3 as iio
-    except ImportError as exc:
-        raise RuntimeError(
-            "render_reveal_animation requires the optional 'viz-render' extra "
-            "(kaleido, imageio, imageio-ffmpeg). Install with "
-            '`uv sync --extra viz-render` or `pip install "pyrite-mc[viz-render]"`.'
-        ) from exc
-    try:
-        import kaleido  # noqa: F401  (import-only availability check)
-    except ImportError as exc:
-        raise RuntimeError(
-            "render_reveal_animation requires the optional 'viz-render' extra "
-            "(kaleido, imageio, imageio-ffmpeg). Install with "
-            '`uv sync --extra viz-render` or `pip install "pyrite-mc[viz-render]"`.'
-        ) from exc
+    require_extra("plots", "imageio", "kaleido", feature="render_reveal_animation")
+    import imageio.v3 as iio
 
     out_path = Path(out_path)
     t_max = dataset_t_max(data)

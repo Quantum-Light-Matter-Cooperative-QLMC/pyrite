@@ -83,16 +83,14 @@ def test_prune_render_cache_keeps_newest_files(tmp_path, monkeypatch):
 
 
 def test_render_reveal_animation_raises_clear_error_when_deps_missing(monkeypatch):
-    import builtins
+    import pyrite._extras as extras
 
-    real_import = builtins.__import__
+    real_find_spec = extras.find_spec
+    monkeypatch.setattr(
+        extras,
+        "find_spec",
+        lambda name: None if name in ("imageio", "kaleido") else real_find_spec(name),
+    )
 
-    def fake_import(name, *args, **kwargs):
-        if name in ("imageio.v3", "kaleido"):
-            raise ImportError(f"no module named {name}")
-        return real_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", fake_import)
-
-    with pytest.raises(RuntimeError, match="viz-render"):
+    with pytest.raises(extras.MissingExtraError, match=r"pyrite-mc\[plots\]"):
         render_reveal_animation(None, {"start_xyz": [], "end_xyz": []}, "out.mp4")

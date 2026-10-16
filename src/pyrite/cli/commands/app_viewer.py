@@ -41,6 +41,7 @@ from ...console.outputs import output_dir
 from ...paths import app_dir
 from .. import _completion as _cli_completion
 from .._deprecations import canonical_option
+from .._extras import require_cli_extra
 
 NOTEBOOK = str(app_dir() / "trace_app.py")
 TUNNEL_PORT = 2719
@@ -85,6 +86,7 @@ def _smoke_command(material, output):
 
 def _export(stem: str | None, material: str | None) -> None:
     """Export viewer HTML without starting a marimo server or browser."""
+    require_cli_extra("apps", feature="pyrite app viewer export")
     resolved = material or get_viewer_default() or "hopg"
     stem = stem or f"pyrite_viewer_{resolved}"
     output = output_dir("results") / f"{stem}.html"
@@ -96,6 +98,7 @@ def _export(stem: str | None, material: str | None) -> None:
 def _launch(
     material, *, edit=False, watch=False, smoke=False, acp=False, tunnel=False, no_token=False
 ):
+    require_cli_extra("apps", feature="pyrite app viewer launch")
     cmd = _command(material, edit=edit, watch=watch, tunnel=tunnel, no_token=no_token)
     print(f"launching {NOTEBOOK} ({'edit' if edit else 'run'}) with material={material}")
     if tunnel:

@@ -23,6 +23,8 @@ pyrite run quickstart
 
 Reference physics tables are downloaded separately by `pyrite tables fetch`.
 For NVIDIA GPUs, install `pyrite-mc[nvidia]` with compatible CUDA drivers.
+For `pyrite.plots`, install `pyrite-mc[plots]`; for the interactive marimo apps
+(`pyrite app ...`), install `pyrite-mc[apps]`.
 
 ## Research status and license
 

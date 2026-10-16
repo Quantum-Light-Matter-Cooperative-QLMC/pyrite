@@ -12,10 +12,9 @@ from pathlib import Path
 from pyrite.devtools import repo_root
 
 ROOT = repo_root()
-EXPECTED_EXTRAS = {"amd", "external-db", "intel", "nvidia"}
+EXPECTED_EXTRAS = {"amd", "apps", "external-db", "intel", "nvidia", "plots"}
 PROJECT_DOCUMENT = tomllib.loads((ROOT / "pyproject.toml").read_text())
 PROJECT_VERSION = PROJECT_DOCUMENT["project"]["version"]
-NOTEBOOK_DEPENDENCIES = PROJECT_DOCUMENT["dependency-groups"]["notebooks"]
 
 
 def _run(*args: str, cwd: Path) -> None:
@@ -23,6 +22,16 @@ def _run(*args: str, cwd: Path) -> None:
     env.pop("VIRTUAL_ENV", None)
     env["PYRITE_MC_BACKEND"] = "cpu"
     subprocess.run(args, cwd=cwd, env=env, check=True)
+
+
+def _run_fails_with_hint(*args: str, cwd: Path, hint: str) -> None:
+    env = os.environ.copy()
+    env.pop("VIRTUAL_ENV", None)
+    env["PYRITE_MC_BACKEND"] = "cpu"
+    result = subprocess.run(args, cwd=cwd, env=env, capture_output=True, text=True)
+    output = result.stdout + result.stderr
+    assert result.returncode != 0, f"{args!r} succeeded without its optional extra"
+    assert hint in output, f"{args!r} did not name {hint!r}:\n{output}"
 
 
 def _python(venv: Path) -> Path:
@@ -112,13 +121,20 @@ def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
     env_home.mkdir()
     _run(pyrite, "--help", cwd=root)
     _run(pyrite, "run", "--help", cwd=root)
+    # Base install: app launches and plot backends must fail with an install hint.
+    _run_fails_with_hint(
+        pyrite, "app", "analysis", "launch", "--smoke", cwd=root, hint="pyrite-mc[apps]"
+    )
+    _run_fails_with_hint(
+        str(_python(venv)), "-c", "import pyrite.plots.mpl", cwd=root, hint="pyrite-mc[plots]"
+    )
     _run(
         uv,
         "pip",
         "install",
         "--python",
         str(_python(venv)),
-        *NOTEBOOK_DEPENDENCIES,
+        f"pyrite-mc[apps] @ {source.as_uri()}",
         cwd=root,
     )
     _run(pyrite, "app", "analysis", "launch", "--smoke", cwd=root)

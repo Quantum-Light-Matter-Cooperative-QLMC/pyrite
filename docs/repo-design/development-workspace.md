@@ -2,6 +2,10 @@
 
 The repository has one uv project and one publishable distribution. The root project owns the `pyrite-mc` distribution, `src/pyrite/`, packaged data, `pyrite`, `pyrite-dev`, and the test suite. Contributor tools are dependency groups in the root `pyproject.toml`; there is no uv workspace split or separate test-tools package.
 
+## Extras versus dependency groups
+
+Dependencies imported by shipped code for a user-facing feature are package extras, published in wheel metadata; contributor, CI, and validation-only tools are dependency groups, which wheels never carry. `plots` holds the runtime of `pyrite.plots` (and the lazily imported matplotlib figures in `perf/` and `validation/`); `apps` is `pyrite-mc[plots]` plus the marimo stack for `src/pyrite/apps/`. The `notebooks` group is `pyrite-mc[apps]` plus notebook conversion tools (`nbconvert`, `pandoc`) that nothing in `src/` imports, so a plain `uv sync` stays complete. Entry points that need an extra check it with `pyrite._extras.require_extra` (CLI: `pyrite.cli._extras.require_cli_extra`), which names `pyrite-mc[<extra>]` and `uv sync --extra <extra>` without importing the dependency. `pyrite-dev package-smoke` installs the built wheel without extras to assert those hints, then with `[apps]` to smoke-launch each app.
+
 ## Why source was not split across distributions
 
 The import and data inventory has one natural wheel owner. Core material and Monte Carlo modules feed `sweep`, `results`, profiles, configuration, and run drivers; plotting consumes results and Monte Carlo APIs; the lazy CLI dispatches drivers, remote orchestration, plotting, and apps. All public imports live under `pyrite`, and `pyrite.DATA_DIR` owns the bundled catalogs, CIFs, detector data, and validation fixtures.

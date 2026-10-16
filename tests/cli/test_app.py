@@ -189,3 +189,35 @@ def test_split_app_export_never_launches(monkeypatch, tmp_path):
         views.COMPARE, "hopg", tmp_path / "pyrite-output" / "results" / "pyrite_compare_hopg.html"
     )
     assert calls[1][1]["env"]["PYRITE_ANALYZE_INITIAL"] == "hopg"
+
+
+def _hide_modules(monkeypatch, *names):
+    import pyrite._extras as extras
+
+    real_find_spec = extras.find_spec
+    monkeypatch.setattr(
+        extras, "find_spec", lambda name: None if name in names else real_find_spec(name)
+    )
+
+
+def test_app_launch_without_apps_extra_names_the_install_hint(monkeypatch):
+    launched = []
+    _hide_modules(monkeypatch, "marimo")
+    monkeypatch.setattr(views.subprocess, "run", lambda *a, **k: launched.append(a))
+
+    result = CliRunner().invoke(cli.command, ["app", "pixels", "launch", "--smoke", "hopg"])
+
+    assert result.exit_code == 1
+    assert "pyrite app pixels launch requires the optional 'apps' extra" in result.output
+    assert 'pip install "pyrite-mc[apps]"' in result.output
+    assert "uv sync --extra apps" in result.output
+    assert launched == []
+
+
+def test_validation_export_without_matplotlib_names_the_plots_extra(monkeypatch):
+    _hide_modules(monkeypatch, "matplotlib")
+
+    result = CliRunner().invoke(cli.command, ["app", "validation", "export"])
+
+    assert result.exit_code == 1
+    assert "pyrite-mc[plots]" in result.output

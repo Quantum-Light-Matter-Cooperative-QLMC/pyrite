@@ -2,6 +2,8 @@
 
 PyRITE stores simulation output as component checkpoints, then lets analysis and export commands consume those checkpoints without rerunning transport.
 
+The apps below need the `apps` extra and `pyrite.plots` needs `plots` (`pip install "pyrite-mc[apps]"`); a checkout's `uv sync` includes both.
+
 ## Checkpoint layout and identity
 
 Canonical full runs use `pyrite-output/checkpoints/<material>/`. Survey runs and modified profiles use identity-qualified directories so incompatible parameter sets do not silently resume into one another. Each dataset records its resolved input payload and hash in component metadata.

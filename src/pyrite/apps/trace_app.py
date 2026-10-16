@@ -1237,7 +1237,7 @@ def _(
                 )
             prune_render_cache()
             set_penetration_render_status((_render_key, None))
-        except RuntimeError as _exc:
+        except (ImportError, RuntimeError) as _exc:
             set_penetration_render_status((_render_key, str(_exc)))
     else:
         set_penetration_render_status((_render_key, None))

@@ -8,6 +8,8 @@ Run `pyrite checkpoint list`, inspect the effective `pyrite-output/checkpoints/`
 
 ## 2. Launch analysis
 
+An installed package needs the `apps` extra (`uv tool install "pyrite-mc[apps]"`); a checkout's `uv sync` already has it.
+
 ```bash
 pyrite app analysis launch hopg
 ```
