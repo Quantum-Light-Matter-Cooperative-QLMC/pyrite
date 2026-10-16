@@ -1,7 +1,9 @@
 """Channeling-radiation emission (cr-dipole-rate, cr-boosted-dipole-angular,
 cr-line-shape, cr-yield-assembly, cr-capture-bound, cr-transition-radiation-bound)."""
 
+import json
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -315,17 +317,23 @@ def test_absorption_is_beer_lambert_on_the_exit_path(solver):
 
 
 def test_diamond_peaks_match_gouanere():
-    # Gouanere et al., PRB 38, 4352 (1988), Table II col. 10: (110) at 80.23 MeV.
+    # Visually checked Table II, col. 10: corrected experimental forward energies.
+    reference_data = json.loads(
+        (Path(__file__).parents[1] / "data/channeling/gouanere-1988-diamond110.json").read_text()
+    )
     profile = planar_profile("diamond", (1, 1, 0), 293.15)
-    energy = 80.23e6
+    energy = reference_data["kinetic_energy_MeV"] * 1e6
     solver = DensityMatrixSolver(
         profile, energy, tds_kernel(profile, energy, n_cells=4, max_order=16)
     )
     grid = np.linspace(110e3, 340e3, 4601)
+    # Thin 0.2 um calculation pins energies only; the measured target is 22 um.
+    # This does not reproduce measured widths, intensities or the thick-target spectrum.
     result = channeling_spectrum(solver, 2000.0, grid, 0.0, divergence_rad=3e-4, dz_ang=100.0)
     peaks, _ = find_peaks(result.spectrum, prominence=0.02 * result.spectrum.max())
     found = grid[peaks]
-    for reference in (313.4e3, 213.9e3, 164.6e3, 130.1e3):
+    for line in reference_data["lines"]:
+        reference = line["forward_energy_keV"] * 1e3
         nearest = found[np.argmin(np.abs(found - reference))]
         assert nearest == pytest.approx(reference, rel=1e-2)
 

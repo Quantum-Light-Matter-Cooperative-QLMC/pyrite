@@ -30,7 +30,7 @@ The default orders (6 Gauss–Legendre radii × 12 azimuths, 9 Gauss–Hermite) 
 
 **Zero bound states.** A flat potential with a 50 eV margin gives an empty catalog and a spectrum and yield that are exactly 0 (test reproduced green).
 
-**Gouanère peaks.** The diamond (110) 80.23 MeV test is green. I could not check the reference values (313.4/213.9/164.6/130.1 keV, Gouanère et al. 1988 Table II col. 10) against the paper: no Zotero tools were available in this session, so they are taken as transcribed.
+**Gouanère peaks.** The diamond (110) 80.23 MeV test is green. The original verification used transcribed values; the later Zotero source audit below confirms them against the PDF.
 
 ## Diff against the implementation
 
@@ -81,3 +81,22 @@ Here $F_m$ is the complex Voigt at lab centre $\varepsilon_m/D$ and half width $
 - Margin 0 gives zero capture. The zero-bound-state test is green, and all 31 tests of `tests/montecarlo/test_channeling_emission.py` pass (`--slow`).
 
 **Verdict:** `rederived`. The quadrature-order caveat recorded earlier stands.
+
+## Source audit from Zotero (2026-10-15)
+
+The full PDF of [Gouanère et al., Phys. Rev. B **38**, 4352 (1988)](https://doi.org/10.1103/PhysRevB.38.4352), Zotero item `JH6GS3ZP`, attachment `PTCL75Q7`, was visually checked. Table II on printed page 4360 (PDF page 9) gives the following diamond (110), 80.23 MeV, 22 µm, room-temperature, zero-incidence values:
+
+| Transition | Observed maximum, col. 4 (keV) | Corrected forward energy, col. 10 (keV) | PyRITE band-centre energy (keV) |
+| --- | ---: | ---: | ---: |
+| $1\to0$ | 310.2 | 313.4 | 312.726 |
+| $2\to1$ | 211.7 | 213.9 | 213.699 |
+| $3\to2$ | 162.8 | 164.6 | 164.585 |
+| $4\to3$ | 128.8 | 130.1 | 130.364 |
+
+The source distinguishes the spectral maximum from the forward energy after correction for multiple scattering. The existing peak-position references are column 10, not the uncorrected observed maxima or the theoretical column 11. The values and source conditions are pinned in `tests/data/channeling/gouanere-1988-diamond110.json`.
+
+The band-centre calculation above uses $k=0$, $H=16$, four Bloch cells, 293.15 K and the TDS kernel. The spectrum regression deliberately uses a thin 0.2 µm target to isolate peak positions; it does not reproduce the measured 22 µm spectrum, widths or absolute intensities. Its 1% tolerance covers the difference in potential models; agreement in peak positions cannot certify the scattering model. The intrinsic-width comparison in [cr-line-shape](cr-line-shape.md) remains separate.
+
+The Watson sources do not supply a planar peak-position benchmark for this model. [Watson and Koehler, Phys. Rev. B **25**, 3079 (1982)](https://doi.org/10.1103/PhysRevB.25.3079), Zotero `DXH6CSY9` / PDF `JKVKGGI2`, printed page 3082, reports no planar transitions above the approximately 1 keV detector cutoff for electrons of 3 MeV or less. The earlier 1981 paper (`JRVHCQY3` / `E5NJ535S`) states the same exclusion in its abstract. Their observed channeling lines are axial. They must not be relabelled as planar anchors.
+
+The Azadegan 2013 numerical example is a theoretical calculation, rather than an independent ELBE measurement. Its use and the measured Azadegan 2006 widths are audited in [cr-line-shape](cr-line-shape.md).
