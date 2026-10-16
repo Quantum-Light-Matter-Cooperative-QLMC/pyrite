@@ -20,7 +20,9 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/coherent_transverse_coherence.py": ("transverse-bunch-form-factor",),
     "checks/collision_statistics_refinement.py": ("energy-controlled-propagation",),
     "checks/cross_reflection_coherence.py": ("cross-reflection-coherence",),
+    "checks/abtem_channeling_oracle.py": ("cr-density-matrix-split-operator",),
     "checks/dans_diffraction_oracle.py": ("dans-diffraction-oracle",),
+    "checks/kephart_occupation.py": ("cr-dechanneling-collapse",),
     "checks/xraylib_cascade_oracle.py": ("characteristic-radiation",),
     "checks/detector_solid_angle_check.py": (
         "detector-eaglexo",

@@ -1,0 +1,1 @@
+{"check": "checks/kephart_occupation.py", "ledger_id": "cr-dechanneling-collapse", "measured_value": null, "recorded_at": "2026-10-16T01:08:56.777983+00:00", "reference_value": null, "revision": "21b67b7f23f235d116ea0b4ce2f261c55a6895a8", "schema_revision": 1, "tolerance": null, "verdict": "pass"}

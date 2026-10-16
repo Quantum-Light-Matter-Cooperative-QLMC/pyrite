@@ -90,10 +90,11 @@ docs = [
     "sphinxcontrib-bibtex>=2.6",
 ]
 
-# Independent validation oracles (crystallography, relaxation cascade).
-# Validation-only; never imported by the production package unless an explicit
-# oracle check is requested.
+# Independent validation oracles (crystallography, relaxation cascade, frozen-
+# phonon multislice for channeling). Validation-only; never imported by the
+# production package unless an explicit oracle check is requested.
 oracle = [
+    "abtem==1.0.10",
     "Dans-Diffraction==3.4.0",
     "mp-api>=0.46.4",
     "xraylib==4.3.0",
