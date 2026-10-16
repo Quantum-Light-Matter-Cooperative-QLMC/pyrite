@@ -244,6 +244,8 @@ def run_case(
         trajectory_capture=trajectory_capture,
     )
     out = _spectrum_case(case, transport, record_timing)
+    if case.get("channeling") is not None:  # zone diagnostics (#506), not persisted
+        out["channeling"] = transport["segs"]["channeling"]
     if observation_directions is not None:
         out["directional"] = _directional_outputs(case, transport, observation_directions)
     return out
@@ -312,8 +314,6 @@ def _check_channeling_transport(case, transport_core, trajectory_capture, block_
         refuse_channeling(case, "electron-block transport")
     if _case_transport_core(case, transport_core) == "cuda":
         refuse_channeling(case, "CUDA transport")
-    # Until the zone handoff lands, never run a channeling case as amorphous.
-    raise NotImplementedError("the planar channeling transport handoff is not implemented yet")
 
 
 def _transport_case(
@@ -405,6 +405,9 @@ def _transport_case(
     E_cut_by_electrons[combined_transport_mask] = min(E_cut_lines, E_cut_brem)
 
     core = _case_transport_core(case, transport_core)
+    channeling = case.get("channeling") is not None
+    if channeling:  # the zone's launches address per-electron streams
+        core = "per-electron"
     # Coupled radiative rows complete their photons on the host.
     resident = keep_segments_on_device and core == "cuda" and "radiative_model" not in case
     straggling = bool(case.get("straggling", False))
@@ -435,14 +438,14 @@ def _transport_case(
     if block_monitor is not None and (block_electrons is None or Ne != Ne_brem):
         raise ValueError("a block monitor needs electron blocks and Ne == Ne_brem")
 
-    def _simulate(keep, max_steps, start=0, stop=Ne_transport, block_kw=None):
+    def _simulate(keep, max_steps, start=0, stop=Ne_transport, block_kw=None, cut=None):
         # A block overrides progress and withholds the bunch (see below).
         call_kw = {**beam_kw, **progress_kw, **({} if block_kw is None else block_kw)}
         return simulate_trajectories(
             case["E0_keV"],
             stop - start,
             case["thickness_ang"],
-            E_cut_by_electrons=E_cut_by_electrons[start:stop],
+            E_cut_by_electrons=E_cut_by_electrons[start:stop] if cut is None else cut,
             composition=case["composition"],
             seed=case["seed"],
             beam_dir=beam,
@@ -471,6 +474,20 @@ def _transport_case(
         )
 
     transport = _transport
+    if channeling:
+        from .channeling import transport_channeling_case
+
+        transport = partial(
+            transport_channeling_case,
+            case,
+            simulate=_simulate,
+            E_cut_by_electrons=E_cut_by_electrons,
+            beam_dir=beam,
+            beam_kw=beam_kw,
+            tilt_polar_rad=tilt_polar_rad,
+            tilt_azim_rad=tilt_azim_rad,
+            stopping_tables=stopping_tables,
+        )
     if block_electrons is not None:
         transport = partial(
             transport_case_blocks,

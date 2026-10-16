@@ -80,3 +80,10 @@ def test_output_baseline_rejects_numerical_change(legacy_output, field):
         legacy_output["spectra"][field][0] *= 1 + 1e-11
     with pytest.raises(AssertionError, match=field):
         assert_output_baseline("legacy", legacy_output)
+
+
+def test_seeded_channeling_output_baseline():
+    """Joined zone + native rows, fates and spectra of the channeling family (#506)."""
+    from tests.helpers.physics_baseline import channeling_output_baseline
+
+    assert_output_baseline("channeling", channeling_output_baseline())

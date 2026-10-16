@@ -290,12 +290,3 @@ def test_dechannel_row_must_open_its_electron():
     rows = _rows([SegmentEvent.ELASTIC, SegmentEvent.DECHANNEL])
     with pytest.raises(ValueError, match="dechanneling row is not the electron's first"):
         check_segment_event_contract(rows)
-
-
-def test_live_transport_never_runs_a_channeling_case_as_amorphous(planar_case, monkeypatch):
-    def forbidden(*_args, **_kwargs):
-        raise AssertionError("amorphous transport started")
-
-    monkeypatch.setattr(runner, "simulate_trajectories", forbidden)
-    with pytest.raises(NotImplementedError, match="handoff"):
-        runner._transport_case(planar_case, transport_core="per-electron")

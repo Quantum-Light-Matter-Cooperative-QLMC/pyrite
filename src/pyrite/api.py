@@ -315,6 +315,8 @@ def simulate(
                 if "adaptive_sampling" in output
                 else {}
             ),
+            # Channeling-zone fates and angles (#506); absent when off.
+            **({"channeling": output["channeling"]} if "channeling" in output else {}),
             **run_provenance(case, xsgen_tables),
         },
     )

@@ -90,6 +90,11 @@ not at the #485 parent: the resolved case mapping and `case_content_key` of a
 `tests/helpers/physics_baseline.py::resolved_channeling_baseline` (5 MeV Si,
 2 um slab, beam 3 deg from the (110) face normal inside the (1-10) planes, every
 selector explicit). There is no `parameter_sha256`: profiles and checkpoints
-cannot select channeling before #507. The seven #485 families above are
+cannot select channeling before #507. `outputs.json["channeling"]` pins the
+same scene on a small zone grid (`channeling_output_baseline`: 16 electrons,
+`H = 12`, four Bloch cells, `dz = 500 Å`, per-electron core, synthetic Mott
+tables): the joined zone and native transport signature, the zone-row count,
+the sampled fates and the small line, characteristic and continuum spectra.
+The seven #485 families above are
 unchanged by #506, which is the channeling-off compatibility proof; they must not
 be regenerated for it.

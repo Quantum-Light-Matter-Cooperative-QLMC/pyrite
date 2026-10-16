@@ -9,7 +9,12 @@ counter-addressed per electron inside that namespace (#361).
 import numpy as np
 
 from ..bunch_front import resolve_front_tilt
-from ..geometry import beam_entry_jacobian, face_arrival_path_ang, project_beam_entry
+from ..geometry import (
+    beam_entry_jacobian,
+    beam_frame_basis,
+    face_arrival_path_ang,
+    project_beam_entry,
+)
 from ..groove import entry_points
 from ..transverse import resolved_from_mapping, sample_transverse
 from .kinematics import beta_from_keV, child_stream_root, counter_normals
@@ -282,3 +287,97 @@ def table_energy_range(E_cut_by_electrons, E_keV, override=None):
     if range_lo > lo or range_hi < hi:
         raise ValueError("_energy_range_keV must cover every transported electron")
     return range_lo, range_hi
+
+
+def normalized_beam_dir(beam_dir):
+    """Validated unit mean beam direction in the slab frame (``None``: ``+z``)."""
+    if beam_dir is None:
+        beam_dir = np.array([0.0, 0.0, 1.0])
+    beam_dir = np.asarray(beam_dir, dtype=float)
+    if beam_dir.shape != (3,) or not np.all(np.isfinite(beam_dir)):
+        raise ValueError("beam_dir must be a finite three-vector")
+    beam_norm = np.linalg.norm(beam_dir)
+    if not np.isfinite(beam_norm) or beam_norm == 0.0:
+        raise ValueError("beam_dir must be nonzero")
+    beam_dir = beam_dir / beam_norm
+    if beam_dir[2] <= 1e-6:
+        raise ValueError("beam_dir must point into the slab (z component > 0)")
+    return beam_dir
+
+
+def primary_directions(beam_dir, transverse_slopes, Ne):
+    """Per-electron incident directions ``(Ne, 3)`` about the unit ``beam_dir``."""
+    if transverse_slopes is None:
+        return np.tile(beam_dir, (Ne, 1))
+    # Slopes are dx/dz, dy/dz about the beam axis, so the per-electron
+    # direction is (x', y', 1) in the beam frame. Zero emittance gives
+    # exactly `beam_dir` back, which is what makes the collimated limit
+    # bit-for-bit rather than merely close.
+    x_prime, y_prime = transverse_slopes
+    basis = beam_frame_basis(beam_dir)
+    dirs = x_prime[:, None] * basis[:, 0] + y_prime[:, None] * basis[:, 1] + beam_dir
+    dirs /= np.linalg.norm(dirs, axis=1, keepdims=True)
+    return dirs
+
+
+def sample_primary_entry(
+    E0_keV,
+    Ne,
+    seed,
+    *,
+    beam_dir=None,
+    beam_fwhm_mm=None,
+    beam_fwhm_y_mm=None,
+    bunch_length_fs=None,
+    long_shape="gaussian",
+    long_offsets_fs=None,
+    longitudinal_distribution=None,
+    transverse_distribution=None,
+    energy_spread_frac=None,
+    bunch_front_tilt=None,
+    tilt_polar_rad=0.0,
+    tilt_azim_rad=0.0,
+):
+    """Primary entrance states exactly as an ungrooved analytic beam samples them.
+
+    The same pure functions of ``seed`` that :func:`simulate_trajectories`
+    calls, composed without transport, so a caller can launch the primaries
+    later from an explicit state (the channeling zone, #506) with identical
+    draws. Returns ``(r_ang, v_hat, E_keV, t_ang, t0_ang, beam_entry)``:
+    entrance-face positions and directions in the slab frame, kinetic
+    energies, start clock and bunch arrival offsets [Angstrom, c=1], and the
+    incident phase-space record.
+    """
+    from ..bunch_front import validate_front_source
+    from .kinematics import _sample_bunch_offsets
+
+    bunch_front_tilt = validate_front_source(
+        bunch_front_tilt,
+        transverse=transverse_distribution,
+        energy_spread=energy_spread_frac,
+        source="analytic",
+        longitudinal=longitudinal_distribution,
+        offsets=long_offsets_fs,
+        shape=long_shape,
+        groove=None,
+    )
+    pos, slopes, record = initial_beam_positions(
+        seed,
+        Ne,
+        transverse_distribution=transverse_distribution,
+        beam_fwhm_mm=beam_fwhm_mm,
+        beam_fwhm_y_mm=beam_fwhm_y_mm,
+        tilt_polar_rad=tilt_polar_rad,
+        tilt_azim_rad=tilt_azim_rad,
+        groove=None,
+        E0_keV=E0_keV,
+        energy_spread_frac=energy_spread_frac,
+        bunch_front_tilt=bunch_front_tilt,
+    )
+    dirs = primary_directions(normalized_beam_dir(beam_dir), slopes, Ne)
+    E_keV = initial_energies_keV(E0_keV, Ne, seed, energy_spread_frac)
+    t0 = _sample_bunch_offsets(
+        Ne, bunch_length_fs, long_shape, long_offsets_fs, seed, longitudinal_distribution
+    )
+    t0, clock, record = resolve_bunch_times(t0, np.zeros(Ne), record, pos, E_keV)
+    return pos, dirs, E_keV, clock, t0, record

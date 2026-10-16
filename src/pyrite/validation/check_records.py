@@ -23,6 +23,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/abtem_channeling_oracle.py": ("cr-density-matrix-split-operator",),
     "checks/dans_diffraction_oracle.py": ("dans-diffraction-oracle",),
     "checks/kephart_occupation.py": ("cr-dechanneling-collapse",),
+    "checks/channeling_handoff.py": ("cr-zone-handoff-accounting",),
     "checks/xraylib_cascade_oracle.py": ("characteristic-radiation",),
     "checks/detector_solid_angle_check.py": (
         "detector-eaglexo",

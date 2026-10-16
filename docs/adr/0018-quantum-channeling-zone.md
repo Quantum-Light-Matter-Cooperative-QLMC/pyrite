@@ -58,6 +58,19 @@ the zone. A dechanneled electron becomes an ordinary launch state that the
 existing native transport cores take over through the secondaries launch seam,
 under a new `EVENT_DECHANNEL` event code. Rechanneling is omitted and recorded
 as a validity limit.
+*Outcome (#506, maintainer decisions 2026-10-16):* each electron's fate
+(entry, free, overflow, bound) and handoff depth are sampled from one
+density-matrix solve per case with keyed per-electron streams. Free `E_⊥` is
+sampled separably from depth, the plane-angle sign is symmetric, and
+`ψ = √(2E_⊥/pv)` (from `U₀ = 0`) tilts the electron's own in-plane direction
+toward the plane normal. Overflow leaves at the band-edge angle, a lower bound,
+with a warning above 10%. Stopping is constant at `S(E₀)` in the solve and the
+zone row, and zone caps shorter than the path are refused. The primaries'
+entrance states come from the same seed-pure draws as amorphous transport and
+relaunch with their own stream keys. Mosaic crystals, coupled radiative
+transport, secondaries, coherent emission, stacks, grooves and CUDA are refused
+in v1. The 300 eV margin sets the dechanneled angular distribution (mean
+4.7 `ψ_c` at 5 MeV Si(110)); see `cr-zone-handoff-accounting`.
 
 ### Evolution backends
 
