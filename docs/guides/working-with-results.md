@@ -75,6 +75,10 @@ that weight (and displays zero when no weight survives); the survival fraction
 is shown separately. Depth samples use the basis current at that depth.
 See the [reconstruction derivation](../validation/channeling/cr-planar-spatial-density-reconstruction.md).
 
+The same app offers an [experimental axial mode](axial-diagnostics.md) with a
+Run action, two-dimensional potential/density maps, coherent phase, and optional
+string-centered OAM. Its bounded diagnostics use the existing axial solvers.
+
 ## Stored components
 
 Current full checkpoints contain three versioned HDF5 components, plus a
