@@ -71,16 +71,19 @@ def _(crystal_ui, depth_ui, divergence_ui, energy_ui, incidence_ui):
 
 
 @app.cell
-def _(crystal, depth_ang, divergence_rad, energy_eV, incidence_rad, mo):
+def _():
     import matplotlib.pyplot as plt
     import numpy as np
 
+    from pyrite.apps.channeling import critical_angle_rad
     from pyrite.materials.channeling import (
         entry_populations,
         longitudinal_kinematics,
         planar_profile,
         transverse_states,
     )
+    from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2
+    from pyrite.materials.crystal import M_E_EV
     from pyrite.montecarlo.channeling import (
         DECHANNELING_MARGIN_EV,
         DensityMatrixSolver,
@@ -89,17 +92,55 @@ def _(crystal, depth_ang, divergence_rad, energy_eV, incidence_rad, mo):
         tds_kernel,
     )
 
+    return (
+        DECHANNELING_MARGIN_EV,
+        DensityMatrixSolver,
+        HBAR2_2M_EV_ANG2,
+        M_E_EV,
+        channeling_spectrum,
+        critical_angle_rad,
+        electronic_kernel,
+        entry_populations,
+        longitudinal_kinematics,
+        np,
+        planar_profile,
+        plt,
+        tds_kernel,
+        transverse_states,
+    )
+
+
+@app.cell
+def _(crystal, energy_eV, longitudinal_kinematics, planar_profile, transverse_states):
+
     profile = planar_profile(crystal, (1, 1, 0), 293.15)
     gamma, _ = longitudinal_kinematics(energy_eV)
     states = transverse_states(profile, gamma, n_plane_waves=16)
+    return gamma, profile, states
+
+
+@app.cell
+def _(
+    DECHANNELING_MARGIN_EV,
+    DensityMatrixSolver,
+    HBAR2_2M_EV_ANG2,
+    depth_ang,
+    divergence_rad,
+    electronic_kernel,
+    energy_eV,
+    gamma,
+    incidence_rad,
+    np,
+    profile,
+    tds_kernel,
+):
     # Include enough plane waves to represent tracked states above the declared
     # dechanneling cutoff. Otherwise those losses are booked as overflow.
     _, barrier_eV = profile.extrema()
-    hbar2_2m = 1973.269804**2 / (2.0 * 510998.95)
     basis_order = (
         int(
             np.ceil(
-                np.sqrt((barrier_eV + DECHANNELING_MARGIN_EV) * gamma / hbar2_2m)
+                np.sqrt((barrier_eV + DECHANNELING_MARGIN_EV) * gamma / HBAR2_2M_EV_ANG2)
                 / profile.g_inv_ang
             )
         )
@@ -113,13 +154,20 @@ def _(crystal, depth_ang, divergence_rad, energy_eV, incidence_rad, mo):
         max_order=grid["max_order"],
     )
     solver = DensityMatrixSolver(profile, energy_eV, kernel)
+    position_ang = np.linspace(0.0, profile.period_ang, 257)
     result = solver.propagate(
         depth_ang,
         100.0,
         incidence_rad=incidence_rad,
         divergence_rad=divergence_rad,
         record_every=5,
+        spatial_x_ang=position_ang,
     )
+    return basis_order, position_ang, result, solver
+
+
+@app.cell
+def _(divergence_rad, energy_eV, entry_populations, np, profile):
 
     angles = np.linspace(-8e-3, 8e-3, 101)
     populations = entry_populations(
@@ -129,7 +177,11 @@ def _(crystal, depth_ang, divergence_rad, energy_eV, incidence_rad, mo):
         divergence_rad=divergence_rad,
         n_plane_waves=16,
     )
-    bound_count = int(np.count_nonzero(states.energies_eV < states.barrier_eV))
+    return angles, populations
+
+
+@app.cell
+def _(channeling_spectrum, depth_ang, divergence_rad, incidence_rad, np, solver):
     theta = 0.0
     energy_grid = np.linspace(100.0, 100_000.0, 1200)
     spectrum = channeling_spectrum(
@@ -142,6 +194,29 @@ def _(crystal, depth_ang, divergence_rad, energy_eV, incidence_rad, mo):
         dz_ang=100.0,
         sample_ang=500.0,
     )
+    return energy_grid, spectrum
+
+
+@app.cell
+def _(
+    M_E_EV,
+    angles,
+    basis_order,
+    critical_angle_rad,
+    crystal,
+    energy_eV,
+    energy_grid,
+    gamma,
+    mo,
+    np,
+    plt,
+    populations,
+    profile,
+    result,
+    spectrum,
+    states,
+):
+    bound_count = states.n_bound
 
     fig, axes = plt.subplots(2, 3, figsize=(15, 8), constrained_layout=True)
     x = np.linspace(0.0, profile.period_ang, 500)
@@ -166,9 +241,7 @@ def _(crystal, depth_ang, divergence_rad, energy_eV, incidence_rad, mo):
         ls="--",
         label="not in bound states",
     )
-    _, barrier_min = profile.extrema()
-    pv = gamma * 510998.95 * (1.0 - gamma**-2)
-    psi_c = np.sqrt(2.0 * (states.barrier_eV - barrier_min) / pv)
+    psi_c = critical_angle_rad(profile, energy_eV)
     axes[0, 1].axvline(psi_c * 1e3, color="0.4", ls=":")
     axes[0, 1].axvline(-psi_c * 1e3, color="0.4", ls=":")
     axes[0, 1].set(
@@ -203,7 +276,7 @@ def _(crystal, depth_ang, divergence_rad, energy_eV, incidence_rad, mo):
     axes[1, 0].legend(frameon=False)
 
     flux = result.free_flux_by_energy
-    pv = gamma * 510998.95 * (1.0 - gamma**-2)
+    pv = gamma * M_E_EV * (1.0 - gamma**-2)
     psi_edges_mrad = np.sqrt(2.0 * np.maximum(result.energy_edges_eV, 0) / pv) * 1e3
     handoff_total = float(flux.sum())
     if handoff_total > 0.0:
@@ -275,6 +348,112 @@ def _(crystal, depth_ang, divergence_rad, energy_eV, incidence_rad, mo):
         "resolution or energy spread."
     )
     mo.vstack([explanation, fig])
+    return
+
+
+@app.cell
+def _(mo, states):
+    state_ui = mo.ui.dropdown(
+        {f"State {n} · {energy:.3f} eV": n for n, energy in enumerate(states.energies_eV)},
+        value=f"State 0 · {states.energies_eV[0]:.3f} eV",
+        label="Transverse eigenstate (Bloch k = 0 Å⁻¹)",
+    )
+    state_ui
+    return (state_ui,)
+
+
+@app.cell
+def _(mo, np, plt, position_ang, profile, state_ui, states):
+    _state = state_ui.value
+    _psi = states.wavefunction(position_ang, _state)
+    # Fix only the displayed global phase: largest plane-wave coefficient positive real.
+    _coeff = states.coefficients[:, _state]
+    _psi *= np.exp(-1j * np.angle(_coeff[np.argmax(np.abs(_coeff))]))
+    _fig, _axes = plt.subplots(1, 3, figsize=(14, 3.5), constrained_layout=True)
+    _axes[0].plot(position_ang, profile.potential(position_ang))
+    _axes[0].axhline(states.energies_eV[_state], color="#d35d4b", label=f"state {_state}")
+    _axes[0].set(title="Selected level and potential", ylabel="Transverse energy (eV)")
+    _axes[0].legend()
+    _axes[1].plot(position_ang, _psi.real, label="Re ψ")
+    _axes[1].plot(position_ang, _psi.imag, label="Im ψ", ls="--")
+    _axes[1].set(title="Single eigenfunction", ylabel="Amplitude (Å⁻½)")
+    _axes[1].legend()
+    _axes[2].plot(position_ang, np.abs(_psi) ** 2)
+    _axes[2].set(title="Eigenstate probability density", ylabel="|ψ|² (Å⁻¹)")
+    for _axis in _axes:
+        _axis.set_xlabel("Across one plane period (Å)")
+        _axis.grid(alpha=0.2)
+    mo.vstack(
+        [
+            mo.md(
+                "Eigenfunctions have unit probability per period at **Bloch k = 0 Å⁻¹**. "
+                "The displayed global phase makes the largest plane-wave coefficient real and positive; "
+                "it does not affect |ψ|². Above-barrier levels are extended states."
+            ),
+            _fig,
+        ]
+    )
+    return
+
+
+@app.cell
+def _(mo, result):
+    sample_ui = mo.ui.slider(
+        0,
+        len(result.z_ang) - 1,
+        value=0,
+        step=1,
+        label="Recorded depth index",
+        show_value=True,
+    )
+    conditional_ui = mo.ui.checkbox(value=False, label="Condition on remaining in the zone")
+    mo.hstack([sample_ui, conditional_ui])
+    return conditional_ui, sample_ui
+
+
+@app.cell
+def _(conditional_ui, mo, np, plt, result, sample_ui):
+    _sample = sample_ui.value
+    _density = result.spatial_density_per_ang
+    _label = "Density per incident electron (Å⁻¹)"
+    if conditional_ui.value:
+        _density = np.divide(
+            _density,
+            result.trace[:, None],
+            out=np.zeros_like(_density),
+            where=result.trace[:, None] > 0,
+        )
+        _label = "Conditional density (Å⁻¹)"
+    _fig, _axes = plt.subplots(1, 2, figsize=(13, 4), constrained_layout=True)
+    _mesh = _axes[0].pcolormesh(
+        result.spatial_x_ang,
+        result.z_ang / 1e4,
+        _density,
+        shading="auto",
+        cmap="viridis",
+    )
+    _axes[0].axhline(result.z_ang[_sample] / 1e4, color="white", ls="--")
+    _axes[0].set(title="Ensemble spatial density", xlabel="Position (Å)", ylabel="Depth (µm)")
+    _fig.colorbar(_mesh, ax=_axes[0], label=_label)
+    _axes[1].plot(result.spatial_x_ang, _density[_sample])
+    _axes[1].set(
+        title=f"Depth {result.z_ang[_sample] / 1e4:.3f} µm",
+        xlabel="Across one plane period (Å)",
+        ylabel=_label,
+    )
+    mo.vstack(
+        [
+            mo.md(
+                f"**Surviving incident-electron weight at this depth:** {result.trace[_sample]:.5f}. "
+                "The heatmap is an **ensemble probability density**, including retained coherences "
+                "in every Bloch block; it is not a unique ensemble wavefunction. The supercell is "
+                "folded into one period. Its integral equals surviving weight by default, or one "
+                "when conditioned (zero if no weight remains). Lost electrons are excluded. "
+                "Changing the state or depth selectors only redraws the stored solution."
+            ),
+            _fig,
+        ]
+    )
     return
 
 

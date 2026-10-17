@@ -53,6 +53,7 @@ from .operators import (
     electronic_kernel,
     tds_kernel,
 )
+from .spatial import spatial_density
 from .transition_radiation import (
     TransitionRadiationBound,
     transition_radiation,
@@ -94,6 +95,7 @@ __all__ = [
     "line_shape",
     "mcwf_stream_key",
     "rest_frame_dipole_rate_inv_s",
+    "spatial_density",
     "tds_kernel",
     "transition_operator",
     "transition_radiation",

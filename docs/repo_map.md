@@ -677,12 +677,27 @@ Notebook support for `src/pyrite/apps/validation_app.py`: the persisted suppleme
 - Public: `load_default_azimuth`, `save_default_azimuth`, `probe_remote_zhai`, `start_remote_zhai`, `remote_zhai_status`, `pull_remote_zhai`.
 - Deps: `remote.config` (`remote_host`).
 
+### `apps/channeling.py` and `apps/channeling_app.py`
+
+The planar channeling demo exposes eigenfunctions, entry populations, fate and
+spectrum diagnostics, and sampled ensemble spatial density. The numerical
+diagnostic `critical_angle_rad` uses the potential minimum and maximum. State,
+depth and conditional-normalization controls only redraw cached solver output.
+`montecarlo/channeling/spatial.py::spatial_density` owns the reusable Born-rule
+reconstruction; `DensityMatrixSolver.propagate(spatial_x_ang=...)` optionally
+records it at the existing recorded depths in the instantaneous basis.
+
 ### `cli/commands/app_analysis.py`
 `pyrite app analysis launch` owner for `src/pyrite/apps/analysis_app.py`: persisted initial-material selection, smoke execution, edit/watch mode, ACP bridges, SSH-tunnel-friendly fixed-port launch. Imports no `apps` module — the persisted default comes from `_app_defaults.py` and the bridges from `_acp.py`, which is what takes `apps` out of the driver import cycle entirely (contract `nothing-imports-the-marimo-apps`).
 - Public: `command`, `main`.
 
 ### `cli/commands/app_views.py`
-`pyrite app pixels launch|export` and `pyrite app compare launch|export` owner for `src/pyrite/apps/pixel_app.py` and `src/pyrite/apps/compare_app.py`: one `MarimoApp` launcher shape (smoke execution, edit/watch mode, ACP bridges, fixed tunnel ports 2720/2721, static-HTML export). The initial material is MATERIAL > the analysis app's persisted default (read-only) > `hopg`, passed as `--material` and `PYRITE_ANALYZE_INITIAL`. Imports no `apps` module.
+`pyrite app pixels launch|export`, `pyrite app compare launch|export` and
+`pyrite app channeling launch|export` share the `MarimoApp` launcher (headless
+smoke, edit/watch, ACP bridges and static HTML export). Fixed tunnel ports are
+2720/2721/2722. Pixels/compare resolve MATERIAL > the analysis app's persisted
+default > `hopg`, passed as `--material` and `PYRITE_ANALYZE_INITIAL`. Channeling
+targets `channeling_app.py` with no material argument. Imports no `apps` module.
 
 ### `cli/commands/app_viewer.py`
 `pyrite app viewer launch|export` owner for `src/pyrite/apps/trace_app.py`: material-argument handling, smoke execution, static-HTML export, ACP bridges, fixed-port tunnel launch.

@@ -45,6 +45,38 @@ Its Material and Checkpoint pickers select the dataset cases are added from; the
 
 For non-interactive use, inspect `pyrite app analysis export --help`; `pyrite app pixels export` and `pyrite app compare export` render the other two apps the same way. The generated [CLI reference](../repo-design/cli/cli-reference.md) is authoritative for accepted arguments and output formats.
 
+## Planar channeling demo
+
+Explore the planar model independently of campaign checkpoints:
+
+```bash
+pyrite app channeling launch
+pyrite app channeling launch --smoke
+pyrite app channeling export --stem channeling
+```
+
+Choose silicon or diamond (110), beam energy, incidence, divergence and zone
+depth inside the app. No material argument is accepted. `--tunnel` uses fixed
+port 2722; launch also supports `--edit`, `--watch`, `--acp` and `--no-token`.
+Export executes the default case headlessly and writes
+`pyrite-output/results/channeling.html`, without starting a browser or server.
+The exported HTML is a static snapshot; live selectors require `launch`.
+
+The eigenstate selector plots a single eigenfunction at Bloch momentum zero,
+normalized to unit probability per period. Its display phase makes the largest
+plane-wave coefficient real and positive. The spatial heatmap and depth slider
+show an **ensemble probability density**, retaining coherences within all Bloch
+blocks. They do not identify a unique ensemble wavefunction. Changing these
+display controls reuses the stored solver and spectrum results.
+
+The supercell density is folded into one period: its integral equals the
+surviving incident-electron weight. The optional conditional view divides by
+that weight (and displays zero when no weight survives); the survival fraction
+is shown separately. Depth samples use the basis current at that depth.
+See the [reconstruction derivation](../validation/channeling/cr-planar-spatial-density-reconstruction.md).
+
+## Stored components
+
 Current full checkpoints contain three versioned HDF5 components, plus a
 fourth when planar channeling was selected:
 
