@@ -144,6 +144,9 @@ pyrite app viewer launch hopg
 
 # Validation dashboard.
 pyrite app validation launch
+
+# Planar quantum states and ensemble spatial density; no checkpoint required.
+pyrite app channeling launch
 ```
 
 Full sweeps are heavy. Run them through

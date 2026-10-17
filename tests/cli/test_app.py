@@ -28,6 +28,7 @@ def test_app_help_imports_only_the_group(monkeypatch):
     assert "validation" in result.output
     assert "pixels" in result.output
     assert "compare" in result.output
+    assert "channeling" in result.output
     assert imported == ["pyrite.cli.commands.app"]
 
 
@@ -212,6 +213,83 @@ def test_app_launch_without_apps_extra_names_the_install_hint(monkeypatch):
     assert 'pip install "pyrite-mc[apps]"' in result.output
     assert "uv sync --extra apps" in result.output
     assert launched == []
+
+
+def test_channeling_launch_and_export_have_no_material_argument(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(views.subprocess, "run", lambda *a, **k: calls.append((a, k)))
+    runner = CliRunner()
+    launched = runner.invoke(
+        cli.command, ["app", "channeling", "launch", "--edit", "--watch", "--tunnel", "--no-token"]
+    )
+    assert launched.exit_code == 0, launched.output
+    argv = calls[0][0][0]
+    assert argv[3:] == [
+        "edit",
+        "--watch",
+        "--port",
+        "2722",
+        "--no-token",
+        views.CHANNELING.notebook,
+    ]
+    assert "--material" not in argv
+    assert views.CHANNELING.tunnel_port not in {
+        analyze.TUNNEL_PORT,
+        viewer.TUNNEL_PORT,
+        check.TUNNEL_PORT,
+        views.PIXELS.tunnel_port,
+        views.COMPARE.tunnel_port,
+    }
+    exported = runner.invoke(cli.command, ["app", "channeling", "export"])
+    assert exported.exit_code == 0, exported.output
+    assert calls[1][0][0] == views._smoke_command(
+        views.CHANNELING,
+        None,
+        tmp_path / "pyrite-output/results/pyrite_channeling.html",
+    )
+    smoke = runner.invoke(cli.command, ["app", "channeling", "launch", "--smoke"])
+    assert smoke.exit_code == 0, smoke.output
+    assert calls[2][0][0][3:5] == ["export", "html"]
+    assert runner.invoke(cli.command, ["app", "channeling", "launch", "silicon"]).exit_code == 2
+
+
+def test_channeling_missing_extra_and_failed_subprocess(monkeypatch):
+    import subprocess
+
+    def fail(*args, **kwargs):
+        raise subprocess.CalledProcessError(7, args[0])
+
+    monkeypatch.setattr(views.subprocess, "run", fail)
+    runner = CliRunner()
+    for action in ("launch", "export"):
+        result = runner.invoke(cli.command, ["app", "channeling", action])
+        assert result.exit_code == 1
+        assert "marimo exited with status 7" in result.output
+    _hide_modules(monkeypatch, "marimo")
+    for action in ("launch", "export"):
+        result = runner.invoke(cli.command, ["app", "channeling", action])
+        assert result.exit_code == 1
+        assert 'pip install "pyrite-mc[apps]"' in result.output
+        assert "uv sync --extra apps" in result.output
+
+
+def test_channeling_help_does_not_load_notebook_or_backend():
+    import subprocess
+    import sys
+
+    probe = """
+import sys
+from click.testing import CliRunner
+from pyrite.cli import command
+for argv in (["--help"], ["app", "--help"], ["app", "channeling", "--help"],
+             ["app", "channeling", "launch", "--help"], ["app", "channeling", "export", "--help"]):
+    result = CliRunner().invoke(command, argv)
+    assert result.exit_code == 0, result.output
+assert "pyrite.apps.channeling_app" not in sys.modules
+assert "pyrite._backend" not in sys.modules
+assert "marimo" not in sys.modules
+"""
+    subprocess.run([sys.executable, "-c", probe], check=True, timeout=15)
 
 
 def test_validation_export_without_matplotlib_names_the_plots_extra(monkeypatch):

@@ -524,7 +524,17 @@ These are the supported low-level simulation entry points. Inputs and outputs us
    pyrite.detectors.response.convolve_detector
    pyrite.montecarlo.runner.run_case
    pyrite.montecarlo.runner.run_cases
+   pyrite.montecarlo.channeling.spatial.spatial_density
 ```
+
+For a planar `DensityMatrixSolver`, opt into scalar position-density history
+with `propagate(..., spatial_x_ang=x_ang)`. The returned `spatial_density_per_ang`
+has shape `(len(z_ang), len(x_ang))`, including entrance and exit; omitted
+sampling leaves it and `spatial_x_ang` as `None`. The density is per incident
+electron, folded into one period, with cell integral equal to the surviving
+solver `trace`. Reconstruction uses the instantaneous basis after any energy
+reprojection. See the [channeling demo](guides/working-with-results.md#planar-channeling-demo)
+and [normalization derivation](validation/channeling/cr-planar-spatial-density-reconstruction.md).
 
 ## Detector response
 

@@ -49,6 +49,7 @@ from ...materials.channeling.potential import PlanarProfile
 from ...materials.channeling.transverse import _hamiltonian, longitudinal_kinematics
 from ...materials.crystal import HBARC_EV_ANG, M_E_EV
 from .operators import ScatteringKernel
+from .spatial import spatial_density
 
 #: Declared calibration of the dechanneling cutoff: states more than this far
 #: above the planar barrier [eV] are a sink (``cr-dechanneling-collapse``).
@@ -106,6 +107,10 @@ class DensityMatrixResult:
     final_density
         Subspace density matrix at the final depth, per Bloch block in the
         eigenbasis of the final ``gamma``; shape ``(n_cells, N, N)``.
+    spatial_x_ang, spatial_density_per_ang
+        Optional cell coordinates [angstrom] and unconditioned ensemble density
+        [angstrom**-1] at ``z_ang``, shape ``(n_z, n_x)``. Both are ``None``
+        unless requested. The cell integral equals ``trace``.
     """
 
     z_ang: np.ndarray
@@ -122,6 +127,8 @@ class DensityMatrixResult:
     barrier_eV: float
     cutoff_eV: float
     final_density: np.ndarray
+    spatial_x_ang: np.ndarray | None = None
+    spatial_density_per_ang: np.ndarray | None = None
 
     @property
     def total_flux(self) -> np.ndarray:
@@ -392,6 +399,7 @@ class DensityMatrixSolver:
         record_every: int = 1,
         energy_edges_eV: np.ndarray | None = None,
         initial: tuple[np.ndarray, float] | None = None,
+        spatial_x_ang: np.ndarray | None = None,
     ) -> DensityMatrixResult:
         """Integrate the entry state to ``thickness_ang`` with steps ``dz_ang``.
 
@@ -402,10 +410,21 @@ class DensityMatrixSolver:
         replaces the entry state by ``(rho_S, entry_flux)`` in the entry
         eigenbasis.
 
+        ``spatial_x_ang`` opts into cell-density samples at ``record_every``
+        steps, including entrance and exit. Reconstruction uses the current
+        basis after any energy reprojection; no matrix history is retained.
+        Storage is ``O(n_recorded * n_x)``; default integration is unchanged.
+
         Validation: cr-density-matrix-split-operator, cr-dechanneling-collapse
         """
         if thickness_ang <= 0.0 or dz_ang <= 0.0:
             raise ValueError("thickness_ang and dz_ang must be positive")
+        if record_every < 1 or int(record_every) != record_every:
+            raise ValueError("record_every must be a positive integer")
+        spatial_x = (
+            None if spatial_x_ang is None else np.array(spatial_x_ang, dtype=float, copy=True)
+        )
+        spatial_history = [] if spatial_x is not None else None
         steps = max(1, int(round(thickness_ang / dz_ang)))
         dz = thickness_ang / steps
         if self.basis.gamma != self.gamma0:
@@ -440,6 +459,17 @@ class DensityMatrixSolver:
         }
 
         def record(z: float) -> None:
+            if spatial_history is not None and spatial_x is not None:
+                spatial_history.append(
+                    spatial_density(
+                        spatial_x,
+                        rho,
+                        self.basis.vectors,
+                        self.orders,
+                        self.kappa,
+                        self.profile.period_ang,
+                    )
+                )
             history["z"].append(z)
             history["E"].append(energy)
             history["bands"].append(self.band_populations(rho))
@@ -493,4 +523,8 @@ class DensityMatrixSolver:
             barrier_eV=self.barrier_eV,
             cutoff_eV=self.cutoff_eV,
             final_density=rho,
+            spatial_x_ang=spatial_x,
+            spatial_density_per_ang=None
+            if spatial_history is None
+            else np.asarray(spatial_history),
         )

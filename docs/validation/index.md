@@ -108,6 +108,7 @@ channeling/cr-lindblad-jump-operators
 channeling/cr-lindblad-jump-operators-anisotropic
 channeling/cr-uniaxial-thermal-projection
 channeling/cr-density-matrix-split-operator
+channeling/cr-planar-spatial-density-reconstruction
 channeling/cr-density-matrix-split-operator-abtem
 channeling/cr-density-matrix-split-operator-mos2
 channeling/cr-mcwf-unravelling

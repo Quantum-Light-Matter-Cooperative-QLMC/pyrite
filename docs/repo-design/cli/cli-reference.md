@@ -197,6 +197,7 @@ Commands:
   analysis    Launch or export the analysis app.
   pixels      Launch or export the pixel-detector observation app.
   compare     Launch or export the case and cross-material comparison app.
+  channeling  Launch or export the planar quantum channeling demo.
   viewer      Launch or export the 3D trajectory viewer.
   validation  Launch or export cached validation figures.
 ```
@@ -353,6 +354,56 @@ Usage: pyrite app compare launch [OPTIONS] [MATERIAL]
   MATERIAL starts the checkpoint picker for this run. Without it, the picker starts on
   the analysis app's saved default material, else hopg; this command never changes that
   default.
+
+Options:
+  --watch     Reload app when source files change.
+  --smoke     Execute app once headlessly and exit.
+  --edit      Use `marimo edit` instead of `marimo run`.
+  --acp       Start local Claude and Codex ACP bridges.
+  --tunnel    Bind fixed port for SSH tunneling.
+  --no-token  Disable marimo auth token.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite app channeling`
+
+```text
+Usage: pyrite app channeling [OPTIONS] COMMAND [ARGS]...
+
+  Launch the interactive planar channeling app with marimo run or edit.
+
+  Choose the crystal and beam settings inside the app; no checkpoint is needed.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  export  Render the planar channeling app as static HTML without starting marimo.
+  launch  Launch the interactive planar channeling app with marimo run or edit.
+```
+
+## `pyrite app channeling export`
+
+```text
+Usage: pyrite app channeling export [OPTIONS]
+
+  Render the planar channeling app as static HTML without starting marimo.
+
+  Writes pyrite-output/results/<stem>.html; the stem defaults to pyrite_channeling.
+
+Options:
+  --stem TEXT  Output stem under pyrite-output/results/ (without .html).
+  -h, --help   Show this message and exit.
+```
+
+## `pyrite app channeling launch`
+
+```text
+Usage: pyrite app channeling launch [OPTIONS]
+
+  Launch the interactive planar channeling app with marimo run or edit.
+
+  Choose the crystal and beam settings inside the app; no checkpoint is needed.
 
 Options:
   --watch     Reload app when source files change.
