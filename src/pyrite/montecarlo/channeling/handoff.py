@@ -55,7 +55,7 @@ import numpy as np
 #: Physics-generation marker of the planar zone and its handoff. It joins
 #: ``case_content_key`` and run provenance only for cases with a ``channeling``
 #: record, so channeling-off identities are unchanged.
-CHANNELING_MODEL = "planar-density-matrix-emission-v2"
+CHANNELING_MODEL = "planar-density-matrix-emission-v3"
 
 #: Per-electron fates, in sampling order.
 FATE_ENTRY, FATE_FREE, FATE_OVERFLOW, FATE_BOUND = 0, 1, 2, 3

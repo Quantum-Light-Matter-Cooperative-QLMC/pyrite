@@ -79,6 +79,7 @@ def test_packaged_conduction_bands_are_sourced():
     bands = so.load_conduction_bands()
     assert set(bands) == {
         "silicon",
+        "diamond",
         "sio2",
         "mos2",
         "hopg",
@@ -137,6 +138,7 @@ def test_fetched_packaged_conduction_bands_pass_default_shell_cutoff():
         ("sio2", {(14, "M1"), (14, "M2"), (8, "L1"), (8, "L2"), (8, "L3")}, 3.4701),
         ("mos2", {(42, "N4"), (42, "O1"), (16, "M1"), (16, "M2"), (16, "M3")}, 1.7797),
         ("hopg", {(6, "L1"), (6, "L2")}, 2.6359),
+        ("diamond", {(6, "L1"), (6, "L2")}, 1.4846),
         ("hbn", {(5, "L1"), (5, "L2"), (7, "L1"), (7, "L2"), (7, "L3")}, 2.5860),
         (
             "wse2",

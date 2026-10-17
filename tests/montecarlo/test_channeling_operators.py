@@ -237,10 +237,15 @@ def test_uniform_density_gives_pure_momentum_diffusion(si110):
     assert np.abs(off).max() < 1e-12 * np.abs(kernel.momentum_kernel).max()
 
 
-def test_catalog_oscillators_required(si110):
-    diamond = planar_profile("diamond", (1, 1, 0))
-    with pytest.raises(ValueError, match="conduction-band"):
-        electronic_kernel(diamond, ENERGY_EV, **SMALL)
+def test_diamond_catalog_oscillators_give_finite_electronic_kernel():
+    # Egerton & Whelan (1974) valence plasmon enters the shell oscillators;
+    # electronic decoherence is positive but below TDS (Gouanere energy).
+    diamond = planar_profile("diamond", (1, 1, 0), 293.15)
+    kernel = electronic_kernel(diamond, 80.23e6, **SMALL)
+    assert np.isfinite(kernel.momentum_kernel).all()
+    rate = decoherence_rate(diamond, 80.23e6, [1e-3, 2e-3])
+    assert np.all(rate.electronic > 0.0)
+    assert np.all(rate.electronic < rate.tds)
 
 
 # ---- decoherence diagnostic --------------------------------------------------

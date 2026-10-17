@@ -285,9 +285,38 @@ example the model centre is 0.63% high, while the TDS and TDS + electronic
 FWHMs are 18.2% and 6.1% low. Different potential/scattering approximations
 prevent an exact reproduction claim. Adding electronic scattering improves
 that one number but cannot make a theoretical example a measurement.
-For diamond, `electronic_kernel` refuses the material because the packaged
-shell data lack the required conduction-band entry. No complete collisional
-prediction was computed; the TDS-only numbers must stay labelled as such.
+Diamond now has a conduction-band entry (#523): the valence-plasmon maximum
+33.3 ± 0.2 eV of Egerton and Whelan, Philos. Mag. **30**, 739 (1974) (80 keV
+transmission EELS, 2 mrad collection semi-angle, FWHM about 13 eV), with four
+electrons per atom (whole $2s2p$ shells; a model allocation, not a measured
+carrier density). It is a loss-intensity maximum at small but non-zero $q$
+(about 0.3 inverse angstroms at the aperture edge), not an optical-limit
+$\mathrm{Im}(-1/\varepsilon)$ fit. The free-electron value is 31.2 eV; the
+ab initio ELF maximum of Azzolini et al., arXiv:1612.01898 (Fig. 3) is about
+35 eV, so the adopted value sits between them. Medvedev, Jeschke and Ziaja,
+New J. Phys. **15**, 015016 (2013), Table A.1 (six valence oscillators,
+$\sum A_j = 982$ eV², plus a K-shell term) and Azzolini et al. Table 1 (four
+Drude–Lorentz oscillators fitted to the ab initio optical ELF,
+$\sum A_n = 921$ eV²) are richer multi-oscillator fits; they are *not*
+copied into the single-oscillator schema and remain a separate model choice.
+The 24 eV hump and 10 eV interband features of Egerton and Whelan are not
+represented.
+
+Gouanère comparison at 80.23 MeV, 300 K, zero Bloch block,
+`max_order=16`, 8 cells, intrinsic transverse FWHM $2h$ (eV):
+
+| Transition | Gouanère | TDS | TDS + electronic | Residual |
+| --- | --- | --- | --- | --- |
+| 1→0 | 0.32 | 0.1980 | 0.2695 | −15.8% |
+| 2→1 | 0.32 | 0.1279 | 0.2456 | −23.3% |
+| 3→2 | 0.26 | 0.0914 | 0.2510 | −3.5% |
+| 4→3 | 0.31 | 0.0712 | 0.2689 | −13.2% |
+
+Electronic decoherence closes most of the TDS gap (−38…−77% → −4…−23%), but
+the model is still low on every line. The remaining residual is attributable
+to the not-yet-implemented in-plane multiple-scattering depth dependence and
+the detector convolution only as a hypothesis; it has not been budgeted. This
+is not an `anchored` linewidth reproduction.
 
 The task owner's separately source-checked Gouanère et al., Phys. Rev. B
 **38**, 4352 (1988), Table II, p. 4360, provides a cleaner measured
@@ -315,7 +344,7 @@ comparison as agreement.
 
 - **Claim:** `cr-line-shape` — `montecarlo/channeling/emission.py::{emission_lines,EmissionLines.spectrum,channeling_spectrum}` — damped-coherence Fourier spectrum, Doppler width transform; Azadegan 2006 Eqs. (6)–(8) and linewidth Tables III–VI; Azadegan 2013 Eq. (7) and p. 1068.
 - **Filters:** units pass; zero-damping/angular-spread limits pass; HWHM/FWHM and Doppler conventions pass. The experimental-length inversion in Azadegan 2006 Table VI has the unresolved approximately factor-two inconsistency documented above.
-- **Re-derivation:** matches the selected-kernel Fourier/Doppler relation. Differs from measured-width reproduction: diamond TDS intrinsic widths are too small, electronic inputs are missing, and the assembled response omits depth-dependent in-plane multiple scattering and detector convolution.
+- **Re-derivation:** matches the selected-kernel Fourier/Doppler relation. Differs from measured-width reproduction: diamond TDS intrinsic widths are too small, TDS + electronic widths remain 4–23% low, and the assembled response omits depth-dependent in-plane multiple scattering and detector convolution.
 - **Verdict:** `rederived` for the stated selected-kernel line-shape equation. Physical measured-width reproduction is incomplete and fails for the TDS-only Gouanère comparison; this evidence does not justify `anchored` for linewidths.
 - **Write-up:** `docs/validation/channeling/cr-line-shape.md`.
 - **Suggested ledger change:** retain `rederived`; replace the stale source-unavailable note with these transcribed measured values, source convention caveat, missing diamond electronic inputs, and failed TDS-only intrinsic-width comparison. The task owner applies any ledger edit; no human sign-off is claimed.
