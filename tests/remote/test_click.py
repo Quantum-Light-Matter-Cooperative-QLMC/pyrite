@@ -284,7 +284,7 @@ def test_pull_zhai_preset_dispatches_without_checkpoint_selection(monkeypatch):
 
     result = invoke(remote_cli.command, ["pull", "--preset", "zhai"])
     incompatible = invoke(remote_cli.command, ["pull", "hopg", "--preset", "zhai"])
-    output = invoke(remote_cli.command, ["pull", "--preset", "zhai", "-o", "wide"])
+    output = invoke(remote_cli.command, ["pull", "--preset", "zhai", "-o", "json"])
 
     assert_clean_result(result)
     assert calls == ["pull"]

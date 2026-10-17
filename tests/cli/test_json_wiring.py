@@ -65,16 +65,18 @@ def test_output_selector_is_the_only_machine_output_door(monkeypatch):
         lambda: "j1\t0042\tFalse\trun\thopg\tdone\n",
     )
 
-    canonical = invoke(root_command, ["job", "list", "-o", "json"])
-    retired = invoke(root_command, ["job", "list", "--json"])
-    wide = invoke(root_command, ["job", "list", "-o", "wide"])
-    help_result = invoke(root_command, ["job", "list", "--help"])
+    canonical = invoke(root_command, ["remote", "job", "list", "-o", "json"])
+    retired = invoke(root_command, ["remote", "job", "list", "--json"])
+    wide = invoke(root_command, ["remote", "job", "list", "-o", "wide"])
+    help_result = invoke(root_command, ["remote", "job", "list", "--help"])
 
-    assert canonical.exit_code == wide.exit_code == 0
-    assert canonical.stderr == wide.stderr == ""
+    assert canonical.exit_code == 0
+    assert wide.exit_code == 2
+    assert canonical.stderr == ""
+    assert "Invalid value" in wide.stderr
     assert retired.exit_code == 2
     assert "No such option" in retired.stderr
-    assert "-o, --output [table|json|wide]" in help_result.stdout
+    assert "-o, --output [table|json]" in help_result.stdout
     assert "--json" not in help_result.stdout
 
 

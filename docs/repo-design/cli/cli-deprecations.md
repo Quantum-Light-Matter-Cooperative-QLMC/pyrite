@@ -8,11 +8,22 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 
 ## Commands
 
-No command spelling is currently deprecated. Every spelling the CLI accepts is canonical; anything else exits as an unknown command.
+| Deprecated spelling | Replacement | Deprecated in | Remove in | Note |
+| --- | --- | --- | --- | --- |
+| `pyrite beam gdf-inspect` | `pyrite beam gdf inspect` | 0.15.0 | 0.17.0 |  |
+| `pyrite beam gdf-times` | `pyrite beam gdf times` | 0.15.0 | 0.17.0 |  |
+| `pyrite detector create` | `pyrite detector create scalar NAME` | 0.15.0 | 0.17.0 | Planar geometry uses create planar; --from-only copies use create clone. |
+| `pyrite job` | `pyrite remote job` | 0.15.0 | 0.17.0 |  |
+| `pyrite material add` | `pyrite material create crystal NAME` | 0.15.0 | 0.17.0 |  |
+| `pyrite material energy-grid` | `pyrite numerics energy-grid` | 0.15.0 | 0.17.0 |  |
+| `pyrite profile cxr-grid` | `pyrite numerics cxr-grid` | 0.15.0 | 0.17.0 |  |
+| `pyrite profile precision` | `pyrite numerics precision` | 0.15.0 | 0.17.0 |  |
 
 ## Options
 
-No option spelling is currently deprecated. Every option the CLI accepts is canonical; anything else exits as a usage error.
+| Command | Deprecated option | Replacement | Deprecated in | Remove in | Note |
+| --- | --- | --- | --- | --- | --- |
+| `pyrite material show` | `--profile` | use pyrite profile ranges show PROFILE MATERIAL | 0.15.0 | 0.17.0 |  |
 
 ## Implicit defaults
 

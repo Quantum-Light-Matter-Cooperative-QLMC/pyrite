@@ -207,4 +207,4 @@ def score_command(ctx, stem, cases, energies, max_segments, overwrite):
         overwrite=overwrite,
     )
     jobid = _checked(trajectories.submit_score, request)
-    click.echo(f"Submitted {jobid}; monitor with `pyrite job attach {jobid}`.")
+    click.echo(f"Submitted {jobid}; monitor with `pyrite remote job attach {jobid}`.")

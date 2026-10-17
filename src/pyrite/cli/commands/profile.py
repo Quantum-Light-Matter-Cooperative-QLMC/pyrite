@@ -47,6 +47,7 @@ from pyrite.console.output import (
     emit_json_result,
     emit_result,
     flatten_option_values,
+    hidden_alias,
     output_option,
 )
 
@@ -235,12 +236,12 @@ def command():
     membership. An absent ``materials`` key means all catalog materials.
     Membership uses ``set|add|remove --material``; ``set --all-materials``
     restores implicit membership. Per-material
-    range overrides and derived energy grids are managed by ``pyrite material``.
+    effective material ranges are inspected with ``profile ranges show``.
 
     Where settings live: ranges, membership, beam/detector references and
-    emission use ``set|add|remove``; calculation controls (electron counts,
-    reflections, mosaic, transport models) use ``numerics``; the line-grid
-    selectors use ``cxr-grid``; filters and the pixel detector use ``filter``
+    emission use ``set|add|remove``; sampling/integration use ``pyrite numerics``;
+    physical models/cutoffs use ``pyrite physics``; line-grid and precision
+    policies live under ``pyrite numerics``. Filters and the pixel detector use ``filter``
     and ``detector``; reusable beams and detectors are named objects
     edited with ``pyrite beam`` and ``pyrite detector``. The full map is
     docs/repo-design/profile-settings.md. Bundled demos are read-only (copy
@@ -252,8 +253,8 @@ def command():
       pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
       pyrite profile create sub_100keV --energy 30:100:10
       pyrite profile set sub_100keV --detector eds
-      pyrite profile numerics set sub_100keV --cxr-trials 2000
-      pyrite profile cxr-grid show sub_100keV
+      pyrite numerics set sub_100keV --cxr-trials 2000
+      pyrite numerics cxr-grid show sub_100keV
       pyrite profile add sub_100keV --energy 75
       pyrite profile set sub_100keV --material hopg,mose2
       pyrite profile rename sub_100keV sub100
@@ -290,7 +291,8 @@ def numerics_show_command(name, json_output):
         return 0
     emit_result(f"[{name} numerics]")
     for group in groups:
-        emit_result(f"{group['name']}:")
+        label = "reflections and mosaic" if group["name"] == "convergence" else group["name"]
+        emit_result(f"{label}:")
         fields = group["fields"]
         if not isinstance(fields, list):  # pragma: no cover - internal payload invariant
             raise AssertionError("numerics fields must be a list")
@@ -529,8 +531,30 @@ def numerics_reset_command(name, fields, yes, dry_run):
     return _write(document, original, dry_run, f"reset numerics for profile {name}")
 
 
-command.add_command(_profile_cxr_grid.command)
-command.add_command(_profile_precision.command)
+hidden_alias(command, _profile_cxr_grid.command, "cxr-grid")
+hidden_alias(command, _profile_precision.command, "precision")
+
+
+@command.group("ranges")
+def ranges_command():
+    """Inspect campaign sweep ranges, including per-material overrides."""
+
+
+@ranges_command.command("show")
+@click.argument("name", metavar="PROFILE", shell_complete=_cli_completion.complete_profile)
+@click.argument("material", shell_complete=_cli_completion.complete_material)
+@output_option
+def ranges_show_command(name, material, json_output):
+    """Show effective ranges and sources for MATERIAL in PROFILE.
+
+    Preserves the legacy cxr.material.show JSON envelope and units: energy in
+    keV, thickness in angstrom, polar/azimuth in degrees. No files are changed.
+    """
+    from .material import _show
+
+    return _show(material, name, json_output)
+
+
 command.add_command(_profile_detectors.command)
 
 
@@ -586,7 +610,7 @@ def list_command(json_output):
 
 @command.command("show")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
-@output_option
+@output_option(wide=True)
 def show_command(name, json_output):
     """Show PROFILE in tables grouped by CLI settings owner.
 

@@ -51,6 +51,7 @@ In other words:
 0016-target-filter-body-components
 0017-in-tree-physics-extension-contract
 0018-quantum-channeling-zone
+0019-cli-configuration-ownership
 ```
 
 | ADR                                                 | Title                               | Status                                 |
@@ -72,3 +73,4 @@ In other words:
 | [0016](0016-target-filter-body-components.md)      | Share descriptions across target and filter roles | Accepted                    |
 | [0017](0017-in-tree-physics-extension-contract.md) | In-tree physics preparation and batch scoring contracts | Proposed |
 | [0018](0018-quantum-channeling-zone.md)            | Model electron channeling as a quantum entrance zone | Proposed |
+| [0019](0019-cli-configuration-ownership.md) | CLI configuration ownership | Accepted |

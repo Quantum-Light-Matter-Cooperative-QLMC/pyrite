@@ -12,6 +12,7 @@ from tomlkit.exceptions import ParseError
 from pyrite._catalog_layout import object_sources
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
+from pyrite.cli._deprecations import DeprecatingGroup
 from pyrite.cli.commands._beam_shared import (
     beam_cli_options,
     collect_beam_updates,
@@ -26,6 +27,7 @@ from pyrite.console.output import (
     confirm_destructive,
     emit_json_result,
     emit_result,
+    hidden_alias,
     output_option,
 )
 
@@ -128,7 +130,7 @@ def _emit_show(payload):
             emit_result(f"  longitudinal.envelope_rms_fs: {longitudinal['envelope_rms_fs']:g}")
 
 
-@click.group(name="beam", no_args_is_help=True)
+@click.group(name="beam", cls=DeprecatingGroup, deprecation_prefix="beam", no_args_is_help=True)
 def command():
     """Manage named beams (``[beams.*]``), attachable to profiles by name.
 
@@ -432,7 +434,12 @@ def delete_command(name, yes, dry_run, json_output):
     return 0
 
 
-@command.command("gdf-times")
+@command.group("gdf")
+def gdf_command():
+    """Inspect GPT particle files and select time or screen outputs (CPU only)."""
+
+
+@gdf_command.command("times")
 @click.argument("path", type=click.Path(path_type=Path))
 def gdf_times(path):
     """List GPT time-output times in seconds and particle counts (CPU only)."""
@@ -446,7 +453,7 @@ def gdf_times(path):
         emit_result(f"{time:.17g} s  {count} particles")
 
 
-@command.command("gdf-inspect")
+@gdf_command.command("inspect")
 @click.argument("path", type=click.Path(path_type=Path))
 @click.option(
     "--time-s", type=NONNEGATIVE_FLOAT, default=None, help="Select time output in seconds."
@@ -516,3 +523,7 @@ def gdf_inspect(path, time_s, time_tolerance_s, screen_position_m, screen_tolera
     )
     emit_result("GPT x/y offsets are preserved; check them against the target footprint.")
     return 0
+
+
+hidden_alias(command, gdf_times, "gdf-times")
+hidden_alias(command, gdf_inspect, "gdf-inspect")

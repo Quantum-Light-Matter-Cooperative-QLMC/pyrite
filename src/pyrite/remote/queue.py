@@ -23,8 +23,8 @@ def _refuse_if_profile_live(catalog_profile):
         raise SystemExit(
             f"refusing to submit: profile {catalog_profile!r} already has a live job "
             f"({', '.join(clash)}); monitor it "
-            f"(pyrite job attach {clash[0]}) or stop it "
-            f"(pyrite job stop --profile {catalog_profile}) first."
+            f"(pyrite remote job attach {clash[0]}) or stop it "
+            f"(pyrite remote job stop --profile {catalog_profile}) first."
         )
 
 
@@ -356,9 +356,9 @@ def start_queue(
                     if trajectories is not None
                     else []
                 ),
-                ("Monitor", f"pyrite job attach {jobid}"),
-                ("Status", f"pyrite job status {jobid} -vv"),
-                ("Logs", f"pyrite job logs {jobid}"),
+                ("Monitor", f"pyrite remote job attach {jobid}"),
+                ("Status", f"pyrite remote job status {jobid} -vv"),
+                ("Logs", f"pyrite remote job logs {jobid}"),
                 *(
                     [
                         (
@@ -428,9 +428,9 @@ def start_zhai_queue(
                 ("SLURM", scheduler_id),
                 ("Host", config.remote_host()),
                 ("Workload", "Zhai reproduction"),
-                ("Monitor", f"pyrite job attach {jobid}"),
-                ("Status", f"pyrite job status {jobid} -vv"),
-                ("Logs", f"pyrite job logs {jobid} --follow"),
+                ("Monitor", f"pyrite remote job attach {jobid}"),
+                ("Status", f"pyrite remote job status {jobid} -vv"),
+                ("Logs", f"pyrite remote job logs {jobid} --follow"),
                 ("Pull", "pyrite remote pull --preset zhai  (after completion)"),
             ]
         )

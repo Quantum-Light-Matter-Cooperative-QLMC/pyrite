@@ -1,7 +1,5 @@
 """Shared TOML helpers for catalog-editing CLI commands."""
 
-import os
-import tempfile
 from pathlib import Path
 
 import tomlkit
@@ -9,14 +7,13 @@ import tomlkit
 from pyrite._catalog_layout import (
     BundledProfileError,
     bundled_catalog,
-    catalog_root,
     read_text,
     write_text,
 )
+from pyrite.catalog_edit import validate as validate_draft
 from pyrite.console.config import catalog_path
 from pyrite.console.output import CLIError
 from pyrite.energy_grid.apply import _CATALOG_PATH
-from pyrite.materials.catalog import load_material_catalog
 
 RANGES = {
     "thickness": "thickness_ang",
@@ -93,15 +90,7 @@ def validated_catalog(path, text, *, profile="standard"):
     ``profile`` selects whose energy-grid references are resolved, as a run
     would.
     """
-    root = catalog_root(path)
-    root.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(dir=root, prefix=".", suffix=".toml.tmp")
-    try:
-        with os.fdopen(fd, "w") as stream:
-            stream.write(text)
-        return load_material_catalog(Path(temporary), profile=profile)
-    finally:
-        Path(temporary).unlink(missing_ok=True)
+    return validate_draft(path, text, profile=profile)
 
 
 def validate(path, text):

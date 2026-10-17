@@ -79,6 +79,7 @@ def test_create_set_and_dry_run(tmp_path, monkeypatch):
         detector.command,
         [
             "create",
+            "scalar",
             "custom",
             "--label",
             "Custom EDS",
@@ -93,7 +94,7 @@ def test_create_set_and_dry_run(tmp_path, monkeypatch):
 
     created = invoke(
         detector.command,
-        ["create", "custom", "--observation-angle", "100"],
+        ["create", "scalar", "custom", "--observation-angle", "100"],
     )
     assert_clean_result(created, stdout="created detector custom\n")
 
@@ -114,7 +115,7 @@ def test_scalar_options_validate_domains(tmp_path, monkeypatch):
     )
     bad_solid_angle = invoke(
         detector.command,
-        ["create", "bad", "--solid-angle", "13"],
+        ["create", "scalar", "bad", "--solid-angle", "13"],
     )
 
     assert bad_acceptance.exit_code == 2
@@ -127,8 +128,10 @@ def test_create_and_set_validate_names_fields_and_overwrites(tmp_path, monkeypat
     path = _catalog(tmp_path, monkeypatch)
     original = path.read_text()
 
-    empty = invoke(detector.command, ["create", "empty", "--label", "Only label"])
-    invalid = invoke(detector.command, ["create", "bad name", "--observation-angle", "90"])
+    empty = invoke(detector.command, ["create", "scalar", "empty", "--label", "Only label"])
+    invalid = invoke(
+        detector.command, ["create", "scalar", "bad name", "--observation-angle", "90"]
+    )
     declined = invoke(
         detector.command,
         ["set", "eds", "--observation-angle", "100"],

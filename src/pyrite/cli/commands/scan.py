@@ -343,7 +343,7 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     ),
 )
 @click.pass_context
-@_cli_core.output_option
+@_cli_core.output_option(wide=True)
 def _command(
     ctx,
     catalog_profile,

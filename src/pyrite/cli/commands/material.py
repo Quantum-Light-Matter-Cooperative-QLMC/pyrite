@@ -5,6 +5,7 @@ from tomlkit.exceptions import ParseError
 
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
+from pyrite.cli._deprecations import DeprecatedOption
 from pyrite.cli._groups import LazyGroup
 from pyrite.console import json as cli_json
 from pyrite.console.output import (
@@ -16,6 +17,7 @@ from pyrite.console.output import (
 
 _COMMANDS = {
     "add": "pyrite.cli.commands.material_add.command",
+    "create": "pyrite.cli.commands.material_create.command",
     "list": "pyrite.cli.commands.material_inventory.command",
     "blaze": "pyrite.cli.commands.blaze.command",
     "energy-grid": "pyrite.cli.commands.energy_grid_surface.material_command",
@@ -24,6 +26,7 @@ _COMMANDS = {
 
 _COMMAND_HELP = {
     "add": "Add a validated medium or crystal to your catalog.",
+    "create": "Create a crystal or amorphous medium with type-specific options.",
     "list": "List materials and media with their source and composition.",
     "blaze": "Run a grooved-crystal sweep and write a checkpoint.",
     "energy-grid": "Derive and inspect detector energy-grid inputs.",
@@ -180,6 +183,7 @@ def _show(material, profile_name, json_output, *, schema="cxr.material.show"):
     cls=LazyGroup,
     lazy_commands=_COMMANDS,
     lazy_help=_COMMAND_HELP,
+    lazy_hidden=("energy-grid", "add"),
     no_args_is_help=True,
     deprecation_prefix="material",
 )
@@ -187,8 +191,8 @@ def command():
     """Add, inspect, validate, and blaze individual materials.
 
     Profile membership and ranges live under ``pyrite profile``. ``show``
-    reports effective ranges and any per-material override that diverges from
-    the profile; ``validate`` checks the complete catalog; ``blaze`` writes a
+    reports intrinsic properties; ``profile ranges show PROFILE MATERIAL``
+    inspects effective campaign ranges. ``validate`` checks the catalog; ``blaze`` writes a
     face-specific checkpoint.
     """
 
@@ -198,12 +202,55 @@ def command():
 @click.option(
     "--profile",
     "profile_name",
-    default=_catalog_io.DEFAULT_PROFILE,
-    show_default=True,
+    default=None,
+    cls=DeprecatedOption,
+    hidden=True,
     shell_complete=_cli_completion.complete_profile,
     help="Resolve defaults and overrides under profile NAME.",
 )
 @output_option
 def show_command(material, profile_name, json_output):
-    """Show MATERIAL's effective ranges and inherited/overridden sources."""
-    return _show(material, profile_name, json_output)
+    """Show intrinsic MATERIAL properties, independent of campaign geometry."""
+    if profile_name is not None:
+        return _show(material, profile_name, json_output)
+    schema = "pyrite.material.show"
+    try:
+        _, document = _catalog_io.catalog_text()
+        if material not in document.get("media", {}) and material not in document.get(
+            "materials", {}
+        ):
+            _unknown_material(document, material)
+        identity = _identity_payload(material)
+        definition = None
+        if "schema_version" in document:
+            from ...materials.catalog import load_material_catalog
+            from .material_inventory import entries
+
+            catalog = load_material_catalog(_catalog_io.active_catalog_path())
+            identity = _identity_payload(material, catalog)
+            definition = next(
+                row for row in entries(_catalog_io.active_catalog_path()) if row["name"] == material
+            )
+        if identity is not None:
+            identity = {
+                key: value for key, value in identity.items() if key not in ("cut", "cut_frame")
+            }
+        payload = {"material": material, "identity": identity, "definition": definition}
+    except (OSError, ValueError, ParseError) as exc:
+        if json_output:
+            emit_json_result(cli_json.failure(schema, {}, str(exc)))
+            return 1
+        raise CLIError(str(exc)) from None
+    if json_output:
+        emit_json_result(cli_json.JsonResult(schema, payload))
+    else:
+        emit_result(material)
+        if identity:
+            for key in ("label", "formula", "phase", "full_name"):
+                if identity.get(key) is not None:
+                    emit_result(f"  {key}: {identity[key]}")
+        if definition:
+            emit_result(f"  kind: {definition['kind']}\n  source: {definition['source']}")
+            emit_result(f"  density: {definition['density_g_cm3']:g} g/cm³")
+            emit_result(f"  composition (atoms/angstrom³): {definition['composition']}")
+    return 0

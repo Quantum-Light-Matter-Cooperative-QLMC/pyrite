@@ -31,9 +31,9 @@ Zhai reproduction uses `pyrite run --preset zhai`, which runs locally unless
 `--remote` is given. Remote runs use
 `pyrite run --remote`. The `check`, `check-config`, `remote run`,
 `remote validate`, and `remote check` spellings were removed at 0.3.0.
-Energy-grid job lifecycle uses the top-level `pyrite job ...` paths; the
+Energy-grid job lifecycle uses `pyrite remote job ...`; the
 former `pyrite energy-grid` job paths were removed at the same time.
-User grid derivation and inspection live below `pyrite material energy-grid`;
+User grid derivation and inspection live below `pyrite numerics energy-grid`;
 normal runs size line grids automatically and resolve continuum bounds per case.
 Explicit derivation requires `--material` and `--energy`
 until 0.15.0; optional derivation requires explicit material/energy selection then.
@@ -53,7 +53,7 @@ default; `wide` is human-only and not a stable automation contract.
 
 Destructive commands preview exact targets by default. In a TTY, accept the
 `[y/N]` prompt to execute; in non-interactive use, pass `-y/--yes`.
-`pyrite job stop` requires JOBID or an explicit selector.
+`pyrite remote job stop` requires JOBID or an explicit selector.
 
 Commands below are authoritative for this version.
 
@@ -95,8 +95,9 @@ Commands:
   trajectories  List, describe, export, and score saved trajectory captures.
   config        Set profile, catalog, workspace, and remote defaults.
   remote        Run and manage MC sweeps on a remote GPU host.
-  job           List, inspect, follow, or stop asynchronous remote jobs.
   profile       Manage named catalog campaigns and material membership.
+  physics       Inspect and edit a campaign's physical models and cutoffs.
+  numerics      Configure sampling, integration, precision and photon grids.
   material      Inspect, validate, edit, and blaze individual materials.
   beam          Manage named beams, attachable to profiles by name.
   detector      Manage named detector geometries.
@@ -590,33 +591,32 @@ Usage: pyrite checkpoint recompute brem [OPTIONS] [MATERIALS]...
   records already at target unless --redo-all.
 
 Options:
-  -a, --all                       Recompute every checkpoint.
-  --profile NAME                  Catalog profile for legacy data; otherwise must match
-                                  checkpoint metadata.
-  --brem-trials N                 Monte Carlo electron histories used to estimate
-                                  bremsstrahlung; overrides profile default.
-  --start EV                      Wide-bremsstrahlung lower bound in eV; overrides
-                                  profile.
-  --stop EV                       Wide-bremsstrahlung exclusive upper bound in eV;
-                                  default follows beam energy.
-  --step EV                       Wide-bremsstrahlung grid spacing in eV; overrides
-                                  profile default.
-  --redo-all                      Recompute records already at target.
-  --checkpoint-dir DIR            Root containing component checkpoint directories to
-                                  update.  [default: (pyrite-output/checkpoints)]
-  --save-every N                  Atomically save after every N recomputed records.
-                                  [default: 100]
-  -R, --remote [TARGET]           Run remotely; bare uses the configured target, =TARGET
-                                  overrides it.
-  --detach                        Return after remote submission.
-  --wait                          Wait and pull remote results.
-  --dry-run                       Preview remote submission; do not connect.
-  --no-sync                       Skip remote code upload.
-  --chunk-minutes MINUTES         Remote self-resubmitting slice length; 0 uses one
-                                  monolithic job.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -a, --all                  Recompute every checkpoint.
+  --profile NAME             Catalog profile for legacy data; otherwise must match
+                             checkpoint metadata.
+  --brem-trials N            Monte Carlo electron histories used to estimate
+                             bremsstrahlung; overrides profile default.
+  --start EV                 Wide-bremsstrahlung lower bound in eV; overrides profile.
+  --stop EV                  Wide-bremsstrahlung exclusive upper bound in eV; default
+                             follows beam energy.
+  --step EV                  Wide-bremsstrahlung grid spacing in eV; overrides profile
+                             default.
+  --redo-all                 Recompute records already at target.
+  --checkpoint-dir DIR       Root containing component checkpoint directories to update.
+                             [default: (pyrite-output/checkpoints)]
+  --save-every N             Atomically save after every N recomputed records.
+                             [default: 100]
+  -R, --remote [TARGET]      Run remotely; bare uses the configured target, =TARGET
+                             overrides it.
+  --detach                   Return after remote submission.
+  --wait                     Wait and pull remote results.
+  --dry-run                  Preview remote submission; do not connect.
+  --no-sync                  Skip remote code upload.
+  --chunk-minutes MINUTES    Remote self-resubmitting slice length; 0 uses one
+                             monolithic job.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite checkpoint recompute cxr`
@@ -630,31 +630,29 @@ Usage: pyrite checkpoint recompute cxr [OPTIONS] [MATERIALS]...
   records already at target unless --redo-all.
 
 Options:
-  -a, --all                       Recompute every checkpoint.
-  --profile NAME                  Catalog profile for legacy data; otherwise must match
-                                  checkpoint metadata.
-  --cxr-trials N                  CXR trial count; overrides profile default.
-  --start EV                      Line-grid lower bound in eV; overrides profile.
-  --stop EV                       Line-grid exclusive upper bound in eV; overrides
-                                  profile.
-  --cxr-step EV                   Uniform line-grid spacing in eV; overrides profile
-                                  grid.
-  --redo-all                      Recompute records already at target.
-  --checkpoint-dir DIR            Root containing component checkpoint directories to
-                                  update.  [default: (pyrite-output/checkpoints)]
-  --save-every N                  Atomically save after every N recomputed records.
-                                  [default: 100]
-  -R, --remote [TARGET]           Run remotely; bare uses the configured target, =TARGET
-                                  overrides it.
-  --detach                        Return after remote submission.
-  --wait                          Wait and pull remote results.
-  --dry-run                       Preview remote submission; do not connect.
-  --no-sync                       Skip remote code upload.
-  --chunk-minutes MINUTES         Remote self-resubmitting slice length; 0 uses one
-                                  monolithic job.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -a, --all                  Recompute every checkpoint.
+  --profile NAME             Catalog profile for legacy data; otherwise must match
+                             checkpoint metadata.
+  --cxr-trials N             CXR trial count; overrides profile default.
+  --start EV                 Line-grid lower bound in eV; overrides profile.
+  --stop EV                  Line-grid exclusive upper bound in eV; overrides profile.
+  --cxr-step EV              Uniform line-grid spacing in eV; overrides profile grid.
+  --redo-all                 Recompute records already at target.
+  --checkpoint-dir DIR       Root containing component checkpoint directories to update.
+                             [default: (pyrite-output/checkpoints)]
+  --save-every N             Atomically save after every N recomputed records.
+                             [default: 100]
+  -R, --remote [TARGET]      Run remotely; bare uses the configured target, =TARGET
+                             overrides it.
+  --detach                   Return after remote submission.
+  --wait                     Wait and pull remote results.
+  --dry-run                  Preview remote submission; do not connect.
+  --no-sync                  Skip remote code upload.
+  --chunk-minutes MINUTES    Remote self-resubmitting slice length; 0 uses one
+                             monolithic job.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite checkpoint archive`
@@ -687,9 +685,9 @@ Usage: pyrite checkpoint archive list [OPTIONS]
   List long-term checkpoint shelf.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite checkpoint archive merge`
@@ -750,9 +748,9 @@ Usage: pyrite checkpoint list [OPTIONS]
   List active local checkpoints.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite checkpoint gc`
@@ -835,9 +833,9 @@ Usage: pyrite trajectories ls [OPTIONS] [DIR]...
   artifact file.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite trajectories info`
@@ -858,9 +856,9 @@ Usage: pyrite trajectories info [OPTIONS] ARTIFACT
   `pyrite trajectories ls`.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite trajectories export`
@@ -952,9 +950,9 @@ Usage: pyrite config [OPTIONS] COMMAND [ARGS]...
 
   Set and inspect environment-scoped CLI defaults.
 
-  Values resolve in one order everywhere: per-call flag, PYRITE_* environment, config
-  store, then built-in default. `pyrite config list` shows each effective value and its
-  source.
+  Values resolve in one order: per-call flag, PYRITE_* environment, config store, then
+  built-in default. Use keys for supported settings, list [PREFIX] for effective values
+  and sources, or explain KEY for metadata and precedence.
 
   Remote runs need remote.target. The other remote.* keys select the SLURM target
   profile; their defaults are the NVIDIA lab box.
@@ -963,40 +961,25 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
+  explain     Show KEY's meaning, default, environment...
   get         Print the effective value for KEY.
-  list        List effective values and the winning...
+  keys        Describe supported keys without reading...
+  list        List effective values and sources,...
   set         Persist VALUE for KEY.
   unset       Remove the stored value for KEY.
   setup       Detect GPU hardware and persist the selected backend.
   completion  Manage PyRITE shell tab-completion.
+```
 
-  Keys (environment variable; built-in default):
-    profile.current        Default catalog scan profile.
-                           PYRITE_PROFILE; standard
-    remote.target          SSH alias of the SLURM head node (required).
-                           PYRITE_REMOTE_HOST; unset
-    remote.gpu_vendor      Remote GPU vendor: nvidia or amd.
-                           PYRITE_REMOTE_GPU_VENDOR; nvidia
-    remote.partition       SLURM partition for new remote jobs.
-                           PYRITE_REMOTE_PARTITION; gpu
-    remote.nodelist        SLURM node list for new remote jobs, or 'any'.
-                           PYRITE_REMOTE_NODELIST; any
-    remote.gres            SLURM gres request, e.g. gpu:radeon8060s:1.
-                           PYRITE_REMOTE_GRES; gpu:1
-    workspace.root         Workspace directory for checkpoints and outputs.
-                           PYRITE_HOME; current directory
-    catalog.path           Material catalog directory or file.
-                           PYRITE_CATALOG; bundled catalog
-    catalog.user           Your profiles, layered over the bundled catalog.
-                           PYRITE_USER_CATALOG; platform config directory
-    xsgen.bremslib_source  BremsLib source tree for table generation.
-                           PYRITE_XSGEN_BREMSLIB_SOURCE; ../BremsLib_v2.0.8
-    xsgen.elsepa_source    ELSEPA source tree for table generation.
-                           PYRITE_XSGEN_ELSEPA_SOURCE; ../elsepa-2020
-    xsgen.sbethe_source    SBETHE source tree for table generation.
-                           PYRITE_XSGEN_SBETHE_SOURCE; ../sbethe
-    mott.tables_dir        NIST SRD 64 tables you downloaded, for 'mott'.
-                           PYRITE_MOTT_TABLES_DIR; unset
+## `pyrite config explain`
+
+```text
+Usage: pyrite config explain [OPTIONS] KEY
+
+  Show KEY's meaning, default, environment mapping and effective source.
+
+Options:
+  -h, --help  Show this message and exit.
 ```
 
 ## `pyrite config get`
@@ -1006,7 +989,18 @@ Usage: pyrite config get [OPTIONS] KEY
 
   Print the effective value for KEY.
 
-  See `pyrite config --help` for the supported keys.
+  See `pyrite config keys` for the supported keys.
+
+Options:
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite config keys`
+
+```text
+Usage: pyrite config keys [OPTIONS] [PREFIX]
+
+  Describe supported keys without reading effective configuration values.
 
 Options:
   -h, --help  Show this message and exit.
@@ -1015,9 +1009,9 @@ Options:
 ## `pyrite config list`
 
 ```text
-Usage: pyrite config list [OPTIONS]
+Usage: pyrite config list [OPTIONS] [PREFIX]
 
-  List effective values and the winning precedence source.
+  List effective values and sources, optionally restricted to a key PREFIX.
 
 Options:
   -h, --help  Show this message and exit.
@@ -1032,34 +1026,6 @@ Usage: pyrite config set [OPTIONS] KEY VALUE
 
 Options:
   -h, --help  Show this message and exit.
-
-  Keys (environment variable; built-in default):
-    profile.current        Default catalog scan profile.
-                           PYRITE_PROFILE; standard
-    remote.target          SSH alias of the SLURM head node (required).
-                           PYRITE_REMOTE_HOST; unset
-    remote.gpu_vendor      Remote GPU vendor: nvidia or amd.
-                           PYRITE_REMOTE_GPU_VENDOR; nvidia
-    remote.partition       SLURM partition for new remote jobs.
-                           PYRITE_REMOTE_PARTITION; gpu
-    remote.nodelist        SLURM node list for new remote jobs, or 'any'.
-                           PYRITE_REMOTE_NODELIST; any
-    remote.gres            SLURM gres request, e.g. gpu:radeon8060s:1.
-                           PYRITE_REMOTE_GRES; gpu:1
-    workspace.root         Workspace directory for checkpoints and outputs.
-                           PYRITE_HOME; current directory
-    catalog.path           Material catalog directory or file.
-                           PYRITE_CATALOG; bundled catalog
-    catalog.user           Your profiles, layered over the bundled catalog.
-                           PYRITE_USER_CATALOG; platform config directory
-    xsgen.bremslib_source  BremsLib source tree for table generation.
-                           PYRITE_XSGEN_BREMSLIB_SOURCE; ../BremsLib_v2.0.8
-    xsgen.elsepa_source    ELSEPA source tree for table generation.
-                           PYRITE_XSGEN_ELSEPA_SOURCE; ../elsepa-2020
-    xsgen.sbethe_source    SBETHE source tree for table generation.
-                           PYRITE_XSGEN_SBETHE_SOURCE; ../sbethe
-    mott.tables_dir        NIST SRD 64 tables you downloaded, for 'mott'.
-                           PYRITE_MOTT_TABLES_DIR; unset
 ```
 
 ## `pyrite config unset`
@@ -1071,7 +1037,7 @@ Usage: pyrite config unset [OPTIONS] KEY
 
   KEY then resolves to its PYRITE_* environment variable, if set, or its built-in
   default. Unsetting a key that is not stored succeeds and changes nothing. See `pyrite
-  config --help` for the supported keys.
+  config keys` for the supported keys.
 
 Options:
   -h, --help  Show this message and exit.
@@ -1172,19 +1138,20 @@ Usage: pyrite remote [OPTIONS] COMMAND [ARGS]...
     pyrite run sub_100keV --remote --dry-run
     pyrite run compute_test_300keV --remote -p
     pyrite run standard -m hopg --remote
-    pyrite job status -vv
+    pyrite remote job status -vv
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  gc            Reclaim remote records obsolete under current scan profiles and...
-  performance   List, pull, or delete remote performance artifacts.
-  prune-jobs    Delete terminal (done/failed/cancelled) job directories; preview...
+  gc            Reclaim remote records obsolete under...
+  performance   List, pull, or delete remote performance...
+  prune-jobs    Delete terminal (done/failed/cancelled)...
   pull          Fetch existing checkpoints from remote box.
-  rm            Delete remote checkpoints; preview unless --yes.
+  rm            Delete remote checkpoints; preview unless...
   sync          Push current code to remote box.
-  trajectories  Inspect remote captures, pull selected cases, or export selected...
+  trajectories  Inspect remote captures, pull selected...
+  job           List, inspect, follow, or stop remote jobs.
 ```
 
 ## `pyrite remote gc`
@@ -1290,32 +1257,30 @@ Usage: pyrite remote pull [OPTIONS] [PROFILE|STEM|MATERIAL@PROFILE]...
   one exists.
 
 Options:
-  --preset [zhai]                 Fetch an existing reproduction cache instead of
-                                  checkpoints.
-  -a, --all                       Pull every configured material.
-  -m, --material MATERIAL         Narrow positional PROFILE or --profile to MATERIAL;
-                                  repeatable.
-  --profile NAME                  Alias for positional PROFILE. Pull its explicit
-                                  members, or the full catalog when membership is
-                                  implicit; -m/--material narrows it.
-  --hash HEXPREFIX                Pin one MATERIAL@PROFILE selector to a parameter-hash
-                                  prefix.
-  -f, --full                      Default is grid-filtered; pull full unfiltered
-                                  checkpoint.
-  --drop-wide-brem                With grid pull, drop wide-brem.
-  --downcast                      With grid pull, downcast to float32.
-  --level9                        Recompress remotely at max compression.
-  --no-sync                       With grid pull, skip code sync.
-  --brem-only                     Merge only brem arrays locally; mutually exclusive
-                                  with --cxr-only.
-  --cxr-only                      Merge only CXR spectra locally; mutually exclusive
-                                  with --brem-only.
-  --force                         With partial merge, insert records absent locally.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -v, --verbose                   Print raw ssh/scp/rsync commands instead of a status
-                                  line.
-  -h, --help                      Show this message and exit.
+  --preset [zhai]            Fetch an existing reproduction cache instead of
+                             checkpoints.
+  -a, --all                  Pull every configured material.
+  -m, --material MATERIAL    Narrow positional PROFILE or --profile to MATERIAL;
+                             repeatable.
+  --profile NAME             Alias for positional PROFILE. Pull its explicit members, or
+                             the full catalog when membership is implicit; -m/--material
+                             narrows it.
+  --hash HEXPREFIX           Pin one MATERIAL@PROFILE selector to a parameter-hash
+                             prefix.
+  -f, --full                 Default is grid-filtered; pull full unfiltered checkpoint.
+  --drop-wide-brem           With grid pull, drop wide-brem.
+  --downcast                 With grid pull, downcast to float32.
+  --level9                   Recompress remotely at max compression.
+  --no-sync                  With grid pull, skip code sync.
+  --brem-only                Merge only brem arrays locally; mutually exclusive with
+                             --cxr-only.
+  --cxr-only                 Merge only CXR spectra locally; mutually exclusive with
+                             --brem-only.
+  --force                    With partial merge, insert records absent locally.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -v, --verbose              Print raw ssh/scp/rsync commands instead of a status line.
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite remote rm`
@@ -1447,10 +1412,10 @@ Options:
   -h, --help        Show this message and exit.
 ```
 
-## `pyrite job`
+## `pyrite remote job`
 
 ```text
-Usage: pyrite job [OPTIONS] COMMAND [ARGS]...
+Usage: pyrite remote job [OPTIONS] COMMAND [ARGS]...
 
   List, inspect, follow, or stop asynchronous remote jobs.
 
@@ -1466,10 +1431,10 @@ Commands:
   stop    Preview or stop one job, one profile's jobs, or all jobs.
 ```
 
-## `pyrite job attach`
+## `pyrite remote job attach`
 
 ```text
-Usage: pyrite job attach [OPTIONS] [JOBID]
+Usage: pyrite remote job attach [OPTIONS] [JOBID]
 
   Monitor one job until terminal or interrupted.
 
@@ -1478,25 +1443,25 @@ Options:
   -h, --help     Show this message and exit.
 ```
 
-## `pyrite job list`
+## `pyrite remote job list`
 
 ```text
-Usage: pyrite job list [OPTIONS]
+Usage: pyrite remote job list [OPTIONS]
 
   List jobs with scheduler IDs, kinds, materials, and states.
 
 Options:
   --kind [run|grid|recompute|validate]
                                   Show only one submission kind.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
+  -o, --output [table|json]       Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite job logs`
+## `pyrite remote job logs`
 
 ```text
-Usage: pyrite job logs [OPTIONS] [JOBID]
+Usage: pyrite remote job logs [OPTIONS] [JOBID]
 
   Show a job diagnostic log; JOBID defaults to latest.
 
@@ -1505,10 +1470,10 @@ Options:
   -h, --help    Show this message and exit.
 ```
 
-## `pyrite job stack`
+## `pyrite remote job stack`
 
 ```text
-Usage: pyrite job stack [OPTIONS] [JOBID]
+Usage: pyrite remote job stack [OPTIONS] [JOBID]
 
   Print the Python stack of every thread in a running job's scans; JOBID defaults to
   latest. Signals the scan (SIGUSR1) without stopping it; jobs submitted before this
@@ -1520,25 +1485,25 @@ Options:
   -h, --help      Show this message and exit.
 ```
 
-## `pyrite job status`
+## `pyrite remote job status`
 
 ```text
-Usage: pyrite job status [OPTIONS] [JOBID]
+Usage: pyrite remote job status [OPTIONS] [JOBID]
 
   Show one job snapshot; JOBID defaults to latest.
 
 Options:
-  -v, --verbose                   Add allocation detail; repeat for case progress and
-                                  recent logs.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -v, --verbose              Add allocation detail; repeat for case progress and recent
+                             logs.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
-## `pyrite job stop`
+## `pyrite remote job stop`
 
 ```text
-Usage: pyrite job stop [OPTIONS] [JOBID]
+Usage: pyrite remote job stop [OPTIONS] [JOBID]
 
   Preview or stop one job, one profile's jobs, or all jobs.
 
@@ -1559,24 +1524,25 @@ Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...
   Profiles are named campaigns in ``[profiles.*]``. They own default ranges, electron-
   count grids, beam policy, detector geometry, and optional material membership. An
   absent ``materials`` key means all catalog materials. Membership uses ``set|add|remove
-  --material``; ``set --all-materials`` restores implicit membership. Per-material range
-  overrides and derived energy grids are managed by ``pyrite material``.
+  --material``; ``set --all-materials`` restores implicit membership. Per-material
+  effective material ranges are inspected with ``profile ranges show``.
 
   Where settings live: ranges, membership, beam/detector references and emission use
-  ``set|add|remove``; calculation controls (electron counts, reflections, mosaic,
-  transport models) use ``numerics``; the line-grid selectors use ``cxr-grid``; filters
-  and the pixel detector use ``filter`` and ``detector``; reusable beams and detectors
-  are named objects edited with ``pyrite beam`` and ``pyrite detector``. The full map is
-  docs/repo-design/profile-settings.md. Bundled demos are read-only (copy with ``create
-  NAME --from DEMO``); yours live in ``catalog.user``.
+  ``set|add|remove``; sampling/integration use ``pyrite numerics``; physical
+  models/cutoffs use ``pyrite physics``; line-grid and precision policies live under
+  ``pyrite numerics``. Filters and the pixel detector use ``filter`` and ``detector``;
+  reusable beams and detectors are named objects edited with ``pyrite beam`` and
+  ``pyrite detector``. The full map is docs/repo-design/profile-settings.md. Bundled
+  demos are read-only (copy with ``create NAME --from DEMO``); yours live in
+  ``catalog.user``.
 
   Examples:
     pyrite profile list
     pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
     pyrite profile create sub_100keV --energy 30:100:10
     pyrite profile set sub_100keV --detector eds
-    pyrite profile numerics set sub_100keV --cxr-trials 2000
-    pyrite profile cxr-grid show sub_100keV
+    pyrite numerics set sub_100keV --cxr-trials 2000
+    pyrite numerics cxr-grid show sub_100keV
     pyrite profile add sub_100keV --energy 75
     pyrite profile set sub_100keV --material hopg,mose2
     pyrite profile rename sub_100keV sub100
@@ -1586,19 +1552,18 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  add        Incrementally add values to profile grids,...
-  create     Create a profile from packaged sweep...
-  cxr-grid   Inspect and edit PROFILE's cxr-grid policy...
-  delete     Delete a profile; irreversible.
-  detector   Manage profile detector IDs, references...
-  filter     Manage finite FilterPlate objects on a...
-  list       List profiles: source, membership,...
-  numerics   Inspect and edit result-affecting...
-  precision  Inspect and edit PROFILE's electron-count...
-  remove     Remove values from an existing profile's...
-  rename     Rename profile NAME to NEW_NAME.
-  set        Replace range grids, the beam reference,...
-  show       Show PROFILE in tables grouped by CLI...
+  add       Incrementally add values to profile grids,...
+  create    Create a profile from packaged sweep...
+  delete    Delete a profile; irreversible.
+  detector  Manage profile detector IDs, references...
+  filter    Manage finite FilterPlate objects on a...
+  list      List profiles: source, membership,...
+  numerics  Inspect and edit result-affecting...
+  ranges    Inspect campaign sweep ranges, including...
+  remove    Remove values from an existing profile's...
+  rename    Rename profile NAME to NEW_NAME.
+  set       Replace range grids, the beam reference,...
+  show      Show PROFILE in tables grouped by CLI...
 ```
 
 ## `pyrite profile add`
@@ -1700,108 +1665,6 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite profile cxr-grid`
-
-```text
-Usage: pyrite profile cxr-grid [OPTIONS] COMMAND [ARGS]...
-
-  Inspect and edit PROFILE's cxr-grid policy (``[profiles.NAME.cxr_grid_policy]``).
-
-  Three selectors, each defaulting to the first value listed:
-
-    bandwidth   kinematic-ceiling | resonance-population
-                closed-form kinematic bound (no simulation), or the case's
-                measured resonance population capped by that bound
-    resolution  sinc-nyquist | resonance-local
-                uniform measured sinc spacing, or spacing refined locally
-                around measured resonances (3 eV backbone)
-    quadrature  node | bin-mean
-                point samples of the sinc^2 line profile, or bin means that
-                keep integrated line yield exact but smooth peak height/width
-
-  resonance-local requires bandwidth resonance-population and quadrature bin-mean. Any
-  stored selector, even one equal to its default, makes every case of the profile
-  resolve its line grid automatically from its own trajectories, ahead of explicit
-  E_grid_line and stored energy-grid rows; automatic resolution does not support
-  coherent emission (#117), and bin-mean does not support a positive max_dE_frac. The
-  table joins the case and dataset identity: editing it gives new checkpoints, and
-  earlier results stay under their old identity.
-
-  Tolerances, maximum spacing (3 eV), the point budget (600000) and backend ULPs are not
-  profile keys: set them per call (API) or with PYRITE_ENERGY_GRID_* environment
-  variables.
-
-  Examples:
-    pyrite profile cxr-grid show high_energy
-    pyrite profile cxr-grid set my_profile --quadrature bin-mean
-    pyrite profile cxr-grid set my_profile --bandwidth resonance-population \
-        --resolution resonance-local --quadrature bin-mean
-    pyrite profile cxr-grid reset my_profile resolution
-    pyrite profile cxr-grid reset my_profile
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  reset  Remove selected FIELDs, or the whole policy when none are named.
-  set    Set one or more cxr-grid selectors on PROFILE.
-  show   Show explicit and effective PROFILE cxr-grid selectors and the grid source.
-```
-
-## `pyrite profile cxr-grid reset`
-
-```text
-Usage: pyrite profile cxr-grid reset [OPTIONS] NAME [bandwidth|resolution|quadrature]...
-
-  Remove selected FIELDs, or the whole policy when none are named.
-
-  Removing the whole policy returns PROFILE to explicit, stored or built-in line grids.
-  A partial reset that leaves an impossible combination is a usage error.
-
-Options:
-  -y, --yes   Skip the 'standard' confirmation prompt.
-  --dry-run   Print proposed TOML diff; write nothing.
-  -h, --help  Show this message and exit.
-```
-
-## `pyrite profile cxr-grid set`
-
-```text
-Usage: pyrite profile cxr-grid set [OPTIONS] NAME
-
-  Set one or more cxr-grid selectors on PROFILE.
-
-  The merged policy is validated before anything is written; an impossible combination
-  is a usage error.
-
-Options:
-  --bandwidth [kinematic-ceiling|resonance-population]
-                                  Line-axis upper edge policy. Default kinematic-
-                                  ceiling.
-  --resolution [sinc-nyquist|resonance-local]
-                                  Line-axis spacing policy; resonance-local needs
-                                  resonance-population and bin-mean. Default sinc-
-                                  nyquist.
-  --quadrature [node|bin-mean]    sinc^2 line-profile evaluation on the axis. Default
-                                  node.
-  -y, --yes                       Skip the 'standard' confirmation prompt.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite profile cxr-grid show`
-
-```text
-Usage: pyrite profile cxr-grid show [OPTIONS] NAME
-
-  Show explicit and effective PROFILE cxr-grid selectors and the grid source.
-
-Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
-```
-
 ## `pyrite profile delete`
 
 ```text
@@ -1813,11 +1676,11 @@ Usage: pyrite profile delete [OPTIONS] NAME
   ``[energy_grids.NAME]`` fallback bucket); referents are listed.
 
 Options:
-  -y, --yes                       Delete the exact previewed profile.
-  --dry-run                       Print proposed TOML diff; delete nothing.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -y, --yes                  Delete the exact previewed profile.
+  --dry-run                  Print proposed TOML diff; delete nothing.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite profile detector`
@@ -1867,9 +1730,9 @@ Usage: pyrite profile detector list [OPTIONS] PROFILE_NAME
   List PROFILE_NAME's resolved detector IDs and references.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite profile detector migrate`
@@ -1989,9 +1852,9 @@ Usage: pyrite profile detector show [OPTIONS] PROFILE_NAME IDENTIFIER
   Show ID's geometry, optional sections and projected scalar acceptance.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite profile filter`
@@ -2046,9 +1909,9 @@ Usage: pyrite profile filter list [OPTIONS] PROFILE_NAME
   List PROFILE's finite filter plates.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite profile filter rm`
@@ -2092,9 +1955,9 @@ Usage: pyrite profile filter show [OPTIONS] PROFILE_NAME IDENTIFIER
   Show one PROFILE filter by its name or one-based list index.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite profile list`
@@ -2105,9 +1968,9 @@ Usage: pyrite profile list [OPTIONS]
   List profiles: source, membership, override, and grid-ref counts.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite profile numerics`
@@ -2257,182 +2120,39 @@ Usage: pyrite profile numerics show [OPTIONS] NAME
   Show explicit and effective PROFILE numerics with value sources.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
-## `pyrite profile precision`
+## `pyrite profile ranges`
 
 ```text
-Usage: pyrite profile precision [OPTIONS] COMMAND [ARGS]...
+Usage: pyrite profile ranges [OPTIONS] COMMAND [ARGS]...
 
-  Inspect and edit PROFILE's electron-count mode: adaptive policy or fixed counts.
-
-  Profiles without fixed electron counts or a policy run adaptive by default (target RSE
-  0.05, 200-20000 electrons, blocks of 100, line and bremsstrahlung). Each incoherent
-  case stops when the relative standard error of its line (and optionally
-  bremsstrahlung) yield meets the target and its heavy-tail guards pass, or at the
-  maximum count flagged statistics-limited. One count serves line and bremsstrahlung
-  transport. Coherent emission, cascades, physical detectors, GDF beams, grooves and
-  fixed electron counts keep fixed counts.
-
-    enable   switch to adaptive: drop fixed counts, optionally customize
-    set      customize fields of an adaptive policy
-    reset    drop customized fields, or the whole table (back to the default)
-    disable  opt out: drop any policy and select fixed counts
-
-  Electron sampling is independent of the line grid; see 'pyrite profile cxr-grid'.
+  Inspect campaign sweep ranges, including per-material overrides.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  disable  Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
-  enable   Switch PROFILE to adaptive electron counts in one atomic edit.
-  reset    Reset optional FIELDs to defaults, or remove the policy when none are...
-  set      Create or update PROFILE's adaptive policy.
-  show     Show PROFILE's electron-count mode, its source, blockers and next steps.
+  show  Show effective ranges and sources for MATERIAL in PROFILE.
 ```
 
-## `pyrite profile precision disable`
+## `pyrite profile ranges show`
 
 ```text
-Usage: pyrite profile precision disable [OPTIONS] NAME
+Usage: pyrite profile ranges show [OPTIONS] PROFILE MATERIAL
 
-  Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
+  Show effective ranges and sources for MATERIAL in PROFILE.
 
-  --cxr-trials/--brem-trials replace that count. A count the profile already sets is
-  otherwise kept, including a sweep grid. A count it lacks is prompted for on a
-  terminal; without a terminal, or with --yes or --dry-run, it takes the full-fidelity
-  default (300 line, 150 brem).
+  Preserves the legacy cxr.material.show JSON envelope and units: energy in keV,
+  thickness in angstrom, polar/azimuth in degrees. No files are changed.
 
 Options:
-  --cxr-trials N   Fixed Monte Carlo electron histories for the CXR spectrum.  [x>=1]
-  --brem-trials N  Fixed Monte Carlo electron histories for bremsstrahlung.  [x>=1]
-  -y, --yes        Use defaults for missing counts; skip confirmations.
-  --dry-run        Print proposed TOML diff; write nothing.
-  -h, --help       Show this message and exit.
-```
-
-## `pyrite profile precision enable`
-
-```text
-Usage: pyrite profile precision enable [OPTIONS] NAME
-
-  Switch PROFILE to adaptive electron counts in one atomic edit.
-
-  Removes the profile's fixed line-trials/brem-trials. Without options the default
-  policy applies (no table is written); options write a policy whose unspecified fields
-  come from the existing policy, else the default. Refuses, writing nothing, when the
-  profile cannot run adaptive (coherent emission, cascades, positrons, a physical
-  detector, or per-material count overrides). Emission, cascades, beam, geometry and
-  line-grid selectors are never changed.
-
-Options:
-  --target-rse FRACTION           Target relative standard error of each watched yield
-                                  (0.05 = 5%).  [x>0.0]
-  --min-electrons N               Smallest count at which the run may stop; a multiple
-                                  of --block-electrons.  [x>=2]
-  --max-electrons N               Count at which the run stops regardless, flagged
-                                  statistics-limited.  [x>=2]
-  --block-electrons N             Electrons per transport block; the rule is checked at
-                                  block ends.  [x>=1]
-  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
-                                  the watched set (a new policy watches line and brem).
-  --max-electron-share FRACTION   Guard: largest share of a yield one electron may hold
-                                  (default 0.05).  [0.0<x<=1.0]
-  --min-effective-electrons N     Guard: effective sample size floor (sum m)^2 / sum m^2
-                                  (default 100).  [x>=0.0]
-  --stability-blocks K            Guard: block ends whose running mean must agree; 0
-                                  disables (default 3).  [x>=0]
-  --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
-                                  the target (default 0.5).  [x>=0.0]
-  --pilot-electrons N             Pilot count that projects the stopping count and skips
-                                  checks until it.  [x>=1]
-  --band-ev START,STOP            Monitor band in eV (default: the case's line band).
-  --batch-means-band-ev START,STOP
-                                  Band in eV for reported per-bin batch-means errors;
-                                  costs one extra reduction.
-  -y, --yes                       Skip the 'standard' confirmation prompt.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite profile precision reset`
-
-```text
-Usage: pyrite profile precision reset [OPTIONS] NAME [target-rse|min-electrons|max-
-                                      electrons|block-electrons|observable|max-electron-
-                                      share|min-effective-electrons|stability-
-                                      blocks|stability-fraction|pilot-electrons|band-
-                                      ev|batch-means-band-ev]...
-
-  Reset optional FIELDs to defaults, or remove the policy when none are named.
-
-  Removing the policy returns PROFILE to the default adaptive policy unless it cannot
-  run adaptive. Fixed counts are untouched; select them with 'pyrite profile precision
-  disable'.
-
-Options:
-  -y, --yes   Skip the 'standard' confirmation prompt.
-  --dry-run   Print proposed TOML diff; write nothing.
-  -h, --help  Show this message and exit.
-```
-
-## `pyrite profile precision set`
-
-```text
-Usage: pyrite profile precision set [OPTIONS] NAME
-
-  Create or update PROFILE's adaptive policy.
-
-  Fields left unspecified keep the existing policy's values; a new policy takes them
-  from the default (target RSE 0.05, 200-20000 electrons, blocks of 100, line and brem).
-  A profile with fixed counts is refused; switch it with 'pyrite profile precision
-  enable'.
-
-Options:
-  --target-rse FRACTION           Target relative standard error of each watched yield
-                                  (0.05 = 5%).  [x>0.0]
-  --min-electrons N               Smallest count at which the run may stop; a multiple
-                                  of --block-electrons.  [x>=2]
-  --max-electrons N               Count at which the run stops regardless, flagged
-                                  statistics-limited.  [x>=2]
-  --block-electrons N             Electrons per transport block; the rule is checked at
-                                  block ends.  [x>=1]
-  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
-                                  the watched set (a new policy watches line and brem).
-  --max-electron-share FRACTION   Guard: largest share of a yield one electron may hold
-                                  (default 0.05).  [0.0<x<=1.0]
-  --min-effective-electrons N     Guard: effective sample size floor (sum m)^2 / sum m^2
-                                  (default 100).  [x>=0.0]
-  --stability-blocks K            Guard: block ends whose running mean must agree; 0
-                                  disables (default 3).  [x>=0]
-  --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
-                                  the target (default 0.5).  [x>=0.0]
-  --pilot-electrons N             Pilot count that projects the stopping count and skips
-                                  checks until it.  [x>=1]
-  --band-ev START,STOP            Monitor band in eV (default: the case's line band).
-  --batch-means-band-ev START,STOP
-                                  Band in eV for reported per-bin batch-means errors;
-                                  costs one extra reduction.
-  -y, --yes                       Skip the 'standard' confirmation prompt.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite profile precision show`
-
-```text
-Usage: pyrite profile precision show [OPTIONS] NAME
-
-  Show PROFILE's electron-count mode, its source, blockers and next steps.
-
-Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite profile remove`
@@ -2575,135 +2295,562 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite material`
+## `pyrite physics`
 
 ```text
-Usage: pyrite material [OPTIONS] COMMAND [ARGS]...
+Usage: pyrite physics [OPTIONS] COMMAND [ARGS]...
 
-  Add, inspect, validate, and blaze individual materials.
+  Inspect and edit PROFILE's physical models and cutoffs (API Physics).
 
-  Profile membership and ranges live under ``pyrite profile``. ``show`` reports
-  effective ranges and any per-material override that diverges from the profile;
-  ``validate`` checks the complete catalog; ``blaze`` writes a face-specific checkpoint.
+  Settings stay in the selected profile; this is not a separate preset store. Use
+  profile create NAME --from SOURCE to clone a campaign. brem_source is currently an
+  API-only setting; CLI campaigns keep their existing sources.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  show         Show MATERIAL's effective ranges and...
-  add          Add a validated medium or crystal to your catalog.
-  list         List materials and media with their source and composition.
-  blaze        Run a grooved-crystal sweep and write a checkpoint.
-  energy-grid  Derive and inspect detector energy-grid inputs.
-  validate     Validate a material catalog without starting simulation.
+  list      List the campaigns whose configuration can be inspected or edited.
+  reset     Reset selected fields, or all fields owned by this command.
+  set       Set PROFILE fields; validate and atomically save, or preview with...
+  show      Show explicit/effective settings and their source for PROFILE.
+  validate  Validate the selected campaign without running simulation or writing...
 ```
 
-## `pyrite material show`
+## `pyrite physics list`
 
 ```text
-Usage: pyrite material show [OPTIONS] MATERIAL
+Usage: pyrite physics list [OPTIONS]
 
-  Show MATERIAL's effective ranges and inherited/overridden sources.
+  List the campaigns whose configuration can be inspected or edited.
 
 Options:
-  --profile TEXT                  Resolve defaults and overrides under profile NAME.
-                                  [default: standard]
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite physics reset`
+
+```text
+Usage: pyrite physics reset [OPTIONS] PROFILE [straggling|inelastic-model|inelastic-
+                            cutoff-ev|secondary-threshold-ev|elastic-
+                            model|bremsstrahlung-model|radiative-model|radiative-cutoff-
+                            ev|pair-production-model|positron-transport|atomic-electron-
+                            deflection|channeling-model|channeling-plane|emission]...
+
+  Reset selected fields, or all fields owned by this command.
+
+Options:
+  -y, --yes   Skip the standard-profile confirmation.
+  --dry-run   Validate and preview without saving.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite physics set`
+
+```text
+Usage: pyrite physics set [OPTIONS] NAME
+
+  Set PROFILE fields; validate and atomically save, or preview with --dry-run.
+
+Options:
+  --straggling / --no-straggling  Enable or disable Urban energy-loss straggling.
+  --inelastic-model [auto|continuous|shell-soft-hard]
+                                  Collision energy-loss scheme: auto (default; shell-
+                                  soft-hard hard inelastic collisions where every layer
+                                  has shell data, otherwise continuous with a warning),
+                                  continuous stopping, or shell-soft-hard (requires
+                                  midpoint and --inelastic-cutoff-ev).
+  --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV (default 50
+                                  under auto); must exceed each material's conduction-
+                                  band resonance (Si 16.7, SiO2 22, MoS2 23 eV).
+                                  [x>0.0]
+  --secondary-threshold-ev EV     Transport hard-collision secondaries above this energy
+                                  in eV (production cut and tracking cutoff; requires
+                                  shell-soft-hard and SBETHE coverage, >= 1000 eV).
+                                  [x>0.0]
+  --elastic-model [mott|elsepa]   Elastic scattering: elsepa (default) full differential
+                                  cross sections (needs 'pyrite tables fetch elsepa';
+                                  bypasses the transport LUT), or the historical mott
+                                  screened-Rutherford angles.
+  --bremsstrahlung-model [auto|eedl|bremslib]
+                                  Continuum bremsstrahlung: auto (default) uses the
+                                  released BremsLib tables with their angular model when
+                                  installed ('pyrite tables fetch bremslib') and warns
+                                  and falls back to EEDL otherwise; bremslib requires
+                                  them; eedl is the fetched EEDL continuum with an
+                                  isotropic photon angle.
+  --radiative-model [auto|uncoupled|bremslib-soft-hard]
+                                  Radiative energy loss: auto (default) couples when
+                                  BremsLib resolves; uncoupled scores after transport;
+                                  bremslib-soft-hard uses soft loss plus sampled hard
+                                  photons. Coupling requires midpoint energy and
+                                  BremsLib. Missing tables and grooved targets fall back
+                                  to uncoupled scoring.
+  --radiative-cutoff-ev EV        Hard-photon cutoff k_c in eV for coupled transport
+                                  (default 1000); must not exceed the continuum electron
+                                  cutoff (1000 eV by default).  [x>0.0]
+  --pair-production-model [penelope-2024]
+                                  Convert coupled hard photons above 1.022 MeV to e-/e+
+                                  pairs (opt-in). Requires --secondary-threshold-ev and
+                                  coupled BremsLib transport; pair electrons are
+                                  transported as secondaries, positrons are recorded
+                                  unless --positron-transport.
+  --positron-transport / --no-positron-transport
+                                  Transport pair positrons above the secondary threshold
+                                  (opt-in; requires --pair-production-model). Positrons
+                                  annihilate in flight and at rest; each annihilation
+                                  photon escapes or is absorbed at its first
+                                  interaction.
+  --atomic-electron-deflection [kawrakow|none]
+                                  Angular deflection by atomic electrons: kawrakow
+                                  (default) scales each element's elastic rate by 1 +
+                                  xi/Z (xi = 1 under continuous stopping; the Moller
+                                  share above W_c is removed under shell-soft-hard,
+                                  which needs elsepa); none keeps elastic-only
+                                  deflection.
+  --channeling-model [off|planar]
+                                  Planar quantum entrance zone (default off); requires
+                                  plane, midpoint, uncoupled radiation and incoherent
+                                  emission. Disable with numerics reset PROFILE
+                                  channeling-model channeling-plane.
+  --channeling-plane H K L        Nonzero Miller indices of the planar channeling
+                                  family; requires planar.
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  --emission [incoherent|coherent|both]
+                                  CXR modes; cross-model constraints are validated
+                                  before saving.
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite material add`
+## `pyrite physics show`
 
 ```text
-Usage: pyrite material add [OPTIONS] NAME
+Usage: pyrite physics show [OPTIONS] PROFILE
 
-  Add a validated medium or crystal; never overwrite a name.
-
-  Default writes go to the user catalog. An explicitly selected complete catalog writes
-  in place. No tables are generated or data downloaded. Media support
-  transport/layers/filters, not coherent crystal emission. New CIFs require formula,
-  phase, one cut, B and a photon grid. Partial occupancy is unsupported. Existing-
-  crystal configuration is reused intact.
+  Show explicit/effective settings and their source for PROFILE.
 
 Options:
-  --formula TEXT                  Simple ASCII formula (medium: fractional counts
-                                  allowed).
-  --density-g-cm3 FLOAT           Required bulk density for media, in g/cm³; CIF
-                                  consistency check only.
-  --mass-fraction ELEMENT=VALUE   Repeat for each element; mass fractions must sum to 1.
-  --atomic-fraction ELEMENT=VALUE
-                                  Repeat for each element; atom fractions must sum to 1.
-  --atom-count ELEMENT=VALUE      Repeat for positive stoichiometric ratios.
-  --crystal TEXT                  Reuse an existing crystal with its configured cut and
-                                  physics inputs.
-  --cif FILE                      Local fully occupied CIF; copied into managed catalog
-                                  storage.
-  --phase TEXT                    Required explicit phase identity for a new CIF.
-  --surface-hkl <INTEGER INTEGER INTEGER>...
-                                  New CIF slab normal in reciprocal Miller indices;
-                                  excludes --beam-uvw.
-  --beam-uvw <INTEGER INTEGER INTEGER>...
-                                  New CIF slab normal in direct lattice indices;
-                                  excludes --surface-hkl.
-  --b-ang2 FLOAT                  Required new-CIF isotropic Debye–Waller factor in
-                                  angstrom²; nonnegative.
-  --photon-grid START STOP STEP   Required new-CIF photon grid in eV; stop is exclusive.
-  --mosaic-fwhm-deg FLOAT         Optional positive new-CIF mosaic FWHM in degrees;
-                                  omitted means perfect crystal.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite physics validate`
+
+```text
+Usage: pyrite physics validate [OPTIONS] PROFILE
+
+  Validate the selected campaign without running simulation or writing files.
+
+Options:
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite numerics`
+
+```text
+Usage: pyrite numerics [OPTIONS] COMMAND [ARGS]...
+
+  Inspect and edit PROFILE's sampling, integration and photon grids.
+
+  Settings stay in the selected profile; no independent preset is created. Physical
+  interaction models and cutoffs live under pyrite physics.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  list         List the campaigns whose configuration can...
+  reset        Reset selected fields, or all fields owned...
+  set          Set PROFILE fields; validate and...
+  show         Show explicit/effective settings and their...
+  validate     Validate the selected campaign without...
+  precision    Configure adaptive precision or fixed trials on PROFILE.
+  cxr-grid     Configure PROFILE's automatic CXR photon-grid policy.
+  energy-grid  Derive and inspect specialist photon-grid artifacts.
+```
+
+## `pyrite numerics list`
+
+```text
+Usage: pyrite numerics list [OPTIONS]
+
+  List the campaigns whose configuration can be inspected or edited.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite numerics reset`
+
+```text
+Usage: pyrite numerics reset [OPTIONS] PROFILE [cxr-trials|brem-trials|line-
+                             electrons|bremsstrahlung-electrons|reflection-
+                             families|maximum-reflections|mosaic-nodes|mosaic-
+                             route|energy-model|maximum-fractional-energy-
+                             loss|channeling-basis-size|channeling-bloch-
+                             cells|channeling-dz-ang|channeling-zone-max-ang]...
+
+  Reset selected fields, or all fields owned by this command.
+
+Options:
+  -y, --yes   Skip the standard-profile confirmation.
+  --dry-run   Validate and preview without saving.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite numerics set`
+
+```text
+Usage: pyrite numerics set [OPTIONS] NAME
+
+  Set PROFILE fields; validate and atomically save, or preview with --dry-run.
+
+Options:
+  --cxr-trials N                  Monte Carlo electron histories used to estimate the
+                                  CXR spectrum.  [x>=1]
+  --brem-trials N                 Monte Carlo electron histories used to estimate
+                                  bremsstrahlung.  [x>=1]
+  --reflection-families N         Ranked reflection families to resolve.  [x>=1]
+  --maximum-reflections N         Cap resolved reflections after family expansion.
+                                  [x>=1]
+  --mosaic-nodes N                Gauss-Hermite nodes per mosaic tilt axis.  [x>=1]
+  --mosaic-route [analytic|mc]    Mosaic broadening route.
+  --energy-model [frozen|midpoint]
+                                  Transport clock model.
+  --maximum-fractional-energy-loss FRACTION
+                                  Cap one row's fractional mean energy loss; positive
+                                  values require midpoint.  [x>=0.0]
+  --channeling-basis-size INTEGER RANGE
+                                  Transverse plane-wave band |h| <= H (default 16).
+                                  [x>=1]
+  --channeling-bloch-cells INTEGER RANGE
+                                  Bloch-grid supercell size (default 16).  [x>=1]
+  --channeling-dz-ang FLOAT RANGE
+                                  Zone depth step in angstrom (default 250).  [x>0]
+  --channeling-zone-max-ang FLOAT RANGE
+                                  Zone length cap in angstrom (default first layer
+                                  thickness).  [x>0]
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite material list`
+## `pyrite numerics show`
 
 ```text
-Usage: pyrite material list [OPTIONS]
+Usage: pyrite numerics show [OPTIONS] PROFILE
 
-  List crystal recipes and media; composition units are atoms/angstrom³.
+  Show explicit/effective settings and their source for PROFILE.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite numerics validate`
+
+```text
+Usage: pyrite numerics validate [OPTIONS] PROFILE
+
+  Validate the selected campaign without running simulation or writing files.
+
+Options:
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite numerics precision`
+
+```text
+Usage: pyrite numerics precision [OPTIONS] COMMAND [ARGS]...
+
+  Inspect and edit PROFILE's electron-count mode: adaptive policy or fixed counts.
+
+  Profiles without fixed electron counts or a policy run adaptive by default (target RSE
+  0.05, 200-20000 electrons, blocks of 100, line and bremsstrahlung). Each incoherent
+  case stops when the relative standard error of its line (and optionally
+  bremsstrahlung) yield meets the target and its heavy-tail guards pass, or at the
+  maximum count flagged statistics-limited. One count serves line and bremsstrahlung
+  transport. Coherent emission, cascades, physical detectors, GDF beams, grooves and
+  fixed electron counts keep fixed counts.
+
+    enable   switch to adaptive: drop fixed counts, optionally customize
+    set      customize fields of an adaptive policy
+    reset    drop customized fields, or the whole table (back to the default)
+    disable  opt out: drop any policy and select fixed counts
+
+  Electron sampling is independent of the line grid; see 'pyrite numerics cxr-grid'.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  disable  Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
+  enable   Switch PROFILE to adaptive electron counts in one atomic edit.
+  reset    Reset optional FIELDs to defaults, or remove the policy when none are...
+  set      Create or update PROFILE's adaptive policy.
+  show     Show PROFILE's electron-count mode, its source, blockers and next steps.
+```
+
+## `pyrite numerics precision disable`
+
+```text
+Usage: pyrite numerics precision disable [OPTIONS] NAME
+
+  Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
+
+  --cxr-trials/--brem-trials replace that count. A count the profile already sets is
+  otherwise kept, including a sweep grid. A count it lacks is prompted for on a
+  terminal; without a terminal, or with --yes or --dry-run, it takes the full-fidelity
+  default (300 line, 150 brem).
+
+Options:
+  --cxr-trials N   Fixed Monte Carlo electron histories for the CXR spectrum.  [x>=1]
+  --brem-trials N  Fixed Monte Carlo electron histories for bremsstrahlung.  [x>=1]
+  -y, --yes        Use defaults for missing counts; skip confirmations.
+  --dry-run        Print proposed TOML diff; write nothing.
+  -h, --help       Show this message and exit.
+```
+
+## `pyrite numerics precision enable`
+
+```text
+Usage: pyrite numerics precision enable [OPTIONS] NAME
+
+  Switch PROFILE to adaptive electron counts in one atomic edit.
+
+  Removes the profile's fixed line-trials/brem-trials. Without options the default
+  policy applies (no table is written); options write a policy whose unspecified fields
+  come from the existing policy, else the default. Refuses, writing nothing, when the
+  profile cannot run adaptive (coherent emission, cascades, positrons, a physical
+  detector, or per-material count overrides). Emission, cascades, beam, geometry and
+  line-grid selectors are never changed.
+
+Options:
+  --target-rse FRACTION           Target relative standard error of each watched yield
+                                  (0.05 = 5%).  [x>0.0]
+  --min-electrons N               Smallest count at which the run may stop; a multiple
+                                  of --block-electrons.  [x>=2]
+  --max-electrons N               Count at which the run stops regardless, flagged
+                                  statistics-limited.  [x>=2]
+  --block-electrons N             Electrons per transport block; the rule is checked at
+                                  block ends.  [x>=1]
+  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
+                                  the watched set (a new policy watches line and brem).
+  --max-electron-share FRACTION   Guard: largest share of a yield one electron may hold
+                                  (default 0.05).  [0.0<x<=1.0]
+  --min-effective-electrons N     Guard: effective sample size floor (sum m)^2 / sum m^2
+                                  (default 100).  [x>=0.0]
+  --stability-blocks K            Guard: block ends whose running mean must agree; 0
+                                  disables (default 3).  [x>=0]
+  --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
+                                  the target (default 0.5).  [x>=0.0]
+  --pilot-electrons N             Pilot count that projects the stopping count and skips
+                                  checks until it.  [x>=1]
+  --band-ev START,STOP            Monitor band in eV (default: the case's line band).
+  --batch-means-band-ev START,STOP
+                                  Band in eV for reported per-bin batch-means errors;
+                                  costs one extra reduction.
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite material blaze`
+## `pyrite numerics precision reset`
 
 ```text
-Usage: pyrite material blaze [OPTIONS] MATERIAL
+Usage: pyrite numerics precision reset [OPTIONS] NAME [target-rse|min-electrons|max-
+                                       electrons|block-electrons|observable|max-
+                                       electron-share|min-effective-electrons|stability-
+                                       blocks|stability-fraction|pilot-electrons|band-
+                                       ev|batch-means-band-ev]...
 
-  Run one material's blazed-crystal MC sweep and write its checkpoint.
+  Reset optional FIELDs to defaults, or remove the policy when none are named.
 
-  Writes checkpoints/<material>_blazed/, separate from flat-face scan checkpoints.
-  Repeat --energy/--spacing/--polar for multiple values.
+  Removing the policy returns PROFILE to the default adaptive policy unless it cannot
+  run adaptive. Fixed counts are untouched; select them with 'pyrite numerics precision
+  disable'.
 
 Options:
-  --energy E                      Beam energies in keV (one or more).  [required]
-  --spacing S                     Groove spacing(s) in meters (one, or one per energy).
-                                  [required]
-  --polar A                       Polar tilt values in degrees.  [0.0<x<90.0]
-  --workers NUMBER                run_cases max_workers (default auto; 0 = serial).
-  --checkpoint-dir DIR            Read and write blazed component checkpoints in DIR.
-                                  [default: (pyrite-output/checkpoints)]
-  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
-                                  resumable work remains.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite numerics precision set`
+
+```text
+Usage: pyrite numerics precision set [OPTIONS] NAME
+
+  Create or update PROFILE's adaptive policy.
+
+  Fields left unspecified keep the existing policy's values; a new policy takes them
+  from the default (target RSE 0.05, 200-20000 electrons, blocks of 100, line and brem).
+  A profile with fixed counts is refused; switch it with 'pyrite numerics precision
+  enable'.
+
+Options:
+  --target-rse FRACTION           Target relative standard error of each watched yield
+                                  (0.05 = 5%).  [x>0.0]
+  --min-electrons N               Smallest count at which the run may stop; a multiple
+                                  of --block-electrons.  [x>=2]
+  --max-electrons N               Count at which the run stops regardless, flagged
+                                  statistics-limited.  [x>=2]
+  --block-electrons N             Electrons per transport block; the rule is checked at
+                                  block ends.  [x>=1]
+  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
+                                  the watched set (a new policy watches line and brem).
+  --max-electron-share FRACTION   Guard: largest share of a yield one electron may hold
+                                  (default 0.05).  [0.0<x<=1.0]
+  --min-effective-electrons N     Guard: effective sample size floor (sum m)^2 / sum m^2
+                                  (default 100).  [x>=0.0]
+  --stability-blocks K            Guard: block ends whose running mean must agree; 0
+                                  disables (default 3).  [x>=0]
+  --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
+                                  the target (default 0.5).  [x>=0.0]
+  --pilot-electrons N             Pilot count that projects the stopping count and skips
+                                  checks until it.  [x>=1]
+  --band-ev START,STOP            Monitor band in eV (default: the case's line band).
+  --batch-means-band-ev START,STOP
+                                  Band in eV for reported per-bin batch-means errors;
+                                  costs one extra reduction.
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite material energy-grid`
+## `pyrite numerics precision show`
 
 ```text
-Usage: pyrite material energy-grid [OPTIONS] COMMAND [ARGS]...
+Usage: pyrite numerics precision show [OPTIONS] NAME
+
+  Show PROFILE's electron-count mode, its source, blockers and next steps.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite numerics cxr-grid`
+
+```text
+Usage: pyrite numerics cxr-grid [OPTIONS] COMMAND [ARGS]...
+
+  Inspect and edit PROFILE's cxr-grid policy (``[profiles.NAME.cxr_grid_policy]``).
+
+  Three selectors, each defaulting to the first value listed:
+
+    bandwidth   kinematic-ceiling | resonance-population
+                closed-form kinematic bound (no simulation), or the case's
+                measured resonance population capped by that bound
+    resolution  sinc-nyquist | resonance-local
+                uniform measured sinc spacing, or spacing refined locally
+                around measured resonances (3 eV backbone)
+    quadrature  node | bin-mean
+                point samples of the sinc^2 line profile, or bin means that
+                keep integrated line yield exact but smooth peak height/width
+
+  resonance-local requires bandwidth resonance-population and quadrature bin-mean. Any
+  stored selector, even one equal to its default, makes every case of the profile
+  resolve its line grid automatically from its own trajectories, ahead of explicit
+  E_grid_line and stored energy-grid rows; automatic resolution does not support
+  coherent emission (#117), and bin-mean does not support a positive max_dE_frac. The
+  table joins the case and dataset identity: editing it gives new checkpoints, and
+  earlier results stay under their old identity.
+
+  Tolerances, maximum spacing (3 eV), the point budget (600000) and backend ULPs are not
+  profile keys: set them per call (API) or with PYRITE_ENERGY_GRID_* environment
+  variables.
+
+  Examples:
+    pyrite numerics cxr-grid show high_energy
+    pyrite numerics cxr-grid set my_profile --quadrature bin-mean
+    pyrite numerics cxr-grid set my_profile --bandwidth resonance-population \
+        --resolution resonance-local --quadrature bin-mean
+    pyrite numerics cxr-grid reset my_profile resolution
+    pyrite numerics cxr-grid reset my_profile
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  reset  Remove selected FIELDs, or the whole policy when none are named.
+  set    Set one or more cxr-grid selectors on PROFILE.
+  show   Show explicit and effective PROFILE cxr-grid selectors and the grid source.
+```
+
+## `pyrite numerics cxr-grid reset`
+
+```text
+Usage: pyrite numerics cxr-grid reset [OPTIONS] NAME
+                                      [bandwidth|resolution|quadrature]...
+
+  Remove selected FIELDs, or the whole policy when none are named.
+
+  Removing the whole policy returns PROFILE to explicit, stored or built-in line grids.
+  A partial reset that leaves an impossible combination is a usage error.
+
+Options:
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite numerics cxr-grid set`
+
+```text
+Usage: pyrite numerics cxr-grid set [OPTIONS] NAME
+
+  Set one or more cxr-grid selectors on PROFILE.
+
+  The merged policy is validated before anything is written; an impossible combination
+  is a usage error.
+
+Options:
+  --bandwidth [kinematic-ceiling|resonance-population]
+                                  Line-axis upper edge policy. Default kinematic-
+                                  ceiling.
+  --resolution [sinc-nyquist|resonance-local]
+                                  Line-axis spacing policy; resonance-local needs
+                                  resonance-population and bin-mean. Default sinc-
+                                  nyquist.
+  --quadrature [node|bin-mean]    sinc^2 line-profile evaluation on the axis. Default
+                                  node.
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite numerics cxr-grid show`
+
+```text
+Usage: pyrite numerics cxr-grid show [OPTIONS] NAME
+
+  Show explicit and effective PROFILE cxr-grid selectors and the grid source.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite numerics energy-grid`
+
+```text
+Usage: pyrite numerics energy-grid [OPTIONS] COMMAND [ARGS]...
 
   Derive and inspect detector energy-grid inputs by material.
 
   Examples:
-    pyrite material energy-grid derive --material mose2 --energy 30,60
-    pyrite material energy-grid show mose2
+    pyrite numerics energy-grid derive --material mose2 --energy 30,60
+    pyrite numerics energy-grid show mose2
 
   Normal runs size line grids automatically and resolve continuum bounds per case.
   Explicit derivation and stored artifacts are optional specialist tools.
@@ -2718,10 +2865,10 @@ Commands:
   brem    Inspect bremsstrahlung energy grids.
 ```
 
-## `pyrite material energy-grid derive`
+## `pyrite numerics energy-grid derive`
 
 ```text
-Usage: pyrite material energy-grid derive [OPTIONS]
+Usage: pyrite numerics energy-grid derive [OPTIONS]
 
   Optionally derive and install grids locally or remotely.
 
@@ -2755,25 +2902,25 @@ Options:
   -h, --help                Show this message and exit.
 ```
 
-## `pyrite material energy-grid show`
+## `pyrite numerics energy-grid show`
 
 ```text
-Usage: pyrite material energy-grid show [OPTIONS] [MATERIAL]
+Usage: pyrite numerics energy-grid show [OPTIONS] [MATERIAL]
 
   Show line and bremsstrahlung grids together.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  --profile NAME                  Resolve profile NAME; precedence: flag >
-                                  PYRITE_PROFILE > config store > standard.
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  --profile NAME             Resolve profile NAME; precedence: flag > PYRITE_PROFILE >
+                             config store > standard.
+  -h, --help                 Show this message and exit.
 ```
 
-## `pyrite material energy-grid cxr`
+## `pyrite numerics energy-grid cxr`
 
 ```text
-Usage: pyrite material energy-grid cxr [OPTIONS] COMMAND [ARGS]...
+Usage: pyrite numerics energy-grid cxr [OPTIONS] COMMAND [ARGS]...
 
   Inspect CXR photon-energy grids.
 
@@ -2784,25 +2931,25 @@ Commands:
   show  Show CXR photon-energy grids.
 ```
 
-## `pyrite material energy-grid cxr show`
+## `pyrite numerics energy-grid cxr show`
 
 ```text
-Usage: pyrite material energy-grid cxr show [OPTIONS] [MATERIAL]
+Usage: pyrite numerics energy-grid cxr show [OPTIONS] [MATERIAL]
 
   Show coherent line-energy grids.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  --profile NAME                  Resolve profile NAME; precedence: flag >
-                                  PYRITE_PROFILE > config store > standard.
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  --profile NAME             Resolve profile NAME; precedence: flag > PYRITE_PROFILE >
+                             config store > standard.
+  -h, --help                 Show this message and exit.
 ```
 
-## `pyrite material energy-grid brem`
+## `pyrite numerics energy-grid brem`
 
 ```text
-Usage: pyrite material energy-grid brem [OPTIONS] COMMAND [ARGS]...
+Usage: pyrite numerics energy-grid brem [OPTIONS] COMMAND [ARGS]...
 
   Inspect bremsstrahlung energy grids.
 
@@ -2813,19 +2960,166 @@ Commands:
   show  Show bremsstrahlung energy grids.
 ```
 
-## `pyrite material energy-grid brem show`
+## `pyrite numerics energy-grid brem show`
 
 ```text
-Usage: pyrite material energy-grid brem show [OPTIONS] [MATERIAL]
+Usage: pyrite numerics energy-grid brem show [OPTIONS] [MATERIAL]
 
   Show bremsstrahlung energy grids.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  --profile NAME             Resolve profile NAME; precedence: flag > PYRITE_PROFILE >
+                             config store > standard.
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite material`
+
+```text
+Usage: pyrite material [OPTIONS] COMMAND [ARGS]...
+
+  Add, inspect, validate, and blaze individual materials.
+
+  Profile membership and ranges live under ``pyrite profile``. ``show`` reports
+  intrinsic properties; ``profile ranges show PROFILE MATERIAL`` inspects effective
+  campaign ranges. ``validate`` checks the catalog; ``blaze`` writes a face-specific
+  checkpoint.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  show      Show intrinsic MATERIAL properties,...
+  create    Create a crystal or amorphous medium with type-specific options.
+  list      List materials and media with their source and composition.
+  blaze     Run a grooved-crystal sweep and write a checkpoint.
+  validate  Validate a material catalog without starting simulation.
+```
+
+## `pyrite material show`
+
+```text
+Usage: pyrite material show [OPTIONS] MATERIAL
+
+  Show intrinsic MATERIAL properties, independent of campaign geometry.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite material create`
+
+```text
+Usage: pyrite material create [OPTIONS] COMMAND [ARGS]...
+
+  Create a crystal or amorphous medium with type-specific requirements.
+
+  New objects go to the user catalog or the explicitly selected external catalog.
+  Existing names are never overwritten; no tables are downloaded.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  amorphous  Create a medium from formula or fractions; --density-g-cm3 is required.
+  crystal    Create in the user catalog from an existing crystal or fully occupied...
+```
+
+## `pyrite material create amorphous`
+
+```text
+Usage: pyrite material create amorphous [OPTIONS] NAME
+
+  Create a medium from formula or fractions; --density-g-cm3 is required.
+
+Options:
+  --formula TEXT                  Simple ASCII formula (medium: fractional counts
+                                  allowed).
+  --density-g-cm3 FLOAT           Required bulk density for media, in g/cm³; CIF
+                                  consistency check only.
+  --mass-fraction ELEMENT=VALUE   Repeat for each element; mass fractions must sum to 1.
+  --atomic-fraction ELEMENT=VALUE
+                                  Repeat for each element; atom fractions must sum to 1.
+  --atom-count ELEMENT=VALUE      Repeat for positive stoichiometric ratios.
+  -o, --output [table|json]       Output format; only json is a stable automation
                                   contract.  [default: table]
-  --profile NAME                  Resolve profile NAME; precedence: flag >
-                                  PYRITE_PROFILE > config store > standard.
   -h, --help                      Show this message and exit.
+```
+
+## `pyrite material create crystal`
+
+```text
+Usage: pyrite material create crystal [OPTIONS] NAME
+
+  Create in the user catalog from an existing crystal or fully occupied CIF. Partial
+  occupancy is unsupported. Photon grids are in eV; lengths in angstrom.
+
+Options:
+  --formula TEXT                  Simple ASCII formula (medium: fractional counts
+                                  allowed).
+  --density-g-cm3 FLOAT           Required bulk density for media, in g/cm³; CIF
+                                  consistency check only.
+  --crystal TEXT                  Reuse an existing crystal with its configured cut and
+                                  physics inputs.
+  --cif FILE                      Local fully occupied CIF; copied into managed catalog
+                                  storage.
+  --phase TEXT                    Required explicit phase identity for a new CIF.
+  --surface-hkl <INTEGER INTEGER INTEGER>...
+                                  New CIF slab normal in reciprocal Miller indices;
+                                  excludes --beam-uvw.
+  --beam-uvw <INTEGER INTEGER INTEGER>...
+                                  New CIF slab normal in direct lattice indices;
+                                  excludes --surface-hkl.
+  --b-ang2 FLOAT                  Required new-CIF isotropic Debye–Waller factor in
+                                  angstrom²; nonnegative.
+  --photon-grid START STOP STEP   Required new-CIF photon grid in eV; stop is exclusive.
+  --mosaic-fwhm-deg FLOAT         Optional positive new-CIF mosaic FWHM in degrees;
+                                  omitted means perfect crystal.
+  -o, --output [table|json]       Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite material list`
+
+```text
+Usage: pyrite material list [OPTIONS]
+
+  List crystal recipes and media; composition units are atoms/angstrom³.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite material blaze`
+
+```text
+Usage: pyrite material blaze [OPTIONS] MATERIAL
+
+  Run one material's blazed-crystal MC sweep and write its checkpoint.
+
+  Writes checkpoints/<material>_blazed/, separate from flat-face scan checkpoints.
+  Repeat --energy/--spacing/--polar for multiple values.
+
+Options:
+  --energy E                 Beam energies in keV (one or more).  [required]
+  --spacing S                Groove spacing(s) in meters (one, or one per energy).
+                             [required]
+  --polar A                  Polar tilt values in degrees.  [0.0<x<90.0]
+  --workers NUMBER           run_cases max_workers (default auto; 0 = serial).
+  --checkpoint-dir DIR       Read and write blazed component checkpoints in DIR.
+                             [default: (pyrite-output/checkpoints)]
+  --max-minutes MINUTES      Soft wall-clock budget in minutes; exit 75 if resumable
+                             work remains.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite material validate`
@@ -2871,14 +3165,13 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  create       Create a new named beam NAME.
-  delete       Delete a named beam; irreversible.
-  gdf-inspect  List GPT outputs and inspect lab coordinates to choose a target z...
-  gdf-times    List GPT time-output times in seconds and particle counts (CPU only).
-  list         List named beams with source, label and profile-reference counts.
-  rename       Rename beam NAME to NEW_NAME.
-  set          Update fields on an existing named beam NAME.
-  show         Show one named beam's fields.
+  create  Create a new named beam NAME.
+  delete  Delete a named beam; irreversible.
+  gdf     Inspect GPT particle files and select time or screen outputs (CPU only).
+  list    List named beams with source, label and profile-reference counts.
+  rename  Rename beam NAME to NEW_NAME.
+  set     Update fields on an existing named beam NAME.
+  show    Show one named beam's fields.
 ```
 
 ## `pyrite beam create`
@@ -2949,17 +3242,32 @@ Usage: pyrite beam delete [OPTIONS] NAME
   listed. Reattach or remove those profiles' ``--beam`` reference first.
 
 Options:
-  -y, --yes                       Delete the exact previewed beam.
-  --dry-run                       Print proposed TOML diff; delete nothing.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -y, --yes                  Delete the exact previewed beam.
+  --dry-run                  Print proposed TOML diff; delete nothing.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
-## `pyrite beam gdf-inspect`
+## `pyrite beam gdf`
 
 ```text
-Usage: pyrite beam gdf-inspect [OPTIONS] PATH
+Usage: pyrite beam gdf [OPTIONS] COMMAND [ARGS]...
+
+  Inspect GPT particle files and select time or screen outputs (CPU only).
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  inspect  List GPT outputs and inspect lab coordinates to choose a target z origin.
+  times    List GPT time-output times in seconds and particle counts (CPU only).
+```
+
+## `pyrite beam gdf inspect`
+
+```text
+Usage: pyrite beam gdf inspect [OPTIONS] PATH
 
   List GPT outputs and inspect lab coordinates to choose a target z origin.
 
@@ -2968,19 +3276,19 @@ Usage: pyrite beam gdf-inspect [OPTIONS] PATH
   target location. Screen labels need not equal lab z.
 
 Options:
-  --time-s NUMBER                 Select time output in seconds.
-  --time-tolerance-s NUMBER       [default: 1e-15]
-  --screen-position-m NUMBER      Select screen coordinate in meters; excludes --time-s.
-  --screen-tolerance-m NUMBER     [default: 1e-09]
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  --time-s NUMBER              Select time output in seconds.
+  --time-tolerance-s NUMBER    [default: 1e-15]
+  --screen-position-m NUMBER   Select screen coordinate in meters; excludes --time-s.
+  --screen-tolerance-m NUMBER  [default: 1e-09]
+  -o, --output [table|json]    Output format; only json is a stable automation contract.
+                               [default: table]
+  -h, --help                   Show this message and exit.
 ```
 
-## `pyrite beam gdf-times`
+## `pyrite beam gdf times`
 
 ```text
-Usage: pyrite beam gdf-times [OPTIONS] PATH
+Usage: pyrite beam gdf times [OPTIONS] PATH
 
   List GPT time-output times in seconds and particle counts (CPU only).
 
@@ -2996,9 +3304,9 @@ Usage: pyrite beam list [OPTIONS]
   List named beams with source, label and profile-reference counts.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite beam rename`
@@ -3079,9 +3387,9 @@ Usage: pyrite beam show [OPTIONS] NAME
   Show one named beam's fields.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite detector`
@@ -3105,9 +3413,9 @@ Usage: pyrite detector [OPTIONS] COMMAND [ARGS]...
 
   Examples:
     pyrite detector list
-    pyrite detector create mine --from reference
+    pyrite detector create clone mine --from reference
     pyrite detector show reference
-    pyrite detector create standard-90 --observation-angle 90
+    pyrite detector create scalar standard-90 --observation-angle 90
     pyrite detector set standard-90 --solid-angle 0.066
     pyrite detector rename standard-90 eds
     pyrite detector delete eds -y
@@ -3116,7 +3424,7 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  create  Create a reusable named detector geometry NAME.
+  create  Create a scalar or planar detector, or clone an existing named detector.
   delete  Delete an unreferenced named detector; irreversible.
   list    List named detectors with source, labels and profile-reference counts.
   rename  Rename NAME and update every referencing profile atomically.
@@ -3128,24 +3436,48 @@ Commands:
 ## `pyrite detector create`
 
 ```text
-Usage: pyrite detector create [OPTIONS] NAME
+Usage: pyrite detector create [OPTIONS] COMMAND [ARGS]...
 
-  Create a reusable named detector geometry NAME.
+  Create a scalar or planar detector, or clone an existing named detector.
 
-  Use --from DETECTOR to copy an existing geometry, scorer, response and acquisition.
-  Otherwise requires at least one detector-geometry option.
+  Fields have the same units and defaults as the API. Edits are validated before an
+  atomic save; --dry-run previews a TOML diff without saving.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  clone   Copy an existing detector with required --from SOURCE.
+  planar  Create a planar pixel detector (distance/pitch in mm).
+  scalar  Create an angle/acceptance/solid-angle detector (deg, sr).
+```
+
+## `pyrite detector create clone`
+
+```text
+Usage: pyrite detector create clone [OPTIONS] NAME
+
+  Copy an existing detector with required --from SOURCE.
+
+Options:
+  --from TEXT   Copy an existing detector; field options override the copy.  [required]
+  --label TEXT  Display-only description; never affects parameter_sha256.
+  --dry-run     Print proposed TOML diff; write nothing.
+  -h, --help    Show this message and exit.
+```
+
+## `pyrite detector create planar`
+
+```text
+Usage: pyrite detector create planar [OPTIONS] NAME
+
+  Create a planar pixel detector (distance/pitch in mm).
 
 Options:
   --from TEXT                     Copy an existing detector; field options override the
                                   copy.
   --label TEXT                    Display-only description; never affects
                                   parameter_sha256.
-  --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
-                                  replacement.  [0.0<=x<=180.0]
-  --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar
-                                  replacement.  [0.0<x<=180.0]
-  --solid-angle SR                Detector solid angle in sr; scalar replacement.
-                                  [0.0<x<=12.566370614359172]
   --distance-mm MM                Source-to-detector distance in mm; required to create.
   --polar-deg DEG                 Detector-centre polar angle from the beam axis in
                                   degrees [0, 180].  [0.0<=x<=180.0]
@@ -3190,6 +3522,26 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
+## `pyrite detector create scalar`
+
+```text
+Usage: pyrite detector create scalar [OPTIONS] NAME
+
+  Create an angle/acceptance/solid-angle detector (deg, sr).
+
+Options:
+  --from TEXT              Copy an existing detector; field options override the copy.
+  --label TEXT             Display-only description; never affects parameter_sha256.
+  --observation-angle DEG  Detector observation angle in degrees [0, 180]; scalar
+                           replacement.  [0.0<=x<=180.0]
+  --polar-acceptance DEG   Full detector polar acceptance span in degrees; scalar
+                           replacement.  [0.0<x<=180.0]
+  --solid-angle SR         Detector solid angle in sr; scalar replacement.
+                           [0.0<x<=12.566370614359172]
+  --dry-run                Print proposed TOML diff; write nothing.
+  -h, --help               Show this message and exit.
+```
+
 ## `pyrite detector delete`
 
 ```text
@@ -3198,11 +3550,11 @@ Usage: pyrite detector delete [OPTIONS] NAME
   Delete an unreferenced named detector; irreversible.
 
 Options:
-  -y, --yes                       Delete the exact previewed detector.
-  --dry-run                       Print proposed TOML diff; delete nothing.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -y, --yes                  Delete the exact previewed detector.
+  --dry-run                  Print proposed TOML diff; delete nothing.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite detector list`
@@ -3213,9 +3565,9 @@ Usage: pyrite detector list [OPTIONS]
   List named detectors with source, labels and profile-reference counts.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite detector rename`
@@ -3314,9 +3666,9 @@ Usage: pyrite detector show [OPTIONS] NAME
   Show one named detector's geometry.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite tables`
@@ -3404,7 +3756,7 @@ Options:
                                   Table species. Positron requires CODE elsepa or
                                   sbethe-tables; other data are species-independent.
                                   [default: electron]
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
+  -o, --output [table|json]       Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
 ```
@@ -3458,7 +3810,7 @@ Options:
   --overwrite                     Regenerate and replace an existing key.
   --keep-on-failure               Keep the scratch directory after an external-code
                                   failure.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
+  -o, --output [table|json]       Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
 ```
@@ -3473,9 +3825,9 @@ Usage: pyrite tables list [OPTIONS]
   A table present in both tiers is listed once, as the tier that would be served.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite tables migrate`
@@ -3494,10 +3846,10 @@ Usage: pyrite tables migrate [OPTIONS]
   do. Exits 0.
 
 Options:
-  --dry-run                       Report what would be copied without writing anything.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  --dry-run                  Report what would be copied without writing anything.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite tables path`
@@ -3511,9 +3863,9 @@ Usage: pyrite tables path [OPTIONS]
   and target-scoped, not run-specific, so they are shared across every workspace.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite tables show`
@@ -3527,9 +3879,9 @@ Usage: pyrite tables show [OPTIONS] KEY
   short hash.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite tables sources`
@@ -3559,9 +3911,9 @@ Usage: pyrite tables sources list [OPTIONS]
   failure.
 
 Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite tables sources set`
@@ -3595,11 +3947,11 @@ Usage: pyrite tables verify [OPTIONS]
   Remote jobs run this before the sweep and fail with state `FAILED (tables)`.
 
 Options:
-  --require TEXT                  Comma-separated codes whose pinned tables or datasets
-                                  must be present (bremslib, elsepa, sbethe-tables,
-                                  eedl, eadl, epdl, sbethe).  [default:
-                                  bremslib,elsepa,sbethe-tables,eedl,eadl,epdl,sbethe]
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  --require TEXT             Comma-separated codes whose pinned tables or datasets must
+                             be present (bremslib, elsepa, sbethe-tables, eedl, eadl,
+                             epdl, sbethe).  [default: bremslib,elsepa,sbethe-
+                             tables,eedl,eadl,epdl,sbethe]
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```

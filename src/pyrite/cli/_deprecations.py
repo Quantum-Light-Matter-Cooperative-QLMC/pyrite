@@ -59,14 +59,40 @@ def _entry(
 #: The 0.1.0 cohort of 68 command spellings was removed at 0.3.0 (issue #68),
 #: and `material set` (deprecated 0.4.0, issue #359) at 0.6.0 (issue #387).
 #: `material simulate` was removed at 0.8.0; use `run --ephemeral`.
-DEPRECATIONS: dict[str, Deprecation] = {}
+DEPRECATIONS: dict[str, Deprecation] = {
+    path: _entry(
+        path,
+        replacement,
+        since="0.15.0",
+        warning_note=(
+            "for media use 'pyrite material create amorphous NAME'"
+            if path == "material add"
+            else ""
+        ),
+        note=(
+            "Planar geometry uses create planar; --from-only copies use create clone."
+            if path == "detector create"
+            else ""
+        ),
+    )
+    for path, replacement in {
+        "job": "pyrite remote job",
+        "beam gdf-inspect": "pyrite beam gdf inspect",
+        "beam gdf-times": "pyrite beam gdf times",
+        "profile precision": "pyrite numerics precision",
+        "profile cxr-grid": "pyrite numerics cxr-grid",
+        "material energy-grid": "pyrite numerics energy-grid",
+        "detector create": "pyrite detector create scalar NAME",
+        "material add": "pyrite material create crystal NAME",
+    }.items()
+}
 
 
 #: Paths whose canonical replacement depends on the arguments given, so the
 #: command computes it and calls `warn_self(path, replacement)` from its own
 #: callback. `DeprecatingGroup` leaves these alone rather than pre-empting them
 #: with the registry's generic replacement.
-SELF_WARNING: frozenset[str] = frozenset()
+SELF_WARNING: frozenset[str] = frozenset({"detector create"})
 
 
 def message(path: str, *, replacement: str | None = None) -> str:
@@ -223,7 +249,14 @@ def _flag(
 #: `--fidelity` cohort (deprecated in 0.4.0, issue #215) at 0.6.0 (issue #387).
 #: `RetiredOption` and `canonical_option` (renamed spellings) and
 #: `DeprecatedOption` (whole options) stay as the substrate ADR-0002 requires.
-DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {}
+DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
+    ("material show", "--profile"): _flag(
+        "material show",
+        "--profile",
+        "use pyrite profile ranges show PROFILE MATERIAL",
+        since="0.15.0",
+    ),
+}
 
 
 def flag_message(command: str, flag: str, replacement: str) -> str:

@@ -14,7 +14,7 @@ new checkpoint stems and earlier results stay under their old identity.
 
 `pyrite profile show NAME` presents Setting / Value tables grouped by editing
 command: sweep/membership/emission, beam, detectors, filters, numerics
-(sampling/convergence/transport), precision, line-grid, energy grids and material
+(sampling/reflection-and-mosaic/transport), precision, line-grid, energy grids and material
 overrides. Energy grids name the profile or built-in defaults, grid overrides
 and stored artifacts together; the last section lists non-grid material
 overrides. Numerics name their value source; adaptive
@@ -32,12 +32,15 @@ on one line. `--output json` retains the stable machine payload.
 | `tilt_azim_deg` | grid, deg | `profile set\|add\|remove --azimuth` | |
 | `E_grid_brem` | grid, eV | TOML (`pyrite-dev energy-grid brem set` stores per-material artifacts instead) | absent = built-in 25 eV uniform spacing; uniform bounds resolve per case |
 | `E_grid_line` | grid, eV | TOML (`pyrite-dev energy-grid line` maintains artifacts) | ignored while a line-grid policy is set |
-| `energy_grid_refs` | material -> artifact digest | `pyrite material energy-grid derive`, `pyrite-dev energy-grid add` | line rows ignored while a line-grid policy is set; brem still applies |
+| `energy_grid_refs` | material -> artifact digest | `pyrite numerics energy-grid derive`, `pyrite-dev energy-grid add` | line rows ignored while a line-grid policy is set; brem still applies |
 | `overrides.MATERIAL.*` | any range/grid key above, plus counts | none: `pyrite material set` was removed in 0.6.0 (#359); use a single-material profile | Remove existing override keys by editing the TOML. Bundled stack rows (`thickness_layers`, sapphire thickness) stay until materials and physical objects are separated |
 
 ## Calculation numerics
 
-`pyrite profile numerics show|set|reset NAME` owns these; `show` reports
+`pyrite numerics show|set|reset NAME` owns sampling, integration and reflection/mosaic controls.
+`pyrite physics show|set|reset NAME` owns physical models, straggling and cutoffs.
+Both edit the existing profile; the legacy combined `profile numerics` view remains
+compatible. `show` reports
 explicit value, effective value and source (`profile`, `default`, `built-in`)
 in human output. The JSON payload retains its existing source spellings.
 
@@ -55,7 +58,7 @@ in human output. The JSON payload retains its existing source spellings.
 
 ## Line-grid policy
 
-`pyrite profile cxr-grid show|set|reset NAME` owns `[profiles.NAME.line_grid_policy]`.
+`pyrite numerics cxr-grid show|set|reset NAME` owns `[profiles.NAME.line_grid_policy]`.
 
 | TOML key | Values (default first) | Flag |
 |---|---|---|

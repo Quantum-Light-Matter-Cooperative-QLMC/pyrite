@@ -9,5 +9,5 @@ def test_empty_job_status_recommends_canonical_logs_command():
         detail=1,
     )
     assert "No case progress reported yet" in output
-    assert "`pyrite job logs`" in output
+    assert "`pyrite remote job logs`" in output
     assert "pyrite remote logs" not in output

@@ -1,4 +1,4 @@
-"""``pyrite profile precision``: a profile's adaptive electron-count policy."""
+"""``pyrite numerics precision``: a profile's adaptive electron-count policy."""
 
 import click
 from tomlkit.exceptions import ParseError
@@ -195,7 +195,7 @@ def command():
       disable  opt out: drop any policy and select fixed counts
 
     Electron sampling is independent of the line grid; see
-    'pyrite profile cxr-grid'.
+    'pyrite numerics cxr-grid'.
     """
 
 
@@ -255,12 +255,12 @@ def precision_show_command(name, json_output):
             if automatic_grid
             else "explicit or stored grids first, automatic for the rest"
         )
-        + f"; independent of electron sampling, see 'pyrite profile cxr-grid show {name}'"
+        + f"; independent of electron sampling, see 'pyrite numerics cxr-grid show {name}'"
     )
     if effective is not None:
-        emit_result(f"  to select fixed counts: pyrite profile precision disable {name}")
+        emit_result(f"  to select fixed counts: pyrite numerics precision disable {name}")
     elif counts and not blockers:
-        emit_result(f"  to switch to adaptive: pyrite profile precision enable {name}")
+        emit_result(f"  to switch to adaptive: pyrite numerics precision enable {name}")
     return 0
 
 
@@ -308,13 +308,13 @@ def precision_set_command(name, yes, dry_run, **values):
     Fields left unspecified keep the existing policy's values; a new policy takes
     them from the default (target RSE 0.05, 200-20000 electrons, blocks of 100,
     line and brem). A profile with fixed counts is refused; switch it with
-    'pyrite profile precision enable'.
+    'pyrite numerics precision enable'.
     """
     updates = _updates(values)
     if not updates:
         raise click.UsageError(
             "provide at least one precision option; "
-            f"'pyrite profile precision enable {name}' selects the default policy"
+            f"'pyrite numerics precision enable {name}' selects the default policy"
         )
     try:
         original, document = _catalog_io.catalog_text()
@@ -335,7 +335,7 @@ def precision_reset_command(name, fields, yes, dry_run):
 
     Removing the policy returns PROFILE to the default adaptive policy unless it
     cannot run adaptive. Fixed counts are untouched; select them with
-    'pyrite profile precision disable'.
+    'pyrite numerics precision disable'.
     """
     keys = tuple(_PRECISION_FIELD_NAMES[field] for field in fields)
     try:

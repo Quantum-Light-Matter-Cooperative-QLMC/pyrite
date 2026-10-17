@@ -1594,8 +1594,8 @@ def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
     assert "· SUBMITTED" in output
     assert "SLURM" in output
     assert "48291" in output
-    assert "pyrite job status" in output
-    assert "pyrite job attach" in output
+    assert "pyrite remote job status" in output
+    assert "pyrite remote job attach" in output
     assert "pyrite remote status" not in output
     assert "pyrite remote attach" not in output
 
@@ -2986,7 +2986,7 @@ def test_attach_watchdog_exits_on_a_stalled_chain(monkeypatch, capsys):
 
 
 def test_job_attach_repeats_verbose_for_the_live_report(monkeypatch):
-    """`remote status -a` retired at 0.3.0; `pyrite job attach` is the door."""
+    """`remote status -a` retired at 0.3.0; `pyrite remote job attach` is the door."""
     from pyrite.cli.commands.job import command as job_command
     from pyrite.console import output as core
 

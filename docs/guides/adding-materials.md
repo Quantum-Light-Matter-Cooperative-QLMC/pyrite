@@ -1,6 +1,6 @@
 # Adding materials
 
-`pyrite material add` registers a validated definition in your catalog. With
+`pyrite material create crystal|amorphous` registers a validated definition in your catalog. With
 bundled selection, it writes only to the user layer (`catalog.user`,
 `PYRITE_USER_CATALOG`, or the platform configuration directory). Names cannot
 replace bundled or existing user material, crystal, or medium identifiers,
@@ -20,19 +20,19 @@ A formula does not determine density:
 
 ```bash
 # Elemental solid.
-pyrite material add amorphous-carbon --formula C --density-g-cm3 2.0
+pyrite material create amorphous amorphous-carbon --formula C --density-g-cm3 2.0
 
 # Compound.
-pyrite material add silica-glass --formula SiO2 --density-g-cm3 2.2
+pyrite material create amorphous silica-glass --formula SiO2 --density-g-cm3 2.2
 
 # Mixed medium; repeat an option for each constituent.
-pyrite material add si-ge-mixture --mass-fraction Si=0.5 --mass-fraction Ge=0.5 \
+pyrite material create amorphous si-ge-mixture --mass-fraction Si=0.5 --mass-fraction Ge=0.5 \
   --density-g-cm3 3.5
 
 # Atomic fractions or stoichiometric ratios are explicit alternatives.
-pyrite material add si-ge-atoms --atomic-fraction Si=0.5 --atomic-fraction Ge=0.5 \
+pyrite material create amorphous si-ge-atoms --atomic-fraction Si=0.5 --atomic-fraction Ge=0.5 \
   --density-g-cm3 3.5
-pyrite material add silica-ratios --atom-count Si=1 --atom-count O=2 \
+pyrite material create amorphous silica-ratios --atom-count Si=1 --atom-count O=2 \
   --density-g-cm3 2.2
 ```
 
@@ -67,14 +67,14 @@ PXR/CBS physics by being registered. Crystal scan recipes live in `materials/`.
 Reuse a configured crystal without altering its cut or physics inputs:
 
 ```bash
-pyrite material add my-silicon --crystal silicon
+pyrite material create crystal my-silicon --crystal silicon
 ```
 
 For a new fully occupied CIF, explicitly supply its formula, phase, one
 orientation, isotropic Debye–Waller factor and photon-energy grid:
 
 ```bash
-pyrite material add lab-si --cif ./silicon.cif --formula Si --phase diamond \
+pyrite material create crystal lab-si --cif ./silicon.cif --formula Si --phase diamond \
   --surface-hkl 1 1 1 --b-ang2 0.46 --photon-grid 100 5000 3
 ```
 

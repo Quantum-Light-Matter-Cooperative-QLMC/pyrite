@@ -756,7 +756,7 @@ def _refuse_conflicting_live_jobs(digest: str, *, force: bool) -> None:
         f"{config.remote_dir()} underneath it can mix two revisions in one set of "
         f"results.\n{detail}\n"
         f"  incoming payload digest {digest[:12]}\n"
-        "wait for it (pyrite job attach <jobid>), stop it (pyrite job stop <jobid>), "
+        "wait for it (pyrite remote job attach <jobid>), stop it (pyrite remote job stop <jobid>), "
         "or override with pyrite remote sync --force."
     )
 

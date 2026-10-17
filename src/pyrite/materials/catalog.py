@@ -76,6 +76,20 @@ def load_material_catalog(
     return _load_material_catalog_cached(source, sources, profile, catalog_root(source).resolve())
 
 
+def _catalog_from_text(text: str, *, path: Path, profile: str = "standard") -> MaterialCatalog:
+    """Validate an editor draft with the selected asset root, without writing it.
+
+    A synthetic single-file origin retains the same relative CIF, GDF and grid
+    artifact resolution as a temporary file beside the selected catalog. This
+    also works before a new user layer exists.
+    """
+    root = catalog_root(path).resolve()
+    origin = root / ".pyrite-catalog-draft.toml"
+    return _load_material_catalog_cached(
+        origin, ((origin.name, text.encode("utf-8")),), profile, root
+    )
+
+
 @functools.lru_cache(maxsize=32)
 def _load_material_catalog_cached(
     source: Path,

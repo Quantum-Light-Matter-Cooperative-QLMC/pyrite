@@ -2,16 +2,16 @@
 
 import difflib
 import re
-from copy import deepcopy
+from copy import copy
 
 import click
-import tomlkit
 from tomlkit.exceptions import ParseError
 
 from pyrite._catalog_layout import object_sources
 from pyrite.campaign.profile_edit import PHYSICAL_SECTIONS
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
+from pyrite.cli._deprecations import DeprecatingGroup, warn_self
 from pyrite.cli.commands._detector_shared import (
     apply_detector_fields,
     collect_detector_updates,
@@ -26,6 +26,7 @@ from pyrite.console.output import (
     emit_result,
     output_option,
 )
+from pyrite.detectors.editing import create_detector
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _DISPLAY_FIELDS = (
@@ -75,7 +76,7 @@ def _referencing_profiles(document, name):
 
 def _write(document, original, dry_run, done_message):
     try:
-        proposed = tomlkit.dumps(document)
+        proposed = _catalog_io.render_catalog(document)
         _catalog_io.validate(_catalog_io.active_catalog_path(), proposed)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
@@ -126,7 +127,9 @@ def _emit_show(payload):
                 emit_result(f"  {key}: {payload[key]}")
 
 
-@click.group(name="detector", no_args_is_help=True)
+@click.group(
+    name="detector", cls=DeprecatingGroup, deprecation_prefix="detector", no_args_is_help=True
+)
 def command():
     """Manage named detector geometries, attachable to profiles by name.
 
@@ -146,9 +149,9 @@ def command():
     \b
     Examples:
       pyrite detector list
-      pyrite detector create mine --from reference
+      pyrite detector create clone mine --from reference
       pyrite detector show reference
-      pyrite detector create standard-90 --observation-angle 90
+      pyrite detector create scalar standard-90 --observation-angle 90
       pyrite detector set standard-90 --solid-angle 0.066
       pyrite detector rename standard-90 eds
       pyrite detector delete eds -y
@@ -207,7 +210,7 @@ def show_command(name, json_output):
     return 0
 
 
-@command.command("create")
+@click.command("create")
 @click.argument("name")
 @click.option(
     "--from",
@@ -243,15 +246,15 @@ def create_command(
         original, document = _catalog_io.catalog_text()
         detectors = _catalog_io.detector_rows(document)
         _catalog_io.require_new_object(detectors, "detector", name)
-        target = (
-            deepcopy(_existing_detector(document, source))
-            if source is not None
-            else tomlkit.table()
+        create_detector(
+            document,
+            name,
+            source=source,
+            label=label,
+            scalar=updates,
+            pixel=pixel,
+            kind=values.pop("_kind", None),
         )
-        if label is not None:
-            target["label"] = label
-        apply_detector_fields(target, updates, pixel)
-        _catalog_io.detectors_table(document)[name] = target
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     return _write(document, original, dry_run, f"created detector {name}")
@@ -366,7 +369,7 @@ def delete_command(name, yes, dry_run, json_output):
         _write(document, original, True, "")
         if not confirm_destructive(False, f"delete detector {name!r}? this cannot be undone"):
             return 0
-    proposed = tomlkit.dumps(document)
+    proposed = _catalog_io.render_catalog(document)
     try:
         current = _catalog_io.current_text()
         if current != original:
@@ -410,3 +413,65 @@ def reset_command(name, sections, yes, dry_run):
     ):
         return 0
     return _write(document, original, dry_run, f"reset detector {name}")
+
+
+class _TypedCreate(click.Group):
+    """Route legacy NAME-first syntax to the same callback for one support window."""
+
+    def parse_args(self, ctx, args):
+        if args and not args[0].startswith("-") and args[0] not in self.commands:
+            ctx.meta["pyrite.legacy_detector_create"] = True
+            ctx.allow_interspersed_args = True
+            ctx.allow_extra_args = False
+            if not any(arg in ("--help", "-h") for arg in args):
+                warn_self("detector create", "pyrite detector create scalar NAME")
+            return create_command.parse_args(ctx, args)
+        return super().parse_args(ctx, args)
+
+    def invoke(self, ctx):
+        if ctx.meta.get("pyrite.legacy_detector_create"):
+            return create_command.invoke(ctx)
+        return super().invoke(ctx)
+
+
+@command.group("create", cls=_TypedCreate)
+def typed_create():
+    """Create a scalar or planar detector, or clone an existing named detector.
+
+    Fields have the same units and defaults as the API. Edits are validated
+    before an atomic save; --dry-run previews a TOML diff without saving.
+    """
+
+
+def _register_create(kind):
+    scalar_names = {"observation_angle_deg", "polar_acceptance_deg", "solid_angle_sr"}
+    common = {"name", "source", "label", "dry_run"}
+    params = [
+        copy(param)
+        for param in create_command.params
+        if param.name in common
+        or (kind != "clone" and ((param.name in scalar_names) == (kind == "scalar")))
+    ]
+    if kind == "clone":
+        next(param for param in params if param.name == "source").required = True
+
+    @click.pass_context
+    def create(ctx, **values):
+        return ctx.invoke(create_command, **values, _kind=None if kind == "clone" else kind)
+
+    typed_create.add_command(
+        click.Command(
+            kind,
+            params=params,
+            callback=create,
+            help={
+                "scalar": "Create an angle/acceptance/solid-angle detector (deg, sr).",
+                "planar": "Create a planar pixel detector (distance/pitch in mm).",
+                "clone": "Copy an existing detector with required --from SOURCE.",
+            }[kind],
+        )
+    )
+
+
+for _kind in ("scalar", "planar", "clone"):
+    _register_create(_kind)

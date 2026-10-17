@@ -15,7 +15,7 @@ With no complete catalog selected, all object tables (`profiles`, `beams`,
 additions from `catalog.user` / `PYRITE_USER_CATALOG` over the bundled catalog.
 Packaged names remain read-only and cannot be reused, even with different case.
 For example, `pyrite beam create lab --from example` and
-`pyrite detector create lab --from reference` make editable user copies.
+`pyrite detector create clone lab --from reference` make editable user copies.
 Their `list` commands report `bundled`, `user` or `catalog` sources in text and
 JSON. Remote sync ships the user layer as `user-catalog/`. Selecting a complete
 external catalog disables this layering; its objects remain writable in place.

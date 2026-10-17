@@ -16,7 +16,8 @@ def test_add_medium_matches_python_and_reports_source():
         cli.command,
         [
             "material",
-            "add",
+            "create",
+            "amorphous",
             "my-silica",
             "--formula",
             "SiO2",
@@ -48,12 +49,22 @@ def test_add_medium_matches_python_and_reports_source():
         (["--formula", "Si"], "density-g-cm3 is required"),
         (["--formula", "H2O", "--density-g-cm3", "1"], "unsupported"),
         (["--mass-fraction", "Si=1", "--mass-fraction", "Si=.1", "--density-g-cm3", "2"], "unique"),
-        (["--formula", "Si", "--density-g-cm3", "2", "--phase", "diamond"], "require --cif"),
         (["--crystal", "silicon", "--formula", "Si"], "cannot be overridden"),
     ],
 )
 def test_invalid_inputs_use_error_exit_and_one_json_value(args, message):
-    result = invoke(cli.command, ["material", "add", "bad", *args, "-o", "json"])
+    result = invoke(
+        cli.command,
+        [
+            "material",
+            "create",
+            "crystal" if "--crystal" in args else "amorphous",
+            "bad",
+            *args,
+            "-o",
+            "json",
+        ],
+    )
     assert result.exit_code == 1
     document = json.loads(result.stdout)
     assert message in str(document)
@@ -62,7 +73,7 @@ def test_invalid_inputs_use_error_exit_and_one_json_value(args, message):
 
 
 def test_existing_crystal_and_cif_cli():
-    result = invoke(cli.command, ["material", "add", "my-si", "--crystal", "silicon"])
+    result = invoke(cli.command, ["material", "create", "crystal", "my-si", "--crystal", "silicon"])
     assert_clean_result(result)
     assert load_material_catalog().materials["my-si"].crystal_key == "silicon"
     source = layout.bundled_catalog().parent / "cifs" / "silicon.cif"
@@ -70,7 +81,8 @@ def test_existing_crystal_and_cif_cli():
         cli.command,
         [
             "material",
-            "add",
+            "create",
+            "crystal",
             "my-cif",
             "--cif",
             str(source),
@@ -95,7 +107,7 @@ def test_existing_crystal_and_cif_cli():
 
 
 def test_help_explains_units_ownership_and_limits():
-    result = invoke(cli.command, ["material", "add", "--help"])
+    result = invoke(cli.command, ["material", "create", "crystal", "--help"])
     assert_clean_result(result)
     assert "g/cm³" in result.stdout
     assert "user catalog" in result.stdout

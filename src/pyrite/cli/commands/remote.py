@@ -18,6 +18,7 @@ from ...console.output import (
 from ...remote import config, lifecycle, transport
 from .. import _completion as _cli_completion
 from .._deprecations import DeprecatingGroup, canonical_option
+from .._groups import LazyGroup
 from ._remote_actions import (
     _cli_check,
     _cli_clear,
@@ -84,7 +85,9 @@ def _reject_all_with_values(command_name, all_, values):
 
 @click.group(
     "remote",
-    cls=DeprecatingGroup,
+    cls=LazyGroup,
+    lazy_commands={"job": "pyrite.cli.commands.job.command"},
+    lazy_help={"job": "List, inspect, follow, or stop remote jobs."},
     help=(
         "[dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n"
         "Host, remote directory, and executable come from PYRITE_REMOTE_HOST, "
@@ -95,7 +98,7 @@ def _reject_all_with_values(command_name, all_, values):
         "  pyrite run sub_100keV --remote --dry-run\n"
         "  pyrite run compute_test_300keV --remote -p\n"
         "  pyrite run standard -m hopg --remote\n"
-        "  pyrite job status -vv"
+        "  pyrite remote job status -vv"
     ),
     no_args_is_help=False,
 )

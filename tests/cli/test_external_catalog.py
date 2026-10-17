@@ -30,7 +30,16 @@ def test_catalog_option_routes_detector_edit_outside_package(tmp_path, monkeypat
     )
     result = CliRunner().invoke(
         command,
-        ["--catalog", str(catalog), "detector", "create", "lab", "--observation-angle", "80"],
+        [
+            "--catalog",
+            str(catalog),
+            "detector",
+            "create",
+            "scalar",
+            "lab",
+            "--observation-angle",
+            "80",
+        ],
         env={"PYRITE_MC_BACKEND": "cpu"},
     )
 

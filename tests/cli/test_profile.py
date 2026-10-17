@@ -1702,7 +1702,7 @@ def test_show_groups_trial_grids_and_complete_numerics_in_aligned_columns(tmp_pa
         "Detector default (",
         "Filters (",
         "Numerics / sampling",
-        "Numerics / convergence",
+        "Numerics / reflections and mosaic",
         "Numerics / transport",
         "Precision (",
         "CXR-grid policy (",

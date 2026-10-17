@@ -136,7 +136,7 @@ Review the exact batch script and `sbatch --parsable` submission command without
 pyrite run standard -m hopg --remote --dry-run
 ```
 
-`pyrite run standard -m hopg --remote` syncs, submits, follows the SLURM job, and pulls the checkpoint. Add `--detach` to return after submission. The hidden compatibility command retains advanced `--chunk-minutes` / `--parallel-materials` controls during migration; use concurrent materials only for workloads measured to fit. Use `pyrite job status`, `pyrite job logs --follow`, or `pyrite job attach` to monitor the allocation. Attached status shows an independent case-progress bar for each material; `logs --follow` shows the raw shared job log. While pending, status ranks the target among all pending jobs in the configured SLURM partition by scheduler priority (descending, then numeric job ID) and shows the current queue leader and reason. This is a consideration-order snapshot, not a start-time promise: priority can change and backfill can run a lower-ranked job first.
+`pyrite run standard -m hopg --remote` syncs, submits, follows the SLURM job, and pulls the checkpoint. Add `--detach` to return after submission. The hidden compatibility command retains advanced `--chunk-minutes` / `--parallel-materials` controls during migration; use concurrent materials only for workloads measured to fit. Use `pyrite remote job status`, `pyrite remote job logs --follow`, or `pyrite remote job attach` to monitor the allocation. Attached status shows an independent case-progress bar for each material; `logs --follow` shows the raw shared job log. While pending, status ranks the target among all pending jobs in the configured SLURM partition by scheduler priority (descending, then numeric job ID) and shows the current queue leader and reason. This is a consideration-order snapshot, not a start-time promise: priority can change and backfill can run a lower-ranked job first.
 
 ### Remote trajectory captures
 
@@ -144,7 +144,7 @@ Capture transport on the compute node while leaving the large HDF5 files there:
 
 ```bash
 pyrite run trajectory_demo --remote --trajectories --detach
-pyrite job status trajectory_demo
+pyrite remote job status trajectory_demo
 pyrite remote trajectories ls
 ```
 
@@ -157,7 +157,7 @@ matching captures on resume and requiring `--overwrite-trajectories` before
 replacing cases that will transport again. Cached cases without artifacts are
 not re-transported; use `--recompute` to capture those cases.
 
-`pyrite job status` reports capture-directory bytes per stem, including partial
+`pyrite remote job status` reports capture-directory bytes per stem, including partial
 writes. After the first transported case, the job log reports its measured
 bytes per segment and an approximate total scaled by the requested electron
 counts. A projection over 10 GiB warns. Energy, geometry, secondary production,
@@ -202,7 +202,7 @@ See [working with results](working-with-results.md) for the ParaView preset.
 
 `score` submits bounded spectrum replay through SLURM using the already synced
 code, writing the remote checkpoint stem recorded in the artifacts. Monitor
-its printed job ID with `pyrite job attach JOBID`, then pull checkpoints with
+its printed job ID with `pyrite remote job attach JOBID`, then pull checkpoints with
 `pyrite remote pull STEM`. Existing records are kept unless `--overwrite`.
 Captures exclude CPU-only profiling and repeated performance sessions.
 
@@ -224,9 +224,9 @@ Pulled files land under `pyrite-output/performance/NAME/<job>/<material>.ndjson`
 
 For a bursty, spectrum-dominated GPU run, add `--nsys` to a single-material, single-repetition performance submit. This runs an uncached job-local session under Nsight Systems and writes CUDA/NVTX/Python-stack trace artifacts beside the NDJSON. `pyrite remote performance pull NAME` fetches the `.nsys-rep`, `.sqlite`, and `.nsys-stats.txt` files too; see the playbook's Nsight section for the exact command and interpretation limits.
 
-`pyrite job stop ...` cancels an active allocation with `scancel`. `pyrite run --preset zhai --remote` follows the same submit-and-wait workflow for the Zhai reproduction; add `--detach` to return after submission. Retrieve an existing cache with `pyrite remote pull --preset zhai`.
+`pyrite remote job stop ...` cancels an active allocation with `scancel`. `pyrite run --preset zhai --remote` follows the same submit-and-wait workflow for the Zhai reproduction; add `--detach` to return after submission. Retrieve an existing cache with `pyrite remote pull --preset zhai`.
 
-With no job id, `pyrite job attach`, `pyrite job logs`, and `pyrite job status` resolve to the most recently active job. Profile submissions name their job after the profile (`sub_100keV`, then `sub_100keV-2` once the bare name is taken), so resubmitting a profile leaves the earlier, now-terminal jobs on the box. `pyrite job attach` warns on stderr when it defaults to a job that is no longer running, so a stale default never masks the live resubmission.
+With no job id, `pyrite remote job attach`, `pyrite remote job logs`, and `pyrite remote job status` resolve to the most recently active job. Profile submissions name their job after the profile (`sub_100keV`, then `sub_100keV-2` once the bare name is taken), so resubmitting a profile leaves the earlier, now-terminal jobs on the box. `pyrite remote job attach` warns on stderr when it defaults to a job that is no longer running, so a stale default never masks the live resubmission.
 
 `pyrite remote prune-jobs` deletes terminal (done/failed/cancelled) job directories, previewing exact targets unless `--yes`. Scope it to one profile family with `--profile NAME` or sweep every profile with `--all`. A live chain is never removed, so it is safe to prune old runs of a profile while a fresh submission of the same profile is still going:
 
