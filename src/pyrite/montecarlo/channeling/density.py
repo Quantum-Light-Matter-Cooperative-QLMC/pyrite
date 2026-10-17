@@ -315,11 +315,27 @@ class DensityMatrixSolver:
         plane[residue[inband], order[inband] + self.max_order, order[inband] + self.max_order] = (
             weights[inband]
         )
+        return self.entry_from_plane(plane, float(weights[~inband].sum()))
+
+    def entry_from_plane(
+        self, plane: np.ndarray, outside: float = 0.0
+    ) -> tuple[np.ndarray, np.ndarray, float]:
+        """Collapse a plane-wave-basis entry density onto the evolving subspace.
+
+        ``plane[r, i, j]`` is block ``kappa_r`` over plane-wave orders (e.g. from
+        :func:`~.states.planar_entry_density`); returns ``(rho_S, free,
+        outside)`` like :meth:`entry_state`.
+
+        Validation: cr-dechanneling-collapse, cr-entry-state-projection
+        """
+        plane = np.asarray(plane, dtype=complex)
+        if plane.shape != (self.n_cells, self.orders.size, self.orders.size):
+            raise ValueError("plane must have shape (n_cells, N, N) of this solver")
         eigen = _sandwich(_adjoint(self.basis.vectors), plane)
         keep = self.basis.subspace
         free = np.where(keep, 0.0, np.einsum("rnn->rn", eigen).real)
         rho = eigen * (keep[:, :, None] & keep[:, None, :])
-        return rho, free, float(weights[~inband].sum())
+        return rho, free, float(outside)
 
     def rate_matrix(self) -> tuple[np.ndarray, np.ndarray]:
         """Golden-rule rates of the rate-equation (Pauli) limit on ``S``.

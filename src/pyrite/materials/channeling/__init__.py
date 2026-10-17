@@ -3,7 +3,8 @@
 Deterministic, scattering-free pieces of the channeling zone (ADR-0018):
 temperature-dependent thermal displacement, the planar continuum potential,
 transverse Bloch states, dipole matrix elements, ideal-entry populations and
-Doppler line energies. Everything is in the plane-local frame: ``x`` along
+Doppler line energies; :mod:`.axial` adds the experimental 2D string potential.
+Planar pieces use the plane-local frame: ``x`` along
 the plane normal, incidence angle to the plane, photon angle to the beam.
 :mod:`.entry` maps a sample tilt and a cut crystal's lattice orientation
 (``CrystalCut``) onto the plane-local incidence, with mean-inner-potential

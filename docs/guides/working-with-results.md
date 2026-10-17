@@ -65,6 +65,24 @@ The persisted source keeps the diagnostic model's constant mean electron energy 
 
 Legacy `.pkl` component paths and plain, gzip, and zstd monoliths remain readable and migrate to HDF5 on the next normal save. Artifacts written before the separate-component contract stored `spec`/`spec_coherent` as totals including `spec_characteristic`; they are separated once on load. Use the [result schema](../repo-design/storage/result-schema.md) for independent inspection.
 
+### Shaped entry wavefunctions (experimental)
+
+The channeling solvers also accept a user-defined transverse entry state in place of a plane wave with divergence. `pyrite.montecarlo.channeling.states` builds them:
+
+- Gaussian, Hermite–Gauss, Laguerre–Gauss (vortex; `donut`), Bessel–Gauss and finite-energy Airy beams;
+- aperture-limited probes with polar aberrations (abTEM convention), an annular aperture, a vortex charge and an arbitrary phase-plate function;
+- any sampled array (`from_array`) or abTEM `Waves` (`from_abtem`);
+- combinations: `superpose` (coherent), `mixture` (incoherent) and `translate`.
+
+```python
+from pyrite.montecarlo.channeling import channeling_spectrum, states
+
+probe = states.aperture_probe(5e6, semiangle_rad=1e-4, aberrations={"C10": -1e3}, ell=1)
+spectrum = channeling_spectrum(solver, 2e5, energies_eV, 0.0, entry_state=probe)
+```
+
+Here `x` is the plane normal. With the default `entry_impact="averaged"`, only the momentum distribution `|ψ̃(k)|²` matters. `entry_impact="fixed"` keeps the probe's position relative to the planes. Planar channeling carries no orbital angular momentum, because the state's in-plane part is traced out; the axial tier (#508) is where vortex states keep their OAM. Simulation-level (`simulate`) selection of entry states is not available yet.
+
 ## Pixel-detector observations
 
 A profile detector with an acquisition also stores one counting observation per case in `pyrite-output/observations/<stem>/`, the sibling of that detector's `pyrite-output/checkpoints/<stem>/`. A profile with several detectors has a separate ID-qualified stem for each. Observations hold factorized per-tile spectra, pixel solid angles, and filter paths rather than a pixel-by-energy cube, so reopening one never reruns transport. The [Python workflow](python-api-workflow.md#persist-reopen-and-rescore-an-observation) covers `ObservationStore` and rescoring; `pyrite.observations.observation_inventory(stem)` lists a stem's stored observations by case without opening their factors.

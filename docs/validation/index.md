@@ -119,6 +119,12 @@ channeling/cr-zone-handoff-accounting
 channeling/cr-persisted-channel
 channeling/quantum-decoherence-budget
 channeling/channeling-modulated-incoherent-emission
+channeling/cr-entry-state-projection
+channeling/cr-axial-2d-eigenproblem
+channeling/cr-axial-realspace-propagation
+channeling/cr-axial-realspace-dissipator
+channeling/cr-vortex-string-coupling
+channeling/cr-axial-helicity-emission
 ```
 
 ```{toctree}

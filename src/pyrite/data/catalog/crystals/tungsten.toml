@@ -1,0 +1,8 @@
+cif = "cifs/tungsten.cif"
+validation_id = "tungsten-cif-structure"
+full_name = "Tungsten"
+formula = "W"
+cod_id = 9006486
+B_ang2 = 0.16
+surface_hkl = [1, 1, 0]
+E_grid = { arange = { start = 100.0, stop = 5000.0, step = 3.0 } }

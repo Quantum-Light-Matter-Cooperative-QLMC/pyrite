@@ -75,7 +75,9 @@ def test_release_covers_every_transport_element_and_elementary_crystal(release):
 
     zs = sorted(int(row["Z"]) for row in TRANSPORT_ELEMENTS.values())
     assert labels[: len(zs)] == [f"Z={z}" for z in zs]
-    assert labels[len(zs) :] == sorted({"silicon", "diamond", "hopg", "black_phosphorus"})
+    assert labels[len(zs) :] == sorted(
+        {"silicon", "diamond", "hopg", "black_phosphorus", "tungsten"}
+    )
     assert all(len(CATALOG.crystal(key).info.composition) == 1 for key in labels[len(zs) :])
 
 

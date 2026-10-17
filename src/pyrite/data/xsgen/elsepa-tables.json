@@ -2,10 +2,10 @@
   "schema": "pyrite.xsgen.elsepa-release.v1",
   "upstream": "ELSEPA 2020, Mendeley Data doi:10.17632/w4hm5vymym.1",
   "archive": {
-    "sha256": "0f918395bebc14583a8daf134eeba9fdcbde876eecc51f3a3e775481e5be3804",
-    "bytes": 25178906,
+    "sha256": "33b1918f518c2f62d03d1741ec0fc29b206e58640ca2def17419e7dd83bdf819",
+    "bytes": 25881348,
     "urls": [
-      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-2/elsepa-tables.zip"
+      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-3/elsepa-tables.zip"
     ]
   },
   "tables": [
@@ -148,6 +148,11 @@
       "label": "silicon",
       "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
       "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f"
+    },
+    {
+      "label": "tungsten",
+      "key": "7a56b372e99d5fb2689e7b18fb256979fa2af15b2437c2c5c8a3adf8b7a2071c",
+      "manifest_sha256": "25aca83933a89a62e9733f64c2f58862344fb907caec1ade74f9e404eff764a3"
     }
   ]
 }

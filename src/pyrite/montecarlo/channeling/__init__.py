@@ -7,9 +7,14 @@ integrates the density matrix with a dechanneling sink, and :mod:`.mcwf`
 unravels the same equation into per-electron quantum jumps. :mod:`.emission`
 scores channeling radiation on ``rho(z)`` as a diagnostic spectrum (P3) from
 the photon transition primitives of :mod:`.dipole`; :mod:`.transition_radiation`
-bounds the excluded transition-radiation background. CPU only.
+bounds the excluded transition-radiation background. :mod:`.states` builds
+user-definable entry wavefunctions (Gaussian, Hermite/Laguerre-Gauss vortex,
+Bessel, Airy, aberrated aperture probes, sampled arrays, abTEM waves) and
+projects them onto the planar Bloch basis. :mod:`.realspace` is the
+experimental axial tier's periodic split-step backend. CPU only.
 """
 
+from . import realspace, states
 from .density import (
     DECHANNELING_MARGIN_EV,
     DECHANNELING_MARGIN_PROVENANCE,
@@ -56,6 +61,8 @@ from .transition_radiation import (
 )
 
 __all__ = [
+    "realspace",
+    "states",
     "CHANNELING_MODEL",
     "DECHANNELING_MARGIN_EV",
     "DECHANNELING_MARGIN_PROVENANCE",

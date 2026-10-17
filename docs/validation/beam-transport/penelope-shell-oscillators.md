@@ -56,6 +56,7 @@ supplies measured $W_{cb}$ and the chemical-valence $f_{cb}$ per formula unit:
 | 2h_tas2 | 17 | 22.0 | in-plane ($q\perp c$) transmission-EELS main plasmon, 2H, metal, [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 20.19 | 2.0668 |
 | 2h_tase2 | 17 | 21.0 | in-plane ($q\perp c$) transmission-EELS main plasmon, 2H, metal, [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 19.03 | 2.0800 |
 | zrse2 | 16 | 19.1 | in-plane ($q\perp c$) transmission-EELS main plasmon, 1T, [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 17.09 | 1.9056 |
+| tungsten | 6 | 25.5 | bulk-plasmon maximum of the REELS-derived ELF (reverse Monte Carlo, 1–3 keV), [Li et al. 2024](https://doi.org/10.1016/j.rinp.2023.107247) | 22.85 | 1.9772 |
 
 The ELF maxima were read from the authors' tabulated 0.1 eV grids
 (Si: 3.7585 at 16.7 eV). For SiO₂ the owner selected Saito's amorphous
@@ -65,11 +66,11 @@ below. The MoS₂ value is the reported thick-terrace peak ("around
 h-BN likewise keep only the π+σ plasmon (their π plasmons near 7 and
 8.5 eV have no oscillator). The WSe₂ value is the reported "about 22 eV"
 volume plasmon of all valence electrons. The dichalcogenides below WSe₂ are Bell & Liang's Table 4 $\omega_L$
-values for the main (all-valence) plasmon. Each measured value lies within
+values for the main (all-valence) plasmon. The tungsten value is the 25.5 eV bulk plasmon, the global maximum of Li et al.'s averaged ELF (Fig. 3; Werner's REELS ELF also peaks near 25 eV); its 43 and 53 eV peaks (5p/4f) have no conduction-band oscillator. Each measured value lies within
 12% of the free-electron Eq. 3.62 value with the same $f_{cb}$ (Si 0.6%,
 MoS₂ 6.4%, SiO₂ −0.25%, HOPG −0.14%, h-BN 6.9%, WSe₂ 8.6%, MoSe₂ 9.2%,
 WS₂ 7.7%, MoTe₂ 6.5%, NbS₂ 11.1%, NbSe₂ 10.2%, TaS₂ 9.0%, TaSe₂ 10.4%,
-ZrSe₂ 11.8%).
+ZrSe₂ 11.8%, W 11.6%).
 
 Caveats on these inputs:
 
@@ -173,7 +174,7 @@ manual default, labelled in `conduction_source`.
 - The fitted $a$ is pinned to $10^{-4}$: 2.2024 (Si), 3.4701 (SiO₂),
   1.7797 (MoS₂), 2.6359 (HOPG), 2.5860 (h-BN), 2.0383 (WSe₂),
   1.9008 (MoSe₂), 2.0033 (WS₂), 1.5922 (MoTe₂), 1.7792 (NbS₂), 1.9101 (NbSe₂),
-  2.0668 (TaS₂), 2.0800 (TaSe₂), 1.9056 (ZrSe₂). SiO₂ gave 3.2025 with the earlier 23.6 eV input.
+  2.0668 (TaS₂), 2.0800 (TaSe₂), 1.9056 (ZrSe₂), 1.9772 (W). SiO₂ gave 3.2025 with the earlier 23.6 eV input.
 - Split-shell and equal-$U$ boundaries, a formula mismatch, a missing
   element, non-finite or non-positive inputs, $W_{cb}\ge I$, any bound
   $W_k\le U_k$, and an $I$ below the zero-binding limit all raise.

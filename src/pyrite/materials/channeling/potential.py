@@ -6,7 +6,7 @@ coprime Miller indices ``(hkl)`` and harmonics ``n (hkl)``, the electron's
 potential energy is
 
 ``U(x) = sum_{n != 0} U_n exp(i n g x)``, with
-``U_n = -(4 pi e^2 / (V g_n^2)) sum_j (Z_j - f_j(g_n)) exp(i 2 pi n hkl . R_j)
+``U_n = -(4 pi e^2 / (V g_n^2)) sum_j (Z_j - f_j(g_n)) exp(-i 2 pi n hkl . R_j)
 exp(-B_j s_n^2)``,
 
 where ``g_n = n |g_hkl|``, ``s_n = g_n / (4 pi)``, ``f_j`` is the X-ray form
@@ -177,7 +177,7 @@ def planar_profile(
     g_n = n * g_prim
     s_n = g_n / (4.0 * np.pi)
     positions = np.array([r for _, r in basis], dtype=float)
-    phases = np.exp(1j * 2.0 * np.pi * np.outer(n, positions @ np.asarray(hkl_c, float)))
+    phases = np.exp(-2j * np.pi * np.outer(n, positions @ np.asarray(hkl_c, float)))
 
     potential = np.zeros(n.size, dtype=complex)
     nuclear = np.zeros(n.size, dtype=complex)
