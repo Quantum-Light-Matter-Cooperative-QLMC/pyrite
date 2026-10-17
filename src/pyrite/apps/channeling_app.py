@@ -106,7 +106,12 @@ def _(crystal, depth_ang, divergence_rad, energy_eV, incidence_rad, mo):
         + 2
     )
     grid = {"n_cells": 8, "max_order": basis_order}
-    kernel = tds_kernel(profile, energy_eV, **grid) + electronic_kernel(profile, energy_eV, **grid)
+    kernel = tds_kernel(profile, energy_eV, **grid) + electronic_kernel(
+        profile,
+        energy_eV,
+        n_cells=grid["n_cells"],
+        max_order=grid["max_order"],
+    )
     solver = DensityMatrixSolver(profile, energy_eV, kernel)
     result = solver.propagate(
         depth_ang,

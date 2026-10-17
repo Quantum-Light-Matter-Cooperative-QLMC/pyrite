@@ -28,7 +28,7 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from itertools import product
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -541,11 +541,25 @@ class _TargetGeometry:
     positional fields, so each declares its own and inherits only behaviour.
     """
 
-    tilt_deg: ScalarOrSeq
-    tilt_azim_deg: ScalarOrSeq
-    footprint: Footprint | None
-    allow_normal_incidence: bool
-    mosaic: bool
+    # The concrete targets are frozen dataclasses. Expose their fields as
+    # read-only to the type checker without adding descriptors to this runtime
+    # mixin; writable annotations here look like invalid overrides to `ty`.
+    if TYPE_CHECKING:
+
+        @property
+        def tilt_deg(self) -> ScalarOrSeq: ...
+
+        @property
+        def tilt_azim_deg(self) -> ScalarOrSeq: ...
+
+        @property
+        def footprint(self) -> Footprint | None: ...
+
+        @property
+        def allow_normal_incidence(self) -> bool: ...
+
+        @property
+        def mosaic(self) -> bool: ...
 
     # -- variant hooks --------------------------------------------------------
 

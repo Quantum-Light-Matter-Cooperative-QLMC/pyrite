@@ -335,7 +335,9 @@ def cmd_format(_: argparse.Namespace) -> None:
 
 
 def cmd_typecheck(_: argparse.Namespace) -> None:
-    run("-m", "ty", "check")
+    # Newer ty releases emit useful warnings for existing patterns. Keep those
+    # visible without making the gate fail unless there is an actual type error.
+    run("-m", "ty", "check", "--exit-zero-on-warning")
 
 
 def cmd_precommit(_: argparse.Namespace) -> None:

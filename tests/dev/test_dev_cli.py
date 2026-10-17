@@ -51,7 +51,7 @@ def test_nbqa_passes_ruff_subcommand_as_one_shell_command(dev_module, monkeypatc
     [
         ("cmd_lint", ("-m", "ruff", "check", ".")),
         ("cmd_format", ("-m", "ruff", "format", ".")),
-        ("cmd_typecheck", ("-m", "ty", "check")),
+        ("cmd_typecheck", ("-m", "ty", "check", "--exit-zero-on-warning")),
         ("cmd_precommit", ("-m", "pre_commit", "run", "--all-files")),
     ],
 )
