@@ -637,6 +637,7 @@ def cmd_docs(args: argparse.Namespace) -> None:
     from pyrite.devtools.validation_ledger import write_or_check
 
     check_doc_paths(ROOT)
+    cmd_cli_reference(argparse.Namespace(check=True))
     ledger = ROOT / "docs" / "validation" / "physics-validation-ledger.md"
     if not write_or_check(ledger, check=True):
         raise RuntimeError(
