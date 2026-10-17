@@ -57,8 +57,9 @@ The resulting spectrum occupies only `spec_channeling`, in photons/eV/sr per
 incident electron on `E_grid`. It includes the diagnostic bound lines and
 tracked free-to-bound capture. `spec`, `spec_characteristic` and `brem` keep
 their existing meanings. Common component owners include CR once in totals;
-off omits it. `CHANNELING_MODEL` advances to `planar-density-matrix-emission-v2`
-only for enabled channeling identities.
+off omits it. `CHANNELING_MODEL` is
+`planar-density-matrix-emission-v3` after #523's diamond electronic-kernel
+input change, and applies only to enabled channeling identities.
 
 Assumptions: the P3 diagnostic source remains at constant mean energy, while
 transport includes continuous stopping. The profile, kernel, margin, mean

@@ -99,8 +99,9 @@ The seven #485 families above are
 unchanged by #506, which is the channeling-off compatibility proof; they must not
 be regenerated for it.
 
-For #507, only `channeling.json`'s content key advances with the enabled
-`CHANNELING_MODEL` v2 marker. Its resolved case payload and all seven
+For #507, only `channeling.json`'s content key advanced with the enabled
+`CHANNELING_MODEL` v2 marker. It advances again to v3 for #523's diamond
+electronic-kernel input. Its resolved case payload and all seven
 channeling-off family snapshots remain unchanged. The new CR component is
 covered by public-producer/checkpoint/totals tests; the PXR/CBS, characteristic
 and continuum arrays retain their separate meanings.

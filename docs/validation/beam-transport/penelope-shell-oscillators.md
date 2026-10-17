@@ -46,6 +46,7 @@ supplies measured $W_{cb}$ and the chemical-valence $f_{cb}$ per formula unit:
 | sio2 | 16 | 22.0 | AR-EELS $q=0$ volume plasmon of amorphous SiO₂, [Saito et al. 2025](https://doi.org/10.1093/jmicro/dfae056) | 22.06 | 3.4701 |
 | mos2 | 18 | 23.0 | π+σ bulk plasmon, [Moynihan et al. 2020](https://doi.org/10.1111/jmi.12900) | 21.61 | 1.7797 |
 | hopg | 4 | 25.0 | in-plane ($E\perp c$) optical ELF π+σ maximum, [Taft & Philipp 1965](https://doi.org/10.1103/PhysRev.138.A197) | 25.03 | 2.6359 |
+| diamond | 4 | 33.3 | valence-plasmon loss maximum, 80 keV transmission EELS, 2 mrad collection (small non-zero $q$, not an optical-limit fit), [Egerton & Whelan 1974](https://doi.org/10.1080/14786437408207231) | 31.18 | 1.4846 |
 | hbn | 8 | 26.4 | in-plane ($q\perp c$) low-$q$ EELS σ+π plasmon, [Tarrio & Schnatterly 1989](https://doi.org/10.1103/PhysRevB.40.7852) | 24.70 | 2.5860 |
 | wse2 | 18 | 22.0 | in-plane ($q=0.1$ Å⁻¹ along ΓM) transmission-EELS volume plasmon, [Ahmad et al. 2017](https://doi.org/10.1088/1361-648X/aa63a7) | 20.26 | 2.0383 |
 | mose2 | 18 | 22.1 | in-plane ($q\perp c$) transmission-EELS main plasmon, 2H, [Bell & Liang 1976](https://doi.org/10.1080/00018737600101362) | 20.25 | 1.9008 |
