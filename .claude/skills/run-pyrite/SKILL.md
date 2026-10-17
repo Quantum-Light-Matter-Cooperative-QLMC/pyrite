@@ -5,7 +5,7 @@ description: Use when running, launching, smoke-testing, or confirming real PyRI
 
 # Run PyRITE
 
-User surfaces: `uv run pyrite ...`; six packaged marimo apps under
+User surfaces: `uv run pyrite ...`; packaged marimo apps under
 `src/pyrite/apps/`; library under `src/pyrite/`. Active checkpoints:
 `checkpoints/<stem>/{line,brem}.pkl`.
 
@@ -24,7 +24,10 @@ Own local runtime confirmation only. Unit/regression design belongs to
 `regression-testing`; remote submission and monitoring belong to
 `remote-gpu-jobs`.
 
-Full repository gate:
+Choose only the affected runtime probe and test modules using `AGENTS.md`
+"Choose tests by impact". Do not start all tests after a local smoke check.
+
+Static repository gate (no tests):
 
 ```bash
 uv run pyrite-dev verify

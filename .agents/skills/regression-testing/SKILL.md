@@ -21,6 +21,9 @@ regression.
 6. Keep CPU tests fast; place expensive external or publication comparisons in
    `checks/`. Time new tests (`--durations=0`); mark any >5 s wall or with a
    large peak RSS `@pytest.mark.slow` (CI still runs them on every PR).
+7. Follow `AGENTS.md` "Choose tests by impact": run the new test and concrete
+   affected consumers. Domain/full-suite runs need shared-surface risk or an
+   explicit audit/release request; `verify` does not run tests.
 
 Report original symptom, pre-fix failure, seed/tolerance rationale, and focused
 command:

@@ -654,25 +654,6 @@ def test_reentry_resumes_material_stopping_and_elastic_scattering():
     assert not np.allclose(out["v_hat"][-1], out["v_hat"][1])
 
 
-@pytest.mark.skip(
-    reason=(
-        "The 'repeated zero-length grooved surface events' guard protects against "
-        "two consecutive sub-EPS (1e-6 Ang) facet crossings for the SAME electron. "
-        "Pre-JIT this was tested by monkeypatching first_surface_event; that seam "
-        "is gone (see _run_grooved's docstring). An extensive parameter search "
-        "(random directions/offsets plus ULP-level constructions matching this "
-        "file's other tangent/near-boundary tests) found single sub-EPS exit "
-        "events but never a self-sustaining pair with a finite re-entry between "
-        "them. The underlying geometry primitive is still covered by "
-        "test_surface_event_accepts_one_ulp_above_valley_band_endpoint and the "
-        "tiny-direction/facet-rate tests above; only this specific transport-level "
-        "double-degenerate scenario is unverified post-refactor."
-    )
-)
-def test_repeated_zero_length_surface_events_raise():
-    pass
-
-
 def test_layer_and_back_face_events_precede_far_surface():
     spacing = 2.0
     spec = blazed_groove_spec(

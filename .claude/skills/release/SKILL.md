@@ -12,7 +12,11 @@ titled `chore(release): bump version to X.Y.Z`; never mix with feature work.
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev release X.Y.Z --check
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev release X.Y.Z --notes-file <scratch>/notes.md
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow
 ```
+
+`verify` is static-only. Release validation explicitly runs the full slow-inclusive
+CPU suite; ordinary feature work follows `AGENTS.md` "Choose tests by impact".
 
 1. `--check` lists deprecation removals due at or before X.Y. Remove each
    (shim, call sites, tests, docs) in earlier commits; no release while due.

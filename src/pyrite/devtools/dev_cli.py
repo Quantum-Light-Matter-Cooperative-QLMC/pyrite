@@ -22,7 +22,7 @@ Commands:
                runs without test paths use memory-bounded xdist workers,
                PYRITE_TEST_WORKERS=N overrides, 1 = serial;
                --slow also runs tests marked slow via PYRITE_SLOW_TESTS=1)
-    test-suite run one stable core/CLI/app/packaging/integration test suite
+    test-suite run one focused domain suite (integration overlaps domains)
                with the same memory-bounded xdist worker default and --slow
                flag as test
     package-smoke build and install clean wheel/editable environments
@@ -35,7 +35,8 @@ Commands:
     release-notes  render notes for a pushed vX.Y.Z tag (release workflow)
     sync-skills mirror .agents/skills into .claude/skills
     check-skills validate the canonical skills and exact mirror
-    verify     check skills, docs, imports, generated structure, lint, types, and tests
+    check-lines check source modules against the 1,250-line budget
+    verify     check types, lint, formatting, source size, docs, and imports (no tests)
     cli-reference     write or --check docs/repo-design/cli/cli-reference.md
     cli-deprecations  write or --check docs/repo-design/cli/cli-deprecations.md
     validation-ledger write or --check generated validation-ledger views
@@ -109,6 +110,88 @@ TEST_SUITE_PATTERNS = {
         "scan/test_scan_*.py",
         "checkpoint/test_slim.py",
     ),
+    # First match owns a module. Keep public-boundary suites above these
+    # domains; keep specialized physics before each family catch-all.
+    "quantum": (
+        "materials/test_channeling_profile.py",
+        "montecarlo/test_channeling_density.py",
+        "montecarlo/test_channeling_emission.py",
+        "montecarlo/test_channeling_mcwf.py",
+        "montecarlo/test_channeling_operators.py",
+    ),
+    "channeling": (
+        "montecarlo/test_channeling_*.py",
+        "materials/test_channeling_*.py",
+    ),
+    "spectrum-coherent": (
+        "montecarlo/test_coherent_*.py",
+        "montecarlo/test_temporal_profile.py",
+    ),
+    "spectrum-brem": (
+        "montecarlo/test_brem_*.py",
+        "montecarlo/test_bremsstrahlung_*.py",
+        "montecarlo/test_positron_brems.py",
+    ),
+    "spectrum": (
+        "montecarlo/test_beam_energy_spread_grid.py",
+        "montecarlo/test_characteristic.py",
+        "montecarlo/test_chunk_invariance.py",
+        "montecarlo/test_electron_blocks.py",
+        "montecarlo/test_emission_adapters.py",
+        "montecarlo/test_line_*.py",
+        "montecarlo/test_mosaic.py",
+        "montecarlo/test_mosaic_mc.py",
+        "montecarlo/test_radiation_error_estimators.py",
+        "montecarlo/test_segment_escape.py",
+        "montecarlo/test_segment_staging.py",
+        "montecarlo/test_sinc_*.py",
+        "montecarlo/test_spectrum_*.py",
+        "montecarlo/test_substep_invariance.py",
+        "montecarlo/test_transition_radiation*.py",
+        "montecarlo/test_xray_dispersion*.py",
+    ),
+    "transport-cascades": (
+        "montecarlo/test_annihilation_cuda.py",
+        "montecarlo/test_coupled_radiative_runner.py",
+        "montecarlo/test_hard_radiative*.py",
+        "montecarlo/test_pair_production*.py",
+        "montecarlo/test_positron_*.py",
+        "montecarlo/test_shell_secondary*.py",
+    ),
+    "transport-collisions": (
+        "montecarlo/test_atomic_electron_deflection.py",
+        "montecarlo/test_dielectric_loss.py",
+        "montecarlo/test_eadl_relaxation.py",
+        "montecarlo/test_eedl_ionization_consistency.py",
+        "montecarlo/test_elastic_model_case.py",
+        "montecarlo/test_elsepa_*.py",
+        "montecarlo/test_energy_loss_straggling.py",
+        "montecarlo/test_inelastic_partition.py",
+        "montecarlo/test_mott_coverage.py",
+        "montecarlo/test_sbethe_*.py",
+        "montecarlo/test_shell_*.py",
+        "montecarlo/test_stopping_*.py",
+        "montecarlo/test_straggling_*.py",
+    ),
+    "transport-runner": (
+        "montecarlo/test_adaptive_stopping.py",
+        "montecarlo/test_block_transport.py",
+        "montecarlo/test_case.py",
+        "montecarlo/test_gpu_oom_retry.py",
+        "montecarlo/test_imports.py",
+        "montecarlo/test_paraview_preset.py",
+        "montecarlo/test_physics_baseline.py",
+        "montecarlo/test_pool_cadence.py",
+        "montecarlo/test_stage_counters.py",
+        "montecarlo/test_trajectory_*.py",
+        "montecarlo/test_transport_batch_progress.py",
+        "montecarlo/test_transport_core_default.py",
+    ),
+    # Flight integration, geometry, beam entry and event contracts remain here.
+    "transport": ("montecarlo/test_*.py",),
+    "energy-grid": ("energy-grid/test_*.py",),
+    "materials": ("materials/test_*.py",),
+    "xsgen": ("xsgen/test_*.py",),
 }
 
 INTEGRATION_TESTS = (
@@ -121,7 +204,8 @@ INTEGRATION_TESTS = (
     "scan/test_run.py",
     "scan/test_sweep.py",
 )
-TEST_SUITE_NAMES = ("core", "cli", "apps", "packaging", "integration")
+PRIMARY_TEST_SUITE_NAMES = ("core", *TEST_SUITE_PATTERNS)
+TEST_SUITE_NAMES = (*PRIMARY_TEST_SUITE_NAMES, "integration")
 
 
 class AgentToolingError(RuntimeError):
@@ -220,9 +304,11 @@ def cmd_repo_map(args: argparse.Namespace) -> None:
         "uv run pyrite-dev lint",
         "uv run pyrite-dev format",
         "uv run pyrite-dev typecheck",
+        "uv run pyrite-dev check-lines",
         "uv run pyrite-dev precommit",
-        "uv run pyrite-dev test",
-        "uv run pyrite-dev test-suite core",
+        "uv run pyrite-dev test path/to/test.py -k test_name",
+        "uv run pyrite-dev test-suite transport",
+        "uv run pyrite-dev test-suite spectrum",
         "uv run pyrite-dev package-smoke",
         "uv run pyrite-dev smoke --material hopg --output-dir /tmp/pyrite-smoke",
         "uv run pyrite-dev docs",
@@ -329,7 +415,7 @@ def parallel_pytest_args(pytest_args: list[str]) -> list[str]:
 
 
 def _pytest_env(args: argparse.Namespace) -> dict[str, str]:
-    """Environment overrides selected by ``test``/``test-suite``/``verify`` flags."""
+    """Environment overrides selected by ``test``/``test-suite`` flags."""
     env = {}
     if getattr(args, "numba", False):
         env["NUMBA_DISABLE_JIT"] = "1"
@@ -353,7 +439,8 @@ def cmd_test(args: argparse.Namespace) -> None:
 def test_files_for_suite(name: str, root: Path = ROOT) -> list[Path]:
     """Return deterministic repository test paths for one documented suite.
 
-    Four domain suites partition every ``tests/test_*.py`` module exactly once.
+    Primary domain suites partition every ``tests/**/test_*.py`` module once.
+    ``core`` owns shared infrastructure and modules outside the named domains.
     ``integration`` intentionally samples public boundaries across domains; the
     full ``pyrite-dev test`` gate remains unchanged.
     """
@@ -383,6 +470,8 @@ def test_files_for_suite(name: str, root: Path = ROOT) -> list[Path]:
 
 def cmd_test_suite(args: argparse.Namespace) -> None:
     paths = [str(path.relative_to(ROOT)) for path in test_files_for_suite(args.suite)]
+    if not paths:
+        raise AgentToolingError(f"test suite {args.suite!r} contains no test modules")
     pytest_args = list(getattr(args, "pytest_args", []))
     # argparse's REMAINDER swallows a flag that follows the suite name.
     if pytest_args[:1] == ["--slow"]:
@@ -568,15 +657,23 @@ def cmd_docs(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_check_lines(_: argparse.Namespace) -> None:
+    from pyrite.devtools.source_checks import SOURCE_LINE_LIMIT, oversized_source_modules
+
+    oversized = oversized_source_modules(ROOT / "src" / "pyrite")
+    if oversized:
+        details = ", ".join(f"{path}: {count}" for path, count in oversized.items())
+        raise AgentToolingError(f"source modules exceed {SOURCE_LINE_LIMIT} lines: {details}")
+
+
 def cmd_verify(args: argparse.Namespace) -> None:
-    cmd_check_skills(args)
-    cmd_imports(args)
-    cmd_repo_map(argparse.Namespace(check=True, write=False))
-    cmd_docs(argparse.Namespace(linkcheck=False))
-    cmd_lint(args)
+    """Run static repository gates; test selection is always explicit."""
     cmd_typecheck(args)
-    if not getattr(args, "skip_tests", False):
-        cmd_test(args)
+    cmd_lint(args)
+    run("-m", "ruff", "format", "--check", ".")
+    cmd_check_lines(args)
+    cmd_docs(argparse.Namespace(linkcheck=False))
+    cmd_imports(args)
 
 
 def cmd_regen_golden(args: argparse.Namespace) -> None:
@@ -814,6 +911,7 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
         ("nbstrip", cmd_nbstrip),
         ("sync-skills", cmd_sync_skills),
         ("check-skills", cmd_check_skills),
+        ("check-lines", cmd_check_lines),
         ("package-smoke", cmd_package_smoke),
     ]:
         sp = sub.add_parser(name)
@@ -857,7 +955,15 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     test.add_argument("--slow", action="store_true", help=_SLOW_HELP)
     test.add_argument("pytest_args", nargs=argparse.REMAINDER)
     test.set_defaults(func=cmd_test)
-    test_suite = sub.add_parser("test-suite")
+    test_suite = sub.add_parser(
+        "test-suite",
+        help="run one focused domain suite",
+        description=(
+            "Run one domain partition; core contains shared/residual tests. "
+            "integration is an overlapping public-boundary sample. "
+            "Use test for the full suite."
+        ),
+    )
     test_suite.add_argument("suite", choices=TEST_SUITE_NAMES)
     test_suite.add_argument("--slow", action="store_true", help=_SLOW_HELP)
     test_suite.add_argument("pytest_args", nargs=argparse.REMAINDER)
@@ -866,14 +972,16 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     smoke.add_argument("--material", default="hopg")
     smoke.add_argument("--output-dir", default="smoke_out")
     smoke.set_defaults(func=cmd_smoke)
-    verify = sub.add_parser("verify")
+    verify = sub.add_parser(
+        "verify",
+        help="run static repository checks (no tests)",
+        description="Check types, lint, formatting, source size, docs, and imports; no tests run.",
+    )
     verify.add_argument(
         "--skip-tests",
         action="store_true",
-        help="run the full non-test verification gate (CI runs tests in domain suites)",
+        help=argparse.SUPPRESS,  # Compatible no-op for older automation.
     )
-    verify.add_argument("--slow", action="store_true", help=_SLOW_HELP)
-    verify.add_argument("pytest_args", nargs=argparse.REMAINDER)
     verify.set_defaults(func=cmd_verify)
     regen_golden = sub.add_parser("regen-golden")
     regen_golden.add_argument("--check", action="store_true")
@@ -1004,31 +1112,18 @@ def main(argv: list[str] | None = None, *, prog_name: str = "pyrite-dev") -> Non
         }[command]
         func(argparse.Namespace(command=command, command_args=raw_args[1:]))
         return
-    if raw_args and raw_args[0] in {"test", "verify"}:
-        command = raw_args[0]
-        func = cmd_test if command == "test" else cmd_verify
+    if raw_args and raw_args[0] == "test":
         rest = raw_args[1:]
-        if command == "verify" and rest == ["--help"]:
-            build_parser(prog_name).parse_args(raw_args)
-            return
-        skip_tests = command == "verify" and bool(rest) and rest[0] == "--skip-tests"
-        if skip_tests:
-            rest = rest[1:]
-            if rest:
-                build_parser(prog_name).error(
-                    "verify --skip-tests does not accept pytest arguments"
-                )
         # pyrite-dev's own flags lead, in any order; the rest goes to pytest.
         flags = set()
         while rest and rest[0] in {"--numba", "--slow"} - flags:
             flags.add(rest.pop(0))
-        func(
+        cmd_test(
             argparse.Namespace(
-                command=command,
+                command="test",
                 numba="--numba" in flags,
                 slow="--slow" in flags,
                 pytest_args=rest,
-                skip_tests=skip_tests,
             )
         )
         return

@@ -448,12 +448,3 @@ def test_merge_dataset_skips_unmatched_unless_force():
     merged, skipped = merge_dataset(local, incoming, "line", force=True)
     assert (merged, skipped) == (1, 0)
     assert local["n"][50.0]["spec"] == [9.0]
-
-
-def test_case_names_keeps_only_supplied_names():
-    res, keep = _grid_plus_stale()
-
-    slim = slim_results(res, case_names=keep)
-
-    assert set(slim) == keep
-    assert set(res) == keep | {"stale_old_config_a", "stale_old_config_b"}

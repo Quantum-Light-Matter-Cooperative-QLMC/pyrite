@@ -30,6 +30,9 @@ description: Use when implementing a coherent, bounded slice of a PyRITE GitHub 
 2. Verify each coherent slice with the smallest useful fresh check, adding a
    real CLI/app probe when static tests cannot prove behavior. Route heavy GPU
    work through `remote-gpu-jobs`; do not run it locally.
+   Follow `AGENTS.md` "Choose tests by impact": changed node/module first,
+   affected consumers next, domain suite only for domain-wide changes. `verify`
+   is static-only; never substitute a full test run for choosing affected tests.
 3. When a slice is independently valid and `commits` permits: inspect status and
    scoped diff, stage explicit assigned paths, run focused checks, and commit.
    Never `git add .`, commit known broken state, or rewrite another worker's
