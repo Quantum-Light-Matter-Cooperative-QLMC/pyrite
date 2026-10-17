@@ -96,7 +96,7 @@ def build_reference() -> str:
         "former `pyrite energy-grid` job paths were removed at the same time.",
         "User grid derivation and inspection live below `pyrite material energy-grid`;",
         "normal runs size line grids automatically and resolve continuum bounds per case.",
-        "Global derivation batch presets (`pyrite profile energy-grid`) are deprecated",
+        "Explicit derivation requires `--material` and `--energy`",
         "until 0.15.0; optional derivation requires explicit material/energy selection then.",
         "Artifact mutation and verification use `pyrite-dev energy-grid`.",
         "",

@@ -68,30 +68,6 @@ def test_remote_status_has_stable_types_sanitized_logs_and_partial_errors():
     assert result.errors[0]["code"] == "malformed_progress"
 
 
-def test_line_grid_defaults_encodes_units_and_source():
-    result = cli_json.cxr_grid_defaults(
-        {
-            "energies": [30, 40],
-            "tilts": [1],
-            "azimuths": [2],
-            "thickness_ang": [1e7],
-            "brem_step_ev": 25,
-            "materials": ["hopg"],
-        },
-        source="persisted",
-    )
-
-    assert result.payload == {
-        "energies_keV": [30.0, 40.0],
-        "tilts_deg": [1.0],
-        "azimuths_deg": [2.0],
-        "thickness_ang": [1e7],
-        "brem_step_eV": 25.0,
-        "materials": ["hopg"],
-        "source": "persisted",
-    }
-
-
 def test_line_grid_show_has_grids_brem_and_provenance():
     materials = {"hopg": {}}
     energy_grids = {

@@ -1,7 +1,6 @@
 """Public policy relocation preserves source and observation content identity."""
 
 import pickle
-import warnings
 from dataclasses import FrozenInstanceError, fields, replace
 
 import numpy as np
@@ -9,7 +8,6 @@ import pytest
 
 import pyrite as pr
 from pyrite import api
-from pyrite._api_deprecations import API_DEPRECATIONS
 from pyrite.campaign.profiles import case_content_key
 
 
@@ -161,22 +159,9 @@ def test_emission_does_not_retain_mutable_input():
     assert replace(physics, straggling=True).emission == physics.emission
 
 
-def test_both_alias_warns_once_and_matches_collection():
-    with pytest.warns(DeprecationWarning, match='Physics\\(emission="both"\\)') as caught:
-        old = pr.Physics(emission="both")
-    assert len(caught) == 1
-    assert "0.15.0" in str(caught[0].message)
-    new = pr.Physics(emission=("incoherent", "coherent"))
-    assert old == new
-    assert hash(old) == hash(new)
-    assert api.build_case(scene(physics=old)) == api.build_case(scene(physics=new))
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always", DeprecationWarning)
-        replace(old, straggling=True)
-    assert not caught
-    entry = API_DEPRECATIONS['Physics(emission="both")']
-    assert entry.deprecated_in == "0.13.1"
-    assert entry.remove_in == "0.15.0"
+def test_both_alias_is_rejected_after_removal():
+    with pytest.raises(ValueError, match='emission="both" was removed in 0.15.0'):
+        pr.Physics(emission="both")
 
 
 def test_emission_collection_sweep_paths_normalize_each_selection():

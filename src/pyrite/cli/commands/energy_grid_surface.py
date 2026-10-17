@@ -56,16 +56,3 @@ def cxr_command() -> None:
 )
 def brem_command() -> None:
     """Inspect bremsstrahlung energy grids."""
-
-
-@click.group(
-    "energy-grid",
-    cls=LazyGroup,
-    lazy_commands={"defaults": "pyrite.cli.commands.energy_grid.defaults_command"},
-    lazy_help={"defaults": "Show, update, or clear persistent derivation inputs."},
-    deprecation_prefix="profile energy-grid",
-    context_settings={"help_option_names": ["-h", "--help"]},
-    no_args_is_help=True,
-)
-def profile_command() -> None:
-    """Deprecated global derivation presets; normal runs size grids automatically."""

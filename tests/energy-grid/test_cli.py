@@ -1,4 +1,3 @@
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -7,9 +6,8 @@ from types import SimpleNamespace
 import pytest
 
 from pyrite.cli import command as root_command
-from pyrite.cli._deprecations import option_message
 from pyrite.cli.commands import energy_grid
-from pyrite.cli.commands.energy_grid_surface import material_command, profile_command
+from pyrite.cli.commands.energy_grid_surface import material_command
 from pyrite.console import output as _cli_core
 from pyrite.devtools.cli_commands import energy_grid_command as dev_energy_grid_command
 from pyrite.remote import config as remote_config
@@ -23,76 +21,18 @@ CLICK_COMMANDS = (
     "gc",
     "cxr",
     "brem",
-    "defaults",
     "show",
 )
-DEFAULTS_WARNING = energy_grid.defaults.LEGACY_WARNING + "\n"
 
 
-def test_profile_help_hides_retiring_presets_without_replacement_store():
+def test_profile_help_omits_removed_presets():
     result = invoke(root_command, ["profile", "--help"])
     assert_clean_result(result)
     assert "energy-grid" not in result.stdout
     result = invoke(root_command, ["material", "energy-grid", "--help"])
     assert_clean_result(result)
     assert "defaults" not in result.stdout
-    assert "automatically" in result.stdout
-
-
-def test_legacy_defaults_json_warns_once_and_preserves_payload(tmp_path, monkeypatch):
-    monkeypatch.setattr(energy_grid.defaults, "DEFAULTS_PATH", tmp_path / "absent.toml")
-    result = invoke(root_command, ["profile", "energy-grid", "defaults", "-o", "json"])
-    assert result.exit_code == 0
-    assert result.stderr.count("is deprecated") == 1
-    assert "0.15.0" in result.stderr
-    assert "normal runs size grids automatically" in result.stderr
-    assert result.stdout.count("\n") == 1
-    assert json.loads(result.stdout)["schema"] == "cxr.energy-grid.defaults"
-
-
-def test_explicit_remote_derivation_does_not_read_presets(monkeypatch):
-    seen = {}
-    monkeypatch.setattr(
-        energy_grid.defaults,
-        "load_defaults",
-        lambda: pytest.fail("explicit derivation must not read presets"),
-    )
-    monkeypatch.setattr(energy_grid.job, "start", lambda **kwargs: seen.update(kwargs) or "job7")
-    result = _invoke_grid(
-        [
-            "derive",
-            "--remote",
-            "--detach",
-            "--material",
-            "mose2",
-            "--energy",
-            "60",
-            "--polar",
-            "5",
-            "--azimuth",
-            "100",
-            "--thickness",
-            "2000",
-            "--brem-step",
-            "12.5",
-        ]
-    )
-    assert_clean_result(result)
-    assert seen["materials"] == "mose2"
-    assert seen["energies"] == "60"
-    assert seen["tilts"] == "5"
-    assert seen["azimuths"] == "100"
-    assert seen["thickness"] == "2000"
-    assert seen["brem_step"] == 12.5
-
-
-def test_local_derivation_warns_once_across_internal_forwarding(monkeypatch):
-    from pyrite.energy_grid import derive
-
-    monkeypatch.setattr(derive, "derive_all_materials", lambda *args, **kwargs: ({}, True))
-    monkeypatch.setattr(energy_grid.apply, "add_file", lambda *args, **kwargs: None)
-    result = invoke(root_command, ["material", "energy-grid", "derive"])
-    assert_clean_result(result, stderr=DEFAULTS_WARNING)
+    assert "defaults" not in result.stdout
 
 
 def _invoke_grid(argv, **kwargs):
@@ -100,8 +40,6 @@ def _invoke_grid(argv, **kwargs):
     head = argv[0] if argv else None
     if head in {"derive", "show"}:
         return invoke(material_command, argv, **kwargs)
-    if head == "defaults":
-        return invoke(profile_command, argv, **kwargs)
     if head in {"add", "rm", "verify", "gc"}:
         return invoke(dev_energy_grid_command, argv, **kwargs)
     if head in {"cxr", "brem"}:
@@ -155,14 +93,23 @@ def test_click_derive_forwards_brem_step(monkeypatch):
         energy_grid.apply, "add_file", lambda path, **kwargs: seen.update(path=path, **kwargs)
     )
 
-    result = _invoke_grid(["derive", "--brem-step", "12.5", "--profile", "survey"])
-
-    assert_clean_result(
-        result, stdout="installed derived grids for profile survey\n", stderr=DEFAULTS_WARNING
+    result = _invoke_grid(
+        [
+            "derive",
+            "--material",
+            "mose2",
+            "--energy",
+            "60",
+            "--brem-step",
+            "12.5",
+            "--profile",
+            "survey",
+        ]
     )
-    assert seen["argv"][:2] == ["--brem-step", "12.5"]
-    assert seen["argv"][2] == "--json-out"
-    json_out = Path(seen["argv"][3])
+
+    assert_clean_result(result, stdout="installed derived grids for profile survey\n")
+    assert seen["argv"][:6] == ["--materials", "mose2", "--energies", "60", "--brem-step", "12.5"]
+    json_out = Path(seen["argv"][-1])
     assert json_out.name == energy_grid.job.DEFAULT_JSON_OUT
     assert json_out.parent != Path(), "derive must not write into the working directory"
     assert seen["path"] == str(json_out)
@@ -191,6 +138,10 @@ def test_click_derive_remote_waits_pulls_and_restores_target(monkeypatch):
             "derive",
             "--remote=box-a",
             "--wait",
+            "--material",
+            "mose2",
+            "--energy",
+            "60",
             "--brem-step",
             "12.5",
             "--profile",
@@ -201,7 +152,6 @@ def test_click_derive_remote_waits_pulls_and_restores_target(monkeypatch):
     assert_clean_result(
         result,
         stdout=("pulled bounds.json\ninstalled derived grids for profile hopg_hbn\n"),
-        stderr=DEFAULTS_WARNING,
     )
     assert seen["host"] == "box-a"
     assert seen["brem_step"] == 12.5
@@ -213,17 +163,6 @@ def test_click_derive_remote_waits_pulls_and_restores_target(monkeypatch):
 
 def test_click_derive_remote_detach_skips_attach(monkeypatch):
     seen = {}
-    monkeypatch.setattr(
-        energy_grid.defaults,
-        "load_defaults",
-        lambda: {
-            **energy_grid.defaults.FALLBACK,
-            "tilts": [1.5],
-            "azimuths": [95.0],
-            "thickness_ang": [2000.0],
-            "brem_step_ev": 17.5,
-        },
-    )
     monkeypatch.setattr(energy_grid.job, "start", lambda **kwargs: seen.update(kwargs) or "job7")
     monkeypatch.setattr(
         energy_grid.remote,
@@ -231,67 +170,29 @@ def test_click_derive_remote_detach_skips_attach(monkeypatch):
         lambda _jobid: (_ for _ in ()).throw(AssertionError("must not attach")),
     )
 
-    result = _invoke_grid(["derive", "--remote", "--detach"])
-
-    assert_clean_result(result, stderr=DEFAULTS_WARNING)
-    assert seen["dry_run"] is False
-    assert seen["tilts"] == "1.5"
-    assert seen["azimuths"] == "95"
-    assert seen["thickness"] == "2000"
-    assert seen["brem_step"] == 17.5
-
-
-def test_click_derive_remote_save_default_persists_locally(monkeypatch):
-    seen = {}
-    persisted = {
-        **energy_grid.defaults.FALLBACK,
-        "materials": ["mose2"],
-        "energies": [60.0],
-        "brem_step_ev": 12.5,
-    }
-    monkeypatch.setattr(energy_grid.defaults, "load_defaults", lambda: persisted)
-    monkeypatch.setattr(
-        energy_grid.defaults,
-        "update_defaults",
-        lambda **kwargs: seen.update(saved=kwargs) or persisted,
-    )
-    monkeypatch.setattr(
-        energy_grid.job, "start", lambda **kwargs: seen.update(job=kwargs) or "job7"
-    )
-
     result = _invoke_grid(
-        ["derive", "--remote", "--detach", "--material", "mose2", "--save-default"],
+        ["derive", "--remote", "--detach", "--material", "mose2", "--energy", "60"]
     )
 
-    assert_clean_result(
-        result, stderr=option_message("material energy-grid derive", "--save-default") + "\n"
-    )
-    assert seen["saved"]["materials"] == ["mose2"]
-    assert seen["job"]["set_default"] is True
+    assert_clean_result(result)
+    assert seen["dry_run"] is False
+    assert seen["tilts"] is None
+    assert seen["azimuths"] is None
+    assert seen["thickness"] is None
+    assert seen["brem_step"] is None
 
 
 def test_click_derive_remote_failed_job_exits_nonzero(monkeypatch):
     monkeypatch.setattr(energy_grid.job, "start", lambda **_kwargs: "job7")
     monkeypatch.setattr(energy_grid.remote, "attach", lambda _jobid: True)
     monkeypatch.setattr(energy_grid.remote, "_job_succeeded", lambda _jobid: False)
-
-    result = _invoke_grid(["derive", "--remote"])
-
+    result = _invoke_grid(["derive", "--remote", "--material", "hopg", "--energy", "30"])
     assert result.exit_code == 1
     assert result.stdout == ""
-    assert (
-        result.stderr
-        == DEFAULTS_WARNING + "Error: energy-grid derivation failed; skipping automatic pull\n"
-    )
+    assert result.stderr == "Error: energy-grid derivation failed; skipping automatic pull\n"
 
 
 def test_click_derive_remote_step_warnings_exits_nonzero(monkeypatch):
-    """A job that continued past a failed step must not auto-pull (#143).
-
-    Exercises the real ``remote._job_succeeded`` (only its ``_job_state``
-    dependency is faked) against the terminal state a queue script actually
-    writes when some steps fail.
-    """
     monkeypatch.setattr(energy_grid.job, "start", lambda **_kwargs: "job7")
     monkeypatch.setattr(energy_grid.remote, "attach", lambda _jobid: True)
     monkeypatch.setattr(
@@ -299,21 +200,17 @@ def test_click_derive_remote_step_warnings_exits_nonzero(monkeypatch):
         "_job_state",
         lambda _jobid: "done with 1 warning(s) [3/3] 2026-09-19T00:00:00+00:00",
     )
-
-    result = _invoke_grid(["derive", "--remote"])
-
+    result = _invoke_grid(["derive", "--remote", "--material", "hopg", "--energy", "30"])
     assert result.exit_code == 1
     assert result.stdout == ""
-    assert (
-        result.stderr
-        == DEFAULTS_WARNING + "Error: energy-grid derivation failed; skipping automatic pull\n"
-    )
+    assert result.stderr == "Error: energy-grid derivation failed; skipping automatic pull\n"
 
 
 def test_click_derive_rejects_incompatible_locality_controls():
-    conflict = _invoke_grid(["derive", "--remote", "--wait", "--detach"])
-    local_only = _invoke_grid(["derive", "--dry-run"])
-
+    conflict = _invoke_grid(
+        ["derive", "--remote", "--wait", "--detach", "--material", "hopg", "--energy", "30"]
+    )
+    local_only = _invoke_grid(["derive", "--dry-run", "--material", "hopg", "--energy", "30"])
     assert conflict.exit_code == 2
     assert "--wait and --detach are mutually exclusive" in conflict.stderr
     assert local_only.exit_code == 2
@@ -325,10 +222,8 @@ def test_click_derive_preserves_nonzero_status(monkeypatch, status):
     from pyrite.energy_grid import derive
 
     monkeypatch.setattr(derive, "main", lambda _argv: status)
-
-    result = _invoke_grid(["derive"])
-
-    assert_clean_result(result, exit_code=status, stderr=DEFAULTS_WARNING)
+    result = _invoke_grid(["derive", "--material", "hopg", "--energy", "30"])
+    assert_clean_result(result, exit_code=status)
 
 
 def test_click_add_pull_stages_into_a_removed_temp_dir(monkeypatch, tmp_path):
@@ -637,67 +532,6 @@ def test_pull_combined_quotes_remote_scp_path(monkeypatch):
     ]
 
 
-def test_click_defaults_clear_fields(monkeypatch):
-    seen = {}
-    monkeypatch.setattr(
-        energy_grid.defaults,
-        "reset_defaults",
-        lambda *keys: seen.update(keys=keys) or energy_grid.defaults.FALLBACK,
-    )
-
-    result = _invoke_grid(
-        ["defaults", "--clear", "tilts", "--clear", "brem-step"],
-    )
-
-    assert_clean_result(result)
-    assert seen["keys"] == ("tilts", "brem_step_ev")
-
-
-def test_click_defaults_reset_all(monkeypatch):
-    seen = {}
-    monkeypatch.setattr(
-        energy_grid.defaults,
-        "reset_defaults",
-        lambda *keys: seen.update(keys=keys) or energy_grid.defaults.FALLBACK,
-    )
-
-    result = _invoke_grid(["defaults", "--reset"])
-
-    assert_clean_result(result)
-    assert seen["keys"] == ()
-
-
-def test_click_defaults_explains_empty_angles(monkeypatch):
-    monkeypatch.setattr(
-        energy_grid.defaults,
-        "load_defaults",
-        lambda: {**energy_grid.defaults.FALLBACK, "tilts": [], "azimuths": []},
-    )
-
-    result = _invoke_grid(["defaults"])
-
-    assert_clean_result(result)
-    assert "inherit each material's catalog-profile polar tilts" in result.stdout
-    assert "inherit each material's catalog-profile azimuths" in result.stdout
-
-
-@pytest.mark.parametrize(
-    "argv",
-    [
-        ["defaults", "--set"],
-        ["defaults", "--set", "--tilts", "5", "--clear", "azimuths"],
-        ["defaults", "--reset", "--clear", "tilts"],
-        ["defaults", "-o", "json", "--reset"],
-    ],
-)
-def test_click_defaults_rejects_ambiguous_mutations(argv):
-    result = _invoke_grid(argv)
-
-    assert result.exit_code == 2
-    assert result.stdout == ""
-    assert "Error:" in result.stderr
-
-
 @pytest.mark.parametrize(
     "argv",
     [
@@ -705,17 +539,12 @@ def test_click_defaults_rejects_ambiguous_mutations(argv):
         ["cxr", "set", "hopg", "--energy", "30", "--stop", "-1"],
         ["cxr", "set", "hopg", "--energy", "30", "--stop", "3000", "--num", "0"],
         ["brem", "set", "hopg", "--stop", "1000", "--step", "0"],
-        ["defaults", "--save-default", "--polar", "90"],
-        ["defaults", "--save-default", "--azimuth", "361"],
-        ["defaults", "--save-default", "--thickness", "0"],
-        ["defaults", "--save-default", "--brem-step", "nan"],
-        ["derive", "--energy", "0"],
-        ["derive", "--polar", "90"],
+        ["derive", "--material", "hopg", "--energy", "0"],
+        ["derive", "--material", "hopg", "--energy", "30", "--polar", "90"],
     ],
 )
 def test_click_numeric_domains_fail_at_boundary(argv):
     result = _invoke_grid(argv)
-
     assert result.exit_code == 2
     assert result.stdout == ""
     assert "Invalid value" in result.stderr
@@ -726,30 +555,19 @@ def test_click_numeric_domains_fail_at_boundary(argv):
     ("argv", "exit_code", "stderr_text"),
     [
         (
-            ["profile", "energy-grid", "defaults", "--polar", "5"],
-            2,
-            "--polar require --save-default",
-        ),
-        (
             ["material", "energy-grid", "show", "not-a-material"],
             1,
             "unknown material: not-a-material",
-        ),
+        )
     ],
 )
 def test_cli_failure_exit_and_stream_contract(argv, exit_code, stderr_text):
     completed = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            "from pyrite.cli import main; raise SystemExit(main())",
-            *argv,
-        ],
+        [sys.executable, "-c", "from pyrite.cli import main; raise SystemExit(main())", *argv],
         capture_output=True,
         text=True,
         check=False,
     )
-
     assert completed.returncode == exit_code
     assert completed.stdout == ""
     assert stderr_text in completed.stderr
@@ -759,26 +577,12 @@ def test_cli_failure_exit_and_stream_contract(argv, exit_code, stderr_text):
 @pytest.mark.parametrize(
     ("argv", "exit_code", "stderr_text"),
     [
-        (
-            ["defaults", "--polar", "5"],
-            2,
-            "--polar require --save-default",
-        ),
-        (
-            ["show", "not-a-material"],
-            1,
-            "unknown material: not-a-material",
-        ),
-        (
-            ["add"],
-            2,
-            "no JSON: pass a path or --pull",
-        ),
+        (["show", "not-a-material"], 1, "unknown material: not-a-material"),
+        (["add"], 2, "no JSON: pass a path or --pull"),
     ],
 )
 def test_click_failure_exit_and_stream_contract(argv, exit_code, stderr_text):
     result = _invoke_grid(argv)
-
     assert result.exit_code == exit_code
     assert result.stdout == ""
     assert stderr_text in result.stderr

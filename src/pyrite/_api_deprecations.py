@@ -22,13 +22,7 @@ def _api_entry(spelling: str, replacement: str, *, since: str) -> ApiDeprecation
 
 #: Keyed by the deprecated spelling as a user writes it (issue #451). Each row is
 #: held to the shipping version by ``tests/test_deprecation_schedule.py``.
-API_DEPRECATIONS: dict[str, ApiDeprecation] = {
-    'Physics(emission="both")': _api_entry(
-        'Physics(emission="both")',
-        'Physics(emission=("incoherent", "coherent"))',
-        since="0.13.1",
-    ),
-}
+API_DEPRECATIONS: dict[str, ApiDeprecation] = {}
 
 
 def warn_api(spelling: str, *, stacklevel: int = 3) -> None:

@@ -159,9 +159,8 @@ Use `result.scene` for what you asked for. `result.case` is the lower-level reso
 or frozenset containing `"incoherent"`, `"coherent"`, or both. It stores a
 deduplicated immutable tuple in incoherent-then-coherent order, so input order
 does not affect hashing or simulation identity. The default is `("incoherent",)`.
-`Physics(emission="both")` is a deprecated input alias (removal in 0.15.0);
-use `Physics(emission=("incoherent", "coherent"))`. CLI, catalog, and checkpoint
-policies retain their existing tri-state format.
+Use `Physics(emission=("incoherent", "coherent"))` to select both modes. CLI,
+catalog, and checkpoint policies retain their existing tri-state format.
 
 `Physics(emission=("incoherent", "coherent"))` and `Physics(emission="coherent")` expose both CXR modes from the
 same transport: `result.cxr.incoherent.density` always means incoherent CXR,

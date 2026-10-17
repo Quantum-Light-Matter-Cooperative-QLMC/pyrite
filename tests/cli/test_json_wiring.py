@@ -12,9 +12,8 @@ from pyrite.cli.commands import job as job_cli
 from pyrite.cli.commands import recompute as recompute_cli
 from pyrite.cli.commands import remote as remote_cli
 from pyrite.cli.commands import scan as scan_cli
-from pyrite.cli.commands.energy_grid_surface import material_command, profile_command
+from pyrite.cli.commands.energy_grid_surface import material_command
 from pyrite.energy_grid import apply as _energy_grid_apply  # noqa: F401 - binds the submodule
-from pyrite.energy_grid import defaults as _energy_grid_defaults  # noqa: F401 - binds it
 from pyrite.remote import lifecycle, viewer
 from pyrite.runs import blaze, scan
 from tests.helpers.cli import invoke
@@ -121,32 +120,6 @@ def test_remote_jobs_runtime_failure_is_json_and_nonzero(monkeypatch):
     assert document["ok"] is False
     assert document["payload"] == {"jobs": []}
     assert document["errors"][0]["message"] == "ssh failed"
-
-
-def test_line_grid_defaults_json_is_read_only(monkeypatch, tmp_path):
-    defaults_path = tmp_path / "defaults.toml"
-    defaults_path.write_text("")
-    monkeypatch.setattr(energy_grid.defaults, "DEFAULTS_PATH", defaults_path)
-    monkeypatch.setattr(
-        energy_grid.defaults,
-        "load_defaults",
-        lambda: {
-            "energies": [30],
-            "tilts": [],
-            "azimuths": [],
-            "thickness_ang": [1e7],
-            "brem_step_ev": 25,
-            "materials": ["hopg"],
-        },
-    )
-
-    document = _document(invoke(profile_command, ["defaults", "-o", "json"]))
-
-    assert document["schema"] == "cxr.energy-grid.defaults"
-    assert document["payload"]["source"] == "persisted"
-    result = invoke(profile_command, ["defaults", "--save-default", "-o", "json"])
-    assert result.exit_code == 2
-    assert result.stdout == ""
 
 
 def test_line_grid_show_json_reads_catalog_and_provenance(monkeypatch, tmp_path):

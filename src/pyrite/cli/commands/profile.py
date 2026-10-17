@@ -15,7 +15,6 @@ from pyrite.cli import _completion as _cli_completion
 from pyrite.cli._deprecations import canonical_option
 from pyrite.cli._groups import LazyGroup
 from pyrite.cli.commands import (
-    _physical_detector,
     _profile_cxr_grid,
     _profile_detectors,
     _profile_filters,
@@ -225,9 +224,6 @@ class _ProfileGroup(LazyGroup):
     name="profile",
     cls=_ProfileGroup,
     deprecation_prefix="profile",
-    lazy_commands={"energy-grid": "pyrite.cli.commands.energy_grid_surface.profile_command"},
-    lazy_help={"energy-grid": "Manage profile-scoped energy-grid derivation inputs."},
-    lazy_hidden={"energy-grid"},
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
@@ -535,7 +531,6 @@ def numerics_reset_command(name, fields, yes, dry_run):
 
 command.add_command(_profile_cxr_grid.command)
 command.add_command(_profile_precision.command)
-command.add_command(_physical_detector.command)
 command.add_command(_profile_detectors.command)
 
 

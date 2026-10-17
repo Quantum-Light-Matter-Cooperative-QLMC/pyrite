@@ -595,6 +595,29 @@ def _tds_strength(element, cov, p, harmonic_g, q_y):
     return 2.0 * (v_ket * v_bra * bracket) @ weights / (2.0 * np.pi) ** 2
 
 
+def _tds_transform(element: str, a2: float, k) -> np.ndarray:
+    """Isotropic 2D TDS transform for the axial dissipator [eV² Å⁶].
+
+    This is the ``S = a² I`` limit of the planar covariance integral.  Axial
+    scattering still uses its isotropic transverse-displacement approximation.
+    Validation: cr-lindblad-jump-operators
+    """
+    radius, w_r = _panels(_geometric_edges(0.05, _Q_MAX_INV_ANG), 8)
+    angle, w_a = _GL[24]
+    angle, w_a = 0.5 * np.pi * (angle + 1.0), 0.5 * np.pi * w_a
+    k = np.asarray(k, dtype=float)
+    out = np.empty(k.size)
+    for index, value in enumerate(k.ravel()):
+        half = 0.5 * value
+        cross = 2.0 * radius[:, None] * half * np.cos(angle)[None, :]
+        base = radius[:, None] ** 2 + half**2
+        v_ket = _potential(element, np.sqrt(np.maximum(base + cross, 0.0)))
+        v_bra = _potential(element, np.sqrt(np.maximum(base - cross, 0.0)))
+        bracket = np.exp(-2.0 * a2 * half**2) - np.exp(-a2 * base)
+        out[index] = 2.0 * (radius * w_r) @ (v_ket * v_bra * bracket) @ w_a
+    return out.reshape(k.shape)
+
+
 def _tds_diagonal(profile, sites, covariances, hbar_v, max_harmonic):
     """Fourier coefficients ``D_m`` of the full TDS ``C(x, x)``, symmetric polar quadrature.
 
