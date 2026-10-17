@@ -389,8 +389,13 @@ def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
 
     Implements Eq. (4), folded with the inverse-volume factor of Eq. (14) and
     one electron charge: ``e*U_g/V = 4*pi*e**2*sum_i(exp(i*g*R_i) *``
-    ``(Z_i-F_i)/g**2 * exp(-W))/V``. The result is in eV; divide by
+    ``(Z_i-f0_i(g))/g**2 * exp(-W))/V``. The result is in eV; divide by
     ``m_e*c**2`` for the dimensionless Eq. (14) coupling.
+
+    ``U_g`` is the Fourier component of the static screened electrostatic
+    (Mott--Bethe) potential, so it uses the Cromer--Mann ``f0`` only. The
+    anomalous ``f'(E)``/``f''(E)`` belong to the photon-scattering
+    susceptibility :func:`chi_g`, not to the potential, and never enter here.
 
     Parameters
     ----------
@@ -401,7 +406,8 @@ def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     B_ang2
         Isotropic Debye--Waller ``B`` factor in square angstroms.
     use_henke
-        Include anomalous form-factor corrections.
+        Accepted for signature parity with :func:`chi_g`; ignored, because the
+        static potential carries no anomalous correction.
 
     Returns
     -------
@@ -417,15 +423,13 @@ def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     _, g = reciprocal_g_vector(hkl, info["lattice"])
     dwf = debye_waller(g, B_ang2)
     acc = 0.0 + 0.0j
-    for (el, R), F in zip(
-        info["basis"], _basis_F(info["basis"], g, photon_E_eV, use_henke), strict=False
-    ):
+    for el, R in info["basis"]:
         phase = np.exp(1j * 2.0 * np.pi * np.dot(hkl, R))
-        acc += phase * (Z_TABLE[el] - F.real) / g**2 * dwf
+        acc += phase * (Z_TABLE[el] - cromer_mann_f0(el, g)) / g**2 * dwf
     result = 4.0 * np.pi * E2_EV_ANG * acc / info["V_cell"]
-    # Without anomalous corrections the CBS coupling is energy-independent,
-    # but callers still receive one value per requested energy so it can share
-    # the chi_g tabulation/interpolation path.
+    # The static CBS coupling is energy-independent, but callers still receive
+    # one value per requested energy so it can share the chi_g tabulation/
+    # interpolation path.
     if np.ndim(photon_E_eV):
         return np.broadcast_to(result, np.shape(photon_E_eV))
     return result
@@ -434,13 +438,14 @@ def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
 def reflection_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_henke=False, xp=np):
     """Tabulate :func:`chi_g` and ``U_g/m_e`` for several reflections at once.
 
-    Both couplings are linear in the per-atom form factor
+    ``chi_g`` is linear in the per-atom form factor
     ``F_i(g, E) = f0_i(g) + f'_i(E) + i f''_i(E)`` (or ``f0_i(g)`` alone when
     no anomalous correction applies), and ``f'``/``f''`` depend only on the
-    element and energy. Grouping the basis by element,
+    element and energy. ``U_g`` is the static potential and uses ``f0`` only.
+    Grouping the basis by element,
 
-        S(g, E)   = DWF(g) [c_g + sum_el P_el(g) (f'_el(E) + i f''_el(E))]
-        acc(g, E) = DWF(g)/g**2 [a_g - sum_el P_el(g) f'_el(E)]
+        S(g, E) = DWF(g) [c_g + sum_el P_el(g) (f'_el(E) + i f''_el(E))]
+        acc(g)  = DWF(g)/g**2 a_g
 
     with ``P_el(g) = sum_{i in el} exp(i 2 pi hkl.R_i)``,
     ``c_g = sum_el P_el f0_el(g)`` and ``a_g = sum_el P_el (Z_el - f0_el(g))``.
@@ -507,8 +512,6 @@ def reflection_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_h
             fp, fpp = dispersive[el]
             s_re += w.real * fp - w.imag * fpp
             s_im += w.imag * fp + w.real * fpp
-            acc_re -= w.real * fp
-            acc_im -= w.imag * fp
         rows[0].append(chi_scale * (dwf * s_re))
         rows[1].append(chi_scale * (dwf * s_im))
         rows[2].append(u_scale * (dwf / g**2) * acc_re)

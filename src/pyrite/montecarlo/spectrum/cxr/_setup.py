@@ -39,8 +39,10 @@ from ._temporal import segment_arrival_times
 # constant, not a selector: the incoherent route scores the segment-mean
 # escape since issue #181, and the phased-field routes the exact per-piece
 # formation integral under absorption since its second slice; each move
-# orphans the previous generation's line spectra once.
-CXR_ESCAPE_MODEL = "segment-mean-v3-snell-resonance"
+# orphans the previous generation's line spectra once. v4 (#513): the CBS
+# potential coupling U_g is the static Z - f0(g), no longer carrying the
+# anomalous f' of edge-prone elements.
+CXR_ESCAPE_MODEL = "segment-mean-v4-snell-resonance"
 
 
 #: Size of the most recent line setups' tabulation, for performance telemetry.

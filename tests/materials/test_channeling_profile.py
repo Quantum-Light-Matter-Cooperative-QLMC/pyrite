@@ -170,13 +170,15 @@ def test_si110_wells_sit_on_planes_with_literature_depth(si110):
     assert si110.potential_eV[0] == 0.0
 
 
-def test_planar_coefficient_is_negative_cbs_coupling():
-    # Diamond is not edge-prone, so U_g uses the bare f0 there; for Si the CBS
-    # coupling adds anomalous f' and the two intentionally differ.
-    profile = planar_profile("diamond", (1, 1, 0), 293.15)
-    b = profile.b_factors_ang2["C"]
-    expected = -U_g("diamond", (2, 2, 0), 1.0e4, B_ang2=b, use_henke=False)
-    assert profile.potential_eV[1] == pytest.approx(expected, rel=1e-12)
+@pytest.mark.parametrize("crystal", ["diamond", "silicon"])
+def test_planar_coefficient_is_negative_cbs_coupling(crystal):
+    # U_g is the static Z - f0 potential for every element (#513), so edge-prone
+    # Si matches the planar profile as diamond does, at any photon energy.
+    profile = planar_profile(crystal, (1, 1, 0), 293.15)
+    b = next(iter(profile.b_factors_ang2.values()))
+    for energy in (1.0e3, 1.839e3, 1.0e4):
+        expected = -U_g(crystal, (2, 2, 0), energy, B_ang2=b, use_henke=False)
+        assert profile.potential_eV[1] == pytest.approx(expected, rel=1e-12)
 
 
 def test_si111_coefficient_against_cbed_structure_factors():
