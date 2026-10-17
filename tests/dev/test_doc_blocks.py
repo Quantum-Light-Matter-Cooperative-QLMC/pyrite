@@ -74,6 +74,46 @@ def test_extractor_raises_on_unterminated_fence(tmp_path):
         extract_fenced_blocks(doc)
 
 
+@pytest.mark.parametrize(
+    ("info", "language"),
+    [("{figure} figures/schematic.svg", "{figure}"), ('python title="Example"', "python")],
+)
+def test_extractor_consumes_fence_arguments_before_next_example(tmp_path, info, language):
+    doc = tmp_path / "directives.md"
+    doc.write_text(
+        f"```{info}\nFirst block\n```\n\n```bash\npyrite --help\n```\n",
+        encoding="utf-8",
+    )
+
+    first, second = extract_fenced_blocks(doc)
+
+    assert (first.language, first.body, first.start_line, first.end_line) == (
+        language,
+        "First block",
+        1,
+        3,
+    )
+    assert (second.language, second.body, second.start_line, second.end_line) == (
+        "bash",
+        "pyrite --help",
+        5,
+        7,
+    )
+
+
+def test_extractor_does_not_close_on_shorter_fence_or_info_string(tmp_path):
+    doc = tmp_path / "nested.md"
+    doc.write_text(
+        "````text\n```bash\npyrite --help\n```\n````python\n`````\n",
+        encoding="utf-8",
+    )
+
+    (block,) = extract_fenced_blocks(doc)
+
+    assert block.body == "```bash\npyrite --help\n```\n````python"
+    assert block.end_line == 6
+
+
 # --- tier 1: bash blocks checked against the live CLI trees --------------
 
 

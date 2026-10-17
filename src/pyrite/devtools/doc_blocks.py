@@ -10,7 +10,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-_FENCE_RE = re.compile(r"^(`{3,})\s*([\w{}-]*)\s*$")
+# Consume the complete info string, including MyST directive arguments, so a
+# directive's closing fence cannot be mistaken for a new code block.
+_FENCE_RE = re.compile(r"^(`{3,})[ \t]*([^` \t]*)(?:[ \t]+[^`]*)?$")
 _SKIP_MARKER_RE = re.compile(r"^\s*<!--\s*verify:\s*skip\s*(?:\(([^)]*)\))?\s*-->\s*$")
 
 
@@ -59,7 +61,8 @@ def extract_fenced_blocks(path: Path) -> list[FencedBlock]:
         fence, language = match.group(1), match.group(2)
         body_start = i + 1
         j = body_start
-        while j < len(lines) and not lines[j].startswith(fence):
+        closing_fence = re.compile(rf"{re.escape(fence)}`*[ \t]*")
+        while j < len(lines) and closing_fence.fullmatch(lines[j]) is None:
             j += 1
         if j >= len(lines):
             raise ValueError(f"{path}:{i + 1}: unterminated fenced code block")
