@@ -34,8 +34,8 @@ from math import gcd
 import numpy as np
 
 from ..atomic import Z_TABLE, cromer_mann_f0
-from ..crystal import CRYSTALS, E2_EV_ANG, reciprocal_g_vector
-from .thermal import thermal_b_factor
+from ..crystal import CRYSTALS, E2_EV_ANG, _direct_lattice_vectors, reciprocal_g_vector
+from .thermal import ChannelingDataError, UniaxialThermalSite, thermal_site
 
 # Waasmaier--Kirfel f0 fits are valid to s = sin(theta)/lambda = 6 / angstrom.
 F0_S_MAX_INV_ANG = 6.0
@@ -68,7 +68,20 @@ class PlanarProfile:
     temperature_K
         Crystal temperature [K] of the thermal smearing.
     b_factors_ang2
-        Site Debye--Waller ``B`` per element at ``temperature_K``.
+        Site Debye--Waller ``B`` per element at ``temperature_K``. When
+        ``thermal_projected`` is true it is ``8 pi^2 n.U.n`` along the plane
+        normal ``n`` only, not an isotropic ``B``.
+    thermal_projected
+        True when any element's ``B`` is the plane-normal projection of an
+        anisotropic displacement; transverse scattering then needs
+        ``covariances_ang2`` and a beam direction.
+    covariances_ang2
+        Per-element Cartesian displacement covariance ``U`` [angstrom^2] in the
+        frame of the catalog direct-lattice vectors; ``None`` when every
+        element is isotropic (``U = B / 8 pi^2 I``).
+    normal
+        Unit reciprocal plane normal ``g / |g|`` in that frame: the direction
+        of ``x``.
     """
 
     crystal: str
@@ -79,6 +92,9 @@ class PlanarProfile:
     electron_density: np.ndarray
     temperature_K: float
     b_factors_ang2: dict[str, float]
+    thermal_projected: bool = False
+    covariances_ang2: dict[str, np.ndarray] | None = None
+    normal: np.ndarray | None = None
 
     @property
     def g_inv_ang(self) -> float:
@@ -168,9 +184,11 @@ def planar_profile(
     basis = info["basis"]
     volume = float(info["V_cell"])
     hkl_c = _coprime(hkl)
-    _, g_prim = reciprocal_g_vector(hkl_c, info["lattice"])
+    g_vec, g_prim = reciprocal_g_vector(hkl_c, info["lattice"])
     elements = sorted({el for el, _ in basis})
-    b_factors = {el: thermal_b_factor(crystal, el, temperature_K) for el in elements}
+    b_factors, covariances = _normal_b_factors(
+        crystal, info["lattice"], g_vec, elements, temperature_K
+    )
 
     n_max = max(1, int(np.floor(4.0 * np.pi * s_max_inv_ang / g_prim)))
     n = np.arange(n_max + 1)
@@ -209,4 +227,50 @@ def planar_profile(
         electron_density=electrons[keep],
         temperature_K=float(temperature_K),
         b_factors_ang2=b_factors,
+        thermal_projected=covariances is not None,
+        covariances_ang2=covariances,
+        normal=g_vec / g_prim,
     )
+
+
+def _is_hexagonal(lattice) -> bool:
+    if lattice["system"] == "hexagonal":
+        return True
+    angles = (lattice.get("alpha"), lattice.get("beta"), lattice.get("gamma"))
+    return (
+        lattice["system"] == "general"
+        and np.isclose(lattice["a"], lattice["b"])
+        and np.allclose(angles, (90.0, 90.0, 120.0))
+    )
+
+
+def _normal_b_factors(crystal, lattice, g_vec, elements, temperature_K):
+    """Return per-element ``B`` along the plane normal and, if any is anisotropic, every ``U``.
+
+    The Debye--Waller factor of a Fourier component ``g`` is
+    ``exp(-g.U.g / 2) = exp(-B_n s^2)`` with ``B_n = 8 pi^2 n.U.n`` and
+    ``n = g / |g|``, so a uniaxial site enters the planar sum exactly through
+    its plane-normal projection. The covariances (``None`` when all elements
+    are isotropic) feed the transverse scattering kernels.
+
+    Validation: cr-uniaxial-thermal-projection
+    """
+    b_factors: dict[str, float] = {}
+    covariances: dict[str, np.ndarray] = {}
+    c_axis = None
+    for el in elements:
+        site = thermal_site(crystal, el)
+        if not isinstance(site, UniaxialThermalSite):
+            b_factors[el] = site.b_factor(temperature_K)
+            covariances[el] = b_factors[el] / (8.0 * np.pi**2) * np.eye(3)
+            continue
+        if c_axis is None:
+            if not _is_hexagonal(lattice):
+                raise ChannelingDataError(f"{crystal}: uniaxial thermal rows need a hexagonal cell")
+            c_axis = _direct_lattice_vectors(lattice)[2]
+            cos2_c = float(
+                np.dot(g_vec, c_axis) ** 2 / (np.dot(g_vec, g_vec) * np.dot(c_axis, c_axis))
+            )
+        b_factors[el] = site.b_factor_along(cos2_c, temperature_K)
+        covariances[el] = site.covariance(c_axis, temperature_K)
+    return b_factors, (covariances if c_axis is not None else None)

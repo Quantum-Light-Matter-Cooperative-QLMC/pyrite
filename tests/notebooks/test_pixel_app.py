@@ -52,7 +52,7 @@ def test_missing_checkpoint_or_observation_renders_an_explanation(tmp_path) -> N
     assert make_observation_selector(mo, empty) is None
     state = load_selected_observation(empty, None)
     assert state.observation is None
-    assert "pyrite profile physical-detector" in state.message
+    assert "pyrite profile detector" in state.message
 
     view = render_pixel_detector(
         mo,

@@ -173,10 +173,7 @@ does not automatically refine a nonuniform continuum grid.
 
 For optional derivation, select both materials and beam energies, for example
 `pyrite material energy-grid derive --material mose2 --energy 30,60 --profile NAME`.
-The global historical batch presets under the hidden `pyrite profile energy-grid
-defaults` and `derive --save-default` are deprecated in 0.13.6 and retire in 0.15.0.
-During that window, omitted inputs still use saved presets and warn on stderr.
-At retirement, material and energy selections become required; geometry and
+Material and energy selections are required; geometry and
 spacing remain per-invocation controls, with omitted angles inheriting profile
 geometry. Explicit user grids, profile `energy_grid_refs`, and stored artifacts
 remain supported. Manual brem edits preserve resolved artifact/catalog spacing

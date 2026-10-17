@@ -27,8 +27,6 @@ import click
 from click.core import ParameterSource
 
 from .._env import GENERATED_INVOCATION_ENV, env_value
-from ..energy_grid.defaults import DEPRECATED_IN as GRID_DEFAULTS_SINCE
-from ..energy_grid.defaults import REMOVE_IN as GRID_DEFAULTS_REMOVE
 
 SUPPORT_WINDOW_MINORS = 2
 
@@ -61,38 +59,14 @@ def _entry(
 #: The 0.1.0 cohort of 68 command spellings was removed at 0.3.0 (issue #68),
 #: and `material set` (deprecated 0.4.0, issue #359) at 0.6.0 (issue #387).
 #: `material simulate` was removed at 0.8.0; use `run --ephemeral`.
-DEPRECATIONS: dict[str, Deprecation] = {
-    "profile energy-grid": _entry(
-        "profile energy-grid",
-        "pyrite material energy-grid derive --material KEY --energy KEV",
-        since=GRID_DEFAULTS_SINCE,
-        note="Normal runs size grids automatically; retire global batch presets and their store.",
-        warning_note="normal runs size grids automatically; explicit derivation is optional",
-    ),
-    "profile physical-detector": _entry(
-        "profile physical-detector", "pyrite profile detector", since="0.13.0"
-    ),
-    **{
-        f"profile physical-detector {leaf}": _entry(
-            f"profile physical-detector {leaf}", replacement, since="0.13.0"
-        )
-        for leaf, replacement in (
-            ("show", "pyrite profile detector show PROFILE physical"),
-            ("set", "pyrite profile detector set PROFILE physical"),
-            (
-                "reset",
-                "pyrite profile detector reset PROFILE physical SECTIONS; pyrite profile detector rm PROFILE physical",
-            ),
-        )
-    },
-}
+DEPRECATIONS: dict[str, Deprecation] = {}
 
 
 #: Paths whose canonical replacement depends on the arguments given, so the
 #: command computes it and calls `warn_self(path, replacement)` from its own
 #: callback. `DeprecatingGroup` leaves these alone rather than pre-empting them
 #: with the registry's generic replacement.
-SELF_WARNING: frozenset[str] = frozenset({"profile physical-detector"})
+SELF_WARNING: frozenset[str] = frozenset()
 
 
 def message(path: str, *, replacement: str | None = None) -> str:
@@ -249,16 +223,7 @@ def _flag(
 #: `--fidelity` cohort (deprecated in 0.4.0, issue #215) at 0.6.0 (issue #387).
 #: `RetiredOption` and `canonical_option` (renamed spellings) and
 #: `DeprecatedOption` (whole options) stay as the substrate ADR-0002 requires.
-DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
-    ("material energy-grid derive", "--save-default"): _flag(
-        "material energy-grid derive",
-        "--save-default",
-        "pass derivation inputs per invocation; normal runs size grids automatically",
-        since=GRID_DEFAULTS_SINCE,
-        note="Remove defaults.py, line_grid_defaults.toml, --set-default forwarding in derive/job, "
-        "remote DEFAULT_MATERIALS/DEFAULT_ENERGIES and packaging/sync references together.",
-    ),
-}
+DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {}
 
 
 def flag_message(command: str, flag: str, replacement: str) -> str:
@@ -432,15 +397,4 @@ class ImplicitDefault:
 
 
 #: Keyed by what the user left unnamed. Rendered into the deprecation reference.
-IMPLICIT_DEFAULTS: dict[str, ImplicitDefault] = {
-    "energy-grid derivation batch inputs": ImplicitDefault(
-        "energy-grid derivation batch inputs",
-        "Saved inputs or historical material/energy/geometry/spacing presets",
-        "--material KEY --energy KEV; per-invocation geometry and spacing",
-        GRID_DEFAULTS_SINCE,
-        GRID_DEFAULTS_REMOVE,
-        "Local and remote derive keep legacy inputs until removal. Then require explicit "
-        "materials and energies; inherit ordinary profile angles and retain built-in "
-        "diagnostic thickness/continuum spacing. Never use first-material energies.",
-    ),
-}
+IMPLICIT_DEFAULTS: dict[str, ImplicitDefault] = {}

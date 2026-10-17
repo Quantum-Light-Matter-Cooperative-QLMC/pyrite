@@ -35,7 +35,6 @@ import numpy as np
 from pyrite._cxr_grid_policy import AUTOMATIC_RESOLUTION_POLICY, COVERAGE_BANDWIDTH_POLICY
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import _quantized_angles, build_cases
-from pyrite.energy_grid import defaults as lg_defaults
 from pyrite.energy_grid.bounds import coverage_energy, cxr_start_eV, margined_stop
 from pyrite.energy_grid.floor import floored_lattice_start_eV
 from pyrite.energy_grid.semantics import resolution_num
@@ -749,13 +748,13 @@ def build_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--materials",
-        default=None,
-        help="comma-separated catalog material keys (default: every standard-profile material)",
+        required=True,
+        help="comma-separated catalog material keys",
     )
     parser.add_argument(
         "--energies",
-        default=None,
-        help="comma-separated beam energies in keV (default: every standard beam energy)",
+        required=True,
+        help="comma-separated beam energies in keV",
     )
     parser.add_argument("--top-k", type=int, default=TOP_K)
     parser.add_argument("--coarse-ne", type=int, default=COARSE_NE)
@@ -809,12 +808,12 @@ def build_parser():
     parser.add_argument(
         "--tilts",
         default=None,
-        help="comma polar tilts (deg); default: profile/persistent",
+        help="comma polar tilts (deg); default: profile geometry",
     )
     parser.add_argument(
         "--azimuths",
         default=None,
-        help="comma azimuths (deg); default: profile/persistent",
+        help="comma azimuths (deg); default: profile geometry",
     )
     parser.add_argument(
         "--thickness",
@@ -827,11 +826,6 @@ def build_parser():
         default=None,
         help="E_grid_brem step (eV) for downstream apply",
     )
-    parser.add_argument(
-        "--set-default",
-        action="store_true",
-        help="deprecated: persist supplied batch inputs until removal in 0.15.0",
-    )
     return parser
 
 
@@ -839,29 +833,12 @@ def _floats(text):
     return [float(x) for x in text.split(",")] if text else None
 
 
-@lg_defaults.legacy_warning_scope()
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    uses_presets = args.set_default or any(
-        value is None
-        for value in (
-            args.materials,
-            args.energies,
-            args.tilts,
-            args.azimuths,
-            args.thickness,
-            args.brem_step,
-        )
-    )
-    if uses_presets:
-        lg_defaults.warn_legacy_defaults()
-    persisted = lg_defaults.load_defaults() if uses_presets else {}
-    tilts = _floats(args.tilts) or (persisted["tilts"] or None)
-    azimuths = _floats(args.azimuths) or (persisted["azimuths"] or None)
-    thicknesses = _floats(args.thickness) or (persisted["thickness_ang"] or None)
-    brem_step_eV = (
-        float(args.brem_step) if args.brem_step is not None else persisted["brem_step_ev"]
-    )
+    tilts = _floats(args.tilts)
+    azimuths = _floats(args.azimuths)
+    thicknesses = _floats(args.thickness)
+    brem_step_eV = args.brem_step
     global WIDE_GRID_STOP_EV, BACKEND_SAFETY_ULPS, MAX_DIAGNOSTIC_SPACING_EV
     global WIDE_GRID_EV, WIDE_BREM_STOP_EV
     WIDE_GRID_STOP_EV = float(args.grid_stop)
@@ -870,26 +847,8 @@ def main(argv=None):
     WIDE_GRID_EV = np.array([WIDE_GRID_START_EV, WIDE_GRID_STOP_EV])
     # The ceiling is the override; each case's floor comes from its own medium.
     WIDE_BREM_STOP_EV = float(args.brem_grid_stop)
-    materials = (
-        args.materials.split(",")
-        if args.materials
-        else list(persisted["materials"] or CATALOG.materials)
-    )
-    if args.energies:
-        energies = [float(e) for e in args.energies.split(",")]
-    elif persisted["energies"]:
-        energies = [float(e) for e in persisted["energies"]]
-    else:
-        energies = [float(e) for e in CATALOG.material(materials[0]).scan.energy_keV]
-    if args.set_default:
-        lg_defaults.update_defaults(
-            tilts=_floats(args.tilts),
-            azimuths=_floats(args.azimuths),
-            thickness_ang=_floats(args.thickness),
-            brem_step_ev=args.brem_step,
-            energies=energies if args.energies else None,
-            materials=materials if args.materials else None,
-        )
+    materials = args.materials.split(",")
+    energies = [float(e) for e in args.energies.split(",")]
 
     combined, complete = derive_all_materials(
         materials,

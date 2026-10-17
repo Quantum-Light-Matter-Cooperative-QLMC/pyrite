@@ -119,33 +119,28 @@ def test_start_submits_slice_zero_with_nice(monkeypatch):
         "_submit_staged_job",
         lambda *args, **kwargs: calls.append((args, kwargs)) or "220",
     )
-
-    job.start(slice_minutes=10.0)
-
+    job.start(slice_minutes=10.0, materials="hopg", energies="30")
     assert calls[-1][1] == {"nice": True}
 
 
-def test_start_dry_run_threads_geometry_and_set_default(monkeypatch, capsys):
-    from pyrite.energy_grid.defaults import LEGACY_WARNING
-
+def test_start_dry_run_threads_explicit_geometry(monkeypatch, capsys):
     monkeypatch.setattr(job.remote, "_new_jobid", lambda: "20260719-120000-deadbeef")
-
     job.start(
+        materials="hopg",
+        energies="30",
         tilts="0,1.5",
         azimuths="45,90",
         thickness="1000,2000",
-        set_default=True,
         brem_step=12.5,
         dry_run=True,
     )
-
     captured = capsys.readouterr()
     script = captured.out
-    assert captured.err == LEGACY_WARNING + "\n"
+    assert captured.err == ""
     assert "--tilts 0,1.5" in script
     assert "--azimuths 45,90" in script
     assert "--thickness 1000,2000" in script
-    assert "--set-default" in script
+    assert "--set-default" not in script
     assert "--brem-step 12.5" in script
 
 
@@ -211,16 +206,12 @@ def test_resubmit_failure_is_terminal_and_fail_closed(tmp_path, monkeypatch):
     assert state.startswith("FAILED (slice resubmission)")
 
 
-def test_default_energies_span_all_seven_standard_beams():
-    assert job.DEFAULT_ENERGIES == "30,50,100,150,200,250,300"
-
-
 def test_slice_payload_threads_brem_grid_stop():
     shell = job._slice_payload(
         "20260720-000000-abcdef01",
         slice_minutes=10.0,
         json_out="bounds.json",
-        energies=job.DEFAULT_ENERGIES,
+        energies="30,50,100,150,200,250,300",
         grid_stop=20000.0,
         brem_grid_stop=40000.0,
     )
@@ -228,7 +219,7 @@ def test_slice_payload_threads_brem_grid_stop():
     assert "--energies 30,50,100,150,200,250,300" in shell
 
 
-def test_slice_payload_threads_geometry_and_set_default_to_derive():
+def test_slice_payload_threads_explicit_geometry_to_derive():
     shell = job._slice_payload(
         "20260720-000000-abcdef01",
         slice_minutes=10.0,
@@ -239,9 +230,7 @@ def test_slice_payload_threads_geometry_and_set_default_to_derive():
         tilts="0,1.5; printf injected",
         azimuths="45,90",
         thickness="1000,2000",
-        set_default=True,
     )
-
     derive_command = next(
         line for line in shell.splitlines() if "python -m pyrite.energy_grid.derive" in line
     )
@@ -249,18 +238,18 @@ def test_slice_payload_threads_geometry_and_set_default_to_derive():
     assert argv[argv.index("--tilts") + 1] == "0,1.5; printf injected"
     assert argv[argv.index("--azimuths") + 1] == "45,90"
     assert argv[argv.index("--thickness") + 1] == "1000,2000"
-    assert "--set-default" in argv
+    assert "--set-default" not in argv
 
 
-def test_slice_payload_omits_unset_geometry_and_set_default():
+def test_slice_payload_omits_unset_geometry():
     shell = job._slice_payload(
         "20260720-000000-abcdef01",
         slice_minutes=10.0,
         json_out="bounds.json",
         energies="100,200",
+        materials="hopg",
         grid_stop=20000.0,
     )
-
     derive_command = next(
         line for line in shell.splitlines() if "python -m pyrite.energy_grid.derive" in line
     )
@@ -303,7 +292,7 @@ def test_metadata_records_brem_grid_stop():
         "20260720-000000-abcdef01",
         slice_minutes=10.0,
         json_out="bounds.json",
-        energies=job.DEFAULT_ENERGIES,
+        energies="30,50,100,150,200,250,300",
         grid_stop=20000.0,
         brem_grid_stop=40000.0,
     )
@@ -315,7 +304,7 @@ def test_metadata_records_explicit_brem_step():
         "20260720-000000-abcdef01",
         slice_minutes=10.0,
         json_out="bounds.json",
-        energies=job.DEFAULT_ENERGIES,
+        energies="30,50,100,150,200,250,300",
         grid_stop=20000.0,
         brem_step=12.5,
     )

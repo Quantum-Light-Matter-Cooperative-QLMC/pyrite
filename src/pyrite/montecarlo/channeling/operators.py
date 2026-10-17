@@ -13,16 +13,19 @@ jump operator. Its diagonal is the local loss rate, so the imaginary
 
 **Thermal diffuse scattering (TDS).** Each atom adds a phase
 ``phi(x, y) = -(1/hbar v) V_proj``. With independent Gaussian displacements
-(Einstein model, ``<u_x^2> = a^2 = B / 8 pi^2``), the incoherent part of the
+(Einstein model) with transverse covariance ``S`` in the frame ``x`` (plane
+normal), ``y`` (in the plane, normal to the beam), the incoherent part of the
 transmission is the phase covariance, ``C(x, x') = Cov[phi(x), phi(x')]`` per
-unit depth. In Fourier form this is
+unit depth. In Fourier form, with ``q = (p+G, q_y)`` and ``q' = (p, q_y)``,
 
 ``C(x, x') = (1/(hbar v)^2) sum_G n_G e^{iGx} int dp dq_y/(2 pi)^2
-v(p+G, q_y) v(p, q_y) e^{ip(x-x')}
-[e^{-a^2 G^2/2} - e^{-a^2((p+G)^2 + p^2 + 2 q_y^2)/2}]``,
+v(q) v(q') e^{ip(x-x')} [e^{-S_xx G^2/2} - e^{-(q.S.q + q'.S.q')/2}]``,
 
 with ``v(q) = -4 pi e^2 (Z - f0(q)) / q^2`` (Mott--Bethe) and ``n_G`` the
-static site density of each species. ``G = 0`` is the familiar
+static site density of each species. An isotropic site has ``S = a^2 I``,
+``a^2 = B / 8 pi^2``. Displacement along the beam does not change the
+projected potential, so only the transverse block of the site covariance
+``U`` enters; ``S_xy`` couples ``q_y`` to ``p``. ``G = 0`` is the familiar
 ``|f^e|^2 (1 - e^{-2 B s^2})`` TDS cross section (Pennycook & Jesson 1991)
 times the mean density. The diagonal is the Hall--Hirsch absorptive potential
 (Hall & Hirsch 1965; Bird & King 1990), which is the open-system form of the
@@ -61,12 +64,20 @@ from dataclasses import dataclass
 from functools import cache
 
 import numpy as np
-from scipy.special import j0
+from scipy.special import ive, j0, jv
 
 from ...materials.atomic import Z_TABLE, cromer_mann_f0
 from ...materials.channeling.potential import F0_S_MAX_INV_ANG, PlanarProfile
+from ...materials.channeling.thermal import ChannelingDataError
 from ...materials.channeling.transverse import longitudinal_kinematics
-from ...materials.crystal import CRYSTALS, E2_EV_ANG, HBARC_EV_ANG, M_E_EV, reciprocal_g_vector
+from ...materials.crystal import (
+    CRYSTALS,
+    E2_EV_ANG,
+    HBARC_EV_ANG,
+    M_E_EV,
+    _direct_lattice_vectors,
+    reciprocal_g_vector,
+)
 from ..transport.inelastic import _qmin_ev
 from ..transport.shell_gos import _PREF_EV_CM2, _triangle_moments, max_energy_loss_eV
 from ..transport.shell_oscillators import MaterialShellOscillators
@@ -149,9 +160,66 @@ def _site_densities(profile: PlanarProfile, max_harmonic: int) -> dict[str, np.n
     return out
 
 
-def _displacement_sq(profile: PlanarProfile, element: str) -> float:
-    """One-axis mean-square thermal displacement ``a^2 = B / 8 pi^2`` [angstrom^2]."""
-    return profile.b_factors_ang2[element] / (8.0 * np.pi**2)
+Covariance = tuple[float, float, float]
+
+
+def _transverse_covariances(profile: PlanarProfile, beam_uvw=None) -> dict[str, Covariance]:
+    """Per-element transverse displacement covariance ``(S_xx, S_xy, S_yy)`` [angstrom^2].
+
+    ``x`` is the plane normal and ``y = x cross b`` with ``b`` the in-plane
+    projection of the beam direction ``beam_uvw`` (direct-lattice indices of
+    the catalog cell). ``S`` is the ``(x, y)`` block of the site covariance
+    ``U``. Isotropic profiles give ``S = (B / 8 pi^2) I`` for any beam. An
+    anisotropic profile needs ``beam_uvw`` unless ``x`` is an eigenvector of
+    every ``U`` and the in-plane block is isotropic (basal planes of a
+    uniaxial crystal).
+
+    Validation: cr-lindblad-jump-operators
+    """
+    if profile.covariances_ang2 is None:
+        if profile.thermal_projected:
+            raise ChannelingDataError(f"{profile.crystal}: projected profile carries no covariance")
+        return {
+            el: (b / (8.0 * np.pi**2), 0.0, b / (8.0 * np.pi**2))
+            for el, b in profile.b_factors_ang2.items()
+        }
+    n = np.asarray(profile.normal, dtype=float)
+    plane = np.eye(3) - np.outer(n, n)
+    if beam_uvw is None:
+        for el, u in profile.covariances_ang2.items():
+            block = plane @ u @ plane
+            tol = 1e-12 * np.trace(u)
+            if np.linalg.norm(plane @ u @ n) > tol or not np.allclose(
+                block, 0.5 * np.trace(block) * plane, atol=tol
+            ):
+                raise ChannelingDataError(
+                    f"{profile.crystal}{profile.hkl}: transverse displacement of {el} depends "
+                    "on the beam azimuth; pass beam_uvw"
+                )
+        y = np.linalg.svd(plane)[0][:, 0]
+    else:
+        uvw = np.asarray(beam_uvw, dtype=float)
+        if uvw.shape != (3,) or not np.all(np.isfinite(uvw)):
+            raise ValueError("beam_uvw must be three finite numbers")
+        beam = uvw @ np.array(_direct_lattice_vectors(CRYSTALS[profile.crystal]["lattice"]))
+        along = plane @ beam
+        if np.linalg.norm(along) <= 1e-9 * np.linalg.norm(beam):
+            raise ValueError("beam_uvw must not be parallel to the plane normal")
+        y = np.cross(n, along / np.linalg.norm(along))
+    out: dict[str, Covariance] = {}
+    for el, u in profile.covariances_ang2.items():
+        sxx, sxy, syy = float(n @ u @ n), float(n @ u @ y), float(y @ u @ y)
+        if sxx <= 0.0 or sxx * syy - sxy**2 <= 0.0:
+            raise ChannelingDataError(
+                f"{profile.crystal}.{el}: covariance is not positive definite"
+            )
+        out[el] = (sxx, sxy, syy)
+    return out
+
+
+def _min_eigenvalue(cov: Covariance) -> float:
+    sxx, sxy, syy = cov
+    return 0.5 * (sxx + syy) - float(np.hypot(0.5 * (sxx - syy), sxy))
 
 
 # ---------------------------------------------------------------------------
@@ -500,35 +568,43 @@ def _transfer_bins(n_cells: int, max_order: int) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 
-def _tds_strength(element, a2, p, harmonic_g, q_y):
+def _tds_strength(element, cov, p, harmonic_g, q_y):
     """``int dq_y/(2 pi)^2 v(p+G) v(p) [bracket]`` over the given ``q_y`` nodes.
 
     ``p``: (P,), ``harmonic_g``: (N,), ``q_y``: (nodes, weights) on ``[0, inf)``.
     Returns (P, N) in eV^2 angstrom^5.
+
+    Validation: cr-lindblad-jump-operators
     """
+    sxx, sxy, syy = cov
     nodes, weights = q_y
     ket = p[:, None, None] + harmonic_g[None, :, None]
     bra = p[:, None, None]
     qy2 = nodes**2
     v_ket = _potential(element, np.sqrt(ket**2 + qy2))
     v_bra = _potential(element, np.sqrt(bra**2 + qy2))
-    bracket = np.exp(-0.5 * a2 * harmonic_g[None, :, None] ** 2) - np.exp(
-        -0.5 * a2 * (ket**2 + bra**2 + 2.0 * qy2)
-    )
+    quad = sxx * (ket**2 + bra**2) + 2.0 * syy * qy2
+    if sxy == 0.0:
+        damp = np.exp(-0.5 * quad)
+    else:
+        # v is even in q_y but S_xy flips sign with it: average +-q_y.
+        cross = 2.0 * sxy * nodes * (ket + bra)
+        damp = 0.5 * (np.exp(-0.5 * (quad + cross)) + np.exp(-0.5 * (quad - cross)))
+    bracket = np.exp(-0.5 * sxx * harmonic_g[None, :, None] ** 2) - damp
     # q_y is integrated over (-inf, inf): twice the half line.
     return 2.0 * (v_ket * v_bra * bracket) @ weights / (2.0 * np.pi) ** 2
 
 
 def _tds_transform(element: str, a2: float, k) -> np.ndarray:
-    """``int d^2q v(q) v(|k - q|) [e^{-a^2 k^2 / 2} - e^{-a^2 (q^2 + |k - q|^2) / 2}]``.
+    """Isotropic 2D TDS transform for the axial dissipator [eV² Å⁶].
 
-    The 2D Fourier transform of one atom's projected-potential variance, times
-    ``(2 pi)^2``, at ``|k|`` [1/angstrom]; symmetric polar quadrature about
-    ``k / 2``. Returns eV^2 angstrom^6, shape of ``k``.
+    This is the ``S = a² I`` limit of the planar covariance integral.  Axial
+    scattering still uses its isotropic transverse-displacement approximation.
+    Validation: cr-lindblad-jump-operators
     """
     radius, w_r = _panels(_geometric_edges(0.05, _Q_MAX_INV_ANG), 8)
     angle, w_a = _GL[24]
-    angle, w_a = 0.5 * np.pi * (angle + 1.0), 0.5 * np.pi * w_a  # [0, pi], doubled below
+    angle, w_a = 0.5 * np.pi * (angle + 1.0), 0.5 * np.pi * w_a
     k = np.asarray(k, dtype=float)
     out = np.empty(k.size)
     for index, value in enumerate(k.ravel()):
@@ -542,15 +618,42 @@ def _tds_transform(element: str, a2: float, k) -> np.ndarray:
     return out.reshape(k.shape)
 
 
-def _tds_diagonal(profile, sites, hbar_v, max_harmonic):
-    """Fourier coefficients ``D_m`` of the full TDS ``C(x, x)``, symmetric polar quadrature."""
+def _tds_diagonal(profile, sites, covariances, hbar_v, max_harmonic):
+    """Fourier coefficients ``D_m`` of the full TDS ``C(x, x)``, symmetric polar quadrature.
+
+    With ``k = (p + G/2, q_y) = r (cos t, sin t)`` the bracket is
+    ``e^{-2 S_xx (G/2)^2} - e^{-k.S.k - S_xx (G/2)^2}``; ``t`` and ``-t`` share
+    the potentials, so the half circle carries the average over both signs of
+    the ``S_xy`` term.
+
+    Validation: cr-lindblad-jump-operators
+    """
+    g = profile.g_inv_ang
+    radius, w_r = _panels(_geometric_edges(0.05, _Q_MAX_INV_ANG), 8)
+    angle, w_a = _GL[24]
+    angle, w_a = 0.5 * np.pi * (angle + 1.0), 0.5 * np.pi * w_a  # [0, pi], doubled below
+    cos_t, sin_t = np.cos(angle), np.sin(angle)
+    r2 = radius[:, None] ** 2
     m = np.arange(max_harmonic + 1)
     coefficients = np.zeros(m.size, dtype=complex)
     for element, density in sites.items():
-        transform = _tds_transform(
-            element, _displacement_sq(profile, element), m * profile.g_inv_ang
-        )
-        coefficients += density[max_harmonic + m] * transform
+        sxx, sxy, syy = covariances[element]
+        k_s_k = r2 * (sxx * cos_t**2 + syy * sin_t**2)[None, :]
+        k_cross = r2 * (2.0 * sxy * cos_t * sin_t)[None, :]
+        for index in m:
+            half = 0.5 * index * g
+            cross = 2.0 * radius[:, None] * half * cos_t[None, :]
+            base = radius[:, None] ** 2 + half**2
+            v_ket = _potential(element, np.sqrt(np.maximum(base + cross, 0.0)))
+            v_bra = _potential(element, np.sqrt(np.maximum(base - cross, 0.0)))
+            exponent = k_s_k + sxx * half**2
+            if sxy == 0.0:
+                damp = np.exp(-exponent)
+            else:
+                damp = 0.5 * (np.exp(-(exponent + k_cross)) + np.exp(-(exponent - k_cross)))
+            bracket = np.exp(-2.0 * sxx * half**2) - damp
+            integral = 2.0 * (radius * w_r) @ (v_ket * v_bra * bracket) @ w_a
+            coefficients[index] += density[max_harmonic + index] * integral
     return coefficients / (2.0 * np.pi * hbar_v) ** 2
 
 
@@ -560,19 +663,23 @@ def tds_kernel(
     *,
     n_cells: int = DEFAULT_CELLS,
     max_order: int = DEFAULT_MAX_ORDER,
+    beam_uvw=None,
 ) -> ScatteringKernel:
     """Return the Einstein-model thermal diffuse scattering kernel.
 
     Implements the phase-covariance kernel of the module docstring with
-    static site densities from the crystal basis, per-element displacement
-    ``a^2 = B(T) / 8 pi^2`` from the profile and the Mott--Bethe potential of
+    static site densities from the crystal basis, per-element transverse
+    covariance ``S`` from the profile (``a^2 I``, ``a^2 = B(T) / 8 pi^2``, for
+    isotropic sites; rotated into the beam frame for anisotropic ones, so
+    ``beam_uvw`` is required when ``S`` depends on the beam azimuth) and the
+    Mott--Bethe potential of
     :func:`~pyrite.materials.channeling.potential.planar_profile`. The ``p``
     integral uses two Gauss--Legendre nodes per bin of width ``g / n_cells``,
     at the same offsets in every bin, which keeps each residue block an exact
     positive-weight sum of covariance matrices.
 
     Assumptions: first Born approximation per atom (``Z alpha / beta << 1``),
-    uncorrelated (Einstein) isotropic displacements, quasi-elastic phonon
+    uncorrelated (Einstein) Gaussian displacements, quasi-elastic phonon
     scattering (no energy loss) and a static planar lattice for ``n_G``.
     Limits: ``T -> 0`` keeps only zero-point TDS; ``a -> 0`` gives ``C = 0``;
     ``C ∝ 1/v^2``, so ``W ∝ 1/v`` with no ``gamma``.
@@ -582,8 +689,10 @@ def tds_kernel(
     _check_grid(n_cells, max_order)
     hbar_v = _kinematics(kinetic_energy_eV)
     g = profile.g_inv_ang
-    a2_min = min(_displacement_sq(profile, el) for el in profile.b_factors_ang2)
-    # Terms carry exp(-a^2 G^2 / 4) at most; stop below 1e-12.
+    covariances = _transverse_covariances(profile, beam_uvw)
+    a2_min = min(_min_eigenvalue(cov) for cov in covariances.values())
+    # Terms carry exp(-a^2 G^2 / 4) at most (a^2 the smallest eigenvalue of S);
+    # stop below 1e-12.
     max_harmonic = int(np.ceil(np.sqrt(4.0 * 27.7 / a2_min) / g))
     sites = _site_densities(profile, max_harmonic)
     width = g / n_cells
@@ -603,9 +712,9 @@ def tds_kernel(
         p_keep = p.reshape(bins.size, sub.size)[keep].ravel()
         entry = np.zeros(int(keep.sum()), dtype=complex)
         for element, density in sites.items():
-            strength = _tds_strength(
-                element, _displacement_sq(profile, element), p_keep, np.array([n * g]), q_y
-            )[:, 0]
+            strength = _tds_strength(element, covariances[element], p_keep, np.array([n * g]), q_y)[
+                :, 0
+            ]
             binned = strength.reshape(-1, sub.size) @ (0.5 * width * sub_w)
             entry += density[max_harmonic + n] * binned
         kernel[residue[keep], ket_order[keep] + max_order, bra_order[keep] + max_order] += entry
@@ -617,7 +726,7 @@ def tds_kernel(
         n_cells=n_cells,
         orders=np.arange(-max_order, max_order + 1),
         momentum_kernel=kernel,
-        diagonal_coefficients=_tds_diagonal(profile, sites, hbar_v, max_harmonic),
+        diagonal_coefficients=_tds_diagonal(profile, sites, covariances, hbar_v, max_harmonic),
         hbar_v_eV_ang=hbar_v,
     )
 
@@ -842,6 +951,7 @@ def decoherence_rate(
     delta_ang,
     *,
     oscillators: MaterialShellOscillators | None = None,
+    beam_uvw=None,
 ) -> DecoherenceRate:
     """Return the cell-averaged decoherence rate ``Gamma(Delta x)``.
 
@@ -849,7 +959,14 @@ def decoherence_rate(
     average, so, with every momentum transfer kept,
 
     - TDS: ``Gamma = sum_s n_s/(hbar v)^2 (1/2 pi) int q dq v_s(q)^2
-      (1 - e^{-a_s^2 q^2}) (1 - J0(q Delta))``;
+      (1 - e^{-a_s^2 q^2}) (1 - J0(q Delta))`` for isotropic sites. For an
+      anisotropic transverse covariance ``S`` (eigenvalues ``lambda_min``,
+      ``lambda_min + 2 rho``; ``S_xx - S_yy = 2 rho cos phi``,
+      ``S_xy = rho sin phi``) the angular average of
+      ``e^{-q.S.q} cos(q_x Delta)`` is
+      ``sum_n eps_n e^{-q^2 lambda_min} ive(n, rho q^2) cos(n phi) J_2n(q Delta)``
+      (``eps_0 = 1``, else 2), which replaces ``e^{-a^2 q^2} J0``. ``beam_uvw``
+      is as in :func:`tds_kernel`;
     - electronic: ``Gamma = 2 pi int q dq w(q) [rho_bar - J0(q Delta)
       <s_q(x) s_q(x + Delta)>_x]``.
 
@@ -864,13 +981,37 @@ def decoherence_rate(
     if np.any(delta < 0.0) or not np.all(np.isfinite(delta)):
         raise ValueError("delta_ang must be finite and non-negative")
     sites = _site_densities(profile, 0)
+    covariances = _transverse_covariances(profile, beam_uvw)
     tds_edges = _geometric_edges(0.05, _Q_MAX_INV_ANG)
 
-    def tds_density(q):
+    def tds_density(q, separation=None):
+        """``q dq`` density of the mean TDS rate, or of its overlap at ``separation``."""
         total = np.zeros_like(q)
         for element, density in sites.items():
-            a2 = _displacement_sq(profile, element)
-            total += density[0].real * q * _potential(element, q) ** 2 * -np.expm1(-a2 * q**2)
+            cov = covariances[element]
+            lam = _min_eigenvalue(cov)
+            rho = 0.5 * (cov[0] + cov[2]) - lam
+            if rho == 0.0:
+                factor = -np.expm1(-lam * q**2)
+                if separation is not None:
+                    factor = factor * j0(q * separation)
+            else:
+                # e^{-q^2 lambda} I_n(rho q^2) < 1e-16 once n^2 > 70 rho q^2 with
+                # lambda q^2 < 37 (Gaussian tail of I_n / I_0).
+                orders = np.arange(int(np.ceil(np.sqrt(70.0 * 37.0 * rho / lam))) + 4)
+                phi = np.arctan2(cov[1], 0.5 * (cov[0] - cov[2]))
+                weight = np.where(orders == 0, 1.0, 2.0) * np.cos(orders * phi)
+                series = (
+                    ive(orders[None, :], rho * q[:, None] ** 2)
+                    * np.exp(-lam * q**2)[:, None]
+                    * weight
+                )
+                if separation is None:
+                    factor = 1.0 - series[:, 0]
+                else:
+                    bessel = jv(2 * orders[None, :], q[:, None] * separation)
+                    factor = j0(q * separation) - (series * bessel).sum(axis=1)
+            total += density[0].real * q * _potential(element, q) ** 2 * factor
         return total / (2.0 * np.pi * hbar_v**2)
 
     q, w = _panels(tds_edges, 8)
@@ -878,7 +1019,7 @@ def decoherence_rate(
     tds = np.empty(delta.shape)
     for index, value in enumerate(delta):
         q, w = _oscillatory_panels(tds_edges, value)
-        tds[index] = tds_mean - w @ (tds_density(q) * j0(q * value))
+        tds[index] = tds_mean - w @ tds_density(q, value)
 
     channels = electronic_channels(_profile_oscillators(profile, oscillators), kinetic_energy_eV)
     root = _root_density(profile, 4 * max(1, profile.electron_density.size))

@@ -101,18 +101,18 @@ Limits:
 - **CR formation length.** Over one CR formation length the coherence decays by only 2.5–4.4 % at MeV energies. No bound-bound CR exists in planar Si(110) or diamond(110) at 30 or 300 keV: there is only one bound state at $k=0$.
 - **Multiple-scattering consistency.** The log-sensitive effective $D_{\rm eff}=2\Gamma/\Delta^2$ at $\Delta=0.03$ Å gives $\theta_{\rm rms}(1\,\mu\text{m})=6.8$ mrad at 3 MeV and 0.77 mrad at 30 MeV. The Highland formula (PDG; Si $X_0=9.37$ cm) gives 7.3 and 0.82 mrad. The full-tail $\Gamma''(0)$ with $q_{\max}=10^4$ Å⁻¹ is larger: TDS alone gives 11.8 mrad at 3 MeV. So the −7 % agreement depends on the choice of $\Delta$, and 1 µm is $x/X_0\approx10^{-5}$, below Highland's stated validity range. It is an order-of-magnitude consistency check, not an anchor.
 
-Diamond(110), $d=1.261$ Å: TDS is exact, but the electronic term uses a **graphite-oscillator surrogate**. Diamond has no conduction-band shell data, so the production electronic kernel refuses it.
+Diamond(110), $d=1.261$ Å: the electronic term now uses the sourced 34 eV diamond valence oscillator{cite:p}`bhattacharya2025`, through the production kernel without an override. The [material survey](channeling-materials.md) records its scope and remaining model limits.
 
-| $T$ | $\Gamma_{\rm TDS}(1\,\text{Å})$ | $\Gamma_{\rm el}^{\rm surr}(1\,\text{Å})$ | $\ell^{\rm surr}(d/2)$ | $n_b$ |
+| $T$ | $\Gamma_{\rm TDS}(1\,\text{Å})$ | $\Gamma_{\rm el}(1\,\text{Å})$ | $\ell(d/2)$ | $n_b$ |
 | --- | --- | --- | --- | --- |
-| 30 keV | 2.21e-4 | 1.75e-3 | 770 Å | 1 |
-| 300 keV | 3.96e-5 | 3.16e-4 | 0.43 µm | 1 |
-| 3 MeV | 2.44e-5 | 1.95e-4 | 0.69 µm | 1 |
-| 30 MeV | 2.39e-5 | 1.91e-4 | 0.71 µm | 4 |
+| 30 keV | 2.21e-4 | 1.52e-3 | 831 Å | 1 |
+| 300 keV | 3.96e-5 | 2.75e-4 | 0.46 µm | 1 |
+| 3 MeV | 2.44e-5 | 1.69e-4 | 0.75 µm | 1 |
+| 30 MeV | 2.39e-5 | 1.66e-4 | 0.76 µm | 4 |
 
-**Order-of-magnitude comparison (not an anchor).** {cite:t}`genz1996` deduce, through their Eq. 19 $\Gamma_{\rm in}=2\gamma^2\hbar c/l_{\rm coh}$, line coherence lengths for diamond(110) 1→0 of 0.53–0.74 µm at 5.2 MeV and 0.68 µm at 9.0 MeV (Table VI). They also find that it "does not change with energy". The surrogate $\ell(d/2)$ = 0.69–0.71 µm is energy independent and of the same size. The observables differ: their quantity is a bound-state line coherence, ours a cell-averaged position coherence. The surrogate electronic term is not channeling-grade either.
+**Order-of-magnitude comparison (not an anchor).** {cite:t}`genz1996` deduce, through their Eq. 19 $\Gamma_{\rm in}=2\gamma^2\hbar c/l_{\rm coh}$, line coherence lengths for diamond(110) 1→0 of 0.53–0.74 µm at 5.2 MeV and 0.68 µm at 9.0 MeV (Table VI). They also find that it "does not change with energy". The diamond-input $\ell(d/2)$ = 0.75–0.76 µm at 3–30 MeV varies little with energy and is of the same order. The observables differ: their quantity is a bound-state line coherence, ours a cell-averaged position coherence. This does not validate linewidths.
 
-**Not computable** (`ChannelingDataError`, no channeling thermal data): the HOPG, hBN, MoS₂ and WSe₂ (001) cells at 30 keV. These crystals do have conduction-band shell data. Graphite's displacements are also strongly anisotropic, so the catalog's single isotropic `B_ang2` is not an adequate stand-in. No values are given for these cells (follow-up F4).
+**Not computable** (`ChannelingDataError`, no channeling thermal data): the HOPG, hBN, MoS₂ and WSe₂ (001) cells at 30 keV. These crystals do have conduction-band shell data. Graphite's displacements are also strongly anisotropic, so the catalog's basal-only `B_ang2` is not an adequate stand-in for a thermal covariance. No values are given for these cells (follow-up F4).
 
 ### 3.3 Reading the budget
 

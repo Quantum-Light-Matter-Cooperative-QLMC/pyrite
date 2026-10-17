@@ -16,9 +16,8 @@ must keep a transverse superposition alive:
   research note).
 
 Cells: Si(110) at 30 keV, 300 keV, 3 MeV and 30 MeV (TDS and electronic);
-diamond(110) at the same energies, TDS exact but electronic only through a
-**graphite-oscillator surrogate** (diamond has no conduction-band shell
-data, so the production electronic kernel refuses it); and the HOPG/vdW
+diamond(110) at the same energies, using its sourced 34 eV valence oscillator
+in the production electronic kernel; and the HOPG/vdW
 catalog crystals at 30 keV, which have no channeling thermal data and are
 reported as not computable.
 
@@ -43,7 +42,6 @@ from pyrite.materials.channeling import ChannelingDataError, planar_profile
 from pyrite.materials.channeling.transverse import longitudinal_kinematics, transverse_states
 from pyrite.materials.crystal import HBARC_EV_ANG
 from pyrite.montecarlo.channeling import decoherence_rate
-from pyrite.montecarlo.transport.shell_rates import catalog_shell_oscillators
 
 ENERGIES_EV = (3.0e4, 3.0e5, 3.0e6, 3.0e7)
 VDW_CELLS = (("hopg", (0, 0, 1)), ("hbn", (0, 0, 1)), ("mos2", (0, 0, 1)), ("wse2", (0, 0, 1)))
@@ -111,13 +109,12 @@ def main(argv: list[str] | None = None) -> int:
     rows = []
     silicon = planar_profile("silicon", (1, 1, 0), temperature)
     diamond = planar_profile("diamond", (1, 1, 0), temperature)
-    surrogate = catalog_shell_oscillators("hopg")
     for energy in ENERGIES_EV:
         rows.append(_row("Si(110)", silicon, energy))
         _print_row(rows[-1])
     for energy in ENERGIES_EV:
-        rows.append(_row("diamond(110)", diamond, energy, oscillators=surrogate))
-        _print_row(rows[-1], " [G_el: graphite-oscillator surrogate, not channeling-grade]")
+        rows.append(_row("diamond(110)", diamond, energy))
+        _print_row(rows[-1])
 
     print("\nHOPG/vdW cells at 30 keV:")
     for crystal, hkl in VDW_CELLS:

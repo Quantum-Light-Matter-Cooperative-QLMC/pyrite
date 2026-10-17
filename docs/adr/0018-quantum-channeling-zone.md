@@ -159,6 +159,19 @@ The following consumers refuse channeling before transport or writes:
 
 ## Consequences
 
+- **Layered-material thermal data (#525):** keep the existing isotropic
+  Si/diamond rows. Layered support requires site identifiers tied to the CIF
+  basis and temperature-dependent displacement covariances in a declared
+  Cartesian frame. An element-only or plane-normal scalar loses inequivalent
+  sites and cannot supply both transverse directions of the TDS kernel.
+  Convert crystallographic ADPs with the lattice metric before rotation;
+  retain the full plane-local covariance for scattering. Do not extrapolate
+  a single-temperature refinement with an unsourced Debye model. This is the
+  schema requirement for a future implementation; the present isotropic loader
+  and kernels continue to refuse crystals without sourced thermal rows.
+  Directional electronic loss and HOPG mosaic quadrature are separate gates.
+  See the [material survey](../research/physics/channeling-materials.md).
+
 - Default outputs, RNG consumption and cache identities are unchanged.
 - Channeling gets a native, testable path that does not depend on an external
   transport engine.

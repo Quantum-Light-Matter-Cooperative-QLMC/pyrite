@@ -94,6 +94,7 @@ beam-transport/transport-midpoint-stopping
 :maxdepth: 1
 :caption: Channeling
 
+channeling/diamond-valence-oscillator
 channeling/cr-debye-b-of-t
 channeling/cr-mott-bethe-factor
 channeling/cr-planar-continuum-potential
@@ -104,8 +105,11 @@ channeling/cr-doppler-line-energy
 channeling/cr-mean-inner-potential
 channeling/cr-plane-incidence
 channeling/cr-lindblad-jump-operators
+channeling/cr-lindblad-jump-operators-anisotropic
+channeling/cr-uniaxial-thermal-projection
 channeling/cr-density-matrix-split-operator
 channeling/cr-density-matrix-split-operator-abtem
+channeling/cr-density-matrix-split-operator-mos2
 channeling/cr-mcwf-unravelling
 channeling/cr-dechanneling-collapse-kephart
 channeling/cr-dipole-rate

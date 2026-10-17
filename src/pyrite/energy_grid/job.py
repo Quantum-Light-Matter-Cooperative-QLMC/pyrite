@@ -19,16 +19,10 @@ today = date.today()
 
 DEFAULT_SLICE_MINUTES = 10.0
 DEFAULT_JSON_OUT = f"line_grid_bounds_eval_{today}.json"
-# All seven standard beam energies: bespoke per-material grids need a complete
-# self-contained table per material, matching the profile's seven rows.
-DEFAULT_ENERGIES = "30,50,100,150,200,250,300"
 DEFAULT_GRID_STOP = 20_000.0
 # Ceiling of the diagnostic brem coverage grid; mirrors analyze_line_grid_bounds
 # WIDE_BREM_STOP_EV so per-material bespoke brem stops are not clipped.
 DEFAULT_BREM_GRID_STOP = 40_000.0
-# The line-grid eval targets the four standard-profile crystals (issue_notes.md
-# #1). Overridable via --materials so other catalog keys can be scanned.
-DEFAULT_MATERIALS = "hopg,diamond,wse2,mose2"
 _REMOTE_OUTPUT_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\.json")
 
 
@@ -72,11 +66,10 @@ def _slice_payload(
     grid_stop,
     brem_grid_stop=DEFAULT_BREM_GRID_STOP,
     brem_step=None,
-    materials=DEFAULT_MATERIALS,
+    materials="hopg",
     tilts=None,
     azimuths=None,
     thickness=None,
-    set_default=False,
 ):
     """Build one resumable slice payload using remote.py's chain contract."""
     _validate_remote_fields(
@@ -111,8 +104,6 @@ def _slice_payload(
     ):
         if value:
             command_parts.append(f"--{flag} {shlex.quote(value)}")
-    if set_default:
-        command_parts.append("--set-default")
     command = " ".join(command_parts)
     return f"""JOBDIR={remote.shell_word(jobdir)}
 cd {remote.shell_remote_dir()} || exit 1
@@ -147,11 +138,10 @@ def _job_script(
     grid_stop,
     brem_grid_stop=DEFAULT_BREM_GRID_STOP,
     brem_step=None,
-    materials=DEFAULT_MATERIALS,
+    materials="hopg",
     tilts=None,
     azimuths=None,
     thickness=None,
-    set_default=False,
 ):
     payload = _slice_payload(
         jobid,
@@ -165,7 +155,6 @@ def _job_script(
         tilts=tilts,
         azimuths=azimuths,
         thickness=thickness,
-        set_default=set_default,
     )
     time_limit = str(max(1, math.ceil(slice_minutes * 3)))
     return remote._slurm_batch_script(
@@ -185,7 +174,7 @@ def _metadata(
     grid_stop,
     brem_grid_stop=DEFAULT_BREM_GRID_STOP,
     brem_step=None,
-    materials=DEFAULT_MATERIALS,
+    materials="hopg",
 ):
     _reject_controls("jobid", jobid)
     _validate_remote_fields(
@@ -221,20 +210,12 @@ def start(
     tilts=None,
     azimuths=None,
     thickness=None,
-    set_default=False,
     no_sync=False,
     dry_run=False,
 ):
     """Sync, stage, and submit slice zero. Return remote job-directory ID."""
-    from pyrite.energy_grid import defaults
-
-    with defaults.legacy_warning_scope():
-        if set_default or any(
-            value is None for value in (materials, energies, tilts, azimuths, thickness, brem_step)
-        ):
-            defaults.warn_legacy_defaults()
-    materials = DEFAULT_MATERIALS if materials is None else materials
-    energies = DEFAULT_ENERGIES if energies is None else energies
+    if materials is None or energies is None:
+        raise SystemExit("--materials and --energies are required")
     if slice_minutes <= 0:
         raise SystemExit("--slice-minutes must be positive")
     jobid = remote._new_jobid()
@@ -251,7 +232,6 @@ def start(
         tilts=tilts,
         azimuths=azimuths,
         thickness=thickness,
-        set_default=set_default,
     )
     metadata = _metadata(
         jobid,
@@ -283,17 +263,14 @@ def build_parser():
     start_parser = subparsers.add_parser("start")
     start_parser.add_argument("--slice-minutes", type=float, default=DEFAULT_SLICE_MINUTES)
     start_parser.add_argument("--json-out", default=DEFAULT_JSON_OUT)
-    start_parser.add_argument("--energies", default=None, help="required from 0.15.0")
+    start_parser.add_argument("--energies", required=True)
     start_parser.add_argument("--grid-stop", type=float, default=DEFAULT_GRID_STOP)
     start_parser.add_argument("--brem-grid-stop", type=float, default=DEFAULT_BREM_GRID_STOP)
     start_parser.add_argument("--brem-step", type=float, default=None)
-    start_parser.add_argument("--materials", default=None, help="required from 0.15.0")
+    start_parser.add_argument("--materials", required=True)
     start_parser.add_argument("--tilts", default=None)
     start_parser.add_argument("--azimuths", default=None)
     start_parser.add_argument("--thickness", default=None)
-    start_parser.add_argument(
-        "--set-default", action="store_true", help="deprecated; removed in 0.15.0"
-    )
     start_parser.add_argument("--no-sync", action="store_true")
     start_parser.add_argument("--dry-run", action="store_true")
     for command in ("status", "attach", "stop"):
@@ -316,7 +293,6 @@ def main(argv=None):
             tilts=args.tilts,
             azimuths=args.azimuths,
             thickness=args.thickness,
-            set_default=args.set_default,
             no_sync=args.no_sync,
             dry_run=args.dry_run,
         )

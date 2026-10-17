@@ -263,16 +263,6 @@ def test_legacy_noop_keeps_case_identity_migration_changes_only_variant(catalog,
     }
 
 
-def test_deprecated_json_warns_once_and_keeps_schema(catalog):
-    from pyrite.cli import command
-
-    result = invoke(command, ["profile", "physical-detector", "show", "standard", "-o", "json"])
-    assert result.exit_code == 0
-    assert len([line for line in result.stderr.splitlines() if "is deprecated" in line]) == 1
-    assert "profile detector show PROFILE physical" in result.stderr
-    assert json.loads(result.stdout)["schema"] == "cxr.profile.physical-detector.show"
-
-
 def test_native_reporting_on_named_detector_and_inline_copy(catalog):
     from pyrite.campaign.observation import resolve_profile_observation
     from pyrite.instrument import NativeAcquisition

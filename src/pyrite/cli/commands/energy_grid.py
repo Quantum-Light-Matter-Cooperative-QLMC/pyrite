@@ -15,19 +15,16 @@ import click
 
 from pyrite import remote
 from pyrite.cli import _completion as _cli_completion
-from pyrite.cli._deprecations import DeprecatedOption, canonical_option
+from pyrite.cli._deprecations import canonical_option
 from pyrite.cli._options import remote_option
 from pyrite.console import config as _cli_config
 from pyrite.console import json as cli_json
 from pyrite.console.output import (
-    AZIMUTH_CSV,
     AZIMUTH_CSV_TEXT,
     ENERGY_CSV_TEXT,
     POSITIVE_FLOAT,
     POSITIVE_INT,
-    THICKNESS_CSV,
     THICKNESS_CSV_TEXT,
-    TILT_CSV,
     TILT_CSV_TEXT,
     CLIError,
     confirm_destructive,
@@ -38,25 +35,8 @@ from pyrite.console.output import (
     output_option,
 )
 from pyrite.console.outputs import output_default, output_label
-from pyrite.energy_grid import apply, defaults, job
+from pyrite.energy_grid import apply, job
 from pyrite.energy_grid import gc as artifact_gc
-
-#: ``--clear FIELD`` choices, mapped to persisted-defaults keys. D5 renamed the
-#: matching flags, so the canonical field names are the singular ones; the
-#: plurals stay accepted because they are values rather than flag spellings and
-#: `RetiredOption` does not reach them.
-_DEFAULT_FIELD_KEYS = {
-    "polar": "tilts",
-    "azimuth": "azimuths",
-    "energy": "energies",
-    "material": "materials",
-    "thickness": "thickness_ang",
-    "brem-step": "brem_step_ev",
-    "tilts": "tilts",
-    "azimuths": "azimuths",
-    "energies": "energies",
-    "materials": "materials",
-}
 
 
 def _pull_combined(json_name=None, *, dest_dir):
@@ -103,14 +83,6 @@ def _derive_options(function):
     surface D5 governs.
     """
     function = click.option(
-        "--save-default",
-        "set_default",
-        cls=DeprecatedOption,
-        is_flag=True,
-        hidden=True,
-        help="Deprecated: persist supplied derivation batch inputs until 0.15.0.",
-    )(function)
-    function = click.option(
         "--thickness",
         type=THICKNESS_CSV_TEXT,
         metavar="ANGSTROM,...",
@@ -135,13 +107,15 @@ def _derive_options(function):
         "energies",
         type=ENERGY_CSV_TEXT,
         metavar="KEV,...",
-        help="Beam energies in keV; comma-separated and positive. Required from 0.15.0.",
+        required=True,
+        help="Beam energies in keV; comma-separated and positive.",
     )(function)
     return canonical_option(
         "--material",
         "materials",
         metavar="KEY,...",
-        help="Material keys; comma-separated. Required from 0.15.0; legacy presets warn.",
+        required=True,
+        help="Material keys; comma-separated.",
         shell_complete=_cli_completion.complete_material_csv,
     )(function)
 
@@ -179,7 +153,6 @@ def _derive_options(function):
 )
 @remote_option
 @click.pass_context
-@defaults.legacy_warning_scope()
 def derive_command(
     ctx,
     materials,
@@ -187,7 +160,6 @@ def derive_command(
     tilts,
     azimuths,
     thickness,
-    set_default,
     brem_step,
     slice_minutes,
     no_sync,
@@ -200,8 +172,7 @@ def derive_command(
     """Optionally derive and install grids locally or remotely.
 
     Normal runs size line grids automatically and resolve continuum bounds per
-    case. From 0.15.0, this specialist tool requires --material and --energy;
-    persistent batch presets and --save-default retire together. Supply geometry
+    case. This specialist tool requires --material and --energy. Supply geometry
     and spacing per invocation; omitted angles inherit ordinary profile geometry.
     Explicit artifact workflows may optimize nonuniform continuum grids beyond
     the normal uniform continuum spacing.
@@ -225,12 +196,6 @@ def derive_command(
             raise click.UsageError(
                 f"remote-only option(s) require -R/--remote: {', '.join(explicit)}"
             )
-    if set_default or any(
-        value is None for value in (materials, energies, tilts, azimuths, thickness, brem_step)
-    ):
-        defaults.warn_legacy_defaults(
-            already_warned=bool(ctx.meta.get("pyrite.deprecated_option_warned:--save-default"))
-        )
     if remote_target is None:
         return _derive_local(
             materials,
@@ -238,7 +203,6 @@ def derive_command(
             tilts,
             azimuths,
             thickness,
-            set_default,
             brem_step,
             _cli_config.resolve("profile.current", catalog_profile).value,
         )
@@ -248,21 +212,17 @@ def derive_command(
         tilts=tilts,
         azimuths=azimuths,
         thickness=thickness,
-        set_default=set_default,
         brem_step=brem_step,
         slice_minutes=slice_minutes,
         no_sync=no_sync,
         dry_run=dry_run,
         detach=detach,
         remote_target=remote_target,
-        persist_local=True,
         catalog_profile=_cli_config.resolve("profile.current", catalog_profile).value,
     )
 
 
-def _derive_local(
-    materials, energies, tilts, azimuths, thickness, set_default, brem_step, catalog_profile
-):
+def _derive_local(materials, energies, tilts, azimuths, thickness, brem_step, catalog_profile):
     from pyrite.energy_grid import derive
 
     argv = []
@@ -277,8 +237,6 @@ def _derive_local(
             argv.extend((f"--{flag}", value))
     if brem_step is not None:
         argv.extend(("--brem-step", str(brem_step)))
-    if set_default:
-        argv.append("--set-default")
     with tempfile.TemporaryDirectory() as workdir:
         json_out = str(Path(workdir) / job.DEFAULT_JSON_OUT)
         _invoke_callback(derive.main, [*argv, "--json-out", json_out])
@@ -301,47 +259,22 @@ def _derive_remote(
     tilts,
     azimuths,
     thickness,
-    set_default,
     brem_step,
     slice_minutes,
     no_sync,
     dry_run,
     detach,
     remote_target,
-    persist_local,
     catalog_profile,
 ):
     from pyrite.remote.config import override_remote_host
 
-    uses_presets = set_default or any(
-        value is None for value in (materials, energies, tilts, azimuths, thickness, brem_step)
-    )
-    persisted = defaults.load_defaults() if uses_presets else {}
-    if set_default and persist_local:
-        persisted = defaults.update_defaults(
-            materials=materials.split(",") if materials else None,
-            energies=[float(value) for value in energies.split(",")] if energies else None,
-            tilts=[float(value) for value in tilts.split(",")] if tilts else None,
-            azimuths=[float(value) for value in azimuths.split(",")] if azimuths else None,
-            thickness_ang=([float(value) for value in thickness.split(",")] if thickness else None),
-            brem_step_ev=brem_step,
-        )
-    resolved_materials = (
-        materials
-        or ",".join(str(value) for value in persisted["materials"])
-        or job.DEFAULT_MATERIALS
-    )
-    resolved_energies = (
-        energies
-        or ",".join(f"{float(value):g}" for value in persisted["energies"])
-        or job.DEFAULT_ENERGIES
-    )
-    resolved_tilts = tilts or ",".join(f"{float(value):g}" for value in persisted["tilts"])
-    resolved_azimuths = azimuths or ",".join(f"{float(value):g}" for value in persisted["azimuths"])
-    resolved_thickness = thickness or ",".join(
-        f"{float(value):g}" for value in persisted["thickness_ang"]
-    )
-    resolved_brem_step = brem_step if brem_step is not None else float(persisted["brem_step_ev"])
+    resolved_materials = materials
+    resolved_energies = energies
+    resolved_tilts = tilts
+    resolved_azimuths = azimuths
+    resolved_thickness = thickness
+    resolved_brem_step = brem_step
     with override_remote_host(None if remote_target == "__configured__" else remote_target):
         jobid = _invoke_callback(
             job.start,
@@ -350,7 +283,6 @@ def _derive_remote(
             tilts=resolved_tilts or None,
             azimuths=resolved_azimuths or None,
             thickness=resolved_thickness or None,
-            set_default=set_default,
             brem_step=resolved_brem_step,
             slice_minutes=slice_minutes,
             no_sync=no_sync,
@@ -729,128 +661,6 @@ def set_brem_command(material, stop, step, spacing, num, start, note, catalog_pr
     except (KeyError, ValueError, OSError) as exc:
         _expected_failure(exc)
     emit_result(f"repointed {resolved_profile}/{material} -> {digest}")
-    return 0
-
-
-@click.command("defaults")
-@output_option
-@canonical_option(
-    "--save-default",
-    "set_values",
-    is_flag=True,
-    help="Persist supplied values; otherwise only show defaults.",
-)
-@click.option(
-    "--clear",
-    "clear_fields",
-    type=click.Choice(tuple(_DEFAULT_FIELD_KEYS), case_sensitive=True),
-    multiple=True,
-    metavar="FIELD",
-    help=(
-        "Reset one field to inherited/built-in behavior; repeatable. "
-        "Fields: polar, azimuth, thickness, brem-step, energy, material."
-    ),
-)
-@click.option(
-    "--reset",
-    is_flag=True,
-    help="Reset every persistent derivation field to inherited/built-in behavior.",
-)
-@canonical_option(
-    "--polar",
-    "tilts",
-    type=TILT_CSV,
-    metavar="DEG,...",
-    help="Persistent derivation polar tilts in degrees [0, 90).",
-)
-@canonical_option(
-    "--azimuth",
-    "azimuths",
-    type=AZIMUTH_CSV,
-    metavar="DEG,...",
-    help="Persistent azimuths in degrees [0, 360].",
-)
-@click.option(
-    "--thickness",
-    type=THICKNESS_CSV,
-    metavar="ANGSTROM,...",
-    help="Persistent positive crystal thicknesses in angstrom.",
-)
-@click.option(
-    "--brem-step",
-    type=POSITIVE_FLOAT,
-    metavar="EV",
-    help="Persistent derivation bremsstrahlung spacing in eV.",
-)
-def defaults_command(
-    json_output,
-    set_values,
-    clear_fields,
-    reset,
-    tilts,
-    azimuths,
-    thickness,
-    brem_step,
-):
-    """Deprecated: show, update, or clear global derivation batch inputs.
-
-    These presets retire in 0.15.0. Normal runs size grids automatically;
-    specialist derivation accepts explicit --material and --energy selections.
-
-    These values feed local and remote ``derive`` when matching options are
-    omitted. Geometry searches determine both line and bremsstrahlung upper
-    bounds; ``brem-step`` controls only applied bremsstrahlung spacing.
-
-    Empty ``polar`` or ``azimuth`` mean inherit each material's catalog-profile
-    angles. These are not physical scan defaults.
-    """
-    supplied = [
-        flag
-        for flag, value in (
-            ("--polar", tilts),
-            ("--azimuth", azimuths),
-            ("--thickness", thickness),
-            ("--brem-step", brem_step),
-        )
-        if value is not None
-    ]
-    if supplied and not set_values:
-        raise click.UsageError(f"{', '.join(supplied)} require --save-default")
-    if set_values and not supplied:
-        raise click.UsageError("--save-default requires at least one value option")
-    mutation_modes = int(set_values) + bool(clear_fields) + int(reset)
-    if mutation_modes > 1:
-        raise click.UsageError("--save-default, --clear, and --reset cannot be combined")
-    if json_output and mutation_modes:
-        raise click.UsageError("--output json is read-only and cannot be combined with mutations")
-    if set_values:
-        defaults.update_defaults(
-            tilts=tilts,
-            azimuths=azimuths,
-            thickness_ang=thickness,
-            brem_step_ev=brem_step,
-        )
-    elif clear_fields:
-        defaults.reset_defaults(*(_DEFAULT_FIELD_KEYS[field] for field in clear_fields))
-    elif reset:
-        defaults.reset_defaults()
-    if json_output:
-        try:
-            values = defaults.load_defaults()
-            source = "persisted" if defaults.DEFAULTS_PATH.exists() else "fallback"
-            result = cli_json.cxr_grid_defaults(values, source=source)
-        except (OSError, TypeError, ValueError) as exc:
-            result = cli_json.failure("cxr.energy-grid.defaults", {}, str(exc))
-        emit_json_result(result)
-        return 0
-    values = defaults.load_defaults()
-    for key, value in values.items():
-        suffix = ""
-        if key == "tilts" and not value:
-            suffix = " (inherit each material's catalog-profile polar tilts)"
-        elif key == "azimuths" and not value:
-            suffix = " (inherit each material's catalog-profile azimuths)"
-        emit_result(f"{key} = {value}{suffix}")
     return 0
 
 

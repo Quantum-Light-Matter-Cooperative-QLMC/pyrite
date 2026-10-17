@@ -6,7 +6,6 @@ from typing import Any, Literal, cast
 
 import numpy as np
 
-from ._api_deprecations import warn_api
 from ._energy_bins import EnergyBins
 from ._precision import Precision
 
@@ -22,12 +21,10 @@ EmissionSelection = (
 LegacyEmissionPolicy = Literal["incoherent", "coherent", "both"]
 
 
-def _emission_selection(value: object, *, warn_both: bool = False) -> tuple[EmissionMode, ...]:
+def _emission_selection(value: object) -> tuple[EmissionMode, ...]:
     """Normalize API selections or stable legacy policies to ordered modes."""
     if isinstance(value, str):
         if value == "both":
-            if warn_both:
-                warn_api('Physics(emission="both")', stacklevel=5)
             return ("incoherent", "coherent")
         modes = (value,)
     elif isinstance(value, (tuple, list, set, frozenset)):
@@ -156,7 +153,7 @@ class Physics:
         tuple, list, set, or frozenset of modes. Stored as a deduplicated tuple
         in incoherent-then-coherent order. Coherent scoring also exposes its
         incoherent companion from the same transport. The input alias
-        ``"both"`` is deprecated; use ``("incoherent", "coherent")``.
+        Use ``("incoherent", "coherent")`` to select both modes.
     brem_source
         ``"mc"``, ``"external"``, or ``None`` continuum policy. ``None``
         disables continuum scoring and is stored as ``"none"`` for case and
@@ -241,7 +238,11 @@ class Physics:
     channeling_plane: tuple[int, int, int] | None = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "emission", _emission_selection(self.emission, warn_both=True))
+        if self.emission == "both":
+            raise ValueError(
+                'emission="both" was removed in 0.15.0; use emission=("incoherent", "coherent")'
+            )
+        object.__setattr__(self, "emission", _emission_selection(self.emission))
         if self.channeling_plane is not None:
             object.__setattr__(self, "channeling_plane", _miller(self.channeling_plane))
         if self.brem_source is None:

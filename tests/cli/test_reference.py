@@ -40,10 +40,6 @@ def test_help_documents_examples_units_side_effects_and_incompatibilities():
         ("remote", "pull"): ("--preset", "grid-filtered"),
         ("material", "energy-grid"): ("detector energy-grid inputs", "Examples:"),
         ("material", "energy-grid", "derive"): ("keV", "angstrom", "spacing in eV"),
-        ("profile", "energy-grid", "defaults"): (
-            "global derivation batch inputs",
-            "not physical scan defaults",
-        ),
         ("job", "status"): ("defaults to latest", "repeat"),
     }
     for path, expected in cases.items():

@@ -33,26 +33,11 @@ INTENTIONAL_P0_CORRECTIONS = [
         ),
     },
     {
-        "id": "line-grid-submit-forwarding",
-        "paths": ["line-grid submit"],
-        "contract": (
-            "Forward tilts, azimuths, thickness, and set-default through every remote slice."
-        ),
-    },
-    {
         "id": "line-grid-atomic-validation",
         "paths": ["line-grid apply", "line-grid set", "line-grid set-brem"],
         "contract": (
             "Validate proposed catalog and provenance before atomic replacement; failed writes "
             "leave both unchanged."
-        ),
-    },
-    {
-        "id": "line-grid-defaults-semantics",
-        "paths": ["line-grid defaults"],
-        "contract": (
-            "Value flags require --set; numeric domains are validated; zero is preserved only "
-            "where documented."
         ),
     },
     {
@@ -109,8 +94,8 @@ INTENTIONAL_P0_CORRECTIONS = [
         "id": "profile-filter-detector-flags-removed",
         "paths": ["profile filter add"],
         "contract": (
-            "A profile's physical detector is set only through `pyrite profile physical-detector "
-            "set`; `profile filter add` no longer accepts `--detector-distance-mm`, "
+            "A profile's physical detector is set only through `pyrite profile detector set "
+            "PROFILE physical`; `profile filter add` no longer accepts `--detector-distance-mm`, "
             "`--detector-*-deg`, `--detector-offset-mm`, `--shape`, or `--pitch-mm`, which "
             "replaced the whole table and dropped its scorer, response, and acquisition. They "
             "are plain 'no such option' usage errors."

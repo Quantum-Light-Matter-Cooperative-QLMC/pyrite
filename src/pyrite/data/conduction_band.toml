@@ -13,6 +13,17 @@ basis = "maximum of the REELS-derived optical energy-loss function (0.1 eV grid)
 source = "L. H. Yang et al., Phys. Rev. B 100, 245209 (2019)"
 doi = "10.1103/PhysRevB.100.245209"
 
+# The effective valence oscillator is present even in an insulator. It does
+# not represent free conduction electrons or the doped sample's sub-eV mode.
+# Validation: diamond-valence-oscillator
+[diamond]
+formula = { C = 1 }
+electrons_per_formula = 4
+resonance_eV = 34.0
+basis = "approximately 34 eV bulk valence plasmon in the undoped HPHT diamond control; Results, Experimental measurements of the dielectric response of BDD, and Supplementary Fig. 2; the boron-doped sub-0.5 eV intervalence mode is excluded; one effective oscillator within the existing PENELOPE model, not a measured full momentum-dependent GOS"
+source = "S. Bhattacharya et al., Nature Communications 16, 444 (2025); publisher full text read for issue #525"
+doi = "10.1038/s41467-024-55353-0"
+
 [sio2]
 formula = { Si = 1, O = 2 }
 electrons_per_formula = 16
@@ -124,11 +135,3 @@ resonance_eV = 25.5
 basis = "bulk plasmon at the maximum of the REELS-derived optical energy-loss function (reverse Monte Carlo, averaged over 1-3 keV spectra; Fig. 3, text); Werner's REELS ELF also peaks near 25 eV; the 43 and 53 eV peaks (5p/4f) are not represented"
 source = "Z. Li et al., Results Phys. 56, 107247 (2024)"
 doi = "10.1016/j.rinp.2023.107247"
-
-[diamond]
-formula = { C = 1 }
-electrons_per_formula = 4
-resonance_eV = 33.3
-basis = "maximum (33.3 +/- 0.2 eV, FWHM about 13 eV) of the valence-plasmon peak in transmission EELS, 80 keV beam, 2 mrad objective-aperture collection semi-angle (q up to about 0.3 A^-1, so not strictly q=0; plasmon dispersion not removed), thin-film maximum of the loss intensity, not an optical-limit Im(-1/eps) fit; the free-electron value is 31.0 eV, the ab initio ELF maximum is about 35 eV (Azzolini et al., arXiv:1612.01898 Fig. 3) and the separate 24 eV hump and 10 eV interband features are not represented; four electrons per atom is a model allocation, not a measured carrier density"
-source = "R. F. Egerton and M. J. Whelan, Philos. Mag. 30, 739 (1974)"
-doi = "10.1080/14786437408207231"
