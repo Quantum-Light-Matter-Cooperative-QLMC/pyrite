@@ -106,6 +106,8 @@ docs = [
     "sphinx-autobuild>=2025.8.25",
     "pydata-sphinx-theme>=0.20.0",
     "sphinxcontrib-bibtex>=2.6",
+    # Exports the browser-only results demo (docs/demo/) during the HTML build.
+    "marimo>=0.25.1",
 ]
 
 # Independent validation oracles (crystallography, relaxation cascade, frozen-

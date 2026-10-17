@@ -117,3 +117,42 @@ def test_validation_writeups_use_rendering_math_delimiters() -> None:
             if fence is None and (r"\(" in line or (r"\[" in line and r"\\[" not in line)):
                 offenders.append(f"{page.relative_to(root)}:{number}")
     assert not offenders, f"non-rendering math delimiters: {offenders}"
+
+
+def test_browser_demo_imports_only_pyodide_safe_modules() -> None:
+    """The docs demo runs under Pyodide, which has no numba build for pyrite."""
+    import ast
+
+    path = Path(__file__).parents[2] / "docs" / "demo" / "results_app.py"
+    imported = set()
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module.split(".")[0])
+
+    assert imported <= {"json", "pathlib", "marimo", "numpy", "plotly", "pyodide"}
+
+
+def test_demo_export_joins_interleaved_segments_per_track() -> None:
+    path = Path(__file__).parents[2] / "scripts" / "export_docs_demo.py"
+    spec = importlib.util.spec_from_file_location("pyrite_export_docs_demo", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    nan = float("nan")
+    # Two tracks, steps interleaved as transport records them: a0 b0 a1 b1.
+    segments = [((0, 0, 0), (0, 0, 1), 0), ((5, 0, 0), (5, 0, 1), 1)]
+    segments += [((0, 0, 1), (0, 0, 2), 0), ((5, 0, 1), (5, 0, 2), 1)]
+    trace = {"x": [], "y": [], "z": [], "line": {"color": []}, "customdata": []}
+    for start, end, track in segments:
+        for point in (start, end, (nan, nan, nan)):
+            for axis, value in zip("xyz", point, strict=True):
+                trace[axis].append(value)
+            trace["line"]["color"].append(float(track))
+            trace["customdata"].append([0.0, 0.0, 0.0, float(track), -1.0])
+
+    joined = module._polyline(trace)
+
+    assert joined["z"] == [0.0, 1.0, 2.0, None, 0.0, 1.0, 2.0]
+    assert joined["x"] == [0.0, 0.0, 0.0, None, 5.0, 5.0, 5.0]

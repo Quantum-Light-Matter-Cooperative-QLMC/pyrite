@@ -18,6 +18,24 @@ It is research software under active development: read the
 - **[Understand the physics](guides/how-pyrite-works.md)** — follow a simulation from beam to observable.
 - **[Use Python](guides/python-api-workflow.md)** — build a scene and inspect an in-memory result.
 
+## Explore results in the browser
+
+The demo below runs in your browser with no install: HOPG PXR+CBS spectra in
+the Zhai et al. (2025) Fig. 1c geometry, bulk versus 29 nm film, beside a 3D
+view of the simulated electron tracks. The first load fetches a Python runtime
+and can take a minute. Its provenance footer lists the PyRITE version, model
+markers, and the validation status of each claim it shows.
+
+```{raw} html
+<iframe class="pyrite-demo" src="demo/index.html" title="PyRITE results demo"
+  loading="lazy" sandbox="allow-scripts allow-same-origin"
+  style="width: 100%; height: 900px; border: 1px solid var(--pst-color-border); border-radius: 6px;">
+  <img src="demo/preview.png" alt="PyRITE results demo preview">
+</iframe>
+<noscript><img src="demo/preview.png" alt="PyRITE results demo preview" style="width: 100%;"></noscript>
+<p><a href="demo/index.html">Open the demo full screen</a>.</p>
+```
+
 ## First simulation
 
 Requires Python 3.13 or newer and [uv](https://docs.astral.sh/uv/).

@@ -159,6 +159,28 @@ pyrite-dev docs --linkcheck
 
 External link checking requires network access and is therefore not part of the offline gate.
 
+## Browser results demo
+
+The overview page embeds `docs/demo/results_app.py`, a marimo notebook that
+imports only `marimo`, `numpy`, and `plotly` so it runs under Pyodide. The
+`_marimo_demo` Sphinx extension exports it with
+`marimo export html-wasm --single-file` into `demo/` of every HTML build and
+copies `docs/demo/public/` beside it; Pyodide and packages load from a CDN at
+view time. The notebook reads only the committed
+`docs/demo/public/results_demo.json`, which carries its own provenance
+(version, commit, model markers, ledger statuses read at export time).
+
+Regenerate the data and the README preview image after populating the Zhai
+cache:
+
+```bash
+pyrite run --preset zhai          # or --remote, then pull the cache back
+uv run python scripts/export_docs_demo.py
+```
+
+The export refuses a missing or stale cache and never reruns the reproduction.
+Commit the JSON and `docs/_static/demo/results-demo-preview.png` together.
+
 ## Warning policy
 
 The checked autodoc warning baseline is intentionally empty: source docstrings must render without parser warnings. The fingerprint mechanism remains so any new source-docstring warning fails the build for review.

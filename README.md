@@ -26,6 +26,12 @@ for supported paths and limitations.
 - Source: <https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite>
 - Documentation: <https://pyrite.readthedocs.io/en/latest/>
 
+[![HOPG PXR+CBS spectra in the Zhai et al. Fig. 1c geometry beside 3D electron
+tracks; opens the interactive browser demo](docs/_static/demo/results-demo-preview.png)](https://pyrite.readthedocs.io/en/latest/#explore-results-in-the-browser)
+
+The [interactive version](https://pyrite.readthedocs.io/en/latest/#explore-results-in-the-browser)
+runs in the browser from the documentation overview page; nothing to install.
+
 ## Install
 
 Requires Python ≥ 3.13. Python 3.13 installs `backports.zstd` automatically;

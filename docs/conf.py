@@ -57,6 +57,7 @@ version = __version__
 # -- Extensions --------------------------------------------------------------
 extensions = [
     "_warning_baseline",  # exact boundary around inherited autodoc parse debt
+    "_marimo_demo",  # browser-only results demo embedded on the overview page
     "myst_parser",  # render the docs/*.md design notes
     "sphinx.ext.autodoc",  # API docs from docstrings
     "sphinx.ext.autosummary",  # per-module summary tables + stub pages
