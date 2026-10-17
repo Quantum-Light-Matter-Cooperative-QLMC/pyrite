@@ -29,7 +29,7 @@ capabilities
 - The line kernel is first-order and kinematic. Each numerical transport row uses one representative velocity and finite-flight sinc factor. CSDA may subdivide one collision-free flight to update energy and clock; those substep fields are grouped before the flight intensity is formed. Dynamical diffraction is excluded. A separate opt-in planar channeling zone
   supports bounded run integration; axial channeling remains an experimental
   diagnostic. See the [capability matrix](capabilities.md) for restrictions.
-- Distinct physical flights and electrons add as intensities by default. This is a random-phase/independent-emission approximation, not collision-induced decoherence. The optional phased tracking policy preserves phase across each electron trajectory and blends inter-electron terms through sampled bunch form factors; see [Coherent-emission tracking](radiation-physics/coherent-emission.md). An opt-in profile key adds the line arrival-time intensity $I(t)=|E(t)|^2$; see [Temporal intensity profile](radiation-physics/temporal-intensity-profile.md).
+- Distinct physical flights and electrons add as intensities by default. This is a random-phase/independent-emission approximation, not collision-induced decoherence. The optional phased tracking policy preserves phase across each electron trajectory with physical bunch-population weighting and geometry-dependent offset averaging; see [Coherent-emission tracking](radiation-physics/coherent-emission.md). An opt-in profile key adds the line arrival-time intensity $I(t)=|E(t)|^2$; see [Temporal intensity profile](radiation-physics/temporal-intensity-profile.md).
 
 ### Incoherent emission
 

@@ -7,10 +7,7 @@ New users should begin with [Getting started](getting-started.md), then use [Wor
 ```{toctree}
 :maxdepth: 1
 
-getting-started
-../project-readme
-../repo-design/cli/cli-reference
-../repo-design/cli/cli-deprecations
+how-pyrite-works
 python-api-workflow
 shell-completion
 configuration-cookbook

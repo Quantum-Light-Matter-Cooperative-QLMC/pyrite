@@ -141,12 +141,16 @@ html_theme = "pydata_sphinx_theme"
 templates_path = ["_templates"]
 html_sidebars = {"**": ["sidebar-collapse.html", "sidebar-sections.html"]}
 html_title = "PyRITE"
+# RTD supplies the preferred domain/version; Sphinx appends each document path.
+html_baseurl = os.environ.get(
+    "READTHEDOCS_CANONICAL_URL", "https://pyrite.readthedocs.io/en/latest/"
+)
 
 
 html_theme_options = {
-    "navigation_depth": 4,
+    "navigation_depth": 2,
     "show_nav_level": 1,
-    "collapse_navigation": False,
+    "collapse_navigation": True,
     "logo": {
         "text": "PyRITE",
         "image_light": "_static/pyrite_full.jpg",

@@ -1,48 +1,82 @@
 # Getting started
 
-This guide takes a new user from installation to a small local run. The [project README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#readme) owns the complete installation matrix, scientific scope, and current validation caveats.
+Install the released package, run one small CPU simulation, and locate its output.
+No source checkout is required. PyRITE needs Python 3.13 or newer and
+[uv](https://docs.astral.sh/uv/); the [README installation matrix](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#install)
+covers library installs and accelerator extras.
 
-## Install and inspect the CLI
-
-PyRITE requires Python 3.13 or newer and [uv](https://docs.astral.sh/uv/).
+## Install and fetch reference data
 
 ```bash
-git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
-cd pyrite
-uv sync
-source .venv/bin/activate     # Windows: .venv\Scripts\activate
+uv tool install pyrite-mc
+pyrite --version
 pyrite --help
+pyrite tables fetch
 ```
 
-Every `pyrite ...` command in these guides assumes `pyrite` is on your `PATH`: either activate the project environment as above in each new shell, or install it once as a tool (`uv tool install .`, see the [shell-completion guide](shell-completion.md)).
+If `pyrite` is not on your `PATH`, run `uv tool update-shell` and restart the
+shell. The base package is CPU-only. `tables fetch` installs pinned EEDL, EADL,
+EPDL, SBETHE, ELSEPA, and BremsLib datasets (about 100 MB) from public GitHub
+Releases; no GitHub token is required. Data go to the selected workspace;
+see [output-home configuration](configuration-cookbook.md#choose-an-output-home).
+For an offline archive or individual dataset, inspect `pyrite tables fetch --help`.
 
-The base installation is CPU-only. Accelerator extras and contributor setup are documented in the [project README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#install) and [development workspace guide](../repo-design/development-workspace.md). To expose `pyrite` as a persistent user command and enable tab-completion without activating `.venv`, follow the [shell-completion guide](shell-completion.md).
+`pyrite config setup` is optional: it detects hardware and saves a backend choice.
+Use the [development setup](../repo-design/development-workspace.md#install-from-source)
+only when contributing or running from a checkout. For persistent tab completion,
+see [shell completion](shell-completion.md).
 
-## Discover profiles and materials
+## Run the quickstart profile
 
-Profiles define reusable campaign settings and material membership. Inspect the available configuration before starting compute:
+Choose a working directory where you want results, then inspect and run the
+bundled one-case HOPG profile:
 
 ```bash
-pyrite profile list
-pyrite profile show standard
-pyrite material show hopg
-pyrite config list
+pyrite profile show quickstart
+pyrite run quickstart
 ```
 
-Use the generated [CLI reference](../repo-design/cli/cli-reference.md) when a command's complete option and output contract matters. The [sweep-profile guide](sweep-profiles.md) explains profiles, fidelity, dataset identity, and named beams.
+The demo uses a 30 keV beam and a 2 µm HOPG target at 45° tilt. It scores
+incoherent PXR/CBS lines plus bremsstrahlung with a scalar detector. Allow roughly
+a minute on CPU, with extra time for first-use compilation. A case-local line
+grid is resolved automatically; no manual energy-grid derivation is needed.
 
-## Run a small smoke test
+Full `standard` sweeps cover much larger grids. Use the
+[cluster guide](running-on-a-cluster.md) for heavy GPU or SLURM work.
 
-Start with one material on the tiny `--quick` grid rather than a production sweep:
+## Locate and inspect the result
 
 ```bash
-pyrite run standard -m hopg --quick
+pyrite checkpoint list
 ```
 
-Bundled profiles resolve a conservative case-local line grid automatically; no derivation step is required. Full sweeps are heavy; use the [cluster guide](running-on-a-cluster.md) for GPU or SLURM work.
+The inventory lists active checkpoint datasets. Find the HOPG dataset produced
+by the run; its component files live beneath
+`pyrite-output/checkpoints/<dataset>/` in the effective workspace. Modified
+profiles can have identity-qualified directory names. Repeating the same run
+resumes compatible stored cases rather than discarding them.
 
-## Inspect the result
+To plot the saved spectra, install the optional apps extra in the same tool
+environment, then launch the analysis app:
 
-Runs write identity-qualified component checkpoints beneath `pyrite-output/checkpoints/`. Continue with [Working with results](working-with-results.md) for checkpoint, analysis-app, export, and cleanup workflows.
+```bash
+uv tool install --upgrade "pyrite-mc[apps]"
+pyrite app analysis launch hopg
+```
 
-Before using output for scientific claims, inspect the [validation ledger](../validation/physics-validation-ledger.md). A successful run does not imply that every model or instrument input is signed off.
+Select the quickstart dataset in the app's **Checkpoint** picker. If it opens on
+**choose a checkpoint**, pick the dataset explicitly. The **Spectra** view shows
+line and continuum components; it reads stored output without rerunning transport.
+See [Working with results](working-with-results.md) for component meanings,
+normalization, exports, and cleanup.
+
+## Choose the next workflow
+
+- [How PyRITE works](how-pyrite-works.md): follow the simulation stages.
+- [Sweep profiles](sweep-profiles.md) and [configuration recipes](configuration-cookbook.md): change beam, material, detector, and sampling settings.
+- [Python API workflow](python-api-workflow.md): simulate one scene in memory.
+- [Run reference](../repo-design/cli/cli-reference-run.md) and [checkpoint reference](../repo-design/cli/cli-reference-checkpoint.md): complete options and output contracts.
+- [Capabilities and limitations](../physics/capabilities.md) and [validation status](../validation/status-summary.md): check the evidence before scientific use.
+
+A completed simulation establishes that the workflow ran; it does not establish
+accuracy for a material, energy, or observable outside the documented evidence.

@@ -29,6 +29,11 @@ jobs:
           python-version: "3.14"
           enable-cache: true
 
+      - name: Check generated references
+        run: |
+          uv run --locked --no-default-groups --group docs pyrite-dev cli-reference --check
+          uv run --locked --no-default-groups --group docs pyrite-dev validation-ledger --check
+
       - name: Build Sphinx documentation
         run: >
           uv run
