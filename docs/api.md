@@ -525,6 +525,9 @@ These are the supported low-level simulation entry points. Inputs and outputs us
    pyrite.montecarlo.runner.run_case
    pyrite.montecarlo.runner.run_cases
    pyrite.montecarlo.channeling.spatial.spatial_density
+   pyrite.montecarlo.channeling.axial_diagnostic.AxialDiagnosticConfig
+   pyrite.montecarlo.channeling.axial_diagnostic.AxialDiagnosticResult
+   pyrite.montecarlo.channeling.axial_diagnostic.axial_diagnostic
 ```
 
 For a planar `DensityMatrixSolver`, opt into scalar position-density history
@@ -535,6 +538,10 @@ electron, folded into one period, with cell integral equal to the surviving
 solver `trace`. Reconstruction uses the instantaneous basis after any energy
 reprojection. See the [channeling demo](guides/working-with-results.md#planar-channeling-demo)
 and [normalization derivation](validation/channeling/cr-planar-spatial-density-reconstruction.md).
+
+The [experimental axial diagnostic](guides/axial-diagnostics.md) assembles coherent
+or MCWF solvers independently of `simulate`, with typed configuration/results
+and explicit incident-electron density normalization.
 
 ## Detector response
 
