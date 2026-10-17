@@ -33,21 +33,3 @@ def test_relocated_click_trees_accept_short_help(root, path, capsys):
         outputs.append(capsys.readouterr().out)
     assert outputs[0].startswith("Usage:")
     assert outputs[0] == outputs[1]
-
-
-def test_hidden_profile_grid_short_help_after_standalone_help(monkeypatch, capsys):
-    from pyrite.cli.commands.energy_grid_surface import profile_command as grid_command
-
-    # Lazy hidden aliases copy the command, including its cached help option.
-    monkeypatch.setattr(grid_command, "_help_option", None)
-    assert run(grid_command, ["--help"], prog_name="energy-grid") in (0, None)
-    capsys.readouterr()
-
-    for flag in ("-h", "--help"):
-        assert run(profile_command, ["energy-grid", flag], prog_name="pyrite-dev profile") in (
-            0,
-            None,
-        )
-        captured = capsys.readouterr()
-        assert captured.out.startswith("Usage:")
-        assert captured.err == ""

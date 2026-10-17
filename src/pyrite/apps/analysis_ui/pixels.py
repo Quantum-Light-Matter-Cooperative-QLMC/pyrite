@@ -63,8 +63,8 @@ def load_selected_observation(
         return PixelObservationState(None, None, "No checkpoint is loaded.")
     if selector is None or selector.value is None:
         detail = (
-            "Configure a counting physical detector with `pyrite profile physical-detector "
-            "set` and run the profile with `pyrite run` to store one."
+            "Configure a counting detector with `pyrite profile detector set` and run "
+            "the profile with `pyrite run` to store one."
         )
         return PixelObservationState(
             inventory, None, f"No stored pixel observation for `{inventory.stem}`. {detail}"

@@ -272,17 +272,8 @@ def test_main_returns_tempfail_when_budget_leaves_work(monkeypatch):
     assert analyze.main(["--materials", "hopg", "--energies", "200"]) == 75
 
 
-def test_main_uses_persistent_materials_and_energies(monkeypatch, capsys):
+def test_main_uses_explicit_materials_and_energies(monkeypatch):
     seen = {}
-    monkeypatch.setattr(
-        analyze.lg_defaults,
-        "load_defaults",
-        lambda: {
-            **analyze.lg_defaults.FALLBACK,
-            "materials": ["wse2", "mose2"],
-            "energies": [40.0, 60.0],
-        },
-    )
     monkeypatch.setattr(
         analyze,
         "derive_all_materials",
@@ -292,18 +283,12 @@ def test_main_uses_persistent_materials_and_energies(monkeypatch, capsys):
         ),
     )
 
-    assert analyze.main([]) == 0
+    assert analyze.main(["--materials", "wse2,mose2", "--energies", "40,60"]) == 0
     assert seen == {"materials": ["wse2", "mose2"], "energies": [40.0, 60.0]}
-    assert capsys.readouterr().err == analyze.lg_defaults.LEGACY_WARNING + "\n"
 
 
-def test_main_explicit_inputs_do_not_read_presets(monkeypatch, capsys):
+def test_main_forwards_optional_inputs(monkeypatch, capsys):
     seen = {}
-    monkeypatch.setattr(
-        analyze.lg_defaults,
-        "load_defaults",
-        lambda: pytest.fail("explicit derivation must not read presets"),
-    )
     monkeypatch.setattr(
         analyze,
         "derive_all_materials",

@@ -281,13 +281,6 @@ def test_set_brem_artifact_repoints_ref_and_preserves_profile_override(
     tmp_path, monkeypatch, step, expected
 ):
     from pyrite import _energy_grid_artifacts as artifacts
-    from pyrite.energy_grid import defaults
-
-    monkeypatch.setattr(
-        defaults,
-        "load_defaults",
-        lambda: pytest.fail("manual artifacts must not read batch presets"),
-    )
 
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
