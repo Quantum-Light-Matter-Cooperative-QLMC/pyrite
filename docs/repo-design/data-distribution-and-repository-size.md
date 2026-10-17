@@ -105,8 +105,8 @@ and release assets are public, so downloads need no GitHub token.
 * - Release
   - Asset
   - Pinned by
-* - `tables-elsepa-1`
-  - `elsepa-tables.zip` (25,178,906 B, 28 tables)
+* - `tables-elsepa-3`
+  - `elsepa-tables.zip` (25,881,348 B, 29 tables)
   - `src/pyrite/data/xsgen/elsepa-tables.json`
 * - `tables-bremslib-1`
   - `bremslib-tables.zip` (23,066,359 B, 24 tables)

@@ -1,0 +1,75 @@
+{
+  "source": {
+    "doi": "10.1103/PhysRevB.25.3079",
+    "zotero_item": "DXH6CSY9",
+    "zotero_attachment": "JKVKGGI2",
+    "page": [3087, 3088],
+    "table": ["I", "II"],
+    "verified": "2026-10-17",
+    "method": "Visual transcription of PDF pages 9-10 (Tables I and II)"
+  },
+  "material": "silicon",
+  "temperature": "room temperature",
+  "detector_angle_rad": 0.046,
+  "notes": [
+    "Table II energies are forward-equivalent: Fig. 7 plots them after multiplying the observed energies by (1 - beta cos theta)/(1 - beta), the factor in the last column, and Table I fits reproduce them.",
+    "Peaks are numbered from lowest to highest x-ray energy per axis; <111> peaks are assigned 3d->2p, 2p->1s, 3p->1s (Andersen and Laegsgaard; Cue et al.).",
+    "<101> is Watson's notation for <110>. Table II lists <211> peak 2 in the first column.",
+    "Table II prints gamma = 4.38 for 1.96 MeV; 1 + E/mc^2 and the Fig. 7 abscissa give 4.84, recorded here.",
+    "Fig. 7 confirms the forward correction: at gamma = 6.85 the <111> points sit at about 1.65, 3.4 and 4.95 keV, the Table II values, not 1.10 times them.",
+    "<211> is internally inconsistent: at 2.78 MeV Table II gives 3.10 keV (the peak-2 fit gives 3.04) while Fig. 7 shows only a lower-line point near 2.1 keV.",
+    "A null is an empty table cell; '3.98(?)' and '9.7?' are recorded with the question mark dropped and flagged uncertain."
+  ],
+  "columns": {
+    "kinetic_energy_MeV": "Table II col. 2",
+    "gamma": "Table II col. 3",
+    "peaks_keV": "Table II cols. 4-6: forward-equivalent peak energies X1, X2, X3",
+    "doppler_factor": "Table II col. 7: (1 - beta cos theta)/(1 - beta) at 0.046 rad"
+  },
+  "axes": {
+    "111": {
+      "uvw": [1, 1, 1],
+      "rows": [
+        {"kinetic_energy_MeV": 2.37, "gamma": 5.64, "peaks_keV": [null, 2.28, 3.41], "doppler_factor": 1.07},
+        {"kinetic_energy_MeV": 2.58, "gamma": 6.05, "peaks_keV": [null, 2.72, 3.90], "doppler_factor": 1.08},
+        {"kinetic_energy_MeV": 2.78, "gamma": 6.44, "peaks_keV": [1.41, 3.03, 4.43], "doppler_factor": 1.09},
+        {"kinetic_energy_MeV": 2.99, "gamma": 6.85, "peaks_keV": [1.63, 3.36, 4.90], "doppler_factor": 1.10}
+      ],
+      "fits": {
+        "this_work": [{"E0_keV": 0.016, "x": 2.4, "x_err": 0.1}, {"E0_keV": 0.088, "x": 1.9}, {"E0_keV": 0.13, "x": 1.9}],
+        "andersen_laegsgaard": [{"E0_keV": 0.012, "x": 2.4}, {"E0_keV": 0.072, "x": 1.9}, {"E0_keV": 0.076, "x": 2.05}]
+      }
+    },
+    "110": {
+      "uvw": [1, 1, 0],
+      "rows": [
+        {"kinetic_energy_MeV": 1.96, "gamma": 4.84, "peaks_keV": [null, 2.76, 3.98], "doppler_factor": 1.05, "uncertain": [2]},
+        {"kinetic_energy_MeV": 2.16, "gamma": 5.23, "peaks_keV": [2.29, 3.40, 4.52], "doppler_factor": 1.06},
+        {"kinetic_energy_MeV": 2.37, "gamma": 5.64, "peaks_keV": [2.65, 4.17, 5.18], "doppler_factor": 1.07},
+        {"kinetic_energy_MeV": 2.56, "gamma": 6.00, "peaks_keV": [3.06, 4.61, null], "doppler_factor": 1.08},
+        {"kinetic_energy_MeV": 2.58, "gamma": 6.05, "peaks_keV": [3.01, 4.72, 5.40], "doppler_factor": 1.08},
+        {"kinetic_energy_MeV": 2.63, "gamma": 6.14, "peaks_keV": [3.18, 4.72, 5.75], "doppler_factor": 1.08},
+        {"kinetic_energy_MeV": 2.64, "gamma": 6.16, "peaks_keV": [3.24, 4.89, 5.92], "doppler_factor": 1.08},
+        {"kinetic_energy_MeV": 2.78, "gamma": 6.44, "peaks_keV": [3.44, 5.33, 6.13], "doppler_factor": 1.09},
+        {"kinetic_energy_MeV": 2.88, "gamma": 6.63, "peaks_keV": [3.62, 5.73, 9.7], "doppler_factor": 1.09, "uncertain": [2]},
+        {"kinetic_energy_MeV": 2.99, "gamma": 6.85, "peaks_keV": [3.88, 5.85, null], "doppler_factor": 1.10},
+        {"kinetic_energy_MeV": 3.09, "gamma": 7.05, "peaks_keV": [4.10, 6.31, null], "doppler_factor": 1.11}
+      ],
+      "fits": {
+        "this_work": [{"E0_keV": 0.12, "x": 1.8, "x_err": 0.1}, {"E0_keV": 0.13, "x": 2.0}, {"E0_keV": 0.30, "x": 1.6}],
+        "cue_et_al": [{"E0_keV": 0.13, "x": 1.7}, null, {"E0_keV": 0.35, "x": 1.5}]
+      }
+    },
+    "211": {
+      "uvw": [2, 1, 1],
+      "rows": [
+        {"kinetic_energy_MeV": 2.78, "gamma": 6.44, "peaks_keV": [null, 3.10], "doppler_factor": 1.09},
+        {"kinetic_energy_MeV": 2.99, "gamma": 6.85, "peaks_keV": [2.20, 3.59], "doppler_factor": 1.10},
+        {"kinetic_energy_MeV": 3.09, "gamma": 7.05, "peaks_keV": [2.34, 3.92], "doppler_factor": 1.11}
+      ],
+      "fits": {
+        "this_work": [{"E0_keV": 0.032, "x": 2.2, "x_err": 0.2}, {"E0_keV": 0.024, "x": 2.6}]
+      }
+    }
+  }
+}

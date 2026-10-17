@@ -100,3 +100,13 @@ Across that interval the free-atom table alone changes by $\times0.966$. The row
 ## Adjudication
 
 Accepted 2026-09-25. The ledger claim now says the crystal density enters only the table identity; the assumptions name the Dirac–Fock (`MELEC 4`) model; the closure check is scoped to its anchor energies; the notes give the per-crystal 1 MeV steps and the HOPG packing caveat; and the `nearest_neighbour_distance_ang` and module docstrings carry the plane-spacing criterion and the corrected wording. The status moved to `rederived`.
+
+## Addendum: tungsten (issue #508)
+
+Scope: the bcc `tungsten` catalog crystal (COD 9006486, $a=3.1648$ Å) added for the axial channeling tier, which makes it a fifth one-element crystal. The equations and code are unchanged. Not yet fresh-context verified.
+
+| crystal | $n$ [Å$^{-3}$] | $d_{\rm nn}$ [Å] | $\rho$ [g cm$^{-3}$] | $R_{\rm mt}$ [Å] |
+| --- | --- | --- | --- | --- |
+| `tungsten` | 0.063094 | 2.74080 ($a\sqrt3/2$) | 19.261 | 1.37040 |
+
+The stored production table (electron, `tables-elsepa-3`) gives $\sigma_{\rm el}^{\rm mt}/\sigma_{\rm el}^{\rm free}=0.897$ and $\sigma_{\rm tr,1}^{\rm mt}/\sigma_{\rm tr,1}^{\rm free}=0.987$ at 1 MeV, a joined $\sigma_{\rm el}$ step of $\times1.08$ from 1 to 1.25 MeV (free atom alone $\times0.970$), and a largest muffin-tin-row closure error $\lvert 4\pi\int{\rm DCS}\,d\mu/\sigma_{\rm el}-1\rvert=3.3\times10^{-3}$ (1 MeV). The positron table is in `tables-elsepa-positron-3`.

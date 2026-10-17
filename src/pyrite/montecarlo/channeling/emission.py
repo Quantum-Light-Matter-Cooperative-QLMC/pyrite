@@ -580,6 +580,8 @@ def _depth_history(
     sample_ang: float,
     incidence_rad: float,
     divergence_rad: float,
+    entry_state=None,
+    impact: str = "averaged",
 ) -> _History:
     if thickness_ang <= 0.0 or dz_ang <= 0.0 or sample_ang <= 0.0:
         raise ValueError("thickness_ang, dz_ang and sample_ang must be positive")
@@ -587,7 +589,16 @@ def _depth_history(
     segments = max(1, int(np.ceil(thickness_ang / (inner * dz_ang))))
     seg = thickness_ang / segments
     step = seg / inner
-    rho, free, outside = solver.entry_state(incidence_rad, divergence_rad)
+    if entry_state is None:
+        rho, free, outside = solver.entry_state(incidence_rad, divergence_rad)
+    else:
+        from .states import planar_entry_density
+
+        if divergence_rad:
+            raise ValueError("entry_state carries its own momentum spread; leave divergence_rad 0")
+        rho, free, outside = solver.entry_from_plane(
+            *planar_entry_density(solver, entry_state, incidence_rad=incidence_rad, impact=impact)
+        )
     entry = float(free.sum()) + outside
     z, rates, bound = [0.0], [lines.rates(rho)], [solver.bound_population(rho)]
     for index in range(1, segments + 1):
@@ -693,6 +704,8 @@ def channeling_spectrum(
     n_divergence: int = 9,
     surface_normal: np.ndarray | Sequence[float] | None = None,
     path_limits_ang: np.ndarray | Sequence[float] | None = None,
+    entry_state=None,
+    entry_impact: str = "averaged",
 ) -> ChannelingSpectrum:
     """Return the channeling-radiation spectrum per electron.
 
@@ -760,6 +773,15 @@ def channeling_spectrum(
         Optional face/cutoff path lengths of all incident primaries, including
         zeros for misses. Weight the ensemble source by geometric survival;
         dechanneling must not be included here because it is already in rho.
+    entry_state
+        Optional :mod:`.states` entry state (``x`` along the plane normal)
+        replacing the plane-wave/``divergence_rad`` entry; it is projected by
+        :func:`~.states.planar_entry_density` and tilted by ``incidence_rad``.
+        A 2D state's in-plane spread is not inferred; pass
+        ``divergence_y_rad``.
+    entry_impact
+        ``"averaged"`` (uniform entry point) or ``"fixed"`` (the state's own
+        position relative to the planes); see :func:`~.states.planar_entry_density`.
 
     Returns
     -------
@@ -790,7 +812,15 @@ def channeling_spectrum(
         raise ValueError("surface_normal must point into the slab along the mean beam")
     lines = emission_lines(solver, include_capture=include_capture, cluster_tol_eV=cluster_tol_eV)
     history = _depth_history(
-        solver, lines, thickness_ang, dz_ang, sample_ang, incidence_rad, divergence_rad
+        solver,
+        lines,
+        thickness_ang,
+        dz_ang,
+        sample_ang,
+        incidence_rad,
+        divergence_rad,
+        entry_state,
+        entry_impact,
     )
     if path_limits_ang is not None:
         history = history.censored(path_limits_ang)
@@ -957,6 +987,8 @@ def capture_bound(
     sample_ang: float = 500.0,
     threshold: float = DEFAULT_CAPTURE_THRESHOLD,
     cluster_tol_eV: float | None = None,
+    entry_state=None,
+    entry_impact: str = "averaged",
 ) -> CaptureBound:
     """Bound the free -> bound radiative-capture yield against the line yield.
 
@@ -977,7 +1009,15 @@ def capture_bound(
     """
     lines = emission_lines(solver, include_capture=True, cluster_tol_eV=cluster_tol_eV)
     history = _depth_history(
-        solver, lines, thickness_ang, dz_ang, sample_ang, incidence_rad, divergence_rad
+        solver,
+        lines,
+        thickness_ang,
+        dz_ang,
+        sample_ang,
+        incidence_rad,
+        divergence_rad,
+        entry_state,
+        entry_impact,
     )
     yields = np.trapezoid(history.rates, history.z_ang, axis=0)
     is_capture = lines.kind == KIND_CAPTURE

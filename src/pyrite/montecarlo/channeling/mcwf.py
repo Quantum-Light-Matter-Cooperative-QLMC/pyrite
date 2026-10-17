@@ -201,6 +201,31 @@ class MCWFSolver:
         state = int(np.searchsorted(np.cumsum(free), rng.random() * free.sum(), "right"))
         return None, float(basis.energies[block, min(state, free.size - 1)])
 
+    def _entry_mixture(self, plane: np.ndarray, outside: float):
+        """Pure plane-wave-basis components ``(block, vector)`` and weights of an entry density."""
+        blocks, vectors, weights = [], [], []
+        for r in range(self.n_cells):
+            values, modes = np.linalg.eigh(plane[r])
+            for value, mode in zip(values, modes.T, strict=True):
+                if value > 1e-14:
+                    blocks.append(r)
+                    vectors.append(mode)
+                    weights.append(value)
+        weights.append(max(outside, 0.0))
+        weights = np.asarray(weights)
+        return blocks, vectors, weights / weights.sum()
+
+    def _entry_from_mixture(self, rng, blocks, vectors, weights):
+        """Sample one pure entry component (or out-of-band flux) and collapse it onto ``S``."""
+        pick = min(
+            int(np.searchsorted(np.cumsum(weights), rng.random(), "right")), weights.size - 1
+        )
+        if pick == len(blocks):
+            rng.random()  # keep the draw order fixed
+            return 0, None, np.nan
+        state, energy = self._collapse(blocks[pick], vectors[pick], rng)
+        return blocks[pick], state, energy
+
     def _entry(self, rng, lattice, weights):
         """Sample an entry plane wave and collapse it onto ``S``."""
         pick = int(np.searchsorted(np.cumsum(weights), rng.random(), "right"))
@@ -230,10 +255,18 @@ class MCWFSolver:
         first_electron: int = 0,
         stopping_eV_per_ang: float = 0.0,
         reprojection_tolerance: float = 1e-4,
+        entry_state=None,
+        entry_impact: str = "averaged",
     ) -> MCWFResult:
         """Run ``n_electrons`` trajectories ``first_electron, ...`` to ``thickness_ang``.
 
-        Validation: cr-mcwf-unravelling
+        ``entry_state`` (a :mod:`.states` state, ``x`` along the plane normal)
+        replaces the plane-wave/``divergence_rad`` entry: each electron draws one
+        pure component of its impact-averaged density
+        (:func:`~.states.planar_entry_density`, ``impact=entry_impact``), tilted by
+        ``incidence_rad``.
+
+        Validation: cr-mcwf-unravelling, cr-entry-state-projection
         """
         if n_electrons < 1 or thickness_ang <= 0.0 or dz_ang <= 0.0:
             raise ValueError("n_electrons, thickness_ang and dz_ang must be positive")
@@ -244,7 +277,27 @@ class MCWFSolver:
         steps = max(1, int(round(thickness_ang / dz_ang)))
         dz = thickness_ang / steps
         half = solver._propagators(dz, solver.hbar_v0)
-        lattice, weights = solver.entry_lattice(incidence_rad, divergence_rad)
+        if entry_state is None:
+            lattice, weights = solver.entry_lattice(incidence_rad, divergence_rad)
+
+            def draw_entry(rng):
+                return self._entry(rng, lattice, weights)
+        else:
+            from .states import planar_entry_density
+
+            if divergence_rad:
+                raise ValueError(
+                    "entry_state carries its own momentum spread; leave divergence_rad 0"
+                )
+            mixture = self._entry_mixture(
+                *planar_entry_density(
+                    solver, entry_state, incidence_rad=incidence_rad, impact=entry_impact
+                )
+            )
+
+            def draw_entry(rng):
+                return self._entry_from_mixture(rng, *mixture)
+
         streams = [_rng(seed, first_electron + i) for i in range(n_electrons)]
         blocks = np.zeros(n_electrons, dtype=int)
         states = np.zeros((n_electrons, self.size), dtype=complex)
@@ -255,7 +308,7 @@ class MCWFSolver:
         energy_eV, gamma_basis = solver.energy_eV, solver.gamma0
         entry = 0
         for i, rng in enumerate(streams):
-            blocks[i], state, energy = self._entry(rng, lattice, weights)
+            blocks[i], state, energy = draw_entry(rng)
             if state is None:
                 entry += 1
                 energies.append(energy)

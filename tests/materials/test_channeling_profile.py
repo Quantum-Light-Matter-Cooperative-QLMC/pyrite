@@ -384,3 +384,18 @@ def test_doppler_denominator_matches_pxr_resonance(energy, theta_deg):
     assert doppler_denominator(energy, np.deg2rad(theta_deg)) == pytest.approx(
         pxr_denominator, rel=1e-12
     )
+
+
+def test_planar_wells_sit_on_atomic_planes():
+    """``x`` is measured from the cell origin: Si(111) planes at 0 and 3d/4 (narrow gap d/4)."""
+    from scipy.signal import argrelmin
+
+    profile = planar_profile("silicon", (1, 1, 1))
+    d = profile.period_ang
+    x = np.arange(4096) * d / 4096
+    u = profile.potential(x)
+    wells = x[argrelmin(u, mode="wrap")[0]]
+    # Each well is pulled ~0.02 angstrom toward its near neighbour, d/4 away.
+    for plane in (0.0, 0.75 * d):
+        offset = (wells - plane + 0.5 * d) % d - 0.5 * d
+        assert np.min(np.abs(offset)) < 0.03

@@ -116,3 +116,11 @@ resonance_eV = 19.1
 basis = "main (all-valence, n = 16) plasmon of 1T-ZrSe2: Table 4 w_L from transmission EELS, 50 keV beam along c, 1 mrad scattering, so q lies in the basal plane"
 source = "M. G. Bell and W. Y. Liang, Adv. Phys. 25, 53 (1976)"
 doi = "10.1080/00018737600101362"
+
+[tungsten]
+formula = { W = 1 }
+electrons_per_formula = 6
+resonance_eV = 25.5
+basis = "bulk plasmon at the maximum of the REELS-derived optical energy-loss function (reverse Monte Carlo, averaged over 1-3 keV spectra; Fig. 3, text); Werner's REELS ELF also peaks near 25 eV; the 43 and 53 eV peaks (5p/4f) are not represented"
+source = "Z. Li et al., Results Phys. 56, 107247 (2024)"
+doi = "10.1016/j.rinp.2023.107247"

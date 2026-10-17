@@ -521,3 +521,13 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** hexagonal volume; 1Ti+2S; finite `(003)` `F_g`, `chi_g`, `U_g`; pinned `[001]` / `±(003)` catalog projection
 - **Anchor:** `tests/materials/test_crystallography.py::test_tis2_003_structure_and_couplings_are_sane`; `tests/scan/test_sweep.py::test_oriented_materials_are_registered_as_symmetric_cuts`
 - **Notes:** 10 micrometre perfect single-crystal preset; odd basal order allowed by the 1T basis; [validation write-up](materials/oriented-v2o5-tis2.md)
+
+## `tungsten-cif-structure`
+
+- **Claim:** bundled bcc tungsten lattice (Im-3m, a = 3.1648 Å at 298 K) and P1-expanded two-atom basis
+- **Code:** `data/cifs/tungsten.cif`; `data/catalog/crystals/tungsten.toml`
+- **Source:** Dubrovinsky & Saxena, *Phys. Chem. Minerals* **24**, 547--550 (1997), doi:10.1007/s002690050070 (COD 9006486)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Added for the #508 axial vortex anchor (heavy pure strings along ⟨001⟩ that bind an on-column 2p pair at TEM energies). Catalog `B_ang2 = 0.16` is the channeling `B(293 K) = 0.159 Å²` from Peng et al. (1996) Table 1 (`cr-debye-b-of-t`); no experimental PXR/CBS agreement claimed.

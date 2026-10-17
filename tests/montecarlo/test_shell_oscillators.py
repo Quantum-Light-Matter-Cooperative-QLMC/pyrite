@@ -92,6 +92,7 @@ def test_packaged_conduction_bands_are_sourced():
         "2h_tas2",
         "2h_tase2",
         "zrse2",
+        "tungsten",
     }
     assert all("doi:10." in band.source for band in bands.values())
 
@@ -150,6 +151,7 @@ def test_fetched_packaged_conduction_bands_pass_default_shell_cutoff():
         ("2h_tas2", {(73, "O4"), (73, "P1"), (16, "M1"), (16, "M2"), (16, "M3")}, 2.0668),
         ("2h_tase2", {(73, "O4"), (73, "P1"), (34, "N1"), (34, "N2"), (34, "N3")}, 2.0800),
         ("zrse2", {(40, "N4"), (40, "O1"), (34, "N1"), (34, "N2"), (34, "N3")}, 1.9056),
+        ("tungsten", {(74, "O4"), (74, "P1")}, 1.9772),
     ],
 )
 def test_fetched_catalog_materials_close_mean_excitation(key, conduction_shells, sternheimer):

@@ -144,7 +144,7 @@ def _site_densities(profile: PlanarProfile, max_harmonic: int) -> dict[str, np.n
     harmonics = np.arange(-max_harmonic, max_harmonic + 1) * step
     out: dict[str, np.ndarray] = {}
     for element, position in info["basis"]:
-        phase = np.exp(1j * 2.0 * np.pi * harmonics * float(np.dot(profile.hkl, position)))
+        phase = np.exp(-2j * np.pi * harmonics * float(np.dot(profile.hkl, position)))
         out[element] = out.get(element, 0.0) + phase / float(info["V_cell"])
     return out
 
@@ -519,25 +519,38 @@ def _tds_strength(element, a2, p, harmonic_g, q_y):
     return 2.0 * (v_ket * v_bra * bracket) @ weights / (2.0 * np.pi) ** 2
 
 
-def _tds_diagonal(profile, sites, hbar_v, max_harmonic):
-    """Fourier coefficients ``D_m`` of the full TDS ``C(x, x)``, symmetric polar quadrature."""
-    g = profile.g_inv_ang
+def _tds_transform(element: str, a2: float, k) -> np.ndarray:
+    """``int d^2q v(q) v(|k - q|) [e^{-a^2 k^2 / 2} - e^{-a^2 (q^2 + |k - q|^2) / 2}]``.
+
+    The 2D Fourier transform of one atom's projected-potential variance, times
+    ``(2 pi)^2``, at ``|k|`` [1/angstrom]; symmetric polar quadrature about
+    ``k / 2``. Returns eV^2 angstrom^6, shape of ``k``.
+    """
     radius, w_r = _panels(_geometric_edges(0.05, _Q_MAX_INV_ANG), 8)
     angle, w_a = _GL[24]
     angle, w_a = 0.5 * np.pi * (angle + 1.0), 0.5 * np.pi * w_a  # [0, pi], doubled below
+    k = np.asarray(k, dtype=float)
+    out = np.empty(k.size)
+    for index, value in enumerate(k.ravel()):
+        half = 0.5 * value
+        cross = 2.0 * radius[:, None] * half * np.cos(angle)[None, :]
+        base = radius[:, None] ** 2 + half**2
+        v_ket = _potential(element, np.sqrt(np.maximum(base + cross, 0.0)))
+        v_bra = _potential(element, np.sqrt(np.maximum(base - cross, 0.0)))
+        bracket = np.exp(-2.0 * a2 * half**2) - np.exp(-a2 * base)
+        out[index] = 2.0 * (radius * w_r) @ (v_ket * v_bra * bracket) @ w_a
+    return out.reshape(k.shape)
+
+
+def _tds_diagonal(profile, sites, hbar_v, max_harmonic):
+    """Fourier coefficients ``D_m`` of the full TDS ``C(x, x)``, symmetric polar quadrature."""
     m = np.arange(max_harmonic + 1)
     coefficients = np.zeros(m.size, dtype=complex)
     for element, density in sites.items():
-        a2 = _displacement_sq(profile, element)
-        for index in m:
-            half = 0.5 * index * g
-            cross = 2.0 * radius[:, None] * half * np.cos(angle)[None, :]
-            base = radius[:, None] ** 2 + half**2
-            v_ket = _potential(element, np.sqrt(np.maximum(base + cross, 0.0)))
-            v_bra = _potential(element, np.sqrt(np.maximum(base - cross, 0.0)))
-            bracket = np.exp(-2.0 * a2 * half**2) - np.exp(-a2 * base)
-            integral = 2.0 * (radius * w_r) @ (v_ket * v_bra * bracket) @ w_a
-            coefficients[index] += density[max_harmonic + index] * integral
+        transform = _tds_transform(
+            element, _displacement_sq(profile, element), m * profile.g_inv_ang
+        )
+        coefficients += density[max_harmonic + m] * transform
     return coefficients / (2.0 * np.pi * hbar_v) ** 2
 
 
@@ -686,20 +699,33 @@ def _close_loss_nodes(channels: ElectronicChannels):
     return _breakpoint_panels(np.geomspace(lower, upper, count), breaks)
 
 
+def _electronic_nodes(channels: ElectronicChannels) -> tuple[np.ndarray, np.ndarray]:
+    """Transfer nodes ``q`` and weights ``c`` with ``int d^2q w(q) f(q) ~ sum c f(q)``.
+
+    Distant nodes are radial ``2 pi q dq`` panels; close nodes are loss panels
+    mapped to their free-electron transfer.
+    """
+    q, w = _electronic_radial(channels)
+    loss, weight = _close_loss_nodes(channels)
+    return (
+        np.concatenate([q, channels.close_transfer(loss)]),
+        np.concatenate([w * channels.distant(q), channels.close_loss(loss) * weight]),
+    )
+
+
+def _electronic_transform(channels: ElectronicChannels, g) -> np.ndarray:
+    """``int d^2q w(q) exp(-g^2 / 2 q^2)`` [angstrom^2] at ``|g|``."""
+    q, c = _electronic_nodes(channels)
+    g = np.asarray(g, dtype=float)
+    return (c @ np.exp(-0.5 * (g.ravel()[None, :] / q[:, None]) ** 2)).reshape(g.shape)
+
+
 def _electronic_diagonal(profile, channels, max_harmonic):
     """``D_G = rho_G int d^2q w(q) exp(-G^2 / 2 q^2)``, the full ``C_el(x, x)`` harmonics."""
     rho = np.zeros(max_harmonic + 1, dtype=complex)
     count = min(rho.size, profile.electron_density.size)
     rho[:count] = profile.electron_density[:count]
-    g = np.arange(rho.size) * profile.g_inv_ang
-    q, w = _electronic_radial(channels)
-    distant = (w * channels.distant(q)) @ np.exp(-0.5 * (g[None, :] / q[:, None]) ** 2)
-    loss, weight = _close_loss_nodes(channels)
-    transfer = channels.close_transfer(loss)
-    close = (channels.close_loss(loss) * weight) @ np.exp(
-        -0.5 * (g[None, :] / transfer[:, None]) ** 2
-    )
-    return rho * (distant + close)
+    return rho * _electronic_transform(channels, np.arange(rho.size) * profile.g_inv_ang)
 
 
 def electronic_kernel(
