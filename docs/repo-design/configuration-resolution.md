@@ -25,7 +25,21 @@ Each context value resolves independently in this order:
 | `remote.gres` | `PYRITE_REMOTE_GRES` | `gpu:1` |
 | `workspace.root` | `PYRITE_HOME` | current directory |
 
-`pyrite config list` shows both effective values and their sources. `config set` writes atomically to Click's platform-specific user configuration directory.
+`pyrite config keys [PREFIX]` lists supported persistent keys without resolving live values;
+`pyrite config list [PREFIX]` shows effective values and their sources.
+`pyrite config explain KEY` shows its input domain, environment mapping, default
+and winning precedence source. Help does not dump the inventory.
+
+The persistent inventory also includes `catalog.path`, `catalog.user`,
+`xsgen.bremslib_source`, `xsgen.elsepa_source`, `xsgen.sbethe_source`, and
+`mott.tables_dir`. Paths are expanded and normalized on setting; `catalog.user`
+can select a new user layer that does not yet exist.
+Backend selection is managed by `config setup`; `PYRITE_MC_BACKEND`, `PYRITE_FP64`,
+transport/resource tuning, automatic grid tolerances, and remote executable/path
+settings remain process-scoped environment controls, not arbitrary config-store
+keys. The inventory below is their maintained owner.
+
+`config set` writes atomically to Click's platform-specific user configuration directory.
 
 The workspace resolver uses an explicit command path first, then the effective `workspace.root`. Generated output paths use `<workspace>/pyrite-output/<kind>/`. With no explicit workspace, output resolution searches upward from cwd for an existing `pyrite-output/` tree before falling back to cwd. See the [output-home rules](../guides/configuration-cookbook.md#choose-an-output-home) for migration and cache lifecycle. Packaged catalog and CIF data remain package-relative and are never redirected into the workspace.
 

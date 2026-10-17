@@ -4,6 +4,7 @@ import tomlkit
 
 from pyrite.cli import command as root_command
 from pyrite.cli.commands import profile
+from pyrite.cli.commands.calculation import numerics_command
 from tests.cli.test_profile import _CATALOG, _catalog
 from tests.helpers.cli import assert_clean_result, assert_table_row, invoke
 
@@ -26,12 +27,12 @@ def _precision(catalog):
 def test_precision_show_reports_the_default_policy_without_a_table(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    shown = invoke(profile.command, ["precision", "show", "sub_100keV"])
+    shown = invoke(numerics_command, ["precision", "show", "sub_100keV"])
     assert_clean_result(shown)
     assert shown.stdout.startswith("[sub_100keV precision] adaptive (default policy)\n")
     assert "  target-rse: 0.05 (default)\n" in shown.stdout
     assert "  max-electrons: 20000 (default)\n" in shown.stdout
-    machine = invoke(root_command, ["profile", "precision", "show", "sub_100keV", "-o", "json"])
+    machine = invoke(root_command, ["numerics", "precision", "show", "sub_100keV", "-o", "json"])
     assert_clean_result(machine)
     envelope = json.loads(machine.stdout)
     assert envelope["schema"] == "cxr.profile.precision.show"
@@ -56,12 +57,12 @@ def test_precision_show_names_why_a_profile_keeps_fixed_counts(tmp_path, monkeyp
     ):
         text = _CATALOG.replace("[profiles.sub_100keV]\n", f"[profiles.sub_100keV]\n{extra}")
         _catalog(tmp_path, monkeypatch, text)
-        shown = invoke(profile.command, ["precision", "show", "sub_100keV"])
+        shown = invoke(numerics_command, ["precision", "show", "sub_100keV"])
         assert_clean_result(shown)
         assert shown.stdout.startswith("[sub_100keV precision] fixed electron counts: ")
         assert reason in shown.stdout
         machine = json.loads(
-            invoke(profile.command, ["precision", "show", "sub_100keV", "-o", "json"]).stdout
+            invoke(numerics_command, ["precision", "show", "sub_100keV", "-o", "json"]).stdout
         )
         assert machine["payload"]["mode"] == "fixed"
         assert reason in machine["payload"]["fixed_reason"]
@@ -70,13 +71,13 @@ def test_precision_show_names_why_a_profile_keeps_fixed_counts(tmp_path, monkeyp
 def test_precision_set_show_and_reset_round_trip(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
-    dry_run = invoke(profile.command, ["precision", "set", "sub_100keV", *_POLICY, "--dry-run"])
+    dry_run = invoke(numerics_command, ["precision", "set", "sub_100keV", *_POLICY, "--dry-run"])
     assert_clean_result(dry_run)
     assert "+target_rse = 0.1" in dry_run.stdout
     assert catalog.read_text() == _CATALOG
 
     written = invoke(
-        profile.command,
+        numerics_command,
         [
             "precision",
             "set",
@@ -101,10 +102,10 @@ def test_precision_set_show_and_reset_round_trip(tmp_path, monkeypatch):
     }
 
     updated = invoke(
-        profile.command, ["precision", "set", "sub_100keV", "--max-electron-share", "0.02"]
+        numerics_command, ["precision", "set", "sub_100keV", "--max-electron-share", "0.02"]
     )
     assert_clean_result(updated)
-    shown = invoke(profile.command, ["precision", "show", "sub_100keV"])
+    shown = invoke(numerics_command, ["precision", "show", "sub_100keV"])
     assert_clean_result(shown)
     assert shown.stdout.startswith("[sub_100keV precision] adaptive (profile policy)\n")
     assert "  target-rse: 0.1\n" in shown.stdout
@@ -113,7 +114,7 @@ def test_precision_set_show_and_reset_round_trip(tmp_path, monkeypatch):
     assert "  min-effective-electrons: 100 (default)\n" in shown.stdout
     assert "  pilot-electrons: none (default)\n" in shown.stdout
     machine = json.loads(
-        invoke(profile.command, ["precision", "show", "sub_100keV", "-o", "json"]).stdout
+        invoke(numerics_command, ["precision", "show", "sub_100keV", "-o", "json"]).stdout
     )
     assert machine["payload"]["mode"] == "adaptive"
     assert machine["payload"]["effective"]["stability_blocks"] == 3
@@ -123,7 +124,7 @@ def test_precision_set_show_and_reset_round_trip(tmp_path, monkeypatch):
     assert_table_row(summary.stdout, "target-rse", "0.1")
     assert_table_row(summary.stdout, "max-electrons", "2000")
 
-    field = invoke(profile.command, ["precision", "reset", "sub_100keV", "max-electron-share"])
+    field = invoke(numerics_command, ["precision", "reset", "sub_100keV", "max-electron-share"])
     assert_clean_result(
         field,
         stdout=(
@@ -132,11 +133,11 @@ def test_precision_set_show_and_reset_round_trip(tmp_path, monkeypatch):
         ),
     )
     assert "max_electron_share" not in _precision(catalog)
-    required = invoke(profile.command, ["precision", "reset", "sub_100keV", "target-rse"])
+    required = invoke(numerics_command, ["precision", "reset", "sub_100keV", "target-rse"])
     assert required.exit_code == 1
     assert "reset without fields" in required.stderr
 
-    removed = invoke(profile.command, ["precision", "reset", "sub_100keV"])
+    removed = invoke(numerics_command, ["precision", "reset", "sub_100keV"])
     assert_clean_result(
         removed,
         stdout=(
@@ -145,25 +146,27 @@ def test_precision_set_show_and_reset_round_trip(tmp_path, monkeypatch):
         ),
     )
     assert _precision(catalog) is None
-    again = invoke(profile.command, ["precision", "reset", "sub_100keV"])
+    again = invoke(numerics_command, ["precision", "reset", "sub_100keV"])
     assert_clean_result(again, stdout="profile sub_100keV: nothing to reset\n")
 
 
 def test_precision_set_validates_at_the_boundary(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
-    band = invoke(profile.command, ["precision", "set", "sub_100keV", *_POLICY, "--band-ev", "9,1"])
+    band = invoke(
+        numerics_command, ["precision", "set", "sub_100keV", *_POLICY, "--band-ev", "9,1"]
+    )
     assert band.exit_code == 2
     assert "START,STOP" in band.stderr
 
     blocks = [*_POLICY[:-1], "30"]
-    misaligned = invoke(profile.command, ["precision", "set", "sub_100keV", *blocks])
+    misaligned = invoke(numerics_command, ["precision", "set", "sub_100keV", *blocks])
     assert misaligned.exit_code == 1
     assert "multiples of block_electrons" in misaligned.stderr
 
-    nothing = invoke(profile.command, ["precision", "set", "sub_100keV"])
+    nothing = invoke(numerics_command, ["precision", "set", "sub_100keV"])
     assert nothing.exit_code == 2
-    assert "pyrite profile precision enable sub_100keV" in nothing.stderr
+    assert "pyrite numerics precision enable sub_100keV" in nothing.stderr
     assert catalog.read_text() == _CATALOG
 
 
@@ -172,17 +175,17 @@ def test_precision_set_refuses_fixed_counts_and_coherent_profiles(tmp_path, monk
         "[profiles.sub_100keV]\n", "[profiles.sub_100keV]\ncxr_trials = { values = [450] }\n"
     )
     _catalog(tmp_path, monkeypatch, fixed)
-    refused = invoke(profile.command, ["precision", "set", "sub_100keV", *_POLICY])
+    refused = invoke(numerics_command, ["precision", "set", "sub_100keV", *_POLICY])
     assert refused.exit_code == 1
     assert "cxr-trials 450" in refused.stderr
-    assert "pyrite profile precision enable sub_100keV" in refused.stderr
+    assert "pyrite numerics precision enable sub_100keV" in refused.stderr
     assert "line-electrons" not in refused.stderr
 
     coherent = _CATALOG.replace(
         "[profiles.sub_100keV]\n", '[profiles.sub_100keV]\nemission = "coherent"\n'
     )
     _catalog(tmp_path, monkeypatch, coherent)
-    refused = invoke(profile.command, ["precision", "set", "sub_100keV", *_POLICY])
+    refused = invoke(numerics_command, ["precision", "set", "sub_100keV", *_POLICY])
     assert refused.exit_code == 1
     assert "adaptive is incoherent-only" in refused.stderr
 
@@ -190,10 +193,10 @@ def test_precision_set_refuses_fixed_counts_and_coherent_profiles(tmp_path, monk
 def test_precision_standard_mutation_requires_confirmation(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
-    declined = invoke(profile.command, ["precision", "set", "standard", *_POLICY], input="n\n")
+    declined = invoke(numerics_command, ["precision", "set", "standard", *_POLICY], input="n\n")
     assert declined.exit_code == 1
     assert catalog.read_text() == _CATALOG
-    accepted = invoke(profile.command, ["precision", "set", "standard", *_POLICY, "--yes"])
+    accepted = invoke(numerics_command, ["precision", "set", "standard", *_POLICY, "--yes"])
     assert_clean_result(accepted)
 
 
@@ -208,7 +211,7 @@ def _profile(catalog):
 def test_first_partial_set_starts_from_the_default_policy(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
-    first = invoke(profile.command, ["precision", "set", "sub_100keV", "--observable", "cxr"])
+    first = invoke(numerics_command, ["precision", "set", "sub_100keV", "--observable", "cxr"])
     assert_clean_result(first, stdout="updated precision for profile sub_100keV\n")
     assert _precision(catalog).unwrap() == {
         "target_rse": 0.05,
@@ -218,7 +221,7 @@ def test_first_partial_set_starts_from_the_default_policy(tmp_path, monkeypatch)
         "observables": ["cxr"],
     }
 
-    retained = invoke(profile.command, ["precision", "set", "sub_100keV", "--target-rse", "0.1"])
+    retained = invoke(numerics_command, ["precision", "set", "sub_100keV", "--target-rse", "0.1"])
     assert_clean_result(retained)
     assert _precision(catalog).unwrap()["observables"] == ["cxr"]
     assert _precision(catalog).unwrap()["target_rse"] == 0.1
@@ -227,12 +230,12 @@ def test_first_partial_set_starts_from_the_default_policy(tmp_path, monkeypatch)
 def test_enable_replaces_fixed_counts_atomically(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch, _fixed())
 
-    preview = invoke(profile.command, ["precision", "enable", "sub_100keV", "--dry-run"])
+    preview = invoke(numerics_command, ["precision", "enable", "sub_100keV", "--dry-run"])
     assert_clean_result(preview)
     assert "-cxr_trials = { values = [500] }" in preview.stdout
     assert catalog.read_text() == _fixed()
 
-    enabled = invoke(profile.command, ["precision", "enable", "sub_100keV", "--observable", "cxr"])
+    enabled = invoke(numerics_command, ["precision", "enable", "sub_100keV", "--observable", "cxr"])
     assert_clean_result(
         enabled,
         stdout=(
@@ -246,14 +249,14 @@ def test_enable_replaces_fixed_counts_atomically(tmp_path, monkeypatch):
     assert row["precision"].unwrap()["observables"] == ["cxr"]
     assert row["precision"].unwrap()["max_electrons"] == 20000
 
-    again = invoke(profile.command, ["precision", "enable", "sub_100keV"])
+    again = invoke(numerics_command, ["precision", "enable", "sub_100keV"])
     assert_clean_result(again, stdout="profile sub_100keV: already adaptive; nothing to change\n")
 
 
 def test_enable_without_options_selects_the_default_policy(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch, _fixed())
 
-    enabled = invoke(profile.command, ["precision", "enable", "sub_100keV"])
+    enabled = invoke(numerics_command, ["precision", "enable", "sub_100keV"])
     assert_clean_result(enabled)
     assert enabled.stdout.endswith("profile sub_100keV: adaptive (default policy)\n")
     assert "precision" not in _profile(catalog)
@@ -267,7 +270,7 @@ def test_enable_refuses_unsupported_profiles_without_writing(tmp_path, monkeypat
     ):
         text = _fixed(f"cxr_trials = {{ values = [500] }}\n{extra}")
         catalog = _catalog(tmp_path, monkeypatch, text)
-        refused = invoke(profile.command, ["precision", "enable", "sub_100keV"])
+        refused = invoke(numerics_command, ["precision", "enable", "sub_100keV"])
         assert refused.exit_code == 1
         assert reason in refused.stderr
         assert catalog.read_text() == text
@@ -277,7 +280,7 @@ def test_enable_refuses_unsupported_profiles_without_writing(tmp_path, monkeypat
         "\n[profiles.sub_100keV.physical_detector]\ndistance_mm = 300.0\n\n[materials.hopg]",
     )
     catalog = _catalog(tmp_path, monkeypatch, detector)
-    refused = invoke(profile.command, ["precision", "set", "sub_100keV", "--target-rse", "0.1"])
+    refused = invoke(numerics_command, ["precision", "set", "sub_100keV", "--target-rse", "0.1"])
     assert refused.exit_code == 1
     assert "physical detector" in refused.stderr
     assert catalog.read_text() == detector
@@ -288,24 +291,24 @@ def test_enable_refuses_unsupported_profiles_without_writing(tmp_path, monkeypat
         "\n[materials.hopg]",
     )
     catalog = _catalog(tmp_path, monkeypatch, override)
-    refused = invoke(profile.command, ["precision", "enable", "sub_100keV"])
+    refused = invoke(numerics_command, ["precision", "enable", "sub_100keV"])
     assert refused.exit_code == 1
     assert "[overrides.hopg] sets cxr-trials" in refused.stderr
     assert catalog.read_text() == override
-    shown = invoke(profile.command, ["precision", "show", "sub_100keV"])
+    shown = invoke(numerics_command, ["precision", "show", "sub_100keV"])
     assert "adaptive unsupported: [overrides.hopg] sets cxr-trials" in shown.stdout
 
 
 def test_disable_selects_fixed_counts_with_defaults_or_flags(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
-    invoke(profile.command, ["precision", "set", "sub_100keV", *_POLICY])
+    invoke(numerics_command, ["precision", "set", "sub_100keV", *_POLICY])
 
-    preview = invoke(profile.command, ["precision", "disable", "sub_100keV", "--dry-run"])
+    preview = invoke(numerics_command, ["precision", "disable", "sub_100keV", "--dry-run"])
     assert_clean_result(preview)
     assert "+cxr_trials = {values = [300]}" in preview.stdout
     assert "precision" in _profile(catalog)
 
-    disabled = invoke(profile.command, ["precision", "disable", "sub_100keV"])
+    disabled = invoke(numerics_command, ["precision", "disable", "sub_100keV"])
     assert_clean_result(
         disabled,
         stdout=(
@@ -317,16 +320,18 @@ def test_disable_selects_fixed_counts_with_defaults_or_flags(tmp_path, monkeypat
     row = _profile(catalog)
     assert "precision" not in row
     assert (row["cxr_trials"]["values"], row["brem_trials"]["values"]) == ([300], [150])
-    shown = invoke(profile.command, ["precision", "show", "sub_100keV"])
+    shown = invoke(numerics_command, ["precision", "show", "sub_100keV"])
     assert "  counts: cxr-trials 300, brem-trials 150\n" in shown.stdout
-    assert "to switch to adaptive: pyrite profile precision enable sub_100keV" in shown.stdout
+    assert "to switch to adaptive: pyrite numerics precision enable sub_100keV" in shown.stdout
 
-    changed = invoke(profile.command, ["precision", "disable", "sub_100keV", "--cxr-trials", "800"])
+    changed = invoke(
+        numerics_command, ["precision", "disable", "sub_100keV", "--cxr-trials", "800"]
+    )
     assert_clean_result(changed)
     assert _profile(catalog)["cxr_trials"]["values"] == [800]
     assert _profile(catalog)["brem_trials"]["values"] == [150]
 
-    same = invoke(profile.command, ["precision", "disable", "sub_100keV"])
+    same = invoke(numerics_command, ["precision", "disable", "sub_100keV"])
     assert_clean_result(
         same, stdout="profile sub_100keV: already uses fixed counts; nothing to change\n"
     )
@@ -339,7 +344,7 @@ def test_disable_keeps_count_sweeps_and_prompts_only_on_a_terminal(tmp_path, mon
     catalog = _catalog(tmp_path, monkeypatch, _fixed(grid))
     monkeypatch.setattr(_profile_precision, "_interactive", lambda: True)
 
-    prompted = invoke(profile.command, ["precision", "disable", "sub_100keV"], input="75\n")
+    prompted = invoke(numerics_command, ["precision", "disable", "sub_100keV"], input="75\n")
     assert prompted.exit_code == 0
     assert "brem-trials [150]" in prompted.stderr
     assert "cxr-trials" not in prompted.stderr
@@ -349,7 +354,7 @@ def test_disable_keeps_count_sweeps_and_prompts_only_on_a_terminal(tmp_path, mon
 
     _catalog(tmp_path, monkeypatch)
     bypassed = invoke(
-        profile.command,
+        numerics_command,
         ["precision", "disable", "sub_100keV", "--cxr-trials", "40", "--brem-trials", "20"],
     )
     assert bypassed.exit_code == 0
@@ -358,22 +363,22 @@ def test_disable_keeps_count_sweeps_and_prompts_only_on_a_terminal(tmp_path, mon
 
 def test_numerics_counts_on_an_adaptive_profile_point_at_disable(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
-    invoke(profile.command, ["precision", "set", "sub_100keV", *_POLICY])
+    invoke(numerics_command, ["precision", "set", "sub_100keV", *_POLICY])
     before = catalog.read_text()
 
     refused = invoke(profile.command, ["numerics", "set", "sub_100keV", "--cxr-trials", "500"])
     assert refused.exit_code == 1
-    assert "pyrite profile precision disable sub_100keV" in refused.stderr
+    assert "pyrite numerics precision disable sub_100keV" in refused.stderr
     assert catalog.read_text() == before
 
 
 def test_show_reports_line_grid_independently_and_next_steps(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
-    shown = invoke(profile.command, ["precision", "show", "sub_100keV"])
+    shown = invoke(numerics_command, ["precision", "show", "sub_100keV"])
     assert "CXR grid: explicit or stored grids first" in shown.stdout
-    assert "to select fixed counts: pyrite profile precision disable sub_100keV" in shown.stdout
+    assert "to select fixed counts: pyrite numerics precision disable sub_100keV" in shown.stdout
     machine = json.loads(
-        invoke(profile.command, ["precision", "show", "sub_100keV", "-o", "json"]).stdout
+        invoke(numerics_command, ["precision", "show", "sub_100keV", "-o", "json"]).stdout
     )["payload"]
     assert machine["fixed_counts"] == {}
     assert machine["blockers"] == []
@@ -389,11 +394,11 @@ def test_show_reports_line_grid_independently_and_next_steps(tmp_path, monkeypat
         ),
     )
     machine = json.loads(
-        invoke(profile.command, ["precision", "show", "sub_100keV", "-o", "json"]).stdout
+        invoke(numerics_command, ["precision", "show", "sub_100keV", "-o", "json"]).stdout
     )["payload"]
     assert machine["fixed_counts"] == {"line_trials": [500], "brem_trials": [100]}
     assert machine["line_grid_automatic_for_every_case"] is True
-    enabled = invoke(profile.command, ["precision", "enable", "sub_100keV"])
+    enabled = invoke(numerics_command, ["precision", "enable", "sub_100keV"])
     assert_clean_result(enabled)
-    shown = invoke(profile.command, ["precision", "show", "sub_100keV"])
+    shown = invoke(numerics_command, ["precision", "show", "sub_100keV"])
     assert "CXR grid: automatic for every case (cxr-grid policy)" in shown.stdout

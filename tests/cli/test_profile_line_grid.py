@@ -1,4 +1,4 @@
-"""``pyrite profile cxr-grid`` against an isolated copy of the bundled catalog."""
+"""``pyrite numerics cxr-grid`` against an isolated copy of the bundled catalog."""
 
 import json
 
@@ -35,11 +35,11 @@ def _stored(catalog, name):
 
 
 def _line_grid(*args):
-    return invoke(root_command, ["profile", "cxr-grid", *args])
+    return invoke(root_command, ["numerics", "cxr-grid", *args])
 
 
 def test_help_lists_selectors_defaults_combinations_and_identity():
-    group = invoke(root_command, ["profile", "cxr-grid", "--help"])
+    group = invoke(root_command, ["numerics", "cxr-grid", "--help"])
     assert_clean_result(group)
     for text in (
         "kinematic-ceiling | resonance-population",
@@ -50,7 +50,7 @@ def test_help_lists_selectors_defaults_combinations_and_identity():
     ):
         assert text in " ".join(group.stdout.split())
 
-    setting = invoke(root_command, ["profile", "cxr-grid", "set", "--help"])
+    setting = invoke(root_command, ["numerics", "cxr-grid", "set", "--help"])
     assert_clean_result(setting)
     flat = " ".join(setting.stdout.split())
     for default in ("kinematic-ceiling", "sinc-nyquist", "node"):
@@ -197,7 +197,7 @@ def test_reset_partial_conflict_named_and_whole(catalog):
 def test_standard_edit_prompts_and_clone_carries_policy(catalog):
     declined = invoke(
         root_command,
-        ["profile", "cxr-grid", "set", "standard", "--quadrature", "bin-mean"],
+        ["numerics", "cxr-grid", "set", "standard", "--quadrature", "bin-mean"],
         input="n\n",
     )
     assert declined.exit_code == 1

@@ -122,9 +122,9 @@ def start_rebrem_queue(
                         )
                     ),
                 ),
-                ("Monitor", f"pyrite job attach {jobid}"),
-                ("Status", f"pyrite job status {jobid} -vv"),
-                ("Logs", f"pyrite job logs {jobid} --follow"),
+                ("Monitor", f"pyrite remote job attach {jobid}"),
+                ("Status", f"pyrite remote job status {jobid} -vv"),
+                ("Logs", f"pyrite remote job logs {jobid} --follow"),
                 ("Pull", f"pyrite remote pull {' '.join(stems)}  (after completion)"),
             ]
         )
@@ -245,9 +245,9 @@ def start_recxr_queue(
                         )
                     ),
                 ),
-                ("Monitor", f"pyrite job attach {jobid}"),
-                ("Status", f"pyrite job status {jobid} -vv"),
-                ("Logs", f"pyrite job logs {jobid} --follow"),
+                ("Monitor", f"pyrite remote job attach {jobid}"),
+                ("Status", f"pyrite remote job status {jobid} -vv"),
+                ("Logs", f"pyrite remote job logs {jobid} --follow"),
                 ("Pull", f"pyrite remote pull {' '.join(stems)} --cxr-only  (after completion)"),
             ]
         )

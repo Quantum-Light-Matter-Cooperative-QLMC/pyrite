@@ -286,7 +286,7 @@ def test_screen_inspection(tmp_path):
     assert result.exit_code == 0, result.output
     assert "--gdf-z-origin-m" in result.output
     assert "physical target" in result.output
-    result = invoke(*args, "-o", "json")
+    result = invoke("gdf", "inspect", str(path), "--screen-position-m", "0", "-o", "json")
     assert result.exit_code == 0, result.output
     assert "\x1b" not in result.output
     assert json.loads(result.output)["payload"]["selected"]["screen_position_m"] == 0

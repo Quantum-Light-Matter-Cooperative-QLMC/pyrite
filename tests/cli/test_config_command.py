@@ -37,28 +37,14 @@ def test_config_set_get_and_list_effective_values(monkeypatch, tmp_path):
     assert_clean_result(set_profile, stdout="profile.current = sub_100keV\n")
     assert_clean_result(set_remote, stdout="remote.target = box-a\n")
     assert_clean_result(get_profile, stdout="sub_100keV\n")
-    assert_clean_result(
-        listed,
-        stdout=(
-            "KEY\tVALUE\tSOURCE\n"
-            "profile.current\tsub_100keV\tconfig store\n"
-            "remote.target\tbox-a\tconfig store\n"
-            "remote.gpu_vendor\tnvidia\tbuilt-in default\n"
-            "remote.partition\tgpu\tbuilt-in default\n"
-            "remote.nodelist\tany\tbuilt-in default\n"
-            "remote.gres\tgpu:1\tbuilt-in default\n"
-            "workspace.root\t.\tbuilt-in default\n"
-            f"catalog.path\t{_config.resolve('catalog.path').value}\tbuilt-in default\n"
-            # conftest points the user layer at a per-test copy of the fixture.
-            f"catalog.user\t{_config.resolve('catalog.user').value}\tPYRITE_USER_CATALOG\n"
-            # The external-code source trees resolve through the same store
-            # and the same precedence, so they list beside everything else.
-            "xsgen.bremslib_source\t../BremsLib_v2.0.8\tbuilt-in default\n"
-            "xsgen.elsepa_source\t../elsepa-2020\tbuilt-in default\n"
-            "xsgen.sbethe_source\t../sbethe\tbuilt-in default\n"
-            "mott.tables_dir\t\tbuilt-in default\n"
-        ),
-    )
+    assert_clean_result(listed)
+    assert "\t" not in listed.stdout
+    lines = listed.stdout.splitlines()
+    assert lines[0].split() == ["KEY", "VALUE", "SOURCE"]
+    assert len(lines) == len(_config.keys()) + 1
+    assert all(any(line.startswith(key + " ") for line in lines) for key in _config.keys())
+    assert "sub_100keV" in lines[1] and "config store" in lines[1]
+    assert "box-a" in lines[2] and "config store" in lines[2]
     assert path.is_file()
 
 
@@ -133,17 +119,49 @@ def test_config_set_rejects_unsafe_slurm_partition(monkeypatch, tmp_path):
     assert not path.exists()
 
 
-def test_config_help_describes_every_key():
-    for args in (["--help"], ["set", "--help"]):
-        result = invoke(config_command.command, args)
+def test_config_keys_describes_every_key_without_resolving(monkeypatch):
+    def unexpected(*args):
+        raise AssertionError("help/key discovery resolved live configuration")
 
-        assert result.exit_code == 0
-        for key in _config.keys():
-            env_name, default, text = _config.describe(key)
-            assert f"  {key} " in result.output
-            assert text in result.output
-            assert f"{env_name}; {default}" in result.output
-        assert all(len(line) <= 80 for line in result.output.splitlines())
+    monkeypatch.setattr(_config, "resolve", unexpected)
+    for args in (["--help"], ["keys", "--help"], ["explain", "--help"]):
+        assert_clean_result(invoke(config_command.command, args))
+    help_result = invoke(config_command.command, ["--help"])
+    assert "Keys (environment" not in help_result.stdout
+    result = invoke(config_command.command, ["keys"])
+    assert_clean_result(result)
+    for key in _config.keys():
+        env_name, default, text = _config.describe(key)
+        assert f"{key}: {text}" in result.stdout
+        assert f"{env_name}; default: {default}" in result.stdout
+
+
+def test_config_subset_explain_and_unknown_prefix(monkeypatch, tmp_path):
+    path = _isolated_store(monkeypatch, tmp_path)
+    _config.set_stored("remote.target", "stored")
+    monkeypatch.setenv("PYRITE_REMOTE_HOST", "environment")
+    subset = invoke(config_command.command, ["list", "remote."])
+    assert_clean_result(subset)
+    assert "environment" in subset.stdout
+    assert "profile.current" not in subset.stdout
+    explained = invoke(config_command.command, ["explain", "remote.target"])
+    assert_clean_result(explained)
+    assert "source: PYRITE_REMOTE_HOST" in explained.stdout
+    assert "effective: environment" in explained.stdout
+    before = path.read_bytes()
+    bad = invoke(config_command.command, ["list", "missing."])
+    assert bad.exit_code == 2
+    assert "config keys" in bad.stderr
+    assert path.read_bytes() == before
+
+
+def test_config_user_catalog_is_settable(monkeypatch, tmp_path):
+    _isolated_store(monkeypatch, tmp_path)
+    monkeypatch.delenv("PYRITE_USER_CATALOG", raising=False)
+    destination = tmp_path / "my-catalog"
+    result = invoke(config_command.command, ["set", "catalog.user", str(destination)])
+    assert_clean_result(result)
+    assert _config.resolve("catalog.user").value == str(destination.resolve())
 
 
 def test_config_set_workspace_root_normalizes_path(monkeypatch, tmp_path):

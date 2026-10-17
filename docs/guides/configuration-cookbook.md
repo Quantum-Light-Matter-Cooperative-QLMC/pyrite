@@ -49,10 +49,10 @@ from the current workspace, including installed-package runs.
 pyrite profile create my-survey
 pyrite profile set my-survey --material hopg,hbn
 pyrite profile show my-survey
-pyrite material show hopg --profile my-survey
+pyrite profile ranges show my-survey hopg
 ```
 
-Set ranges on the profile. When one material needs different ranges, give it its own profile (`pyrite profile create NAME --from PROFILE --material MATERIAL`) rather than a per-material override: overrides silently diverge one material from the profile it appears to follow. `pyrite material set` was removed in 0.6.0 (issue #359); remove existing `[profiles.NAME.overrides.MATERIAL]` range keys by editing the catalog TOML. Inspect the effective material after every edit; `pyrite material show` marks each range `inherited` or `overridden`, and the displayed result, not the TOML fragment alone, is what a run hashes.
+Set ranges on the profile. When one material needs different ranges, give it its own profile (`pyrite profile create NAME --from PROFILE --material MATERIAL`) rather than a per-material override: overrides silently diverge one material from the profile it appears to follow. `pyrite material set` was removed in 0.6.0 (issue #359); remove existing `[profiles.NAME.overrides.MATERIAL]` range keys by editing the catalog TOML. Inspect the effective material after every edit; `pyrite profile ranges show PROFILE MATERIAL` marks each range `inherited` or `overridden`, and the displayed result, not the TOML fragment alone, is what a run hashes.
 
 ## Reuse a named beam
 
@@ -67,10 +67,10 @@ Renaming a beam updates profile references and leaves identities unchanged becau
 ## Change one material safely
 
 ```bash
-pyrite material show hopg --profile my-survey
+pyrite profile ranges show my-survey hopg
 pyrite profile create hopg-thick --from my-survey --material hopg
 pyrite profile set hopg-thick --thickness 50000 --dry-run
-pyrite material show hopg --profile hopg-thick
+pyrite profile ranges show hopg-thick hopg
 ```
 
 After changing a profile or material, existing variant checkpoints are not silently reused as the new dataset. Preview stale data with:
@@ -86,7 +86,7 @@ Add `--yes` only after checking the exact selection.
 If `run` reports missing line bounds:
 
 ```bash
-PYRITE_PROFILE=my-survey pyrite material energy-grid derive --material hopg --energy 30,60
+PYRITE_PROFILE=my-survey pyrite numerics energy-grid derive --material hopg --energy 30,60
 pyrite-dev energy-grid add PATH_FROM_DERIVE --profile my-survey --material hopg
 pyrite-dev energy-grid verify
 ```

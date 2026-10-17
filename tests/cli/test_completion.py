@@ -331,7 +331,10 @@ def test_detector_commands_wire_catalog_completion_but_not_new_names():
         assert (
             _callback(detector.command.commands[name], "name") is _cli_completion.complete_detector
         )
-    assert _callback(detector.command.commands["create"], "name") is None
+    for kind in ("scalar", "planar", "clone"):
+        created = detector.typed_create.commands[kind]
+        assert _callback(created, "name") is None
+        assert _callback(created, "source") is _cli_completion.complete_detector
     assert _callback(detector.command.commands["rename"], "new_name") is None
     for name in ("create", "set"):
         assert (

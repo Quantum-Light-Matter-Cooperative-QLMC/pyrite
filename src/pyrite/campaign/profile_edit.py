@@ -25,6 +25,7 @@ from pyrite._precision import (
     Precision,
     default_precision_fallback,
 )
+from pyrite.detectors.editing import _toml_value, merge_pixel_detector
 from pyrite.detectors.spec import Detector
 
 RANGES = {
@@ -173,7 +174,7 @@ def set_numerics(document, name, updates):
     if "precision" in target and any(key in updates for key in SAMPLING_KEYS):
         raise ValueError(
             f"profile {name!r} has an adaptive precision policy; select fixed counts with: "
-            f"pyrite profile precision disable {name} --cxr-trials N --brem-trials N"
+            f"pyrite numerics precision disable {name} --cxr-trials N --brem-trials N"
         )
     merged = {**profile_numerics_values(target), **updates}
     validate_profile_numerics(merged)
@@ -435,7 +436,7 @@ def set_precision(document, name, updates):
     if counts:
         raise ValueError(
             f"profile {name!r} sets fixed electron counts ({describe_counts(counts)}); "
-            f"replace them with: pyrite profile precision enable {name} [OPTIONS]"
+            f"replace them with: pyrite numerics precision enable {name} [OPTIONS]"
         )
     _check_adaptive(name, target)
     target["precision"] = _precision_table(merged)
@@ -500,7 +501,7 @@ def reset_precision(document, name, fields=()):
     if required:
         raise ValueError(
             f"{', '.join(required)} is required by the policy; reset without fields to "
-            f"remove the policy, or 'pyrite profile precision disable {name}' to select "
+            f"remove the policy, or 'pyrite numerics precision disable {name}' to select "
             "fixed electron counts"
         )
     removed = tuple(field for field in fields if field in current)
@@ -738,22 +739,6 @@ def remove_filter(document, profile_name, identifier):
 
 #: Nested ``physical_detector`` sections that ``reset`` can remove one at a time.
 PHYSICAL_SECTIONS = ("scorer", "response", "acquisition")
-_ACQUISITION_AXIS_KEYS = (
-    "reporting_bins",
-    "measured_edges_eV",
-    "measured_min_eV",
-    "measured_max_eV",
-    "measured_bin_width_eV",
-)
-
-
-def _toml_value(value):
-    if isinstance(value, dict):
-        table = tomlkit.table()
-        for key, item in value.items():
-            table[key] = _toml_value(item)
-        return table
-    return list(value) if isinstance(value, tuple) else value
 
 
 def own_physical_detector(profile):
@@ -787,37 +772,6 @@ def set_physical_detector(
     merge_pixel_detector(
         table, geometry=geometry, scorer=scorer, response=response, acquisition=acquisition
     )
-
-
-def merge_pixel_detector(table, *, geometry, scorer=None, response=None, acquisition=None):
-    """Merge supplied pixel fields, replacing incompatible response/bin sections."""
-    for key, value in geometry.items():
-        table[key] = _toml_value(value)
-    if scorer:
-        section = table.setdefault("scorer", tomlkit.table())
-        for key, value in scorer.items():
-            section[key] = _toml_value(value)
-    if response:
-        current = table.get("response")
-        kind = response.get("kind")
-        parameters = {key: value for key, value in response.items() if key != "kind"}
-        effective_kind = kind if kind is not None else (current or {}).get("kind")
-        if parameters and effective_kind != "timepix3":
-            raise ValueError("Timepix3 response options require --response timepix3")
-        if kind is not None and (current is None or current.get("kind") != kind):
-            table["response"] = _toml_value(dict(response))
-        else:
-            for key, value in parameters.items():
-                current[key] = _toml_value(value)
-    if acquisition:
-        section = table.setdefault("acquisition", tomlkit.table())
-        if any(key in acquisition for key in _ACQUISITION_AXIS_KEYS):
-            for key in _ACQUISITION_AXIS_KEYS:
-                section.pop(key, None)
-        if acquisition.get("mode") == "expected":
-            section.pop("seed", None)
-        for key, value in acquisition.items():
-            section[key] = _toml_value(value)
 
 
 def reset_physical_detector(document, name, sections=()):

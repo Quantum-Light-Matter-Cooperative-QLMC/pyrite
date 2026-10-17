@@ -71,6 +71,27 @@ _DEFAULT_LABELS = {
 }
 
 
+def domain(key: str) -> str:
+    """User-facing input domain; detailed validation stays at the owning setter."""
+    if key == "profile.current":
+        return "existing catalog profile name"
+    if key == "remote.target":
+        return "SSH host alias (no whitespace or shell operators)"
+    if key == "remote.gpu_vendor":
+        return "nvidia | amd (case-insensitive)"
+    if key.startswith("remote."):
+        return "validated SLURM setting; nodelist 'any' clears the node restriction"
+    if key.startswith("xsgen."):
+        return "source-tree path containing the selected external generator"
+    if key == "catalog.path":
+        return "existing complete catalog file or directory"
+    if key == "mott.tables_dir":
+        return "existing NIST SRD 64 table directory"
+    if key in ("workspace.root", "catalog.user"):
+        return "directory path (expanded and made absolute; need not exist yet)"
+    raise KeyError(f"unknown config key: {key}")
+
+
 class ConfigError(ValueError):
     """The user configuration store is unreadable or invalid."""
 

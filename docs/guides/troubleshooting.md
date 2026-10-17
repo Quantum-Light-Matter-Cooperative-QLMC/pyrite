@@ -31,7 +31,7 @@ Local line windows are opt-in while their convergence is being measured (issue #
 
 ## Deriving grids on purpose
 
-`pyrite material energy-grid derive --profile NAME` is an inspection and prewarming command, not a prerequisite. It measures a 95%-integrated-coverage **bandwidth** (not an accuracy target) and installs immutable artifacts, repointing that profile automatically; add `--remote` for the configured compute host, then run `pyrite-dev energy-grid verify`. Detached submission returns before installation; attach to the job for progress, then rerun without `--detach` to resume, pull, and install. Do not paste survey-cropped bounds into the catalog; fidelity reduction happens later.
+`pyrite numerics energy-grid derive --profile NAME` is an inspection and prewarming command, not a prerequisite. It measures a 95%-integrated-coverage **bandwidth** (not an accuracy target) and installs immutable artifacts, repointing that profile automatically; add `--remote` for the configured compute host, then run `pyrite-dev energy-grid verify`. Detached submission returns before installation; attach to the job for progress, then rerun without `--detach` to resume, pull, and install. Do not paste survey-cropped bounds into the catalog; fidelity reduction happens later.
 
 ## A run does not resume the checkpoint I expected
 
@@ -51,7 +51,7 @@ Inspect `pyrite config setup --help` and the active backend environment. CPU is 
 
 ## Remote execution fails
 
-Verify `pyrite config get remote.target`, then inspect `pyrite job list` and `pyrite job status JOB_ID`. Use `job logs` for scheduler/runtime failures and `remote` resource commands for connectivity/setup. Detached submission returns before results exist; pull or wait for completion before analysis.
+Verify `pyrite config get remote.target`, then inspect `pyrite remote job list` and `pyrite remote job status JOB_ID`. Use `job logs` for scheduler/runtime failures and `remote` resource commands for connectivity/setup. Detached submission returns before results exist; pull or wait for completion before analysis.
 
 ## Results look plausible but differ unexpectedly
 

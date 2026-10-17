@@ -219,7 +219,8 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
                 source = "default" if row["source"] == "fidelity" else row["source"]
                 value = f"{_display(row['effective'])} ({source})"
             rows.append((label, value))
-        _table(f"Numerics / {group['name']} (profile numerics)", rows)
+        label = "reflections and mosaic" if group["name"] == "convergence" else group["name"]
+        _table(f"Numerics / {label} (profile numerics)", rows)
 
     precision = payload["precision"]
     if precision["effective"] is None:

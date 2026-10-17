@@ -359,7 +359,7 @@ def confirm_destructive(yes: bool, prompt: str) -> bool:
     return click.confirm(prompt, default=False, err=True)
 
 
-OUTPUT_CHOICES = click.Choice(("table", "json", "wide"), case_sensitive=True)
+OUTPUT_CHOICES = click.Choice(("table", "json"), case_sensitive=True)
 
 
 def _json_selected(_ctx, _param, value: str) -> bool:
@@ -367,13 +367,15 @@ def _json_selected(_ctx, _param, value: str) -> bool:
     return value == "json"
 
 
-def output_option(function):
+def output_option(function=None, *, wide=False):
     """Add the canonical human/machine output selector."""
+    if function is None:
+        return lambda target: output_option(target, wide=wide)
     return click.option(
         "-o",
         "--output",
         "json_output",
-        type=OUTPUT_CHOICES,
+        type=click.Choice(("table", "json", "wide")) if wide else OUTPUT_CHOICES,
         default="table",
         show_default=True,
         is_eager=True,
@@ -384,6 +386,16 @@ def output_option(function):
 
 def emit_result(message: str) -> None:
     click.echo(message)
+
+
+def emit_table(headers, rows) -> None:
+    """Emit an aligned, color-independent human table without tab stops."""
+    cells = [tuple(str(value) for value in row) for row in (headers, *rows)]
+    widths = [max(len(click.unstyle(row[i])) for row in cells) for i in range(len(headers))]
+    for row in cells:
+        emit_result(
+            "  ".join(value.ljust(width) for value, width in zip(row, widths, strict=True)).rstrip()
+        )
 
 
 def emit_diagnostic(message: str) -> None:

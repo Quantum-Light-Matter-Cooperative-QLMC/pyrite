@@ -8,20 +8,21 @@ Existing `--survey` checkpoints keep their identity: they remain readable, and `
 
 The supported high-level Python API has no fidelity shorthand. Construct a `Scene`, `Sweep`, and `Numerics` explicitly as described in the [Python API workflow](python-api-workflow.md). The internal `pyrite.campaign.config.default_settings` and `material_sweep` helpers remain campaign compatibility surfaces rather than the supported library entry point.
 
-`pyrite material energy-grid derive`, locally or with `--remote`, is an optional optimization upstream of this choice: it measures line and bremsstrahlung bounds without a fidelity setting and installs those bounds for `--profile NAME` (or the configured current profile). Without installed bounds, runs use automatic line-grid resolution.
+`pyrite numerics energy-grid derive`, locally or with `--remote`, is an optional optimization upstream of this choice: it measures line and bremsstrahlung bounds without a fidelity setting and installs those bounds for `--profile NAME` (or the configured current profile). Without installed bounds, runs use automatic line-grid resolution.
 
 The bundled `trajectory_demo` profile is a single fixed-count case with a micron-scale beam for [saved-trajectory inspection](working-with-results.md#save-electron-trajectories). Run it directly with `pyrite run trajectory_demo --trajectories trajectories/`; `--quick` is unnecessary.
 
 ## Calculation numerics
 
-Use the nested profile workflow to inspect every result-affecting calculation control and the source of its effective value:
+Use the API-aligned views to inspect a campaign’s numerical controls and physical models. These commands edit the existing profile; they do not create independent preset stores:
 
 ```bash
-pyrite profile numerics show standard
-pyrite profile numerics show standard -o json
+pyrite numerics show standard
+pyrite numerics show standard -o json
+pyrite physics show standard -o json
 ```
 
-The output groups sampling counts, reflection/mosaic convergence, and transport integration controls. Each field reports its explicit profile value, effective value, and source (`profile`, `fidelity`, or `built-in`). Resolution follows:
+Numerics reports sampling counts, reflection/mosaic sampling, and transport integration controls. Physics reports interaction models and cutoffs. Each field reports its explicit profile value, effective value, and source (`profile`, `fidelity`, or `built-in`). Resolution follows:
 
 ```text
 per-run override > explicit profile value > fidelity preset > built-in
@@ -30,20 +31,21 @@ per-run override > explicit profile value > fidelity preset > built-in
 Set controls without editing TOML directly:
 
 ```bash
-pyrite profile numerics set standard \
+pyrite numerics set standard \
   --cxr-trials 500 --brem-trials 200 \
   --reflection-families 6 --maximum-reflections 12 \
   --mosaic-route mc --mosaic-nodes 7 --yes
 
-pyrite profile numerics set standard \
-  --energy-model midpoint --maximum-fractional-energy-loss 0.02 --straggling --yes
+pyrite numerics set standard \
+  --energy-model midpoint --maximum-fractional-energy-loss 0.02 --yes
+pyrite physics set standard --straggling --yes
 ```
 
 `--dry-run` prints the exact TOML diff without writing. Reset named fields, or omit all field names to reset every explicit numeric to fidelity/built-in resolution:
 
 ```bash
-pyrite profile numerics reset standard reflection-families mosaic-route --yes
-pyrite profile numerics reset standard --yes
+pyrite numerics reset standard reflection-families mosaic-route --yes
+pyrite numerics reset standard --yes
 ```
 
 `profile create|set|add` accepts `-l/--cxr-trials` and `-b/--brem-trials`, including comma-separated trial-count grids. A trial is one Monte Carlo electron history used to estimate the corresponding spectrum, rather than one electron in the physical beam. These counts select histories from shared transport, so they are not added together to determine the transport count.
@@ -61,7 +63,7 @@ emission, disable any explicit precision policy, then enable the entrance
 zone through calculation numerics:
 
 ```bash
-pyrite profile numerics set my_scan \
+pyrite numerics set my_scan \
   --channeling-model planar --channeling-plane 1 1 0 \
   --radiative-model uncoupled --energy-model midpoint \
   --cxr-trials 300 --brem-trials 150
@@ -82,7 +84,7 @@ Trajectory capture and electron blocks currently refuse channeling.
 and `--channeling-zone-max-ang` control the zone resolution and cap. Enabled
 controls enter dataset identity and checkpoint stems. Channeling defaults to
 off; changing its inactive resolution controls leaves off identities unchanged.
-Disable it with `pyrite profile numerics reset my_scan channeling-model
+Disable it with `pyrite numerics reset my_scan channeling-model
 channeling-plane`. Checkpoints carry a separate **Channeling** component that
 the analysis app can select; replay and line recompute rescore it on their
 line grid, and bremsstrahlung repair preserves it. See
@@ -93,29 +95,29 @@ model limits.
 
 Profiles run adaptive electron counts by default. Each incoherent case transports electrons in blocks and stops once the relative standard error of each watched yield meets the target and the heavy-tail guards pass. If the target is not met by the maximum count, the run stops there and is flagged statistics-limited. One count serves both line and bremsstrahlung transport.
 
-A profile with neither fixed counts nor a `precision` table uses the default policy: target relative standard error 0.05 on line and bremsstrahlung yields, 200 to 20,000 electrons, blocks of 100, and the default guards. A profile keeps fixed counts, and `pyrite profile show` and `pyrite profile precision show` say why, when it sets `n_electrons`/`n_electrons_brem` (directly or in a material override) or when it cannot run adaptive: coherent or `both` emission, particle cascades (secondaries, pair production, positrons), a GDF beam, or a grooved entrance face. A physical detector also needs fixed counts: give such a profile counts, since precision commands refuse it. `pyrite profile precision show NAME` also prints the fixed counts as `line-trials`/`brem-trials`, any blocker, the line-grid source and the command that changes mode.
+A profile with neither fixed counts nor a `precision` table uses the default policy: target relative standard error 0.05 on line and bremsstrahlung yields, 200 to 20,000 electrons, blocks of 100, and the default guards. A profile keeps fixed counts, and `pyrite profile show` and `pyrite numerics precision show` say why, when it sets `n_electrons`/`n_electrons_brem` (directly or in a material override) or when it cannot run adaptive: coherent or `both` emission, particle cascades (secondaries, pair production, positrons), a GDF beam, or a grooved entrance face. A physical detector also needs fixed counts: give such a profile counts, since precision commands refuse it. `pyrite numerics precision show NAME` also prints the fixed counts as `line-trials`/`brem-trials`, any blocker, the line-grid source and the command that changes mode.
 
 The default (#361) changed every affected dataset identity once, including `standard`'s, so runs from before it do not resume; their checkpoints stay on disk under the old stems. On a subset of the `standard` sweep (hopg and MoS2, 48 cases, 30–300 keV, 100 nm–1 mm), the default converged every case at 400–2,100 electrons. A fixed count of 300 left about half the cases above 5 %, and a single fixed count that met 5 % everywhere needed 1,500–2,000 electrons per case.
 
 Switching modes:
 
 ```bash
-pyrite profile precision enable hopg_scan             # drop fixed counts; default policy
-pyrite profile precision enable hopg_scan --observable line   # drop counts; custom policy
-pyrite profile precision set hopg_scan --target-rse 0.02      # customize one field
-pyrite profile precision reset hopg_scan stability-blocks     # one field back to its default
-pyrite profile precision reset hopg_scan              # drop the table: default policy
-pyrite profile precision disable hopg_scan --cxr-trials 500 --brem-trials 100   # opt out
-pyrite profile precision show hopg_scan
+pyrite numerics precision enable hopg_scan             # drop fixed counts; default policy
+pyrite numerics precision enable hopg_scan --observable line   # drop counts; custom policy
+pyrite numerics precision set hopg_scan --target-rse 0.02      # customize one field
+pyrite numerics precision reset hopg_scan stability-blocks     # one field back to its default
+pyrite numerics precision reset hopg_scan              # drop the table: default policy
+pyrite numerics precision disable hopg_scan --cxr-trials 500 --brem-trials 100   # opt out
+pyrite numerics precision show hopg_scan
 ```
 
 `enable` removes `n_electrons`/`n_electrons_brem` and, in the same write, stores a policy when options are given; it reports the counts it removed and never changes emission, cascades, beam, geometry or line-grid selectors. It refuses, writing nothing, when the profile cannot run adaptive, including per-material count overrides (`[profiles.NAME.overrides.MATERIAL]`), which must be removed from the catalog by hand. `set` customizes a policy: an existing policy keeps the fields not given, and a new one starts from the default (target 0.05, 200–20,000 electrons, blocks of 100, line and brem). On a fixed-count profile `set` refuses and names `enable`. `--observable` replaces the watched set, so `--observable line` alone stops watching bremsstrahlung.
 
-`reset` without fields removes the table and returns the profile to the default policy; it does not add fixed counts. To opt out, `disable` removes any policy and sets fixed counts. Explicit `--cxr-trials`/`--brem-trials` replace that count, and a count the profile already sets, including a sweep grid, is otherwise kept. A missing count is prompted for on a terminal; without one, or with `--yes`/`--dry-run`, it takes the full-fidelity default (300 line, 150 brem). `pyrite profile numerics set --cxr-trials` on a profile with a policy is refused and names `disable`. Every command accepts `--dry-run`.
+`reset` without fields removes the table and returns the profile to the default policy; it does not add fixed counts. To opt out, `disable` removes any policy and sets fixed counts. Explicit `--cxr-trials`/`--brem-trials` replace that count, and a count the profile already sets, including a sweep grid, is otherwise kept. A missing count is prompted for on a terminal; without one, or with `--yes`/`--dry-run`, it takes the full-fidelity default (300 line, 150 brem). `pyrite numerics set --cxr-trials` on a profile with a policy is refused and names `disable`. Every command accepts `--dry-run`.
 
 Bundled demos are read-only: copy one with `pyrite profile create NAME --from DEMO` and edit the copy (maintainers edit the bundled file with `pyrite-dev profile`). The policy is stored as `[profiles.NAME.precision]`. The minimum, maximum and optional `--pilot-electrons` must be multiples of the block size. Optional guards default to `--max-electron-share 0.05`, `--min-effective-electrons 100`, `--stability-blocks 3` and `--stability-fraction 0.5`. `--band-ev START,STOP` fixes the monitor band; it defaults to the case's line band. `--batch-means-band-ev` adds reported per-bin errors and is never used to stop.
 
-Electron sampling and the line grid are independent. A `[profiles.NAME.line_grid_policy]` table resolves each case's line grid automatically (see [line-grid policy](#line-grid-policy)) whether the counts are fixed or adaptive, and precision commands never change it; `pyrite profile cxr-grid show NAME` lists the grid sources. The bundled `quickstart`, `sweep_demo`, `high_energy_demo` and `hopg_emittance_demo` profiles run adaptive. `high_energy_demo` also resolves its line grid with the measured policy. `coherent_demo` (coherent emission), `detector_demo` and `pixelated_detector_demo` (physical detectors), and `trajectory_demo` (trajectory capture) keep fixed counts because adaptive precision does not support those routes. `two_detector_demo` also uses fixed counts to bound the two-detector workload. Removing the demos' fixed counts changed their dataset identities, so earlier demo checkpoints do not resume.
+Electron sampling and the line grid are independent. A `[profiles.NAME.line_grid_policy]` table resolves each case's line grid automatically (see [line-grid policy](#line-grid-policy)) whether the counts are fixed or adaptive, and precision commands never change it; `pyrite numerics cxr-grid show NAME` lists the grid sources. The bundled `quickstart`, `sweep_demo`, `high_energy_demo` and `hopg_emittance_demo` profiles run adaptive. `high_energy_demo` also resolves its line grid with the measured policy. `coherent_demo` (coherent emission), `detector_demo` and `pixelated_detector_demo` (physical detectors), and `trajectory_demo` (trajectory capture) keep fixed counts because adaptive precision does not support those routes. `two_detector_demo` also uses fixed counts to bound the two-detector workload. Removing the demos' fixed counts changed their dataset identities, so earlier demo checkpoints do not resume.
 
 A profile with an explicit `precision` table cannot also set `n_electrons`/`n_electrons_brem` grids, directly or in a material override, or coherent emission; the catalog loader rejects each combination. An explicit policy also refuses physical detectors (`run --ephemeral`), GDF beams, grooves, and particle cascades, rather than falling back. Adaptive runs use only the per-electron or CUDA transport cores. An adaptive run never uses the canonical `<material>` checkpoint stem.
 
@@ -146,14 +148,14 @@ By default each case's line axis spans a closed-form kinematic bandwidth at the 
 `resonance-local` requires `resonance-population` and `bin-mean`. Edit the table with the `line-grid` group rather than TOML; impossible combinations are usage errors (exit 2) and nothing is written:
 
 ```bash
-pyrite profile cxr-grid show high_energy
-pyrite profile cxr-grid show high_energy -o json
-pyrite profile cxr-grid set my_profile --bandwidth resonance-population \
+pyrite numerics cxr-grid show high_energy
+pyrite numerics cxr-grid show high_energy -o json
+pyrite numerics cxr-grid set my_profile --bandwidth resonance-population \
   --resolution resonance-local --quadrature bin-mean --dry-run
-pyrite profile cxr-grid set my_profile --bandwidth resonance-population \
+pyrite numerics cxr-grid set my_profile --bandwidth resonance-population \
   --resolution resonance-local --quadrature bin-mean
-pyrite profile cxr-grid reset my_profile resolution quadrature
-pyrite profile cxr-grid reset my_profile
+pyrite numerics cxr-grid reset my_profile resolution quadrature
+pyrite numerics cxr-grid reset my_profile
 ```
 
 `show` lists each selector's explicit value, effective value and source, and which grid source the profile's cases use. `pyrite profile show NAME` prints a one-line summary, and its JSON payload carries `line_grid_policy` (`null` when unset). Editing `standard` prompts unless `--yes`.
@@ -172,7 +174,7 @@ and immutable artifacts remain optional specialist tools; automatic line sizing
 does not automatically refine a nonuniform continuum grid.
 
 For optional derivation, select both materials and beam energies, for example
-`pyrite material energy-grid derive --material mose2 --energy 30,60 --profile NAME`.
+`pyrite numerics energy-grid derive --material mose2 --energy 30,60 --profile NAME`.
 Material and energy selections are required; geometry and
 spacing remain per-invocation controls, with omitted angles inheriting profile
 geometry. Explicit user grids, profile `energy_grid_refs`, and stored artifacts
@@ -262,7 +264,7 @@ Copy packaged instrument objects before editing them:
 
 ```bash
 pyrite beam create lab-beam --from example --rep-rate-hz 1000
-pyrite detector create lab-detector --from reference --observation-angle 120
+pyrite detector create scalar lab-detector --from reference --observation-angle 120
 pyrite profile create lab-scan --from quickstart
 pyrite profile set lab-scan --beam lab-beam --detector lab-detector
 ```
@@ -380,7 +382,7 @@ The pixel pose uses `distance_mm`, `polar_deg`, `azimuth_deg`, `roll_deg`, and `
 Use `profile detector list PROFILE` and `show PROFILE ID` to inspect resolved geometry, references and optional sections. Attach a reusable object with `add PROFILE ID --detector REF`; replace a reference with `set PROFILE ID --detector REF`. `set PROFILE ID` also accepts scalar and pixel field options for inline entries. A named entry requires `--inline-copy` before profile-local field edits; this copies all its settings and leaves the shared object unchanged. Use `pyrite detector set REF` to edit a reusable object for all profiles.
 
 ```bash
-pyrite detector create sensor --distance-mm 400 --shape 256 256 --angular-shape 2 2 \
+pyrite detector create planar sensor --distance-mm 400 --shape 256 256 --angular-shape 2 2 \
   --response ideal --exposure-s 1 --measured-range-ev 0 20000 --measured-bin-width-ev 400
 pyrite profile create survey --detector reference
 pyrite profile detector migrate survey --dry-run

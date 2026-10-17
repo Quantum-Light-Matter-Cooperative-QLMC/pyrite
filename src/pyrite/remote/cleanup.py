@@ -25,7 +25,7 @@ def _refuse_if_busy(materials, quick):
             "refusing to start: a live job is already producing the same "
             "checkpoint(s), and two runs writing one <stem>.pkl race on its "
             f".tmp and crash.\n{detail}\n"
-            "monitor it (pyrite job attach <jobid>) or stop it "
+            "monitor it (pyrite remote job attach <jobid>) or stop it "
             "(pyrite remote stop <material>) first, or run different materials."
         )
 

@@ -9,7 +9,7 @@ import pytest
 from pyrite import cli
 from pyrite._catalog_layout import read_text
 from pyrite.cli import _catalog_io
-from pyrite.cli.commands import _simulation, material
+from pyrite.cli.commands import _simulation, material, profile
 from tests.helpers.cli import assert_clean_result, invoke
 
 _CATALOG = """[profiles.standard]
@@ -49,7 +49,7 @@ def _catalog(tmp_path, monkeypatch):
 def test_show_default_profile_reports_effective_sources(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    result = invoke(material.command, ["show", "hopg"])
+    result = invoke(profile.command, ["ranges", "show", "standard", "hopg"])
 
     assert_clean_result(result)
     assert "hopg: profile standard" in result.stdout
@@ -61,7 +61,7 @@ def test_show_default_profile_reports_effective_sources(tmp_path, monkeypatch):
 def test_show_nonstandard_profile_json(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    result = invoke(material.command, ["show", "hopg", "--profile", "survey", "-o", "json"])
+    result = invoke(profile.command, ["ranges", "show", "survey", "hopg", "-o", "json"])
 
     assert_clean_result(result)
     document = json.loads(result.stdout)
@@ -113,7 +113,7 @@ def test_root_and_group_help_expose_new_ownership_only():
     assert "validate" in material_help.stdout
     assert "blaze" in material_help.stdout
     assert "list" in material_help.stdout
-    assert "add" in material_help.stdout
+    assert "create" in material_help.stdout
 
 
 def test_material_group_lazily_routes_validate_and_blaze():

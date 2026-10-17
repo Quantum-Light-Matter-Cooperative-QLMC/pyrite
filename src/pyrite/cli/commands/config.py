@@ -5,25 +5,11 @@ from pathlib import Path
 import click
 
 from ...console import config as _config
-from ...console.output import CLIError, emit_diagnostic, emit_result
+from ...console.output import CLIError, emit_diagnostic, emit_result, emit_table
 from ...remote.config import validate_remote_target, validate_slurm_setting
 from .._groups import LazyGroup
 
 _KEY = click.Choice(_config.keys(), case_sensitive=True)
-
-
-def _keys_epilog() -> str:
-    """Describe every KEY with its environment variable and built-in default."""
-    width = max(map(len, _config.keys()))
-    lines = ["\b", "Keys (environment variable; built-in default):"]
-    for key in _config.keys():
-        env_name, default, text = _config.describe(key)
-        lines.append(f"  {key:<{width}}  {text}")
-        lines.append(f"  {'':<{width}}  {env_name}; {default}")
-    return "\n".join(lines)
-
-
-_KEYS_EPILOG = _keys_epilog()
 
 
 def _validated(key: str, value: str) -> str:
@@ -53,7 +39,7 @@ def _validated(key: str, value: str) -> str:
         except MaterialConfigError as exc:
             raise click.BadParameter(str(exc), param_hint="VALUE") from exc
         return str(path)
-    if key == "workspace.root":
+    if key in ("workspace.root", "catalog.user"):
         return str(Path(value).expanduser().resolve())
     if key.startswith("xsgen."):
         return _validated_code_source(key, value)
@@ -102,21 +88,20 @@ def _validated_code_source(key: str, value: str) -> str:
         "setup": "Detect GPU hardware and persist the selected backend.",
         "completion": "Manage PyRITE shell tab-completion.",
     },
-    epilog=_KEYS_EPILOG,
 )
 def command() -> None:
     """Set and inspect environment-scoped CLI defaults.
 
-    Values resolve in one order everywhere: per-call flag, PYRITE_* environment,
-    config store, then built-in default. `pyrite config list` shows each
-    effective value and its source.
+    Values resolve in one order: per-call flag, PYRITE_* environment, config
+    store, then built-in default. Use keys for supported settings, list [PREFIX]
+    for effective values and sources, or explain KEY for metadata and precedence.
 
     Remote runs need remote.target. The other remote.* keys select the SLURM
     target profile; their defaults are the NVIDIA lab box.
     """
 
 
-@command.command("set", epilog=_KEYS_EPILOG)
+@command.command("set")
 @click.argument("key", type=_KEY, metavar="KEY")
 @click.argument("value")
 def set_command(key: str, value: str) -> None:
@@ -136,7 +121,7 @@ def unset_command(key: str) -> None:
 
     KEY then resolves to its PYRITE_* environment variable, if set, or its
     built-in default. Unsetting a key that is not stored succeeds and changes
-    nothing. See `pyrite config --help` for the supported keys.
+    nothing. See `pyrite config keys` for the supported keys.
     """
     try:
         removed = _config.unset_stored(key)
@@ -153,7 +138,7 @@ def unset_command(key: str) -> None:
 def get_command(key: str) -> None:
     """Print the effective value for KEY.
 
-    See `pyrite config --help` for the supported keys.
+    See `pyrite config keys` for the supported keys.
     """
     try:
         click.echo(_config.resolve(key).value)
@@ -162,15 +147,49 @@ def get_command(key: str) -> None:
 
 
 @command.command("list")
-def list_command() -> None:
-    """List effective values and the winning precedence source."""
+@click.argument("prefix", required=False, default="")
+def list_command(prefix: str) -> None:
+    """List effective values and sources, optionally restricted to a key PREFIX."""
+    keys = _matching_keys(prefix)
     try:
         rows = []
-        for key in _config.keys():
+        for key in keys:
             resolved = _config.resolve(key)
             rows.append((key, resolved.value, resolved.source))
     except _config.ConfigError as exc:
         raise CLIError(str(exc)) from exc
-    click.echo("KEY\tVALUE\tSOURCE")
-    for key, value, source in rows:
-        click.echo(f"{key}\t{value}\t{source}")
+    emit_table(("KEY", "VALUE", "SOURCE"), rows)
+
+
+def _matching_keys(prefix):
+    keys = [key for key in _config.keys() if key.startswith(prefix)]
+    if not keys:
+        raise click.BadParameter(
+            f"no keys match {prefix!r}; use pyrite config keys", param_hint="PREFIX"
+        )
+    return keys
+
+
+@command.command("keys")
+@click.argument("prefix", required=False, default="")
+def keys_command(prefix: str) -> None:
+    """Describe supported keys without reading effective configuration values."""
+    for key in _matching_keys(prefix):
+        env_name, default, description = _config.describe(key)
+        emit_result(f"{key}: {description}\n  {env_name}; default: {default}")
+
+
+@command.command("explain")
+@click.argument("key", type=_KEY, metavar="KEY")
+def explain_command(key: str) -> None:
+    """Show KEY's meaning, default, environment mapping and effective source."""
+    try:
+        resolved = _config.resolve(key)
+    except _config.ConfigError as exc:
+        raise CLIError(str(exc)) from exc
+    env_name, default, description = _config.describe(key)
+    emit_result(f"{key}: {description}")
+    emit_result(f"  domain: {_config.domain(key)}")
+    emit_result(f"  environment: {env_name}\n  default: {default}")
+    emit_result(f"  effective: {resolved.value}\n  source: {resolved.source}")
+    emit_result("  precedence: per-call flag > environment > config store > built-in default")

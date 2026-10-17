@@ -39,7 +39,12 @@ def test_user_instrument_lifecycle_preserves_package(
 ):
     before = snapshot(bundled)
     command = module.command
-    assert_clean_result(invoke(command, ["create", "mine", "--from", source]))
+    assert_clean_result(
+        invoke(
+            command,
+            ["create", *(["clone"] if module is detector else []), "mine", "--from", source],
+        )
+    )
     table = kind + "s"
     original = layout.read_raw(bundled)[table][source]
     assert layout.read_raw(bundled)[table]["mine"] == original
@@ -78,10 +83,23 @@ def test_copy_rejects_case_collision_and_dry_run_writes_nothing(
     bundled, module, source, _isolate_user_catalog
 ):
     before = snapshot(bundled), snapshot(_isolate_user_catalog)
-    result = invoke(module.command, ["create", source.upper(), "--from", source])
+    result = invoke(
+        module.command,
+        ["create", *(["clone"] if module is detector else []), source.upper(), "--from", source],
+    )
     assert result.exit_code == 1
     assert "already exists" in result.stderr
-    result = invoke(module.command, ["create", "mine", "--from", source, "--dry-run"])
+    result = invoke(
+        module.command,
+        [
+            "create",
+            *(["clone"] if module is detector else []),
+            "mine",
+            "--from",
+            source,
+            "--dry-run",
+        ],
+    )
     assert_clean_result(result)
     assert "mine" in result.stdout
     assert (snapshot(bundled), snapshot(_isolate_user_catalog)) == before
@@ -111,7 +129,10 @@ def test_maintainer_edits_bundle_and_restores_selection(
 def test_copy_preserves_nested_fields_and_applies_overrides(bundled, module, source, options, key):
     table = "beams" if module is beam else "detectors"
     original = layout.read_raw(bundled)[table][source]
-    result = invoke(module.command, ["create", "mine", "--from", source, *options])
+    result = invoke(
+        module.command,
+        ["create", *(["planar"] if module is detector else []), "mine", "--from", source, *options],
+    )
     assert_clean_result(result)
     copied = layout.read_raw(bundled)[table]["mine"]
     assert copied == {**original, key: 123.0}

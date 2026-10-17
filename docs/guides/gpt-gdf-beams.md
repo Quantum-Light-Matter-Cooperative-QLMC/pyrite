@@ -16,7 +16,7 @@ Run GPT and inspect the native output directly:
 
 ```bash
 gpt -o beam.gdf beam.in
-pyrite beam gdf-times beam.gdf
+pyrite beam gdf times beam.gdf
 ```
 
 If you do not yet have GPT output, save this small fixture generator as
@@ -52,8 +52,8 @@ Generate and inspect `beam.gdf`:
 
 ```bash
 python make_example_gdf.py
-pyrite beam gdf-times beam.gdf
-pyrite beam gdf-inspect beam.gdf --time-s 1e-9
+pyrite beam gdf times beam.gdf
+pyrite beam gdf inspect beam.gdf --time-s 1e-9
 ```
 
 The equivalent Python workflow is:
@@ -193,7 +193,7 @@ analytic spot, energy-spread, Twiss, or longitudinal-distribution settings.
 Create a reusable beam, attach it, and run the profile:
 
 ```bash
-pyrite beam gdf-inspect beam.gdf --time-s 1e-9
+pyrite beam gdf inspect beam.gdf --time-s 1e-9
 pyrite beam create gpt_beam \
   --source gpt_gdf --gdf-path beam.gdf \
   --gdf-time-s 1e-9 --gdf-time-tolerance-s 1e-15 \
@@ -268,13 +268,13 @@ transport; actual GPU validation has not been performed for this source.
 List outputs and inspect the sole time snapshot in `beam.gdf` automatically:
 
 ```bash
-pyrite beam gdf-inspect beam.gdf
+pyrite beam gdf inspect beam.gdf
 ```
 
 Inspect a particular screen, including actual lab x/y/z ranges and weighted means:
 
 ```bash
-pyrite beam gdf-inspect screen.gdf --screen-position-m 1.05
+pyrite beam gdf inspect screen.gdf --screen-position-m 1.05
 ```
 
 Add `-o json` for structured output. Use the physical target's lab-z coordinate

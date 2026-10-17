@@ -15,7 +15,7 @@ resumes on re-invocation; ``redo_all`` forces a full recompute.
 ``progress_file`` (single material only) atomically maintains the same compact
 JSON progress record a remote sweep writes (see
 ``pyrite._progress._write_progress_record``), so the remote recompute queues feed the
-``pyrite job status``/``attach`` case-progress dashboard. ``max_minutes``
+``pyrite remote job status``/``attach`` case-progress dashboard. ``max_minutes``
 bounds the whole run across the material list against one monotonic deadline;
 if any material stops short of complete the driver raises ``SystemExit(75)``
 so the chunked remote queue self-resubmits.
@@ -84,7 +84,7 @@ def rebrem_checkpoints(
     ``progress_file`` (single material only) atomically maintains the same
     compact JSON progress record a remote run writes (see
     ``scan._write_progress_record``), so the remote rebrem queue feeds the
-    ``pyrite job status``/``attach`` case-progress dashboard: repaired records
+    ``pyrite remote job status``/``attach`` case-progress dashboard: repaired records
     count as new cases, already-at-target records as cached.
 
     ``max_minutes`` bounds the whole run across the material list against one

@@ -38,9 +38,10 @@ def row(catalog):
 
 def test_named_scalar_and_pixel_collection_entirely_cli(catalog):
     for args in (
-        ["create", "scalar", "--observation-angle", "100"],
+        ["create", "scalar", "scalar", "--observation-angle", "100"],
         [
             "create",
+            "planar",
             "camera",
             "--distance-mm",
             "400",
@@ -187,6 +188,7 @@ def test_named_pixel_reset_replaces_response_and_axis(catalog):
     for args in (
         [
             "create",
+            "planar",
             "camera",
             "--distance-mm",
             "100",
@@ -273,6 +275,7 @@ def test_native_reporting_on_named_detector_and_inline_copy(catalog):
             detector.command,
             [
                 "create",
+                "planar",
                 "native_camera",
                 "--distance-mm",
                 "400",

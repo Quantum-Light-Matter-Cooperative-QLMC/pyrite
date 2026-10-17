@@ -28,8 +28,8 @@ def material_command() -> None:
 
     \b
     Examples:
-      pyrite material energy-grid derive --material mose2 --energy 30,60
-      pyrite material energy-grid show mose2
+      pyrite numerics energy-grid derive --material mose2 --energy 30,60
+      pyrite numerics energy-grid show mose2
 
     Normal runs size line grids automatically and resolve continuum bounds per
     case. Explicit derivation and stored artifacts are optional specialist tools.

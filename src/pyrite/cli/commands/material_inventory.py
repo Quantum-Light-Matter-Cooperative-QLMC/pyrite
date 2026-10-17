@@ -3,7 +3,7 @@
 import click
 
 from ...console import json as cli_json
-from ...console.output import CLIError, emit_json_result, emit_result, output_option
+from ...console.output import CLIError, emit_json_result, emit_table, output_option
 
 
 def entries(path):
@@ -56,7 +56,10 @@ def command(json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult(schema, {"materials": rows}))
     else:
-        for row in rows:
-            emit_result(
-                f"{row['name']}  {row['kind']}  {row['source']}  {row['density_g_cm3']:g} g/cm³"
-            )
+        emit_table(
+            ("NAME", "KIND", "SOURCE", "DENSITY (g/cm³)"),
+            [
+                (row["name"], row["kind"], row["source"], f"{row['density_g_cm3']:g}")
+                for row in rows
+            ],
+        )

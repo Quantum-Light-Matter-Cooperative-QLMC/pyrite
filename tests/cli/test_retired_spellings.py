@@ -12,7 +12,7 @@ import click
 import pytest
 
 from pyrite.cli import command
-from pyrite.cli._deprecations import DEPRECATIONS
+from pyrite.cli._deprecations import DEPRECATIONS, SELF_WARNING
 from pyrite.devtools.cli_commands import energy_grid_command
 from tests.helpers.cli import invoke
 
@@ -246,4 +246,4 @@ def test_only_registered_deprecations_are_hidden() -> None:
     root = click.Context(command, info_name="pyrite")
     hidden = [" ".join(path) for path, child in walk(command, root) if child.hidden]
 
-    assert sorted(hidden) == sorted(DEPRECATIONS)
+    assert sorted(hidden) == sorted(set(DEPRECATIONS) - SELF_WARNING)
