@@ -3,7 +3,7 @@
 # theme = "light"
 # ///
 
-"""Interactive planar channeling and channeling-radiation demo."""
+"""Interactive planar and experimental axial channeling diagnostics."""
 
 import marimo
 
@@ -25,8 +25,8 @@ def _():
                 [
                     page_title(
                         mo,
-                        "Planar channeling and radiation",
-                        "Explore transverse states, dechanneling, and the emitted spectrum for an aligned electron beam.",
+                        "Channeling diagnostics",
+                        "Explore planar states and radiation, or experimental axial wave and ensemble diagnostics.",
                         eyebrow="PyRITE physics demo",
                     ),
                     theme_ui,
@@ -36,7 +36,7 @@ def _():
                 wrap=True,
             ),
             mo.md(
-                "This demo solves the planar quantum channeling model on the CPU. "
+                "Choose the planar quantum model or experimental axial diagnostics on the CPU. "
                 "The plots below describe model states and probabilities; they are not detector measurements. "
                 "Trajectory replay is not available for channeling cases."
             ),
@@ -47,6 +47,14 @@ def _():
 
 @app.cell
 def _(mo):
+    mode_ui = mo.ui.radio(["Planar", "Axial (experimental)"], value="Planar", label="Mode")
+    mode_ui
+    return (mode_ui,)
+
+
+@app.cell
+def _(mo, mode_ui):
+    mo.stop(mode_ui.value != "Planar")
     crystal_ui = mo.ui.dropdown(
         {"Silicon (110)": "silicon", "Diamond (110)": "diamond"},
         value="Silicon (110)",
@@ -454,6 +462,133 @@ def _(conditional_ui, mo, np, plt, result, sample_ui):
             _fig,
         ]
     )
+    return
+
+
+@app.cell
+def _(mo, mode_ui):
+    mo.stop(mode_ui.value != "Axial (experimental)")
+    axial_form = (
+        mo.md(
+            """
+        **Experimental axial diagnostic** — periodic CPU model; no campaign integration.
+
+        {crystal} {axis} {energy} {mode} {grid} {cells}
+
+        {depth} {step} {electrons} {seed} {preset}
+
+        {waist} {impact_x} {impact_y} {tilt_x} {tilt_y} {oam}
+
+        Waist w means exp(-r²/w²); impact is relative to the projected cell origin.
+        The equal ±1 mixture adds probabilities, with equal incident weights.
+        Tilt is a separate carrier angle. Larger statistics belong on remote compute.
+        """
+        )
+        .batch(
+            crystal=mo.ui.dropdown(["silicon", "diamond"], value="silicon", label="Crystal"),
+            axis=mo.ui.dropdown(["001", "110"], value="001", label="Axis"),
+            energy=mo.ui.slider(1, 10, value=5, label="Energy (MeV)"),
+            mode=mo.ui.dropdown(["coherent", "mcwf"], value="coherent", label="Evolution"),
+            grid=mo.ui.dropdown([16, 32, 48], value=32, label="Grid samples per axis"),
+            cells=mo.ui.slider(1, 3, value=1, label="Cells per axis"),
+            depth=mo.ui.dropdown([50, 100, 200], value=100, label="Depth (Å)"),
+            step=mo.ui.dropdown([1, 2, 5], value=5, label="Step (Å)"),
+            electrons=mo.ui.slider(1, 32, value=16, label="MCWF electrons"),
+            seed=mo.ui.number(0, 100000, value=0, label="Seed"),
+            preset=mo.ui.dropdown(
+                ["Gaussian", "Vortex +1", "Vortex -1", "Equal ±1 mixture"],
+                value="Gaussian",
+                label="Entry preset",
+            ),
+            waist=mo.ui.slider(0.2, 1.0, step=0.1, value=0.5, label="Waist (Å)"),
+            impact_x=mo.ui.slider(-1, 1, step=0.1, value=0, label="Impact x (Å)"),
+            impact_y=mo.ui.slider(-1, 1, step=0.1, value=0, label="Impact y (Å)"),
+            tilt_x=mo.ui.slider(-1, 1, step=0.1, value=0, label="Tilt x (mrad)"),
+            tilt_y=mo.ui.slider(-1, 1, step=0.1, value=0, label="Tilt y (mrad)"),
+            oam=mo.ui.checkbox(value=False, label="OAM about string 0, radius 0.5 Å"),
+        )
+        .form(submit_button_label="Run axial diagnostic")
+    )
+    axial_form
+    return (axial_form,)
+
+
+@app.cell
+def _(axial_form, mo):
+    from pyrite.apps.axial_channeling import axial_demo_figure, solve_axial_demo
+    from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
+
+    mo.stop(axial_form.value is None, mo.md("Choose settings and press **Run axial diagnostic**."))
+    _v = axial_form.value
+    axial_config = AxialDiagnosticConfig(
+        crystal=_v["crystal"],
+        axis=(0, 0, 1) if _v["axis"] == "001" else (1, 1, 0),
+        kinetic_energy_eV=_v["energy"] * 1e6,
+        cells=(_v["cells"],) * 2,
+        shape=(_v["grid"],) * 2,
+        depths_ang=tuple(range(0, _v["depth"] + 1, 10)),
+        step_ang=_v["step"],
+        tilt_rad=(_v["tilt_x"] * 1e-3, _v["tilt_y"] * 1e-3),
+        mode=_v["mode"],
+        n_electrons=_v["electrons"],
+        seed=int(_v["seed"]),
+        oam_string=0 if _v["oam"] else None,
+    )
+    axial_result = solve_axial_demo(
+        axial_config, _v["preset"], _v["waist"], (_v["impact_x"], _v["impact_y"])
+    )
+    return axial_demo_figure, axial_result
+
+
+@app.cell
+def _(axial_result, mo):
+    axial_sample_ui = mo.ui.slider(
+        0, len(axial_result.depths_ang) - 1, value=0, label="Recorded axial depth", show_value=True
+    )
+    axial_conditional_ui = mo.ui.checkbox(
+        value=False, label="Condition axial density on grid survival"
+    )
+    mo.hstack([axial_sample_ui, axial_conditional_ui])
+    return axial_conditional_ui, axial_sample_ui
+
+
+@app.cell
+def _(axial_conditional_ui, axial_demo_figure, axial_result, axial_sample_ui, mo):
+    _index = axial_sample_ui.value
+    _fig = axial_demo_figure(axial_result, _index, axial_conditional_ui.value)
+    _notes = (
+        f"**{axial_result.config.mode} · depth {axial_result.depths_ang[_index]:g} Å** · "
+        f"surviving weight {axial_result.surviving[_index]:.6f}. "
+        "Density integrates to incident-electron survival, or one when conditioned "
+        "(zero if extinct). Coherent norm is not scattering survival. "
+        "The finite periodic grid can wrap the probe and lose momentum transfers; "
+        "compare grid, supercell and step convergence. MCWF statistics here are illustrative. "
+        "Existing axial validation limits remain in the physics ledger. "
+    )
+    _items = [mo.md(_notes), _fig]
+    if axial_result.oam_populations is not None:
+        import matplotlib.pyplot as _axial_plt
+
+        _ofig, _oax = _axial_plt.subplots()
+        for _i, _ell in enumerate(axial_result.oam_ells):
+            _oax.plot(
+                axial_result.depths_ang, axial_result.oam_populations[:, _i], label=f"ℓ={_ell}"
+            )
+        _oax.set(
+            xlabel="Depth (Å)",
+            ylabel="Pℓ per incident electron in disk",
+            title=f"OAM about string 0 at {axial_result.oam_origin_ang} Å; R=0.5 Å",
+        )
+        _oax.legend(ncol=4, fontsize=7)
+        _items.extend(
+            [
+                mo.md(
+                    "Disk OAM is truncated to |ℓ| ≤ 8; omitted disk/mode weight is not renormalized."
+                ),
+                _ofig,
+            ]
+        )
+    mo.vstack(_items)
     return
 
 

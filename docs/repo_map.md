@@ -690,6 +690,12 @@ Notebook support for `src/pyrite/apps/validation_app.py`: the persisted suppleme
 
 ### `apps/channeling.py` and `apps/channeling_app.py`
 
+The channeling app also offers a bounded experimental axial mode through
+`apps/axial_channeling.py` (entry presets, cached solves, stored-array plotting).
+`montecarlo/channeling/axial_diagnostic.py` assembles existing coherent/MCWF
+solvers with typed configuration/results, incident-normalized density and optional
+string-centered OAM; no standard run integration.
+
 The planar channeling demo exposes eigenfunctions, entry populations, fate and
 spectrum diagnostics, and sampled ensemble spatial density. The numerical
 diagnostic `critical_angle_rad` uses the potential minimum and maximum. State,

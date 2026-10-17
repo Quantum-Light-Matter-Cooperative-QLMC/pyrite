@@ -50,3 +50,97 @@ def test_every_plotted_eigenfunction_has_unit_probability_per_period():
             1,
             abs=1e-13,
         )
+
+
+def test_axial_display_controls_do_not_feed_solve():
+    tree = ast.parse(APP.read_text())
+    solve_cells = [
+        cell
+        for cell in tree.body
+        if isinstance(cell, ast.FunctionDef)
+        and any(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "solve_axial_demo"
+            for node in ast.walk(cell)
+        )
+    ]
+    assert len(solve_cells) == 1
+    assert {arg.arg for arg in solve_cells[0].args.args} == {"axial_form", "mo"}
+
+
+@pytest.mark.parametrize("mode", ["coherent", "mcwf"])
+def test_axial_app_executes_same_api_and_reuses_solve(mode):
+    from types import SimpleNamespace
+
+    import matplotlib.pyplot as plt
+
+    from pyrite.apps.axial_channeling import solve_axial_demo
+    from pyrite.apps.channeling_app import app
+    from pyrite.montecarlo.channeling.axial_diagnostic import axial_diagnostic
+
+    values = dict(
+        crystal="silicon",
+        axis="001",
+        energy=5,
+        mode=mode,
+        cells=1,
+        grid=16,
+        depth=50,
+        step=5,
+        electrons=2,
+        seed=547,
+        preset="Gaussian",
+        waist=0.5,
+        impact_x=0,
+        impact_y=0,
+        tilt_x=0,
+        tilt_y=0,
+        oam=False,
+    )
+    _, definitions = app.run(
+        defs={
+            "mode_ui": SimpleNamespace(value="Axial (experimental)"),
+            "axial_form": SimpleNamespace(value=values),
+        }
+    )
+    result = definitions["axial_result"]
+    direct = axial_diagnostic(result.config, entry=result.entry)
+    np.testing.assert_allclose(result.density_per_ang2, direct.density_per_ang2)
+    assert solve_axial_demo(result.config, "Gaussian", 0.5, (0, 0)) is result
+    assert (
+        result.wavefunctions_per_ang is None
+        if mode == "mcwf"
+        else result.wavefunctions_per_ang is not None
+    )
+    plt.close("all")
+
+
+def test_axial_app_bounds_and_cache():
+    from dataclasses import replace
+
+    import matplotlib.pyplot as plt
+
+    from pyrite.apps.axial_channeling import axial_demo_figure, solve_axial_demo
+    from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
+
+    config = AxialDiagnosticConfig(shape=(16, 16))
+    result = solve_axial_demo(config, "Equal ±1 mixture")
+    assert solve_axial_demo(config, "Equal ±1 mixture") is result
+    assert result.wavefunctions_per_ang is None
+    figure = axial_demo_figure(result, 1, True)
+    assert "No unique phase" in figure.axes[2].texts[0].get_text()
+    plt.close(figure)
+    for updates in ({"shape": (64, 64)}, {"n_electrons": 33}, {"depths_ang": (0, 1000)}):
+        with pytest.raises(ValueError, match="app limit"):
+            solve_axial_demo(replace(config, **updates))
+
+
+def test_axial_form_waits_for_run():
+    from types import SimpleNamespace
+
+    from pyrite.apps.channeling_app import app
+
+    _, definitions = app.run(defs={"mode_ui": SimpleNamespace(value="Axial (experimental)")})
+    assert definitions["axial_form"].value is None
+    assert "axial_result" not in definitions
