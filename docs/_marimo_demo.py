@@ -1,9 +1,12 @@
 """Export the browser-only results demo (``docs/demo/``) into the HTML build.
 
-``marimo export html-wasm --single-file`` writes one small page that fetches
-marimo and Pyodide from a CDN when viewed. The bundled data in
-``docs/demo/public/`` is copied beside it, where ``mo.notebook_location()``
-resolves it at view time, along with the README preview still.
+``marimo export html-wasm`` writes the page plus marimo's frontend assets;
+Pyodide and packages load from a CDN when viewed. The directory export (not
+``--single-file``) is required: Pyodide's worker must be served from
+``demo/assets/`` for ``mo.notebook_location()`` to resolve to ``demo/``, where
+the bundled ``public/`` data sits. A ``--single-file`` page runs its worker
+from a ``blob:`` URL, so the notebook cannot locate its data. The README
+preview still is copied beside it as the no-JS fallback.
 """
 
 from __future__ import annotations
@@ -38,8 +41,7 @@ def _export(app: Sphinx, exception: Exception | None) -> None:
             "html-wasm",
             str(DEMO / "results_app.py"),
             "--output",
-            str(out / "index.html"),
-            "--single-file",
+            str(out),
             "--mode",
             "run",
             "--no-show-code",
@@ -47,8 +49,10 @@ def _export(app: Sphinx, exception: Exception | None) -> None:
         ],
         check=True,
     )
+    # marimo drops an assistant prompt file into exports; it is not site content.
+    (out / "CLAUDE.md").unlink(missing_ok=True)
     if (DEMO / "public").is_dir():
-        shutil.copytree(DEMO / "public", out / "public")
+        shutil.copytree(DEMO / "public", out / "public", dirs_exist_ok=True)
     if PREVIEW.is_file():
         shutil.copyfile(PREVIEW, out / "preview.png")
 

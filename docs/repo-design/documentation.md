@@ -163,10 +163,13 @@ External link checking requires network access and is therefore not part of the 
 
 The overview page embeds `docs/demo/results_app.py`, a marimo notebook that
 imports only `marimo`, `numpy`, and `plotly` so it runs under Pyodide. The
-`_marimo_demo` Sphinx extension exports it with
-`marimo export html-wasm --single-file` into `demo/` of every HTML build and
-copies `docs/demo/public/` beside it; Pyodide and packages load from a CDN at
-view time. The notebook reads only the committed
+`_marimo_demo` Sphinx extension exports it with `marimo export html-wasm` into
+`demo/` of every HTML build (about 27 MB of marimo frontend assets) and copies
+`docs/demo/public/` beside it; Pyodide and packages load from a CDN at view
+time. Keep the directory export: a `--single-file` page runs Pyodide from a
+`blob:` worker, so `mo.notebook_location()` cannot find the bundled data. The
+page needs HTTP; preview a local build with
+`python -m http.server -d docs/_build/html`, not `file://`. The notebook reads only the committed
 `docs/demo/public/results_demo.json`, which carries its own provenance
 (version, commit, model markers, ledger statuses read at export time).
 

@@ -22,6 +22,7 @@ app = marimo.App(width="medium")
 
 with app.setup:
     import json
+    import sys
     from pathlib import Path
 
     import marimo as mo
@@ -40,12 +41,19 @@ with app.setup:
 
 @app.function
 def load_demo_data(location):
-    """Read the bundled JSON from a local path or, under Pyodide, a URL."""
+    """Read the bundled JSON: a URL under Pyodide, a local path otherwise.
+
+    Returns ``None`` only when a local checkout has no exported data; a failed
+    browser fetch raises with the URL it tried.
+    """
     target = str(location)
-    if target.startswith(("http://", "https://")):
+    if sys.platform == "emscripten":
         from pyodide.http import open_url
 
-        return json.loads(open_url(target).read())
+        try:
+            return json.loads(open_url(target).read())
+        except Exception as exc:
+            raise RuntimeError(f"could not load demo data from {target}: {exc}") from exc
     path = Path(target)
     return json.loads(path.read_text()) if path.exists() else None
 

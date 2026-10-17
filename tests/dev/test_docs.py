@@ -131,7 +131,7 @@ def test_browser_demo_imports_only_pyodide_safe_modules() -> None:
         elif isinstance(node, ast.ImportFrom) and node.module:
             imported.add(node.module.split(".")[0])
 
-    assert imported <= {"json", "pathlib", "marimo", "numpy", "plotly", "pyodide"}
+    assert imported <= {"json", "sys", "pathlib", "marimo", "numpy", "plotly", "pyodide"}
 
 
 def test_demo_export_joins_interleaved_segments_per_track() -> None:
