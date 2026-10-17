@@ -1,6 +1,7 @@
 """Post-P0 argparse contract frozen for Click migration."""
 
 import json
+import re
 from pathlib import Path
 
 import click
@@ -8,7 +9,13 @@ import pytest
 from click.testing import CliRunner, Result
 
 from pyrite import cli
-from pyrite.cli._deprecations import DEPRECATIONS, RetiredOption
+from pyrite.cli._deprecations import (
+    DEPRECATED_FLAGS,
+    DEPRECATIONS,
+    SELF_WARNING,
+    DeprecatedOption,
+    RetiredOption,
+)
 
 CONTRACT = Path(__file__).parents[1] / "data" / "cli_contract.json"
 
@@ -182,6 +189,12 @@ def test_click_tree_preserves_frozen_command_and_option_names():
         # `pyrite app <leaf>` stopped launching implicitly at 0.3.0, so the
         # launch options it used to advertise now sit on its `launch` child.
         relocated = _run(*path, "launch", "--help").stdout if path[:1] == ("app",) else ""
+        if path == ("detector", "create"):
+            # NAME-first compatibility still accepts the frozen options; the
+            # bare group now documents typed scalar/planar/clone children.
+            relocated = "\n".join(
+                _run(*path, kind, "--help").stdout for kind in ("scalar", "planar", "clone")
+            )
         current = cli.command
         ctx = click.Context(current)
         for part in path:
@@ -190,21 +203,37 @@ def test_click_tree_preserves_frozen_command_and_option_names():
         retired = {
             param.retired_flag for param in current.params if isinstance(param, RetiredOption)
         }
+        hidden_deprecated = {
+            flag
+            for param in current.params
+            if isinstance(param, DeprecatedOption) and param.hidden
+            for flag in param.opts
+            if (" ".join(path), flag) in DEPRECATED_FLAGS
+        }
         for option in _node_options(node):
             if (path, option) in _REMOVED_OPTIONS:
                 assert option not in completed.stdout
                 continue
-            assert option in completed.stdout or option in relocated or option in retired
+            assert (
+                option in completed.stdout
+                or option in relocated
+                or option in retired
+                or option in hidden_deprecated
+            )
         for child in node["subcommands"]:
             if child["path"].startswith("line-grid"):
                 continue
             child_name = child["path"].split()[-1]
             child_path = tuple(child["path"].split())
             if not _retired(child_path) and not child["hidden"]:
-                if child["path"] in DEPRECATIONS:
+                if child["path"] in DEPRECATIONS and child["path"] not in SELF_WARNING:
                     # Registered deprecated aliases remain callable but leave help.
                     assert current.get_command(ctx, child_name).hidden
-                    assert child_name not in completed.stdout
+                    # Examples can mention the replacement path containing the
+                    # same leaf name; only its command-list entry must be gone.
+                    assert not re.search(
+                        rf"^  {re.escape(child_name)}\s+", completed.stdout, re.MULTILINE
+                    )
                 else:
                     assert child_name in completed.stdout
             check(child)

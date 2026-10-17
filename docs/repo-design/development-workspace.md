@@ -2,6 +2,21 @@
 
 The repository has one uv project and one publishable distribution. The root project owns the `pyrite-mc` distribution, `src/pyrite/`, packaged data, `pyrite`, `pyrite-dev`, and the test suite. Contributor tools are dependency groups in the root `pyproject.toml`; there is no uv workspace split or separate test-tools package.
 
+## Install from source
+
+For installed-package use, follow [Getting started](../guides/getting-started.md).
+Contributor setup requires Git and [uv](https://docs.astral.sh/uv/):
+
+```bash
+git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
+cd pyrite
+uv sync --locked
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+```
+
+A plain sync includes the contributor tools and interactive apps. Run commands
+through `uv run` without activation, or activate the environment in each shell.
+
 ## Extras versus dependency groups
 
 Dependencies imported by shipped code for a user-facing feature are package extras, published in wheel metadata; contributor, CI, and validation-only tools are dependency groups, which wheels never carry. `plots` holds the runtime of `pyrite.plots` (and the lazily imported matplotlib figures in `perf/` and `validation/`); `apps` is `pyrite-mc[plots]` plus the marimo stack for `src/pyrite/apps/`. The `notebooks` group is `pyrite-mc[apps]` plus notebook conversion tools (`nbconvert`, `pandoc`) that nothing in `src/` imports, so a plain `uv sync` stays complete. Entry points that need an extra check it with `pyrite._extras.require_extra` (CLI: `pyrite.cli._extras.require_cli_extra`), which names `pyrite-mc[<extra>]` and `uv sync --extra <extra>` without importing the dependency. `pyrite-dev package-smoke` installs the built wheel without extras to assert those hints, then with `[apps]` to smoke-launch each app.

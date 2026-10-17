@@ -172,3 +172,34 @@ PYRITE_DOCS_SHOW_AUTODOC_WARNINGS=1
 ```
 
 The build intentionally fails while printing every baseline record.
+
+## Navigation and discovery checks
+
+Keep the homepage concise and route users to installation, physics, and API
+workflows. Global navigation shows major sections and the active branch;
+validation evidence, API objects, and ADR inventories remain reachable from
+their section pages. Preserve existing page URLs when reorganizing toctrees.
+
+After navigation changes, inspect the rendered homepage, Getting started,
+physics, validation, and API at desktop and narrow widths. Check sidebar
+scrolling, focus/tab order, mobile opening and closing, and deep links. Generated
+references must be regenerated at their source, including family CLI pages and
+validation status/domain summaries.
+
+The homepage metadata is maintained in `index.md`; Sphinx's `html_baseurl` uses
+`READTHEDOCS_CANONICAL_URL` with a local-build fallback to `en/latest/`. Read the
+Docs supplies the preferred domain/version as described in its
+[canonical URL documentation](https://docs.readthedocs.com/platform/stable/canonical-urls.html).
+Inspect the built homepage and an API page for distinct per-page canonical
+links. Repeat on the deployed site: local output cannot prove the hosting
+version policy or a search engine's selected canonical.
+
+On October 17, 2026, public HTTP checks returned a sitemap containing
+`en/latest/` and `en/stable/`; robots.txt allowed crawling and linked that
+sitemap. The then-deployed homepage lacked a canonical link. After deployment,
+recheck [the sitemap](https://pyrite.readthedocs.io/sitemap.xml), homepage
+metadata, and an API page. A project owner must use Google Search Console to
+inspect homepage indexability, last crawl, selected canonical, and sitemap
+submission. Repository-only automation has no authenticated access to that
+property. Metadata and indexing requests do not guarantee search ranking;
+retain useful API and validation pages in search.

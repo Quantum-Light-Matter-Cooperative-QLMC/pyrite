@@ -12,9 +12,7 @@ development-workspace
 documentation
 releasing
 ../validation/formatting-style
-configuration-resolution
 materials-catalog-schema
-profile-settings
 data-distribution-and-repository-size
 core-architecture-rfc
 ../repo_map

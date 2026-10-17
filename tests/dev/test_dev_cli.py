@@ -79,6 +79,9 @@ def test_docs_cleans_generated_trees_and_runs_strict_build(
     monkeypatch.setattr(
         "pyrite.devtools.docs_paths.check_doc_paths", lambda root: calls.append(("paths", root))
     )
+    monkeypatch.setattr(
+        dev_module, "cmd_cli_reference", lambda args: calls.append(("cli-reference", args.check))
+    )
     monkeypatch.setattr(dev_module, "run_uv", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     dev_module.cmd_docs(Namespace(linkcheck=linkcheck))
@@ -87,6 +90,7 @@ def test_docs_cleans_generated_trees_and_runs_strict_build(
     assert removed == [docs / "_autosummary", docs / "_build"]
     assert calls == [
         ("paths", dev_module.ROOT),
+        ("cli-reference", True),
         (
             (
                 "--group",
@@ -104,6 +108,24 @@ def test_docs_cleans_generated_trees_and_runs_strict_build(
             {"extra_env": {"PYRITE_MC_BACKEND": "cpu"}},
         ),
     ]
+
+
+def test_docs_rejects_stale_cli_before_cleaning_or_building(dev_module, monkeypatch) -> None:
+    monkeypatch.setattr("pyrite.devtools.docs_paths.check_doc_paths", lambda root: None)
+
+    def stale(args):
+        assert args.check is True
+        raise SystemExit(2)
+
+    monkeypatch.setattr(dev_module, "cmd_cli_reference", stale)
+    removed = []
+    built = []
+    monkeypatch.setattr(dev_module, "_remove_path", removed.append)
+    monkeypatch.setattr(dev_module, "run_uv", lambda *args, **kwargs: built.append(args))
+    with pytest.raises(SystemExit, match="2"):
+        dev_module.cmd_docs(Namespace(linkcheck=False))
+    assert removed == []
+    assert built == []
 
 
 def test_docs_parser_exposes_offline_and_linkcheck_modes(dev_module) -> None:

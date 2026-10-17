@@ -83,6 +83,8 @@ def test_status_summary_is_derived_from_rows() -> None:
     )
 
     summary = render_status_summary(entries)
+    assert "[detailed validation ledger](physics-validation-ledger.md)" in summary
+    assert "Formal sign-off requires human review" in summary
     assert "0 / 2 claims signed off" in summary
     assert "| `anchored` | 1 |" in summary
     assert "| `discrepancy` | 1 |" in summary
@@ -190,6 +192,7 @@ def test_domain_inventory_links_to_detailed_record() -> None:
     )
 
     inventory = render_domain_inventories(entries)
+    assert "[detailed validation ledger](physics-validation-ledger.md)" in inventory
     assert "(ledger-domain.md#deep-link)" in inventory
 
 

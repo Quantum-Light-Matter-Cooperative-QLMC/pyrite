@@ -60,12 +60,13 @@ The old `--ne-line`/`--ne-brem` options and `profile numerics set --line-electro
 
 For an existing single-crystal silicon or diamond profile with incoherent
 emission, disable any explicit precision policy, then enable the entrance
-zone through calculation numerics:
+zone through physics settings, then set the numerical counts:
 
 ```bash
-pyrite numerics set my_scan \
+pyrite physics set my_scan \
   --channeling-model planar --channeling-plane 1 1 0 \
-  --radiative-model uncoupled --energy-model midpoint \
+  --radiative-model uncoupled
+pyrite numerics set my_scan --energy-model midpoint \
   --cxr-trials 300 --brem-trials 150
 PYRITE_MC_TRANSPORT_CORE=cuda pyrite run my_scan --remote
 ```
@@ -84,7 +85,7 @@ Trajectory capture and electron blocks currently refuse channeling.
 and `--channeling-zone-max-ang` control the zone resolution and cap. Enabled
 controls enter dataset identity and checkpoint stems. Channeling defaults to
 off; changing its inactive resolution controls leaves off identities unchanged.
-Disable it with `pyrite numerics reset my_scan channeling-model
+Disable it with `pyrite physics reset my_scan channeling-model
 channeling-plane`. Checkpoints carry a separate **Channeling** component that
 the analysis app can select; replay and line recompute rescore it on their
 line grid, and bremsstrahlung repair preserves it. See
