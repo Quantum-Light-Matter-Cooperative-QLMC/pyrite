@@ -133,6 +133,16 @@ def build_reference_pages(overview_name: str = "cli-reference.md") -> dict[str, 
     lines.extend(["```", "", "## Command tree", ""])
     root_path, root_command, root_ctx = nodes[0]
     lines.extend(_help_section(root_path, root_command, root_ctx))
+    lines.extend(
+        [
+            "## Command compatibility links",
+            "",
+            "Existing command fragments remain available below; each link opens the full family reference.",
+            "",
+            "<!-- Inline HTML preserves legacy fragment IDs without adding headings to the local table of contents. -->",
+            "",
+        ]
+    )
     pages: dict[str, str] = {}
     for family in families:
         family_lines = [
@@ -150,17 +160,13 @@ def build_reference_pages(overview_name: str = "cli-reference.md") -> dict[str, 
             if len(path) < 2 or path[1] != family:
                 continue
             family_lines.extend(_help_section(path, current, ctx))
-            # Keep the old heading (and its MyST fragment) at the original URL.
             title = " ".join(path)
-            lines.extend(
-                [
-                    f"## `{title}`",
-                    "",
-                    f"[Command help and options](cli-reference-{family}.md#{'-'.join(path)})",
-                    "",
-                ]
+            fragment = "-".join(path)
+            lines.append(
+                f'- <span id="{fragment}"></span>[`{title}`](cli-reference-{family}.md#{fragment})'
             )
         pages[f"cli-reference-{family}.md"] = "\n".join(family_lines)
+    lines.append("")
     return {overview_name: "\n".join(lines), **pages}
 
 

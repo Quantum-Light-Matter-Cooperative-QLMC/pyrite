@@ -138,682 +138,179 @@ Commands:
   tables        Inspect generated cross-section tables and external code trees.
 ```
 
-## `pyrite run`
-
-[Command help and options](cli-reference-run.md#pyrite-run)
-
-## `pyrite app`
-
-[Command help and options](cli-reference-app.md#pyrite-app)
-
-## `pyrite app analysis`
-
-[Command help and options](cli-reference-app.md#pyrite-app-analysis)
-
-## `pyrite app analysis export`
-
-[Command help and options](cli-reference-app.md#pyrite-app-analysis-export)
-
-## `pyrite app analysis launch`
-
-[Command help and options](cli-reference-app.md#pyrite-app-analysis-launch)
-
-## `pyrite app pixels`
-
-[Command help and options](cli-reference-app.md#pyrite-app-pixels)
-
-## `pyrite app pixels export`
-
-[Command help and options](cli-reference-app.md#pyrite-app-pixels-export)
-
-## `pyrite app pixels launch`
-
-[Command help and options](cli-reference-app.md#pyrite-app-pixels-launch)
-
-## `pyrite app compare`
-
-[Command help and options](cli-reference-app.md#pyrite-app-compare)
-
-## `pyrite app compare export`
-
-[Command help and options](cli-reference-app.md#pyrite-app-compare-export)
-
-## `pyrite app compare launch`
-
-[Command help and options](cli-reference-app.md#pyrite-app-compare-launch)
-
-## `pyrite app channeling`
-
-[Command help and options](cli-reference-app.md#pyrite-app-channeling)
-
-## `pyrite app channeling export`
-
-[Command help and options](cli-reference-app.md#pyrite-app-channeling-export)
-
-## `pyrite app channeling launch`
-
-[Command help and options](cli-reference-app.md#pyrite-app-channeling-launch)
-
-## `pyrite app viewer`
-
-[Command help and options](cli-reference-app.md#pyrite-app-viewer)
-
-## `pyrite app viewer export`
-
-[Command help and options](cli-reference-app.md#pyrite-app-viewer-export)
-
-## `pyrite app viewer launch`
-
-[Command help and options](cli-reference-app.md#pyrite-app-viewer-launch)
-
-## `pyrite app validation`
-
-[Command help and options](cli-reference-app.md#pyrite-app-validation)
-
-## `pyrite app validation export`
-
-[Command help and options](cli-reference-app.md#pyrite-app-validation-export)
-
-## `pyrite app validation launch`
-
-[Command help and options](cli-reference-app.md#pyrite-app-validation-launch)
-
-## `pyrite checkpoint`
-
-[Command help and options](cli-reference-checkpoint.md#pyrite-checkpoint)
-
-## `pyrite checkpoint slim`
-
-[Command help and options](cli-reference-checkpoint.md#pyrite-checkpoint-slim)
-
-## `pyrite checkpoint recompute`
-
-[Command help and options](cli-reference-checkpoint.md#pyrite-checkpoint-recompute)
-
-## `pyrite checkpoint recompute brem`
-
-[Command help and options](cli-reference-checkpoint.md#pyrite-checkpoint-recompute-brem)
-
-## `pyrite checkpoint recompute cxr`
-
-[Command help and options](cli-reference-checkpoint.md#pyrite-checkpoint-recompute-cxr)
-
-## `pyrite checkpoint archive`
-
-[Command help and options](cli-reference-checkpoint.md#pyrite-checkpoint-archive)
-
-## `pyrite checkpoint archive list`
-
-[Command help and options](cli-reference-checkpoint.md#pyrite-checkpoint-archive-list)
-
-## `pyrite checkpoint archive merge`
-
-[Command help and options](cli-reference-checkpoint.md#pyrite-checkpoint-archive-merge)
-
-## `pyrite checkpoint archive restore`
-
-[Command help and options](cli-reference-checkpoint.md#pyrite-checkpoint-archive-restore)
-
-## `pyrite checkpoint archive store`
-
-[Command help and options](cli-reference-checkpoint.md#pyrite-checkpoint-archive-store)
-
-## `pyrite checkpoint list`
-
-[Command help and options](cli-reference-checkpoint.md#pyrite-checkpoint-list)
-
-## `pyrite checkpoint gc`
-
-[Command help and options](cli-reference-checkpoint.md#pyrite-checkpoint-gc)
-
-## `pyrite checkpoint rm`
-
-[Command help and options](cli-reference-checkpoint.md#pyrite-checkpoint-rm)
-
-## `pyrite trajectories`
-
-[Command help and options](cli-reference-trajectories.md#pyrite-trajectories)
-
-## `pyrite trajectories ls`
-
-[Command help and options](cli-reference-trajectories.md#pyrite-trajectories-ls)
-
-## `pyrite trajectories info`
-
-[Command help and options](cli-reference-trajectories.md#pyrite-trajectories-info)
-
-## `pyrite trajectories export`
-
-[Command help and options](cli-reference-trajectories.md#pyrite-trajectories-export)
-
-## `pyrite trajectories score`
-
-[Command help and options](cli-reference-trajectories.md#pyrite-trajectories-score)
-
-## `pyrite config`
-
-[Command help and options](cli-reference-config.md#pyrite-config)
-
-## `pyrite config explain`
-
-[Command help and options](cli-reference-config.md#pyrite-config-explain)
-
-## `pyrite config get`
-
-[Command help and options](cli-reference-config.md#pyrite-config-get)
-
-## `pyrite config keys`
-
-[Command help and options](cli-reference-config.md#pyrite-config-keys)
-
-## `pyrite config list`
-
-[Command help and options](cli-reference-config.md#pyrite-config-list)
-
-## `pyrite config set`
-
-[Command help and options](cli-reference-config.md#pyrite-config-set)
-
-## `pyrite config unset`
-
-[Command help and options](cli-reference-config.md#pyrite-config-unset)
-
-## `pyrite config setup`
-
-[Command help and options](cli-reference-config.md#pyrite-config-setup)
-
-## `pyrite config completion`
-
-[Command help and options](cli-reference-config.md#pyrite-config-completion)
-
-## `pyrite config completion install`
-
-[Command help and options](cli-reference-config.md#pyrite-config-completion-install)
-
-## `pyrite config completion remove`
-
-[Command help and options](cli-reference-config.md#pyrite-config-completion-remove)
-
-## `pyrite remote`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote)
-
-## `pyrite remote gc`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-gc)
-
-## `pyrite remote performance`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-performance)
-
-## `pyrite remote performance list`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-performance-list)
-
-## `pyrite remote performance pull`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-performance-pull)
-
-## `pyrite remote performance rm`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-performance-rm)
-
-## `pyrite remote prune-jobs`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-prune-jobs)
-
-## `pyrite remote pull`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-pull)
-
-## `pyrite remote rm`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-rm)
-
-## `pyrite remote sync`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-sync)
-
-## `pyrite remote trajectories`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-trajectories)
-
-## `pyrite remote trajectories export`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-trajectories-export)
-
-## `pyrite remote trajectories info`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-trajectories-info)
-
-## `pyrite remote trajectories ls`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-trajectories-ls)
-
-## `pyrite remote trajectories pull`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-trajectories-pull)
-
-## `pyrite remote trajectories score`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-trajectories-score)
-
-## `pyrite remote job`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-job)
-
-## `pyrite remote job attach`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-job-attach)
-
-## `pyrite remote job list`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-job-list)
-
-## `pyrite remote job logs`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-job-logs)
-
-## `pyrite remote job stack`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-job-stack)
-
-## `pyrite remote job status`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-job-status)
-
-## `pyrite remote job stop`
-
-[Command help and options](cli-reference-remote.md#pyrite-remote-job-stop)
-
-## `pyrite profile`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile)
-
-## `pyrite profile add`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-add)
-
-## `pyrite profile create`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-create)
-
-## `pyrite profile delete`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-delete)
-
-## `pyrite profile detector`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-detector)
-
-## `pyrite profile detector add`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-detector-add)
-
-## `pyrite profile detector list`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-detector-list)
-
-## `pyrite profile detector migrate`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-detector-migrate)
-
-## `pyrite profile detector reset`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-detector-reset)
-
-## `pyrite profile detector rm`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-detector-rm)
-
-## `pyrite profile detector set`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-detector-set)
-
-## `pyrite profile detector show`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-detector-show)
-
-## `pyrite profile filter`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-filter)
-
-## `pyrite profile filter add`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-filter-add)
-
-## `pyrite profile filter list`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-filter-list)
-
-## `pyrite profile filter rm`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-filter-rm)
-
-## `pyrite profile filter set`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-filter-set)
-
-## `pyrite profile filter show`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-filter-show)
-
-## `pyrite profile list`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-list)
-
-## `pyrite profile numerics`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-numerics)
-
-## `pyrite profile numerics reset`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-numerics-reset)
-
-## `pyrite profile numerics set`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-numerics-set)
-
-## `pyrite profile numerics show`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-numerics-show)
-
-## `pyrite profile ranges`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-ranges)
-
-## `pyrite profile ranges show`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-ranges-show)
-
-## `pyrite profile remove`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-remove)
-
-## `pyrite profile rename`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-rename)
-
-## `pyrite profile set`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-set)
-
-## `pyrite profile show`
-
-[Command help and options](cli-reference-profile.md#pyrite-profile-show)
-
-## `pyrite physics`
-
-[Command help and options](cli-reference-physics.md#pyrite-physics)
-
-## `pyrite physics list`
-
-[Command help and options](cli-reference-physics.md#pyrite-physics-list)
-
-## `pyrite physics reset`
-
-[Command help and options](cli-reference-physics.md#pyrite-physics-reset)
-
-## `pyrite physics set`
-
-[Command help and options](cli-reference-physics.md#pyrite-physics-set)
-
-## `pyrite physics show`
-
-[Command help and options](cli-reference-physics.md#pyrite-physics-show)
-
-## `pyrite physics validate`
-
-[Command help and options](cli-reference-physics.md#pyrite-physics-validate)
-
-## `pyrite numerics`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics)
-
-## `pyrite numerics list`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-list)
-
-## `pyrite numerics reset`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-reset)
-
-## `pyrite numerics set`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-set)
-
-## `pyrite numerics show`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-show)
-
-## `pyrite numerics validate`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-validate)
-
-## `pyrite numerics precision`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-precision)
-
-## `pyrite numerics precision disable`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-precision-disable)
-
-## `pyrite numerics precision enable`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-precision-enable)
-
-## `pyrite numerics precision reset`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-precision-reset)
-
-## `pyrite numerics precision set`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-precision-set)
-
-## `pyrite numerics precision show`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-precision-show)
-
-## `pyrite numerics cxr-grid`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-cxr-grid)
-
-## `pyrite numerics cxr-grid reset`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-cxr-grid-reset)
-
-## `pyrite numerics cxr-grid set`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-cxr-grid-set)
-
-## `pyrite numerics cxr-grid show`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-cxr-grid-show)
-
-## `pyrite numerics energy-grid`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-energy-grid)
-
-## `pyrite numerics energy-grid derive`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-energy-grid-derive)
-
-## `pyrite numerics energy-grid show`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-energy-grid-show)
-
-## `pyrite numerics energy-grid cxr`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-energy-grid-cxr)
-
-## `pyrite numerics energy-grid cxr show`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-energy-grid-cxr-show)
-
-## `pyrite numerics energy-grid brem`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-energy-grid-brem)
-
-## `pyrite numerics energy-grid brem show`
-
-[Command help and options](cli-reference-numerics.md#pyrite-numerics-energy-grid-brem-show)
-
-## `pyrite material`
-
-[Command help and options](cli-reference-material.md#pyrite-material)
-
-## `pyrite material show`
-
-[Command help and options](cli-reference-material.md#pyrite-material-show)
-
-## `pyrite material create`
-
-[Command help and options](cli-reference-material.md#pyrite-material-create)
-
-## `pyrite material create amorphous`
-
-[Command help and options](cli-reference-material.md#pyrite-material-create-amorphous)
-
-## `pyrite material create crystal`
-
-[Command help and options](cli-reference-material.md#pyrite-material-create-crystal)
-
-## `pyrite material list`
-
-[Command help and options](cli-reference-material.md#pyrite-material-list)
-
-## `pyrite material blaze`
-
-[Command help and options](cli-reference-material.md#pyrite-material-blaze)
-
-## `pyrite material validate`
-
-[Command help and options](cli-reference-material.md#pyrite-material-validate)
-
-## `pyrite beam`
-
-[Command help and options](cli-reference-beam.md#pyrite-beam)
-
-## `pyrite beam create`
-
-[Command help and options](cli-reference-beam.md#pyrite-beam-create)
-
-## `pyrite beam delete`
-
-[Command help and options](cli-reference-beam.md#pyrite-beam-delete)
-
-## `pyrite beam gdf`
-
-[Command help and options](cli-reference-beam.md#pyrite-beam-gdf)
-
-## `pyrite beam gdf inspect`
-
-[Command help and options](cli-reference-beam.md#pyrite-beam-gdf-inspect)
-
-## `pyrite beam gdf times`
-
-[Command help and options](cli-reference-beam.md#pyrite-beam-gdf-times)
-
-## `pyrite beam list`
-
-[Command help and options](cli-reference-beam.md#pyrite-beam-list)
-
-## `pyrite beam rename`
-
-[Command help and options](cli-reference-beam.md#pyrite-beam-rename)
-
-## `pyrite beam set`
-
-[Command help and options](cli-reference-beam.md#pyrite-beam-set)
-
-## `pyrite beam show`
-
-[Command help and options](cli-reference-beam.md#pyrite-beam-show)
-
-## `pyrite detector`
-
-[Command help and options](cli-reference-detector.md#pyrite-detector)
-
-## `pyrite detector create`
-
-[Command help and options](cli-reference-detector.md#pyrite-detector-create)
-
-## `pyrite detector create clone`
-
-[Command help and options](cli-reference-detector.md#pyrite-detector-create-clone)
-
-## `pyrite detector create planar`
-
-[Command help and options](cli-reference-detector.md#pyrite-detector-create-planar)
-
-## `pyrite detector create scalar`
-
-[Command help and options](cli-reference-detector.md#pyrite-detector-create-scalar)
-
-## `pyrite detector delete`
-
-[Command help and options](cli-reference-detector.md#pyrite-detector-delete)
-
-## `pyrite detector list`
-
-[Command help and options](cli-reference-detector.md#pyrite-detector-list)
-
-## `pyrite detector rename`
-
-[Command help and options](cli-reference-detector.md#pyrite-detector-rename)
-
-## `pyrite detector reset`
-
-[Command help and options](cli-reference-detector.md#pyrite-detector-reset)
-
-## `pyrite detector set`
-
-[Command help and options](cli-reference-detector.md#pyrite-detector-set)
-
-## `pyrite detector show`
-
-[Command help and options](cli-reference-detector.md#pyrite-detector-show)
-
-## `pyrite tables`
-
-[Command help and options](cli-reference-tables.md#pyrite-tables)
-
-## `pyrite tables fetch`
-
-[Command help and options](cli-reference-tables.md#pyrite-tables-fetch)
-
-## `pyrite tables generate`
-
-[Command help and options](cli-reference-tables.md#pyrite-tables-generate)
-
-## `pyrite tables list`
-
-[Command help and options](cli-reference-tables.md#pyrite-tables-list)
-
-## `pyrite tables migrate`
-
-[Command help and options](cli-reference-tables.md#pyrite-tables-migrate)
-
-## `pyrite tables path`
-
-[Command help and options](cli-reference-tables.md#pyrite-tables-path)
-
-## `pyrite tables show`
-
-[Command help and options](cli-reference-tables.md#pyrite-tables-show)
-
-## `pyrite tables sources`
-
-[Command help and options](cli-reference-tables.md#pyrite-tables-sources)
-
-## `pyrite tables sources list`
-
-[Command help and options](cli-reference-tables.md#pyrite-tables-sources-list)
-
-## `pyrite tables sources set`
-
-[Command help and options](cli-reference-tables.md#pyrite-tables-sources-set)
-
-## `pyrite tables verify`
-
-[Command help and options](cli-reference-tables.md#pyrite-tables-verify)
+## Command compatibility links
+
+Existing command fragments remain available below; each link opens the full family reference.
+
+<!-- Inline HTML preserves legacy fragment IDs without adding headings to the local table of contents. -->
+
+- <span id="pyrite-run"></span>[`pyrite run`](cli-reference-run.md#pyrite-run)
+- <span id="pyrite-app"></span>[`pyrite app`](cli-reference-app.md#pyrite-app)
+- <span id="pyrite-app-analysis"></span>[`pyrite app analysis`](cli-reference-app.md#pyrite-app-analysis)
+- <span id="pyrite-app-analysis-export"></span>[`pyrite app analysis export`](cli-reference-app.md#pyrite-app-analysis-export)
+- <span id="pyrite-app-analysis-launch"></span>[`pyrite app analysis launch`](cli-reference-app.md#pyrite-app-analysis-launch)
+- <span id="pyrite-app-pixels"></span>[`pyrite app pixels`](cli-reference-app.md#pyrite-app-pixels)
+- <span id="pyrite-app-pixels-export"></span>[`pyrite app pixels export`](cli-reference-app.md#pyrite-app-pixels-export)
+- <span id="pyrite-app-pixels-launch"></span>[`pyrite app pixels launch`](cli-reference-app.md#pyrite-app-pixels-launch)
+- <span id="pyrite-app-compare"></span>[`pyrite app compare`](cli-reference-app.md#pyrite-app-compare)
+- <span id="pyrite-app-compare-export"></span>[`pyrite app compare export`](cli-reference-app.md#pyrite-app-compare-export)
+- <span id="pyrite-app-compare-launch"></span>[`pyrite app compare launch`](cli-reference-app.md#pyrite-app-compare-launch)
+- <span id="pyrite-app-channeling"></span>[`pyrite app channeling`](cli-reference-app.md#pyrite-app-channeling)
+- <span id="pyrite-app-channeling-export"></span>[`pyrite app channeling export`](cli-reference-app.md#pyrite-app-channeling-export)
+- <span id="pyrite-app-channeling-launch"></span>[`pyrite app channeling launch`](cli-reference-app.md#pyrite-app-channeling-launch)
+- <span id="pyrite-app-viewer"></span>[`pyrite app viewer`](cli-reference-app.md#pyrite-app-viewer)
+- <span id="pyrite-app-viewer-export"></span>[`pyrite app viewer export`](cli-reference-app.md#pyrite-app-viewer-export)
+- <span id="pyrite-app-viewer-launch"></span>[`pyrite app viewer launch`](cli-reference-app.md#pyrite-app-viewer-launch)
+- <span id="pyrite-app-validation"></span>[`pyrite app validation`](cli-reference-app.md#pyrite-app-validation)
+- <span id="pyrite-app-validation-export"></span>[`pyrite app validation export`](cli-reference-app.md#pyrite-app-validation-export)
+- <span id="pyrite-app-validation-launch"></span>[`pyrite app validation launch`](cli-reference-app.md#pyrite-app-validation-launch)
+- <span id="pyrite-checkpoint"></span>[`pyrite checkpoint`](cli-reference-checkpoint.md#pyrite-checkpoint)
+- <span id="pyrite-checkpoint-slim"></span>[`pyrite checkpoint slim`](cli-reference-checkpoint.md#pyrite-checkpoint-slim)
+- <span id="pyrite-checkpoint-recompute"></span>[`pyrite checkpoint recompute`](cli-reference-checkpoint.md#pyrite-checkpoint-recompute)
+- <span id="pyrite-checkpoint-recompute-brem"></span>[`pyrite checkpoint recompute brem`](cli-reference-checkpoint.md#pyrite-checkpoint-recompute-brem)
+- <span id="pyrite-checkpoint-recompute-cxr"></span>[`pyrite checkpoint recompute cxr`](cli-reference-checkpoint.md#pyrite-checkpoint-recompute-cxr)
+- <span id="pyrite-checkpoint-archive"></span>[`pyrite checkpoint archive`](cli-reference-checkpoint.md#pyrite-checkpoint-archive)
+- <span id="pyrite-checkpoint-archive-list"></span>[`pyrite checkpoint archive list`](cli-reference-checkpoint.md#pyrite-checkpoint-archive-list)
+- <span id="pyrite-checkpoint-archive-merge"></span>[`pyrite checkpoint archive merge`](cli-reference-checkpoint.md#pyrite-checkpoint-archive-merge)
+- <span id="pyrite-checkpoint-archive-restore"></span>[`pyrite checkpoint archive restore`](cli-reference-checkpoint.md#pyrite-checkpoint-archive-restore)
+- <span id="pyrite-checkpoint-archive-store"></span>[`pyrite checkpoint archive store`](cli-reference-checkpoint.md#pyrite-checkpoint-archive-store)
+- <span id="pyrite-checkpoint-list"></span>[`pyrite checkpoint list`](cli-reference-checkpoint.md#pyrite-checkpoint-list)
+- <span id="pyrite-checkpoint-gc"></span>[`pyrite checkpoint gc`](cli-reference-checkpoint.md#pyrite-checkpoint-gc)
+- <span id="pyrite-checkpoint-rm"></span>[`pyrite checkpoint rm`](cli-reference-checkpoint.md#pyrite-checkpoint-rm)
+- <span id="pyrite-trajectories"></span>[`pyrite trajectories`](cli-reference-trajectories.md#pyrite-trajectories)
+- <span id="pyrite-trajectories-ls"></span>[`pyrite trajectories ls`](cli-reference-trajectories.md#pyrite-trajectories-ls)
+- <span id="pyrite-trajectories-info"></span>[`pyrite trajectories info`](cli-reference-trajectories.md#pyrite-trajectories-info)
+- <span id="pyrite-trajectories-export"></span>[`pyrite trajectories export`](cli-reference-trajectories.md#pyrite-trajectories-export)
+- <span id="pyrite-trajectories-score"></span>[`pyrite trajectories score`](cli-reference-trajectories.md#pyrite-trajectories-score)
+- <span id="pyrite-config"></span>[`pyrite config`](cli-reference-config.md#pyrite-config)
+- <span id="pyrite-config-explain"></span>[`pyrite config explain`](cli-reference-config.md#pyrite-config-explain)
+- <span id="pyrite-config-get"></span>[`pyrite config get`](cli-reference-config.md#pyrite-config-get)
+- <span id="pyrite-config-keys"></span>[`pyrite config keys`](cli-reference-config.md#pyrite-config-keys)
+- <span id="pyrite-config-list"></span>[`pyrite config list`](cli-reference-config.md#pyrite-config-list)
+- <span id="pyrite-config-set"></span>[`pyrite config set`](cli-reference-config.md#pyrite-config-set)
+- <span id="pyrite-config-unset"></span>[`pyrite config unset`](cli-reference-config.md#pyrite-config-unset)
+- <span id="pyrite-config-setup"></span>[`pyrite config setup`](cli-reference-config.md#pyrite-config-setup)
+- <span id="pyrite-config-completion"></span>[`pyrite config completion`](cli-reference-config.md#pyrite-config-completion)
+- <span id="pyrite-config-completion-install"></span>[`pyrite config completion install`](cli-reference-config.md#pyrite-config-completion-install)
+- <span id="pyrite-config-completion-remove"></span>[`pyrite config completion remove`](cli-reference-config.md#pyrite-config-completion-remove)
+- <span id="pyrite-remote"></span>[`pyrite remote`](cli-reference-remote.md#pyrite-remote)
+- <span id="pyrite-remote-gc"></span>[`pyrite remote gc`](cli-reference-remote.md#pyrite-remote-gc)
+- <span id="pyrite-remote-performance"></span>[`pyrite remote performance`](cli-reference-remote.md#pyrite-remote-performance)
+- <span id="pyrite-remote-performance-list"></span>[`pyrite remote performance list`](cli-reference-remote.md#pyrite-remote-performance-list)
+- <span id="pyrite-remote-performance-pull"></span>[`pyrite remote performance pull`](cli-reference-remote.md#pyrite-remote-performance-pull)
+- <span id="pyrite-remote-performance-rm"></span>[`pyrite remote performance rm`](cli-reference-remote.md#pyrite-remote-performance-rm)
+- <span id="pyrite-remote-prune-jobs"></span>[`pyrite remote prune-jobs`](cli-reference-remote.md#pyrite-remote-prune-jobs)
+- <span id="pyrite-remote-pull"></span>[`pyrite remote pull`](cli-reference-remote.md#pyrite-remote-pull)
+- <span id="pyrite-remote-rm"></span>[`pyrite remote rm`](cli-reference-remote.md#pyrite-remote-rm)
+- <span id="pyrite-remote-sync"></span>[`pyrite remote sync`](cli-reference-remote.md#pyrite-remote-sync)
+- <span id="pyrite-remote-trajectories"></span>[`pyrite remote trajectories`](cli-reference-remote.md#pyrite-remote-trajectories)
+- <span id="pyrite-remote-trajectories-export"></span>[`pyrite remote trajectories export`](cli-reference-remote.md#pyrite-remote-trajectories-export)
+- <span id="pyrite-remote-trajectories-info"></span>[`pyrite remote trajectories info`](cli-reference-remote.md#pyrite-remote-trajectories-info)
+- <span id="pyrite-remote-trajectories-ls"></span>[`pyrite remote trajectories ls`](cli-reference-remote.md#pyrite-remote-trajectories-ls)
+- <span id="pyrite-remote-trajectories-pull"></span>[`pyrite remote trajectories pull`](cli-reference-remote.md#pyrite-remote-trajectories-pull)
+- <span id="pyrite-remote-trajectories-score"></span>[`pyrite remote trajectories score`](cli-reference-remote.md#pyrite-remote-trajectories-score)
+- <span id="pyrite-remote-job"></span>[`pyrite remote job`](cli-reference-remote.md#pyrite-remote-job)
+- <span id="pyrite-remote-job-attach"></span>[`pyrite remote job attach`](cli-reference-remote.md#pyrite-remote-job-attach)
+- <span id="pyrite-remote-job-list"></span>[`pyrite remote job list`](cli-reference-remote.md#pyrite-remote-job-list)
+- <span id="pyrite-remote-job-logs"></span>[`pyrite remote job logs`](cli-reference-remote.md#pyrite-remote-job-logs)
+- <span id="pyrite-remote-job-stack"></span>[`pyrite remote job stack`](cli-reference-remote.md#pyrite-remote-job-stack)
+- <span id="pyrite-remote-job-status"></span>[`pyrite remote job status`](cli-reference-remote.md#pyrite-remote-job-status)
+- <span id="pyrite-remote-job-stop"></span>[`pyrite remote job stop`](cli-reference-remote.md#pyrite-remote-job-stop)
+- <span id="pyrite-profile"></span>[`pyrite profile`](cli-reference-profile.md#pyrite-profile)
+- <span id="pyrite-profile-add"></span>[`pyrite profile add`](cli-reference-profile.md#pyrite-profile-add)
+- <span id="pyrite-profile-create"></span>[`pyrite profile create`](cli-reference-profile.md#pyrite-profile-create)
+- <span id="pyrite-profile-delete"></span>[`pyrite profile delete`](cli-reference-profile.md#pyrite-profile-delete)
+- <span id="pyrite-profile-detector"></span>[`pyrite profile detector`](cli-reference-profile.md#pyrite-profile-detector)
+- <span id="pyrite-profile-detector-add"></span>[`pyrite profile detector add`](cli-reference-profile.md#pyrite-profile-detector-add)
+- <span id="pyrite-profile-detector-list"></span>[`pyrite profile detector list`](cli-reference-profile.md#pyrite-profile-detector-list)
+- <span id="pyrite-profile-detector-migrate"></span>[`pyrite profile detector migrate`](cli-reference-profile.md#pyrite-profile-detector-migrate)
+- <span id="pyrite-profile-detector-reset"></span>[`pyrite profile detector reset`](cli-reference-profile.md#pyrite-profile-detector-reset)
+- <span id="pyrite-profile-detector-rm"></span>[`pyrite profile detector rm`](cli-reference-profile.md#pyrite-profile-detector-rm)
+- <span id="pyrite-profile-detector-set"></span>[`pyrite profile detector set`](cli-reference-profile.md#pyrite-profile-detector-set)
+- <span id="pyrite-profile-detector-show"></span>[`pyrite profile detector show`](cli-reference-profile.md#pyrite-profile-detector-show)
+- <span id="pyrite-profile-filter"></span>[`pyrite profile filter`](cli-reference-profile.md#pyrite-profile-filter)
+- <span id="pyrite-profile-filter-add"></span>[`pyrite profile filter add`](cli-reference-profile.md#pyrite-profile-filter-add)
+- <span id="pyrite-profile-filter-list"></span>[`pyrite profile filter list`](cli-reference-profile.md#pyrite-profile-filter-list)
+- <span id="pyrite-profile-filter-rm"></span>[`pyrite profile filter rm`](cli-reference-profile.md#pyrite-profile-filter-rm)
+- <span id="pyrite-profile-filter-set"></span>[`pyrite profile filter set`](cli-reference-profile.md#pyrite-profile-filter-set)
+- <span id="pyrite-profile-filter-show"></span>[`pyrite profile filter show`](cli-reference-profile.md#pyrite-profile-filter-show)
+- <span id="pyrite-profile-list"></span>[`pyrite profile list`](cli-reference-profile.md#pyrite-profile-list)
+- <span id="pyrite-profile-numerics"></span>[`pyrite profile numerics`](cli-reference-profile.md#pyrite-profile-numerics)
+- <span id="pyrite-profile-numerics-reset"></span>[`pyrite profile numerics reset`](cli-reference-profile.md#pyrite-profile-numerics-reset)
+- <span id="pyrite-profile-numerics-set"></span>[`pyrite profile numerics set`](cli-reference-profile.md#pyrite-profile-numerics-set)
+- <span id="pyrite-profile-numerics-show"></span>[`pyrite profile numerics show`](cli-reference-profile.md#pyrite-profile-numerics-show)
+- <span id="pyrite-profile-ranges"></span>[`pyrite profile ranges`](cli-reference-profile.md#pyrite-profile-ranges)
+- <span id="pyrite-profile-ranges-show"></span>[`pyrite profile ranges show`](cli-reference-profile.md#pyrite-profile-ranges-show)
+- <span id="pyrite-profile-remove"></span>[`pyrite profile remove`](cli-reference-profile.md#pyrite-profile-remove)
+- <span id="pyrite-profile-rename"></span>[`pyrite profile rename`](cli-reference-profile.md#pyrite-profile-rename)
+- <span id="pyrite-profile-set"></span>[`pyrite profile set`](cli-reference-profile.md#pyrite-profile-set)
+- <span id="pyrite-profile-show"></span>[`pyrite profile show`](cli-reference-profile.md#pyrite-profile-show)
+- <span id="pyrite-physics"></span>[`pyrite physics`](cli-reference-physics.md#pyrite-physics)
+- <span id="pyrite-physics-list"></span>[`pyrite physics list`](cli-reference-physics.md#pyrite-physics-list)
+- <span id="pyrite-physics-reset"></span>[`pyrite physics reset`](cli-reference-physics.md#pyrite-physics-reset)
+- <span id="pyrite-physics-set"></span>[`pyrite physics set`](cli-reference-physics.md#pyrite-physics-set)
+- <span id="pyrite-physics-show"></span>[`pyrite physics show`](cli-reference-physics.md#pyrite-physics-show)
+- <span id="pyrite-physics-validate"></span>[`pyrite physics validate`](cli-reference-physics.md#pyrite-physics-validate)
+- <span id="pyrite-numerics"></span>[`pyrite numerics`](cli-reference-numerics.md#pyrite-numerics)
+- <span id="pyrite-numerics-list"></span>[`pyrite numerics list`](cli-reference-numerics.md#pyrite-numerics-list)
+- <span id="pyrite-numerics-reset"></span>[`pyrite numerics reset`](cli-reference-numerics.md#pyrite-numerics-reset)
+- <span id="pyrite-numerics-set"></span>[`pyrite numerics set`](cli-reference-numerics.md#pyrite-numerics-set)
+- <span id="pyrite-numerics-show"></span>[`pyrite numerics show`](cli-reference-numerics.md#pyrite-numerics-show)
+- <span id="pyrite-numerics-validate"></span>[`pyrite numerics validate`](cli-reference-numerics.md#pyrite-numerics-validate)
+- <span id="pyrite-numerics-precision"></span>[`pyrite numerics precision`](cli-reference-numerics.md#pyrite-numerics-precision)
+- <span id="pyrite-numerics-precision-disable"></span>[`pyrite numerics precision disable`](cli-reference-numerics.md#pyrite-numerics-precision-disable)
+- <span id="pyrite-numerics-precision-enable"></span>[`pyrite numerics precision enable`](cli-reference-numerics.md#pyrite-numerics-precision-enable)
+- <span id="pyrite-numerics-precision-reset"></span>[`pyrite numerics precision reset`](cli-reference-numerics.md#pyrite-numerics-precision-reset)
+- <span id="pyrite-numerics-precision-set"></span>[`pyrite numerics precision set`](cli-reference-numerics.md#pyrite-numerics-precision-set)
+- <span id="pyrite-numerics-precision-show"></span>[`pyrite numerics precision show`](cli-reference-numerics.md#pyrite-numerics-precision-show)
+- <span id="pyrite-numerics-cxr-grid"></span>[`pyrite numerics cxr-grid`](cli-reference-numerics.md#pyrite-numerics-cxr-grid)
+- <span id="pyrite-numerics-cxr-grid-reset"></span>[`pyrite numerics cxr-grid reset`](cli-reference-numerics.md#pyrite-numerics-cxr-grid-reset)
+- <span id="pyrite-numerics-cxr-grid-set"></span>[`pyrite numerics cxr-grid set`](cli-reference-numerics.md#pyrite-numerics-cxr-grid-set)
+- <span id="pyrite-numerics-cxr-grid-show"></span>[`pyrite numerics cxr-grid show`](cli-reference-numerics.md#pyrite-numerics-cxr-grid-show)
+- <span id="pyrite-numerics-energy-grid"></span>[`pyrite numerics energy-grid`](cli-reference-numerics.md#pyrite-numerics-energy-grid)
+- <span id="pyrite-numerics-energy-grid-derive"></span>[`pyrite numerics energy-grid derive`](cli-reference-numerics.md#pyrite-numerics-energy-grid-derive)
+- <span id="pyrite-numerics-energy-grid-show"></span>[`pyrite numerics energy-grid show`](cli-reference-numerics.md#pyrite-numerics-energy-grid-show)
+- <span id="pyrite-numerics-energy-grid-cxr"></span>[`pyrite numerics energy-grid cxr`](cli-reference-numerics.md#pyrite-numerics-energy-grid-cxr)
+- <span id="pyrite-numerics-energy-grid-cxr-show"></span>[`pyrite numerics energy-grid cxr show`](cli-reference-numerics.md#pyrite-numerics-energy-grid-cxr-show)
+- <span id="pyrite-numerics-energy-grid-brem"></span>[`pyrite numerics energy-grid brem`](cli-reference-numerics.md#pyrite-numerics-energy-grid-brem)
+- <span id="pyrite-numerics-energy-grid-brem-show"></span>[`pyrite numerics energy-grid brem show`](cli-reference-numerics.md#pyrite-numerics-energy-grid-brem-show)
+- <span id="pyrite-material"></span>[`pyrite material`](cli-reference-material.md#pyrite-material)
+- <span id="pyrite-material-show"></span>[`pyrite material show`](cli-reference-material.md#pyrite-material-show)
+- <span id="pyrite-material-create"></span>[`pyrite material create`](cli-reference-material.md#pyrite-material-create)
+- <span id="pyrite-material-create-amorphous"></span>[`pyrite material create amorphous`](cli-reference-material.md#pyrite-material-create-amorphous)
+- <span id="pyrite-material-create-crystal"></span>[`pyrite material create crystal`](cli-reference-material.md#pyrite-material-create-crystal)
+- <span id="pyrite-material-list"></span>[`pyrite material list`](cli-reference-material.md#pyrite-material-list)
+- <span id="pyrite-material-blaze"></span>[`pyrite material blaze`](cli-reference-material.md#pyrite-material-blaze)
+- <span id="pyrite-material-validate"></span>[`pyrite material validate`](cli-reference-material.md#pyrite-material-validate)
+- <span id="pyrite-beam"></span>[`pyrite beam`](cli-reference-beam.md#pyrite-beam)
+- <span id="pyrite-beam-create"></span>[`pyrite beam create`](cli-reference-beam.md#pyrite-beam-create)
+- <span id="pyrite-beam-delete"></span>[`pyrite beam delete`](cli-reference-beam.md#pyrite-beam-delete)
+- <span id="pyrite-beam-gdf"></span>[`pyrite beam gdf`](cli-reference-beam.md#pyrite-beam-gdf)
+- <span id="pyrite-beam-gdf-inspect"></span>[`pyrite beam gdf inspect`](cli-reference-beam.md#pyrite-beam-gdf-inspect)
+- <span id="pyrite-beam-gdf-times"></span>[`pyrite beam gdf times`](cli-reference-beam.md#pyrite-beam-gdf-times)
+- <span id="pyrite-beam-list"></span>[`pyrite beam list`](cli-reference-beam.md#pyrite-beam-list)
+- <span id="pyrite-beam-rename"></span>[`pyrite beam rename`](cli-reference-beam.md#pyrite-beam-rename)
+- <span id="pyrite-beam-set"></span>[`pyrite beam set`](cli-reference-beam.md#pyrite-beam-set)
+- <span id="pyrite-beam-show"></span>[`pyrite beam show`](cli-reference-beam.md#pyrite-beam-show)
+- <span id="pyrite-detector"></span>[`pyrite detector`](cli-reference-detector.md#pyrite-detector)
+- <span id="pyrite-detector-create"></span>[`pyrite detector create`](cli-reference-detector.md#pyrite-detector-create)
+- <span id="pyrite-detector-create-clone"></span>[`pyrite detector create clone`](cli-reference-detector.md#pyrite-detector-create-clone)
+- <span id="pyrite-detector-create-planar"></span>[`pyrite detector create planar`](cli-reference-detector.md#pyrite-detector-create-planar)
+- <span id="pyrite-detector-create-scalar"></span>[`pyrite detector create scalar`](cli-reference-detector.md#pyrite-detector-create-scalar)
+- <span id="pyrite-detector-delete"></span>[`pyrite detector delete`](cli-reference-detector.md#pyrite-detector-delete)
+- <span id="pyrite-detector-list"></span>[`pyrite detector list`](cli-reference-detector.md#pyrite-detector-list)
+- <span id="pyrite-detector-rename"></span>[`pyrite detector rename`](cli-reference-detector.md#pyrite-detector-rename)
+- <span id="pyrite-detector-reset"></span>[`pyrite detector reset`](cli-reference-detector.md#pyrite-detector-reset)
+- <span id="pyrite-detector-set"></span>[`pyrite detector set`](cli-reference-detector.md#pyrite-detector-set)
+- <span id="pyrite-detector-show"></span>[`pyrite detector show`](cli-reference-detector.md#pyrite-detector-show)
+- <span id="pyrite-tables"></span>[`pyrite tables`](cli-reference-tables.md#pyrite-tables)
+- <span id="pyrite-tables-fetch"></span>[`pyrite tables fetch`](cli-reference-tables.md#pyrite-tables-fetch)
+- <span id="pyrite-tables-generate"></span>[`pyrite tables generate`](cli-reference-tables.md#pyrite-tables-generate)
+- <span id="pyrite-tables-list"></span>[`pyrite tables list`](cli-reference-tables.md#pyrite-tables-list)
+- <span id="pyrite-tables-migrate"></span>[`pyrite tables migrate`](cli-reference-tables.md#pyrite-tables-migrate)
+- <span id="pyrite-tables-path"></span>[`pyrite tables path`](cli-reference-tables.md#pyrite-tables-path)
+- <span id="pyrite-tables-show"></span>[`pyrite tables show`](cli-reference-tables.md#pyrite-tables-show)
+- <span id="pyrite-tables-sources"></span>[`pyrite tables sources`](cli-reference-tables.md#pyrite-tables-sources)
+- <span id="pyrite-tables-sources-list"></span>[`pyrite tables sources list`](cli-reference-tables.md#pyrite-tables-sources-list)
+- <span id="pyrite-tables-sources-set"></span>[`pyrite tables sources set`](cli-reference-tables.md#pyrite-tables-sources-set)
+- <span id="pyrite-tables-verify"></span>[`pyrite tables verify`](cli-reference-tables.md#pyrite-tables-verify)

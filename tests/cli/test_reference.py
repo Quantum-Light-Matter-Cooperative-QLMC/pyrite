@@ -2,6 +2,7 @@ import statistics
 import subprocess
 import sys
 import time
+from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
@@ -35,19 +36,32 @@ def test_checked_cli_reference_is_current():
 
 
 def test_reference_families_cover_live_commands_and_preserve_legacy_fragments():
+    class AnchorParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.ids = []
+
+        def handle_starttag(self, tag, attrs):
+            self.ids.extend(value for name, value in attrs if name == "id")
+
     pages = cli_reference.build_reference_pages()
     assert pages == cli_reference.build_reference_pages()
     overview = pages["cli-reference.md"]
     assert "schema_version" in overview
     assert "resumable compute exits 75" in overview
+    anchors = AnchorParser()
+    anchors.feed(overview)
     nodes = list(cli_reference._walk(command, ("pyrite",)))
+    assert set(anchors.ids) == {"-".join(path) for path, _, _ in nodes if len(path) > 1}
+    assert len(anchors.ids) == len(set(anchors.ids))
     for path, current, ctx in nodes:
         heading = f"## `{' '.join(path)}`\n"
-        assert heading in overview
         if len(path) == 1:
+            assert heading in overview
             continue
+        assert heading not in overview
         filename = f"cli-reference-{path[1]}.md"
-        assert f"{filename}#{'-'.join(path)}" in overview
+        assert f"[`{' '.join(path)}`]({filename}#{'-'.join(path)})" in overview
         assert (
             sum(heading in content for name, content in pages.items() if name != "cli-reference.md")
             == 1
