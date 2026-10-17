@@ -162,8 +162,12 @@ def test_absorber_mu_outlives_the_chantler_coupling_ceiling(composition):
     couplings, n_re, log_mu = _line_tables(crystal, composition, grid)
     assert np.all(np.isfinite(log_mu))
     chantler_end = grid >= 1.0e6
-    for table in (*couplings, n_re[None, :]):
+    # chi_g and n carry the Chantler ceiling; the static CBS potential U_g
+    # (#513) has no anomalous term and stays finite.
+    for table in (*couplings[:2], n_re[None, :]):
         assert np.all(np.isnan(table[:, chantler_end]))
+    for table in couplings[2:]:
+        assert np.all(np.isfinite(table[:, chantler_end]))
 
 
 def test_nan_ceiling_is_inactive_without_anomalous_refraction():

@@ -103,7 +103,10 @@ def delta_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
 
     A_PXR / A_CBS, Feranchuk-Spence Eq. (16):
 
-        delta_g = sum_i F_i exp(i g Ri) / sum_i (Z_i - F_i) exp(i g Ri)
+        delta_g = sum_i F_i exp(i g Ri) / sum_i (Z_i - f0_i) exp(i g Ri)
+
+    The numerator is the photon amplitude (F = f0 + f'); the denominator is the
+    static CBS potential, which carries no anomalous term (see U_g).
 
     Depends only on the charge distribution (energy-independent far from edges).
 
@@ -132,7 +135,7 @@ def delta_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
 
         num += F.real * phase
 
-        den += (Z_TABLE[el] - F.real) * phase
+        den += (Z_TABLE[el] - cromer_mann_f0(el, g)) * phase
 
     return num / den
 
@@ -732,7 +735,7 @@ def cxr_lines_fixed(
 
         S += F_el[el] * phase * dwf
 
-        ZmF += (Z_TABLE[el] - F_el[el].real) * phase * dwf
+        ZmF += (Z_TABLE[el] - cromer_mann_f0(el, g_mag)) * phase * dwf
 
     lam = HC_EV_ANG / E
 

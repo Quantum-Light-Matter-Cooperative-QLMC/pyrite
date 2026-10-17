@@ -833,3 +833,28 @@ def test_emission_coupling_tables_reduce_to_crystallographic_without_fpp(crystal
     got = emission_coupling_tables(crystal, hkl_list, E, 0.4, use_henke)
     for g_tab, w_tab in zip(got, want, strict=True):
         np.testing.assert_array_equal(g_tab, w_tab)
+
+
+def test_U_g_is_static_mott_bethe_for_edge_prone_si():
+    # Issue #513: U_g is the Fourier component of the screened electrostatic
+    # potential, Z - f0(g). Anomalous f' belongs to chi_g, so Si (220) is the
+    # same at 10 keV and across the Si K edge, with and without use_henke.
+    energies = np.array([1000.0, 1839.0, 10000.0])
+    expected = 4.31638  # eV, B = 0.48 A^2; electrostatic Z - f0 value
+    for use_henke in (False, True):
+        got = U_g("silicon", (2, 2, 0), energies, 0.48, use_henke)
+        np.testing.assert_allclose(got.real, expected, rtol=1e-5)
+    # chi_g keeps the edge-prone anomalous policy.
+    chi = chi_g("silicon", (2, 2, 0), energies, 0.48)
+    assert abs(chi[1] / chi[2]) != pytest.approx(abs(chi[0] / chi[2]))
+
+
+@pytest.mark.parametrize("use_henke", [False, True])
+def test_reflection_coupling_tables_u_matches_static_U_g(use_henke):
+    grid = np.array([1000.0, 1839.0, 10000.0])
+    hkls = [(2, 2, 0), (1, 1, 1)]
+    _, _, u_re, u_im = reflection_coupling_tables("silicon", hkls, grid, 0.48, use_henke)
+    for row, hkl in enumerate(hkls):
+        ref = U_g("silicon", hkl, grid, 0.48, use_henke) / 510998.95
+        np.testing.assert_allclose(u_re[row], ref.real, rtol=1e-12, atol=0)
+        np.testing.assert_allclose(u_im[row], ref.imag, rtol=1e-12, atol=1e-18)
