@@ -24,19 +24,31 @@ uv sync --locked
 # Runtime-only environment, used by remote installations.
 uv sync --no-default-groups --locked
 
-# Stable domain partitions. Together these contain every tests/test_*.py once.
+# Start with the changed behavior's test node or owning module.
+pyrite-dev test path/to/test.py -k test_name
+
+# Domain partitions for changes spanning a domain. Together these contain
+# every tests/**/test_*.py once; core is shared/residual, not the full suite.
+pyrite-dev test-suite transport
+pyrite-dev test-suite transport-collisions
+pyrite-dev test-suite transport-cascades
+pyrite-dev test-suite transport-runner
+pyrite-dev test-suite spectrum
+pyrite-dev test-suite spectrum-coherent
+pyrite-dev test-suite spectrum-brem
+pyrite-dev test-suite quantum
+pyrite-dev test-suite channeling
+pyrite-dev test-suite energy-grid
+pyrite-dev test-suite materials
+pyrite-dev test-suite xsgen
 pyrite-dev test-suite core
-pyrite-dev test-suite core --durations=30 --durations-min=0.5
 pyrite-dev test-suite cli
 pyrite-dev test-suite apps
 pyrite-dev test-suite packaging
 
-# One focused test module or selection.
-pyrite-dev test path/to/test.py -k test_name
-
 # Include the opt-in slow tier (CI always does).
-pyrite-dev test --slow
-pyrite-dev test-suite core --slow
+pyrite-dev test --slow path/to/test.py
+pyrite-dev test-suite transport --slow
 
 # Fresh-process CPU imports and README simulation; see the startup reference.
 pyrite-dev startup --cache warm --repeats 3
@@ -45,13 +57,17 @@ pyrite-dev startup --cache warm --repeats 3
 pyrite-dev lint
 pyrite-dev format
 pyrite-dev typecheck
+pyrite-dev check-lines
 pyrite-dev precommit
 
-# Additive cross-boundary sample and release gates.
+# Cross-boundary sample only when those public boundaries are affected.
 pyrite-dev test-suite integration
-pyrite-dev docs
+
+# Static gate: types, lint, format check, source line budget, docs, imports.
 pyrite-dev verify
-pyrite-dev verify --skip-tests
+
+# Full slow-inclusive CPU suite: explicit audit/release operation.
+pyrite-dev test --slow
 
 # Clean wheel and editable-install compatibility check.
 pyrite-dev package-smoke
@@ -62,22 +78,53 @@ Use the project runner rather than bare `pytest` or an environment-specific Pyth
 See [CPU startup latency](compute/startup-latency.md) for benchmark cache policies,
 profiling, and the recorded baseline.
 
-Suite ownership uses deterministic filename rules in `pyrite._dev`. A regression test requires the four domain suites to cover every test module exactly once, so a new test cannot silently disappear from focused coverage. The integration suite intentionally overlaps domain suites; it exercises public imports/data, exports, CLI contract, remote, sweep/run, and a headless app path. `pyrite-dev docs` performs the clean offline warnings-as-errors Sphinx build; `verify` includes that documentation gate along with skills, imports, generated repository structure, lint, types, and tests. CI runs the four domain suites once each, including the `slow` tier, with adaptive workers (and slow-test timings for core), then uses `verify --skip-tests` for the remaining checks; local `verify` still runs everything.
+Suite ownership uses ordered filename rules in `pyrite.devtools.dev_cli`. First match owns a module; `core` owns the remainder. Regression tests require all primary suites to partition every test module exactly once and require CI's matrix to match that inventory. Empty selections fail rather than accidentally invoking the full suite. The `integration` suite intentionally overlaps primary suites; it samples public imports/data, exports, CLI contract, remote, sweep/run, and a headless app path.
+
+| Suite | Ownership |
+|---|---|
+| `transport` | Flight integration, beam/RNG entry, geometry, grooves, event/segment contracts and transport-core diagnostics. |
+| `transport-collisions` | Atomic/shell/elastic scattering, stopping, energy-loss straggling and their configuration/table contracts. |
+| `transport-cascades` | Coupled hard-radiative flights, secondary transport, pair conversion, positrons and annihilation, including process-specific runner tests. |
+| `transport-runner` | Shared case/adaptive/block scheduling, backend/resource policy, trajectory artifacts, telemetry and cross-stage baseline helpers. |
+| `spectrum` | Shared/incoherent CXR, absorption/escape, bin integration, mosaicity, characteristic and transition radiation, spectrum staging and mixed emission tests. |
+| `spectrum-coherent` | Coherent CXR fields, physical-population/transverse factors, formation absorption, omission and temporal intensity. |
+| `spectrum-brem` | Analytic/EEDL/BremsLib bremsstrahlung scoring, hard-photon event scoring, source/angular comparisons and positron scaling. |
+| `quantum` | Channeling bound states, density-matrix and MCWF solvers, scattering operators and dipole-emission physics. |
+| `channeling` | Channeling selection/configuration, source production, native-transport handoff, replay and physical observations. |
+| `energy-grid` | Grid policy, derivation, artifacts and convergence; CLI module stays in `cli`. |
+| `materials` | Material/catalog/crystal/attenuation tests, after packaging, apps, CLI and channeling exceptions. |
+| `xsgen` | Cross-section generation, table stores, fetch/release tooling and external-code adapters. |
+| `core` | Shared/residual tests: API/campaign, checkpoints/results/observations, detector/instrument, plotting, remaining remote and developer tooling. |
+| `cli`, `apps`, `packaging` | Existing public-boundary selections take precedence over domain rules. |
+
+Transport and spectrum family selectors are disjoint leaves: `transport` and
+`spectrum` do not rerun their sibling suites. `quantum` covers channeling solver
+physics; classical coherent CXR remains in `spectrum-coherent`. Mixed cascade
+runner tests stay with their physical process, while shared scheduling and
+trajectory artifacts live in `transport-runner`. Grid-specific coherent tests
+remain in `energy-grid`.
+
+For ordinary edits, select the changed behavior's node/module and trace its affected callers and consumers. Widen to a domain only for changes spanning that domain or its fixtures; do not run all of `core` as a generic safety check. See `AGENTS.md` "Choose tests by impact" for examples. Documentation/guidance-only work needs relevant static checks, not simulation tests. Repeat checks only after new edits, failures or unresolved concerns.
+
+`verify` never invokes pytest: it checks types, Ruff lint and formatting (without rewriting files), the 1,250-line Python source-module budget, a clean offline warnings-as-errors Sphinx build, and import-linter. `--skip-tests` remains an undocumented compatibility no-op; pytest arguments and `--slow` are rejected. Run tests explicitly. CI runs each primary domain with the `slow` tier once per supported Python version (3.13 and 3.14), with adaptive workers and duration reporting; skills and generated repository-map checks remain separate CI steps.
 
 The suites read hash-pinned fetched data rather than packaged data (ADR-0014): the EPICS2025 EEDL and EADL files, the derived EPDL photon table, SBETHE's `sdbase/` and catalogue stopping tables, and the ELSEPA and BremsLib tables, with the positron SBETHE and ELSEPA pins alongside the electron ones. Install all of it once per machine with `pyrite tables fetch` (about 140 MB; one code with `pyrite tables fetch CODE`, a positron pin with `pyrite tables fetch {sbethe-tables,elsepa} --projectile positron`, or `--archive PATH` from a local copy); a test that needs one fails naming the command. Positron tests check every table their pinned release lists (`tests/helpers/positron_tables.py`): none installed skips, naming the fetch command (fails instead when `CI` is set, so CI never skips a positron anchor silently); some installed fails, naming the command. Tests never see a developer's `PYRITE_HOME` or config store, so they read the default user-data location, `~/.local/share/pyrite/datasets/` on Linux; fetch without `PYRITE_HOME` set. PyRITE's own archives (EPDL, SBETHE tables, ELSEPA, BremsLib, and the EEDL/EADL mirrors) are public GitHub Release assets, so fetching them needs no GitHub token. CI caches the datasets, `xsgen/tables` and `xsgen/reference-data` directories under a key derived from `src/pyrite/datasets.py`, `src/pyrite/xsgen/fetch.py` (the `sdbase/` pin) and `src/pyrite/data/xsgen/*-tables.json`, and runs `pyrite tables fetch`; they verify a cached copy and need no network on a hit. The `elastic_model="mott"` tests read the synthetic SRD 64-format tables in `tests/data/mott_srd64_synthetic/` (regenerate with `uv run python -m tests.helpers.mott_synthetic`).
 
-`pyrite-dev test`, `test-suite`, and the test step of `verify` use `pytest-xdist` workers by default: `min(CPUs, available memory / 2 GiB, 6)`, since a worker peaks at roughly 1.2–1.8 GiB. Set `PYRITE_TEST_WORKERS=N` to choose the count (`1` runs serially). `test` runs that name test paths remain serial by default; all commands honor explicit `-n`/`--numprocesses` or `-p no:xdist`. Pytest keeps `tmp_path` directories only for failed tests.
+`pyrite-dev test` and `test-suite` use `pytest-xdist` workers by default: `min(CPUs, available memory / 2 GiB, 6)`, since a worker peaks at roughly 1.2–1.8 GiB. Set `PYRITE_TEST_WORKERS=N` to choose the count (`1` runs serially). `test` runs that name test paths remain serial by default; both commands honor explicit `-n`/`--numprocesses` or `-p no:xdist`. Pytest keeps `tmp_path` directories only for failed tests.
 
-Tests marked `slow` are skipped by default. The marker covers tests that take more than 5 s wall time or have a large peak RSS, plus rarely-needed exhaustive cases. The skip reason and a closing summary line say how to enable them. Pass `--slow` to `test`, `test-suite`, or `verify` (before forwarded pytest arguments), or set `PYRITE_SLOW_TESTS=1`. A slow test named by node id (`path::test_name`), or selected by any `-m` expression that names `slow`, runs without the flag. CI sets `PYRITE_SLOW_TESTS=1` on every PR, so physics anchors may carry the marker. Tag a whole heavy module with `pytestmark = pytest.mark.slow`.
+Tests marked `slow` are skipped by default. The marker covers tests that take more than 5 s wall time or have a large peak RSS, plus rarely-needed exhaustive cases. The skip reason and a closing summary line say how to enable them. Pass `--slow` to `test` or `test-suite` (before forwarded pytest arguments), or set `PYRITE_SLOW_TESTS=1`. A slow test named by node id (`path::test_name`), or selected by any `-m` expression that names `slow`, runs without the flag. CI sets `PYRITE_SLOW_TESTS=1` on every PR, so physics anchors may carry the marker. Tag a whole heavy module with `pytestmark = pytest.mark.slow`.
 
 ## Coverage
 
 ```bash
 pyrite-dev test --cov
 pyrite-dev test --numba --cov
+pyrite-dev test --slow --numba --cov
 ```
 
-`--cov` is forwarded straight to `pytest-cov`, which reads `[tool.coverage.*]` in `pyproject.toml` for source/branch/report settings; any other `pytest-cov`/`coverage.py` flag (`--cov-report=html`, `-k`, ...) composes the same way. `--numba` must come before other forwarded arguments; it sets `NUMBA_DISABLE_JIT=1` so `@njit` bodies (`montecarlo/transport.py`, `geometry.py`, `groove.py`) run under the Python tracer instead of compiled, at roughly 2x wall clock. Read the resulting totals against the two compiled-code caveats documented next to `[tool.coverage.report]` in `pyproject.toml`: the CuPy kernel modules (`montecarlo/transport/_jit_*.py`, `montecarlo/spectrum/*_jit_kernel.py`) report 0% on any environment without the `nvidia` extra, and `@njit` bodies need `--numba` to be measured at all.
+`--cov` is forwarded straight to `pytest-cov`, which reads `[tool.coverage.*]` in `pyproject.toml` for source/branch/report settings; any other coverage flag (`--cov-report=html`, `-k`, ...) composes the same way. `--numba` must precede forwarded arguments; it sets `NUMBA_DISABLE_JIT=1` so CPU `@njit` bodies run under the Python tracer. These audit timings are not comparable to compiled CI runs. Include `--slow` for a complete CPU audit; default coverage omits those tests.
+
+Read totals against the compiled-code caveats beside `[tool.coverage.report]` in `pyproject.toml`. For a CPU-only assessment, separately report exclusions for the CUDA device helpers/kernels (`transport/_jit_*device.py`, `_jit_*kernel.py`, `_jit_annihilation.py`, and `spectrum/*_jit_kernel.py`); retain host dispatch/fallback and error paths. In particular, `transport/_jit_radiative.py` is **CPU Numba**, despite its name: do not exclude it with a blanket `_jit_*` glob. Hardware, online, external-Fortran and optional-oracle skips still limit what a CPU run establishes; report them alongside line and branch coverage.
 
 ## Measurements (2026-08-01)
 

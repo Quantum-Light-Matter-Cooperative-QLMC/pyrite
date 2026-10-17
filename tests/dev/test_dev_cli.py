@@ -51,7 +51,7 @@ def test_nbqa_passes_ruff_subcommand_as_one_shell_command(dev_module, monkeypatc
     [
         ("cmd_lint", ("-m", "ruff", "check", ".")),
         ("cmd_format", ("-m", "ruff", "format", ".")),
-        ("cmd_typecheck", ("-m", "ty", "check")),
+        ("cmd_typecheck", ("-m", "ty", "check", "--exit-zero-on-warning")),
         ("cmd_precommit", ("-m", "pre_commit", "run", "--all-files")),
     ],
 )
@@ -189,7 +189,6 @@ def test_test_without_numba_omits_extra_env_kwarg(dev_module, monkeypatch) -> No
         (["test", "--slow", "-k", "x"], False, ["-k", "x"]),
         (["test", "--slow", "--numba", "--cov"], True, ["--cov"]),
         (["test", "--numba", "--slow"], True, []),
-        (["verify", "--slow"], False, []),
     ],
 )
 def test_main_strips_leading_slow_flag_before_pytest_args(
@@ -291,12 +290,84 @@ def test_domain_suites_partition_every_test_module_once(dev_module) -> None:
     all_tests = set((dev_module.ROOT / "tests").rglob("test_*.py"))
     selected = [
         path
-        for suite in ("core", "cli", "apps", "packaging")
+        for suite in dev_module.PRIMARY_TEST_SUITE_NAMES
         for path in dev_module.test_files_for_suite(suite)
     ]
 
     assert set(selected) == all_tests
     assert len(selected) == len(set(selected))
+
+
+def test_ci_runs_every_primary_suite_once(dev_module) -> None:
+    import yaml
+
+    workflow = yaml.safe_load((dev_module.ROOT / ".github/workflows/ci.yml").read_text())
+    matrix = workflow["jobs"]["focused"]["strategy"]["matrix"]
+
+    assert set(matrix["suite"]) == set(dev_module.PRIMARY_TEST_SUITE_NAMES)
+    assert len(matrix["suite"]) == len(set(matrix["suite"]))
+    assert matrix["python"] == ["3.13", "3.14"]
+
+
+@pytest.mark.parametrize(
+    ("path", "owner"),
+    [
+        ("montecarlo/test_transport_per_electron.py", "transport"),
+        ("montecarlo/test_coupled_radiative_runner.py", "transport-cascades"),
+        ("montecarlo/test_shell_secondary_transport.py", "transport-cascades"),
+        ("montecarlo/test_pair_production.py", "transport-cascades"),
+        ("montecarlo/test_shell_partition.py", "transport-collisions"),
+        ("montecarlo/test_straggling_surface.py", "transport-collisions"),
+        ("montecarlo/test_trajectory_capture.py", "transport-runner"),
+        ("montecarlo/test_gpu_oom_retry.py", "transport-runner"),
+        ("montecarlo/test_brem_events.py", "spectrum-brem"),
+        ("montecarlo/test_positron_brems.py", "spectrum-brem"),
+        ("montecarlo/test_beam_energy_spread_grid.py", "spectrum"),
+        ("montecarlo/test_coherent_emission.py", "spectrum-coherent"),
+        ("montecarlo/test_temporal_profile.py", "spectrum-coherent"),
+        ("montecarlo/test_transition_radiation.py", "spectrum"),
+        ("montecarlo/test_channeling_handoff.py", "channeling"),
+        ("montecarlo/test_channeling_replay.py", "channeling"),
+        ("montecarlo/test_channeling_emission.py", "quantum"),
+        ("montecarlo/test_channeling_density.py", "quantum"),
+        ("materials/test_channeling_profile.py", "quantum"),
+        ("energy-grid/test_coherent_line_grid.py", "energy-grid"),
+        ("materials/test_crystallography.py", "materials"),
+        ("xsgen/test_sbethe.py", "xsgen"),
+        ("checkpoint/test_io.py", "core"),
+        ("energy-grid/test_cli.py", "cli"),
+        ("montecarlo/test_output_noise.py", "cli"),
+        ("materials/test_validation_background.py", "apps"),
+        ("montecarlo/test_exports.py", "packaging"),
+    ],
+)
+def test_domain_suite_ownership(dev_module, path, owner) -> None:
+    assert dev_module.ROOT / "tests" / path in dev_module.test_files_for_suite(owner)
+
+
+def test_new_modules_join_their_domain_or_core(dev_module, tmp_path) -> None:
+    for relative in ("montecarlo/test_new_transport.py", "test_new_shared.py"):
+        path = tmp_path / "tests" / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+
+    assert dev_module.test_files_for_suite("transport", tmp_path) == [
+        tmp_path / "tests/montecarlo/test_new_transport.py"
+    ]
+    assert dev_module.test_files_for_suite("core", tmp_path) == [
+        tmp_path / "tests/test_new_shared.py"
+    ]
+
+
+def test_empty_suite_never_falls_back_to_all_tests(dev_module, monkeypatch) -> None:
+    monkeypatch.setattr(dev_module, "test_files_for_suite", lambda name: [])
+    calls = []
+    monkeypatch.setattr(dev_module, "_run_pytest", lambda *args: calls.append(args))
+
+    with pytest.raises(dev_module.AgentToolingError, match="contains no test modules"):
+        dev_module.cmd_test_suite(Namespace(suite="transport"))
+
+    assert calls == []
 
 
 def test_test_suite_forwards_stable_paths_and_pytest_arguments(dev_module, monkeypatch) -> None:
@@ -318,7 +389,7 @@ def test_test_suite_forwards_stable_paths_and_pytest_arguments(dev_module, monke
     ]
 
 
-@pytest.mark.parametrize("suite", ["core", "cli", "apps", "packaging", "integration"])
+@pytest.mark.parametrize("suite", dev_cli.TEST_SUITE_NAMES)
 def test_test_suite_uses_memory_bounded_workers(dev_module, monkeypatch, suite) -> None:
     calls = []
     monkeypatch.setenv("PYRITE_TEST_WORKERS", "3")
@@ -344,65 +415,41 @@ def test_test_suite_respects_explicit_worker_choice(dev_module, monkeypatch, pyt
     assert calls == [("-m", "pytest", *pytest_args, *paths)]
 
 
-def test_verify_runs_checks_in_required_order(dev_module, monkeypatch) -> None:
+@pytest.mark.parametrize("argv", [["verify"], ["verify", "--skip-tests"]])
+def test_verify_runs_static_checks_without_tests(dev_module, monkeypatch, argv) -> None:
     calls = []
     for name in (
-        "cmd_check_skills",
         "cmd_imports",
-        "cmd_repo_map",
         "cmd_docs",
         "cmd_lint",
         "cmd_typecheck",
-        "cmd_test",
+        "cmd_check_lines",
     ):
         monkeypatch.setattr(dev_module, name, lambda _args, name=name: calls.append(name))
+    monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
+    monkeypatch.setattr(dev_module, "cmd_test", lambda _args: pytest.fail("tests ran"))
 
-    dev_module.cmd_verify(Namespace(pytest_args=[]))
+    dev_module.main(argv)
 
     assert calls == [
-        "cmd_check_skills",
-        "cmd_imports",
-        "cmd_repo_map",
-        "cmd_docs",
-        "cmd_lint",
         "cmd_typecheck",
-        "cmd_test",
+        "cmd_lint",
+        ("-m", "ruff", "format", "--check", "."),
+        "cmd_check_lines",
+        "cmd_docs",
+        "cmd_imports",
     ]
 
 
-def test_verify_skip_tests_runs_every_other_check(dev_module, monkeypatch) -> None:
-    calls = []
-    for name in (
-        "cmd_check_skills",
-        "cmd_imports",
-        "cmd_repo_map",
-        "cmd_docs",
-        "cmd_lint",
-        "cmd_typecheck",
-        "cmd_test",
-    ):
-        monkeypatch.setattr(dev_module, name, lambda _args, name=name: calls.append(name))
-
-    dev_module.main(["verify", "--skip-tests"])
-
-    assert calls == [
-        "cmd_check_skills",
-        "cmd_imports",
-        "cmd_repo_map",
-        "cmd_docs",
-        "cmd_lint",
-        "cmd_typecheck",
-    ]
-
-
-def test_verify_skip_tests_rejects_pytest_arguments(dev_module, monkeypatch) -> None:
+@pytest.mark.parametrize("args", [["-k", "example"], ["--slow"], ["--numba"], ["tests"]])
+def test_verify_rejects_pytest_arguments(dev_module, monkeypatch, args) -> None:
     monkeypatch.setattr(dev_module, "cmd_verify", lambda _args: pytest.fail("verify ran"))
 
     with pytest.raises(SystemExit, match="2"):
-        dev_module.main(["verify", "--skip-tests", "-k", "example"])
+        dev_module.main(["verify", *args])
 
 
-def test_verify_help_exposes_skip_tests_without_running_checks(
+def test_verify_help_explains_static_gate_without_running_checks(
     dev_module, monkeypatch, capsys
 ) -> None:
     monkeypatch.setattr(dev_module, "cmd_verify", lambda _args: pytest.fail("verify ran"))
@@ -410,7 +457,28 @@ def test_verify_help_exposes_skip_tests_without_running_checks(
     with pytest.raises(SystemExit, match="0"):
         dev_module.main(["verify", "--help"])
 
-    assert "--skip-tests" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "no tests run" in output
+    assert "--skip-tests" not in output
+
+
+def test_check_lines_reports_oversized_source_path(dev_module, monkeypatch, tmp_path) -> None:
+    package = tmp_path / "src/pyrite"
+    package.mkdir(parents=True)
+    (package / "oversized.py").write_text("# line\n" * 1_251)
+    monkeypatch.setattr(dev_module, "ROOT", tmp_path)
+
+    with pytest.raises(dev_module.AgentToolingError, match=r"oversized.py: 1251"):
+        dev_module.main(["check-lines"])
+
+
+def test_source_line_budget_accepts_limit_and_ignores_non_python(tmp_path) -> None:
+    from pyrite.devtools.source_checks import oversized_source_modules
+
+    (tmp_path / "at_limit.py").write_text("# line\n" * 1_250)
+    (tmp_path / "large.txt").write_text("text\n" * 2_000)
+
+    assert oversized_source_modules(tmp_path) == {}
 
 
 def test_smoke_forwards_material_and_output_directory(dev_module, monkeypatch) -> None:

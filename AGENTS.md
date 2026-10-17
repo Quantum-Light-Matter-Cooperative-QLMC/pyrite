@@ -27,19 +27,28 @@ prose keep required format.
 Use project runner; never bare `pytest`, `.venv/bin/python`, or path-hack imports.
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test path/to/test.py -k test_name
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite transport
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite transport-collisions
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite transport-cascades
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite transport-runner
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite spectrum
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite spectrum-coherent
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite spectrum-brem
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite quantum
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite channeling
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite energy-grid
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite materials
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite xsgen
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite core
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite cli
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite apps
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite packaging
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test path/to/test.py -k test_name
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow   # include slow tier
-PYRITE_ONLINE_TESTS=1 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --cov
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --numba --cov
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow path/to/test.py
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev lint
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev format
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev check-lines
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev nbstrip
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
@@ -48,6 +57,37 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev precommit
 
 If `uv run` cannot write project environment, add
 `UV_PROJECT_ENVIRONMENT=/tmp/pyrite-venv`; do not switch interpreters.
+
+## Choose tests by impact
+
+Start with the changed behavior's test node or owning module. Trace callers and
+consumers before selecting neighboring tests; use a domain suite only when the
+change spans that domain or its shared fixtures. Never default to the full
+suite, `core`, or `integration` for a local edit. `core` is a residual partition,
+not an aggregate safety check. Re-run only after a new change, failure, or
+unresolved concern. Inert docs/guidance edits need their relevant static checks,
+not simulation tests.
+
+| Changed surface | Smallest useful coverage; widen only if affected |
+|---|---|
+| Flight integration, beam/RNG, geometry | Matching `tests/montecarlo/test_*.py`; add affected runner/segment/spectrum consumers when event or trajectory contracts change. Broader: `transport`. |
+| Collision/stopping/straggling physics | Matching atomic, shell, elastic or stopping tests. Broader: `transport-collisions`; radiative flights, secondaries, pair/positron cascades: `transport-cascades`. |
+| Runner/resource/trajectory plumbing | Matching adaptive/block/dispatch/artifact tests. Broader: `transport-runner`. |
+| Radiation scoring/reduction | Matching spectrum tests; add affected grid/result consumers for changed grid/shape/normalization contracts. Broader: `spectrum` for shared/incoherent CXR, `spectrum-coherent` for coherent/temporal, `spectrum-brem` for bremsstrahlung. These are disjoint, not aggregates. |
+| Quantum channeling physics | Bound-state, density-matrix, MCWF, scattering-operator or dipole-emission module. Broader: `quantum`. |
+| Channeling integration | Matching selection/handoff/replay/producer tests. Broader: `channeling`; add quantum solver tests only if that physics changed. |
+| Energy-grid policy/artifacts | Matching `tests/energy-grid/` modules and affected spectrum consumers. Broader: `energy-grid`; CLI wiring stays in `cli`. |
+| Catalog/materials/tables | Matching `tests/materials/` or `tests/xsgen/` modules; use `regen-golden` only for authorized catalog changes and check affected grid/transport consumers. Broader: `materials`/`xsgen`. |
+| CLI or app | Affected command/app module, plus owning domain tests only if underlying behavior changed. Broader: `cli`/`apps`. |
+| Checkpoints/results/instrument/API | Matching modules under `tests/checkpoint/`, `results/`, `observations/`, `detectors/`, `instrument/`, or `scan/`; add concrete serialization/public callers, not all of `core`. |
+| Developer runner/suite ownership | `tests/dev/test_dev_cli.py`; packaging/import changes add corresponding public export/package tests. Broader: `packaging`. |
+
+Select slow tests explicitly by node ID, or put `--slow` before test paths;
+do not enable every slow test just to exercise one changed path. Full
+`pyrite-dev test --slow` and CPU `test --slow --numba --cov` are explicit
+release/audit operations; CI runs every primary domain with slow tests on both
+supported Python versions. `verify` runs only types, lint/format checks, source
+line budgets, docs, and import-linter; it never runs tests or changes formatting.
 
 ## Work rules
 

@@ -13,9 +13,13 @@ git status --short src/pyrite/data/catalog src/pyrite/materials/catalog.py
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev regen-golden
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
   tests/materials/test_material_catalog.py -k golden
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/energy-grid/
 git diff --stat tests/data/material_catalog_golden.json
 ```
 
 Never hand-edit golden. Surface surprising diff. Do not stage or commit unless
 asked.
+
+Add only the energy-grid modules that consume changed material/line defaults;
+use the `energy-grid` suite when catalog-wide grid policy changed. Follow
+`AGENTS.md` "Choose tests by impact" rather than running all grid tests for
+every catalog edit.

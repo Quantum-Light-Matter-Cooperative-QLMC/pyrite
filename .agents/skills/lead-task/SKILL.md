@@ -54,7 +54,10 @@ Own the issue outcome, not unlimited repository scope.
 
 ## Close milestone
 
-Run focused, neighboring/runtime, then broader checks proportional to risk.
+Follow `AGENTS.md` "Choose tests by impact": run changed nodes/modules and
+affected consumers; widen to a domain only for shared/domain-wide changes.
+Do not automatically run `core`, `integration`, or the full suite. `verify`
+runs static checks only; full test runs belong to explicit release/audit work.
 Inspect the integrated diff and reconcile delegated artifacts. Do not claim
 landing until integration is confirmed. Report:
 

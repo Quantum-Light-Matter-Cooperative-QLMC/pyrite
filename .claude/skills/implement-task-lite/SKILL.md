@@ -21,7 +21,9 @@ delegation, physics changes, or backlog management.
    reading manuals, or inspecting tool config unless the tool actually fails.
 4. Make the smallest complete change. Add a focused regression test when
    behavior changes; do not widen cleanup.
-5. Run the named/focused checks. Do not run heavy GPU sweeps locally.
+5. Run the named/focused checks. Follow `AGENTS.md` "Choose tests by impact":
+   changed node/module plus affected callers only; no automatic domain/full
+   suite. `verify` is static-only. Do not run heavy GPU sweeps locally.
 6. If `commits` permits, inspect the scoped diff, stage explicit task paths, and
    commit one logical result. Never `git add .`; never commit known broken state.
 7. Do not edit the GitHub issue unless `issue-writer: yes`; if authorized, tick
