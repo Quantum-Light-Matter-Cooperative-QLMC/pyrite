@@ -31,3 +31,34 @@ temperatures_K = [170.0, 180.0, 190.0, 210.0, 220.0, 230.0, 240.0, 260.0, 270.0,
 B_ang2 = [0.0927, 0.0981, 0.1036, 0.1145, 0.1199, 0.1254, 0.1308, 0.1417, 0.1471, 0.1526]
 source = "L.-M. Peng, G. Ren, S. L. Dudarev, M. J. Whelan, Acta Cryst. A52, 456 (1996), Table 1 (phonon-DOS derived)"
 doi = "10.1107/S010876739600089X"
+
+# Uniaxial single-temperature rows (#535). `model = "uniaxial_c"` gives the
+# mean-square displacement <u^2> [angstrom^2] along one basal axis
+# (`u_basal_ang2`) and along c (`u_c_ang2`); every site of the element must be
+# symmetry-equivalent. Valid only at `temperature_K +- tolerance_K`; never
+# extrapolated (ADR-0018). The planar potential uses their plane-normal
+# projection; TDS uses the transverse block of the full covariance (#535).
+# Validation: cr-uniaxial-thermal-projection
+#
+# 2H-MoS2: Schoenfeld, Huang & Moss (1983), Table 3, 2H row, values without the
+# TDS correction (TDS-corrected values agree within error). Room temperature is
+# not stated numerically; 295 +- 10 K is the declared admissible window.
+[mos2.Mo]
+model = "uniaxial_c"
+atomic_weight = 95.95
+temperature_K = 295.0
+tolerance_K = 10.0
+u_basal_ang2 = 0.0048
+u_c_ang2 = 0.0077
+source = "B. Schoenfeld, J. J. Huang, S. C. Moss, Acta Cryst. B39, 404 (1983), Table 3 (2H-MoS2, X-ray, room temperature)"
+doi = "10.1107/S0108768183002645"
+
+[mos2.S]
+model = "uniaxial_c"
+atomic_weight = 32.06
+temperature_K = 295.0
+tolerance_K = 10.0
+u_basal_ang2 = 0.0038
+u_c_ang2 = 0.0049
+source = "B. Schoenfeld, J. J. Huang, S. C. Moss, Acta Cryst. B39, 404 (1983), Table 3 (2H-MoS2, X-ray, room temperature)"
+doi = "10.1107/S0108768183002645"

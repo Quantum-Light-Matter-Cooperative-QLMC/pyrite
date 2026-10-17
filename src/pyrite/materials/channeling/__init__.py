@@ -16,6 +16,7 @@ from .potential import PlanarProfile, planar_profile
 from .thermal import (
     ChannelingDataError,
     ThermalSite,
+    UniaxialThermalSite,
     debye_b_factor,
     debye_integral,
     fit_debye_temperature,
@@ -37,6 +38,7 @@ __all__ = [
     "PlaneIncidence",
     "ThermalSite",
     "TransverseStates",
+    "UniaxialThermalSite",
     "debye_b_factor",
     "debye_integral",
     "doppler_denominator",

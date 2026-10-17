@@ -4,12 +4,17 @@ An independent wave-optics solution of planar channeling with thermal diffuse
 scattering, compared with :class:`~pyrite.montecarlo.channeling.DensityMatrixSolver`
 running the TDS kernel alone (abTEM has no electronic excitation).
 
-**Model.** The default ``crystal`` model is diamond-structure Si oriented so
-the (110) planes contain the beam, which runs along the high-index in-plane
-direction ``[1, -1, n]``. Lattice row correlations are therefore exact, and
-the in-plane periodic structure diffracts coherently. Each frozen
-configuration displaces every atom by an isotropic Gaussian of
-``a^2 = B(T)/8 pi^2`` per axis, the Einstein model the kernel assumes. The
+**Model.** The default ``crystal`` model orients a catalog crystal (default
+Si) so the ``(hkl)`` planes contain the beam, which runs along a high-index
+in-plane direction ``[uvw]`` (``--beam``; Si (110) defaults to ``[1, -1, n]``).
+The orthogonal supercell uses the shortest lattice rows along the plane normal
+and normal to the beam; a hexagonal cell with irrational ``c/a`` has them for
+basal ``(001)`` planes but not for oblique beams in prismatic planes. Lattice
+row correlations are therefore exact, and the in-plane periodic structure
+diffracts coherently. Each frozen configuration displaces every atom by a
+Gaussian with its element's Cartesian covariance from the profile (isotropic
+``a^2 = B(T)/8 pi^2`` per axis, or the uniaxial tensor of #535), the Einstein
+model the kernel assumes; the comparison kernel gets the same beam. The
 supercell spans ``n_cells`` true periods in ``x``, so its plane-wave momenta
 are the solver's Bloch grid ``kappa_r + h g``. The ``random-string`` model
 (planes of atoms uniform in ``y`` and ``z``) is an amorphous-in-plane solid
@@ -20,7 +25,8 @@ against ``e / (hbar v)``. At each exit plane the wave is projected onto
 PyRITE's transverse Bloch states (``|h| <= max_order``):
 ``P_n(z) = <sum_r |<r n|psi(., y)>|^2>_y``, averaged over configurations.
 Lobato and Waasmaier--Kirfel Mott--Bethe factors agree to ~1e-3 for Si, so
-both codes share one continuum potential to that level.
+both codes share one continuum potential to that level; for Mo and S they
+differ by 6% and 2% at ``s = 0.05 / angstrom`` (1% above ``s = 0.2``).
 
 Run configurations on ``pyrite remote`` (SLURM, CPU) in batches, then merge::
 
@@ -48,12 +54,18 @@ import numpy as np
 
 from pyrite.materials.channeling import longitudinal_kinematics, planar_profile
 from pyrite.materials.channeling.transverse import _hamiltonian
-from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
+from pyrite.materials.crystal import (
+    CRYSTALS,
+    HBARC_EV_ANG,
+    _direct_lattice_vectors,
+    reciprocal_g_vector,
+)
 
 
 def _config(args) -> dict:
     return {
         "energy_eV": args.energy,
+        "crystal": args.crystal,
         "hkl": list(args.hkl),
         "temperature_K": args.temperature,
         "n_cells": args.cells,
@@ -66,6 +78,7 @@ def _config(args) -> dict:
         "seed": args.seed,
         "model": args.model,
         "axis_index": args.axis_index,
+        "beam_uvw": list(args.beam) if args.beam is not None else None,
     }
 
 
@@ -92,24 +105,72 @@ def build_atoms(profile, cfg, rng):
     return random_string_atoms(profile, cfg, rng)
 
 
-def crystal_atoms(profile, cfg, rng):
-    """Diamond-structure Si with (110) planes containing the beam ``[1, -1, n]``.
+def _lattice_matrix(crystal):
+    return np.array(_direct_lattice_vectors(CRYSTALS[crystal]["lattice"]))
 
-    Orthogonal cell rows ``[1 1 0]`` (x, plane normal), ``[n -n -2]`` (y) and
-    ``[1 -1 n]`` (z, beam), in cubic lattice units. The beam is an
-    ``n``-indexed in-plane direction, far from low-index axes for large
-    ``n``. Atoms keep the lattice's row correlations; each configuration
-    displaces every atom by an isotropic Gaussian of ``a^2 = B/8 pi^2`` per
-    axis (Einstein model).
+
+def beam_direction(profile, cfg):
+    """Beam ``[uvw]`` (direct-lattice indices): ``--beam``, else Si's ``[1, -1, n]``."""
+    if cfg.get("beam_uvw") is not None:
+        return np.array(cfg["beam_uvw"], dtype=int)
+    if profile.crystal == "silicon" and tuple(profile.hkl) == (1, 1, 0):
+        return np.array([1, -1, cfg["axis_index"]])
+    raise SystemExit("--beam is required outside Si (110)")
+
+
+def orthogonal_rows(profile, beam, search=None):
+    """Shortest direct-lattice rows ``x`` (along -g), ``y`` and ``z = beam``, mutually orthogonal.
+
+    ``x`` points along ``-g`` because ``planar_profile`` places an atom at
+    ``x = -hkl.R d``; ``y = z cross x`` keeps the frame right-handed. A
+    hexagonal cell with irrational ``c/a`` has such rows only for a few
+    beams (e.g. any basal direction in the ``(001)`` planes).
+    """
+    if int(np.dot(profile.hkl, beam)) != 0:
+        raise SystemExit(f"beam {beam.tolist()} does not lie in the {profile.hkl} planes")
+    lattice = _lattice_matrix(profile.crystal)
+    # The row normal to the beam grows with the beam indices (a hexagonal
+    # basal [u, v, 0] needs [2v - u, v - 2u, 0]).
+    search = search or max(24, 3 * int(np.abs(beam).max()))
+    axis = np.arange(-search, search + 1)
+    grid = np.stack(np.meshgrid(axis, axis, axis, indexing="ij"), -1).reshape(-1, 3)
+    grid = grid[np.any(grid != 0, axis=1)]
+    cart = grid @ lattice
+    lengths = np.linalg.norm(cart, axis=1)
+    z = beam @ lattice
+    x_dir = -profile.normal
+    y_dir = np.cross(z, x_dir) / np.linalg.norm(z)
+    rows = []
+    for direction in (x_dir, y_dir):
+        cosine = cart @ direction / lengths
+        hits = np.flatnonzero(np.abs(cosine - 1.0) < 1e-9)
+        if hits.size == 0:
+            raise SystemExit(
+                f"no lattice vector within |index| <= {search} along {direction}: "
+                "no periodic orthogonal cell for this plane and beam"
+            )
+        rows.append(grid[hits[np.argmin(lengths[hits])]])
+    rows.append(beam)
+    return np.array(rows), lattice
+
+
+def crystal_atoms(profile, cfg, rng):
+    """Oriented catalog crystal with the beam along an in-plane direction ``[uvw]``.
+
+    Orthogonal cell rows from :func:`orthogonal_rows`: ``x`` along the plane
+    normal, ``z`` along the beam. A high-index beam keeps atom strings along
+    ``z`` incoherent (planar, not axial, channeling). Atoms keep the lattice's
+    row correlations; each configuration displaces every atom by a Gaussian
+    with the profile's per-element Cartesian covariance (Einstein model),
+    rotated into the cell frame.
     """
     from ase import Atoms
 
-    if tuple(profile.hkl) != (1, 1, 0) or profile.crystal != "silicon":
-        raise SystemExit("the crystal model is implemented for Si (110)")
-    n = cfg["axis_index"]
-    rows = np.array([[1, 1, 0], [n, -n, -2], [1, -1, n]], dtype=float)
-    lattice = float(CRYSTALS["silicon"]["lattice"]["a"])
-    lengths = lattice * np.linalg.norm(rows, axis=1)
+    beam = beam_direction(profile, cfg)
+    rows, lattice = orthogonal_rows(profile, beam)
+    row_cart = rows @ lattice
+    lengths = np.linalg.norm(row_cart, axis=1)
+    unit = row_cart / lengths[:, None]
     periods_per_cell = int(round(lengths[0] / profile.period_ang))
     if cfg["n_cells"] % periods_per_cell:
         raise SystemExit(f"--cells must be a multiple of {periods_per_cell} for the crystal model")
@@ -118,19 +179,21 @@ def crystal_atoms(profile, cfg, rng):
         1,
         int(np.ceil(cfg["thickness_ang"] / lengths[2])),
     )
-    basis = np.array([position for _, position in CRYSTALS["silicon"]["basis"]], dtype=float)
+    basis = CRYSTALS[profile.crystal]["basis"]
+    elements = np.array([element for element, _ in basis])
+    fractions = np.array([position for _, position in basis], dtype=float)
     # Integer lattice translations covering the orthogonal cell.
     span = int(np.abs(rows).sum(axis=0).max()) + 1
     grid = np.stack(np.meshgrid(*[np.arange(-span, span + 1)] * 3, indexing="ij"), -1).reshape(
         -1, 3
     )
-    fractional = (grid[:, None, :] + basis[None, :, :]).reshape(-1, 3)
+    fractional = (grid[:, None, :] + fractions[None, :, :]).reshape(-1, 3)
+    labels = np.tile(elements, grid.shape[0])
     # Coordinates along the orthogonal axes, as fractions of each cell length.
-    unit = rows / np.linalg.norm(rows, axis=1)[:, None]
-    cart = fractional @ unit.T * lattice / lengths
+    cart = (fractional @ lattice) @ unit.T / lengths
     inside = np.all((cart >= -1e-9) & (cart < 1 - 1e-9), axis=1)
-    cell_positions = cart[inside] * lengths
-    expected = int(round(len(basis) * np.prod(lengths) / lattice**3))
+    cell_positions, cell_labels = cart[inside] * lengths, labels[inside]
+    expected = int(round(len(basis) * abs(np.linalg.det(rows))))
     if len(cell_positions) != expected:
         raise SystemExit(f"orthogonal cell holds {len(cell_positions)} atoms, expected {expected}")
     shifts = (
@@ -138,19 +201,31 @@ def crystal_atoms(profile, cfg, rng):
         * lengths
     )
     positions = (shifts[:, None, :] + cell_positions[None, :, :]).reshape(-1, 3)
+    symbols = np.tile(cell_labels, shifts.shape[0])
     extent = lengths * np.array(repeat)
-    positions = positions[positions[:, 2] < cfg["thickness_ang"]]
-    sigma = np.sqrt(profile.b_factors_ang2["Si"] / (8.0 * np.pi**2))
-    positions = positions + sigma * rng.standard_normal(positions.shape)
+    keep = positions[:, 2] < cfg["thickness_ang"]
+    positions, symbols = positions[keep], symbols[keep]
+    for element in np.unique(symbols):
+        mask = symbols == element
+        covariance = unit @ _site_covariance(profile, element) @ unit.T
+        factor = np.linalg.cholesky(covariance)
+        positions[mask] += rng.standard_normal((int(mask.sum()), 3)) @ factor.T
     positions[:, :2] %= extent[:2]
     # Displacements may push entrance/exit atoms just outside the slab.
     positions[:, 2] = np.clip(positions[:, 2], 0.0, np.nextafter(cfg["thickness_ang"], 0.0))
     return Atoms(
-        symbols=["Si"] * len(positions),
+        symbols=symbols.tolist(),
         positions=positions,
         cell=[extent[0], extent[1], cfg["thickness_ang"]],
         pbc=True,
     )
+
+
+def _site_covariance(profile, element):
+    """Cartesian displacement covariance [angstrom^2] in the catalog lattice frame."""
+    if profile.covariances_ang2 is not None:
+        return profile.covariances_ang2[element]
+    return profile.b_factors_ang2[element] / (8.0 * np.pi**2) * np.eye(3)
 
 
 def random_string_atoms(profile, cfg, rng):
@@ -168,6 +243,8 @@ def random_string_atoms(profile, cfg, rng):
     width, depth = cfg["extent_y_ang"], cfg["thickness_ang"]
     symbols, positions = [], []
     for element, xs in sites.items():
+        if profile.thermal_projected:
+            raise SystemExit("the random-string model is isotropic only")
         sigma = np.sqrt(profile.b_factors_ang2[element] / (8.0 * np.pi**2))
         count = int(round(areal * width * depth))
         for x0 in xs:
@@ -217,7 +294,7 @@ def run(args) -> int:
     import abtem
 
     cfg = _config(args)
-    profile = planar_profile("silicon", tuple(args.hkl), args.temperature)
+    profile = planar_profile(args.crystal, tuple(args.hkl), args.temperature)
     gamma, _ = longitudinal_kinematics(args.energy)
     sigma_check = check_interaction_constant(args.energy)
     orders, vectors = bloch_basis(profile, gamma, args.cells, args.orders)
@@ -270,26 +347,31 @@ def compare(args) -> int:
     cfg = json.loads(configs.pop())
     populations = np.concatenate([f["populations"] for f in files])
     depth = files[0]["depth_ang"]
-    mean = populations.mean(axis=0)
-    sem = populations.std(axis=0, ddof=1) / np.sqrt(populations.shape[0])
-    profile = planar_profile("silicon", tuple(cfg["hkl"]), cfg["temperature_K"])
+    profile = planar_profile(cfg.get("crystal", "silicon"), tuple(cfg["hkl"]), cfg["temperature_K"])
     kernel = tds_kernel(
-        profile, cfg["energy_eV"], n_cells=cfg["n_cells"], max_order=cfg["max_order"]
+        profile,
+        cfg["energy_eV"],
+        n_cells=cfg["n_cells"],
+        max_order=cfg["max_order"],
+        beam_uvw=beam_direction(profile, cfg) if cfg["model"] == "crystal" else None,
     )
     solver = DensityMatrixSolver(profile, cfg["energy_eV"], kernel, margin_eV=1e9)
     step = depth[1] - depth[0]
     dz = step / max(1, int(np.ceil(step / args.dz)))
     result = solver.propagate(depth[-1], dz, record_every=int(round(step / dz)))
     bands = min(args.bands, result.band_populations.shape[1])  # the solver reports bound bands
-    ours = result.band_populations[:, :bands]
-    theirs = mean[:, :bands]
-    error = sem[:, :bands]
+    groups = degenerate_groups(solver.basis.energies[0], bands, args.merge_eV)
+    ours = np.stack([result.band_populations[:, g].sum(axis=1) for g in groups], axis=1)
+    grouped = np.stack([populations[:, :, g].sum(axis=2) for g in groups], axis=2)
+    theirs = grouped.mean(axis=0)
+    error = grouped.std(axis=0, ddof=1) / np.sqrt(grouped.shape[0])
     z_score = (ours - theirs) / np.maximum(error, 1e-12)
     report = {
         "check": "abtem_channeling_oracle",
         "config": cfg,
         "configurations": int(populations.shape[0]),
         "depth_ang": depth.tolist(),
+        "band_groups": [g.tolist() for g in groups],
         "abtem_bands": theirs.tolist(),
         "abtem_sem": error.tolist(),
         "pyrite_bands": ours.tolist(),
@@ -315,11 +397,32 @@ def compare(args) -> int:
     return 0
 
 
+def degenerate_groups(energies_eV, bands, merge_eV):
+    """Index groups of the lowest ``bands`` states, merging gaps below ``merge_eV``.
+
+    States split by less than ``merge_eV`` dephase only over ``hbar v / dE``,
+    far beyond the oracle depth, and their individual eigenvectors are an
+    arbitrary gauge choice when the split is numerical (e.g. mirror-related
+    wells), so only the group population is comparable. A group that
+    straddles ``bands`` is kept whole.
+    """
+    energies = np.asarray(energies_eV, dtype=float)
+    groups, start = [], 0
+    while start < min(bands, energies.size):
+        stop = start + 1
+        while stop < energies.size and energies[stop] - energies[stop - 1] < merge_eV:
+            stop += 1
+        groups.append(np.arange(start, stop))
+        start = stop
+    return groups
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     go = sub.add_parser("run", help="propagate frozen configurations and project them")
     go.add_argument("--energy", type=float, default=16.92e6)
+    go.add_argument("--crystal", default="silicon", help="catalog crystal with thermal rows")
     go.add_argument("--hkl", type=int, nargs=3, default=(1, 1, 0))
     go.add_argument("--temperature", type=float, default=293.15)
     go.add_argument("--cells", type=int, default=8)
@@ -336,12 +439,26 @@ def main(argv=None) -> int:
     )
     go.add_argument("--model", choices=("crystal", "random-string"), default="crystal")
     go.add_argument(
-        "--axis-index", type=int, default=7, help="beam [1, -1, n] for the crystal model"
+        "--axis-index", type=int, default=7, help="Si (110) beam [1, -1, n] without --beam"
+    )
+    go.add_argument(
+        "--beam",
+        type=int,
+        nargs=3,
+        default=None,
+        metavar=("U", "V", "W"),
+        help="in-plane beam [uvw] for the crystal model (required outside Si (110))",
     )
     go.add_argument("--out", type=Path, required=True)
     cmp_ = sub.add_parser("compare", help="merge configuration files and compare with PyRITE")
     cmp_.add_argument("files", nargs="+", type=Path)
     cmp_.add_argument("--bands", type=int, default=6)
+    cmp_.add_argument(
+        "--merge-eV",
+        type=float,
+        default=1e-3,
+        help="sum states split by less than this [eV] (degenerate gauge)",
+    )
     cmp_.add_argument("--dz", type=float, default=25.0)
     cmp_.add_argument(
         "--tolerance",

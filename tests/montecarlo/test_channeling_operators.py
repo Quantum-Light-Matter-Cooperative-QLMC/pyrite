@@ -8,15 +8,24 @@ import xraydb
 from scipy import integrate
 
 from pyrite.materials.atomic import Z_TABLE
-from pyrite.materials.channeling import longitudinal_kinematics, planar_profile
-from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, M_E_EV
+from pyrite.materials.channeling import (
+    ChannelingDataError,
+    longitudinal_kinematics,
+    planar_profile,
+)
+from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, M_E_EV, _direct_lattice_vectors
 from pyrite.montecarlo.channeling import (
     decoherence_rate,
     electronic_channels,
     electronic_kernel,
     tds_kernel,
 )
-from pyrite.montecarlo.channeling.operators import _site_densities
+from pyrite.montecarlo.channeling.operators import (
+    _kinematics,
+    _site_densities,
+    _tds_diagonal,
+    _transverse_covariances,
+)
 from pyrite.montecarlo.transport.shell_gos import (
     shell_gos_moments,
     windowed_shell_gos_moments,
@@ -282,3 +291,118 @@ def test_tds_decoherence_rate_matches_cell_kernel(si110):
         expected = kernel.diagonal_coefficients[0].real - np.diagonal(cells[j]).real.mean()
         got = decoherence_rate(si110, ENERGY_EV, [j * si110.period_ang]).tds[0]
         assert got == pytest.approx(expected, rel=1e-3)
+
+
+# ---- anisotropic TDS (#535) -------------------------------------------------
+
+MOS2_TILTED = ((1, 0, 1), (0, 1, 0))  # plane and beam with an S_xy cross term
+
+
+@pytest.fixture(scope="module")
+def mos2_tilted():
+    return planar_profile("mos2", MOS2_TILTED[0], 295.0)
+
+
+def _uniaxial_block(element, normal, y):
+    # Independent of the profile: S_ij = u_b delta_ij + (u_c - u_b)(c.e_i)(c.e_j).
+    u_b, u_c = {"Mo": (0.0048, 0.0077), "S": (0.0038, 0.0049)}[element]
+    cx, cy = normal[2], y[2]  # catalog frame: c along z
+    return (u_b + (u_c - u_b) * cx**2, (u_c - u_b) * cx * cy, u_b + (u_c - u_b) * cy**2)
+
+
+def test_transverse_covariance_follows_plane_and_beam(mos2_tilted):
+    basal = planar_profile("mos2", (0, 0, 1), 295.0)
+    # Basal planes: x = c and the basal block is isotropic, so no beam is needed.
+    got = _transverse_covariances(basal)
+    assert got["Mo"] == pytest.approx((0.0077, 0.0, 0.0048), abs=1e-15)
+    assert got["S"] == pytest.approx((0.0049, 0.0, 0.0038), abs=1e-15)
+    prism = planar_profile("mos2", (1, 0, 0), 295.0)
+    with pytest.raises(ChannelingDataError, match="beam_uvw"):
+        _transverse_covariances(prism)
+    with pytest.raises(ValueError, match="parallel"):
+        _transverse_covariances(prism, (2, 1, 0))  # [210] is the (100) normal
+    # Beam along c leaves the basal displacement transverse; a basal beam
+    # exposes u_c along y.
+    along_c = _transverse_covariances(prism, (0, 0, 1))["Mo"]
+    assert along_c == pytest.approx((0.0048, 0.0, 0.0048), abs=1e-15)
+    basal_beam = _transverse_covariances(prism, (1, 2, 0))["Mo"]
+    assert basal_beam == pytest.approx((0.0048, 0.0, 0.0077), abs=1e-15)
+    # Oblique plane: cross term, and S_xx is the profile's plane-normal B.
+    normal = mos2_tilted.normal
+    beam = _direct_lattice_vectors(CRYSTALS["mos2"]["lattice"])[1].copy()  # [010]
+    beam -= normal * (beam @ normal)
+    y = np.cross(normal, beam / np.linalg.norm(beam))
+    got = _transverse_covariances(mos2_tilted, MOS2_TILTED[1])
+    for element in ("Mo", "S"):
+        assert got[element] == pytest.approx(_uniaxial_block(element, normal, y), rel=1e-12)
+        assert got[element][0] == pytest.approx(
+            mos2_tilted.b_factors_ang2[element] / (8 * np.pi**2)
+        )
+        assert abs(got[element][1]) > 1e-4 * got[element][0]
+
+
+def test_anisotropic_tds_kernel_is_positive_and_matches_decoherence(mos2_tilted):
+    plane, beam = MOS2_TILTED
+    with pytest.raises(ChannelingDataError, match="beam_uvw"):
+        tds_kernel(mos2_tilted, ENERGY_EV, **SMALL)
+    kernel = tds_kernel(mos2_tilted, ENERGY_EV, n_cells=8, max_order=24, beam_uvw=beam)
+    for block in kernel.momentum_kernel:
+        np.testing.assert_allclose(block, block.conj().T, atol=1e-15)
+        assert np.linalg.eigvalsh(block).min() > -1e-12 * np.abs(block).max()
+    # Position-space route of the jump kernel (with the +-q_y average) against
+    # the Bessel-series Gamma of decoherence_rate.
+    cells = kernel.cell_kernel(80)
+    for j in (1, 2):
+        expected = kernel.diagonal_coefficients[0].real - np.diagonal(cells[j]).real.mean()
+        got = decoherence_rate(mos2_tilted, ENERGY_EV, [j * mos2_tilted.period_ang], beam_uvw=beam)
+        assert got.tds[0] == pytest.approx(expected, rel=1e-3)
+
+
+@pytest.mark.parametrize(
+    ("delta", "reference"), [(0.3, 1.9416176e-4), (1.0, 2.1518548e-4), (5.0, 2.1392400e-4)]
+)
+def test_anisotropic_decoherence_rate_matches_polar_quadrature(mos2_tilted, delta, reference):
+    # Reference: direct 2D polar quadrature of (1/(2 pi hbar v)^2) sum_s n_s
+    # int d^2q v^2 (1 - e^{-q.S.q})(1 - cos(q_x Delta)) (2048 angles, 40-node
+    # Gauss panels in |q|), no Bessel series; written for #535, not fresh context.
+    got = decoherence_rate(mos2_tilted, ENERGY_EV, [delta], beam_uvw=MOS2_TILTED[1])
+    assert got.tds[0] == pytest.approx(reference, rel=2e-5)
+
+
+def test_anisotropic_mean_loss_depends_only_on_eigenvalues(mos2_tilted):
+    # G = 0: C(x, x) averages v(|q|)^2 (1 - e^{-q.S.q}) over the plane, which is
+    # invariant under rotating S; the G != 0 harmonics are not.
+    hbar_v = _kinematics(ENERGY_EV)
+    sites = _site_densities(mos2_tilted, 4)
+    tilted = _transverse_covariances(mos2_tilted, MOS2_TILTED[1])
+    rotated = {}
+    for element, (sxx, sxy, syy) in tilted.items():
+        low, high = np.linalg.eigvalsh([[sxx, sxy], [sxy, syy]])
+        rotated[element] = (high, 0.0, low)
+    a = _tds_diagonal(mos2_tilted, sites, tilted, hbar_v, 4)
+    b = _tds_diagonal(mos2_tilted, sites, rotated, hbar_v, 4)
+    assert a[0].real == pytest.approx(b[0].real, rel=1e-6)
+    assert abs(a[1] / b[1] - 1.0) > 1e-3
+
+
+def test_anisotropic_tds_recovers_isotropic_limit(si110):
+    # A vanishing tilted anisotropy through the cross-term path converges to
+    # the isotropic Si kernel at first order.
+    a2 = si110.b_factors_ang2["Si"] / (8 * np.pi**2)
+    c = np.array([1.0, 2.0, 0.5]) / np.linalg.norm([1.0, 2.0, 0.5])
+    reference = tds_kernel(si110, ENERGY_EV, **SMALL)
+    for eps in (1e-3, 1e-4):
+        profile = replace(
+            si110,
+            thermal_projected=True,
+            covariances_ang2={"Si": a2 * (np.eye(3) + eps * np.outer(c, c))},
+        )
+        kernel = tds_kernel(profile, ENERGY_EV, beam_uvw=(1, -1, 1), **SMALL)
+        error = np.abs(kernel.momentum_kernel - reference.momentum_kernel).max()
+        assert error < 2.0 * eps * np.abs(reference.momentum_kernel).max()
+        assert kernel.diagonal_coefficients[:4] == pytest.approx(
+            reference.diagonal_coefficients[:4], rel=2.0 * eps
+        )
+        rate = decoherence_rate(profile, ENERGY_EV, [0.5, 3.0], beam_uvw=(1, -1, 1))
+        base = decoherence_rate(si110, ENERGY_EV, [0.5, 3.0])
+        assert rate.tds == pytest.approx(base.tds, rel=2.0 * eps)

@@ -104,6 +104,30 @@ def test_packaged_conduction_band_keys_resolve_to_bundled_crystals_or_media():
         assert key in catalog.crystals or key in catalog.media, key
 
 
+def test_diamond_valence_oscillator_keeps_two_core_electrons():
+    # Bhattacharya et al. (2025), doi:10.1038/s41467-024-55353-0:
+    # the undoped control has a bulk valence plasmon at approximately 34 eV.
+    band = so.load_conduction_bands()["diamond"]
+    assert band.resonance_eV == 34.0
+    assert band.electrons_per_formula == 4.0
+    assert band.formula == {6: 1.0}
+    # Minimal C shell fixture: test the valence/core partition and logarithmic
+    # sum rule independently of fetched atomic-shell reference data.
+    shells = {
+        6: (
+            _shell(6, 1, "K", "1s1/2", 2, 284.0),
+            _shell(6, 2, "L1", "2s1/2", 2, 19.39),
+            _shell(6, 3, "L2", "2p1/2", 2, 11.26),
+        )
+    }
+    result = so.build_shell_oscillators({6: 1.0}, 81.0, 38.0, shells, band)
+    valence, core = result.oscillators
+    assert (valence.strength, valence.resonance_energy_eV) == (4.0, 34.0)
+    assert (core.atomic_number, core.label, core.strength) == (6, "K", 2.0)
+    assert sum(o.strength for o in result.oscillators) == 6.0
+    assert _closure(result) == pytest.approx(6.0 * np.log(81.0), rel=1e-12)
+
+
 def test_conduction_band_cache_keeps_caller_mutations_and_file_edits_isolated(tmp_path):
     path = tmp_path / "bands.toml"
     contents = """[fixture]

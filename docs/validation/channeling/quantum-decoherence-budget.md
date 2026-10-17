@@ -195,3 +195,12 @@ Every number in the research note's Si(110) and diamond(110) tables matches the 
 ## Verdict
 
 `rederived`. The closed forms (a)–(d) re-derive term by term. `decoherence_rate` implements them, and the TDS branch agrees with an independent quadrature to $\le1.2\times10^{-5}$ after the lattice-constant offset. Findings 1–6 are wording and notes corrections, not formula discrepancies. No anchor test exists (the row's `Anchor` is empty), so `anchored` is not supported.
+
+## Material-input update (#525)
+
+The source-to-code derivation above records the original #501 calculation.
+The current check uses the diamond 34 eV valence input instead of the former
+graphite surrogate; its equations are unchanged. Refreshed numerical results
+and source scope are in the [material survey](../../research/physics/channeling-materials.md)
+and [diamond verification](diamond-valence-oscillator.md). The original
+surrogate numbers in this historical verification are not current predictions.

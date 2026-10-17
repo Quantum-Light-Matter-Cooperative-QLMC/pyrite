@@ -91,6 +91,58 @@ def test_ineligible_crystal_is_refused():
         planar_profile("hopg", (0, 0, 1))
 
 
+# ---- uniaxial layered rows (cr-uniaxial-thermal-projection) -----------------
+
+
+def test_mos2_basal_profile_has_sandwich_wells():
+    profile = planar_profile("mos2", (0, 0, 1), 293.15)
+    c = CRYSTALS["mos2"]["lattice"]["c"]
+    # 2H stacking extincts odd 00l: true period is c/2, one S-Mo-S sandwich.
+    assert profile.period_ang == pytest.approx(c / 2)
+    assert profile.thermal_projected
+    assert profile.b_factors_ang2["Mo"] == pytest.approx(8 * np.pi**2 * 0.0077)
+    x = np.linspace(0.0, profile.period_ang, 4096, endpoint=False)
+    u = profile.potential(x)
+    minima = x[(u < np.roll(u, 1)) & (u < np.roll(u, -1))]
+    # Wells on the S (z = 0.121, 0.379) and Mo (z = 0.25) planes.
+    np.testing.assert_allclose(minima, np.array([0.121, 0.25, 0.379]) * c, atol=0.01)
+    # The global maximum (barrier) is in the van der Waals gap at the cell edge.
+    assert x[np.argmax(u)] < 0.05 * c or x[np.argmax(u)] > 0.45 * c
+
+
+def test_mos2_prismatic_profile_uses_basal_displacement():
+    profile = planar_profile("mos2", (1, 0, 0), 293.15)
+    a = CRYSTALS["mos2"]["lattice"]["a"]
+    assert profile.period_ang == pytest.approx(a * np.sqrt(3) / 2)
+    assert profile.b_factors_ang2 == pytest.approx(
+        {"Mo": 8 * np.pi**2 * 0.0048, "S": 8 * np.pi**2 * 0.0038}
+    )
+
+
+def test_mos2_prismatic_extinctions_and_cutoff_convergence():
+    a = CRYSTALS["mos2"]["lattice"]["a"]
+    # (110) planes of the hexagonal cell repeat every a/2.
+    assert planar_profile("mos2", (1, 1, 0), 295.0).period_ang == pytest.approx(a / 2)
+    for hkl in ((0, 0, 1), (1, 0, 0), (1, 0, 1)):
+        full = planar_profile("mos2", hkl, 295.0)
+        cut = planar_profile("mos2", hkl, 295.0, s_max_inv_ang=4.0)
+        assert np.subtract(*full.extrema()) == pytest.approx(np.subtract(*cut.extrema()), abs=0.01)
+
+
+def test_mos2_basal_bound_states_converge_and_scale_as_sqrt_gamma():
+    # The 66 eV, c/2-wide basal well binds ~33 states at 40 MeV, so the
+    # plane-wave basis must exceed the bound count: the default 32 orders
+    # undercount above ~40 MeV (51 instead of 65 at 160 MeV).
+    profile = planar_profile("mos2", (0, 0, 1), 295.0)
+    counts = []
+    for energy in (40e6, 160e6):
+        gamma, _ = longitudinal_kinematics(energy)
+        pair = [transverse_states(profile, gamma, n_plane_waves=m).n_bound for m in (64, 96)]
+        assert abs(pair[1] - pair[0]) <= 1
+        counts.append(pair[1])
+    assert counts == [33, 65]
+
+
 # ---- planar potential (cr-planar-continuum-potential, cr-mott-bethe-factor) --
 
 

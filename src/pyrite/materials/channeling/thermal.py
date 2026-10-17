@@ -12,6 +12,12 @@ tabulated range.
 Data live in the packaged ``channeling_thermal.toml``, keyed by catalog crystal
 and element. Crystals without an entry are ineligible for channeling profiles
 (ADR-0018); the catalog scalar ``B_ang2`` used by PXR/CBS is not consulted.
+
+Layered hexagonal crystals carry :class:`UniaxialThermalSite` rows instead: a
+single-temperature measurement of the mean-square displacement in the basal
+plane and along ``c``. They have no isotropic ``B`` and no temperature model;
+the static potential uses their plane-normal projection and thermal diffuse
+scattering their full covariance (#535).
 """
 
 from __future__ import annotations
@@ -100,6 +106,85 @@ class ThermalSite:
         return debye_b_factor(t, self.atomic_weight, theta)
 
 
+@dataclass(frozen=True)
+class UniaxialThermalSite:
+    """Single-temperature uniaxial thermal displacement of one element.
+
+    The Cartesian covariance is ``diag(u_basal, u_basal, u_c)`` with ``c``
+    along the hexagonal axis, as site symmetry requires for an element whose
+    sites are all symmetry-equivalent on a 3-, 4- or 6-fold axis. The row
+    holds at ``temperature_K +- tolerance_K`` only; it is never extrapolated
+    (ADR-0018: no Debye curve from a single refinement).
+
+    Attributes
+    ----------
+    crystal, element
+        Catalog crystal key and element symbol.
+    atomic_weight
+        Atomic weight on the 12C = 12 scale.
+    temperature_K, tolerance_K
+        Measurement temperature [K] and the admissible half-window [K].
+    u_basal_ang2, u_c_ang2
+        Mean-square displacement ``<u^2>`` along one basal axis and along
+        ``c`` [angstrom^2].
+    source, doi
+        Provenance of the values.
+    """
+
+    crystal: str
+    element: str
+    atomic_weight: float
+    temperature_K: float
+    tolerance_K: float
+    u_basal_ang2: float
+    u_c_ang2: float
+    source: str
+    doi: str
+
+    def __post_init__(self) -> None:
+        values = (self.temperature_K, self.u_basal_ang2, self.u_c_ang2)
+        if min(values) <= 0.0 or self.tolerance_K < 0.0:
+            raise ChannelingDataError(
+                f"{self.crystal}.{self.element}: temperature and displacements must be "
+                "positive and tolerance non-negative"
+            )
+
+    def _check_temperature(self, temperature_K: float) -> None:
+        t = float(temperature_K)
+        if abs(t - self.temperature_K) > self.tolerance_K:
+            raise ChannelingDataError(
+                f"{self.crystal}.{self.element}: thermal row holds only at "
+                f"{self.temperature_K:g} +- {self.tolerance_K:g} K, not {t:g} K"
+            )
+
+    def b_factor_along(self, cos2_c: float, temperature_K: float) -> float:
+        """Return ``B = 8 pi^2 n.U.n`` [angstrom^2] along a unit direction ``n``.
+
+        ``cos2_c`` is the squared cosine between ``n`` and ``c``, so
+        ``n.U.n = u_basal (1 - cos2_c) + u_c cos2_c``.
+
+        Validation: cr-uniaxial-thermal-projection
+        """
+        self._check_temperature(temperature_K)
+        if not 0.0 <= cos2_c <= 1.0 + 1e-12:
+            raise ValueError("cos2_c must lie in [0, 1]")
+        c2 = min(float(cos2_c), 1.0)
+        return 8.0 * np.pi**2 * (self.u_basal_ang2 * (1.0 - c2) + self.u_c_ang2 * c2)
+
+    def covariance(self, c_axis, temperature_K: float) -> np.ndarray:
+        """Return the Cartesian covariance ``U = u_b I + (u_c - u_b) c c^T`` [angstrom^2].
+
+        ``c_axis`` is the hexagonal axis in the Cartesian frame of the result;
+        it is normalized here.
+
+        Validation: cr-uniaxial-thermal-projection
+        """
+        self._check_temperature(temperature_K)
+        c = np.asarray(c_axis, dtype=float)
+        c = c / np.linalg.norm(c)
+        return self.u_basal_ang2 * np.eye(3) + (self.u_c_ang2 - self.u_basal_ang2) * np.outer(c, c)
+
+
 def debye_integral(y):
     """Return the Debye integral ``phi(y) = (1/y) * int_0^y x / (exp(x) - 1) dx``.
 
@@ -185,13 +270,29 @@ def fit_debye_temperature(B_ang2, temperature_K, atomic_weight):
     )
 
 
+AnyThermalSite = ThermalSite | UniaxialThermalSite
+
+
 @lru_cache(maxsize=4)
-def _load(path: Path) -> dict[tuple[str, str], ThermalSite]:
+def _load(path: Path) -> dict[tuple[str, str], AnyThermalSite]:
     with path.open("rb") as handle:
         raw = tomllib.load(handle)
-    sites = {}
+    sites: dict[tuple[str, str], AnyThermalSite] = {}
     for crystal, elements in raw.items():
         for element, row in elements.items():
+            if row.get("model") == "uniaxial_c":
+                sites[crystal, element] = UniaxialThermalSite(
+                    crystal=crystal,
+                    element=element,
+                    atomic_weight=float(row["atomic_weight"]),
+                    temperature_K=float(row["temperature_K"]),
+                    tolerance_K=float(row["tolerance_K"]),
+                    u_basal_ang2=float(row["u_basal_ang2"]),
+                    u_c_ang2=float(row["u_c_ang2"]),
+                    source=str(row["source"]),
+                    doi=str(row["doi"]),
+                )
+                continue
             sites[crystal, element] = ThermalSite(
                 crystal=crystal,
                 element=element,
@@ -204,12 +305,12 @@ def _load(path: Path) -> dict[tuple[str, str], ThermalSite]:
     return sites
 
 
-def load_thermal_sites(path: Path | None = None) -> dict[tuple[str, str], ThermalSite]:
+def load_thermal_sites(path: Path | None = None) -> dict[tuple[str, str], AnyThermalSite]:
     """Return packaged thermal sites keyed by ``(crystal, element)``."""
     return dict(_load(Path(path) if path is not None else THERMAL_DATA_PATH))
 
 
-def thermal_site(crystal: str, element: str, path: Path | None = None) -> ThermalSite:
+def thermal_site(crystal: str, element: str, path: Path | None = None) -> AnyThermalSite:
     """Return one crystal/element thermal site or raise ``ChannelingDataError``."""
     sites = load_thermal_sites(path)
     try:
@@ -225,6 +326,15 @@ def thermal_site(crystal: str, element: str, path: Path | None = None) -> Therma
 def thermal_b_factor(crystal: str, element: str, temperature_K: float) -> float:
     """Return the Debye-model ``B(T)`` [angstrom^2] for one site of a crystal.
 
+    Raises ``ChannelingDataError`` for a uniaxial row, which has no isotropic
+    ``B``.
+
     Validation: cr-debye-b-of-t
     """
-    return thermal_site(crystal, element).b_factor(temperature_K)
+    site = thermal_site(crystal, element)
+    if isinstance(site, UniaxialThermalSite):
+        raise ChannelingDataError(
+            f"{crystal}.{element}: anisotropic thermal row has no isotropic B; "
+            "only the planar-potential projection supports it (#535)"
+        )
+    return site.b_factor(temperature_K)

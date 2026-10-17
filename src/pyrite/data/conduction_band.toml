@@ -13,6 +13,17 @@ basis = "maximum of the REELS-derived optical energy-loss function (0.1 eV grid)
 source = "L. H. Yang et al., Phys. Rev. B 100, 245209 (2019)"
 doi = "10.1103/PhysRevB.100.245209"
 
+# The effective valence oscillator is present even in an insulator. It does
+# not represent free conduction electrons or the doped sample's sub-eV mode.
+# Validation: diamond-valence-oscillator
+[diamond]
+formula = { C = 1 }
+electrons_per_formula = 4
+resonance_eV = 34.0
+basis = "approximately 34 eV bulk valence plasmon in the undoped HPHT diamond control; Results, Experimental measurements of the dielectric response of BDD, and Supplementary Fig. 2; the boron-doped sub-0.5 eV intervalence mode is excluded; one effective oscillator within the existing PENELOPE model, not a measured full momentum-dependent GOS"
+source = "S. Bhattacharya et al., Nature Communications 16, 444 (2025); publisher full text read for issue #525"
+doi = "10.1038/s41467-024-55353-0"
+
 [sio2]
 formula = { Si = 1, O = 2 }
 electrons_per_formula = 16
