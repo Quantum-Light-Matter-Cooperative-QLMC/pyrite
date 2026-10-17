@@ -1,0 +1,26 @@
+# Capabilities and maturity
+
+This inventory describes available paths and their limits, using the maintained
+model references below. **Available does not mean validated:** the generated
+[validation summary](../validation/status-summary.md) reports evidence and human
+sign-off separately; the [domain inventories](../validation/domain-inventories.md)
+link each claim to its authoritative ledger record.
+
+| Model or effect | Availability | Scope and limits | Model and evidence |
+|---|---|---|---|
+| Elastic electron scattering and collision stopping | Default | Independent electron flights; ELSEPA elastic tables and SBETHE material stopping. Upstream beamline transport and space charge are excluded. | [Electron transport](beam-transport/electron-transport.md); [transport evidence](../validation/ledger-transport-background.md) |
+| Shell soft/hard inelastic events | Conditional default | Automatic selection requires covered shell data for every layer and the supported transport configuration. Other cases use continuous loss; missing required reference tables raise. | [Selection and supported paths](beam-transport/shell-soft-hard-transport.md#configuration); [shell evidence](../validation/beam-transport/shell-soft-hard-transport.md) |
+| Secondary electrons | Opt-in | Shell-collision secondaries use generation-based transport with explicit tracking thresholds and resource limits. Coherent spectra with secondary transport are refused. | [Secondary electron transport](beam-transport/shell-soft-hard-transport.md#secondary-electron-transport); [secondary evidence](../validation/beam-transport/shell-secondary-transport.md) |
+| Pair conversion and positron transport | Opt-in | Coupled hard-photon cascades can create pairs; positron transport requires its own tables and explicit selection. This is not general photon multiple-scattering transport. | [Pair conversion](radiation-physics/hard-bremsstrahlung-events.md#pair-conversion-of-hard-photons), [positrons](beam-transport/positron-transport.md); [transport ledger](../validation/ledger-transport-background.md) |
+| PXR and CBS lines | Default | First-order kinematic emission. Physical flights and electrons normally add as intensities; dynamical diffraction is excluded. | [Coherent radiation](radiation-physics/coherent-radiation.md); [coherent-physics evidence](../validation/ledger-core-coherent-physics.md) |
+| Trajectory and bunch coherence | Opt-in | Phased tracking preserves trajectory phase and uses sampled bunch form factors; consumer restrictions apply. | [Coherent-emission tracking](radiation-physics/coherent-emission.md); [coherence evidence](../validation/radiation-physics/coherent-emission.md) |
+| Bremsstrahlung and characteristic radiation | Default, with data-dependent backend | BremsLib is preferred when installed; otherwise bremsstrahlung warns and falls back to EEDL. Characteristic lines are a separate incoherent component. | [Bremsstrahlung](radiation-physics/bremsstrahlung.md), [characteristic radiation](radiation-physics/characteristic-radiation.md); [radiation evidence](../validation/ledger-transport-background.md) |
+| Planar quantum channeling | Opt-in, bounded run integration | Fixed-count runs, native continuation, persisted additive spectra and line recompute are supported. The zone solve and radiation source run on CPU; native continuation can use CUDA. Adaptive precision, capture/block transport and several combined physics/geometry modes are refused. Consult the current run-surface restrictions before enabling it. | [Architecture and implemented outcomes](../adr/0018-quantum-channeling-zone.md#run-surfaces-521); [channeling evidence](../validation/ledger-channeling.md) |
+| Axial channeling and vortex inputs | Experimental diagnostic | Bounded diagnostic solvers and app views; no standard run integration. Experimental checks do not establish general predictive accuracy. | [Axial evidence](../validation/channeling/cr-axial-2d-eigenproblem.md), [real-space propagation](../validation/channeling/cr-axial-realspace-propagation.md); [diagnostic workflow](../guides/axial-diagnostics.md) |
+| Photon escape and detector response | Default source escape; downstream response | Straight-ray attenuation and passive bulk dispersion. Detector acceptance, efficiency and measured-energy redistribution follow source scoring; general photon scattering, interface optics and feedback on electrons are excluded from this escape model. | [Photon escape](radiation-physics/photon-escape-and-dispersion.md), [detector response](detectors/detector-response.md); [detector evidence](../validation/ledger-detector-forward-models.md) |
+| Transition radiation | Omitted, observable-dependent bounds | Bounds apply to stated observables and regimes; omission is not a claim of universal negligibility. | [Omission and escalation rules](radiation-physics/transition-radiation.md); [detected omission bound](../validation/radiation-physics/tr-detected-omission-bound.md) |
+
+Research designs may describe later tiers alongside implemented outcomes. Use
+the linked run-surface restrictions for execution support, and the ledger for
+the evidence behind a numerical claim. No maturity label in this table promotes
+a ledger status or replaces formal human sign-off.

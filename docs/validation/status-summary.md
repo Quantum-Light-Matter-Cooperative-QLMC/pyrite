@@ -2,9 +2,11 @@
 
 # Validation status summary
 
-Compact generated view of the [detailed validation ledger] (physics-validation-ledger.md). Regenerate with `pyrite-dev validation-ledger --write` after editing detailed records.
+Compact generated view of the [detailed validation ledger](physics-validation-ledger.md). Regenerate with `pyrite-dev validation-ledger --write` after editing detailed records.
 
 **Publication gate:** 0 / 225 claims signed off.
+
+Formal sign-off requires human review of each claim. Independent derivations, automated checks and experimental comparisons provide evidence; none alone confers sign-off.
 
 ## Latest automated evidence
 

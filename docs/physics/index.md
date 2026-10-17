@@ -4,6 +4,16 @@ This section documents the physical models, assumptions, conventions, and numeri
 
 These pages describe **how the simulated physical system is represented**. For evidence that a model or implementation reproduces analytic results, literature values, external calculations, or independent derivations, see the [physics validation](../validation/index.md) section.
 
+The [capability matrix](capabilities.md) distinguishes default models, opt-in
+paths, experimental diagnostics and omitted effects. Implementation availability
+is separate from [validation status](../validation/status-summary.md).
+
+```{toctree}
+:hidden:
+
+capabilities
+```
+
 ## Model at a glance
 
 ### Beam and electron transport
@@ -16,7 +26,9 @@ These pages describe **how the simulated physical system is represented**. For e
 
 - Phase-specific crystal structures, complex atomic form factors, isotropic Debye--Waller factors, and selected or catalog-pinned reflection families define the reciprocal-space couplings. Optional Gaussian mosaicity uses either analytic broadening or incoherent orientation quadrature; see [Crystal structure](materials/crystal-structure.md), [Structure factor](materials/structure-factor.md), [Reflection selection](materials/reflection-selection.md), and [Crystal mosaicity](materials/crystal-mosaicity.md).
 - The electron field couples to the crystal susceptibility as PXR; the periodic screened potential drives CBS. Their amplitudes interfere within each polarization, while distinct polarizations, reflections, mosaic orientations, and crystalline layers add as intensities; see [Coherent PXR and CBS radiation](radiation-physics/coherent-radiation.md).
-- The line kernel is first-order and kinematic. Each numerical transport row uses one representative velocity and finite-flight sinc factor. CSDA may subdivide one collision-free flight to update energy and clock; those substep fields are grouped before the flight intensity is formed. Dynamical diffraction and electron channeling are excluded.
+- The line kernel is first-order and kinematic. Each numerical transport row uses one representative velocity and finite-flight sinc factor. CSDA may subdivide one collision-free flight to update energy and clock; those substep fields are grouped before the flight intensity is formed. Dynamical diffraction is excluded. A separate opt-in planar channeling zone
+  supports bounded run integration; axial channeling remains an experimental
+  diagnostic. See the [capability matrix](capabilities.md) for restrictions.
 - Distinct physical flights and electrons add as intensities by default. This is a random-phase/independent-emission approximation, not collision-induced decoherence. The optional phased tracking policy preserves phase across each electron trajectory and blends inter-electron terms through sampled bunch form factors; see [Coherent-emission tracking](radiation-physics/coherent-emission.md). An opt-in profile key adds the line arrival-time intensity $I(t)=|E(t)|^2$; see [Temporal intensity profile](radiation-physics/temporal-intensity-profile.md).
 
 ### Incoherent emission

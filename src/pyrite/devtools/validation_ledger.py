@@ -186,9 +186,11 @@ def render_status_summary(
             "",
             "# Validation status summary",
             "",
-            "Compact generated view of the [detailed validation ledger] (physics-validation-ledger.md). Regenerate with `pyrite-dev validation-ledger --write` after editing detailed records.",
+            "Compact generated view of the [detailed validation ledger](physics-validation-ledger.md). Regenerate with `pyrite-dev validation-ledger --write` after editing detailed records.",
             "",
             f"**Publication gate:** {signed} / {len(entries)} claims signed off.",
+            "",
+            "Formal sign-off requires human review of each claim. Independent derivations, automated checks and experimental comparisons provide evidence; none alone confers sign-off.",
             "",
             "## Latest automated evidence",
             "",
@@ -219,7 +221,7 @@ def render_domain_inventories(entries: tuple[LedgerEntry, ...]) -> str:
         "",
         "# Validation domain inventories",
         "",
-        "Generated browsing views of every claim in the [detailed validation ledger] (physics-validation-ledger.md). The detailed record remains authoritative.",
+        "Generated browsing views of every claim in the [detailed validation ledger](physics-validation-ledger.md). The detailed record remains authoritative.",
         "",
     ]
     for domain, domain_entries in domains.items():

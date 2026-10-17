@@ -17,9 +17,11 @@ natively.
 The longer-term goal is a general-purpose electron transport and radiation
 toolkit for 1 keV–100 MeV electrons, with native GPU acceleration, arbitrary
 source, target, and detector geometries, and extensible physics. Against the
-FORTRAN-based PENELOPE and the C++-based Geant4, PyRITE trades maturity for a
-lower barrier to entry: it is plain Python, fast, and easy to extend. Electron
-channeling in crystals below 100 MeV is under investigation.
+FORTRAN-based PENELOPE and the `C++`-based Geant4, PyRITE trades maturity for a
+lower barrier to entry: it is plain Python, fast, and easy to extend. Opt-in
+planar channeling has a bounded run integration; axial channeling remains an
+experimental diagnostic. See the [capability matrix](docs/physics/capabilities.md)
+for supported paths and limitations.
 
 - Source: <https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite>
 - Documentation: <https://pyrite.readthedocs.io/en/latest/>
@@ -244,11 +246,12 @@ per-segment PXR + CBS, incoherent bremsstrahlung, and characteristic lines →
 photon escape → detector scoring.
 
 - **[Electron transport](docs/physics/beam-transport/electron-transport.md):**
-  independent piecewise-linear flights with explicit elastic collisions and
-  condensed energy loss; deterministic by default, with optional Urban
-  straggling. Elastic collisions sample ELSEPA partial-wave cross sections;
-  collision stopping uses material-level SBETHE tables. Beamline space charge
-  and secondary electrons are not modeled.
+  independent piecewise-linear flights with explicit elastic collisions.
+  Shell soft/hard inelastic collisions are the default where shell data covers
+  every layer; other cases use continuous loss with optional Urban straggling.
+  Elastic collisions sample ELSEPA partial-wave cross sections; collision
+  stopping uses material-level SBETHE tables. Secondary electron transport is
+  opt-in; upstream beamline transport and space charge are excluded.
 - **[Crystal source](docs/physics/materials/structure-factor.md):**
   phase-specific structures, complex atomic form factors, Debye-Waller factors,
   selected reflections, and optional mosaicity define the reciprocal-space
@@ -260,7 +263,8 @@ photon escape → detector scoring.
   subdivided to resolve CSDA energy and clock evolution; each segment uses one
   representative velocity. The in-medium Bragg resonance is
   $\omega = (\mathbf v\cdot\mathbf g)/[1 - \mathrm{Re}\lbrace n(\omega)\rbrace\,\hat{\mathbf n}\cdot\mathbf v]$.
-  Dynamical diffraction and electron channeling are not modeled.
+  Dynamical diffraction is excluded. The separate opt-in planar channeling
+  path and its restrictions are listed in the [capability matrix](docs/physics/capabilities.md).
 - **[Incoherent continuum](docs/physics/radiation-physics/bremsstrahlung.md):**
   the default is the direction-resolved BremsLib v2.0 double-differential cross
   section (`pyrite tables fetch bremslib`). Without those tables, a run warns
