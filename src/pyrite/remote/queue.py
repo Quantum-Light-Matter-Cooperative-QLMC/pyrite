@@ -1,6 +1,7 @@
 """Remote profile and validation queue submission."""
 
 import math
+from dataclasses import dataclass
 
 from ..console import dashboard as presentation
 from . import config, scripts, state, transport
@@ -39,6 +40,148 @@ def _profile_jobid(catalog_profile):
     while f"{catalog_profile}-{suffix}" in existing:
         suffix += 1
     return f"{catalog_profile}-{suffix}"
+
+
+@dataclass(frozen=True)
+class _ProfilingModes:
+    """Cache and profiling options of one queue submission, validated together."""
+
+    performance_profile: str | None = None
+    performance_repetitions: int = 1
+    performance_interval: float = 5.0
+    spec_chunk: int | None = None
+    brem_chunk: int | None = None
+    nsys: bool = False
+    cpu: bool = False
+    cpu_only: bool = False
+    no_cache: bool = False
+    recompute: bool = False
+    py_spy: bool = False
+
+    @property
+    def job_local_artifacts(self):
+        """Profiling-only submissions whose checkpoints are not pulled back."""
+        return self.performance_repetitions > 1 or self.nsys or self.cpu or self.cpu_only
+
+    def validate(self, *, chunked, parallel_materials, materials):
+        """Refuse invalid combinations before any remote probe or write."""
+        self._validate_profile_requirements()
+        self._validate_exclusions(chunked)
+        self._validate_allocation(chunked, parallel_materials, materials)
+
+    def _validate_profile_requirements(self):
+        repetitions = self.performance_repetitions
+        if (
+            not isinstance(repetitions, int)
+            or isinstance(repetitions, bool)
+            or not 1 <= repetitions <= 20
+        ):
+            raise SystemExit("performance repetitions must be an integer from 1 to 20")
+        if self.performance_interval <= 0:
+            raise SystemExit("performance interval must be greater than zero")
+        if self.performance_profile is None and (
+            repetitions != 1
+            or self.performance_interval != 5.0
+            or self.spec_chunk is not None
+            or self.brem_chunk is not None
+            or self.nsys
+            or self.py_spy
+            or self.cpu
+            or self.cpu_only
+        ):
+            raise SystemExit(
+                "performance repetitions, interval, chunk pins, nsys, and CPU profiling "
+                "require a performance profile"
+            )
+
+    def _validate_exclusions(self, chunked):
+        if self.cpu and self.cpu_only:
+            raise SystemExit("cpu and cpu-only modes are mutually exclusive")
+        if self.no_cache and self.recompute:
+            raise SystemExit("no-cache and recompute modes are mutually exclusive")
+        if self.cpu_only and self.nsys:
+            raise SystemExit("cpu-only mode cannot be combined with nsys")
+        if self.py_spy:
+            self._validate_py_spy(chunked)
+        if self.cpu_only and self.performance_repetitions != 1:
+            raise SystemExit("cpu-only mode cannot use performance repetitions")
+        if self.cpu_only and self.performance_interval != 5.0:
+            raise SystemExit("cpu-only mode cannot set the performance sampling interval")
+        if self.cpu_only and (self.spec_chunk is not None or self.brem_chunk is not None):
+            raise SystemExit("cpu-only mode cannot set GPU chunk pins")
+
+    def _validate_py_spy(self, chunked):
+        if self.nsys or self.cpu_only:
+            raise SystemExit("py-spy cannot be combined with nsys or cpu-only mode")
+        if chunked:
+            raise SystemExit("py-spy requires a monolithic allocation")
+        if self.performance_repetitions != 1:
+            raise SystemExit("py-spy requires exactly one performance repetition")
+
+    def _validate_allocation(self, chunked, parallel_materials, materials):
+        single_process = parallel_materials in (None, 1)
+        if self.performance_repetitions > 1 and chunked:
+            raise SystemExit("performance repetitions require a monolithic allocation")
+        if self.performance_repetitions > 1 and not single_process:
+            raise SystemExit("performance repetitions require one material process per GPU")
+        if self.nsys:
+            _validate_nsys_allocation(
+                chunked=chunked,
+                repetitions=self.performance_repetitions,
+                single_process=single_process,
+                materials=materials,
+            )
+        if (self.cpu or self.cpu_only) and chunked:
+            raise SystemExit("CPU profiling requires a monolithic allocation")
+        if chunked and parallel_materials is not None:
+            raise SystemExit(
+                "--parallel-materials only applies to a monolithic allocation; "
+                "pass --chunk-minutes 0 to use it"
+            )
+
+
+def _validate_nsys_allocation(*, chunked, repetitions, single_process, materials):
+    if chunked:
+        raise SystemExit("nsys requires a monolithic allocation")
+    if repetitions != 1:
+        raise SystemExit("nsys requires exactly one performance repetition")
+    if not single_process:
+        raise SystemExit("nsys requires one material process per GPU")
+    if len(materials) != 1:
+        raise SystemExit("nsys requires exactly one material")
+    if config.remote_gpu_vendor() != "nvidia":
+        raise SystemExit("nsys requires an NVIDIA target (remote.gpu_vendor=nvidia)")
+
+
+def _trajectory_capture_options(trajectories, overwrite_trajectories, modes):
+    """Resolve opt-in trajectory capture to its remote root and script options."""
+    if trajectories is None:
+        if overwrite_trajectories:
+            raise SystemExit("overwrite-trajectories requires trajectories")
+        return None, {}
+    from .trajectories import capture_root
+
+    try:
+        trajectories = capture_root(trajectories)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+    if modes.cpu_only or modes.performance_repetitions > 1:
+        raise SystemExit("trajectory capture excludes CPU-only and repeated profiling")
+    return trajectories, {
+        "trajectories": trajectories,
+        "overwrite_trajectories": overwrite_trajectories,
+    }
+
+
+def _queue_jobid(catalog_profile, dry_run):
+    if catalog_profile == "standard":
+        return scripts._new_jobid()
+    # a profile submit is named after the profile: readable, and the same
+    # handle stop/pull --profile already take. One live job per profile.
+    if dry_run:
+        return catalog_profile  # preview only; no remote existence probe
+    _refuse_if_profile_live(catalog_profile)
+    return _profile_jobid(catalog_profile)
 
 
 def start_queue(
@@ -98,96 +241,27 @@ def start_queue(
     transport._check_shell_tokens(
         [catalog_profile, *([performance_profile] if performance_profile is not None else [])]
     )
-    capture_options = {}
-    if trajectories is not None:
-        from .trajectories import capture_root
-
-        try:
-            trajectories = capture_root(trajectories)
-        except ValueError as error:
-            raise SystemExit(str(error)) from error
-        if cpu_only or performance_repetitions > 1:
-            raise SystemExit("trajectory capture excludes CPU-only and repeated profiling")
-        capture_options = {
-            "trajectories": trajectories,
-            "overwrite_trajectories": overwrite_trajectories,
-        }
-    elif overwrite_trajectories:
-        raise SystemExit("overwrite-trajectories requires trajectories")
+    modes = _ProfilingModes(
+        performance_profile=performance_profile,
+        performance_repetitions=performance_repetitions,
+        performance_interval=performance_interval,
+        spec_chunk=spec_chunk,
+        brem_chunk=brem_chunk,
+        nsys=nsys,
+        cpu=cpu,
+        cpu_only=cpu_only,
+        no_cache=no_cache,
+        recompute=recompute,
+        py_spy=py_spy,
+    )
+    trajectories, capture_options = _trajectory_capture_options(
+        trajectories, overwrite_trajectories, modes
+    )
     chunked = chunk_minutes > 0
-    if (
-        not isinstance(performance_repetitions, int)
-        or isinstance(performance_repetitions, bool)
-        or not 1 <= performance_repetitions <= 20
-    ):
-        raise SystemExit("performance repetitions must be an integer from 1 to 20")
-    if performance_interval <= 0:
-        raise SystemExit("performance interval must be greater than zero")
-    if performance_profile is None and (
-        performance_repetitions != 1
-        or performance_interval != 5.0
-        or spec_chunk is not None
-        or brem_chunk is not None
-        or nsys
-        or py_spy
-        or cpu
-        or cpu_only
-    ):
-        raise SystemExit(
-            "performance repetitions, interval, chunk pins, nsys, and CPU profiling "
-            "require a performance profile"
-        )
-    if cpu and cpu_only:
-        raise SystemExit("cpu and cpu-only modes are mutually exclusive")
-    if no_cache and recompute:
-        raise SystemExit("no-cache and recompute modes are mutually exclusive")
-    if cpu_only and nsys:
-        raise SystemExit("cpu-only mode cannot be combined with nsys")
-    if py_spy and (nsys or cpu_only):
-        raise SystemExit("py-spy cannot be combined with nsys or cpu-only mode")
-    if py_spy and chunked:
-        raise SystemExit("py-spy requires a monolithic allocation")
-    if py_spy and performance_repetitions != 1:
-        raise SystemExit("py-spy requires exactly one performance repetition")
-    if cpu_only and performance_repetitions != 1:
-        raise SystemExit("cpu-only mode cannot use performance repetitions")
-    if cpu_only and performance_interval != 5.0:
-        raise SystemExit("cpu-only mode cannot set the performance sampling interval")
-    if cpu_only and (spec_chunk is not None or brem_chunk is not None):
-        raise SystemExit("cpu-only mode cannot set GPU chunk pins")
-    if performance_repetitions > 1 and chunked:
-        raise SystemExit("performance repetitions require a monolithic allocation")
-    if performance_repetitions > 1 and parallel_materials not in (None, 1):
-        raise SystemExit("performance repetitions require one material process per GPU")
-    if nsys and chunked:
-        raise SystemExit("nsys requires a monolithic allocation")
-    if nsys and performance_repetitions != 1:
-        raise SystemExit("nsys requires exactly one performance repetition")
-    if nsys and parallel_materials not in (None, 1):
-        raise SystemExit("nsys requires one material process per GPU")
-    if nsys and len(materials) != 1:
-        raise SystemExit("nsys requires exactly one material")
-    if nsys and config.remote_gpu_vendor() != "nvidia":
-        raise SystemExit("nsys requires an NVIDIA target (remote.gpu_vendor=nvidia)")
-    if (cpu or cpu_only) and chunked:
-        raise SystemExit("CPU profiling requires a monolithic allocation")
-    if chunked and parallel_materials is not None:
-        raise SystemExit(
-            "--parallel-materials only applies to a monolithic allocation; "
-            "pass --chunk-minutes 0 to use it"
-        )
+    modes.validate(chunked=chunked, parallel_materials=parallel_materials, materials=materials)
     if not dry_run and not cpu_only:
         _refuse_if_busy(materials, quick)
-    if catalog_profile != "standard":
-        # a profile submit is named after the profile: readable, and the same
-        # handle stop/pull --profile already take. One live job per profile.
-        if not dry_run:
-            _refuse_if_profile_live(catalog_profile)
-            jobid = _profile_jobid(catalog_profile)
-        else:
-            jobid = catalog_profile  # preview only; no remote existence probe
-    else:
-        jobid = scripts._new_jobid()
+    jobid = _queue_jobid(catalog_profile, dry_run)
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     stems = (
         []
@@ -251,42 +325,39 @@ def start_queue(
         )
         time_limit = config.SLURM_TIME
     workers_per_material = config.SLURM_CPUS_PER_MATERIAL if workers is None else max(1, workers)
-    cpus_per_task = workers_per_material * (parallel_materials or 1)
     script = scripts._slurm_batch_script(
         jobid,
         payload,
         job_name=f"pyrite-{jobid}",
         reservation_stems=stems,
         time_limit=time_limit,
-        cpus_per_task=cpus_per_task,
+        cpus_per_task=workers_per_material * (parallel_materials or 1),
         chunked=chunked,
     )
-    upload = scripts._write_job_script_command(
-        jobdir,
-        scripts._queue_metadata(
-            jobid,
-            materials,
-            quick,
-            workers,
-            parallel_materials,
-            chunk_minutes,
-            fidelity,
-            high_energy_min_kev,
-            catalog_profile,
-            performance_profile,
-            performance_repetitions,
-            performance_interval,
-            spec_chunk,
-            brem_chunk,
-            nsys,
-            cpu,
-            cpu_only,
-            no_cache,
-            recompute,
-            py_spy=py_spy,
-            **capture_options,
-        ),
+    metadata = scripts._queue_metadata(
+        jobid,
+        materials,
+        quick,
+        workers,
+        parallel_materials,
+        chunk_minutes,
+        fidelity,
+        high_energy_min_kev,
+        catalog_profile,
+        performance_profile,
+        performance_repetitions,
+        performance_interval,
+        spec_chunk,
+        brem_chunk,
+        nsys,
+        cpu,
+        cpu_only,
+        no_cache,
+        recompute,
+        py_spy=py_spy,
+        **capture_options,
     )
+    upload = scripts._write_job_script_command(jobdir, metadata)
     submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)
 
     if dry_run:
@@ -303,7 +374,28 @@ def start_queue(
     # which produces a CRLF run.sh that bash silently refuses to execute.
     _stage_job_script(jobid, stems, upload, script)
     scheduler_id = _submit_staged_job(jobid, stems, nice=chunked)
+    print(
+        f"\nJOB {jobid} · SUBMITTED\n"
+        + presentation.format_fields(
+            _submission_fields(
+                jobid=jobid,
+                scheduler_id=scheduler_id,
+                materials=materials,
+                metadata=metadata,
+                catalog_profile=catalog_profile,
+                stems=stems,
+                trajectories=trajectories,
+                modes=modes,
+            )
+        )
+    )
+    return jobid
 
+
+def _submission_fields(
+    *, jobid, scheduler_id, materials, metadata, catalog_profile, stems, trajectories, modes
+):
+    """Rows of the post-submission summary: identity, mode, and follow-up commands."""
     # A profile submit pulls by profile, not by a wall of hash-qualified stems
     # nobody can type; pull --profile resolves each member's MATERIAL@PROFILE
     # checkpoint remotely.
@@ -312,77 +404,36 @@ def start_queue(
         if catalog_profile != "standard"
         else f"pyrite remote pull {' '.join(stems)}"
     )
-    print(
-        f"\nJOB {jobid} · SUBMITTED\n"
-        + presentation.format_fields(
-            [
-                ("SLURM", scheduler_id),
-                ("Host", config.remote_host()),
-                ("Materials", ", ".join(materials)),
-                (
-                    "Mode",
-                    presentation.mode_summary(
-                        scripts._queue_metadata(
-                            jobid,
-                            materials,
-                            quick,
-                            workers,
-                            parallel_materials,
-                            chunk_minutes,
-                            fidelity,
-                            high_energy_min_kev,
-                            catalog_profile,
-                            performance_profile,
-                            performance_repetitions,
-                            performance_interval,
-                            spec_chunk,
-                            brem_chunk,
-                            nsys,
-                            cpu,
-                            cpu_only,
-                            no_cache,
-                            recompute,
-                        )
-                    ),
-                ),
-                *(
-                    [
-                        ("Trajectories", trajectories),
-                        (
-                            "Capture pull",
-                            f"pyrite remote trajectories --root {config.shell_word(trajectories)} pull STEM --yes",
-                        ),
-                    ]
-                    if trajectories is not None
-                    else []
-                ),
-                ("Monitor", f"pyrite remote job attach {jobid}"),
-                ("Status", f"pyrite remote job status {jobid} -vv"),
-                ("Logs", f"pyrite remote job logs {jobid}"),
-                *(
-                    [
-                        (
-                            "Performance",
-                            f"pyrite remote performance pull {performance_profile}",
-                        )
-                    ]
-                    if performance_profile is not None
-                    else []
-                ),
-                *(
-                    [
-                        (
-                            "Checkpoints",
-                            "job-local profiling artifacts; no automatic checkpoint pull",
-                        )
-                    ]
-                    if performance_repetitions > 1 or nsys or cpu or cpu_only
-                    else [("Pull", f"{pull_hint}  (after completion)")]
-                ),
-            ]
+    fields = [
+        ("SLURM", scheduler_id),
+        ("Host", config.remote_host()),
+        ("Materials", ", ".join(materials)),
+        ("Mode", presentation.mode_summary(metadata)),
+    ]
+    if trajectories is not None:
+        fields += [
+            ("Trajectories", trajectories),
+            (
+                "Capture pull",
+                f"pyrite remote trajectories --root {config.shell_word(trajectories)} pull STEM --yes",
+            ),
+        ]
+    fields += [
+        ("Monitor", f"pyrite remote job attach {jobid}"),
+        ("Status", f"pyrite remote job status {jobid} -vv"),
+        ("Logs", f"pyrite remote job logs {jobid}"),
+    ]
+    if modes.performance_profile is not None:
+        fields.append(
+            ("Performance", f"pyrite remote performance pull {modes.performance_profile}")
         )
-    )
-    return jobid
+    if modes.job_local_artifacts:
+        fields.append(
+            ("Checkpoints", "job-local profiling artifacts; no automatic checkpoint pull")
+        )
+    else:
+        fields.append(("Pull", f"{pull_hint}  (after completion)"))
+    return fields
 
 
 def start_zhai_queue(

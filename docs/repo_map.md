@@ -538,6 +538,7 @@ Headless sweep driver: build cases → `run_sweep` → checkpoint; owns `--no-ca
 - Compatibility: `_ProgressTimer` and `_write_progress_record` re-export the neutral `pyrite._progress` implementations.
 - Deps: `_progress`, `config`, `run`, `sweep`.
 - `runs/_trajectory_capture.py` builds the opt-in `--trajectories` capture (root, overwrite, profile scene, provenance) for `scan.py`.
+- `runs/_material_progress.py` holds `_run_material`'s `run_sweep` callback state (`MaterialProgress`: progress file, dashboard job record, performance-logger context) and starts the `--performance-profile` logger.
 
 ### `runs/observe.py`
 Library producer for one persisted pixel-detector observation: `produce_observation(scene, numerics, store)` reuses a stored observation without transport when `api.observation_plan(...).find_reusable` matches its true-spatial identity, rescoring only response/acquisition/normalization; otherwise it runs `api.simulate` and stores the result.
