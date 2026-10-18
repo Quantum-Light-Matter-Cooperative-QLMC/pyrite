@@ -42,9 +42,11 @@ class CatalogDraft:
         return translate_catalog_text(tomlkit.dumps(self.document), canonical=True)
 
     def diff(self):
+        """Unified diff in canonical vocabulary, so legacy spellings are not noise."""
+        current = translate_catalog_text(self.original, canonical=True)
         return "".join(
             difflib.unified_diff(
-                translate_catalog_text(self.original, canonical=True).splitlines(True),
+                translate_catalog_text(current, canonical=True).splitlines(True),
                 self.serialize().splitlines(True),
                 "catalog (current)",
                 "catalog (proposed)",

@@ -99,3 +99,84 @@ def merge_pixel_detector(table, *, geometry, scorer=None, response=None, acquisi
             section.pop("seed", None)
         for key, value in acquisition.items():
             section[key] = _toml_value(value)
+
+
+def acquisition_changes(values):
+    """Typed acquisition option values to TOML keys; reject conflicting reporting bins."""
+    edges = values["measured_edges_ev"]
+    uniform = values["measured_range_ev"], values["measured_bin_width_ev"]
+    native = values.get("reporting_bins")
+    if native is not None and (edges is not None or any(item is not None for item in uniform)):
+        raise ValueError("--reporting-bins native conflicts with explicit measured bins")
+    if edges is not None and any(item is not None for item in uniform):
+        raise ValueError(
+            "use --measured-edges-ev or --measured-range-ev with --measured-bin-width-ev, not both"
+        )
+    if (uniform[0] is None) != (uniform[1] is None):
+        raise ValueError("--measured-range-ev and --measured-bin-width-ev go together")
+    if edges is not None and any(
+        right <= left for left, right in zip(edges, edges[1:], strict=False)
+    ):
+        raise ValueError("--measured-edges-ev must be strictly increasing")
+    if edges is not None and len(edges) < 2:
+        raise ValueError("--measured-edges-ev needs at least two edges")
+    if values["realization"] == "expected" and values["realization_seed"] is not None:
+        raise ValueError("--realization-seed applies only to --realization poisson")
+    changes = {}
+    if native is not None:
+        changes["reporting_bins"] = native
+    if values["exposure_s"] is not None:
+        changes["exposure_s"] = values["exposure_s"]
+    if edges is not None:
+        changes["measured_edges_eV"] = list(edges)
+    if uniform[0] is not None:
+        minimum, maximum = uniform[0]
+        changes.update(
+            measured_min_eV=minimum, measured_max_eV=maximum, measured_bin_width_eV=uniform[1]
+        )
+    if values["hit_threshold_ev"] is not None:
+        changes["hit_threshold_eV"] = values["hit_threshold_ev"]
+    if values["realization"] is not None:
+        changes["mode"] = values["realization"]
+    if values["realization_seed"] is not None:
+        changes["seed"] = values["realization_seed"]
+    return changes
+
+
+def pixel_changes(values):
+    """Split option-keyed typed values into (geometry, scorer, response, acquisition).
+
+    ``values`` uses the ``pyrite detector`` option names (``None`` when unset), so
+    the CLI and the terminal editor stage identical patches.
+    """
+    geometry = {
+        key: values[key]
+        for key in (
+            "distance_mm",
+            "polar_deg",
+            "azimuth_deg",
+            "roll_deg",
+            "offset_mm",
+            "shape",
+            "pitch_mm",
+        )
+        if values[key] is not None
+    }
+    scorer = {
+        key: values[key] for key in ("reconstruction", "angular_shape") if values[key] is not None
+    }
+    response = {
+        key: values[option]
+        for key, option in (
+            ("kind", "response"),
+            ("thickness_um", "timepix_thickness_um"),
+            ("bias_v", "timepix_bias_v"),
+            ("dE_mc", "timepix_input_bin_ev"),
+            ("dE_out", "timepix_output_bin_ev"),
+            ("n_mc", "timepix_samples"),
+            ("seed", "timepix_seed"),
+        )
+        if values[option] is not None
+    }
+    acquisition = acquisition_changes(values)
+    return geometry, scorer, response, acquisition

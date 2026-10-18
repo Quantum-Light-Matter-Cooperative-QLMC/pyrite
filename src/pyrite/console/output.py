@@ -270,14 +270,14 @@ class _CSV(click.ParamType):
         return value if self.preserve_text else values
 
     def _fail_domain(self, param, ctx):
-        if self.lower == 0 and self.lower_open and self.upper is None:
-            self.fail(f"{self.label} values must be finite and positive", param, ctx)
-        relation = "<=" if self.upper_inclusive else "<"
-        self.fail(
-            f"{self.label} values must satisfy {self.lower:g} <= value {relation} {self.upper:g}",
-            param,
-            ctx,
+        if self.lower == 0 and self.upper is None:
+            sign = "positive" if self.lower_open else "nonnegative"
+            self.fail(f"{self.label} values must be finite and {sign}", param, ctx)
+        lower = "" if self.lower is None else f"{self.lower:g} {'<' if self.lower_open else '<='} "
+        upper = (
+            "" if self.upper is None else f" {'<=' if self.upper_inclusive else '<'} {self.upper:g}"
         )
+        self.fail(f"{self.label} values must satisfy {lower}value{upper}", param, ctx)
 
 
 POSITIVE_INT = FiniteRange(integer=True, minimum=0, minimum_open=True)

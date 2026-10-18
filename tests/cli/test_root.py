@@ -87,4 +87,6 @@ def test_root_help_prefers_grouped_checkpoint_commands(capsys):
         "tables",
         # Added by #397: saved trajectory captures.
         "trajectories",
+        # Added by #553: optional terminal detector editor.
+        "tui",
     }

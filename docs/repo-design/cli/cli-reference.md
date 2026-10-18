@@ -72,6 +72,7 @@ Choose a family for its complete help, options, defaults, and examples.
 - [`pyrite beam`](cli-reference-beam.md) — Manage named beams (``[beams.*]``), attachable to profiles by name.
 - [`pyrite detector`](cli-reference-detector.md) — Manage named detector geometries, attachable to profiles by name.
 - [`pyrite tables`](cli-reference-tables.md) — Inspect generated cross-section tables and external code trees.
+- [`pyrite tui`](cli-reference-tui.md) — Open the terminal detector editor (prototype; needs the tui extra).
 
 ```{toctree}
 :hidden:
@@ -89,6 +90,7 @@ cli-reference-material
 cli-reference-beam
 cli-reference-detector
 cli-reference-tables
+cli-reference-tui
 ```
 
 ## Command tree
@@ -136,6 +138,7 @@ Commands:
   beam          Manage named beams, attachable to profiles by name.
   detector      Manage named detector geometries.
   tables        Inspect generated cross-section tables and external code trees.
+  tui           Edit detectors in a terminal UI (prototype; tui extra).
 ```
 
 ## Command compatibility links
@@ -345,3 +348,4 @@ Existing command fragments remain available below; each link opens the full fami
 - <span id="pyrite-tables-sources-list"></span>[`pyrite tables sources list`](cli-reference-tables.md#pyrite-tables-sources-list)
 - <span id="pyrite-tables-sources-set"></span>[`pyrite tables sources set`](cli-reference-tables.md#pyrite-tables-sources-set)
 - <span id="pyrite-tables-verify"></span>[`pyrite tables verify`](cli-reference-tables.md#pyrite-tables-verify)
+- <span id="pyrite-tui"></span>[`pyrite tui`](cli-reference-tui.md#pyrite-tui)

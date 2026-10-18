@@ -48,11 +48,12 @@ Components (a + b denotes a static import cycle):
   p24: runs
   p25: storage
   p26: transport
-  p27: validation
-  p28: xsgen
+  p27: tui
+  p28: validation
+  p29: xsgen
 Edges (importer -> imported):
   p0 -> p15
-  p0 -> p27
+  p0 -> p28
   p0 -> p5
   p0 -> p7
   p1 -> p13
@@ -65,7 +66,7 @@ Edges (importer -> imported):
   p1 -> p23
   p1 -> p24
   p1 -> p25
-  p1 -> p27
+  p1 -> p28
   p1 -> p3
   p1 -> p4
   p1 -> p7
@@ -84,7 +85,7 @@ Edges (importer -> imported):
   p14 -> p15
   p14 -> p8
   p16 -> p15
-  p16 -> p28
+  p16 -> p29
   p16 -> p7
   p17 -> p14
   p17 -> p16
@@ -108,8 +109,8 @@ Edges (importer -> imported):
   p22 -> p19
   p22 -> p23
   p22 -> p24
-  p22 -> p27
   p22 -> p28
+  p22 -> p29
   p22 -> p3
   p22 -> p4
   p22 -> p7
@@ -124,25 +125,27 @@ Edges (importer -> imported):
   p24 -> p17
   p24 -> p19
   p24 -> p23
-  p24 -> p28
+  p24 -> p29
   p24 -> p3
   p24 -> p4
   p24 -> p7
-  p27 -> p15
-  p27 -> p16
-  p27 -> p3
-  p27 -> p4
   p27 -> p7
   p27 -> p8
   p28 -> p15
+  p28 -> p16
+  p28 -> p3
+  p28 -> p4
   p28 -> p7
+  p28 -> p8
+  p29 -> p15
+  p29 -> p7
   p3 -> p13
   p3 -> p14
   p3 -> p15
   p3 -> p16
   p3 -> p17
   p3 -> p23
-  p3 -> p28
+  p3 -> p29
   p3 -> p6
   p3 -> p8
   p4 -> p15
@@ -157,7 +160,8 @@ Edges (importer -> imported):
   p5 -> p19
   p5 -> p22
   p5 -> p24
-  p5 -> p28
+  p5 -> p27
+  p5 -> p29
   p5 -> p3
   p5 -> p4
   p5 -> p7
@@ -169,7 +173,7 @@ Edges (importer -> imported):
   p9 -> p20
   p9 -> p23
   p9 -> p24
-  p9 -> p27
+  p9 -> p28
   p9 -> p3
   p9 -> p5
   p9 -> p7
@@ -195,6 +199,7 @@ Tests: `tests/optimization/`. Guide: `docs/guides/optimization-studies.md`.
 - **Advanced scientific facades**: `transport/__init__.py` lazily aliases the supported lowered `Case`, trajectory simulation and saved-capture summaries; `radiation/__init__.py` aliases deterministic line energies, three supported spectrum functions and experimental directional sources. No engine moves or numerical changes; existing implementation paths retain compatibility. `DirectionalSpectrum` remains owned by `results.directional`. Contracts and migration: [advanced API](reference/python-api/transport.md#advanced-transport-and-radiation).
 
 - **`pyrite` console script** → `cli:main` (`pyproject.toml [project.scripts]`), lazy Click dispatch for user workflows including `physics` and `numerics`; remote lifecycle is canonical at `remote job`, with the former root `job` hidden through 0.17.0. Retired top-level setup, completion, performance, energy-grid, scan, analyze/export, and flat checkpoint spellings remain hidden compatibility aliases where the D7 registry documents a replacement. Checked user-facing inventory: [CLI reference](repo-design/cli/cli-reference.md).
+- **`pyrite tui`** → `cli.commands.tui` → lazy `tui.detector_app.run`: optional Textual detector editor (prototype). Checks the `tui` extra and an interactive terminal before importing Textual; root and nested help never import it.
 - **`import pyrite`** → `__init__`: lightweight lazy exports for `Beam`, target variants, shared `SubstanceRef`/`RectangularBody` descriptions and `Target`/`Filter` roles, `Detector`, `Scene`, path-addressed `Sweep`, `Physics`, `Numerics`, `CxrReflections`, `Precision`, `Analysis`, `Result`, and `simulate`.
 - **`pyrite.simulate(scene)` / `pyrite.simulate(beam, target, detector, ...)`** → `api:simulate`: lower one scalar scene to the typed `Case`, run it without checkpoint I/O, and return response-free source arrays plus resolved provenance in `Result`.
 - **Opt-in photon aperture** → `_photon_config.PhotonTransport`, `campaign.photon_cases`, `montecarlo.runner.photon_aperture`: lower a scalar physical Scene's selected CPU/CUDA photon source, share its primary rows with directional scoring, and expose the separate `Result.aperture` tally. `_photon_support` owns shared reference identity/preparation; `results.aperture` owns checked checkpoint reconstruction and histogram/current views. Optional `photon.h5` and CAS payloads retain original pins; full artifact replay supports the mode, bounded replay refuses it. Contract: [photon aperture observations](repo-design/compute/photon-aperture.md).
@@ -858,11 +863,20 @@ downloads. Launch: `pyrite app configuration launch` (port 2726). Guide:
 
 `catalog_edit.CatalogDraft` owns explicit-path in-memory drafts, canonical TOML,
 validation, diffs, stale-edit checks and atomic selected-layer saving.
-`detectors.editing` owns detector create/clone/patch and response/acquisition
-merges, shared with profile edits and the typed detector CLI. Neither imports
+`detectors.editing` owns detector create/clone/patch, response/acquisition
+merges and option-keyed `pixel_changes`, shared with profile edits, the typed
+detector CLI and the terminal editor. Neither imports
 Click command modules. `cli.commands.calculation` exposes API-owned
 `physics`/`numerics` views and edits of existing profiles; it creates no preset
 store. See [ADR-0019](adr/0019-cli-configuration-ownership.md).
+
+`tui.detector_form` is the UI-independent form/session model for the optional
+terminal detector editor (#553): fields mirror the typed `detector create`
+options, typed values pass through `detectors.editing` into one `CatalogDraft`,
+and `StagedEdit.cli_commands()` names the equivalent CLI calls. Only
+`tui.detector_app` imports Textual (`tui` extra); the `tui-imports-no-cli`
+import contract keeps both front ends on the shared services. Guide:
+[detector editor](guides/detector-editor.md).
 
 ### `cli/commands/job.py`
 Canonical `pyrite remote job list|status|logs|attach|stop` Click layer. Reuses the remote viewer, JSON envelope, completion, exit, confirmation, and lifecycle owners; normalizes persisted submitter names into the four public job kinds. The former root `job` alias was removed in 0.17.0.

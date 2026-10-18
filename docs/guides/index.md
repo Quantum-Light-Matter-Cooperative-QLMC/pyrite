@@ -60,6 +60,13 @@ experimental-planar-channeling
 experimental-axial-channeling
 transition-radiation-demo
 radiation-diagnostics
+directional-source-heatmap
+analysis-tutorial
+sweep-profiles
+external-catalog
+detector-editor
+adding-materials
+gpt-gdf-beams
 ```
 
 Quantum/channeling examples are **experimental and not rigorously validated**.

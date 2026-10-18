@@ -1,4 +1,4 @@
-"""Install hints for optional runtime extras (``pyrite-mc[plots]``, ``pyrite-mc[apps]``).
+"""Install hints for optional runtime extras (``pyrite-mc[plots]``, ``[apps]``, ``[tui]``).
 
 Availability is probed with :func:`importlib.util.find_spec`, which never imports
 the dependency, so callers can check before paying an import or spawning marimo.
@@ -19,6 +19,7 @@ _PLOTS_MODULES = (
 EXTRA_MODULES: dict[str, tuple[str, ...]] = {
     "plots": _PLOTS_MODULES,
     "apps": ("marimo", "anywidget", "vegafusion", *_PLOTS_MODULES),
+    "tui": ("textual",),
 }
 
 

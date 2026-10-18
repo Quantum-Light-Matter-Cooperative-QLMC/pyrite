@@ -1,4 +1,4 @@
-"""CLI-facing install hints for the optional ``apps``/``plots`` extras."""
+"""CLI-facing install hints for the optional ``apps``/``plots``/``tui`` extras."""
 
 import click
 

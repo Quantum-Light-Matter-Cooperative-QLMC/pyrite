@@ -74,6 +74,7 @@ TEST_SUITE_PATTERNS = {
         "remote/test_click.py",
         "scan/test_scan_*.py",
         "checkpoint/test_slim.py",
+        "tui/test_*.py",
     ),
     # First match owns a module. Keep public-boundary suites above these
     # domains; keep specialized physics before each family catch-all.

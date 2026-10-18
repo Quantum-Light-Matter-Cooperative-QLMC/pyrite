@@ -175,3 +175,13 @@ def test_delete_refuses_referenced_and_removes_orphan(tmp_path, monkeypatch):
     assert_clean_result(deleted)
     assert json.loads(deleted.stdout)["payload"] == {"deleted": "orphan"}
     assert "[detectors.orphan]" not in path.read_text()
+
+
+def test_negative_measured_edge_is_a_usage_error_not_a_traceback():
+    result = invoke(
+        detector.command,
+        ["create", "planar", "chip", "--distance-mm", "1", "--measured-edges-ev", "-1,5"],
+    )
+
+    assert result.exit_code == 2
+    assert "measured edges values must be finite and nonnegative" in result.stderr
