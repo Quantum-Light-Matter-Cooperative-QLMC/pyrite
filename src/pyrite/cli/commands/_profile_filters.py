@@ -4,7 +4,8 @@ import click
 import tomlkit
 from tomlkit.exceptions import ParseError
 
-from pyrite.campaign import profile_edit as _profile_edit
+from pyrite.campaign import profile_filters as _profile_edit
+from pyrite.campaign._profile_document import existing_profile
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli.commands._filter_shared import filter_cli_options, filter_from_row, filter_row
@@ -51,7 +52,7 @@ def filter_add_command(profile_name, dry_run, **values):
 
 
 def _filter_payload(document, profile_name):
-    profile = _profile_edit.existing_profile(document, profile_name)
+    profile = existing_profile(document, profile_name)
     rows = _profile_edit.filter_rows(profile)
     return {
         "profile": profile_name,

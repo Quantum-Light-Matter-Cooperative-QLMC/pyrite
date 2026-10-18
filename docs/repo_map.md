@@ -159,7 +159,7 @@ Edges (importer -> imported):
 - **`pyrite.simulate(beam, target, detector, ...)`** → `api:simulate`: lower one scalar scene to the typed `Case`, run it without checkpoint I/O, and return response-free source arrays plus resolved provenance in `Result`.
 - **`pyrite.photon_energies(materials, beam_energy_eV, ...)`** → `materials.emission:photon_energies`: deterministic vacuum line-centre arrays with paired NumPy broadcasting or Cartesian grids; catalogue cut/reflection resolution, no transport or accelerator initialization.
 - **`pyrite profile ...`** → `cli.commands.profile`: manage named campaign defaults and material membership through `set|add|remove`; an absent membership key means all catalog materials. Bundled demo profiles are read-only; edits write to the user catalog layer. **`pyrite-dev profile ...`** → `devtools.dev_cli:cmd_profile`: the same tree against the bundled catalog for maintaining the shipped demos. **`pyrite-dev beam ...`** and **`pyrite-dev detector ...`** likewise maintain packaged instrument examples; user commands copy them with `create NAME --from SOURCE` and edit the user layer.
-- **`pyrite profile detector list|show|add|set|reset|rm|migrate`** → `cli.commands._profile_detectors` (registered on `profile`): detector collection membership, inline scalar/pixel settings, optional-section resets, and explicit legacy migration, with storage/merge primitives in `campaign/profile_edit.py`. An acquisition makes the profile a counting observation whose projection supersedes the scalar detector for sweeps. **`pyrite profile filter add|set|rm|list|show`** → `cli.commands._profile_filters` (registered on `profile`): edits ordered plates and no longer touches the physical detector. **`pyrite numerics cxr-grid show|set|reset`** → `cli.commands._profile_cxr_grid` (registered on `profile`): the `[profiles.NAME.line_grid_policy]` selectors and the profile's grid-source summary; selector-combination checks shared with `_cxr_grid_policy.check_selector_combination`, edit primitives in `campaign/profile_edit.py`. Settings inventory: `docs/repo-design/profile-settings.md`.
+- **`pyrite profile detector list|show|add|set|reset|rm|migrate`** → `cli.commands._profile_detectors` (registered on `profile`): detector collection membership, inline scalar/pixel settings, optional-section resets, and explicit legacy migration, with storage/merge primitives in `campaign/profile_detectors.py`. An acquisition makes the profile a counting observation whose projection supersedes the scalar detector for sweeps. **`pyrite profile filter add|set|rm|list|show`** → `cli.commands._profile_filters` (registered on `profile`): edits ordered plates and no longer touches the physical detector. **`pyrite numerics cxr-grid show|set|reset`** → `cli.commands._profile_cxr_grid` (registered on `profile`): the `[profiles.NAME.line_grid_policy]` selectors and the profile's grid-source summary; selector-combination checks shared with `_cxr_grid_policy.check_selector_combination`, edit primitives in `campaign/profile_edit.py`. Settings inventory: `docs/repo-design/profile-settings.md`.
 - **`pyrite profile create NAME [--from SOURCE]`** → `cli.commands.profile` and `campaign.profile_edit`: without `--from`, copies packaged `standard` sweep ranges, applicable material overrides, and membership into a new profile; with `--from`, explicitly clones SOURCE except material overrides. Omitted bremsstrahlung grids resolve to the built-in 25 eV default. Omitted detector and physical-detector fields resolve to code defaults and none, respectively.
 - **`pyrite material show MATERIAL`** → `cli.commands.material`: inspect intrinsic composition, density and identity. **`pyrite profile ranges show PROFILE MATERIAL`** inspects effective campaign ranges/overrides; `material show --profile` remains a warning compatibility view. `pyrite material blaze MATERIAL ...` routes to the specialized blazed sweep. Hidden compatibility aliases remain under `pyrite sweep`.
 - **`pyrite material validate [catalog]`** → `cli.commands.check_config:_run`: validate bundled offline catalog or explicit complete catalog without starting simulation; hidden alias: `pyrite check-config`.
@@ -474,10 +474,31 @@ Immutable resolved numerics with value provenance and stable CLI/JSON grouping; 
 - Public: `NumericsResolution`, `NUMERICS_GROUPS`.
 - Deps: `_numerics` (`CHANNELING_KEYS`), standard library.
 
-### `campaign/profile_edit.py`
-Domain operations over parsed catalog documents for profile creation, updates, membership, overrides, detector settings, beam references, emission policy, rename, and deletion. The Click layer owns prompts and persistence; this module owns validation and mutation semantics.
-- Public: intentionally internal to `cli.commands.profile`.
-- Deps: `detectors.spec` (`Detector`), `tomlkit` document/container types; lazy `runs.scan` import for manifest-backed membership groups.
+### Profile authoring (`campaign/profile_*.py`)
+
+Click-free operations over parsed catalog documents. `profile_edit.py` retains
+compatibility exports for existing services and the multi-family profile command;
+new consumers import their operation family. CLI parsing, prompts and persistence
+remain at their existing owners; `catalog_edit.CatalogDraft` provides service
+validation, stale-edit checks and atomic saving.
+
+| Owner | Responsibility |
+|---|---|
+| `_profile_document.py` | Shared document lookup, reference errors, range values and TOML copying |
+| `profile_lifecycle.py` | Packaged creation templates, clone/set, ranges/emission, rename/delete |
+| `profile_membership.py` | Explicit material membership and catalog ordering |
+| `profile_numerics.py` | Numerical controls and coupled transport validation |
+| `profile_precision.py` | Adaptive policy, fixed-count transitions and blockers |
+| `profile_cxr_grid.py` | Line-grid selectors, conflicts and source inspection |
+| `profile_filters.py` | Ordered filter queries and edits |
+| `profile_detectors.py` | Detector storage, attachment, physical edits and explicit migration |
+| `profile_summary.py` | Read-only summary assembly and named/inline detector display resolution |
+
+`profile_detector_entries` selects collection/legacy/default IDs for editing,
+summary and migration without changing storage. Pixel edits reuse
+`detectors.editing.merge_pixel_detector`; summaries project geometry through
+`observation.physical_detector_from_config`. Domain operations import no Click
+command modules.
 
 ### `energy_grid/` (package)
 Photon-energy-grid derivation, bounds analysis, and catalog application (user inspection nests under `pyrite material` and `pyrite profile`). The compact case-grid codec shared by campaign, checkpoints, and Monte Carlo lives below this driver package at `pyrite._energy_grid_encoding`; `encoding.py` is its public compatibility facade.

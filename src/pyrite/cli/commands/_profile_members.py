@@ -1,6 +1,6 @@
 """Material-membership helpers shared by the catalog profile commands."""
 
-from pyrite.campaign import profile_edit as _profile_edit
+from pyrite.campaign import profile_membership as _profile_edit
 
 
 def csv_materials(material_csv):

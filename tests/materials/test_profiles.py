@@ -10,7 +10,7 @@ import pytest
 import tomlkit
 
 from pyrite import DATA_DIR
-from pyrite.campaign import profile_edit, profiles
+from pyrite.campaign import profile_edit, profile_lifecycle, profiles
 from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.profiles import (
     FIDELITY_NAMES,
@@ -1049,7 +1049,7 @@ def test_member_overrides_copies_only_member_rows_without_uniform_brem():
         "E_grid_brem = { arange = { start = 50.0, stop = 40000.0, step = 25.0 } }\n"
     )
     with mock.patch.object(
-        profile_edit, "_packaged_standard", return_value=tomlkit.parse(packaged)
+        profile_lifecycle, "_packaged_standard", return_value=tomlkit.parse(packaged)
     ):
         members = profile_edit.member_overrides(document, {"mote2_product", "hopg"})
         implicit = profile_edit.member_overrides(document, None)

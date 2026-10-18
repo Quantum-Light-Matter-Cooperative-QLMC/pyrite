@@ -1,1165 +1,185 @@
-"""Catalog-profile document queries and mutations.
+"""Compatibility exports for catalog-profile document operations.
 
-This module owns profile semantics over an already parsed materials catalog.
-CLI parsing, prompts, rendering, and atomic persistence remain in
-``pyrite.cli.commands.profile``.
+Operation owners live in the sibling ``profile_*`` modules; summary assembly
+is read-only. CLI parsing, prompts and persistence stay with their existing
+owners. Import a specific family when adding a domain consumer.
 """
 
-import difflib
+from pyrite._numerics import TRANSPORT_KEYS
 
-import tomlkit
-
-from pyrite import DATA_DIR
-from pyrite._cxr_grid_policy import ENVIRONMENT_NAMES as CXR_GRID_ENVIRONMENT_NAMES
-from pyrite._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS, check_selector_combination
-from pyrite._env import env_value
-from pyrite._numerics import (
-    PROFILE_NUMERICS_KEYS,
-    SAMPLING_KEYS,
-    TRANSPORT_KEYS,
-    validate_profile_numerics,
+from ._profile_document import (
+    EXTRA_RANGES,
+    RANGES,
+    beam_rows,
+    catalog_key,
+    clone_grid,
+    detector_rows,
+    display,
+    energy_grid_refs,
+    existing_profile,
+    material_rows,
+    profile_overrides,
+    profile_rows,
+    range_values,
+    unknown_beam,
+    unknown_detector,
+    unknown_profile,
+    values_item,
 )
-from pyrite._precision import (
-    DEFAULT_PRECISION,
-    REQUIRED_FIELDS,
-    Precision,
-    default_precision_fallback,
+from .profile_cxr_grid import (
+    CxrGridPolicyConflict,
+    _check_cxr_grid_policy,
+    cxr_grid_fields,
+    cxr_grid_sources,
+    profile_cxr_grid_values,
+    reset_cxr_grid_policy,
+    set_cxr_grid_policy,
 )
-from pyrite.detectors.editing import _toml_value, merge_pixel_detector
-from pyrite.detectors.spec import Detector
-
-RANGES = {
-    "thickness": "thickness_ang",
-    "energy": "energy_keV",
-    "polar": "tilt_deg",
-    "azimuth": "tilt_azim_deg",
-}
-EXTRA_RANGES = {"ne_line": "n_electrons", "ne_brem": "n_electrons_brem"}
-ACTIVE_DETECTOR_FIELDS = (
-    ("observation_angle_deg", "observation angle", "deg"),
-    ("polar_acceptance_deg", "polar acceptance (full span)", "deg"),
-    ("solid_angle_sr", "solid angle", "sr"),
+from .profile_detectors import (
+    ACTIVE_DETECTOR_FIELDS,
+    PHYSICAL_SECTIONS,
+    _scalar_detector,
+    attach_detector_shortcut,
+    detector_table,
+    migrate_profile_detectors,
+    own_physical_detector,
+    physical_detector_row,
+    profile_detector_entries,
+    profile_detector_slot,
+    reset_physical_detector,
+    set_physical_detector,
 )
-_EMISSION_DECODE = {
-    "incoherent": frozenset({"incoherent"}),
-    "coherent": frozenset({"coherent"}),
-    "both": frozenset({"incoherent", "coherent"}),
-}
-_CREATION_KEYS = (*RANGES.values(), "E_grid_brem", "materials")
-
-
-def creation_template(document):
-    """Build a new profile from the immutable packaged standard sweep data.
-
-    Override rows are not copied here; :func:`create_profile` adds them once
-    membership is final (:func:`member_overrides`).
-    """
-    packaged = _packaged_standard()
-    target = tomlkit.table()
-    for key in _CREATION_KEYS:
-        if key == "materials":
-            # External catalogs may contain a smaller or different material set.
-            selected = [name for name in packaged[key] if name in material_rows(document)]
-            if selected:
-                target[key] = selected
-        elif key in packaged:
-            target[key] = clone_grid(packaged[key])
-    return target
-
-
-def _packaged_standard():
-    return tomlkit.parse((DATA_DIR / "catalog" / "profiles" / "standard.toml").read_text())
-
-
-def _uniform_grid(value) -> bool:
-    return isinstance(value, dict) and "arange" in value
-
-
-def member_overrides(document, members):
-    """Packaged ``standard`` override rows a new profile can actually read.
-
-    Only rows for MEMBERS are copied: a non-member resolves against
-    ``standard`` itself (``materials/_parse.py``), so its row would be dead.
-    A uniform ``E_grid_brem`` row is dropped too: the case grid replaces its
-    start with the medium floor and its stop with E0, so only ``step`` would
-    survive, and the built-in default already carries that (issue #256).
-    """
-    known = material_rows(document)
-    overrides = tomlkit.table()
-    for material, row in _packaged_standard().get("overrides", {}).items():
-        if material not in known or (members is not None and material not in members):
-            continue
-        entry = tomlkit.table()
-        for key, value in row.items():
-            if key == "E_grid_brem" and _uniform_grid(value):
-                continue
-            entry[key] = clone_grid(value)
-        if entry:
-            overrides[material] = entry
-    return overrides
-
-
-def catalog_key(label):
-    return RANGES.get(label) or EXTRA_RANGES[label]
-
-
-def profile_rows(document):
-    profiles = document.get("profiles", {})
-    if not isinstance(profiles, dict):
-        raise ValueError("catalog profiles table is missing")
-    return profiles
-
-
-def material_rows(document):
-    materials = document.get("materials", {})
-    if not isinstance(materials, dict):
-        raise ValueError("catalog materials table is missing")
-    return materials
-
-
-def beam_rows(document):
-    beams = document.get("beams", {})
-    if not isinstance(beams, dict):
-        raise ValueError("catalog beams table must be a table")
-    return beams
-
-
-def detector_rows(document):
-    detectors = document.get("detectors", {})
-    if not isinstance(detectors, dict):
-        raise ValueError("catalog detectors table must be a table")
-    return detectors
-
-
-def profile_overrides(profile):
-    overrides = profile.get("overrides", {})
-    if not isinstance(overrides, dict):
-        raise ValueError("profile overrides table must be a table")
-    return overrides
-
-
-def range_values(row, key):
-    value = row.get(key)
-    if not isinstance(value, dict) or not isinstance(value.get("values"), list):
-        raise ValueError(f"{key} must be a values grid")
-    return [float(item) for item in value["values"]]
-
-
-def values_item(values):
-    item = tomlkit.inline_table()
-    item["values"] = values
-    return item
-
-
-def profile_numerics_values(profile):
-    """Return explicit profile numerics as plain Python values."""
-    values = {}
-    for key in PROFILE_NUMERICS_KEYS:
-        if key not in profile:
-            continue
-        value = profile[key]
-        if key in SAMPLING_KEYS:
-            if not isinstance(value, dict) or not isinstance(value.get("values"), list):
-                raise ValueError(f"{key} must be a values grid")
-            value = list(value["values"])
-        elif hasattr(value, "unwrap"):
-            value = value.unwrap()
-        values[key] = value
-    return values
-
-
-def set_numerics(document, name, updates):
-    """Validate and atomically stage supplied result-affecting numerics."""
-    target = existing_profile(document, name)
-    if "precision" in target and any(key in updates for key in SAMPLING_KEYS):
-        raise ValueError(
-            f"profile {name!r} has an adaptive precision policy; select fixed counts with: "
-            f"pyrite numerics precision disable {name} --cxr-trials N --brem-trials N"
-        )
-    merged = {**profile_numerics_values(target), **updates}
-    validate_profile_numerics(merged)
-    for key, value in updates.items():
-        target[key] = values_item([value]) if key in SAMPLING_KEYS else value
-    _check_cxr_grid_policy(target, profile_cxr_grid_values(target))
-    return tuple(updates)
-
-
-def reset_numerics(document, name, fields=()):
-    """Remove selected explicit numerics, or every explicit field when empty."""
-    target = existing_profile(document, name)
-    selected = tuple(fields) or PROFILE_NUMERICS_KEYS
-    removed = tuple(key for key in selected if key in target)
-    remaining = profile_numerics_values(target)
-    for key in selected:
-        remaining.pop(key, None)
-    validate_profile_numerics(remaining)
-    for key in removed:
-        target.pop(key, None)
-    return removed
-
-
-class CxrGridPolicyConflict(ValueError):
-    """A line-grid policy combination no case could resolve."""
-
-
-def profile_cxr_grid_values(profile):
-    """Return the explicit ``line_grid_policy`` table as plain values, or ``None``."""
-    table = profile.get("line_grid_policy")
-    if table is None:
-        return None
-    if not isinstance(table, dict):
-        raise ValueError("line_grid_policy must be a table")
-    return dict(table.unwrap() if hasattr(table, "unwrap") else table)
-
-
-def cxr_grid_fields(explicit):
-    """Explicit, effective and source rows for each profile line-grid selector."""
-    explicit = explicit or {}
-    return [
-        {
-            "key": key,
-            "explicit": explicit.get(key),
-            "effective": explicit.get(key, choices[0]),
-            "source": "profile" if key in explicit else "built-in default",
-            "choices": list(choices),
-        }
-        for key, choices in PROFILE_CXR_GRID_SELECTORS.items()
-    ]
-
-
-def _check_cxr_grid_policy(profile, policy):
-    """Refuse a non-empty POLICY that no case of PROFILE could resolve."""
-    if not policy:
-        return
-    effective = {row["key"]: row["effective"] for row in cxr_grid_fields(policy)}
-    try:
-        check_selector_combination(**effective)
-    except ValueError as exc:
-        raise CxrGridPolicyConflict(str(exc)) from None
-    # Automatic resolution refuses the coherent route without feature windows
-    # (#117); `windows = true` resolves it inside per-line windows (#350).
-    if profile.get("emission") in ("coherent", "both") and policy.get("windows") is not True:
-        raise CxrGridPolicyConflict(
-            "a line-grid policy without feature windows resolves every line grid "
-            f"automatically, which the {profile['emission']} emission route does not "
-            "support (#117); add 'windows = true' to [line_grid_policy], or keep an "
-            "explicit or stored line grid for coherent emission"
-        )
-    max_de_frac = profile.get("max_dE_frac", 0.0)
-    if effective["quadrature"] == "bin-mean" and max_de_frac > 0.0:
-        raise CxrGridPolicyConflict(
-            "bin-mean quadrature is incompatible with a positive max_dE_frac; reset it "
-            "with 'pyrite profile numerics reset NAME maximum-fractional-energy-loss'"
-        )
-
-
-def set_cxr_grid_policy(document, name, updates):
-    """Validate and stage line-grid selectors; return ``{key: previous}`` for changed keys."""
-    target = existing_profile(document, name)
-    current = profile_cxr_grid_values(target) or {}
-    merged = {**current, **updates}
-    _check_cxr_grid_policy(target, merged)
-    # Edit in place: TOML-only keys (`windows`, `max_points`) stay as written.
-    table = target.get("line_grid_policy")
-    if table is None:
-        table = target["line_grid_policy"] = tomlkit.table()
-    for key in PROFILE_CXR_GRID_SELECTORS:
-        if key in updates:
-            table[key] = updates[key]
-    return {key: current.get(key) for key, value in updates.items() if current.get(key) != value}
-
-
-def reset_cxr_grid_policy(document, name, fields=()):
-    """Remove selected selectors, or the whole policy when FIELDS is empty."""
-    target = existing_profile(document, name)
-    current = profile_cxr_grid_values(target)
-    if current is None:
-        return ()
-    selected = tuple(fields) or tuple(current)
-    removed = tuple(key for key in selected if key in current)
-    remaining = {key: value for key, value in current.items() if key not in selected}
-    _check_cxr_grid_policy(target, remaining)
-    if remaining:
-        for key in removed:
-            target["line_grid_policy"].pop(key)
-    else:
-        target.pop("line_grid_policy")
-    return removed
-
-
-def cxr_grid_sources(document, profile):
-    """Describe which line-grid source this profile's cases use, before resolution.
-
-    Mirrors ``campaign.sweep._cxr_grid_for_energy``: any profile policy turns
-    automatic resolution on for every case and outranks explicit and stored
-    grids; otherwise explicit ``E_grid_line`` wins, then a stored per-energy row
-    (``energy_grid_refs``/``E_grid_line_by_energy``), then automatic resolution
-    for uncovered energies. ``PYRITE_ENERGY_GRID_*`` outranks stored rows only.
-    """
-    policy = profile_cxr_grid_values(profile)
-    overrides = profile_overrides(profile)
-    shared = document.get("energy_grids", {})
-    environment = [name for name in CXR_GRID_ENVIRONMENT_NAMES if env_value(name) is not None]
-    return {
-        "automatic_for_every_case": bool(policy),
-        "explicit_line_grid": "E_grid_line" in profile,
-        "explicit_line_grid_overrides": sorted(
-            material
-            for material, row in overrides.items()
-            if isinstance(row, dict) and "E_grid_line" in row
-        ),
-        "energy_grid_refs": sorted(energy_grid_refs(profile)),
-        "shared_energy_grids": sorted(shared if isinstance(shared, dict) else ()),
-        "environment": environment,
-    }
-
-
-def profile_precision_values(profile):
-    """Return the explicit ``precision`` table as plain values, or ``None``."""
-    table = profile.get("precision")
-    if table is None:
-        return None
-    if not isinstance(table, dict):
-        raise ValueError("precision must be a table")
-    return dict(table.unwrap() if hasattr(table, "unwrap") else table)
-
-
-def precision_resolution(profile):
-    """Resolve a profile row's electron-count mode for display.
-
-    Returns ``(explicit, effective, source, fixed_reason)``: ``source`` is
-    ``"profile"``, ``"default"`` or ``"fixed"``. Per-material count overrides,
-    GDF beams and grooved faces also keep fixed counts; they are resolved per
-    run, not here.
-    """
-    explicit = profile_precision_values(profile)
-    if explicit is not None:
-        return explicit, Precision.from_dict(explicit).to_dict(), "profile", None
-    reason = default_precision_fallback(
-        fixed_counts=any(key in profile for key in SAMPLING_KEYS),
-        emission=profile.get("emission"),
-        secondary_threshold_eV=profile.get("secondary_threshold_eV"),
-        pair_production_model=profile.get("pair_production_model"),
-        positron_transport=bool(profile.get("positron_transport", False)),
-    )
-    if reason is not None:
-        return None, None, "fixed", reason
-    return None, DEFAULT_PRECISION.to_dict(), "default", None
-
-
-def _precision_table(values):
-    table = tomlkit.table()
-    for key in Precision.__dataclass_fields__:
-        if key in values and values[key] is not None:
-            value = values[key]
-            if key == "observables":
-                value = ["cxr" if name == "line" else name for name in value]
-            table[key] = _toml_value(value)
-    return table
-
-
-#: CLI spellings of the fixed electron-count profile keys.
-SAMPLING_FLAGS = {"n_electrons": "cxr-trials", "n_electrons_brem": "brem-trials"}
-#: Fields a first policy takes from :data:`DEFAULT_PRECISION` unless supplied.
-_INITIAL_FIELDS = (*REQUIRED_FIELDS, "observables")
-
-
-def fixed_counts(profile):
-    """Return the profile's explicit fixed counts as ``{key: [counts]}``."""
-    return {key: profile_numerics_values(profile)[key] for key in SAMPLING_KEYS if key in profile}
-
-
-def describe_counts(counts):
-    """Render fixed counts with their CLI spellings: ``line-trials 500, brem-trials 100``."""
-    return ", ".join(
-        f"{SAMPLING_FLAGS[key]} {','.join(str(value) for value in counts[key])}"
-        for key in SAMPLING_KEYS
-        if key in counts
-    )
-
-
-def precision_blockers(profile):
-    """Why adaptive precision cannot apply to this profile row, before any write.
-
-    Covers the profile-level routes a run refuses: coherent emission, particle
-    cascades, positron transport, physical-detector observation directions and
-    per-material count overrides. GDF beams and grooved targets are resolved per
-    run.
-    """
-    blockers = []
-    emission = profile.get("emission")
-    if emission in ("coherent", "both"):
-        blockers.append(f"emission is {emission!r} (adaptive is incoherent-only)")
-    if "secondary_threshold_eV" in profile or "pair_production_model" in profile:
-        blockers.append("particle cascades (secondaries or pair production) are enabled")
-    if profile.get("positron_transport"):
-        blockers.append("positron transport is enabled")
-    if "physical_detector" in profile:
-        blockers.append("the physical detector scores observation directions")
-    for material, row in sorted(profile_overrides(profile).items()):
-        keys = [key for key in SAMPLING_KEYS if isinstance(row, dict) and key in row]
-        if keys:
-            blockers.append(
-                f"[overrides.{material}] sets {', '.join(SAMPLING_FLAGS[key] for key in keys)}; "
-                "remove those keys from the catalog first"
-            )
-    return blockers
-
-
-def _check_adaptive(name, profile):
-    blockers = precision_blockers(profile)
-    if blockers:
-        raise ValueError(f"profile {name!r} cannot use adaptive precision: {'; '.join(blockers)}")
-
-
-def _initial_policy(current, updates):
-    """Merge ``updates`` over ``current``, or over the default budget for a first policy."""
-    if current is None:
-        current = {key: DEFAULT_PRECISION.to_dict()[key] for key in _INITIAL_FIELDS}
-        current["observables"] = list(current["observables"])
-    merged = {**current, **updates}
-    Precision.from_dict(merged)
-    return merged
-
-
-def set_precision(document, name, updates):
-    """Validate and stage an adaptive precision policy; return overwritten fields.
-
-    A first policy starts from :data:`DEFAULT_PRECISION`'s budget and
-    observables; an existing policy keeps every field ``updates`` leaves out.
-    Fixed counts are refused: ``enable_precision`` replaces them atomically.
-    """
-    target = existing_profile(document, name)
-    current = profile_precision_values(target)
-    merged = _initial_policy(current, updates)
-    counts = fixed_counts(target)
-    if counts:
-        raise ValueError(
-            f"profile {name!r} sets fixed electron counts ({describe_counts(counts)}); "
-            f"replace them with: pyrite numerics precision enable {name} [OPTIONS]"
-        )
-    _check_adaptive(name, target)
-    target["precision"] = _precision_table(merged)
-    current = current or {}
-    return tuple(key for key in updates if key in current and current[key] != updates[key])
-
-
-def enable_precision(document, name, updates):
-    """Switch a profile to adaptive precision atomically.
-
-    Removes fixed counts, then writes a policy only when ``updates`` are given
-    or one already exists (unspecified fields as in :func:`set_precision`);
-    otherwise :data:`DEFAULT_PRECISION` applies. Returns the removed counts;
-    nothing is staged on refusal.
-    """
-    target = existing_profile(document, name)
-    _check_adaptive(name, target)
-    current = profile_precision_values(target)
-    policy = None
-    if updates or current is not None:
-        policy = _initial_policy(current, updates)
-    counts = fixed_counts(target)
-    for key in counts:
-        target.pop(key)
-    if policy is not None:
-        target["precision"] = _precision_table(policy)
-    return counts
-
-
-def disable_precision(document, name, counts):
-    """Remove any adaptive policy and set fixed ``counts``; return the removed policy.
-
-    ``counts`` maps sampling keys to one count each; a key it omits keeps the
-    profile's existing count grid and must already exist.
-    """
-    target = existing_profile(document, name)
-    missing = [
-        SAMPLING_FLAGS[key] for key in SAMPLING_KEYS if key not in counts and key not in target
-    ]
-    if missing:
-        raise ValueError(f"fixed counts need {', '.join(missing)}")
-    validate_profile_numerics({key: [value] for key, value in counts.items()})
-    removed = profile_precision_values(target)
-    if removed is not None:
-        target.pop("precision")
-    for key, value in counts.items():
-        if fixed_counts(target).get(key) != [value]:
-            target[key] = values_item([value])
-    return removed
-
-
-def reset_precision(document, name, fields=()):
-    """Remove selected optional precision fields, or the whole policy when empty."""
-    target = existing_profile(document, name)
-    current = profile_precision_values(target)
-    if current is None:
-        return ()
-    if not fields:
-        target.pop("precision")
-        return tuple(current)
-    required = [field for field in fields if field in REQUIRED_FIELDS]
-    if required:
-        raise ValueError(
-            f"{', '.join(required)} is required by the policy; reset without fields to "
-            f"remove the policy, or 'pyrite numerics precision disable {name}' to select "
-            "fixed electron counts"
-        )
-    removed = tuple(field for field in fields if field in current)
-    remaining = {key: value for key, value in current.items() if key not in fields}
-    Precision.from_dict(remaining)
-    target["precision"] = _precision_table(remaining)
-    return removed
-
-
-def display(values):
-    return ", ".join(f"{value:g}" for value in values)
-
-
-def unknown_profile(document, name):
-    profiles = profile_rows(document)
-    suggestions = difflib.get_close_matches(name, profiles, n=3, cutoff=0.5)
-    message = f"unknown profile: {name}"
-    if suggestions:
-        message += f". Did you mean: {', '.join(suggestions)}?"
-    message += f". Create it first with: pyrite profile create {name}"
-    raise ValueError(message)
-
-
-def existing_profile(document, name):
-    """Return ``[profiles.NAME]`` or raise with suggestions."""
-    profiles = profile_rows(document)
-    if name not in profiles:
-        unknown_profile(document, name)
-    return profiles[name]
-
-
-def energy_grid_refs(profile):
-    """Return this profile's ``material -> artifact digest`` map, sorted."""
-    refs = profile.get("energy_grid_refs")
-    if not isinstance(refs, dict):
-        return {}
-    return {material: str(refs[material]) for material in sorted(refs)}
-
-
-def filter_rows(profile):
-    filters = profile.get("filters", [])
-    if not isinstance(filters, list) or not all(isinstance(row, dict) for row in filters):
-        raise ValueError("profile filters must be an array of tables")
-    return filters
-
-
-def physical_detector_row(profile):
-    """Return only the profile's own physical detector."""
-    physical = profile.get("physical_detector")
-    if physical is not None and not isinstance(physical, dict):
-        raise ValueError("profile physical_detector must be a table")
-    return physical
-
-
-def _scalar_detector(values):
-    """Build the scalar ``Detector`` a legacy detector row resolves to."""
-    angle = values.get("observation_angle_deg")
-    return Detector(
-        **({} if angle is None else {"observation_angle_deg": angle}),
-        _legacy_acceptance=(values.get("polar_acceptance_deg"), values.get("solid_angle_sr")),
-    )
-
-
-def profile_payload(document, name):
-    profile = existing_profile(document, name)
-    overrides = profile_overrides(profile)
-    materials = profile.get("materials")
-    range_keys = [*RANGES.items(), *EXTRA_RANGES.items()]
-    beam = profile.get("beam")
-    beam_ref = str(beam) if isinstance(beam, str) else None
-    beam_payload = beam.unwrap() if beam_ref is None and hasattr(beam, "unwrap") else None
-    raw_detector = profile.get("detector")
-    detector_present = raw_detector is not None
-    detector_ref = str(raw_detector) if isinstance(raw_detector, str) else None
-    if detector_ref is not None:
-        named = detector_rows(document).get(detector_ref)
-        if not isinstance(named, dict):
-            unknown_detector(document, detector_ref)
-        raw_detector = named
-    elif not isinstance(raw_detector, dict):
-        raw_detector = {}
-    active_detector_keys = {key for key, _label, _unit in ACTIVE_DETECTOR_FIELDS}
-    detector = _scalar_detector(raw_detector)
-    filters = [
-        dict(row.unwrap() if hasattr(row, "unwrap") else row) for row in filter_rows(profile)
-    ]
-    physical = physical_detector_row(profile)
-    declared_detectors = profile.get("detectors")
-    if declared_detectors is not None:
-        detector_items = declared_detectors.items()
-    else:
-        detector_items = []
-        if physical is not None:
-            detector_items.append(("physical", physical))
-        if detector_present:
-            detector_items.append(("default", profile["detector"]))
-        if not detector_items:
-            detector_items.append(("default", {}))
-    detector_collection = {}
-    for detector_id, entry in detector_items:
-        reference = str(entry) if isinstance(entry, str) else None
-        if reference is not None:
-            entry = detector_rows(document).get(reference)
-            if entry is None:
-                unknown_detector(document, reference)
-        values = dict(entry.unwrap() if hasattr(entry, "unwrap") else entry)
-        if "distance_mm" in values:
-            from .observation import physical_detector_from_config
-
-            geometry = {
-                key: value
-                for key, value in values.items()
-                if key
-                in {
-                    "distance_mm",
-                    "polar_deg",
-                    "azimuth_deg",
-                    "roll_deg",
-                    "offset_mm",
-                    "shape",
-                    "pitch_mm",
-                }
-            }
-            projection = physical_detector_from_config(geometry).scalar_detector()
-            detector_collection[detector_id] = {
-                "kind": "pixel",
-                "reference": reference,
-                "settings": values,
-                "acceptance": {key: getattr(projection, key) for key in active_detector_keys},
-            }
-        else:
-            resolved = _scalar_detector(values)
-            detector_collection[detector_id] = {
-                "kind": "scalar",
-                "reference": reference,
-                "settings": {key: getattr(resolved, key) for key in active_detector_keys},
-                "acceptance": {key: getattr(resolved, key) for key in active_detector_keys},
-            }
-    return {
-        "name": name,
-        "ranges": [
-            {"name": label, "catalog_key": key, "values": range_values(profile, key)}
-            for label, key in range_keys
-            if key in profile
-        ],
-        "materials": list(materials) if isinstance(materials, list) else None,
-        "beam": beam_payload,
-        "beam_ref": beam_ref,
-        "detector_ref": detector_ref,
-        "detector_present": detector_present,
-        "detector": {key: getattr(detector, key) for key, _label, _unit in ACTIVE_DETECTOR_FIELDS},
-        "detectors": detector_collection,
-        "filters": filters,
-        "physical_detector": (
-            None
-            if physical is None
-            else dict(physical.unwrap() if hasattr(physical, "unwrap") else physical)
-        ),
-        "emission": profile.get("emission"),
-        "temporal_profile": profile.get("temporal_profile") is True,
-        "line_grid_policy": profile_cxr_grid_values(profile),
-        "precision": dict(
-            zip(
-                ("explicit", "effective", "source", "fixed_reason"),
-                precision_resolution(profile),
-                strict=True,
-            )
-        ),
-        "transport_numerics": {key: profile[key] for key in TRANSPORT_KEYS if key in profile},
-        "overrides": {
-            material: sorted(row)
-            for material, row in overrides.items()
-            if isinstance(row, dict) and row
-        },
-        "energy_grid_refs": energy_grid_refs(profile),
-    }
-
-
-def add_filter(document, profile_name, row):
-    profile = existing_profile(document, profile_name)
-    filters = filter_rows(profile)
-    name = row.get("name")
-    if name is not None and any(existing.get("name") == name for existing in filters):
-        raise ValueError(f"profile {profile_name!r} already has a filter named {name!r}")
-    if "filters" not in profile:
-        profile["filters"] = tomlkit.aot()
-        filters = profile["filters"]
-    filters.append(row)
-
-
-def _filter_index(filters, profile_name, identifier):
-    """Resolve a filter by one-based list index or display name."""
-    if identifier.isdigit():
-        candidate = int(identifier) - 1
-        if 0 <= candidate < len(filters):
-            return candidate
-    index = next((i for i, row in enumerate(filters) if row.get("name") == identifier), None)
-    if index is None:
-        raise ValueError(
-            f"profile {profile_name!r} has no filter {identifier!r}; use 'pyrite profile filter list {profile_name}'"
-        )
-    return index
-
-
-def update_filter(document, profile_name, identifier, changes):
-    """Merge ``changes`` into one filter in place, keeping its position.
-
-    Returns the updated row as a plain mapping. A new ``name`` must stay unique
-    within the profile; order is never changed, because it is part of the
-    observation's identity.
-    """
-    profile = existing_profile(document, profile_name)
-    filters = filter_rows(profile)
-    index = _filter_index(filters, profile_name, identifier)
-    row = filters[index]
-    new_name = changes.get("name")
-    if new_name is not None and any(
-        other.get("name") == new_name for position, other in enumerate(filters) if position != index
-    ):
-        raise ValueError(f"profile {profile_name!r} already has a filter named {new_name!r}")
-    for key, value in changes.items():
-        row[key] = list(value) if isinstance(value, tuple) else value
-    return dict(row.unwrap() if hasattr(row, "unwrap") else row)
-
-
-def remove_filter(document, profile_name, identifier):
-    profile = existing_profile(document, profile_name)
-    filters = filter_rows(profile)
-    index = _filter_index(filters, profile_name, identifier)
-    removed = filters.pop(index)
-    if not filters:
-        profile.pop("filters", None)
-    return dict(removed.unwrap() if hasattr(removed, "unwrap") else removed)
-
-
-#: Nested ``physical_detector`` sections that ``reset`` can remove one at a time.
-PHYSICAL_SECTIONS = ("scorer", "response", "acquisition")
-
-
-def own_physical_detector(profile):
-    """Return the profile's own ``physical_detector`` table, or ``None``."""
-    table = profile.get("physical_detector")
-    if table is not None and not isinstance(table, dict):
-        raise ValueError("profile physical_detector must be a table")
-    return table
-
-
-def set_physical_detector(
-    document, name, *, geometry, scorer=None, response=None, acquisition=None
-):
-    """Merge updates into ``name``'s physical detector.
-
-    ``response`` with a new ``kind`` replaces that section (parameters of
-    another kind never leak into it); without one, parameters merge into the
-    existing Timepix3 response. An
-    acquisition axis (explicit edges, or min/max/bin width) replaces the other
-    spelling, and ``mode = "expected"`` drops any realization seed.
-    """
-    profile = existing_profile(document, name)
-    table = own_physical_detector(profile)
-    if table is None:
-        if "distance_mm" not in geometry:
-            raise ValueError(
-                f"profile {name!r} has no physical detector; creating one requires --distance-mm"
-            )
-        table = _toml_value({})
-        profile["physical_detector"] = table
-    merge_pixel_detector(
-        table, geometry=geometry, scorer=scorer, response=response, acquisition=acquisition
-    )
-
-
-def reset_physical_detector(document, name, sections=()):
-    """Remove ``name``'s physical detector, or only the named nested sections."""
-    profile = existing_profile(document, name)
-    table = own_physical_detector(profile)
-    if table is None:
-        raise ValueError(f"profile {name!r} has no physical detector")
-    if not sections:
-        profile.pop("physical_detector")
-        return
-    missing = [section for section in sections if section not in table]
-    if missing:
-        raise ValueError(f"profile {name!r} physical detector has no {', '.join(missing)} section")
-    for section in sections:
-        table.pop(section)
-
-
-def clone_grid(value):
-    """Deep-copy a grid descriptor as inline TOML."""
-    plain = value.unwrap() if hasattr(value, "unwrap") else value
-    if isinstance(plain, dict):
-        table = tomlkit.inline_table()
-        for key, item in plain.items():
-            table[key] = clone_grid(item)
-        return table
-    return tomlkit.item(plain)
-
-
-def detector_table(profile):
-    """Return writable ``[profiles.NAME.detector]`` table."""
-    detector = profile.get("detector")
-    if detector is None:
-        detector = tomlkit.table()
-        profile["detector"] = detector
-    elif isinstance(detector, str):
-        raise ValueError(
-            f"profile has detector = {detector!r} (a named reference); edit it with "
-            f"'pyrite detector set {detector} ...', or replace the reference with "
-            "--detector NAME"
-        )
-    elif not isinstance(detector, dict):
-        raise ValueError("profile detector must be a table or named reference")
-    return detector
-
-
-def unknown_beam(document, name):
-    known = beam_rows(document)
-    suggestions = difflib.get_close_matches(name, known, n=3, cutoff=0.5)
-    message = f"unknown beam: {name}"
-    if suggestions:
-        message += f". Did you mean: {', '.join(suggestions)}?"
-    message += f". Create it first with: pyrite beam create {name}"
-    raise ValueError(message)
-
-
-def unknown_detector(document, name):
-    known = detector_rows(document)
-    suggestions = difflib.get_close_matches(name, known, n=3, cutoff=0.5)
-    message = f"unknown detector: {name}"
-    if suggestions:
-        message += f". Did you mean: {', '.join(suggestions)}?"
-    message += f". Create it first with: pyrite detector create {name}"
-    raise ValueError(message)
-
-
-def merge_values(document, name, updates, *, add):
-    """Mutate range values for ``profile add`` and ``profile remove``."""
-    target = existing_profile(document, name)
-    for label, values in updates.items():
-        key = catalog_key(label)
-        if key not in target:
-            if not add:
-                raise ValueError(f"profile {name} has no {key} grid to remove values from")
-            existing = []
-        else:
-            existing = range_values(target, key)
-        if add:
-            merged = sorted(set(existing) | set(values))
-        else:
-            missing = [value for value in values if value not in existing]
-            if missing:
-                raise ValueError(
-                    f"{label} values not present in profile {name}: {display(missing)}"
-                )
-            merged = sorted(set(existing) - set(values))
-        target[key] = values_item(merged)
-
-
-def _current_emission_modes(target):
-    value = target.get("emission")
-    return set(_EMISSION_DECODE[value]) if value is not None else set()
-
-
-def _emission_label(modes):
-    if modes == {"incoherent", "coherent"}:
-        return "both"
-    if modes == {"incoherent"}:
-        return "incoherent"
-    if modes == {"coherent"}:
-        return "coherent"
-    return None
-
-
-def apply_emission_add(target, coherent, incoherent):
-    current = _current_emission_modes(target)
-    requested = {
-        mode for mode, flag in (("coherent", coherent), ("incoherent", incoherent)) if flag
-    }
-    added = sorted(requested - current)
-    if not added:
-        return None
-    new_modes = current | requested
-    label = _emission_label(new_modes)
-    auto_both = label == "both" and _emission_label(current) != "both"
-    target["emission"] = label
-    _check_cxr_grid_policy(target, profile_cxr_grid_values(target))
-    return label, added, auto_both
-
-
-def apply_emission_remove(name, target, coherent, incoherent):
-    current = _current_emission_modes(target)
-    requested = {
-        mode for mode, flag in (("coherent", coherent), ("incoherent", incoherent)) if flag
-    }
-    if not requested:
-        return None
-    missing = sorted(requested - current)
-    if missing:
-        raise ValueError(f"profile {name} emission does not include: {', '.join(missing)}")
-    label = _emission_label(current - requested)
-    if label is None:
-        target.pop("emission", None)
-    else:
-        target["emission"] = label
-    return label, sorted(requested)
-
-
-def membership_target(document, name):
-    """Return the profile's explicit ``materials`` list or raise with guidance."""
-    target = existing_profile(document, name)
-    materials = target.get("materials")
-    if materials is None:
-        raise ValueError(
-            f"profile {name!r} has implicit all-catalog-materials membership; "
-            "it already includes every material. To restrict it, use: "
-            f"pyrite profile set {name} --material MATERIAL,..."
-        )
-    if not isinstance(materials, list):
-        raise ValueError(f"profiles.{name}.materials must be an array of material keys")
-    return target, materials
-
-
-def csv_materials(material_csv):
-    requested = [key.strip() for key in material_csv.split(",") if key.strip()]
-    if not requested:
-        raise ValueError("--material requires at least one material key")
-    return requested
-
-
-def validate_materials(document, requested):
-    requested = set(requested)
-    known = material_rows(document)
-    unknown = sorted(requested - set(known))
-    if unknown:
-        raise ValueError(f"unknown material: {', '.join(unknown)}")
-    return [key for key in known if key in requested]
-
-
-def group_materials(document, requested, *, allow_unknown=False):
-    """Validate requested membership and return catalog-ordered keys."""
-    requested = list(requested)
-    if not requested:
-        raise ValueError("provide MATERIAL keys")
-    if allow_unknown:
-        known = material_rows(document)
-        requested = list(dict.fromkeys(requested))
-        return [key for key in known if key in requested] + [
-            key for key in requested if key not in known
-        ]
-    return validate_materials(document, requested)
-
-
-def add_membership(document, name, requested):
-    target, membership = membership_target(document, name)
-    requested = validate_materials(document, requested)
-    added = [key for key in requested if key not in membership]
-    target["materials"] = validate_materials(document, [*membership, *requested])
-    return added, sorted(set(requested) - set(added))
-
-
-def remove_membership(document, name, requested):
-    target, membership = membership_target(document, name)
-    requested = list(dict.fromkeys(requested))
-    removed = [key for key in requested if key in membership]
-    target["materials"] = [key for key in membership if key not in removed]
-    return removed, sorted(set(requested) - set(removed))
-
-
-def _apply_transport_updates(target, updates):
-    """Validate coupled transport controls, then write supplied values."""
-    if not updates:
-        return
-    validate_profile_numerics({**profile_numerics_values(target), **updates})
-    for key, value in updates.items():
-        target[key] = value
-
-
-def create_profile(
-    document,
-    name,
-    source_name,
-    *,
-    updates,
-    beam_name,
-    detector_name,
-    transport_updates,
-    materials,
-):
-    """Create a profile row from a source row and validated CLI values."""
-    profiles = profile_rows(document)
-    if name in profiles:
-        raise ValueError(
-            f"profile {name!r} already exists; edit it with: pyrite profile set {name}"
-        )
-    if beam_name is not None and beam_name not in beam_rows(document):
-        unknown_beam(document, beam_name)
-    if detector_name is not None and detector_name not in detector_rows(document):
-        unknown_detector(document, detector_name)
-    if source_name is not None and source_name not in profiles:
-        raise ValueError(f"unknown source profile: {source_name}")
-    target = creation_template(document) if source_name is None else tomlkit.table()
-    if source_name is not None:
-        for key, value in profiles[source_name].items():
-            if key != "overrides":
-                target[key] = clone_grid(value)
-    for label, values in updates.items():
-        target[catalog_key(label)] = values_item(values)
-    if beam_name is not None:
-        target["beam"] = beam_name
-    if detector_name is not None:
-        attach_detector_shortcut(target, detector_name)
-    _apply_transport_updates(target, transport_updates)
-    if materials is not None:
-        target["materials"] = validate_materials(document, csv_materials(materials))
-    if source_name is None:
-        members = target.get("materials")
-        overrides = member_overrides(document, None if members is None else set(members))
-        if overrides:
-            target["overrides"] = overrides
-    profiles[name] = target
-
-
-def set_profile(
-    document,
-    name,
-    *,
-    updates,
-    beam_name,
-    detector_name,
-    transport_updates,
-    materials,
-    all_materials,
-    emission,
-    temporal_profile=None,
-):
-    """Replace supplied profile fields and return overwritten field labels.
-
-    ``temporal_profile`` True writes the opt-in key; False removes it (off is
-    the absent default).
-    """
-    target = existing_profile(document, name)
-    if beam_name is not None and beam_name not in beam_rows(document):
-        unknown_beam(document, beam_name)
-    if detector_name is not None and detector_name not in detector_rows(document):
-        unknown_detector(document, detector_name)
-    material_keys = (
-        validate_materials(document, csv_materials(materials)) if materials is not None else None
-    )
-    overwriting = {
-        label: range_values(target, catalog_key(label))
-        for label in updates
-        if catalog_key(label) in target
-    }
-    for label, values in updates.items():
-        target[catalog_key(label)] = values_item(values)
-    if beam_name is not None:
-        target["beam"] = beam_name
-    if detector_name is not None:
-        attach_detector_shortcut(target, detector_name)
-    _apply_transport_updates(target, transport_updates)
-    if material_keys is not None:
-        target["materials"] = material_keys
-    elif all_materials:
-        target.pop("materials", None)
-    if emission is not None:
-        target["emission"] = emission
-    if temporal_profile is True:
-        target["temporal_profile"] = True
-    elif temporal_profile is False:
-        target.pop("temporal_profile", None)
-    _check_cxr_grid_policy(target, profile_cxr_grid_values(target))
-    return overwriting
-
-
-def rename_profile(document, name, new_name):
-    profiles = profile_rows(document)
-    if new_name in profiles:
-        raise ValueError(f"profile {new_name!r} already exists")
-    target = existing_profile(document, name)
-    del profiles[name]
-    profiles[new_name] = target
-    energy_grids = document.get("energy_grids")
-    if isinstance(energy_grids, dict) and name in energy_grids:
-        grid = energy_grids[name]
-        del energy_grids[name]
-        energy_grids[new_name] = grid
-
-
-def delete_profile(document, name):
-    """Validate references, remove a profile row, and return override count."""
-    target = existing_profile(document, name)
-    energy_grids = document.get("energy_grids", {})
-    if isinstance(energy_grids, dict) and name in energy_grids:
-        raise ValueError(
-            f"cannot delete profile {name!r}; still referenced by:\n- "
-            f"energy_grids.{name} (shared line-grid store; delete its rows with "
-            f"pyrite energy-grid line delete {name} first)"
-        )
-    overrides = profile_overrides(target)
-    n_overrides = sum(1 for row in overrides.values() if isinstance(row, dict) and row)
-    del profile_rows(document)[name]
-    return n_overrides
-
-
-def attach_detector_shortcut(profile, reference):
-    """Replace an unambiguous attachment without discarding a collection."""
-    collection = profile.get("detectors")
-    if collection is None:
-        profile["detector"] = reference
-    elif len(collection) == 1:
-        collection[next(iter(collection))] = reference
-    else:
-        raise ValueError(
-            "multiple detector IDs; use: pyrite profile detector set PROFILE ID --detector REF"
-        )
-
-
-def profile_detector_entries(profile):
-    """Return the existing detector IDs without converting legacy storage."""
-    if "detectors" in profile:
-        return profile["detectors"]
-    entries = {}
-    if "physical_detector" in profile:
-        entries["physical"] = profile["physical_detector"]
-    if "detector" in profile:
-        entries["default"] = profile["detector"]
-    return entries or {"default": {}}
-
-
-def profile_detector_slot(profile, identifier, *, create_physical=False):
-    """Return the owning table/key for one detector, preserving its representation."""
-    if "detectors" in profile:
-        if identifier not in profile["detectors"]:
-            raise ValueError(f"unknown detector ID {identifier!r}")
-        return profile["detectors"], identifier
-    entries = profile_detector_entries(profile)
-    if identifier not in entries and not (create_physical and identifier == "physical"):
-        raise ValueError(f"unknown detector ID {identifier!r}; available: {', '.join(entries)}")
-    return profile, "physical_detector" if identifier == "physical" else "detector"
-
-
-def migrate_profile_detectors(document, name):
-    """Explicitly convert legacy declarations, preserving order and resolved defaults."""
-    profile = existing_profile(document, name)
-    if "detectors" in profile:
-        raise ValueError(f"profile {name!r} already uses a detector collection")
-    collection = tomlkit.table()
-    for identifier, entry in profile_detector_entries(profile).items():
-        # An implicit scalar uses code defaults; collection entries must declare geometry.
-        if not entry:
-            entry = {
-                key: getattr(Detector(), key)
-                for key, _, _ in ACTIVE_DETECTOR_FIELDS
-                if getattr(Detector(), key) is not None
-            }
-        collection[identifier] = clone_grid(entry)
-    profile.pop("detector", None)
-    profile.pop("physical_detector", None)
-    profile["detectors"] = collection
-    return list(collection)
+from .profile_filters import _filter_index, add_filter, filter_rows, remove_filter, update_filter
+from .profile_lifecycle import (
+    _CREATION_KEYS,
+    _EMISSION_DECODE,
+    _current_emission_modes,
+    _emission_label,
+    _packaged_standard,
+    _uniform_grid,
+    apply_emission_add,
+    apply_emission_remove,
+    create_profile,
+    creation_template,
+    delete_profile,
+    member_overrides,
+    merge_values,
+    rename_profile,
+    set_profile,
+)
+from .profile_membership import (
+    add_membership,
+    csv_materials,
+    group_materials,
+    membership_target,
+    remove_membership,
+    validate_materials,
+)
+from .profile_numerics import (
+    _apply_transport_updates,
+    profile_numerics_values,
+    reset_numerics,
+    set_numerics,
+)
+from .profile_precision import (
+    _INITIAL_FIELDS,
+    SAMPLING_FLAGS,
+    _check_adaptive,
+    _initial_policy,
+    _precision_table,
+    describe_counts,
+    disable_precision,
+    enable_precision,
+    fixed_counts,
+    precision_blockers,
+    precision_resolution,
+    profile_precision_values,
+    reset_precision,
+    set_precision,
+)
+from .profile_summary import profile_payload
+
+__all__ = [
+    "RANGES",
+    "EXTRA_RANGES",
+    "catalog_key",
+    "profile_rows",
+    "material_rows",
+    "beam_rows",
+    "detector_rows",
+    "profile_overrides",
+    "range_values",
+    "values_item",
+    "display",
+    "unknown_profile",
+    "existing_profile",
+    "energy_grid_refs",
+    "clone_grid",
+    "unknown_beam",
+    "unknown_detector",
+    "membership_target",
+    "csv_materials",
+    "validate_materials",
+    "group_materials",
+    "add_membership",
+    "remove_membership",
+    "CxrGridPolicyConflict",
+    "profile_cxr_grid_values",
+    "cxr_grid_fields",
+    "_check_cxr_grid_policy",
+    "set_cxr_grid_policy",
+    "reset_cxr_grid_policy",
+    "cxr_grid_sources",
+    "profile_numerics_values",
+    "set_numerics",
+    "reset_numerics",
+    "_apply_transport_updates",
+    "SAMPLING_FLAGS",
+    "_INITIAL_FIELDS",
+    "profile_precision_values",
+    "precision_resolution",
+    "_precision_table",
+    "fixed_counts",
+    "describe_counts",
+    "precision_blockers",
+    "_check_adaptive",
+    "_initial_policy",
+    "set_precision",
+    "enable_precision",
+    "disable_precision",
+    "reset_precision",
+    "filter_rows",
+    "add_filter",
+    "_filter_index",
+    "update_filter",
+    "remove_filter",
+    "ACTIVE_DETECTOR_FIELDS",
+    "PHYSICAL_SECTIONS",
+    "physical_detector_row",
+    "_scalar_detector",
+    "own_physical_detector",
+    "set_physical_detector",
+    "reset_physical_detector",
+    "detector_table",
+    "attach_detector_shortcut",
+    "profile_detector_entries",
+    "profile_detector_slot",
+    "migrate_profile_detectors",
+    "_EMISSION_DECODE",
+    "_CREATION_KEYS",
+    "creation_template",
+    "_packaged_standard",
+    "_uniform_grid",
+    "member_overrides",
+    "merge_values",
+    "_current_emission_modes",
+    "_emission_label",
+    "apply_emission_add",
+    "apply_emission_remove",
+    "create_profile",
+    "set_profile",
+    "rename_profile",
+    "delete_profile",
+    "profile_payload",
+    "TRANSPORT_KEYS",
+]
