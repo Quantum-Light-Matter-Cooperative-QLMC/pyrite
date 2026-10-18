@@ -26,12 +26,14 @@ Click wiring for these lives in :mod:`pyrite.cli.commands.recompute`.
 import time
 from pathlib import Path
 
-from .._energy_grid_encoding import decode_energy_grid, encode_energy_grid
+from .._energy_grid_encoding import encode_energy_grid
 from .._grid_semantics import is_uniform_grid
 from .._progress import _ProgressTimer, _write_progress_record
 from ..console.outputs import output_dir
 from ..montecarlo import runner
 from . import _checkpoint_store
+from ._repair_planning import _BremRequest, _plan_brem, _plan_cxr
+from ._repair_progress import _RepairProgress
 from .persistence import (
     _checkpoint_exists,
     _checkpoint_load,
@@ -369,22 +371,6 @@ def recxr_checkpoints(
 
 
 # ---- brem-only repair --------------------------------------------------------
-def _stored_brem_grid(r):
-    """The brem grid a cached record was computed on: the case's encoded grid,
-    the record's stored array, or the legacy single-grid fallback."""
-    import numpy as np
-
-    c = r["case"]
-    if "E_grid_brem" in c:
-        return decode_energy_grid(c["E_grid_brem"])
-    if r.get("E_grid_brem") is not None and np.asarray(r["E_grid_brem"]).size:
-        return np.asarray(r["E_grid_brem"], float)
-    # legacy single-grid record
-    step_b = c.get("brem_step_eV", 10.0)
-    eg = np.asarray(r["E_grid"], float)
-    return np.arange(eg[0], eg[-1] + step_b, step_b)
-
-
 def repair_brem_wide(
     results,
     only_nonfinite=True,
@@ -466,135 +452,61 @@ def repair_brem_wide(
     target_nodes = None if brem_nodes is None else np.asarray(brem_nodes, dtype=float)
     if target_nodes is not None and (target_nodes.ndim != 1 or target_nodes.size < 2):
         raise ValueError("brem_nodes must be a one-dimensional grid of at least two nodes")
-    retune = target_nodes is not None or any(
-        value is not None
-        for value in (ne_brem, brem_start_eV, brem_stop_eV, brem_step_eV, fidelity)
+    request = _BremRequest(
+        ne_brem,
+        brem_start_eV,
+        brem_stop_eV,
+        brem_step_eV,
+        target_nodes,
+        fidelity,
     )
-    todo = []
-    n_skipped = 0
-    for name in results:
-        for r in results[name].values():
-            bw = r.get("brem_wide")
-            bw_array = np.asarray(bw) if bw is not None else np.asarray([])
-            finite = bw_array.size > 0 and np.isfinite(bw_array).all() and np.any(bw_array != 0)
-            if only_nonfinite:
-                at_target = finite
-                if retune:
-                    c = r["case"]
-                    if ne_brem is not None and int(c.get("Ne_brem", -1)) != int(ne_brem):
-                        at_target = False
-                    if fidelity is not None and c.get("brem_profile") != fidelity:
-                        at_target = False
-                    if target_nodes is not None:
-                        g = _stored_brem_grid(r)
-                        if g.shape != target_nodes.shape or not np.array_equal(g, target_nodes):
-                            at_target = False
-                    elif any(
-                        value is not None for value in (brem_start_eV, brem_stop_eV, brem_step_eV)
-                    ):
-                        g = _stored_brem_grid(r)
-                        if (
-                            brem_start_eV is None
-                            and brem_stop_eV is None
-                            and brem_step_eV is not None
-                        ):
-                            if g.size < 2 or not np.isclose(g[1] - g[0], float(brem_step_eV)):
-                                at_target = False
-                        else:
-                            stored_step = float(g[1] - g[0]) if g.size >= 2 else None
-                            step = float(brem_step_eV) if brem_step_eV is not None else stored_step
-                            start = (
-                                float(brem_start_eV)
-                                if brem_start_eV is not None
-                                else (float(g[0]) if g.size else None)
-                            )
-                            stop = (
-                                float(brem_stop_eV)
-                                if brem_stop_eV is not None
-                                else (float(c["E0_keV"]) * 1e3 + step if step is not None else None)
-                            )
-                            if start is None or stop is None or step is None:
-                                at_target = False
-                            else:
-                                target = np.arange(start, stop, step)
-                                if g.shape != target.shape or not np.allclose(g, target):
-                                    at_target = False
-                if at_target:
-                    n_skipped += 1
-                    continue
-            todo.append(r)
-    if on_progress is not None:
-        on_progress(0, len(todo), n_skipped)
+    todo, n_skipped = _plan_brem(results, request, only_nonfinite)
+    cadence = _RepairProgress(
+        results,
+        len(todo),
+        n_skipped,
+        save_every,
+        save_cb,
+        on_progress,
+        max_seconds,
+        status,
+        progress=progress,
+        saved_message=True,
+    )
     if not todo:
         print(
             "nothing to redo (all records already at target brem parameters)"
-            if retune
+            if request.retune
             else "nothing to repair (all brem_wide already finite)"
         )
-        if status is not None:
-            status["complete"] = True
-        return 0
+        return cadence.finish()
     print(f"repairing brem for {len(todo)} record(s)...")
-    t0 = time.perf_counter()
-    deadline = None if max_seconds is None else time.monotonic() + max_seconds
-    done = 0
-    broke = False
-    for k, r in enumerate(todo, 1):
-        if deadline is not None and time.monotonic() >= deadline:
-            broke = True
+    cadence.start()
+    for r, E_brem, updates in todo:
+        if cadence.expired():
             break
-        c = r["case"]
-        if ne_brem is not None:
-            c["Ne_brem"] = int(ne_brem)
-        if fidelity is not None:
-            c["brem_profile"] = fidelity
-        if target_nodes is not None:
-            # A graded target is already final: build_cases likewise passes a
-            # nonuniform grid through for every beam energy instead of extending
-            # it to E0, so the retuned record matches what a live sweep would get.
-            E_brem = target_nodes
-            c["E_grid_brem"] = encode_energy_grid(E_brem)
-        elif any(value is not None for value in (brem_start_eV, brem_stop_eV, brem_step_eV)):
-            stored = _stored_brem_grid(r)
-            step_b = (
-                float(brem_step_eV) if brem_step_eV is not None else float(stored[1] - stored[0])
-            )
-            start = float(brem_start_eV) if brem_start_eV is not None else float(stored[0])
-            stop = (
-                float(brem_stop_eV)
-                if brem_stop_eV is not None
-                else float(c["E0_keV"]) * 1e3 + step_b
-            )
-            E_brem = np.arange(start, stop, step_b)
-            c["E_grid_brem"] = (start, stop, step_b)
-        else:
-            E_brem = _stored_brem_grid(r)
-        brem_wide = _brem_for_case(c, E_brem)
-        r["brem_wide"] = brem_wide
-        r["E_grid_brem"] = E_brem
-        r["brem"] = np.interp(np.asarray(r["E_grid"], float), E_brem, brem_wide)
-        # Return this record's GPU scratch on the SAME A2 cadence the live sweep
-        # uses in _spectrum_case. _brem_for_case runs the full transport+spectrum
-        # path in-process, so without this the CuPy reserved pool grows and
-        # fragments record-over-record until a long `pyrite rebrem` fills the card
-        # (Task 8). Guarded like the live path; skipped cases never reach here, so
-        # resumability (deadline break, save_cb, skip-at-target) is untouched.
-        if runner._RESOURCE_POLICY.gpu:
-            runner._maybe_free_pool()
-        done = k
-        if on_progress is not None:
-            on_progress(k, len(todo), n_skipped)
-        if save_cb is not None and save_every and (k % save_every == 0):
-            save_cb(results)
-            if progress:
-                print(f"    ...saved progress ({k}/{len(todo)})")
-        if progress and (k % 50 == 0 or k == len(todo)):
-            print(f"  {k}/{len(todo)}  ({time.perf_counter() - t0:.0f} s)")
-    if save_cb is not None:
-        save_cb(results)  # final save
-    if status is not None:
-        status["complete"] = not broke
-    return done
+        r["case"].update(updates)
+        _repair_brem_record(r, E_brem, _brem_for_case)
+        cadence.completed()
+    return cadence.finish()
+
+
+def _repair_brem_record(r, E_brem, _brem_for_case):
+    """Score one brem record through the live runner and release GPU scratch."""
+    import numpy as np
+
+    brem_wide = _brem_for_case(r["case"], E_brem)
+    r["brem_wide"] = brem_wide
+    r["E_grid_brem"] = E_brem
+    r["brem"] = np.interp(np.asarray(r["E_grid"], float), E_brem, brem_wide)
+    # Return this record's GPU scratch on the SAME A2 cadence the live sweep
+    # uses in _spectrum_case. _brem_for_case runs the full transport+spectrum
+    # path in-process, so without this the CuPy reserved pool grows and
+    # fragments record-over-record until a long `pyrite rebrem` fills the card
+    # (Task 8). Guarded like the live path; skipped cases never reach here, so
+    # resumability (deadline break, save_cb, skip-at-target) is untouched.
+    if runner._RESOURCE_POLICY.gpu:
+        runner._maybe_free_pool()
 
 
 def repair_checkpoint(checkpoint_path, save_every=100, max_seconds=None, status=None, **kw):
@@ -626,47 +538,6 @@ def repair_checkpoint(checkpoint_path, save_every=100, max_seconds=None, status=
     return results
 
 
-def _target_cxr_grid(
-    sweep,
-    r,
-    line_step_eV,
-    from_config,
-    cxr_start_eV=None,
-    line_stop_eV=None,
-):
-    """The line grid a reline should land on for record ``r``.
-
-    ``line_step_eV`` -> uniform grid at that spacing over the record's current
-    [E_grid[0], E_grid[-1]]. Else ``from_config`` -> the material's CURRENT
-    E_grid_line_by_energy at this record's E0 (the bespoke-grid workflow), via
-    the same lookup build_cases uses. Else the record's existing grid."""
-    import numpy as np
-
-    eg = np.asarray(r["E_grid"], float)
-    if from_config and sweep is not None:
-        from ..campaign.sweep import _cxr_grid_for_energy, sweep_crystal_params
-
-        # Coordinates only: a returned policy payload describes a resolution the
-        # runner would refine from its own trajectories, and reline pins the
-        # explicit coordinates instead (it drops `case["line_grid_policy"]`).
-        coordinates, _policy = _cxr_grid_for_energy(
-            sweep, sweep_crystal_params(sweep), float(r["case"]["E0_keV"])
-        )
-        base = np.asarray(coordinates, float)
-    else:
-        base = eg
-    if any(value is not None for value in (cxr_start_eV, line_stop_eV, line_step_eV)):
-        from ..checkpoints.recompute_defaults import uniform_bounds
-
-        start, stop, step = uniform_bounds(base)
-        return np.arange(
-            start if cxr_start_eV is None else float(cxr_start_eV),
-            stop if line_stop_eV is None else float(line_stop_eV),
-            step if line_step_eV is None else float(line_step_eV),
-        )
-    return base
-
-
 def repair_cxr_spec(
     results,
     material,
@@ -694,7 +565,7 @@ def repair_cxr_spec(
     Planar ``spec_channeling`` is independently rescored from the case on the
     target grid; brem repair preserves this separate component.
 
-    Target line grid per record (see :func:`_target_cxr_grid`): ``line_step_eV``
+    Target line grid per record: ``line_step_eV``
     (explicit uniform spacing), else ``from_config`` rebuilds it from
     ``material``'s current ``E_grid_line_by_energy`` at the record's E0 (edit
     the catalog, ``pyrite reline`` re-runs lines on the new grid), else the
@@ -715,10 +586,6 @@ def repair_cxr_spec(
     deadline cut the pass short (``True`` otherwise). Both default to a no-op so
     the local path is byte-identical to today. Returns the number of records
     actually relined; mutates in place."""
-    import time
-
-    import numpy as np
-
     sweep = None
     if from_config:
         try:
@@ -737,106 +604,80 @@ def repair_cxr_spec(
         except Exception:
             sweep = None  # unknown/derived stem -> fall back to each record's grid
 
-    todo = []
-    n_skipped = 0
-    for name in results:
-        for r in results[name].values():
-            target = _target_cxr_grid(
-                sweep,
-                r,
-                line_step_eV,
-                from_config,
-                cxr_start_eV,
-                line_stop_eV,
-            )
-            eg = np.asarray(r["E_grid"], float)
-            spec = r.get("spec")
-            finite = spec is not None and np.isfinite(np.asarray(spec)).all()
-            if r["case"].get("channeling") is not None:
-                channeling = r.get("spec_channeling")
-                finite = finite and channeling is not None
-                if channeling is not None:
-                    channeling = np.asarray(channeling)
-                    finite = (
-                        finite and channeling.shape == eg.shape and np.isfinite(channeling).all()
-                    )
-            grid_ok = eg.shape == target.shape and np.allclose(eg, target)
-            ne_ok = cxr_ne is None or int(r["case"].get("Ne", -1)) == int(cxr_ne)
-            fidelity_ok = fidelity is None or r["case"].get("line_profile") == fidelity
-            at_target = finite and grid_ok and ne_ok and fidelity_ok
-            if only_stale and not redo_all and at_target:
-                n_skipped += 1
-                continue
-            todo.append((r, target))
-    for r, _ in todo:
-        if r.get("spec_channeling") is not None and r["case"].get("channeling") is None:
-            raise ValueError("cannot reline spec_channeling without its case channeling metadata")
-    if on_progress is not None:
-        on_progress(0, len(todo), n_skipped)
+    todo, n_skipped = _plan_cxr(
+        results,
+        sweep,
+        only_stale,
+        redo_all,
+        cxr_ne,
+        fidelity,
+        line_step_eV,
+        from_config,
+        cxr_start_eV,
+        line_stop_eV,
+    )
+    cadence = _RepairProgress(
+        results,
+        len(todo),
+        n_skipped,
+        save_every,
+        save_cb,
+        on_progress,
+        max_seconds,
+        status,
+    )
     if not todo:
         print("nothing to reline (all records already at target line grid / Ne)")
-        if status is not None:
-            status["complete"] = True
-        return 0
+        return cadence.finish()
     print(f"relining {len(todo)} record(s)...")
-    t0 = time.perf_counter()
-    deadline = None if max_seconds is None else time.monotonic() + max_seconds
-    done = 0
-    broke = False
-    for k, (r, target) in enumerate(todo, 1):
-        if deadline is not None and time.monotonic() >= deadline:
-            broke = True
+    cadence.start()
+    for r, target, updates in todo:
+        if cadence.expired():
             break
-        c = r["case"]
-        if cxr_ne is not None:
-            c["Ne"] = int(cxr_ne)
-        if fidelity is not None:
-            c["line_profile"] = fidelity
-        # `spec` is always the incoherent line sum; a coherent/both checkpoint
-        # (detected by an existing `spec_coherent`) gets BOTH arrays refreshed
-        # onto the new grid from ONE re-transport, so `spec_coherent` never goes
-        # stale relative to `spec`/`E_grid`. Old pre-dual coherent checkpoints
-        # (no `spec_coherent` key) are orphaned by design -- reline only ever
-        # re-derives the incoherent `spec` for those.
-        want_coherent = "spec_coherent" in r
-        spec, spec_coherent, spec_characteristic = runner._cxr_pair_for_case(
-            c, target, want_coherent=want_coherent, return_characteristic=True
-        )
-        if c.get("channeling") is not None:
-            from ..montecarlo.runner.channeling_emission import rescore_channeling_spectrum
+        r["case"].update(updates)
+        _repair_cxr_record(r, target)
+        cadence.completed()
+    return cadence.finish()
 
-            r["spec_channeling"] = rescore_channeling_spectrum(c, target)
-        r["spec"] = spec
-        r["spec_characteristic"] = spec_characteristic
-        if want_coherent:
-            r["spec_coherent"] = spec_coherent
-        r["E_grid"] = target
-        # A windowed (#101) target has no triple form; keep its exact coordinates.
-        c["E_grid_line"] = (
-            (float(target[0]), float(target[-1]), len(target))
-            if is_uniform_grid(target)
-            else encode_energy_grid(target)
-        )
-        # Recompute pins explicit coordinates, which outrank any automatic
-        # case-local policy the record was built under (issue #101). Drop the
-        # policy so the stored case does not claim a resolution it no longer has.
-        c.pop("line_grid_policy", None)
-        bw = r.get("brem_wide")
-        egb = r.get("E_grid_brem")
-        if bw is not None and egb is not None:
-            r["brem"] = np.interp(target, np.asarray(egb, float), np.asarray(bw, float))
-        done = k
-        if on_progress is not None:
-            on_progress(k, len(todo), n_skipped)
-        if save_cb is not None and save_every and (k % save_every == 0):
-            save_cb(results)
-        if k % 50 == 0 or k == len(todo):
-            print(f"  {k}/{len(todo)}  ({time.perf_counter() - t0:.0f} s)")
-    if save_cb is not None:
-        save_cb(results)
-    if status is not None:
-        status["complete"] = not broke
-    return done
+
+def _repair_cxr_record(r, target):
+    """Refresh the line companions together, retaining the wide brem source."""
+    import numpy as np
+
+    c = r["case"]
+    # `spec` is always the incoherent line sum; a coherent/both checkpoint
+    # (detected by an existing `spec_coherent`) gets BOTH arrays refreshed
+    # onto the new grid from ONE re-transport, so `spec_coherent` never goes
+    # stale relative to `spec`/`E_grid`. Old pre-dual coherent checkpoints
+    # (no `spec_coherent` key) are orphaned by design -- reline only ever
+    # re-derives the incoherent `spec` for those.
+    want_coherent = "spec_coherent" in r
+    spec, spec_coherent, spec_characteristic = runner._cxr_pair_for_case(
+        c, target, want_coherent=want_coherent, return_characteristic=True
+    )
+    if c.get("channeling") is not None:
+        from ..montecarlo.runner.channeling_emission import rescore_channeling_spectrum
+
+        r["spec_channeling"] = rescore_channeling_spectrum(c, target)
+    r["spec"] = spec
+    r["spec_characteristic"] = spec_characteristic
+    if want_coherent:
+        r["spec_coherent"] = spec_coherent
+    r["E_grid"] = target
+    # A windowed (#101) target has no triple form; keep its exact coordinates.
+    c["E_grid_line"] = (
+        (float(target[0]), float(target[-1]), len(target))
+        if is_uniform_grid(target)
+        else encode_energy_grid(target)
+    )
+    # Recompute pins explicit coordinates, which outrank any automatic
+    # case-local policy the record was built under (issue #101). Drop the
+    # policy so the stored case does not claim a resolution it no longer has.
+    c.pop("line_grid_policy", None)
+    bw = r.get("brem_wide")
+    egb = r.get("E_grid_brem")
+    if bw is not None and egb is not None:
+        r["brem"] = np.interp(target, np.asarray(egb, float), np.asarray(bw, float))
 
 
 def recxr_checkpoint(
