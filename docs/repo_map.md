@@ -667,6 +667,7 @@ Canonical local performance-artifact lifecycle: inventory, analysis, and preview
 
 ### `checkpoints/recompute.py`
 Checkpoint repair and recompute owner for both component datasets. Per-record `repair_brem_wide` / `repair_cxr_spec`, checkpoint-level `repair_checkpoint` / `recxr_checkpoint`, and batch `rebrem_checkpoints` / `recxr_checkpoints` share one progress callback. Enumerates checkpoint stems and resolves per-material identity and fidelity defaults. Folded from the retired `rebrem.py`/`reline.py`.
+Pure eligibility, target-grid validation and case-parameter planning live in `_repair_planning.py`; `_repair_progress.py` owns the shared deadline, callback and save cadence. Component execution stays in `recompute.py`, using the live runner scorers. Repair contracts live in `tests/checkpoint/test_recompute.py`.
 - Deps: `checkpoints.persistence`, `checkpoints._checkpoint_store`, `checkpoints.recompute_defaults`, `_progress`, `energy_grid.encoding`, `montecarlo`; imports no run driver package.
 
 ### `cli/commands/recompute.py`
