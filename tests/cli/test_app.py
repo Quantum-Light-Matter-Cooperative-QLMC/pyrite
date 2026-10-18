@@ -2,6 +2,7 @@
 
 import importlib
 
+import pytest
 from click.testing import CliRunner
 
 from pyrite import cli
@@ -29,6 +30,7 @@ def test_app_help_imports_only_the_group(monkeypatch):
     assert "pixels" in result.output
     assert "compare" in result.output
     assert "channeling" in result.output
+    assert "transition-radiation" in result.output
     assert imported == ["pyrite.cli.commands.app"]
 
 
@@ -215,45 +217,48 @@ def test_app_launch_without_apps_extra_names_the_install_hint(monkeypatch):
     assert launched == []
 
 
-def test_channeling_launch_and_export_have_no_material_argument(monkeypatch, tmp_path):
+@pytest.mark.parametrize("name", ["channeling", "transition-radiation"])
+def test_channeling_launch_and_export_have_no_material_argument(monkeypatch, tmp_path, name):
     calls = []
     monkeypatch.setattr(views.subprocess, "run", lambda *a, **k: calls.append((a, k)))
     runner = CliRunner()
     launched = runner.invoke(
-        cli.command, ["app", "channeling", "launch", "--edit", "--watch", "--tunnel", "--no-token"]
+        cli.command, ["app", name, "launch", "--edit", "--watch", "--tunnel", "--no-token"]
     )
     assert launched.exit_code == 0, launched.output
     argv = calls[0][0][0]
+    app = views.CHANNELING if name == "channeling" else views.TRANSITION_RADIATION
     assert argv[3:] == [
         "edit",
         "--watch",
         "--port",
-        "2722",
+        str(app.tunnel_port),
         "--no-token",
-        views.CHANNELING.notebook,
+        app.notebook,
     ]
     assert "--material" not in argv
-    assert views.CHANNELING.tunnel_port not in {
+    assert app.tunnel_port not in {
         analyze.TUNNEL_PORT,
         viewer.TUNNEL_PORT,
         check.TUNNEL_PORT,
         views.PIXELS.tunnel_port,
         views.COMPARE.tunnel_port,
     }
-    exported = runner.invoke(cli.command, ["app", "channeling", "export"])
+    exported = runner.invoke(cli.command, ["app", name, "export"])
     assert exported.exit_code == 0, exported.output
     assert calls[1][0][0] == views._smoke_command(
-        views.CHANNELING,
+        app,
         None,
-        tmp_path / "pyrite-output/results/pyrite_channeling.html",
+        tmp_path / f"pyrite-output/results/pyrite_{name}.html",
     )
-    smoke = runner.invoke(cli.command, ["app", "channeling", "launch", "--smoke"])
+    smoke = runner.invoke(cli.command, ["app", name, "launch", "--smoke"])
     assert smoke.exit_code == 0, smoke.output
     assert calls[2][0][0][3:5] == ["export", "html"]
-    assert runner.invoke(cli.command, ["app", "channeling", "launch", "silicon"]).exit_code == 2
+    assert runner.invoke(cli.command, ["app", name, "launch", "silicon"]).exit_code == 2
 
 
-def test_channeling_missing_extra_and_failed_subprocess(monkeypatch):
+@pytest.mark.parametrize("name", ["channeling", "transition-radiation"])
+def test_channeling_missing_extra_and_failed_subprocess(monkeypatch, name):
     import subprocess
 
     def fail(*args, **kwargs):
@@ -262,12 +267,12 @@ def test_channeling_missing_extra_and_failed_subprocess(monkeypatch):
     monkeypatch.setattr(views.subprocess, "run", fail)
     runner = CliRunner()
     for action in ("launch", "export"):
-        result = runner.invoke(cli.command, ["app", "channeling", action])
+        result = runner.invoke(cli.command, ["app", name, action])
         assert result.exit_code == 1
         assert "marimo exited with status 7" in result.output
     _hide_modules(monkeypatch, "marimo")
     for action in ("launch", "export"):
-        result = runner.invoke(cli.command, ["app", "channeling", action])
+        result = runner.invoke(cli.command, ["app", name, action])
         assert result.exit_code == 1
         assert 'pip install "pyrite-mc[apps]"' in result.output
         assert "uv sync --extra apps" in result.output
@@ -285,6 +290,12 @@ for argv in (["--help"], ["app", "--help"], ["app", "channeling", "--help"],
              ["app", "channeling", "launch", "--help"], ["app", "channeling", "export", "--help"]):
     result = CliRunner().invoke(command, argv)
     assert result.exit_code == 0, result.output
+for argv in (["app", "transition-radiation", "--help"],
+             ["app", "transition-radiation", "launch", "--help"],
+             ["app", "transition-radiation", "export", "--help"]):
+    result = CliRunner().invoke(command, argv)
+    assert result.exit_code == 0, result.output
+assert "pyrite.apps.transition_radiation_app" not in sys.modules
 assert "pyrite.apps.channeling_app" not in sys.modules
 assert "pyrite._backend" not in sys.modules
 assert "marimo" not in sys.modules

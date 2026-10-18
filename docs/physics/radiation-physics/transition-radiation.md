@@ -1,6 +1,6 @@
 # Transition radiation: omission bound and decisions
 
-PyRITE does not emit transition radiation (TR). This page records, for each application, whether that omission is bounded below the statistical precision of a detected observable, or whether TR must be implemented (#103). The decision belongs to an observable, a band and a geometry, not to a beam energy. The small energy an electron loses to TR is never used as evidence: a few eV per interface can still dominate a weak soft-X-ray band.
+PyRITE emits transition radiation (TR) as an opt-in planar-stack component, including coherent bunch emission (CTR). See the [TR/CTR demo](../../guides/transition-radiation-demo.md) for a notebook and reference profiles, and [Run-case component](#run-case-component) for selection and limits. This page also records where the default omission is bounded below the statistical precision of a detected observable. The decision belongs to an observable, a band and a geometry, not to a beam energy. The small energy an electron loses to TR is never used as evidence: a few eV per interface can still dominate a weak soft-X-ray band.
 
 The screening calculation lives in `pyrite.montecarlo.spectrum.transition_radiation`; the study that produces the numbers below is `checks/transition_radiation_omission.py`. Neither is a production emission component.
 
