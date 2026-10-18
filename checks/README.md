@@ -30,6 +30,7 @@ run through the collector.
 
 | Artifact | Purpose |
 |---|---|
+| `axial_escape_accounting.py` | Bounded deterministic Si TDS plane-wave comparison: a position-diagonal sink cannot identify outgoing Fourier-window escape for different incident momenta (#548). Research only; no physical escape model or validation verdict. |
 | `channeling_material_survey.py` | Catalog-wide thermal, shell-oscillator, plane-incidence and static-profile availability inventory (#525). JSON report only; no physics-validation verdict or ledger evidence record. |
 | `trajectory_viewer_benchmark.py` | Tracks-only Plotly/PyVista loading, construction, camera screenshot, filtering and memory probe on identical saved captures. Replication diagnoses resource scaling, not transport physics; no ledger records. |
 | `physics_adapter_overhead.py` | Bounded default-physics CPU phase benchmark across matched source revisions; separate startup/warm timings, source keys, output hashes and RSS. No transport-validity claim; see [overhead evidence](../docs/repo-design/compute/physics-adapter-overhead.md). |

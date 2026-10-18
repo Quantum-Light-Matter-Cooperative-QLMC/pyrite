@@ -1,7 +1,7 @@
 # Optional photon transport
 
 Status: architecture agreed for [issue #341](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/341);
-recorded in [ADR-0018](../../adr/0018-photon-transport-source-and-scoring.md).
+recorded in [ADR-0020](../../adr/0020-photon-transport-source-and-scoring.md).
 The photon tracker described here is not implemented or validated. Current
 production behavior remains [straight-ray escape](../../physics/radiation-physics/photon-escape-and-dispersion.md).
 
