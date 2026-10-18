@@ -569,6 +569,11 @@ def trajectory_volume_data(rec_or_case, *, Ne=40, seed=0, realistic=False, beam_
 
     Not new physics -- delegates to the already-ledgered ``_trajectory_data``.
     """
+    from ...montecarlo.trajectory_selection import TrajectorySelection
+    from ..trajectory_capture import saved_trajectory_data
+
+    if isinstance(rec_or_case, TrajectorySelection):
+        return saved_trajectory_data(rec_or_case)[1]
     case = _case_of(rec_or_case)
     if realistic:
         # true finite crystal + physical beam spot: transport samples each entry
@@ -636,6 +641,18 @@ def trajectory_volume_figure(
     :func:`_exit_paths_3d`). Use :func:`dataset_t_max` and :func:`frame_reveal_fs`
     to derive a cutoff for a given animation frame.
     """
+    from ...montecarlo.trajectory_selection import TrajectorySelection
+    from ..trajectory_capture import saved_trajectory_data
+
+    if isinstance(rec_or_case, TrajectorySelection):
+        case, data = saved_trajectory_data(rec_or_case)
+        return trajectory_volume_figure_from_data(
+            case,
+            data,
+            realistic=realistic,
+            beam_fwhm_mm=beam_fwhm_mm,
+            reveal_until_fs=reveal_until_fs,
+        )
     data = trajectory_volume_data(
         rec_or_case, Ne=Ne, seed=seed, realistic=realistic, beam_fwhm_mm=beam_fwhm_mm
     )

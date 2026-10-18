@@ -84,6 +84,13 @@ def penetration_survival_chart(
     :func:`pyrite.plots.plot_penetration_survival`. ``tilt`` picks the polar tilt
     (nearest; default closest to normal incidence). Returns an
     :class:`altair.Chart`, or ``None`` when there are no cases."""
+    from ...montecarlo.trajectory_selection import TrajectorySelection
+    from ..trajectory_capture import saved_trajectory_data
+
+    saved = None
+    if isinstance(cases_or_results, TrajectorySelection):
+        case, saved = saved_trajectory_data(cases_or_results)
+        cases_or_results = [case]
     cases = _trajectory_cases(cases_or_results)
     if not cases:
         return None
@@ -94,7 +101,7 @@ def penetration_survival_chart(
     for E0 in energies:
         c = next((c for c in cases if c["E0_keV"] == E0 and c["tilt_deg"] == t), None)
         if c is not None:
-            data_by_energy[E0] = _trajectory_data(c, Ne, seed)
+            data_by_energy[E0] = saved if saved is not None else _trajectory_data(c, Ne, seed)
     if not data_by_energy:
         return None
     df = survival_frame(data_by_energy, n_bins=n_bins, depth_frac=depth_frac)
@@ -288,6 +295,11 @@ def trajectory_chart(
     arrows. Pan/zoom and hover individual tracks. Keep ``Ne`` modest (vector
     marks, not a datashader raster -- see the module docstring). Returns an
     :class:`altair.Chart`, or ``None`` when the cascade is empty."""
+    from ...montecarlo.trajectory_selection import TrajectorySelection
+    from ..trajectory_capture import saved_trajectory_data
+
+    if isinstance(rec_or_case, TrajectorySelection):
+        rec_or_case, data = saved_trajectory_data(rec_or_case)
     case = _case_of(rec_or_case)
     if data is None:
         data = _trajectory_data(case, Ne, seed)

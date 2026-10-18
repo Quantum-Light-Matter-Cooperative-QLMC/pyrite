@@ -764,3 +764,13 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** degrees/sign/azimuth, dimensionless c*time/position slope, conditional versus marginal RMS; exact matching-face cancellation at signed and grazing angles; zero-front stream compatibility; joint Gaussian factor versus independent ray phases and brute-force averaging; matched/reversed fronts and conservative interval/window bounds
 - **Anchor:** `tests/montecarlo/test_bunch_front_tilt.py`; `tests/scan/test_bunch_front_tilt.py`; `tests/scan/test_bunch_front_matching.py`
 - **Notes:** Monoenergetic parallel Gaussian/point analytic sources, residual Gaussian timing or PointBunch. Front tilt changes timing, not the mean beam direction or target orientation. Fresh-context verifier independently derived the source geometry before inspecting implementation; equations, sign, amplitude/intensity factors and matching-face convention agree. Synthetic complete-reducer tests cover finite and infinite slabs at fixed physical population, and temporal amplitude filtering. No human sign-off claimed. [derivation](beam-transport/linear-bunch-front-tilt.md)
+
+## `trajectory-depth-loss-profile`
+
+- **Claim:** saved-segment continuous-loss depth attribution, per stored layer, conserving covered segment loss
+- **Code:** `montecarlo/trajectory_summary.py::depth_loss_profile`
+- **Source:** explicit uniform-along-segment analysis convention in [transport outputs](../physics/beam-transport/transport-outputs.md#continuous-loss-depth-attribution)
+- **Status:** anchored
+- **Checks:** keV/bin units; overlap partition; reversed segments; transverse midpoint convention; partial coverage; no hard-deposit or dose interpretation
+- **Anchor:** `tests/montecarlo/test_trajectory_summary.py::test_depth_loss_analytic_and_transverse`; `::test_streamed_secondary_energy_ledger_matches_canonical`
+- **Notes:** Fresh-context verifier independently derived the overlap expression before source inspection and returned `rederived`; analytic anchors pass. [Validation write-up](beam-transport/trajectory-depth-loss-profile.md). Human sign-off remains #277.

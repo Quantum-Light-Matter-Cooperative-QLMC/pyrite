@@ -812,3 +812,14 @@ CPU-only EasyGDF adapter: raw GPT time/screen selection and coordinate inspectio
 correlated weighted resampling, and explicit lab-to-entrance projection.
 `BeamSpec` resolves the source into hashed `Case.gdf_source` metadata; transport
 receives numeric initial-state arrays through its existing backend boundary.
+
+### Saved trajectory analysis
+
+`montecarlo/trajectory_summary.py` owns bounded row-only histogram reductions and
+per-primary summary streaming; `trajectory_balance.py` reuses the canonical
+secondary energy ledger with local pair-event indices.
+`plots/trajectory_capture.py` adapts bounded whole-history selections to the
+existing shared trajectory projection; `plots/altair/trajectory_summary.py`
+renders the summary tables. `apps/viewer.py::load_saved_capture` is the thin
+trace-app loading owner. `campaign/beam_metrics.py::capture_beam_metrics` reads
+a separately bounded prefix of initial sampled particles.

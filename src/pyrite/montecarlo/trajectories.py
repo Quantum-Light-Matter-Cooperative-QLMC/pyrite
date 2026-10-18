@@ -931,7 +931,11 @@ def read_trajectory_artifact(
 
 
 def iter_electron_row_blocks(
-    path: str | os.PathLike[str], max_rows: int
+    path: str | os.PathLike[str],
+    max_rows: int,
+    *,
+    fields: tuple[str, ...] | None = None,
+    include_shared: bool = True,
 ) -> Iterator[dict[str, Any]]:
     """Stream an artifact's transport result in whole-electron row blocks.
 
@@ -941,10 +945,15 @@ def iter_electron_row_blocks(
     electron alone has more, so host memory is bounded by the block, not the
     segment count. Blocks partition the rows and never split an electron.
 
+    ``fields`` restricts row columns; ``include_shared=False`` skips non-row
+    arrays and the eager history index. This mode bounds memory independently
+    of the number of histories (apart from a single oversized history).
+
     Raises
     ------
     TrajectoryArtifactError
-        Unreadable, incomplete, or pre-schema-2 artifact, or ``max_rows < 1``.
+        Unreadable, incomplete, or pre-schema-2 artifact, invalid fields,
+        or ``max_rows < 1``.
     """
     import h5py
 
@@ -964,10 +973,19 @@ def iter_electron_row_blocks(
             )
         view = transport_view(handle)
         row_names = view.row_fields()
-        shared = {key: _read_node(view[key]) for key in view if key not in row_names}
+        shared = (
+            {key: _read_node(view[key]) for key in view if key not in row_names}
+            if include_shared
+            else {}
+        )
+        if fields is not None:
+            unknown = set(fields) - set(row_names)
+            if unknown:
+                raise TrajectoryArtifactError(f"not stored row fields: {sorted(unknown)}")
+            row_names = list(fields)
         ids = view["electron_id" if "electron_id" in view else "elec_id"]
         n_rows = int(ids.shape[0])
-        index = view.electron_index()
+        index = view.electron_index() if include_shared else None
         start = 0
         while True:
             stop = min(start + max_rows, n_rows)

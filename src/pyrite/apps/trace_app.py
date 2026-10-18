@@ -25,6 +25,7 @@ def _():
         theme_switch,
     )
     from pyrite.apps._widgets import MaterialSelect
+    from pyrite.apps.viewer import saved_capture_panel
 
     # penetration_survival_chart / trajectory_chart can exceed Vega-Lite's
     # default 5000-row cap; vegafusion (shipped with marimo[recommended])
@@ -64,6 +65,7 @@ def _():
     )
 
     return (
+        saved_capture_panel,
         CAMERA_PRESETS,
         CATALOG,
         DEFAULT_ANGLES,
@@ -125,12 +127,7 @@ def _(mo, page_title, style_sheet, theme_switch):
 
 @app.cell
 def _(CAMERA_PRESETS, mo):
-    # Both 3D tabs expose the SAME camera control set. An explicit camera is
-    # what makes a snapshot match what you see: marimo's plotly component drops
-    # `scene.camera` relayout events, so a camera you drag to never reaches
-    # Python -- neither the modebar PNG (which re-renders from the spec marimo
-    # sent) nor the offscreen video render can see it. These controls put the
-    # view back in the figure spec, where both paths read it.
+    # Explicit camera controls keep the displayed figure and export view aligned.
     _VIEW_OPTIONS = ["default", *CAMERA_PRESETS, "custom"]
 
     def camera_controls(default_angles):
@@ -183,6 +180,34 @@ def _(CATALOG, MaterialSelect, mo):
     )
     material_ui
     return (material_ui,)
+
+
+@app.cell
+def _(mo):
+    capture_source_ui = mo.ui.dropdown(
+        ["Live transport", "Saved capture"], value="Live transport", label="Source"
+    )
+    capture_path_ui = mo.ui.text(label="Artifact path", full_width=True)
+    capture_first_ui = mo.ui.number(start=1, stop=1000, value=50, step=1, label="First histories")
+    capture_load_ui = mo.ui.run_button(label="Open saved capture")
+    mo.vstack([capture_source_ui, capture_path_ui, mo.hstack([capture_first_ui, capture_load_ui])])
+    return capture_source_ui, capture_path_ui, capture_first_ui, capture_load_ui
+
+
+@app.cell
+def _(capture_source_ui, capture_path_ui, capture_first_ui, capture_load_ui, mo):
+    from pyrite.apps.viewer import load_saved_capture
+
+    saved_capture = None
+    capture_error = None
+    if capture_source_ui.value == "Saved capture" and capture_load_ui.value:
+        try:
+            saved_capture = load_saved_capture(
+                capture_path_ui.value, first=int(capture_first_ui.value), max_segments=100_000
+            )
+        except (OSError, ValueError, RuntimeError, KeyError) as _error:
+            capture_error = str(_error)
+    return saved_capture, capture_error
 
 
 @app.cell
@@ -325,35 +350,21 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    # Transported-dataset cache. The penetration figure is a static full-reveal
-    # view (orbit/hover via Plotly, no client-side playback); this cache exists
-    # purely to avoid re-running Monte Carlo transport when an UNRELATED
-    # control (e.g. a different tab) reruns this cell but the transport
-    # parameters (case, Ne, seed, realistic, beam_fwhm) haven't changed.
+    # Cache transported rows independently of display controls.
     get_penetration_data, set_penetration_data = mo.state(None)
     return get_penetration_data, set_penetration_data
 
 
 @app.cell
 def _(mo):
-    # Render-status handoff between the eager render cell (below the tabs)
-    # and the lazy tab body: (render_key, error_str_or_None). Setting it
-    # after a render completes reruns the tab so the freshly cached video
-    # appears without another click.
+    # Render status lets the lazy tab discover completed exports.
     get_penetration_render_status, set_penetration_render_status = mo.state(None)
     return get_penetration_render_status, set_penetration_render_status
 
 
 @app.cell
 def _(mo):
-    # Survival-chart cache, same pattern as get_penetration_data above.
-    # penetration_survival_chart(...) runs its OWN fresh Ne=500-electron
-    # transport, so without caching it would redo that work every time the
-    # tab body reruns for ANY reason -- e.g. toggling Realistic mode, which
-    # the survival curve does not even depend on. Keyed on the smaller set of
-    # knobs the chart itself actually depends on (material, beam energy,
-    # polar tilt, thickness) in the tab body below. Altair charts are plain
-    # objects, so caching/reusing one is safe.
+    # Cache the live survival calculation independently of the track view.
     get_penetration_survival, set_penetration_survival = mo.state(None)
     return get_penetration_survival, set_penetration_survival
 
@@ -403,12 +414,7 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    # The interactive Plotly frame animation is gone: the tab shows a static
-    # full-reveal figure plus an
-    # explicit Render button that produces a smooth, looping fixed-camera
-    # video via pyrite.plots.plotly.render.render_reveal_animation.
-    # Rendering is a blocking multi-second-to-minutes kaleido/ffmpeg job, so
-    # it stays opt-in behind a button rather than running on every rerun.
+    # Animation rendering stays opt-in behind a run button.
     penetration_render_frames_ui = mo.ui.slider(
         start=24, stop=120, value=60, step=12, label="Render frames", show_value=True
     )
@@ -465,6 +471,10 @@ def _(
 
 @app.cell
 def _(
+    saved_capture_panel,
+    capture_source_ui,
+    saved_capture,
+    capture_error,
     MATERIAL,
     apply_altair_theme,
     apply_plotly_theme,
@@ -594,11 +604,7 @@ def _(
                     secondary_threshold_eV=float(penetration_secondary_threshold_ui.value),
                 )
 
-        # Survival-chart cache: penetration_survival_chart runs its OWN fresh
-        # Ne=500-electron transport, so without caching it would redo that work
-        # every time the tab body reruns for ANY reason -- e.g. toggling
-        # Realistic mode, which the survival curve does not even depend on.
-        # Keyed on just the knobs the chart itself depends on.
+        # Reuse survival results while only display settings change.
         _survival_key = (
             MATERIAL,
             penetration_energy_keV,
@@ -620,10 +626,7 @@ def _(
         _beam_fwhm = float(penetration_beam_fwhm_ui.value)
         _realistic = penetration_realistic_ui.value
 
-        # The transported dataset depends only on (case, Ne, seed, realistic,
-        # beam_fwhm). Cache the whole `data` dict in mo.state keyed on that
-        # tuple so Monte Carlo transport runs once per parameter set, not once
-        # per rerun of an unrelated control.
+        # Reuse transported rows while their simulation parameters are unchanged.
         _data_key = (
             _nc["name"],
             _nc["E0_keV"],
@@ -651,10 +654,7 @@ def _(
             # redoing transport.
             set_penetration_data((_data_key, _data, _nc))
 
-        # Static full-reveal figure (orbit/hover intact); the old interactive
-        # Plotly frame animation was intentionally removed; the static figure remains.
-        # workstream 2. Smooth playback now comes from the Render button below,
-        # which prerenders a fixed-camera video via render_reveal_animation.
+        # Filter the cached full-reveal data before building display traces.
         _max_generation = int(penetration_max_generation_ui.value)
         _min_energy = float(penetration_min_energy_ui.value)
         _view_data = visible_trajectory_data(
@@ -697,12 +697,7 @@ def _(
             f"Iavg={_beam_metrics.average_current_a * 1e9:.3g} nA"
         )
 
-        # Render button: prerender a smooth, looping fixed-camera video of the
-        # SAME reveal sequence the old client-side animation played, offscreen
-        # via kaleido + ffmpeg (see pyrite.plots.plotly.render). Cached
-        # under ~/.cache/pyrite/viewer-renders keyed on every parameter the
-        # render depends on, so an unchanged parameter set short-circuits to
-        # the existing file instead of re-rendering.
+        # Export the same cached dataset and explicit camera shown above.
         _custom_view = penetration_camera_view_ui.value == "custom"
         _camera_controls = mo.hstack(
             [
@@ -953,7 +948,14 @@ def _(
         ]
         return mo.vstack(_parts)
 
-    return (penetration_tab,)
+    def selected_penetration_tab():
+        if capture_source_ui.value == "Saved capture":
+            return saved_capture_panel(
+                saved_capture, capture_error, mo=mo, theme=_theme, camera=penetration_camera
+            )
+        return penetration_tab()
+
+    return (selected_penetration_tab,)
 
 
 @app.cell
@@ -1139,7 +1141,7 @@ def _(
 
 
 @app.cell
-def _(MATERIAL, crystal_tab, mo, penetration_tab):
+def _(MATERIAL, crystal_tab, mo, selected_penetration_tab):
     # Two views, one 3D scene each; lazy so the un-viewed tab never runs
     # transport or builds a lattice figure.
     if MATERIAL is None:
@@ -1150,7 +1152,7 @@ def _(MATERIAL, crystal_tab, mo, penetration_tab):
     else:
         view = mo.ui.tabs(
             {
-                "Trace": penetration_tab,
+                "Trace": selected_penetration_tab,
                 "Structure": crystal_tab,
             },
             lazy=True,

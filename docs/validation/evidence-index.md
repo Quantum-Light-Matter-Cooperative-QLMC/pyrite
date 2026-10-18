@@ -19,6 +19,7 @@ beam-transport/adaptive-sample-size-stopping
 beam-transport/beam-energy-spread-injection
 beam-transport/beam-phase-space-injection
 beam-transport/beam-phase-space-metrics
+beam-transport/trajectory-depth-loss-profile
 beam-transport/linear-bunch-front-tilt
 beam-transport/gpt-gdf-injection
 beam-transport/coherent-line-grid-fringe-spacing

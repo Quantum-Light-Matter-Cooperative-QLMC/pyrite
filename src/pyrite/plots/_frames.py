@@ -372,6 +372,12 @@ def _trajectory_data(
             else {}
         ),
     )
+    return _trajectory_from_transport(case, segs, beam, n_hat, total_thickness_ang)
+
+
+def _trajectory_from_transport(case, segs, beam, n_hat, total_thickness_ang):
+    """Project transported or saved rows into the existing display contract."""
+    abs_layers = case.get("abs_layers")
     e1, e2 = _beam_detector_basis(beam, n_hat)
     L, v, r = segs["L_ang"], segs["v_hat"], segs["r_mid"]
     start = r - 0.5 * L[:, None] * v

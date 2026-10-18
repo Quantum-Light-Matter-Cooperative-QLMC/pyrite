@@ -14,6 +14,8 @@ launcher and the notebook share lives lower still, in
 :mod:`pyrite._app_defaults`, so neither package has to import the other.
 """
 
+from typing import Any
+
 from .._app_defaults import get_viewer_default, set_viewer_default
 from .._env import env_value
 
@@ -45,3 +47,62 @@ def initial_material(cli_args, persisted_default):
     if persisted_default:
         return persisted_default
     return "hopg"
+
+
+def load_saved_capture(
+    path: str,
+    *,
+    first: int = 50,
+    max_segments: int = 100_000,
+) -> tuple[Any, dict[str, Any], dict[str, Any]]:
+    """Load bounded whole histories for the trace app without running transport."""
+    from ..montecarlo.trajectory_selection import select_trajectories
+    from ..plots.trajectory_capture import saved_trajectory_data
+
+    selection = select_trajectories(path, first=first)
+    case, data = saved_trajectory_data(selection, max_segments=max_segments)
+    return selection, case, data
+
+
+def saved_capture_panel(
+    saved_capture: Any,
+    error: str | None,
+    *,
+    mo: Any,
+    theme: str,
+    camera: dict,
+) -> Any:
+    """Render the trace app saved-source panel from already loaded rows."""
+    from ..plots.altair.trajectories import penetration_survival_chart, trajectory_chart
+    from ..plots.plotly.trajectories import trajectory_volume_figure_from_data
+    from ._design import apply_altair_theme, apply_plotly_theme
+
+    if saved_capture is None:
+        return mo.md(error or "Enter an artifact path and open a saved capture.")
+    _selection, _saved_case, _saved_data = saved_capture
+    _saved_volume = trajectory_volume_figure_from_data(_saved_case, _saved_data)
+    apply_plotly_theme(_saved_volume, theme)
+    _saved_volume.update_scenes(camera=camera)
+    return mo.vstack(
+        [
+            mo.md(
+                f"**Saved capture:** {_selection.histories} histories, {_selection.segments:,} segments. "
+                "Fractions describe this selection."
+            ),
+            mo.ui.plotly(_saved_volume),
+            mo.hstack(
+                [
+                    mo.ui.altair_chart(
+                        apply_altair_theme(
+                            trajectory_chart(_saved_case, data=_saved_data, width=420),
+                            theme,
+                        )
+                    ),
+                    mo.ui.altair_chart(
+                        apply_altair_theme(penetration_survival_chart(_selection, width=420), theme)
+                    ),
+                ],
+                wrap=True,
+            ),
+        ]
+    )
