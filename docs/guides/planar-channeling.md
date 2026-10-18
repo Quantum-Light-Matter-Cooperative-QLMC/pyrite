@@ -109,7 +109,7 @@ To enable the zone on your own single-crystal profile:
 ```bash
 pyrite numerics precision disable my_scan --cxr-trials 300 --brem-trials 150
 pyrite physics set my_scan \
-  --channeling-model planar --channeling-plane 1 -1 0 \
+  --channeling-model planar --channeling-plane 1 1 0 \
   --radiative-model uncoupled --emission incoherent
 pyrite numerics set my_scan --energy-model midpoint
 pyrite profile set my_scan --detector forward
