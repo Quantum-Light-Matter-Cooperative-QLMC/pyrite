@@ -266,7 +266,7 @@ def test_nonrelativistic_limit(tmp_path):
 
 def test_device_upload_boundary_accepts_only_numeric_arrays(tmp_path, monkeypatch):
     """Exercise the CUDA-shared uploader with NumPy storage, without a GPU."""
-    from pyrite.montecarlo.transport import api, batching
+    from pyrite.montecarlo.transport import batching, host_pass
     from pyrite.montecarlo.transport.lut import TransportLUTConfig
 
     uploaded = []
@@ -289,7 +289,7 @@ def test_device_upload_boundary_accepts_only_numeric_arrays(tmp_path, monkeypatc
     def with_numeric_backend(core, xp, *args, **kwargs):
         return original(core, NumericBackend(), *args, **kwargs)
 
-    monkeypatch.setattr(api, "_run_per_electron_transport", with_numeric_backend)
+    monkeypatch.setattr(host_pass, "_run_per_electron_transport", with_numeric_backend)
     path = write_gdf(tmp_path / "beam.gdf")
     case = build_cases(gdf_sweep(path), n_electrons=2, n_electrons_brem=2)[0]
     result = simulate_trajectories(

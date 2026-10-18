@@ -568,3 +568,30 @@ def test_pre_adapter_seeded_cascade_baseline(monkeypatch):
             "launch_kind": segments["secondary_tracks"]["launch_kind"].tolist(),
         },
     )
+
+
+def test_cascade_receives_exactly_the_public_parameters(monkeypatch):
+    """The cascade hand-off forwards every parameter, in order, and nothing else."""
+    import inspect
+
+    from pyrite.montecarlo.transport import api, secondaries
+
+    seen = {}
+
+    def capture(simulate, kw):
+        seen["simulate"], seen["kw"] = simulate, kw
+        return "cascade"
+
+    monkeypatch.setattr(secondaries, "transport_secondary_cascade", capture)
+    tables = object()
+    out = api.simulate_trajectories(
+        100.0, 3, 1.0e4, element="Si", stopping_tables=tables, secondary_threshold_eV=1.0e3
+    )
+    assert out == "cascade"
+    assert seen["simulate"] is api.simulate_trajectories
+    kw = seen["kw"]
+    assert list(kw) == list(inspect.signature(api.simulate_trajectories).parameters)
+    assert kw["stopping_tables"] is tables
+    assert (kw["E0_keV"], kw["Ne"], kw["thickness_ang"], kw["element"]) == (100.0, 3, 1.0e4, "Si")
+    assert kw["secondary_threshold_eV"] == 1.0e3
+    assert (kw["_secondary"], kw["_electron_start"], kw["_energy_range_keV"]) == (None, 0, None)
