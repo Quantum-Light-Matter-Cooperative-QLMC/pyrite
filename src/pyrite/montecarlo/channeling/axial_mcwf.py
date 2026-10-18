@@ -50,6 +50,9 @@ _SHELL_EDGES = np.array(
 BATCH = 128
 
 Observable = Callable[[np.ndarray, tuple[float, float]], np.ndarray]
+#: ``hook(electron, phi, tilt)`` after entry and every kept jump: a replacement
+#: state, or ``None`` to absorb the electron.
+JumpHook = Callable[[int, np.ndarray, tuple[float, float]], "np.ndarray | None"]
 
 
 def density_observable(phi: np.ndarray, tilt: tuple[float, float]) -> np.ndarray:
@@ -69,11 +72,13 @@ class AxialMCWFResult:
         Ensemble mean of the observable at each depth (removed electrons
         contribute zero), shape ``(n_depths, ...)``.
     surviving
-        Fraction of electrons not removed by a sink jump, per depth.
+        Fraction of electrons not removed by a sink jump or a ``jump_hook``
+        absorption, per depth.
     sink_depths_ang
         Depth of every sink jump [angstrom].
     jumps
-        Total jumps per mechanism: ``tds``, ``sink``, ``electronic``.
+        Total jumps per mechanism: ``tds``, ``sink``, ``electronic``, plus
+        ``absorbed`` (hook absorptions) when a ``jump_hook`` is given.
     n_electrons
         Trajectories run.
     """
@@ -133,6 +138,19 @@ class AxialMCWF:
 
     # -- jumps --------------------------------------------------------------
 
+    def _jump(self, state, tilt, rng):
+        """Draw one jump: ``(kind, normalized state or None for a sink, tilt)``."""
+        density = np.abs(state) ** 2
+        shares = [self._expect(density, rate) for rate in self._rates.values()]
+        kind = list(self._rates)[_choose(rng, shares)]
+        if kind == "sink":
+            return kind, None, tilt
+        if kind == "tds":
+            state = self._tds_jump(state, density, rng)
+        else:
+            state, tilt = self._electronic_jump(state, density, tilt, rng)
+        return kind, state / np.sqrt(np.sum(np.abs(state) ** 2) * self.grid.cell_area_ang2), tilt
+
     def _expect(self, density: np.ndarray, rate: np.ndarray) -> float:
         return float(np.sum(density * rate) * self.grid.cell_area_ang2)
 
@@ -188,11 +206,17 @@ class AxialMCWF:
         step_ang: float = 5.0,
         tilt_rad: tuple[float, float] = (0.0, 0.0),
         observable: Observable = density_observable,
+        jump_hook: JumpHook | None = None,
     ) -> AxialMCWFResult:
         """Run ``n_electrons`` trajectories from ``entry`` and average ``observable``.
 
         ``depths_ang`` must be ascending multiples of ``step_ang`` (rounded to
         the nearest step). ``tilt_rad`` is the mean carrier tilt.
+        ``jump_hook`` (research diagnostics) sees each normalized state at entry
+        and after every TDS or electronic jump; it returns the state to
+        continue, or ``None`` to absorb the electron (counted as ``absorbed``).
+        It must draw from its own random streams; ``None`` leaves every
+        trajectory unchanged.
         """
         if n_electrons < 1 or step_ang <= 0.0:
             raise ValueError("n_electrons must be >= 1 and step_ang positive")
@@ -210,9 +234,9 @@ class AxialMCWF:
         alive = np.zeros(steps.size)
         sinks: list[float] = []
         jumps = {"tds": 0, "sink": 0, "electronic": 0}
+        absorbed = 0
         area = self.grid.cell_area_ang2
         cells = self.grid.shape[0] * self.grid.shape[1]
-        kinds = list(self._rates)
 
         for start in range(0, n_electrons, BATCH):
             rngs = [_rng(seed, e) for e in range(start, min(start + BATCH, n_electrons))]
@@ -222,10 +246,11 @@ class AxialMCWF:
                 phi[b] = components[_choose(rng, mix)][1]
             phi /= np.sqrt(np.sum(np.abs(phi) ** 2, axis=(1, 2)) * area)[:, None, None]
             tilts = [base_tilt] * size
+            live = _enter(jump_hook, start, phi, base_tilt, area)
+            absorbed += int(size - live.sum())
             half = np.broadcast_to(self._half_kinetic(base_tilt, step_ang), phi.shape).copy()
             full = half**2
             thresholds = np.array([rng.random() for rng in rngs])
-            live = np.ones(size, dtype=bool)
             # Stored spectrum lags the physical one by a half kinetic step:
             # physical = half * lagged, so consecutive half steps fuse into one.
             lagged = _fft2(phi) * half.conj()
@@ -237,33 +262,29 @@ class AxialMCWF:
                     step += 1
                     norms = np.sum(np.abs(lagged) ** 2, axis=(1, 2)) * area / cells
                     for b in np.flatnonzero(live & (norms <= thresholds)):
-                        rng = rngs[b]
                         state = _ifft2(lagged[b] * half[b]) / np.sqrt(norms[b])
-                        density = np.abs(state) ** 2
-                        shares = [self._expect(density, rate) for rate in self._rates.values()]
-                        kind = kinds[_choose(rng, shares)]
+                        kind, state, tilts[b] = self._jump(state, tilts[b], rngs[b])
                         jumps[kind] += 1
                         if kind == "sink":
                             sinks.append(step * step_ang)
+                        elif kind == "electronic":
+                            half[b] = self._half_kinetic(tilts[b], step_ang)
+                            full[b] = half[b] ** 2
+                        kept = _apply_hook(jump_hook, start + b, state, tilts[b], area)
+                        # A sink removes before the hook; count only hook removals.
+                        absorbed += int(kept is None) - int(kind == "sink")
+                        state = kept
+                        if state is None:
                             live[b] = False
                             lagged[b] = 0.0
                             continue
-                        if kind == "tds":
-                            state = self._tds_jump(state, density, rng)
-                        else:
-                            state, tilts[b] = self._electronic_jump(state, density, tilts[b], rng)
-                            half[b] = self._half_kinetic(tilts[b], step_ang)
-                            full[b] = half[b] ** 2
-                        state /= np.sqrt(np.sum(np.abs(state) ** 2) * area)
                         lagged[b] = _fft2(state) * half[b].conj()
-                        thresholds[b] = rng.random()
-                states = _ifft2(lagged[live] * half[live])
-                for b, state in zip(np.flatnonzero(live), states, strict=True):
-                    state = state / np.sqrt(np.sum(np.abs(state) ** 2) * area)
-                    value = np.asarray(observable(state, tilts[b]))
-                    sums[index] = value if sums[index] is None else sums[index] + value
+                        thresholds[b] = rngs[b].random()
+                sums[index] = _observe(observable, lagged, half, live, tilts, area, sums[index])
                 alive[index] += live.sum()
 
+        if jump_hook is not None:
+            jumps["absorbed"] = absorbed
         template = next((s for s in sums if s is not None), None)
         if template is None:
             template = np.asarray(observable(components[0][1], base_tilt)) * 0.0
@@ -278,6 +299,47 @@ class AxialMCWF:
             jumps=jumps,
             n_electrons=int(n_electrons),
         )
+
+
+def _enter(hook, start, phi, tilt, area):
+    """Apply ``hook`` to each entry state in place; return the live mask."""
+    live = np.ones(len(phi), dtype=bool)
+    for b in range(len(phi)):
+        entered = _apply_hook(hook, start + b, phi[b], tilt, area)
+        live[b] = entered is not None
+        phi[b] = 0.0 if entered is None else entered
+    return live
+
+
+def _observe(observable, lagged, half, live, tilts, area, total):
+    """Add ``observable`` over the live, normalized physical states to ``total``.
+
+    ``total`` is ``None`` until a live state is observed.
+    """
+    states = _ifft2(lagged[live] * half[live])
+    for b, state in zip(np.flatnonzero(live), states, strict=True):
+        state = state / np.sqrt(np.sum(np.abs(state) ** 2) * area)
+        value = np.asarray(observable(state, tilts[b]))
+        total = value if total is None else total + value
+    return total
+
+
+def _apply_hook(hook, electron, state, tilt, area):
+    """Return the normalized state a :data:`JumpHook` keeps, or ``None``.
+
+    Without a hook, or for a removed (``None``) state, ``state`` is returned
+    untouched (no renormalization).
+    """
+    if hook is None or state is None:
+        return state
+    out = hook(electron, state, tilt)
+    if out is None:
+        return None
+    out = np.asarray(out, dtype=complex)
+    norm = np.sum(np.abs(out) ** 2) * area
+    if out.shape != state.shape or not np.isfinite(norm) or norm <= 0.0:
+        raise ValueError("jump_hook must return a finite nonzero state of the grid shape")
+    return out / np.sqrt(norm)
 
 
 def _fft2(values: np.ndarray) -> np.ndarray:

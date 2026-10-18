@@ -878,3 +878,139 @@ Suggested ledger edit: keep `Status: unverified`. In Notes, cite this section
 as the scoped fresh-context review of the Bloch-block functions (`rederived`),
 and record the research-note wording corrections. Only a human can grant
 sign-off.
+
+# MCWF return-flux comparison: scoped verification (2026-10-18)
+
+Scope: the `jump_hook` argument of `AxialMCWF.run`
+(`src/pyrite/montecarlo/channeling/axial_mcwf.py`), and `GridProjector`,
+`projective_hook`, `_job` and `main` in `checks/axial_mcwf_return_flux.py`.
+Fresh context; the derivation below was written from the research note and
+the ledger rows before the diff bodies were compared.
+
+## Independent derivation
+
+**Grid Hamiltonian.** The split-step propagates
+$\psi=e^{i\mathbf k_t\cdot\mathbf r}\phi$ with
+$\exp[-i\,\Delta z\,(T+U-iW)/\hbar v]$ and
+$T=\frac{\hbar^2}{2\gamma m}\lvert\mathbf k_t+\mathbf k_{\mathbf m}\rvert^2$,
+the relativistic transverse mass $\gamma m$. Pointwise multiplication by $U$ on
+an $N$-point periodic grid is the circular convolution
+$(U\phi)_{\mathbf m}=\sum_{\mathbf m'}\hat U_{(\mathbf m-\mathbf m')\bmod N}\phi_{\mathbf m'}$.
+If $U$ has the crystal period and the grid spans $c$ cells with $c\mid N$, the
+sampled $U$ is periodic with $N/c$ points, so $\hat U_{\mathbf n}=0$ unless
+$\mathbf n\equiv0\pmod c$. Hence $H=T+U$ couples only orders of equal residue
+$\mathbf m\bmod c$ (the $c^2$ Bloch momenta $\boldsymbol\kappa=\mathbf r\,\mathbf g/c$),
+and diagonalising each block gives $P(E_m)=\sum_{E_\alpha<E_m}\lvert\alpha\rangle\langle\alpha\rvert$
+exactly for the represented grid. FFT index $i$ and signed order $m$ agree
+modulo $c$ because $c\mid N$.
+
+**Projective unravelling.** For $\rho=P\rho P$ the retained generator
+(`eq-axial-retained-generator` in the research note) has no-jump operator
+$PH_\perp P-\tfrac{i}{2}\hbar v\,\Gamma$ with $\Gamma=P(\sum_aJ_a^\dagger J_a)P$, and
+gain $\sum_aPJ_a\rho J_a^\dagger P$. Measuring $P$ after a jump on
+$\lvert\chi\rangle=J_a\lvert\psi\rangle/\lVert J_a\psi\rVert$ keeps
+$P\chi/\lVert P\chi\rVert$ with probability $\lVert P\chi\rVert^2$; averaged
+over jumps this reproduces the gain term exactly. The MCWF no-jump evolution
+uses the full $W$, not $PWP$, so for a state in $P$ it generates an $F$
+amplitude of first order in $\epsilon=\lvert\langle f\rvert W\lvert p\rangle\rvert/\lvert E_f-E_p\rvert$
+(adiabatic dressing plus an oscillating part). The post-jump outcome
+probability therefore differs at $O(\epsilon)$ through the cross term
+$2\,\mathrm{Re}\langle PJ_aP\psi\vert PJ_aF\psi\rangle$, and the retained
+weight at $O(\epsilon^2)$. For a pure entry state the deterministic entry
+projection times $p_0=\lVert P\phi_0\rVert^2$ is exact: the measured ensemble
+is $p_0\cdot\{\text{trajectories from }P\phi_0/\sqrt{p_0}\}+(1-p_0)\cdot0$.
+
+**Nesting.** With $E_m\ge U_{\max}$ inside a gap at the entry tilt,
+$P(U_{\max})\le P(E_m)$, so the model and reference bound weights coincide at
+$z=0$ and the deficit starts at zero.
+
+## Cheap filters before implementation inspection
+
+Units: $\hbar^2/2m$ in eV Å$^2$ divided by $\gamma$, $k$ in Å$^{-1}$, so $T$ is
+in eV; the tilt passed to the hook is $\mathbf k_t$ in Å$^{-1}$
+(`momentum * tilt_rad`). Limits: cut above the spectrum gives the identity
+hook; cut below it absorbs at entry. Sign: absorption can only lower the
+ensemble bound weight. All pass.
+
+## Implementation comparison
+
+- `_half_kinetic` uses `HBAR2_2M_EV_ANG2 / self.gamma * (kx**2 + ky**2)` with
+  `kx = grid.kx + tilt`; `_setup` passes the same scale and `grid.kx`. Match.
+- `GridProjector` builds residue blocks from `fftfreq` orders and the coupling
+  `u[(i - j) % N]`. Match with the circular convolution above.
+- `run` calls the hook once per electron at entry (before the threshold draw)
+  and after each normalised TDS/electronic jump, with the kicked tilt after an
+  electronic jump. It never touches the Philox streams, so an identity hook
+  only renormalises an already normalised state. Absorption sets
+  `live[b] = False` and `lagged[b] = 0`, mirroring the sink branch; absorbed
+  electrons contribute zero to `observables` and are excluded from `surviving`.
+- `projective_hook` streams are `SeedSequence((seed, 0x548, electron))`,
+  independent of the MCWF keys. Entry is projected deterministically and
+  `_job` scales by `p0` from the same zero tilt that `run` uses by default.
+
+## Independent numeric evidence (2026-10-18)
+
+Default grid ($2\times2$ cells, $64^2$, TDS-only absorptive part): Γ-point gaps
+at the three cuts 7.97, 94.93, 178.07 eV are 1.49, 3.73, 2.26 eV, and
+$W$ ranges $5\times10^{-4}$ to 2.2 eV (mean 0.063 eV). Over straddling pairs
+in the Γ eigenbasis, $\max\epsilon=0.016$, 0.006, 0.009 and
+$\max_p\sum_f\epsilon^2=3.5\times10^{-4}$, $7\times10^{-5}$, $9\times10^{-5}$:
+at zero tilt the leakage is off-resonant. At three random tilts with
+$\lvert\mathbf k_t\rvert\approx0.1$ to 0.3 Å$^{-1}$, the nearest level to the
+same cuts lies 0.01 to 1.0 eV away, comparable to $W$; there the cut is not in
+a gap and $\epsilon$ is not small. One $64^2$ block set costs about 3 s and
+67 MB of eigenvectors. Focused tests pass (3 + 3), and `--smoke` runs in about
+7 s with zero entry deficit.
+
+## Discrepancies and recommendations
+
+1. **Caveat incomplete for electronic jumps.** Electronic kicks give each
+   electron a generic tilt. The cuts sit in gaps only at Γ, so for runs with
+   electronic jumps the coherent $P\leftrightarrow F$ leakage is not
+   off-resonant in general, and $P(E_m)$ at a generic tilt can split
+   near-degenerate levels.
+2. **Cache memory (`GridProjector.spectrum`, check line 72).** Electronic kicks
+   produce a new continuous tilt per jump, so caching up to 257 tilts holds
+   about 17 GB per worker at the default grid. After clearing, cached tilts
+   are evicted and get recomputed at every observation depth. This is a cost
+   and memory bug for the lab-box default, not a physics error.
+3. **Estimator bias.** The deficit is a mean of per-chunk ratios
+   $1-X/X_{\rm ref}$, which is biased at $O(\mathrm{CV}^2)$ per chunk of 256
+   electrons. Use a ratio of pooled means, with a jackknife or delta-method
+   SEM, or state the bias. `deficit.mean` together with `nanstd` is
+   inconsistent but harmless here.
+4. **Wording.** The `AxialMCWFResult` docstrings for `surviving` ("not removed
+   by a sink jump") and `jumps` omit `absorbed`. The research note says the
+   `--mechanisms tds` run "cross-checks" the secular table, but the default
+   grid ($\pm16$ orders per cell, $c=2$) matches no row of that table, and
+   MCWF keeps coherences. It is a comparison only at matched orders and $c$.
+5. **Test independence.** The block test applies $H$ by FFT kinetic plus
+   pointwise $U$, which is a genuine independent route. Not tested: the solver's
+   kinetic scale (the test uses $\gamma=10$), hook-plus-electronic-jump
+   ordering, Born-rule frequencies, stream disjointness, and the $p_0$
+   scaling.
+
+## Verdict and limitations
+
+**Scoped verdict: `jump_hook` mechanics and `GridProjector` algebra
+rederived. The research-note caveat is a discrepancy (item 1); items 2 and 3
+are implementation findings. Overall ledger claim: unverified.** Electronic
+loss magnitudes were not checked (SBETHE data were unavailable). Suggested
+ledger edit: keep `Status: unverified`. Cite this section as the scoped
+review, and record items 1, 3 and 4 in the note. Only a human can grant
+sign-off.
+
+### Follow-up applied (2026-10-18)
+
+The review findings were addressed in `checks/axial_mcwf_return_flux.py`.
+`GridProjector.gap_cut` places the cut at each tilt in the widest level gap
+within `--gap-window-eV` of the nominal matching energy, and each row reports
+the smallest and median gaps used, so $\epsilon$ can be judged after the run.
+The per-tilt cache is now least-recently-used with 160 entries. The default
+grid is $32^2$ ($2\times2$ cells, about 4 MB per entry). The deficit is the
+ratio of pooled means, with a delete-one-chunk jackknife SEM (`None` for one
+chunk, which removes the NaN that previously broke JSON output). New tests
+cover the solver's kinetic scale, the Born-rule keep frequency, the gap
+choice, and the pooled estimator. `AxialMCWFResult` docstrings now name
+`absorbed`. The hook combined with electronic jumps is still untested here
+because SBETHE data is not installed.

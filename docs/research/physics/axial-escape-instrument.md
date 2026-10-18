@@ -504,6 +504,42 @@ entrance. Electronic jumps, Bloch-$\mathbf k$ and supercell convergence, and a
 full coherent comparison remain open. These are research diagnostics, not
 dechanneling predictions.
 
+## MCWF return-flux comparison with electronic jumps
+
+The secular model cannot carry electronic jumps without Bloch-$\mathbf k$
+resolution finer than its dense rate tables allow, so
+`checks/axial_mcwf_return_flux.py` measures the same deficit with the
+production MCWF unravelling (`cr-axial-realspace-dissipator`), TDS and
+electronic jumps together. The reference ensemble runs unchanged. Each
+absorbing ensemble measures the grid spectral projector $P(E_m)$ at the
+electron's carrier tilt at entry and after every jump, through the
+`AxialMCWF.run(jump_hook=...)` hook: outcome $P$ continues with the projected
+state, outcome $F$ is handed off. The no-jump loss operator does not commute
+with $P$, so this differs from the absorbing generator by the coherent
+$P\leftrightarrow F$ leakage of the no-jump evolution, of relative size
+$\epsilon=|W_{fp}|/\Delta E$ across the cut, and it enters jump outcomes at
+first order through cross terms. At the $\Gamma$-point gaps of the
+$2\times2$, $64^2$ grid $\max\epsilon\approx0.016$. Electronic kicks give each
+electron a generic tilt, at which a fixed cut need not sit in a gap (nearest
+levels 0.01 to 1 eV away against $|W|$ up to 2.2 eV). The script therefore
+places the cut at each tilt in the widest level gap within
+`--gap-window-eV` (default 2 eV) of the nominal matching energy, and
+reports the smallest and median gaps used; $\epsilon$ is bounded only where
+those gaps are wide against $W$. Entry is projected
+deterministically and the ensemble scaled by the entrance weight $p_0$,
+which removes entry sampling noise. The bound observable is the weight below
+$U_{\max}$; the cuts are the spectral gaps nearest $U_{\max}$,
+$U_{\max}+(U_{\max}-U_{\min})$ and $U_{\max}+2(U_{\max}-U_{\min})$. Chunks
+share seeds across models and measurement streams are disjoint from the jump
+streams, so deficits are paired and the SEM is taken across chunks. The
+deficit is the ratio of pooled means per depth, $1-\langle X\rangle/\langle
+X_{\rm ref}\rangle$, with a delete-one-chunk jackknife SEM. The default
+(Si [001], 5 MeV, $2\times2$ cells, $32^2$, 3 µm, 32×128 electrons) is a
+lab-box job; `--smoke` is a seconds-long TDS-only plumbing check. A
+`--mechanisms tds` run is comparable with the secular table above only at
+matched plane-wave orders and Bloch sampling; the default ($\pm8$ orders per
+cell, $c=2$) matches no row there. Results are pending.
+
 ## Matching prescription still to establish
 
 Retain slow free states in the quantum zone. Investigate native matching only

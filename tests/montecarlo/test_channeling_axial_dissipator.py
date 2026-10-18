@@ -373,3 +373,61 @@ def test_anisotropic_in_plane_displacement_rejected():
     profile = axial_profile("silicon", (0, 0, 1), displacements_ang2={"Si": u2})
     with pytest.raises(NotImplementedError, match="isotropic"):
         axial_dissipator(profile, 1e6, (1, 1), (8, 8))
+
+
+@pytest.fixture(scope="module")
+def tds_solver(si001):
+    dissipator = axial_dissipator(si001, 1e6, (1, 1), (12, 12), mechanisms=("tds",))
+    return AxialMCWF(dissipator, 1e6, si001.on_grid((1, 1), dissipator.grid.shape))
+
+
+def test_identity_jump_hook_leaves_trajectories_unchanged(tds_solver):
+    entry = states.gaussian(waist_ang=0.6)
+    calls = []
+
+    def hook(electron, phi, tilt):
+        calls.append(electron)
+        return phi
+
+    plain = tds_solver.run(entry, [2000.0], 24, seed=5, step_ang=10.0)
+    hooked = tds_solver.run(entry, [2000.0], 24, seed=5, step_ang=10.0, jump_hook=hook)
+    # Same trajectories; the hook's renormalization only adds roundoff.
+    np.testing.assert_allclose(plain.observables, hooked.observables, rtol=0, atol=1e-12)
+    np.testing.assert_array_equal(plain.surviving, hooked.surviving)
+    assert hooked.jumps == {**plain.jumps, "absorbed": 0}
+    # One entry call per electron plus one per kept (TDS) jump.
+    assert len(calls) == 24 + plain.jumps["tds"]
+
+
+def test_jump_hook_absorbs_at_entry_and_after_jumps(tds_solver):
+    entry = states.gaussian(waist_ang=0.6)
+    none = tds_solver.run(
+        entry, [0.0, 500.0], 10, seed=5, step_ang=10.0, jump_hook=lambda e, phi, t: None
+    )
+    assert none.jumps["absorbed"] == 10 and none.surviving.tolist() == [0.0, 0.0]
+    seen = set()
+
+    def first_jump_absorbs(electron, phi, tilt):
+        if electron in seen:
+            return None
+        seen.add(electron)
+        return phi
+
+    plain = tds_solver.run(entry, [3000.0], 24, seed=5, step_ang=10.0)
+    hooked = tds_solver.run(
+        entry, [3000.0], 24, seed=5, step_ang=10.0, jump_hook=first_jump_absorbs
+    )
+    # Survivors are exactly the electrons with no jump of any kind.
+    assert hooked.jumps["absorbed"] + hooked.jumps["sink"] + hooked.surviving[0] * 24 == 24
+    assert hooked.surviving[0] <= plain.surviving[0]
+
+
+def test_jump_hook_must_return_a_grid_state(tds_solver):
+    with pytest.raises(ValueError, match="finite nonzero state"):
+        tds_solver.run(
+            states.gaussian(waist_ang=0.6),
+            [10.0],
+            2,
+            step_ang=10.0,
+            jump_hook=lambda e, phi, t: np.zeros(3),
+        )
