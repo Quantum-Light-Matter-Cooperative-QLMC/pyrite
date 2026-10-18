@@ -5,10 +5,10 @@ run.py
 Drive a sweep through ``montecarlo.run_cases`` with on-disk checkpointing
 and per-group streaming feedback.
 
-:func:`run_sweep` resumes from a per-material checkpoint
-(``checkpoints/<material>.pkl``, skipping cached cases), stores each finished
-case into ``results``, re-pickles that material's checkpoint at config
-granularity (crash-safe), and invokes ``on_chunk(group_config_names)`` once a
+:func:`run_sweep` resumes from a per-material component checkpoint
+(``checkpoints/<material>/``, skipping cached cases), stores each finished
+case into ``results``, publishes immutable shards at config
+granularity, and invokes ``on_chunk(group_config_names)`` once a
 whole **group**
 has finished. By default a group is everything that shares
 (material, thickness, polar tilt, finite footprint) -- i.e. the full azimuth
@@ -24,14 +24,9 @@ through workers behind one main-process CUDA spectrum context; see
 montecarlo.run_cases.
 """
 
-import json
 import os
-import pickle
 import time
-from collections import defaultdict
-from pathlib import Path
 
-from ..checkpoints import _checkpoint_store
 from ..checkpoints.persistence import (  # noqa: F401 -- compatibility exports
     _CAS_OPTIONAL_PAYLOAD_KEYS,
     _CAS_PAYLOAD_KEYS,
@@ -54,6 +49,7 @@ from ..checkpoints.persistence import (  # noqa: F401 -- compatibility exports
     _material_analysis_cache,
     _material_analysis_cache_path,
     _save_recomputed_checkpoint,
+    _SweepCheckpoint,
     _valid_cas_payload,
     _write_case_manifest,
     cached_material_analysis,
@@ -71,6 +67,8 @@ from ..checkpoints.recompute import (  # noqa: F401 -- compatibility exports
 )
 from ..montecarlo import run_cases, runner
 from ..results import store_result
+from ._sweep_execution import SweepCompletion
+from ._sweep_plan import SweepResume, SweepWork, has_record
 
 
 def __getattr__(name):
@@ -131,14 +129,14 @@ def run_sweep(
     results : the dict to fill ({name: {E0: record}}).
     checkpoint_dir : directory for the per-material checkpoints (default
         ``pyrite-output/checkpoints`` in the workspace). A sweep is
-        single-material, so each writes ``<checkpoint_dir>/<material>.pkl``
-        holding ONLY that material's configs -- different materials never share a
-        pickle, and ``results`` can hold several materials in one kernel without
-        them clobbering each other on disk. Created if missing; seeded once from
-        the legacy combined ``cxr_run_checkpoint.pkl`` if that's still around.
-    checkpoint_path : explicit override for the pickle path; None (default)
-        derives the per-material path above. A rerun with resume=True skips every
-        config already in the pickle.
+        single-material, so each writes ``<checkpoint_dir>/<material>/``
+        holding only that material's configs. ``results`` can hold several
+        materials in one kernel without them clobbering each other on disk.
+        Completed configs are sharded until the sweep completes; consolidation
+        then publishes component files and a manifest before removing shards.
+    checkpoint_path : explicit override for the checkpoint path; None (default)
+        derives the per-material path above. An explicit ``.pkl`` path retains
+        whole-store saves. Resume skips stored ``(name, E0_keV)`` pairs.
     max_workers : forwarded to run_cases. None sizes the GPU transport pool or
         the full-case CPU pool automatically; 0 forces serial execution. CPU
         full-case pools are also capped by available memory.
@@ -222,10 +220,9 @@ def run_sweep(
 
     Returns True iff every requested ``(name, E0_keV)`` pair ended up in
     ``results`` (i.e. the sweep ran to completion, budget or not); False if
-    ``max_seconds`` cut it short. On an incomplete return, one final
-    ``_save()`` runs (beyond the per-config saves already done in ``_cb``) so
-    whatever finished before the deadline is persisted -- harmless and
-    idempotent even when it turns out nothing new needed saving.
+    ``max_seconds`` cut it short. Incomplete component checkpoints retain their
+    completed-config shards for resume. Legacy ``.pkl`` paths receive a final
+    whole-store save on an incomplete return, including partial configs.
     """
     if time_fn is None:
         time_fn = time.monotonic
@@ -244,246 +241,36 @@ def run_sweep(
     if checkpoint_path is None:
         checkpoint_path = checkpoint_path_for(material, checkpoint_dir)
     os.makedirs(os.path.dirname(checkpoint_path) or ".", exist_ok=True)
-    # Shared per-material content-addressable store lives under the checkpoint
-    # directory root (the parent of this stem's component dir), so every profile
-    # of this material addresses the SAME blob pool -- the cross-profile share.
-    cas_root = os.path.dirname(checkpoint_path) or "."
-    cache_read = cache_read and content_key_fn is not None
-    cache_write = cache_write and content_key_fn is not None
-
-    def _content_key(case):
-        """Content key for ``case`` or None when it is not canonically hashable
-        (an exotic/legacy case simply falls back to normal recompute + per-stem
-        store rather than aborting the run)."""
-        if content_key_fn is None:
-            return None
-        try:
-            key = content_key_fn(case)
-            _checkpoint_store.cas_blob_path(material, key, cas_root)
-            return key
-        except (TypeError, ValueError):
-            return None
-
-    def _crystal_of(rec_map):
-        return next(iter(rec_map.values()))["case"]["crystal"]
-
-    # Sharded checkpointing applies to the component-directory layout only; a
-    # caller pinning a legacy ``<stem>.pkl`` keeps the whole-file save path.
-    _sharded = Path(checkpoint_path).suffix != ".pkl"
-
-    def _material_subset():
-        return {n: results[n] for n in results if _crystal_of(results[n]) == material}
-
-    def _save():
-        """Pickle just THIS material's configs -- ``results`` may also hold other
-        materials run earlier in the same kernel, which belong in their own pkl.
-        Refreshes the sidecar manifest alongside (see :func:`_manifest_save`) so
-        :func:`checkpoint_manifest` never serves a stale energy/record-count
-        summary after a fresh save."""
-        subset = _material_subset()
-        _checkpoint_components_save(checkpoint_path, subset)
-        _manifest_save(checkpoint_path, subset, dataset_identity)
-
-    def _timed_save():
-        started = time.perf_counter()
-        _save()
-        if on_timing is not None:
-            elapsed = time.perf_counter() - started
-            on_timing({"checkpoint_seconds": elapsed, "consolidation_seconds": elapsed})
-
-    incremental_manifest = None
-
-    def _save_part(name):
-        """Persist one just-finished config as an immutable shard -- O(1) per
-        config, versus ``_save``'s whole-store re-serialization (O(N^2) over a
-        sweep). The manifest accumulator scans existing/resumed results once,
-        then visits only each newly completed config so live viewers retain fresh
-        counts without an O(N^2) sweep rescan."""
-        nonlocal incremental_manifest
-
-        started = time.perf_counter()
-        path = Path(checkpoint_path)
-        _checkpoint_store.save_part(path.name, path.parent, name, results[name])
-        if incremental_manifest is None:
-            incremental_manifest = _IncrementalManifest(dataset_identity)
-            incremental_manifest.add(_material_subset())
-        else:
-            incremental_manifest.add({name: results[name]})
-        _manifest_write(checkpoint_path, incremental_manifest.manifest())
-        if on_timing is not None:
-            elapsed = time.perf_counter() - started
-            on_timing({"checkpoint_seconds": elapsed, "shard_write_seconds": elapsed})
-
-    def _consolidate():
-        """Fold shards into authoritative ``{line,brem,characteristic}.h5`` files the
-        rest of the toolchain expects, then drop the shard directory."""
-        path = Path(checkpoint_path)
-        if not _checkpoint_store.has_parts(path.name, path.parent):
-            return
+    checkpoint = _SweepCheckpoint(
+        checkpoint_path, results, material, dataset_identity, on_timing, on_activity
+    )
+    preparation = SweepResume(cases, results, checkpoint, content_key_fn, cache_read, cache_write)
+    metadata_eligible = (
+        metadata_only_complete
+        and trajectory_capture is None
+        and observation is None
+        and on_chunk is None
+    )
+    if preparation.load(resume, metadata_eligible):
+        if on_runtime is not None:
+            on_runtime(runner.runtime_plan([], max_workers))
+        total_cost = sum(case_cost_fn(case) for case in cases) if case_cost_fn is not None else None
+        if on_cost is not None and total_cost is not None:
+            on_cost(total_cost, total_cost)
+        if on_progress is not None:
+            on_progress(0, len(cases), len(cases))
         if on_activity is not None:
-            on_activity({"phase": "saving", "case": None, "in_flight_case_count": 0})
-        print("checkpoint: saving completed material")
-        _timed_save()
-        _checkpoint_store.clear_parts(path.name, path.parent)
+            on_activity({"phase": "handoff", "case": None, "in_flight_case_count": 0})
+        print(f"0 of {len(cases)} cases to run ({len(cases)} cached; metadata proof)")
+        return True
 
-    if resume and _checkpoint_exists(checkpoint_path):
-        if on_activity is not None:
-            on_activity({"phase": "loading", "case": None, "in_flight_case_count": 0})
-        print(f"checkpoint: loading {checkpoint_path}")
-        resume_started = time.perf_counter()
-        manifest_path = _manifest_path_for(checkpoint_path)
-        path = Path(checkpoint_path)
-        existing_identity = None
-        if os.path.isfile(manifest_path):
-            try:
-                with open(manifest_path) as handle:
-                    existing_identity = json.load(handle).get("dataset_identity")
-            except (OSError, ValueError, TypeError):
-                pass
-        if isinstance(existing_identity, dict):
-            from ..campaign.profiles import normalize_dataset_identity
+    if preparation.loaded:
+        preparation.seed_cache()
+    preparation.replay_cache()
 
-            existing_identity = normalize_dataset_identity(existing_identity)
-        if (
-            dataset_identity is not None
-            and existing_identity is not None
-            and dataset_identity.get("parameter_sha256")
-            != existing_identity.get("parameter_sha256")
-        ):
-            raise ValueError(
-                "checkpoint dataset identity mismatch: "
-                f"requested {dataset_identity.get('profile')}:"
-                f"{dataset_identity.get('parameter_sha256', '')[:12]}, existing "
-                f"{existing_identity.get('profile')}:"
-                f"{existing_identity.get('parameter_sha256', '')[:12]}; "
-                "archive or select a different variant before resuming"
-            )
-        requested_proof = _case_set_proof_from_cases(cases)
-        signature = _checkpoint_signature(checkpoint_path)
-        manifest_fresh = (
-            bool(signature)
-            and os.path.isfile(manifest_path)
-            and (os.stat(manifest_path).st_mtime_ns >= max(item[1] for item in signature))
-        )
-        if (
-            metadata_only_complete
-            and trajectory_capture is None
-            and observation is None
-            and on_chunk is None
-            and not _checkpoint_store.has_parts(path.name, path.parent)
-            and manifest_fresh
-            and isinstance(existing_identity, dict)
-            and dataset_identity is not None
-            and existing_identity.get("parameter_sha256")
-            == dataset_identity.get("parameter_sha256")
-        ):
-            with open(manifest_path) as handle:
-                manifest = json.load(handle)
-            if manifest.get("completed_case_set") == requested_proof:
-                if on_timing is not None:
-                    on_timing({"resume_seconds": time.perf_counter() - resume_started})
-                if on_runtime is not None:
-                    on_runtime(runner.runtime_plan([], max_workers))
-                total_cost = (
-                    sum(case_cost_fn(case) for case in cases) if case_cost_fn is not None else None
-                )
-                if on_cost is not None and total_cost is not None:
-                    on_cost(total_cost, total_cost)
-                if on_progress is not None:
-                    on_progress(0, len(cases), len(cases))
-                if on_activity is not None:
-                    on_activity({"phase": "handoff", "case": None, "in_flight_case_count": 0})
-                print(f"0 of {len(cases)} cases to run ({len(cases)} cached; metadata proof)")
-                return True
-        loaded = _checkpoint_load(checkpoint_path)
-        print(f"checkpoint: loaded in {time.perf_counter() - resume_started:.3f} s")
-        if on_timing is not None:
-            on_timing({"resume_seconds": time.perf_counter() - resume_started})
-        results.update(loaded)
-        print(
-            f"resumed {sum(len(v) for v in loaded.values())} {material} cases from {checkpoint_path}"
-        )
-
-        # Migration: seed missing blobs from a compatible existing checkpoint.
-        # Compare the stored case's key with the currently requested case before
-        # writing, so a legacy checkpoint without identity provenance can never
-        # poison the shared store with a mismatched record.
-        if cache_write:
-            for case in cases:
-                record = results.get(case["name"], {}).get(case["E0_keV"])
-                if record is None:
-                    continue
-                key = _content_key(case)
-                stored_key = _content_key(record.get("case", {}))
-                payload = _cas_payload_from_record(record)
-                if (
-                    key is not None
-                    and key == stored_key
-                    and payload is not None
-                    and not _checkpoint_store.cas_contains(material, key, cas_root)
-                ):
-                    _checkpoint_store.cas_save(material, key, cas_root, payload)
-
-    # Cross-profile reuse: any case not already resumed from this profile's own
-    # checkpoint whose content key already has a CAS blob (populated by ANY
-    # profile of this material) is replayed through store_result instead of
-    # recomputed. Replaying with the REQUESTED case makes the reconstructed
-    # record bit-identical to a fresh compute (the requester's own detector/flux
-    # scalars, its own case payload); only the profile-invariant transport arrays
-    # come from the shared blob.
-    if cache_read:
-        reused = 0
-        for c in cases:
-            if c["name"] in results and c["E0_keV"] in results[c["name"]]:
-                continue
-            key = _content_key(c)
-            if key is None or not _checkpoint_store.cas_contains(material, key, cas_root):
-                continue
-            try:
-                out = _checkpoint_store.cas_load(material, key, cas_root)
-            except (OSError, EOFError, pickle.UnpicklingError):
-                continue
-            if not _valid_cas_payload(out):
-                continue
-            store_result(results, c, out)
-            reused += 1
-        if reused:
-            print(f"reused {reused} {material} cases from shared content cache")
-            _save()  # persist reused cases into this profile's checkpoint + manifest
-
-    # Thin per-profile pointer table: (name, E0_keV) -> content_key, plus label
-    # provenance. Enables a future GC / `pyrite clear` to know which shared blobs a
-    # profile references. Written on any run that populates the store.
-    if cache_write:
-        _write_case_manifest(checkpoint_path, cases, _content_key, dataset_identity)
-
-    def _has_record(case):
-        return case["name"] in results and case["E0_keV"] in results[case["name"]]
-
-    # Observation production: reuse what the store can already rescore, and
-    # queue the rest for directional evaluation on their own transport.
-    observation_plans = {}
-    observation_only = set()
-    if observation is not None and not transport_only:
-        reused_observations = 0
-        for c in cases:
-            plan = observation.plan(c)
-            stored = plan.find_reusable(observation.store)
-            if stored is not None:
-                observation.store.put(stored)
-                reused_observations += 1
-                continue
-            observation_plans[(c["name"], c["E0_keV"])] = plan
-            if _has_record(c):
-                observation_only.add((c["name"], c["E0_keV"]))
-        print(
-            f"observations: {len(observation_plans)} to produce, {reused_observations} reused "
-            f"({observation.store.path})"
-        )
-
-    todo = [c for c in cases if not _has_record(c) or (c["name"], c["E0_keV"]) in observation_plans]
-    cached_cases = len(cases) - len(todo)
-    print(f"{len(todo)} of {len(cases)} cases to run ({cached_cases} cached)")
+    work = SweepWork(cases, results, observation, transport_only)
+    todo = work.todo
+    print(f"{len(todo)} of {len(cases)} cases to run ({len(cases) - len(todo)} cached)")
     if trajectory_capture is not None:
         if trajectory_capture.scene is None and observation is not None:
             from dataclasses import replace
@@ -516,133 +303,45 @@ def run_sweep(
         from ._trajectory_capture import CaptureSizeReport
 
         capture_size_report = CaptureSizeReport(trajectory_capture, todo)
-    completed_new_cases = 0
-    total_cost = sum(case_cost_fn(c) for c in cases) if case_cost_fn is not None else None
-    done_cost = (
-        total_cost - sum(case_cost_fn(c) for c in todo) if case_cost_fn is not None else None
+    completion = SweepCompletion(
+        cases, todo, group_key, case_cost_fn, on_cost, on_progress, on_chunk
     )
-    if on_cost is not None and case_cost_fn is not None:
-        on_cost(done_cost, total_cost)
-    if on_progress is not None:
-        on_progress(completed_new_cases, len(cases), cached_cases)
-
-    # all config names in each group (cached + to-run), in first-seen order
-    group_names = defaultdict(list)
-    seen = set()
-    for c in cases:
-        if c["name"] not in seen:
-            seen.add(c["name"])
-            group_names[group_key(c)].append(c["name"])
-
-    # per group: how many of its configs still have unfinished energies;
-    # per config: how many beam energies it still owes
-    group_remaining = defaultdict(int)
-    energies_remaining = {}
-    for c in todo:
-        if (c["name"], c["E0_keV"]) in observation_only:
-            continue
-        if c["name"] not in energies_remaining:
-            group_remaining[group_key(c)] += 1
-        energies_remaining[c["name"]] = energies_remaining.get(c["name"], 0) + 1
-    n_groups = len(group_remaining)
-    progress_state = {"done": 0}
+    completion.report()
+    completion.prepare_groups(todo, work.observation_only)
 
     def _cb(i, case, out):
-        nonlocal completed_new_cases, done_cost
-
         if capture_size_report is not None:
             capture_size_report.completed(case)
 
         if transport_only:
-            completed_new_cases += 1
-
-            if case_cost_fn is not None:
-                done_cost += case_cost_fn(case)
-
-            if on_cost is not None and case_cost_fn is not None:
-                on_cost(done_cost, total_cost)
-
-            if on_progress is not None:
-                on_progress(completed_new_cases, len(cases), cached_cases)
-
+            completion.case_finished(case)
             return
 
-        directional = out.pop("directional", None)
-        key = (case["name"], case["E0_keV"])
-        plan = observation_plans.get(key)
-        if plan is not None and directional is not None:
-            assert observation is not None
-            observation.store.put(plan.assemble(directional, observation.provenance(case)))
-            del observation_plans[key]
-        if key in observation_only:
-            # The scalar record was already cached; this run owed only the
-            # observation, so the resumed record and its shards stay as they were.
-            completed_new_cases += 1
-            if case_cost_fn is not None:
-                done_cost += case_cost_fn(case)
-            if on_cost is not None and case_cost_fn is not None:
-                on_cost(done_cost, total_cost)
-            if on_progress is not None:
-                on_progress(completed_new_cases, len(cases), cached_cases)
+        if work.accept_observation(case, out):
+            completion.case_finished(case)
             return
 
         store_result(results, case, out)
 
-        if cache_write:
-            key = _content_key(case)
-            if key is not None:
-                _checkpoint_store.cas_save(material, key, cas_root, out)
+        preparation.store_transport(case, out)
         if on_case is not None:
             on_case(case)
-        name = case["name"]
-        energies_remaining[name] -= 1
-        if energies_remaining[name] == 0:  # this config (all energies) is done
-            if _sharded:
-                _save_part(name)  # crash-safe at config granularity, O(1) write
-            else:
-                _timed_save()  # legacy monolith: whole-file rewrite
-            g = group_key(case)
-            group_remaining[g] -= 1
-            if group_remaining[g] == 0 and on_chunk is not None:
-                # the whole azimuth sweep at this tilt is in -> stream it, with a
-                # progress line that stays next to the streamed plot/table (the
-                # tqdm bar is up top and scrolls away)
-                progress_state["done"] += 1
-                print(
-                    f"\n=== {case['thickness_ang'] / 1e4:g} um, tilt "
-                    f"{case['tilt_deg']:g} deg done "
-                    f"-- {progress_state['done']}/{n_groups} tilt-groups ==="
-                )
-                on_chunk(group_names[g])
-        completed_new_cases += 1
-        if case_cost_fn is not None:
-            done_cost += case_cost_fn(case)
-        if on_cost is not None and case_cost_fn is not None:
-            on_cost(done_cost, total_cost)
-        if on_progress is not None:
-            on_progress(completed_new_cases, len(cases), cached_cases)
+        completion.scalar_finished(case, checkpoint)
+        completion.case_finished(case)
 
-    # Fully-cached tilt-groups have no cases left to run, so the callback above
-    # never fires for them. On resume, replay them through on_chunk first (in
-    # tilt order) so their best-azimuth plots/tables are redrawn too.
-    if on_chunk is not None:
-        for g in sorted(g for g in group_names if group_remaining.get(g, 0) == 0):
-            rep = next(iter(results[group_names[g][0]].values()))["case"]
-            print(
-                f"\n=== cached: {rep['thickness_ang'] / 1e4:g} um, "
-                f"tilt {rep['tilt_deg']:g} deg (already computed) ==="
-            )
-            on_chunk(group_names[g])
+    # Replay cached groups before launching new work, including observation-only
+    # work whose scalar group is already complete.
+    completion.replay_cached_groups(results)
 
     should_stop = None if deadline is None else (lambda: time_fn() >= deadline)
     run_cases_options = {}
     if trajectory_capture is not None:
         run_cases_options["trajectory_capture"] = trajectory_capture
-    if observation_plans:
+    if work.observation_plans:
         run_cases_options["observation_directions"] = [
             (
                 None
-                if (plan := observation_plans.get((c["name"], c["E0_keV"]))) is None
+                if (plan := work.observation_plans.get((c["name"], c["E0_keV"]))) is None
                 else plan.directions_sample
             )
             for c in todo
@@ -664,14 +363,8 @@ def run_sweep(
         **run_cases_options,
     )
     print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")
-    complete = all(_has_record(c) for c in cases) and not observation_plans
-    if _sharded:
-        if complete:
-            # Completion publishes one authoritative component pair. Budget pauses
-            # retain immutable shards so the next slice does no full rewrite.
-            _consolidate()
-    elif not complete:
-        _timed_save()  # persist whatever finished before the budget ran out
+    complete = all(has_record(results, c) for c in cases) and not work.observation_plans
+    checkpoint.finish(complete)
     if on_activity is not None:
         on_activity({"phase": "handoff", "case": None, "in_flight_case_count": 0})
     return complete

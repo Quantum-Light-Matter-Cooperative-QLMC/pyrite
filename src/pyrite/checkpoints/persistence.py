@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import pickle
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -531,3 +532,87 @@ def cases_from_results(results):
     its own ``case``) -- pass to filter_results / plot_heatmaps / the trajectory
     grid so the visualization app never has to rebuild the Sweep."""
     return [rec["case"] for recs in results.values() for rec in recs.values()]
+
+
+class _SweepCheckpoint:
+    """One material's publication lifecycle; incomplete sweeps retain shards."""
+
+    def __init__(
+        self, checkpoint_path, results, material, dataset_identity, on_timing=None, on_activity=None
+    ):
+        self.checkpoint_path = checkpoint_path
+        self.results = results
+        self.material = material
+        self.dataset_identity = dataset_identity
+        self.on_timing = on_timing
+        self.on_activity = on_activity
+        self.incremental_manifest = None
+        self.sharded = Path(checkpoint_path).suffix != ".pkl"
+
+    def config_finished(self, name):
+        if self.sharded:
+            self.save_part(name)
+        else:
+            self.timed_save()
+
+    def finish(self, complete):
+        if self.sharded:
+            if complete:
+                self.consolidate()
+        elif not complete:
+            self.timed_save()
+
+    def material_subset(self):
+        return {
+            n: self.results[n]
+            for n in self.results
+            if next(iter(self.results[n].values()))["case"]["crystal"] == self.material
+        }
+
+    def save(self):
+        """Serialize just this material's configs -- ``results`` may also hold other
+        materials run earlier in the same kernel, which belong in their own pkl.
+        Refreshes the sidecar manifest alongside (see :func:`_manifest_save`) so
+        :func:`checkpoint_manifest` never serves a stale energy/record-count
+        summary after a fresh save."""
+        subset = self.material_subset()
+        _checkpoint_components_save(self.checkpoint_path, subset)
+        _manifest_save(self.checkpoint_path, subset, self.dataset_identity)
+
+    def timed_save(self):
+        started = time.perf_counter()
+        self.save()
+        if self.on_timing is not None:
+            elapsed = time.perf_counter() - started
+            self.on_timing({"checkpoint_seconds": elapsed, "consolidation_seconds": elapsed})
+
+    def save_part(self, name):
+        """Persist one just-finished config as an immutable shard -- O(1) per
+        config, versus ``save``'s whole-store re-serialization (O(N^2) over a
+        sweep). The manifest accumulator scans existing/resumed results once,
+        then visits only each newly completed config so live viewers retain fresh
+        counts without an O(N^2) sweep rescan."""
+        started = time.perf_counter()
+        path = Path(self.checkpoint_path)
+        _checkpoint_store.save_part(path.name, path.parent, name, self.results[name])
+        if self.incremental_manifest is None:
+            self.incremental_manifest = _IncrementalManifest(self.dataset_identity)
+            self.incremental_manifest.add(self.material_subset())
+        else:
+            self.incremental_manifest.add({name: self.results[name]})
+        _manifest_write(self.checkpoint_path, self.incremental_manifest.manifest())
+        if self.on_timing is not None:
+            elapsed = time.perf_counter() - started
+            self.on_timing({"checkpoint_seconds": elapsed, "shard_write_seconds": elapsed})
+
+    def consolidate(self):
+        """Fold shards into authoritative ``{line,brem,characteristic}.h5`` files the
+        rest of the toolchain expects, then drop the shard directory."""
+        path = Path(self.checkpoint_path)
+        if not _checkpoint_store.has_parts(path.name, path.parent):
+            return
+        if self.on_activity is not None:
+            self.on_activity({"phase": "saving", "case": None, "in_flight_case_count": 0})
+        print("checkpoint: saving completed material")
+        self.timed_save()
+        _checkpoint_store.clear_parts(path.name, path.parent)
