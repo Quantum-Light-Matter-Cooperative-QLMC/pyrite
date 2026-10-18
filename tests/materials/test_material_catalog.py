@@ -1188,6 +1188,185 @@ seed = 19
     assert observation.detector.response.seed == 7
 
 
+def _acquisition_catalog_text(fields, *, named=False):
+    path = "detectors.camera" if named else "profiles.standard.physical_detector"
+    base = _minimal_catalog(
+        material_rows='[materials.mos2]\ndisplay_name = "mos2"\ncrystal = "mos2"',
+        profile_extra='detectors = { sensor = "camera" }' if named else "",
+    )
+    return base + f"\n[{path}]\ndistance_mm = 400.0\n[{path}.acquisition]\n{fields}\n"
+
+
+@pytest.mark.parametrize("named", [False, True], ids=["inline", "reference"])
+@pytest.mark.parametrize(
+    ("bins", "expected"),
+    [
+        ('reporting_bins = "native"', {"reporting_bins": "native"}),
+        ("measured_edges_eV = [0, 0.1, 0.3]", {"measured_edges_eV": (0.0, 0.1, 0.3)}),
+        (
+            "measured_min_eV = 0.0\nmeasured_max_eV = 0.3\nmeasured_bin_width_eV = 0.1",
+            {"measured_edges_eV": (0.0, 0.1, 0.2, 0.3)},
+        ),
+    ],
+)
+def test_acquisition_bin_modes_resolve_immutable_records(tmp_path, named, bins, expected):
+    from pyrite.materials import load_material_catalog
+
+    text = _acquisition_catalog_text("exposure_s = 1.0\n" + bins, named=named)
+    catalog = load_material_catalog(_write_catalog(tmp_path, text))
+    detector = catalog.profile_detector_set("standard")["sensor" if named else "physical"]
+    acquisition = detector["acquisition"]
+    assert dict(acquisition) == {
+        "exposure_s": 1.0,
+        **expected,
+        "hit_threshold_eV": 0.0,
+        "mode": "expected",
+        "seed": None,
+    }
+    with pytest.raises(TypeError):
+        acquisition["exposure_s"] = 2.0
+    if named:
+        assert acquisition == catalog.detectors["camera"]["acquisition"]
+
+
+@pytest.mark.parametrize("named", [False, True], ids=["inline", "reference"])
+@pytest.mark.parametrize(
+    ("bins", "suffix", "message"),
+    [
+        (
+            "",
+            "",
+            "requires reporting_bins = 'native', measured_edges_eV or all of measured min/max/bin-width",
+        ),
+        *[
+            (
+                fields,
+                "",
+                "requires reporting_bins = 'native', measured_edges_eV or all of measured min/max/bin-width",
+            )
+            for fields in (
+                "measured_min_eV = 0",
+                "measured_max_eV = 1",
+                "measured_bin_width_eV = 1",
+                "measured_min_eV = 0\nmeasured_max_eV = 1",
+                "measured_min_eV = 0\nmeasured_bin_width_eV = 1",
+                "measured_max_eV = 1\nmeasured_bin_width_eV = 1",
+            )
+        ],
+        (
+            'reporting_bins = "native"\nmeasured_edges_eV = [0, 1]',
+            "",
+            "reporting_bins = 'native' conflicts with explicit measured bins",
+        ),
+        (
+            'reporting_bins = "native"\nmeasured_min_eV = 0',
+            "",
+            "reporting_bins = 'native' conflicts with explicit measured bins",
+        ),
+        (
+            'reporting_bins = "other"\nmeasured_edges_eV = [0, 1]',
+            ".reporting_bins",
+            "must be 'native'; omit for explicit bins",
+        ),
+        (
+            "measured_edges_eV = [0, 1]\nmeasured_max_eV = 1",
+            "",
+            "use measured_edges_eV or min/max/bin-width, not both",
+        ),
+        *[
+            (
+                f"measured_edges_eV = {value}",
+                ".measured_edges_eV",
+                "must contain at least two nonnegative numbers",
+            )
+            for value in ("1", "[]", "[0]", "[-1, 0]", "[0, inf]", "[0, nan]", "[false, 1]")
+        ],
+        *[
+            (f"measured_edges_eV = {value}", ".measured_edges_eV", "must be strictly increasing")
+            for value in ("[1, 0]", "[0, 0]")
+        ],
+        *[
+            (
+                f"measured_min_eV = {minimum}\nmeasured_max_eV = {maximum}\nmeasured_bin_width_eV = {width}",
+                "",
+                "measured min/max/bin-width must define a finite positive range",
+            )
+            for minimum, maximum, width in (
+                ("-1", "1", "1"),
+                ("0", "0", "1"),
+                ("1", "0", "1"),
+                ("0", "1", "0"),
+                ("0", "1", "-1"),
+                ("nan", "1", "1"),
+                ("0", "inf", "1"),
+                ("0", "1", "nan"),
+                ("false", "1", "1"),
+            )
+        ],
+        (
+            "measured_min_eV = 0\nmeasured_max_eV = 1\nmeasured_bin_width_eV = 0.3",
+            ".measured_bin_width_eV",
+            "energy range must be an integer multiple of bin width",
+        ),
+    ],
+)
+def test_acquisition_bin_errors_keep_context(tmp_path, named, bins, suffix, message):
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    text = _acquisition_catalog_text("exposure_s = 1.0\n" + bins, named=named)
+    with pytest.raises(MaterialConfigError) as caught:
+        load_material_catalog(_write_catalog(tmp_path, text))
+    root = "detectors.camera" if named else "profiles.standard.physical_detector"
+    assert caught.value.errors == (f"{root}.acquisition{suffix}: {message}",)
+
+
+def test_acquisition_accumulates_errors_in_field_order(tmp_path):
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    text = _acquisition_catalog_text(
+        'unexpected = 1\nexposure_s = nan\nreporting_bins = "other"\n'
+        'hit_threshold_eV = -1\nmode = "expected"\nseed = -1'
+    )
+    with pytest.raises(MaterialConfigError) as caught:
+        load_material_catalog(_write_catalog(tmp_path, text))
+    path = "profiles.standard.physical_detector.acquisition"
+    assert caught.value.errors == tuple(
+        path + message
+        for message in (
+            ".unexpected: unknown key",
+            ".exposure_s: must be a finite positive number",
+            ".reporting_bins: must be 'native'; omit for explicit bins",
+            ": requires reporting_bins = 'native', measured_edges_eV or all of measured min/max/bin-width",
+            ".hit_threshold_eV: must be a finite nonnegative number",
+            ".seed: must be a nonnegative integer",
+            ".seed: is not accepted in expected mode",
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("fields", "messages"),
+    [
+        (
+            'mode = "other"\nseed = false',
+            ("mode: must be 'expected' or 'poisson'", "seed: must be a nonnegative integer"),
+        ),
+        ('mode = "poisson"', ("seed: is required for poisson mode",)),
+        ('mode = "poisson"\nseed = 1.5', ("seed: must be a nonnegative integer",)),
+        ("hit_threshold_eV = inf", ("hit_threshold_eV: must be a finite nonnegative number",)),
+    ],
+)
+def test_acquisition_mode_and_threshold_errors(tmp_path, fields, messages):
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    text = _acquisition_catalog_text('exposure_s = 1\nreporting_bins = "native"\n' + fields)
+    with pytest.raises(MaterialConfigError) as caught:
+        load_material_catalog(_write_catalog(tmp_path, text))
+    assert caught.value.errors == tuple(
+        "profiles.standard.physical_detector.acquisition." + message for message in messages
+    )
+
+
 def test_counting_observation_does_not_inherit_standard_detector(tmp_path):
     from pyrite.campaign.observation import resolve_profile_observation
     from pyrite.materials import load_material_catalog

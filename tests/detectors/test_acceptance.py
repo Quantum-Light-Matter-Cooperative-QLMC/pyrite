@@ -192,10 +192,10 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     ]
     assert cases[0] == cases[1]
     assert case_content_key(cases[0]) == case_content_key(cases[1])
-    # Captured with this exact input on main at 86db77f5, before acceptance objects.
+    # Input captured at 86db77f5 before acceptance objects; hashes re-pinned for #513 CBS v4.
     assert (
         case_content_key(cases[1])
-        == "32b309b2aa6564d8806a66018d433801379ec0ba500648f6357d3fb8c6e44661"
+        == "f1dadd1d129c3256ce7255b0df3bf3a5e56e57e3db34d9868c0defa3884e1084"
     )
     sweeps = [
         LegacySweep(material="hopg", beam=beam.to_spec(), target=target, detector=d)
@@ -205,7 +205,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     assert identities[0] == identities[1]
     assert (
         identities[1]["parameter_sha256"]
-        == "04c7fc6e9e1f7669c8b08db9efc7d5ddc4664b922a5717daa504401d79a0d29b"
+        == "004e8e0abd0d528d0230e559aa62bd7009e3862e9ec21f21dfd9e009d7631dea"
     )
     # Pin to the pre-object payload vocabulary; no acceptance metadata enters identity.
     assert "detector" not in identities[0]["resolved_parameters"]["sweep"]

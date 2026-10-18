@@ -28,13 +28,12 @@ def test_output_baseline_accepts_coherent_phase_roundoff():
     actual = json.loads(
         (Path(__file__).parents[1] / "data/physics-baseline/outputs.json").read_text()
     )["coherent"]
-    # Python 3.14 CI at 5b21c9a2, job 116064737035. The other components pass
-    # the ordinary accumulated-roundoff bound; coherent phases amplify it.
-    actual["spectra"]["spec_coherent"] = [
-        3.205073846525819e-09,
-        1.923644409935218e-09,
-        1.7515258903692567e-09,
-    ]
+    # Representative relative errors from Python 3.14 CI at 5b21c9a2,
+    # job 116064737035. Apply them to the current model generation: coherent
+    # phases exceed the ordinary accumulated-roundoff bound, unlike brem.
+    actual["spectra"]["spec_coherent"] = np.asarray(actual["spectra"]["spec_coherent"]) * (
+        1 + np.array([3e-12, -3e-13, -6e-12])
+    )
     assert_output_baseline("coherent", actual)
 
 
