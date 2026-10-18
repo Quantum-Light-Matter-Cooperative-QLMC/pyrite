@@ -89,7 +89,7 @@ def test_mott_checks_drawn_range_without_extending_it(mott_tables):
 @pytest.mark.parametrize("core", ["lockstep", "per-electron"])
 @pytest.mark.parametrize("lut", [False, True])
 def test_mott_guard_preserves_in_range_results_bit_for_bit(mott_tables, monkeypatch, core, lut):
-    from pyrite.montecarlo.transport import api
+    from pyrite.montecarlo.transport import host_pass
 
     options = dict(
         transport_core=core,
@@ -97,7 +97,7 @@ def test_mott_guard_preserves_in_range_results_bit_for_bit(mott_tables, monkeypa
         energy_spread_frac=0.001,
     )
     checked = _run(290.0, **options)
-    monkeypatch.setattr(api, "check_mott_coverage", lambda *_: None)
+    monkeypatch.setattr(host_pass, "check_mott_coverage", lambda *_: None)
     unchecked = _run(290.0, **options)
     assert checked.keys() == unchecked.keys()
     for key in checked:
