@@ -10,7 +10,7 @@ import pytest
 import tomlkit
 
 from pyrite import DATA_DIR
-from pyrite.campaign import profile_edit, profiles
+from pyrite.campaign import profile_lifecycle, profile_summary, profiles
 from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.profiles import (
     FIDELITY_NAMES,
@@ -1049,10 +1049,10 @@ def test_member_overrides_copies_only_member_rows_without_uniform_brem():
         "E_grid_brem = { arange = { start = 50.0, stop = 40000.0, step = 25.0 } }\n"
     )
     with mock.patch.object(
-        profile_edit, "_packaged_standard", return_value=tomlkit.parse(packaged)
+        profile_lifecycle, "_packaged_standard", return_value=tomlkit.parse(packaged)
     ):
-        members = profile_edit.member_overrides(document, {"mote2_product", "hopg"})
-        implicit = profile_edit.member_overrides(document, None)
+        members = profile_lifecycle.member_overrides(document, {"mote2_product", "hopg"})
+        implicit = profile_lifecycle.member_overrides(document, None)
 
     assert members.unwrap() == {"mote2_product": {"thickness_layers": 3}}
     assert implicit.unwrap() == {
@@ -1111,7 +1111,7 @@ def test_bundled_profile_display_has_explicit_detector_acceptance():
     document = tomlkit.parse(read_text(bundled_catalog()))
     assert "default" not in document["detectors"]
     for name in BUNDLED_PROFILES:
-        payload = profile_edit.profile_payload(document, name)
+        payload = profile_summary.profile_payload(document, name)
         assert payload["detector_ref"] == "reference"
         for detector in payload["detectors"].values():
             assert all(value is not None for value in detector["acceptance"].values())

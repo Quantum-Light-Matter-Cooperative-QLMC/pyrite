@@ -6,8 +6,9 @@ from typing import Any, cast
 import click
 from tomlkit.exceptions import ParseError
 
+from pyrite.campaign import _profile_document, profile_numerics
+
 from ..._numerics import PHYSICS_FIELDS
-from ...campaign import profile_edit
 from ...campaign.profiles import resolve_numerics
 from ...console import json as cli_json
 from ...console.output import CLIError, emit_json_result, emit_result, output_option
@@ -30,8 +31,8 @@ def _show(name, json_output, *, physics):
     schema = f"pyrite.{noun}.show"
     try:
         _, document = _catalog_io.catalog_text()
-        target = profile_edit.existing_profile(document, name)
-        resolution = resolve_numerics(profile_edit.profile_numerics_values(target))
+        target = _profile_document.existing_profile(document, name)
+        resolution = resolve_numerics(profile_numerics.profile_numerics_values(target))
         fields = [
             row
             for group in resolution.groups()
@@ -73,10 +74,10 @@ def _set(name, yes, dry_run, *, physics, emission=None, **values):
         raise click.UsageError("provide at least one setting option")
     try:
         original, document = _catalog_io.catalog_text()
-        target = profile_edit.existing_profile(document, name)
+        target = _profile_document.existing_profile(document, name)
         if emission is not None:
             target["emission"] = emission
-        profile_edit.set_numerics(document, name, updates)
+        profile_numerics.set_numerics(document, name, updates)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     noun = "physics" if physics else "numerics"
@@ -89,12 +90,12 @@ def _reset(name, fields, yes, dry_run, *, physics):
     selected = tuple(fields) or (*names, *(("emission",) if physics else ()))
     try:
         original, document = _catalog_io.catalog_text()
-        target = profile_edit.existing_profile(document, name)
+        target = _profile_document.existing_profile(document, name)
         if "emission" in selected:
             target.pop("emission", None)
         keys = tuple(dict.fromkeys(names[field] for field in selected if field != "emission"))
         if keys:
-            profile_edit.reset_numerics(document, name, keys)
+            profile_numerics.reset_numerics(document, name, keys)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     confirm_standard(name, "reset calculation settings on", yes, dry_run)
@@ -161,7 +162,7 @@ def _register(group, *, physics):
         """Validate the selected campaign without running simulation or writing files."""
         try:
             _, document = _catalog_io.catalog_text()
-            profile_edit.existing_profile(document, name)
+            _profile_document.existing_profile(document, name)
             _catalog_io.validated_catalog(
                 _catalog_io.active_catalog_path(),
                 _catalog_io.render_catalog(document),

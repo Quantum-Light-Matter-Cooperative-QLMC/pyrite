@@ -8,7 +8,7 @@ import tomlkit
 
 from pyrite import DATA_DIR
 from pyrite._catalog_layout import read_text
-from pyrite.campaign import profile_edit
+from pyrite.campaign import profile_summary
 from pyrite.cli import _catalog_io
 from pyrite.cli.commands import detector, profile
 from tests.helpers.cli import assert_clean_result, invoke
@@ -110,13 +110,13 @@ def test_legacy_edits_do_not_convert_storage(catalog):
     )
     assert "detectors" not in row(catalog)
     original = row(catalog).unwrap()
-    before = profile_edit.profile_payload(tomlkit.parse(catalog.read_text()), "standard")[
+    before = profile_summary.profile_payload(tomlkit.parse(catalog.read_text()), "standard")[
         "detectors"
     ]
     call("set", "standard", "physical", "--distance-mm", "100", "-y")
     assert row(catalog).unwrap() == original
     call("migrate", "standard", "-y")
-    after = profile_edit.profile_payload(tomlkit.parse(catalog.read_text()), "standard")[
+    after = profile_summary.profile_payload(tomlkit.parse(catalog.read_text()), "standard")[
         "detectors"
     ]
     assert before == after

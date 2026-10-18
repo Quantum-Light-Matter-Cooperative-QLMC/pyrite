@@ -8,7 +8,7 @@ import click
 from tomlkit.exceptions import ParseError
 
 from pyrite._catalog_layout import object_sources
-from pyrite.campaign.profile_edit import PHYSICAL_SECTIONS
+from pyrite.campaign.profile_detectors import PHYSICAL_SECTIONS
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli._deprecations import DeprecatingGroup, warn_self

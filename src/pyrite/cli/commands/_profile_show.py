@@ -6,7 +6,7 @@ import textwrap
 import click
 
 from pyrite._energy_grid_encoding import encode_energy_grid
-from pyrite.campaign import profile_edit
+from pyrite.campaign import _profile_document, profile_cxr_grid, profile_detectors
 from pyrite.cli import _catalog_io
 from pyrite.console.output import emit_result
 from pyrite.materials._catalog_decode import resolve_grid_descriptor
@@ -77,9 +77,9 @@ def _grid_summary(value, *, brem=False):
 
 def energy_grid_rows(document, target):
     """Report declared sources and case semantics without resolving trajectories."""
-    sources = profile_edit.cxr_grid_sources(document, target)
-    policy = profile_edit.profile_cxr_grid_values(target)
-    refs = profile_edit.energy_grid_refs(target)
+    sources = profile_cxr_grid.cxr_grid_sources(document, target)
+    policy = profile_cxr_grid.profile_cxr_grid_values(target)
+    refs = _profile_document.energy_grid_refs(target)
     if policy:
         line = "automatic for every case (profile policy)"
     elif "E_grid_line" in target:
@@ -100,7 +100,7 @@ def energy_grid_rows(document, target):
         rows.append(
             ("line explicit", _grid_summary(target["E_grid_line"]) + " (inactive: profile policy)")
         )
-    for material, override in profile_edit.profile_overrides(target).items():
+    for material, override in _profile_document.profile_overrides(target).items():
         for key, name in (("E_grid_line", "line"), ("E_grid_brem", "brem")):
             if key not in override:
                 continue
@@ -141,14 +141,17 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
     ranges = [
         (row["name"], f"[{_catalog_io.display(row['values'])}]")
         for row in payload["ranges"]
-        if row["catalog_key"] in profile_edit.RANGES.values()
+        if row["catalog_key"] in _profile_document.RANGES.values()
     ]
     units = {"thickness": "Angstrom", "energy": "keV", "polar": "deg", "azimuth": "deg"}
     ranges = [(label, f"{value} {units[label]}") for label, value in ranges]
     # Layer-count grids have no CLI setter but remain useful sweep axes.
     if "thickness_layers" in target:
         ranges.append(
-            ("thickness-layers", _display(profile_edit.range_values(target, "thickness_layers")))
+            (
+                "thickness-layers",
+                _display(_profile_document.range_values(target, "thickness_layers")),
+            )
         )
     materials = payload["materials"]
     _table(
@@ -176,7 +179,7 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
 
     for detector_id, entry in payload["detectors"].items():
         rows = [("kind", entry["kind"]), ("reference", entry["reference"] or "inline / built-in")]
-        for key, label, unit in profile_edit.ACTIVE_DETECTOR_FIELDS:
+        for key, label, unit in profile_detectors.ACTIVE_DETECTOR_FIELDS:
             value = entry["acceptance"][key]
             rows.append((label, "unspecified" if value is None else f"{value:g} {unit}"))
         if entry["kind"] == "pixel":

@@ -4,7 +4,9 @@ import click
 from tomlkit.exceptions import ParseError
 
 from pyrite._precision import OBSERVABLES
-from pyrite.campaign import profile_edit as _profile_edit
+from pyrite.campaign import profile_precision as _profile_edit
+from pyrite.campaign._profile_document import existing_profile
+from pyrite.campaign.profile_cxr_grid import cxr_grid_sources
 from pyrite.campaign.profiles import get_fidelity_preset
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
@@ -168,7 +170,7 @@ def show_cxr(precision):
 def _mode_cxr(document, name):
     """One-line resulting electron-count mode after an edit."""
     _explicit, effective, source, reason = _profile_edit.precision_resolution(
-        _profile_edit.existing_profile(document, name)
+        existing_profile(document, name)
     )
     if effective is None:
         return f"profile {name}: fixed electron counts ({reason})"
@@ -206,11 +208,11 @@ def precision_show_command(name, json_output):
     """Show PROFILE's electron-count mode, its source, blockers and next steps."""
     try:
         _text, document = _catalog_io.catalog_text()
-        profile = _profile_edit.existing_profile(document, name)
+        profile = existing_profile(document, name)
         explicit, effective, source, fixed_reason = _profile_edit.precision_resolution(profile)
         counts = _profile_edit.fixed_counts(profile)
         blockers = _profile_edit.precision_blockers(profile)
-        grid = _profile_edit.cxr_grid_sources(document, profile)
+        grid = cxr_grid_sources(document, profile)
     except (OSError, TypeError, ValueError, ParseError) as exc:
         if json_output:
             emit_json_result(cli_json.failure("cxr.profile.precision.show", {}, str(exc)))
@@ -383,7 +385,7 @@ def precision_disable_command(name, line_trials, brem_trials, yes, dry_run):
     """
     try:
         original, document = _catalog_io.catalog_text()
-        current = _profile_edit.fixed_counts(_profile_edit.existing_profile(document, name))
+        current = _profile_edit.fixed_counts(existing_profile(document, name))
     except (OSError, TypeError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     preset = get_fidelity_preset("full")
@@ -403,7 +405,7 @@ def precision_disable_command(name, line_trials, brem_trials, yes, dry_run):
         counts[key] = defaults[key] if value is None else value
     try:
         removed = _profile_edit.disable_precision(document, name, counts)
-        result = _profile_edit.fixed_counts(_profile_edit.existing_profile(document, name))
+        result = _profile_edit.fixed_counts(existing_profile(document, name))
     except (OSError, TypeError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     if _catalog_io.is_unchanged(document, original):

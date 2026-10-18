@@ -1,7 +1,10 @@
 """Govern compatibility-module removal metadata against the live package tree."""
 
 import ast
+import importlib
 import importlib.util
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -54,3 +57,46 @@ def test_public_export_deprecation_support_window() -> None:
 )
 def test_removed_cxr_module_paths_are_unavailable(module):
     assert importlib.util.find_spec(module) is None
+
+
+def test_profile_edit_import_warns_and_preserves_export_identity():
+    from pyrite.campaign import (
+        _profile_document,
+        profile_cxr_grid,
+        profile_lifecycle,
+        profile_summary,
+    )
+
+    name = "pyrite.campaign.profile_edit"
+    with pytest.warns(
+        DeprecationWarning, match=r"pyrite.campaign.profile_edit.*0\.17\.0.*profile_lifecycle"
+    ) as recorded:
+        legacy = (
+            importlib.reload(sys.modules[name])
+            if name in sys.modules
+            else importlib.import_module(name)
+        )
+    assert len(recorded) == 1
+    assert legacy.create_profile is profile_lifecycle.create_profile
+    assert legacy.profile_payload is profile_summary.profile_payload
+    assert legacy.RANGES is _profile_document.RANGES
+    assert legacy.CxrGridPolicyConflict is profile_cxr_grid.CxrGridPolicyConflict
+    assert legacy._packaged_standard is profile_lifecycle._packaged_standard
+
+
+def test_profile_commands_import_without_the_deprecated_facade():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-W",
+            "error:pyrite.campaign.profile_edit:DeprecationWarning",
+            "-c",
+            "import sys; from pyrite.cli.commands import profile, calculation; "
+            "assert 'pyrite.campaign.profile_edit' not in sys.modules",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == result.stderr == ""

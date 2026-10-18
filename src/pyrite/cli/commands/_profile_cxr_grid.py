@@ -8,7 +8,8 @@ from pyrite._cxr_grid_policy import (
     PROFILE_CXR_GRID_SELECTORS,
     RESONANCE_BANDWIDTH_POLICY,
 )
-from pyrite.campaign import profile_edit as _profile_edit
+from pyrite.campaign import profile_cxr_grid as _profile_edit
+from pyrite.campaign._profile_document import existing_profile
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli.commands._profile_shared import confirm_standard, write
@@ -100,7 +101,7 @@ def cxr_grid_show_command(name, json_output):
     """Show explicit and effective PROFILE cxr-grid selectors and the grid source."""
     try:
         _text, document = _catalog_io.catalog_text()
-        target = _profile_edit.existing_profile(document, name)
+        target = existing_profile(document, name)
         explicit = _profile_edit.profile_cxr_grid_values(target)
         payload = {
             "profile": name,
@@ -161,7 +162,7 @@ def cxr_grid_set_command(name, yes, dry_run, **values):
         raise click.UsageError("provide at least one of --bandwidth, --resolution, --quadrature")
     try:
         original, document = _catalog_io.catalog_text()
-        target = _profile_edit.existing_profile(document, name)
+        target = existing_profile(document, name)
         merged = {**(_profile_edit.profile_cxr_grid_values(target) or {}), **updates}
         changed = _profile_edit.set_cxr_grid_policy(document, name, updates)
     except _profile_edit.CxrGridPolicyConflict as exc:
@@ -192,7 +193,7 @@ def cxr_grid_reset_command(name, fields, yes, dry_run):
     """
     try:
         original, document = _catalog_io.catalog_text()
-        target = _profile_edit.existing_profile(document, name)
+        target = existing_profile(document, name)
         current = _profile_edit.profile_cxr_grid_values(target) or {}
         remaining = {key: value for key, value in current.items() if key not in fields}
         removed = _profile_edit.reset_cxr_grid_policy(document, name, fields)

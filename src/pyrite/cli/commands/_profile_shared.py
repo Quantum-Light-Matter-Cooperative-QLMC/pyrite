@@ -5,13 +5,13 @@ import difflib
 import click
 from tomlkit.exceptions import ParseError
 
-from pyrite.campaign import profile_edit as _profile_edit
+from pyrite.campaign import _profile_document
 from pyrite.cli import _catalog_io
 from pyrite.console.output import CLIError, emit_result
 
 
 def existing_profile(document, name):
-    return _profile_edit.existing_profile(document, name)
+    return _profile_document.existing_profile(document, name)
 
 
 def confirm_standard(name, action, yes, dry_run):

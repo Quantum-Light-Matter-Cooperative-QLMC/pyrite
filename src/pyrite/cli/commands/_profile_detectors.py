@@ -6,7 +6,14 @@ import click
 from click.shell_completion import CompletionItem
 from tomlkit.exceptions import ParseError
 
-from pyrite.campaign import profile_edit as edit
+from pyrite.campaign import profile_detectors as edit
+from pyrite.campaign._profile_document import (
+    clone_grid,
+    detector_rows,
+    existing_profile,
+    unknown_detector,
+)
+from pyrite.campaign.profile_summary import detector_payloads
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as completion
 from pyrite.cli.commands._detector_shared import (
@@ -29,7 +36,7 @@ from pyrite.console.output import (
 def complete_id(ctx, param, incomplete):
     try:
         _, document = _catalog_io.catalog_text()
-        profile = edit.existing_profile(document, ctx.params.get("profile_name"))
+        profile = existing_profile(document, ctx.params.get("profile_name"))
         return [
             CompletionItem(key)
             for key in edit.profile_detector_entries(profile)
@@ -54,7 +61,7 @@ def _inspect(profile_name, identifier, json_output):
     kind = "cxr.profile.detector.list" if identifier is None else "cxr.profile.detector.show"
     try:
         _, document = _catalog_io.catalog_text()
-        entries = edit.profile_payload(document, profile_name)["detectors"]
+        entries = detector_payloads(document, existing_profile(document, profile_name))
         for entry in entries.values():
             if entry["kind"] == "pixel":
                 entry["settings"] = {
@@ -109,8 +116,8 @@ def show_command(profile_name, identifier, json_output):
 
 
 def _reference(document, reference):
-    if reference not in edit.detector_rows(document):
-        edit.unknown_detector(document, reference)
+    if reference not in detector_rows(document):
+        unknown_detector(document, reference)
 
 
 def _validate(document):
@@ -142,7 +149,7 @@ def add_command(profile_name, identifier, reference, yes, dry_run):
         )
     try:
         original, document = _catalog_io.catalog_text()
-        profile = edit.existing_profile(document, profile_name)
+        profile = existing_profile(document, profile_name)
         if "detectors" not in profile:
             raise ValueError(
                 f"legacy profile; preview conversion with: pyrite profile detector migrate {profile_name} --dry-run"
@@ -203,7 +210,7 @@ def set_command(
         raise click.UsageError("nothing to set; pass --detector or field options")
     try:
         original, document = _catalog_io.catalog_text()
-        profile = edit.existing_profile(document, profile_name)
+        profile = existing_profile(document, profile_name)
         owner, key = edit.profile_detector_slot(
             profile, identifier, create_physical=bool(pixel[0].get("distance_mm"))
         )
@@ -221,7 +228,7 @@ def set_command(
                     raise ValueError(
                         f"shared detector {entry!r}; use 'pyrite detector set {entry}' or --inline-copy"
                     )
-                entry = edit.clone_grid(edit.detector_rows(document)[entry])
+                entry = clone_grid(detector_rows(document)[entry])
                 entry.pop("label", None)
             elif inline_copy:
                 raise ValueError("--inline-copy requires a named detector reference")
@@ -262,7 +269,7 @@ def rm_command(profile_name, identifier, yes, dry_run):
 def _remove(profile_name, identifier, sections, yes, dry_run):
     try:
         original, document = _catalog_io.catalog_text()
-        profile = edit.existing_profile(document, profile_name)
+        profile = existing_profile(document, profile_name)
         owner, key = edit.profile_detector_slot(profile, identifier)
         if key not in owner:
             raise ValueError("implicit default detector cannot be removed; attach a detector first")
@@ -304,9 +311,9 @@ def migrate_command(profile_name, yes, dry_run):
     """
     try:
         original, document = _catalog_io.catalog_text()
-        before = edit.profile_payload(document, profile_name)["detectors"]
+        before = detector_payloads(document, existing_profile(document, profile_name))
         identifiers = edit.migrate_profile_detectors(document, profile_name)
-        after = edit.profile_payload(document, profile_name)["detectors"]
+        after = detector_payloads(document, existing_profile(document, profile_name))
         if before != after:
             raise ValueError("migration would change resolved detector values")
     except (OSError, ValueError, ParseError) as exc:
