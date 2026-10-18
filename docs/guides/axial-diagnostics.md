@@ -5,6 +5,10 @@ axial solvers. They add no physics, transport handoff, or campaign integration;
 `Physics(channeling_model="axial")` remains refused. The core diagnostic needs
 neither marimo nor plotting extras.
 
+The proposed [standard-run contracts](../research/physics/axial-run-integration.md)
+separate physical escape, numerical sinks and source scoring; they do not enable
+Scene/profile axial selection.
+
 ## One Python call
 
 ```python

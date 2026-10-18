@@ -23,6 +23,7 @@ physics/superradiant-pxr
 physics/quantum-coherent-emission
 physics/phase-retention
 physics/channeling-radiation-physics
+physics/axial-run-integration
 physics/channeling-materials
 physics/mos2-directional-loss-sources
 physics/transition-radiation-recommendations
