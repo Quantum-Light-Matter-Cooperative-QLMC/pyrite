@@ -24,6 +24,11 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/dans_diffraction_oracle.py": ("dans-diffraction-oracle",),
     "checks/kephart_occupation.py": ("cr-dechanneling-collapse",),
     "checks/channeling_handoff.py": ("cr-zone-handoff-accounting",),
+    # Axial handoff research diagnostics are recorded in the ledger notes, not
+    # as physical validation verdicts.
+    "checks/axial_escape_accounting.py": (),
+    "checks/axial_matching_study.py": (),
+    "checks/axial_mcwf_return_flux.py": (),
     "checks/quantum_decoherence_budget.py": ("quantum-decoherence-budget",),
     "checks/channeling_material_survey.py": (),
     "checks/channeling_modulated_emission.py": ("channeling-modulated-incoherent-emission",),
