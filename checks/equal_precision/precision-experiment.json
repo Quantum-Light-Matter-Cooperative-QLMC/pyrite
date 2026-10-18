@@ -1,0 +1,67 @@
+{
+  "schema": "pyrite.equal-precision.radiative-precision.v1",
+  "purpose": "Isolate radiative FP32 arithmetic and photon inversion cost while preserving FP64 trajectory state, elastic/stopping helpers, RNG integer streams and uniform generation.",
+  "variants": [
+    "fp64",
+    "rad-fp32-52",
+    "rad-fp32-24",
+    "rad-cell64-24",
+    "rad-stable32-24"
+  ],
+  "pilot": {
+    "histories": 5000,
+    "batch_histories": 5000,
+    "scratch_mib": 4096,
+    "probe_electrons": 0,
+    "seeds": [
+      58001,
+      58002,
+      58003,
+      58004,
+      58005
+    ],
+    "scenes": [
+      "si-300-100um-0deg",
+      "w-300-10um-0deg"
+    ]
+  },
+  "preflight": {
+    "histories": 64,
+    "seed": 57901,
+    "scenes": "All six scenes in manifest.json",
+    "moment_scaled_error_limit": 0.0002,
+    "moment_relative_floor": 1e-06,
+    "inverse_error_over_incident_energy_limit": 0.0002,
+    "notes": "Component screening, not a validated whole-transport accuracy bound. Failures remain explicit; safe finite arms may still be timed as unqualified diagnostics."
+  },
+  "budget": {
+    "preflight_allocations": 2,
+    "preflight_minutes": 5,
+    "pilot_allocations": 2,
+    "pilot_minutes_each": 10,
+    "cpus_per_task": 1,
+    "gpu": 1,
+    "memory_gib": 24
+  },
+  "timing": "Fresh processes; one full identical-workload warmup, separate seed +1000000; synchronized boundaries. Alternate variant order each replicate. Preserve full request/reduction and transport intervals separately. No new Nsight counters assumed. CXR execution-call profiling is enabled only in small preflight runs and disabled in all timed pilots. Full fresh-process wall time is retained separately from transport/emission.",
+  "invariants": {
+    "max_energy_ledger_error_keV": 1e-07,
+    "max_photon_debit_error_keV": 1e-09,
+    "max_direction_norm_error": 1e-10
+  },
+  "ensemble_screen": {
+    "fraction_absolute_margin": 0.005,
+    "energy_margin_fraction_of_beam": 0.005,
+    "yield_relative_margin": 0.05,
+    "confidence": 0.95,
+    "multiple_comparison": "Approximate normal Bonferroni intervals over all scene/population/variant/observable comparisons. Sum of primary-mean SEs bounds unknown cross-precision seed covariance. Zero variance or fewer than 20 scoring primaries leaves source-yield precision unresolved.",
+    "minimum_nonzero_primaries_for_yield_screen": 20
+  },
+  "exclusions": "No production source/default/model marker/version change. No PXR/CBS, no result reuse in transport timing, no extrapolated 100000-primary gain, no qualified cross-engine speedup. Host photon-angle completion remains unchanged FP64 and is included in transport/emission timing.",
+  "revision": 2,
+  "decisions": [
+    "Job 1339 retained the initial four-arm preflight, including failures. Its generated CUDA exposed an experimental FP32 exported eV-to-keV constant leaking into the FP64 transport debit; corrected before timing.",
+    "Revision 2 keeps the exported unit converter FP64 and uses a separate FP32 constant inside radiative helpers. Adds stable FP32 log1p linear-cell evaluation to compare against selective FP64."
+  ],
+  "stable_cell_evaluation": "Linear chi integral equals chi_left*log1p(x)+slope*left*(x-log1p(x)), x=(right-left)/left. For x<=0.01 evaluate the latter correction through x^6; omitted magnitude <=x^7/7, below FP32 rounding of that correction. No physical tail/grid/model approximation."
+}

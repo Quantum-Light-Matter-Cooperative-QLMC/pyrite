@@ -1,0 +1,89 @@
+{
+  "schema": "pyrite.equal-precision.quotient-method-verification.v1",
+  "date": "2026-10-15",
+  "scope": "Numerical helper, fixed-design finite-sample mean-equivalence tooling and completed held-out study.",
+  "checks": {
+    "gpu_preflight": {
+      "job": 1378,
+      "reference_tests": 9,
+      "performance_tests": 86,
+      "component_cases": 4000,
+      "new_arm": "rad-quotient32-24",
+      "full_screen_passed": true
+    },
+    "linux_performance": {
+      "job": 1390,
+      "passed": 87
+    },
+    "linux_source_lint": "passed",
+    "linux_typecheck": "passed",
+    "linux_docs": {
+      "job": 1391,
+      "result": "passed"
+    },
+    "real_artifact_integrity": {
+      "job": 1392,
+      "result": "passed; incomplete fixed design yields32 unresolved and no confidence intervals"
+    },
+    "local_focused_tests": 47,
+    "prior_six_helper_sources": "byte-identical",
+    "heldout": {
+      "complete": true,
+      "comparisons_passed": 32,
+      "comparisons_failed": 0,
+      "comparisons_unresolved": 0,
+      "histories_per_arm": {
+        "Si": 1200000,
+        "W": 250000
+      }
+    },
+    "final_analysis_plot_docs": {
+      "job": 1406,
+      "partition": "cpu",
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "analysis": "byte-identical to job 1393 summary",
+      "plot": "regenerated and visually inspected",
+      "strict_docs": "passed"
+    },
+    "documentation_tests": {
+      "linux_job": 1407,
+      "linux_passed": 6,
+      "windows_passed": 5,
+      "windows_failed": 1,
+      "windows_failure": "Unchanged test_literal_documentation_path_check_reports_missing_target expects slash but receives backslash in src/example.py diagnostic. Actual repository documentation-path check passed."
+    },
+    "plot_source_lint": "passed",
+    "numerical_budget_audit": {
+      "linux_job": 1409,
+      "partition": "cpu",
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "linux_focused_tests": 24,
+      "windows_new_audit_tests": 10,
+      "portable_output": "byte-identical across Windows/Linux after explicit LF output fix",
+      "source_lint": "passed",
+      "strict_docs": "passed",
+      "prior_attempt": {
+        "job": 1408,
+        "state": "FAILED",
+        "reason": "Byte comparison caught CRLF vs LF in new JSON writer; fixed and rerun."
+      },
+      "gpu_samples_added": 0,
+      "summary": "quotient-budget-summary.json"
+    }
+  },
+  "logs": {
+    "quotient-audit-1392.log": "69b2f208a2b8e4b4d262c464c15509fa459460aa88f50e28084016857471ac34",
+    "quotient-checks-1390.log": "43819f1b62ec70a58ad7056b375f5c8faf2c9508a0abe852f485c88bd4a58af3",
+    "quotient-docs-1391.log": "4464d472e601d85307ededc40605b77caf2c71d64f9cedd7cab1a7c8db388f13",
+    "quotient-final-1406.log": "4a535264ece3f130cd966edebf9a194b66e24d8b32f5cccec738692b140697d1",
+    "quotient-doc-tests-1407.log": "ba13093a7f034a0a4fac0ce5fe5474b6cdc8fe47446e9baa9ee14795131e704f",
+    "quotient-budget-1409.log": "ffb903a027aac9004e62b2f0d66c012864531075ad6b0ee1435febd1b191ce27",
+    "quotient-budget-1408.log": "e4404f8a3b9d43ae472b87611ff4ee57522bb7af0a8454ab0381467a6c0d1018"
+  },
+  "qualified_observable_equivalence": true,
+  "qualified_T_epsilon": false,
+  "production_source_changes": false,
+  "completed_results": "quotient-equivalence-summary.json"
+}

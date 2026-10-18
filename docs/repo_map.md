@@ -696,6 +696,7 @@ Click layer for `pyrite checkpoint gc` (`gc_command`) and `pyrite checkpoint rm`
 
 ### `perf/`
 Performance sample collection and analysis. `performance_profile.py` owns the append-only runtime logger; `performance_analysis.py` owns artifact loading, summaries, and comparisons.
+Opt-in cross-engine benchmark helpers (#510, driven from `checks/equal_precision/`): `precision.py` primary-history moments, `geant4.py` TestEm5 log parsing, `benchmark_matrix.py` frozen matrix expansion, `comparison.py` common per-primary comparison schema and cone acceptance quadrature.
 
 ### `cli/commands/performance.py`
 Canonical local performance-artifact lifecycle: inventory, analysis, and preview-by-default profile deletion (`rm`; the retired `prune` spelling stays a hidden alias). `profile analyze` remains a hidden warning alias. Revalidates selected file signatures before deletion.

@@ -1,0 +1,1517 @@
+{
+  "schema": "pyrite.equal-precision.active-controls-summary.v1",
+  "interpretation": "Three measured active step caps per scene, not numerical convergence. Initial step-limit failures retained. A future convergence study must use a common sufficient max_steps and fresh statistical populations.",
+  "seed": 69001,
+  "histories": 64,
+  "core": "per-electron",
+  "requested_cpus": 1,
+  "allocated_cpus": 2,
+  "threads": 1,
+  "requested_memory_gib": 8,
+  "transport_sources_identical": true,
+  "tables_identical_within_scene": true,
+  "jobs": [
+    {
+      "job": 1580,
+      "elapsed_s": 145,
+      "archive": "activity-ladder-1580.tar.gz",
+      "archive_sha256": "8feb4f86707ea700c1e409229d119dd090828420ad664c39ee8431eb56d9eb2c",
+      "schema": "pyrite.equal-precision.activity-ladder-summary.v1",
+      "protocol": {
+        "schema": "pyrite.equal-precision.activity-ladder.v1",
+        "purpose": "Find active energy-step controls; no numerical convergence or speed claim.",
+        "scenes": [
+          "si-300-100um-0deg",
+          "w-300-10um-0deg",
+          "si-800-100um-0deg",
+          "w-800-10um-0deg",
+          "si-100-1um-0deg",
+          "w-100-100um-75deg"
+        ],
+        "caps": [
+          0.05,
+          0.001,
+          0.00025,
+          6.25e-05
+        ],
+        "histories": 64,
+        "seed": 69001,
+        "core": "per-electron",
+        "cutoff_eV": 1000,
+        "budget": {
+          "cpus": 1,
+          "memory_gib": 8,
+          "allocation_seconds": 300,
+          "runner_seconds": 260,
+          "process_seconds": 30,
+          "no_retries": true
+        },
+        "selection_rule": "For each scene, require nonzero measured energy-limited rows at all three tighter caps; retain every outcome. Activity alone does not establish convergence."
+      },
+      "protocol_sha256": "491851190e76568b123f0c7ffc284590c113788cfeb330d0bc68b6f05079049c",
+      "outcomes": [
+        {
+          "scene": "si-300-100um-0deg",
+          "cap": 0.05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 57431,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 9.094947017729282e-13,
+              "photon_debit_max_error_keV": 1.865174681370263e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 76724,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 6.821210263296962e-13,
+              "photon_debit_max_error_keV": 5.329070518200751e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "8169539a4b7f13f1374e53fafd11de40cde947c261b3e946a7adb97e4b6ff66b"
+        },
+        {
+          "scene": "si-300-100um-0deg",
+          "cap": 0.001,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 62145,
+              "energy_limited_rows": 4711,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.1368683772161603e-12,
+              "photon_debit_max_error_keV": 2.1094237467877974e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 90139,
+              "energy_limited_rows": 13406,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.3642420526593924e-12,
+              "photon_debit_max_error_keV": 2.7533531010703882e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "af31a197469575d75f1c3f3753967609e87e388fa701e8ccf07564a614c7b694"
+        },
+        {
+          "scene": "si-300-100um-0deg",
+          "cap": 0.00025,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 115079,
+              "energy_limited_rows": 57639,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 6.252776074688882e-13,
+              "photon_debit_max_error_keV": 1.509903313490213e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 188186,
+              "energy_limited_rows": 111448,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.6484591469634324e-12,
+              "photon_debit_max_error_keV": 1.1546319456101628e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "85312ed4432a8cdac32dadb5fd48728bb155f0fde286068bd16e7898a1ac17f1"
+        },
+        {
+          "scene": "si-300-100um-0deg",
+          "cap": 6.25e-05,
+          "outcome": "failed",
+          "reason": "adapter exit 1"
+        },
+        {
+          "scene": "w-300-10um-0deg",
+          "cap": 0.05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 121154,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 1.0800249583553523e-12,
+              "photon_debit_max_error_keV": 2.6645352591003757e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 117816,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 8.526512829121202e-13,
+              "photon_debit_max_error_keV": 1.7763568394002505e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "4d81078a319b9eb61381de3b88ecfea647dde8f53cb4c39f910931da3466c491"
+        },
+        {
+          "scene": "w-300-10um-0deg",
+          "cap": 0.001,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 122679,
+              "energy_limited_rows": 1525,
+              "primaries_with_energy_substeps": 23,
+              "energy_ledger_max_error_keV": 1.1368683772161603e-13,
+              "photon_debit_max_error_keV": 2.6645352591003757e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 119199,
+              "energy_limited_rows": 1381,
+              "primaries_with_energy_substeps": 16,
+              "energy_ledger_max_error_keV": 5.684341886080801e-13,
+              "photon_debit_max_error_keV": 1.7763568394002505e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "ef05dfa65824ebcff65d3fdb487214f30f63cec8bf0b26cda4e7a7517616d82e"
+        },
+        {
+          "scene": "w-300-10um-0deg",
+          "cap": 0.00025,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 149277,
+              "energy_limited_rows": 28121,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 2.0463630789890885e-12,
+              "photon_debit_max_error_keV": 2.8199664825478976e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 145220,
+              "energy_limited_rows": 27401,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.0800249583553523e-12,
+              "photon_debit_max_error_keV": 2.4868995751603507e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "df5ef7edb3df730df8121557d0e5046daeff4600d7d34b1d5f7889e929ddb36b"
+        },
+        {
+          "scene": "w-300-10um-0deg",
+          "cap": 6.25e-05,
+          "outcome": "failed",
+          "reason": "adapter exit 1"
+        },
+        {
+          "scene": "si-800-100um-0deg",
+          "cap": 0.05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 26373,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.5067062021407764e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 26794,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 4.263256414560601e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "f23476db2e72d46730fa7b0ac58fd0653077a919c5c1e931f45127033473641f"
+        },
+        {
+          "scene": "si-800-100um-0deg",
+          "cap": 0.001,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 26378,
+              "energy_limited_rows": 5,
+              "primaries_with_energy_substeps": 4,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.5067062021407764e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 26796,
+              "energy_limited_rows": 2,
+              "primaries_with_energy_substeps": 2,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 4.263256414560601e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "5139585b27917ed1c477c44b352cf6d6addae90a7c9df8ebfd40816b0d2ff6c0"
+        },
+        {
+          "scene": "si-800-100um-0deg",
+          "cap": 0.00025,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 30061,
+              "energy_limited_rows": 3687,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 2.4202861936828413e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 30499,
+              "energy_limited_rows": 3705,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 4.440892098500626e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "4f724ce819f4a90524f06c97a93019c0c51e03bae3040c77771e7acdbaf5f32e"
+        },
+        {
+          "scene": "si-800-100um-0deg",
+          "cap": 6.25e-05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 64863,
+              "energy_limited_rows": 38489,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.3290705182007514e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 65679,
+              "energy_limited_rows": 38885,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 2.5757174171303632e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "6f6145f4423aa8112f35a05360ced901143b52c7c5219e5d585a7c1fd1592a1a"
+        },
+        {
+          "scene": "w-800-10um-0deg",
+          "cap": 0.05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 46031,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 2.842170943040401e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 52531,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.684341886080802e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "b6c342d518872272c4108e34180232daad3a3037d0af40379d3afb3777e0e8b9"
+        },
+        {
+          "scene": "w-800-10um-0deg",
+          "cap": 0.001,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 46031,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 2.842170943040401e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 52531,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.684341886080802e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "d824e2581c11dc2f0a93d5c2a2756e796b2576415af16d8cc9175e48d9f970b6"
+        },
+        {
+          "scene": "w-800-10um-0deg",
+          "cap": 0.00025,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 46211,
+              "energy_limited_rows": 180,
+              "primaries_with_energy_substeps": 60,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 2.842170943040401e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 52720,
+              "energy_limited_rows": 189,
+              "primaries_with_energy_substeps": 60,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 2.842170943040401e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "11b3297468ebbc705fd1a65eac9a1783139509dcc1f205c1c49b9e59f30e289e"
+        },
+        {
+          "scene": "w-800-10um-0deg",
+          "cap": 6.25e-05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 61424,
+              "energy_limited_rows": 15393,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.306866057708248e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 70035,
+              "energy_limited_rows": 17502,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 4.973799150320701e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "987a1d70d0fd82bba34310724c22ea0ba0235200ae17307bf725174dc2f710a1"
+        },
+        {
+          "scene": "si-100-1um-0deg",
+          "cap": 0.05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 781,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 801,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            }
+          },
+          "sample_sha256": "61c6436d117242b0cef1acb792eb422c1b07efc9d6ee6d50ae126c5b1df0f12b"
+        },
+        {
+          "scene": "si-100-1um-0deg",
+          "cap": 0.001,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 985,
+              "energy_limited_rows": 204,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 1009,
+              "energy_limited_rows": 208,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            }
+          },
+          "sample_sha256": "2f66d1b5ab1e4d2ae191bf9a84de296d5c96b504cd0b9b63248f5ede3aeb2fa2"
+        },
+        {
+          "scene": "si-100-1um-0deg",
+          "cap": 0.00025,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 2447,
+              "energy_limited_rows": 1666,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 2425,
+              "energy_limited_rows": 1624,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            }
+          },
+          "sample_sha256": "b9414b405e76c4cc6f2806fb76262a405ade9c062e0469d9936f66e9999655c9"
+        },
+        {
+          "scene": "si-100-1um-0deg",
+          "cap": 6.25e-05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 8442,
+              "energy_limited_rows": 7660,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 8362,
+              "energy_limited_rows": 7561,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            }
+          },
+          "sample_sha256": "1cbfca6342a361883bf1117d90e56e86351ba6b5fd0f40a35a92db450eabf0ee"
+        },
+        {
+          "scene": "w-100-100um-75deg",
+          "cap": 0.05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 64606,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 2.1316282072803006e-13,
+              "photon_debit_max_error_keV": 5.329070518200751e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 58165,
+              "energy_limited_rows": 0,
+              "primaries_with_energy_substeps": 0,
+              "energy_ledger_max_error_keV": 2.2737367544323206e-13,
+              "photon_debit_max_error_keV": 7.105427357601002e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "e0e21f0b43addb5caa73d94e64477b520b768777df4c2e067c4b27db3086ade3"
+        },
+        {
+          "scene": "w-100-100um-75deg",
+          "cap": 0.001,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 84408,
+              "energy_limited_rows": 19783,
+              "primaries_with_energy_substeps": 58,
+              "energy_ledger_max_error_keV": 3.979039320256561e-13,
+              "photon_debit_max_error_keV": 6.8833827526759706e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 74536,
+              "energy_limited_rows": 16359,
+              "primaries_with_energy_substeps": 58,
+              "energy_ledger_max_error_keV": 4.263256414560601e-13,
+              "photon_debit_max_error_keV": 5.329070518200751e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "3904413d89e47845a7a2f24742176f4c66acb3ea1c4c120233ff2b8390105232"
+        },
+        {
+          "scene": "w-100-100um-75deg",
+          "cap": 0.00025,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 201345,
+              "energy_limited_rows": 136716,
+              "primaries_with_energy_substeps": 63,
+              "energy_ledger_max_error_keV": 5.542233338928781e-13,
+              "photon_debit_max_error_keV": 4.440892098500626e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 174481,
+              "energy_limited_rows": 116301,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 5.400124791776761e-13,
+              "photon_debit_max_error_keV": 1.7763568394002505e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "bf6bc12a4f718e0db1b34d530da5d76f53c63f9df890f5c5702c120d056a3328"
+        },
+        {
+          "scene": "w-100-100um-75deg",
+          "cap": 6.25e-05,
+          "outcome": "failed",
+          "reason": "adapter exit 1"
+        }
+      ],
+      "complete": false,
+      "qualified_numerical_convergence": false
+    },
+    {
+      "job": 1582,
+      "elapsed_s": 52,
+      "archive": "activity-ladder-1582.tar.gz",
+      "archive_sha256": "219526d7d49b9b08f644745322fc2ab89bf731914667ee4c0ad1cba2f4a1faf3",
+      "schema": "pyrite.equal-precision.activity-ladder-summary.v1",
+      "protocol": {
+        "schema": "pyrite.equal-precision.activity-ladder.v1",
+        "purpose": "Capacity follow-up to job 1580: tightest cap exceeded 20000 steps in 300keV scenes. Separate frozen grid, no automatic retries.",
+        "scenes": [
+          "si-300-100um-0deg",
+          "w-300-10um-0deg",
+          "si-800-100um-0deg",
+          "w-800-10um-0deg",
+          "si-100-1um-0deg",
+          "w-100-100um-75deg"
+        ],
+        "caps": [
+          6.25e-05
+        ],
+        "histories": 64,
+        "seed": 69001,
+        "core": "per-electron",
+        "cutoff_eV": 1000,
+        "budget": {
+          "cpus": 1,
+          "memory_gib": 8,
+          "allocation_seconds": 300,
+          "runner_seconds": 260,
+          "process_seconds": 30,
+          "no_retries": true
+        },
+        "selection_rule": "Report activity for all six scenes at the tightest cap with an explicit sufficient step limit. Keep job1580 failures separate; no convergence inference.",
+        "max_steps": 80000
+      },
+      "protocol_sha256": "562aa0fd085b9fd3097a9933a018c9206adf53a9c6da82ad2448c4f1ae1cd3a0",
+      "outcomes": [
+        {
+          "scene": "si-300-100um-0deg",
+          "cap": 6.25e-05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 360646,
+              "energy_limited_rows": 303204,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.7621459846850485e-12,
+              "photon_debit_max_error_keV": 2.4868995751603507e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 621212,
+              "energy_limited_rows": 544472,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 4.661160346586257e-12,
+              "photon_debit_max_error_keV": 1.687538997430238e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "0c309f23777b375b61f9f48b66be1b7f90a677678e285d29d2ef9cc28befc96e"
+        },
+        {
+          "scene": "w-300-10um-0deg",
+          "cap": 6.25e-05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 344980,
+              "energy_limited_rows": 223824,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 3.240074875066057e-12,
+              "photon_debit_max_error_keV": 2.3314683517128287e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 336217,
+              "energy_limited_rows": 218397,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.5916157281026244e-12,
+              "photon_debit_max_error_keV": 1.9539925233402755e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "b73066b5c9af8d4d1cf42c9af2d95313779de666eb17d1a07660bd48a3cc8687"
+        },
+        {
+          "scene": "si-800-100um-0deg",
+          "cap": 6.25e-05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 64863,
+              "energy_limited_rows": 38489,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.3290705182007514e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 65679,
+              "energy_limited_rows": 38885,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 2.5757174171303632e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "bb1a3d4a269de6a82fbf369c832cb1a3e29caec45057b28173fd8ce1288c7b29"
+        },
+        {
+          "scene": "w-800-10um-0deg",
+          "cap": 6.25e-05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 61424,
+              "energy_limited_rows": 15393,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.306866057708248e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 70035,
+              "energy_limited_rows": 17502,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 4.973799150320701e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "d1bc2ea9021cb876a2468a919c4c393cd02d59fbd5f5473ecd035c2386de8aaf"
+        },
+        {
+          "scene": "si-100-1um-0deg",
+          "cap": 6.25e-05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 8442,
+              "energy_limited_rows": 7660,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 8362,
+              "energy_limited_rows": 7561,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            }
+          },
+          "sample_sha256": "dd55e8353ddf24172b250cc7f081d6a9786762666e7c05e58ed1b16c83433442"
+        },
+        {
+          "scene": "w-100-100um-75deg",
+          "cap": 6.25e-05,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 697320,
+              "energy_limited_rows": 632690,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.0942358130705543e-12,
+              "photon_debit_max_error_keV": 4.440892098500626e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 600956,
+              "energy_limited_rows": 542780,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 5.115907697472721e-13,
+              "photon_debit_max_error_keV": 5.329070518200751e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "467509c2dbcc5cf1b0a2650bffd56bde5e1d4c84e372006edd7a7bb59cc9ca45"
+        }
+      ],
+      "complete": true,
+      "qualified_numerical_convergence": false
+    },
+    {
+      "job": 1583,
+      "elapsed_s": 39,
+      "archive": "activity-ladder-1583.tar.gz",
+      "archive_sha256": "03021750334ece5d3264b1111a11107ec5e4cce2cc2dab7ad7c97ca765a3bb5f",
+      "schema": "pyrite.equal-precision.activity-ladder-summary.v1",
+      "protocol": {
+        "schema": "pyrite.equal-precision.activity-ladder.v1",
+        "purpose": "Complete a common three-level active refinement ladder after job1580 found W800 inactive at0.001. Separate frozen midpoint probe; no convergence inference.",
+        "scenes": [
+          "si-300-100um-0deg",
+          "w-300-10um-0deg",
+          "si-800-100um-0deg",
+          "w-800-10um-0deg",
+          "si-100-1um-0deg",
+          "w-100-100um-75deg"
+        ],
+        "caps": [
+          0.000125
+        ],
+        "histories": 64,
+        "seed": 69001,
+        "core": "per-electron",
+        "cutoff_eV": 1000,
+        "budget": {
+          "cpus": 1,
+          "memory_gib": 8,
+          "allocation_seconds": 300,
+          "runner_seconds": 260,
+          "process_seconds": 30,
+          "no_retries": true
+        },
+        "selection_rule": "Require measured energy-limited rows at the midpoint in all six scenes, retaining failed/unresolved outcomes. Combine activity evidence only, never statistical inference, with the separately captured endpoint probes.",
+        "max_steps": 80000
+      },
+      "protocol_sha256": "72a39e8e0539fe73bace49e983556ee4eec272059a24218da9334170df79ba24",
+      "outcomes": [
+        {
+          "scene": "si-300-100um-0deg",
+          "cap": 0.000125,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 195971,
+              "energy_limited_rows": 138530,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.0231815394945443e-12,
+              "photon_debit_max_error_keV": 9.769962616701378e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 331491,
+              "energy_limited_rows": 254751,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 2.0463630789890885e-12,
+              "photon_debit_max_error_keV": 2.5757174171303632e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "80ef203c67956100454f9d401c2528f009a221d0ba23c8c07551f1c59def36a9"
+        },
+        {
+          "scene": "w-300-10um-0deg",
+          "cap": 0.000125,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 210290,
+              "energy_limited_rows": 89134,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 7.958078640513122e-13,
+              "photon_debit_max_error_keV": 1.7319479184152442e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 204845,
+              "energy_limited_rows": 87026,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 2.3874235921539366e-12,
+              "photon_debit_max_error_keV": 2.6645352591003757e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "42eeb5d2649caa2fe9b828dd4376c911b01c958f56ca356c178e473f398cea9d"
+        },
+        {
+          "scene": "si-800-100um-0deg",
+          "cap": 0.000125,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 40663,
+              "energy_limited_rows": 14289,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 4.973799150320701e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 41307,
+              "energy_limited_rows": 14513,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.5067062021407764e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "c56890ea6959dafa78d8c46900ccd47f8fcd2b3c541ca7c958d9e6b2ff5809f6"
+        },
+        {
+          "scene": "w-800-10um-0deg",
+          "cap": 0.000125,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 49095,
+              "energy_limited_rows": 3064,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.684341886080802e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 55977,
+              "energy_limited_rows": 3445,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 4.618527782440651e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "2f8e7ced5a3043ff2940ccee6887f23e17e070c00090cade4017dc7447772f5d"
+        },
+        {
+          "scene": "si-100-1um-0deg",
+          "cap": 0.000125,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 4446,
+              "energy_limited_rows": 3664,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 4403,
+              "energy_limited_rows": 3602,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            }
+          },
+          "sample_sha256": "32bec2efd2f40bac437c4e9d0180b50c243e2a1ba5a8434629c57f91d312ebf5"
+        },
+        {
+          "scene": "w-100-100um-75deg",
+          "cap": 0.000125,
+          "outcome": "ok",
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 365848,
+              "energy_limited_rows": 301219,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.5205614545266144e-12,
+              "photon_debit_max_error_keV": 4.218847493575595e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 315926,
+              "energy_limited_rows": 257752,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.0373923942097463e-12,
+              "photon_debit_max_error_keV": 1.7763568394002505e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          },
+          "sample_sha256": "af94fbc087509f9484738a594bbca08c84679507ebf9b28523a770f7fa61f7f0"
+        }
+      ],
+      "complete": true,
+      "qualified_numerical_convergence": false
+    }
+  ],
+  "active_ladder": [
+    {
+      "scene": "si-300-100um-0deg",
+      "levels": [
+        {
+          "job": 1580,
+          "cap": 0.00025,
+          "max_steps": 20000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 115079,
+              "energy_limited_rows": 57639,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 6.252776074688882e-13,
+              "photon_debit_max_error_keV": 1.509903313490213e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 188186,
+              "energy_limited_rows": 111448,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.6484591469634324e-12,
+              "photon_debit_max_error_keV": 1.1546319456101628e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        },
+        {
+          "job": 1583,
+          "cap": 0.000125,
+          "max_steps": 80000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 195971,
+              "energy_limited_rows": 138530,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.0231815394945443e-12,
+              "photon_debit_max_error_keV": 9.769962616701378e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 331491,
+              "energy_limited_rows": 254751,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 2.0463630789890885e-12,
+              "photon_debit_max_error_keV": 2.5757174171303632e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        },
+        {
+          "job": 1582,
+          "cap": 6.25e-05,
+          "max_steps": 80000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 360646,
+              "energy_limited_rows": 303204,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.7621459846850485e-12,
+              "photon_debit_max_error_keV": 2.4868995751603507e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 621212,
+              "energy_limited_rows": 544472,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 4.661160346586257e-12,
+              "photon_debit_max_error_keV": 1.687538997430238e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "levels": [
+        {
+          "job": 1580,
+          "cap": 0.00025,
+          "max_steps": 20000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 149277,
+              "energy_limited_rows": 28121,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 2.0463630789890885e-12,
+              "photon_debit_max_error_keV": 2.8199664825478976e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 145220,
+              "energy_limited_rows": 27401,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.0800249583553523e-12,
+              "photon_debit_max_error_keV": 2.4868995751603507e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        },
+        {
+          "job": 1583,
+          "cap": 0.000125,
+          "max_steps": 80000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 210290,
+              "energy_limited_rows": 89134,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 7.958078640513122e-13,
+              "photon_debit_max_error_keV": 1.7319479184152442e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 204845,
+              "energy_limited_rows": 87026,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 2.3874235921539366e-12,
+              "photon_debit_max_error_keV": 2.6645352591003757e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        },
+        {
+          "job": 1582,
+          "cap": 6.25e-05,
+          "max_steps": 80000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 344980,
+              "energy_limited_rows": 223824,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 3.240074875066057e-12,
+              "photon_debit_max_error_keV": 2.3314683517128287e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 336217,
+              "energy_limited_rows": 218397,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.5916157281026244e-12,
+              "photon_debit_max_error_keV": 1.9539925233402755e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scene": "si-800-100um-0deg",
+      "levels": [
+        {
+          "job": 1580,
+          "cap": 0.00025,
+          "max_steps": 20000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 30061,
+              "energy_limited_rows": 3687,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 2.4202861936828413e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 30499,
+              "energy_limited_rows": 3705,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 4.440892098500626e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        },
+        {
+          "job": 1583,
+          "cap": 0.000125,
+          "max_steps": 80000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 40663,
+              "energy_limited_rows": 14289,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 4.973799150320701e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 41307,
+              "energy_limited_rows": 14513,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.5067062021407764e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        },
+        {
+          "job": 1582,
+          "cap": 6.25e-05,
+          "max_steps": 80000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 64863,
+              "energy_limited_rows": 38489,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.3290705182007514e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 65679,
+              "energy_limited_rows": 38885,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 2.5757174171303632e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scene": "w-800-10um-0deg",
+      "levels": [
+        {
+          "job": 1580,
+          "cap": 0.00025,
+          "max_steps": 20000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 46211,
+              "energy_limited_rows": 180,
+              "primaries_with_energy_substeps": 60,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 2.842170943040401e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 52720,
+              "energy_limited_rows": 189,
+              "primaries_with_energy_substeps": 60,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 2.842170943040401e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        },
+        {
+          "job": 1583,
+          "cap": 0.000125,
+          "max_steps": 80000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 49095,
+              "energy_limited_rows": 3064,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.684341886080802e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 55977,
+              "energy_limited_rows": 3445,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 4.618527782440651e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        },
+        {
+          "job": 1582,
+          "cap": 6.25e-05,
+          "max_steps": 80000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 61424,
+              "energy_limited_rows": 15393,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 5.306866057708248e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 70035,
+              "energy_limited_rows": 17502,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 4.973799150320701e-14,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scene": "si-100-1um-0deg",
+      "levels": [
+        {
+          "job": 1580,
+          "cap": 0.00025,
+          "max_steps": 20000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 2447,
+              "energy_limited_rows": 1666,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 2425,
+              "energy_limited_rows": 1624,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            }
+          }
+        },
+        {
+          "job": 1583,
+          "cap": 0.000125,
+          "max_steps": 80000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 4446,
+              "energy_limited_rows": 3664,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 4403,
+              "energy_limited_rows": 3602,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            }
+          }
+        },
+        {
+          "job": 1582,
+          "cap": 6.25e-05,
+          "max_steps": 80000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 8442,
+              "energy_limited_rows": 7660,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 8362,
+              "energy_limited_rows": 7561,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 0.0,
+              "photon_debit_max_error_keV": 0.0,
+              "direction_norm_max_error": 1.1102230246251565e-16
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scene": "w-100-100um-75deg",
+      "levels": [
+        {
+          "job": 1580,
+          "cap": 0.00025,
+          "max_steps": 20000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 201345,
+              "energy_limited_rows": 136716,
+              "primaries_with_energy_substeps": 63,
+              "energy_ledger_max_error_keV": 5.542233338928781e-13,
+              "photon_debit_max_error_keV": 4.440892098500626e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 174481,
+              "energy_limited_rows": 116301,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 5.400124791776761e-13,
+              "photon_debit_max_error_keV": 1.7763568394002505e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        },
+        {
+          "job": 1583,
+          "cap": 0.000125,
+          "max_steps": 80000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 365848,
+              "energy_limited_rows": 301219,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.5205614545266144e-12,
+              "photon_debit_max_error_keV": 4.218847493575595e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 315926,
+              "energy_limited_rows": 257752,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.0373923942097463e-12,
+              "photon_debit_max_error_keV": 1.7763568394002505e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        },
+        {
+          "job": 1582,
+          "cap": 6.25e-05,
+          "max_steps": 80000,
+          "activity": {
+            "warmup": {
+              "primaries": 64,
+              "rows": 697320,
+              "energy_limited_rows": 632690,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 1.0942358130705543e-12,
+              "photon_debit_max_error_keV": 4.440892098500626e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            },
+            "measurement": {
+              "primaries": 64,
+              "rows": 600956,
+              "energy_limited_rows": 542780,
+              "primaries_with_energy_substeps": 64,
+              "energy_ledger_max_error_keV": 5.115907697472721e-13,
+              "photon_debit_max_error_keV": 5.329070518200751e-15,
+              "direction_norm_max_error": 2.220446049250313e-16
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "capacity_parity": [
+    {
+      "scene": "si-800-100um-0deg",
+      "cap": 6.25e-05,
+      "all_stored_primary_score_arrays_identical": true
+    },
+    {
+      "scene": "w-800-10um-0deg",
+      "cap": 6.25e-05,
+      "all_stored_primary_score_arrays_identical": true
+    },
+    {
+      "scene": "si-100-1um-0deg",
+      "cap": 6.25e-05,
+      "all_stored_primary_score_arrays_identical": true
+    }
+  ],
+  "qualified_numerical_convergence": false,
+  "qualified_equal_precision_speedup": false
+}

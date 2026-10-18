@@ -75,8 +75,13 @@ def _rad_row_chi(reduced, nominal, nom_base, n_red, top_r, chi, chi_row):
     if reduced >= top_r:
         return chi[chi_row + n_red - I32_ONE]
     lower = I32_ZERO
-    while lower + I32_ONE < n_red - I32_ONE and reduced >= nominal[nom_base + lower + I32_ONE]:
-        lower += I32_ONE
+    upper = n_red - I32_ONE
+    while upper - lower > I32_ONE:
+        mid = (lower + upper) // I32_TWO
+        if reduced >= nominal[nom_base + mid]:
+            lower = mid
+        else:
+            upper = mid
     x0 = nominal[nom_base + lower]
     x1 = nominal[nom_base + lower + I32_ONE]
     if lower == n_red - I32_TWO:
@@ -106,13 +111,17 @@ def _rad_chi(reduced, row, fraction, nominal, nom_base, n_red, top, t_base, chi,
 @jit.rawkernel(device=True)
 def _rad_next_node(x, nominal, nom_base, n_red, top_a, top_b, cut_reduced):
     """Smallest reduced node above ``x`` in host ``_photon_nodes``' union, else inf."""
+    lo = I32_ZERO
+    hi = n_red - I32_ONE
+    while lo < hi:
+        mid = (lo + hi) // I32_TWO
+        if nominal[nom_base + mid] <= x:
+            lo = mid + I32_ONE
+        else:
+            hi = mid
     best = F64_INF
-    k = I32_ZERO
-    while k < n_red - I32_ONE:
-        v = nominal[nom_base + k]
-        if v > x and v < best:
-            best = v
-        k += I32_ONE
+    if lo < n_red - I32_ONE:
+        best = nominal[nom_base + lo]
     if top_a > x and top_a < best:
         best = top_a
     if top_b > x and top_b < best:
@@ -161,7 +170,13 @@ def _rad_moment(
     scale = F64_MB_CM2 * z * z
     soft = F64_ZERO
     hard_rate = F64_ZERO
-    red_left = _rad_next_node(-F64_ONE, nominal, nom_base, n_red, top_a, top_b, cut_reduced)
+    # Each selector retains the original cell arithmetic and summation order,
+    # but visits only its side of the cutoff. In particular, soft stopping
+    # never evaluates the logarithmic hard-rate integrals.
+    if which == RAD_SOFT:
+        red_left = _rad_next_node(-F64_ONE, nominal, nom_base, n_red, top_a, top_b, cut_reduced)
+    else:
+        red_left = cut_reduced
     left = _rad_photon(red_left, energy_eV, cutoff_eV, cut_reduced)
     chi_left = _rad_chi(
         left / energy_eV, row, fraction, nominal, nom_base, n_red, top, t_base, chi, chi_base
@@ -169,6 +184,8 @@ def _rad_moment(
     red_right = _rad_next_node(red_left, nominal, nom_base, n_red, top_a, top_b, cut_reduced)
     while red_right < F64_INF:
         right = _rad_photon(red_right, energy_eV, cutoff_eV, cut_reduced)
+        if which == RAD_SOFT and right > cutoff_eV:
+            break
         chi_right = _rad_chi(
             right / energy_eV, row, fraction, nominal, nom_base, n_red, top, t_base, chi, chi_base
         )

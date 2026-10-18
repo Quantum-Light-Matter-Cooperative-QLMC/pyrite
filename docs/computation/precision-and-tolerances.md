@@ -40,6 +40,8 @@ Transport arithmetic and lookup tables use `float64` on every core. The CPU per-
 
 Small rounding differences in scattering angles can grow over hundreds of events. Keeping transport precision fixed avoids adding a type difference to those comparisons. Segment arrays also remain `float64` when retained on the device for spectrum calculations.
 
+The opt-in [radiative precision experiment](../repo-design/compute/transport-precision-experiment.md) measures selected FP32 helper variants. It does not change this policy; endpoint and ensemble accuracy remain unresolved.
+
 ### Why spectrum precision is configurable
 
 Spectrum reductions have large working sets. Using `float32` halves the storage per value and the transient footprint used to size chunks. Device staging casts each shared segment array to the working type once for reuse across kernels.

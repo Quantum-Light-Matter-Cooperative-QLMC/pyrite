@@ -1,0 +1,158 @@
+{
+  "schema": "pyrite.equal-precision.endpoint-cpu-debug.v1",
+  "date": "2026-10-15",
+  "status": "CPU component diagnosis complete; GPU component and pilot results recorded separately in endpoint-gpu-summary.json",
+  "reference_probes": "precision-final.tar.gz/evidence/precision/1343",
+  "results": [
+    {
+      "variant": "fp64",
+      "source_sha256": "a5d6090478a27367a98fbe7808494ae2b3304394335076b54de07981df285ef2",
+      "reports": [
+        {
+          "element": "Si",
+          "cases": 2000,
+          "table_key": "e0adf1e0df726a399449a1da9e02eb80a0fd5dcc16b72a0eb8d4bd2075298fa2",
+          "table_digest": "7bd17a28f6e0094153971e0531202e14ec6da1f4bf7922264b1022d4ff7990dd",
+          "finite": true,
+          "nonnegative": true,
+          "photon_support": true,
+          "max_scaled_soft_error": 6.907795283865856e-16,
+          "max_scaled_hard_error": 6.824071787685926e-15,
+          "max_inverse_error_over_incident_energy": 7.275957614183427e-16,
+          "screening_passed": true
+        },
+        {
+          "element": "W",
+          "cases": 2000,
+          "table_key": "66519f6617ea19e5975790a5792cb7948ceb48e28958b322f808598b38397ce0",
+          "table_digest": "81855a6a59572b128669101947911ad0f5fea8c173d023733207c8579fadb542",
+          "finite": true,
+          "nonnegative": true,
+          "photon_support": true,
+          "max_scaled_soft_error": 4.457233448691527e-16,
+          "max_scaled_hard_error": 6.816625802399554e-15,
+          "max_inverse_error_over_incident_energy": 3.9092626387120336e-16,
+          "screening_passed": true
+        }
+      ],
+      "interpretation": "NumPy execution of generated helpers only. CUDA compilation, GPU math, transport invariants, ensemble equivalence and timing remain unvalidated."
+    },
+    {
+      "variant": "rad-stable32-24",
+      "source_sha256": "d9ede42b5924ddfd0efd8ffbc008da8a3450bb2405989368f93602762581eb5e",
+      "reports": [
+        {
+          "element": "Si",
+          "cases": 2000,
+          "table_key": "e0adf1e0df726a399449a1da9e02eb80a0fd5dcc16b72a0eb8d4bd2075298fa2",
+          "table_digest": "7bd17a28f6e0094153971e0531202e14ec6da1f4bf7922264b1022d4ff7990dd",
+          "finite": true,
+          "nonnegative": true,
+          "photon_support": true,
+          "max_scaled_soft_error": 3.336208371880788e-07,
+          "max_scaled_hard_error": 0.010308900979457433,
+          "max_inverse_error_over_incident_energy": 3.168135085143149e-06,
+          "screening_passed": false
+        },
+        {
+          "element": "W",
+          "cases": 2000,
+          "table_key": "66519f6617ea19e5975790a5792cb7948ceb48e28958b322f808598b38397ce0",
+          "table_digest": "81855a6a59572b128669101947911ad0f5fea8c173d023733207c8579fadb542",
+          "finite": true,
+          "nonnegative": true,
+          "photon_support": true,
+          "max_scaled_soft_error": 3.952862260400893e-07,
+          "max_scaled_hard_error": 0.018370035683288516,
+          "max_inverse_error_over_incident_energy": 2.1694383060093967e-06,
+          "screening_passed": false
+        }
+      ],
+      "interpretation": "NumPy execution of generated helpers only. CUDA compilation, GPU math, transport invariants, ensemble equivalence and timing remain unvalidated."
+    },
+    {
+      "variant": "rad-boundary64-24",
+      "source_sha256": "70df00784022a3010164aac10d222fe58efb6141819be29805177d9fee58fa37",
+      "reports": [
+        {
+          "element": "Si",
+          "cases": 2000,
+          "table_key": "e0adf1e0df726a399449a1da9e02eb80a0fd5dcc16b72a0eb8d4bd2075298fa2",
+          "table_digest": "7bd17a28f6e0094153971e0531202e14ec6da1f4bf7922264b1022d4ff7990dd",
+          "finite": true,
+          "nonnegative": true,
+          "photon_support": true,
+          "max_scaled_soft_error": 2.3601641908087608e-07,
+          "max_scaled_hard_error": 3.079030183232581e-07,
+          "max_inverse_error_over_incident_energy": 3.1902859592810275e-06,
+          "screening_passed": true
+        },
+        {
+          "element": "W",
+          "cases": 2000,
+          "table_key": "66519f6617ea19e5975790a5792cb7948ceb48e28958b322f808598b38397ce0",
+          "table_digest": "81855a6a59572b128669101947911ad0f5fea8c173d023733207c8579fadb542",
+          "finite": true,
+          "nonnegative": true,
+          "photon_support": true,
+          "max_scaled_soft_error": 2.1560733310625096e-07,
+          "max_scaled_hard_error": 3.9557170829198283e-07,
+          "max_inverse_error_over_incident_energy": 2.092557652310158e-06,
+          "screening_passed": true
+        }
+      ],
+      "interpretation": "NumPy execution of generated helpers only. CUDA compilation, GPU math, transport invariants, ensemble equivalence and timing remain unvalidated."
+    }
+  ],
+  "coordinate_example": {
+    "energy_eV": 23643.540225079392,
+    "cutoff_eV": 23643.516581539167,
+    "width_eV": 0.02364354022574844,
+    "float32_width_eV": 0.025390625,
+    "relative_width_error": 0.0738926894014349
+  },
+  "protocol_sha256": "83034d610239079a84396db9770f1ebf04835e7f56edaf96079813e10af027e2",
+  "jobs": {
+    "preflight": 1371,
+    "si": 1372,
+    "w": 1373,
+    "partition": "gpu",
+    "state": "COMPLETED, ExitCode=0:0",
+    "gpu": "RTX 5080",
+    "limits_minutes": [
+      5,
+      10,
+      10
+    ],
+    "replaced_pending_drafts": [
+      1369,
+      1370
+    ],
+    "timing_gate": "All required arms pass six-scene invariants; boundary64 additionally passes full endpoint component screening. afterok dependencies."
+  },
+  "checks": {
+    "focused_tests": 32,
+    "source_lint": "passed",
+    "previous_five_generated_controls": "byte-identical to 3e38d7e9",
+    "windows_performance_suite": "65 passed, 2 skipped, 3 failures: Tk setup, CRLF fixture byte size and unavailable Windows iowait. Linux suite queued in preflight.",
+    "focused_log_sha256": "e64fafb60cf2c349199c118c277361f6c71e2c4ea8befdd38ad21adf4387b320",
+    "docs": "Documentation path check passed. Incremental strict Sphinx build has only existing pyrite.simulate/fcntl import warning on Windows (exit 1).",
+    "docs_log_sha256": "41f8629ee71907cbdd01ce7d8b84d7a080cceacfd7890e9970b72e15ea5f3380",
+    "linux_performance_tests": 72,
+    "linux_typecheck": "passed",
+    "linux_docs": {
+      "job": 1375,
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "command": "uv run pyrite-dev docs",
+      "log_sha256": "18250ecd6504fad0e4651fbd77748fee338f13720d001df50f2d287cee140d9f",
+      "log_path": "scratch/endpoint-results/endpoint-docs-1375.log"
+    }
+  },
+  "limitations": "NumPy execution of generated helpers is not CUDA math/compilation validation, whole-transport equivalence or timing evidence. No production source/default/model marker change.",
+  "archive": {
+    "path": "scratch/endpoint-cpu-evidence.tar.gz",
+    "sha256": "e6e71f4075736c2036cac66234fc974f0cbe428a0e894b11088c191891681fea",
+    "availability": "Local scratch; not published. Contains generated-helper source, CPU probe, protocol, tests, raw per-case scores and verification logs."
+  }
+}

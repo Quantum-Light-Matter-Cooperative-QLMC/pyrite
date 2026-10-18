@@ -53,6 +53,10 @@ beam-transport/sbethe-atomic-shell-inputs
 beam-transport/sbethe-atomic-shell-inputs-verification
 beam-transport/gos-core-edge
 beam-transport/electron-transport
+beam-transport/equal-precision-pilot
+beam-transport/transport-precision-equivalence
+beam-transport/cheap-numerical-validation
+beam-transport/equal-precision-protocol
 beam-transport/energy-controlled-propagation
 beam-transport/energy-loss-straggling
 beam-transport/energy-step-convergence

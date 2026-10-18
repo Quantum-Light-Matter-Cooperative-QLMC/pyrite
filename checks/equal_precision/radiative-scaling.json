@@ -1,0 +1,16 @@
+{
+  "schema": "pyrite.equal-precision.radiative-scaling.v1",
+  "purpose": "Verify exact-output GPU radiative integration optimization at the representative population.",
+  "histories": 100000,
+  "batch_histories": 5000,
+  "scratch_mib": 4096,
+  "probe_electrons": 0,
+  "seed": 57001,
+  "scenes": ["si-300-100um-0deg", "w-300-10um-0deg"],
+  "variants": ["baseline", "candidate"],
+  "warmup": "Complete identical-workload request, seed +1000000, synchronized CUDA boundaries.",
+  "budget": {"allocations":2,"minutes_each":10,"cpus":1,"gpu":1,"memory_gb":24},
+  "stages": {"baseline-w":[["w-300-10um-0deg","baseline"]],"remaining":[["w-300-10um-0deg","candidate"],["si-300-100um-0deg","baseline"],["si-300-100um-0deg","candidate"]]},
+  "repeats": "One fresh-process large-population pair per scene; three independent-seed pairs at 5000 histories provide the replicated diagnostic. No qualified cross-engine ratio.",
+  "interpretation": "Same-workload production-kernel optimization, not Geant4 physics equivalence or time to precision. No launch-geometry, scratch, capacity, numerical-control or physics-setting changes. Hash every returned trajectory array in every warmup and measured block."
+}

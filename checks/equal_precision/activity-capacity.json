@@ -1,0 +1,29 @@
+{
+  "schema": "pyrite.equal-precision.activity-ladder.v1",
+  "purpose": "Capacity follow-up to job 1580: tightest cap exceeded 20000 steps in 300keV scenes. Separate frozen grid, no automatic retries.",
+  "scenes": [
+    "si-300-100um-0deg",
+    "w-300-10um-0deg",
+    "si-800-100um-0deg",
+    "w-800-10um-0deg",
+    "si-100-1um-0deg",
+    "w-100-100um-75deg"
+  ],
+  "caps": [
+    6.25e-05
+  ],
+  "histories": 64,
+  "seed": 69001,
+  "core": "per-electron",
+  "cutoff_eV": 1000,
+  "budget": {
+    "cpus": 1,
+    "memory_gib": 8,
+    "allocation_seconds": 300,
+    "runner_seconds": 260,
+    "process_seconds": 30,
+    "no_retries": true
+  },
+  "selection_rule": "Report activity for all six scenes at the tightest cap with an explicit sufficient step limit. Keep job1580 failures separate; no convergence inference.",
+  "max_steps": 80000
+}

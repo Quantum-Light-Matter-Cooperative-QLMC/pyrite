@@ -1,0 +1,372 @@
+{
+  "schema": "pyrite.equal-precision.coverage-audit.v1",
+  "matrix_sha256": "304fda1f0eeaf2504e944417aca15200bef0fa6d143c44273808b0757d3f9b27",
+  "tables": {
+    "silicon": {
+      "elsepa": [
+        {
+          "element": "Si",
+          "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+          "min_keV": 0.1,
+          "max_keV": 100000.0
+        }
+      ],
+      "sbethe": {
+        "key": "9bd7223c184ec73672b2b9e360710c419bfe11aaf50511c32552d43ca701c70f",
+        "min_keV": 1.0,
+        "max_keV": 1000000.0
+      },
+      "bremslib": [
+        {
+          "element": "Si",
+          "key": "e0adf1e0df726a399449a1da9e02eb80a0fd5dcc16b72a0eb8d4bd2075298fa2",
+          "min_keV": 0.009999999999999997,
+          "max_keV": 30000.0
+        }
+      ]
+    },
+    "tungsten": {
+      "elsepa": [
+        {
+          "element": "W",
+          "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+          "min_keV": 0.1,
+          "max_keV": 100000.0
+        }
+      ],
+      "sbethe": {
+        "error": "TableNotFoundError: no SBETHE table for material 'W'; generate the catalog table with 'pyrite tables generate --code sbethe --material W'"
+      },
+      "bremslib": [
+        {
+          "element": "W",
+          "key": "66519f6617ea19e5975790a5792cb7948ceb48e28958b322f808598b38397ce0",
+          "min_keV": 0.009999999999999997,
+          "max_keV": 30000.0
+        }
+      ]
+    },
+    "diamond": {
+      "elsepa": [
+        {
+          "element": "C",
+          "key": "ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb",
+          "min_keV": 0.1,
+          "max_keV": 100000.0
+        }
+      ],
+      "sbethe": {
+        "key": "a31be2af5a0d08961f69adc378d3fd2ff6b05f54e01d29ef9b39d844e242708f",
+        "min_keV": 1.0,
+        "max_keV": 1000000.0
+      },
+      "bremslib": [
+        {
+          "element": "C",
+          "key": "2d5ddb8b2ad0a72863d4a8a6b0976eb4083152317767e2d4678b4dcc86265405",
+          "min_keV": 0.009999999999999997,
+          "max_keV": 30000.0
+        }
+      ]
+    },
+    "sio2": {
+      "elsepa": [
+        {
+          "element": "Si",
+          "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+          "min_keV": 0.1,
+          "max_keV": 100000.0
+        },
+        {
+          "element": "O",
+          "key": "eedc1d3152023c9334cee631afa07d17140ab9de34d5fd9bb91bcb9f302c6a34",
+          "min_keV": 0.1,
+          "max_keV": 100000.0
+        }
+      ],
+      "sbethe": {
+        "key": "b222cbd15ab6a1e041fea28bca0d28c131b66cf5daaeeb63ce603fb06e20632a",
+        "min_keV": 1.0,
+        "max_keV": 1000000.0
+      },
+      "bremslib": [
+        {
+          "element": "Si",
+          "key": "e0adf1e0df726a399449a1da9e02eb80a0fd5dcc16b72a0eb8d4bd2075298fa2",
+          "min_keV": 0.009999999999999997,
+          "max_keV": 30000.0
+        },
+        {
+          "element": "O",
+          "key": "254e2c3ede19bac58be9a81c5653bae6229f25df62d87ebec561928599bb05ad",
+          "min_keV": 0.009999999999999997,
+          "max_keV": 30000.0
+        }
+      ]
+    }
+  },
+  "n_covered": 22,
+  "n_cases": 43,
+  "cases": [
+    {
+      "id": "silicon-100kev-tr0.03-0deg",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-100kev-tr0.3-0deg",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-100kev-tr3-0deg",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-800kev-tr0.03-0deg",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-800kev-tr0.3-0deg",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-800kev-tr3-0deg",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-5000kev-tr0.03-0deg",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-5000kev-tr0.3-0deg",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-5000kev-tr3-0deg",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "tungsten-100kev-tr0.03-0deg",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "tungsten-100kev-tr0.3-0deg",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "tungsten-100kev-tr3-0deg",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "tungsten-800kev-tr0.03-0deg",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "tungsten-800kev-tr0.3-0deg",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "tungsten-800kev-tr3-0deg",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "tungsten-5000kev-tr0.03-0deg",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "tungsten-5000kev-tr0.3-0deg",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "tungsten-5000kev-tr3-0deg",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "silicon-300kev-100um-0deg-anchor",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-800kev-100um-0deg-anchor",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "tungsten-300kev-10um-0deg-anchor",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "tungsten-800kev-10um-0deg-anchor",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "silicon-100kev-1um-0deg-anchor",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "tungsten-100kev-100um-75deg-anchor",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "silicon-800kev-tr0.3-45deg-oblique",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-800kev-tr0.3-75deg-oblique",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "tungsten-800kev-tr0.03-75deg-oblique",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "tungsten-800kev-tr3-75deg-oblique",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "diamond-800kev-tr0.3-0deg-low-z",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "sio2-800kev-tr0.3-0deg-compound",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-800kev-tr0.3-0deg-spot100um",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-800kev-tr0.3-0deg-div5mrad",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-800kev-tr0.3-0deg-espread1pct",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "silicon-800kev-tr3-0deg-footprint1mm",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "tungsten-800kev-tr3-0deg-footprint1mm",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "silicon-800kev-tr0.3-0deg-det90-5",
+      "covered": false,
+      "gaps": [
+        "uncollided detector arm needs the pending weighted per-segment scorer"
+      ]
+    },
+    {
+      "id": "tungsten-800kev-tr0.3-0deg-det90-5",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable",
+        "uncollided detector arm needs the pending weighted per-segment scorer"
+      ]
+    },
+    {
+      "id": "silicon-5000kev-tr0.03-0deg-det0-1",
+      "covered": false,
+      "gaps": [
+        "uncollided detector arm needs the pending weighted per-segment scorer"
+      ]
+    },
+    {
+      "id": "tungsten-800kev-tr0.03-0deg-det0-15",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable",
+        "uncollided detector arm needs the pending weighted per-segment scorer"
+      ]
+    },
+    {
+      "id": "tungsten-100kev-tr3-0deg-det135-5",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable",
+        "uncollided detector arm needs the pending weighted per-segment scorer"
+      ]
+    },
+    {
+      "id": "silicon-800kev-tr0.3-0deg-straggling",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "tungsten-800kev-tr0.3-0deg-straggling",
+      "covered": false,
+      "gaps": [
+        "sbethe unavailable"
+      ]
+    },
+    {
+      "id": "silicon-800kev-tr0.3-0deg-secondaries",
+      "covered": true,
+      "gaps": []
+    }
+  ]
+}

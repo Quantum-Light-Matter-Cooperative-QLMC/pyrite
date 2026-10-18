@@ -1,0 +1,588 @@
+# Equal-precision comparator adapter pilot
+
+This is the first implementation stage of [#510](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/510),
+measured on the lab box on 2026-10-14. It exercises coupled primary transport
+and source-photon scoring. Numerical convergence and cross-code equivalence
+have not been established, so it supports **no speedup or qualified time to
+precision claim**. It adds no physics-validation claim or sign-off.
+
+## Frozen pilot scope
+
+The executable [manifest](../../../checks/equal_precision/manifest.json) fixes
+six absolute-dimension scenes. The {download}`runner and adapters <../../../checks/equal_precision/README.md>`
+retain commands, seeds, table identities, raw per-primary tallies and job/code
+provenance. Pilot seeds are 51001–51010; measurement seeds 52001–52010 are held
+out. Proposed sample sizes are 200 and 1000 incident primaries per replica.
+Failed, timed-out and incomplete workloads remain evidence.
+
+| Material | Density (g/cm³) | Energy (keV) | Surface-normal thickness (µm) | Incidence |
+| --- | --- | --- | --- | --- |
+| Si | 2.3291534103942357 | 300 | 100 | 0° |
+| W | 19.3 | 300 | 10 | 0° |
+| Si | 2.3291534103942357 | 800 | 100 | 0° |
+| W | 19.3 | 800 | 10 | 0° |
+| Si | 2.3291534103942357 | 100 | 1 | 0° |
+| W | 19.3 | 100 | 100 | 75° |
+
+Each target is a 10 × 10 mm prism in vacuum; the beam enters the center of its
+entrance face. Geometry is a first-exit problem: both adapters terminate the
+primary on a forward, backward or side exit. The electron threshold is 10 keV.
+PyRITE uses production ELSEPA, SBETHE, Kawrakow atomic-electron deflection,
+midpoint integration with `max_dE_frac=0.05`, continuous collisional stopping
+without straggling, and coupled BremsLib soft/hard radiation at 1 keV.
+Geant4 TestEm5 11.4.2 uses `empenelope` with its efficient multiple scattering,
+loss fluctuations and fluorescence off, a 1 nm global range cut and 10 mm
+electron production cut. The latter suppresses delta-ray production in this
+energy range; the raw converted threshold dump must be inspected per scene.
+No photon or secondary transport enters either source tally. Photon production
+range cuts and PyRITE's hard cutoff are different controls; their mismatch
+remains a numerical gate, not an assumed equivalence.
+
+Geant4 source pin: `8cc04f65977807f1848da7b958c421cd5e162f26`, with the existing
+[emission patch](../../../checks/full_track_bremslib/geant4-testem5-emission.patch)
+and benchmark-only scoring/material edits from `prepare_geant4.py`. The tool
+checks its input scoring-file hashes and records changed-file hashes. Silicon
+uses the exact catalog number density, with atomic weight 28.085 g/mol in both
+adapters; tungsten uses 183.84 g/mol. The historical rounded silicon density
+was rejected by SBETHE's identity guard during preflight and is not silently
+substituted. These are model comparisons; Geant4 is not experimental truth.
+
+PXR/CBS amplitudes, reflection grids and spectral scorers are absent from the
+adapter call graph. Shared imports load CXR definitions. CPU/CUDA smoke runs
+trace CXR/line computation calls during transport and warmup; class/module
+creation and annotation scaffolding are excluded. Timed pilots disable this
+instrumentation. Characteristic radiation is not part of this pilot.
+
+## Measured small-population pilot
+
+Jobs 1304 and 1305 produced **151 valid samples** across all six scenes and
+three engines: 96 at 200 histories and 55 at 1000, with no pilot failures.
+The 200-history groups have five or six fresh-process repeats; the 1000-history
+groups have three, except Si 300-keV CPU with four. The proposed ten replicas
+per population were not completed within this stage's allocation budget.
+The [machine-readable summary](../check-records/equal-precision/pilot-summary.json)
+contains every group and uncertainty estimate. The complete
+[raw pilot evidence](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/evidence-510-v1/pilot-evidence-2026-10-14.tar.gz)
+retains preflight failures as well as successful measurements.
+
+Selected **warmed transport + event-emission** times, median [min, max] seconds,
+for 1000 histories; default 512 MiB scratch and 1024-primary initial probe:
+
+| Anchor | CPU per-electron | CUDA |
+| --- | --- | --- |
+| Si, 300 keV, 100 µm | 9.717 [9.610, 9.848] | 2.612 [2.611, 2.655] |
+| W, 300 keV, 10 µm | 18.496 [18.057, 19.093] | 8.932 [8.708, 9.055] |
+
+These times exclude warmup; complete process wall times are in the summary.
+All-zero thin-Si source scores remain unresolved precision. Counts from
+different population sizes are not pooled together.
+
+![Observed source-yield precision with primary counts and repeats](../check-records/equal-precision/pilot-precision.png)
+
+## Large-history extension
+
+Following user steering, [the scaling manifest](../../../checks/equal_precision/scaling.json)
+adds 100000-history Si/W 300-keV anchor runs for CUDA and Geant4, seeds
+53001–53003. It permits two additional ten-minute allocations with one CPU,
+one GPU and 24 GB RAM. PyRITE reduces bounded 5000-history blocks immediately;
+`_electron_start` preserves each primary's global counter-addressed stream.
+Only per-primary scores survive between blocks. CUDA uses a 4096 MiB scratch
+budget and disables the short initial probe; both are recorded performance
+controls, with the same policy in warmup and measurement. The complete
+100000-history request is warmed before it is measured. The larger serial CPU
+arm is deferred within this extension's budget, based on measured per-history
+cost. Records distinguish summed transport-call time from full request time
+including block reduction, as well as process wall time including warmup.
+
+These are coupled hard-photon **event** source tallies. The production weighted
+per-segment radiation estimator is a separate pending arm; this event pilot
+does not establish its time-to-precision or variance advantage. Equal history
+counts are a scaling diagnostic. Accuracy-qualified comparisons must still
+choose counts independently by each estimator's achieved uncertainty.
+
+## Cache and timing contract
+
+Every CPU/CUDA sample performs one **same-workload in-process warmup** with
+seed `measurement_seed + 1000000`; warmup results are discarded. It then
+repeats transport with the declared pilot seed. History count, scene, tables,
+core and numerical settings are identical. CUDA device synchronization bounds
+both warmup completion and the measured call. The measured
+`transport_and_emission` interval excludes warmup, imports/table resolution,
+score reduction and evidence serialization. Every record explicitly reports
+`cache_state="warmed-in-process"`, warmup seed/count/time and synchronization.
+
+Fresh-process `.wall.json` includes all of those costs. Geant4 records a fresh
+process including diagnostic terminal/emission logging; its interval is not
+matched to PyRITE's warmed call. Neither the source-yield curve nor the raw
+phase timers justify a cross-engine speed ratio. There is no controlled
+cold-cache baseline or telemetry/logging-overhead calibration yet. Import/JIT
+setup and computed-result caching must remain distinct in later measurements.
+No checkpoint or trajectory result is reused.
+
+The allocation requests one CPU, one GPU and 12 GB RAM, for ten minutes; the
+pilot driver stops after nine minutes. BLAS/OpenMP/Numba threads are pinned
+to one. SLURM's default is 1500 MB per CPU, overridden explicitly. The live
+GPU partition permits at most eight CPUs and rejects whole-node exclusivity;
+resource/affinity limitations must be resolved before comparative measurement.
+Hardware and scheduler snapshots are retained: AMD Ryzen 9 9950X3D
+(16 physical cores, SMT2), NVIDIA GeForce RTX 5080 (16303 MiB), Windows/WSL
+Linux host, NVIDIA kernel driver 610.47 and CUDA driver interface 13.3. The
+locked environment uses Python 3.14.6 and CuPy 14.2.0. Peak RSS is per process;
+accounting storage is disabled. End-of-job or instantaneous GPU readings are
+not peak VRAM measurements.
+
+## Measured 100000-history extension
+
+Jobs 1306 and 1307 produced eight valid samples: one CUDA run per anchor and
+three Geant4 repeats per anchor. CUDA repeats beyond the first were explicitly
+deferred by the bounded allocation budget. The [scaling summary](../check-records/equal-precision/scaling-summary.json)
+and [raw evidence plus profiling trace](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/evidence-510-v1/scaling-evidence-2026-10-14.tar.gz)
+retain those outcomes. Artifact digests are in
+[SHA256SUMS](../../../checks/equal_precision/results/SHA256SUMS).
+
+| Anchor, 100000 histories | CUDA warmed transport/emission (s), one run | Geant4 fresh process (s), median [min,max], three runs | Source-yield RSE per run, CUDA / Geant4 median |
+| --- | --- | --- | --- |
+| Si, 300 keV, 100 µm | 59.627 | 5.495 [5.491, 5.501] | 3.87% / 3.89% |
+| W, 300 keV, 10 µm | 208.586 | 5.880 [5.879, 5.918] | 1.64% / 1.66% |
+
+CUDA warmup took 63.520 s (Si) and 210.907 s (W), excluded from the table's
+CUDA intervals. Full timed requests including block reductions took 60.133 s
+and 209.540 s; complete fresh adapter processes including warmup took 125.148 s
+and 422.465 s. Returned transport position/direction/energy arrays were float64.
+The Geant4 intervals include startup and per-primary diagnostic logging.
+These timings identify a substantial raw workload difference, not an
+accuracy-qualified speed ratio. Integrated source-yield RSE alone does not
+qualify every spectral/electron observable or establish physical equivalence.
+
+The initial W request exceeded its allocation's remaining 399.08 s. A launcher
+cleanup defect let its Python child finish after that timeout; the late JSON
+is retained but **excluded** from all valid summaries. The retry used a fresh
+full allocation and completed normally. Deadline handling now kills the whole
+process group, with regression checks for both a child launcher and actual
+`uv run` Python children. The analysis also rejects a late result whenever its
+failed-attempt marker exists. Requests that cannot fit measured budget estimates
+are recorded as deferred rather than started near the deadline.
+
+![Large-population source-yield precision, pooled across the labelled replicas](../check-records/equal-precision/scaling-precision.png)
+
+## Geant4 single-scattering follow-up
+
+The follow-up switches the same TestEm5 executable to `emstandardSS`, retaining
+the scene, seed integers, primary scoring, cutoff macros, secondary suppression,
+and single CPU worker. Two 1000-history preflights precede the 100000-history
+replicas; their scores are never pooled across population sizes. Native process
+times retain startup, table initialization and logging. Existing CUDA results
+retain their full matching workload warmup and device synchronization.
+
+The raw process table confirms `CoulombScat` with
+`eDPWACoulombScattering` for electrons. Geant4 11.4.2's
+[single-scattering constructor](https://github.com/Geant4/geant4/blob/v11.4.2/source/physics_lists/constructors/electromagnetic/src/G4EmStandardPhysicsSS.cc)
+selects this Dirac partial-wave model by default. This resolves individual
+elastic events and is algorithmically closer to PyRITE's ELSEPA flights.
+However, switching the constructor also changes ionisation and bremsstrahlung
+models: the log identifies standard `eIoni` and Seltzer–Berger `eBremSB`, rather
+than the original Penelope configuration. This is not a controlled change of
+only the elastic stepping algorithm. Elastic data, atomic-electron angular
+deflection, stopping, radiative models and step controls still require an
+equivalence investigation. Neither arm includes PXR/CBS here.
+
+Jobs 1309–1310 completed three 100000-history replicas per anchor and both
+1000-history preflights, with no failures. The continuation finished the final
+W replica after the first allocation stopped at its budget boundary.
+[Validated summaries](../check-records/equal-precision/single-scattering-summary.json)
+and the [raw evidence archive](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/evidence-510-v1/single-scattering-evidence-2026-10-15.tar.gz)
+retain scores, logs, scheduler records and exact runtime scripts.
+
+| Anchor, 100000 histories | Geant4 SS native process (s), median [min,max], three runs | Geant4 multiple scattering (s), median | CUDA warmed transport (s), one run | SS source-yield RSE per run, median |
+| --- | --- | --- | --- | --- |
+| Si, 300 keV, 100 µm | 92.048 [91.732, 92.815] | 5.495 | 59.627 | 3.81% |
+| W, 300 keV, 10 µm | 116.235 [115.056, 117.050] | 5.880 | 208.586 | 1.64% |
+
+The complete SS adapter wall medians were 92.312 s and 116.552 s, including
+Python score parsing/reduction. The pooled 300000-primary SS source means were
+0.00692667 (Si) and 0.03805 (W) photons ≥10 keV per primary; pooled uncertainty
+is distinct from the table's per-run uncertainty. These results reverse the
+CPU/CUDA ordering for Si relative to the multiple-scattering comparison, while
+W remains faster in this Geant4 configuration. They do not qualify a universal
+speed ratio or establish equivalent physics.
+
+![Single-scattering source-yield precision, with preflight populations separate](../check-records/equal-precision/single-scattering-precision.png)
+
+### Work-count audit
+
+The Geant4 run summary reports about 1742–1748 charged material steps per
+primary for 100000-history Si and 2206–2212 for W. A retained thread snapshot
+shows one busy physics worker at about 99% CPU and a nearly idle coordinator;
+the executable is multithread-capable but this run requests one physics worker.
+Primary terminal logs are complete for all 100000 incident electrons.
+
+Separate GPU diagnostic job 1311 counts the returned segment work without
+changing transport settings. It uses 1000 histories, the same 53000 seed as
+the SS preflights, 4096 MiB scratch, zero probe and a full matching warmup.
+These instrumented timings are excluded from the large-population comparison.
+
+| 1000-history diagnostic | PyRITE CUDA returned segments/primary | Geant4 SS material steps/primary | PyRITE / Geant4 mean material path (µm) |
+| --- | --- | --- | --- |
+| Si | 1041.064 | 1767 | 164.703 / 166.7 |
+| W | 1980.980 | 2148 | 23.534 / 22.62 |
+
+[Si work counts](../check-records/equal-precision/si-300-100um-0deg-work.json)
+and [W work counts](../check-records/equal-precision/w-300-10um-0deg-work.json)
+include event kinds, per-primary count quantiles, zero step-limit terminations
+and returned-array byte sums. Returned segments exclude capacity replays;
+Geant4 steps include all charged material steps, so these are workload
+diagnostics rather than identical physical-event counts. The CPU is not
+processing only a handful of events while PyRITE resolves thousands.
+
+Source inspection identifies concrete differences in work per event. The
+installed Geant4 `G4eDPWAElasticDCS` uses alias selection plus rational inversion,
+with stochastic energy-table selection. PyRITE performs two binary-search CDF
+inversions and interpolates their quantiles. More substantially, PyRITE's exact
+coupled radiative path calls `_rad_layer_moment` separately for soft stopping
+and hard rate at each step, then calls it again for midpoint soft stopping.
+Each `_rad_moment` integrates the photon grid, and `_rad_next_node` scans that
+grid for every successive node. This is repeated numerical integration inside
+the transport kernel, rather than a precomputed rate lookup. It is a strong
+profiling candidate, not yet a measured percentage of kernel time. The frozen
+comparison also disables the transport LUT. PyRITE retains per-segment state;
+Geant4 streams only primary endpoints and hard-emission logs.
+
+The observed counts rule out a larger PyRITE step count as the explanation in
+these diagnostics. They leave physical-model differences, per-step numerical
+work, scratch-capacity replay, trajectory writes and GPU execution efficiency
+to separate. The earlier 99.8% active-kernel profile cannot distinguish them.
+No transport or physics default has been changed on this evidence.
+
+## Separate diagnostic profile
+
+Job 1308 used Nsight Systems plus cProfile on **1000** W 300-keV histories,
+one full warmup and one measured request, 4096 MiB scratch, zero initial probe.
+Its instrumented times are excluded from benchmark summaries. The raw Nsight
+report, host profile and statistics are retained in the scaling evidence archive;
+the SQLite export cache can be regenerated from the report.
+
+`_transport_kernel` used 11.601 s across four launches and **99.8% of active GPU
+kernel time**. All recorded CUDA memory operations totaled about 0.114 s.
+Host cProfile measured 13.004 s cumulative in `simulate_trajectories` out of
+15.147 s total; this includes GPU waits and is not exclusive CPU execution.
+The four launches cover two transport requests and include capacity-management
+work. This identifies the transport kernel as the material GPU hotspot for this
+profile, while leaving its internal scattering/radiative costs unresolved.
+It does not establish a 100000-history breakdown or justify a universal
+scaling law.
+
+## Kernel-cost investigation, 2026-10-15
+
+Two separate bounded lab allocations, 1312 and 1313, completed 50 diagnostic
+samples using the same RTX 5080 and frozen Si/W 300-keV scenes. Each process
+uses a complete same-workload warmup with a separate seed, synchronized CUDA
+timing, 4096 MiB configured scratch, and no initial probe. Job 1312 measures
+three seeds at 1000 primaries; job 1313 measures two at 5000. Variants are
+interleaved within each scene/seed, on one requested CPU and GPU, with BLAS and
+Numba threads pinned to one. Allocation limits are five minutes and 24 GB RAM
+each. Resource isolation and instrumentation-overhead calibration remain
+limitations. Raw evidence is in the
+[diagnostic archive](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/evidence-510-v1/kernel-diagnostic-evidence-2026-10-15.tar.gz);
+the [machine-readable summary](../check-records/equal-precision/kernel-diagnostic-summary.json)
+retains all samples and timing spreads. Reproduction commands and variant
+definitions are in the adapter README. These samples are excluded from the
+cross-engine timing summaries.
+Recorded peak process RSS ranges from 0.86 to 2.69 GiB across these diagnostic
+processes, including warmup and hashing. GPU snapshots are retained; no sampled
+peak VRAM or profiler-based memory-traffic attribution was collected here.
+
+### Complete-history replay and radiative grid searches
+
+The initial capacity of 512 is too small for these tracks. Overflow does not
+stop transport: every primary continues to its terminal state so the driver
+can discover the required capacity. It then restores initial state and runs
+transport again. With 1000 primaries, both launches transport exactly the same
+number of segments and take almost equal time. The adapter constructs a new
+transport request for every outer block; learned capacity is not carried to
+the next 5000-primary block, or from warmup to measurement.
+
+Starting at 12500 slots avoids replay for these measured seeds. Separately,
+binary searches replace the repeated successor-node and SDCS-row linear scans
+inside the radiative integrals. No integration arithmetic, event sampling or
+random draws are intentionally changed. Hashes of **every returned trajectory
+array**, including event/photon arrays, match the baseline exactly for both
+warmup and measurement in all tested control/search variants. This is bounded
+diagnostic evidence, not a general parity proof or production-ready change.
+
+Warmed instrumented transport times, median [min,max] seconds, three repeats:
+
+| Variant, 1000 primaries | Si | W |
+| --- | --- | --- |
+| Baseline | 2.611 [2.567,2.666] | 6.117 [5.840,6.218] |
+| Binary successor-node search only | 2.381 [2.314,2.423] | 5.601 [5.363,5.652] |
+| Both binary searches | 2.291 [2.217,2.315] | 5.372 [5.138,5.439] |
+| Larger initial capacity only | 1.377 [1.362,1.421] | 3.230 [3.157,3.375] |
+| Both searches and larger capacity | 1.200 [1.150,1.257] | 2.853 [2.786,2.911] |
+
+Avoiding replay reduces these transport intervals by about 47%; search changes
+alone reduce them by about 12–13%. Thus grid rescanning is measurable, but it
+does not by itself explain the original performance gap. These diagnostic
+times are not substituted for the earlier uninstrumented measurements.
+
+### Why 100000 requested particles do not saturate this GPU
+
+The total population is divided into independent 5000-primary calls. The
+baseline launcher assigns one CUDA thread per primary, 128 threads per block:
+5000 primaries produce only 40 blocks. Runtime properties report **84 streaming
+multiprocessors**, with 1536 maximum resident threads each. Even before
+divergence or register restrictions, 40 blocks cannot occupy all 84
+multiprocessors, and 5000 active threads are only 3.9% of the device's aggregate
+resident-thread ceiling. This is a launch-population bound, not a measured
+hardware occupancy counter.
+
+The W seed-55001 baseline starts 5000 primaries at capacity 512, then replays
+4221 at capacity 12407 and runs the remaining 779 separately. The synchronized
+launch intervals are 2.866, 2.883 and 2.863 s respectively. The small tail costs
+almost as much as the much larger batch. The scratch calculation limits batch
+size using the largest track, while threads follow whole tracks with widely
+varying lengths. Total particle count therefore increases the number of sparse
+launches instead of increasing concurrent work indefinitely.
+
+Changing only CUDA blocks from 128 to 32 threads produces identical trajectories
+and reduces warmed 5000-primary transport by 16% (Si) and 18% (W). It distributes
+the same primaries over more blocks; it does not increase the number of primary
+threads. The compiled baseline reports 184 registers and 40 bytes of local
+storage per thread. The search variant reports 172 registers and the same local
+storage. These are compiler resource attributes, not measured spill traffic or
+an exclusive register-stall attribution.
+
+Warmed instrumented transport times, median [min,max] seconds, two repeats:
+
+| Variant, 5000 primaries | Si | W |
+| --- | --- | --- |
+| Baseline | 2.932 [2.890,2.974] | 10.589 [10.548,10.629] |
+| 32 threads per CUDA block only | 2.459 [2.447,2.472] | 8.685 [8.674,8.695] |
+| Larger initial capacity only | 2.944 [2.933,2.955] | 7.503 [7.453,7.553] |
+| Both searches, larger capacity, 32 threads | 2.197 [2.189,2.205] | 5.732 [5.628,5.836] |
+| Coupled radiation disabled, baseline launch/capacity | 0.480 [0.433,0.526] | 1.303 [1.299,1.307] |
+
+Larger initial capacity alone does not improve Si at 5000 histories: its
+scratch requirement splits that request into 4190 and 810 primaries, replacing
+one redundant full launch with two sparse useful launches. Capacity tuning
+must account for concurrency and tails, rather than simply raising the guess.
+The combined variant reduces measured transport by 25% (Si) and 46% (W) at this
+population, without changing returned arrays. Its complete request/reduction
+time includes diagnostic hashing and is not a production end-to-end result.
+
+Twenty baseline 5000-primary intervals give approximately 58.6 s (Si) and
+211.8 s (W), close to the earlier **measured** 100000-primary intervals of
+59.6 s and 208.6 s. This is a consistency check explaining the batching
+behavior; the modified variants have not been benchmarked at 100000 histories,
+and no modified full-request time is established by multiplication.
+
+### Radiative work per step remains the largest cost candidate
+
+Disabling coupled radiative transport reduces 5000-primary transport by about
+6.1× (Si) and 8.1× (W). For seed 55001, returned segment counts change only
+from 5101003 to 5099683 (Si, 0.03%) and from 10135558 to 10003686 (W, 1.3%).
+Synchronized launch costs also fall sharply: Si's first measured launch falls
+from 1.236 to 0.133 s; W's from 2.866 to 0.310 s. The faster case still performs
+single-flight elastic transport, trajectory storage, capacity replay and
+host transfers. This strongly localizes the excess work to the coupled
+radiative path rather than a much larger number of electron steps.
+
+This ablation **changes physics**, including radiative energy feedback and
+emission. It does not measure an exclusive radiative percentage, demonstrate
+equal observables or justify dropping radiation. The no-radiation photon
+columns in diagnostic files are placeholders and must never enter a source
+precision comparison.
+
+Source inspection supplies a specific mechanism: a normal nonterminal midpoint
+step evaluates radiative moments four times per element: soft and hard moments
+at the starting energy, soft stopping for the cutoff-distance test, and soft
+stopping at the predicted midpoint. These calls integrate the photon grid
+inside every electron step; additional work samples the rare hard emissions.
+The device reports a single-to-double precision throughput ratio of **64**,
+and the tested kernel uses double-precision numerical work. That hardware
+property can disadvantage this workload; it is not evidence that runtime is
+uniformly FP64-throughput-bound. Instruction-level stall/throughput attribution
+has not been measured.
+
+This differs from Geant4's documented runtime approach: continuous energy-loss
+values are calculated during initialization and retrieved from stopping/range
+tables during tracking, rather than recomputing their defining integrals at
+each step. See the [Geant4 11.4 energy-loss implementation description](https://geant4.web.cern.ch/documentation/dev/prm_html/PhysicsReferenceManual/electromagnetic/energy_loss/enloss.html).
+This per-step work difference remains relevant when Geant4 uses single
+scattering. Multiple scattering additionally reduces resolved collision work,
+as discussed below. The GPU-versus-CPU timing alone cannot separate these
+algorithm and physical-model differences.
+
+The measured priorities are therefore: reduce repeated radiative rate/stopping
+integration, address repeated full-history replay together with sparse batch
+tails, and improve useful launch concurrency. Precomputed radiative rate/soft
+stopping tables need numerical-convergence checks; integrating them is separate
+from enabling the existing transport LUT, which this coupled mode does not
+support. Streaming primary tallies or bounded track continuation could reduce
+dense trajectory scratch pressure, but need independent measurements. The
+binary-search and block-size experiments are smaller exact-result candidates.
+No production kernel, physical model or default was changed by this diagnosis.
+
+## Exact CUDA radiative evaluation optimization
+
+The subsequent implementation changes only the CUDA radiative helper module.
+The soft-moment selector stops at the cutoff instead of integrating the unused
+hard region; the hard-rate selector starts at the cutoff instead of traversing
+the unused soft region. Both preserve the original cell formulas and summation
+order for the selected result. Binary searches replace the successor-node and
+SDCS-row scans, including the hard-photon sampler's uses of those helpers.
+No rate approximation, lookup interpolation, physics switch, numerical step
+control, buffer configuration or CUDA block-size change enters this slice.
+
+The retained pre-change source SHA-256 is
+`5c1c6f0c45ad47a92d49c8f1d8d6bf933dfc06ffb09f6c004a4d505e3cdf69e1`;
+the candidate is
+`a5d6090478a27367a98fbe7808494ae2b3304394335076b54de07981df285ef2`.
+The benchmark loader selects the baseline module before CUDA kernel imports;
+the candidate uses the production module. Every process performs a full
+same-workload warmup, then a synchronized fresh-seed measurement. Full returned
+trajectory arrays are hashed during the untimed reduction phase in every block.
+The source pin, inputs, environment, timings and generated CUDA are retained
+per job. No computed trajectory/checkpoint result is reused.
+
+Job 1314 completed three independent-seed pairs at 5000 primaries per Si/W
+300-keV anchor, with baseline/candidate interleaved within each scene and seed.
+Warmup and measured array hashes agree exactly for every pair. Median [min,max]
+warmed instrumented transport seconds:
+
+| 5000 primaries | Baseline | Candidate | Median interval reduction |
+| --- | --- | --- | --- |
+| Si, 300 keV, 100 µm | 2.985 [2.938,3.034] | 1.779 [1.742,1.851] | 40.4% |
+| W, 300 keV, 10 µm | 10.366 [10.336,10.497] | 6.093 [6.069,6.104] | 41.2% |
+
+The [pilot summary](../check-records/equal-precision/radiative-pilot-summary.json)
+and [complete raw pilot evidence](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/evidence-510-v1/radiative-pilot-evidence-2026-10-15.tar.gz)
+retain all twelve samples and the GPU test log.
+
+This is the isolated production-helper change, rather than the earlier combined
+search/capacity/block-size experiment. In the first W pair, measured synchronized
+kernel launches fall from about 2.84 s each to 1.42–1.44 s, with unchanged
+launch populations, segment counts and capacity replays. Compiler attributes
+change from 184 to 180 registers per thread; local storage remains 40 bytes.
+The transport interval includes host dispatch, synchronization, compaction,
+transfer and host photon-completion work, which explains why its fractional reduction is smaller than the
+per-launch reduction. Instrumentation overhead remains uncalibrated.
+
+Nine GPU radiative regression cases pass, including deterministic replay,
+first-row CPU/GPU parity, photon energy debit and aggregate CPU/GPU agreement.
+The new direct moment checks exercise incident-grid boundaries, photon-grid
+nodes, coincident cutoff/tip nodes, both sides of rounding boundaries and a
+cutoff equal to the electron energy. They compare against the independent CPU
+quadrature and analytic constant-SDCS integrals, with FP64 rounding tolerances.
+The new test takes 1.98 s on its first measured hardware invocation and 0.02 s
+for the second parameter case. Existing physics-validation identifiers remain
+unchanged; this adds no independent physics sign-off or physical-model claim.
+
+The [frozen large-population protocol](../../../checks/equal_precision/radiative-scaling.json)
+specifies separate 100000-primary pairs at seed 57001, with 5000-primary blocks,
+4096 MiB configured scratch, zero probe and a complete warmup. Its budget is
+two ten-minute allocations, one CPU, one GPU and 24 GB RAM each. One large pair
+per scene checks representative scaling; it does not supply a repeated timing
+distribution or a confidence interval on a speed ratio. The replicated
+5000-primary pilot remains separate from that population.
+
+Jobs 1315–1316 completed all four large-population requests within that budget,
+with no failures or deferrals. The
+[combined optimization summary](../check-records/equal-precision/radiative-optimization-summary.json)
+and [raw large-population evidence](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/evidence-510-v1/radiative-scaling-evidence-2026-10-15.tar.gz)
+retain the inputs, primary tallies, source snapshots, generated CUDA and logs.
+At 100000 primaries, warmed synchronized transport intervals are:
+
+| Anchor | Baseline (s) | Candidate (s) | Interval reduction |
+| --- | --- | --- | --- |
+| Si, 300 keV, 100 µm | 60.451 | 34.514 | 42.9% |
+| W, 300 keV, 10 µm | 209.200 | 122.267 | 41.6% |
+
+All forty block hashes per variant match within each scene: twenty warmup and
+twenty measured blocks, including all returned event/photon arrays. Together
+with the three-seed pilot, this verifies every tested same-workload trajectory
+against the retained baseline. The results establish this optimization's
+measured effect for the declared CUDA workloads; they do not establish a
+cross-engine speed ratio or general parity for arbitrary untested inputs.
+Recorded peak process RSS is at most 2.72 GiB across these optimization runs,
+including warmup and diagnostic hashing; peak VRAM was not sampled.
+
+The large baseline/candidate requests including diagnostic reductions take
+76.072/49.929 s for Si and 240.026/152.427 s for W. Those intervals include
+full-array hashing, so they are not production end-to-end benchmarks. Full
+warmup is also retained separately and excluded from the transport table.
+Repeated full-history replay and sparse batch tails remain unchanged; they
+are separate optimization opportunities. Physics defaults, numerical controls,
+model markers and the package version are unchanged.
+
+## Algorithm interpretation
+
+The tested Geant4 run uses one CPU physics worker and no GPU. Its
+[multiple-scattering model](https://geant4.web.cern.ch/documentation/dev/prm_html/PhysicsReferenceManual/electromagnetic/elastic_scattering/msc.html)
+combines many collisions into net path, angle and displacement changes, while
+this PyRITE arm resolves individual ELSEPA flights. The measured difference
+motivates investigating a selectable condensed-history transport policy for
+PXR/CBS-free workloads. This is an architectural inference, not an exclusive
+profile attribution or an accuracy-qualified speed claim. Such a policy needs
+validation of electron, source and detector observables near boundaries and
+across step controls; coherent PXR/CBS paths additionally need a phase-error
+contract. It is separate physics work, outside this benchmark implementation.
+
+## Statistical contract and remaining gates
+
+The independent unit is one incident primary, including zero-score histories.
+Photon/segment scores from the same primary are summed before taking moments.
+Raw score arrays retain band covariance, and integrated yields are scored
+before estimating their SE. Independent replica means provide a second SE
+diagnostic. Zero sample variance is unresolved precision, never a passed target.
+For all-zero scores the summary also gives an exact one-sided 95% upper bound
+on the probability that a primary scores nonzero; it is not a photon-yield
+upper bound. For observed nonzero scores, reported RSEs are diagnostic estimates; rare-bin
+minimum counts and absolute floors have not yet been calibrated. Reusing a
+seed at different history counts correlates curve points, which are never
+pooled together. Equal seed integers across engines do not pair trajectories.
+
+Analysis-integrity verification on 2026-10-15 (SLURM 1335) passed all 40
+performance tests, lint, native Linux type checks and the documentation build.
+The stricter analyzer accepted all 167 retained successful samples across the
+pilot, scaling and single-scattering snapshots, preserved the scaling failure,
+and verified that every pooled observable includes all incident primaries.
+Existing metrics agree apart from FP64 sum-of-squares rounding below
+8 × 10⁻¹⁶ relative; current analyzer output also supplies native-process timing
+fields absent from the earlier pilot/scaling summaries. Raw samples were read
+without rerunning transport. The [verification record](../check-records/equal-precision/analysis-verification-2026-10-15.json)
+retains input provenance, check results, summary hashes and raw-log locations.
+This CPU-only verification requested one CPU and 8 GiB, received two logical
+CPUs, and completed in 138 s; these are verification costs, not transport timings.
+
+[Issue #200's launch study](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/commit/7650913643221aea61e1a92a4399e5e0efccd0fe)
+supplies useful measurement practice: freeze fixtures per production route,
+separate transfer/compilation from synchronized kernel timing, alternate
+repeated configurations, predeclare numerical tolerances, and include partial
+final blocks. It retained CXR defaults; its reduction timings and launch choices
+do not establish transport settings for #510. PXR/CBS remain excluded here.
+Its denied Nsight Compute counters also require explicit disclosure of profiler
+limits before attributing bottlenecks; launch geometry alone is not a measured
+occupancy or memory-throughput counter.
+
+The full study remains open. The [protocol page](equal-precision-protocol.md)
+now freezes the matrix definition and records the table-coverage audit; the
+18 range-scaled scenes still need a pinned common range source; 5 MeV, finite phase space,
+compound/low-Z material, finite-footprint, detector-acceptance and straggling
+extensions remain explicit deferred entries. Transport-only scoring, matched
+Geant4 warmup, phase/overhead attribution, numerical/cutoff/FP32–FP64 refinement,
+physical equivalence margins with multiple-comparison control, rare-event
+floors, equal-core resources, and held-out time-to-target measurements remain
+required before ranking engines. No new production physics/defaults change.
+
+Standalone PENELOPE was not found in the inspected lab executable locations.
+The [NEA distribution page](https://databank.io.oecd-nea.org/codes/penelope/)
+provides its access/licensing route; the
+[2024 manual](https://www.oecd-nea.org/jcms/pl_108003/penelope-2024-a-code-system-for-monte-carlo-simulation-of-electron-and-photon-transport)
+is not itself a runnable installation. [PenRed](https://github.com/PenRed/PenRed)
+is a practical separately named alternative (feasibility pin
+`145a8a357f08affa551f592300fa6dfcab98a762`): its upstream instructions use
+C++14/CMake and `src/compiled/mains/pen_main`, with optional threading/MPI.
+Its matching primary-only scorer, pinned material databases and converged
+settings are not implemented in this stage. It is not reported as standalone
+PENELOPE-2024. Optional EGSnrc remains deferred until the two-engine accuracy
+and scoring contracts are established.
