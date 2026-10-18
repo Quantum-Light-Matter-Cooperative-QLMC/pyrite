@@ -105,9 +105,11 @@ impact_ang: [0.2, 0.0], tilt_offset_rad: [0.0, 0.0]}`; omitted averaging
 resolves to fixed impact and zero divergence. This is schema notation, not
 an invocation of today's API.
 
-Planar lowering requires 1D and calls `planar_entry_density`; axial lowering
-requires 2D and samples each component through `RealSpaceGrid.sample`.
-Do not invent a projection from an arbitrary 2D input onto a planar state.
+Planar lowering calls `planar_entry_density`: it accepts 1D input or the
+existing 2D partial trace over in-plane momentum, preserving transverse
+coherences as specified by `cr-entry-state-projection`. Axial lowering requires
+2D and samples each component through `RealSpaceGrid.sample`. Reuse that
+established planar reduction rather than inventing an amplitude projection.
 The legacy planar entry remains unchanged when no recipe is supplied. An
 explicit recipe owns microscopic impact and angular spread; reject concurrent
 nonzero beam emittance/divergence until their joint distribution is defined.
@@ -122,7 +124,13 @@ separately: a periodized state's norm can differ from one through coherent
 image overlap as well as truncation. Rejected entry flux, when physically
 defined, needs a separate positive launch distribution.
 
-## Physical escape is the unresolved architecture choice
+## Physical escape within the selected entrance-zone architecture
+
+**Maintainer decision (2026-10-17): entrance-zone handoff.** Full-slab quantum
+propagation is not the standard-run architecture for #548. The
+[escape-operator derivation](axial-escape-instrument.md) separates physical
+matching from numerical truncation and defines the positive accounting that
+the joint outgoing instrument must satisfy.
 
 The MCWF construction averages outer products of independent trajectories to
 obtain a density operator{cite:p}`castin2008`. Its particular numerical
@@ -141,17 +149,27 @@ Sen and Lynn explicitly introduce a phenomenological planar loss model and
 discuss rechanneling{cite:p}`sen2014channeling`; it supplies no axial outgoing
 distribution. Do not transplant the planar 300 eV margin or band-edge angle.
 
-Two concrete architectures remain available:
+The architecture decision distinguishes these two routes:
 
 | Architecture | Required evidence and consequence |
 | --- | --- |
-| Full-slab quantum evolution | Retain tracked above-barrier states to the physical exit; no in-solid handoff or artificial absorbing boundary. Numerical sinks invalidate a run unless bounded as numerical error by independent convergence. Requires a validated exit-state treatment and stopping/source approximations. Changes the entrance-zone scope of ADR-0018 and needs a maintainer decision. |
-| Entrance zone with physical escape | Derive a positive escape instrument with a retained map and outgoing measure jointly in depth, transverse position, 2D momentum and energy. Preserve population accounting and quantify omitted rechanneling. Requires differential transfer information for overflow; the current sink rate alone is insufficient. Preserves the intended zone/native architecture. |
+| Full-slab quantum evolution (not selected) | Retain tracked above-barrier states to the physical exit; no in-solid handoff or artificial absorbing boundary. Numerical sinks invalidate a run unless bounded as numerical error by independent convergence. Would require a different exit-state/stopping/source contract. |
+| Entrance zone with physical escape (selected) | Derive a positive escape instrument with a retained map and outgoing measure jointly in depth, transverse position, 2D momentum and energy. Preserve population accounting and quantify omitted rechanneling. Requires differential transfer information for overflow; the current sink rate alone is insufficient. Preserves the intended zone/native architecture. |
 
-Recommendation: retain the entrance-zone target of #548, but derive and anchor
-that map before exposing the selector. Use full-slab diagnostics to study
-convergence, without presenting them as an integrated run. The first
-architecture is a possible explicit scope change, not an automatic fallback.
+**Maintainer decision (2026-10-18): staged depth budget.** Targets range
+from hundreds of nanometres to millimetres. The
+[return-flux study](axial-escape-instrument.md) shows that a fixed-energy
+handoff omits rechanneling yield that grows with depth. #548 therefore ships
+the entrance zone with a declared per-case depth budget, derived from the
+return-flux deficit, and refuses thicker cases before any work or writes. A
+re-entry hybrid is a separate follow-up issue: native transport between fresh
+quantum entrance zones whenever multiple scattering returns the electron
+inside the matching cone. Classical bound orbits are not used, because the
+bound regime has only a few transverse states.
+
+Derive and anchor the entrance-zone map before exposing the selector. Use
+full-slab diagnostics to study convergence, without presenting them as an
+integrated run or substituting a different architecture.
 
 For the zone architecture, the proposed accounting contract is incident weight
 equals retained quantum weight plus cumulative physical handoff weight plus
@@ -238,9 +256,10 @@ Reserve `cr-axial-zone-handoff-accounting` for the new physical escape map,
 joint launch distribution, flux balance and continuity. Reserve
 `cr-axial-persisted-channel` for the new source estimator, line shape,
 normalization, frame/absorption mapping and exactly-once persistence.
-Neither claim is implemented or verified by this proposal. Register their
-ledger rows as `unverified` when their model definitions are selected; attach
-source derivations and in-code markers before physics code lands. Both must
+The handoff claim now has an `unverified` research ledger row and a diagnostic
+counterexample; it has no production implementation or physical verdict.
+Register the source claim when its model is selected; attach source derivations
+and in-code markers before physics code lands. Both must
 reach `anchored` through fresh-context review and independent regression
 oracles before #548 is complete.
 
