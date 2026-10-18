@@ -5,6 +5,29 @@ Captured from unmodified runtime at commit
 on CPU/NumPy fp64, Python 3.14.4. These are compatibility fixtures, not independent
 physics references. Do not regenerate merely to make a refactor pass.
 
+## CBS v4 generation (#513)
+
+The deliberate static `Z - f0(g)` CBS potential correction in `e7c66c6f`
+changed `CXR_ESCAPE_MODEL` from v3 to v4. The resolved-case and channeling
+hashes, plus the legacy/fallback/multilayer/coherent line spectra, were
+re-pinned against that generation at `c4ab4179` (CPU/NumPy fp64, Python
+3.14.4). The acquisition-parser refactor in #565 produces identical results
+to its parent; these failures were inherited from the model change.
+
+Before re-pinning, restoring only `materials/crystal.py` and
+`montecarlo/spectrum/cxr/_setup.py` from the parent of `e7c66c6f` made all
+15 failing transport-runner/core compatibility checks pass against the
+original expectations. Under v4, the resolved case payloads, seeded transport
+signatures, characteristic spectra, and continuum spectra retain their
+original expectations. Only the CXR-containing `spec`/`spec_coherent` arrays
+and generation-dependent identity hashes changed. Other output families and
+all comparison tolerances remain unchanged.
+The coherent-roundoff acceptance test applies representative relative errors
+from the recorded CI sample to the current spectrum, instead of embedding
+absolute v3 intensities.
+
+## Fixture inputs
+
 `resolved.json` stores full resolved case mappings, `case_content_key` and
 `dataset_identity.parameter_sha256` for legacy Mott, ELSEPA, missing-BremsLib
 EEDL fallback, coupled BremsLib, multilayer, coherent and cascade selections.
