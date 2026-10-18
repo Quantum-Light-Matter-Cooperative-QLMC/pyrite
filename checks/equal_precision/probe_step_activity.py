@@ -28,7 +28,13 @@ def main():
     parser.add_argument("scene")
     parser.add_argument("cap", type=float)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--seed", type=int, default=68001)
+    parser.add_argument("--max-steps", type=int, default=20000)
     args = parser.parse_args()
+    if not 0 < args.cap <= 1 or args.seed < 0 or args.max_steps < 1:
+        parser.error("cap must be in (0, 1], seed nonnegative, and max-steps positive")
+    if args.output.exists():
+        parser.error("output must be fresh")
     from precision_checks import trajectory_checks
 
     root = Path(__file__).parent
@@ -50,11 +56,13 @@ def main():
         "--histories",
         "64",
         "--seed",
-        "68001",
+        str(args.seed),
         "--core",
         "per-electron",
         "--max-de-frac",
         str(args.cap),
+        "--max-steps",
+        str(args.max_steps),
         "--cutoff-ev",
         "1000",
         "--batch-histories",

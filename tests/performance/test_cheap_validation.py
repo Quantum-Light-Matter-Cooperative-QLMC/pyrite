@@ -175,6 +175,58 @@ def test_activity_counts_only_energy_cap_events_not_hard_photons():
     assert result == dict(rows=7, energy_limited_rows=3, primaries_with_energy_substeps=2)
 
 
+def test_activity_ladder_keeps_all_scenes_and_fresh_planning_population():
+    import json
+
+    protocol = json.loads((ROOT / "activity-ladder.json").read_bytes())
+    previous = json.loads((ROOT / "cheap-validation.json").read_bytes())
+    rows = runpy.run_path(str(ROOT / "run_activity_ladder.py"))["requests"](protocol)
+    assert len(rows) == len(set(rows)) == 24
+    assert set(protocol["scenes"]) == set(previous["scenes"])
+    assert protocol["caps"] == [0.05, 0.001, 0.00025, 0.0000625]
+    assert protocol["seed"] not in previous["convergence"]["seeds"] + [68001]
+
+
+@pytest.mark.parametrize(
+    "corruption", [None, "seed", "cap", "warmup", "audit", "counts", "capacity"]
+)
+def test_activity_ladder_rejects_incomplete_or_mismatched_planning_samples(corruption):
+    import json
+
+    protocol = json.loads((ROOT / "activity-ladder.json").read_bytes())
+    record, _, _, scene = evidence()
+    record.update(
+        schema="pyrite.equal-precision.step-activity.v1",
+        histories=64,
+        seed=69001,
+        activity={
+            phase: dict(
+                primaries=64, rows=1000, energy_limited_rows=100, primaries_with_energy_substeps=20
+            )
+            for phase in ["warmup", "measurement"]
+        },
+    )
+    record["warmup"].update(histories=64, seed=1000000 + 69001)
+    if corruption == "seed":
+        record["seed"] = 68001
+    elif corruption == "cap":
+        record["max_de_frac"] = 0.001
+    elif corruption == "warmup":
+        record["activity"]["warmup"]["primaries"] = 32
+    elif corruption == "audit":
+        record["cxr_execution_audit"]["enabled"] = False
+    elif corruption == "counts":
+        record["activity"]["measurement"]["primaries_with_energy_substeps"] = 65
+    elif corruption == "capacity":
+        record["max_steps"] = 80000
+    check = runpy.run_path(str(ROOT / "run_activity_ladder.py"))["check_sample"]
+    if corruption is None:
+        check(record, scene["id"], 0.05, protocol)
+    else:
+        with pytest.raises(ValueError):
+            check(record, scene["id"], 0.05, protocol)
+
+
 def test_incomplete_fixed_grid_never_produces_selected_subset_intervals(tmp_path):
     import json
     import subprocess

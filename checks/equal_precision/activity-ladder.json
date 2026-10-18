@@ -1,0 +1,31 @@
+{
+  "schema": "pyrite.equal-precision.activity-ladder.v1",
+  "purpose": "Find active energy-step controls; no numerical convergence or speed claim.",
+  "scenes": [
+    "si-300-100um-0deg",
+    "w-300-10um-0deg",
+    "si-800-100um-0deg",
+    "w-800-10um-0deg",
+    "si-100-1um-0deg",
+    "w-100-100um-75deg"
+  ],
+  "caps": [
+    0.05,
+    0.001,
+    0.00025,
+    6.25e-05
+  ],
+  "histories": 64,
+  "seed": 69001,
+  "core": "per-electron",
+  "cutoff_eV": 1000,
+  "budget": {
+    "cpus": 1,
+    "memory_gib": 8,
+    "allocation_seconds": 300,
+    "runner_seconds": 260,
+    "process_seconds": 30,
+    "no_retries": true
+  },
+  "selection_rule": "For each scene, require nonzero measured energy-limited rows at all three tighter caps; retain every outcome. Activity alone does not establish convergence."
+}

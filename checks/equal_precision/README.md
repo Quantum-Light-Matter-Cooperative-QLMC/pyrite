@@ -330,6 +330,23 @@ substeps with a two-minute CPU cap. See the
 [method, results and commands](../../docs/validation/beam-transport/cheap-numerical-validation.md).
 Small samples and inactive controls must not be reported as convergence.
 
+`activity-ladder.json` freezes a separate 24-request CPU activity design:
+all six scenes, fresh seed 69001, 64 primaries, and caps 0.05, 0.001,
+0.00025 and 0.0000625. Submit `sbatch checks/equal_precision/activity-ladder.sbatch`
+from an isolated staged checkout. It requests one CPU, 8 GiB RAM and five
+minutes; the runner stops after 260 seconds and caps each process tree at
+30 seconds. Every sample includes full-workload warmup, trajectory checks and
+the PXR/CBS execution audit. Source snapshots, raw scores, failures/deferrals
+and an explicit incomplete-grid outcome are retained. Existing output
+directories are rejected. This planning population is separate from all
+convergence/equivalence families; nonzero energy-limited counts show an active
+control, not numerical convergence.
+`activity-capacity.json` and `activity-midpoint.json` freeze separate six-scene
+follow-ups with an explicit 80000-step limit; pass either path as the batch
+script's first argument. Earlier step-limit failures remain in the original
+grid. The adapter's default history limit stays 20000. See the
+[active-control results](../../docs/validation/beam-transport/cheap-numerical-validation.md#active-refinement-levels-and-the-history-step-limit).
+
 ## Full matrix freeze and coverage audit
 
 `matrix-spec.json` defines the 18-scene core, the six pilot anchors and the

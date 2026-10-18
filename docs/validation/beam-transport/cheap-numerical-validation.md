@@ -105,6 +105,76 @@ needs demonstrated active controls and several refinement levels; W 800 keV
 still needs a tighter activity probe. Agreement between two inactive settings
 is not evidence of convergence.
 
+### Active refinement levels and the history-step limit
+
+On 2026-10-18, a separate planning population (64 primaries per scene, seed
+69001; full matching warmup at seed 1069001) tested tighter caps. The frozen
+`activity-ladder.json` grid contained all six scenes at 0.05, 0.001, 0.00025 and
+0.0000625. CPU job 1580 completed 21 of 24 requests in 145 seconds. At the
+tightest cap, Si/W 300 keV and thick W 100 keV exceeded the unchanged
+20,000-step history limit. These are retained failed transport requests;
+their missing terminal states are not treated as converged or discarded.
+
+`activity-capacity.json` then froze a separate six-scene tight-cap grid with
+an explicit 80,000-step limit. Job 1582 completed all six requests in 52
+seconds. For the three scenes that completed at both limits, every stored
+measured per-primary score array is exactly identical. This is a CPU capacity
+spot-check, not a claim about all workloads or CUDA. The adapter now records
+the requested step limit; its default remains 20,000. Its call profiler is
+also disabled when transport raises, preserving the original failure without
+an unrelated profiling error at interpreter shutdown.
+
+W 800 keV still recorded zero energy-limited rows at cap 0.001 in the fresh
+population, but recorded 189 at 0.00025. A third frozen six-scene grid,
+`activity-midpoint.json`, tested 0.000125 with the 80,000-step limit. Job 1583
+completed all six requests in 39 seconds. Together these probes identify
+three active refinement levels in every scene. Measured energy-limited rows
+(warmup excluded):
+
+| Scene | Cap 0.00025 | Cap 0.000125 | Cap 0.0000625 |
+| --- | ---: | ---: | ---: |
+| Si 300 keV / 100 µm | 111448 | 254751 | 544472 |
+| W 300 keV / 10 µm | 27401 | 87026 | 218397 |
+| Si 800 keV / 100 µm | 3705 | 14513 | 38885 |
+| W 800 keV / 10 µm | 189 | 3445 | 17502 |
+| Si 100 keV / 1 µm | 1624 | 3602 | 7561 |
+| W 100 keV / 100 µm / 75° | 116301 | 257752 | 542780 |
+
+The first column uses the completed 20,000-step requests; the other columns
+use 80,000. A future numerical-convergence study should freeze a common
+sufficient limit (80,000 here), use fresh statistical populations, and measure
+observable changes against the one-third error budget. This planning evidence
+establishes control activity only: it neither bounds numerical bias nor
+qualifies convergence, equivalence or time-to-precision. Repeated caps and
+capacity checks share a seed and must not be counted as independent replicas.
+
+All three allocations requested one CPU, 8 GiB RAM and five minutes, with
+single-thread worker/BLAS/OpenMP settings. SLURM reported two allocated CPUs;
+no equal-core or exclusive-host timing claim follows. The runner caps each
+process tree at 30 seconds and the whole grid at 260 seconds, retains
+failures/deferrals, and rejects reused output directories. All 33 successful
+requests passed the trajectory and PXR/CBS execution audits. Transport source
+snapshots match across the three jobs; table identities match within each
+scene. Archive, file, sample, probe-source and raw-score hashes were verified.
+
+The [activity record](../check-records/equal-precision/active-controls-summary.json)
+retains every grid outcome, each captured protocol, archive SHA-256, warmup
+and measured counts, and the capacity score comparisons. Raw archives remain
+under ignored `scratch/activity-ladder-results/` locally and in the isolated
+lab checkout `/home/aamador/pyrite-510-active-controls-20261018/scratch/`.
+Reproduce after maintained remote sync and table staging:
+
+```bash
+sbatch checks/equal_precision/activity-ladder.sbatch
+sbatch checks/equal_precision/activity-ladder.sbatch checks/equal_precision/activity-capacity.json
+sbatch checks/equal_precision/activity-ladder.sbatch checks/equal_precision/activity-midpoint.json
+```
+
+These CPU jobs require the retained pilot's anonymous-W SBETHE table, which
+is still absent from released assets; the
+[table-coverage gap](equal-precision-protocol.md#table-coverage-audit) remains.
+They change no production transport defaults or physics-model markers.
+
 ## Comparator configuration audit
 
 The reused executable's SHA-256 is
@@ -160,7 +230,8 @@ Adjust pinned lab checkout/executable paths for a different machine. Use the
 captured protocol bytes for historical analysis. The standalone activity probe
 is also reproducible one scene/cap at a time with `probe_step_activity.py`.
 
-Remaining cheap work is to find active step controls for W 800 keV and freeze
-an informative refinement ladder. Electron-tracking cutoff, table density,
-quadrature/detector and comparator-model convergence remain separate gaps.
-Production stays unchanged; the large precision studies remain deferred.
+Active step controls and a three-level refinement ladder are now identified
+for all six scenes. Measuring numerical changes with sufficient precision
+remains open. Electron-tracking cutoff, table density, quadrature/detector and
+comparator-model convergence remain separate gaps. Production stays unchanged;
+the large precision studies remain deferred.

@@ -63,8 +63,9 @@ def main():
     parser.add_argument("--batch-histories", type=int, default=0)
     parser.add_argument("--scratch-mib", type=int, default=512)
     parser.add_argument("--probe-electrons", type=int, default=1024)
+    parser.add_argument("--max-steps", type=int, default=20000)
     args = parser.parse_args()
-    if args.histories < 2 or args.batch_histories < 0 or args.scratch_mib < 1:
+    if args.histories < 2 or args.batch_histories < 0 or args.scratch_mib < 1 or args.max_steps < 1:
         parser.error("invalid history count or scratch budget")
     manifest_path = Path(__file__).with_name("manifest.json")
     manifest = json.loads(manifest_path.read_text())
@@ -114,7 +115,7 @@ def main():
     cxr_calls = []
 
     def audit(frame, event, arg):
-        module = frame.f_globals.get("__name__", "")
+        module = frame.f_globals.get("__name__", "") or ""
         name = frame.f_code.co_name
         import_scaffolding = (
             name.startswith("<") or name[:1].isupper() or name in {"__annotate__", "__create_fn__"}
@@ -143,6 +144,7 @@ def main():
         seed=args.seed,
         energy_model="midpoint",
         max_dE_frac=args.max_de_frac,
+        max_steps=args.max_steps,
         elastic_model="elsepa",
         elastic_tables=[[dict(e.arrays) for e in entries]],
         stopping_tables=[stopping.arrays()],
@@ -192,11 +194,13 @@ def main():
 
     # Warm the complete request with identical batching and numerical controls.
     warmup_start = time.perf_counter()
-    warm, _, _, warmup_s, _ = run_request(args.seed + 1_000_000)
-    del warm
-    scores, compute_s, reduction_s, request_s, dtypes = run_request(args.seed)
-    if args.audit_cxr:
-        sys.setprofile(None)
+    try:
+        warm, _, _, warmup_s, _ = run_request(args.seed + 1_000_000)
+        del warm
+        scores, compute_s, reduction_s, request_s, dtypes = run_request(args.seed)
+    finally:
+        if args.audit_cxr:
+            sys.setprofile(None)
     if cxr_calls:
         raise RuntimeError(f"unexpected PXR/CBS computation calls: {cxr_calls}")
     end = time.perf_counter()
@@ -223,6 +227,7 @@ def main():
         segment_dtypes=dtypes,
         tables=tables,
         max_de_frac=args.max_de_frac,
+        max_steps=args.max_steps,
         cutoff_eV=args.cutoff_ev,
         timings_s={
             "imports_and_tables": warmup_start - setup,
