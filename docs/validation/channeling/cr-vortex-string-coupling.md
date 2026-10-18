@@ -101,3 +101,114 @@ All formulas match: harmonic normalization ($\sqrt{2\pi}/n_\theta$), the Gauss�
 **Minor.** The class docstring says the callable returns $P_\ell$ "of the state normalized on the grid", but `__call__` does not normalize. It relies on `AxialMCWF` passing normalized states, which it does.
 
 **Scope framing.** The ledger Notes correctly mark the Xin & Zheng and Lubk physics anchors as open, and the row claims only projection and symmetry. The bound-state energies quoted in the Notes (Si ⟨001⟩ 2p at 100–300 keV, −18.0 eV at 10 MeV) were not checked here.
+
+## 8. Decay-observable review (2026-10-17)
+
+Scope: the subsequent W 300 keV population follow-up at base `c4ab4179`.
+This verifier did not implement it. The population test was inspected before
+this derivation; this is therefore an adversarial observable check, not a
+new independent re-derivation of the TDS or electronic scattering kernel.
+The expression below was recorded before inspecting the MCWF implementation.
+
+### Physical observable and carrier convention
+
+For orthonormal fixed-string 2p orbitals $u_a$, the physical population is
+$p_{2p}=\operatorname{Tr}(\rho\Pi_{2p})$, with
+$\Pi_{2p}=\sum_a|u_a\rangle\langle u_a|$.
+In the carrier representation $\psi(\mathbf r)=e^{i\mathbf t\cdot\mathbf r}\phi(\mathbf r)$,
+
+$$
+p_{2p}(\phi,\mathbf t)=\sum_a\left|
+\int d^2r\,u_a^*(\mathbf r)e^{i\mathbf t\cdot\mathbf r}\phi(\mathbf r)
+\right|^2.
+$$
+
+It is dimensionless, non-negative and at most one for a normalized state
+and an orthogonal projector. At zero tilt it reduces to the ordinary
+overlap. Under a change of carrier representation
+$\phi\mapsto e^{-i\mathbf q\cdot\mathbf r}\phi$,
+$\mathbf t\mapsto\mathbf t+\mathbf q$, it is invariant. Omitting the
+carrier phase instead computes occupation of orbitals tilted along with
+the trajectory, a different observable. An electronic momentum-transfer
+jump $L_{\mathbf q}\propto\sqrt{\rho_q(\mathbf r)}e^{i\mathbf q\cdot\mathbf r}$
+must therefore affect the fixed-string overlap even when its phase is
+stored entirely in $\mathbf t$.
+
+For a normalized eigenstate, the total jump length is
+$\lambda_{\rm jump}^{-1}=\langle u|\sum_\alpha L_\alpha^\dagger L_\alpha|u\rangle$,
+with units Å$^{-1}$. Its population derivative is instead
+
+$$
+\frac{d p_{2p}}{dz}=
+-\frac{i}{\hbar v}\operatorname{Tr}(\Pi_{2p}[H,\rho])+
+\sum_\alpha\operatorname{Tr}\left[
+\left(L_\alpha^\dagger\Pi_{2p}L_\alpha
+-\tfrac12\{\Pi_{2p},L_\alpha^\dagger L_\alpha\}\right)\rho\right].
+$$
+
+The positive recycling term prevents identification of jump length with
+population lifetime. The artificial grid sink contributes loss to the
+represented ensemble; it does not establish physical escape. Coherent
+eigenstate stationarity likewise establishes no scattering lifetime.
+
+### Comparison and numerical counterexample
+
+`AxialMCWF._electronic_jump` returns
+`sqrt(smoothed_density(q)) * phi` and adds the sampled momentum transfer to
+`tilt`. `AxialMCWF.run` passes that envelope and tilt to the observable.
+The test's `two_p(phi, tilt)` ignores `tilt` and contracts its orbitals
+directly with `phi`. The first divergent term is therefore the missing
+$e^{i\mathbf t\cdot\mathbf r}$ in the overlap integral, not the MCWF
+waiting time or the electronic jump rate.
+
+A deterministic counterexample uses exactly the test's W $\langle001\rangle$
+300 keV orbitals (`max_order=12`), three-cell 72² grid, central-cell cut
+and discrete normalization. Their Gram matrix has unit diagonal and
+off-diagonal magnitude below $3\times10^{-16}$. Set
+$\phi=e^{-iqx}u_1$ and $\mathbf t=(q,0)$: every row represents the same
+physical state $\psi=u_1$, with true 2p population one.
+
+| $q$ [Å$^{-1}$] | carrier-aware population | current test's overlap |
+| --- | --- | --- |
+| 0 | 1.000000 | 1.000000 |
+| 1 | 1.000000 | 0.948243 |
+| 3 | 1.000000 | 0.630300 |
+| 5 | 1.000000 | 0.312356 |
+
+This is a representation-invariance test with an exact known answer,
+not a stochastic decay fit. It proves the electronic population regression
+measures the wrong observable; it does not quantify the correction to any
+specific ensemble curve. Both over- and underestimates are possible for
+general states. TDS-only runs at the test's zero initial tilt keep zero
+carrier tilt and are unaffected by this particular error.
+
+The minimal correction is to project
+`exp(1j * (tilt[0] * grid.x[:, None] + tilt[1] * grid.y[None, :])) * phi`
+against the fixed orbitals. Pin carrier invariance with the construction
+above before regenerating the seeded electronic reference and its
+24-versus-32-samples-per-cell convergence evidence. No change to the jump
+operator follows from this finding.
+
+The recorded grid-convergence curves remain historical model results.
+The TDS-plus-electronic values must not be treated as validated fixed-string
+populations until the observable is corrected and the curves rerun. A
+passing seeded regression against those same values would not resolve the
+discrepancy. The published coherent phase/selectivity anchors cannot
+establish the dissipative population lifetime.
+
+- **Claim:** `cr-vortex-string-coupling` — population follow-up in
+  `tests/montecarlo/test_channeling_axial_dissipator.py::test_tungsten_two_p_population_decay`.
+- **Filters:** units pass; zero-tilt limit passes; carrier-representation
+  invariance fails when electronic kicks create nonzero tilt.
+- **Re-derivation:** differs by the missing carrier phase in the projector.
+- **Verdict:** `discrepancy` for the TDS-plus-electronic population
+  extension; no new verdict on the parent scattering kernels or the
+  previously checked cylindrical-harmonic projector.
+- **Suggested ledger change:** flag the electronic population follow-up as
+  a discrepancy and withdraw its numeric values as physical population
+  evidence. Preserve the established projection/symmetry derivation and
+  distinguish the unaffected zero-tilt TDS-only evidence. Do not promote
+  the combined vortex acceptance to `anchored` from the current curves.
+
+The implementation and ledger were not changed by this verifier, following
+the [independent-verifier contract](../methodology.md#independent-verifier-contract).
