@@ -49,6 +49,7 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev lint
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev format
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev check-lines
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev complexity --check
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev nbstrip
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
@@ -87,7 +88,8 @@ do not enable every slow test just to exercise one changed path. Full
 `pyrite-dev test --slow` and CPU `test --slow --numba --cov` are explicit
 release/audit operations; CI runs every primary domain with slow tests on both
 supported Python versions. `verify` runs only types, lint/format checks, source
-line budgets, docs, and import-linter; it never runs tests or changes formatting.
+line budgets, the complexity ratchet, docs, and import-linter; it never runs
+tests or changes formatting.
 
 ## Work rules
 

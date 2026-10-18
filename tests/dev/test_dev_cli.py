@@ -451,6 +451,7 @@ def test_verify_runs_static_checks_without_tests(dev_module, monkeypatch, argv) 
         "cmd_lint",
         "cmd_typecheck",
         "cmd_check_lines",
+        "cmd_complexity",
     ):
         monkeypatch.setattr(dev_module, name, lambda _args, name=name: calls.append(name))
     monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
@@ -463,6 +464,7 @@ def test_verify_runs_static_checks_without_tests(dev_module, monkeypatch, argv) 
         "cmd_lint",
         ("-m", "ruff", "format", "--check", "."),
         "cmd_check_lines",
+        "cmd_complexity",
         "cmd_docs",
         "cmd_imports",
     ]
