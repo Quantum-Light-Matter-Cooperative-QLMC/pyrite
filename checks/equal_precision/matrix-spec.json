@@ -1,0 +1,319 @@
+{
+  "schema": "pyrite.equal-precision.matrix-spec.v1",
+  "issue": 510,
+  "stage": "frozen-matrix-definition",
+  "range_source": {
+    "name": "NIST ESTAR CSDA range (ICRU Report 37 methods)",
+    "status": "pending-download",
+    "note": "One pinned tabulation per material; every engine receives the same absolute thickness."
+  },
+  "materials": [
+    {
+      "key": "silicon",
+      "element_or_formula": "Si",
+      "density_g_cm3": 2.3291534103942357,
+      "catalog": "crystal silicon",
+      "role": "core"
+    },
+    {
+      "key": "tungsten",
+      "element_or_formula": "W",
+      "density_g_cm3": 19.3,
+      "catalog": "anonymous W at the pilot/Geant4 density; catalog tungsten crystal is 19.261064912240354",
+      "role": "core"
+    },
+    {
+      "key": "diamond",
+      "element_or_formula": "C",
+      "density_g_cm3": 3.516268075357436,
+      "catalog": "crystal diamond",
+      "role": "low-z extension"
+    },
+    {
+      "key": "sio2",
+      "element_or_formula": "SiO2",
+      "density_g_cm3": 2.1999322214447874,
+      "catalog": "medium sio2",
+      "role": "compound extension"
+    }
+  ],
+  "core": {
+    "materials": [
+      "silicon",
+      "tungsten"
+    ],
+    "energies_keV": [
+      100,
+      800,
+      5000
+    ],
+    "t_over_r": [
+      0.03,
+      0.3,
+      3
+    ]
+  },
+  "defaults": {
+    "width_mm": 10.0,
+    "beam": {
+      "particle": "electron",
+      "spot_rms_mm": 0.0,
+      "divergence_rms_mrad": 0.0,
+      "energy_spread_rms_frac": 0.0,
+      "truncation": "none"
+    },
+    "physics": {
+      "electron_cutoff_keV": 10,
+      "hard_photon_cutoff_eV": 1000,
+      "score_threshold_keV": 10,
+      "score_bin_keV": 10,
+      "straggling": false,
+      "inelastic_model": "continuous",
+      "secondary_transport": false,
+      "photon_transport": false,
+      "characteristic": false,
+      "pxr": false,
+      "cbs": false,
+      "termination": "first slab exit or electron cutoff"
+    }
+  },
+  "extensions": [
+    {
+      "material": "silicon",
+      "energy_keV": 300,
+      "t_over_r": null,
+      "angle_deg": 0,
+      "variant": "anchor",
+      "thickness_um": 100,
+      "anchor_of": "si-300-100um-0deg"
+    },
+    {
+      "material": "silicon",
+      "energy_keV": 800,
+      "t_over_r": null,
+      "angle_deg": 0,
+      "variant": "anchor",
+      "thickness_um": 100,
+      "anchor_of": "si-800-100um-0deg"
+    },
+    {
+      "material": "tungsten",
+      "energy_keV": 300,
+      "t_over_r": null,
+      "angle_deg": 0,
+      "variant": "anchor",
+      "thickness_um": 10,
+      "anchor_of": "w-300-10um-0deg"
+    },
+    {
+      "material": "tungsten",
+      "energy_keV": 800,
+      "t_over_r": null,
+      "angle_deg": 0,
+      "variant": "anchor",
+      "thickness_um": 10,
+      "anchor_of": "w-800-10um-0deg"
+    },
+    {
+      "material": "silicon",
+      "energy_keV": 100,
+      "t_over_r": null,
+      "angle_deg": 0,
+      "variant": "anchor",
+      "thickness_um": 1,
+      "anchor_of": "si-100-1um-0deg"
+    },
+    {
+      "material": "tungsten",
+      "energy_keV": 100,
+      "t_over_r": null,
+      "angle_deg": 75,
+      "variant": "anchor",
+      "thickness_um": 100,
+      "anchor_of": "w-100-100um-75deg"
+    },
+    {
+      "material": "silicon",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 45,
+      "variant": "oblique"
+    },
+    {
+      "material": "silicon",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 75,
+      "variant": "oblique"
+    },
+    {
+      "material": "tungsten",
+      "energy_keV": 800,
+      "t_over_r": 0.03,
+      "angle_deg": 75,
+      "variant": "oblique"
+    },
+    {
+      "material": "tungsten",
+      "energy_keV": 800,
+      "t_over_r": 3,
+      "angle_deg": 75,
+      "variant": "oblique"
+    },
+    {
+      "material": "diamond",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 0,
+      "variant": "low-z"
+    },
+    {
+      "material": "sio2",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 0,
+      "variant": "compound"
+    },
+    {
+      "material": "silicon",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 0,
+      "variant": "spot100um",
+      "beam": {
+        "spot_rms_mm": 0.1
+      }
+    },
+    {
+      "material": "silicon",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 0,
+      "variant": "div5mrad",
+      "beam": {
+        "divergence_rms_mrad": 5.0
+      }
+    },
+    {
+      "material": "silicon",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 0,
+      "variant": "espread1pct",
+      "beam": {
+        "energy_spread_rms_frac": 0.01
+      }
+    },
+    {
+      "material": "silicon",
+      "energy_keV": 800,
+      "t_over_r": 3,
+      "angle_deg": 0,
+      "variant": "footprint1mm",
+      "width_mm": 1.0
+    },
+    {
+      "material": "tungsten",
+      "energy_keV": 800,
+      "t_over_r": 3,
+      "angle_deg": 0,
+      "variant": "footprint1mm",
+      "width_mm": 1.0
+    },
+    {
+      "material": "silicon",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 0,
+      "variant": "det90-5",
+      "detector": {
+        "center_deg": 90,
+        "half_angle_deg": 5
+      }
+    },
+    {
+      "material": "tungsten",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 0,
+      "variant": "det90-5",
+      "detector": {
+        "center_deg": 90,
+        "half_angle_deg": 5
+      }
+    },
+    {
+      "material": "silicon",
+      "energy_keV": 5000,
+      "t_over_r": 0.03,
+      "angle_deg": 0,
+      "variant": "det0-1",
+      "detector": {
+        "center_deg": 0,
+        "half_angle_deg": 1
+      }
+    },
+    {
+      "material": "tungsten",
+      "energy_keV": 800,
+      "t_over_r": 0.03,
+      "angle_deg": 0,
+      "variant": "det0-15",
+      "detector": {
+        "center_deg": 0,
+        "half_angle_deg": 15
+      }
+    },
+    {
+      "material": "tungsten",
+      "energy_keV": 100,
+      "t_over_r": 3,
+      "angle_deg": 0,
+      "variant": "det135-5",
+      "detector": {
+        "center_deg": 135,
+        "half_angle_deg": 5
+      }
+    },
+    {
+      "material": "silicon",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 0,
+      "variant": "straggling",
+      "physics": {
+        "straggling": true
+      }
+    },
+    {
+      "material": "tungsten",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 0,
+      "variant": "straggling",
+      "physics": {
+        "straggling": true
+      }
+    },
+    {
+      "material": "silicon",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 0,
+      "variant": "secondaries",
+      "physics": {
+        "inelastic_model": "shell-soft-hard",
+        "secondary_threshold_keV": 10,
+        "secondary_transport": true
+      }
+    }
+  ],
+  "interaction_checks": {
+    "energy_x_thickness": "core product",
+    "angle_x_thickness": [
+      "tungsten-800kev-tr0.03-75deg-oblique",
+      "tungsten-800kev-tr3-75deg-oblique"
+    ]
+  },
+  "pilot_requirement": "At least six distinct setups spanning thin/stopping-dominated, low/high energy and normal/oblique incidence; the retained six-scene adapter pilot is the anchor subset."
+}

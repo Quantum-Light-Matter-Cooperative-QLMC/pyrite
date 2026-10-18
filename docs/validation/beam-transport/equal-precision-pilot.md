@@ -564,8 +564,9 @@ Its denied Nsight Compute counters also require explicit disclosure of profiler
 limits before attributing bottlenecks; launch geometry alone is not a measured
 occupancy or memory-throughput counter.
 
-The full study remains open: the 18 range-scaled scenes need a pinned common
-range source and common table-coverage audit; 5 MeV, finite phase space,
+The full study remains open. The [protocol page](equal-precision-protocol.md)
+now freezes the matrix definition and records the table-coverage audit; the
+18 range-scaled scenes still need a pinned common range source; 5 MeV, finite phase space,
 compound/low-Z material, finite-footprint, detector-acceptance and straggling
 extensions remain explicit deferred entries. Transport-only scoring, matched
 Geant4 warmup, phase/overhead attribution, numerical/cutoff/FP32–FP64 refinement,
