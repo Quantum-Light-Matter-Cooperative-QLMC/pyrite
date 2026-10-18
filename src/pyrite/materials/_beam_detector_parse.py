@@ -598,6 +598,93 @@ def _parse_observation_response(
     return MappingProxyType(cleaned)
 
 
+_ACQUISITION_UNIFORM_KEYS = ("measured_min_eV", "measured_max_eV", "measured_bin_width_eV")
+
+
+def _parse_explicit_acquisition_edges(
+    raw_edges: object, path: str, errors: _Errors
+) -> tuple[float, ...] | None:
+    """Decode finite, nonnegative, strictly increasing measured edges."""
+    values = [_number(item) for item in raw_edges] if isinstance(raw_edges, list) else []
+    if len(values) < 2 or any(value is None or value < 0.0 for value in values):
+        errors.add(f"{path}.measured_edges_eV", "must contain at least two nonnegative numbers")
+    elif any(
+        cast(float, right) <= cast(float, left)
+        for left, right in zip(values, values[1:], strict=False)
+    ):
+        errors.add(f"{path}.measured_edges_eV", "must be strictly increasing")
+    else:
+        return tuple(cast(float, value) for value in values)
+    return None
+
+
+def _parse_uniform_acquisition_edges(
+    row: Mapping[str, object], path: str, errors: _Errors
+) -> tuple[float, ...] | None:
+    """Validate a complete uniform range and retain its exact upper endpoint."""
+    minimum, maximum, width = (_number(row[key]) for key in _ACQUISITION_UNIFORM_KEYS)
+    if (
+        minimum is None
+        or maximum is None
+        or width is None
+        or minimum < 0.0
+        or maximum <= minimum
+        or width <= 0.0
+    ):
+        errors.add(path, "measured min/max/bin-width must define a finite positive range")
+    else:
+        quotient = (maximum - minimum) / width
+        bins = round(quotient)
+        if bins <= 0 or not math.isclose(quotient, bins, rel_tol=1.0e-12, abs_tol=1.0e-12):
+            errors.add(
+                f"{path}.measured_bin_width_eV",
+                "energy range must be an integer multiple of bin width",
+            )
+        else:
+            generated = tuple(minimum + index * width for index in range(bins + 1))
+            return (*generated[:-1], maximum)
+    return None
+
+
+def _parse_acquisition_bins(
+    row: Mapping[str, object], path: str, errors: _Errors, *, native: bool
+) -> tuple[float, ...] | None:
+    """Select one bin mode; report conflicts before decoding either range."""
+    explicit = "measured_edges_eV" in row
+    uniform_count = sum(key in row for key in _ACQUISITION_UNIFORM_KEYS)
+    if "reporting_bins" in row and not native:
+        errors.add(f"{path}.reporting_bins", "must be 'native'; omit for explicit bins")
+    if native and (explicit or uniform_count):
+        errors.add(path, "reporting_bins = 'native' conflicts with explicit measured bins")
+    elif native:
+        pass
+    elif explicit and uniform_count:
+        errors.add(path, "use measured_edges_eV or min/max/bin-width, not both")
+    elif explicit:
+        return _parse_explicit_acquisition_edges(row["measured_edges_eV"], path, errors)
+    elif uniform_count == len(_ACQUISITION_UNIFORM_KEYS):
+        return _parse_uniform_acquisition_edges(row, path, errors)
+    else:
+        errors.add(
+            path,
+            "requires reporting_bins = 'native', measured_edges_eV or all of measured min/max/bin-width",
+        )
+
+    return None
+
+
+def _validate_acquisition_mode(mode: object, seed: object, path: str, errors: _Errors) -> None:
+    """Accumulate mode and seed errors in catalog field order."""
+    if mode not in {"expected", "poisson"}:
+        errors.add(f"{path}.mode", "must be 'expected' or 'poisson'")
+    if seed is not None and (type(seed) is not int or seed < 0):
+        errors.add(f"{path}.seed", "must be a nonnegative integer")
+    if mode == "poisson" and seed is None:
+        errors.add(f"{path}.seed", "is required for poisson mode")
+    if mode == "expected" and seed is not None:
+        errors.add(f"{path}.seed", "is not accepted in expected mode")
+
+
 def _parse_acquisition(
     raw: object,
     path: str,
@@ -611,72 +698,15 @@ def _parse_acquisition(
     if exposure is None or exposure <= 0.0:
         errors.add(f"{path}.exposure_s", "must be a finite positive number")
 
-    explicit = "measured_edges_eV" in row
-    uniform_keys = ("measured_min_eV", "measured_max_eV", "measured_bin_width_eV")
-    uniform_count = sum(key in row for key in uniform_keys)
-    edges: tuple[float, ...] | None = None
     native = row.get("reporting_bins") == "native"
-    if "reporting_bins" in row and not native:
-        errors.add(f"{path}.reporting_bins", "must be 'native'; omit for explicit bins")
-    if native and (explicit or uniform_count):
-        errors.add(path, "reporting_bins = 'native' conflicts with explicit measured bins")
-    elif native:
-        pass
-    elif explicit and uniform_count:
-        errors.add(path, "use measured_edges_eV or min/max/bin-width, not both")
-    elif explicit:
-        raw_edges = row["measured_edges_eV"]
-        values = [_number(item) for item in raw_edges] if isinstance(raw_edges, list) else []
-        if len(values) < 2 or any(value is None or value < 0.0 for value in values):
-            errors.add(f"{path}.measured_edges_eV", "must contain at least two nonnegative numbers")
-        elif any(
-            cast(float, right) <= cast(float, left)
-            for left, right in zip(values, values[1:], strict=False)
-        ):
-            errors.add(f"{path}.measured_edges_eV", "must be strictly increasing")
-        else:
-            edges = tuple(cast(float, value) for value in values)
-    elif uniform_count == len(uniform_keys):
-        minimum, maximum, width = (_number(row[key]) for key in uniform_keys)
-        if (
-            minimum is None
-            or maximum is None
-            or width is None
-            or minimum < 0.0
-            or maximum <= minimum
-            or width <= 0.0
-        ):
-            errors.add(path, "measured min/max/bin-width must define a finite positive range")
-        else:
-            quotient = (maximum - minimum) / width
-            bins = round(quotient)
-            if bins <= 0 or not math.isclose(quotient, bins, rel_tol=1.0e-12, abs_tol=1.0e-12):
-                errors.add(
-                    f"{path}.measured_bin_width_eV",
-                    "energy range must be an integer multiple of bin width",
-                )
-            else:
-                generated = tuple(minimum + index * width for index in range(bins + 1))
-                edges = (*generated[:-1], maximum)
-    else:
-        errors.add(
-            path,
-            "requires reporting_bins = 'native', measured_edges_eV or all of measured min/max/bin-width",
-        )
+    edges = _parse_acquisition_bins(row, path, errors, native=native)
 
     threshold = _number(row.get("hit_threshold_eV", 0.0))
     if threshold is None or threshold < 0.0:
         errors.add(f"{path}.hit_threshold_eV", "must be a finite nonnegative number")
     mode = row.get("mode", "expected")
-    if mode not in {"expected", "poisson"}:
-        errors.add(f"{path}.mode", "must be 'expected' or 'poisson'")
     seed = row.get("seed")
-    if seed is not None and (type(seed) is not int or seed < 0):
-        errors.add(f"{path}.seed", "must be a nonnegative integer")
-    if mode == "poisson" and seed is None:
-        errors.add(f"{path}.seed", "is required for poisson mode")
-    if mode == "expected" and seed is not None:
-        errors.add(f"{path}.seed", "is not accepted in expected mode")
+    _validate_acquisition_mode(mode, seed, path, errors)
     if (
         exposure is None
         or exposure <= 0.0
