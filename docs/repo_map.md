@@ -887,6 +887,11 @@ receives numeric initial-state arrays through its existing backend boundary.
 
 ### Experimental DTR diagnostic
 
+`montecarlo/spectrum/dtr_two_beam.py` adds an experimental CPU two-harmonic
+Maxwell straight-passage diagnostic, with passive mode classification and
+bounded face-referenced propagators. Its `dtr-two-beam-boundary` claim is
+unverified; it has no production selector or CBS phase reconciliation.
+
 `montecarlo/spectrum/dtr.py` owns first-Born per-crossing diffraction of a
 homogeneous stack's free TR waves and own-field diffraction on a straight
 passage. `validation/dtr_reference.py` reads the shipped

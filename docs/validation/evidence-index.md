@@ -159,6 +159,7 @@ radiation-physics/temporal-intensity-profile
 radiation-physics/directional-source-rate-normalization
 radiation-physics/tr-coherent-bunch
 radiation-physics/tr-crossing-superposition
+radiation-physics/tr-cuda-parity
 radiation-physics/tr-detected-omission-bound
 radiation-physics/tr-interface-energy-scale
 radiation-physics/tr-line-cross-term

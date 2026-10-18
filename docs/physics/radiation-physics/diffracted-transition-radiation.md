@@ -8,7 +8,9 @@ once, through one crystal harmonic. `pxr_straight_amplitude` diffracts the
 charge's own field through the same harmonic on a straight passage. Their
 vectors share a Maxwell normalization and reference plane and can be summed
 before squaring. This is the first slice of #581. There is no production DTR
-selector, dynamical two-beam solve, or reconciled production CBS field yet.
+selector or reconciled production CBS field yet. A separate experimental
+[two-beam straight-passage diagnostic](#two-beam-straight-passage-diagnostic)
+is described below.
 
 The own-field/free-field separation follows
 [Artru and Rullhusen, NIM B **145**, 1–7 (1998)](https://doi.org/10.1016/S0168-583X(98)00241-9).
@@ -180,3 +182,110 @@ reconciliation against the Feranchuk line, layered coherent escape,
 catalog/campaign integration and the two-beam limits/published reproduction.
 Independent validation is pending by user choice. The claims
 `dtr-two-beam-boundary` and `line-tr-phase-reconciliation` remain open in #581.
+
+
+## Two-beam straight-passage diagnostic
+
+`Validation: dtr-two-beam-boundary`
+
+`dtr_two_beam.two_beam_straight_field` is a separate experimental CPU
+boundary diagnostic. It retains both polarizations, both propagation senses
+and repeated diffraction between two transverse harmonics in one crystal
+layer. Its ledger status is **unverified**. The checks below establish internal
+consistency; they do not replace independent rederivation, a published
+spectral-angular reproduction, or an extinction-law anchor. This section is
+an implementation-author derivation from Maxwell's equations. Caticha's
+[two-wave boundary formulation](https://doi.org/10.1103/PhysRevA.40.4322)
+is source context, not a numbered equation transcribed here.
+
+With the same frequency convention as above, define transverse harmonics
+$\boldsymbol\kappa_j=\omega\hat{\mathbf n}_\parallel+j\mathbf g_\parallel$
+for $j=0,1$. Write physical harmonic-1 fields as
+$\mathbf E_1(z)=e^{ig_z z}\widetilde{\mathbf E}_1(z)$ and likewise for
+$\mathbf H_1$. The permittivity in this gauge is the constant matrix
+
+$$
+\mathcal E=\begin{pmatrix}
+\varepsilon_0 & \chi_{\mathbf g}e^{i\mathbf g\cdot\mathbf r_0}\\
+\chi_{-\mathbf g}e^{-i\mathbf g\cdot\mathbf r_0}&\varepsilon_0
+\end{pmatrix}.
+$$
+
+In an absorbing crystal the reverse harmonic is not generally the conjugate
+of the transfer harmonic. The anti-Hermitian part
+$(\mathcal E-\mathcal E^\dagger)/(2i)$ must be positive semidefinite;
+active truncated permittivity is refused.
+
+For two-component harmonic vectors, let $K_x,K_y$ be the diagonal transverse
+momenta and $Y=(E_x,E_y,H_x,H_y)^{\mathsf T}$. Eliminating the longitudinal
+components gives
+
+$$
+E_z=\mathcal E^{-1}\left[\frac{K_yH_x-K_xH_y}{\omega}
+-\frac{4\pi iJ_z}{\omega}\right],\qquad
+H_z=\frac{K_xE_y-K_yE_x}{\omega}.
+$$
+
+The tangential equations are $Y'=iMY+f$, with the ungauged blocks
+
+$$
+M=\begin{pmatrix}
+0&0&K_x\mathcal E^{-1}K_y/\omega&\omega I-K_x\mathcal E^{-1}K_x/\omega\\
+0&0&K_y\mathcal E^{-1}K_y/\omega-\omega I&-K_y\mathcal E^{-1}K_x/\omega\\
+-K_xK_y/\omega&K_x^2/\omega-\omega\mathcal E&0&0\\
+\omega\mathcal E-K_y^2/\omega&K_yK_x/\omega&0&0
+\end{pmatrix},
+$$
+
+and
+
+$$
+f=\begin{pmatrix}
+4\pi K_x\mathcal E^{-1}J_z/\omega\\
+4\pi K_y\mathcal E^{-1}J_z/\omega\\
+4\pi J_y\\-4\pi J_x
+\end{pmatrix}.
+$$
+
+The gauge subtracts $g_z$ from harmonic 1's four diagonal entries. All lengths
+in this system are inverse eV; API Å values are divided by $\hbar c$.
+
+The uncoupled homogeneous-stack own and free fields give $Y_0$ exactly for a
+globally straight charge. Solve only for the diffraction correction:
+
+$$
+\delta Y'=iM\delta Y+i(M-M_0)Y_0+(f-f_0).
+$$
+
+The last term is essential: the own field contains an external longitudinal
+current, so it does not obey the source-free longitudinal relation. Omitting
+this contact term produced a roughly 7% complex-field error in the initial
+weak-coupling test. The retained correction uses the difference of the coupled
+and uncoupled inverse permittivities multiplying that current. Current and
+field phases use the same specified time and point on the straight trajectory.
+
+Diagonalize $M=V\Lambda V^{-1}$. Classify outgoing modes by passive decay,
+or by the sign of their normal Poynting flux when real. Reference an upward
+mode at the lower face and a downward mode at the upper face, so propagation
+through the layer never grows. The finite-layer source integrals use (4),
+including its equal-exponent limit, and only the outward subset of modes is
+evaluated at either face. Tangential continuity of both harmonics is imposed
+at every interface. The two exterior half-spaces carry outgoing modes only.
+
+The result separates the response to the observed charge harmonic
+(`transition`, including diffraction extinction) from the response to its
+second harmonic (`line`, including PXR and DTR). Their complex sum is `total`.
+Use (5) for the photon density. Source charge is positive; multiply both fields
+by the electron charge sign before combining with any other amplitude.
+The surface termination rotates the second source row while leaving the
+observed source row invariant.
+
+Focused tests cover zero harmonics in both passage directions, the weak-coupling
+limit against the existing Born PXR+DTR vector, the termination phase, active
+permittivity rejection, and a passive $10^8$ Å opaque layer without growing
+exponentials. These are diagnostic checks only. Production Feranchuk/CBS
+phase reconciliation, transported per-history integration, mosaicity,
+normal catalog/campaign support, recoil/energy-loss justification, and a
+published dynamical anchor remain open in #103/#581. This new diagnostic has
+not been run on CUDA; the hardware evidence below concerns the existing
+homogeneous TR/CTR implementation.
