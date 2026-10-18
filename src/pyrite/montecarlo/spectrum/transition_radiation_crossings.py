@@ -19,11 +19,14 @@ counted, not recorded. Grooved runs and frozen rows are rejected.
 the stack (:func:`~pyrite.montecarlo.spectrum.transition_radiation.interface_transition_radiation_amplitude`)
 and :func:`crossing_transition_radiation` sums them per history, so the entry,
 exit and inner interfaces of one history interfere with their transport phases.
-Histories add incoherently; coherence between histories (CTR) is not here.
+Histories add incoherently by default; ``coherence="bunch"`` keeps the
+cross-history terms (coherent TR, CTR) through the distinct-pair bunch
+estimator of the coherent-emission path.
 """
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -317,6 +320,8 @@ def crossing_transition_radiation(
     *,
     n_electrons: int,
     coherence: str = "history",
+    physical_electrons: float | None = None,
+    form_factor=None,
     max_elements: int = 1 << 22,
     xp=np,
 ):
@@ -331,15 +336,32 @@ def crossing_transition_radiation(
     and ``max_elements`` bounds one chunk's ``len(s) * crossings`` (a single
     history above it is evaluated alone).
 
-    Validation: tr-crossing-superposition
+    ``coherence="bunch"`` adds coherent transition radiation (CTR) between
+    histories. With ``S_e`` the summed field of history ``e``, ``G = sum |S_e|^2``
+    and ``P = |sum S_e|^2`` over the ``M = n_electrons`` sampled histories, the
+    yield per electron of a bunch of ``N = physical_electrons`` is
+    ``[G + (N - 1)/(M - 1) F (P - G)] / M`` (the distinct-pair estimator of
+    ``coherent_population.pair_scale``). The sampled arrival offsets and
+    transverse positions already sit in the crossing phases, so the default
+    ``F = 1``; pass ``form_factor`` (an array broadcast against the result, or
+    ``form_factor(E)``) only for histories transported without those offsets,
+    e.g. the Gaussian ``exp(-(E sigma_t / hbar c)^2)``. ``N = None`` takes the
+    sampled histories as the bunch (``N = M``, the plain coherent sum ``P / M``).
+    The estimate is signed: an undersampled excess can give negative bins,
+    which warn and are returned unclipped.
+
+    Validation: tr-crossing-superposition, tr-coherent-bunch
     """
-    if coherence not in ("history", "crossing"):
-        raise ValueError("coherence must be 'history' or 'crossing'")
+    if coherence not in ("history", "crossing", "bunch"):
+        raise ValueError("coherence must be 'history', 'crossing' or 'bunch'")
+    if coherence != "bunch" and (physical_electrons is not None or form_factor is not None):
+        raise ValueError("physical_electrons and form_factor need coherence='bunch'")
     energy = np.asarray(photon_energy_eV, dtype=float)
     n = np.asarray(direction, dtype=float)
     shape = np.broadcast_shapes(energy.shape, n.shape[:-1])
     omega_nz2 = xp.asarray(np.broadcast_to(energy * n[..., 2] ** 2, shape))
     total = xp.zeros(shape, dtype=float)
+    field = xp.zeros((*shape, 3), dtype=complex)
     order = np.argsort(crossings.electron_id, kind="stable")
     history = crossings.electron_id[order]
     starts = np.flatnonzero(np.r_[True, history[1:] != history[:-1]])
@@ -356,15 +378,54 @@ def crossing_transition_radiation(
         amplitude = crossing_amplitudes(
             _take(crossings, order[first:last]), energy, n, layer_eps, xp=xp
         )
-        if coherence == "history":
+        if coherence != "crossing":
             cumulative = xp.cumsum(amplitude, axis=-2)
             ends = xp.asarray(np.r_[starts[lo + 1 : hi], last] - first - 1)
             summed = cumulative[..., ends, :]
             summed[..., 1:, :] -= cumulative[..., ends[:-1], :]
             amplitude = summed
         total += xp.sum(xp.abs(amplitude) ** 2, axis=(-2, -1))
+        if coherence == "bunch":
+            field += xp.sum(amplitude, axis=-2)
         lo = hi
+    if coherence == "bunch":
+        total = _bunch_power(
+            total, field, energy, shape, n_electrons, physical_electrons, form_factor, xp
+        )
     return omega_nz2 * total / (16.0 * np.pi**4 * int(n_electrons))
+
+
+def _bunch_power(grouped, field, energy, shape, n_electrons, physical_electrons, form_factor, xp):
+    """Distinct-pair bunch power ``G + (N - 1)/(M - 1) F (P - G)`` before division by ``M``.
+
+    Source: the ensemble power per physical electron ``E|S|^2 + (N-1) F |E S|^2``
+    of ``coherent_population.pair_scale``, with ``G/M`` and ``(P-G)/(M(M-1))``
+    estimating its two moments. One physical electron leaves ``G``; identical
+    in-phase histories give ``N G``.
+
+    Validation: tr-coherent-bunch
+    """
+    from .coherent_population import CoherentSamplingWarning, pair_scale
+
+    population = int(n_electrons) if physical_electrons is None else physical_electrons
+    scale = pair_scale(population, int(n_electrons))
+    if form_factor is None:
+        factor = 1.0
+    else:
+        factor = form_factor(energy) if callable(form_factor) else form_factor
+        factor = xp.asarray(np.broadcast_to(np.asarray(factor, dtype=float), shape))
+    flat = xp.sum(xp.abs(field) ** 2, axis=-1)
+    power = grouped + scale * factor * (flat - grouped)
+    negative = int(xp.count_nonzero(power < 0.0))
+    if negative:
+        warnings.warn(
+            CoherentSamplingWarning(
+                f"CTR pair estimate is negative in {negative} of {power.size} bins: "
+                "the sampled histories do not resolve the bunch excess; returned unclipped"
+            ),
+            stacklevel=3,
+        )
+    return power
 
 
 def _take(crossings: BoundaryCrossings, index) -> BoundaryCrossings:

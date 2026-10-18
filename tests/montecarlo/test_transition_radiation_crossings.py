@@ -244,6 +244,13 @@ def test_transported_yield_is_substep_and_chunk_invariant(bilayer):
     assert np.all(np.isfinite(y)) and np.all(y > 0.0)
     small = crossing_transition_radiation(coarse, photon, n, eps, n_electrons=ne, max_elements=40)
     np.testing.assert_allclose(small, y, rtol=1e-12)
+    ctr = [
+        crossing_transition_radiation(
+            coarse, photon, n, eps, n_electrons=ne, coherence="bunch", max_elements=budget
+        )
+        for budget in (40, 1 << 22)
+    ]
+    np.testing.assert_allclose(ctr[0], ctr[1], rtol=1e-12)
     refined = crossing_transition_radiation(fine, photon, n, eps, n_electrons=ne)
     np.testing.assert_allclose(refined, y, rtol=1e-3)
     back = crossing_transition_radiation(coarse, photon, _directions(-1), eps, n_electrons=ne)
@@ -259,7 +266,7 @@ def test_amplitude_input_validation(bilayer):
         crossing_amplitudes(c, 300.0, _directions(+1), [1.0])
     with pytest.raises(ValueError, match="coherence"):
         crossing_transition_radiation(c, 300.0, _directions(+1), [1.0, 1.0], n_electrons=1,
-                                      coherence="bunch")  # fmt: skip
+                                      coherence="beam")  # fmt: skip
 
 
 def test_regular_radiator_reproduces_the_garibian_stack_formula():
