@@ -106,6 +106,11 @@ tests or changes formatting.
   relevant `*_MODEL` marker or `tables-*-N` tag in that PR.
 - Heavy sweeps/GPU work use `pyrite remote`; never run locally.
 - Add imports with first use. Verify with smallest useful command.
+- After editing `src/pyrite/` routines, run `pyrite-dev complexity --check`. On
+  a new or worsened CC > 20 routine, simplify it; if the branching is inherent,
+  run `complexity --write` and justify each added/raised baseline entry in the
+  PR. Never split code only to pass the metric. Policy:
+  `docs/repo-design/complexity.md`.
 - New tests >5 s wall or with large peak RSS get `@pytest.mark.slow`
   (default runs skip them; CI runs them). Check with `--durations=0`.
 

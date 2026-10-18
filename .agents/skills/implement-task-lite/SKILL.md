@@ -24,6 +24,9 @@ delegation, physics changes, or backlog management.
 5. Run the named/focused checks. Follow `AGENTS.md` "Choose tests by impact":
    changed node/module plus affected callers only; no automatic domain/full
    suite. `verify` is static-only. Do not run heavy GPU sweeps locally.
+   After source edits run `pyrite-dev complexity --check`. If it fails and the
+   slice cannot stay simple without refactoring, stop and report; do not
+   `--write` the baseline.
 6. If `commits` permits, inspect the scoped diff, stage explicit task paths, and
    commit one logical result. Never `git add .`; never commit known broken state.
 7. Do not edit the GitHub issue unless `issue-writer: yes`; if authorized, tick
