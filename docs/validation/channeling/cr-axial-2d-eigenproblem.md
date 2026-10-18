@@ -193,3 +193,10 @@ bands are not reproduced by this review.
   missing upper peaks and $\langle211\rangle$ exclusions. Full triplet
   ordering remains unvalidated. The task owner applies the status change;
   this verifier edits only this write-up.
+
+### Implementation-owner adjudication (2026-10-17)
+
+Applied the preceding review's recommendation: the ledger is `anchored` for
+main-line identification and cross-axis ordering only. All three focused
+Watson tests pass. The missing upper peaks and $\langle211\rangle$
+assignment remain outside this anchor; human sign-off is unchanged.
