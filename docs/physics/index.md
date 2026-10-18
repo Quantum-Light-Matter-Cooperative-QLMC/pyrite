@@ -81,6 +81,7 @@ radiation-physics/characteristic-radiation
 radiation-physics/photon-escape-and-dispersion
 radiation-physics/spectral-observables
 radiation-physics/transition-radiation
+radiation-physics/diffracted-transition-radiation
 ```
 
 ```{toctree}

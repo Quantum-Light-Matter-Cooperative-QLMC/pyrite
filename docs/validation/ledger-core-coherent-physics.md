@@ -2,6 +2,16 @@
 
 Part of the [physics validation ledger](physics-validation-ledger.md). See the [validation methodology](methodology.md) for the status lifecycle and the [domain inventories](domain-inventories.md) for a claim-by-claim index.
 
+## `dtr-kinematic-boundary`
+
+- **Claim:** First-Born diffraction of one planar crystal layer's homogeneous-stack free TR field, per crossing, and of the own field on a straight passage, gives complex DTR and PXR vacuum vectors in the existing Maxwell stack normalization; same-harmonic interference is retained when those vectors are summed
+- **Code:** `montecarlo/spectrum/dtr.py::{dtr_crossing_amplitudes, pxr_straight_amplitude, _integral, _radiate}`; reference `validation/dtr_reference.py::reference_spectrum`
+- **Source:** Driven Maxwell dyadic sheet Green function and tangential E/H continuity; [author derivation](../physics/radiation-physics/diffracted-transition-radiation.md), Eqs. (1)–(5). Own/free-field separation: Artru & Rullhusen, NIM B 145, 1–7 (1998), DOI 10.1016/S0168-583X(98)00241-9 (metadata/abstract checked, numerical figures not reproduced)
+- **Status:** unverified
+- **Checks:** Zero harmonic and matched-media DTR limits; finite phase-matching and vanishing-film limits; transversality; positive-charge normalization; termination and lateral-translation phases; vacuum dipole-volume integral; complex finite difference of the existing full Maxwell solve for a weak periodic dielectric perturbation, approximated by a fine staircase
+- **Anchor:** `tests/montecarlo/test_transition_radiation_dtr.py` (internal Maxwell-solver consistency and analytic limits, not an external published anchor); alternating SiO2/MoS2/SiO2 diagnostic profile in `validation/reference_data/dtr_stack.toml`
+- **Notes:** Issue #581 first slice, experimental field diagnostic only. No production DTR selector, CBS phase reconciliation, mosaic average, thick-crystal extinction, transport validity claim or device validation. The layer harmonic scatters once; use only in the Born regime. Reference is a deterministic straight passage, not a production campaign profile. Independent fresh-context validation remains pending by explicit user choice; no independent write-up exists. The separate `dtr-two-beam-boundary` and `line-tr-phase-reconciliation` acceptance claims are not satisfied by this record.
+
 ## `tr-interface-energy-scale`
 
 - **Claim:** Relativistic vacuum/material single-interface TR energy scale `W ≈ alpha gamma hbar omega_p / 3` and photon roll-off scale of order `gamma hbar omega_p`

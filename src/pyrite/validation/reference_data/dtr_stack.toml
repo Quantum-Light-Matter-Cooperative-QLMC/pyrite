@@ -1,0 +1,24 @@
+# Deterministic Maxwell/Born diagnostic, not a `pyrite run` campaign profile.
+# Straight passage only: 10 MeV transport has not been certified by this check.
+name = "sio2-mos2-sio2-dtr"
+kinetic_energy_keV = 10000.0
+observation_offset_rad = 0.05
+energy_half_width_eV = 60.0
+energy_nodes = 1201
+reflection = [0, 0, 2]
+lattice_origin_ang = [0.0, 0.0, 50.0]
+crystal_layer = 1
+
+# Substrate-to-emission-face order, as required by the Maxwell stack solver.
+# Symmetric stack: beam enters at z=200 Angstrom and travels toward z=0.
+[[layers]]
+material = "sio2"
+thickness_ang = 50.0
+
+[[layers]]
+material = "mos2"
+thickness_ang = 100.0
+
+[[layers]]
+material = "sio2"
+thickness_ang = 50.0
