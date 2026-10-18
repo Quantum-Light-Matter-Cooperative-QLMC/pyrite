@@ -57,11 +57,6 @@
       "cc": 23
     },
     {
-      "path": "src/pyrite/campaign/profiles.py",
-      "name": "_identity_v1",
-      "cc": 59
-    },
-    {
       "path": "src/pyrite/campaign/single_scene.py",
       "name": "resolve_pixel_scene",
       "cc": 31
@@ -70,11 +65,6 @@
       "path": "src/pyrite/campaign/sweep.py",
       "name": "BeamSpec.gdf_beam",
       "cc": 28
-    },
-    {
-      "path": "src/pyrite/campaign/sweep.py",
-      "name": "build_cases",
-      "cc": 97
     },
     {
       "path": "src/pyrite/checkpoints/_result_v2.py",
@@ -155,11 +145,6 @@
       "path": "src/pyrite/cli/commands/remote.py",
       "name": "pull_command",
       "cc": 27
-    },
-    {
-      "path": "src/pyrite/cli/commands/scan.py",
-      "name": "_command",
-      "cc": 84
     },
     {
       "path": "src/pyrite/cli/commands/tables.py",
@@ -529,11 +514,6 @@
       "exception": "Numerical transport kernel: a split or rewrite needs RNG-stream, event-order, CPU/GPU parity and performance evidence (#567, #344); never refactor for the metric alone."
     },
     {
-      "path": "src/pyrite/montecarlo/transport/api.py",
-      "name": "simulate_trajectories",
-      "cc": 111
-    },
-    {
       "path": "src/pyrite/montecarlo/transport/batching.py",
       "name": "_drive_per_electron_batches",
       "cc": 27
@@ -660,11 +640,6 @@
       "cc": 22
     },
     {
-      "path": "src/pyrite/remote/queue.py",
-      "name": "start_queue",
-      "cc": 78
-    },
-    {
       "path": "src/pyrite/remote/transport.py",
       "name": "_sync_code_locked",
       "cc": 37
@@ -703,11 +678,6 @@
       "path": "src/pyrite/runs/scan.py",
       "name": "_resolved_run",
       "cc": 32
-    },
-    {
-      "path": "src/pyrite/runs/scan.py",
-      "name": "_run_material",
-      "cc": 65
     },
     {
       "path": "src/pyrite/xsgen/elsepa/deck.py",
