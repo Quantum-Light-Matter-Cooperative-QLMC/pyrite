@@ -8,7 +8,14 @@ import tomlkit
 from tomlkit.exceptions import ParseError
 
 from pyrite import _catalog_layout
-from pyrite.campaign import profile_edit as _profile_edit
+from pyrite._numerics import TRANSPORT_KEYS
+from pyrite.campaign import (
+    _profile_document,
+    profile_detectors,
+    profile_lifecycle,
+    profile_numerics,
+    profile_summary,
+)
 from pyrite.campaign.profiles import resolve_numerics
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
@@ -104,11 +111,11 @@ _PROFILE_UPDATE_LABELS = {
 }
 
 #: Electron-count profile settings (plan P2.4): single-value grids, sweepable.
-_ACTIVE_DETECTOR_FIELDS = _profile_edit.ACTIVE_DETECTOR_FIELDS
+_ACTIVE_DETECTOR_FIELDS = profile_detectors.ACTIVE_DETECTOR_FIELDS
 
 
 def _catalog_key(label):
-    return _profile_edit.catalog_key(label)
+    return _profile_document.catalog_key(label)
 
 
 def _ne_cli_options(function):
@@ -188,7 +195,7 @@ def _collect_updates(thickness, energy, polar, azimuth, ne_line=None, ne_brem=No
 
 
 def _unknown_profile(document, name):
-    return _profile_edit.unknown_profile(document, name)
+    return _profile_document.unknown_profile(document, name)
 
 
 def _check_name(name):
@@ -200,11 +207,11 @@ def _check_name(name):
 
 
 def _profile_payload(document, name):
-    return _profile_edit.profile_payload(document, name)
+    return profile_summary.profile_payload(document, name)
 
 
 def _energy_grid_refs(profile):
-    return _profile_edit.energy_grid_refs(profile)
+    return _profile_document.energy_grid_refs(profile)
 
 
 class _ProfileGroup(LazyGroup):
@@ -275,9 +282,9 @@ def numerics_show_command(name, json_output):
     fidelity = "full"
     try:
         _text, document = _catalog_io.catalog_text()
-        target = _profile_edit.existing_profile(document, name)
+        target = _profile_document.existing_profile(document, name)
         resolution = resolve_numerics(
-            _profile_edit.profile_numerics_values(target), fidelity=fidelity
+            profile_numerics.profile_numerics_values(target), fidelity=fidelity
         )
         groups = resolution.groups()
         payload = {"profile": name, "fidelity": fidelity, "groups": groups}
@@ -507,7 +514,7 @@ def numerics_set_command(name, yes, dry_run, **values):
         raise click.UsageError("provide at least one numerics option")
     try:
         original, document = _catalog_io.catalog_text()
-        _profile_edit.set_numerics(document, name, updates)
+        profile_numerics.set_numerics(document, name, updates)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     _confirm_standard(name, "set calculation numerics on", yes, dry_run)
@@ -524,7 +531,7 @@ def numerics_reset_command(name, fields, yes, dry_run):
     keys = tuple(_NUMERICS_FIELD_NAMES[field] for field in fields)
     try:
         original, document = _catalog_io.catalog_text()
-        _profile_edit.reset_numerics(document, name, keys)
+        profile_numerics.reset_numerics(document, name, keys)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     _confirm_standard(name, "reset calculation numerics on", yes, dry_run)
@@ -625,7 +632,7 @@ def show_command(name, json_output):
         payload = _profile_payload(document, name)
         if not json_output:
             target = _existing_profile(document, name)
-            resolution = resolve_numerics(_profile_edit.profile_numerics_values(target))
+            resolution = resolve_numerics(profile_numerics.profile_numerics_values(target))
             grid_rows = _profile_show.energy_grid_rows(document, target)
     except (OSError, ValueError, ParseError) as exc:
         if json_output:
@@ -729,7 +736,7 @@ def create_command(
         original, document = _catalog_io.catalog_text()
         inherited = []
         if source is not None:
-            source_row = _profile_edit.profile_rows(document).get(source, {})
+            source_row = _profile_document.profile_rows(document).get(source, {})
             inherited = [
                 label
                 for key, label in (
@@ -743,11 +750,11 @@ def create_command(
                 )
                 if key in source_row
             ]
-            if any(key in source_row for key in _profile_edit.TRANSPORT_KEYS):
+            if any(key in source_row for key in TRANSPORT_KEYS):
                 inherited.append("transport numerics")
             if "line_grid_policy" in source_row:
                 inherited.append("line-grid policy")
-        _profile_edit.create_profile(
+        profile_lifecycle.create_profile(
             document,
             name,
             source_name,
@@ -877,7 +884,7 @@ def set_command(
         )
     try:
         original, document = _catalog_io.catalog_text()
-        overwriting = _profile_edit.set_profile(
+        overwriting = profile_lifecycle.set_profile(
             document,
             name,
             updates=updates,
@@ -915,11 +922,11 @@ def set_command(
     changes = "; ".join(
         (
             f"{_PROFILE_UPDATE_LABELS.get(label, label)} changed from "
-            f"{_profile_edit.display(overwriting[label])} "
-            f"to {_profile_edit.display(updates[label])}"
+            f"{_profile_document.display(overwriting[label])} "
+            f"to {_profile_document.display(updates[label])}"
             if label in overwriting
             else f"{_PROFILE_UPDATE_LABELS.get(label, label)} set to "
-            f"{_profile_edit.display(updates[label])}"
+            f"{_profile_document.display(updates[label])}"
         )
         for label in updates
     )
@@ -933,16 +940,16 @@ def set_command(
 
 def _merge_values(name, updates, *, add):
     original, document = _catalog_io.catalog_text()
-    _profile_edit.merge_values(document, name, updates, add=add)
+    profile_lifecycle.merge_values(document, name, updates, add=add)
     return original, document
 
 
 def _apply_emission_add(target, coherent, incoherent):
-    return _profile_edit.apply_emission_add(target, coherent, incoherent)
+    return profile_lifecycle.apply_emission_add(target, coherent, incoherent)
 
 
 def _apply_emission_remove(name, target, coherent, incoherent):
-    return _profile_edit.apply_emission_remove(name, target, coherent, incoherent)
+    return profile_lifecycle.apply_emission_remove(name, target, coherent, incoherent)
 
 
 @command.command("add")
@@ -1140,7 +1147,7 @@ def rename_command(name, new_name, dry_run):
         raise CLIError(f"profile {name!r} already named {new_name!r}")
     try:
         original, document = _catalog_io.catalog_text()
-        _profile_edit.rename_profile(document, name, new_name)
+        profile_lifecycle.rename_profile(document, name, new_name)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     return _write(document, original, dry_run, f"renamed profile {name} to {new_name}")
@@ -1167,7 +1174,7 @@ def delete_command(name, yes, dry_run, json_output):
         raise CLIError("cannot delete profile 'standard': the catalog schema requires it")
     try:
         original, document = _catalog_io.catalog_text()
-        n_overrides = _profile_edit.delete_profile(document, name)
+        n_overrides = profile_lifecycle.delete_profile(document, name)
     except (OSError, ValueError, ParseError) as exc:
         if json_output:
             emit_json_result(cli_json.failure("cxr.profile.delete", {}, str(exc)))

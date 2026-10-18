@@ -1,10 +1,12 @@
-"""Compatibility exports for catalog-profile document operations.
+"""Compatibility re-export for deprecated catalog-profile document operations.
 
+Deprecated since 0.15.2; removal scheduled for 0.17.0.
 Operation owners live in the sibling ``profile_*`` modules; summary assembly
 is read-only. CLI parsing, prompts and persistence stay with their existing
 owners. Import a specific family when adding a domain consumer.
 """
 
+from pyrite._module_deprecations import warn_module_deprecation
 from pyrite._numerics import TRANSPORT_KEYS
 
 from ._profile_document import (
@@ -183,3 +185,5 @@ __all__ = [
     "profile_payload",
     "TRANSPORT_KEYS",
 ]
+
+warn_module_deprecation(__name__)
