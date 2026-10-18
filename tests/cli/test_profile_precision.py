@@ -24,6 +24,59 @@ def _precision(catalog):
     return tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"].get("precision")
 
 
+def test_independent_brem_targets_roundtrip_and_reset(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    result = invoke(
+        numerics_command,
+        [
+            "precision",
+            "set",
+            "sub_100keV",
+            *_POLICY,
+            "--brem-target-rse",
+            "0.2",
+            "--brem-min-electrons",
+            "100",
+            "--brem-max-electrons",
+            "1000",
+        ],
+    )
+    assert_clean_result(result)
+    assert _precision(catalog)["brem_target_rse"] == 0.2
+    shown = invoke(numerics_command, ["precision", "show", "sub_100keV", "-o", "json"])
+    assert_clean_result(shown)
+    effective = json.loads(shown.stdout)["payload"]["effective"]
+    assert effective["brem_min_electrons"] == 100
+    assert effective["brem_max_electrons"] == 1000
+    original = catalog.read_text()
+    invalid = invoke(
+        numerics_command,
+        [
+            "precision",
+            "set",
+            "sub_100keV",
+            "--brem-max-electrons",
+            "2020",
+        ],
+    )
+    assert invalid.exit_code != 0
+    assert "must not exceed max_electrons" in invalid.output
+    assert catalog.read_text() == original
+    reset = invoke(
+        numerics_command,
+        [
+            "precision",
+            "reset",
+            "sub_100keV",
+            "brem-target-rse",
+            "brem-min-electrons",
+            "brem-max-electrons",
+        ],
+    )
+    assert_clean_result(reset)
+    assert not any(key.startswith("brem_") for key in _precision(catalog))
+
+
 def test_precision_show_reports_the_default_policy_without_a_table(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 

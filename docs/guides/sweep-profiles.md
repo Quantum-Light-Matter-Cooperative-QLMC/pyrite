@@ -129,6 +129,16 @@ A profile with an explicit `precision` table cannot also set `n_electrons`/`n_el
 
 The Python API takes the same policy as `Numerics(precision=Precision(...))`; see the [API example](../api.md#scene-simulation). Configured `Settings`/`Sweep` campaigns can set `Settings(precision=policy)` and lower it with `api.build_configured_cases`.
 
+To stop bremsstrahlung independently, keep both observables and set its target:
+
+```bash
+pyrite numerics precision set hopg_scan --observable cxr --observable brem \
+  --target-rse 0.02 --brem-target-rse 0.05 \
+  --brem-min-electrons 200 --brem-max-electrons 10000
+```
+
+The brem bounds default to the shared minimum and maximum and must be block multiples; its maximum cannot exceed `--max-electrons`. Brem uses a prefix of the one transport, freezes when its target and guards pass or its maximum is reached, and stops adding monitor work. Line transport continues until brem finishes and line converges or the transport maximum is reached. The optional pilot is clipped to brem's bounds; guards are shared. The Python equivalents are `brem_target_rse`, `brem_min_electrons`, and `brem_max_electrons` on `Precision`. Reset the three `brem-*` fields together to return to shared stopping. Existing shared policies and their identities are unchanged. See [statistical methods](../computation/statistical-methods.md#adaptive-electron-counts) for cutoff, normalization and replay details.
+
 The dataset and case identities include the requested policy. Realized counts and statistics are stored separately as `adaptive_sampling` in the result and in every checkpoint component, so a realized count never changes the identity used for resume or CAS reuse. Electron-count sweep grids cannot be combined with adaptive precision. Use [statistical methods](../computation/statistical-methods.md#adaptive-electron-counts) to choose a minimum that accounts for skewed contributions and rare electrons.
 
 ## Bremsstrahlung grid
