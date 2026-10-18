@@ -122,6 +122,12 @@ For 30--100 MeV, beyond supported transport (#439, #440), the analytic compariso
 
 ## Diffracted TR and PXR
 
+An [experimental first-Born field diagnostic](diffracted-transition-radiation.md)
+now diffracts the stack's internal free TR waves through one crystal harmonic
+and provides an alternating SiO₂/MoS₂/SiO₂ reference. It is not part of the
+production component sum and has no CBS field or dynamical extinction solve;
+the production interference limitations below still apply.
+
 In a crystal the boundary term carries the susceptibility's Fourier components too: diffracted TR (DTR) emerges near the Bragg directions where PXR does, and its amplitude interferes with PXR rather than adding as an intensity {cite:p}`shevelev2024`. In the kinematic theory the PXR amplitude carries the medium-dressed virtual-photon denominator $\omega^2(\gamma^{-2}+\theta^2-\chi_0)$ {cite:p}`nitta1991kinematical` (Eq. 19), while the boundary term carries the difference between the vacuum and medium denominators, as ordinary TR does. Their ratio estimates
 
 $$

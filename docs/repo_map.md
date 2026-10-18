@@ -816,6 +816,18 @@ correlated weighted resampling, and explicit lab-to-entrance projection.
 `BeamSpec` resolves the source into hashed `Case.gdf_source` metadata; transport
 receives numeric initial-state arrays through its existing backend boundary.
 
+### Experimental DTR diagnostic
+
+`montecarlo/spectrum/dtr.py` owns first-Born per-crossing diffraction of a
+homogeneous stack's free TR waves and own-field diffraction on a straight
+passage. `validation/dtr_reference.py` reads the shipped
+`validation/reference_data/dtr_stack.toml` alternating SiO2/MoS2/SiO2 profile
+and writes paired DTR-on/off spectra, signed interference, material/profile
+provenance and a figure. No production case, CBS, dynamical extinction or
+validated high-energy transport is implied. Checks:
+`tests/montecarlo/test_transition_radiation_dtr*.py`. Derivation:
+[experimental DTR](physics/radiation-physics/diffracted-transition-radiation.md).
+
 ### Saved trajectory analysis
 
 `montecarlo/trajectory_summary.py` owns bounded row-only histogram reductions and
