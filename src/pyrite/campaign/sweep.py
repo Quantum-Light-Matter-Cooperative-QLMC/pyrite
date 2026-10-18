@@ -31,7 +31,7 @@ from __future__ import annotations
 import math
 import warnings
 from collections.abc import Sequence
-from dataclasses import InitVar, asdict, dataclass, field, replace
+from dataclasses import InitVar, dataclass, field, replace
 from itertools import product
 from typing import TYPE_CHECKING, Any, cast
 
@@ -63,9 +63,10 @@ from .._precision import Precision
 from ..detectors import Detector
 from ..materials import CATALOG, LayerSpec
 from ..materials.crystal import reciprocal_g_vector
-from ..montecarlo.bunch_front import BunchFrontTilt, resolve_front_tilt, validate_front_source
+from ..montecarlo.bunch_front import BunchFrontTilt, resolve_front_tilt
 from ..montecarlo.case import Case
 from ..montecarlo.transverse import TransverseDistribution, resolve_transverse_distribution
+from .beam_cases import beam_case_keys, beam_distribution_keys
 from .bremsstrahlung_cases import radiative_case_keys, resolve_auto_bremsstrahlung
 from .cost import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is the stable import path)
     _COST_E_CUT_KEV,
@@ -82,6 +83,7 @@ from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is th
     Footprint,
     Layer,
     LoweredTarget,
+    ResolvedCut,
     ScalarOrSeq,
     Slab,
     Stack,
@@ -105,7 +107,7 @@ from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is th
     target_replace,
 )
 from .inelastic_cases import resolve_atomic_electron_deflection, resolve_auto_inelastic
-from .longitudinal import LongitudinalDistribution, resolve_longitudinal_distribution
+from .longitudinal import LongitudinalDistribution
 
 MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
 
@@ -723,6 +725,236 @@ def _cxr_grid_for_energy(
     return grid, policy.payload()
 
 
+def _electron_budget(
+    sweep: Sweep, precision: Precision | None, n_electrons: Any, n_electrons_brem: Any
+) -> tuple[Any, Any]:
+    """Return the line/continuum electron counts after adaptive-precision checks."""
+    if precision is None:
+        return n_electrons, n_electrons_brem
+    if not isinstance(precision, Precision):
+        raise TypeError("precision must be a Precision or None")
+    if sweep.n_electrons is not None or sweep.n_electrons_brem is not None:
+        raise ValueError("adaptive precision cannot be combined with electron-count sweep grids")
+    return precision.max_electrons, precision.max_electrons
+
+
+def _case_energies(sweep: Sweep, gdf: GDFBeam | None) -> np.ndarray:
+    """Beam energies the product crosses; a non-shape-only GDF run uses its maximum."""
+    if gdf is None or sweep.beam.gdf_shape_only:
+        return _seq(sweep.beam.energy_keV)
+    return np.array([gdf.energy_keV.max()])
+
+
+def _brem_grid(
+    sweep: Sweep, cp: dict, energies: np.ndarray, cxr_grids: tuple[np.ndarray, ...]
+) -> np.ndarray:
+    """Return the continuum grid before encoding.
+
+    An explicit ``EnergyBins.brem`` is exact. Otherwise a 50 eV lattice starts
+    where the line grids do and extends past the highest beam energy.
+    """
+    bins = sweep.energy_bins
+    if bins.brem is not None:
+        return np.asarray(bins.brem, float)
+    if bins.cxr is not None:
+        brem_start = float(np.atleast_1d(bins.cxr)[0])
+    elif bins.cxr_by_energy:
+        brem_start = min(float(np.atleast_1d(grid)[0]) for grid in bins.cxr_by_energy.values())
+    elif bins.cxr_by_energy is None:
+        brem_start = float(cp["E_grid"][0])
+    else:
+        # A configured-but-empty mapping: every energy resolved
+        # automatically, so the continuum starts where those grids do.
+        brem_start = min(float(np.atleast_1d(grid)[0]) for grid in cxr_grids)
+    return np.arange(brem_start, float(energies.max()) * 1e3 + 50.0, 50.0)  # type: ignore[reportArgumentType]
+
+
+def _floored_brem_case_grid(sweep: Sweep, brem_grid: np.ndarray) -> Any:
+    """Encode the continuum grid and floor a uniform band at the medium's start.
+
+    A uniform band declares a `start`, but the energy below which the
+    continuum and photon-escape models carry no validity is a property of
+    the *medium*, not of the profile that declared the band. Resolving it
+    here -- the first place the band and the material meet -- is what lets
+    a profile-level default stay at 0.0 and still never produce a node
+    outside the modelled band, and what keeps two profiles sharing the
+    same material agreeing on the grid, which a per-profile stored start
+    could not do. A declared start ABOVE the floor is an ordinary
+    bandwidth choice and is kept, matching
+    ``energy_grid.floor.geometric_continuum_grid``. Nonuniform grids are
+    passed through: their builders resolve their own floor, and a sweep
+    with no catalog material names no medium to take a floor from.
+    """
+    brem_case_grid = encode_energy_grid(brem_grid)
+    if isinstance(brem_case_grid, tuple) and sweep.material is not None:
+        start, stop, step = brem_case_grid
+        brem_case_grid = (max(start, floored_lattice_start_eV(sweep.material, step)), stop, step)
+    return brem_case_grid
+
+
+def _case_brem_grid(brem_case_grid: Any, energy_keV: float) -> Any:
+    """A uniform band stops one step past this case's beam energy; others stay exact."""
+    if not isinstance(brem_case_grid, tuple):
+        return brem_case_grid
+    start, _, step = brem_case_grid
+    return (start, energy_keV * 1e3 + step, step)
+
+
+def _detector_acceptance(detector: Detector) -> tuple[float, float]:
+    """Polar acceptance (deg) and solid angle (sr); ``None`` is the Timepix3 reference."""
+    dtheta = (
+        TIMEPIX3_DTHETA_OBS_DEG
+        if detector.polar_acceptance_deg is None
+        else detector.polar_acceptance_deg
+    )
+    domega = TIMEPIX3_DOMEGA_SR if detector.solid_angle_sr is None else detector.solid_angle_sr
+    return dtheta, domega
+
+
+def _sweep_orientation(sweep: Sweep, cp: dict) -> ResolvedCut:
+    """Resolve the crystal axis from ``Sweep.beam_uvw`` or the target's cut, never both."""
+    assert sweep.target is not None
+    beam_uvw = cp["beam_uvw"] if sweep.beam_uvw is None else sweep.beam_uvw
+    surface_hkl = cp["surface_hkl"] if sweep.beam_uvw is None else None
+    cut = sweep.target._crystal_cut()
+    if (
+        cut is not None
+        and sweep.beam_uvw is not None
+        and (cut.beam_uvw is not None or cut.surface_hkl is not None)
+    ):
+        raise ValueError("give the crystal axis on either Sweep.beam_uvw or Slab.cut, not both")
+    return resolve_crystal_cut(cut, beam_uvw, surface_hkl)
+
+
+def _mosaic_case_keys(sweep: Sweep, cp: dict) -> tuple[float | None, float | None]:
+    """Return ``(analytic_rad, mc_rad)``: the mosaic FWHM on at most one route.
+
+    Crystal mosaicity is None unless the run enables it AND the crystal has a
+    mosaic_fwhm_deg (or the Sweep overrides it); None is a perfect crystal, so
+    store_result adds no mosaic term (exact no-op). The exact MC route does the
+    broadening INSIDE mc_cxr_spectrum and turns the analytic store_result term
+    OFF (mutually exclusive -- applying both double-counts).
+    """
+    assert sweep.target is not None
+    mosaic_deg = None
+    if sweep.target.mosaic:
+        mosaic_deg = (
+            sweep.mosaic_fwhm_deg
+            if sweep.mosaic_fwhm_deg is not None
+            else CATALOG.crystal(cp["crystal"]).mosaic_fwhm_deg
+        )
+    mosaic_fwhm_rad = float(np.deg2rad(mosaic_deg)) if mosaic_deg else None
+    if sweep.mosaic_route not in ("analytic", "mc"):
+        raise ValueError(f"mosaic_route must be 'analytic' or 'mc', got {sweep.mosaic_route!r}")
+    if mosaic_fwhm_rad is not None and sweep.mosaic_route == "mc":
+        return None, mosaic_fwhm_rad
+    return mosaic_fwhm_rad, None
+
+
+def _electron_counts(grid: Any, fallback: Any, label: str) -> list[int]:
+    if grid is None:
+        return [int(fallback)]
+    raw = _seq(grid)
+    counts = [int(value) for value in raw]
+    if any(count <= 0 or count != value for count, value in zip(counts, raw, strict=True)):
+        raise ValueError(f"{label} electron counts must be positive integers")
+    return counts
+
+
+def _model_case_keys(
+    *,
+    coherent_emission: bool,
+    temporal_profile: bool,
+    straggling: bool,
+    energy_model: str,
+    max_dE_frac: float,
+    inelastic_model: str,
+    inelastic_cutoff_eV: float | None,
+    secondary_threshold_eV: float | None,
+    elastic_model: str,
+    bremsstrahlung_model: str,
+    radiative: dict[str, Any],
+) -> dict[str, Any]:
+    """Opt-in transport/radiation keys; each is divergence-only.
+
+    An absent key is the historical default, so case payloads (and their
+    content keys) stay bit-for-bit. "auto" models join after resolution.
+    """
+    keys: dict[str, Any] = {}
+    # coherent segment sum: absent -> the incoherent default.
+    if coherent_emission:
+        keys["coherent_emission"] = True
+    if temporal_profile:
+        keys["temporal_profile"] = True
+    if straggling:
+        keys["straggling"] = True
+    if energy_model == "midpoint":
+        keys["energy_model"] = "midpoint"
+    if max_dE_frac > 0.0:
+        keys["max_dE_frac"] = float(max_dE_frac)
+    # Shell soft/hard inelastic mode: continuous stopping stays absent.
+    if inelastic_model == "shell-soft-hard":
+        keys["inelastic_model"] = inelastic_model
+        keys["inelastic_cutoff_eV"] = float(cast(float, inelastic_cutoff_eV))
+    # Opt-in secondary transport (#94).
+    if secondary_threshold_eV is not None:
+        keys["secondary_threshold_eV"] = float(secondary_threshold_eV)
+    # ELSEPA elastic model (the default): an explicit "mott" case keeps its
+    # historical payload.
+    if elastic_model == "elsepa":
+        keys["elastic_model"] = "elsepa"
+    # Opt-in BremsLib continuum, with any coupled radiative keys.
+    if bremsstrahlung_model == "bremslib":
+        keys.update({"bremsstrahlung_model": "bremslib", **radiative})
+    return keys
+
+
+def _line_grid_case_keys(grid: np.ndarray, policy: dict | None) -> dict[str, Any]:
+    """Line-grid fields for one beam energy.
+
+    ``line_grid_policy`` is automatic resolution only: absent keeps every
+    explicit/stored-grid case payload bit-for-bit, so existing checkpoints stay
+    addressable. ``line_quadrature`` is divergence-only (#116): node sampling
+    keeps its payload.
+    """
+    encoded = encode_energy_grid(grid)
+    keys: dict[str, Any] = {"E_grid": encoded, "E_grid_line": encoded}  # E_grid: legacy key
+    if policy is not None:
+        keys["line_grid_policy"] = policy
+    if cxr_quadrature_from_payload(policy) == "bin-mean":
+        keys["line_quadrature"] = "bin-mean"
+    return keys
+
+
+def _resolve_case_models(
+    cases: list[Case],
+    *,
+    inelastic_model: str,
+    inelastic_cutoff_eV: float | None,
+    energy_model: str,
+    atomic_electron_deflection: str,
+    bremsstrahlung_model: str,
+    radiative: dict[str, Any],
+) -> list[Case]:
+    """Resolve "auto" models on the assembled cases, then warn on kinematic validity."""
+    if inelastic_model == "auto":
+        cases = resolve_auto_inelastic(
+            cases,
+            DEFAULT_INELASTIC_CUTOFF_EV
+            if inelastic_cutoff_eV is None
+            else float(inelastic_cutoff_eV),
+            energy_model,
+        )
+    cases = resolve_atomic_electron_deflection(cases, atomic_electron_deflection)
+    if bremsstrahlung_model == "auto":
+        cases = resolve_auto_bremsstrahlung(cases, radiative)
+    from .kinematic_validity import warn_kinematic_validity
+
+    for case in cases:
+        warn_kinematic_validity(case)
+    return cases
+
+
 def build_cases(
     sweep: Sweep,
     n_electrons=450,
@@ -766,14 +998,10 @@ def build_cases(
     Validation: inelastic-angular-deflection
     """
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
-    if precision is not None:
-        if not isinstance(precision, Precision):
-            raise TypeError("precision must be a Precision or None")
-        if sweep.n_electrons is not None or sweep.n_electrons_brem is not None:
-            raise ValueError(
-                "adaptive precision cannot be combined with electron-count sweep grids"
-            )
-        n_electrons = n_electrons_brem = precision.max_electrons
+    assert sweep.detector is not None
+    n_electrons, n_electrons_brem = _electron_budget(
+        sweep, precision, n_electrons, n_electrons_brem
+    )
     validate_inelastic_numerics(
         inelastic_model, inelastic_cutoff_eV, energy_model, secondary_threshold_eV
     )
@@ -786,197 +1014,35 @@ def build_cases(
     )
     target = sweep.target
     cp = sweep_crystal_params(sweep)
-    # line grid: fine + narrow (per-material default or detector mapping/fixed
-    # binning). brem grid: coarse + wide -- each case spans up to that case's
-    # beam energy because brem cuts off at the particle energy.
-    # A uniform E_grid_brem keeps the legacy start/spacing behavior and extends
-    # to each beam energy. Scalar/nonuniform grids are explicit and stay exact.
     gdf = sweep.beam.gdf_beam()
     if gdf is not None and coherent_emission:
         raise ValueError("gpt_gdf currently supports incoherent emission only")
-    energies = (
-        _seq(sweep.beam.energy_keV)
-        if gdf is None or sweep.beam.gdf_shape_only
-        else np.array([gdf.energy_keV.max()])
-    )
+    energies = _case_energies(sweep, gdf)
+    # line grid: fine + narrow (per-material default or detector mapping/fixed
+    # binning). brem grid: coarse + wide -- each case spans up to that case's
+    # beam energy because brem cuts off at the particle energy.
     resolved_cxr = tuple(_cxr_grid_for_energy(sweep, cp, float(energy)) for energy in energies)
-    cxr_grids = tuple(grid for grid, _ in resolved_cxr)
-    cxr_policies = tuple(policy for _, policy in resolved_cxr)
-    assert sweep.detector is not None
-    bins = sweep.energy_bins
-    fixed_cxr_grid = bins.cxr
-    if bins.brem is not None:
-        brem_grid = np.asarray(bins.brem, float)
-    else:
-        if fixed_cxr_grid is not None:
-            brem_start = float(np.atleast_1d(fixed_cxr_grid)[0])
-        elif bins.cxr_by_energy:
-            brem_start = min(float(np.atleast_1d(grid)[0]) for grid in bins.cxr_by_energy.values())
-        elif bins.cxr_by_energy is None:
-            brem_start = float(cp["E_grid"][0])
-        else:
-            # A configured-but-empty mapping: every energy resolved
-            # automatically, so the continuum starts where those grids do.
-            brem_start = min(float(np.atleast_1d(grid)[0]) for grid in cxr_grids)
-        brem_grid = np.arange(brem_start, float(energies.max()) * 1e3 + 50.0, 50.0)  # type: ignore[reportArgumentType]
-
-    dtheta = (
-        TIMEPIX3_DTHETA_OBS_DEG
-        if sweep.detector.polar_acceptance_deg is None
-        else sweep.detector.polar_acceptance_deg
-    )
-    domega = (
-        TIMEPIX3_DOMEGA_SR
-        if sweep.detector.solid_angle_sr is None
-        else sweep.detector.solid_angle_sr
-    )
-    beam_uvw = cp["beam_uvw"] if sweep.beam_uvw is None else sweep.beam_uvw
-    surface_hkl = cp["surface_hkl"] if sweep.beam_uvw is None else None
-    cut = target._crystal_cut()
-    if (
-        cut is not None
-        and sweep.beam_uvw is not None
-        and (cut.beam_uvw is not None or cut.surface_hkl is not None)
-    ):
-        raise ValueError("give the crystal axis on either Sweep.beam_uvw or Slab.cut, not both")
-    orientation = resolve_crystal_cut(cut, beam_uvw, surface_hkl)
+    brem_grid = _brem_grid(sweep, cp, energies, tuple(grid for grid, _ in resolved_cxr))
+    dtheta, domega = _detector_acceptance(sweep.detector)
+    orientation = _sweep_orientation(sweep, cp)
     beam_uvw, surface_hkl = orientation.beam_uvw, orientation.surface_hkl
-    # Beam phase-space fields threaded onto every case (constant across the
-    # product). The legacy ``beam_fwhm_mm`` key stays == the x-plane FWHM so a
-    # default isotropic spot is bit-for-bit; the elliptical ``beam_fwhm_y_mm``
-    # and the longitudinal bunch / pulse-rate keys join ONLY when they actually
-    # diverge from the point-bunch/default-source configuration, so existing
-    # case payloads and checkpoint matching remain stable.
-    b = sweep.beam
-    front = validate_front_source(
-        b.bunch_front_tilt,
-        transverse=b.transverse,
-        energy_spread=b.energy_spread_frac,
-        source=b.source,
-        longitudinal=b.longitudinal,
-        offsets=b.long_offsets_fs,
-        shape=b.long_shape,
-        groove=sweep.target._entrance_face(),
-    )
-    fwhm_x = None if b.transverse_fwhm_x_mm is None else float(b.transverse_fwhm_x_mm)
-    fwhm_y = None if b.transverse_fwhm_y_mm is None else float(b.transverse_fwhm_y_mm)
-    beam_case: dict[str, Any] = {"beam_fwhm_mm": fwhm_x}
-    if front is not None:
-        beam_case["bunch_front_tilt"] = asdict(front)
-    if gdf is not None:
-        beam_case["gdf_source"] = {
-            "path": str(b.gdf_path),
-            "time_s": gdf.time_s,
-            "tolerance_s": b.gdf_time_tolerance_s,
-            "normalization": b.gdf_normalization,
-            "z_origin_m": b.gdf_z_origin_m,
-            "sha256": gdf.sha256,
-            **({"shape_only": True} if b.gdf_shape_only else {}),
-            **(
-                {
-                    "screen_position_m": gdf.screen_position_m,
-                    "screen_tolerance_m": b.gdf_screen_tolerance_m,
-                }
-                if gdf.screen_position_m is not None
-                else {}
-            ),
-        }
-    if b.bunch_charge_pc != 1.0 or b.rep_rate_hz != 5000.0:
-        beam_case["bunch_charge_pc"] = float(b.bunch_charge_pc)
-        beam_case["rep_rate_hz"] = float(b.rep_rate_hz)
-    if gdf is not None and b.gdf_normalization == "gdf_charge":
-        assert gdf.absolute_charge_c is not None
-        beam_case["bunch_charge_pc"] = gdf.absolute_charge_c * 1e12
-        beam_case["rep_rate_hz"] = float(b.rep_rate_hz)
-    if fwhm_y != fwhm_x:
-        beam_case["beam_fwhm_y_mm"] = fwhm_y
-    if b.energy_spread_frac is not None:
-        beam_case["energy_spread_frac"] = float(b.energy_spread_frac)
-    if b.longitudinal is not None and (
-        b.bunch_length_fs is not None or b.long_offsets_fs is not None or b.long_shape != "gaussian"
-    ):
-        raise ValueError(
-            "longitudinal policy is incompatible with legacy bunch_length_fs, "
-            "long_shape, and long_offsets_fs fields"
-        )
-    if b.transverse is not None and (
-        b.transverse_fwhm_x_mm is not None or b.transverse_fwhm_y_mm is not None
-    ):
-        # Spot FWHM, divergence and emittance are three numbers for two
-        # independent moments plus a correlation. Resolving that by precedence
-        # would hand back a plausible beam that is not the requested one, so it
-        # is an error. Note the FWHM fields DEFAULT to a 1 mm spot: a transverse
-        # policy has to clear them explicitly (BeamSpec.with_transverse does).
-        raise ValueError(
-            "transverse policy is incompatible with the legacy transverse_fwhm_x_mm "
-            "and transverse_fwhm_y_mm fields; clear them "
-            "(they default to a 1 mm spot) or use BeamSpec.with_transverse"
-        )
-    if b.bunch_length_fs is not None or b.long_offsets_fs is not None:
-        beam_case["long_shape"] = b.long_shape
-        if b.bunch_length_fs is not None:
-            beam_case["bunch_length_fs"] = float(b.bunch_length_fs)
-        if b.long_offsets_fs is not None:
-            beam_case["long_offsets_fs"] = tuple(float(x) for x in b.long_offsets_fs)
+    beam_case = beam_case_keys(sweep, gdf)
     # Case names are persisted: they key the results dict and feed `_case_key`,
     # which `pyrite checkpoint gc` compares against. So they are built from the
     # stable catalog key, never from the display label -- a label is display
     # metadata and editing one must not invalidate stored checkpoints.
     material_spec = CATALOG.materials.get(target.material)
     name_stem = material_spec.key if material_spec is not None else target.material
-    # crystal mosaicity (analytic, optional): None unless the run enables it AND the
-    # crystal has a mosaic_fwhm_deg (or the Sweep overrides it). None -> perfect
-    # crystal, so store_result adds no mosaic term (exact no-op).
-    mosaic_deg = None
-    if target.mosaic:
-        mosaic_deg = (
-            sweep.mosaic_fwhm_deg
-            if sweep.mosaic_fwhm_deg is not None
-            else CATALOG.crystal(cp["crystal"]).mosaic_fwhm_deg
-        )
-    mosaic_fwhm_rad = float(np.deg2rad(mosaic_deg)) if mosaic_deg else None
-    if sweep.mosaic_route not in ("analytic", "mc"):
-        raise ValueError(f"mosaic_route must be 'analytic' or 'mc', got {sweep.mosaic_route!r}")
-    # exact MC route: do the broadening INSIDE mc_cxr_spectrum and turn the analytic
-    # store_result term OFF (mutually exclusive -- applying both double-counts).
-    # Both are None when there is no mosaic to apply.
-    mosaic_mc = mosaic_fwhm_rad is not None and sweep.mosaic_route == "mc"
-    mosaic_analytic_rad = None if mosaic_mc else mosaic_fwhm_rad
-    mosaic_mc_rad = mosaic_fwhm_rad if mosaic_mc else None
-
-    brem_case_grid = encode_energy_grid(brem_grid)
-    if isinstance(brem_case_grid, tuple) and sweep.material is not None:
-        # A uniform band declares a `start`, but the energy below which the
-        # continuum and photon-escape models carry no validity is a property of
-        # the *medium*, not of the profile that declared the band. Resolving it
-        # here -- the first place the band and the material meet -- is what lets
-        # a profile-level default stay at 0.0 and still never produce a node
-        # outside the modelled band, and what keeps two profiles sharing the
-        # same material agreeing on the grid, which a per-profile stored start
-        # could not do. A declared start ABOVE the floor is an ordinary
-        # bandwidth choice and is kept, matching
-        # ``energy_grid.floor.geometric_continuum_grid``. Nonuniform grids are
-        # passed through: their builders resolve their own floor, and a sweep
-        # with no catalog material names no medium to take a floor from.
-        start, stop, step = brem_case_grid
-        brem_case_grid = (max(start, floored_lattice_start_eV(sweep.material, step)), stop, step)
-
-    def _electron_counts(grid, fallback, label):
-        if grid is None:
-            return [int(fallback)]
-        raw = _seq(grid)
-        counts = [int(value) for value in raw]
-        if any(count <= 0 or count != value for count, value in zip(counts, raw, strict=True)):
-            raise ValueError(f"{label} electron counts must be positive integers")
-        return counts
-
+    mosaic_analytic_rad, mosaic_mc_rad = _mosaic_case_keys(sweep, cp)
+    brem_case_grid = _floored_brem_case_grid(sweep, brem_grid)
     ne_pairs = list(
         product(
             _electron_counts(sweep.n_electrons, n_electrons, "n_electrons"),
             _electron_counts(sweep.n_electrons_brem, n_electrons_brem, "n_electrons_brem"),
         )
     )
-    explicit_ne = sweep.n_electrons is not None or sweep.n_electrons_brem is not None
+    # Explicit grids suffix the persisted case name with ``ne=<line>/<brem>``.
+    ne_suffix = sweep.n_electrons is not None or sweep.n_electrons_brem is not None
 
     # Geometry is owned end to end by the target: it validated itself at Sweep
     # construction, validate_against carries the one target x detector rule, and
@@ -990,8 +1056,8 @@ def build_cases(
         n_families=sweep.n_families,
         orientation=orientation,
     )
-
-    if radiative and any(g.case_keys().get("groove_spacing_ang") is not None for g in geometries):
+    grooved = any(g.case_keys().get("groove_spacing_ang") is not None for g in geometries)
+    if radiative and grooved:
         warnings.warn(
             "coupled BremsLib radiative transport is unavailable for grooves; "
             "using uncoupled bremsstrahlung scoring",
@@ -999,48 +1065,32 @@ def build_cases(
             stacklevel=2,
         )
         radiative = {}
-
-    if gdf is not None and any(
-        g.case_keys().get("groove_spacing_ang") is not None for g in geometries
-    ):
+    if gdf is not None and grooved:
         raise ValueError("gpt_gdf currently requires a flat entrance face")
+    model_keys = _model_case_keys(
+        coherent_emission=coherent_emission,
+        temporal_profile=temporal_profile,
+        straggling=straggling,
+        energy_model=energy_model,
+        max_dE_frac=max_dE_frac,
+        inelastic_model=inelastic_model,
+        inelastic_cutoff_eV=inelastic_cutoff_eV,
+        secondary_threshold_eV=secondary_threshold_eV,
+        elastic_model=elastic_model,
+        bremsstrahlung_model=bremsstrahlung_model,
+        radiative=radiative,
+    )
     cases = []
     for i_c, geometry in enumerate(geometries):
-        name = geometry.name
         for i_e, E0 in enumerate(energies):
-            cxr_case_grid = encode_energy_grid(cxr_grids[i_e])
-            resolved_transverse = None
-            if b.transverse is not None:
-                resolved_transverse = asdict(
-                    resolve_transverse_distribution(b.transverse, energy_keV=float(E0))
-                )
-            resolved_longitudinal = None
-            if b.longitudinal is not None:
-                if b.longitudinal.kind != "gaussian" and orientation.recip_miscut_rad is not None:
-                    raise ValueError(
-                        "targeted longitudinal modes assume g parallel to the surface "
-                        "normal; a miscut CrystalCut is unsupported"
-                    )
-                crystal_spec = CATALOG.crystal(cp["crystal"])
-                resolved_longitudinal = asdict(
-                    resolve_longitudinal_distribution(
-                        b.longitudinal,
-                        material=target.material,
-                        crystal=cp["crystal"],
-                        lattice=crystal_spec.lattice,
-                        hkl_list=cp["hkl_list"],
-                        surface_hkl=surface_hkl,
-                        beam_uvw=beam_uvw,
-                        energy_keV=float(E0),
-                        theta_obs_deg=float(sweep.detector.observation_angle_deg),
-                        tilt_deg=geometry.tilt_deg,
-                    )
-                )
+            distribution_keys = beam_distribution_keys(sweep, cp, orientation, geometry, float(E0))
+            line_grid_keys = _line_grid_case_keys(*resolved_cxr[i_e])
             for i_n, (ne_line, ne_brem) in enumerate(ne_pairs):
-                case_name = f"{name} ne={ne_line}/{ne_brem}" if explicit_ne else name
                 cases.append(
                     Case(
-                        name=case_name,
+                        name=f"{geometry.name} ne={ne_line}/{ne_brem}"
+                        if ne_suffix
+                        else geometry.name,
                         crystal=cp["crystal"],
                         composition=cp["composition"],
                         hkl_list=cp["hkl_list"],
@@ -1050,75 +1100,11 @@ def build_cases(
                         # groove spacing when there is one (absent otherwise)
                         **geometry.case_keys(),
                         **beam_case,
-                        **(
-                            {"longitudinal_distribution": resolved_longitudinal}
-                            if resolved_longitudinal is not None
-                            else {}
-                        ),
-                        **(
-                            {"transverse_distribution": resolved_transverse}
-                            if resolved_transverse is not None
-                            else {}
-                        ),
-                        E_grid=cxr_case_grid,  # legacy key (== line grid)
-                        E_grid_line=cxr_case_grid,
-                        # Automatic resolution only. Absent keeps every
-                        # explicit/stored-grid case payload bit-for-bit, so
-                        # existing checkpoints stay addressable.
-                        **(
-                            {"line_grid_policy": cxr_policies[i_e]}
-                            if cxr_policies[i_e] is not None
-                            else {}
-                        ),
-                        # Divergence-only (#116): node sampling keeps its payload.
-                        **(
-                            {"line_quadrature": "bin-mean"}
-                            if cxr_quadrature_from_payload(cxr_policies[i_e]) == "bin-mean"
-                            else {}
-                        ),
-                        E_grid_brem=(
-                            (
-                                brem_case_grid[0],
-                                float(E0) * 1e3 + brem_case_grid[2],
-                                brem_case_grid[2],
-                            )
-                            if isinstance(brem_case_grid, tuple)
-                            else brem_case_grid
-                        ),
+                        **distribution_keys,
+                        **line_grid_keys,
+                        E_grid_brem=_case_brem_grid(brem_case_grid, float(E0)),
                         theta_obs_rad=np.deg2rad(sweep.detector.observation_angle_deg),
-                        # coherent segment sum: divergence-only key (absent -> the
-                        # incoherent default, bit-for-bit case payload).
-                        **({"coherent_emission": True} if coherent_emission else {}),
-                        **({"temporal_profile": True} if temporal_profile else {}),
-                        **({"straggling": True} if straggling else {}),
-                        **({"energy_model": "midpoint"} if energy_model == "midpoint" else {}),
-                        **({"max_dE_frac": float(max_dE_frac)} if max_dE_frac > 0.0 else {}),
-                        # Shell soft/hard inelastic mode: divergence-only keys,
-                        # so continuous-stopping case payloads (and their content
-                        # keys) stay bit-for-bit. "auto" joins after resolution.
-                        **(
-                            {
-                                "inelastic_model": inelastic_model,
-                                "inelastic_cutoff_eV": float(cast(float, inelastic_cutoff_eV)),
-                            }
-                            if inelastic_model == "shell-soft-hard"
-                            else {}
-                        ),
-                        # Opt-in secondary transport (#94): divergence-only.
-                        **(
-                            {"secondary_threshold_eV": float(secondary_threshold_eV)}
-                            if secondary_threshold_eV is not None
-                            else {}
-                        ),
-                        # ELSEPA elastic model (the default): divergence-only, so
-                        # an explicit "mott" case keeps its historical payload.
-                        **({"elastic_model": "elsepa"} if elastic_model == "elsepa" else {}),
-                        # Opt-in BremsLib continuum: divergence-only, like the above.
-                        **(
-                            {"bremsstrahlung_model": "bremslib", **radiative}
-                            if bremsstrahlung_model == "bremslib"
-                            else {}
-                        ),
+                        **model_keys,
                         beam_uvw=beam_uvw,
                         surface_hkl=surface_hkl,
                         mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")
@@ -1128,9 +1114,7 @@ def build_cases(
                         Ne=ne_line,
                         Ne_brem=ne_brem,
                         **(
-                            {"adaptive_precision": precision.to_dict()}
-                            if precision is not None
-                            else {}
+                            {} if precision is None else {"adaptive_precision": precision.to_dict()}
                         ),
                         seed=1000 * i_c + 10 * i_e + 1 + 100_000_000 * i_n,
                         spec_chunk=sweep.spec_chunk,  # GPU rows/matmul (None -> run_case default)
@@ -1140,19 +1124,12 @@ def build_cases(
                         domega_sr=domega,
                     )
                 )
-    if inelastic_model == "auto":
-        cases = resolve_auto_inelastic(
-            cases,
-            DEFAULT_INELASTIC_CUTOFF_EV
-            if inelastic_cutoff_eV is None
-            else float(cast(float, inelastic_cutoff_eV)),
-            energy_model,
-        )
-    cases = resolve_atomic_electron_deflection(cases, atomic_electron_deflection)
-    if bremsstrahlung_model == "auto":
-        cases = resolve_auto_bremsstrahlung(cases, radiative)
-    from .kinematic_validity import warn_kinematic_validity
-
-    for case in cases:
-        warn_kinematic_validity(case)
-    return cases
+    return _resolve_case_models(
+        cases,
+        inelastic_model=inelastic_model,
+        inelastic_cutoff_eV=inelastic_cutoff_eV,
+        energy_model=energy_model,
+        atomic_electron_deflection=atomic_electron_deflection,
+        bremsstrahlung_model=bremsstrahlung_model,
+        radiative=radiative,
+    )
