@@ -849,9 +849,9 @@ def test_run_sweep_exact_metadata_hit_skips_decode_launch_and_writes(tmp_path, m
     def forbidden(*_args, **_kwargs):
         raise AssertionError("exact metadata hit must not decode, launch, or write")
 
-    monkeypatch.setattr("pyrite.runs.run._checkpoint_load", forbidden)
+    monkeypatch.setattr("pyrite.runs._sweep_plan._checkpoint_load", forbidden)
     monkeypatch.setattr("pyrite.runs.run.run_cases", forbidden)
-    monkeypatch.setattr("pyrite.runs.run._checkpoint_components_save", forbidden)
+    monkeypatch.setattr("pyrite.checkpoints.persistence._checkpoint_components_save", forbidden)
     progress = []
     assert run_sweep(
         cases,
@@ -886,6 +886,90 @@ def test_budget_pause_keeps_shards_until_completion(tmp_path, monkeypatch):
     assert not _checkpoint_store.has_parts("hopg", tmp_path)
 
 
+@pytest.mark.parametrize("failure", ["components", "manifest"])
+def test_consolidation_failure_retains_recoverable_shards(tmp_path, monkeypatch, failure):
+    from pyrite.checkpoints import persistence
+
+    cases = [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 45.0)]
+    monkeypatch.setattr("pyrite.runs.run.run_cases", stub_run_cases)
+    chunks = []
+    target = "_checkpoint_components_save" if failure == "components" else "_manifest_save"
+
+    def fail(*args, **kwargs):
+        raise OSError("publication failed")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(persistence, target, fail)
+        with pytest.raises(OSError, match="publication failed"):
+            run_sweep(cases, {}, checkpoint_dir=str(tmp_path), on_chunk=chunks.append)
+
+    assert chunks == [["cfg_a", "cfg_b"]]
+    assert _checkpoint_store.has_parts("hopg", tmp_path)
+    recovered = _checkpoint_store.load("hopg", tmp_path)
+    assert {name: set(records) for name, records in recovered.items()} == {
+        "cfg_a": {30.0},
+        "cfg_b": {45.0},
+    }
+
+    def no_new_work(cases, **kwargs):
+        assert cases == []
+
+    monkeypatch.setattr("pyrite.runs.run.run_cases", no_new_work)
+    chunks.clear()
+    assert run_sweep(cases, {}, checkpoint_dir=str(tmp_path), on_chunk=chunks.append)
+    assert chunks == [["cfg_a", "cfg_b"]]
+    assert not _checkpoint_store.has_parts("hopg", tmp_path)
+    assert json.loads((tmp_path / "hopg" / "meta.json").read_text())["n_records"] == 2
+
+
+@pytest.mark.parametrize("failure", ["shard", "shard_manifest"])
+def test_shard_failure_preserves_prior_work_without_completing_group(
+    tmp_path, monkeypatch, failure
+):
+    from pyrite.checkpoints import persistence
+
+    cases = [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 45.0)]
+    monkeypatch.setattr("pyrite.runs.run.run_cases", stub_run_cases)
+    save_part = _checkpoint_store.save_part
+    manifest_write = persistence._manifest_write
+    chunks = []
+    events = []
+
+    def fail_second(stem, root, name, records):
+        if name == "cfg_b":
+            raise OSError("shard failed")
+        save_part(stem, root, name, records)
+
+    def fail_second_manifest(path, manifest):
+        if manifest["n_records"] == 2:
+            raise OSError("shard failed")
+        manifest_write(path, manifest)
+
+    with monkeypatch.context() as patch:
+        if failure == "shard":
+            patch.setattr(_checkpoint_store, "save_part", fail_second)
+        else:
+            patch.setattr(persistence, "_manifest_write", fail_second_manifest)
+        with pytest.raises(OSError, match="shard failed"):
+            run_sweep(
+                cases,
+                {},
+                checkpoint_dir=str(tmp_path),
+                on_chunk=chunks.append,
+                on_case=lambda case: events.append(case["name"]),
+                on_progress=lambda done, total, cached: events.append(done),
+            )
+    assert events == [0, "cfg_a", 1, "cfg_b"]
+    assert chunks == []
+    expected = {"cfg_a"} if failure == "shard" else {"cfg_a", "cfg_b"}
+    assert set(_checkpoint_store.load("hopg", tmp_path)) == expected
+    ran = []
+    monkeypatch.setattr("pyrite.runs.run.run_cases", tracking_run_cases_factory(ran))
+    assert run_sweep(cases, {}, checkpoint_dir=str(tmp_path), on_chunk=chunks.append)
+    assert ran == (["cfg_b"] if failure == "shard" else [])
+    assert chunks == [["cfg_a", "cfg_b"]]
+
+
 def test_manifest_refresh_preserves_existing_dataset_identity(tmp_path):
     identity = {"profile": "survey", "parameter_sha256": "a" * 64}
     results = {"cfg": {30.0: {"case": _fake_case("cfg", 30.0)}}}
@@ -911,6 +995,11 @@ def test_run_sweep_refuses_resume_across_dataset_identities(tmp_path, monkeypatc
         progress=False,
         dataset_identity=old,
     )
+    before = {
+        path.relative_to(tmp_path): (path.read_bytes(), path.stat().st_mtime_ns)
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
 
     with pytest.raises(ValueError, match="dataset identity mismatch"):
         run_sweep(
@@ -919,7 +1008,13 @@ def test_run_sweep_refuses_resume_across_dataset_identities(tmp_path, monkeypatc
             checkpoint_path=str(checkpoint),
             progress=False,
             dataset_identity=new,
+            content_key_fn=lambda _: "f" * 64,
         )
+    assert {
+        path.relative_to(tmp_path): (path.read_bytes(), path.stat().st_mtime_ns)
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    } == before
 
 
 # ---------------------------------------------------------------------------

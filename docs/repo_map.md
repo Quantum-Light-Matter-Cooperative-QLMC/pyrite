@@ -489,12 +489,12 @@ Photon-energy-grid derivation, bounds analysis, and catalog application (user in
 Deterministic `cxr.campaign-lock.v1` writer/reader. Each successfully completed dataset records its resolved profile, material, dataset identity, explicit energy-grid artifact hash (or legacy marker), beside checkpoint metadata as `cxr.lock.json`; incomplete runs emit no lock. Active and archived locks remain artifact-GC roots.
 
 ### `runs/run.py`
-Checkpointed, resumable sweep execution driver. Owns case execution and cross-profile per-case CAS replay; persistence, manifests, component loading, and repairs live in `checkpoints`. Compatibility re-exports preserve the former `pyrite.runs.run` helper imports.
+Checkpointed, resumable sweep execution driver. Owns callback sequencing, trajectory preflight, deadlines and draining. `runs._sweep_plan` owns identity/metadata eligibility, per-case CAS seeding/replay and observation work selection; `runs._sweep_execution` owns progress/cost counters and config/group completion. Persistence, manifests, component loading, and repairs live in `checkpoints`. Compatibility re-exports preserve the former `pyrite.runs.run` helper imports.
 - Public: `run_sweep`, `load_checkpoint`, `checkpoint_path_for`, `cases_from_results`, `repair_brem_wide`, `repair_checkpoint`.
-- Deps: `checkpoints.persistence`, `checkpoints.recompute`, `checkpoints._checkpoint_store`, `montecarlo` (`run_cases`), `results`.
+- Deps: `runs._sweep_plan`, `runs._sweep_execution`, `checkpoints.persistence`, `checkpoints.recompute`, `montecarlo` (`run_cases`), `results`.
 
 ### `checkpoints/persistence.py`
-Checkpoint persistence owner: paths, load/save, component loaders, thin `cases.json` manifests, legacy seeding, and the default checkpoint directory. Keeps storage layout and serialization policy behind the checkpoint package.
+Checkpoint persistence owner: paths, load/save, component loaders, thin `cases.json` manifests, legacy seeding, and the default checkpoint directory. `_SweepCheckpoint` owns per-material shard publication, incremental manifests and consolidation; it retains shards on pauses or publication failure and clears them only after component and manifest saves succeed. Keeps storage layout and serialization policy behind the checkpoint package.
 - Public compatibility surface is re-exported from `runs.run` where required.
 - Deps: `checkpoints._checkpoint_store`, `checkpoints._checkpoint_io`, `paths`, `results`.
 
