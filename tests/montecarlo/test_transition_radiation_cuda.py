@@ -33,9 +33,19 @@ def test_cupy_solve_matches_numpy_on_an_absorbing_oblique_multilayer():
     layers = [(eps_si, 2e3), (1.0, 5e3), (eps_mo, 800.0)]
     sapphire = medium_dielectric("sapphire", photon)[:, None, None]
     args = (photon[:, None, None], n[None, :, None, :], velocities[None, None, :, :], layers)
-    host = planar_transition_radiation(*args, sapphire)
-    device = planar_transition_radiation(*args, cupy.asarray(sapphire), xp=cupy)
+    host, host_amplitude = planar_transition_radiation(*args, sapphire, return_amplitude=True)
+    device, device_amplitude = planar_transition_radiation(
+        *args, cupy.asarray(sapphire), xp=cupy, return_amplitude=True
+    )
     assert isinstance(device, cupy.ndarray) and device.dtype == cupy.float64
     # cuSOLVER and LAPACK round differently in near-cancelling, ~1e-14-of-peak
     # entries; the absolute floor keeps 1e-10 relative on everything above it.
     np.testing.assert_allclose(cupy.asnumpy(device), host, rtol=1e-10, atol=1e-12 * host.max())
+    assert isinstance(device_amplitude, cupy.ndarray)
+    assert device_amplitude.dtype == cupy.complex128
+    np.testing.assert_allclose(
+        cupy.asnumpy(device_amplitude),
+        host_amplitude,
+        rtol=1e-10,
+        atol=1e-12 * np.max(abs(host_amplitude)),
+    )

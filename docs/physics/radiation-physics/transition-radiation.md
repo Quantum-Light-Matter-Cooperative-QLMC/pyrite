@@ -37,6 +37,31 @@ summed over polarization. Interference between interfaces, formation zones, abso
 - zero contrast and a vanishing film radiate nothing; an opaque film reduces to its exit interface; a transparent film averages to twice one interface and peaks at four times;
 - for $\gamma\gg1$ and $\omega\gg\omega_p$ the exit interface is Jackson's small-angle form {cite:p}`jackson1999classical` (Eq. 13.91) used by the channeling bound.
 
+## Crossing superposition on transported tracks
+
+`Validation: tr-crossing-superposition`
+
+The solve is linear in its source. The right-hand side at interface $i$ is the jump $-(\mathbf P_{i+1}-\mathbf P_i)$ of the tangential own field $(\mathbf E_p,\mathbf H_p)_\perp$ between the media on either side, times $e^{iqz_i}$. For a charge through the origin at $t=0$ that phase equals $e^{i(\omega t_i-\mathbf k_\perp\cdot\mathbf r_{\perp,i})}$ at its crossing $(\mathbf r_i,t_i)$. The vacuum amplitude is therefore a sum over crossings,
+
+$$
+\mathbf a=\sum_c \mathsf G_{i_c}\,\bigl[-(\mathbf P_{i_c+1}-\mathbf P_{i_c})(\mathbf v_c)\bigr]\,e^{i(\omega t_c-\mathbf k_\perp\cdot\mathbf r_{\perp,c})},
+$$
+
+where $\mathsf G_i$, the top-wave rows of the inverse continuity matrix, carries each layer's propagation, absorption and multiple reflection from interface $i$ to the vacuum. For a straight trajectory the sum reproduces the solve exactly (`interface_transition_radiation_amplitude`; agreement to $10^{-12}$ of the peak in both senses through an absorbing oblique stack).
+
+On transported tracks, `transition_radiation_crossings.boundary_crossings` supplies $(\mathbf r_c,t_c,\mathbf v_c)$ from the row events (entry, composition-changing layer boundaries, top and bottom exits; substeps and equal-media boundaries never cross), and `crossing_transition_radiation` sums the crossings of one primary history coherently before squaring. Entry/exit formation-zone and multilayer interference then follow from the transported crossing times and points. Histories add incoherently; coherence between histories (CTR) is not included. `coherence="crossing"` gives the independent-interface (dephased) limit, which a thickness average of the coherent film recovers.
+
+**Assumptions.** Each crossing is a locally straight passage at its own velocity: $\mathbf P(\mathbf v_c)$ is the own field of an unbounded straight charge. Deflection between crossings radiates bremsstrahlung, which is not this term. The emitting face's vacuum surrounds the stack, interfaces are laterally infinite, and side exits and grooved faces carry no TR. Far-field origin: the transverse origin of the emitting face, time the transport clock $t_0+t$; the global $-i$ stationary-phase factor is dropped. Results change with numerical substeps only at quadrature level ($<10^{-3}$ in the smoke test).
+
+**Published regular radiator.** For $N$ transparent foils in vacuum the small-angle density of {cite:t}`garibian1971transition` and {cite:t}`grichine2002generation` (the {cite:t}`geant4tr` regular-radiator stack factor),
+
+$$
+\frac{d^2N}{dE\,d\Omega}=\frac{2\alpha}{\pi^2E}\,\theta^2\Bigl(\frac1{A_2}-\frac1{A_1}\Bigr)^2\operatorname{Re}\langle R^{(N)}\rangle,\qquad
+\langle R^{(N)}\rangle=N\frac{(1-F_1)(1-F_2)}{1-F}+\frac{(1-F_1)^2F_2(1-F^N)}{(1-F)^2},
+$$
+
+with $A_j=\gamma^{-2}+\theta^2+\omega_{p,j}^2/\omega^2$, $F_j=e^{-i\phi_j}$, $\phi_j=\omega t_jA_j/2$ and $F=F_1F_2$ ($2\operatorname{Re}\langle R^{(N)}\rangle=4\sin^2\frac{\phi_1}2\sin^2\frac{N(\phi_1+\phi_2)}2/\sin^2\frac{\phi_1+\phi_2}2$), is reproduced by `crossing_transition_radiation` on the stack's straight-track crossings within $2\times10^{-4}$ of the peak for ten 15 µm foils with 200 µm gaps at $\gamma=2000$, 2–40 keV and $\theta\le3/\gamma$. The residual is the formula's small-angle phase: with exact phases $t_j(\omega/v-\lambda_j)$ the agreement is $10^{-5}$. The absorbing-radiator flux form is not reproduced.
+
 ## Interface energy scale
 
 `Validation: tr-interface-energy-scale`
