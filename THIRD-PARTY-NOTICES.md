@@ -149,10 +149,14 @@ require derived or adapted material to be marked as such.
   source `sbethe.f` in its source distribution (the repository checkout and
   the sdist, under `vendor/xsgen/sbethe/`; not the wheel), compiles it, and invokes
   the resulting program to generate material-scoped stopping-power and
-  related inelastic cross-section tables. PyRITE does **not** redistribute
-  the accompanying `sdbase/` database, the bundled prebuilt Windows binary,
-  or the bundled documentation; `sdbase/` is downloaded on demand from the
-  pinned deposit above into the user's own data directory. Tables derived or
+  related inelastic cross-section tables. PyRITE does **not** bundle the
+  accompanying `sdbase/` database, the prebuilt Windows binary, or the
+  documentation into any source or wheel distribution. It **redistributes**
+  the deposit's archive byte for byte, unmodified (same SHA-256 as the
+  pin), as a separately downloaded asset on its release `mirror-sbethe2-1`,
+  whose notes carry this attribution; `pyrite tables fetch sbethe` tries
+  that mirror, then the deposit above, and extracts only `sdbase/` into the
+  user's own data directory. Tables derived or
   resampled from SBETHE output are **adaptations** under the license and are
   marked as such in the provenance manifest stored beside each generated
   table. PyRITE **redistributes** the stopping tables for its catalogue

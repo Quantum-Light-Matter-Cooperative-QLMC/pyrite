@@ -27,6 +27,14 @@ def _archive() -> bytes:
     return stream.getvalue()
 
 
+@pytest.fixture(autouse=True)
+def _no_github_token(monkeypatch):
+    """The mirror is a GitHub Release URL; keep these tests on the public path."""
+    for name in fetch_module.GITHUB_TOKEN_ENV:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(fetch_module.shutil, "which", lambda name: None)
+
+
 class _Response(io.BytesIO):
     def __enter__(self):
         return self
@@ -49,8 +57,74 @@ def test_fetch_verifies_then_extracts_only_sdbase(monkeypatch, tmp_path):
     assert not (result.path.parent / "docs").exists()
     assert not (result.path.parent / "sbethe.exe").exists()
     marker = json.loads((result.path / ".pyrite-fetch.json").read_text())
-    assert marker["source_url"] == fetch_module.SBETHE_ARCHIVE_URL
+    assert marker["source_url"] == fetch_module.SBETHE_MIRROR_URL
     assert marker["source_archive"] is None
+
+
+def test_the_mirror_is_tried_first_and_mendeley_is_kept_as_fallback():
+    assert fetch_module.SBETHE_ARCHIVE_URLS == (
+        fetch_module.SBETHE_MIRROR_URL,
+        fetch_module.SBETHE_ARCHIVE_URL,
+    )
+    assert fetch_module._RELEASE_ASSET_URL.fullmatch(fetch_module.SBETHE_MIRROR_URL)
+    assert fetch_module.SBETHE_ARCHIVE_URL.startswith("https://data.mendeley.com/")
+    # The digest is the data's identity; a mirror never re-pins it (#516).
+    assert fetch_module.SBETHE_ARCHIVE_SHA256 == (
+        "d5d4879c2073ada3bd799fe0727054549cd6ec65cc699acbd0ff25fd5c3c4144"
+    )
+
+
+# What Mendeley served on 2026-10-15: HTTP 200 with a JSON error body.
+_ERROR_BODY = b'{"message":"invalid json response body ... <!DOCTYPE html>"}'
+
+
+def test_a_bad_mirror_body_falls_back_to_mendeley(monkeypatch, tmp_path):
+    payload = _archive()
+    monkeypatch.setattr(fetch_module, "SBETHE_ARCHIVE_SHA256", hashlib.sha256(payload).hexdigest())
+
+    def open_url(request, **kwargs):
+        if request.full_url == fetch_module.SBETHE_MIRROR_URL:
+            return _Response(_ERROR_BODY)
+        return _Response(payload)
+
+    monkeypatch.setattr(fetch_module, "urlopen", open_url)
+    monkeypatch.setattr(fetch_module, "fetched_data_dir", lambda code, name: tmp_path / code / name)
+
+    result = fetch_module.fetch_sbethe()
+
+    assert result.installed is True
+    marker = json.loads((result.path / ".pyrite-fetch.json").read_text())
+    assert marker["source_url"] == fetch_module.SBETHE_ARCHIVE_URL
+
+
+def test_mendeley_down_installs_from_the_mirror(monkeypatch, tmp_path):
+    payload = _archive()
+    monkeypatch.setattr(fetch_module, "SBETHE_ARCHIVE_SHA256", hashlib.sha256(payload).hexdigest())
+
+    def open_url(request, **kwargs):
+        if "mendeley" in request.full_url:
+            pytest.fail("Mendeley contacted although the mirror served the pinned bytes")
+        return _Response(payload)
+
+    monkeypatch.setattr(fetch_module, "urlopen", open_url)
+    monkeypatch.setattr(fetch_module, "fetched_data_dir", lambda code, name: tmp_path / code / name)
+
+    assert fetch_module.fetch_sbethe().installed is True
+
+
+def test_every_bad_location_is_listed_and_its_body_described(monkeypatch, tmp_path):
+    destination = tmp_path / "sbethe" / "sdbase"
+    monkeypatch.setattr(fetch_module, "urlopen", lambda *a, **k: _Response(_ERROR_BODY))
+    monkeypatch.setattr(fetch_module, "fetched_data_dir", lambda code, name: destination)
+
+    with pytest.raises(DataFetchError, match="every download location") as caught:
+        fetch_module.fetch_sbethe()
+
+    message = str(caught.value)
+    assert fetch_module.SBETHE_MIRROR_URL in message
+    assert fetch_module.SBETHE_ARCHIVE_URL in message
+    assert f"{len(_ERROR_BODY)} bytes, not a zip archive" in message
+    assert not destination.exists()
 
 
 def test_a_local_archive_is_recorded_as_the_source(monkeypatch, tmp_path):

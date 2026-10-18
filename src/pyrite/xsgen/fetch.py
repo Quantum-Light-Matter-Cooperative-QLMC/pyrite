@@ -8,6 +8,11 @@ catalogue elements are too large for the wheel, so the wheel pins their
 release archive instead and the installer places each verified table into the
 user table directory, where :func:`pyrite.xsgen.store.resolve` finds it.
 
+SBETHE's archive is tried first from PyRITE's own GitHub Release mirror, a
+byte-identical copy of the upstream zip, and then from Mendeley Data, so an
+upstream outage does not stop a fetch (#516). The pinned digest decides what
+installs, whichever location served it.
+
 Either archive may come from a local copy rather than the network, which is
 how a cluster without outbound access is provisioned; the pinned digest is
 checked the same way.
@@ -50,10 +55,19 @@ from .sbethe.release import load_release_index as load_sbethe_release_index
 from .sources import fetched_data_dir
 from .store import arrays_digest, manifest_digest, resolve, user_table_dir
 
+#: The upstream Mendeley Data download of the pinned SBETHE archive.
 SBETHE_ARCHIVE_URL = (
     "https://data.mendeley.com/public-files/datasets/7zw25f428t/files/"
     "a7d2eed6-9aab-4462-936d-b15adf0e7c16/file_downloaded"
 )
+#: PyRITE's release mirror of the same bytes (CC BY-NC 3.0; attribution in the
+#: release notes). It is a separately fetched download, never bundled.
+SBETHE_MIRROR_URL = (
+    "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/"
+    "mirror-sbethe2-1/sbethe-7zw25f428t-v2.zip"
+)
+#: Download locations, in the order they are tried.
+SBETHE_ARCHIVE_URLS = (SBETHE_MIRROR_URL, SBETHE_ARCHIVE_URL)
 SBETHE_ARCHIVE_SHA256 = "d5d4879c2073ada3bd799fe0727054549cd6ec65cc699acbd0ff25fd5c3c4144"
 SBETHE_DEPOSIT = "10.17632/7zw25f428t.2"
 _CHUNK = 1 << 20
@@ -211,15 +225,34 @@ def _download(url: str, destination: Path, label: str) -> str:
     return _stream(request, destination, label)
 
 
+def _describe_body(path: Path) -> str:
+    """Summarize a downloaded body that failed its digest check.
+
+    A host that is down often answers 200 with an HTML or JSON error page;
+    its size and first bytes make that obvious (#516).
+    """
+    try:
+        with path.open("rb") as stream:
+            head = stream.read(64)
+        size = path.stat().st_size
+    except OSError:
+        return "unreadable body"
+    if head.startswith(b"PK\x03\x04"):
+        return f"{size} bytes, a zip archive"
+    text = head.decode("utf-8", "replace").split("\n", 1)[0].strip()
+    return f"{size} bytes, not a zip archive (starts {text[:40]!r})"
+
+
 def _obtain(
     archive: Path | None, urls: tuple[str, ...], work: Path, label: str, expected: str
-) -> Path:
-    """Return a verified archive: a local copy if given, else a download.
+) -> tuple[Path, str | None]:
+    """Return a verified archive and the URL that served it.
 
-    The digest is checked before anything is extracted, whichever the
-    source, so a local copy is exactly as trusted as the network. Download
-    locations are tried in order; one that fails or serves other bytes is
-    skipped, and the error lists every attempt.
+    A local copy, if given, is used instead of downloading and its URL is
+    ``None``. The digest is checked before anything is extracted, whichever
+    the source, so a local copy is exactly as trusted as the network.
+    Download locations are tried in order; one that fails or serves other
+    bytes is skipped, and the error lists every attempt.
     """
     if archive is not None:
         path = Path(archive)
@@ -232,7 +265,7 @@ def _obtain(
                 f"{label} archive SHA-256 mismatch: expected {expected}, received {actual}; "
                 "nothing was installed"
             )
-        return path
+        return path, None
     if not urls:
         raise DataFetchError(f"no download location is pinned for {label}")
     path = work / "archive.zip"
@@ -245,13 +278,13 @@ def _obtain(
                 failures.append(str(exc))
                 break
             if actual == expected:
-                return path
+                return path, url
             # A CDN can serve a truncated or interstitial body once and the pinned
             # bytes on the next request (#333); the digest is still enforced, so
             # retrying never weakens the pin.
             message = (
                 f"{label} archive SHA-256 mismatch: expected {expected}, "
-                f"received {actual} from {url}"
+                f"received {actual} from {url} ({_describe_body(path)})"
             )
         else:
             failures.append(message)
@@ -326,9 +359,9 @@ def fetch_sbethe(archive: str | Path | None = None) -> FetchResult:
     destination.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".sbethe-fetch-", dir=destination.parent) as temp:
         work = Path(temp)
-        bundle = _obtain(
+        bundle, source_url = _obtain(
             None if archive is None else Path(archive),
-            (SBETHE_ARCHIVE_URL,),
+            SBETHE_ARCHIVE_URLS,
             work,
             f"SBETHE data ({SBETHE_DEPOSIT})",
             SBETHE_ARCHIVE_SHA256,
@@ -349,7 +382,7 @@ def fetch_sbethe(archive: str | Path | None = None) -> FetchResult:
             # Exactly one of these is set: where the verified bytes actually
             # came from. The digest alone cannot say whether they were
             # downloaded or copied in from a local archive.
-            "source_url": SBETHE_ARCHIVE_URL if archive is None else None,
+            "source_url": source_url,
             "source_archive": None if archive is None else str(Path(archive).resolve()),
         }
         (staged / ".pyrite-fetch.json").write_text(
@@ -450,7 +483,7 @@ def _install_release(
     with tempfile.TemporaryDirectory(prefix=f".{code}-fetch-", dir=destination) as temp:
         work = Path(temp)
         label = f"{name} tables ({pinned.upstream})"
-        bundle_path = _obtain(
+        bundle_path, _ = _obtain(
             None if archive is None else Path(archive),
             pinned.urls,
             work,
@@ -590,6 +623,8 @@ __all__ = [
     "FetchResult",
     "SBETHE_ARCHIVE_SHA256",
     "SBETHE_ARCHIVE_URL",
+    "SBETHE_ARCHIVE_URLS",
+    "SBETHE_MIRROR_URL",
     "fetch_bremslib",
     "fetch_elsepa",
     "fetch_sbethe",

@@ -123,15 +123,22 @@ and release assets are public, so downloads need no GitHub token.
 * - `mirror-eadl2025-1`
   - `EADL2025.ALL` (fallback after LLNL)
   - `pyrite.datasets.EADL`
+* - `mirror-sbethe2-1`
+  - `sbethe-7zw25f428t-v2.zip` (unmodified SBETHE deposit v2 zip, tried before Mendeley)
+  - `pyrite.xsgen.fetch.SBETHE_ARCHIVE_URLS`
 ```
 
 Each index and dataset lists its download locations in order (`archive.urls`
 in the table indexes, `Dataset.urls` in `pyrite.datasets`): upstream first
 where one exists, then PyRITE's release, later a Zenodo record. A location
 that fails or serves other bytes is skipped; the pinned SHA-256 decides what
-installs, so adding a mirror cannot change it. The SBETHE `sdbase/` database
-stays upstream-only (its redistribution terms are unconfirmed), and NIST SRD 64
-Mott tables are never hosted. `pyrite tables fetch` without a code installs
+installs, so adding a mirror cannot change it. The SBETHE archive is the
+exception to upstream-first: Mendeley Data has answered HTTP 200 with an error
+page instead of the zip (#516), so `pyrite tables fetch sbethe` tries the
+`mirror-sbethe2-1` copy first and Mendeley second. SBETHE is CC BY-NC 3.0, so
+the mirror is the unmodified upstream zip with attribution in its release
+notes, and stays a separately fetched download that is never bundled into a
+distributed artifact. NIST SRD 64 Mott tables are never hosted. `pyrite tables fetch` without a code installs
 everything.
 
 `pyrite tables fetch` downloads public release URLs directly without a token.
