@@ -35,17 +35,20 @@ import time
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
 
 import click
 
 from .._catalog_keys import material_keys
 from .._env import GENERATED_INVOCATION_ENV, set_canonical_env
-from .._progress import _electron_progress_fields, _ProgressTimer, _write_progress_record
+from .._progress import (  # noqa: F401  (re-exported: progress helpers' historical scan import path)
+    _ProgressTimer,
+    _write_progress_record,
+)
 from ..console import dashboard as _dashboard
 from ..console import json as cli_json
 from ..console import output as _cli_core
 from ..console.outputs import output_dir
+from ._material_progress import MaterialProgress, start_performance_logger
 
 # Lazy runtime bindings keep help fast while preserving monkeypatchable module
 # seams used by focused driver tests.
@@ -816,20 +819,7 @@ def _run_material(args, material, max_seconds=None):
     summary = format_penetration_watchdog_summary(dropped, material=material)
     if summary is not None:
         print(summary)
-    print(
-        f"{material} [{getattr(args, 'detector_id', 'default')}]: {len(cases)} cases across "
-        f"{len({c['name'] for c in cases})} configs "
-        f"[profile={fidelity}, parameters={identity['parameter_sha256'][:12]}]"
-        + (" (quick grid)" if args.quick else "")
-        + ("" if settings.emission == "incoherent" else f" ({settings.emission})")
-    )
-    # read the RESOLVED orientation off the first case, not the Sweep request:
-    # HOPG/h-BN hand-pin hkl_list and bypass dominant_reflections entirely, so
-    # echoing sweep.n_families would claim a knob that's actually inert for them.
-    print(
-        f"crystal orientation: beam_uvw={cases[0]['beam_uvw']} "
-        f"hkl_list ({len(cases[0]['hkl_list'])} reflections)={cases[0]['hkl_list']}"
-    )
+    _print_sweep_header(args, material, cases, settings, identity)
 
     # Always pass an explicit path named for the catalog material key: run_sweep's
     # default derives the name from the film crystal, which would make a named
@@ -838,250 +828,17 @@ def _run_material(args, material, max_seconds=None):
     # its coarse off-grid points never contaminate the real per-material sweep.
     ckpt = os.path.join(args.checkpoint_dir, stem)
     results = {}
-    progress_file = getattr(args, "progress_file", None)
-    progress_phase = getattr(args, "progress_phase", None)
-    has_dashboard = hasattr(args, "_job_records")
-    latest_progress = {
-        "total_cases": len(cases),
-        "cached_cases": 0,
-        "completed_new_cases": 0,
-    }
-    if progress_file is not None and Path(progress_file).is_file():
-        try:
-            previous = json.loads(Path(progress_file).read_text(encoding="utf-8"))
-            if (
-                previous.get("material") == material
-                and previous.get("total_cases") == len(cases)
-                and all(
-                    isinstance(previous.get(key), int)
-                    for key in ("cached_cases", "completed_new_cases")
-                )
-                and 0 <= previous["cached_cases"] + previous["completed_new_cases"] <= len(cases)
-            ):
-                latest_progress.update(
-                    cached_cases=previous["cached_cases"],
-                    completed_new_cases=previous["completed_new_cases"],
-                )
-        except (OSError, ValueError, TypeError):
-            pass
-    latest_case = {}
-    last_completed_case = {}
-    # Cost weighting uses sweep.case_cost and run_sweep's cached/done split to
-    # track relative matmul work; scan_app.py uses the same meter locally.
-    latest_cost = {}
-    initial_done_cost = None
-    progress_timer = _ProgressTimer(progress_file) if progress_file is not None else None
-    runtime_info = {}
-    timing_info: dict[str, Any] = {
-        "checkpoint_count": 0,
-        "checkpoint_seconds_total": 0.0,
-        "gpu_oom_retry_count_total": 0,
-        "gpu_feed_wait_fraction": None,
-    }
-    activity_info = {
-        "phase": "setup",
-        "active_case": None,
-        "in_flight_case_count": 0,
-    }
-    performance_state = {"state": "running"}
-    performance_lock = threading.Lock()
-
-    def _case_summary(case):
-        from .._backend import BackendResourceError
-        from ..montecarlo import runner as montecarlo_runner
-
-        # The runtime plan is informational here. A grid the device budget
-        # cannot admit is the scheduler's to handle (CPU fallback or refusal);
-        # progress reporting must not raise it first.
-        try:
-            plan = montecarlo_runner.case_runtime_plan(case)
-        except BackendResourceError as error:
-            plan = {"runtime_plan_error": str(error)}
-        return {
-            "configuration": str(case["name"]),
-            "energy_keV": round(float(case["E0_keV"]), 3),
-            "tilt_deg": round(float(case["tilt_deg"]), 2),
-            "azimuth_deg": round(float(case["tilt_azim_deg"]), 2),
-            "thickness_um": round(float(case["thickness_ang"]) / 1e4, 4),
-            **plan,
-        }
-
-    def _note_case(case):
-        # Completion callbacks are not active-case signals. Keep this separately
-        # so the dashboard never presents a finished frontier as NOW TESTING.
-        with performance_lock:
-            last_completed_case.clear()
-            last_completed_case.update(_case_summary(case))
-
-    def _record_cost(done_cost, total_cost):
-        nonlocal initial_done_cost
-        with performance_lock:
-            if initial_done_cost is None:
-                initial_done_cost = done_cost
-            latest_cost.update(done_cost=done_cost, total_cost=total_cost)
-
-    def _record_progress(completed_new_cases, total_cases, cached_cases):
-        with performance_lock:
-            latest_progress.update(
-                total_cases=total_cases,
-                cached_cases=cached_cases,
-                completed_new_cases=completed_new_cases,
-            )
-            progress_snapshot = dict(latest_progress)
-            cost_snapshot = dict(latest_cost)
-            case_snapshot = dict(latest_case) or None
-            electron_snapshot = _electron_progress_fields(activity_info) if case_snapshot else {}
-
-        computed_cost = (
-            None
-            if initial_done_cost is None or "done_cost" not in cost_snapshot
-            else max(0.0, cost_snapshot["done_cost"] - initial_done_cost)
-        )
-        if hasattr(args, "_job_records"):
-            rec = {
-                "material": material,
-                "state": "running",
-                "total_cases": progress_snapshot["total_cases"],
-                "cached_cases": progress_snapshot["cached_cases"],
-                "completed_new_cases": progress_snapshot["completed_new_cases"],
-            }
-            if case_snapshot:
-                rec["current"] = case_snapshot
-            if activity_info.get("phase"):
-                rec["activity"] = activity_info["phase"]
-            if last_completed_case:
-                rec["last_completed"] = dict(last_completed_case)
-            if "done_cost" in cost_snapshot and "total_cost" in cost_snapshot:
-                rec["done_cost"] = cost_snapshot["done_cost"]
-                rec["total_cost"] = cost_snapshot["total_cost"]
-            rec.update(electron_snapshot)
-            if progress_timer:
-                rec.update(
-                    progress_timer.snapshot(
-                        completed_new_cases=progress_snapshot["completed_new_cases"],
-                        computed_cost=computed_cost,
-                    )
-                )
-            args._job_records[material] = rec
-
-        if progress_file is not None:
-            assert progress_timer is not None
-            _write_progress_record(
-                progress_file,
-                material=material,
-                phase=progress_phase,
-                state="running",
-                current=case_snapshot,
-                activity=activity_info.get("phase"),
-                last_completed=dict(last_completed_case) or None,
-                **progress_snapshot,
-                **cost_snapshot,
-                **electron_snapshot,
-                **progress_timer.snapshot(
-                    completed_new_cases=progress_snapshot["completed_new_cases"],
-                    computed_cost=computed_cost,
-                ),
-            )
-
-    def _record_runtime(info):
-        with performance_lock:
-            runtime_info.clear()
-            runtime_info.update(info)
-
-    def _record_timing(info):
-        with performance_lock:
-            checkpoint_seconds = info.get("checkpoint_seconds")
-            if checkpoint_seconds is not None:
-                timing_info["checkpoint_count"] += 1
-                timing_info["checkpoint_seconds"] = checkpoint_seconds
-                timing_info["checkpoint_seconds_total"] += checkpoint_seconds
-            retries = info.get("gpu_oom_retry_count", 0)
-            timing_info["gpu_oom_retry_count_total"] += retries
-            for key, value in info.items():
-                if key == "gpu_oom_retry_count":
-                    continue
-                if key in {
-                    "transport_seconds",
-                    "spectrum_seconds",
-                    "driver_wait_seconds",
-                }:
-                    timing_info[f"last_{key}"] = value
-                else:
-                    timing_info[key] = value
-            wait = timing_info.get("driver_wait_seconds_total", 0.0)
-            spectrum = timing_info.get("spectrum_seconds_total", 0.0)
-            denominator = wait + spectrum
-            timing_info["gpu_feed_wait_fraction"] = wait / denominator if denominator > 0 else None
-
-    def _record_activity(info):
-        info = dict(info)
-        active = info.pop("case", None)
-        active_case = _case_summary(active) if active is not None else None
-        raw_phase = info.get("phase")
-        phase = raw_phase if raw_phase in {"loading", "saving", "handoff"} else "computing"
-        with performance_lock:
-            activity_info.clear()
-            activity_info.update(info, phase=phase, active_case=active_case)
-            latest_case.clear()
-            if active_case is not None and phase == "computing":
-                latest_case.update(active_case)
-        _record_progress(
-            latest_progress["completed_new_cases"],
-            latest_progress["total_cases"],
-            latest_progress["cached_cases"],
-        )
-
-    def _performance_context():
-        with performance_lock:
-            return {
-                **runtime_info,
-                **latest_progress,
-                **latest_cost,
-                **timing_info,
-                **activity_info,
-                "current": dict(latest_case) or None,
-                **performance_state,
-            }
-
-    if progress_file is not None:
-        assert progress_timer is not None
-        _write_progress_record(
-            progress_file,
-            material=material,
-            phase=progress_phase,
-            state="running",
-            **latest_progress,
-            **progress_timer.snapshot(),
-        )
-    performance_logger = None
-    performance_profile = getattr(args, "performance_profile", None)
-    if performance_profile is not None:
-        from ..campaign.profiles import _jsonable
-        from ..perf.performance_profile import PerformanceLogger
-
-        performance_dir = getattr(args, "performance_dir", None)
-        performance_root = Path(performance_dir) if performance_dir else output_dir("performance")
-        profile_dir = performance_root / performance_profile
-        performance_logger = PerformanceLogger(
-            profile_dir / f"{material}.ndjson",
-            profile=performance_profile,
-            material=material,
-            static={
-                "fidelity": fidelity,
-                "catalog_profile": identity.get("catalog_profile", "standard"),
-                "parameter_sha256": identity["parameter_sha256"],
-                "checkpoint_stem": stem,
-                "total_case_count": len(cases),
-                # Beam parameters now resolve through Sweep.beam, including
-                # profile TOML values plus CLI overrides. Log that resolved
-                # dataclass instead of reconstructing legacy top-level fields.
-                "beam_parameters": _jsonable(sweep.beam),
-            },
-            context=_performance_context,
-            latest_path=profile_dir / f"{material}.latest.json",
-            interval_seconds=getattr(args, "performance_interval", 5.0),
-        )
-        performance_logger.start()
+    progress = MaterialProgress(args, material, len(cases))
+    progress.write_started()
+    performance_logger = start_performance_logger(
+        args,
+        material,
+        identity=identity,
+        stem=stem,
+        cases=cases,
+        sweep=sweep,
+        context=progress.performance_context,
+    )
     # Shared per-case cache gates. Default reads + writes; --recompute / --no-cache
     # / a -p perf run narrow this (see the `run` command). cache_read also drives
     # the per-stem resume, so a --no-cache/--recompute/perf run recomputes rather
@@ -1090,8 +847,7 @@ def _run_material(args, material, max_seconds=None):
     cache_write = getattr(args, "cache_write", True)
     # Opt-in transport artifacts (issue #159): absent unless --trajectories.
     capture_kw = {}
-    trajectory_dir = getattr(args, "trajectories", None)
-    if trajectory_dir is not None:
+    if getattr(args, "trajectories", None) is not None:
         from ._trajectory_capture import scan_trajectory_capture
 
         capture_kw["trajectory_capture"] = scan_trajectory_capture(
@@ -1101,8 +857,8 @@ def _run_material(args, material, max_seconds=None):
 
     content_key_fn = source_content_key_fn()
     try:
-        if progress_timer is not None:
-            progress_timer.start()
+        if progress.timer is not None:
+            progress.timer.start()
         result = run_sweep(
             cases,
             results,
@@ -1114,36 +870,12 @@ def _run_material(args, material, max_seconds=None):
             cache_read=cache_read,
             cache_write=cache_write,
             progress=not getattr(args, "no_progress", False),
-            on_progress=(
-                _record_progress
-                if progress_file is not None or performance_logger is not None or has_dashboard
-                else None
-            ),
-            on_case=(
-                _note_case
-                if progress_file is not None or performance_logger is not None or has_dashboard
-                else None
-            ),
-            on_runtime=_record_runtime if performance_logger is not None else None,
-            on_timing=_record_timing if performance_logger is not None else None,
-            on_activity=(
-                _record_activity
-                if progress_file is not None or performance_logger is not None or has_dashboard
-                else None
+            **progress.sweep_callbacks(
+                logged=performance_logger is not None, case_cost_fn=case_cost
             ),
             deadline=deadline,
             max_seconds=(None if deadline is None else max(0.0, deadline - time.monotonic())),
             dataset_identity=identity,
-            case_cost_fn=(
-                case_cost
-                if progress_file is not None or performance_logger is not None or has_dashboard
-                else None
-            ),
-            on_cost=(
-                _record_cost
-                if progress_file is not None or performance_logger is not None or has_dashboard
-                else None
-            ),
             metadata_only_complete=True,
             **capture_kw,
             observation=_sweep_observation(args, identity, settings, stem, content_key_fn),
@@ -1153,72 +885,21 @@ def _run_material(args, material, max_seconds=None):
         # is read as complete; every other falsy return fails loud as incomplete.
         complete = True if result is None else bool(result)
         if complete:
-            from ..checkpoints.campaign_lock import write_lock
-            from ..materials import CATALOG
-
-            catalog_profile = str(identity.get("catalog_profile", "standard"))
-            write_lock(
-                ckpt,
-                profile=catalog_profile,
-                material=material,
-                dataset_identity=identity,
-                energy_grid_digest=CATALOG.profile_energy_grid_ref(catalog_profile, material),
-            )
+            _write_campaign_lock(ckpt, material, identity)
     except BaseException:
-        with performance_lock:
-            performance_state["state"] = "failed"
-        if progress_file is not None:
-            assert progress_timer is not None
-            _write_progress_record(
-                progress_file,
-                material=material,
-                phase=progress_phase,
-                state="failed",
-                **latest_progress,
-                **latest_cost,
-                **progress_timer.snapshot(
-                    completed_new_cases=latest_progress["completed_new_cases"],
-                    computed_cost=(
-                        None
-                        if initial_done_cost is None or "done_cost" not in latest_cost
-                        else max(0.0, latest_cost["done_cost"] - initial_done_cost)
-                    ),
-                ),
-            )
+        progress.set_state("failed")
+        progress.write_failed()
         if performance_logger is not None:
             performance_logger.close("failed")
         raise
-    with performance_lock:
-        performance_state["state"] = "done" if complete else "paused"
+    state = "done" if complete else "paused"
+    progress.set_state(state)
     if performance_logger is not None:
-        performance_logger.close("done" if complete else "paused")
-
-    if hasattr(args, "_job_records") and material in args._job_records:
-        args._job_records[material]["state"] = "done" if complete else "paused"
-
-    if progress_file is not None:
-        assert progress_timer is not None
-        _write_progress_record(
-            progress_file,
-            material=material,
-            phase=progress_phase,
-            state="done" if complete else "paused",
-            activity="handoff",
-            last_completed=dict(last_completed_case) or None,
-            **latest_progress,
-            **latest_cost,
-            **progress_timer.snapshot(
-                completed_new_cases=latest_progress["completed_new_cases"],
-                computed_cost=(
-                    None
-                    if initial_done_cost is None or "done_cost" not in latest_cost
-                    else max(0.0, latest_cost["done_cost"] - initial_done_cost)
-                ),
-            ),
-        )
+        performance_logger.close(state)
+    progress.finish(state)
     n = max(
         sum(len(v) for v in results.values()),
-        latest_progress["cached_cases"] + latest_progress["completed_new_cases"],
+        progress.latest_progress["cached_cases"] + progress.latest_progress["completed_new_cases"],
     )
     if complete:
         print(f"{_cli_core.paint('done', 'done')} -> {args.checkpoint_dir}/{stem}/ ({n} records)")
@@ -1228,3 +909,34 @@ def _run_material(args, material, max_seconds=None):
             f"{args.checkpoint_dir}/{stem}/ ({n} records)"
         )
     return complete
+
+
+def _print_sweep_header(args, material, cases, settings, identity):
+    print(
+        f"{material} [{getattr(args, 'detector_id', 'default')}]: {len(cases)} cases across "
+        f"{len({c['name'] for c in cases})} configs "
+        f"[profile={identity['fidelity']}, parameters={identity['parameter_sha256'][:12]}]"
+        + (" (quick grid)" if args.quick else "")
+        + ("" if settings.emission == "incoherent" else f" ({settings.emission})")
+    )
+    # read the RESOLVED orientation off the first case, not the Sweep request:
+    # HOPG/h-BN hand-pin hkl_list and bypass dominant_reflections entirely, so
+    # echoing sweep.n_families would claim a knob that's actually inert for them.
+    print(
+        f"crystal orientation: beam_uvw={cases[0]['beam_uvw']} "
+        f"hkl_list ({len(cases[0]['hkl_list'])} reflections)={cases[0]['hkl_list']}"
+    )
+
+
+def _write_campaign_lock(ckpt, material, identity):
+    from ..checkpoints.campaign_lock import write_lock
+    from ..materials import CATALOG
+
+    catalog_profile = str(identity.get("catalog_profile", "standard"))
+    write_lock(
+        ckpt,
+        profile=catalog_profile,
+        material=material,
+        dataset_identity=identity,
+        energy_grid_digest=CATALOG.profile_energy_grid_ref(catalog_profile, material),
+    )
