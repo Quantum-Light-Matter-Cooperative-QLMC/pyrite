@@ -479,9 +479,12 @@ def _(mo, mode_ui):
 
         {waist} {impact_x} {impact_y} {tilt_x} {tilt_y} {oam}
 
-        Waist w means exp(-r²/w²); impact is relative to the projected cell origin.
-        The equal ±1 mixture adds probabilities, with equal incident weights.
-        Tilt is a separate carrier angle. Larger statistics belong on remote compute.
+        Waist w means exp(-r²/w²); impact is relative to the projected cell origin,
+        drawn at the center of each map. The equal ±1 mixture adds probabilities,
+        with equal incident weights. Tilt is a separate carrier angle. The app
+        records 41 depths and caps grid samples × steps × trajectories at 1.1e9
+        (1 mm coherent at 32² and 10 Å steps, about a minute; ~300 µm MCWF with
+        32 electrons). Larger studies belong on remote compute.
         """
         )
         .batch(
@@ -491,8 +494,27 @@ def _(mo, mode_ui):
             mode=mo.ui.dropdown(["coherent", "mcwf"], value="coherent", label="Evolution"),
             grid=mo.ui.dropdown([16, 32, 48], value=32, label="Grid samples per axis"),
             cells=mo.ui.slider(1, 3, value=1, label="Cells per axis"),
-            depth=mo.ui.dropdown([50, 100, 200], value=100, label="Depth (Å)"),
-            step=mo.ui.dropdown([1, 2, 5], value=5, label="Step (Å)"),
+            depth=mo.ui.dropdown(
+                {
+                    "10 nm": 100,
+                    "50 nm": 500,
+                    "100 nm": 1000,
+                    "500 nm": 5000,
+                    "1 µm": 10_000,
+                    "2 µm": 20_000,
+                    "5 µm": 50_000,
+                    "10 µm": 100_000,
+                    "20 µm": 200_000,
+                    "50 µm": 500_000,
+                    "100 µm": 1_000_000,
+                    "200 µm": 2_000_000,
+                    "500 µm": 5_000_000,
+                    "1 mm": 10_000_000,
+                },
+                value="1 µm",
+                label="Depth",
+            ),
+            step=mo.ui.dropdown([1, 2, 5, 10, 20], value=5, label="Step (Å)"),
             electrons=mo.ui.slider(1, 32, value=16, label="MCWF electrons"),
             seed=mo.ui.number(0, 100000, value=0, label="Seed"),
             preset=mo.ui.dropdown(
@@ -515,7 +537,11 @@ def _(mo, mode_ui):
 
 @app.cell
 def _(axial_form, mo):
-    from pyrite.apps.axial_channeling import axial_demo_figure, solve_axial_demo
+    from pyrite.apps.axial_channeling import (
+        axial_demo_depths,
+        axial_demo_figure,
+        solve_axial_demo,
+    )
     from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
 
     mo.stop(axial_form.value is None, mo.md("Choose settings and press **Run axial diagnostic**."))
@@ -526,7 +552,7 @@ def _(axial_form, mo):
         kinetic_energy_eV=_v["energy"] * 1e6,
         cells=(_v["cells"],) * 2,
         shape=(_v["grid"],) * 2,
-        depths_ang=tuple(range(0, _v["depth"] + 1, 10)),
+        depths_ang=axial_demo_depths(_v["depth"], _v["step"]),
         step_ang=_v["step"],
         tilt_rad=(_v["tilt_x"] * 1e-3, _v["tilt_y"] * 1e-3),
         mode=_v["mode"],
@@ -534,9 +560,12 @@ def _(axial_form, mo):
         seed=int(_v["seed"]),
         oam_string=0 if _v["oam"] else None,
     )
-    axial_result = solve_axial_demo(
-        axial_config, _v["preset"], _v["waist"], (_v["impact_x"], _v["impact_y"])
-    )
+    try:
+        axial_result = solve_axial_demo(
+            axial_config, _v["preset"], _v["waist"], (_v["impact_x"], _v["impact_y"])
+        )
+    except ValueError as _error:
+        mo.stop(True, mo.md(f"**Not run:** {_error}"))
     return axial_demo_figure, axial_result
 
 
@@ -557,7 +586,7 @@ def _(axial_conditional_ui, axial_demo_figure, axial_result, axial_sample_ui, mo
     _index = axial_sample_ui.value
     _fig = axial_demo_figure(axial_result, _index, axial_conditional_ui.value)
     _notes = (
-        f"**{axial_result.config.mode} · depth {axial_result.depths_ang[_index]:g} Å** · "
+        f"**{axial_result.config.mode} · depth {axial_result.depths_ang[_index] / 1e4:.4g} µm** · "
         f"surviving weight {axial_result.surviving[_index]:.6f}. "
         "Density integrates to incident-electron survival, or one when conditioned "
         "(zero if extinct). Coherent norm is not scattering survival. "
@@ -572,12 +601,15 @@ def _(axial_conditional_ui, axial_demo_figure, axial_result, axial_sample_ui, mo
         _ofig, _oax = _axial_plt.subplots()
         for _i, _ell in enumerate(axial_result.oam_ells):
             _oax.plot(
-                axial_result.depths_ang, axial_result.oam_populations[:, _i], label=f"ℓ={_ell}"
+                axial_result.depths_ang / 1e4,
+                axial_result.oam_populations[:, _i],
+                label=f"ℓ={_ell}",
             )
+        _ox, _oy = axial_result.oam_origin_ang
         _oax.set(
-            xlabel="Depth (Å)",
+            xlabel="Depth (µm)",
             ylabel="Pℓ per incident electron in disk",
-            title=f"OAM about string 0 at {axial_result.oam_origin_ang} Å; R=0.5 Å",
+            title=f"OAM about string 0 at ({_ox:.2f}, {_oy:.2f}) Å; R=0.5 Å",
         )
         _oax.legend(ncol=4, fontsize=7)
         _items.extend(

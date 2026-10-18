@@ -24,7 +24,7 @@ result = axial_diagnostic(
         kinetic_energy_eV=5e6,
         cells=(1, 1),
         shape=(32, 32),
-        depths_ang=tuple(range(0, 101, 10)),
+        depths_ang=tuple(range(0, 10_001, 250)),
         step_ang=5,
         mode="coherent",
         seed=0,
@@ -36,8 +36,13 @@ In `pyrite app channeling launch`, choose **Axial (experimental)** and press
 **Run axial diagnostic** with the default settings to reproduce this solve.
 Depth and conditioning selectors redraw stored arrays; the last four distinct
 completed solves are cached. The axial branch waits for Run, so ordinary static
-export still executes the default planar demo. App bounds are 48² samples,
-3² cells, 200 Å depth, steps of at least 1 Å, and 32 MCWF electrons. These are
+export still executes the default planar demo. Depths run from 10 nm to 1 mm;
+the app records 41 evenly spaced depths (`axial_demo_depths`). App bounds are
+48² samples, 3² cells, steps of at least 1 Å, 32 MCWF electrons, and grid
+samples × steps × trajectories ≤ 1.1e9 (`APP_WORK_LIMIT`, at most about a minute
+on one core). At 32² and 10 Å steps this reaches 1 mm for a coherent pure state
+and about 300 µm for 32 MCWF electrons. Maps are drawn with the projected origin,
+and so string 0 and the default impact, at the panel center. These are
 illustrative statistics: run expensive studies through the remote workflow,
 not the interactive app or local heavy sweeps.
 

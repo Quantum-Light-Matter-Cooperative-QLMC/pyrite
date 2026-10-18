@@ -131,9 +131,46 @@ def test_axial_app_bounds_and_cache():
     figure = axial_demo_figure(result, 1, True)
     assert "No unique phase" in figure.axes[2].texts[0].get_text()
     plt.close(figure)
-    for updates in ({"shape": (64, 64)}, {"n_electrons": 33}, {"depths_ang": (0, 1000)}):
+    for updates in (
+        {"shape": (64, 64)},
+        {"n_electrons": 33},
+        {"depths_ang": tuple(range(0, 500, 10))},
+        {"depths_ang": (0.0, 1e8)},
+        {"mode": "mcwf", "n_electrons": 32, "depths_ang": (0.0, 1e7)},
+    ):
         with pytest.raises(ValueError, match="app limit"):
             solve_axial_demo(replace(config, **updates))
+
+
+def test_axial_app_depths_reach_dechanneling_scale():
+    from pyrite.apps.axial_channeling import APP_MAX_DEPTHS, axial_demo_depths
+
+    depths = axial_demo_depths(1e7, 10)
+    assert depths[0] == 0 and depths[-1] == 1e7 and len(depths) == APP_MAX_DEPTHS
+    np.testing.assert_allclose(np.mod(depths, 10), 0)
+    assert axial_demo_depths(100, 5) == tuple(float(5 * i) for i in range(21))
+    with pytest.raises(ValueError, match="at least one step"):
+        axial_demo_depths(1, 5)
+
+
+def test_axial_maps_center_the_origin_string():
+    import matplotlib.pyplot as plt
+
+    from pyrite.apps.axial_channeling import axial_demo_figure, solve_axial_demo
+    from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
+
+    result = solve_axial_demo(AxialDiagnosticConfig(shape=(16, 16), depths_ang=(0.0,)))
+    figure = axial_demo_figure(result, 0)
+    for ax, pick in ((figure.axes[0], np.argmin), (figure.axes[1], np.argmax)):
+        image = ax.images[0]
+        left, right, bottom, top = image.get_extent()
+        shown = image.get_array()
+        row, col = np.unravel_index(pick(shown), shown.shape)
+        x = left + (col + 0.5) * (right - left) / shown.shape[1]
+        y = bottom + (row + 0.5) * (top - bottom) / shown.shape[0]
+        assert abs(x) < 1e-12 and abs(y) < 1e-12
+        assert left < 0 < right and bottom < 0 < top
+    plt.close(figure)
 
 
 def test_axial_form_waits_for_run():
