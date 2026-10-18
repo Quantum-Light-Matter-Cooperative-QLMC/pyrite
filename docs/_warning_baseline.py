@@ -82,7 +82,9 @@ def _install_filter(app: Sphinx) -> None:
 
 
 def _check_filter(app: Sphinx, _exception: BaseException | None) -> None:
-    baseline = _BASELINES.pop(id(app))
+    baseline = _BASELINES.pop(id(app), None)
+    if baseline is None or _exception is not None:
+        return
     count = len(baseline.fingerprints)
     digest = baseline.digest()
     if count != EXPECTED_COUNT or digest != EXPECTED_SHA256:
