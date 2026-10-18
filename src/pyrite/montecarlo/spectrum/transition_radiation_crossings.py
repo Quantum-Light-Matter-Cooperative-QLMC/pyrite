@@ -257,6 +257,10 @@ def boundary_crossings(
 
 
 _FLIP = np.array([1.0, -1.0, -1.0])  # rotation by pi about x: the entrance face on top
+#: Fused CUDA kernel for CUDA CuPy arrays (``transition_radiation_jit_kernel``);
+#: a test patches it off to run the CuPy array route on the device. ROCm/HIP
+#: CuPy always takes the array route.
+_USE_JIT_TRANSITION = True
 
 
 def crossing_amplitudes(
@@ -288,6 +292,35 @@ def crossing_amplitudes(
 
     Validation: tr-crossing-superposition
     """
+    frame = _emission_frame(crossings, direction, layer_eps)
+    amplitude = interface_transition_radiation_amplitude(
+        photon_energy_eV,
+        frame.direction,
+        frame.layers,
+        1.0,
+        frame.velocity,
+        crossings.time_ang,
+        frame.position,
+        frame.face,
+        xp=xp,
+    )
+    scale = xp.asarray(crossings.charge.astype(float)[:, None] * frame.flip)
+    return amplitude * scale
+
+
+@dataclass(frozen=True)
+class _EmissionFrame:
+    """Crossings in the stack frame of the emitting face (that face on top)."""
+
+    direction: np.ndarray
+    layers: list
+    velocity: np.ndarray
+    position: np.ndarray
+    face: np.ndarray
+    flip: np.ndarray
+
+
+def _emission_frame(crossings: BoundaryCrossings, direction, layer_eps) -> _EmissionFrame:
     n = np.asarray(direction, dtype=float)
     if not (np.all(n[..., 2] > 0.0) or np.all(n[..., 2] < 0.0)):
         raise ValueError("directions must all leave through one face (one sign of n_z)")
@@ -300,19 +333,14 @@ def crossing_amplitudes(
     face = crossings.interface if forward else thickness.size - crossings.interface
     gamma = 1.0 + crossings.kinetic_energy_keV * 1e3 / M_E_EV
     velocity = np.sqrt(1.0 - 1.0 / gamma**2)[:, None] * crossings.direction
-    amplitude = interface_transition_radiation_amplitude(
-        photon_energy_eV,
+    return _EmissionFrame(
         n * flip,
         layers if forward else layers[::-1],
-        1.0,
         velocity * flip,
-        crossings.time_ang,
         crossings.position_ang * flip,
-        face,
-        xp=xp,
+        np.asarray(face, dtype=np.int64),
+        flip,
     )
-    scale = xp.asarray(crossings.charge.astype(float)[:, None] * flip)
-    return amplitude * scale
 
 
 def crossing_transition_radiation(
@@ -337,7 +365,9 @@ def crossing_transition_radiation(
     crossing alone: the independent-interface (dephased) limit, not the
     default thin-film model. ``n_electrons`` is the incident count (``Ne``),
     and ``max_elements`` bounds one chunk's ``len(s) * crossings`` (a single
-    history above it is evaluated alone).
+    history above it is evaluated alone). CUDA CuPy arrays take the fused
+    kernel of ``transition_radiation_jit_kernel``, which keeps no per-crossing
+    arrays and needs no chunks.
 
     ``coherence="bunch"`` adds coherent transition radiation (CTR) between
     histories. With ``S_e`` the summed field of history ``e``, ``G = sum |S_e|^2``
@@ -363,12 +393,57 @@ def crossing_transition_radiation(
     n = np.asarray(direction, dtype=float)
     shape = np.broadcast_shapes(energy.shape, n.shape[:-1])
     omega_nz2 = xp.asarray(np.broadcast_to(energy * n[..., 2] ** 2, shape))
-    total = xp.zeros(shape, dtype=float)
-    field = xp.zeros((*shape, 3), dtype=complex)
     order = np.argsort(crossings.electron_id, kind="stable")
     history = crossings.electron_id[order]
     starts = np.flatnonzero(np.r_[True, history[1:] != history[:-1]])[: history.size]
-    per_chunk = max(1, int(max_elements) // max(1, int(np.prod(shape, dtype=int))))
+    if history.size and _fused_kernel(xp):
+        total, field = _device_sums(
+            _take(crossings, order), starts, energy, n, layer_eps, coherence, shape
+        )
+    else:
+        total, field = _chunked_sums(
+            crossings, order, starts, energy, n, layer_eps, coherence, shape, max_elements, xp
+        )
+    if coherence == "bunch":
+        total = _bunch_power(
+            total, field, energy, shape, n_electrons, physical_electrons, form_factor, xp
+        )
+    return omega_nz2 * total / (16.0 * np.pi**4 * int(n_electrons))
+
+
+def _fused_kernel(xp) -> bool:
+    """CUDA CuPy (not ROCm/HIP) with the fused kernel enabled."""
+    if not _USE_JIT_TRANSITION or getattr(xp, "__name__", "") != "cupy":
+        return False
+    return not getattr(xp.cuda.runtime, "is_hip", False)
+
+
+def _device_sums(crossings, starts, energy, n, layer_eps, coherence, shape):
+    """Per-history power and bunch field of sorted crossings, fused on the CUDA device."""
+    import cupy
+
+    from .transition_radiation import _checked_kinematics, interface_response
+    from .transition_radiation_jit_kernel import history_sums
+
+    frame = _emission_frame(crossings, n, layer_eps)
+    _checked_kinematics(energy, frame.direction, frame.velocity)
+    stack = interface_response(energy, frame.direction, frame.layers, 1.0, xp=cupy)
+    count = crossings.interface.size
+    bounds = np.arange(count + 1) if coherence == "crossing" else np.r_[starts, count]
+    power, field = history_sums(
+        stack, frame.velocity, crossings.time_ang, frame.position, frame.face,
+        crossings.charge.astype(float), bounds,
+    )  # fmt: skip
+    field = field * cupy.asarray(frame.flip)
+    return power.reshape(shape), field.reshape((*shape, 3))
+
+
+def _chunked_sums(crossings, order, starts, energy, n, layer_eps, coherence, shape, budget, xp):
+    """Per-history power and bunch field over chunks of whole histories, on ``xp`` arrays."""
+    total = xp.zeros(shape, dtype=float)
+    field = xp.zeros((*shape, 3), dtype=complex)
+    history = crossings.electron_id[order]
+    per_chunk = max(1, int(budget) // max(1, int(np.prod(shape, dtype=int))))
     history_end = np.r_[starts[1:], history.size]
     lo = 0
     while lo < starts.size:
@@ -391,11 +466,7 @@ def crossing_transition_radiation(
         if coherence == "bunch":
             field += xp.sum(amplitude, axis=-2)
         lo = hi
-    if coherence == "bunch":
-        total = _bunch_power(
-            total, field, energy, shape, n_electrons, physical_electrons, form_factor, xp
-        )
-    return omega_nz2 * total / (16.0 * np.pi**4 * int(n_electrons))
+    return total, field
 
 
 def _bunch_power(grouped, field, energy, shape, n_electrons, physical_electrons, form_factor, xp):

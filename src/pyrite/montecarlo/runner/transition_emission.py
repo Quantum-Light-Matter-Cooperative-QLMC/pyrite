@@ -12,6 +12,12 @@ the continuum cutoff ``E_cut_brem_keV``; crossings after a history ends at the
 cutoff are not recorded. Permittivities are the independent-atom forward
 scattering of each transport layer's composition (Chantler ``f'``, ``f''``).
 
+On a CuPy (CUDA/ROCm) backend the crossing amplitudes, the stack solve and
+the history and bunch sums run on the device: each chunk of whole histories
+uploads its crossing records once, the fields accumulate on the device, and
+only the finished spectrum returns to the host. Other backends score on the
+host with NumPy.
+
 Validation: tr-crossing-superposition, tr-coherent-bunch
 """
 
@@ -19,6 +25,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..._backend import cp
 from ..spectrum.transition_radiation import composition_dielectric
 from ..spectrum.transition_radiation_crossings import (
     TRANSITION_MODEL,
@@ -55,8 +62,11 @@ def case_layer_eps(case, energy_eV) -> list[np.ndarray]:
     return eps
 
 
-def case_transition_spectrum(case, transport) -> np.ndarray:
+def case_transition_spectrum(case, transport, *, xp=None) -> np.ndarray:
     """TR on ``transport['E_grid']`` at ``transport['n_hat']`` (sample frame).
+
+    ``xp=None`` scores on the CuPy device when the backend has one, else with
+    NumPy. The result is a host array.
 
     Validation: tr-crossing-superposition, tr-coherent-bunch
     """
@@ -75,7 +85,7 @@ def case_transition_spectrum(case, transport) -> np.ndarray:
         from ..spectrum.coherent_population import physical_bunch_electrons
 
         population = physical_bunch_electrons(case)
-    return crossing_transition_radiation(
+    spectrum = crossing_transition_radiation(
         crossings,
         energy,
         direction,
@@ -83,7 +93,9 @@ def case_transition_spectrum(case, transport) -> np.ndarray:
         n_electrons=count,
         coherence=record["coherence"],
         physical_electrons=population,
+        xp=(np if cp is None else cp) if xp is None else xp,
     )
+    return spectrum.get() if hasattr(spectrum, "get") else np.asarray(spectrum)
 
 
 def block_transition_spectrum(case, segs, energy_eV, n_hat, ne_brem) -> np.ndarray:

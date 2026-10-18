@@ -57,6 +57,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -65,10 +66,12 @@ from ...materials.attenuation import _resolve_composition
 from ...materials.crystal import ALPHA_FS, HBARC_EV_ANG, HC_EV_ANG, M_E_EV, R_E_ANG, Z_TABLE
 
 __all__ = [
+    "InterfaceResponse",
     "TransitionRadiationOmission",
     "beta_from_kinetic_eV",
     "composition_dielectric",
     "ginzburg_frank_interface",
+    "interface_response",
     "interface_transition_radiation_amplitude",
     "medium_dielectric",
     "omission_tolerance",
@@ -413,20 +416,10 @@ def interface_transition_radiation_amplitude(
     _checked_kinematics(energy, n, v)
     if np.any((face < 0) | (face > len(layers))):
         raise ValueError("interface must index 0..len(layers)")
-    omega = xp.asarray(np.broadcast_to(energy, shape).ravel())
-    n = xp.asarray(np.broadcast_to(n, (*shape, 3)).reshape(-1, 3))
-    media = _stack_media(substrate_eps, layers, shape, xp)
-    k_perp = omega[:, None] * n[:, :2]
-    matrix, top, lam = _free_system(omega, k_perp, media, _interface_heights(layers), xp)
-    # Top-wave rows of the inverse: solve the transposed system once.
-    select = xp.zeros((omega.size, matrix.shape[1], 2), dtype=complex)
-    select[:, top, 0] = select[:, top + 1, 1] = 1.0
-    response = xp.linalg.solve(xp.swapaxes(matrix, 1, 2), select)  # (B, size, 2)
-    response = response.reshape(omega.size, -1, 4, 2)  # rows 4i..4i+3: interface i
-
+    stack = interface_response(energy, n, layers, substrate_eps, xp=xp)
+    omega, k_perp, eps = stack.omega, stack.k_perp, stack.eps
     v_dev = xp.asarray(v)[None]
     q = (omega[:, None] - xp.sum(k_perp[:, None] * v_dev[..., :2], axis=-1)) / v_dev[..., 2]
-    eps = xp.stack(media)  # (n_media, B)
     face_dev = xp.asarray(face)
     jump = []
     for offset, sign in ((1, -1.0), (0, 1.0)):
@@ -444,9 +437,51 @@ def interface_transition_radiation_amplitude(
         / HBARC_EV_ANG
     )
     source = (jump[0] + jump[1]) * phase[..., None]  # (B, K, 4)
-    e_t = xp.einsum("bkrc,bkr->bkc", response[:, face_dev], source)
-    e_z = -xp.sum(k_perp[:, None] * e_t, axis=-1) / lam[-1][:, None]
+    e_t = xp.einsum("bkrc,bkr->bkc", stack.response[:, face_dev], source)
+    e_z = -xp.sum(k_perp[:, None] * e_t, axis=-1) / stack.lam_top[:, None]
     return xp.concatenate([e_t, e_z[..., None]], axis=-1).reshape((*shape, face.size, 3))
+
+
+@dataclass(frozen=True)
+class InterfaceResponse:
+    """Crossing-independent part of :func:`interface_transition_radiation_amplitude`.
+
+    Flattened over the ``B`` broadcast energy/direction pairs, on ``xp``:
+    ``omega`` ``(B,)`` [eV], ``k_perp = omega n_perp`` ``(B, 2)``, the media
+    permittivities ``eps`` ``(n_media, B)`` (substrate first, vacuum last),
+    the top-wave response ``(B, n_interfaces, 4, 2)`` to a tangential
+    ``(E_x, E_y, H_x, H_y)`` jump at each interface, and the vacuum ``lambda``.
+    """
+
+    shape: tuple[int, ...]
+    omega: Any
+    k_perp: Any
+    eps: Any
+    response: Any
+    lam_top: Any
+
+
+def interface_response(
+    photon_energy_eV, direction, layers, substrate_eps, *, xp=np
+) -> InterfaceResponse:
+    """Stack solve shared by every crossing: one transposed solve per energy/direction.
+
+    Validation: tr-crossing-superposition
+    """
+    energy = np.asarray(photon_energy_eV, dtype=float)
+    n = np.asarray(direction, dtype=float)
+    shape = np.broadcast_shapes(energy.shape, n.shape[:-1])
+    omega = xp.asarray(np.broadcast_to(energy, shape).ravel())
+    n = xp.asarray(np.broadcast_to(n, (*shape, 3)).reshape(-1, 3))
+    media = _stack_media(substrate_eps, layers, shape, xp)
+    k_perp = omega[:, None] * n[:, :2]
+    matrix, top, lam = _free_system(omega, k_perp, media, _interface_heights(layers), xp)
+    # Top-wave rows of the inverse: solve the transposed system once.
+    select = xp.zeros((omega.size, matrix.shape[1], 2), dtype=complex)
+    select[:, top, 0] = select[:, top + 1, 1] = 1.0
+    response = xp.linalg.solve(xp.swapaxes(matrix, 1, 2), select)  # (B, size, 2)
+    response = response.reshape(omega.size, -1, 4, 2)  # rows 4i..4i+3: interface i
+    return InterfaceResponse(shape, omega, k_perp, xp.stack(media), response, lam[-1])
 
 
 def omission_tolerance(target_rse: float) -> float:
