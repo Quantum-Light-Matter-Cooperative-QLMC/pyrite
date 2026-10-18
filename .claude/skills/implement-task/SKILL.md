@@ -33,6 +33,8 @@ description: Use when implementing a coherent, bounded slice of a PyRITE GitHub 
    Follow `AGENTS.md` "Choose tests by impact": changed node/module first,
    affected consumers next, domain suite only for domain-wide changes. `verify`
    is static-only; never substitute a full test run for choosing affected tests.
+   After source edits run `pyrite-dev complexity --check`; handle a failure per
+   `AGENTS.md` (simplify first; `--write` only with a stated reason, reported).
 3. When a slice is independently valid and `commits` permits: inspect status and
    scoped diff, stage explicit assigned paths, run focused checks, and commit.
    Never `git add .`, commit known broken state, or rewrite another worker's

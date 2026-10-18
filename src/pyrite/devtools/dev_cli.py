@@ -36,7 +36,10 @@ Commands:
     sync-skills mirror .agents/skills into .claude/skills
     check-skills validate the canonical skills and exact mirror
     check-lines check source modules against the 1,250-line budget
-    verify     check types, lint, formatting, source size, docs, and imports (no tests)
+    complexity report source complexity; --check runs the high-CC ratchet,
+               --write rewrites its baseline
+    verify     check types, lint, formatting, source size, complexity ratchet,
+               docs, and imports (no tests)
     cli-reference     write or --check docs/repo-design/cli/cli-reference.md
     cli-deprecations  write or --check docs/repo-design/cli/cli-deprecations.md
     validation-ledger write or --check generated validation-ledger views
@@ -308,6 +311,7 @@ def cmd_repo_map(args: argparse.Namespace) -> None:
         "uv run pyrite-dev format",
         "uv run pyrite-dev typecheck",
         "uv run pyrite-dev check-lines",
+        "uv run pyrite-dev complexity --check",
         "uv run pyrite-dev precommit",
         "uv run pyrite-dev test path/to/test.py -k test_name",
         "uv run pyrite-dev test-suite transport",
@@ -672,12 +676,32 @@ def cmd_check_lines(_: argparse.Namespace) -> None:
         raise AgentToolingError(f"source modules exceed {SOURCE_LINE_LIMIT} lines: {details}")
 
 
+def cmd_complexity(args: argparse.Namespace) -> None:
+    from pyrite.devtools.complexity import ComplexityToolError, run
+
+    try:
+        status = run(
+            ROOT,
+            scope=getattr(args, "scope", "src"),
+            check=getattr(args, "check", False),
+            write=getattr(args, "write", False),
+            as_json=getattr(args, "json", False),
+            top=getattr(args, "top", 15),
+            churn=getattr(args, "churn", None),
+        )
+    except ComplexityToolError as exc:
+        raise SystemExit(f"complexity: {exc}") from exc
+    if status:
+        raise SystemExit(status)
+
+
 def cmd_verify(args: argparse.Namespace) -> None:
     """Run static repository gates; test selection is always explicit."""
     cmd_typecheck(args)
     cmd_lint(args)
     run("-m", "ruff", "format", "--check", ".")
     cmd_check_lines(args)
+    cmd_complexity(argparse.Namespace(check=True))
     cmd_docs(argparse.Namespace(linkcheck=False))
     cmd_imports(args)
 
@@ -826,6 +850,13 @@ def cmd_startup(args: argparse.Namespace) -> None:
     from pyrite.devtools.startup import run
 
     run(args)
+
+
+def _positive_int(value: str) -> int:
+    count = int(value)
+    if count < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return count
 
 
 def _positive_repeats(value: str) -> int:
@@ -978,10 +1009,37 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     smoke.add_argument("--material", default="hopg")
     smoke.add_argument("--output-dir", default="smoke_out")
     smoke.set_defaults(func=cmd_smoke)
+    complexity = sub.add_parser(
+        "complexity",
+        help="report source complexity or run the high-CC ratchet",
+        description=(
+            "Report Radon CC/MI and optional scc inventory and git churn; "
+            "--check fails on new or worsened routines above CC 20."
+        ),
+    )
+    complexity_mode = complexity.add_mutually_exclusive_group()
+    complexity_mode.add_argument(
+        "--check", action="store_true", help="fail on new or worsened high-CC routines"
+    )
+    complexity_mode.add_argument(
+        "--write", action="store_true", help="rewrite the baseline and print its changes"
+    )
+    complexity_mode.add_argument("--json", action="store_true", help="emit the report as JSON")
+    complexity.add_argument(
+        "--scope", choices=("src", "tests"), default="src", help="tests are report-only"
+    )
+    complexity.add_argument("--top", type=_positive_int, default=15, help="list length")
+    complexity.add_argument(
+        "--churn", type=_positive_int, metavar="N", help="add git churn over N commits"
+    )
+    complexity.set_defaults(func=cmd_complexity)
     verify = sub.add_parser(
         "verify",
         help="run static repository checks (no tests)",
-        description="Check types, lint, formatting, source size, docs, and imports; no tests run.",
+        description=(
+            "Check types, lint, formatting, source size, complexity ratchet, docs, and imports; "
+            "no tests run."
+        ),
     )
     verify.add_argument(
         "--skip-tests",

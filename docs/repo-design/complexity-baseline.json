@@ -1,0 +1,718 @@
+{
+  "schema": 1,
+  "scope": "src/pyrite",
+  "threshold": 20,
+  "tool": {
+    "radon": "6.0.1"
+  },
+  "routines": [
+    {
+      "path": "src/pyrite/_catalog_layout.py",
+      "name": "source_files",
+      "cc": 23
+    },
+    {
+      "path": "src/pyrite/_cxr_grid_policy.py",
+      "name": "resolve_cxr_grid_policy",
+      "cc": 33
+    },
+    {
+      "path": "src/pyrite/_cxr_vocabulary.py",
+      "name": "translate_catalog_text",
+      "cc": 22
+    },
+    {
+      "path": "src/pyrite/_numerics.py",
+      "name": "Numerics.__post_init__",
+      "cc": 21
+    },
+    {
+      "path": "src/pyrite/_precision.py",
+      "name": "Precision.__post_init__",
+      "cc": 39
+    },
+    {
+      "path": "src/pyrite/apps/trace_app.py",
+      "name": "_.penetration_tab",
+      "cc": 36
+    },
+    {
+      "path": "src/pyrite/campaign/beam.py",
+      "name": "Beam.from_spec",
+      "cc": 29
+    },
+    {
+      "path": "src/pyrite/campaign/config.py",
+      "name": "material_sweep",
+      "cc": 38
+    },
+    {
+      "path": "src/pyrite/campaign/front_matching.py",
+      "name": "phase_matched_front_for_scene",
+      "cc": 24
+    },
+    {
+      "path": "src/pyrite/campaign/longitudinal.py",
+      "name": "LongitudinalDistribution.__post_init__",
+      "cc": 23
+    },
+    {
+      "path": "src/pyrite/campaign/profiles.py",
+      "name": "_identity_v1",
+      "cc": 59
+    },
+    {
+      "path": "src/pyrite/campaign/single_scene.py",
+      "name": "resolve_pixel_scene",
+      "cc": 31
+    },
+    {
+      "path": "src/pyrite/campaign/sweep.py",
+      "name": "BeamSpec.gdf_beam",
+      "cc": 28
+    },
+    {
+      "path": "src/pyrite/campaign/sweep.py",
+      "name": "build_cases",
+      "cc": 97
+    },
+    {
+      "path": "src/pyrite/checkpoints/_result_v2.py",
+      "name": "_Reader._decode_column",
+      "cc": 24
+    },
+    {
+      "path": "src/pyrite/checkpoints/_result_v2.py",
+      "name": "_Writer._encode_column",
+      "cc": 26
+    },
+    {
+      "path": "src/pyrite/checkpoints/archive.py",
+      "name": "union_checkpoint",
+      "cc": 21
+    },
+    {
+      "path": "src/pyrite/checkpoints/checkpoint_cleanup.py",
+      "name": "clear_checkpoints",
+      "cc": 25
+    },
+    {
+      "path": "src/pyrite/checkpoints/recompute.py",
+      "name": "rebrem_checkpoints",
+      "cc": 41
+    },
+    {
+      "path": "src/pyrite/checkpoints/recompute.py",
+      "name": "recxr_checkpoints",
+      "cc": 29
+    },
+    {
+      "path": "src/pyrite/checkpoints/recompute_defaults.py",
+      "name": "dataset_context",
+      "cc": 34
+    },
+    {
+      "path": "src/pyrite/cli/commands/_beam_shared.py",
+      "name": "collect_beam_updates",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/cli/commands/_pixel_detector_shared.py",
+      "name": "_acquisition_changes",
+      "cc": 23
+    },
+    {
+      "path": "src/pyrite/cli/commands/_profile_show.py",
+      "name": "emit_show",
+      "cc": 34
+    },
+    {
+      "path": "src/pyrite/cli/commands/_remote_actions.py",
+      "name": "_cli_start",
+      "cc": 30
+    },
+    {
+      "path": "src/pyrite/cli/commands/profile.py",
+      "name": "remove_command",
+      "cc": 26
+    },
+    {
+      "path": "src/pyrite/cli/commands/profile.py",
+      "name": "set_command",
+      "cc": 30
+    },
+    {
+      "path": "src/pyrite/cli/commands/remote.py",
+      "name": "_reject_exclusive_start_flags",
+      "cc": 23
+    },
+    {
+      "path": "src/pyrite/cli/commands/remote.py",
+      "name": "_reject_start_allocation_conflicts",
+      "cc": 21
+    },
+    {
+      "path": "src/pyrite/cli/commands/remote.py",
+      "name": "pull_command",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/cli/commands/scan.py",
+      "name": "_command",
+      "cc": 84
+    },
+    {
+      "path": "src/pyrite/cli/commands/tables.py",
+      "name": "verify_command",
+      "cc": 21
+    },
+    {
+      "path": "src/pyrite/cli/commands/trajectories.py",
+      "name": "export_command",
+      "cc": 31
+    },
+    {
+      "path": "src/pyrite/console/dashboard/render.py",
+      "name": "_compute_time_estimate",
+      "cc": 42
+    },
+    {
+      "path": "src/pyrite/console/dashboard/render.py",
+      "name": "format_job_status",
+      "cc": 44
+    },
+    {
+      "path": "src/pyrite/console/dashboard/render.py",
+      "name": "mode_summary",
+      "cc": 29
+    },
+    {
+      "path": "src/pyrite/detectors/editing.py",
+      "name": "merge_pixel_detector",
+      "cc": 21
+    },
+    {
+      "path": "src/pyrite/devtools/package_smoke.py",
+      "name": "_inspect_wheel",
+      "cc": 25
+    },
+    {
+      "path": "src/pyrite/energy_grid/apply.py",
+      "name": "add_file",
+      "cc": 24
+    },
+    {
+      "path": "src/pyrite/energy_grid/convergence_case.py",
+      "name": "run_window_config",
+      "cc": 24
+    },
+    {
+      "path": "src/pyrite/energy_grid/derive.py",
+      "name": "derive_bounds",
+      "cc": 30
+    },
+    {
+      "path": "src/pyrite/instrument/acquisition.py",
+      "name": "AcquisitionBatch.__post_init__",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/instrument/model.py",
+      "name": "PlanarDetector.__post_init__",
+      "cc": 22
+    },
+    {
+      "path": "src/pyrite/materials/_beam_detector_parse.py",
+      "name": "_parse_filter_rows",
+      "cc": 23
+    },
+    {
+      "path": "src/pyrite/materials/_beam_detector_parse.py",
+      "name": "_parse_longitudinal_policy",
+      "cc": 32
+    },
+    {
+      "path": "src/pyrite/materials/_beam_detector_parse.py",
+      "name": "_parse_profile_beam",
+      "cc": 47
+    },
+    {
+      "path": "src/pyrite/materials/_catalog_decode.py",
+      "name": "_grid",
+      "cc": 26
+    },
+    {
+      "path": "src/pyrite/materials/_parse.py",
+      "name": "_parse_crystals",
+      "cc": 57
+    },
+    {
+      "path": "src/pyrite/materials/_parse.py",
+      "name": "_parse_materials",
+      "cc": 61
+    },
+    {
+      "path": "src/pyrite/materials/_parse.py",
+      "name": "_parse_profiles",
+      "cc": 56
+    },
+    {
+      "path": "src/pyrite/materials/_parse.py",
+      "name": "_scan",
+      "cc": 44
+    },
+    {
+      "path": "src/pyrite/materials/authoring.py",
+      "name": "_save_material_locked",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/materials/authoring.py",
+      "name": "build_crystal",
+      "cc": 29
+    },
+    {
+      "path": "src/pyrite/materials/catalog.py",
+      "name": "_load_material_catalog_cached",
+      "cc": 56
+    },
+    {
+      "path": "src/pyrite/materials/emission.py",
+      "name": "photon_energies",
+      "cc": 26
+    },
+    {
+      "path": "src/pyrite/montecarlo/case.py",
+      "name": "Case.__post_init__",
+      "cc": 58
+    },
+    {
+      "path": "src/pyrite/montecarlo/channeling/axial_diagnostic.py",
+      "name": "_validate",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/montecarlo/channeling/axial_dissipator.py",
+      "name": "axial_dissipator",
+      "cc": 22
+    },
+    {
+      "path": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
+      "name": "AxialMCWF.run",
+      "cc": 26
+    },
+    {
+      "path": "src/pyrite/montecarlo/channeling/emission.py",
+      "name": "emission_lines",
+      "cc": 45
+    },
+    {
+      "path": "src/pyrite/montecarlo/channeling/mcwf.py",
+      "name": "MCWFSolver.run",
+      "cc": 23
+    },
+    {
+      "path": "src/pyrite/montecarlo/eadl_relaxation.py",
+      "name": "_extract_eadl_relaxation",
+      "cc": 40
+    },
+    {
+      "path": "src/pyrite/montecarlo/gdf.py",
+      "name": "load_gdf_beam",
+      "cc": 58
+    },
+    {
+      "path": "src/pyrite/montecarlo/groove.py",
+      "name": "_first_surface_event_scalar_numba",
+      "cc": 24
+    },
+    {
+      "path": "src/pyrite/montecarlo/runner/__init__.py",
+      "name": "_spectrum_case_impl",
+      "cc": 24
+    },
+    {
+      "path": "src/pyrite/montecarlo/runner/__init__.py",
+      "name": "_transport_case",
+      "cc": 29
+    },
+    {
+      "path": "src/pyrite/montecarlo/runner/channeling.py",
+      "name": "transport_channeling_case",
+      "cc": 26
+    },
+    {
+      "path": "src/pyrite/montecarlo/runner/cxr_grid.py",
+      "name": "_resolve_policy_grid",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/montecarlo/runner/scheduling.py",
+      "name": "run_cases",
+      "cc": 79
+    },
+    {
+      "path": "src/pyrite/montecarlo/shell_configuration.py",
+      "name": "_parse_atomic_shells",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/brem.py",
+      "name": "_extract_bremsstrahlung_table",
+      "cc": 32
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/brem.py",
+      "name": "mc_brem_spectrum",
+      "cc": 49
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/brem_events.py",
+      "name": "mc_hard_brem_event_spectrum",
+      "cc": 32
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "name": "_parse_characteristic_file",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "name": "mc_characteristic_spectrum",
+      "cc": 30
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_band_audit.py",
+      "name": "certify_row_band_power",
+      "cc": 22
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_grouped_jit_kernel.py",
+      "name": "_grouped_intensity_kernel",
+      "cc": 32
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_grouped_jit_kernel.py",
+      "name": "run_coherent_grouped_intensity_kernel",
+      "cc": 22
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_jit_kernel.py",
+      "name": "_kernel_2e",
+      "cc": 22
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_jit_kernel.py",
+      "name": "_kernel_3e",
+      "cc": 31
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_normalization.py",
+      "name": "_interpolated_power_bounds",
+      "cc": 23
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_normalization.py",
+      "name": "_sampled_power_bounds",
+      "cc": 30
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_sample_certificates.py",
+      "name": "row_derivative_bounds",
+      "cc": 55
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_sample_certificates.py",
+      "name": "sample_row_norm_certificate",
+      "cc": 43
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_spectrum_audit.py",
+      "name": "audit_captured_spectrum_yield",
+      "cc": 21
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_spectrum_audit.py",
+      "name": "audit_full_axis_spectrum_yield",
+      "cc": 26
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_stream_jit_kernel.py",
+      "name": "_coherent_prologue_kernel",
+      "cc": 24
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_stream_jit_kernel.py",
+      "name": "_field_kernel_2e",
+      "cc": 29
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_stream_jit_kernel.py",
+      "name": "run_coherent_prologue_kernel",
+      "cc": 36
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_windows.py",
+      "name": "coherent_window_seeds",
+      "cc": 21
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/cxr/_batched.py",
+      "name": "_accumulate_batched",
+      "cc": 24
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/cxr/_batched_finalize.py",
+      "name": "_batched_coherent_finalize",
+      "cc": 31
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/cxr/_per_hkl.py",
+      "name": "_accumulate_reflection",
+      "cc": 38
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/cxr/_per_hkl.py",
+      "name": "_accumulate_reflection_coherent",
+      "cc": 30
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/cxr/_setup.py",
+      "name": "_prepare_spectrum",
+      "cc": 77
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/cxr_seeds.py",
+      "name": "absorption_edge_brackets",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/transition_radiation.py",
+      "name": "planar_transition_radiation",
+      "cc": 23
+    },
+    {
+      "path": "src/pyrite/montecarlo/trajectories.py",
+      "name": "_write_node",
+      "cc": 24
+    },
+    {
+      "path": "src/pyrite/montecarlo/trajectory_export.py",
+      "name": "export_segments_vtp",
+      "cc": 38
+    },
+    {
+      "path": "src/pyrite/montecarlo/trajectory_scene.py",
+      "name": "export_trajectory_scene",
+      "cc": 37
+    },
+    {
+      "path": "src/pyrite/montecarlo/trajectory_selection.py",
+      "name": "read_selection",
+      "cc": 21
+    },
+    {
+      "path": "src/pyrite/montecarlo/trajectory_selection.py",
+      "name": "select_trajectories",
+      "cc": 40
+    },
+    {
+      "path": "src/pyrite/montecarlo/transport/_jit_kernel.py",
+      "name": "_transport_kernel",
+      "cc": 140,
+      "exception": "Numerical transport kernel: a split or rewrite needs RNG-stream, event-order, CPU/GPU parity and performance evidence (#567, #344); never refactor for the metric alone."
+    },
+    {
+      "path": "src/pyrite/montecarlo/transport/_jit_lut_kernel.py",
+      "name": "_transport_lut_kernel",
+      "cc": 88,
+      "exception": "Numerical transport kernel: a split or rewrite needs RNG-stream, event-order, CPU/GPU parity and performance evidence (#567, #344); never refactor for the metric alone."
+    },
+    {
+      "path": "src/pyrite/montecarlo/transport/api.py",
+      "name": "simulate_trajectories",
+      "cc": 111
+    },
+    {
+      "path": "src/pyrite/montecarlo/transport/batching.py",
+      "name": "_drive_per_electron_batches",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/montecarlo/transport/cores.py",
+      "name": "make_cpu_transport_core.body",
+      "cc": 227,
+      "exception": "Numerical transport kernel: a split or rewrite needs RNG-stream, event-order, CPU/GPU parity and performance evidence (#567, #344); never refactor for the metric alone."
+    },
+    {
+      "path": "src/pyrite/montecarlo/transport/events.py",
+      "name": "check_segment_event_contract",
+      "cc": 33
+    },
+    {
+      "path": "src/pyrite/montecarlo/transport/inelastic.py",
+      "name": "build_gos_partition",
+      "cc": 25
+    },
+    {
+      "path": "src/pyrite/montecarlo/transport/kinematics.py",
+      "name": "_sample_bunch_offsets",
+      "cc": 28
+    },
+    {
+      "path": "src/pyrite/montecarlo/transport/lut.py",
+      "name": "build_transport_energy_lut",
+      "cc": 24
+    },
+    {
+      "path": "src/pyrite/montecarlo/transport/secondaries.py",
+      "name": "transport_secondary_cascade",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/montecarlo/transport/shell_oscillators.py",
+      "name": "build_shell_oscillators",
+      "cc": 46
+    },
+    {
+      "path": "src/pyrite/montecarlo/transport/shell_sampling.py",
+      "name": "sample_shell_hard_loss",
+      "cc": 22
+    },
+    {
+      "path": "src/pyrite/montecarlo/transport/shell_transport.py",
+      "name": "build_shell_inelastic_tables",
+      "cc": 26
+    },
+    {
+      "path": "src/pyrite/perf/performance_analysis.py",
+      "name": "_interval_rows",
+      "cc": 21
+    },
+    {
+      "path": "src/pyrite/perf/performance_analysis.py",
+      "name": "_plot_timeline",
+      "cc": 44
+    },
+    {
+      "path": "src/pyrite/perf/performance_analysis.py",
+      "name": "_session_row",
+      "cc": 35
+    },
+    {
+      "path": "src/pyrite/perf/performance_analysis.py",
+      "name": "_write_summary",
+      "cc": 25
+    },
+    {
+      "path": "src/pyrite/plots/mpl/interactive.py",
+      "name": "browse_plotly",
+      "cc": 32
+    },
+    {
+      "path": "src/pyrite/plots/mpl/sweeps.py",
+      "name": "_value_heatmap",
+      "cc": 39
+    },
+    {
+      "path": "src/pyrite/plots/mpl/sweeps.py",
+      "name": "facet_metric",
+      "cc": 26
+    },
+    {
+      "path": "src/pyrite/plots/mpl/trajectories.py",
+      "name": "plot_trajectory_grid",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/remote/_queue_scripts.py",
+      "name": "_material_stems",
+      "cc": 21
+    },
+    {
+      "path": "src/pyrite/remote/_queue_scripts.py",
+      "name": "_queue_script",
+      "cc": 32
+    },
+    {
+      "path": "src/pyrite/remote/cleanup.py",
+      "name": "clear_remote",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/remote/jobs.py",
+      "name": "stop_jobs",
+      "cc": 21
+    },
+    {
+      "path": "src/pyrite/remote/performance.py",
+      "name": "prune_remote_performance",
+      "cc": 22
+    },
+    {
+      "path": "src/pyrite/remote/pull.py",
+      "name": "pull",
+      "cc": 35
+    },
+    {
+      "path": "src/pyrite/remote/pull.py",
+      "name": "resolve_profile_stem",
+      "cc": 22
+    },
+    {
+      "path": "src/pyrite/remote/queue.py",
+      "name": "start_queue",
+      "cc": 78
+    },
+    {
+      "path": "src/pyrite/remote/transport.py",
+      "name": "_sync_code_locked",
+      "cc": 37
+    },
+    {
+      "path": "src/pyrite/remote/transport.py",
+      "name": "_sync_entries",
+      "cc": 22
+    },
+    {
+      "path": "src/pyrite/remote/viewer.py",
+      "name": "_live_status",
+      "cc": 33
+    },
+    {
+      "path": "src/pyrite/results/selection.py",
+      "name": "slim_results",
+      "cc": 21
+    },
+    {
+      "path": "src/pyrite/results/spatial.py",
+      "name": "SpatialResult._coordinates",
+      "cc": 23
+    },
+    {
+      "path": "src/pyrite/runs/blaze.py",
+      "name": "run",
+      "cc": 31
+    },
+    {
+      "path": "src/pyrite/runs/run.py",
+      "name": "run_sweep",
+      "cc": 40
+    },
+    {
+      "path": "src/pyrite/runs/scan.py",
+      "name": "_resolved_run",
+      "cc": 32
+    },
+    {
+      "path": "src/pyrite/runs/scan.py",
+      "name": "_run_material",
+      "cc": 65
+    },
+    {
+      "path": "src/pyrite/xsgen/elsepa/deck.py",
+      "name": "ElsepaDeck.__post_init__",
+      "cc": 27
+    }
+  ]
+}

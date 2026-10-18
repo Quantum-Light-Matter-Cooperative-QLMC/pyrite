@@ -26,7 +26,10 @@ task docs, commit, or push. `dispatch-task` owns routing to a worker.
    separately.
 2. Inspect only enough repository context to make the plan executable. Use
    `repo-orientation` when ownership or impact is unclear; use Serena only when
-   symbol-level navigation materially helps.
+   symbol-level navigation materially helps. For maintainability/refactor work,
+   cite `pyrite-dev complexity` (`--json`, `--churn N` when history matters)
+   with its provenance line rather than ad hoc metric runs; CC/MI show
+   maintenance risk, not defects.
 3. Make the issue body concise and executable. Prefer these sections:
 
    ```markdown

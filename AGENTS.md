@@ -49,6 +49,7 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev lint
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev format
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev check-lines
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev complexity --check
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev nbstrip
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
@@ -87,7 +88,8 @@ do not enable every slow test just to exercise one changed path. Full
 `pyrite-dev test --slow` and CPU `test --slow --numba --cov` are explicit
 release/audit operations; CI runs every primary domain with slow tests on both
 supported Python versions. `verify` runs only types, lint/format checks, source
-line budgets, docs, and import-linter; it never runs tests or changes formatting.
+line budgets, the complexity ratchet, docs, and import-linter; it never runs
+tests or changes formatting.
 
 ## Work rules
 
@@ -104,6 +106,11 @@ line budgets, docs, and import-linter; it never runs tests or changes formatting
   relevant `*_MODEL` marker or `tables-*-N` tag in that PR.
 - Heavy sweeps/GPU work use `pyrite remote`; never run locally.
 - Add imports with first use. Verify with smallest useful command.
+- After editing `src/pyrite/` routines, run `pyrite-dev complexity --check`. On
+  a new or worsened CC > 20 routine, simplify it; if the branching is inherent,
+  run `complexity --write` and justify each added/raised baseline entry in the
+  PR. Never split code only to pass the metric. Policy:
+  `docs/repo-design/complexity.md`.
 - New tests >5 s wall or with large peak RSS get `@pytest.mark.slow`
   (default runs skip them; CI runs them). Check with `--durations=0`.
 

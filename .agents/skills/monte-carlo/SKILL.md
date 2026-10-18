@@ -11,6 +11,9 @@ description: "Use when PyRITE changes involve stochastic-kernel or RNG correctne
 - New stochastic processes require regression tests with deterministic seeds.
 - Benchmark new kernels against the CPU baseline.
 - Keep CPU and GPU implementations numerically consistent.
+- Transport kernels carry complexity-baseline `exception` notes: restructure
+  them only with RNG-stream, event-order, CPU/GPU parity and performance
+  evidence, never to lower CC (`docs/repo-design/complexity.md`).
 
 Own stochastic/RNG correctness only. Use `regression-testing` for general test
 design, `performance` for measurement protocol, and `physics-review` for model

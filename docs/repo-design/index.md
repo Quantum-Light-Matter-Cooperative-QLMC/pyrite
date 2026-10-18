@@ -11,6 +11,7 @@ It is intended primarily for contributors and maintainers. User-facing instructi
 development-workspace
 documentation
 releasing
+complexity
 ../validation/formatting-style
 materials-catalog-schema
 data-distribution-and-repository-size
