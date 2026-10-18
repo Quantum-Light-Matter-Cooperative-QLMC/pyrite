@@ -84,10 +84,119 @@ $U_{(1,0)},U_{(1,1)},U_{(2,0)}$: independent $-4.315893,\ -2.563743,\ -1.473438$
 
 Tests: `uv run pyrite-dev test --slow tests/montecarlo/test_channeling_axial.py` gives 17 passed (155 s), including the five anchors listed in the row.
 
-## Peak-order acceptance
+## Peak-order acceptance (historical, 2026-10-16)
 
 Issue #508 acceptance reads "`cr-axial-2d-eigenproblem` reaches `anchored` (peak ordering only; experimental tier)", and the checklist item "Peak-order anchors: Watson axial Si lines; Gouanère" is open. The existing Watson/Gouanère tests (`tests/materials/test_channeling_profile.py`, `tests/montecarlo/test_channeling_emission.py::test_diamond_peaks_match_gouanere`) are planar. No axial peak-order anchor exists yet. The five listed anchors are internal consistency checks (planar limit, cell, symmetry, norm), not reference values, so the claim is not yet `anchored` in the acceptance sense.
 
 ## Adjudication
 
 The re-derivation matches in factor, sign, phase convention ($e^{-i\mathbf G\cdot\mathbf R_j}$, wells on strings), anisotropic Debye–Waller exponent, zone selection, rectangular cell and string bookkeeping, planar limit, and Bloch Hamiltonian and normalization. Numerical agreement is at the meV level for the potential and to 4 d.p. for the eigenvalues. The depths are plausible against Molière/Lindhard continuum-string estimates. Verdict: `rederived`. The `anchored` status awaits the axial peak-order anchor.
+
+## Independent Watson anchor review (2026-10-17)
+
+Scope: the subsequent main-line anchors at base `c4ab4179`, not a repeat of
+the potential derivation above. This verifier did not implement the anchors.
+The source pages and the following derivation were inspected and recorded
+before reading the test or emission implementation bodies.
+
+### Source and independent expression
+
+Watson & Koehler, [Phys. Rev. B **25**, 3079 (1982)](https://doi.org/10.1103/PhysRevB.25.3079),
+pp. 3086–3088, Fig. 7 and Tables I–II, provide the comparison. The local
+Zotero attachment `JKVKGGI2` was read directly; PDF pages 8–10 were rendered
+and visually inspected. Table II labels its columns observed x rays, but
+Fig. 7 and the numerical example on p. 3086 put its numbers on the
+forward-equivalent scale: at approximately 3 MeV the reported forward
+triplet is 1.65, 3.40, 4.95 keV, agreeing with the table's 1.63, 3.36,
+4.90 keV. Applying the last-column correction again would instead give
+1.79, 3.70, 5.39 keV and disagree with that example and the plotted points.
+This is an internally checked interpretation, not an explicit table heading.
+
+For transverse Hamiltonian levels $\epsilon_i>\epsilon_f$ and a photon at
+angle $\theta$ to the longitudinal velocity, energy conservation to first
+order in the longitudinal recoil gives
+
+$$
+E_\gamma(\theta)=\frac{\epsilon_i-\epsilon_f}{1-\beta\cos\theta},
+\qquad
+\gamma=1+\frac{T}{m_ec^2},\qquad \beta=\sqrt{1-\gamma^{-2}}.
+$$
+
+Thus $E_\gamma(0)=\gamma^2(1+\beta)(\epsilon_i-\epsilon_f)$ and
+the conversion from measured to forward energy is
+$(1-\beta\cos\theta)/(1-\beta)$. No additional factor of $\gamma$
+multiplies a transverse energy gap already computed with mass $\gamma m_e$.
+At $\gamma\to1$ the energy becomes the transverse gap; at $\theta=0$
+and large $\gamma$ it approaches $2\gamma^2$ times that gap. All factors
+are dimensionless and positive. At 2.99 MeV, $\gamma=6.8513$ and the
+0.046 rad correction is approximately 1.0977. The printed 4.38 at
+1.96 MeV is inconsistent with the independent value 4.8356; 4.84 is the
+appropriate rounded value.
+
+For dipole emission the transverse amplitude is
+$\mathbf d_{fi}=\langle f|\mathbf r_\perp|i\rangle$.
+The commutator $[H,\mathbf r_\perp]=-i\hbar\mathbf p_\perp/(\gamma m_e)$
+independently gives
+
+$$
+\mathbf d_{fi}=-\frac{i\hbar^2}{\gamma m_e(\epsilon_f-\epsilon_i)}
+\langle f|\mathbf k_\perp|i\rangle.
+$$
+
+Its units are Å. For equal upper-level populations, spontaneous dipole
+rates rank as $(\epsilon_i-\epsilon_f)^3|\mathbf d_{fi}|^2$ at a fixed
+beam energy. Selecting the strongest such line ending in the deepest
+level is a reproducible model diagnostic; it does not predict measured
+relative intensities without entry populations and transport. Watson's
+$\langle111\rangle$ assignment is explicitly, in ascending photon energy,
+$3d\to2p$, $2p\to1s$, $3p\to1s$. Testing only the middle line cannot
+establish the ordering of this triplet. Cubic symmetry identifies the
+paper's $\langle101\rangle$ family with $\langle110\rangle$.
+
+### Implementation comparison and verdict
+
+`AxialLineCatalog.photon_energy_eV` divides the transverse gap by
+`doppler_denominator`, matching the expression above. `axial_line_catalog`
+uses the velocity-form dipole with the same sign, effective mass and energy
+denominator. Its equal-population strength and `yield_per_ang` implement
+the dipole-rate ranking. The fixture faithfully transcribes the tested
+Table II columns and Table I fits, including the corrected 1.96 MeV gamma.
+The untested $\langle211\rangle$ entries are reordered into ascending
+energy rather than literal table columns, as its notes disclose.
+
+The tests `test_silicon_axial_main_line_matches_watson_koehler` (both axes)
+and `test_silicon_axial_main_lines_order_like_watson_koehler` require:
+
+- the model main line to be nearest the assigned measured peak;
+- agreement within 20% of Watson and 10% of the other laboratory's fit;
+- a fitted gamma exponent within 0.25 of Watson's empirical exponent;
+- the $\langle110\rangle$ main line above the $\langle111\rangle$ main
+  line at each of the four common energies.
+
+Those are legitimate, deliberately loose experimental-tier main-line
+anchors. The 20% tolerance is a model-comparison window, not Watson's
+measurement error (3% quoted on p. 3087). The 0.5 eV bandwidth gate is an
+explicit approximation, not a fit of the peak energy. The tests do not
+establish full within-axis multiplet ordering, widths, yields, or the
+$\langle211\rangle$ assignment. The 1983 many-beam source and higher
+bands are not reproduced by this review.
+
+- **Claim:** `cr-axial-2d-eigenproblem` — main-line anchor extension to
+  `materials/channeling/axial.py::axial_states`; Watson Tables I–II/Fig. 7.
+- **Filters:** units pass; nonrelativistic/forward limits pass;
+  signs and Doppler convention pass.
+- **Re-derivation:** matches for the photon-energy and dipole conventions.
+- **Verdict:** `rederived` for this extension; the experimental comparison
+  is limited to the main-line anchors named above.
+- **Suggested ledger change:** promote to `anchored` only with the explicit
+  scope **main-line identification and cross-axis ordering**; retain the
+  missing upper peaks and $\langle211\rangle$ exclusions. Full triplet
+  ordering remains unvalidated. The task owner applies the status change;
+  this verifier edits only this write-up.
+
+### Implementation-owner adjudication (2026-10-17)
+
+Applied the preceding review's recommendation: the ledger is `anchored` for
+main-line identification and cross-axis ordering only. All three focused
+Watson tests pass. The missing upper peaks and $\langle211\rangle$
+assignment remain outside this anchor; human sign-off is unchanged.

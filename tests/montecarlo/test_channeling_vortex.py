@@ -142,7 +142,7 @@ def test_atom_size_vortex_keeps_on_column_2p_and_helicity(tungsten_string):
 @pytest.mark.slow
 @pytest.mark.parametrize(("offset_cells", "waist_ang"), [(0.5, 0.35), (0.0, 3.0)])
 def test_off_centre_or_wide_vortex_loses_selectivity(tungsten_string, offset_cells, waist_ang):
-    # Lubk et al. (arXiv:1111.6050): OAM about the beam axis is not OAM about
+    # Löffler & Schattschneider (arXiv:1111.6050): OAM about the beam axis is not OAM about
     # the string once the probe is off-centre or wider than the string spacing.
     grid, center, cell, _, orbitals, propagator = tungsten_string
     entry = (center[0] + offset_cells * cell, center[1])

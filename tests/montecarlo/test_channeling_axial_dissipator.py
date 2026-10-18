@@ -15,6 +15,7 @@ from pyrite.montecarlo.channeling import states
 from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
 from pyrite.montecarlo.channeling.axial_mcwf import AxialMCWF
 from pyrite.montecarlo.channeling.operators import electronic_kernel, tds_kernel
+from pyrite.montecarlo.channeling.realspace import RealSpaceGrid
 
 
 @pytest.fixture(scope="module")
@@ -199,12 +200,42 @@ def test_tungsten_two_p_tds_jump_length():
     np.testing.assert_allclose(np.array(lengths)[:, 1], np.array(lengths)[:, 2], rtol=1e-6)
 
 
+def _orbital_population(grid, orbitals, phi, tilt):
+    # Fixed-string orbitals project the physical state, not its carrier envelope.
+    psi = np.exp(1j * (tilt[0] * grid.x[:, None] + tilt[1] * grid.y[None, :])) * phi
+    overlaps = np.einsum("sij,ij->s", orbitals.conj(), psi) * grid.cell_area_ang2
+    return np.array([np.sum(np.abs(overlaps) ** 2)])
+
+
+@pytest.mark.parametrize("tilt", [(0.0, 0.0), (1.0, 0.0), (0.0, -1.3), (3.0, -2.0)])
+def test_population_observable_is_carrier_invariant(tilt):
+    grid = RealSpaceGrid((10.0, 12.0), (16, 20))
+    orbital = np.ones(grid.shape, dtype=complex) / np.sqrt(grid.area_ang2)
+    orbitals = np.stack([orbital, orbital * np.exp(2j * np.pi * grid.y[None, :] / 12.0)])
+    psi = np.sqrt(0.3) * orbitals[0] + 1j * np.sqrt(0.7) * orbitals[1]
+    carrier = np.exp(1j * (tilt[0] * grid.x[:, None] + tilt[1] * grid.y[None, :]))
+    # Every carrier/envelope pair represents this same physical state in the subspace.
+    population = _orbital_population(grid, orbitals, psi / carrier, tilt)
+    np.testing.assert_allclose(population, [1.0], rtol=0, atol=1e-12)
+
+
+def test_population_observable_counts_an_electronic_carrier_kick():
+    grid = RealSpaceGrid((10.0, 12.0), (16, 20))
+    phi = np.ones(grid.shape, dtype=complex) / np.sqrt(grid.area_ang2)
+    orbitals = phi[None, :, :]
+    np.testing.assert_allclose(_orbital_population(grid, orbitals, phi, (0.0, 0.0)), [1.0])
+    # A reciprocal-grid kick leaves the envelope unchanged but makes the physical
+    # plane wave orthogonal to the original orbital. This is not a gauge change.
+    population = _orbital_population(grid, orbitals, phi, (2 * np.pi / 10.0, 0.0))
+    np.testing.assert_allclose(population, [0.0], rtol=0, atol=1e-12)
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize(
     ("mechanisms", "expected"),
     [
         (("tds",), [0.9427, 0.3392, 0.1194, 0.0065]),
-        (("tds", "electronic"), [0.9427, 0.2879, 0.0846, 0.0030]),
+        (("tds", "electronic"), [0.9427, 0.2980, 0.0913, 0.0035]),
     ],
 )
 def test_tungsten_two_p_population_decay(mechanisms, expected):
@@ -212,10 +243,11 @@ def test_tungsten_two_p_population_decay(mechanisms, expected):
 
     A centred LG l = 1 probe (waist 0.35 A) enters 2p with 0.943. The
     1024-electron references at 24 and 32 samples per cell (3 x 3 and 5 x 5
-    cells agree) give 0.36, 0.14, 0.007 (TDS only) and 0.30, 0.11, 0.004
-    (TDS + electronic) at 10, 20 and 50 nm; 16 samples per cell overstate
-    TDS-only survival (0.41, 0.18, 0.013). These seeded 256-electron runs pin
-    the model; one electron moves the mean by 0.004.
+    cells agree) give 0.36, 0.14, 0.007 (TDS only) at 10, 20 and 50 nm;
+    16 samples per cell overstate TDS-only survival (0.41, 0.18, 0.013).
+    The electronic reference was regenerated with the full carrier phase:
+    the old envelope-only overlap gave 0.288, 0.085, 0.003. These seeded
+    256-electron runs pin the model; one electron moves the mean by 0.004.
     """
     energy = 300e3
     profile = axial_profile("tungsten", (0, 0, 1))
@@ -230,8 +262,7 @@ def test_tungsten_two_p_population_decay(mechanisms, expected):
     orbitals /= np.sqrt([grid.norm(o) for o in orbitals])[:, None, None]
 
     def two_p(phi, tilt):
-        overlaps = np.einsum("sij,ij->s", orbitals.conj(), phi) * grid.cell_area_ang2
-        return np.array([np.sum(np.abs(overlaps) ** 2)])
+        return _orbital_population(grid, orbitals, phi, tilt)
 
     stepper = AxialMCWF(dissipator, energy, profile.on_grid((3, 3), grid.shape))
     entry = states.laguerre_gauss(1, 0, waist_ang=0.35, center_ang=(cell, cell))
