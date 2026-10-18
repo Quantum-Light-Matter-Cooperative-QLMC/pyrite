@@ -235,10 +235,11 @@ _RECORD_ARRAY_FIELDS = (
     "spec_coherent",
     "spec_characteristic",
     "spec_channeling",
+    "spec_transition",
 )
 _WIDE_BREM_FIELDS = ("brem_wide", "E_grid_brem")
 
-# The coherent, characteristic and channeling components use the line grid, so
+# The coherent, characteristic, channeling and transition components use the line grid, so
 # a --cxr-only projection/merge must carry them with ``spec``.
 CXR_RECORD_KEYS = (
     "spec",
@@ -246,6 +247,7 @@ CXR_RECORD_KEYS = (
     "spec_coherent",
     "spec_characteristic",
     "spec_channeling",
+    "spec_transition",
 )
 BREM_RECORD_KEYS = ("brem_wide", "brem", "E_grid_brem")
 
@@ -297,7 +299,12 @@ def merge_dataset(local, incoming, dataset, force=False):
             # one: otherwise a stale, possibly wrong-length array is paired with
             # the incoming line grid.
             if dataset == "line" and "spec" in inc:
-                for companion in ("spec_coherent", "spec_characteristic", "spec_channeling"):
+                for companion in (
+                    "spec_coherent",
+                    "spec_characteristic",
+                    "spec_channeling",
+                    "spec_transition",
+                ):
                     if companion not in inc:
                         r.pop(companion, None)
             bw, egb, eg = r.get("brem_wide"), r.get("E_grid_brem"), r.get("E_grid")
@@ -428,6 +435,7 @@ _BASKET_RECORD_FIELDS = (
     "spec",
     "spec_characteristic",
     "spec_channeling",
+    "spec_transition",
     "brem",
     "E_grid_brem",
     "brem_wide",

@@ -172,3 +172,59 @@ def test_missing_source_with_tr_is_an_unbounded_bias():
     result = transition_radiation_omission(energy, np.array([0.0, 1e-8, 0.0]), tr, target_rse=0.05)
     assert result.bias_bound == np.inf and not result.omit
     assert result.ratio[2] == 0.0
+
+
+@pytest.mark.parametrize(
+    "layers,substrate", [([], 0.8 + 0.03j), ([(0.7 + 0.02j, 800.0), (1.0, 400.0)], 0.9 + 0.01j)]
+)
+@pytest.mark.parametrize("scalar", [False, True])
+def test_optional_amplitude_reconstructs_yield_and_is_transverse(layers, substrate, scalar):
+    energy = 300.0 if scalar else np.array([[100.0], [300.0]])
+    n = _direction(0.3, 0.7) if scalar else np.stack([_direction(0.3, 0.7), _direction(0.7, 1.2)])
+    v = np.array([0.1, -0.2, 0.8])
+    default = planar_transition_radiation(energy, n, v, layers, substrate)
+    yield_, amplitude = planar_transition_radiation(
+        energy, n, v, layers, substrate, return_amplitude=True
+    )
+    np.testing.assert_array_equal(yield_, default)
+    assert amplitude.shape == (*yield_.shape, 3)
+    assert amplitude.dtype == np.complex128
+    reconstructed = energy * n[..., 2] ** 2 * np.sum(abs(amplitude) ** 2, axis=-1) / (16 * np.pi**4)
+    np.testing.assert_allclose(yield_, reconstructed, rtol=1e-14)
+    np.testing.assert_allclose(
+        np.sum(n * amplitude, axis=-1), 0.0, atol=1e-14 * np.max(abs(amplitude))
+    )
+
+
+@pytest.mark.parametrize("layers", [[], [(1.0, 1000.0)], [(0.8 + 0.03j, 0.0)]])
+def test_optional_amplitude_vanishes_without_a_net_interface(layers):
+    yield_, amplitude = planar_transition_radiation(
+        300.0, _direction(0.3), [0.1, 0.0, 0.8], layers, return_amplitude=True
+    )
+    np.testing.assert_allclose(amplitude, 0.0, atol=1e-16)
+    assert float(yield_) < 1e-30
+
+
+@pytest.mark.parametrize("beta,psi", [(0.3, 0.5), (0.99, 1.0)])
+def test_conductor_amplitude_is_polarized_like_charge_plus_image(beta, psi):
+    velocity = beta * np.array([np.sin(psi), 0.0, np.cos(psi)])
+    image = velocity * np.array([1.0, 1.0, -1.0])
+    for theta, phi in ((0.3, 0.0), (0.9, 2.0)):
+        n = _direction(theta, phi)
+        amp = np.cross(n, velocity) / (1 - n @ velocity) - np.cross(n, image) / (1 - n @ image)
+        expected = np.cross(n, amp)
+        _, amplitude = planar_transition_radiation(
+            50.0, n, velocity, [], -1e9 + 1e9j, return_amplitude=True
+        )
+        overlap = abs(np.vdot(expected, amplitude))
+        overlap /= np.linalg.norm(expected) * np.linalg.norm(amplitude)
+        assert overlap == pytest.approx(1.0, abs=1e-6)
+
+
+def test_normal_incidence_amplitude_is_p_polarized():
+    n = _direction(0.4, 0.7)
+    _, amplitude = planar_transition_radiation(
+        200.0, n, [0.0, 0.0, 0.95], [(0.8 + 0.02j, 3e3)], 0.9 + 0.01j, return_amplitude=True
+    )
+    s_hat = np.cross([0.0, 0.0, 1.0], n)
+    assert abs(s_hat @ amplitude) <= 1e-12 * np.linalg.norm(amplitude)

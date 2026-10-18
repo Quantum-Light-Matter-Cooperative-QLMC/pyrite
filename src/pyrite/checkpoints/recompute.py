@@ -652,9 +652,13 @@ def _repair_cxr_record(r, target):
     # (no `spec_coherent` key) are orphaned by design -- reline only ever
     # re-derives the incoherent `spec` for those.
     want_coherent = "spec_coherent" in r
-    spec, spec_coherent, spec_characteristic = runner._cxr_pair_for_case(
-        c, target, want_coherent=want_coherent, return_characteristic=True
+    transition = c.get("transition_radiation") is not None
+    extra = {"return_transition": True} if transition else {}
+    spec, spec_coherent, spec_characteristic, *spec_transition = runner._cxr_pair_for_case(
+        c, target, want_coherent=want_coherent, return_characteristic=True, **extra
     )
+    if transition:
+        r["spec_transition"] = spec_transition[0]
     if c.get("channeling") is not None:
         from ..montecarlo.runner.channeling_emission import rescore_channeling_spectrum
 
@@ -697,7 +701,7 @@ def recxr_checkpoint(
         _save_recomputed_checkpoint(
             checkpoint_path,
             results,
-            components=("characteristic", "channeling", "line"),
+            components=("characteristic", "channeling", "transition", "line"),
         )
 
     n = repair_cxr_spec(

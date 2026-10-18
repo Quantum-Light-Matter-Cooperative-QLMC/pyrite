@@ -65,6 +65,7 @@ TRANSPORT_KEYS = (
     "pair_production_model",
     "positron_transport",
     "atomic_electron_deflection",
+    "transition_radiation",
 )
 #: Collision-loss schemes a run may select: ``"auto"`` (the default) plus the
 #: ``simulate_trajectories`` schemes of
@@ -99,6 +100,11 @@ DEFAULT_RADIATIVE_CUTOFF_EV = 1000.0
 #: default) leaves every case, identity and RNG stream unchanged; ``"planar"``
 #: runs the planar density-matrix entrance zone with a one-way handoff.
 CHANNELING_MODELS = ("off", "planar")
+#: Transition-radiation component selectors (#103). ``"off"`` (the default)
+#: leaves every case and identity unchanged; ``"history"`` sums each primary
+#: history's boundary crossings coherently; ``"bunch"`` also keeps the
+#: cross-history (CTR) terms with the physical bunch population.
+TRANSITION_RADIATION_MODES = ("off", "history", "bunch")
 PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
 
@@ -219,6 +225,12 @@ class Physics:
     channeling_plane
         Miller indices ``(h, k, l)`` of the channeling plane family; required
         by, and only accepted with, ``channeling_model="planar"``.
+    transition_radiation
+        ``"off"`` (default), ``"history"`` or ``"bunch"``: score planar-stack
+        transition radiation from the transported boundary crossings as the
+        separate ``spec_transition`` component (#103), per history or with
+        coherent bunch (CTR) terms. Requires ``energy_model="midpoint"``;
+        excludes channeling.
     """
 
     emission: EmissionSelection = "incoherent"
@@ -236,6 +248,7 @@ class Physics:
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
     channeling_model: Literal["off", "planar"] = "off"
     channeling_plane: tuple[int, int, int] | None = None
+    transition_radiation: Literal["off", "history", "bunch"] = "off"
 
     def __post_init__(self) -> None:
         if self.emission == "both":
@@ -290,6 +303,7 @@ class Physics:
         )
         validate_atomic_electron_deflection(self.atomic_electron_deflection)
         validate_channeling_physics(self, energy_model)
+        validate_transition_physics(self, energy_model)
 
 
 PHYSICS_FIELDS = tuple(f.name for f in fields(Physics))
@@ -419,6 +433,26 @@ def validate_channeling_physics(physics: "Physics", energy_model: str) -> None:
         raise ValueError("channeling_model='planar' does not support secondary transport")
     if "coherent" in cast(tuple[str, ...], physics.emission):
         raise ValueError("channeling_model='planar' supports incoherent emission only")
+
+
+def validate_transition_physics(physics: "Physics", energy_model: str) -> None:
+    """Validate the transition-radiation selector against the run (#103).
+
+    Boundary crossings come from midpoint row events; channeling owns the
+    entrance zone without those events. Per-case gates (grooves, adaptive
+    precision, temporal profiles) are ``Case`` validation.
+    """
+    mode = physics.transition_radiation
+    if mode not in TRANSITION_RADIATION_MODES:
+        raise ValueError(
+            f"transition_radiation must be one of {', '.join(TRANSITION_RADIATION_MODES)}"
+        )
+    if mode == "off":
+        return
+    if energy_model != "midpoint":
+        raise ValueError("transition_radiation requires energy_model='midpoint'")
+    if physics.channeling_model != "off":
+        raise ValueError("transition_radiation does not support channeling_model='planar'")
 
 
 def validate_channeling_numerics(

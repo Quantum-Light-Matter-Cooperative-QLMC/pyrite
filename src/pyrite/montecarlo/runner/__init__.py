@@ -26,7 +26,7 @@ from ..._backend import BACKEND
 from ..._energy_grid_encoding import decode_energy_grid as decode_energy_grid
 from ..._env import env_value, set_canonical_env
 from .. import spectrum as _spectrum_mod
-from ..case import Case, refuse_channeling
+from ..case import Case, refuse_channeling, refuse_transition_radiation
 from ..geometry import tilted_geometry as tilted_geometry
 from ..groove import blazed_groove_spec as blazed_groove_spec
 from ..spectrum import (
@@ -303,12 +303,13 @@ def _beam_kwargs(case):
     )
 
 
-def _check_channeling_transport(case, trajectory_capture, block_electrons):
-    """Refuse channeling transport options before any work (ADR-0017 tier 3)."""
+def _check_opt_in_transport(case, trajectory_capture, block_electrons):
+    """Refuse transport options an opt-in component lacks, before any work (ADR-0017 tier 3)."""
     if trajectory_capture is not None:
         refuse_channeling(case, "trajectory capture")
     if block_electrons is not None:
         refuse_channeling(case, "electron-block transport")
+        refuse_transition_radiation(case, "electron-block transport")
 
 
 def _transport_case(
@@ -355,8 +356,7 @@ def _transport_case(
     # worker reconstructs adapters locally; no callable or device state travels
     # in the case payload.
     select_emission(case)
-    if case.get("channeling") is not None:
-        _check_channeling_transport(case, trajectory_capture, block_electrons)
+    _check_opt_in_transport(case, trajectory_capture, block_electrons)
     if case.get("adaptive_precision") is not None:
         return _adaptive.transport_requested_precision(
             case,
@@ -576,6 +576,7 @@ def _transport_case(
 from .emission import _brem_for_case as _brem_for_case
 from .emission import _brem_wide_from_segments as _brem_wide_from_segments
 from .emission import _characteristic_from_segments as _characteristic_from_segments
+from .emission import optional_line_components
 
 
 def _cxr_for_segments(
@@ -827,7 +828,9 @@ def _cxr_for_case(case, E_grid, *, coherent=None):
     ).values
 
 
-def _cxr_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=False):
+def _cxr_pair_for_case(
+    case, E_grid, *, want_coherent, return_characteristic=False, return_transition=False
+):
     """Reline mirror of the runner's one-transport / dual-kernel invariant: one
     re-transport of ``case`` yields the incoherent ``spec`` and (when
     ``want_coherent``) a ``spec_coherent`` from the SAME segments, so a
@@ -835,7 +838,8 @@ def _cxr_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=Fal
     keeps both arrays on that grid instead of leaving ``spec_coherent`` stale.
     Returns ``(spec, spec_coherent_or_None)``, both PXR/CBS only. With
     ``return_characteristic=True``, append the separate characteristic
-    component as a third item."""
+    component as a third item; ``return_transition=True`` then also appends
+    ``spec_transition`` from the same transport."""
     from dataclasses import replace
 
     from .emission_adapters import EmissionBatch, select_emission
@@ -868,7 +872,12 @@ def _cxr_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=Fal
     characteristic = emission.characteristic.evaluate(
         replace(batch, electron_limit=case["Ne_brem"]), "spec_characteristic"
     ).values
-    return spec, spec_coherent, characteristic
+    if not return_transition:
+        return spec, spec_coherent, characteristic
+    from .transition_emission import case_transition_spectrum
+
+    transport = dict(segs=segs, E_grid=E_grid, n_hat=n_hat, Ne_brem=case["Ne_brem"])
+    return spec, spec_coherent, characteristic, case_transition_spectrum(case, transport)
 
 
 from .stage_chunks import (
@@ -1138,10 +1147,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 }
     if spec_coherent is not None:
         out["spec_coherent"] = spec_coherent
-    if case.get("channeling") is not None:
-        from .channeling_emission import case_channeling_spectrum
-
-        out["spec_channeling"] = case_channeling_spectrum(case, tp)
+    out.update(optional_line_components(case, tp))
     if coherent_yield_record is not None:
         out["line_grid_coherent_yield_audit"] = coherent_yield_record
     out.update(temporal_outputs(temporal, temporal_coherent))

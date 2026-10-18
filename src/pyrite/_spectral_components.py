@@ -8,6 +8,8 @@ Run outputs and result records carry each emission channel as its own array:
   ``E_grid``;
 - ``spec_channeling``: optional planar channeling-radiation density on
   ``E_grid`` (ADR-0018), present only when channeling was selected;
+- ``spec_transition``: optional transition-radiation density on ``E_grid``
+  (#103), present only when transition radiation was selected;
 - ``brem`` / ``brem_wide``: bremsstrahlung on ``E_grid`` / ``E_grid_brem``.
 
 No array includes another. Consumers that need a combined view call
@@ -33,7 +35,7 @@ SEPARATE_CONTRACT = "separate"
 _CXR_KEYS = ("spec", "spec_coherent")
 
 #: Additive line-grid components summed onto either CXR mode, in order.
-LINE_COMPONENT_KEYS = ("spec_characteristic", "spec_channeling")
+LINE_COMPONENT_KEYS = ("spec_characteristic", "spec_channeling", "spec_transition")
 
 
 def separate_legacy(obj: Any) -> Any:
@@ -66,6 +68,7 @@ def cxr_spectrum(
     coherent: bool = False,
     characteristic: bool = True,
     channeling: bool = True,
+    transition: bool = True,
 ) -> np.ndarray:
     """Line-grid emission density: PXR/CBS plus the selected additive components.
 
@@ -73,12 +76,18 @@ def cxr_spectrum(
     when the record has none). ``characteristic`` and ``channeling`` add
     ``spec_characteristic`` and ``spec_channeling``; a record without a
     component contributes no term. Both are incoherent with PXR/CBS, so each
-    intensity adds once to either CXR spectrum.
+    intensity adds once to either CXR spectrum. ``transition`` adds
+    ``spec_transition``, the ``g = 0`` TR field: its ensemble interference
+    with a reflection ``g`` carries the beam-entry characteristic function at
+    ``g_parallel`` and vanishes for ``g_parallel sigma_perp >> 1``; for ``g``
+    along the surface normal the cross term (and diffracted TR) is not
+    included.
 
-    Validation: characteristic-radiation
+    Validation: characteristic-radiation, tr-line-cross-term
     """
     total = np.asarray(record["spec_coherent" if coherent else "spec"])
-    for key, selected in zip(LINE_COMPONENT_KEYS, (characteristic, channeling), strict=True):
+    selection = (characteristic, channeling, transition)
+    for key, selected in zip(LINE_COMPONENT_KEYS, selection, strict=True):
         component = record.get(key) if selected else None
         if component is not None:
             total = total + np.asarray(component)
@@ -91,10 +100,15 @@ def incident_spectrum(
     coherent: bool = False,
     characteristic: bool = True,
     channeling: bool = True,
+    transition: bool = True,
 ) -> np.ndarray:
     """Every photon source on ``E_grid``: :func:`cxr_spectrum` plus ``brem``."""
     return cxr_spectrum(
-        record, coherent=coherent, characteristic=characteristic, channeling=channeling
+        record,
+        coherent=coherent,
+        characteristic=characteristic,
+        channeling=channeling,
+        transition=transition,
     ) + np.asarray(record["brem"])
 
 

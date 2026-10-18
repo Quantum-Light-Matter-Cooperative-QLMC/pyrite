@@ -488,9 +488,10 @@ def transport_case_adaptive(
     Validation: adaptive-sample-size-stopping
     """
     from .. import runner
-    from ..case import refuse_channeling
+    from ..case import refuse_channeling, refuse_transition_radiation
 
     refuse_channeling(case, "adaptive precision")
+    refuse_transition_radiation(case, "adaptive precision")
     settings.validate_case(case)
     if settings.batch_means_band_eV is not None:
         from .emission_adapters import select_emission

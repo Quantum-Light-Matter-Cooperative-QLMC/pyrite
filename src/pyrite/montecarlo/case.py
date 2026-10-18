@@ -81,6 +81,7 @@ _CASE_KEY_ORDER = (
     "positron_transport",
     "atomic_electron_deflection",
     "channeling",
+    "transition_radiation",
     "beam_uvw",
     "surface_hkl",
     "mosaic_fwhm_rad",
@@ -303,6 +304,7 @@ class Case(Mapping[str, Any]):
     adaptive_precision: dict[str, object] | _Absent = _ABSENT
     coherent_flat_omission_limit: float | _Absent = _ABSENT
     channeling: dict[str, object] | _Absent = _ABSENT
+    transition_radiation: dict[str, object] | _Absent = _ABSENT
 
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
@@ -416,6 +418,7 @@ class Case(Mapping[str, Any]):
                 )
         if self.channeling is not _ABSENT:
             self._validate_channeling()
+        self._validate_transition_radiation()
         if self.coherent_flat_omission_limit is not _ABSENT:
             _positive(
                 "coherent_flat_omission_limit", self.coherent_flat_omission_limit, allow_zero=True
@@ -474,6 +477,31 @@ class Case(Mapping[str, Any]):
             raise ValueError("channeling supports a single-layer slab only")
         if self.mosaic_fwhm_rad or self.mosaic_mc_fwhm_rad:
             raise ValueError("channeling does not support mosaic crystals")
+
+    def _validate_transition_radiation(self) -> None:
+        record = self.transition_radiation
+        if record is _ABSENT:
+            return
+        if not isinstance(record, Mapping) or set(record) != set(TRANSITION_RECORD_KEYS):
+            raise ValueError(
+                "transition_radiation must be a record with keys "
+                + ", ".join(TRANSITION_RECORD_KEYS)
+            )
+        if record["model"] != "planar-stack":
+            raise ValueError("transition_radiation model must be 'planar-stack'")
+        if record["coherence"] not in ("history", "bunch"):
+            raise ValueError("transition_radiation coherence must be 'history' or 'bunch'")
+        if self.energy_model != "midpoint":
+            raise ValueError("transition_radiation requires energy_model='midpoint'")
+        refused = {
+            "groove_spacing_ang": "a grooved entrance face",
+            "channeling": "channeling transport",
+            "adaptive_precision": "adaptive precision",
+            "temporal_profile": "temporal profiles",
+        }
+        for key, what in refused.items():
+            if getattr(self, key) is not _ABSENT:
+                raise ValueError(f"transition_radiation does not support {what}")
 
     def _validate_radiative(self) -> None:
         if self.radiative_model != "bremslib-soft-hard":
@@ -537,6 +565,24 @@ CHANNELING_RECORD_KEYS = (
     "dz_ang",
     "zone_max_ang",
 )
+
+
+#: Keys of the resolved ``Case.transition_radiation`` record, in canonical order.
+TRANSITION_RECORD_KEYS = ("model", "coherence")
+
+
+def transition_case_record(coherence: str) -> dict[str, object]:
+    """Resolved ``Case.transition_radiation`` record for ``"history"`` or ``"bunch"``."""
+    return {"model": "planar-stack", "coherence": coherence}
+
+
+def refuse_transition_radiation(case: Mapping[str, Any], consumer: str) -> None:
+    """Raise before any work when ``consumer`` cannot carry ``spec_transition`` (#103).
+
+    Adaptive precision and electron-block transport do not score it.
+    """
+    if case.get("transition_radiation") is not None:
+        raise ValueError(f"{consumer} does not support transition_radiation cases yet (#103)")
 
 
 def refuse_channeling(case: Mapping[str, Any], consumer: str) -> None:

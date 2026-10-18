@@ -100,6 +100,7 @@ _CAS_OPTIONAL_PAYLOAD_KEYS = frozenset(
         "spec_coherent",
         "spec_characteristic",
         "spec_channeling",
+        "spec_transition",
         "temporal_t_fs",
         "temporal_intensity",
         "temporal_intensity_coherent",

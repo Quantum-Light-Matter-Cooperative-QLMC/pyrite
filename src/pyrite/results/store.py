@@ -30,6 +30,7 @@ from .._numerics import (
     validate_inelastic_numerics,
     validate_pair_production_numerics,
     validate_radiative_numerics,
+    validate_transition_physics,
 )
 from .._precision import Precision
 from .._spectral_components import LINE_COMPONENT_KEYS, cxr_spectrum
@@ -130,6 +131,9 @@ class Settings:
         ``Z(Z + xi)`` elastic-rate correction, or ``"none"``.
     channeling_model, channeling_plane
         Opt-in planar entrance zone and its Miller indices; defaults to off.
+    transition_radiation
+        Opt-in ``"history"`` or ``"bunch"`` transition-radiation component
+        (#103); defaults to ``"off"``.
     channeling_basis_size, channeling_bloch_cells, channeling_dz_ang, channeling_zone_max_ang
         Zone basis, Bloch grid, depth step and optional length cap, as in Numerics.
     emission
@@ -168,6 +172,7 @@ class Settings:
     channeling_bloch_cells: int = 16
     channeling_dz_ang: float = 250.0
     channeling_zone_max_ang: float | None = None
+    transition_radiation: Literal["off", "history", "bunch"] = "off"
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_cxr_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so
@@ -222,6 +227,15 @@ class Settings:
             )
             self.channeling_plane = physics.channeling_plane
             validate_channeling_physics(physics, self.energy_model)
+        if self.transition_radiation != "off":
+            validate_transition_physics(
+                Physics(
+                    transition_radiation=self.transition_radiation,
+                    channeling_model=self.channeling_model,
+                    channeling_plane=self.channeling_plane,
+                ),
+                self.energy_model,
+            )
         validate_channeling_numerics(
             self.channeling_basis_size,
             self.channeling_bloch_cells,

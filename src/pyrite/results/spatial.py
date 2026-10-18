@@ -15,13 +15,14 @@ if TYPE_CHECKING:
     from ..instrument import Acquisition, AcquisitionBatch
     from ..instrument.geometry import PixelRays
 
-#: Spatial result components. ``*_total`` adds characteristic and channeling radiation.
+#: Spatial result components. ``*_total`` adds characteristic, channeling and transition radiation.
 COMPONENTS = (
     "cxr",
     "brem",
     "coherent",
     "characteristic",
     "channeling",
+    "transition",
     "cxr_total",
     "coherent_total",
 )
@@ -203,6 +204,9 @@ class SpatialResult:
     channeling
         Optional planar channeling-radiation factors on the line grid,
         combined like ``characteristic``.
+    transition
+        Optional transition-radiation factors on the line grid (#103),
+        combined like ``characteristic``.
     tile_directions_lab
         Optional representative unit direction per angular tile with shape
         ``(n_tile, 3)`` in the lab frame; required to persist the result.
@@ -222,6 +226,7 @@ class SpatialResult:
     channeling: SpectralFactors | None = None
     tile_directions_lab: np.ndarray | None = None
     reconstruction: str = "nearest_tile"
+    transition: SpectralFactors | None = None
 
     def __post_init__(self) -> None:
         from ..instrument.model import RECONSTRUCTIONS
@@ -249,7 +254,7 @@ class SpatialResult:
             if not isinstance(self.coherent_cxr, SpectralFactors):
                 raise TypeError("coherent_cxr must be SpectralFactors or None")
             self._validate_factor(self.coherent_cxr)
-        for name in ("characteristic", "channeling"):
+        for name in ("characteristic", "channeling", "transition"):
             factor = getattr(self, name)
             if factor is not None:
                 if not isinstance(factor, SpectralFactors):
@@ -399,10 +404,16 @@ class SpatialResult:
             if self.channeling is None:
                 raise ValueError("channeling radiation spectrum is not available")
             return self.channeling
+        if component == "transition":
+            if self.transition is None:
+                raise ValueError("transition radiation spectrum is not available")
+            return self.transition
         if component in {"cxr_total", "coherent_total"}:
             base = self._factor(component.removesuffix("_total"))
             extras = [
-                extra for extra in (self.characteristic, self.channeling) if extra is not None
+                extra
+                for extra in (self.characteristic, self.channeling, self.transition)
+                if extra is not None
             ]
             if not extras:
                 return base
@@ -495,7 +506,7 @@ class SpatialResult:
             ``pixels``.
         component
             One of :data:`COMPONENTS`. ``"cxr"`` and ``"coherent"`` exclude
-            characteristic and channeling radiation; ``"cxr_total"`` and
+            characteristic, channeling and transition radiation; ``"cxr_total"`` and
             ``"coherent_total"`` include both when present.
         measured
             Apply the detector response after geometric scoring.
@@ -541,7 +552,7 @@ class SpatialResult:
             Finite increasing ``(low, high)`` bounds in eV, inclusive.
         component
             One of :data:`COMPONENTS`. ``"cxr"`` and ``"coherent"`` exclude
-            characteristic and channeling radiation; ``"cxr_total"`` and
+            characteristic, channeling and transition radiation; ``"cxr_total"`` and
             ``"coherent_total"`` include both when present.
         measured
             Apply detector response before integration.
@@ -596,7 +607,7 @@ class SpatialResult:
         ----------
         component
             One of :data:`COMPONENTS`. ``"cxr"`` and ``"coherent"`` exclude
-            characteristic and channeling radiation; ``"cxr_total"`` and
+            characteristic, channeling and transition radiation; ``"cxr_total"`` and
             ``"coherent_total"`` include both when present.
         pixel_chunk
             Positive maximum pixels materialized per working chunk.

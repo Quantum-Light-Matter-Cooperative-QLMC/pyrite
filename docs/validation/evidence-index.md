@@ -151,8 +151,11 @@ radiation-physics/coherent-physical-bunch-population
 radiation-physics/coherent-line-spectrum
 radiation-physics/coherent-segment-midpoint-time
 radiation-physics/temporal-intensity-profile
+radiation-physics/tr-coherent-bunch
+radiation-physics/tr-crossing-superposition
 radiation-physics/tr-detected-omission-bound
 radiation-physics/tr-interface-energy-scale
+radiation-physics/tr-line-cross-term
 radiation-physics/cross-reflection-coherence
 radiation-physics/external-brem-subtraction
 radiation-physics/finite-footprint-longitudinal-decoherence

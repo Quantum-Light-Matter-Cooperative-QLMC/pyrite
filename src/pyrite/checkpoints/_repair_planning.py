@@ -207,6 +207,10 @@ def _cxr_at_target(r, target, cxr_ne, fidelity):
         if channeling is not None:
             channeling = np.asarray(channeling)
             finite = finite and channeling.shape == eg.shape and np.isfinite(channeling).all()
+    if r["case"].get("transition_radiation") is not None:
+        transition = r.get("spec_transition")
+        finite = finite and transition is not None and np.shape(transition) == eg.shape
+        finite = finite and bool(np.isfinite(np.asarray(transition, dtype=float)).all())
     grid_ok = eg.shape == target.shape and np.allclose(eg, target)
     ne_ok = cxr_ne is None or int(r["case"].get("Ne", -1)) == int(cxr_ne)
     fidelity_ok = fidelity is None or r["case"].get("line_profile") == fidelity
@@ -250,6 +254,13 @@ def _plan_cxr(
             ):
                 raise ValueError(
                     "cannot reline spec_channeling without its case channeling metadata"
+                )
+            if (
+                record.get("spec_transition") is not None
+                and record["case"].get("transition_radiation") is None
+            ):
+                raise ValueError(
+                    "cannot reline spec_transition without its case transition_radiation record"
                 )
             updates = {}
             if cxr_ne is not None:

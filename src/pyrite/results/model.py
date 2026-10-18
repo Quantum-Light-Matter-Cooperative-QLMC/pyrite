@@ -113,6 +113,7 @@ class Result:
         ├── cxr.coherent        SpectralDensity | None
         ├── characteristic      SpectralDensity | None   atomic lines, CXR grid
         ├── channeling          SpectralDensity | None   planar CR, CXR grid
+        ├── transition          SpectralDensity | None   transition radiation, CXR grid
         ├── brem                SpectralDensity  continuum, own wider grid
         ├── scene, numerics     what you asked for (shortcuts into provenance)
         ├── case                low-level resolved transport input (Case)
@@ -123,7 +124,7 @@ class Result:
     on its own grid; no family includes another. Derived views:
     :meth:`to_dataframe` (long, native grids), :meth:`spectral_flux` (wide,
     common grid, beam/acceptance-scaled, with a ``total`` column), and
-    :meth:`combined_cxr` (CXR plus characteristic and channeling). Displaying a result in a
+    :meth:`combined_cxr` (CXR plus characteristic, channeling and transition radiation). Displaying a result in a
     notebook renders this layout with grid sizes and ranges.
     """
 
@@ -135,6 +136,8 @@ class Result:
     """Atomic characteristic lines on the CXR grid, excluded from both CXR modes."""
     channeling: SpectralDensity | None
     """Planar channeling radiation on the CXR grid (ADR-0018), or ``None`` when off."""
+    transition: SpectralDensity | None
+    """Planar-stack transition radiation on the CXR grid (#103), or ``None`` when off."""
     case: Case
     """Fully resolved low-level transport input; prefer :attr:`scene` for inputs."""
     provenance: Provenance
@@ -149,13 +152,19 @@ class Result:
         brem: SpectralDensity,
         characteristic: SpectralDensity | None = None,
         channeling: SpectralDensity | None = None,
+        transition: SpectralDensity | None = None,
         case: Case,
         provenance: Mapping[str, Any],
         spatial: SpatialResult | None = None,
     ) -> None:
         if not isinstance(cxr, CxrSpectra) or not isinstance(brem, SpectralDensity):
             raise TypeError("Result requires cxr=CxrSpectra and brem=SpectralDensity")
-        for label, component in (("characteristic", characteristic), ("channeling", channeling)):
+        extras = (
+            ("characteristic", characteristic),
+            ("channeling", channeling),
+            ("transition", transition),
+        )
+        for label, component in extras:
             if component is None:
                 continue
             if not isinstance(component, SpectralDensity):
@@ -173,6 +182,7 @@ class Result:
             ("brem", brem),
             ("characteristic", characteristic),
             ("channeling", channeling),
+            ("transition", transition),
             ("case", case),
             (
                 "provenance",
@@ -188,12 +198,15 @@ class Result:
         mode: str = "incoherent",
         include_characteristic: bool = True,
         include_channeling: bool = True,
+        include_transition: bool = True,
     ) -> SpectralDensity:
-        """Return the selected CXR mode plus optional atomic and channeling emission.
+        """Return the selected CXR mode plus optional atomic, channeling and TR emission.
 
         The returned density is photons / incident electron / eV / sr, with
         the selected mode's source/observation normalization. Brem is excluded
-        because it may use another photon-energy grid.
+        because it may use another photon-energy grid. Transition radiation
+        adds as an intensity (``tr-line-cross-term``): its interference with a
+        reflection ``g`` along the surface normal is not included.
         """
         if mode not in {"incoherent", "coherent"}:
             raise ValueError("mode must be 'incoherent' or 'coherent'")
@@ -205,6 +218,8 @@ class Result:
             density = density + self.characteristic.density
         if include_channeling and self.channeling is not None:
             density = density + self.channeling.density
+        if include_transition and self.transition is not None:
+            density = density + self.transition.density
         return SpectralDensity(component.photon_energy_eV, density, component.normalization)
 
     @property
@@ -233,6 +248,8 @@ class Result:
             parts.append(("characteristic", None, self.characteristic))
         if self.channeling is not None:
             parts.append(("channeling", None, self.channeling))
+        if self.transition is not None:
+            parts.append(("transition", None, self.transition))
         parts.append(("brem", None, self.brem))
         return parts
 
@@ -240,7 +257,7 @@ class Result:
         """Return the separate spectral arrays as a tidy long-form polars DataFrame.
 
         Columns are ``component`` (``cxr``, ``characteristic``, ``channeling``,
-        ``brem``),
+        ``transition``, ``brem``),
         ``mode`` (CXR ``incoherent``/``coherent``, null for other families),
         ``photon_energy_eV`` (eV), ``density`` (photons / incident electron /
         eV / sr), and ``normalization`` (``source`` or ``observation-average``).
@@ -305,8 +322,8 @@ class Result:
         """Return a wide spectrum table on a common grid, in physical units.
 
         Columns are ``photon_energy_eV``, ``photon_energy_keV``, one column per
-        family (``cxr`` in the selected ``mode``, ``characteristic`` and
-        ``channeling`` when present, ``brem``), and ``total``, their sum. The grid is the union of
+        family (``cxr`` in the selected ``mode``, ``characteristic``,
+        ``channeling`` and ``transition`` when present, ``brem``), and ``total``, their sum. The grid is the union of
         every family's native nodes, so each family is exact at its own nodes
         and linearly interpolated between them. Outside its own grid a family
         is zero; the total therefore omits brem below the brem grid start.
@@ -382,6 +399,7 @@ class Result:
             ("cxr.coherent", grid(self.cxr.coherent), "coherent PXR/CBS"),
             ("characteristic", grid(self.characteristic), "atomic lines, CXR grid"),
             ("channeling", grid(self.channeling), "planar channeling radiation, CXR grid"),
+            ("transition", grid(self.transition), "transition radiation, CXR grid"),
             ("brem", grid(self.brem), "bremsstrahlung continuum"),
             (
                 "scene",

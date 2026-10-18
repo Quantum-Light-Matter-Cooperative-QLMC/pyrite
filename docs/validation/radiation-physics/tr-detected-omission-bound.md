@@ -164,3 +164,16 @@ I wrote my own vector multilayer solver: my own unknown layout, the particular f
 The physics of the claim reproduces term by term: the field normalization, the far-field factor, signs and branch, the Ginzburg–Frank closed form in both senses, the conductor, zero-contrast and Jackson 13.91 limits, the $\varepsilon$ convention, the positivity argument and the $\text{rse}/3$ rule. There is no divergent factor, sign, exponent, unit or convention.
 
 Verdict: `rederived`. Findings 1–3 are recorded as implementation and scope caveats that do not change any documented decision. Only a human may mark the row `signed-off`.
+
+## Screening solver amplitude API
+
+`planar_transition_radiation(..., return_amplitude=True)` also exposes the
+outgoing Cartesian field vector already used to compute the yield. Its source
+docstring defines the normalization and interface reference plane. The default
+intensity-only return is preserved. The CPU tests check yield reconstruction,
+transversality, broadcasting, and matched-medium/zero-thickness limits; the
+hardware test compares the complex vector on NumPy and CuPy.
+
+This API exposure does not extend the existing `rederived` claim to bunch
+translation phases, cross-component phase conventions, or production CTR.
+Those require separate validation before coherent summation is advertised.
