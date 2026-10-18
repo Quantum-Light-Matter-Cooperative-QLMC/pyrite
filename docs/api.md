@@ -522,6 +522,11 @@ These are the supported low-level simulation entry points. Inputs and outputs us
    pyrite.montecarlo.spectrum.mc_brem_spectrum
    pyrite.detectors.response.detector_efficiency
    pyrite.detectors.response.convolve_detector
+   pyrite.montecarlo.trajectory_summary.summarize_trajectories
+   pyrite.montecarlo.trajectory_summary.iter_primary_summaries
+   pyrite.montecarlo.trajectory_summary.depth_loss_profile
+   pyrite.montecarlo.trajectory_balance.capture_secondary_energy_balance
+   pyrite.campaign.beam_metrics.capture_beam_metrics
    pyrite.montecarlo.runner.run_case
    pyrite.montecarlo.runner.run_cases
    pyrite.montecarlo.channeling.spatial.spatial_density

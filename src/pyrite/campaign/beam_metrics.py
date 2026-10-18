@@ -213,3 +213,35 @@ def initial_state_metrics(
         bunch_charge_pc=beam.bunch_charge_pc,
         rep_rate_hz=beam.rep_rate_hz,
     )
+
+
+def capture_beam_metrics(
+    path: str,
+    beam: BeamLike,
+    *,
+    max_particles: int = 65536,
+) -> tuple[BeamMetrics, int, int]:
+    """Diagnose a bounded prefix of an artifact's initial sampled particles.
+
+    Returns ``(metrics, sampled_particles, available_particles)``. Uses the
+    existing ``initial_state_metrics`` / ``sampled_beam_metrics`` definitions;
+    sample includes missed entries. Increase ``max_particles`` to the available
+    count for full-bunch metrics. The prefix is deterministic and is not a claim
+    of random subsampling. Array memory is bounded by ``max_particles``.
+    """
+    import h5py
+
+    from ..montecarlo.trajectories import read_trajectory_header
+
+    if max_particles < 1:
+        raise ValueError("max_particles must be positive")
+    read_trajectory_header(path)
+    with h5py.File(path, "r") as handle:
+        group = handle["transport"]
+        total = int(group["initial_E_keV"].shape[0])
+        count = min(total, max_particles)
+        values = [
+            group[key][:count]
+            for key in ("initial_r_ang", "initial_v_hat", "initial_t0_ang", "initial_E_keV")
+        ]
+    return initial_state_metrics(*values, beam), count, total

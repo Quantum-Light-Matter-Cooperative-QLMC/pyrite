@@ -291,3 +291,54 @@ pyrite checkpoint slim --help
 `gc` removes cases that no longer match current profile resolution; `rm` targets selected datasets. Both provide previews and confirmation controls. Review their help before destructive use.
 
 Remote runs can be pulled into the same local checkpoint layout. See [Running on a cluster](running-on-a-cluster.md) for submission and transfer.
+
+## Analyze saved trajectory captures
+
+Schema-2/3 trajectory artifacts can be reduced without running transport:
+
+```python
+import numpy as np
+from pyrite.montecarlo.trajectory_summary import summarize_trajectories
+from pyrite.plots.altair.trajectory_summary import summary_charts
+
+tables = summarize_trajectories(
+    "capture.h5",
+    depth_edges_ang=np.linspace(-1, 40001, 81),
+    energy_edges_keV=np.linspace(0, 30, 61),
+    max_rows=65536,
+)
+charts = summary_charts(tables)
+```
+
+Choose depth edges covering the entire capture, including surface nudges, and
+include layer interfaces. Tables contain units in their column names. The
+[observable definitions](../physics/beam-transport/transport-outputs.md#saved-capture-observables)
+explain the primary-only fates/ranges and all-generation continuous-loss profile.
+Histograms retain underflow/overflow counts; charts show finite bins only.
+`iter_primary_summaries(path, max_rows=...)` yields bounded per-history tables
+when individual values are needed. Consume those tables incrementally to keep
+memory bounded. One whole primary shower may exceed `max_rows`; it is never
+split. Reduction memory otherwise depends on the block and fixed histogram
+sizes, rather than the capture's segment or history count.
+
+For secondary-transport captures, compare the continuous-loss profile sum with
+`capture_secondary_energy_balance(path)` from
+`pyrite.montecarlo.trajectory_balance`. Its `term, energy_keV` table reuses the
+transport energy ledger and includes cutoff, binding, pair and annihilation
+terms. Pair metadata is filtered in bounded scans; this can require repeated
+passes. `campaign.beam_metrics.capture_beam_metrics(path, beam,
+max_particles=65536)` reuses sampled-beam diagnostics over a deterministic prefix
+of `initial_*`, including missed entries, returning metrics plus sampled and
+available counts. Increase the limit to the available count for full-bunch
+metrics; its memory limit is separate from the segment-block limit.
+
+Launch the trace viewer with `pyrite app viewer launch`. Choose **Saved capture**,
+enter the artifact path and number of first histories, then **Open saved capture**.
+The existing 3D, cross-section and survival views use those stored rows without
+transport. Reads are capped at 100,000 material plus vacuum segments; reduce the
+history count if the cap is exceeded. Saved-view fractions describe the selected
+material-entering histories. The API also accepts `select_trajectories(...)`
+whole-history selections directly in `trajectory_chart`,
+`penetration_survival_chart`, `trajectory_volume_data` and
+`trajectory_volume_figure`. Track-only selections are rejected because they
+cannot describe complete primary survival.

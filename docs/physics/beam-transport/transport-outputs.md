@@ -210,3 +210,48 @@ Statistical technique (estimators, error bars, seed handling, and the convergenc
 ## Validation
 
 `Validation: electron-transport` for the segment semantics and the row-event contract, `transport-midpoint-stopping` and `substep-radiation-invariance` for the midpoint fields and their reduction, `radiation-error-estimators` for the diagnostic estimators, and `beam-phase-space-metrics` for the incident-diagnostic reduction. See the [physics validation ledger](../../validation/physics-validation-ledger.md).
+
+## Saved-capture observables
+
+`montecarlo.trajectory_summary` reduces schema-2/3 captures without re-transport.
+`iter_primary_summaries` yields one row per material-entering primary history:
+its terminal primary event, maximum depth over both segment endpoints, summed
+material path length, terminal pre-event energy, and terminal polar angle to
+sample $+z$. Descendants do not determine the primary's exit fate or range.
+Missed entries have no per-history material rows. Aggregate fate fractions use
+the stored sampled count `Ne`, with `missed` and otherwise `without_rows`
+histories explicit. Incomplete primary paths are explicitly
+`unfinished`. Exit-energy/angle histograms include top, bottom and side exits.
+Depth and range use Å, energies keV, angles radians; histograms retain explicit
+underflow/overflow rows. Hard spectra group recorded transfer energies (or hard
+photon energies) by event kind and hard channel. Generation counts cover
+transported tracks, with launch energy taken from each track's first row;
+subthreshold particles without transported tracks are excluded.
+
+### Continuous-loss depth attribution
+
+Validation: `trajectory-depth-loss-profile`.
+
+This is an explicit saved-segment analysis convention, not a mass-normalized
+dose: assume the recorded continuous loss
+$\Delta E=E_{\mathrm{start}}-E_{\mathrm{end}}$ is uniform per arclength on its
+straight segment. For endpoint depths $a\leq b$ and bin $[e_j,e_{j+1})$,
+
+$$
+Q_j=\Delta E\frac{\max(0,\min(b,e_{j+1})-\max(a,e_j))}{b-a}.
+$$
+
+The table groups by the segment's stored layer. Include layer interfaces among
+bin edges. A transverse segment ($a=b$) puts all its loss in the midpoint bin;
+the final right edge is inclusive. At an internal edge this point-bin rule
+need not equal the symmetric nonzero-span limit. Complete depth coverage gives
+$\sum_j Q_j=\Delta E$; reversing the segment direction leaves it unchanged.
+Partial coverage intentionally retains only the covered fraction.
+
+The result is **continuous loss in keV per bin**, summed over all generations.
+It excludes cutoff residuals, subthreshold secondary deposits, and hard binding
+or radiation terms. `trajectory_balance.capture_secondary_energy_balance`
+reuses the canonical `secondary_energy_balance` ledger, including pair and
+annihilation terms; compare the profile total with `continuous_keV`, and the
+complete ledger with its `residual_keV`. No extra local-deposition assumption
+is made for hard transfers.

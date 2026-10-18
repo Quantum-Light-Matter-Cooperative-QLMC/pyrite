@@ -201,6 +201,7 @@ Generated browsing views of every claim in the [detailed validation ledger](phys
 | [`blazed-groove-geometry`](ledger-transport-background.md#blazed-groove-geometry) | blazed sawtooth entrance-face profile (period Λ, depth h = Λ sin(tp)cos(tp); working facet ⊥ n̂, relief facet ⊥ beam) with exact periodic material/vacuum crossings for electron entry, exit, and later-facet re-entry plus coherent and bremsstrahlung photon escape; restricted to θ_obs = 90°, tilt_azim = 180°, 0 < tilt_polar < 90° | `unverified` |
 | [`gpt-gdf-injection`](ledger-transport-background.md#gpt-gdf-injection) | native GPT time-output and screen records preserve correlated electron phase space, relativistic kinetic energy, signed bunch charge, and unbiased current-normalized sampling through explicit entrance-plane projection | `anchored` |
 | [`linear-bunch-front-tilt`](ledger-transport-background.md#linear-bunch-front-tilt) | signed electron-front angle from the beam-normal plane gives incoming arrival delay `c*t0 = c*epsilon + tan(theta) u.w / beta0`; adding the separate ray-to-face delay once makes matching front and crystal angles parallel to the entrance face. Gaussian position-time correlation shifts the coherent mismatch from `K` to `K - omega J^-T a`. | `anchored` |
+| [`trajectory-depth-loss-profile`](ledger-transport-background.md#trajectory-depth-loss-profile) | saved-segment continuous-loss depth attribution, per stored layer, conserving covered segment loss | `anchored` |
 
 ## Mosaicity & multilayer (code-cross-checked; need sign-off + measured data)
 
