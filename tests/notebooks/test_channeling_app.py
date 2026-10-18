@@ -228,3 +228,12 @@ def test_planar_far_field_components_mirror_each_other():
     lit = intensity[0] > 1e-6 * intensity.max()
     np.testing.assert_allclose(np.exp(1j * phase[0][lit]), np.exp(-1j * phase[1][lit]), atol=1e-9)
     assert axis[0] == -3.0 and axis[-1] == 3.0
+
+
+def test_ring_winding_reads_the_orbital_index():
+    from pyrite.apps.channeling import ring_winding
+
+    assert ring_winding(10.0, np.array([[1.0, -1j], [1j, 1.0]])) == (0, 2)  # J_z = +1
+    assert ring_winding(10.0, np.array([[1.0, 1j], [-1j, 1.0]])) == (-2, 0)  # J_z = -1
+    assert ring_winding(10.0, np.diag([1.0, 0.0])) == (-2, 2)  # planar, outside the nulls
+    assert ring_winding(10.0, np.diag([1.0, 0.0]), radius=0.5) == (0, 0)

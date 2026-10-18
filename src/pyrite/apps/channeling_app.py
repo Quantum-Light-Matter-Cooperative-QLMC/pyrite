@@ -595,14 +595,68 @@ def _(axial_form, mo):
 
 @app.cell
 def _(axial_result, mo):
-    axial_sample_ui = mo.ui.slider(
-        0, len(axial_result.depths_ang) - 1, value=0, label="Recorded axial depth", show_value=True
+    get_axial_frame, set_axial_frame = mo.state(0)
+    axial_frames = len(axial_result.depths_ang)
+    axial_play_ui = mo.ui.switch(value=False, label="Play depth")
+    axial_speed_ui = mo.ui.dropdown(
+        ["0.25s", "0.5s", "1s", "2s"], value="0.5s", label="Frame interval"
     )
     axial_conditional_ui = mo.ui.checkbox(
         value=False, label="Condition axial density on grid survival"
     )
-    mo.hstack([axial_sample_ui, axial_conditional_ui])
-    return axial_conditional_ui, axial_sample_ui
+    return (
+        axial_conditional_ui,
+        axial_frames,
+        axial_play_ui,
+        axial_speed_ui,
+        get_axial_frame,
+        set_axial_frame,
+    )
+
+
+@app.cell
+def _(axial_play_ui, axial_speed_ui, mo):
+    # The refresh element only exists (and only ticks) while playing.
+    axial_tick_ui = (
+        mo.ui.refresh(options=[axial_speed_ui.value], default_interval=axial_speed_ui.value)
+        if axial_play_ui.value
+        else None
+    )
+    return (axial_tick_ui,)
+
+
+@app.cell
+def _(axial_frames, axial_tick_ui, get_axial_frame, mo, set_axial_frame):
+    mo.stop(axial_tick_ui is None)
+    _ = axial_tick_ui.value  # rerun on every tick
+    set_axial_frame((get_axial_frame() + 1) % axial_frames)
+    return
+
+
+@app.cell
+def _(
+    axial_conditional_ui,
+    axial_frames,
+    axial_play_ui,
+    axial_speed_ui,
+    axial_tick_ui,
+    get_axial_frame,
+    mo,
+    set_axial_frame,
+):
+    axial_sample_ui = mo.ui.slider(
+        0,
+        axial_frames - 1,
+        value=get_axial_frame(),
+        label="Recorded axial depth",
+        show_value=True,
+        on_change=set_axial_frame,
+    )
+    _controls = [axial_sample_ui, axial_play_ui, axial_speed_ui, axial_conditional_ui]
+    if axial_tick_ui is not None:
+        _controls.append(axial_tick_ui)
+    mo.hstack(_controls, wrap=True)
+    return (axial_sample_ui,)
 
 
 @app.cell

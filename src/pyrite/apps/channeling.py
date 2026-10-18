@@ -52,18 +52,44 @@ def far_field_maps(gamma: float, coherency: np.ndarray, span: float = 3.0, n: in
     return axis, intensity, phase, float(values[-1] / total)
 
 
+def ring_winding(gamma: float, coherency: np.ndarray, radius: float = 2.0) -> tuple[int, int]:
+    """Phase windings of the leading mode's ``E_+`` and ``E_-`` on the ring ``gamma theta = radius``.
+
+    A winding ``l`` is the orbital index of that circular component
+    (``l = J_z - sigma`` for a line of definite ``J_z``).
+
+    Validation: cr-dipole-far-field-amplitude
+    """
+    from pyrite.montecarlo.channeling.dipole import dipole_far_field
+
+    vector = np.linalg.eigh(np.asarray(coherency, dtype=complex))[1][:, -1]
+    phi = np.linspace(0.0, 2.0 * np.pi, 721)
+    field = dipole_far_field(
+        radius / gamma * np.cos(phi), radius / gamma * np.sin(phi), gamma, vector
+    )[:2]
+    turns = np.diff(np.unwrap(np.angle(field), axis=-1), axis=-1).sum(axis=-1) / (2.0 * np.pi)
+    return int(np.rint(turns[0])), int(np.rint(turns[1]))
+
+
 def far_field_figure(gamma: float, coherency: np.ndarray, title: str):
-    """Draw intensity and phase of the ``E_+`` and ``E_-`` far-field components."""
+    """Draw intensity and phase of the ``E_+`` and ``E_-`` far-field components.
+
+    Each component has its own intensity scale; its share of the plotted
+    photons and its phase winding on the ``gamma theta = 2`` ring are in the
+    titles. Phase is masked below 1e-3 of that component's peak.
+    """
     import matplotlib.pyplot as plt
 
     axis, intensity, phase, purity = far_field_maps(gamma, coherency)
+    windings = ring_winding(gamma, coherency)
+    shares = intensity.sum(axis=(1, 2)) / intensity.sum()
     beta = np.sqrt(1.0 - gamma**-2)
     grid = np.hypot(*np.meshgrid(axis, axis, indexing="ij")) / gamma
     ratio = (1.0 - beta) / (1.0 - beta * np.cos(grid))
     extent = (axis[0], axis[-1], axis[0], axis[-1])
-    peak = intensity.max()
-    fig, axes = plt.subplots(1, 4, figsize=(16, 3.8), constrained_layout=True)
+    fig, axes = plt.subplots(1, 4, figsize=(18, 4), constrained_layout=True)
     for k, label in enumerate(("E₊ (σ = +1)", "E₋ (σ = −1)")):
+        peak = intensity[k].max()
         mesh = axes[2 * k].imshow(
             intensity[k].T, origin="lower", extent=extent, vmin=0, vmax=peak, cmap="magma"
         )
@@ -71,13 +97,20 @@ def far_field_figure(gamma: float, coherency: np.ndarray, title: str):
             axis, axis, ratio.T, levels=[0.25, 0.5, 0.75], colors="w", linewidths=0.6
         )
         axes[2 * k].clabel(contours, fmt="E/E₀=%.2g", fontsize=6)
-        axes[2 * k].set(title=f"{label} intensity", xlabel="γθx", ylabel="γθy")
+        axes[2 * k].set(
+            title=f"{label} · {shares[k]:.0%} of mapped photons",
+            xlabel="γθx",
+            ylabel="γθy",
+        )
         fig.colorbar(mesh, ax=axes[2 * k], label="photons per (1/γ)² per line photon")
         shown = np.where(intensity[k] > 1e-3 * peak, phase[k], np.nan)
         mesh = axes[2 * k + 1].imshow(
             shown.T, origin="lower", extent=extent, cmap="twilight", vmin=-np.pi, vmax=np.pi
         )
-        axes[2 * k + 1].set(title=f"{label} phase", xlabel="γθx", ylabel="γθy")
+        axes[2 * k + 1].add_patch(plt.Circle((0, 0), 2.0, fill=False, color="k", lw=0.6, ls="--"))
+        axes[2 * k + 1].set(
+            title=f"{label} phase · ℓ = {windings[k]:+d} on γθ = 2", xlabel="γθx", ylabel="γθy"
+        )
         fig.colorbar(mesh, ax=axes[2 * k + 1], label="rad")
     fig.suptitle(f"{title} · leading-mode purity {purity:.3f}")
     return fig

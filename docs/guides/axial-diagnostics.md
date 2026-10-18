@@ -34,7 +34,9 @@ result = axial_diagnostic(
 
 In `pyrite app channeling launch`, choose **Axial (experimental)** and press
 **Run axial diagnostic** with the default settings to reproduce this solve.
-Depth and conditioning selectors redraw stored arrays; the last four distinct
+Depth and conditioning selectors redraw stored arrays; **Play depth** steps
+the recorded depth at the chosen frame interval (wrapping at the end) and
+redraws the maps and radiation panels each frame. The last four distinct
 completed solves are cached. The axial branch waits for Run, so ordinary static
 export still executes the default planar demo. Depths run from 10 nm to 1 mm;
 the app records 41 evenly spaced depths (`axial_demo_depths`). App bounds are
@@ -112,8 +114,14 @@ polarization matrix `T_ab` and its depth integral. The app then draws:
 - the selected line's far field versus `γθ`: intensity and phase of the
   components `E_±` on a fixed lab circular basis (`dipole_far_field`). A phase
   winding `ℓ` around the axis is orbital angular momentum `ℓ = J_z − σ`, so
-  a pure `J_z = +1` line leaves `E₊` flat and winds `E₋` twice. Contours show
-  the Doppler energy relative to forward.
+  a pure `J_z = +1` line leaves `E₊` flat and winds `E₋` twice. `σ` is the
+  photon spin projection a fixed circular polarizer selects; `J_z = σ + ℓ` is
+  the total set by the electron transition. Each component has its own
+  intensity scale; titles give its share of the mapped photons and the
+  winding on the `γθ = 2` ring. Contours show the Doppler energy relative to
+  forward. Dipole order allows only `J_z = ±1` (transverse `d`, no `J_z = 0`);
+  `|ΔJ_z| ≥ 2` needs quadrupole or higher order, suppressed by
+  `(state size / rest-frame wavelength)²`.
 
 The planar mode draws the same maps for its real dipole along the plane
 normal, an equal coherent mix of `J_z = ±1` with no net OAM. These are
