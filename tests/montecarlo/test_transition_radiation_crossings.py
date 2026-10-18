@@ -315,3 +315,22 @@ def test_regular_radiator_reproduces_the_garibian_stack_formula():
     )
     visible = exact > 1e-3 * peak
     np.testing.assert_allclose(computed[visible], exact[visible], rtol=1e-5)
+
+
+def test_chunks_hold_whole_histories_within_the_element_budget(bilayer, monkeypatch):
+    import pyrite.montecarlo.spectrum.transition_radiation_crossings as module
+
+    sizes, original = [], module.crossing_amplitudes
+
+    def spy(crossings, *args, **kwargs):
+        sizes.append(len(crossings))
+        return original(crossings, *args, **kwargs)
+
+    monkeypatch.setattr(module, "crossing_amplitudes", spy)
+    c = boundary_crossings(bilayer, _BILAYER)
+    per_history = np.bincount(c.electron_id)
+    budget = int(np.max(per_history)) + 3  # one direction and energy: crossings per chunk
+    module.crossing_transition_radiation(
+        c, 300.0, _directions(+1)[:1], [1.0 + 0.0j, 0.9], n_electrons=1, max_elements=budget
+    )
+    assert sum(sizes) == len(c) and max(sizes) <= budget and len(sizes) > 1

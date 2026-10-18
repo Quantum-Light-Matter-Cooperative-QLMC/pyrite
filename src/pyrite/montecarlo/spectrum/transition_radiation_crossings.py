@@ -158,6 +158,8 @@ def boundary_crossings(
     BoundaryCrossings
         Entry of each primary through ``z = 0``, every layer boundary with a
         change of composition, and every top or bottom exit.
+
+    Validation: tr-crossing-superposition
     """
     if segments.get("event_kind") is None:
         raise ValueError("boundary crossings need midpoint rows (energy_model='midpoint')")
@@ -326,7 +328,8 @@ def crossing_transition_radiation(
     points; histories add incoherently. ``coherence="crossing"`` squares each
     crossing alone: the independent-interface (dephased) limit, not the
     default thin-film model. ``n_electrons`` is the incident count (``Ne``),
-    and ``max_elements`` bounds one chunk's ``len(s) * crossings``.
+    and ``max_elements`` bounds one chunk's ``len(s) * crossings`` (a single
+    history above it is evaluated alone).
 
     Validation: tr-crossing-superposition
     """
@@ -341,12 +344,15 @@ def crossing_transition_radiation(
     history = crossings.electron_id[order]
     starts = np.flatnonzero(np.r_[True, history[1:] != history[:-1]])
     per_chunk = max(1, int(max_elements) // max(1, int(np.prod(shape, dtype=int))))
+    history_end = np.r_[starts[1:], history.size]
     lo = 0
     while lo < starts.size:
         first = starts[lo]
-        hi = int(np.searchsorted(starts, first + per_chunk, side="right"))
+        # Whole histories whose crossings end within the budget; one history
+        # larger than the budget is taken alone, never split.
+        hi = int(np.searchsorted(history_end, first + per_chunk, side="right"))
         hi = max(hi, lo + 1)
-        last = starts[hi] if hi < starts.size else history.size
+        last = history_end[hi - 1]
         amplitude = crossing_amplitudes(
             _take(crossings, order[first:last]), energy, n, layer_eps, xp=xp
         )

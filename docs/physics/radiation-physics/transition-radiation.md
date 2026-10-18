@@ -62,6 +62,18 @@ $$
 
 with $A_j=\gamma^{-2}+\theta^2+\omega_{p,j}^2/\omega^2$, $F_j=e^{-i\phi_j}$, $\phi_j=\omega t_jA_j/2$ and $F=F_1F_2$ ($2\operatorname{Re}\langle R^{(N)}\rangle=4\sin^2\frac{\phi_1}2\sin^2\frac{N(\phi_1+\phi_2)}2/\sin^2\frac{\phi_1+\phi_2}2$), is reproduced by `crossing_transition_radiation` on the stack's straight-track crossings within $2\times10^{-4}$ of the peak for ten 15 µm foils with 200 µm gaps at $\gamma=2000$, 2–40 keV and $\theta\le3/\gamma$. The residual is the formula's small-angle phase: with exact phases $t_j(\omega/v-\lambda_j)$ the agreement is $10^{-5}$. The absorbing-radiator flux form is not reproduced.
 
+## Detector channels and acceptance
+
+`Validation: tr-detector-integration`
+
+Thin-film and stack TR has formation-zone fringes in energy and angle far narrower than a broad logarithmic grid. `transition_radiation_detector.detected_transition_radiation` therefore integrates the crossing-superposition density over each pixel of a planar detector (`PlanarPose` with a `PixelGrid`, or a bare plane) and each energy channel, instead of sampling it:
+
+$$
+N_{p,c}=\int_{E_c}^{E_{c+1}}dE\int_{\Omega_p}d\Omega\,\frac{d^2N}{dE\,d\Omega},
+$$
+
+with composite trapezoid nodes inside every channel and $s\times s$ point sub-pixels per pixel ($A\cos/r^2$). The energy and angular levels double one at a time, toward the axis whose last doubling changed the table most, until a third of the larger last change (both rules are second order) is within `rtol` of the table peak. That estimate is asymptotic, not a bound. The source is a point at the lab origin, directions map into the slab frame with transport's tilt, and the detector must lie beyond one face. Photons are incident on the plane; filters and detector response stay read-time factors. A single exit interface reproduces the closed Ginzburg--Frank form through the acceptance to $10^{-3}$, and a 50 µm film with about twenty fringes per channel matches a dense Gauss--Legendre reference to $5\times10^{-4}$, where the starting grid is off by more than 5%.
+
 ## Interface energy scale
 
 `Validation: tr-interface-energy-scale`
