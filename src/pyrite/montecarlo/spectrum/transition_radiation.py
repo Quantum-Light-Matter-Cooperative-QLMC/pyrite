@@ -67,6 +67,7 @@ from ...materials.crystal import ALPHA_FS, HBARC_EV_ANG, HC_EV_ANG, M_E_EV, R_E_
 __all__ = [
     "TransitionRadiationOmission",
     "beta_from_kinetic_eV",
+    "composition_dielectric",
     "ginzburg_frank_interface",
     "interface_transition_radiation_amplitude",
     "medium_dielectric",
@@ -95,12 +96,22 @@ def medium_dielectric(material, photon_energy_eV) -> np.ndarray:
 
     Validation: tr-detected-omission-bound
     """
+    return composition_dielectric(_resolve_composition(material), photon_energy_eV)
+
+
+def composition_dielectric(composition, photon_energy_eV) -> np.ndarray:
+    """:func:`medium_dielectric` of an explicit ``[(element, atoms/A^3), ...]`` composition.
+
+    The transport layers' compositions, without a catalog lookup.
+
+    Validation: tr-detected-omission-bound
+    """
     energy = np.asarray(photon_energy_eV, dtype=float)
     wavelength = HC_EV_ANG / energy
     total = np.zeros(energy.shape, dtype=complex)
-    for element, density in _resolve_composition(material):
+    for element, density in composition:
         f_prime, f_double_prime = henke_dispersion(element, energy)
-        total = total + density * (Z_TABLE[element] + f_prime - 1j * f_double_prime)
+        total = total + float(density) * (Z_TABLE[element] + f_prime - 1j * f_double_prime)
     return 1.0 - R_E_ANG * wavelength**2 / np.pi * total
 
 

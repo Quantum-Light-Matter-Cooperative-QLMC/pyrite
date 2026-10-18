@@ -289,6 +289,7 @@ def simulate(
     coherent = output.get("spec_coherent")
     characteristic = output.get("spec_characteristic")
     channeling = output.get("spec_channeling")
+    transition = output.get("spec_transition")
     return Result(
         cxr=CxrSpectra(
             SpectralDensity(output["E_grid"], output["spec"]),
@@ -299,6 +300,7 @@ def simulate(
             None if characteristic is None else SpectralDensity(output["E_grid"], characteristic)
         ),
         channeling=(None if channeling is None else SpectralDensity(output["E_grid"], channeling)),
+        transition=(None if transition is None else SpectralDensity(output["E_grid"], transition)),
         case=case,
         provenance={
             "scene": scene,
@@ -470,6 +472,9 @@ def _simulate_planar(
     channeling_average = (
         None if spatial.channeling is None else spatial.average_density("channeling")
     )
+    transition_average = (
+        None if spatial.transition is None else spatial.average_density("transition")
+    )
     return Result(
         cxr=CxrSpectra(
             SpectralDensity(energy, spatial.average_density("cxr"), "observation-average"),
@@ -485,6 +490,11 @@ def _simulate_planar(
             None
             if channeling_average is None
             else SpectralDensity(energy, channeling_average, "observation-average")
+        ),
+        transition=(
+            None
+            if transition_average is None
+            else SpectralDensity(energy, transition_average, "observation-average")
         ),
         case=case,
         provenance={

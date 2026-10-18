@@ -220,13 +220,16 @@ def _narrow_line_domain(records, band, x_domain):
     return max(domains, key=lambda domain: domain[1] - domain[0], default=None)
 
 
-def _characteristic_view(record, *, include_characteristic, include_channeling=True):
+def _characteristic_view(
+    record, *, include_characteristic, include_channeling=True, include_transition=True
+):
     """Drop the line-grid components that are not selected."""
     dropped = {
         key
         for key, selected in (
             ("spec_characteristic", include_characteristic),
             ("spec_channeling", include_channeling),
+            ("spec_transition", include_transition),
         )
         if not selected and key in record
     }
@@ -236,21 +239,29 @@ def _characteristic_view(record, *, include_characteristic, include_channeling=T
 
 
 def _selected_cxr_record(
-    record, line_source, *, include_cxr, include_characteristic, include_channeling=True
+    record,
+    line_source,
+    *,
+    include_cxr,
+    include_characteristic,
+    include_channeling=True,
+    include_transition=True,
 ):
     """Score selected line-grid terms without adding a component twice."""
     selected = np.zeros_like(np.asarray(line_source, dtype=float))
     if include_cxr:
         selected += np.asarray(line_source, dtype=float)
-    for key, include in (
+    components = (
         ("spec_characteristic", include_characteristic),
         ("spec_channeling", include_channeling),
-    ):
+        ("spec_transition", include_transition),
+    )
+    for key, include in components:
         if include and record.get(key) is not None:
             selected += np.asarray(record[key], dtype=float)
     scored_record = {**record, "spec": selected}
-    scored_record.pop("spec_characteristic", None)
-    scored_record.pop("spec_channeling", None)
+    for key, _ in components:
+        scored_record.pop(key, None)
     return scored_record
 
 

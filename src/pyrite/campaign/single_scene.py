@@ -171,6 +171,9 @@ def resolve_pixel_scene(
                 Literal["off", "planar"], transport.get("channeling_model", "off")
             ),
             channeling_plane=cast(tuple[int, int, int] | None, transport.get("channeling_plane")),
+            transition_radiation=cast(
+                Literal["off", "history", "bunch"], transport.get("transition_radiation", "off")
+            ),
             positron_transport=bool(transport.get("positron_transport", False)),
             atomic_electron_deflection=cast(
                 Literal["kawrakow", "none"],

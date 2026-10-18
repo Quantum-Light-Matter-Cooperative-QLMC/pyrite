@@ -1,8 +1,9 @@
 """Component-aware checkpoint storage.
 
 Active checkpoints live at ``<root>/<stem>/{line,brem,characteristic}.h5``,
-plus ``channeling.h5`` once any record carries ``spec_channeling`` (ADR-0018 P5;
-stores without channeling keep the historical three-file layout). Callers keep
+plus ``channeling.h5`` once any record carries ``spec_channeling`` (ADR-0018 P5)
+and ``transition.h5`` once any carries ``spec_transition`` (#103); stores
+without them keep the historical three-file layout. Callers keep
 using the historical merged ``{name: {E0: record}}`` in-memory shape; this
 module splits records on write and merges them on read.  A legacy
 ``<root>/<stem>.pkl`` remains readable, so migration happens on the next save.
@@ -20,19 +21,18 @@ import numpy as np
 
 from . import _checkpoint_io
 
-COMPONENTS = ("line", "brem", "characteristic", "channeling")
+COMPONENTS = ("line", "brem", "characteristic", "channeling", "transition")
 #: Components whose artifact is written only when non-empty or already present.
-OPTIONAL_COMPONENTS = frozenset({"channeling"})
+OPTIONAL_COMPONENTS = frozenset({"channeling", "transition"})
 _HDF5_SUFFIX = ".h5"
 _LEGACY_SUFFIX = ".pkl"
 _BREM_KEYS = frozenset({"brem", "E_grid_brem", "brem_wide"})
 _BREM_CASE_KEYS = frozenset({"Ne_brem", "E_grid_brem", "brem_chunk", "brem_file"})
-_CHARACTERISTIC_KEYS = frozenset({"spec_characteristic"})
-_CHANNELING_KEYS = frozenset({"spec_channeling"})
 #: Line-grid component key carried by each separately stored component.
 _LINE_COMPONENT_KEY = {
     "characteristic": "spec_characteristic",
     "channeling": "spec_channeling",
+    "transition": "spec_transition",
 }
 _SHARED_KEYS = frozenset({"case", "E_grid", "scale", "adaptive_sampling"})
 
@@ -101,9 +101,7 @@ def _component_store(results: dict, component: str) -> dict:
                 selected[energy] = {
                     key: value
                     for key, value in record.items()
-                    if key not in _BREM_KEYS
-                    and key not in _CHARACTERISTIC_KEYS
-                    and key not in _CHANNELING_KEYS
+                    if key not in _BREM_KEYS and key not in _LINE_COMPONENT_KEY.values()
                 }
             elif component == "brem":
                 selected[energy] = {
@@ -215,7 +213,7 @@ def save(
 ) -> None:
     """Atomically replace selected component artifacts.
 
-    Components land in background, characteristic, channeling, line order.
+    Components land in background, characteristic, channeling, transition, line order.
     Since line is the authoritative record index, interruption cannot expose a
     new line record without its matching independently stored companions. An
     optional component (:data:`OPTIONAL_COMPONENTS`) is skipped while it is
@@ -236,7 +234,7 @@ def save(
                 _dump_component(stem, root, component, _component_store(legacy, component))
     order = tuple(
         component
-        for component in ("brem", "characteristic", "channeling", "line")
+        for component in ("brem", "characteristic", "channeling", "transition", "line")
         if component in components
     )
     for component in order:
@@ -317,7 +315,7 @@ def load(stem: str, root: str | os.PathLike[str]) -> dict:
         else:
             brem = {}
         companions = {}
-        for component in ("characteristic", "channeling"):
+        for component in ("characteristic", "channeling", "transition"):
             path = component_read_path(stem, component, root)
             if path.is_file():
                 companions[component] = _checkpoint_io.load(str(path))

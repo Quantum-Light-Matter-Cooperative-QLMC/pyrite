@@ -38,6 +38,7 @@ NUMERICS_GROUPS = (
             ("pair_production_model", "pair production model"),
             ("positron_transport", "positron transport"),
             ("atomic_electron_deflection", "atomic-electron deflection"),
+            ("transition_radiation", "transition radiation"),
             *((key, key.replace("_", " ")) for key in CHANNELING_KEYS),
         ),
     ),

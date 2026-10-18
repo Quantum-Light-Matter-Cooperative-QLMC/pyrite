@@ -124,6 +124,13 @@ class PixelSampling:
             ),
             tile_directions_lab=self.directions_lab,
             reconstruction=reconstruction,
+            transition=(
+                None
+                if "spec_transition_by_direction" not in output
+                else SpectralFactors(
+                    energy, np.asarray(output["spec_transition_by_direction"]), line_mu
+                )
+            ),
         )
 
 
@@ -237,7 +244,7 @@ class ObservationPlan:
             reconstruction=observation.scorer.reconstruction,
         )
         axes = [spatial.cxr.energy_eV, spatial.brem.energy_eV]
-        for extra in (spatial.characteristic, spatial.channeling):
+        for extra in (spatial.characteristic, spatial.channeling, spatial.transition):
             if extra is not None:
                 axes.append(extra.energy_eV)
         if spatial.coherent_cxr is not None:

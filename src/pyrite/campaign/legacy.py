@@ -117,6 +117,7 @@ def physics_from_legacy(settings: Any) -> Physics:
         atomic_electron_deflection=getattr(settings, "atomic_electron_deflection", "kawrakow"),
         channeling_model=getattr(settings, "channeling_model", "off"),
         channeling_plane=getattr(settings, "channeling_plane", None),
+        transition_radiation=getattr(settings, "transition_radiation", "off"),
     )
 
 

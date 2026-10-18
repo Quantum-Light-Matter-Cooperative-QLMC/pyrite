@@ -377,7 +377,9 @@ def pull(
                 base = _checkpoint_store.load(stem, dest)
                 n_merged, n_skipped = merge_dataset(base, incoming, dataset, force=force)
                 components = (
-                    ("characteristic", "channeling", "line") if dataset == "line" else (dataset,)
+                    ("characteristic", "channeling", "transition", "line")
+                    if dataset == "line"
+                    else (dataset,)
                 )
                 _checkpoint_store.save(stem, dest, base, components=components)
                 _manifest_save(str(local), base, resolved_identity)

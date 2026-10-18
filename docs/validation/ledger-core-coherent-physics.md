@@ -15,7 +15,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `tr-crossing-superposition`
 
 - **Claim:** The planar-stack TR vacuum amplitude of a straight charge is the sum over its interface crossings of the stack response to the own-field jump at the crossing velocity, phased `exp[i(omega t_c - k_perp . r_perp,c)]`; on transported tracks the per-history coherent sum of those crossing amplitudes (entry, composition-changing layer boundaries, top/bottom exits) gives the TR yield per incident electron, histories incoherent
-- **Code:** `montecarlo/spectrum/transition_radiation.py::interface_transition_radiation_amplitude`; `montecarlo/spectrum/transition_radiation_crossings.py::{boundary_crossings, crossing_amplitudes, crossing_transition_radiation}`
+- **Code:** `montecarlo/spectrum/transition_radiation.py::interface_transition_radiation_amplitude`; `montecarlo/spectrum/transition_radiation_crossings.py::{boundary_crossings, crossing_amplitudes, crossing_transition_radiation}`; run-case producer `montecarlo/runner/transition_emission.py::{case_transition_spectrum, block_transition_spectrum}`
 - **Source:** Linearity of the Ginzburg–Frank boundary-value solve (`tr-detected-omission-bound`); Ginzburg & Tsytovich 1990, Ch. 2; regular-radiator reference: Garibyan, Sov. Phys. JETP 33, 23 (1971); Grichine, Phys. Lett. B 525, 225 (2002), as in the Geant4 XTR Physics Reference Manual
 - **Status:** rederived
 - **Checks:** Required: crossing phase equals `exp(i q z_i)` on a straight line; jump sign and media indexing; entrance-face frame rotation (pi about `x`, stack reversed, interface `N - i`) and back-rotation of the vector; charge sign; `beta` from crossing kinetic energy; history grouping and chunk boundaries; normalization `E n_z^2 |sum a|^2 / (16 pi^4 Ne)`. Limits: straight-track sum equals the full solve in both senses; equal media give zero; thickness average of the coherent film equals the crossing-incoherent sum; substep invariance
@@ -35,7 +35,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `tr-coherent-bunch`
 
 - **Claim:** Coherent TR of a bunch of `N` independent electrons, per electron, is `E n_z^2 [G + (N-1)/(M-1) F (P - G)] / (16 pi^4 M)` with `G = sum_e |S_e|^2` and `P = |sum_e S_e|^2` over `M` sampled histories, `S_e` the history's crossing-superposition vector amplitude phased with its own arrival offset and transverse entry; `F = 1` for sampled offsets, an analytic form factor only for offset-free histories
-- **Code:** `montecarlo/spectrum/transition_radiation_crossings.py::{crossing_transition_radiation, _bunch_power}`
+- **Code:** `montecarlo/spectrum/transition_radiation_crossings.py::{crossing_transition_radiation, _bunch_power}`; `montecarlo/runner/transition_emission.py::case_transition_spectrum`
 - **Source:** Distinct-pair estimator of `coherent-physical-bunch-population` (`coherent_population.pair_scale`) applied to the `tr-crossing-superposition` amplitudes; bunch form factor as in `coherent-inter-electron-decoherence`
 - **Status:** rederived
 - **Checks:** Required: the cross-history vector sum accumulates across chunks; the estimator's two moments (`G/M`, `(P-G)/(M(M-1))`); `N = None` means `N = M`; the analytic factor multiplies the excess only. Limits: identical in-phase histories give `1 + (N-1) F` per electron (`N^2` per point bunch); `N = 1` gives the per-history yield; sampled Gaussian `t0` and transverse offsets give `exp(-w^2 sigma_t^2 - (w sin(theta) sigma_x)^2)`; a long bunch averages to the incoherent sum; chunk invariance on transported histories
@@ -55,7 +55,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `tr-detected-omission-bound`
 
 - **Claim:** Exact classical TR of a straight, uniform-velocity charge through a planar stack (boundary-value solve of tangential `E`/`H` continuity, any `eps`, speed, incidence, emission direction, layer count) and the per-observable omission bound `b = max_E T(E)/S(E) <= target_rse / 3` for positive linear detector responses
-- **Code:** `montecarlo/spectrum/transition_radiation.py::planar_transition_radiation`, `ginzburg_frank_interface`, `medium_dielectric`, `omission_tolerance`, `transition_radiation_omission`; study `checks/transition_radiation_omission.py`
+- **Code:** `montecarlo/spectrum/transition_radiation.py::planar_transition_radiation`, `ginzburg_frank_interface`, `medium_dielectric`, `composition_dielectric` (run-case layers: `montecarlo/runner/transition_emission.py::case_layer_eps`), `omission_tolerance`, `transition_radiation_omission`; study `checks/transition_radiation_omission.py`
 - **Source:** Ginzburg & Tsytovich 1990, Ch. 2 (Ginzburg–Frank boundary problem); Jackson 3rd ed. §13.7, Eqs. 13.91–13.92; DeRaad, Tsai & Erber, Phys. Rev. D 18, 2152 (1978)
 - **Status:** rederived
 - **Checks:** Required: field normalization (`phi`, `E_p`, `H_p`, `1/|v_z|`), far-field factor `omega cos^2 theta |a|^2 / (16 pi^4)`, `eps` sign convention vs `chi_0`; limits: closed Ginzburg–Frank form at normal incidence (both senses), conductor image charge at oblique incidence, zero contrast, vanishing/opaque/transparent film, Jackson 13.91 limit; positivity argument for the bound and the `rse/3` rule

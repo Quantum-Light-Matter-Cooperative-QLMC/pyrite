@@ -45,6 +45,7 @@ from ..montecarlo.spectrum.coherent_population import (
     COHERENT_POPULATION_MODEL,
     physical_bunch_electrons,
 )
+from ..montecarlo.spectrum.transition_radiation_crossings import TRANSITION_MODEL
 from ..montecarlo.transport import STOPPING_MODEL
 from ..results import EmissionMode, Settings
 from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
@@ -290,6 +291,7 @@ def resolve_numerics(
         "pair_production_model": physics.pair_production_model,
         "positron_transport": physics.positron_transport,
         "atomic_electron_deflection": physics.atomic_electron_deflection,
+        "transition_radiation": physics.transition_radiation,
     }
     effective.update(
         {
@@ -587,6 +589,11 @@ def _identity_v1(
     if channeling["channeling_model"] not in (None, "off"):
         resolved["channeling"] = channeling
         resolved["channeling_model"] = CHANNELING_MODEL
+    # Transition radiation (#103) is opt-in on the same divergence-only rule.
+    transition = settings_payload.pop("transition_radiation", "off")
+    if transition != "off":
+        resolved["transition_radiation"] = transition
+        resolved["transition_model"] = TRANSITION_MODEL
     # Fixed-N payloads retain their exact historical bytes. In adaptive mode
     # the requested policy owns the budget; the unused fixed defaults and the
     # realized count do not participate in dataset identity.
@@ -765,6 +772,8 @@ def case_content_key(
     # are unchanged. The record itself (plane, margin, numerics) is in "case".
     if case.get("channeling") is not None:
         payload["channeling_model"] = CHANNELING_MODEL
+    if case.get("transition_radiation") is not None:
+        payload["transition_model"] = TRANSITION_MODEL
     if xsgen_tables:
         payload["xsgen_tables"] = {str(key): str(value) for key, value in xsgen_tables.items()}
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()

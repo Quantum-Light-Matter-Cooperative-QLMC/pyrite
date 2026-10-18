@@ -73,6 +73,9 @@ def resolved_physics_view(
     if channeling is not None:
         selections["transport.channeling"] = channeling["model"]
         selections["emission.channeling"] = channeling["model"]
+    transition = resolved.get("transition_radiation")
+    if transition is not None:
+        selections["emission.transition"] = transition["model"]
     # Reuse facade policy with legacy defaults, without mutating Case omissions.
     Physics(
         elastic_model=selections["transport.elastic"],
@@ -107,6 +110,10 @@ def resolved_physics_view(
         from .montecarlo.channeling.handoff import CHANNELING_MODEL
 
         markers["channeling_model"] = CHANNELING_MODEL
+    if transition is not None:
+        from .montecarlo.spectrum.transition_radiation_crossings import TRANSITION_MODEL
+
+        markers["transition_model"] = TRANSITION_MODEL
     return ResolvedPhysicsView(
         descriptor_ids=tuple(descriptor.id for descriptor in descriptors),
         model_markers=tuple(markers.items()),

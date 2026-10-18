@@ -100,6 +100,22 @@ def spectrum_from_artifact(
     return _spectrum_case(case, dict(inputs, segs=segs), record_timing)
 
 
+def _check_streamable(case, path) -> None:
+    """Refuse a case whose spectra need every segment or history at once."""
+    for key in STREAM_REFUSED_KEYS:
+        if case.get(key):
+            raise TrajectoryArtifactError(
+                f"{key} needs every segment at once; score {path} with "
+                "spectrum_from_artifact instead"
+            )
+    transition = case.get("transition_radiation")
+    if transition is not None and transition["coherence"] == "bunch":
+        raise TrajectoryArtifactError(
+            "bunch transition radiation needs every history at once; score "
+            f"{path} with spectrum_from_artifact instead"
+        )
+
+
 def stream_spectrum_from_artifact(
     path: str | PathLike[str],
     case: Case | Mapping[str, Any] | None = None,
@@ -111,8 +127,8 @@ def stream_spectrum_from_artifact(
     The bounded-memory form of :func:`spectrum_from_artifact`: never
     transports, never holds more than about ``max_segments`` segment rows
     (plus per-electron and scalar fields) on the host, and sums the
-    incoherent line, characteristic, and continuum estimators over disjoint
-    electron blocks. Each is a track-length sum normalized by a fixed electron
+    incoherent line, characteristic, continuum and per-history transition
+    radiation estimators over disjoint electron blocks. Each is a track-length sum normalized by a fixed electron
     count, so blocks add; only the floating-point summation order differs from
     the live run.
 
@@ -120,22 +136,19 @@ def stream_spectrum_from_artifact(
     ------
     TrajectoryArtifactError
         As :func:`spectrum_from_artifact`, or a case that needs every segment
-        at once (coherent emission, temporal profile).
+        at once (coherent emission, temporal profile, bunch transition radiation).
     """
     from dataclasses import replace
 
     from . import _segments_on_device
     from .cxr_grid import check_cxr_truncation, cxr_truncation_audit
     from .emission_adapters import EmissionBatch, select_emission
+    from .transition_emission import block_transition_spectrum
 
     artifact = read_trajectory_artifact(path, load_transport=False)
     case, inputs = _checked_case_and_inputs(artifact, case)
-    for key in STREAM_REFUSED_KEYS:
-        if case.get(key):
-            raise TrajectoryArtifactError(
-                f"{key} needs every segment at once; score {artifact.path} with "
-                "spectrum_from_artifact instead"
-            )
+    _check_streamable(case, artifact.path)
+    transition = case.get("transition_radiation") is not None
     emission = select_emission(case)
     try:
         emission.preflight(case, streaming=True)
@@ -146,7 +159,7 @@ def stream_spectrum_from_artifact(
     Ne_lines, Ne_brem = inputs["Ne_lines"], inputs["Ne_brem"]
     audit = cxr_truncation_audit(case, E_grid, n_electrons=Ne_lines)
     table_cache: dict = {}
-    spec = spec_characteristic = brem_wide = None
+    spec = spec_characteristic = brem_wide = spec_transition = None
     n_segments = 0
     segs = {}
     for segs in iter_electron_row_blocks(path, max_segments):
@@ -173,13 +186,15 @@ def stream_spectrum_from_artifact(
             emission.continuum.evaluate(
                 replace(batch, energy_eV=E_brem, electron_limit=Ne_brem), "brem_wide"
             ).values,
+            # Per-history TR over whole-electron blocks, normalized by Ne_brem.
+            block_transition_spectrum(case, segs, E_grid, n_hat, Ne_brem),
         )
         if spec is None:
-            spec, spec_characteristic, brem_wide = parts
+            spec, spec_characteristic, brem_wide, spec_transition = parts
         else:
-            spec, spec_characteristic, brem_wide = (
-                total + part
-                for total, part in zip((spec, spec_characteristic, brem_wide), parts, strict=True)
+            totals = (spec, spec_characteristic, brem_wide, spec_transition)
+            spec, spec_characteristic, brem_wide, spec_transition = (
+                total + part for total, part in zip(totals, parts, strict=True)
             )
     if n_segments != int(artifact.attrs["segment_count"]):
         raise TrajectoryArtifactError(f"trajectory artifact {artifact.path} segments are truncated")
@@ -207,6 +222,10 @@ def stream_spectrum_from_artifact(
 
         # CR is one deterministic ensemble source per case, never a block sum.
         out["spec_channeling"] = rescore_channeling_spectrum(case, E_grid, n_hat)
+    if transition:
+        out["spec_transition"] = (
+            np.zeros(E_grid.shape) if spec_transition is None else spec_transition
+        )
     diagnostic = inputs.get("diagnostic_grid")
     if diagnostic is not None:
         out["line_grid_diagnostic"] = diagnostic

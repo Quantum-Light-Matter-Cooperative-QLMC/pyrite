@@ -52,6 +52,9 @@ __all__ = [
 
 #: ``layer_before``/``layer_after`` code of the vacuum outside either face.
 VACUUM = -1
+#: Identity marker of the run-case TR component (#103). v1: per-history or
+#: bunch crossing superposition, Chantler layer permittivity, Ne_brem population.
+TRANSITION_MODEL = "planar-stack-crossings-v1"
 _LAUNCH_POSITRON = 3  # transport.secondaries.LAUNCH_POSITRON, without its import cost
 _ENTRY_ATOL_ANG = 1e-5  # the interface nudge allowed by check_segment_event_contract
 
@@ -364,7 +367,7 @@ def crossing_transition_radiation(
     field = xp.zeros((*shape, 3), dtype=complex)
     order = np.argsort(crossings.electron_id, kind="stable")
     history = crossings.electron_id[order]
-    starts = np.flatnonzero(np.r_[True, history[1:] != history[:-1]])
+    starts = np.flatnonzero(np.r_[True, history[1:] != history[:-1]])[: history.size]
     per_chunk = max(1, int(max_elements) // max(1, int(np.prod(shape, dtype=int))))
     history_end = np.r_[starts[1:], history.size]
     lo = 0

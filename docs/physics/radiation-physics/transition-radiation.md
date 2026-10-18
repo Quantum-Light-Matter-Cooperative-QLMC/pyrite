@@ -160,6 +160,17 @@ The sampled offsets already sit in the crossing phases $e^{i(\omega t_c-\mathbf 
 
 **Assumptions.** Electrons are independent and identically distributed; with sampled offsets nothing else is needed. An analytic `form_factor` additionally requires transport that does not depend on the omitted offsets (true for the planar stack: arrival time does not enter transport and the slab is laterally infinite). It can stand in for one offset alone, e.g. pass only $e^{-(\omega\sigma_t)^2}$ for histories transported with a sampled spot but no arrival-time spread. The estimate is signed and unclipped: when $(N-1)/(M-1)\gg1$ the excess noise can exceed a small true excess and give negative bins, which raise `CoherentSamplingWarning`. No sampling-error certificate is produced.
 
+## Run-case component
+
+A run opts in with `Physics(transition_radiation="history" | "bunch")` (profile key `transition_radiation`, CLI `--transition-radiation`; default `"off"`). Lowering attaches the case record `transition_radiation = {"model": "planar-stack", "coherence": ...}` (`Case.transition_radiation`); `energy_model = "midpoint"` is required for the row events, and grooved faces, channeling, temporal profiles and adaptive precision are refused. The spectrum phase then adds `spec_transition` [photons/eV/sr per incident electron] on the line grid at the case direction, and `spec_transition_by_direction` for observation directions, from the same transported segments as every other component (`runner.transition_emission.case_transition_spectrum`). `_spectral_components.cxr_spectrum` and `incident_spectrum` add it once to either CXR mode (`transition=False` deselects it), for the reason given in the next section.
+
+- **Population.** The electrons below `Ne_brem`, which transport follows down to the continuum cutoff `E_cut_brem_keV`; crossings after a history ends at the cutoff are not recorded. For a 1 keV cutoff the omitted exits have $\beta^2\le4\times10^{-3}$.
+- **Media.** Each transport layer's permittivity is the independent-atom forward scattering of its composition with Chantler $f',f''$ (`composition_dielectric`); energies outside the table are refused. The [validity boundary](#validity-boundary) of that model applies: crude near and below the plasma energy and near edges.
+- **Coherence.** `"bunch"` uses the physical population `bunch_charge_pc / e` with the sampled offsets (above); its signed estimate warns when undersampled.
+- **Identity and provenance.** On the divergence-only rule: `"off"` keeps every dataset and case digest; `"history"`/`"bunch"` add `TRANSITION_MODEL` (`planar-stack-crossings-v1`) to the dataset identity, the case content key and the physics provenance (`emission.transition` descriptor).
+- **Storage and consumers.** Checkpoints store it as the separate optional `transition.h5` component; reline rescores it from the same re-transport as the line kernel; full and streamed artifact replay score it (`"history"` sums whole-electron blocks, `"bunch"` refuses streaming). `Result.transition`, `SpatialResult.transition` and `spec_transition_by_direction` carry it to the API, planar observations and plots; `combined_cxr`, `cxr_total` and `cxr_spectrum` add it (each can exclude it).
+- **Refused.** Adaptive precision and electron-block transport do not score it (`refuse_transition_radiation`). Finite footprints are allowed: side exits are counted and carry no TR.
+
 ## Interference with PXR and CBS
 
 `Validation: tr-line-cross-term`

@@ -228,6 +228,18 @@ BUILTIN_DESCRIPTORS = DescriptorCatalog(
             required_datasets=("channeling_thermal", "shell-configuration"),
         ),
         ModelDescriptor(
+            "emission.transition",
+            "planar-stack",
+            "montecarlo.runner.transition_emission",
+            (
+                "planar slab or stack, midpoint row events",
+                "locally straight crossings, laterally infinite faces",
+                "no grooves, channeling, adaptive precision or temporal profiles",
+            ),
+            implementations=("cpu",),
+            output_slots=("spec_transition",),
+        ),
+        ModelDescriptor(
             "emission.characteristic",
             "characteristic",
             "montecarlo.runner.emission",

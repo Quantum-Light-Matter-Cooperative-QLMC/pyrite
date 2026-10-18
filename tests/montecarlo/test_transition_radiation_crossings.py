@@ -9,6 +9,7 @@ from pyrite.montecarlo.spectrum.transition_radiation import planar_transition_ra
 from pyrite.montecarlo.spectrum.transition_radiation_crossings import (
     VACUUM,
     BoundaryCrossings,
+    _take,
     boundary_crossings,
     crossing_amplitudes,
     crossing_transition_radiation,
@@ -255,6 +256,16 @@ def test_transported_yield_is_substep_and_chunk_invariant(bilayer):
     np.testing.assert_allclose(refined, y, rtol=1e-3)
     back = crossing_transition_radiation(coarse, photon, _directions(-1), eps, n_electrons=ne)
     assert np.all(np.isfinite(back)) and np.all(back > 0.0)
+
+
+def test_no_crossings_give_zero_yield(bilayer):
+    c = boundary_crossings(bilayer, _BILAYER)
+    none = _take(c, np.zeros(0, dtype=int))
+    for coherence in ("history", "crossing", "bunch"):
+        y = crossing_transition_radiation(
+            none, _PHOTON, _directions(+1), [1.0, 0.9], n_electrons=4, coherence=coherence
+        )
+        assert y.shape == (2, 3) and np.all(y == 0.0)
 
 
 def test_amplitude_input_validation(bilayer):
