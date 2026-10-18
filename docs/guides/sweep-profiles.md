@@ -73,6 +73,11 @@ PYRITE_MC_TRANSPORT_CORE=cuda pyrite run my_scan --remote
 
 Choose the plane relative to the crystal cut and beam alignment; the command
 above selects the Si(110) family, rather than configuring the sample pose.
+CR is forward-peaked: a 90° detector sees lines below about 10 eV, so attach an
+on-axis detector such as the packaged `forward`. The packaged
+`channeling_demo` profile is a complete example; see
+[planar channeling runs](planar-channeling.md) for its prerequisites, the
+Python equivalent and the model limits.
 Explicit fixed counts are required because adaptive precision has no
 per-electron channeling variance observable. The zone solve runs on the CPU;
 its sampled handoff states continue through CUDA transport. Native rows return

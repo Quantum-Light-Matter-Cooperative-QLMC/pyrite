@@ -229,6 +229,49 @@ def test_trajectory_demo_is_one_fixed_count_case_with_micron_beam():
     assert settings.precision is None  # trajectory capture requires fixed counts
 
 
+def _channeling_demo():
+    sweep = material_sweep("silicon", catalog_profile="channeling_demo")
+    settings = profiles.profile_run_settings(
+        default_settings(), "channeling_demo", "full", sweep=sweep
+    )
+    return sweep, settings
+
+
+def test_channeling_demo_selects_one_fixed_count_planar_case_on_axis():
+    from pyrite.detectors import SensorAcceptance
+
+    assert CATALOG.profile_materials("channeling_demo") == ("silicon",)
+    sweep, settings = _channeling_demo()
+    assert settings.channeling_model == "planar"
+    assert settings.channeling_plane == (1, -1, 0)
+    assert settings.radiative_model == "uncoupled"
+    assert settings.energy_model == "midpoint"
+    assert settings.emission == "incoherent"
+    assert settings.precision is None  # adaptive precision refuses channeling
+    # The packaged forward detector is the documented API sensor resolved on axis.
+    polar, _, omega = SensorAcceptance(distance_mm=1000.0, width_mm=3.0, height_mm=3.0).resolve()
+    assert sweep.detector.observation_angle_deg == 0.0
+    assert sweep.detector.polar_acceptance_deg == polar
+    assert sweep.detector.solid_angle_sr == omega
+    cxr = np.asarray(sweep.energy_bins.cxr)
+    assert cxr[0] == 1000.0 and cxr[-1] == 23950.0  # Si K and the on-axis CR lines
+
+
+def test_channeling_demo_lowers_to_one_planar_case():
+    from pyrite import api
+
+    sweep, settings = _channeling_demo()
+    cases = api.build_configured_cases(sweep, settings)
+    assert len(cases) == 1
+    case = cases[0]
+    assert case["crystal"] == "silicon"
+    assert case["E0_keV"] == 17_000.0 and case["thickness_ang"] == 20_000.0
+    assert case["Ne"] == case["Ne_brem"] == 200
+    assert case["theta_obs_rad"] == 0.0
+    assert case["channeling"]["plane_hkl"] == (1, -1, 0)
+    assert case["channeling"]["basis_size"] == 16
+
+
 def test_case_content_key_excludes_label_perf_and_flux_scale_fields():
     case = next(iter(_cases_by_key("hopg", "standard").values()))
     base = case_content_key(case)

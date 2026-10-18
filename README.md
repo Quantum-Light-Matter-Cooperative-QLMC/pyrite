@@ -180,6 +180,7 @@ or two on CPU:
 | `two_detector_demo` | two ideal scalar apertures at 90° and 135°, exposing raw spectra |
 | `high_energy_demo` | a 1 MeV beam with the measured line-grid policy |
 | `hopg_emittance_demo` | Courant-Snyder transverse beam phase space |
+| `channeling_demo` | opt-in planar channeling radiation from 17 MeV Si(110), on-axis detector ([guide](docs/guides/planar-channeling.md)) |
 
 `standard` is also bundled: it is the catalog's base profile, which every
 material's default scan ranges resolve from, and a full research-scale sweep.

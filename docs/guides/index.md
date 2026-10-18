@@ -12,6 +12,7 @@ python-api-workflow
 shell-completion
 configuration-cookbook
 working-with-results
+planar-channeling
 axial-diagnostics
 analysis-tutorial
 running-on-a-cluster

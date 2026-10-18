@@ -1,0 +1,25 @@
+# Demo: opt-in planar channeling (ADR-0018). One 17 MeV case through a 2 um Si
+# slab (the Kephart et al. 1989 energy and thickness), 3 deg from the (110)
+# face normal inside the (1-10) planes, seen on axis by the forward detector.
+# The zone needs fixed counts, midpoint integration, uncoupled radiative
+# transport and incoherent emission. The 1-24 keV line grid covers Si K and the
+# on-axis 1->0, 2->1 and 3->2 CR lines near 18.5, 10.2 and 7.0 keV.
+# Needs `pyrite tables fetch`, including SBETHE.
+#   pyrite run channeling_demo
+#   pyrite profile create my_channeling --from channeling_demo
+
+thickness_ang = {values = [20000.0]}
+energy_keV = {values = [17000.0]}
+tilt_deg = {values = [3.0]}
+tilt_azim_deg = {values = [45.0]}
+materials = ["silicon"]
+cxr_trials = {values = [200]}
+brem_trials = {values = [200]}
+beam = "example"
+detector = "forward"
+emission = "incoherent"
+energy_model = "midpoint"
+radiative_model = "uncoupled"
+channeling_model = "planar"
+channeling_plane = [1, -1, 0]
+E_grid_line = {arange = {start = 1000.0, stop = 24000.0, step = 50.0}}

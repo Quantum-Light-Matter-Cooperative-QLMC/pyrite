@@ -1,0 +1,8 @@
+# On-axis scalar detector: a 3 x 3 mm sensor at 1 m on the beam axis, for
+# forward-peaked emission such as planar channeling radiation. Values are
+# SensorAcceptance(distance_mm=1000, width_mm=3, height_mm=3) resolved at 0 deg.
+# Ideal response: checkpoint spectra remain raw source spectra.
+label = "On-axis 3 x 3 mm sensor at 1 m, single ideal scalar detector"
+observation_angle_deg = 0.0
+polar_acceptance_deg = 0.1718872096239171
+solid_angle_sr = 8.999979750053168e-06
