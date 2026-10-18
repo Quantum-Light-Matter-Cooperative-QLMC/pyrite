@@ -13,6 +13,7 @@ shell-completion
 configuration-cookbook
 working-with-results
 planar-channeling
+transition-radiation-demo
 axial-diagnostics
 analysis-tutorial
 running-on-a-cluster

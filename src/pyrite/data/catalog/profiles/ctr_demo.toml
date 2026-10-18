@@ -1,0 +1,20 @@
+# Same scene as tr_demo, with sampled inter-electron phases and physical charge.
+# Signed CTR estimates may warn; these counts are illustrative, not converged.
+#   pyrite run ctr_demo
+thickness_ang = {values = [200.0]}
+energy_keV = {values = [30.0]}
+tilt_deg = {values = [5.0]}
+tilt_azim_deg = {values = [0.0]}
+materials = ["silicon"]
+beam = "tr_demo"
+detector = "tr_backward"
+cxr_trials = {values = [32]}
+brem_trials = {values = [64]}
+energy_model = "midpoint"
+inelastic_model = "continuous"
+radiative_model = "uncoupled"
+bremsstrahlung_model = "eedl"
+emission = "incoherent"
+transition_radiation = "bunch"
+E_grid_line = {arange = {start = 200.0, stop = 1010.0, step = 10.0}}
+E_grid_brem = {arange = {start = 200.0, stop = 30000.0, step = 100.0}}

@@ -1,0 +1,6 @@
+# Scalar source density at 150 deg from the beam. Acceptance is reporting
+# metadata, not a fringe-resolved detector integration.
+label = "TR demo: backward 150 deg, ideal scalar detector"
+observation_angle_deg = 150.0
+polar_acceptance_deg = 1.0
+solid_angle_sr = 0.0001

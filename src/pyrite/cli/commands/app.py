@@ -13,6 +13,7 @@ _LEAVES = {
     "pixels": "pyrite.cli.commands.app.pixels_command",
     "compare": "pyrite.cli.commands.app.compare_command",
     "channeling": "pyrite.cli.commands.app.channeling_command",
+    "transition-radiation": "pyrite.cli.commands.app.transition_radiation_command",
     "viewer": "pyrite.cli.commands.app.viewer_command",
     "validation": "pyrite.cli.commands.app.validation_command",
 }
@@ -21,6 +22,7 @@ _HELP = {
     "pixels": "Launch or export the pixel-detector observation app.",
     "compare": "Launch or export the case and cross-material comparison app.",
     "channeling": "Launch or export the planar quantum channeling demo.",
+    "transition-radiation": "Launch or export the TR/CTR demo.",
     "viewer": "Launch or export the 3D trajectory viewer.",
     "validation": "Launch or export cached validation figures.",
 }
@@ -101,6 +103,14 @@ def channeling_command() -> click.Group:
         "channeling",
         "pyrite.cli.commands.app_views.channeling_command",
         "pyrite.cli.commands.app_views.channeling_export_command",
+    )
+
+
+def transition_radiation_command() -> click.Group:
+    return _launch_leaf(
+        "transition-radiation",
+        "pyrite.cli.commands.app_views.transition_radiation_command",
+        "pyrite.cli.commands.app_views.transition_radiation_export_command",
     )
 
 

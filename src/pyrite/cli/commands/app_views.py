@@ -8,6 +8,8 @@ The checkpoint apps split out of the analysis app and share one launcher shape:
   checkpoints and cross-material comparison).
 - ``channeling`` starts ``src/pyrite/apps/channeling_app.py`` (standalone planar
   quantum demo, with controls inside the app and no material argument).
+- ``transition-radiation`` starts ``src/pyrite/apps/transition_radiation_app.py``
+  (standalone TR/CTR demo, with no material argument).
 
 Each checkpoint app's material picker starts on MATERIAL when given, else on the analysis
 app's persisted default (:func:`pyrite._app_defaults.get_analysis_default`,
@@ -58,6 +60,9 @@ class MarimoApp:
 PIXELS = MarimoApp("pixels", "pixel_app.py", 2720, "pixel-detector observation")
 COMPARE = MarimoApp("compare", "compare_app.py", 2721, "case and cross-material comparison")
 CHANNELING = MarimoApp("channeling", "channeling_app.py", 2722, "planar channeling", False)
+TRANSITION_RADIATION = MarimoApp(
+    "transition-radiation", "transition_radiation_app.py", 2723, "TR/CTR", False
+)
 
 
 def resolve_material(material: str | None) -> str:
@@ -221,3 +226,5 @@ compare_command = _launch_command(COMPARE)
 compare_export_command = _export_command(COMPARE)
 channeling_command = _launch_command(CHANNELING)
 channeling_export_command = _export_command(CHANNELING)
+transition_radiation_command = _launch_command(TRANSITION_RADIATION)
+transition_radiation_export_command = _export_command(TRANSITION_RADIATION)
