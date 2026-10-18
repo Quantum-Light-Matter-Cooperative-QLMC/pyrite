@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 
 OBSERVABLES = ("cxr", "brem")
@@ -60,6 +60,14 @@ class Precision:
         Optional band for per-bin batch-means errors of the final ``spec`` and
         ``brem_wide``; reported only, never used to stop. Costs one extra
         line and brem reduction over the realized segments.
+    brem_target_rse
+        Enable independent brem-prefix stopping at this target. Requires both
+        observables. ``target_rse`` then governs CXR; line transport continues
+        until brem finishes, so ``Ne_brem <= Ne``. Omit for the shared rule.
+    brem_min_electrons, brem_max_electrons
+        Optional brem bounds, defaulting to the shared bounds; block multiples.
+        The brem maximum cannot exceed ``max_electrons``. Guards and block size
+        are shared; the brem pilot is clipped to its own bounds.
     """
 
     target_rse: float
@@ -74,6 +82,9 @@ class Precision:
     pilot_electrons: int | None = None
     band_eV: tuple[float, float] | None = None
     batch_means_band_eV: tuple[float, float] | None = None
+    brem_target_rse: float | None = None
+    brem_min_electrons: int | None = None
+    brem_max_electrons: int | None = None
 
     def __post_init__(self) -> None:
         for name in ("max_electrons", "block_electrons"):
@@ -137,12 +148,45 @@ class Precision:
                 or not 0.0 < band[0] < band[1]
             ):
                 raise ValueError(f"{name} must contain two positive finite increasing energies")
+        self._validate_brem_policy()
+
+    def _validate_brem_policy(self) -> None:
+        if self.brem_target_rse is None:
+            if self.brem_min_electrons is not None or self.brem_max_electrons is not None:
+                raise ValueError("brem count bounds require brem_target_rse")
+            return
+        if set(self.observables) != set(OBSERVABLES):
+            raise ValueError("brem_target_rse requires both cxr and brem observables")
+        policy = self.brem_policy()
+        if policy.max_electrons > self.max_electrons:
+            raise ValueError("brem_max_electrons must not exceed max_electrons (brem is a prefix)")
+
+    def brem_policy(self) -> Precision:
+        """Scalar brem rule for independent stopping; shares block size and guards."""
+        minimum = self.min_electrons if self.brem_min_electrons is None else self.brem_min_electrons
+        maximum = self.max_electrons if self.brem_max_electrons is None else self.brem_max_electrons
+        pilot = self.pilot_electrons
+        return replace(
+            self,
+            target_rse=self.target_rse if self.brem_target_rse is None else self.brem_target_rse,
+            min_electrons=minimum,
+            max_electrons=maximum,
+            observables=("brem",),
+            pilot_electrons=None if pilot is None else min(max(pilot, minimum), maximum),
+            brem_target_rse=None,
+            brem_min_electrons=None,
+            brem_max_electrons=None,
+        )
 
     def to_dict(self) -> dict[str, Any]:
         """Return the requested policy, without realized counts or statistics."""
         # Persisted requested-policy and identity payloads retain their historical
         # vocabulary. Public in-memory observables are canonical CXR names.
         values = asdict(self)
+        # Absent independent settings must not change existing policy identities.
+        for key in ("brem_target_rse", "brem_min_electrons", "brem_max_electrons"):
+            if values[key] is None:
+                del values[key]
         values["observables"] = tuple(
             "line" if name == "cxr" else name for name in self.observables
         )

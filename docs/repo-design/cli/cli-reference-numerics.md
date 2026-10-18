@@ -133,9 +133,10 @@ Usage: pyrite numerics precision [OPTIONS] COMMAND [ARGS]...
   0.05, 200-20000 electrons, blocks of 100, line and bremsstrahlung). Each incoherent
   case stops when the relative standard error of its line (and optionally
   bremsstrahlung) yield meets the target and its heavy-tail guards pass, or at the
-  maximum count flagged statistics-limited. One count serves line and bremsstrahlung
-  transport. Coherent emission, cascades, physical detectors, GDF beams, grooves and
-  fixed electron counts keep fixed counts.
+  maximum count flagged statistics-limited. By default one count serves both
+  populations. --brem-target-rse enables independent brem-prefix stopping; line
+  transport continues until brem finishes. Coherent emission, cascades, physical
+  detectors, GDF beams, grooves and fixed electron counts keep fixed counts.
 
     enable   switch to adaptive: drop fixed counts, optionally customize
     set      customize fields of an adaptive policy
@@ -190,6 +191,12 @@ Usage: pyrite numerics precision enable [OPTIONS] NAME
   line-grid selectors are never changed.
 
 Options:
+  --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
+                                  and brem observables.  [x>0.0]
+  --brem-min-electrons N          Brem minimum; defaults to --min-electrons. Requires
+                                  --brem-target-rse.  [x>=2]
+  --brem-max-electrons N          Brem maximum, at most --max-electrons; defaults to it.
+                                  Requires --brem-target-rse.  [x>=2]
   --target-rse FRACTION           Target relative standard error of each watched yield
                                   (0.05 = 5%).  [x>0.0]
   --min-electrons N               Smallest count at which the run may stop; a multiple
@@ -222,11 +229,13 @@ Options:
 ## `pyrite numerics precision reset`
 
 ```text
-Usage: pyrite numerics precision reset [OPTIONS] NAME [target-rse|min-electrons|max-
-                                       electrons|block-electrons|observable|max-
-                                       electron-share|min-effective-electrons|stability-
-                                       blocks|stability-fraction|pilot-electrons|band-
-                                       ev|batch-means-band-ev]...
+Usage: pyrite numerics precision reset [OPTIONS] NAME [target-rse|brem-target-rse|brem-
+                                       min-electrons|brem-max-electrons|min-
+                                       electrons|max-electrons|block-
+                                       electrons|observable|max-electron-share|min-
+                                       effective-electrons|stability-blocks|stability-
+                                       fraction|pilot-electrons|band-ev|batch-means-
+                                       band-ev]...
 
   Reset optional FIELDs to defaults, or remove the policy when none are named.
 
@@ -253,6 +262,12 @@ Usage: pyrite numerics precision set [OPTIONS] NAME
   enable'.
 
 Options:
+  --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
+                                  and brem observables.  [x>0.0]
+  --brem-min-electrons N          Brem minimum; defaults to --min-electrons. Requires
+                                  --brem-target-rse.  [x>=2]
+  --brem-max-electrons N          Brem maximum, at most --max-electrons; defaults to it.
+                                  Requires --brem-target-rse.  [x>=2]
   --target-rse FRACTION           Target relative standard error of each watched yield
                                   (0.05 = 5%).  [x>0.0]
   --min-electrons N               Smallest count at which the run may stop; a multiple

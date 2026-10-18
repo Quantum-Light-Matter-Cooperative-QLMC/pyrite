@@ -172,6 +172,12 @@ Defaults are $c = 0.05$, $E_{\min} = 100$, $k = 3$ and $f = 0.5$. They are inter
 
 The optional pilot projects $N = n_{\text{pilot}} \max_o (r_{o}/\varepsilon)^2$, rounded up to a block and clipped to $[n_{\text{pilot}}, n_{\max}]$. No check runs until $N$ is reached. The rule then resumes block by block.
 
+**Independent populations.** Set `Precision(..., observables=("cxr", "brem"), brem_target_rse=...)` to apply the same scalar rule separately. Brem freezes at its first passing block end, or its own maximum, and later blocks skip its monitor reduction. CXR is rechecked on every eligible block until brem has finished; it can therefore use more electrons than its first apparent convergence required. `brem_min_electrons` and `brem_max_electrons` default to the shared bounds, are block multiples, and the brem maximum cannot exceed the transport maximum. The guards are shared; an optional pilot is applied separately, clipped to each population's bounds. A failed brem target still marks the result statistics-limited when CXR succeeds.
+
+The prefix constraint is $N_{\rm brem}\le N_{\rm CXR}$. Electrons below $N_{\rm brem}$ use the minimum of both transport cutoffs; later electrons use only the line cutoff. Every block's interpolation tables span the entire transport population's energy range, including line-only electrons. Energy-spread replay recomputes both stopping decisions and the cutoff transition on the replay's tables. Spectra and optional batch means use their own population's denominator and rows; brem excludes `electron_id >= Ne_brem`. The provenance records each population's count, target, RSE, guards, pilot and stop reason. Identity contains only the requested policy. Omitting the brem target preserves the original shared-count policy and identity. Equal targets alone do not force equal counts; equal fixed bounds do. Joint cost/variance allocation is not implemented.
+
+Independent-population RSEs and batch errors are estimated precision diagnostics. The scalar coverage studies below do not establish coverage for the coupled stopping rule. Interpreting all CXR contributions as one physical observable also assumes that its post-transport cutoff reconstruction removes dependence on whether an electron belonged to the deeper brem prefix; fixed-pair equality alone does not validate that assumption for every transport model.
+
 **The ESS guard and the error target are one inequality.** For non-negative $m_i$, the two bound the same pair of sums:
 
 ```{math}

@@ -19,6 +19,9 @@ from .._deprecations import canonical_option
 
 _PRECISION_FIELD_NAMES = {
     "target-rse": "target_rse",
+    "brem-target-rse": "brem_target_rse",
+    "brem-min-electrons": "brem_min_electrons",
+    "brem-max-electrons": "brem_max_electrons",
     "min-electrons": "min_electrons",
     "max-electrons": "max_electrons",
     "block-electrons": "block_electrons",
@@ -51,6 +54,24 @@ def _energy_band(_ctx, param, value):
 def _policy_options(function):
     """Attach the adaptive-policy field options shared by ``set`` and ``enable``."""
     options = (
+        click.option(
+            "--brem-target-rse",
+            type=click.FloatRange(min=0.0, min_open=True),
+            metavar="FRACTION",
+            help="Stop brem independently at this RSE; requires both cxr and brem observables.",
+        ),
+        click.option(
+            "--brem-min-electrons",
+            type=click.IntRange(min=2),
+            metavar="N",
+            help="Brem minimum; defaults to --min-electrons. Requires --brem-target-rse.",
+        ),
+        click.option(
+            "--brem-max-electrons",
+            type=click.IntRange(min=2),
+            metavar="N",
+            help="Brem maximum, at most --max-electrons; defaults to it. Requires --brem-target-rse.",
+        ),
         click.option(
             "--target-rse",
             type=click.FloatRange(min=0.0, min_open=True),
@@ -186,7 +207,9 @@ def command():
     bremsstrahlung). Each incoherent case stops when the relative standard error
     of its line (and optionally bremsstrahlung) yield meets the target and its
     heavy-tail guards pass, or at the maximum count flagged statistics-limited.
-    One count serves line and bremsstrahlung transport. Coherent emission,
+    By default one count serves both populations. --brem-target-rse enables
+    independent brem-prefix stopping; line transport continues until brem finishes.
+    Coherent emission,
     cascades, physical detectors, GDF beams, grooves and fixed electron counts
     keep fixed counts.
 
@@ -244,7 +267,7 @@ def precision_show_command(name, json_output):
         emit_result(f"[{name} precision] adaptive ({source} policy)")
         for flag, key in _PRECISION_FIELD_NAMES.items():
             marker = "" if explicit is not None and key in explicit else " (default)"
-            emit_result(f"  {flag}: {_display(effective[key])}{marker}")
+            emit_result(f"  {flag}: {_display(effective.get(key))}{marker}")
         emit_result(
             "  per material, fixed counts, GDF beams and grooved faces keep fixed electron counts"
         )

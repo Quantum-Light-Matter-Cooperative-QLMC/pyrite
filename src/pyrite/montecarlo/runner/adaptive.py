@@ -250,7 +250,13 @@ def run_stopping_rule(settings: AdaptiveSettings, measure: Measure) -> dict[str,
     per-electron population; ``block`` is ``None``. For tests and studies of
     the rule itself.
     """
-    monitor = StoppingMonitor(settings, measure)
+    from .independent import IndependentStoppingMonitor
+
+    monitor = (
+        StoppingMonitor(settings, measure)
+        if settings.brem_target_rse is None
+        else IndependentStoppingMonitor(settings, measure)
+    )
     for start, stop in electron_blocks(settings.max_electrons, settings.block_electrons):
         monitor.on_block(start, stop, None)
         if monitor.should_stop(stop):
@@ -388,6 +394,7 @@ def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
     start_eV, stop_eV = settings.batch_means_band_eV
     segs = transport["segs"]
     n = int(segs["Ne"])
+    n_brem = int(transport["Ne_brem"])
     blocks = electron_blocks(n, settings.block_electrons)
     E_grid, E_brem = np.asarray(transport["E_grid"]), np.asarray(transport["E_brem"])
     cxr_bins = (E_grid >= start_eV) & (E_grid <= stop_eV)
@@ -407,12 +414,17 @@ def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
             electron_limit=n,
         )
         line = emission.cxr.evaluate(batch, "spec").values
-        brem = emission.continuum.evaluate(replace(batch, energy_eV=E_brem), "brem_wide").values
         cxr_batches.append(np.asarray(_to_cpu(line))[cxr_bins] * scale)
-        brem_batches.append(np.asarray(_to_cpu(brem))[brem_bins] * scale)
+        if start < n_brem:
+            brem = emission.continuum.evaluate(
+                replace(batch, energy_eV=E_brem, electron_limit=n_brem), "brem_wide"
+            ).values
+            brem_scale = n_brem / (stop - start)
+            brem_batches.append(np.asarray(_to_cpu(brem))[brem_bins] * brem_scale)
     k = len(blocks)
 
     def summary(energies, batches):
+        k = len(batches)
         values = np.asarray(batches, dtype=float)
         mean = values.mean(axis=0)
         se = values.std(axis=0, ddof=1) / math.sqrt(k) if k >= 2 else np.full(mean.shape, np.nan)
@@ -430,6 +442,7 @@ def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
     return {
         "band_eV": [float(start_eV), float(stop_eV)],
         "n_batches": k,
+        **({"n_batches_brem": len(brem_batches)} if settings.brem_target_rse is not None else {}),
         "batch_electrons": settings.block_electrons,
         "spec": summary(E_grid[cxr_bins], cxr_batches),
         "brem_wide": summary(E_brem[brem_bins], brem_batches),
@@ -486,7 +499,9 @@ def transport_case_adaptive(
     core = adaptive_transport_core(case, settings, transport_core)
     loop_case = {key: value for key, value in case.items() if key != "adaptive_precision"}
     loop_case.update(Ne=settings.max_electrons, Ne_brem=settings.max_electrons)
-    monitor = StoppingMonitor(settings, case_measure(loop_case, settings))
+    from .independent import case_stopping_monitor
+
+    monitor = case_stopping_monitor(loop_case, settings)
     transport = runner._transport_case(
         loop_case,
         record_timing,
@@ -501,10 +516,19 @@ def transport_case_adaptive(
     transport["_adaptive_precision"] = settings.to_dict()
     if statistics["statistics_limited"]:
         worst = {name: status["relative_se"] for name, status in statistics["statistics"].items()}
+        limit = (
+            f"reached max_electrons={settings.max_electrons} without meeting "
+            f"target_rse={settings.target_rse:g} and its guards"
+        )
+        if settings.brem_target_rse is not None:
+            limit = (
+                f"stopped at Ne={statistics['realized_electrons']}, "
+                f"Ne_brem={statistics['realized_electrons_brem']} without meeting "
+                "every population's target and guards"
+            )
         warnings.warn(
             f"{case.get('name', 'case')} at {case['E0_keV']:g} keV: the adaptive run "
-            f"reached max_electrons={settings.max_electrons} without meeting "
-            f"target_rse={settings.target_rse:g} and its guards (relative SE {worst}); "
+            f"{limit} (relative SE {worst}); "
             "treat the result as statistics-limited.",
             CxrYieldStatisticsWarning,
             stacklevel=2,

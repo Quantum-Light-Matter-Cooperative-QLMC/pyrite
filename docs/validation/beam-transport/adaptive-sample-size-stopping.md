@@ -69,7 +69,7 @@ The target $r_n\le\varepsilon$ therefore implies $\mathrm{ESS}_n\ge 1/(\varepsil
 
 - The per-electron values have finite variance. A heavy tail with infinite variance (Pareto index $\le 2$) breaks the CLT and every guard. The guards only act on sampled values.
 - The incoherent reduction is a sum over electrons. The coherent line sum couples electrons ([coherent versus incoherent statistics](../../computation/statistical-methods.md#coherent-versus-incoherent-statistics)), so adaptive runs refuse `coherent_emission`. They also refuse the lockstep core, whose shared generator is not prefix-stable, and GDF beams.
-- All watched observables share one realized count, with `Ne == Ne_brem`. Per-electron cutoffs depend on the line/brem split, so a shared count keeps every block's transport equal to the fixed-$N$ run's.
+- Without `brem_target_rse`, all watched observables share one realized count, with `Ne == Ne_brem`. Per-electron cutoffs depend on the line/brem split, so a shared count keeps every block's transport equal to the fixed-$N$ run's.
 - The monitor band is fixed before transport: the case's policy bandwidth, else its line-grid ends. Under the `resonance-population` policy the final axis may end below the bandwidth ceiling, so the monitor counts tails the final axis truncates. That share is audited separately (`line-grid-resonance-bandwidth`).
 
 ## Limiting cases
@@ -187,3 +187,161 @@ The anchor file `tests/montecarlo/test_adaptive_stopping.py` passed: 45 tests in
 The estimator, the merge, the ESS identity, the guards, the pilot, batch means and band weights rederive and match the code. The anchor tests are green. The Gaussian and hopg acceptance numbers reproduce exactly, and the issue #361 acceptance holds: 20/20 light-case seeds lie within $1.96\varepsilon$, and the paired stopping bias of 0.06 % is below the 3.0 % smallest reported error. This supports `anchored`. Findings 1–3 are errors in quoted evidence and limit statements, not in the implementation. Correct the ledger `Checks` and `Notes` text before applying the status, so the row does not certify a wrong number or an overstated default guard. Human sign-off remains pending (#277).
 
 Human sign-off pending (#277).
+
+## Independent prefix extension verification (2026-10-18, issue #366)
+
+Fresh-context verifier; did not implement the extension. The derivation in this
+subsection was written before reading the extension implementation. The prior
+verification above is preserved and concerns the shared-count policy.
+
+### Source-first derivation and filters
+
+The intended signature extends `Precision` by `brem_target_rse`,
+`brem_min_electrons`, and `brem_max_electrons`. Sources remain Welford and
+Chan–Golub–LeVeque for moments, Kish for concentration, and
+[Glynn and Whitt (1992)](https://web.stanford.edu/~glynn/papers/1992/GW92a.html)
+for sequential simulation precision. This extension changes population ownership,
+not the scalar RSE formula. It supplies separate marginal precision diagnostics;
+it does not establish simultaneous confidence coverage for both outputs.
+
+Let $L_i$ and $H_i$ be nonnegative line and bremsstrahlung scalar contributions
+of electron $i$ on one counter-addressed transport. Their units are their
+respective band-integrated photon yield per incident electron per solid angle;
+all RSE, share, ESS, and relative stability tests are dimensionless. Correlation
+between $L_i$ and $H_i$ on the same electron is allowed. Independent stopping
+means separate policies, not statistically independent outputs.
+
+For component $o$ at its own count $n_o$, define
+
+$$
+\bar X_o=\frac{1}{n_o}\sum_{i=1}^{n_o}X_{o,i},\qquad
+s_o^2=\frac{\sum_{i=1}^{n_o}(X_{o,i}-\bar X_o)^2}{n_o-1},\qquad
+r_o=\frac{s_o}{\sqrt{n_o}\lvert\bar X_o\rvert}.
+$$
+
+Each component applies the original four guards using its own target and
+bounds. Bremsstrahlung freezes at the first eligible passing block end, or its
+maximum, giving $N_b$. Line moments must continue to include every transported
+electron while bremsstrahlung remains active. Consequently, if $P_L(n)$ is
+the current line passing predicate, the final line count is the first eligible
+block end at or after $N_b$ satisfying $P_L(n)$, or the overall maximum.
+A prior line pass cannot be latched: its RSE and stability can fail after a late
+large contribution. Thus $N_b\le N_L$; equal targets alone do not require equal
+counts. Equal fixed bounds give $N_b=N_L=N$, the ordinary fixed-count limit.
+Absent `brem_target_rse`, the existing shared policy remains the governing rule.
+An all-zero component has undefined relative precision and reaches its cap.
+
+For equal batches of $B$ incident electrons, component $o$ has
+$K_o=N_o/B$ batches. If $\bar S_{o,j}$ is a batch's mean spectrum, then
+
+$$
+S_o=\frac{1}{K_o}\sum_{j=1}^{K_o}\bar S_{o,j},\qquad
+\widehat{\operatorname{SE}}(S_o)=
+\frac{s(\bar S_{o,1},\ldots,\bar S_{o,K_o})}{\sqrt{K_o}}.
+$$
+
+A scorer normalized by its full population $N_o$ must therefore be rescaled by
+$N_o/B$ when scoring one batch. Using $N_L/B$ for the brem prefix would inflate
+its batch means by $N_L/N_b$. Fewer than two batches cannot estimate a batch SE.
+
+The first $N_b$ electrons require the minimum of the line and brem transport
+cutoffs; subsequent electrons require the line cutoff only. Whole-population
+energy tables must match those of the realized fixed-count case. With energy
+spread, changing realized counts can change the interpolation table range, hence
+the contributions themselves. Replay with realized-population tables and recheck
+both policies is required before accepting a tentative stop. These are numerical
+identity requirements, not an additional independent-electron theorem. Finite
+variance, incoherent linear reduction, and the existing unsupported-route
+restrictions remain necessary. Units, zero-signal and equal-fixed-bound limits,
+and positivity/concentration conventions pass these source-first filters.
+
+### Extension implementation comparison
+
+After writing the derivation, I inspected `IndependentStoppingMonitor`,
+`StoppingMonitor`, `run_stopping_rule`, `case_stopping_monitor`, `batch_means`,
+`transport_case_adaptive`, `transport_case_blocks`, `_transport_case`, and
+`Precision`. The two scalar monitors reuse the established moments and guards.
+Only the brem monitor stops receiving blocks after its decision; the line
+monitor receives and checks every block. Brem bounds cannot exceed the overall
+maximum, and both policies enforce whole blocks. The absent-policy path still
+constructs `StoppingMonitor`; absent optional keys are omitted from serialization.
+The transport closure uses the combined cutoff until the brem decision, then
+line-only cutoffs; replay redecides the prefix between blocks. Table ranges use
+the whole transported population. `batch_means` rescales by $N_L/B$ for line and
+$N_b/B$ for brem, and computes each SE using its own number of batches. These
+terms and conventions match the derivation; no equation discrepancy found.
+
+### Independent numeric checks and extension verdict
+
+A separate direct NumPy reference recomputed mean, sample SD, share, ESS and
+stability from each full prefix, without using implementation moment or guard
+helpers. For seeds 0–99 it used 400 lognormal line contributions (log-SD 1),
+400 brem contributions (log-SD 0.5), and injected a line contribution of 500 at
+index 80 for every third seed. Policies used blocks of 20, line target 0.15 and
+bounds 40–400, brem target 0.2 and bounds 60–240, share cap 0.2, ESS floor 10,
+and two stability blocks with fraction 0.5. All 100 realized count pairs and
+both component RSEs matched; 80 pairs had unequal counts. Equal fixed bounds
+80–80 returned exactly 80 line and 80 brem electrons.
+
+The focused `tests/montecarlo/test_independent_stopping.py` anchors additionally
+cover late line failure after an earlier pass, a frozen prefix, retry reset,
+brem statistics limitation, invalid policies, absent-policy compatibility, and
+bitwise equality of final spectra with fixed realized count pairs using different
+cutoffs, bunch centering and zero/nonzero energy spread. Batch means reconstruct
+the component spectra on their respective populations.
+
+**Verdict:** extension `rederived`. Retain the shared-policy verification above.
+The prior equal-count assumption now applies only when `brem_target_rse` is
+absent; it is superseded for the opt-in extension by $N_b\le N_L$ and the cutoff
+and replay conditions derived here. Existing skew-tail, optional-stopping and
+unsampled-tail limitations remain. No new calibrated coverage claim is made.
+Human sign-off remains pending (#277).
+
+Verification checks: the focused independent-stopping anchors together with
+`tests/dev/test_docs.py` passed (24 tests). Rendered-page inspection found 27
+math elements in this extension, all with `class="math notranslate"`, and no
+literal dollar delimiters anywhere in the article body.
+
+### Cutoff and joint-stopping assumption audit
+
+Unequal transport cutoffs do not automatically define different line observables.
+The built-in CXR adapter calls `_cxr_for_segments`; `_cxr_for_segments_once`
+passes the same `E_cut_lines_keV` to every CXR evaluation, including the scalar
+monitor. CXR setup calls `_clip_segments_to_cutoff`: it removes rows below the
+line floor and shortens the terminal flight using the transport stopping law
+and attached stopping tables. It reconstructs the midpoint/end state for
+midpoint-energy rows. The intended invariant is that transporting farther for
+brem cannot add a low-energy tail to the line contribution. The prefix and
+suffix therefore measure the same line observable **provided this clipping
+operation reproduces the line-floor transport observable** on the selected
+transport/energy-loss route. Equal cutoffs satisfy this condition directly.
+The extension reuses that existing physical/numerical contract; this audit did
+not independently certify every transport model's cutoff reconstruction.
+
+The fixed-realized-pair equality anchor checks the requested mixed-cutoff
+numerical experiment, including its denominators; it does not prove the
+clipping invariant or identical distributions across the split. If a route's
+cutoff reconstruction fails that invariant, prefix and suffix line contributions
+can have different means or variances. The pooled sample-SD RSE would then
+remain the implemented descriptive statistic, but its interpretation as an
+i.i.d. standard error would be unsupported. Even for a fixed split, differing
+means add between-group variation to the pooled sample variance; a random,
+correlated split additionally needs its selection effects accounted for.
+
+There is a second, independent limitation: final CXR stopping is constrained by
+the brem decision from correlated observations on the same transport. It is
+therefore a joint-data stopping time, rather than the standalone scalar stop
+used in the earlier Gaussian and hopg coverage studies. Those studies do not
+establish interval coverage or stopping-bias bounds for this extension. Nor does
+computing batch means at the selected counts remove optional-stopping effects.
+Read both scalar RSEs and batch SEs as estimated precision diagnostics; neither
+new marginal interval calibration nor simultaneous coverage is certified here.
+
+The extension remains `rederived` for the stated moment formulas, guarded
+prefix decision and fixed-realized-pair numerical identity. Passing reference
+anchors can support `anchored` for that scoped claim. Any ledger extension must
+explicitly exclude a new coverage/bias guarantee for the coupled stopping rule
+and state the cutoff-observable equivalence assumption. The earlier shared-rule
+coverage evidence remains scoped to its original populations and policy.
+
+Implementation anchors after verification: the equal-minimum hopg case at line target 0.035 and brem target 0.1 stops at 60 and 40 electrons, with RSEs 0.03052 and 0.03132. CPU and CUDA realized-pair tests compare every transport array and final component spectra bit-for-bit with fixed runs, using unequal cutoffs. Seed 8 places the maximum initial energy beyond the realized population and explicitly forces table-range replay. Both CUDA cases passed on the lab RTX 5080 (SLURM job 1588, 2026-10-18). Batch-summary reconstruction uses the reduction precision: float64 on CPU and float32 on CUDA, including brem outputs widened after reduction.

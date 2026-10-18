@@ -268,6 +268,14 @@ def transport_case_blocks(
         return run(n_electrons)
     result = run(n_electrons, on_block=monitor.on_block, should_stop=monitor.should_stop)
     realized = int(result["Ne"])
+
+    def replay_block(start, stop, block):
+        monitor.on_block(start, stop, block)
+        # Independent brem stopping must be re-decided on the replay's tables
+        # before transporting the next (line-only) block.
+        if hasattr(monitor, "brem_count") and stop < realized:
+            monitor.should_stop(stop)
+
     if energy_range_of(realized) != energy_range:
         monitor.replayed_transport = True
         while True:
@@ -275,7 +283,7 @@ def transport_case_blocks(
             # Replay changes interpolation tables and hence the measured
             # contributions. Recompute the moments and guards from the exact
             # transport we return; a stale pre-replay decision is insufficient.
-            result = run(realized, on_block=monitor.on_block)
+            result = run(realized, on_block=replay_block)
             if monitor.should_stop(realized):
                 break
             realized = min(realized + block_electrons, n_electrons)

@@ -342,10 +342,10 @@ def _transport_case(
     :mod:`.block_transport`). ``None`` keeps the single call. The lockstep
     core is rejected.
 
-    block_monitor: internal (#361), with ``block_electrons`` and
-    ``Ne == Ne_brem``. Its hooks see every block and may stop transport early
-    (:mod:`.adaptive`); the case then continues as the fixed-N case at the
-    realized count -- cutoffs, line grid and spectrum inputs alike.
+    block_monitor: internal (#361, #366), with ``block_electrons`` and equal
+    requested maxima ``Ne == Ne_brem``. Hooks may stop transport early and
+    freeze brem at a prefix (:mod:`.independent`); the case then continues as
+    the fixed-count case at the realized pair, including cutoffs and grids.
 
     Validation: grazing-beam-projection
     """
@@ -441,6 +441,10 @@ def _transport_case(
     def _simulate(keep, max_steps, start=0, stop=Ne_transport, block_kw=None, cut=None):
         # A block overrides progress and withholds the bunch (see below).
         call_kw = {**beam_kw, **progress_kw, **({} if block_kw is None else block_kw)}
+        if block_monitor is not None:
+            brem_stop = getattr(block_monitor, "brem_count", None)
+            if brem_stop is not None and start >= brem_stop:
+                cut = np.full(stop - start, E_cut_lines, dtype=np.float64)
         return simulate_trajectories(
             case["E0_keV"],
             stop - start,
@@ -511,12 +515,13 @@ def _transport_case(
             segs_all = transport(False)
     else:
         segs_all = transport(False)
-    if block_monitor is not None and int(segs_all["Ne"]) != Ne_transport:
-        # Stopped early: from here on this is the fixed-N case at the realized
-        # count, whose cutoffs are the leading slice (Ne == Ne_brem).
-        Ne = Ne_brem = Ne_transport = int(segs_all["Ne"])
+    if block_monitor is not None:
+        # From here on this is the fixed-count case at the realized pair.
+        Ne = Ne_transport = int(segs_all["Ne"])
+        Ne_brem = getattr(block_monitor, "brem_count", None) or Ne
         case = {**case, "Ne": Ne, "Ne_brem": Ne_brem}
         E_cut_by_electrons = E_cut_by_electrons[:Ne_transport]
+        E_cut_by_electrons[Ne_brem:] = E_cut_lines
 
     # Line resolution needs the transport distribution, so it is chosen after
     # the case's own trajectories exist and before the spectrum phase. No second

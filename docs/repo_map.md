@@ -209,6 +209,8 @@ Optional local ACP bridge lifecycle (Claude and Codex stdio-to-WebSocket adapter
 ### `_precision.py`
 Import-light `Precision` policy for adaptive sampling: validates the requested budget, observables, guards and bands; serializes the policy separately from realized statistics. Shared by `Numerics`, `Settings`, `Case`, and the adaptive runner, without importing a backend.
 
+`montecarlo/runner/independent.py` owns opt-in brem-prefix stopping: separate scalar monitors, a frozen brem population, and live CXR rechecks. `Precision.brem_target_rse` selects it; `block_transport.py` redecides the prefix during realized-range replay, and the runner applies line-only cutoffs after the brem stop.
+
 ### `_backend.py`
 Portable array backend shared by every device-dispatching kernel: NumPy, CUDA/ROCm CuPy, and Intel dpnp/SYCL adapters behind a deterministic `PYRITE_MC_BACKEND` selection. Exports `xp`, `cp`, `REAL`, `_to_cpu`, `_GPU`, `is_device_array`. Lives at the package root, not under `montecarlo/`, because `materials.attenuation` dispatches on it too — that is what keeps `materials` out of the `montecarlo` import cycle. Importing it runs the accelerator probe, so cheap-import callers (CLI, catalog parsing) reach for it inside the function that needs a device. Deps: `_env`.
 
