@@ -17,14 +17,12 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 import numpy as np
 
 from .._numerics import (
     CHANNELING_KEYS,
-    DEFAULT_INELASTIC_CUTOFF_EV,
-    DEFAULT_RADIATIVE_CUTOFF_EV,
     PHYSICS_FIELDS,
     PROFILE_NUMERICS_KEYS,
     SAMPLING_KEYS,
@@ -50,10 +48,10 @@ from ..montecarlo.spectrum.coherent_population import (
 from ..montecarlo.transport import STOPPING_MODEL
 from ..results import EmissionMode, Settings
 from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
-from .inelastic_cases import (
-    covered_shell_materials,
-    shell_fallback_reason,
-    target_shell_materials,
+from .identity_options import (
+    pop_identity_options,
+    radiative_numerics_payload,
+    transport_numerics_payload,
 )
 from .numerics_resolution import NUMERICS_GROUPS as NUMERICS_GROUPS
 from .numerics_resolution import NumericsResolution
@@ -391,50 +389,33 @@ def case_bremsstrahlung_marker(case: Case | Mapping[str, Any]) -> str:
     )
 
 
-def _identity_v1(
-    material: str,
-    fidelity: str,
-    settings: Settings,
-    sweep: Sweep,
-    *,
-    variant: str | None = None,
-    catalog_profile: str = "standard",
-    xsgen_tables: Mapping[str, str] | None = None,
-    bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] | None = None,
-) -> dict[str, Any]:
-    """Return profile plus exact resolved parameters and stable SHA-256 digest."""
-    assert sweep.target is not None
-    crystallography = crystal_params(sweep.target.material, sweep.n_families)
+def _crystallography_payload(sweep: Sweep, crystallography: Mapping[str, Any]) -> dict[str, Any]:
+    """Catalog crystal, truncated reflections and the axis the cases resolve."""
     reflections = crystallography["hkl_list"]
     if sweep.max_reflections is not None:
         reflections = reflections[: sweep.max_reflections]
-    resolved = {
-        "material": material,
-        "fidelity": fidelity,
-        "variant": variant,
-        "settings": _jsonable(settings),
-        "sweep": _jsonable(sweep),
-        "crystallography": {
-            "crystal": crystallography["crystal"],
-            "hkl_list": _jsonable(reflections),
-            "beam_uvw": _jsonable(
-                sweep.beam_uvw if sweep.beam_uvw is not None else crystallography["beam_uvw"]
-            ),
-            "surface_hkl": _jsonable(
-                None if sweep.beam_uvw is not None else crystallography["surface_hkl"]
-            ),
-        },
+    return {
+        "crystal": crystallography["crystal"],
+        "hkl_list": _jsonable(reflections),
+        "beam_uvw": _jsonable(
+            sweep.beam_uvw if sweep.beam_uvw is not None else crystallography["beam_uvw"]
+        ),
+        "surface_hkl": _jsonable(
+            None if sweep.beam_uvw is not None else crystallography["surface_hkl"]
+        ),
     }
-    # Hash compatibility: the P2.4 electron-count sweep grids join the payload
-    # only when actually set, so pre-existing runs keep their historical
-    # parameter_sha256 (and therefore their checkpoint identity) bit-for-bit.
-    sweep_payload = resolved["sweep"]
-    # Flat legacy projection of the geometry, for the same reason as the beam and
-    # detector projections below: geometry lives on ``Sweep.target`` in code, but
-    # the hashed payload keeps the HISTORICAL flat keys -- ``thickness_ang``,
-    # ``tilt_deg``, the footprint pair, the substrate sugar -- so every
-    # pre-existing ``parameter_sha256`` (and its checkpoint stem) stays
-    # bit-for-bit.
+
+
+def _project_target_detector_and_bins(sweep_payload: dict[str, Any], sweep: Sweep) -> None:
+    """Replace the nested target, detector and energy bins by their historical flat keys.
+
+    Geometry lives on ``Sweep.target`` in code, but the hashed payload keeps the
+    HISTORICAL flat keys -- ``thickness_ang``, ``tilt_deg``, the footprint pair,
+    the substrate sugar -- so every pre-existing ``parameter_sha256`` (and its
+    checkpoint stem) stays bit-for-bit. The detector and energy bins follow the
+    same rule.
+    """
+    assert sweep.target is not None
     sweep_payload.pop("target", None)
     sweep_payload.update(_jsonable(target_flat_fields(sweep.target)))
     detector_payload = sweep_payload.pop("detector")
@@ -465,9 +446,30 @@ def _identity_v1(
     }
     if reserved_detector:
         sweep_payload["detector"] = reserved_detector
-    # Preserve the historical flat beam keys in the hash and checkpoint stem.
-    # New beam fields join the hash only when they differ from inert defaults,
-    # like ``n_electrons`` and ``catalog_profile`` below (decision 6).
+
+
+def _longitudinal_resolutions(sweep: Sweep, settings: Settings) -> list[Any]:
+    """Distinct resolved longitudinal records across the run's cases, in case order."""
+    cases = build_cases(
+        sweep,
+        n_electrons=settings.n_electrons,
+        n_electrons_brem=settings.n_electrons_brem,
+        coherent_emission=settings.coherent_emission,
+    )
+    serialized: dict[str, Any] = {}
+    for case in cases:
+        resolution = case["longitudinal_distribution"]
+        key = json.dumps(_jsonable(resolution), sort_keys=True, separators=(",", ":"))
+        serialized.setdefault(key, _jsonable(resolution))
+    return list(serialized.values())
+
+
+def _project_beam(sweep_payload: dict[str, Any], sweep: Sweep) -> dict[str, Any]:
+    """Replace the nested beam by its historical flat keys; return the popped beam.
+
+    New beam fields join the hash only when they differ from inert defaults,
+    like ``n_electrons`` and ``catalog_profile`` (decision 6).
+    """
     beam_payload = sweep_payload.pop("beam")
     gdf = sweep.beam.gdf_beam()
     if gdf is not None:
@@ -492,18 +494,11 @@ def _identity_v1(
         sweep_payload["long_offsets_fs"] = beam_payload["long_offsets_fs"]
     if beam_payload["longitudinal"] is not None:
         sweep_payload["longitudinal"] = beam_payload["longitudinal"]
-        cases = build_cases(
-            sweep,
-            n_electrons=settings.n_electrons,
-            n_electrons_brem=settings.n_electrons_brem,
-            coherent_emission=settings.coherent_emission,
-        )
-        serialized: dict[str, Any] = {}
-        for case in cases:
-            resolution = case["longitudinal_distribution"]
-            key = json.dumps(_jsonable(resolution), sort_keys=True, separators=(",", ":"))
-            serialized.setdefault(key, _jsonable(resolution))
-        resolved["longitudinal_resolutions"] = list(serialized.values())
+    return beam_payload
+
+
+def _project_beam_tail(sweep_payload: dict[str, Any], beam_payload: Mapping[str, Any]) -> None:
+    """Divergence-only beam keys hashed after the longitudinal resolutions."""
     if beam_payload["transverse"] is not None:
         sweep_payload["transverse"] = beam_payload["transverse"]
     if beam_payload["rep_rate_hz"] != 5000.0:
@@ -514,6 +509,70 @@ def _identity_v1(
         sweep_payload["energy_spread_frac"] = beam_payload["energy_spread_frac"]
     if beam_payload["bunch_front_tilt"] is not None:
         sweep_payload["bunch_front_tilt"] = beam_payload["bunch_front_tilt"]
+
+
+def _model_generation_markers(emission: str) -> dict[str, Any]:
+    """Unconditional physics-generation constants carried by every digest.
+
+    Each is a CONSTANT, not a selector: it perturbed every digest exactly once
+    when the physics it names changed, orphaning older checkpoints
+    (rev-and-re-run) instead of letting them resume into a run that computes
+    different numbers.
+    """
+    # The in-medium photon dispersion is unconditional physics now, not an
+    # opt-in model; digests minted before it used the retired vacuum
+    # k = omega kinematics.
+    markers: dict[str, Any] = {"line_kinematics": "in-medium"}
+    # Production resolves one shell- and density-effect-corrected SBETHE table
+    # per material; the former Joy--Luo/Berger--Seltzer splice remains
+    # reference-only. ``xsgen_tables`` separates different generated inputs
+    # and manifests within this model.
+    markers["stopping_model"] = STOPPING_MODEL
+    # Characteristic line production changes the stored line arrays, so the
+    # exact EEDL/xraydb model generation separates pre-characteristic and
+    # future database generations.
+    markers["characteristic_model"] = CHARACTERISTIC_MODEL
+    # The PXR/CBS line route's escape model (segment-mean escape since #181).
+    markers["line_escape_model"] = CXR_ESCAPE_MODEL
+    if emission != "incoherent":
+        markers["coherent_population_model"] = COHERENT_POPULATION_MODEL
+    # Every photon-escape factor reads the narrow-beam mu, sourced from
+    # EPDL2025 since issue #274 (was Chantler f2 + Elam).
+    markers["attenuation_model"] = ATTENUATION_MODEL
+    return markers
+
+
+def _identity_v1(
+    material: str,
+    fidelity: str,
+    settings: Settings,
+    sweep: Sweep,
+    *,
+    variant: str | None = None,
+    catalog_profile: str = "standard",
+    xsgen_tables: Mapping[str, str] | None = None,
+    bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] | None = None,
+) -> dict[str, Any]:
+    """Return profile plus exact resolved parameters and stable SHA-256 digest."""
+    assert sweep.target is not None
+    crystallography = crystal_params(sweep.target.material, sweep.n_families)
+    resolved = {
+        "material": material,
+        "fidelity": fidelity,
+        "variant": variant,
+        "settings": _jsonable(settings),
+        "sweep": _jsonable(sweep),
+        "crystallography": _crystallography_payload(sweep, crystallography),
+    }
+    sweep_payload = resolved["sweep"]
+    _project_target_detector_and_bins(sweep_payload, sweep)
+    beam_payload = _project_beam(sweep_payload, sweep)
+    if beam_payload["longitudinal"] is not None:
+        resolved["longitudinal_resolutions"] = _longitudinal_resolutions(sweep, settings)
+    _project_beam_tail(sweep_payload, beam_payload)
+    # Hash compatibility: the P2.4 electron-count sweep grids join the payload
+    # only when actually set, so pre-existing runs keep their historical
+    # parameter_sha256 (and therefore their checkpoint identity) bit-for-bit.
     for key in ("n_electrons", "n_electrons_brem", "line_grid_policy"):
         if sweep_payload.get(key) is None:
             sweep_payload.pop(key, None)
@@ -522,16 +581,6 @@ def _identity_v1(
     # pre-existing standard-profile identity keeps its historical digest.
     if catalog_profile != "standard":
         resolved["catalog_profile"] = catalog_profile
-    # emission (run-affecting) follows the same divergence-only rule: it is a NEW
-    # Settings field, so hashing it unconditionally would perturb every
-    # pre-existing digest. Strip it from the serialized settings and re-add it at
-    # the top level only when it diverges from "incoherent" -- an incoherent
-    # run's parameter_sha256 stays bit-for-bit, while "coherent" and "both" each
-    # get a distinct digest (and checkpoint stem) so the three modes never
-    # collide or resume into one another. Clean rename of the old
-    # coherent_emission=True key: no legacy back-compat branch, so pre-existing
-    # coherent checkpoints are intentionally orphaned (rev-and-re-run). The bunch
-    # fields (bunch_length_fs etc.) keep their own divergence rule above.
     settings_payload = resolved["settings"]
     # Channeling is opt-in: strip every new inert field before hashing.
     channeling = {key: settings_payload.pop(key, None) for key in CHANNELING_KEYS}
@@ -546,143 +595,42 @@ def _identity_v1(
         resolved["adaptive_precision"] = precision_payload
         settings_payload.pop("n_electrons", None)
         settings_payload.pop("n_electrons_brem", None)
-    if isinstance(settings_payload, Mapping):
-        emission = str(settings_payload.pop("emission", "incoherent"))
-        temporal_profile = bool(settings_payload.pop("temporal_profile", False))
-        straggling = bool(settings_payload.pop("straggling", False))
-        energy_model = str(settings_payload.pop("energy_model", "frozen"))
-        max_dE_frac = float(settings_payload.pop("max_dE_frac", 0.0))
-        inelastic_model = str(settings_payload.pop("inelastic_model", "auto"))
-        inelastic_cutoff_eV = settings_payload.pop("inelastic_cutoff_eV", None)
-        secondary_threshold_eV = settings_payload.pop("secondary_threshold_eV", None)
-        elastic_model = str(settings_payload.pop("elastic_model", "mott"))
-        settings_brem_model = str(settings_payload.pop("bremsstrahlung_model", "auto"))
-        radiative_model = str(settings_payload.pop("radiative_model", "uncoupled"))
-        radiative_cutoff_eV = settings_payload.pop("radiative_cutoff_eV", None)
-        pair_production_model = settings_payload.pop("pair_production_model", None)
-        positron_transport = bool(settings_payload.pop("positron_transport", False))
-        # Absent in a record minted before #317: elastic-only, as it ran.
-        atomic_electron_deflection = str(settings_payload.pop("atomic_electron_deflection", "none"))
-    else:  # pragma: no cover - settings is always a jsonable Mapping here
-        emission = str(getattr(settings, "emission", "incoherent"))
-        temporal_profile = bool(getattr(settings, "temporal_profile", False))
-        straggling = bool(getattr(settings, "straggling", False))
-        energy_model = str(getattr(settings, "energy_model", "frozen"))
-        max_dE_frac = float(getattr(settings, "max_dE_frac", 0.0))
-        inelastic_model = str(getattr(settings, "inelastic_model", "auto"))
-        inelastic_cutoff_eV = getattr(settings, "inelastic_cutoff_eV", None)
-        secondary_threshold_eV = getattr(settings, "secondary_threshold_eV", None)
-        elastic_model = str(getattr(settings, "elastic_model", "mott"))
-        settings_brem_model = str(getattr(settings, "bremsstrahlung_model", "auto"))
-        radiative_model = str(getattr(settings, "radiative_model", "uncoupled"))
-        radiative_cutoff_eV = getattr(settings, "radiative_cutoff_eV", None)
-        pair_production_model = getattr(settings, "pair_production_model", None)
-        positron_transport = bool(getattr(settings, "positron_transport", False))
-        atomic_electron_deflection = str(getattr(settings, "atomic_electron_deflection", "none"))
-    if emission != "incoherent":
-        resolved["emission"] = emission
+    options = pop_identity_options(settings_payload)
+    # emission (run-affecting) follows the divergence-only rule: an incoherent
+    # run's parameter_sha256 stays bit-for-bit, while "coherent" and "both" each
+    # get a distinct digest (and checkpoint stem) so the three modes never
+    # collide or resume into one another. Clean rename of the old
+    # coherent_emission=True key: no legacy back-compat branch, so pre-existing
+    # coherent checkpoints are intentionally orphaned (rev-and-re-run).
+    if options.emission != "incoherent":
+        resolved["emission"] = options.emission
     # Opt-in line I(t) (#292): divergence-only, so off keeps every digest.
-    if temporal_profile:
+    if options.temporal_profile:
         resolved["temporal_profile"] = True
-    transport_numerics = {}
-    if straggling:
-        transport_numerics["straggling"] = True
-    if energy_model != "frozen":
-        transport_numerics["energy_model"] = energy_model
-    if max_dE_frac != 0.0:
-        transport_numerics["max_dE_frac"] = max_dE_frac
-    # Divergence-only like the three keys above: continuous stopping leaves
-    # every existing digest unchanged. "auto" (#281) records shell soft/hard
-    # only when the run's layers resolve to it, as its cases do.
-    if inelastic_model == "auto":
-        materials = target_shell_materials(sweep.target, crystallography["crystal"])
-        fallback = shell_fallback_reason(
-            materials,
-            grooved=sweep_payload.get("groove_spacing_ang") is not None,
-            energy_model=energy_model,
-            covered=covered_shell_materials(),
-        )
-        if fallback is None:
-            inelastic_model = "shell-soft-hard"
-            if inelastic_cutoff_eV is None:
-                inelastic_cutoff_eV = DEFAULT_INELASTIC_CUTOFF_EV
-    if inelastic_model == "shell-soft-hard":
-        transport_numerics["inelastic_model"] = inelastic_model
-        transport_numerics["inelastic_cutoff_eV"] = float(cast(float, inelastic_cutoff_eV))
-    if secondary_threshold_eV is not None:  # divergence-only (#94)
-        transport_numerics["secondary_threshold_eV"] = float(secondary_threshold_eV)
-    if elastic_model != "mott":
-        transport_numerics["elastic_model"] = elastic_model
-    # Atomic-electron deflection (#317): on by default, so it forks every new
-    # run's digest once; "none" keeps the elastic-only digest. Recorded only
-    # where it runs, as its cases do: a Mott run resolved to shell soft/hard
-    # keeps elastic-only deflection.
-    if atomic_electron_deflection != "none" and (
-        elastic_model != "mott" or inelastic_model != "shell-soft-hard"
-    ):
-        transport_numerics["atomic_electron_deflection"] = atomic_electron_deflection
+    grooved = sweep_payload.get("groove_spacing_ang") is not None
+    transport_numerics = transport_numerics_payload(
+        options, sweep, crystallography["crystal"], grooved=grooved
+    )
     if transport_numerics:
         resolved["transport_numerics"] = transport_numerics
-    # The in-medium photon dispersion is unconditional physics now, not an opt-in
-    # model, so it no longer earns a divergence-only key. Every digest minted
-    # before that change was computed under the retired vacuum k = omega
-    # kinematics, though, so the payload carries a permanent line-kinematics
-    # generation marker. It is a CONSTANT, not a selector: it perturbs every
-    # digest exactly once, orphaning the vacuum-era checkpoints (rev-and-re-run,
-    # matching how the emission rename was handled) instead of letting them
-    # resume into a run that computes different numbers.
-    resolved["line_kinematics"] = "in-medium"
-    # Same rule for the electron collision-stopping model. Production resolves
-    # one shell- and density-effect-corrected SBETHE table per material; the
-    # former Joy--Luo/Berger--Seltzer splice remains reference-only. The model
-    # marker separates every splice-era record, while ``xsgen_tables`` below
-    # separates different generated inputs and manifests within this model.
-    resolved["stopping_model"] = STOPPING_MODEL
-    # Characteristic line production is unconditional and changes the stored
-    # line arrays, so the exact EEDL/xraydb model generation must separate
-    # checkpoints from pre-characteristic and future database generations.
-    resolved["characteristic_model"] = CHARACTERISTIC_MODEL
-    # The PXR/CBS line route's escape model is unconditional physics too
-    # (segment-mean escape since issue #181); same constant-marker rule.
-    resolved["line_escape_model"] = CXR_ESCAPE_MODEL
-    if emission != "incoherent":
-        resolved["coherent_population_model"] = COHERENT_POPULATION_MODEL
-    # Every photon-escape factor reads the narrow-beam mu, sourced from EPDL2025
-    # since issue #274 (was Chantler f2 + Elam); same constant-marker rule.
-    resolved["attenuation_model"] = ATTENUATION_MODEL
+    resolved.update(_model_generation_markers(options.emission))
     # The continuum now defaults to evaluated EEDL MF=23/527 + MF=26/527
     # instead of the historical analytic Bethe--Heitler approximation.
-    requested = settings_brem_model if bremsstrahlung_model is None else bremsstrahlung_model
+    requested = (
+        options.bremsstrahlung_model if bremsstrahlung_model is None else bremsstrahlung_model
+    )
     validate_bremsstrahlung_model(requested)
     resolved_brem_model = resolve_bremsstrahlung_model(requested, _target_elements(sweep.target))
     resolved["bremsstrahlung_model"] = _bremsstrahlung_identity_marker(resolved_brem_model)
-    # Coupled radiative transport (#172): divergence-only, and recorded only
-    # when BremsLib resolved, because an EEDL fallback runs uncoupled.
-    if (
-        radiative_model != "uncoupled"
-        and resolved_brem_model == "bremslib"
-        and sweep_payload.get("groove_spacing_ang") is None
-    ):
-        transport_numerics["radiative_model"] = "bremslib-soft-hard"
-        transport_numerics["radiative_cutoff_eV"] = (
-            DEFAULT_RADIATIVE_CUTOFF_EV
-            if radiative_cutoff_eV is None
-            else float(cast(float, radiative_cutoff_eV))
-        )
-        # Pair conversion (#275) rides on the coupling: divergence-only too.
-        if pair_production_model is not None:
-            transport_numerics["pair_production_model"] = str(pair_production_model)
-        # Positron transport (#276) rides on pair conversion: divergence-only.
-        if positron_transport:
-            transport_numerics["positron_transport"] = True
+    radiative = radiative_numerics_payload(options, resolved_brem_model, grooved=grooved)
+    if radiative:
+        transport_numerics.update(radiative)
         resolved["transport_numerics"] = transport_numerics
     # Externally generated cross-section tables (issue #161), as table key ->
     # provenance-manifest digest. A *divergence-only* key, like `emission` and
-    # `transport_numerics` above and unlike the four model constants: a run
-    # that resolves no xsgen table omits it entirely and keeps its historical
-    # digest bit-for-bit. The four constants each perturbed every digest once,
-    # deliberately, because the physics they name changed for every run; no
-    # A participating table's manifest digest covers the Fortran
+    # `transport_numerics` above and unlike the model constants: a run that
+    # resolves no xsgen table omits it entirely and keeps its historical digest
+    # bit-for-bit. A participating table's manifest digest covers the Fortran
     # source, the compiler, the deck and the model parameters, so regenerating
     # a table under different settings re-keys the run rather than resuming
     # into checkpoints computed from the old one.
