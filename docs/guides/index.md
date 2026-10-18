@@ -24,6 +24,7 @@ analysis-tutorial
 running-on-a-cluster
 sweep-profiles
 external-catalog
+detector-editor
 adding-materials
 gpt-gdf-beams
 troubleshooting

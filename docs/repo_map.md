@@ -32,7 +32,8 @@ Components (a + b denotes a static import cycle):
   p8: materials
   p9: perf
   p10: plots
-  p11: xsgen
+  p11: tui
+  p12: xsgen
 Edges (importer -> imported):
   p0 -> p2
   p0 -> p3
@@ -47,14 +48,17 @@ Edges (importer -> imported):
   p10 -> p5
   p10 -> p8
   p11 -> p4
-  p11 -> p8
-  p2 -> p11
+  p11 -> p5
+  p12 -> p4
+  p12 -> p8
+  p2 -> p12
   p2 -> p4
   p2 -> p5
   p2 -> p7
   p2 -> p8
   p2 -> p9
   p3 -> p11
+  p3 -> p12
   p3 -> p2
   p3 -> p4
   p3 -> p5
@@ -78,6 +82,7 @@ Edges (importer -> imported):
 ## Entry points
 
 - **`pyrite` console script** → `cli:main` (`pyproject.toml [project.scripts]`), lazy Click dispatch for user workflows including `physics` and `numerics`; remote lifecycle is canonical at `remote job`, with the former root `job` hidden through 0.17.0. Retired top-level setup, completion, performance, energy-grid, scan, analyze/export, and flat checkpoint spellings remain hidden compatibility aliases where the D7 registry documents a replacement. Checked user-facing inventory: [CLI reference](repo-design/cli/cli-reference.md).
+- **`pyrite tui`** → `cli.commands.tui` → lazy `tui.detector_app.run`: optional Textual detector editor (prototype). Checks the `tui` extra and an interactive terminal before importing Textual; root and nested help never import it.
 - **`import pyrite`** → `__init__`: lightweight lazy exports for `Beam`, target variants, shared `SubstanceRef`/`RectangularBody` descriptions and `Target`/`Filter` roles, `Detector`, `Scene`, path-addressed `Sweep`, `Physics`, `Numerics`, `CxrReflections`, `Precision`, `Analysis`, `Result`, and `simulate`.
 - **`pyrite.simulate(beam, target, detector, ...)`** → `api:simulate`: lower one scalar scene to the typed `Case`, run it without checkpoint I/O, and return response-free source arrays plus resolved provenance in `Result`.
 - **`pyrite.photon_energies(materials, beam_energy_eV, ...)`** → `materials.emission:photon_energies`: deterministic vacuum line-centre arrays with paired NumPy broadcasting or Cartesian grids; catalogue cut/reflection resolution, no transport or accelerator initialization.
@@ -665,11 +670,20 @@ Canonical `pyrite detector list|show|create|set|reset|rename|delete` Click layer
 
 `catalog_edit.CatalogDraft` owns explicit-path in-memory drafts, canonical TOML,
 validation, diffs, stale-edit checks and atomic selected-layer saving.
-`detectors.editing` owns detector create/clone/patch and response/acquisition
-merges, shared with profile edits and the typed detector CLI. Neither imports
+`detectors.editing` owns detector create/clone/patch, response/acquisition
+merges and option-keyed `pixel_changes`, shared with profile edits, the typed
+detector CLI and the terminal editor. Neither imports
 Click command modules. `cli.commands.calculation` exposes API-owned
 `physics`/`numerics` views and edits of existing profiles; it creates no preset
 store. See [ADR-0019](adr/0019-cli-configuration-ownership.md).
+
+`tui.detector_form` is the UI-independent form/session model for the optional
+terminal detector editor (#553): fields mirror the typed `detector create`
+options, typed values pass through `detectors.editing` into one `CatalogDraft`,
+and `StagedEdit.cli_commands()` names the equivalent CLI calls. Only
+`tui.detector_app` imports Textual (`tui` extra); the `tui-imports-no-cli`
+import contract keeps both front ends on the shared services. Guide:
+[detector editor](guides/detector-editor.md).
 
 ### `cli/commands/job.py`
 Canonical `pyrite remote job list|status|logs|attach|stop` Click layer. Reuses the remote viewer, JSON envelope, completion, exit, confirmation, and lifecycle owners; normalizes persisted submitter names into the four public job kinds. The former root `job` is a hidden warning alias through 0.17.0.

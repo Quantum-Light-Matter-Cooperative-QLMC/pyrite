@@ -12,7 +12,7 @@ from pathlib import Path
 from pyrite.devtools import repo_root
 
 ROOT = repo_root()
-EXPECTED_EXTRAS = {"amd", "apps", "external-db", "intel", "nvidia", "plots"}
+EXPECTED_EXTRAS = {"amd", "apps", "external-db", "intel", "nvidia", "plots", "tui"}
 PROJECT_DOCUMENT = tomllib.loads((ROOT / "pyproject.toml").read_text())
 PROJECT_VERSION = PROJECT_DOCUMENT["project"]["version"]
 
@@ -128,6 +128,7 @@ def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
     _run_fails_with_hint(
         str(_python(venv)), "-c", "import pyrite.plots.mpl", cwd=root, hint="pyrite-mc[plots]"
     )
+    _run_fails_with_hint(pyrite, "tui", cwd=root, hint="pyrite-mc[tui]")
     _run(
         uv,
         "pip",

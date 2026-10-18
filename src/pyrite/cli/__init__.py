@@ -25,6 +25,7 @@ _COMMANDS = {
     "beam": "pyrite.cli.commands.beam.command",
     "detector": "pyrite.cli.commands.detector.command",
     "tables": "pyrite.cli.commands.tables.command",
+    "tui": "pyrite.cli.commands.tui.command",
 }
 
 _COMMAND_HELP = {
@@ -42,6 +43,7 @@ _COMMAND_HELP = {
     "beam": "Manage named beams, attachable to profiles by name.",
     "detector": "Manage named detector geometries.",
     "tables": "Inspect generated cross-section tables and external code trees.",
+    "tui": "Edit detectors in a terminal UI (prototype; tui extra).",
 }
 
 

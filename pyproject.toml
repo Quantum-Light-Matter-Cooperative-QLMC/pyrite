@@ -69,6 +69,10 @@ apps = [
     "marimo[recommended]>=0.25.1",
     "vegafusion>=2.0.3",
 ]
+# Optional terminal detector editor (``pyrite tui``); see docs/guides/detector-editor.md.
+tui = [
+    "textual>=8.2.8",
+]
 
 [project.scripts]
 pyrite = "pyrite.cli:main"
@@ -146,6 +150,10 @@ notebooks = [
     "pyrite-mc[apps]",
     "nbconvert>=7.17.1",
     "pandoc>=2.4",
+]
+# Contributor checkout: the optional terminal editor, so its headless tests run.
+tui = [
+    "pyrite-mc[tui]",
 ]
 
 [tool.pytest.ini_options]
@@ -430,6 +438,23 @@ forbidden_modules = [
     "pyrite.cli",
 ]
 allow_indirect_imports = true
+
+# The optional terminal editor (#553) is a peer of the Click CLI over the same
+# domain services (`catalog_edit`, `detectors.editing`): it must not reuse Click
+# commands or the marimo apps, so both front ends serialize through one owner.
+# Only `cli.commands.tui` imports it, lazily, after the extra check.
+[[tool.importlinter.contracts]]
+id = "tui-imports-no-cli"
+name = "Terminal editor imports no CLI or marimo app"
+type = "forbidden"
+source_modules = [
+    "pyrite.tui",
+]
+forbidden_modules = [
+    "pyrite.apps",
+    "pyrite.cli",
+]
+allow_indirect_imports = false
 
 # `console` is the bottom of the presentation stack: colour, prompts, JSON
 # envelopes, the config store and the live dashboard. It may import the path
