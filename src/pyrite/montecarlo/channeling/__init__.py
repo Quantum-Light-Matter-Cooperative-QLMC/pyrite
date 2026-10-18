@@ -24,6 +24,7 @@ from .density import (
 from .dipole import (
     FirstOrderTransition,
     boosted_dipole_pattern,
+    dipole_far_field,
     dipole_rate_per_ang,
     dipole_stokes,
     first_order_transition,
@@ -87,6 +88,7 @@ __all__ = [
     "channeling_spectrum",
     "decoherence_rate",
     "dipole_rate_per_ang",
+    "dipole_far_field",
     "dipole_stokes",
     "electronic_channels",
     "electronic_kernel",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from numbers import Integral
 from typing import Literal
@@ -97,6 +98,8 @@ class AxialDiagnosticResult:
     survival is unitary norm, not scattering survival. ``oam_populations`` is
     per incident electron inside the selected disk, truncated to ``oam_ells``;
     it is neither a full-cell nor a survivor-conditioned OAM distribution.
+    ``observables`` holds the optional caller observable, shape ``(depth, k)``,
+    weighted like ``density_per_ang2`` (per incident electron).
     """
 
     config: AxialDiagnosticConfig
@@ -113,6 +116,7 @@ class AxialDiagnosticResult:
     oam_ells: np.ndarray | None
     oam_populations: np.ndarray | None
     oam_origin_ang: tuple[float, float] | None
+    observables: np.ndarray | None = None
     experimental_model: str = "experimental axial diagnostic; existing #508 solvers"
 
     def density(self, *, conditional: bool = False) -> np.ndarray:
@@ -127,17 +131,42 @@ class AxialDiagnosticResult:
         )
 
 
+def _coherent(config, grid, potential, components, norms, observe):
+    """Weighted sum of ``observe`` over coherent component histories, and the last history."""
+    solver = SplitStepPropagator(
+        grid, config.kinetic_energy_eV, potential_eV=potential, tilt_rad=config.tilt_rad
+    )
+    k = momentum_inv_ang(config.kinetic_energy_eV)
+    tilt = (k * config.tilt_rad[0], k * config.tilt_rad[1])
+    stacked = 0.0
+    history = None
+    for (weight, phi), norm in zip(components, norms, strict=True):
+        history = np.stack(
+            [
+                state
+                for _, state in solver.trajectory(
+                    phi / np.sqrt(norm), config.depths_ang, step_ang=config.step_ang
+                )
+            ]
+        )
+        stacked = stacked + weight * np.stack([observe(state, tilt) for state in history])
+    return stacked, history
+
+
 def axial_diagnostic(
     config: AxialDiagnosticConfig = AxialDiagnosticConfig(),
     *,
     entry: EntryState | None = None,
+    observable: Callable[[np.ndarray, tuple[float, float]], np.ndarray] | None = None,
 ) -> AxialDiagnosticResult:
     """Assemble and run the existing experimental axial diagnostic on the CPU.
 
     ``entry`` uses the existing 2D pure/mixture interface; omitted means a
     Gaussian of waist 0.5 Å at the coordinate origin. No amplitudes are averaged
     across mixture components or MCWF electrons. This adds no physics and does
-    not enable ``Physics(channeling_model="axial")``. See the axial diagnostic
+    not enable ``Physics(channeling_model="axial")``. ``observable(phi, tilt)``
+    (``AxialMCWF`` signature, tilt in Å⁻¹) must be linear in ``|phi><phi|``;
+    it is averaged with the same weights as the density. See the axial diagnostic
     guide for periodic boundaries, convergence and validation limits.
 
     Validation: cr-axial-realspace-propagation, cr-axial-realspace-dissipator
@@ -166,31 +195,20 @@ def axial_diagnostic(
             raise ValueError("oam_string must index a profile string")
         origin = profile.strings[config.oam_string].position_ang
         projection = CylindricalProjection(grid, origin, config.oam_radius_ang, 8)
-    waves = None
-    oam = None
+    observers: list[Callable[[np.ndarray, tuple[float, float]], np.ndarray]] = [
+        lambda phi, tilt: np.abs(phi).ravel() ** 2
+    ]
+    if projection is not None:
+        observers.append(projection)
+    if observable is not None:
+        observers.append(observable)
+
+    def observe(phi, tilt):
+        return np.concatenate([np.asarray(f(phi, tilt)) for f in observers])
+
     if config.mode == "coherent":
-        solver = SplitStepPropagator(
-            grid, config.kinetic_energy_eV, potential_eV=potential, tilt_rad=config.tilt_rad
-        )
-        density = np.zeros((len(config.depths_ang), *grid.shape))
-        if projection is not None:
-            oam = np.zeros((len(config.depths_ang), len(projection.ells)))
-        tilt = tuple(momentum_inv_ang(config.kinetic_energy_eV) * t for t in config.tilt_rad)
-        for (weight, phi), norm in zip(components, norms, strict=True):
-            history = np.stack(
-                [
-                    state
-                    for _, state in solver.trajectory(
-                        phi / np.sqrt(norm), config.depths_ang, step_ang=config.step_ang
-                    )
-                ]
-            )
-            density += weight * np.abs(history) ** 2
-            if projection is not None:
-                oam += weight * np.stack([projection(state, tilt) for state in history])
-            if not isinstance(entry, MixedState):
-                waves = history
-        surviving = density.sum(axis=(1, 2)) * grid.cell_area_ang2
+        stacked, waves = _coherent(config, grid, potential, components, norms, observe)
+        waves = None if isinstance(entry, MixedState) else waves
         jumps = {}
     else:
         dissipator = axial_dissipator(
@@ -200,11 +218,6 @@ def axial_diagnostic(
             config.shape,
             mechanisms=config.mechanisms,
         )
-
-        def observe(phi, tilt):
-            values = np.abs(phi).ravel() ** 2
-            return values if projection is None else np.concatenate((values, projection(phi, tilt)))
-
         mcwf = AxialMCWF(dissipator, config.kinetic_energy_eV, potential).run(
             entry,
             config.depths_ang,
@@ -214,11 +227,17 @@ def axial_diagnostic(
             tilt_rad=config.tilt_rad,
             observable=observe,
         )
-        count = grid.shape[0] * grid.shape[1]
-        density = mcwf.observables[:, :count].reshape(-1, *grid.shape)
-        if projection is not None:
-            oam = mcwf.observables[:, count:]
-        surviving, jumps = mcwf.surviving, mcwf.jumps
+        stacked, waves, jumps = mcwf.observables, None, mcwf.jumps
+    count = grid.shape[0] * grid.shape[1]
+    stop = count if projection is None else count + len(projection.ells)
+    # A complex caller observable promotes the stack; density and OAM are real.
+    density = stacked[:, :count].real.reshape(-1, *grid.shape)
+    oam = None if projection is None else stacked[:, count:stop].real
+    extra = None if observable is None else stacked[:, stop:]
+    if config.mode == "coherent":
+        surviving = density.sum(axis=(1, 2)) * grid.cell_area_ang2
+    else:
+        surviving = mcwf.surviving
     return AxialDiagnosticResult(
         config,
         entry,
@@ -234,4 +253,5 @@ def axial_diagnostic(
         None if projection is None else projection.ells,
         oam,
         origin,
+        extra,
     )

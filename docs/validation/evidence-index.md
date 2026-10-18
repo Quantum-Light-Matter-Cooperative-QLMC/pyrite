@@ -117,6 +117,7 @@ channeling/cr-axial-realspace-propagation
 channeling/cr-axial-realspace-dissipator
 channeling/cr-vortex-string-coupling
 channeling/cr-axial-helicity-emission
+channeling/cr-dipole-far-field-amplitude
 ```
 
 ```{toctree}

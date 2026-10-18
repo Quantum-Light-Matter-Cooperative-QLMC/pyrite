@@ -360,6 +360,30 @@ def _(
 
 
 @app.cell
+def _(gamma, mo, np):
+    from pyrite.apps.channeling import far_field_figure
+
+    _far = far_field_figure(gamma, np.diag([1.0, 0.0]), "Planar dipole line (x = plane normal)")
+    mo.vstack(
+        [
+            mo.md(
+                "**Planar far field.** Every planar line is a real dipole along the plane "
+                "normal, so these maps are shared by all lines at this energy. It is an equal "
+                "coherent sum of J_z = +1 and −1: on a fixed circular basis E₊ and E₋ "
+                "mirror each other and vanish at the boosted dipole null (γθx = ±1, "
+                "θy = 0). Circles inside γθ = 1 see no winding; circles enclosing both "
+                "nulls wind −2 (E₊) and +2 (E₋), so the line carries no net OAM. A pure axial J_z = +1 line "
+                "instead leaves E₊ flat and winds E₋ twice everywhere. Contours give the "
+                "Doppler energy relative to forward; the spectrum above is the forward "
+                "line content."
+            ),
+            _far,
+        ]
+    )
+    return
+
+
+@app.cell
 def _(mo, states):
     state_ui = mo.ui.dropdown(
         {f"State {n} · {energy:.3f} eV": n for n, energy in enumerate(states.energies_eV)},
@@ -618,6 +642,73 @@ def _(axial_conditional_ui, axial_demo_figure, axial_result, axial_sample_ui, mo
                     "Disk OAM is truncated to |ℓ| ≤ 8; omitted disk/mode weight is not renormalized."
                 ),
                 _ofig,
+            ]
+        )
+    mo.vstack(_items)
+    return
+
+
+@app.cell
+def _(axial_result, mo):
+    from pyrite.apps.axial_channeling import (
+        axial_line_options,
+        axial_radiation,
+        axial_radiation_figures,
+    )
+
+    axial_radiation_data = axial_radiation(axial_result)
+    mo.stop(
+        axial_radiation_data is None,
+        mo.md(
+            "**Radiation:** no flat-level line catalog for this case (needs one string per "
+            "cell, as on [001], and at least two flat bound levels at this energy)."
+        ),
+    )
+    assert axial_radiation_data is not None
+    _options, _strongest = axial_line_options(axial_radiation_data)
+    axial_line_ui = mo.ui.dropdown(_options, value=_strongest, label="Radiation line")
+    axial_line_ui
+    return axial_line_ui, axial_radiation_data, axial_radiation_figures
+
+
+@app.cell
+def _(
+    axial_line_ui,
+    axial_radiation_data,
+    axial_radiation_figures,
+    axial_sample_ui,
+    mo,
+):
+    _spectrum, _far, _moments = axial_radiation_figures(
+        axial_radiation_data, axial_sample_ui.value, axial_line_ui.value
+    )
+    _items = [
+        mo.md(
+            "**Axial channeling radiation (string 0).** Bars are photons per incident "
+            "electron emitted before the selected depth, from the level densities of string "
+            "0's Wigner–Seitz cell, split by the line's J_z = ±1 content (the on-axis "
+            "helicity). Maps show the selected line's far field on a fixed lab circular "
+            "basis versus γθ: σ = ±1 picks a fixed circular polarizer, and a phase winding "
+            "of ℓ around the axis is orbital angular momentum ℓ = J_z − σ (a pure J_z = +1 "
+            "line gives a plain E₊ and an E₋ that winds twice). Phase is the leading "
+            "coherency mode's; purity below one means an incoherent mix. Contours give the "
+            "Doppler energy relative to forward. Dipole order; levels and lines follow "
+            "`cr-axial-helicity-emission`, fields `cr-dipole-far-field-amplitude`."
+        ),
+        _spectrum,
+    ]
+    if _far is None:
+        _items.append(mo.md("The selected line has no emission before this depth."))
+    else:
+        _items.extend(
+            [
+                mo.md(
+                    f"Within θ ≤ 1/γ: ⟨helicity⟩ {_moments['helicity']:+.3f}, "
+                    f"J_z {_moments['J_z']:+.3f}, S_z {_moments['S_z']:+.3f}, "
+                    f"L_z {_moments['L_z']:+.3f} ħ per photon; "
+                    f"{_moments['fraction']:.3f} of the line's photons fall in that cone."
+                ),
+                _far,
             ]
         )
     mo.vstack(_items)

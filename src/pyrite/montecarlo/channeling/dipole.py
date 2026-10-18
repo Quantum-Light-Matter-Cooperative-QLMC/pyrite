@@ -152,6 +152,55 @@ def dipole_stokes(theta_rad, phi_rad, gamma):
     return np.stack([(a1**2 - a2**2) / intensity, 2.0 * a1 * a2 / intensity], axis=-1)
 
 
+def dipole_far_field(theta_x_rad, theta_y_rad, gamma, dipole) -> np.ndarray:
+    """Return the lab far-field amplitude of a complex transverse dipole line [sr^-1/2].
+
+    The Liénard--Wiechert field of :func:`dipole_stokes` is linear in the
+    acceleration, so a dipole ``d = (d_x, d_y, 0)`` oscillating as
+    ``d e^{-i omega t}`` radiates ``E ∝ (n . d)(n - beta z) - (1 - beta cos theta) d``
+    toward ``n = (sin theta cos phi, sin theta sin phi, cos theta)`` with
+    ``tan phi = theta_y / theta_x`` and ``theta = hypot(theta_x, theta_y)``.
+    Returned are its components ``(E_+, E_-, E_z)`` on the fixed lab basis
+    ``e_+- = (x +- i y)/sqrt 2`` (``E_+- = e_+-^* . E``) and ``z``, scaled by
+    ``sqrt(3/8 pi) / (gamma (1 - beta cos theta)^2 |d|)`` so that
+    ``|E_+|^2 + |E_-|^2 + |E_z|^2`` is the photon density per sr per emitted
+    photon (unit sphere integral). ``E_+-`` are the circular components a
+    fixed polarizer selects; their phase winds as ``exp(i l phi)`` with
+    ``l = J_z - (+-1)`` for a ``J_z`` line (paraxially, orbital angular momentum).
+    The global phase is that of ``d``.
+
+    Assumptions: electric-dipole line, point source on the axis, far field.
+    Limits: ``d = x`` reproduces :func:`boosted_dipole_pattern` and the
+    linear polarization of :func:`dipole_stokes`; ``d = (x + i y)/sqrt 2``
+    (``J_z = +1``) gives on-axis ``E_-= 0`` and ``E_-`` winding twice.
+
+    Validation: cr-dipole-far-field-amplitude
+    """
+    d = np.asarray(dipole, dtype=complex)
+    if d.shape != (2,) or not np.linalg.norm(d) > 0.0:
+        raise ValueError("dipole needs two complex components, not both zero")
+    tx, ty = np.broadcast_arrays(
+        np.asarray(theta_x_rad, dtype=float), np.asarray(theta_y_rad, dtype=float)
+    )
+    theta = np.hypot(tx, ty)
+    phi = np.arctan2(ty, tx)
+    n = np.stack([np.sin(theta) * np.cos(phi), np.sin(theta) * np.sin(phi), np.cos(theta)])
+    beta = float(_beta(gamma))
+    denom = _denominator(gamma, theta)
+    axes = (3,) + (1,) * theta.ndim
+    z_hat = np.array([0.0, 0.0, 1.0]).reshape(axes)
+    d3 = np.array([d[0], d[1], 0.0]).reshape(axes)
+    field = (n[0] * d[0] + n[1] * d[1]) * (n - beta * z_hat) - denom * d3
+    field *= np.sqrt(3.0 / (8.0 * np.pi)) / (float(gamma) * denom**2 * np.linalg.norm(d))
+    return np.stack(
+        [
+            (field[0] - 1j * field[1]) / np.sqrt(2.0),
+            (field[0] + 1j * field[1]) / np.sqrt(2.0),
+            field[2],
+        ]
+    )
+
+
 # ---------------------------------------------------------------------------
 # Generic first-order transition operator
 # ---------------------------------------------------------------------------

@@ -181,3 +181,50 @@ def test_axial_form_waits_for_run():
     _, definitions = app.run(defs={"mode_ui": SimpleNamespace(value="Axial (experimental)")})
     assert definitions["axial_form"].value is None
     assert "axial_result" not in definitions
+
+
+def test_axial_radiation_reports_vortex_helicity_and_far_field():
+    import matplotlib.pyplot as plt
+
+    from pyrite.apps.axial_channeling import (
+        axial_demo_depths,
+        axial_line_options,
+        axial_radiation,
+        axial_radiation_figures,
+        solve_axial_demo,
+    )
+    from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
+
+    config = AxialDiagnosticConfig(shape=(32, 32), depths_ang=axial_demo_depths(500, 5))
+    vortex = axial_radiation(solve_axial_demo(config, "Vortex +1"))
+    options, strongest = axial_line_options(vortex)
+    assert options[strongest] == 0 and len(vortex.catalog.lines) == 1
+    photons = vortex.photons(len(vortex.depths_ang) - 1)
+    assert photons[0] > 0
+    spectrum, far, moments = axial_radiation_figures(vortex, len(vortex.depths_ang) - 1, 0)
+    assert moments["J_z"] == pytest.approx(1.0, abs=1e-3)
+    assert far is not None and "purity 1.000" in far.texts[0].get_text()
+    plt.close("all")
+    # A centred Gaussian enters 1s only: no line emission and no map.
+    gaussian = axial_radiation(solve_axial_demo(config, "Gaussian"))
+    assert axial_radiation_figures(gaussian, 1, 0)[1] is None
+    plt.close("all")
+    # [110] has four strings per projected cell: no on-column catalog.
+    assert axial_radiation(solve_axial_demo(replace_axis(config), "Gaussian")) is None
+
+
+def replace_axis(config):
+    from dataclasses import replace
+
+    return replace(config, axis=(1, 1, 0), shape=(16, 16), depths_ang=(0.0, 10.0))
+
+
+def test_planar_far_field_components_mirror_each_other():
+    from pyrite.apps.channeling import far_field_maps
+
+    axis, intensity, phase, purity = far_field_maps(10.0, np.diag([1.0, 0.0]), n=41)
+    assert purity == pytest.approx(1.0)
+    np.testing.assert_allclose(intensity[0], intensity[1], atol=1e-12)
+    lit = intensity[0] > 1e-6 * intensity.max()
+    np.testing.assert_allclose(np.exp(1j * phase[0][lit]), np.exp(-1j * phase[1][lit]), atol=1e-9)
+    assert axis[0] == -3.0 and axis[-1] == 3.0

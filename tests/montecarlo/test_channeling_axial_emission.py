@@ -171,3 +171,54 @@ def test_mcwf_line_helicity_tracks_the_surviving_2p_imbalance(tungsten):
         yields.append(catalog.yield_per_ang(line, rho))
     assert yields[2] < 0.5 * yields[0]  # TDS empties 2p within ~10 nm
     assert v / i > 0.5  # survivors keep their helicity
+
+
+def _winding(field) -> float:
+    return float(np.sum(np.diff(np.unwrap(np.angle(field)))) / (2 * np.pi))
+
+
+@pytest.mark.parametrize("gamma", [1.6, 10.8])
+def test_far_field_amplitude_normalizes_and_reduces_to_the_planar_dipole(gamma):
+    from pyrite.montecarlo.channeling.dipole import dipole_far_field
+
+    theta = np.linspace(0.0, np.pi, 3001)
+    phi = np.linspace(0.0, 2 * np.pi, 361)[:-1]
+    t, p = np.meshgrid(theta, phi, indexing="ij")
+    for d in ((1.0, 0.0), (1.0, 1j), (0.3, 0.7 - 0.2j)):
+        density = np.sum(np.abs(dipole_far_field(t * np.cos(p), t * np.sin(p), gamma, d)) ** 2, 0)
+        total = np.trapezoid(density.mean(axis=1) * np.sin(theta), theta) * 2 * np.pi
+        assert total == pytest.approx(1.0, abs=1e-4)
+    planar = dipole_far_field(t * np.cos(p), t * np.sin(p), gamma, (2.0, 0.0))
+    np.testing.assert_allclose(
+        np.sum(np.abs(planar) ** 2, 0), boosted_dipole_pattern(t, p, gamma), rtol=1e-9, atol=1e-12
+    )
+    # A real dipole's field is real up to the fixed basis: E_- = conj(E_+).
+    np.testing.assert_allclose(planar[1], planar[0].conj(), atol=1e-12)
+
+
+def test_far_field_of_a_jz_plus_line_winds_only_the_opposite_circular_component():
+    from pyrite.montecarlo.channeling.dipole import dipole_far_field
+
+    gamma = 10.8
+    on_axis = dipole_far_field(0.0, 0.0, gamma, (1.0, 1j))
+    assert abs(on_axis[1]) < 1e-15 and abs(on_axis[2]) < 1e-15
+    phi = np.linspace(0.0, 2 * np.pi, 2001)
+    for radius in (0.3, 1.0, 2.5):
+        e_plus, e_minus, _ = dipole_far_field(
+            radius / gamma * np.cos(phi), radius / gamma * np.sin(phi), gamma, (1.0, 1j)
+        )
+        assert _winding(e_plus) == pytest.approx(0.0, abs=1e-9)
+        assert _winding(e_minus) == pytest.approx(2.0, abs=1e-9)  # l = J_z - sigma
+        mirrored = dipole_far_field(
+            radius / gamma * np.cos(phi), radius / gamma * np.sin(phi), gamma, (1.0, -1j)
+        )
+        assert _winding(mirrored[0]) == pytest.approx(-2.0, abs=1e-9)
+    # Paraxially the fixed-basis components are the helicity patterns.
+    theta = np.array([1e-3, 0.3, 1.0]) / gamma
+    field = dipole_far_field(theta, 0.0 * theta, gamma, np.array([1.0, 1j]) / np.sqrt(2))
+    np.testing.assert_allclose(
+        np.abs(field[0]) ** 2, helicity_pattern(theta, gamma, 1, 1), rtol=2e-2
+    )
+    np.testing.assert_allclose(
+        np.abs(field[1][1:]) ** 2, helicity_pattern(theta[1:], gamma, 1, -1), rtol=2e-2
+    )

@@ -727,10 +727,13 @@ Notebook support for `src/pyrite/apps/validation_app.py`: the persisted suppleme
 ### `apps/channeling.py` and `apps/channeling_app.py`
 
 The channeling app also offers a bounded experimental axial mode through
-`apps/axial_channeling.py` (entry presets, cached solves, stored-array plotting).
+`apps/axial_channeling.py` (entry presets, cached solves, stored-array plotting,
+string-0 level densities and helicity-split line yields via `axial_radiation`).
 `montecarlo/channeling/axial_diagnostic.py` assembles existing coherent/MCWF
-solvers with typed configuration/results, incident-normalized density and optional
-string-centered OAM; no standard run integration.
+solvers with typed configuration/results, incident-normalized density, optional
+string-centered OAM and an optional caller observable; no standard run integration.
+`apps/channeling.py::far_field_maps` draws fixed-basis circular far-field
+intensity/phase of a planar or axial dipole line from `dipole.dipole_far_field`.
 
 The planar channeling demo exposes eigenfunctions, entry populations, fate and
 spectrum diagnostics, and sampled ensemble spatial density. The numerical

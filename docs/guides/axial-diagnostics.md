@@ -96,6 +96,33 @@ inside that disk **per incident electron**, without renormalizing omitted
 radial or angular-mode weight. This is a local disk diagnostic, not total
 cell OAM or a probability conditioned on survival.
 
+## Channeling radiation
+
+When the case has a flat-level line catalog (one string per projected cell,
+as on silicon or diamond [001], at energies with at least two flat bound
+levels), the app records each level's density on string 0's Wigner–Seitz
+cell at every stored depth (`LevelDensity` through the `observable` argument
+of `axial_diagnostic`). `axial_radiation` turns these into each line's
+polarization matrix `T_ab` and its depth integral. The app then draws:
+
+- photons per incident electron emitted before the selected depth, per line,
+  split by the line's `J_z = ±1` content (the on-axis helicity);
+- each line's emission rate versus depth, which falls as MCWF scattering
+  empties the emitting level (coherent evolution keeps it constant);
+- the selected line's far field versus `γθ`: intensity and phase of the
+  components `E_±` on a fixed lab circular basis (`dipole_far_field`). A phase
+  winding `ℓ` around the axis is orbital angular momentum `ℓ = J_z − σ`, so
+  a pure `J_z = +1` line leaves `E₊` flat and winds `E₋` twice. Contours show
+  the Doppler energy relative to forward.
+
+The planar mode draws the same maps for its real dipole along the plane
+normal, an equal coherent mix of `J_z = ±1` with no net OAM. These are
+dipole-order display diagnostics; the field claim is
+[`cr-dipole-far-field-amplitude`](../validation/ledger-channeling.md#cr-dipole-far-field-amplitude)
+and the levels and lines follow
+[`cr-axial-helicity-emission`](../validation/ledger-channeling.md#cr-axial-helicity-emission).
+On [110] (several strings per cell) no line catalog is built.
+
 ## Supported data and limits
 
 Catalog thermal data currently cover silicon and diamond. The app offers

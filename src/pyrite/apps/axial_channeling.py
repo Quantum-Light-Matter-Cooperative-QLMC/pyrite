@@ -1,14 +1,24 @@
 """Bounded, cached solves and plotting for the experimental axial demo."""
 
+from dataclasses import dataclass
 from functools import lru_cache
 
 import numpy as np
 
+from pyrite.materials.channeling.axial import axial_profile
 from pyrite.montecarlo.channeling.axial_diagnostic import (
     AxialDiagnosticConfig,
     AxialDiagnosticResult,
     axial_diagnostic,
 )
+from pyrite.montecarlo.channeling.axial_emission import (
+    AxialLineCatalog,
+    LevelDensity,
+    axial_line_catalog,
+    photon_angular_momentum,
+)
+from pyrite.montecarlo.channeling.dipole import dipole_rate_per_ang
+from pyrite.montecarlo.channeling.realspace import RealSpaceGrid
 from pyrite.montecarlo.channeling.states import MixedState, gaussian, laguerre_gauss, mixture
 
 #: Interactive budget in grid samples x split steps x trajectories (<= ~1 min on one core).
@@ -71,7 +81,90 @@ def solve_axial_demo(
             f"app limit: grid samples x steps x trajectories <= {APP_WORK_LIMIT:.1e}; "
             "use a coarser step, fewer electrons, or remote compute"
         )
-    return axial_diagnostic(config, entry=entry)
+    levels = _level_observable(config)
+    return axial_diagnostic(config, entry=entry, observable=levels)
+
+
+@lru_cache(maxsize=4)
+def _catalog(crystal, axis, kinetic_energy_eV, temperature_K) -> AxialLineCatalog | None:
+    profile = axial_profile(crystal, axis, temperature_K)
+    if len(profile.strings) != 1 or np.hypot(*profile.strings[0].position_ang) > 1e-9:
+        return None  # on-column orbitals need one string per cell, at the origin
+    catalog = axial_line_catalog(profile, kinetic_energy_eV)
+    return catalog if catalog.lines else None
+
+
+class _RolledLevelDensity:
+    """``LevelDensity`` about string 0 after rolling the origin to the grid middle.
+
+    The roll keeps the string's Wigner–Seitz cell contiguous on the periodic
+    grid; the carrier phase it shifts is global, so ``rho`` is unchanged.
+    """
+
+    def __init__(self, catalog: AxialLineCatalog, grid: RealSpaceGrid) -> None:
+        self.shift = (grid.shape[0] // 2, grid.shape[1] // 2)
+        center = tuple(
+            k * e / n for k, e, n in zip(self.shift, grid.extent_ang, grid.shape, strict=True)
+        )
+        self.levels = LevelDensity(catalog, grid, center)
+
+    def __call__(self, phi, tilt_inv_ang=(0.0, 0.0)):
+        return self.levels(np.roll(phi, self.shift, axis=(0, 1)), tilt_inv_ang)
+
+
+def _level_observable(config: AxialDiagnosticConfig) -> _RolledLevelDensity | None:
+    catalog = _catalog(config.crystal, config.axis, config.kinetic_energy_eV, config.temperature_K)
+    if catalog is None:
+        return None
+    period = catalog.profile.period_ang
+    grid = RealSpaceGrid((period[0] * config.cells[0], period[1] * config.cells[1]), config.shape)
+    return _RolledLevelDensity(catalog, grid)
+
+
+@dataclass(frozen=True)
+class AxialRadiation:
+    """Dipole lines of string 0 accumulated over the stored depths.
+
+    ``polarization[d, j]`` is line ``j``'s ``T_ab`` (``a, b = +, -``) at depth
+    ``d`` [Å²]; ``cumulative[d, j]`` integrates it over depth (trapezoid on the
+    recorded depths) [Å³], so ``photons(d)`` is the line yield per incident
+    electron emitted before depth ``d``.
+    """
+
+    catalog: AxialLineCatalog
+    depths_ang: np.ndarray
+    polarization: np.ndarray
+    cumulative: np.ndarray
+
+    def photons(self, sample: int) -> np.ndarray:
+        """Photons per incident electron per line emitted before ``depths_ang[sample]``."""
+        strength = np.trace(self.cumulative[sample], axis1=1, axis2=2).real
+        deltas = np.array([line.delta_eV for line in self.catalog.lines])
+        return dipole_rate_per_ang(deltas, np.sqrt(np.maximum(strength, 0)), self.catalog.gamma)
+
+    def coherency(self, sample: int, line: int) -> np.ndarray:
+        """Cartesian ``C_ab = sum d_a d_b^*`` of a line's accumulated emission [Å³]."""
+        u = np.array([[1.0, 1.0], [1j, -1j]]) / np.sqrt(2.0)
+        return u @ self.cumulative[sample, line] @ u.conj().T
+
+
+def axial_radiation(result: AxialDiagnosticResult) -> AxialRadiation | None:
+    """Return line emission from a demo solve, or ``None`` without a line catalog.
+
+    Validation: cr-axial-helicity-emission
+    """
+    observable = _level_observable(result.config)
+    if observable is None or result.observables is None:
+        return None
+    catalog = observable.levels.catalog
+    rho = [observable.levels.unpack(values) for values in result.observables]
+    polarization = np.array(
+        [[line.polarization(levels[line.initial]) for line in catalog.lines] for levels in rho]
+    )
+    steps = np.diff(result.depths_ang)[:, None, None, None]
+    increments = 0.5 * (polarization[1:] + polarization[:-1]) * steps
+    cumulative = np.concatenate([np.zeros_like(polarization[:1]), np.cumsum(increments, axis=0)])
+    return AxialRadiation(catalog, np.asarray(result.depths_ang), polarization, cumulative)
 
 
 def _centered(values: np.ndarray, grid):
@@ -130,3 +223,74 @@ def axial_demo_figure(result: AxialDiagnosticResult, sample: int, conditional: b
         ylim=(0, 1.05),
     )
     return fig
+
+
+def catalog_rate(catalog: AxialLineCatalog, line, polarization: np.ndarray) -> np.ndarray:
+    """Photons per Å per incident electron from ``T_ab`` stacked over depth."""
+    strength = np.trace(polarization, axis1=-2, axis2=-1).real
+    return dipole_rate_per_ang(line.delta_eV, np.sqrt(np.maximum(strength, 0)), catalog.gamma)
+
+
+def axial_radiation_figures(radiation: AxialRadiation, sample: int, line: int):
+    """Helicity-split line spectrum and the selected line's far-field maps."""
+    import matplotlib.pyplot as plt
+
+    from pyrite.apps.channeling import far_field_figure
+
+    catalog = radiation.catalog
+    photons = radiation.photons(sample)
+    energies_keV = np.array([catalog.photon_energy_eV(item) for item in catalog.lines]) / 1e3
+    trace = np.trace(radiation.cumulative[sample], axis1=1, axis2=2).real
+    plus = np.divide(
+        radiation.cumulative[sample, :, 0, 0].real, trace, out=np.zeros_like(trace), where=trace > 0
+    )
+    width = 0.01 * energies_keV.max()
+    spectrum, (ax, rate_ax) = plt.subplots(1, 2, figsize=(13, 3.6), constrained_layout=True)
+    ax.bar(energies_keV, photons * plus, width, label="J_z = +1 (on-axis helicity +)")
+    ax.bar(energies_keV, photons * (1 - plus), width, bottom=photons * plus, label="J_z = −1")
+    ax.bar(energies_keV[line], photons[line], width, fill=False, edgecolor="k", lw=1.2)
+    ax.set(
+        title=f"Line yield before {radiation.depths_ang[sample] / 1e4:.4g} µm (string 0)",
+        xlabel="Forward photon energy (keV)",
+        ylabel="Photons per incident electron",
+        xlim=(0, 1.1 * energies_keV.max()),
+    )
+    ax.legend(frameon=False, fontsize=8)
+    depths_um = radiation.depths_ang / 1e4
+    for j, item in enumerate(catalog.lines):
+        rate = 1e4 * catalog_rate(catalog, item, radiation.polarization[:, j])
+        rate_ax.plot(
+            depths_um, rate, lw=2 if j == line else 1, label=f"{item.initial}→{item.final}"
+        )
+    rate_ax.axvline(depths_um[sample], ls="--", color="0.5")
+    rate_ax.set(
+        title="Line emission rate vs depth",
+        xlabel="Depth (µm)",
+        ylabel="Photons per µm per incident electron",
+        ylim=(0, None),
+    )
+    rate_ax.legend(frameon=False, fontsize=7, ncol=2)
+    chosen = catalog.lines[line]
+    title = (
+        f"Line {chosen.initial}→{chosen.final}, {catalog.photon_energy_eV(chosen) / 1e3:.3g} keV "
+        "forward"
+    )
+    if photons[line] > 1e-12:
+        far = far_field_figure(catalog.gamma, radiation.coherency(sample, line), title)
+        moments = photon_angular_momentum(
+            radiation.cumulative[sample, line], catalog.gamma, 1.0 / catalog.gamma
+        )
+    else:
+        far, moments = None, None
+    return spectrum, far, moments
+
+
+def axial_line_options(radiation: AxialRadiation) -> tuple[dict[str, int], str]:
+    """Dropdown labels for every line and the label of the brightest at the last depth."""
+    catalog = radiation.catalog
+    labels = [
+        f"{item.initial}→{item.final} · {catalog.photon_energy_eV(item) / 1e3:.3g} keV"
+        for item in catalog.lines
+    ]
+    strongest = int(np.argmax(radiation.photons(len(radiation.depths_ang) - 1)))
+    return dict(zip(labels, range(len(labels)), strict=True)), labels[strongest]

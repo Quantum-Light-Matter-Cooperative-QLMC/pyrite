@@ -168,3 +168,25 @@ def test_diamond110_and_empty_sample(config, monkeypatch):
     monkeypatch.setattr(RealSpaceGrid, "sample", lambda self, state: np.zeros(self.shape))
     with pytest.raises(ValueError, match="sampled norm"):
         axial_diagnostic(config)
+
+
+@pytest.mark.parametrize("mode", ["coherent", "mcwf"])
+def test_caller_observable_is_weighted_like_the_density(mode):
+    config = AxialDiagnosticConfig(
+        shape=(16, 16), depths_ang=(0.0, 50.0), mode=mode, n_electrons=4, mechanisms=("tds",)
+    )
+    entry = mixture(
+        [(0.25, laguerre_gauss(1, waist_ang=0.5)), (0.75, laguerre_gauss(-1, waist_ang=0.5))]
+    )
+
+    def observable(phi, tilt):
+        return np.abs(phi).ravel() ** 2 + 0j  # complex, as LevelDensity returns
+
+    result = axial_diagnostic(replace(config, oam_string=0), entry=entry, observable=observable)
+    np.testing.assert_allclose(
+        result.observables.reshape(result.density_per_ang2.shape), result.density_per_ang2
+    )
+    assert np.isrealobj(result.density_per_ang2) and np.isrealobj(result.oam_populations)
+    plain = axial_diagnostic(replace(config, oam_string=0), entry=entry)
+    assert plain.observables is None
+    np.testing.assert_allclose(result.oam_populations, plain.oam_populations)
