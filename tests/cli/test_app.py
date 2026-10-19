@@ -217,7 +217,7 @@ def test_app_launch_without_apps_extra_names_the_install_hint(monkeypatch):
     assert launched == []
 
 
-@pytest.mark.parametrize("name", ["channeling", "transition-radiation"])
+@pytest.mark.parametrize("name", ["channeling", "transition-radiation", "angular-heatmap"])
 def test_channeling_launch_and_export_have_no_material_argument(monkeypatch, tmp_path, name):
     calls = []
     monkeypatch.setattr(views.subprocess, "run", lambda *a, **k: calls.append((a, k)))
@@ -227,7 +227,11 @@ def test_channeling_launch_and_export_have_no_material_argument(monkeypatch, tmp
     )
     assert launched.exit_code == 0, launched.output
     argv = calls[0][0][0]
-    app = views.CHANNELING if name == "channeling" else views.TRANSITION_RADIATION
+    app = {
+        "channeling": views.CHANNELING,
+        "transition-radiation": views.TRANSITION_RADIATION,
+        "angular-heatmap": views.ANGULAR_HEATMAP,
+    }[name]
     assert argv[3:] == [
         "edit",
         "--watch",
@@ -257,7 +261,7 @@ def test_channeling_launch_and_export_have_no_material_argument(monkeypatch, tmp
     assert runner.invoke(cli.command, ["app", name, "launch", "silicon"]).exit_code == 2
 
 
-@pytest.mark.parametrize("name", ["channeling", "transition-radiation"])
+@pytest.mark.parametrize("name", ["channeling", "transition-radiation", "angular-heatmap"])
 def test_channeling_missing_extra_and_failed_subprocess(monkeypatch, name):
     import subprocess
 

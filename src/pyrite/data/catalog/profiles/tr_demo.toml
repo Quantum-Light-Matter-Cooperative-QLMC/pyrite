@@ -16,4 +16,3 @@ bremsstrahlung_model = "eedl"
 emission = "incoherent"
 transition_radiation = "history"
 E_grid_line = {arange = {start = 200.0, stop = 1010.0, step = 10.0}}
-E_grid_brem = {arange = {start = 200.0, stop = 30000.0, step = 100.0}}

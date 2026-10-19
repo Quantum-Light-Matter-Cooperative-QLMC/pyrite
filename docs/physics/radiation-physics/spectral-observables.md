@@ -68,3 +68,26 @@ Everything on these pages is **source** physics: what the sample emits toward a 
 ## Validation
 
 The normalization, summation order, and per-electron convention are covered by the `coherent-line-spectrum` row; the component split's non-additivity is recorded there too. The estimators are `radiation-error-estimators`. The analytic single-segment reference `closed-form-flux` is `anchored`, but its corrected escape-length term still needs independent re-verification. This does not establish agreement with every literature comparison. Consult the [validation ledger](../../validation/physics-validation-ledger.md) before scientific use.
+
+## Detector-free directional rates
+
+For an incoherent escaped source density $Y(E,\theta)$ per incident electron,
+
+$$
+R(E,\theta) = Y(E,\theta)\,\frac{I_{\rm nA}\,10^{-9}}{|e|}
+\quad[\mathrm{ph\,s^{-1}\,eV^{-1}\,sr^{-1}}].
+$$
+
+Here $I_{\rm nA}$ is the nonnegative mean electron-current magnitude in nA,
+$|e|=1.602176634\times10^{-19}$ C exactly, and independent incident electrons
+are assumed. No solid-angle, angular-sample spacing or energy spacing factor
+belongs in this differential rate. Supported source bins vanish at zero current.
+The pulse convention is $I_{\rm nA}=Q_{\rm pC} f_{\rm Hz}/1000$.
+Source: [BIPM SI ampere](https://www.bipm.org/en/si-base-units/ampere).
+Validation: `directional-source-rate-normalization`.
+
+`DirectionalSpectrum.rate` applies this conversion to the incoherent PXR/CBS
+total, retaining intra-electron PXR–CBS interference. It is not a detector
+counting observable or a prescription for cross-electron coherent intensity.
+See [directional heatmaps](../../guides/directional-source-heatmap.md) for
+coordinates, unsupported grazing directions and explicit grid requirements.

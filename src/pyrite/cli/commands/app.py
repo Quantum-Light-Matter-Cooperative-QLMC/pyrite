@@ -13,6 +13,7 @@ _LEAVES = {
     "pixels": "pyrite.cli.commands.app.pixels_command",
     "compare": "pyrite.cli.commands.app.compare_command",
     "channeling": "pyrite.cli.commands.app.channeling_command",
+    "angular-heatmap": "pyrite.cli.commands.app.angular_heatmap_command",
     "transition-radiation": "pyrite.cli.commands.app.transition_radiation_command",
     "viewer": "pyrite.cli.commands.app.viewer_command",
     "validation": "pyrite.cli.commands.app.validation_command",
@@ -22,6 +23,7 @@ _HELP = {
     "pixels": "Launch or export the pixel-detector observation app.",
     "compare": "Launch or export the case and cross-material comparison app.",
     "channeling": "Launch or export the planar quantum channeling demo.",
+    "angular-heatmap": "Launch or export the detector-free directional source heatmap.",
     "transition-radiation": "Launch or export the TR/CTR demo.",
     "viewer": "Launch or export the 3D trajectory viewer.",
     "validation": "Launch or export cached validation figures.",
@@ -192,3 +194,11 @@ def validation_export_command(
 
 validation_command.add_command(validation_launch_command)
 validation_command.add_command(validation_export_command)
+
+
+def angular_heatmap_command() -> click.Group:
+    return _launch_leaf(
+        "angular-heatmap",
+        "pyrite.cli.commands.app_views.angular_heatmap_command",
+        "pyrite.cli.commands.app_views.angular_heatmap_export_command",
+    )

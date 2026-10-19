@@ -94,7 +94,8 @@ class Scene:
     target
         Scalar :class:`~pyrite.Target`, :class:`~pyrite.Slab` or :class:`~pyrite.Stack`.
     detector
-        Scalar observation model or physical planar detector.
+        Scalar observation model or physical planar detector. ``None`` requests
+        detector-free source lowering (use ``directional_source`` to score it).
     filters
         Ordered :class:`~pyrite.Filter` or :class:`~pyrite.FilterPlate` instances
         between the source and a planar detector.
@@ -114,7 +115,7 @@ class Scene:
 
     beam: Beam
     target: LegacyTarget | Target
-    detector: Detector | PlanarDetector = field(default_factory=Detector)
+    detector: Detector | PlanarDetector | None = field(default_factory=Detector)
     filters: tuple[FilterPlate | Filter, ...] = ()
     acquisition: Acquisition | NativeAcquisition | None = None
     physics: Physics = field(default_factory=Physics, kw_only=True)
@@ -131,7 +132,7 @@ class Scene:
             object.__setattr__(self, "beam", Beam.from_spec(self.beam))
         if not isinstance(self.beam, Beam):
             raise TypeError("Scene.beam must be a Beam")
-        if not isinstance(self.detector, (Detector, PlanarDetector)):
+        if not isinstance(self.detector, (Detector, PlanarDetector, type(None))):
             raise TypeError("Scene.detector must be a Detector or PlanarDetector")
         try:
             filters = tuple(self.filters)

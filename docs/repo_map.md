@@ -727,6 +727,16 @@ Notebook support for `src/pyrite/apps/validation_app.py`: the persisted suppleme
 - Public: `load_default_azimuth`, `save_default_azimuth`, `probe_remote_zhai`, `start_remote_zhai`, `remote_zhai_status`, `pull_remote_zhai`.
 - Deps: `remote.config` (`remote_host`).
 
+### Detector-free directional source
+
+`directional.py::directional_source` lowers beam/target through a source-only
+`SourceDirection` context, then `montecarlo/runner/directional_source.py` reuses
+one transport for CXR-only directional scoring. `results/directional.py` owns
+the typed component and mean-current scaling. The thin standalone
+`apps/angular_heatmap_app.py` uses bounded cache/plot helpers in
+`apps/angular_heatmap.py`; `pyrite app angular-heatmap launch|export` uses
+the shared launcher on tunnel port 2724. No detector or checkpoint required.
+
 ### `apps/transition_radiation.py` and `apps/transition_radiation_app.py`
 
 The standalone TR/CTR demo lives in `apps/transition_radiation_app.py`, with

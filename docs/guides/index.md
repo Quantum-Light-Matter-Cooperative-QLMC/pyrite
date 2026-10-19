@@ -14,6 +14,7 @@ configuration-cookbook
 working-with-results
 planar-channeling
 transition-radiation-demo
+directional-source-heatmap
 axial-diagnostics
 analysis-tutorial
 running-on-a-cluster

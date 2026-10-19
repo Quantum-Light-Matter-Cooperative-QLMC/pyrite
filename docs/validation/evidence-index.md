@@ -151,6 +151,7 @@ radiation-physics/coherent-physical-bunch-population
 radiation-physics/coherent-line-spectrum
 radiation-physics/coherent-segment-midpoint-time
 radiation-physics/temporal-intensity-profile
+radiation-physics/directional-source-rate-normalization
 radiation-physics/tr-coherent-bunch
 radiation-physics/tr-crossing-superposition
 radiation-physics/tr-detected-omission-bound
