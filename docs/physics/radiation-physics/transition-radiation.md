@@ -186,7 +186,11 @@ TR here is the $\mathbf g=0$ term of the polarization current: $\varepsilon$ of 
 
 **Decision.** For reflections with $g_\parallel\sigma_\perp\gg1$, TR and the coherent lines are **additive** in the ensemble: TR is a separate component and no TR–line cross term is kept. The ensemble average of that cross term is reduced by $\tilde\rho(\mathbf g_\parallel)$ itself; it is not a term dropped for its size. The condition is $g_\parallel\sigma_\perp\gg1$, not $\mathbf g_\parallel\neq0$: a small miscut or a mosaic node tilted by a small angle from a surface-normal $\mathbf g$ can leave $g_\parallel\sigma_\perp\lesssim1$.
 
-**Not covered.** These cases keep a TR–line cross term and are not implemented:
+**Not covered by the homogeneous `history`/`bunch` component.** These cases
+keep a TR–line cross term. The experimental opt-in
+[`two-beam` transported-current path](diffracted-transition-radiation.md#opt-in-transported-current-production-scoring)
+retains it for one perfect-crystal reflection, with independent validation
+pending:
 
 - $\mathbf g$ along the surface normal ($\mathbf g_\parallel=0$: planes parallel to the surface, symmetric Bragg geometry). This includes the default orientation of the layered catalog crystals: the (00l) rows of HOPG and hBN with [001] along the normal, and the central node of a mosaic average. Symmetric Laue geometry, with $\mathbf g$ in the surface plane, is the most strongly suppressed case, not an exception. At $\mathbf g_\parallel=0$ the translation phase is trivial. The cross term then depends on the surface termination (the lattice origin relative to the face), which PyRITE does not model, and on the absolute phase of $A_{\rm PXR}+A_{\rm CBS}$ relative to the Maxwell solve here, which has not been reconciled.
 - A point spot (`PointSpot()`): every history enters at the same lattice point, so $\tilde\rho=1$. This is the degenerate pure-geometry limit, not a physical beam.

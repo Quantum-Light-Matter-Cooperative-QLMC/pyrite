@@ -604,6 +604,21 @@ def _cxr_for_segments(
     chunk-halving retry. A case that fits runs as one unchanged call; coherent
     sums, which may couple electrons, are never split.
     """
+    if (case.get("transition_radiation") or {}).get("model") == "two-beam":
+        from .dtr_emission import case_dtr_spectrum
+
+        if coefficient_capture is not None or temporal is not None:
+            raise ValueError(
+                "two-beam scoring does not support coefficient capture or temporal output"
+            )
+        return case_dtr_spectrum(
+            case,
+            segs,
+            E_grid,
+            n_hat,
+            coherent=bool(case.get("coherent_emission", False)) if coherent is None else coherent,
+            count=Ne,
+        )
     once = partial(
         _cxr_for_segments_once,
         E_grid=E_grid,

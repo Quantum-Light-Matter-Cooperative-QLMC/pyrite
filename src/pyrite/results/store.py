@@ -172,7 +172,8 @@ class Settings:
     channeling_bloch_cells: int = 16
     channeling_dz_ang: float = 250.0
     channeling_zone_max_ang: float | None = None
-    transition_radiation: Literal["off", "history", "bunch"] = "off"
+    transition_radiation: Literal["off", "history", "bunch", "two-beam"] = "off"
+    transition_lattice_origin_ang: tuple[float, float, float] | None = None
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_cxr_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so
@@ -227,10 +228,11 @@ class Settings:
             )
             self.channeling_plane = physics.channeling_plane
             validate_channeling_physics(physics, self.energy_model)
-        if self.transition_radiation != "off":
+        if self.transition_radiation != "off" or self.transition_lattice_origin_ang is not None:
             validate_transition_physics(
                 Physics(
                     transition_radiation=self.transition_radiation,
+                    transition_lattice_origin_ang=self.transition_lattice_origin_ang,
                     channeling_model=self.channeling_model,
                     channeling_plane=self.channeling_plane,
                 ),

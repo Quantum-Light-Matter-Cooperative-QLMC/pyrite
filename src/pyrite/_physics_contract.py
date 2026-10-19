@@ -240,6 +240,18 @@ BUILTIN_DESCRIPTORS = DescriptorCatalog(
             output_slots=("spec_transition",),
         ),
         ModelDescriptor(
+            "emission.transition",
+            "two-beam",
+            "montecarlo.runner.dtr_emission",
+            (
+                "experimental transported-current Maxwell/CBS solve",
+                "one perfect crystal layer and one reflection",
+                "unverified; CPU scoring; no recoil",
+            ),
+            implementations=("cpu",),
+            output_slots=("spec", "spec_coherent", "spec_transition"),
+        ),
+        ModelDescriptor(
             "emission.characteristic",
             "characteristic",
             "montecarlo.runner.emission",

@@ -7,8 +7,9 @@ from production PXR/CBS. It diffracts the homogeneous stack's free TR field
 once, through one crystal harmonic. `pxr_straight_amplitude` diffracts the
 charge's own field through the same harmonic on a straight passage. Their
 vectors share a Maxwell normalization and reference plane and can be summed
-before squaring. This is the first slice of #581. There is no production DTR
-selector or reconciled production CBS field yet. A separate experimental
+before squaring. This is the first slice of #581. An experimental
+[opt-in transported-current production path](#opt-in-transported-current-production-scoring)
+now combines a two-beam solve with a CBS current. A separate experimental
 [two-beam straight-passage diagnostic](#two-beam-straight-passage-diagnostic)
 is described below.
 
@@ -178,8 +179,10 @@ The PXR diagnostic assumes a globally straight passage; DTR retains the
 existing locally straight crossing assumption. There is no CBS, mosaic
 average, cross-reflection coherence, channeling, grooves, detector-acceptance
 integration or CUDA validation. Production still needs the phase/sign/basis
-reconciliation against the Feranchuk line, layered coherent escape,
-catalog/campaign integration and the two-beam limits/published reproduction.
+reconciliation independently checked, broader catalog/campaign support and
+the two-beam limits/published reproduction. The transported-current path below
+implements an experimental Maxwell/CBS reconciliation and layered escape;
+the reference diagnostic above remains first Born without CBS.
 Independent validation is pending by user choice. The claims
 `dtr-two-beam-boundary` and `line-tr-phase-reconciliation` remain open in #581.
 
@@ -291,9 +294,9 @@ the transition field and third-order correction to the line field. Separate
 checks cover the two source rows' translation phases, invariance under choosing
 another point on the same straight trajectory, transversality, and agreement
 of spectral/angular array evaluation with individual solves. These are
-diagnostic checks only. Production Feranchuk/CBS
-phase reconciliation, transported per-history integration, mosaicity,
-normal catalog/campaign support, recoil/energy-loss justification, and a
+diagnostic checks only. Independent verification of the transported-current
+Maxwell/CBS reconciliation below, mosaicity, broader catalog/campaign support,
+recoil/energy-loss justification, and a
 published dynamical anchor remain open in #103/#581. This new diagnostic has
 not been run on CUDA; the hardware evidence below concerns the existing
 homogeneous TR/CTR implementation.
@@ -337,3 +340,170 @@ agreement, or an energy-loss bound. The weak reference and an intentionally
 thick variant have regression checks for finite output and their differing
 departure from Born. Thickness changes can introduce finer fringes and require
 a fresh spectral-grid convergence check.
+
+## Opt-in transported-current production scoring
+
+`Validation: dtr-transported-current`
+
+`Physics(transition_radiation="two-beam")` replaces the production PXR/CBS
+line scorer with the experimental CPU transported-current solve. The default
+remains `"off"`: no two-beam field is computed and existing default cache
+identities are preserved. `"history"` and `"bunch"` retain their earlier
+homogeneous-stack TR behavior. The new claims remain **unverified**;
+passing the consistency checks below does not establish independent physics
+validation or the published DTR/PXR anchor.
+
+The first production scope is one reflection in one perfect crystal layer,
+with homogeneous outer layers, planar faces, equal line/continuum trial counts
+and an explicit node-sampled energy grid. Multiple crystal layers/reflections,
+mosaicity, automatic/bin-mean line grids, secondary cascades, adaptive precision,
+temporal output and electron-block transport are refused. A track leaving a
+side face is refused during scoring. CUDA transport can supply rows, but this
+new scorer is CPU-only; earlier homogeneous TR/CTR hardware parity does not
+validate it. The supplied grid must resolve the requested spectrum.
+
+```python
+import numpy as np
+import pyrite as pr
+
+physics = pr.Physics(
+    transition_radiation="two-beam",
+    transition_lattice_origin_ang=(0.0, 0.0, 0.0),  # Å, entrance-frame lattice origin
+    radiative_model="uncoupled",
+    bremsstrahlung_model="eedl",
+)
+numerics = pr.Numerics(
+    cxr_trials=3,
+    brem_trials=3,
+    cxr_reflections=pr.CxrReflections(max_reflections=1),
+    energy_bins=pr.EnergyBins(
+        cxr=np.linspace(500.0, 1500.0, 9),
+        brem=np.array([500.0, 5000.0]),
+    ),
+)
+result = pr.simulate(
+    pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+    pr.Slab("hopg", thickness_ang=100.0, tilt_deg=30.0, footprint=None),
+    pr.Detector(),
+    physics=physics,
+    numerics=numerics,
+)
+```
+
+This is a small execution smoke, not a converged spectral prediction.
+The origin defaults to zero only in the opt-in model; changing it changes the
+case/content/dataset identities. The model marker is
+`two-beam-transported-current-v1`. Live scoring, observation directions,
+line recomputation and trajectory replay share the same scorer. History-mode
+streaming adds whole-electron blocks with the original incident normalization;
+coherent replay needs all histories at once.
+
+### Finite transported charge current
+
+For a row starting at $(\mathbf r_j,t_j)$ with velocity $\mathbf v_j$ and
+duration $T_j$, Fourier-transform the point current
+$\mathbf J=q\mathbf v_j\delta(\mathbf r-\mathbf r_j(t))$ and integrate the
+outgoing modal Green function in time:
+
+$$
+\int_0^{T_j} dt\,\exp\{i[\omega(t_j+t)
+-\boldsymbol\kappa_h\cdot(\mathbf r_{\perp j}+\mathbf v_{\perp j}t)
+-h g_z(z_j+v_{zj}t)+\lambda_a(z_f-z_j-v_{zj}t)]\}.
+$$
+
+Here $h=0,1$ is the gauged source harmonic and $z_f$ the face toward which
+mode $a$ decays or propagates. All lengths/clocks in this integral are inverse
+eV. `dtr_history` divides the transported Å values by $\hbar c$; velocities
+remain in units of $c$. Evaluating the difference of bounded endpoint
+exponentials, with an `expm1`/equal-exponent limit, avoids growing propagators
+and supports horizontal rows without dividing by $v_z$. Each physical exterior
+continuation supplies its vacuum own field at the corresponding outer face.
+Internal transport subdivisions never create a boundary source. Histories
+are grouped before squaring; a numerical substep is not a new emitter.
+
+### CBS phase in the same Maxwell basis
+
+`Validation: line-tr-phase-reconciliation`
+
+This is an author derivation from the variation of a point-charge current and
+the relativistic lattice force, using the potential convention of Feranchuk
+Eq. (14), as implemented in `materials.crystal.U_g`. For electron potential
+energy $-U_{\mathbf g}e^{-i\mathbf g\cdot(\mathbf r-\mathbf r_0)}$, the
+locally straight first-order displacement is
+
+$$
+\delta\mathbf v=\frac{U_{\mathbf g}/m}{\gamma\,\mathbf v\cdot\mathbf g}
+[\mathbf g-\mathbf v(\mathbf v\cdot\mathbf g)],\qquad
+\delta\mathbf r=\frac{i\delta\mathbf v}{\mathbf v\cdot\mathbf g}.
+$$
+
+The row's oscillating factor $e^{-i\mathbf g\cdot(\mathbf r-\mathbf r_0)}$
+multiplies both. Varying $q\mathbf v\delta(\mathbf r-\mathbf r(t))$ gives
+$\delta\mathbf J=\partial_t\mathbf P+\nabla\times\mathbf M$, where
+$\mathbf P=q\delta\mathbf r\delta(\mathbf r-\mathbf r(t))$ and
+$\mathbf M=\mathbf P\times\mathbf v$. Use
+$\mathbf D=\mathcal E\mathbf E+4\pi\mathbf P$ and
+$\mathbf B=\mathbf H+4\pi\mathbf M$ in the same Maxwell system above.
+In addition to the charge-current drive, its tangential source is
+
+$$
+4\pi\begin{pmatrix}
+-iK_x\mathcal E^{-1}P_z+i\omega M_y\\
+-iK_y\mathcal E^{-1}P_z-i\omega M_x\\
+-iK_xM_z-i\omega P_y\\
+-iK_yM_z+i\omega P_x
+\end{pmatrix}.
+$$
+
+The longitudinal polarization contact term is retained. The reverse harmonic
+uses $-\mathbf g$ and its own potential and susceptibility, with the opposite
+termination phase. The lattice-force perturbation is local to each straight
+transport piece; weak deflection by the periodic potential is assumed.
+$\mathbf v\cdot\mathbf g=0$ is refused rather than treated as channeling.
+
+In vacuum at $\omega(1-\hat{\mathbf n}\cdot\mathbf v)=\mathbf v\cdot\mathbf g$,
+the effective transverse CBS current is $-q\mathbf A_{\rm CBS}$, while the
+first-Born polarization current is $-q\mathbf A_{\rm PXR}$. Both therefore
+produce the same outgoing-field conversion,
+
+$$
+\mathbf E_{\rm out}=\frac{2\pi q}{n_z}
+(\mathbf A_{\rm PXR}+\mathbf A_{\rm CBS})
+\int dt\,e^{i[\omega t-(\mathbf k+\mathbf g)\cdot\mathbf r+\mathbf g\cdot\mathbf r_0
++k_z z_{\rm face}]}.
+$$
+
+This fixes the common phase and their relative sign without fitting an
+intensity. Away from that vacuum/on-resonance limit, the finite-current
+Maxwell solve supplies dispersion, absorption, diffraction and polarization;
+the old approximate line kernel is not added again. Tests compare the complex
+vector against the relativistic Feranchuk sum in its weak-coupling limit.
+
+### Signed production component accounting
+
+Let $C$ be the coupled finite-current field (charge and CBS), $B$ the uncoupled
+charge field of the same rows, and $T$ the existing physical-crossing TR field.
+The scored joint field is $S=T+C-B$. Subtracting $B$ removes the ordinary
+finite-current acceleration radiation before combining with the separately
+scored continuum and the existing TR baseline. This is the transported-current
+diffraction correction to that baseline; ordinary TR still has its earlier
+locally straight crossing assumption. Diffraction of the transported
+acceleration field remains in $C-B$.
+
+With $a=E n_z^2/(16\pi^4)$, store `spec_transition` as
+$a\langle|T|^2\rangle$ and `spec` as
+$a[\langle|S|^2\rangle-\langle|T|^2\rangle]$. Thus the line slot can be
+negative: it contains signed interference and extinction, not an independent
+positive photon source. Adding the two components gives the joint density.
+`include_transition=False` removes the baseline only, not all boundary terms;
+a physical disabled comparison requires rerunning with the Physics option off.
+Checkpoint round trips preserve the signed arrays and selected model.
+
+The coherent companion applies the existing distinct-pair population estimator
+to the joint per-history Cartesian fields, including their sampled space/time
+offsets. It subtracts the same history-TR baseline, so adding the one stored
+`spec_transition` component gives the coherent joint density. An analytic
+offset factor is not applied again. Undersampled negative pair estimates warn
+and remain unclipped. Neither this path nor its consistency tests provide a
+TR energy-loss/recoil bound, a published dynamical extinction anchor, or
+independent sign-off. Those requirements remain open in #103/#581.

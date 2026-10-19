@@ -890,7 +890,14 @@ receives numeric initial-state arrays through its existing backend boundary.
 `montecarlo/spectrum/dtr_two_beam.py` adds an experimental CPU two-harmonic
 Maxwell straight-passage diagnostic, with passive mode classification and
 bounded face-referenced propagators. Its `dtr-two-beam-boundary` claim is
-unverified; it has no production selector or CBS phase reconciliation.
+unverified. `spectrum/dtr_history.py` extends the boundary solve to finite
+transport currents and moving lattice-force dipoles. `runner/dtr_emission.py`
+owns the opt-in `Physics(transition_radiation="two-beam")` scorer, used by the
+shared live/directions/replay/reline line seam. It returns the signed joint-field
+correction to the separate crossing-TR component. Model/termination join identity
+only when selected. The transported-current and CBS-phase claims remain
+unverified; this CPU path supports one perfect crystal layer/reflection,
+explicit node grids and equal line/continuum populations.
 
 `montecarlo/spectrum/dtr.py` owns first-Born per-crossing diffraction of a
 homogeneous stack's free TR waves and own-field diffraction on a straight

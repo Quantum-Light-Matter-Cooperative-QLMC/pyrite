@@ -10,7 +10,27 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Status:** unverified
 - **Checks:** Zero coupling recovers the homogeneous TR vector in both passage senses; weak coupling recovers the existing first-Born PXR+DTR complex vector; finite one-way coupling matches Born through capped/uncapped stacks with oblique reciprocal vectors in both passage senses; reverse coupling adds the leading second-order transition and third-order line corrections; translation phases, straight-trajectory reference invariance, transversality and spectral/angular broadcasting hold; surface termination rotates only the diffracted source row; a passive opaque slab stays finite; active truncated permittivity refuses
 - **Anchor:** `tests/montecarlo/test_transition_radiation_two_beam.py` (internal solver consistency and limits only; no published or independent anchor). `validation.dtr_reference --two-beam` exports the alternating-stack Born/two-beam comparison, source-row densities and signed interference; `tests/montecarlo/test_transition_radiation_dtr_reference.py` checks accounting, distinct provenance and weak/thick reference behavior. This comparison does not add an independent anchor.
-- **Notes:** Issues #103/#581. Experimental CPU straight-passage diagnostic only. No production integration, Feranchuk/CBS phase reconciliation, mosaic average, transported tracks, recoil, device parity, independently verified extinction law or published reproduction. The longitudinal external-current contact term is retained when eliminating Ez. Fresh-context rederivation and the published anchor remain pending; this does not complete #581's acceptance claim.
+- **Notes:** Issues #103/#581. This claim covers the experimental CPU straight-passage boundary diagnostic. The opt-in transported-current production extension and CBS source have separate claims below. No mosaic average, recoil, device parity, independently verified extinction law or published reproduction. The longitudinal external-current contact term is retained when eliminating Ez. Fresh-context rederivation and the published anchor remain pending; this does not complete #581's acceptance claim.
+
+## `dtr-transported-current`
+
+- **Claim:** Time-integrated modal Green functions propagate piecewise transported point currents through one two-harmonic crystal layer, including exterior own-field continuations. The coupled-minus-uncoupled current field is added to the existing crossing-TR baseline; grouping histories before squaring retains the signed boundary/line interference without adding ordinary finite-current acceleration radiation twice.
+- **Code:** `montecarlo/spectrum/dtr_history.py`; `montecarlo/runner/dtr_emission.py`
+- **Source:** Author derivation from the same Maxwell boundary system as `dtr-two-beam-boundary`; [transported-current equations and accounting](../physics/radiation-physics/diffracted-transition-radiation.md#opt-in-transported-current-production-scoring).
+- **Status:** unverified
+- **Checks:** Straight currents reproduce the existing two-beam field in either passage sense; scattered histories with a horizontal flight are invariant under equal-velocity substeps; zero harmonics leave only the separate crossing-TR component; live/API/checkpoint/full and streamed replay/reline share the scorer; off avoids it; model/termination change provenance and identity; the coherent companion uses the joint distinct-pair estimator.
+- **Anchor:** `tests/montecarlo/test_dtr_history.py`, `tests/montecarlo/test_dtr_production.py` (implementation consistency only)
+- **Notes:** Opt-in CPU scoring, one perfect crystal layer/reflection, equal populations and explicit node grid. No new CUDA claim, recoil bound or published reproduction. Ordinary TR retains its locally straight crossing model. Secondary cascades, mosaics, multiple crystal layers/reflections and automatic/bin-mean grids refuse. Fresh-context independent validation remains pending; no signed-off or rederived claim is made.
+
+## `line-tr-phase-reconciliation`
+
+- **Claim:** Varying the transported point-charge current by the relativistic periodic-potential displacement gives moving polarization P and magnetization M=P cross v. Their Maxwell source, including longitudinal P, yields the same vacuum/on-resonance outgoing-field conversion for the Feranchuk PXR and CBS amplitudes, fixing their relative sign and common phase before a joint boundary solve.
+- **Code:** `montecarlo/spectrum/dtr_history.py::{_drive, _cbs_dipole, _segment_rhs}`; `montecarlo/runner/dtr_emission.py::_row_parameters`
+- **Source:** Author current-variation derivation and the relativistic Feranchuk Eq. (14) convention already owned by `cbs-amplitude`; [CBS phase derivation](../physics/radiation-physics/diffracted-transition-radiation.md#cbs-phase-in-the-same-maxwell-basis).
+- **Status:** unverified
+- **Checks:** Complex CBS vacuum field matches the relativistic Eq. (14) amplitude and absolute finite-passage phase; weak-coupling joint PXR/CBS field matches their sum with one common conversion; no intensity-fitted phase. Production replaces the legacy line scorer when selected.
+- **Anchor:** `tests/montecarlo/test_dtr_history.py::{test_cbs_vacuum_resonance_has_feranchuk_amplitude_and_absolute_phase,test_pxr_and_cbs_have_the_same_feranchuk_to_maxwell_phase}`
+- **Notes:** The potential perturbation is locally straight and first order; v.g=0 refuses. This verifies an implementation-author consistency limit, not fresh-context rederivation, an absorbing-medium comparison to the legacy approximate line, a published anchor or human sign-off. Issues #103/#581 remain open.
 
 ## `dtr-kinematic-boundary`
 
