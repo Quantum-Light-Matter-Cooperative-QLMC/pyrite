@@ -11,7 +11,8 @@ def source_outputs(case, directions, *, direction_batch=16, transport_core="auto
 
     Keep one transport and one staged segment copy. Direction batches bound
     scratch lifetimes; only the requested (direction, energy) result is retained.
-    Use the production adapter, including layer radiation and target escape.
+    Use the production adapter, including layer radiation and target escape:
+    a finite footprint traces each emission point to its first prism face.
     No continuum, characteristic, coherent, channeling or TR scorers run.
     """
     from . import _segments_on_device, _transport_case
@@ -21,7 +22,10 @@ def source_outputs(case, directions, *, direction_batch=16, transport_core="auto
     segments = _segments_on_device(transport["segs"])
     energy = np.asarray(transport["E_grid"])
     values = np.full((len(vectors), len(energy)), np.nan)
-    supported = np.abs(vectors[:, 2]) > 1e-10
+    # A finite footprint gives every direction a side exit; only the laterally
+    # infinite slab leaves directions parallel to its faces without an escape.
+    finite = case.get("crystal_width_mm") is not None
+    supported = np.full(len(vectors), True) if finite else np.abs(vectors[:, 2]) > 1e-10
     adapter = select_emission(case).cxr
     for start in range(0, len(vectors), direction_batch):
         table_cache = {}

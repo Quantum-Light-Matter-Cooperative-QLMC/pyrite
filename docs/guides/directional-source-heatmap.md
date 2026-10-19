@@ -6,15 +6,22 @@ pyrite app angular-heatmap launch --smoke
 pyrite app angular-heatmap export
 ```
 
-The standalone app computes a bounded initial example: 30 keV point electrons,
-20 Å silicon, target tilts 30° and 45°, eight incident histories per tilt,
-72 periodic observation angles and 129 photon energies from 100 to 5000 eV.
-It needs no detector, campaign or checkpoint. Edit the controls and submit
-**Run source maps** to calculate another scene. Selecting/comparing computed
-tilts, changing mean current, or choosing linear/log color only redraws cached
-source arrays. Export writes the default example into static HTML; static HTML
-cannot run new transports. The four-entry in-memory calculation cache is local
-to the running app process.
+The standalone app opens on 30 keV point electrons through a 2000 Å silicon
+film with a finite 5 × 5 mm footprint, target tilts 30° and 45°, 128 incident
+histories per tilt, 72 periodic observation angles and 1025 photon energies from
+100 eV up to the kinematic line ceiling (2000 eV here). It needs no detector,
+campaign or checkpoint. The 5 × 5 mm footprint is the project's historical
+bounded crystal (`campaign.geometry.DEFAULT_FOOTPRINT`); set the width and
+height to your sample.
+
+Controls are grouped by role: **Beam**, **Target**, **Footprint**,
+**Observation**, **Photon energy** and **Execution**. Submit **Run source maps**
+to calculate a scene. The **Display** row (mean current, log color, tilts shown)
+only redraws cached source arrays. A status rail reports the backend, elapsed
+time, footprint, resolved photon grid, line ceiling and history count. Export
+writes the default example into static HTML; static HTML cannot run new
+transports. The four-entry in-memory calculation cache is local to the running
+app process.
 
 Only the existing **incoherent PXR/CBS total** is scored, including its PXR–CBS
 interference. Bremsstrahlung, characteristic, cross-electron coherent,
@@ -35,9 +42,8 @@ convention; target angles resolve to the nearest half degree. A map is a
 
 Angles are periodic point samples on [−180°, +180°), without a repeated endpoint.
 The plot closes the circle by duplicating the first sample for drawing only.
-Sample-face grazing directions (`abs(n_sample,z) <= 1e-10`) are unsupported and
-masked gray, not silently reported as zero. In log color, zero bins are also
-gray; linear color distinguishes true zero from masked values.
+Side-by-side tilts share both axes and one color scale: only the leftmost panel
+carries the energy label and a single colorbar carries the intensity label.
 
 The reusable result stores photons per incident electron per eV per sr. Its
 `rate(current_na)` scales by the incident electron rate `I[nA] * 1e-9 / |e|`,
@@ -49,22 +55,64 @@ See [spectral observables](../physics/radiation-physics/spectral-observables.md)
 and the independently verified
 [normalization claim](../validation/radiation-physics/directional-source-rate-normalization.md).
 
+## Finite-target escape
+
+Each emitting segment is attenuated along the exact ray to its first crystal
+face, side faces of the finite footprint included, with the segment-mean
+transmission split at face switches and layer interfaces. This is the existing
+line scorer's escape (Validation: `finite-transverse-crystal`,
+`segment-escape-average`); the directional source reuses it unchanged.
+
+With a finite footprint every direction is evaluated. Directions parallel to the
+slab faces (θ = tilt ± 90° at zero tilt and plane azimuths) leave through a
+millimetre side face, so for keV photons they are a deep, **physical**
+attenuation minimum, not a masked gap. Shrinking the footprint to 10 µm lifts
+those directions by orders of magnitude; away from them, a 5 mm footprint agrees
+with the infinite slab to machine precision. The **Infinite slab** option keeps
+that limiting case for comparison. Only there are face-parallel directions
+(`abs(n_sample,z) <= 1e-10`) unsupported, NaN and drawn gray. Zero or
+underflowed intensity takes the lowest color, so gray always means unsupported.
+Regression: `tests/montecarlo/test_directional_source.py::test_finite_target_escape_limits`.
+
+## Photon window and relativistic forward lines
+
+The line resonance `E = ħc v·g / (1 − n·v)` Doppler-shifts toward the beam
+direction. At 1 MeV (β = 0.941) the dominant silicon line at 45° tilt rises from
+2.35 keV at 30° to 7.3 keV at 0°, matching the factor
+`(1 − β cos 30°)/(1 − β) = 3.1`. With the former fixed 5 keV stop, the
+near-forward band therefore looked like a deep null that was absent at 30 keV
+(β = 0.33, all lines below about 1 keV). It is window truncation: on a
+100 eV–63 keV grid the 0° integrated yield is among the largest on the circle.
+
+The app therefore stops the grid at the scene's **kinematic line ceiling**
+`ħcβ|g|max/(1 − β)` over the scored reflections, capped by the beam kinetic
+energy (Validation: `line-grid-kinematic-bandwidth`,
+`line-grid-emission-ceiling`). A manual stop below the ceiling raises a warning.
+Use logarithmic energy spacing for MeV beams, where the window spans decades.
+The API reports the ceiling as `provenance["line_window_ceiling_eV"]`, and
+`pyrite.directional.source_line_ceiling_eV(beam, target, numerics=...)` returns
+it before any transport. Regression:
+`tests/montecarlo/test_directional_source.py::test_relativistic_forward_band_is_window_truncation`.
+
 ## Reusable source calculation
 
 ```python
 import numpy as np
-from pyrite import Beam, PointSpot, PointBunch, Slab, Numerics, directional_source
+from pyrite import Beam, Footprint, PointSpot, PointBunch, Slab, Numerics, directional_source
+from pyrite.directional import source_line_ceiling_eV
 
 beam = Beam(
     30.0, transverse=PointSpot(), longitudinal=PointBunch(), bunch_charge_pc=1.0, rep_rate_hz=5000.0
 )
-target = Slab("silicon", 20.0, tilt_deg=30.0, footprint=None)
+target = Slab("silicon", 2000.0, tilt_deg=30.0, footprint=Footprint(5.0, 5.0))
+numerics = Numerics(cxr_trials=128)
+stop = source_line_ceiling_eV(beam, target, numerics=numerics)
 source = directional_source(
     beam,
     target,
     angle_deg=np.linspace(-180, 180, 72, endpoint=False),
-    energy_eV=np.linspace(100, 5000, 129),
-    numerics=Numerics(cxr_trials=8),
+    energy_eV=np.linspace(100, stop, 1025),
+    numerics=numerics,
     seed=1,
     direction_batch=16,
 )
@@ -72,45 +120,48 @@ rate = source.rate()  # shape (angle, energy), ph/s/eV/sr
 rate_at_10_na = source.rate(10.0)  # rescales without transport
 ```
 
-The provisional API also accepts flat stacks and finite rectangular footprints;
-the app uses infinite flat slabs. Grooves, direction-targeted longitudinal
-policies and adaptive precision are unsupported and rejected. Existing target
-geometry restrictions still apply. It transports once per scalar target/tilt,
-then evaluates bounded direction batches on the same segments. `brem_trials`
-is replaced by `cxr_trials` to avoid an unnecessary second population; only the
-CXR adapter is evaluated. Result metadata records the case, seed, resolved
-numerics, plane azimuth, energy-grid choice, package/model/table provenance and
-source identity. Component identity and independent energy coordinates leave
-room for other future source components without assuming additive semantics.
+The provisional API accepts flat slabs and stacks, finite or infinite.
+Grooves, direction-targeted longitudinal policies and adaptive precision are
+unsupported and rejected. Existing target geometry restrictions still apply. It
+transports once per scalar target/tilt, then evaluates bounded direction batches
+on the same segments. `brem_trials` is replaced by `cxr_trials` to avoid an
+unnecessary second population; only the CXR adapter is evaluated. Result
+metadata records the case, seed, resolved numerics, plane azimuth, energy-grid
+choice, line ceiling, package/model/table provenance and source identity.
+Component identity and independent energy coordinates leave room for other
+future source components without assuming additive semantics.
 
-## Resolution and model limits
+## Resolution, statistics and limits
 
-Supply an explicit common photon-energy **point grid** for the entire circle.
-It must increase, start at or above 10 eV, and end at or below the incident
-electron kinetic energy. A narrow single-direction automatic line window is
-never substituted. Out-of-window resonances can still be omitted by the
-existing scorer, including their tails; extend bounds and refine energy and
-angle spacing before trusting a peak. Low sample counts are noisy. The app
-caps the reflection set at four; use `Numerics(cxr_reflections=...)` through
-the API for a reflection-convergence study. Other source components may need
-different native energy grids and different combination rules.
+The grid is an explicit common photon-energy **point grid** for the whole
+circle. It must increase, start at or above 10 eV, and end at or below the
+incident electron kinetic energy. A narrow single-direction automatic line
+window is never substituted.
 
-The thin initial target deliberately broadens features. A bounded CPU check
-for its 30° map doubles 72→144 angles and 129→257 energy points on the same
-100–5000 eV window. With seed 1 and eight histories, common-node densities agree
-exactly, energy-integral L1 changes by 0.18%, peak density by 0.84%, and a
-plane-slice quadrature by 0.74% (unsupported grazing samples omitted). That last
-quantity is a convergence diagnostic, not a solid-angle-integrated photon
-rate. Doubling incident histories to 16 changes the density L1 by 2.24%,
-consistent with retaining per-incident-electron normalization. Regression:
+A 2000 Å film resolves much narrower lines than a thin film. For the default 30°
+map (seed 1), doubling the energy points changes the energy-integral L1 by
+3.6% from 257→513, 0.55% from 513→1025 and 0.017% from 1025→2049; the peak is
+unchanged from 1025. Hence the 1025-point default. Statistics, not grids, then
+dominate: seed-to-seed spread of the angular yield profile is 58% at 8
+histories, about 8% at 128 and 2% at 512; per-pixel spread falls as 1/√N
+(0.39 at 128). Raise histories before reading fine structure. Regression:
 `tests/notebooks/test_angular_heatmap_app.py::test_default_grid_refinement_and_history_normalization`.
-These checks cover this broad thin-film example, not arbitrary thick targets
-or sharply resolved resonances. The finite plotted window is not a total yield.
+The finite plotted window is not a total yield.
 
-The quick local app allows up to four tilts, 256 histories, 720 angles,
-2049 energies and 2000 Å thickness, with a combined four-million
-history–angle–energy scoring budget. Tilts must remain distinct after the
-shared half-degree pose resolution. Large combinations remain expensive;
-route heavy sweeps and convergence studies through `pyrite remote` using a
-small script around the reusable API. The existing kinematic PXR/CBS and escape
-model validity limits apply unchanged.
+The app has no demonstration caps on tilts, thickness, histories or grid size.
+It validates physical inputs, keeps tilts distinct after half-degree pose
+resolution, and refuses only result arrays larger than about 1.6 GB; the
+spinner reports the electron × direction × energy work before it starts.
+*Max reflections* (default 4) truncates the reflection set; raise it for a
+reflection-convergence study. The existing kinematic PXR/CBS and escape model
+validity limits apply unchanged.
+
+## Execution backends
+
+The array backend is fixed when PyRITE is imported, so choose it at launch:
+`PYRITE_MC_BACKEND=cuda pyrite app angular-heatmap launch` runs transport and
+scoring on a local GPU, and the app's status rail shows the resolved backend.
+*Transport core* selects the CPU lockstep/per-electron or CUDA transport core;
+*Direction batch* bounds scoring scratch per batch without changing
+normalization. For sweeps beyond an interactive session, script the
+`directional_source` API and run it on the GPU host through `pyrite remote`.

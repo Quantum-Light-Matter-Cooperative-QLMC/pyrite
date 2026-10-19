@@ -205,3 +205,95 @@ def test_detector_acceptance_remains_strictly_positive():
 
     with pytest.raises(ValueError):
         Detector(acceptance=AngularAcceptance(polar_deg=1.0, solid_angle_sr=0.0))
+
+
+def test_finite_footprint_scores_face_parallel_directions(monkeypatch):
+    """Side faces give every direction an escape path; nothing is masked."""
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner import directional_source as owner
+
+    monkeypatch.setattr(
+        runner,
+        "_transport_case",
+        lambda *args, **kw: {"segs": {}, "Ne_lines": 7, "E_grid": np.array([100.0, 200.0])},
+    )
+    monkeypatch.setattr(runner, "_segments_on_device", lambda segs: segs)
+    monkeypatch.setattr(
+        owner,
+        "select_emission",
+        lambda case: SimpleNamespace(
+            cxr=SimpleNamespace(evaluate=lambda b, s: SimpleNamespace(values=np.ones(2)))
+        ),
+    )
+    values, supported = owner.source_outputs(
+        {"E_grid": np.array([100.0, 200.0]), "crystal_width_mm": 5.0, "crystal_height_mm": 5.0},
+        [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0]],
+    )
+    assert supported.all() and np.isfinite(values).all()
+
+
+def test_line_window_ceiling_bound_and_kinetic_cap():
+    """Validation: line-grid-kinematic-bandwidth; line-grid-emission-ceiling."""
+    from pyrite.directional import line_window_ceiling_eV
+    from pyrite.materials import CATALOG
+    from pyrite.materials.crystal import reciprocal_g_vector
+
+    g = reciprocal_g_vector((2, 2, 0), CATALOG.crystal("silicon").lattice)[1]
+    gamma = 1 + 1000e3 / 510998.95
+    beta = np.sqrt(1 - gamma**-2)
+    case = {"crystal": "silicon", "hkl_list": [(1, 1, 1), (2, 2, 0)], "E0_keV": 1000.0}
+    expected = 1973.269804 * beta * g / (1 - beta)
+    assert expected <= line_window_ceiling_eV(case) < expected + 100
+    # Doppler bound grows ~2 gamma^2: by 100 MeV energy conservation binds.
+    assert line_window_ceiling_eV({**case, "E0_keV": 1e5}) == 1e8
+
+
+def _escape_scan(footprint, keV, energy, angles):
+    from pyrite._numerics import CxrReflections
+    from pyrite.campaign.geometry import Footprint
+
+    return directional_source(
+        Beam(keV, transverse=PointSpot(), longitudinal=PointBunch()),
+        Slab(
+            "silicon",
+            2000.0,
+            tilt_deg=45.0,
+            footprint=None if footprint is None else Footprint(footprint, footprint),
+        ),
+        energy_eV=energy,
+        angle_deg=angles,
+        numerics=Numerics(cxr_trials=2, cxr_reflections=CxrReflections(max_reflections=4)),
+    )
+
+
+def test_finite_target_escape_limits():
+    """Infinite-footprint limit, deep physical face-parallel minimum, side exit.
+
+    Validation: finite-transverse-crystal; segment-escape-average
+    """
+    angles = np.array([-60.0, -45.0, 0.0, 90.0, 135.0])
+    energy = np.linspace(100.0, 2000.0, 65)
+    infinite, wide, narrow = (_escape_scan(f, 30.0, energy, angles) for f in (None, 5.0, 0.01))
+    face = [1, 4]  # tilt -/+ 90 deg: parallel to the slab faces
+    np.testing.assert_array_equal(infinite.supported, [True, False, True, True, False])
+    assert wide.supported.all() and narrow.supported.all()
+    keep = infinite.supported
+    np.testing.assert_allclose(wide.density[keep], infinite.density[keep], rtol=1e-12)
+    yields = [np.trapezoid(r.density, energy, axis=1) for r in (wide, narrow)]
+    # 2.5 mm of silicon is opaque at these energies; a 10 um footprint is not.
+    assert np.all(yields[0][face] < 1e-6 * yields[0][2])
+    assert np.all(yields[1][face] > 1e3 * yields[0][face])
+
+
+def test_relativistic_forward_band_is_window_truncation():
+    """#590 near-forward 1 MeV 'null': lines blueshift above a 5 keV stop."""
+    angles = np.array([0.0, 30.0])
+    result = _escape_scan(5.0, 1000.0, np.geomspace(100.0, 63_200.0, 400), angles)
+    assert result.provenance["line_window_ceiling_eV"] > 5000
+    energy, density = result.energy_eV, result.density
+    total = np.trapezoid(density, energy, axis=1)
+    below = np.trapezoid(density[:, energy <= 5000], energy[energy <= 5000], axis=1)
+    assert total[0] > 0.5 * total[1]  # forward emission is not suppressed
+    assert below[0] < 0.05 * total[0] and below[1] > 0.5 * total[1]
