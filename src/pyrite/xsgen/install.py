@@ -2,8 +2,17 @@
 
 from ._errors import DataFetchError
 
-FETCH_CODES = ("eedl", "eadl", "epdl", "sbethe", "sbethe-tables", "elsepa", "bremslib")
-DATASET_FETCH_CODES = ("eedl", "eadl", "epdl")
+FETCH_CODES = (
+    "eedl",
+    "eadl",
+    "epdl",
+    "epdl-differential",
+    "sbethe",
+    "sbethe-tables",
+    "elsepa",
+    "bremslib",
+)
+DATASET_FETCH_CODES = ("eedl", "eadl", "epdl", "epdl-differential")
 _POSITRON_FETCH_CODES = ("sbethe-tables", "elsepa")
 #: ``(code, projectile)`` pins a bare fetch installs, in order: each code, with
 #: its positron pin right after the electron one (#385).

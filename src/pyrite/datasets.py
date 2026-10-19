@@ -104,6 +104,19 @@ EPDL = Dataset(
     sha256="fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9",
     description="EPDL2025 MF=23 photon cross sections, knot-thinned by PyRITE (1.5 MB)",
 )
+#: PyRITE-derived EPDL2025 subshell photoionization, form factor and incoherent
+#: scattering function (``release_epdl_table.py --table differential``) for the
+#: opt-in photon transport of #341. Versioned apart from :data:`EPDL`, whose
+#: digest keys narrow-beam attenuation results.
+EPDL_DIFFERENTIAL = Dataset(
+    name="epdl-differential",
+    filename="epdl2025_differential.npz",
+    urls=(f"{_RELEASES}/tables-epdl-differential-1/epdl2025_differential.npz",),
+    sha256="d36a50d1add5c6f0b3df80a108e83aa8db8a4822445ca192534f6bc0a55bb166",
+    description=(
+        "EPDL2025 subshell photoionization and scattering functions, knot-thinned by PyRITE (11 MB)"
+    ),
+)
 #: SHA-256 of SBETHE's ``sdbase/pdatconf.p14``, the atomic-shell file every
 #: default-model run reads. ``sdbase/`` is a multi-file tree fetched by
 #: :mod:`pyrite.xsgen.fetch`, so it is pinned here rather than as a
@@ -112,7 +125,9 @@ EPDL = Dataset(
 PDATCONF_SHA256 = "cd239554bb6e823692ea4611d443df8684b4cace06006fc271a4168cb78c62d2"
 
 #: Every fetched dataset, in report order.
-DATASETS: dict[str, Dataset] = {dataset.name: dataset for dataset in (EEDL, EADL, EPDL)}
+DATASETS: dict[str, Dataset] = {
+    dataset.name: dataset for dataset in (EEDL, EADL, EPDL, EPDL_DIFFERENTIAL)
+}
 
 #: Outcomes of :func:`verify_dataset`; ``ok`` is the only passing one.
 OK = "ok"
@@ -339,6 +354,7 @@ __all__ = [
     "EADL",
     "EEDL",
     "EPDL",
+    "EPDL_DIFFERENTIAL",
     "MISMATCH",
     "MISSING",
     "OK",

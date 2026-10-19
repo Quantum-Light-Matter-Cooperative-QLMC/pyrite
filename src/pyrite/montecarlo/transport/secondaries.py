@@ -459,13 +459,26 @@ def _harvest(result, threshold_keV):
     }
 
 
-def transport_secondary_cascade(simulate, kw):
+def _with_launch(kw, launch: LaunchState | None):
+    """Generation-0 arguments of an explicit launch: no beam, its count and energy."""
+    if launch is None:
+        return kw
+    energies = np.asarray(launch.E_keV, dtype=float)
+    return dict(kw, **_BEAM_ARGS, Ne=int(energies.size), E0_keV=float(np.max(energies)))
+
+
+def transport_secondary_cascade(simulate, kw, *, launch: LaunchState | None = None):
     """Run ``simulate`` over primaries and every launched generation; join rows.
 
     ``kw`` is the caller's full :func:`simulate_trajectories` argument mapping.
+    ``launch`` replaces beam sampling for generation 0 with explicit electron
+    states (photon-born charged rows, #341); ``Ne`` and ``E0_keV`` then follow
+    the launch and beam arguments are ignored. ``None`` leaves the cascade
+    unchanged.
     Validation: shell-secondary-transport, photon-pair-first-interaction, bhabha-close,
     heitler-annihilation
     """
+    kw = _with_launch(kw, launch)
     threshold_keV, max_generations, max_tracks = _validate(kw)
     seed = kw["seed"]
     base = {
@@ -492,7 +505,8 @@ def transport_secondary_cascade(simulate, kw):
     lo = min(cut_min, threshold_keV)
     Ne = int(kw["Ne"])
     gen0 = simulate(
-        **base, _secondary=SecondaryPass(None, (lo, float(kw["E0_keV"])), _photon_seed(seed, 0))
+        **base,
+        _secondary=SecondaryPass(launch, (lo, float(kw["E0_keV"])), _photon_seed(seed, 0)),
     )
     # The transport widened gen 0's range to its sampled energies; match it.
     table_range = (lo, max(float(kw["E0_keV"]), float(np.max(gen0["initial_E_keV"]))))

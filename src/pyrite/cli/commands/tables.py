@@ -9,8 +9,8 @@ another code is rejected rather than silently ignored. ``fetch`` installs
 SBETHE's pinned reference database without extracting the archive's prebuilt
 executable or documentation, the pinned releases of BremsLib-derived,
 ELSEPA elastic and SBETHE catalogue stopping tables, and the pinned EPICS2025
-EEDL, EADL and derived EPDL files every run reads; without a code it installs
-all of them.
+EEDL, EADL and derived EPDL files every run reads, plus the derived EPDL
+photon-transport table; without a code it installs all of them.
 """
 
 import json
@@ -610,8 +610,9 @@ def _fetch_cxr(payload: dict) -> str:
     type=click.Path(exists=True, dir_okay=False),
     default=None,
     help=(
-        "Install CODE from a local copy of the pinned archive (for eedl, eadl and "
-        "epdl, of the pinned file itself) instead of downloading it. Needs CODE."
+        "Install CODE from a local copy of the pinned archive (for eedl, eadl, "
+        "epdl and epdl-differential, of the pinned file itself) instead of "
+        "downloading it. Needs CODE."
     ),
 )
 @click.option(
@@ -634,6 +635,11 @@ def fetch_command(
                    run reads for the characteristic-radiation cascade.
     epdl           EPDL2025 photon cross sections (1.5 MB, knot-thinned by
                    PyRITE) for narrow-beam attenuation.
+    epdl-differential
+                   EPDL2025 subshell photoionization, form factors and
+                   incoherent scattering functions (11 MB, knot-thinned by
+                   PyRITE) for the photon transport in development; no run
+                   reads it yet.
     sbethe         SBETHE's 18 MB sdbase/ reference database, which the shell
                    inelastic model and SBETHE generation read. Only sdbase/ is
                    extracted from the upstream archive.
@@ -657,7 +663,8 @@ def fetch_command(
     PyRITE's mirror). A complete existing install returns successfully without
     network access.
 
-    PyRITE's own archives (epdl, sbethe-tables, elsepa, bremslib, and the eedl
+    PyRITE's own archives (epdl, epdl-differential, sbethe-tables, elsepa,
+    bremslib, and the eedl
     and eadl mirrors) are on public GitHub Releases; downloading them needs no
     GitHub token.
     """
@@ -734,7 +741,7 @@ def fetch_command(
     show_default=True,
     help=(
         "Comma-separated codes whose pinned tables or datasets must be present "
-        "(bremslib, elsepa, sbethe-tables, eedl, eadl, epdl, sbethe)."
+        "(bremslib, elsepa, sbethe-tables, eedl, eadl, epdl, epdl-differential, sbethe)."
     ),
 )
 @output_option

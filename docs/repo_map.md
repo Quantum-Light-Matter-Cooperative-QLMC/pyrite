@@ -323,7 +323,48 @@ Per-atom EPDL2025 photon cross sections (photoelectric, coherent, incoherent, nu
 - Public: `photon_cross_sections_ang2`, `total_photon_cross_section_ang2`, `photoelectric_edges`, `PHOTON_CHANNELS`, `EPDL_E_MIN_EV`/`EPDL_E_MAX_EV`, `ATTENUATION_MODEL` (identity marker).
 - Deps: `materials.atomic` (`Z_TABLE`), `DATA_DIR`.
 
+### `materials/photon_differential.py`
+EPDL2025 subshell photoionization (EADL designators and binding energies), coherent form factor `F(x, Z)` and incoherent scattering function `S(x, Z)` (`x = sin(θ/2)/λ`, Å⁻¹) for the opt-in photon transport of #341, from the fetched dataset `epdl-differential` (SHA-pinned; `scripts/release_epdl_table.py --table differential`). No transport caller yet.
+- Public: `photoionization_subshells`, `subshell_photoionization_cross_sections_ang2`, `coherent_form_factor`, `incoherent_scattering_function`, `coherent_form_factor_table`, `incoherent_scattering_function_table` (read-only knots for bounded rejection), `PhotoionizationSubshell`, `X_MAX_INV_ANG`.
+- Deps: `materials.photon_cross_sections`, `datasets`.
+
 ### `montecarlo/` (package)
+
+`transport/photon_navigation.py` owns the standalone host all-channel photon
+first-flight reference: sample-frame stack/prism ray intervals, vacuum entry
+and gaps, and EPDL channel/element competition from explicit uniforms. It has
+no production callers; the existing pair/annihilation route remains separate.
+
+`transport/relaxation.py` owns the standalone host sampled EADL vacancy
+cascade: explicit draws, depth-first transition ancestry, terminal-hole
+multiplicity, and individual energy budgets with signed transition defects.
+It consumes validated `eadl_relaxation` data; the existing expected cascade
+and characteristic scorer retain their current paths. No production caller.
+
+`transport/photon_scattering.py` owns standalone CPU Rayleigh (Thomson × F²)
+and Compton (Klein–Nishina × S, without Doppler/binding corrections) events,
+including recoil and sample-frame directions. `transport/photoelectric.py`
+selects EPDL subshells, samples Sauter–Gavrila photoelectrons and calls the
+sampled EADL cascade. `transport/photon_sampling.py` supplies explicit-draw
+validation and stable angular rotations. These references have no production
+callers; integrated EPDL rates still own channel/atom competition.
+
+`transport/photon_histories.py` chains those references into a host photon
+history queue: lineage-keyed Philox streams, isotropic relaxation emission,
+charged electron/positron handoff rows, an absorbing sample-frame aperture
+for ordinary hits, and a per-history weighted energy ledger. Filter plates
+navigate as oriented `PhotonBox`es (`photon_navigation.scene_first_interactions`);
+lab-frame poses convert through `photon_box_from_pose`/`PhotonAperture.from_pose`.
+Charged rows are not transported; no source adapters or production callers exist.
+
+`transport/photon_coupling.py` alternates that queue with a charged stage:
+`track_coupled_histories` launches photon-born electrons above the stage
+threshold inside the transport stack, `cascade_charged_stage` runs them
+through the shell soft/hard cascade from an explicit `LaunchState`
+(`secondaries.transport_secondary_cascade(launch=...)`), and their hard
+bremsstrahlung photons re-enter the queue with lineage keys. Positrons stay
+pending; per-history coupled ledger closes. No production caller.
+
 Simulation core: electron transport, segment-sum PXR+CBS and EEDL characteristic line spectra, bremsstrahlung, parallel case runner, and detector-convolution helpers. Split from single module into submodules; **every public and internal name re-exported from package** — `from pyrite.montecarlo import X` unchanged (`tests/montecarlo/test_exports.py` freeze export set).
 - `case` — frozen, validating `Case` input schema. `build_cases` returns it; `to_dict()` reproduces the version-1 legacy mapping and `run_case` temporarily accepts either representation.
 - `_resources` — execution resource-policy resolution and backend-neutral pre-allocation chunk admission. Small devices default conservative.

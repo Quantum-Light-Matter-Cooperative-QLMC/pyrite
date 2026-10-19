@@ -48,7 +48,7 @@ Commands:
 ## `pyrite tables fetch`
 
 ```text
-Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|sbethe|sbethe-
+Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|epdl-differential|sbethe|sbethe-
                            tables|elsepa|bremslib]
 
   Fetch pinned data into your user data directory; without CODE, all of it.
@@ -59,6 +59,11 @@ Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|sbethe|sbethe-
                  run reads for the characteristic-radiation cascade.
   epdl           EPDL2025 photon cross sections (1.5 MB, knot-thinned by
                  PyRITE) for narrow-beam attenuation.
+  epdl-differential
+                 EPDL2025 subshell photoionization, form factors and
+                 incoherent scattering functions (11 MB, knot-thinned by
+                 PyRITE) for the photon transport in development; no run
+                 reads it yet.
   sbethe         SBETHE's 18 MB sdbase/ reference database, which the shell
                  inelastic model and SBETHE generation read. Only sdbase/ is
                  extracted from the upstream archive.
@@ -80,13 +85,15 @@ Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|sbethe|sbethe-
   Download locations are tried in order (upstream, then PyRITE's mirror). A complete
   existing install returns successfully without network access.
 
-  PyRITE's own archives (epdl, sbethe-tables, elsepa, bremslib, and the eedl and eadl
-  mirrors) are on public GitHub Releases; downloading them needs no GitHub token.
+  PyRITE's own archives (epdl, epdl-differential, sbethe-tables, elsepa, bremslib, and
+  the eedl and eadl mirrors) are on public GitHub Releases; downloading them needs no
+  GitHub token.
 
 Options:
   --archive FILE                  Install CODE from a local copy of the pinned archive
-                                  (for eedl, eadl and epdl, of the pinned file itself)
-                                  instead of downloading it. Needs CODE.
+                                  (for eedl, eadl, epdl and epdl-differential, of the
+                                  pinned file itself) instead of downloading it. Needs
+                                  CODE.
   --projectile [electron|positron]
                                   Table species. Positron requires CODE elsepa or
                                   sbethe-tables; other data are species-independent.
@@ -284,8 +291,8 @@ Usage: pyrite tables verify [OPTIONS]
 Options:
   --require TEXT             Comma-separated codes whose pinned tables or datasets must
                              be present (bremslib, elsepa, sbethe-tables, eedl, eadl,
-                             epdl, sbethe).  [default: bremslib,elsepa,sbethe-
-                             tables,eedl,eadl,epdl,sbethe]
+                             epdl, epdl-differential, sbethe).  [default:
+                             bremslib,elsepa,sbethe-tables,eedl,eadl,epdl,sbethe]
   -o, --output [table|json]  Output format; only json is a stable automation contract.
                              [default: table]
   -h, --help                 Show this message and exit.

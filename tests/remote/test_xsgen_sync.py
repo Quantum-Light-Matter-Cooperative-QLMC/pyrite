@@ -355,6 +355,9 @@ def test_local_datasets_map_arcnames_to_verified_files(monkeypatch, tmp_path):
         EEDL_ARC: tmp_path / "eedl" / "EEDL.endf",
         EADL_ARC: tmp_path / "eadl" / "EADL2025.ALL",
         "datasets/epdl/epdl2025_mf23.npz": tmp_path / "epdl" / "epdl2025_mf23.npz",
+        "datasets/epdl-differential/epdl2025_differential.npz": (
+            tmp_path / "epdl-differential" / "epdl2025_differential.npz"
+        ),
     }
 
 

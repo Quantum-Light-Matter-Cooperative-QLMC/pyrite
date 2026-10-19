@@ -1,10 +1,16 @@
-"""Derive PyRITE's compact EPDL2025 photon cross-section table.
+"""Derive PyRITE's compact EPDL2025 photon tables.
 
 Maintainer-only. Reads the SHA-256-pinned upstream EPICS2025 photo-atomic tape
-(``EPDL2025.ALL``, about 86 MB) and writes the small table that
-:mod:`pyrite.materials.photon_cross_sections` reads at runtime. Publish it as a
-PyRITE release asset and pin its URL in ``pyrite.datasets.EPDL``; users
-install it with ``pyrite tables fetch epdl``.
+(``EPDL2025.ALL``, about 86 MB) and writes one of two small tables. Publish
+each as a PyRITE release asset and pin its URL in :mod:`pyrite.datasets`.
+
+``--table mf23`` (default) writes the attenuation table that
+:mod:`pyrite.materials.photon_cross_sections` reads (``pyrite.datasets.EPDL``,
+``pyrite tables fetch epdl``). ``--table differential`` writes the separately
+versioned photon-transport table that
+:mod:`pyrite.materials.photon_differential` reads
+(``pyrite.datasets.EPDL_DIFFERENTIAL``, ``pyrite tables fetch
+epdl-differential``); it leaves the attenuation table and its digest alone.
 
 For every element Z=1--100 the table keeps the five MF=23 integrated cross
 sections whose sum is the narrow-beam total:
@@ -16,8 +22,20 @@ sections whose sum is the narrow-beam total:
 * MT=515 pair production in the electron field (triplet).
 
 MT=501 (total) and MT=516 (pair total) are sums of these and are not stored.
+
+The differential table keeps, for every element:
+
+* MF=23 MT=534--599 subshell photoionization, with each subshell's binding
+  energy ``EPE``; subshell designator = MT - 533, the EADL convention,
+* MF=27 MT=502 coherent form factor ``F(x, Z)``,
+* MF=27 MT=504 incoherent scattering function ``S(x, Z)``,
+
+with ``x = sin(theta/2)/lambda`` in 1/Angstrom. The MF=27 MT=505/506 anomalous
+scattering factors are not kept. Upstream ``EFL`` is zero for every EPDL2025
+subshell, so it is not stored; fluorescence comes from EADL.
+
 The upstream sections are pre-linearized (ENDF interpolation law 2, lin-lin)
-on dense grids. The only modification is knot thinning: within each run of
+on dense grids (MF=27 as well). The only modification is knot thinning: within each run of
 strictly increasing energies -- photoionization edges are repeated energies,
 and a zero-valued threshold point starts a pair-production section -- knots
 are dropped greedily while lin-lin interpolation through the kept knots, the
@@ -29,14 +47,16 @@ are stored as float32 (relative rounding ~6e-8, far below the tolerance).
 The output is a deterministic ``.npz``: fixed member order and zip timestamps,
 so a rerun from the same tape and tolerance reproduces the same bytes. Pin the
 printed SHA-256 in ``photon_cross_sections.EPDL_TABLE_SHA256`` and
-``pyrite.datasets.EPDL``.
+``pyrite.datasets.EPDL`` (or ``photon_differential.EPDL_DIFFERENTIAL_SHA256``
+and ``pyrite.datasets.EPDL_DIFFERENTIAL``).
 
 Usage::
 
     UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python scripts/release_epdl_table.py \\
-        --source /path/to/EPDL2025.ALL --write
+        --source /path/to/EPDL2025.ALL [--table differential] --write
 
 Validation: narrow-beam-total-attenuation
+Validation: epdl-photon-differential-data
 """
 
 import argparse
@@ -51,9 +71,15 @@ import numpy as np
 EPDL_URL = "https://nuclear.llnl.gov/EPICS/ENDF2025/EPDL2025.ALL"
 EPDL_SHA256 = "59bbd8c559685dda0bf0de2762bc43126f599cd154d635940f17b6a59c1c43fd"
 CHANNEL_MTS = (522, 502, 504, 517, 515)
+SUBSHELL_MTS = range(534, 600)
+SCATTERING_MTS = (502, 504)
 DEFAULT_TOLERANCE = 5.0e-4
 Z_MAX = 100
-OUTPUT = Path(__file__).resolve().parents[1] / "build" / "xsgen-release" / "epdl2025_mf23.npz"
+_RELEASE_DIR = Path(__file__).resolve().parents[1] / "build" / "xsgen-release"
+OUTPUTS = {
+    "mf23": _RELEASE_DIR / "epdl2025_mf23.npz",
+    "differential": _RELEASE_DIR / "epdl2025_differential.npz",
+}
 
 
 def _chord_ok(e: np.ndarray, s: np.ndarray, i: int, j: int, tolerance: float) -> bool:
@@ -168,6 +194,81 @@ def build_table(source: Path, tolerance: float) -> dict[str, np.ndarray]:
     }
 
 
+def _thinned_lin_lin(section, x_field: str, y_field: str, where: str, tolerance: float):
+    """Thin one upstream TAB1 after checking it declares lin-lin only."""
+    if np.any(np.rint(np.asarray(section["INT"], dtype=float)) != 2):
+        raise ValueError(f"{where}: expected lin-lin (law 2) only")
+    return thin_section(
+        np.asarray(section[x_field], dtype=float),
+        np.asarray(section[y_field], dtype=float),
+        tolerance,
+    )
+
+
+def build_differential_table(source: Path, tolerance: float) -> dict[str, np.ndarray]:
+    """Read the upstream tape and return the arrays of the differential table.
+
+    One row per stored section, ordered by Z, then MF=23 subshells by MT, then
+    MF=27 MT=502 and 504. ``binding_eV`` is the subshell ``EPE`` (NaN for
+    MF=27 rows); ``x`` is photon energy in eV for MF=23 rows and momentum
+    transfer in 1/Angstrom for MF=27 rows; ``y`` is barn per atom, ``F`` or
+    ``S`` respectively.
+    """
+    from endf_parserpy import EndfFile
+
+    z_col, mf_col, mt_col, binding, offsets = [], [], [], [], [0]
+    xs, ys = [], []
+    seen = set()
+
+    def append(z: int, mf: int, mt: int, epe: float, x: np.ndarray, y: np.ndarray) -> None:
+        z_col.append(z)
+        mf_col.append(mf)
+        mt_col.append(mt)
+        binding.append(epe)
+        xs.append(x)
+        ys.append(y)
+        offsets.append(offsets[-1] + x.size)
+
+    with EndfFile(source, on_error="raise") as tape:
+        for position in range(len(tape)):
+            material = tape[position]
+            z = round(float(material.za) / 1000.0)
+            if z in seen or not 1 <= z <= Z_MAX:
+                raise ValueError(f"unexpected or duplicate material Z={z}")
+            seen.add(z)
+            shells = [mt for mt in SUBSHELL_MTS if (23, mt) in material]
+            if not shells:
+                raise ValueError(f"Z={z}: no MF=23 subshell photoionization sections")
+            for mt in shells:
+                section = material[23, mt]
+                epe = float(section["EPE"])
+                energy, sigma = _thinned_lin_lin(
+                    section, "Eint", "sigma", f"Z={z} MF=23 MT={mt}", tolerance
+                )
+                if not np.isfinite(epe) or epe <= 0.0 or energy[0] != epe:
+                    raise ValueError(f"Z={z} MT={mt}: binding energy {epe} is not the first knot")
+                append(z, 23, mt, epe, energy, sigma)
+            for mt in SCATTERING_MTS:
+                x, value = _thinned_lin_lin(
+                    material[27, mt], "xint", "H", f"Z={z} MF=27 MT={mt}", tolerance
+                )
+                if x[0] != 0.0:
+                    raise ValueError(f"Z={z} MF=27 MT={mt}: grid must start at x=0")
+                append(z, 27, mt, np.nan, x, value)
+    if seen != set(range(1, Z_MAX + 1)):
+        raise ValueError(f"tape does not cover Z=1..{Z_MAX}")
+    return {
+        "z": np.asarray(z_col, dtype=np.int16),
+        "mf": np.asarray(mf_col, dtype=np.int16),
+        "mt": np.asarray(mt_col, dtype=np.int16),
+        "binding_eV": np.asarray(binding, dtype=np.float64),
+        "offsets": np.asarray(offsets, dtype=np.int64),
+        "x": np.concatenate(xs).astype(np.float64),
+        "y": np.concatenate(ys).astype(np.float32),
+        "tolerance": np.asarray(tolerance, dtype=np.float64),
+    }
+
+
 def write_deterministic_npz(path: Path, arrays: dict[str, np.ndarray]) -> str:
     """Write ``arrays`` as a byte-reproducible compressed ``.npz``; return its SHA-256."""
     buffer = io.BytesIO()
@@ -196,8 +297,9 @@ def _sha256(path: Path) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--source", type=Path, help="local EPDL2025.ALL (else download)")
+    parser.add_argument("--table", choices=sorted(OUTPUTS), default="mf23")
     parser.add_argument("--tolerance", type=float, default=DEFAULT_TOLERANCE)
-    parser.add_argument("--output", type=Path, default=OUTPUT)
+    parser.add_argument("--output", type=Path, help="output path (default: build/xsgen-release/)")
     parser.add_argument("--write", action="store_true", help="write the table")
     args = parser.parse_args(argv)
 
@@ -209,11 +311,17 @@ def main(argv: list[str] | None = None) -> int:
     if actual != EPDL_SHA256:
         raise SystemExit(f"{source}: SHA-256 {actual} != pinned {EPDL_SHA256}")
 
-    arrays = build_table(source, args.tolerance)
-    print(f"tables: {arrays['z'].size}, knots: {arrays['energy_eV'].size}")
+    if args.table == "differential":
+        arrays = build_differential_table(source, args.tolerance)
+        knots = arrays["x"].size
+    else:
+        arrays = build_table(source, args.tolerance)
+        knots = arrays["energy_eV"].size
+    print(f"tables: {arrays['z'].size}, knots: {knots}")
     if args.write:
-        sha = write_deterministic_npz(args.output, arrays)
-        print(f"wrote {args.output} ({args.output.stat().st_size} bytes)")
+        output = args.output or OUTPUTS[args.table]
+        sha = write_deterministic_npz(output, arrays)
+        print(f"wrote {output} ({output.stat().st_size} bytes)")
         print(f"sha256 {sha}")
     return 0
 

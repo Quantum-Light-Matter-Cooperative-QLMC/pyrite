@@ -144,6 +144,11 @@ radiation-physics/closed-form-flux
 radiation-physics/coherent-emission
 radiation-physics/pair-production-sampling
 radiation-physics/photon-pair-first-interaction
+radiation-physics/photon-channel-first-interaction
+radiation-physics/eadl-sampled-relaxation
+radiation-physics/photon-compton-scattering
+radiation-physics/photon-rayleigh-scattering
+radiation-physics/photon-photoelectric-sampling
 radiation-physics/coherent-formation-absorption
 radiation-physics/coherent-inter-electron-decoherence
 radiation-physics/quantum-pair-population-normalization
@@ -158,6 +163,7 @@ radiation-physics/tr-detected-omission-bound
 radiation-physics/tr-interface-energy-scale
 radiation-physics/tr-line-cross-term
 radiation-physics/cross-reflection-coherence
+radiation-physics/epdl-photon-differential-data
 radiation-physics/external-brem-subtraction
 radiation-physics/finite-footprint-longitudinal-decoherence
 radiation-physics/finite-time-lineshape

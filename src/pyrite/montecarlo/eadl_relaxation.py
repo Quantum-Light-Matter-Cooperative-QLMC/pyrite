@@ -401,13 +401,17 @@ def vacancy_cascade(
 
 @dataclass(frozen=True, slots=True)
 class RelaxationEnergyBudget:
-    """Expected energy partition of one primary vacancy's EADL cascade, in eV.
+    """Energy partition of one primary vacancy's EADL cascade, in eV.
+
+    Used for expectations by ``relaxation_energy_budget`` and individual
+    histories by ``transport.relaxation.sample_relaxation_cascade``.
 
     ``primary_binding_eV == photon_eV + electron_eV + terminal_binding_eV +
-    transition_energy_defect_eV`` up to the EADL branching-sum tolerance.
+    transition_energy_defect_eV`` up to the EADL branching-sum tolerance for
+    expectations, or floating-point roundoff for individual histories.
     ``terminal_binding_eV`` is the binding energy still held by vacancies that
     do not decay (below the cutoff or without EADL transitions).
-    ``transition_energy_defect_eV`` is the expected sum of ``EBI_i - EBI_j -
+    ``transition_energy_defect_eV`` is the sum (or expected sum) of ``EBI_i - EBI_j -
     EBI_k - ETR`` over decays: EADL transition energies are computed
     separately from its single-vacancy binding energies, so they do not
     difference exactly.
