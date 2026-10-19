@@ -283,7 +283,15 @@ observed source row invariant.
 Focused tests cover zero harmonics in both passage directions, the weak-coupling
 limit against the existing Born PXR+DTR vector, the termination phase, active
 permittivity rejection, and a passive $10^8$ Å opaque layer without growing
-exponentials. These are diagnostic checks only. Production Feranchuk/CBS
+exponentials. With the reverse harmonic set to zero, the finite-strength
+triangular system agrees with the Born vector through capped and uncapped
+stacks, for oblique reciprocal vectors and both passage directions. Turning
+the reverse harmonic back on gives the leading second-order correction to
+the transition field and third-order correction to the line field. Separate
+checks cover the two source rows' translation phases, invariance under choosing
+another point on the same straight trajectory, transversality, and agreement
+of spectral/angular array evaluation with individual solves. These are
+diagnostic checks only. Production Feranchuk/CBS
 phase reconciliation, transported per-history integration, mosaicity,
 normal catalog/campaign support, recoil/energy-loss justification, and a
 published dynamical anchor remain open in #103/#581. This new diagnostic has
