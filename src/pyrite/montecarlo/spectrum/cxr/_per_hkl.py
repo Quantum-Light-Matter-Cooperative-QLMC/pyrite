@@ -562,7 +562,7 @@ def _coherent_jit_grouped_row(st, elec_id_sel, per_cxr_sel, L_esc_sel, formation
         half_dL, apb, bma, q = (f[sl] for f in form_p)
         run_coherent_reduction_kernel(
             *(c[sl] for c in cols),
-            E_grid_c,  # ty: ignore[too-many-positional-arguments]
+            E_grid_c,
             out=out,
             mosaic_weight=1.0,
             L_esc=L_p[sl],
