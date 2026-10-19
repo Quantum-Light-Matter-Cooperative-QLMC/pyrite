@@ -145,6 +145,7 @@ radiation-physics/coherent-emission
 radiation-physics/pair-production-sampling
 radiation-physics/photon-pair-first-interaction
 radiation-physics/photon-channel-first-interaction
+radiation-physics/eadl-sampled-relaxation
 radiation-physics/coherent-formation-absorption
 radiation-physics/coherent-inter-electron-decoherence
 radiation-physics/quantum-pair-population-normalization

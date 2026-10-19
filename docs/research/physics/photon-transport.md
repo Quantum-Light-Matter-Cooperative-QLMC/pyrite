@@ -16,7 +16,8 @@ photon transport model:
 | `materials/photon_differential.py` | Pinned EPDL2025 subshell photoionization (EADL designators and binding energies), form factor `F(x, Z)` and incoherent scattering function `S(x, Z)` (`epdl-photon-differential-data`) | Compton profiles if Doppler broadening is added; EPDL2025 File 27 has none |
 | `montecarlo/transport/pair_production.py` | Stack/prism first interaction and pair daughter sampling | Return every interaction channel and element; resume photons after scattering |
 | `montecarlo/transport/photon_navigation.py` | Standalone CPU all-channel/element first-flight reference, vacuum entry/gaps and exact stack/prism boundaries (`photon-channel-first-interaction`) | Integrate into the photon queue and resume after sampled scattering; production pair/annihilation paths still use their historical entry point |
-| `montecarlo/eadl_relaxation.py` | EADL transition energies and probabilities; deterministic expected vacancy cascade | Sample individual vacancy decays and daughter photons/electrons |
+| `montecarlo/eadl_relaxation.py` | EADL transition energies and probabilities; deterministic expected vacancy cascade | Pass validated records to the sampled cascade for event emission |
+| `montecarlo/transport/relaxation.py` | Standalone CPU individual vacancy cascades with explicit draws, transition ancestry, terminal holes and signed energy defects (`eadl-sampled-relaxation`) | Add emission directions and queue handoff; no production caller yet |
 | `montecarlo/transport/secondaries.py` | Charged-particle generation queue, pair launches, energy balance | One owner of photon interactions and charged daughter handoff |
 | `montecarlo/transport/annihilation.py` | At-rest/in-flight two-photon emission and first-interaction sink from #295 | Hand off emission rows before sink scoring, preserving event lineage and rest-energy accounting |
 | `montecarlo/runner/emission.py` | Directional continuum and characteristic estimators with escape attenuation | An unattenuated source adapter with energy, position, direction, and statistical weight |
@@ -35,11 +36,15 @@ all 100 elements, so photoelectric vacancies index the relaxation data
 directly. Upstream `EFL` is zero, and File 27 holds no Compton profiles; the
 MT 505/506 anomalous scattering factors are not packaged.
 
-EADL's `vacancy_cascade` returns expected vacancy visits, not individual
-transitions. A sampled cascade must consume `EADLSubshellRelaxation` transition
-records, retaining explicit terminal vacancies and the energy residual policy
-of `relaxation_energy_budget`. Existing characteristic scoring combines EEDL,
-EADL, and xraydb; that scorer's expected output is not a list of photon events.
+EADL's `vacancy_cascade` returns expected vacancy visits. The standalone
+`sample_relaxation_cascade` consumes `EADLSubshellRelaxation` transition
+records, retaining individual transitions, explicit terminal vacancies and
+the energy residual policy of `relaxation_energy_budget`. It normalizes the
+rounded EADL transition probabilities for categorical sampling, consumes one
+explicit uniform per decay and visits daughters in depth-first order. It
+does not yet emit directions or hand particles to transport. Existing
+characteristic scoring combines EEDL, EADL, and xraydb; that scorer's expected
+output is not a list of photon events.
 
 ## Ownership and input contract
 

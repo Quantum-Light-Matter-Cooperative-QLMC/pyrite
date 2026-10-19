@@ -335,6 +335,12 @@ first-flight reference: sample-frame stack/prism ray intervals, vacuum entry
 and gaps, and EPDL channel/element competition from explicit uniforms. It has
 no production callers; the existing pair/annihilation route remains separate.
 
+`transport/relaxation.py` owns the standalone host sampled EADL vacancy
+cascade: explicit draws, depth-first transition ancestry, terminal-hole
+multiplicity, and individual energy budgets with signed transition defects.
+It consumes validated `eadl_relaxation` data; the existing expected cascade
+and characteristic scorer retain their current paths. No production caller.
+
 Simulation core: electron transport, segment-sum PXR+CBS and EEDL characteristic line spectra, bremsstrahlung, parallel case runner, and detector-convolution helpers. Split from single module into submodules; **every public and internal name re-exported from package** — `from pyrite.montecarlo import X` unchanged (`tests/montecarlo/test_exports.py` freeze export set).
 - `case` — frozen, validating `Case` input schema. `build_cases` returns it; `to_dict()` reproduces the version-1 legacy mapping and `run_case` temporarily accepts either representation.
 - `_resources` — execution resource-policy resolution and backend-neutral pre-allocation chunk admission. Small devices default conservative.
