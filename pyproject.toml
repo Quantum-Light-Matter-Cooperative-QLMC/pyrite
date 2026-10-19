@@ -82,6 +82,16 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyrite"]
 
+[tool.hatch.build.targets.sdist]
+only-include = [
+    "src/pyrite",
+    "pyproject.toml",
+    "PYPI.md",
+    "README.md",
+    "LICENSE.txt",
+    "THIRD-PARTY-NOTICES.md",
+]
+
 [dependency-groups]
 test = [
     "pytest>=9.1.0",

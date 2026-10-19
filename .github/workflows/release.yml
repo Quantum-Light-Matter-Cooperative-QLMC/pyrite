@@ -72,6 +72,48 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+      - name: Audit distribution contents
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import tarfile
+
+          MAX_SDIST_MIB = 5
+
+          for archive in Path("dist").glob("*.tar.gz"):
+              size_mib = archive.stat().st_size / 1024**2
+
+              print(f"{archive.name}: {size_mib:.2f} MiB")
+
+              assert size_mib < MAX_SDIST_MIB, (
+                  f"Source distribution exceeds {MAX_SDIST_MIB} MiB"
+              )
+
+              with tarfile.open(archive) as tar:
+                  names = [
+                      member.name.split("/", 1)[-1]
+                      for member in tar.getmembers()
+                  ]
+
+              forbidden = (
+                  ".serena/",
+                  ".claude/",
+                  ".agents/",
+                  "agentdocs/",
+                  ".import_linter_cache/",
+                  ".grimp_cache/",
+              )
+
+              unexpected = [
+                  name for name in names
+                  if name.startswith(forbidden)
+              ]
+
+              assert not unexpected, (
+                  f"Unexpected files in sdist: {unexpected[:10]}"
+              )
+          PY
+
   publish:
     name: Publish to PyPI
     needs: build
