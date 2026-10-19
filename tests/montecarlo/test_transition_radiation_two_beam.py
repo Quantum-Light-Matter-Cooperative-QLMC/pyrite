@@ -82,6 +82,45 @@ def test_active_permittivity_refuses():
         two_beam_straight_field(**config)
 
 
+@pytest.mark.parametrize("medium", ["layer", "substrate"])
+@pytest.mark.parametrize("eps", [np.nan, np.inf, 1.0 + np.nan * 1j])
+def test_nonfinite_permittivity_refuses_before_solving(medium, eps):
+    config = _config(chi=1e-4)
+    if medium == "layer":
+        config["layers"] = [(eps, 300.0)]
+    else:
+        config["substrate_eps"] = eps
+    with pytest.raises(ValueError, match="permittivit.*finite"):
+        two_beam_straight_field(**config)
+
+
+@pytest.mark.parametrize("eps", [1.0, 0.995, -0.5, 0.995 + 0.0001j])
+@pytest.mark.parametrize("g_parallel", [0.0, 2.0])
+def test_uncoupled_propagating_and_evanescent_harmonics(eps, g_parallel):
+    config = _config()
+    config["layers"] = [(eps, 300.0)]
+    config["reciprocal_vector_ang"] = np.array([g_parallel, 0.0, -1.0])
+    config["position_ang"] = np.zeros(3)
+    field = two_beam_straight_field(**config)
+    _, expected = planar_transition_radiation(
+        config["photon_energy_eV"],
+        config["direction"],
+        config["velocity"],
+        config["layers"],
+        return_amplitude=True,
+    )
+    np.testing.assert_allclose(field.transition, expected, rtol=1e-10, atol=1e-13)
+    np.testing.assert_array_equal(field.line, 0.0)
+
+
+def test_vanishing_coupled_film_in_vacuum():
+    config = _config(chi=1e-3)
+    config["layers"] = [(1.0, 1e-8)]
+    config["position_ang"] = np.zeros(3)
+    field = two_beam_straight_field(**config)
+    assert np.linalg.norm(field.total) < 1e-12
+
+
 @pytest.mark.parametrize("sign", [-1, 1])
 @pytest.mark.parametrize("caps", [False, True])
 @pytest.mark.parametrize("g", [(0.015, -0.01, 0.04), (0.015, -0.01, -1.0)])

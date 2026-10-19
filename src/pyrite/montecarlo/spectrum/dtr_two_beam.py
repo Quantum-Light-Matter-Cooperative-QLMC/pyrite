@@ -258,7 +258,7 @@ def two_beam_straight_field(
     finite layers run from substrate toward emitting vacuum, n_z > 0.
     ``chi_transfer`` multiplies exp[-i g.(r-origin)]; ``chi_reverse`` is the
     opposite harmonic and is not generally its complex conjugate in an
-    absorbing crystal. Local, isotropic, passive permittivity is required.
+    absorbing crystal. Finite, local, isotropic, passive permittivity is required.
     Time/position fix one point on the globally straight line, in Angstrom
     with c=1. No recoil, CBS, mosaicity or transported-track approximation is
     included here. Both propagation senses and polarizations are solved.
@@ -272,6 +272,9 @@ def two_beam_straight_field(
 
     Validation: dtr-two-beam-boundary
     """
+    media = [substrate_eps, *(eps for eps, _ in layers)]
+    if any(not np.all(np.isfinite(np.asarray(eps, complex))) for eps in media):
+        raise ValueError("layer and substrate permittivities must be finite")
     s = _stack(
         photon_energy_eV,
         direction,
