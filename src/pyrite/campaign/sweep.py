@@ -330,6 +330,18 @@ TIMEPIX3_DTHETA_OBS_DEG = float(
 TIMEPIX3_DOMEGA_SR = float(TIMEPIX3_CHIP_WIDTH_M**2 / TIMEPIX3_DISTANCE_M**2)
 
 
+@dataclass(frozen=True)
+class SourceDirection:
+    """Lowering reference only; no detector acceptance, response or acquisition.
+
+    Source callers supply an explicit common energy grid and replace this
+    reference direction during scoring. Targeted longitudinal policies are
+    rejected by the source API because they require a single observation.
+    """
+
+    observation_angle_deg: float = 90.0
+
+
 @dataclass
 class Sweep:
     """One parameter sweep.
@@ -463,7 +475,7 @@ class Sweep:
     # Canonical detector owner. Kept after existing fields so legacy positional
     # Sweep construction retains its historical argument order.
     energy_bins: EnergyBins = field(default_factory=EnergyBins, kw_only=True)
-    detector: Detector | None = None
+    detector: Detector | SourceDirection | None = None
     # Canonical geometry owner. Every flat geometry input above is an InitVar
     # that normalizes onto this field, so the target is the only geometry state
     # a Sweep carries and ``dataclasses.replace`` preserves it.
@@ -568,6 +580,10 @@ class Sweep:
             "domega_sr": domega_sr,
         }
         nested = self.detector
+        if isinstance(nested, SourceDirection):
+            if any(value is not None for value in supplied.values()):
+                raise ValueError("source direction cannot have detector acceptance")
+            return
         if nested is not None and not isinstance(nested, Detector):
             raise TypeError("detector must be a Detector")
         base = Detector() if nested is None else nested
@@ -800,8 +816,10 @@ def _case_brem_grid(brem_case_grid: Any, energy_keV: float) -> Any:
     return (start, energy_keV * 1e3 + step, step)
 
 
-def _detector_acceptance(detector: Detector) -> tuple[float, float]:
+def _detector_acceptance(detector: Detector | SourceDirection) -> tuple[float, float]:
     """Polar acceptance (deg) and solid angle (sr); ``None`` is the Timepix3 reference."""
+    if isinstance(detector, SourceDirection):
+        return 0.0, 0.0
     dtheta = (
         TIMEPIX3_DTHETA_OBS_DEG
         if detector.polar_acceptance_deg is None

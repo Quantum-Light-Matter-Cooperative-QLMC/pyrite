@@ -588,3 +588,13 @@ Single-shot simulations return `pyrite.Result`. Resumable campaign checkpoints c
    pyrite.results.cxr_metrics
    pyrite.results.summary_table
 ```
+
+## Provisional directional source API
+
+`pyrite.directional_source(beam, target, energy_eV=..., angle_deg=..., ...)`
+returns `pyrite.DirectionalSpectrum` without a detector or checkpoint. The result
+contains explicit coordinates, escaped incoherent PXR/CBS density per incident
+electron/eV/sr, supported-direction mask and resolved provenance. `.rate()` uses
+the beam mean current; `.rate(current_na)` rescales stored arrays to ph/s/eV/sr.
+This new surface is provisional; see [directional heatmaps](guides/directional-source-heatmap.md)
+for the bounded example, full-circle convention, supported geometry and limits.

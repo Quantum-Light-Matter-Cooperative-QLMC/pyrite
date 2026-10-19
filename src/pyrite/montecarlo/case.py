@@ -250,7 +250,7 @@ class Case(Mapping[str, Any]):
     spec_chunk: int | None
     brem_chunk: int | None
     dtheta_obs_rad: float
-    domega_sr: float
+    domega_sr: float  # zero denotes absent acceptance for detector-free source scoring
 
     # Producer-conditional fields. `_Absent` is internal and skipped by
     # serialization; explicit None remains a real legacy payload value.
@@ -337,7 +337,7 @@ class Case(Mapping[str, Any]):
             _energy_grid(name, getattr(self, name))
         for name in ("theta_obs_rad", "tilt_deg", "tilt_azim_deg", "dtheta_obs_rad"):
             _finite(name, getattr(self, name))
-        _positive("domega_sr", self.domega_sr)
+        _positive("domega_sr", self.domega_sr, allow_zero=True)
         _positive_optional("mosaic_fwhm_rad", self.mosaic_fwhm_rad, allow_zero=True)
         _positive_optional("mosaic_mc_fwhm_rad", self.mosaic_mc_fwhm_rad, allow_zero=True)
         _positive_int("mosaic_mc_nodes", self.mosaic_mc_nodes)

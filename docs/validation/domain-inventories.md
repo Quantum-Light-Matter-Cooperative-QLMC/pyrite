@@ -57,6 +57,7 @@ Generated browsing views of every claim in the [detailed validation ledger](phys
 | [`zhai-hbn-921-detected`](ledger-core-coherent-physics.md#zhai-hbn-921-detected) | end-to-end detected-spectrum anchor vs Zhai SI Fig. S5b (h-BN 921 nm, 17.5–25 keV, tilt 17°/130°) | `discrepancy` |
 | [`kinematic-validity-envelope`](ledger-core-coherent-physics.md#kinematic-validity-envelope) | Photon Born screen: $D = \omega^2\lvert\chi_g\rvert/\lvert\Delta\rvert$, $L_{\rm ext}=2/(\omega\lvert\chi_g\rvert)$ and $R=L_{\rm ext}/\min(t,L_{\rm abs})$, using $\omega=E/(\hbar c)$ and vacuum $\Delta=g^2+2\omega\hat{\mathbf n}\cdot\mathbf g$. Runtime warning requires both $D\ge0.01$ and $R\le1$; conservative screening policy, not a dynamical solution or quantified error bound. | `anchored` |
 | [`coherent-physical-bunch-population`](ledger-core-coherent-physics.md#coherent-physical-bunch-population) | Per-physical-electron coherent source power estimated with distinct incident Monte Carlo pairs; physical bunch charge weights the cross-electron excess, sample count normalizes the estimator | `rederived` |
+| [`directional-source-rate-normalization`](ledger-core-coherent-physics.md#directional-source-rate-normalization) | Independent-electron directional source density per incident electron/eV/sr becomes ph/s/eV/sr by multiplication by mean current magnitude in nA times `1e-9/\|e\|`, with no solid-angle or sample-spacing factor; the existing incoherent PXR–CBS interference is retained | `anchored` |
 
 ## Crystallography & atomic data
 

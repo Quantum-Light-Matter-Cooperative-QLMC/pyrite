@@ -220,6 +220,8 @@ _PUBLIC_OBJECTS = {
     "fetch_tables": ("pyrite.xsgen.install", "fetch_tables"),
     "photon_energies": ("pyrite.materials.emission", "photon_energies"),
     "simulate": ("pyrite.api", "simulate"),
+    "directional_source": ("pyrite.directional", "directional_source"),
+    "DirectionalSpectrum": ("pyrite.results.directional", "DirectionalSpectrum"),
 }
 
 

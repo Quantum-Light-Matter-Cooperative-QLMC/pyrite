@@ -265,6 +265,8 @@ def simulate(
     -----
     This function performs no checkpoint I/O.
     """
+    if detector is None:
+        raise TypeError("simulate requires a detector; use directional_source for source maps")
     resolved_numerics = Numerics() if numerics is None else numerics
     if not isinstance(resolved_numerics, Numerics):
         raise TypeError("numerics must be a Numerics")

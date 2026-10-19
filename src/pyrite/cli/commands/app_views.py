@@ -60,6 +60,9 @@ class MarimoApp:
 PIXELS = MarimoApp("pixels", "pixel_app.py", 2720, "pixel-detector observation")
 COMPARE = MarimoApp("compare", "compare_app.py", 2721, "case and cross-material comparison")
 CHANNELING = MarimoApp("channeling", "channeling_app.py", 2722, "planar channeling", False)
+ANGULAR_HEATMAP = MarimoApp(
+    "angular-heatmap", "angular_heatmap_app.py", 2724, "directional source heatmap", False
+)
 TRANSITION_RADIATION = MarimoApp(
     "transition-radiation", "transition_radiation_app.py", 2723, "TR/CTR", False
 )
@@ -228,3 +231,6 @@ channeling_command = _launch_command(CHANNELING)
 channeling_export_command = _export_command(CHANNELING)
 transition_radiation_command = _launch_command(TRANSITION_RADIATION)
 transition_radiation_export_command = _export_command(TRANSITION_RADIATION)
+
+angular_heatmap_command = _launch_command(ANGULAR_HEATMAP)
+angular_heatmap_export_command = _export_command(ANGULAR_HEATMAP)

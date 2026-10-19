@@ -536,3 +536,13 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** Implementation-context units, distinct-pair normalization, identical aligned fields, zero-mean iid fields, missed entries, Gaussian longitudinal limit, negative-estimate refusal, temporal and detector normalization; fresh-context independent derivation and source-to-code comparison match
 - **Anchor:** `tests/montecarlo/test_coherent_physical_population.py` (including the Gaussian-arrival blend `::test_gaussian_arrival_spread_blends_by_the_longitudinal_form_factor` and the long-bunch incoherent limit `::test_long_bunch_reduces_to_the_incoherent_sum`); `tests/montecarlo/test_temporal_profile.py`
 - **Notes:** [Derivation, assumptions and integration limits](radiation-physics/coherent-physical-bunch-population.md). Production supplies physical charge; low-level callers without it retain historical semantics. Nonnegative output is not a sampling certificate. Convex full-axis audits refuse signed weights they cannot enclose. Earlier remote evidence must be repeated under this operator. Does not promote the full windowed-resolution claim; human sign-off pending. **2026-10-08 (#370):** finite footprints pair offset-free fields with `F = F_z F_perp`; identity `physical-distinct-pairs-v2`. Infinite slabs still pair complete fields with `F = 1`, now including the tilted face-arrival delay in `t0`.
+
+## `directional-source-rate-normalization`
+
+- **Claim:** Independent-electron directional source density per incident electron/eV/sr becomes ph/s/eV/sr by multiplication by mean current magnitude in nA times `1e-9/|e|`, with no solid-angle or sample-spacing factor; the existing incoherent PXR–CBS interference is retained
+- **Code:** `results/directional.py::DirectionalSpectrum.{current_na,rate}`; existing pulse convention `results/store.py::beam_current_na`
+- **Source:** [BIPM SI ampere](https://www.bipm.org/en/si-base-units/ampere), exact elementary charge `1.602176634e-19` C; [spectral observables](../physics/radiation-physics/spectral-observables.md#detector-free-directional-rates)
+- **Status:** anchored
+- **Checks:** Units; zero current; linear current scaling; default Q×f normalization; angular-grid and acceptance independence; rejection of negative/nonfinite current
+- **Anchor:** `tests/montecarlo/test_directional_source.py::test_rate_normalization_zero_linear_default_and_no_solid_angle`; `test_invalid_mean_current_rejected`
+- **Notes:** Fresh-context independent derivation and source-to-code check agree ([write-up](radiation-physics/directional-source-rate-normalization.md)); hard-coded BIPM numeric anchors pin regression. No new PXR/CBS or target-escape model claim. Human sign-off remains pending in #277.

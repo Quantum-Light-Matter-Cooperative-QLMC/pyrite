@@ -12,8 +12,8 @@ from .transition_cases import resolve_transition_radiation
 
 if TYPE_CHECKING:
     from .model import Scene, Sweep
+from .sweep import SourceDirection, build_cases
 from .sweep import Sweep as LegacySweep
-from .sweep import build_cases
 
 
 def scene_physics(scene: Scene, numerics: Numerics) -> Physics:
@@ -33,7 +33,7 @@ def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
     scalar_detector = (
         scene.detector.scalar_detector()
         if isinstance(scene.detector, PlanarDetector)
-        else scene.detector
+        else (SourceDirection() if scene.detector is None else scene.detector)
     )
     target = scene.target_spec
     legacy = LegacySweep(

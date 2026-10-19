@@ -28,18 +28,24 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from itertools import product
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 import numpy as np
 
 from .._energy_grid_encoding import decode_energy_grid
 from .._formatting import fmt_thickness
-from ..detectors import Detector
 from ..materials import CATALOG, LayerSpec
 from ..materials._composition import resolve_composition
 from ..materials.crystal import dominant_reflections
 
 ScalarOrSeq = float | Sequence[float] | np.ndarray
+
+
+class _ObservationDirection(Protocol):
+    """Only the reference direction needed for target/observation validation."""
+
+    @property
+    def observation_angle_deg(self) -> float: ...
 
 
 def _seq(x):
@@ -596,7 +602,7 @@ class _TargetGeometry:
         if not np.all((tilts > 0.0) & (tilts < 90.0)):
             raise ValueError("blazed grooves require 0 < tilt_deg < 90 for every case")
 
-    def validate_against(self, detector: Detector) -> None:
+    def validate_against(self, detector: _ObservationDirection) -> None:
         """Validate the target x detector leg the target cannot own alone.
 
         Grooves are machined for one escape direction, so they need
