@@ -1,361 +1,75 @@
 # PyRITE
 
-A **Py**thon toolkit for **R**adiation from **I**nteractions and **T**ransport of **E**lectrons.
+**Simulate how electrons travel through matter—and the X-rays they produce.**
 
-PyRITE is a Monte Carlo electron transport code for crystalline and amorphous
-solids. Its transport model largely follows the well-validated PENELOPE code
-system. Its main purpose is to predict tunable X-ray lines emitted when
-electrons interact coherently with crystals: parametric X-ray radiation (PXR)
-and coherent bremsstrahlung (CBS). Neither PENELOPE nor Geant4 models these
-natively.
+PyRITE (**Py**thon toolkit for **R**adiation from **I**nteractions and **T**ransport of **E**lectrons) is a Python-based Monte Carlo simulation toolkit for electron transport and radiation in solids. It is designed for researchers studying electron–matter interactions, crystal-based X-ray sources, and related experiments.
+
+Its particular focus is **parametric X-ray radiation (PXR)** and **coherent bremsstrahlung (CBS)**: radiation produced when electrons interact with the ordered structure of a crystal. PyRITE brings these specialized calculations together with electron transport and other X-ray emission processes in one workflow.
+
+**[Try the interactive demo](https://pyrite.readthedocs.io/en/latest/demo/index.html)** · **[Read the documentation](https://pyrite.readthedocs.io/en/latest/)** · **[Explore the examples](https://pyrite.readthedocs.io/en/latest/guides/getting-started.html)**
+
+[![Example PyRITE spectra and simulated electron trajectories](https://pyrite.readthedocs.io/en/latest/demo/preview.png)](https://pyrite.readthedocs.io/en/latest/demo/index.html)
+
+*Example radiation spectra and electron trajectories. Click the image to explore the browser demo—no installation required.*
+
+## What can PyRITE do?
+
+- **Follow electrons through materials.** Model scattering and energy loss in crystalline and amorphous solids.
+- **Predict X-ray emission.** Calculate PXR, CBS, bremsstrahlung, and characteristic X-ray spectra.
+- **Explore experimental designs.** Vary electron beams, materials, crystal orientations, target thicknesses, and detector configurations.
+- **Work the way you prefer.** Run simulations from the command line, use a Python API, or explore results through interactive applications.
+- **Scale up when needed.** Start with a CPU simulation; optional GPU backends and workflows for larger studies are available.
+
+PyRITE is especially useful for investigating **tunable, crystal-based X-ray sources**, including how electron scattering and background radiation affect the spectra that an experiment might measure. Unlike general-purpose transport codes such as PENELOPE and Geant4, its central focus includes native PXR/CBS calculations.
+
+## Try it in your browser
+
+The **[interactive results demo](https://pyrite.readthedocs.io/en/latest/demo/index.html)** lets you explore sample X-ray spectra and electron trajectories without installing Python or downloading any datasets. It's the easiest way to see what PyRITE produces.
+
+## Get started locally
+
+PyRITE is published on [PyPI as `pyrite-mc`](https://pypi.org/project/pyrite-mc/) and requires **Python 3.13 or newer**.
+
+To install the command-line tool with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv tool install pyrite-mc
+```
+
+Download the reference data, then run the bundled quickstart example:
+
+```bash
+pyrite tables fetch
+pyrite run quickstart
+```
+
+The reference data download is approximately **100 MB**. The quickstart is a small CPU simulation of X-ray emission from highly oriented pyrolytic graphite (HOPG); results are saved under `pyrite-output/`.
+
+To use PyRITE as a Python library instead, install it in your environment:
+
+```bash
+pip install pyrite-mc
+```
+
+For interactive local apps, optional GPU support, configuration, and a walk-through of your first results, see the **[getting-started guide](https://pyrite.readthedocs.io/en/latest/guides/getting-started.html)**. For library usage, see the **[Python API guide](https://pyrite.readthedocs.io/en/latest/guides/python-api-workflow.html)**.
+
+## Research status and validation
 
 > [!IMPORTANT]
-> PyRITE is unvalidated research code under active development. Absolute
-> predictions are only as trustworthy as their entry in the
-> [physics validation ledger](docs/validation/physics-validation-ledger.md).
+> **PyRITE is research software under active development, not a fully validated radiation-transport code.** Different models and features have different levels of testing and physical validity. Check the [capability matrix](https://pyrite.readthedocs.io/en/latest/physics/capabilities.html) and [validation status](https://pyrite.readthedocs.io/en/latest/validation/status-summary.html) before relying on quantitative predictions.
 
-The longer-term goal is a general-purpose electron transport and radiation
-toolkit for 1 keV–100 MeV electrons, with native GPU acceleration, arbitrary
-source, target, and detector geometries, and extensible physics. Against the
-FORTRAN-based PENELOPE and the `C++`-based Geant4, PyRITE trades maturity for a
-lower barrier to entry: it is plain Python, fast, and easy to extend. Opt-in
-planar channeling has a bounded run integration; axial channeling remains an
-experimental diagnostic. See the [capability matrix](docs/physics/capabilities.md)
-for supported paths and limitations.
+PyRITE's development emphasizes transparent physical assumptions, reproducible calculations, and comparison with theory and published results. The [physics documentation](https://pyrite.readthedocs.io/en/latest/physics/index.html) explains the models and their limitations.
 
-- Source: <https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite>
-- Documentation: <https://pyrite.readthedocs.io/en/latest/>
+## Get involved
 
-[![HOPG PXR+CBS spectra in the Zhai et al. Fig. 1c geometry beside 3D electron
-tracks; opens the interactive browser demo](docs/_static/demo/results-demo-preview.png)](https://pyrite.readthedocs.io/en/latest/#explore-results-in-the-browser)
+PyRITE is developed at UCLA's Quantum Light–Matter Cooperative (QLMC). Feedback from researchers—especially comparisons with analytical calculations, other simulation codes, or experimental measurements—is welcome.
 
-The [interactive version](https://pyrite.readthedocs.io/en/latest/#explore-results-in-the-browser)
-runs in the browser from the documentation overview page; nothing to install.
+If you encounter a problem, have a feature request, or would like to discuss a possible collaboration, [open an issue](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues) or start a [discussion](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/discussions).
 
-## Install
+## License
 
-Requires Python ≥ 3.13. Python 3.13 installs `backports.zstd` automatically;
-Python 3.14+ uses the standard-library implementation.
+PyRITE is distributed under the [UCLA Academic Software License](LICENSE.txt) for educational and academic research by eligible academic or nonprofit researchers. **Commercial use requires separate permission**; see the license for details.
 
-```bash
-# Command-line tool in its own environment (recommended):
-uv tool install pyrite-mc
+---
 
-# Or into the current environment, for use as a library:
-pip install pyrite-mc
-# OR
-uv add pyrite-mc
-```
-
-Then fetch the reference data and check the install:
-
-```bash
-pyrite tables fetch    # pinned datasets and tables, about 100 MB
-pyrite config setup    # optional: detect GPU hardware, save the backend
-pyrite --help
-```
-
-`pyrite tables fetch` downloads EEDL, EADL, EPDL, SBETHE, ELSEPA, and BremsLib
-data from public GitHub Releases; no GitHub token is needed. Run
-`pyrite tables fetch --help` to list the individual datasets, or
-`pyrite tables fetch NAME --archive PATH` to install one from a local archive.
-In a notebook with no terminal (for example, jupyter), call `pyrite.fetch_tables()`,
-which does the same as a bare `pyrite tables fetch`.
-
-For tab completion, run `pyrite config completion install` and restart the
-shell; with `uv tool`, run `uv tool update-shell` first so `pyrite` is on
-`PATH`. See the [shell-completion guide](docs/guides/shell-completion.md).
-
-### GPU acceleration
-
-The base `pyrite-mc` package is CPU-only. Install at most one GPU extra by
-adding it in brackets after the package name:
-
-| Hardware | Extra    | Backend                 |
-| -------- | -------- | ----------------------- |
-| NVIDIA   | `nvidia` | CUDA CuPy               |
-| AMD      | `amd`    | ROCm source-built CuPy  |
-| Intel    | `intel`  | oneAPI `dpnp` + `dpctl` |
-
-```bash
-uv tool install pyrite-mc[nvidia]
-```
-
-The `amd` extra builds CuPy from source and needs `CUPY_INSTALL_USE_HIP=1` set
-for the install command; ROCm support is entirely untested as of this writing;
-Intel support is provisional, and FP64 operations are currently unsupported.
-
-> [!NOTE]
-> `uv` refuses to combine GPU extras, but `pip` does not check: installing
-> two of them leaves conflicting CuPy builds in one environment.
-
-`PYRITE_MC_BACKEND=auto|cpu|cuda|rocm|sycl` selects the array backend. See
-[execution and acceleration](docs/computation/execution-and-acceleration.md)
-for backend, precision, transport-core, and memory-policy controls.
-
-### Plotting and interactive apps
-
-The base package runs simulations and the CLI without any plotting stack. Two
-extras add it; combine them with a GPU extra as `pyrite-mc[apps,nvidia]`:
-
-| Extra   | Adds                                                     |
-| ------- | -------------------------------------------------------- |
-| `plots` | `pyrite.plots` (matplotlib, Altair, Plotly, datashader)  |
-| `apps`  | `plots` plus marimo for the `pyrite app` commands        |
-
-```bash
-uv tool install "pyrite-mc[apps]"
-```
-
-Without the extra, `pyrite app` commands and `pyrite.plots` backends exit with
-an install hint naming it. A checkout's plain `uv sync` already includes both.
-
-### From a checkout
-
-To work from source:
-
-```bash
-git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
-cd pyrite
-uv sync                       # creates .venv/; add --extra nvidia|amd|intel for a GPU
-source .venv/bin/activate     # Windows: .venv\Scripts\activate
-```
-
-Commands in the README and user guides assume `pyrite` is on your `PATH`:
-activate `.venv` in each shell, or install once with `uv tool install .`
-(see the [shell-completion guide](docs/guides/shell-completion.md)).
-Contributor and CI commands are in the [development workspace guide](docs/repo-design/development-workspace.md).
-
-## Run
-
-Outputs generated using the CLI default to `pyrite-output/<kind>/` in the current workspace.
-For a fixed output home, run `pyrite config set workspace.root /path/to/workspace`
-once. Subdirectories reuse the nearest existing output tree; see the
-[output-home and migration rules](docs/guides/configuration-cookbook.md#choose-an-output-home).
-
-`pyrite run` executes a resumable campaign over a named profile and writes
-checkpoints under `pyrite-output/checkpoints/`:
-
-```bash
-# Smallest end-to-end demo (~1 min on CPU); writes component checkpoints.
-pyrite run quickstart
-
-# Analyze an existing checkpoint.
-pyrite app analysis launch hopg
-
-# Pixel-detector observations, and case / cross-material comparison.
-pyrite app pixels launch hopg
-pyrite app compare launch hopg
-
-# Interactive transport and lattice viewer; no checkpoint required.
-pyrite app viewer launch hopg
-
-# Validation dashboard.
-pyrite app validation launch
-
-# Planar quantum states and ensemble spatial density; no checkpoint required.
-pyrite app channeling launch
-```
-
-Full sweeps are heavy. Run them through
-[PyRITE's remote workflow](docs/guides/running-on-a-cluster.md) or the portable
-SLURM templates documented there. GPT `.gdf` electron-beam snapshots can be used
-as a beam source; see [GDF beam import](docs/guides/gpt-gdf-beams.md).
-
-### Profiles
-
-A profile is a named campaign: thickness, energy, and tilt grids, electron
-counts, beam and detector references, and material membership. PyRITE ships
-light demo profiles that each exercise one feature and run locally in a minute
-or two on CPU:
-
-| Demo | Shows |
-| --- | --- |
-| `quickstart` | one HOPG case, incoherent PXR lines plus bremsstrahlung |
-| `sweep_demo` | a small two-material energy x tilt sweep for the analysis app |
-| `trajectory_demo` | `--trajectories` capture and VTK export |
-| `coherent_demo` | coherent + incoherent emission in windowed line grids |
-| `detector_demo` | a pixel detector behind a filter, with Poisson counts |
-| `pixelated_detector_demo` | native Timepix3 pixel grid with ideal response and expected counts |
-| `two_detector_demo` | two ideal scalar apertures at 90° and 135°, exposing raw spectra |
-| `high_energy_demo` | a 1 MeV beam with the measured line-grid policy |
-| `hopg_emittance_demo` | Courant-Snyder transverse beam phase space |
-| `channeling_demo` | opt-in planar channeling radiation from 17 MeV Si(110), on-axis detector ([guide](docs/guides/planar-channeling.md)) |
-
-`standard` is also bundled: it is the catalog's base profile, which every
-material's default scan ranges resolve from, and a full research-scale sweep.
-
-```bash
-pyrite profile list
-pyrite profile show quickstart
-pyrite profile numerics show quickstart
-```
-
-Bundled profiles are read-only. Profiles you create or edit live in your user
-catalog layer, `profiles/NAME.toml` under the platform config directory
-(`~/.config/pyrite/` on Linux; `pyrite config get catalog.user`), and are read
-over the bundled catalog:
-
-```bash
-# Clone a demo, then replace its energy (keV) and thickness (Å) grids.
-pyrite profile create my_scan --from quickstart --energy 30:60:10 --thickness 5000,20000
-pyrite profile set my_scan --material hopg,hbn
-pyrite profile numerics set my_scan --cxr-trials 2000
-pyrite profile show my_scan
-pyrite run my_scan -m hopg
-```
-
-A complete catalog of your own (materials, beams, detectors) is selected with
-`pyrite config set catalog.path DIR`; profile edits then write there instead.
-
-See [sweep profiles](docs/guides/sweep-profiles.md),
-[external catalogs](docs/guides/external-catalog.md), and the
-[profile settings map](docs/repo-design/profile-settings.md) for every field.
-
-### Python API
-
-For a single simulation with no files on disk, `Physics` chooses models and
-`Numerics` controls sampling, energy grids, and execution:
-
-```python
-import pyrite as pr
-
-beam = pr.Beam(
-    energy_keV=30.0, transverse=pr.TransverseSpot(fwhm_x_mm=1.0), longitudinal=pr.PointBunch()
-)
-target = pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0))
-detector = pr.Detector()
-result = pr.simulate(
-    beam,
-    target,
-    detector,
-    physics=pr.Physics(),
-    numerics=pr.Numerics(cxr_trials=450, brem_trials=100),
-)
-print(result.provenance["identity_digest"])
-```
-
-With the scalar `Detector` shown here, `simulate` returns emitted spectra in
-photons per incident electron per eV per sr, plus run identification, and
-neither reads nor writes a checkpoint. Detector response is not applied; apply
-it to the spectra explicitly if needed. The
-[Python API workflow](docs/guides/python-api-workflow.md) covers scenes,
-sweeps, detector scoring, and persistence. Prefer `pyrite run` when you need
-resumability, profiles, remote execution, or the analysis apps.
-
-The generated [CLI reference](docs/repo-design/cli/cli-reference.md) documents
-every command.
-
-## Core physics
-
-Pipeline: sampled electron beam → single-scattering electron transport →
-per-segment PXR + CBS, incoherent bremsstrahlung, and characteristic lines →
-photon escape → detector scoring.
-
-- **[Electron transport](docs/physics/beam-transport/electron-transport.md):**
-  independent piecewise-linear flights with explicit elastic collisions.
-  Shell soft/hard inelastic collisions are the default where shell data covers
-  every layer; other cases use continuous loss with optional Urban straggling.
-  Elastic collisions sample ELSEPA partial-wave cross sections; collision
-  stopping uses material-level SBETHE tables. Secondary electron transport is
-  opt-in; upstream beamline transport and space charge are excluded.
-- **[Crystal source](docs/physics/materials/structure-factor.md):**
-  phase-specific structures, complex atomic form factors, Debye-Waller factors,
-  selected reflections, and optional mosaicity define the reciprocal-space
-  coupling.
-- **[Coherent lines](docs/physics/radiation-physics/coherent-radiation.md):**
-  first-order kinematic Born PXR and CBS amplitudes are summed coherently within
-  each transport segment, i.e. between elastic collisions that change the
-  electron direction $\hat{\mathbf v}$. A collision-free flight may be
-  subdivided to resolve CSDA energy and clock evolution; each segment uses one
-  representative velocity. The in-medium Bragg resonance is
-  $\omega = (\mathbf v\cdot\mathbf g)/[1 - \mathrm{Re}\lbrace n(\omega)\rbrace\,\hat{\mathbf n}\cdot\mathbf v]$.
-  Dynamical diffraction is excluded. The separate opt-in planar channeling
-  path and its restrictions are listed in the [capability matrix](docs/physics/capabilities.md).
-- **[Incoherent continuum](docs/physics/radiation-physics/bremsstrahlung.md):**
-  the default is the direction-resolved BremsLib v2.0 double-differential cross
-  section (`pyrite tables fetch bremslib`). Without those tables, a run warns
-  and falls back to isotropic EEDL bremsstrahlung: the ENDF-6 MF=23/MT=527 total
-  cross section times the normalized MF=26/MT=527 photon-energy density, also
-  selectable as `bremsstrahlung_model="eedl"`. Unscreened Born Bethe-Heitler
-  with an Elwert correction remains an optional backend.
-- **[Characteristic lines](docs/physics/radiation-physics/characteristic-radiation.md):**
-  electron-impact vacancies from EEDL subshell ionization cross sections relax
-  through xraydb fluorescence yields with L-shell Coster-Kronig redistribution.
-  Each line carries its natural-width Lorentzian and is scored as a separate
-  incoherent component of the line spectrum.
-- **[Photon transport](docs/physics/radiation-physics/photon-escape-and-dispersion.md):**
-  straight-ray Beer-Lambert escape with the total narrow-beam coefficient
-  (photoabsorption plus Rayleigh and Compton removal). Scattered photons leave
-  the ray with no build-up, redirection, or re-emission; bulk refractive
-  dispersion is passive; interface optics are omitted.
-- **[Detector treatment](docs/physics/detectors/detector-response.md):** source
-  spectra are evaluated in a fixed far-field direction. Solid-angle acceptance,
-  aperture broadening, efficiency, and measured-energy redistribution are
-  downstream steps.
-
-By default PyRITE neglects interference between distinct flights and between
-incident electrons. The optional
-[`coherent`/`both` tracking policy](docs/physics/radiation-physics/coherent-emission.md)
-keeps phase along each single-electron trajectory and adds inter-electron terms
-weighted by the sampled bunch form factor.
-
-The [physics model index](docs/physics/index.md) lists assumptions, model
-variants, and conventions, with links to each implementation-level description.
-Geometry follows the [tilt convention](docs/physics/geometry/tilt-convention.md).
-
-## Data and outputs
-
-`src/pyrite/data/catalog/` is the bundled catalog: crystals, media, materials,
-beams, detectors, and demo profiles, one TOML file per object. Your own
-profiles and their energy-grid artifacts live in the user catalog layer
-(`catalog.user`). Settings live in `~/.config/pyrite/config.toml`, remembered
-app state in `~/.local/state/pyrite/`, fetched data in `~/.local/share/pyrite/`,
-and rebuildable caches in `~/.cache/pyrite/` (platform equivalents elsewhere). Phase-specific CIFs
-live in `src/pyrite/data/cifs/`; loading is offline. `pyrite material validate`
-checks the selected catalog.
-
-Each checkpoint is `pyrite-output/checkpoints/<stem>/{line,brem,characteristic}.h5` plus a
-`pyrite-output/checkpoints/<stem>/meta.json` manifest. Stored source spectra exclude detector
-response unless a detector view applies it explicitly.
-
-## Validation
-
-The analytic core is cross-checked against Feranchuk et al. (2000) and Zhai et
-al. (2025). Before scientific use, consult the
-[validation ledger](docs/validation/physics-validation-ledger.md) for
-claim-level status and the [validation methodology](docs/validation/methodology.md).
-
-## References
-
-Primary physics and data sources:
-
-- I. D. Feranchuk, A. Ulyanenkov, J. Harada, and J. C. H. Spence, Parametric
-  x-ray radiation and coherent bremsstrahlung from nonrelativistic electrons in
-  crystals, *Phys. Rev. E* **62**, 4225 (2000).
-  [doi:10.1103/PhysRevE.62.4225](https://doi.org/10.1103/PhysRevE.62.4225)
-- Q. Zhai et al., Enhanced tunable X-rays from bulk crystals driven by
-  table-top free electron energies, *Nat. Commun.* **16**, 11218 (2025).
-  [doi:10.1038/s41467-025-66063-6](https://doi.org/10.1038/s41467-025-66063-6)
-- F. Salvat, *PENELOPE-2024: A Code System for Monte Carlo Simulation of
-  Electron and Photon Transport*, OECD NEA report NEA/MBDAV/R(2024)1 (2025).
-- F. Salvat, A. Jablonski, and C. J. Powell, ELSEPA — Dirac partial-wave
-  calculation of elastic scattering of electrons and positrons by atoms,
-  positive ions and molecules, *Comput. Phys. Commun.* **165**, 157 (2005).
-  [doi:10.1016/j.cpc.2004.09.006](https://doi.org/10.1016/j.cpc.2004.09.006)
-- A. Poškus, Double and single differential cross sections of electron-atom
-  bremsstrahlung at electron energies up to 30 MeV for Z = 1–100,
-  *At. Data Nucl. Data Tables* **166**, 101734 (2025).
-  [doi:10.1016/j.adt.2025.101734](https://doi.org/10.1016/j.adt.2025.101734)
-
-The full bibliography (atomic data libraries, stopping powers, form factors,
-and numerical methods) is on the
-[published references page](https://pyrite.readthedocs.io/en/latest/references.html),
-generated from [`docs/references.bib`](docs/references.bib).
-
-## Status and license
-
-Academic research code under active development, distributed under the
-[UCLA Academic Software License](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE.txt)
-for educational or academic research use by academic or nonprofit researchers.
-For commercial licensing, contact the author listed in the license.
+**[Documentation](https://pyrite.readthedocs.io/en/latest/)** · **[Interactive demo](https://pyrite.readthedocs.io/en/latest/demo/index.html)** · **[PyPI](https://pypi.org/project/pyrite-mc/)** · **[Releases](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases)**
