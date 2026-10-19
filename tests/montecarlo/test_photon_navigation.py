@@ -180,6 +180,88 @@ def test_empty_batch():
     assert all(value.shape == (0,) for value in hit.values())
 
 
+def _plane_crossing_reference(origin, direction, uniforms, layers, footprint):
+    """Scalar oracle: split at every plane, classify midpoints, spend depth.
+
+    Uses synthetic per-atom rates from the fixture, no navigation helpers or
+    EPDL getter. Midpoint classification is independent of ray/box clipping.
+    """
+    planes = [(2, face) for top, bottom, _ in layers for face in (top, bottom)]
+    if footprint is not None:
+        planes += [(axis, face) for axis in (0, 1) for face in (-footprint / 2, footprint / 2)]
+    crossings = {0.0}
+    for axis, face in planes:
+        if direction[axis] != 0:
+            distance = (face - origin[axis]) / direction[axis]
+            if distance > 0:
+                crossings.add(float(distance))
+    edges = [*sorted(crossings), np.inf]
+    depth = -np.log1p(-uniforms[0])
+    for start, end in zip(edges[:-1], edges[1:], strict=True):
+        midpoint = start + 1 if np.isinf(end) else (start + end) / 2
+        point = origin + midpoint * direction
+        if footprint is not None and not all(
+            -footprint / 2 <= q < footprint / 2 for q in point[:2]
+        ):
+            continue
+        for layer, (top, bottom, composition) in enumerate(layers):
+            if not top <= point[2] < bottom:
+                continue
+            weights = [
+                (atom, channel, density * rate)
+                for atom, (element, density) in enumerate(composition)
+                for channel, rate in enumerate(
+                    {"C": [1, 0, 2, 1, 0], "Si": [0, 1, 0, 2, 1]}[element]
+                )
+            ]
+            total = sum(weight for _, _, weight in weights)
+            if total == 0:
+                continue
+            if depth >= total * (end - start):
+                depth -= total * (end - start)
+                continue
+            threshold = uniforms[1] * total
+            for atom, channel, weight in weights:
+                if threshold < weight:
+                    return start + depth / total, layer, channel, atom
+                threshold -= weight
+    return np.inf, -1, -1, -1
+
+
+@pytest.mark.parametrize("footprint", [None, 4.0])
+def test_mixed_material_flights_match_plane_crossing_reference(rates, footprint):
+    rng = np.random.default_rng(34101)
+    n = 300
+    origins = rng.uniform(-6, 6, (n, 3))
+    directions = rng.normal(size=(n, 3))
+    directions /= np.linalg.norm(directions, axis=1)[:, None]
+    # Force shared/outer faces, parallel directions and inward/outward entry.
+    origins[:6] = [[0, 0, z] for z in (0, 1, 3, 5, 5, 0)]
+    directions[:6] = [[1, 0, 0], [1, 0, 0], [1, 0, 0], [0, 0, -1], [0, 0, 1], [0, 0, -1]]
+    uniforms = rng.random((n, 2))
+    uniforms[:6, 0] = 0
+    layers = [(0, 1, [("C", 0.25)]), (2, 3, []), (3, 5, [("Si", 0.5), ("C", 0.125)])]
+    hit = nav.photon_first_interactions(
+        origins,
+        directions,
+        np.full(n, 1e5),
+        uniforms,
+        layers,
+        width_ang=footprint,
+        height_ang=footprint,
+    )
+    reference = np.array(
+        [
+            _plane_crossing_reference(origin, direction, draws, layers, footprint)
+            for origin, direction, draws in zip(origins, directions, uniforms, strict=True)
+        ]
+    )
+    # Independent float64 plane crossings/depth accumulation: a few ulps.
+    np.testing.assert_allclose(hit["distance_ang"], reference[:, 0], rtol=1e-13, atol=1e-14)
+    for column, key in enumerate(("layer", "channel", "element"), start=1):
+        np.testing.assert_array_equal(hit[key], reference[:, column])
+
+
 @pytest.mark.parametrize("value", [-1.0, np.nan, np.inf, 1e308])
 def test_invalid_rates_are_refused(monkeypatch, value):
     monkeypatch.setattr(
