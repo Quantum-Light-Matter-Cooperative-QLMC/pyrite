@@ -243,10 +243,16 @@ To first order the shift is
 $-Q^2/(2E\beta\,\hat u\cdot\mathbf Q)-(\mathbf Q\cdot\hat n/E)/(1-\beta\,\hat u\cdot\hat n)$
 with $\mathbf Q=\hbar c\mathbf g$ and $E$ the electron total energy. Forward
 ultrarelativistic lines give about $-\hbar\omega/E$; the longitudinal
-lattice-recoil term alone is $Q/(2\beta E)$, about 1 % for 30 keV HOPG (002).
+lattice-recoil term has magnitude $Q/(2\beta E)$, about 1 % for 30 keV HOPG (002).
 Routine 10–100 keV lines are therefore counted, and the screen does not warn
 until the in-crystal applicability of the vacuum shift is settled (#527).
 Version 1 records lack this counter.
+
+The recoil ratio uses float64 kinetic energy and normalized directions, but
+only after the production-precision seed is finite and positive. A forward
+seed lost to a rounded `1 - beta·n` denominator remains an invalid seed and is
+not recovered by this overlay. The count is not a complete recoil census at
+energies where production precision fails; that limitation belongs to #440.
 
 The vacuum seed screen is independent of the output grid. The subsequent root
 screen reuses the production table and solver, including endpoint clamping

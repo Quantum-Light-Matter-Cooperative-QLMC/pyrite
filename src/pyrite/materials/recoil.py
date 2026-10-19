@@ -153,8 +153,8 @@ def recoil_shift_fraction(
     but the exact root is forbidden. To first order in Q/E the fraction is
     -Q.Q/(2E*beta*u.Q) - (Q.n/E)/(1-beta*u.n). Forward lines with Q along u
     give -photon/(beta*E)*(1+(1-beta)/(2*beta)), tending to -photon/E; the
-    first (longitudinal lattice-recoil) term alone is Q/(2*beta*E) for Q along
-    u, about 1 % at 30 keV for HOPG (002). Transverse transfer can exceed
+    first (longitudinal lattice-recoil) term has magnitude Q/(2*beta*E) for Q
+    along u, about 1 % at 30 keV for HOPG (002). Transverse transfer can exceed
     photon/E.
 
     Validation: line-recoil-validity-screen
