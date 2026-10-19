@@ -16,7 +16,7 @@ def test_bare_fetch_runs_every_step_and_reports_failures(monkeypatch):
         return {"code": code, "installed": True}
 
     monkeypatch.setattr(install, "fetch_one", fake)
-    with pytest.raises(DataFetchError, match=r"1 of 9 failed:\nbremslib: offline"):
+    with pytest.raises(DataFetchError, match=r"1 of 10 failed:\nbremslib: offline"):
         install.fetch_tables()
     assert seen == list(install.BARE_FETCH_STEPS)
 

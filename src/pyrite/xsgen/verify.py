@@ -23,7 +23,7 @@ from .store import manifest_digest, resolve
 #: Codes whose release indexes pin tables, in report order.
 TABLE_CODES = ("bremslib", "elsepa", "sbethe-tables")
 #: Fetched single-file datasets, in report order (see :mod:`pyrite.datasets`).
-DATASET_CODES = ("eedl", "eadl", "epdl")
+DATASET_CODES = ("eedl", "eadl", "epdl", "epdl-differential")
 #: Fetched reference-data directories, in report order.
 REFERENCE_CODES = ("sbethe",)
 #: Codes fixed by ``pyrite tables fetch CODE`` alone, without ``--archive``.

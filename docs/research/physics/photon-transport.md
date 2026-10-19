@@ -12,8 +12,10 @@ photon transport model:
 
 | Owner | Available behavior | Extension required |
 | --- | --- | --- |
-| `materials/photon_cross_sections.py` | Five EPDL2025 integrated per-atom cross sections, including separate nuclear and electron-field pair channels | Pinned subshell photoionization cross sections, scattering functions, and form factors |
+| `materials/photon_cross_sections.py` | Five EPDL2025 integrated per-atom cross sections, including separate nuclear and electron-field pair channels | None for channel competition |
+| `materials/photon_differential.py` | Pinned EPDL2025 subshell photoionization (EADL designators and binding energies), form factor `F(x, Z)` and incoherent scattering function `S(x, Z)` (`epdl-photon-differential-data`) | Compton profiles if Doppler broadening is added; EPDL2025 File 27 has none |
 | `montecarlo/transport/pair_production.py` | Stack/prism first interaction and pair daughter sampling | Return every interaction channel and element; resume photons after scattering |
+| `montecarlo/transport/photon_navigation.py` | Standalone CPU all-channel/element first-flight reference, vacuum entry/gaps and exact stack/prism boundaries (`photon-channel-first-interaction`) | Integrate into the photon queue and resume after sampled scattering; production pair/annihilation paths still use their historical entry point |
 | `montecarlo/eadl_relaxation.py` | EADL transition energies and probabilities; deterministic expected vacancy cascade | Sample individual vacancy decays and daughter photons/electrons |
 | `montecarlo/transport/secondaries.py` | Charged-particle generation queue, pair launches, energy balance | One owner of photon interactions and charged daughter handoff |
 | `montecarlo/transport/annihilation.py` | At-rest/in-flight two-photon emission and first-interaction sink from #295 | Hand off emission rows before sink scoring, preserving event lineage and rest-energy accounting |
@@ -22,12 +24,16 @@ photon transport model:
 | `_physics_contract.py`, `runner/case_tables.py` | Immutable model descriptors and native elastic preparation | Declare photon requirements and prepare numeric tables; implement queue/samplers in native transport |
 | `runner/emission_adapters.py` | Selected batch producers in existing spectral slots, with streaming/adaptive preflight | Separate unattenuated source sampling and tracked scoring from directional attenuated arrays |
 
-`scripts/release_epdl_table.py` exports only five integrated MF=23 channels.
-Its pinned table cannot supply photoelectric shell probabilities or the
-angular distributions requested by #341. Extend the data release with a
-separately versioned artifact; retain the existing attenuation artifact and
-its digest. Inspect the full upstream EPDL2025 sections and declared
-interpolation laws before specifying the new parser{cite:p}`epdl2025`.
+`scripts/release_epdl_table.py` exports the five integrated MF=23 channels
+as the attenuation table, and with `--table differential` a separately
+versioned table (`pyrite tables fetch epdl-differential`) of MF=23 MT 534–599
+subshell photoionization and MF=27 MT 502/504 `F(x, Z)` and `S(x, Z)`, with
+`x = sin(θ/2)/λ` in Å⁻¹{cite:p}`epdl2025`. The attenuation table and its digest
+are unchanged. Every upstream section used declares lin-lin interpolation.
+EPDL2025 subshell sets and binding energies are identical to EADL2025's for
+all 100 elements, so photoelectric vacancies index the relaxation data
+directly. Upstream `EFL` is zero, and File 27 holds no Compton profiles; the
+MT 505/506 anomalous scattering factors are not packaged.
 
 EADL's `vacancy_cascade` returns expected vacancy visits, not individual
 transitions. A sampled cascade must consume `EADLSubshellRelaxation` transition

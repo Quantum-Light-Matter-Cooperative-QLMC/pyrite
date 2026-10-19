@@ -117,6 +117,9 @@ and release assets are public, so downloads need no GitHub token.
 * - `tables-epdl-1`
   - `epdl2025_mf23.npz` (derived EPDL2025 photon table)
   - `pyrite.datasets.EPDL`
+* - `tables-epdl-differential-1`
+  - `epdl2025_differential.npz` (10,799,061 B, derived EPDL2025 subshell and scattering-function table)
+  - `pyrite.datasets.EPDL_DIFFERENTIAL`
 * - `mirror-eedl2025-1`
   - `EEDL.endf` (fallback after LLNL)
   - `pyrite.datasets.EEDL`

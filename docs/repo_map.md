@@ -323,7 +323,18 @@ Per-atom EPDL2025 photon cross sections (photoelectric, coherent, incoherent, nu
 - Public: `photon_cross_sections_ang2`, `total_photon_cross_section_ang2`, `photoelectric_edges`, `PHOTON_CHANNELS`, `EPDL_E_MIN_EV`/`EPDL_E_MAX_EV`, `ATTENUATION_MODEL` (identity marker).
 - Deps: `materials.atomic` (`Z_TABLE`), `DATA_DIR`.
 
+### `materials/photon_differential.py`
+EPDL2025 subshell photoionization (EADL designators and binding energies), coherent form factor `F(x, Z)` and incoherent scattering function `S(x, Z)` (`x = sin(θ/2)/λ`, Å⁻¹) for the opt-in photon transport of #341, from the fetched dataset `epdl-differential` (SHA-pinned; `scripts/release_epdl_table.py --table differential`). No transport caller yet.
+- Public: `photoionization_subshells`, `subshell_photoionization_cross_sections_ang2`, `coherent_form_factor`, `incoherent_scattering_function`, `PhotoionizationSubshell`, `X_MAX_INV_ANG`.
+- Deps: `materials.photon_cross_sections`, `datasets`.
+
 ### `montecarlo/` (package)
+
+`transport/photon_navigation.py` owns the standalone host all-channel photon
+first-flight reference: sample-frame stack/prism ray intervals, vacuum entry
+and gaps, and EPDL channel/element competition from explicit uniforms. It has
+no production callers; the existing pair/annihilation route remains separate.
+
 Simulation core: electron transport, segment-sum PXR+CBS and EEDL characteristic line spectra, bremsstrahlung, parallel case runner, and detector-convolution helpers. Split from single module into submodules; **every public and internal name re-exported from package** — `from pyrite.montecarlo import X` unchanged (`tests/montecarlo/test_exports.py` freeze export set).
 - `case` — frozen, validating `Case` input schema. `build_cases` returns it; `to_dict()` reproduces the version-1 legacy mapping and `run_case` temporarily accepts either representation.
 - `_resources` — execution resource-policy resolution and backend-neutral pre-allocation chunk admission. Small devices default conservative.

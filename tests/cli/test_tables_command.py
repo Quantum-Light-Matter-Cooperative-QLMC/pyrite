@@ -724,6 +724,7 @@ _BARE_ORDER = [
     "eedl",
     "eadl",
     "epdl",
+    "epdl-differential",
     "sbethe",
     "sbethe-tables",
     "sbethe-tables:positron",
@@ -752,7 +753,7 @@ def test_bare_fetch_reports_a_failed_positron_pin_separately(isolated, monkeypat
     assert result.exit_code == 1
     assert calls == _BARE_ORDER
     assert "failed: elsepa (positron): elsepa:positron unreachable" in result.stderr
-    assert "1 of 9 failed: elsepa (positron)" in result.stderr
+    assert "1 of 10 failed: elsepa (positron)" in result.stderr
     assert "(3 positron tables)" in result.stdout
 
 
@@ -764,8 +765,8 @@ def test_bare_fetch_reports_a_failure_runs_the_rest_and_exits_1(isolated, monkey
     assert result.exit_code == 1
     assert calls == _BARE_ORDER
     assert "failed: epdl: epdl unreachable" in result.stderr
-    assert "1 of 9 failed: epdl" in result.stderr
-    assert "epdl" not in result.stdout
+    assert "1 of 10 failed: epdl" in result.stderr
+    assert f"{tmp_path / 'epdl'}\n" not in result.stdout
 
 
 def test_bare_fetch_json_lists_results_and_failures(isolated, monkeypatch, tmp_path):
