@@ -35,7 +35,7 @@ class Provenance(Mapping[str, Any]):
         :attr:`resolved_physics`, :attr:`stopping_model`, :attr:`characteristic_model`,
         :attr:`attenuation_model`, :attr:`bremsstrahlung_model`.
     Run diagnostics
-        :attr:`kinematic_validity`, :attr:`adaptive_sampling`,
+        :attr:`kinematic_validity`, :attr:`line_data_coverage`, :attr:`adaptive_sampling`,
         :attr:`line_grid_policy`, :attr:`line_grid_resolved`.
     Environment
         :attr:`backend`, :attr:`device`, :attr:`git_sha`, :attr:`git_dirty`,
@@ -81,6 +81,11 @@ class Provenance(Mapping[str, Any]):
     """Bremsstrahlung cross-section source marker (BremsLib or EEDL)."""
 
     # Run diagnostics
+    line_data_coverage: list[Mapping[str, Any]] | None = None
+    """Unweighted line-pair optical-domain screens, per direction and policy.
+    Counts are not a lost-yield estimate; vacuum seeds are distinguished from
+    solved roots, including roots outside the production tabulation.
+    """
     kinematic_validity: Mapping[str, Any] | None = None
     """Central-ray kinematic-theory screen per reflection: ``model``, limits,
     and ``reflections`` with their dynamical/extinction ratios."""

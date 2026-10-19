@@ -170,6 +170,9 @@ radiation-physics/finite-time-lineshape
 radiation-physics/line-absorption-tabulation
 radiation-physics/kinematic-validity-envelope
 radiation-physics/line-energy-dispersion
+radiation-physics/line-recoil-formation
+radiation-physics/line-recoil-resonance
+radiation-physics/line-recoil-validity-screen
 radiation-physics/narrow-beam-total-attenuation
 radiation-physics/pxr-amplitude
 radiation-physics/self-absorption

@@ -285,6 +285,17 @@ Supported vacuum photon-energy comparison API. Resolves catalogue entrance cryst
 Static, scattering-free quantum-channeling profile (ADR-0018, #503), in the plane-local frame. `thermal` interpolates phonon-DOS site `B(T)` from `data/channeling_thermal.toml` and extrapolates with the Debye model; crystals without rows are refused (`ChannelingDataError`). `potential` builds the planar continuum potential and nuclear/electron densities from Mott--Bethe `Z - f0` Fourier sums with thermal smearing, detecting extinctions to set the true period. `transverse` solves the Bloch plane-wave eigenproblem with mass `gamma m`, gives dipole matrix elements, entry populations versus incidence angle (with divergence), and the shared cancellation-free Doppler denominator. `entry` maps sample tilt and a #25 `CrystalCut` lattice rotation onto the plane-local incidence, with independent-atom mean-inner-potential refraction at the face. `axial` (#508, experimental) builds the 2D string potential of a lattice axis from every zone reflection, on the smallest rectangular projected cell, with per-site/anisotropic displacement tensors, atomic strings, band-limited grid synthesis and the 2D plane-wave eigenproblem `axial_states`. Depth evolution and emission belong to `montecarlo/channeling/` (#504, #505).
 - Public: `planar_profile`, `PlanarProfile`, `plane_incidence`, `PlaneIncidence`, `mean_inner_potential_eV`, `transverse_states`, `TransverseStates`, `entry_populations`, `line_energy_eV`, `doppler_denominator`, `longitudinal_kinematics`, `thermal_b_factor`, `debye_b_factor`, `debye_integral`, `fit_debye_temperature`, `load_thermal_sites`, `ThermalSite`, `ChannelingDataError`. Deps: `materials.atomic`, `materials.crystal`, `DATA_DIR`, NumPy, SciPy; no Monte Carlo imports.
 
+### `materials/recoil.py`
+Provisional exact vacuum line-recoil reference: physical positive-mass-shell
+photon roots, fixed-momentum energy mismatch and its stable derivative Jacobian.
+Paired NumPy broadcasting. Read only by the record-only line coverage screen
+(`spectrum/cxr/_coverage.py`); no production scorer or `photon_energies`
+selection, medium/interface model, quantum amplitude or arbitrary-trajectory
+coherence.
+Ledger: `line-recoil-resonance`, `line-recoil-formation`, `line-recoil-validity-screen`.
+- Entry points: `recoil_resonance_eV`, `recoil_shift_fraction`, `recoil_mismatch_inv_ang`, `recoil_mismatch_slope`.
+- Deps: `materials.crystal` (shared constants), NumPy.
+
 ### `validation/validation_oracles.py`
 Optional validation-only adapters for external crystallography/scattering comparators. Pinned `Dans_Diffraction` 3.4 backend builds or loads crystals, compares lattice parameters, reciprocal-vector magnitudes, and `|F_hkl|²`, then applies fail-closed geometry/non-resonant/dispersive thresholds; production physics stay in `materials/crystal.py`.
 - Public: `build_dans_crystal_from_pyrite`, `load_dans_crystal_from_cif`, `compare_lattice`, `compare_reflection_geometry`, `compare_structure_factor_magnitudes`, `validate_dans_crystal`; comparison, tolerance, and report dataclasses.

@@ -12,6 +12,36 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `tests/montecarlo/test_transition_radiation_dtr.py` (internal Maxwell-solver consistency and analytic limits, not an external published anchor); alternating SiO2/MoS2/SiO2 diagnostic profile in `validation/reference_data/dtr_stack.toml`
 - **Notes:** Issue #581 first slice, experimental field diagnostic only. No production DTR selector, CBS phase reconciliation, mosaic average, thick-crystal extinction, transport validity claim or device validation. The layer harmonic scatters once; use only in the Born regime. Reference is a deterministic straight passage, not a production campaign profile. Independent fresh-context validation remains pending by explicit user choice; no independent write-up exists. The separate `dtr-two-beam-boundary` and `line-tr-phase-reconciliation` acceptance claims are not satisfied by this record.
 
+## `line-recoil-resonance`
+
+- **Claim:** exact vacuum photon root from the relativistic final-electron mass shell with a static crystal taking reciprocal momentum `+hbar*g`; physical roots lie in `(0,T]`, with `T` the incident kinetic energy; stable forward evaluation retains `1-beta` after beta rounds to one
+- **Code:** `materials/recoil.py::{recoil_resonance_eV,_coefficients}`
+- **Source:** Shi et al., *Transverse recoil imprinted on free-electron radiation*, Nature Communications 15, 7803 (2024), DOI `10.1038/s41467-024-52050-w`, exact conservation Eq. (6), with reciprocal label negated relative to the paper; not its small-recoil Eq. (7)
+- **Status:** anchored
+- **Checks:** energy/momentum units; positive final-energy branch; zero/negative/too-transverse transfer forbidden; final electron at rest; forward/backward geometries; soft-transfer classical limit and the additional transverse-lattice-recoil smallness condition; NumPy paired broadcasting
+- **Anchor:** `tests/materials/test_recoil.py::{test_resonance_matches_unsquared_mass_shell,test_hopg_forward_root_no_longer_exceeds_the_beam_energy,test_forbidden_branches_return_nan,test_all_kinetic_energy_endpoint_and_broadcasting,test_forward_denominator_survives_beta_rounding_to_unity,test_classical_limit_requires_small_lattice_recoil_too}` (65-digit unsquared mass-shell bisection)
+- **Notes:** Reference implementation only; production spectra and `photon_energies` still use their existing model. No in-medium or quantum-intensity claim. Fresh-context verification independently rederived the source equation before code inspection, matched implementation and rotated/broadcast high-precision checks, and returned `rederived`; the owner applies `anchored` with the named passing regression tests. [Derivation](radiation-physics/line-recoil-resonance.md). Human sign-off pending.
+
+## `line-recoil-formation`
+
+- **Claim:** vacuum energy mismatch `(E_f+photon-E_i)/(hbar*c)` and its positive derivative `(1-beta_f.n)/(hbar*c)`, setting a fixed-momentum flight's finite-duration time integral and energy Jacobian
+- **Code:** `materials/recoil.py::{recoil_mismatch_inv_ang,recoil_mismatch_slope}`
+- **Source:** Shi et al. (2024), exact conservation Eq. (6) and interaction-picture scattering time integrals in Methods, DOI `10.1038/s41467-024-52050-w`
+- **Status:** anchored
+- **Checks:** mismatch has inverse-length units; age/duration are `c*dt` in angstroms, not spatial flight length; resonance stationarity; derivative against centred differences; positive massive-electron Jacobian; exact sum of constant-momentum time pieces
+- **Anchor:** `tests/materials/test_recoil.py::{test_exact_mismatch_zero_and_derivative_jacobian,test_constant_momentum_flight_factor_is_split_invariant}`
+- **Notes:** Limited to a prescribed straight constant-momentum flight and one vacuum plane-wave final electron mode. Does not certify joining flights with different momenta, inter-electron coherence, absolute intensity, absorption or first-order Snell propagation. Current production formation kernels are unchanged. Fresh-context verification returned `rederived` after deriving before source inspection and matching the implementation, mass-shell derivative and rotated/broadcast checks; owner applies `anchored` with the named passing tests. [Derivation](radiation-physics/line-recoil-formation.md). Human sign-off pending.
+
+## `line-recoil-validity-screen`
+
+- **Claim:** exact vacuum line-recoil shift `E_exact/E_classical - 1`, with `E_classical = beta*u.Q/(1-beta*u.n)` the transfer-free limit of the `line-recoil-resonance` root on the same stable denominator; first order `-Q.Q/(2E*beta*u.Q) - (Q.n/E)/(1-beta*u.n)`; NaN for a nonpositive classical root, `+inf` for a positive classical root with a forbidden exact root. Record-only screen counts positive vacuum seeds with `|shift| > 0.01`
+- **Code:** `materials/recoil.py::recoil_shift_fraction`; `montecarlo/spectrum/cxr/_coverage.py::_recoil_count`
+- **Source:** ratio of the `line-recoil-resonance` root (Shi et al. 2024, Eq. (6), reciprocal label negated) to its `Q -> 0` limit; first-order expansion author-derived
+- **Status:** anchored
+- **Checks:** 65-digit unsquared mass-shell root over the classical root (forward, backward, oblique, 30 keV–50 MeV); first-order expansion at small transfer; ultrarelativistic forward limit `-photon/E`; transverse transfer exceeding `photon/E`; NaN/`+inf` branches; float64 `beta -> 1`; screen counts with no warning and spectra bitwise unchanged
+- **Anchor:** `tests/materials/test_recoil.py::{test_shift_fraction_matches_mass_shell_over_classical,test_shift_fraction_first_order_limit_and_forward_photon_ratio,test_transverse_transfer_shifts_more_than_photon_over_energy,test_shift_fraction_branches_and_broadcasting}`; `tests/montecarlo/test_line_data_coverage.py::{test_forward_high_energy_miss_survives_a_low_explicit_axis,test_recoil_screen_counts_supported_forward_lines_without_warning,test_supported_spectrum_is_bitwise_unchanged_and_does_not_warn}`
+- **Notes:** Issue #249 diagnostic. Vacuum free-electron kinematics only; whether the shift applies to a Bloch electron in a finite slab is open (#527). The 1 % limit (`RECOIL_SHIFT_LIMIT`) is screening policy. The longitudinal term has magnitude `Q/(2*beta*E)`, ~1 % for 30 keV HOPG (002), so ordinary 10–100 keV lines are counted; the screen therefore records counts without a warning. Fresh-context verification derived before implementation inspection and returned `rederived`; independent 75-digit unsquared mass-shell checks agree within `1.6e-16` absolute shift. The owner applies `anchored` with the named passing regressions. The overlay first requires a finite positive production-precision seed: float64 recoil evaluation does not recover seeds lost to forward-denominator rounding (#440). [Derivation and evidence](radiation-physics/line-recoil-validity-screen.md). Human sign-off pending.
+
 ## `tr-interface-energy-scale`
 
 - **Claim:** Relativistic vacuum/material single-interface TR energy scale `W ≈ alpha gamma hbar omega_p / 3` and photon roll-off scale of order `gamma hbar omega_p`

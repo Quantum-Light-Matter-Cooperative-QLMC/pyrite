@@ -185,7 +185,80 @@ Ledger rows: `coherent-line-spectrum` (how $|A|^2$ is used, summed, and normaliz
 Follow those rows in the [validation ledger](../../validation/physics-validation-ledger.md) before scientific use; no row in this section is human `signed-off` yet. Implementation owners: `pyrite.materials.crystal.chi_g`, `pyrite.materials.crystal.U_g`, and `pyrite.montecarlo.spectrum.cxr.mc_cxr_spectrum`.
 
 
+## Recoil reference and production limits
+
+`pyrite.materials.recoil` supplies a provisional vacuum reference derived from
+the exact electron energy--momentum conservation in Eq. (6) of
+{cite:t}`shi2024recoil`. `recoil_resonance_eV` accepts electron kinetic energy
+in eV, unit electron/photon directions and a signed reciprocal vector in
+inverse angstroms. It returns the physical photon root or NaN for a forbidden
+branch. The crystal takes momentum $+\hbar\mathbf g$; the source paper uses
+the opposite reciprocal label. A 50 MeV forward HOPG (004) root obeys the
+kinetic-energy bound rather than the classical bound above it.
+
+`recoil_mismatch_inv_ang` and `recoil_mismatch_slope` provide the exact vacuum
+energy mismatch and its derivative for one fixed-momentum flight and one
+plane-wave final electron mode. Flight duration means $c\,\Delta t$, in
+angstroms; it is not the spatial flight length. The derivative supplies the
+energy Jacobian. The independent [resonance](../../validation/radiation-physics/line-recoil-resonance.md)
+and [formation](../../validation/radiation-physics/line-recoil-formation.md)
+records state the branch, small-transfer limits and numerical checks.
+
+These references are not selected by `simulate`, production spectrum kernels,
+or the supported `photon_energies` comparison API. A recoil-corrected centre
+does not supply quantum radiation amplitudes or justify the current coherent
+sum over different final electron states. Production integration also needs
+the interface phase and its derivative to be derived in the same convention;
+the existing first-order Snell formula cannot simply be appended to the
+vacuum reference. Those integrations remain part of #249. Small photon energy
+relative to the electron total energy alone is insufficient for the classical
+limit when transverse reciprocal momentum is significant.
+
 ## Runtime kinematic screen
+
+The line scorer also screens the transported population for optical-data
+coverage before output-axis masks. `LineOpticalDataWarning` reports positive
+vacuum seeds outside the available optical domain and in-domain seeds whose
+production root lookup encounters missing optical data. This remains visible
+when an automatic axis ends below the missing lines. It does not extrapolate
+Chantler or recover those lines.
+
+`Result.provenance.line_data_coverage` and checkpoint line records retain one
+`line-data-coverage.v2` record per successful spectrum call, direction and
+emission policy. Electron-block execution and emitting layers can produce
+multiple records. Counts are unweighted eligible escape-piece/reflection/mosaic
+pairs: only the selected line-electron population with finite positive duration
+is included. They depend on segmentation and quadrature; they are neither lost
+photon yield nor a fraction of incident electrons. Separate counters describe
+nonpositive/invalid vacuum seeds, missing data, critical-angle rejection,
+nonconvergence and the line-energy floor. `finite_root_outside_grid` is a subset
+of `finite_root`; `vacuum_seed_outside_tabulation` is an additional flag, so
+neither should be added to the mutually exclusive outcome counts.
+
+`recoil_shift_exceeds_limit` is a further overlay on positive vacuum seeds,
+including those outside the optical domain. It counts seeds whose exact vacuum
+recoil root differs from the classical root by more than `recoil_shift_limit`
+(1 %), or is forbidden (`materials/recoil.py::recoil_shift_fraction`, `line-recoil-validity-screen`).
+To first order the shift is
+$-Q^2/(2E\beta\,\hat u\cdot\mathbf Q)-(\mathbf Q\cdot\hat n/E)/(1-\beta\,\hat u\cdot\hat n)$
+with $\mathbf Q=\hbar c\mathbf g$ and $E$ the electron total energy. Forward
+ultrarelativistic lines give about $-\hbar\omega/E$; the longitudinal
+lattice-recoil term has magnitude $Q/(2\beta E)$, about 1 % for 30 keV HOPG (002).
+Routine 10–100 keV lines are therefore counted, and the screen does not warn
+until the in-crystal applicability of the vacuum shift is settled (#527).
+Version 1 records lack this counter.
+
+The recoil ratio uses float64 kinetic energy and normalized directions, but
+only after the production-precision seed is finite and positive. A forward
+seed lost to a rounded `1 - beta·n` denominator remains an invalid seed and is
+not recovered by this overlay. The count is not a complete recoil census at
+energies where production precision fails; that limitation belongs to #440.
+
+The vacuum seed screen is independent of the output grid. The subsequent root
+screen reuses the production table and solver, including endpoint clamping
+outside that table; such roots do not establish full-domain optical support.
+The screen leaves spectra and case identity unchanged. Older cached records
+without this field have unknown transported coverage.
 
 Case lowering evaluates selected reflections for each crystalline layer at
 its central incident-ray vacuum resonance. `KinematicValidityWarning` reports
