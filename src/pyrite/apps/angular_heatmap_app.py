@@ -1,12 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     # Until a release contains directional_source; then pin pyrite-mc>=VERSION.
-#     "pyrite-mc @ git+https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite@main",
-#     # Probed at import; without a usable GPU PyRITE falls back to NumPy.
-#     "cupy-cuda13x[ctk]>=14.1.1; sys_platform == 'linux'",
 #     "marimo>=0.25.1",
-#     "matplotlib>=3.11.0",
 # ]
 #
 # [tool.marimo.display]
