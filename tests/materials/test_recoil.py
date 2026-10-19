@@ -10,6 +10,7 @@ from pyrite.materials.recoil import (
     recoil_mismatch_inv_ang,
     recoil_mismatch_slope,
     recoil_resonance_eV,
+    recoil_shift_fraction,
 )
 
 
@@ -182,3 +183,65 @@ def test_nonunit_direction_and_unphysical_photon_are_rejected():
         recoil_resonance_eV(1e6, [0, 0, 2], [0, 0, 2], [0, 0, 1])
     with pytest.raises(ValueError, match="photon"):
         recoil_mismatch_inv_ang(2e6, 1e6, [0, 0, 1], [0, 0, 2], [0, 0, 1])
+
+
+def _classical(kinetic, g, direction):
+    beta = np.sqrt(kinetic * (kinetic + 2 * M_E_EV)) / (kinetic + M_E_EV)
+    u = np.array([0.0, 0.0, 1.0])
+    return HBARC_EV_ANG * beta * np.dot(u, g) / (1 - beta * np.dot(u, direction))
+
+
+@pytest.mark.parametrize(
+    ("kinetic", "g", "direction"),
+    [
+        (50e6, [0, 0, 3.75], [0, 0, 1]),
+        (1e6, [0, 0, 1.875], [0, 0, 1]),
+        (30e3, [0.4, 0.2, 1.8], [0.6, 0, 0.8]),
+        (5e6, [0.4, 0.2, 1.8], [0.0, 0.6, -0.8]),
+    ],
+)
+def test_shift_fraction_matches_mass_shell_over_classical(kinetic, g, direction):
+    expected = _mass_shell_root(kinetic, g, direction) / _classical(kinetic, g, direction) - 1
+    actual = recoil_shift_fraction(kinetic, [0, 0, 1], g, direction)
+    assert actual == pytest.approx(expected, rel=1e-10, abs=1e-14)
+
+
+def test_shift_fraction_first_order_limit_and_forward_photon_ratio():
+    kinetic = 1e6
+    total = kinetic + M_E_EV
+    beta = np.sqrt(kinetic * (kinetic + 2 * M_E_EV)) / total
+    for g, direction in (([0, 0, 1e-4], [0, 0, 1]), ([3e-5, 0, 1e-4], [0.6, 0, 0.8])):
+        q = HBARC_EV_ANG * np.asarray(g)
+        n = np.asarray(direction, dtype=float)
+        first = -np.dot(q, q) / (2 * total * beta * q[2]) - (np.dot(q, n) / total) / (
+            1 - beta * n[2]
+        )
+        assert recoil_shift_fraction(kinetic, [0, 0, 1], g, direction) == pytest.approx(
+            first, rel=1e-3
+        )
+    # Ultrarelativistic forward lines with Q along u shift by about -photon/E.
+    kinetic, g = 50e6, [0, 0, 1e-4]
+    photon = _classical(kinetic, g, [0, 0, 1])
+    assert recoil_shift_fraction(kinetic, [0, 0, 1], g, [0, 0, 1]) == pytest.approx(
+        -photon / (kinetic + M_E_EV), rel=1e-3
+    )
+
+
+def test_transverse_transfer_shifts_more_than_photon_over_energy():
+    # A small classical photon/E ratio does not bound the shift.
+    kinetic, g, direction = 1e6, [10, 0, 0.5], [-0.8, 0, 0.6]
+    photon = _classical(kinetic, g, direction)
+    shift = recoil_shift_fraction(kinetic, [0, 0, 1], g, direction)
+    assert abs(shift) > 10 * photon / (kinetic + M_E_EV)
+
+
+def test_shift_fraction_branches_and_broadcasting():
+    # Nonpositive classical root: no line, NaN. Forbidden exact root: +inf.
+    assert np.isnan(recoil_shift_fraction(1e6, [0, 0, 1], [0, 0, -2], [0, 0, 1]))
+    assert np.isinf(recoil_shift_fraction(1e6, [0, 0, 1], [10, 0, 0.001], [0, 0, 1]))
+    kinetic = np.array([30e3, 1e6, 50e6])
+    actual = recoil_shift_fraction(kinetic, [0, 0, 1], [0, 0, 1.875], [0, 0, 1])
+    assert actual.shape == (3,)
+    assert np.all(np.diff(np.abs(actual)) > 0)
+    # Finite where beta itself rounds to one in float64.
+    assert np.isfinite(recoil_shift_fraction(1e15, [0, 0, 1], [0, 0, 2e-8], [0, 0, 1]))

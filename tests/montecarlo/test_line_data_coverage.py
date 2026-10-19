@@ -14,6 +14,7 @@ from pyrite.montecarlo.spectrum.cxr import (
     _prepare_spectrum,
 )
 from pyrite.montecarlo.spectrum.cxr._coverage import (
+    RECOIL_SHIFT_LIMIT,
     LineOpticalDataWarning,
     collect_line_data_coverage,
 )
@@ -65,6 +66,10 @@ def test_forward_high_energy_miss_survives_a_low_explicit_axis(coherent, route, 
     assert counts["vacuum_seed_outside_optical_data"] == 1
     assert counts["no_positive_vacuum_seed"] == 1
     assert counts["finite_root"] == 0
+    # The same forward seed is far outside the low-recoil regime.
+    assert counts["recoil_shift_exceeds_limit"] == 1
+    assert record["recoil_shift_limit"] == RECOIL_SHIFT_LIMIT
+    assert record["schema"] == "line-data-coverage.v2"
     assert record["coherent"] is coherent
     outcomes = (
         "invalid_vacuum_seed",
@@ -114,6 +119,9 @@ def test_supported_spectrum_is_bitwise_unchanged_and_does_not_warn():
             actual = mc_cxr_spectrum(**kwargs)
     np.testing.assert_array_equal(actual, expected)
     assert records[0]["counts"]["finite_root"] == 1
+    # 30 keV HOPG (002) at this angle: the longitudinal lattice-recoil term
+    # alone is ~1 %, so the record-only screen counts it without warning.
+    assert records[0]["counts"]["recoil_shift_exceeds_limit"] == 1
     assert records[0]["counts"]["vacuum_seed_outside_optical_data"] == 0
 
 
@@ -127,6 +135,19 @@ def test_failed_nested_attempt_does_not_publish_counts_or_warnings():
             _spectrum()
     assert len(records) == 1
     assert len(emitted) == 1
+
+
+def test_recoil_screen_counts_supported_forward_lines_without_warning():
+    # 1 MeV forward HOPG (002): the classical seed (~59 keV) has optical data,
+    # but photon/E is ~4 %, so only the record-only recoil count is set.
+    with warnings.catch_warnings(record=True) as emitted:
+        warnings.simplefilter("always")
+        with collect_line_data_coverage() as records:
+            _spectrum((1000.0,))
+    assert not [w for w in emitted if issubclass(w.category, UserWarning)]
+    counts = records[0]["counts"]
+    assert counts["vacuum_seed_outside_optical_data"] == 0
+    assert counts["recoil_shift_exceeds_limit"] == 1
 
 
 def test_low_level_call_warns_without_a_collector():

@@ -10,7 +10,12 @@ from numpy.typing import ArrayLike, NDArray
 
 from .crystal import HBARC_EV_ANG, M_E_EV
 
-__all__ = ["recoil_resonance_eV", "recoil_mismatch_inv_ang", "recoil_mismatch_slope"]
+__all__ = [
+    "recoil_resonance_eV",
+    "recoil_shift_fraction",
+    "recoil_mismatch_inv_ang",
+    "recoil_mismatch_slope",
+]
 
 
 def _real(value: ArrayLike, name: str) -> NDArray[np.float64]:
@@ -131,6 +136,40 @@ def recoil_resonance_eV(
     valid = (numerator > 0) & (denominator > 0) & np.isfinite(root) & (root > 0)
     valid &= root <= kinetic + endpoint_tolerance
     return np.asarray(np.where(valid, np.minimum(root, kinetic), np.nan))
+
+
+def recoil_shift_fraction(
+    kinetic_eV: ArrayLike,
+    electron_direction: ArrayLike,
+    g_ang_inv: ArrayLike,
+    photon_direction: ArrayLike,
+) -> NDArray[np.float64]:
+    """Return the exact vacuum root over its classical limit, minus one.
+
+    The classical limit drops the transfer terms of the exact root,
+    (beta*u.Q)/(1-beta*u.n), evaluated with the same stable forward
+    denominator. Arguments follow recoil_resonance_eV. Returns NaN where the
+    classical root is not positive (no line), and +inf where it is positive
+    but the exact root is forbidden. To first order in Q/E the fraction is
+    -Q.Q/(2E*beta*u.Q) - (Q.n/E)/(1-beta*u.n). Forward lines with Q along u
+    give -photon/(beta*E)*(1+(1-beta)/(2*beta)), tending to -photon/E; the
+    first (longitudinal lattice-recoil) term alone is Q/(2*beta*E) for Q along
+    u, about 1 % at 30 keV for HOPG (002). Transverse transfer can exceed
+    photon/E.
+
+    Validation: line-recoil-validity-screen
+    """
+    exact = recoil_resonance_eV(kinetic_eV, electron_direction, g_ang_inv, photon_direction)
+    _kinetic, total, beta, direction, transfer, normal = _state(
+        kinetic_eV, electron_direction, g_ang_inv, photon_direction
+    )
+    numerator = beta * np.sum(direction * transfer, axis=-1)
+    denominator = (M_E_EV / total) ** 2 / (1 + beta)
+    denominator += 0.5 * beta * np.sum((direction - normal) ** 2, axis=-1)
+    classical = numerator / denominator
+    with np.errstate(divide="ignore", invalid="ignore"):
+        fraction = np.where(np.isfinite(exact), exact / classical - 1, np.inf)
+    return np.asarray(np.where(classical > 0, fraction, np.nan))
 
 
 def _photon(photon_eV, kinetic):

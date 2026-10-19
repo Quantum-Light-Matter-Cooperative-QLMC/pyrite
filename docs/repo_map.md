@@ -288,10 +288,12 @@ Static, scattering-free quantum-channeling profile (ADR-0018, #503), in the plan
 ### `materials/recoil.py`
 Provisional exact vacuum line-recoil reference: physical positive-mass-shell
 photon roots, fixed-momentum energy mismatch and its stable derivative Jacobian.
-Paired NumPy broadcasting; no production scorer or `photon_energies` selection,
-medium/interface model, quantum amplitude or arbitrary-trajectory coherence.
-Ledger: `line-recoil-resonance`, `line-recoil-formation`.
-- Entry points: `recoil_resonance_eV`, `recoil_mismatch_inv_ang`, `recoil_mismatch_slope`.
+Paired NumPy broadcasting. Read only by the record-only line coverage screen
+(`spectrum/cxr/_coverage.py`); no production scorer or `photon_energies`
+selection, medium/interface model, quantum amplitude or arbitrary-trajectory
+coherence.
+Ledger: `line-recoil-resonance`, `line-recoil-formation`, `line-recoil-validity-screen`.
+- Entry points: `recoil_resonance_eV`, `recoil_shift_fraction`, `recoil_mismatch_inv_ang`, `recoil_mismatch_slope`.
 - Deps: `materials.crystal` (shared constants), NumPy.
 
 ### `validation/validation_oracles.py`

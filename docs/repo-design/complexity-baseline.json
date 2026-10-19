@@ -284,7 +284,7 @@
     {
       "path": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
       "name": "AxialMCWF.run",
-      "cc": 26
+      "cc": 25
     },
     {
       "path": "src/pyrite/montecarlo/channeling/emission.py",
@@ -314,12 +314,12 @@
     {
       "path": "src/pyrite/montecarlo/runner/__init__.py",
       "name": "_spectrum_case_impl",
-      "cc": 24
+      "cc": 23
     },
     {
       "path": "src/pyrite/montecarlo/runner/__init__.py",
       "name": "_transport_case",
-      "cc": 29
+      "cc": 28
     },
     {
       "path": "src/pyrite/montecarlo/runner/channeling.py",
@@ -330,6 +330,11 @@
       "path": "src/pyrite/montecarlo/runner/cxr_grid.py",
       "name": "_resolve_policy_grid",
       "cc": 27
+    },
+    {
+      "path": "src/pyrite/montecarlo/runner/directions.py",
+      "name": "directional_outputs",
+      "cc": 22
     },
     {
       "path": "src/pyrite/montecarlo/runner/scheduling.py",
@@ -470,11 +475,6 @@
       "path": "src/pyrite/montecarlo/spectrum/cxr_seeds.py",
       "name": "absorption_edge_brackets",
       "cc": 27
-    },
-    {
-      "path": "src/pyrite/montecarlo/spectrum/transition_radiation.py",
-      "name": "planar_transition_radiation",
-      "cc": 23
     },
     {
       "path": "src/pyrite/montecarlo/trajectories.py",

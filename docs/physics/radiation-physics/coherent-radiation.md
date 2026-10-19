@@ -224,7 +224,7 @@ when an automatic axis ends below the missing lines. It does not extrapolate
 Chantler or recover those lines.
 
 `Result.provenance.line_data_coverage` and checkpoint line records retain one
-`line-data-coverage.v1` record per successful spectrum call, direction and
+`line-data-coverage.v2` record per successful spectrum call, direction and
 emission policy. Electron-block execution and emitting layers can produce
 multiple records. Counts are unweighted eligible escape-piece/reflection/mosaic
 pairs: only the selected line-electron population with finite positive duration
@@ -234,6 +234,19 @@ nonpositive/invalid vacuum seeds, missing data, critical-angle rejection,
 nonconvergence and the line-energy floor. `finite_root_outside_grid` is a subset
 of `finite_root`; `vacuum_seed_outside_tabulation` is an additional flag, so
 neither should be added to the mutually exclusive outcome counts.
+
+`recoil_shift_exceeds_limit` is a further overlay on positive vacuum seeds,
+including those outside the optical domain. It counts seeds whose exact vacuum
+recoil root differs from the classical root by more than `recoil_shift_limit`
+(1 %), or is forbidden (`materials/recoil.py::recoil_shift_fraction`, `line-recoil-validity-screen`).
+To first order the shift is
+$-Q^2/(2E\beta\,\hat u\cdot\mathbf Q)-(\mathbf Q\cdot\hat n/E)/(1-\beta\,\hat u\cdot\hat n)$
+with $\mathbf Q=\hbar c\mathbf g$ and $E$ the electron total energy. Forward
+ultrarelativistic lines give about $-\hbar\omega/E$; the longitudinal
+lattice-recoil term alone is $Q/(2\beta E)$, about 1 % for 30 keV HOPG (002).
+Routine 10–100 keV lines are therefore counted, and the screen does not warn
+until the in-crystal applicability of the vacuum shift is settled (#527).
+Version 1 records lack this counter.
 
 The vacuum seed screen is independent of the output grid. The subsequent root
 screen reuses the production table and solver, including endpoint clamping
