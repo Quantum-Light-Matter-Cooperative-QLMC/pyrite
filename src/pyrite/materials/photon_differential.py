@@ -24,8 +24,9 @@ right-continuous at repeated knots. A subshell is zero below its first knot;
 outside ``[EPDL_E_MIN_EV, EPDL_E_MAX_EV]`` (energies) or ``[0, X_MAX_INV_ANG]``
 (momentum transfer) values are NaN.
 
-This is atomic data access, not a sampler: nothing in transport reads it yet
-(issue #341). The sum of the subshells is the MT=522 photoelectric total within
+Standalone CPU interaction samplers consume these tables (issue #341); no
+production photon tracker is enabled. The sum of the subshells is the MT=522
+photoelectric total within
 the two tables' thinning tolerances; the attenuation table stays the owner of
 channel competition.
 """
@@ -174,6 +175,15 @@ def coherent_form_factor(element: str, x_inv_ang: object) -> np.ndarray:
     return _evaluate(_table()[_atomic_number(element)].form_factor, x_inv_ang, 0.0, X_MAX_INV_ANG)
 
 
+def coherent_form_factor_table(element: str) -> tuple[np.ndarray, np.ndarray]:
+    """Read-only lin-lin knots ``(x [Å⁻¹], F)`` for bounded rejection sampling.
+
+    These are the same pinned knots used by ``coherent_form_factor``.
+    Validation: epdl-photon-differential-data
+    """
+    return _table()[_atomic_number(element)].form_factor
+
+
 def incoherent_scattering_function(element: str, x_inv_ang: object) -> np.ndarray:
     """EPDL2025 incoherent scattering function ``S(x, Z)``; ``S(0) = 0``, ``S -> Z``.
 
@@ -185,3 +195,12 @@ def incoherent_scattering_function(element: str, x_inv_ang: object) -> np.ndarra
     return _evaluate(
         _table()[_atomic_number(element)].scattering_function, x_inv_ang, 0.0, X_MAX_INV_ANG
     )
+
+
+def incoherent_scattering_function_table(element: str) -> tuple[np.ndarray, np.ndarray]:
+    """Read-only lin-lin knots ``(x [Å⁻¹], S)`` for bounded rejection sampling.
+
+    These are the same pinned knots used by ``incoherent_scattering_function``.
+    Validation: epdl-photon-differential-data
+    """
+    return _table()[_atomic_number(element)].scattering_function

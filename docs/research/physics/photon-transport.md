@@ -15,13 +15,16 @@ photon transport model:
 | `materials/photon_cross_sections.py` | Five EPDL2025 integrated per-atom cross sections, including separate nuclear and electron-field pair channels | None for channel competition |
 | `materials/photon_differential.py` | Pinned EPDL2025 subshell photoionization (EADL designators and binding energies), form factor `F(x, Z)` and incoherent scattering function `S(x, Z)` (`epdl-photon-differential-data`) | Compton profiles if Doppler broadening is added; EPDL2025 File 27 has none |
 | `montecarlo/transport/pair_production.py` | Stack/prism first interaction and pair daughter sampling | Return every interaction channel and element; resume photons after scattering |
-| `montecarlo/transport/photon_navigation.py` | Standalone CPU all-channel/element first-flight reference, vacuum entry/gaps and exact stack/prism boundaries (`photon-channel-first-interaction`) | Integrate into the photon queue and resume after sampled scattering; production pair/annihilation paths still use their historical entry point |
+| `montecarlo/transport/photon_navigation.py` | Standalone CPU all-channel/element first-flight reference, vacuum entry/gaps and exact stack/prism boundaries (`photon-channel-first-interaction`) | Called per flight by `photon_histories`; `scene_first_interactions` adds disjoint oriented boxes (`photon-scene-navigation`); production pair/annihilation paths still use their historical entry point |
 | `montecarlo/eadl_relaxation.py` | EADL transition energies and probabilities; deterministic expected vacancy cascade | Pass validated records to the sampled cascade for event emission |
-| `montecarlo/transport/relaxation.py` | Standalone CPU individual vacancy cascades with explicit draws, transition ancestry, terminal holes and signed energy defects (`eadl-sampled-relaxation`) | Add emission directions and queue handoff; no production caller yet |
+| `montecarlo/transport/relaxation.py` | Standalone CPU individual vacancy cascades with explicit draws, transition ancestry, terminal holes and signed energy defects (`eadl-sampled-relaxation`) | Isotropic emission and queue handoff live in `photon_histories`; no production caller yet |
+| `montecarlo/transport/photon_scattering.py` | Standalone CPU Rayleigh and Compton events, outgoing photon directions and free-electron recoil (`photon-rayleigh-scattering`, `photon-compton-scattering`) | Optional Doppler/binding model needs new data and validation |
+| `montecarlo/transport/photoelectric.py` | Standalone EPDL subshell absorption, Sauter–Gavrila photoelectrons and sampled EADL cascades (`photon-photoelectric-sampling`) | None for the host queue; production integration remains |
+| `montecarlo/transport/photon_histories.py` | Standalone CPU photon queue over all five channels with lineage-keyed streams, isotropic relaxation emission, charged handoff rows, an absorbing sample-frame aperture and per-history energy closure (`photon-history-queue`) | Transport handed-off charged rows and return their photons; filters; source adapters, lab-frame/mm aperture conversion and normalization |
 | `montecarlo/transport/secondaries.py` | Charged-particle generation queue, pair launches, energy balance | One owner of photon interactions and charged daughter handoff |
 | `montecarlo/transport/annihilation.py` | At-rest/in-flight two-photon emission and first-interaction sink from #295 | Hand off emission rows before sink scoring, preserving event lineage and rest-energy accounting |
 | `montecarlo/runner/emission.py` | Directional continuum and characteristic estimators with escape attenuation | An unattenuated source adapter with energy, position, direction, and statistical weight |
-| `instrument/` | Finite detector and filter geometry, ballistic filter transmission | Track filter interactions before applying the detector response |
+| `instrument/` | Finite detector and filter geometry, ballistic filter transmission | Tracked photons use `photon_box_from_pose`/`PhotonAperture.from_pose` (`photon-scene-navigation`); ballistic transmission must be bypassed once photon mode is enabled |
 | `_physics_contract.py`, `runner/case_tables.py` | Immutable model descriptors and native elastic preparation | Declare photon requirements and prepare numeric tables; implement queue/samplers in native transport |
 | `runner/emission_adapters.py` | Selected batch producers in existing spectral slots, with streaming/adaptive preflight | Separate unattenuated source sampling and tracked scoring from directional attenuated arrays |
 
@@ -45,6 +48,49 @@ explicit uniform per decay and visits daughters in depth-first order. It
 does not yet emit directions or hand particles to transport. Existing
 characteristic scoring combines EEDL, EADL, and xraydb; that scorer's expected
 output is not a list of photon events.
+
+The standalone interaction references sample unpolarized isolated atoms.
+Rayleigh uses $(1+\cos^2\theta)F(x,Z)^2$, with $x=\sin(\theta/2)/\lambda$,
+and unchanged photon energy. Compton uses Klein–Nishina times $S(x,Z)$
+and free-electron recoil; binding and Doppler broadening are omitted, so
+it creates no vacancy. Photoabsorption uses EPDL subshell probabilities and
+$T=E-B_i$, followed by the sampled EADL cascade. Its Sauter–Gavrila K-shell
+angular approximation is applied to all photoelectron shells. These choices
+do not model polarization, crystal coherence, anomalous Rayleigh amplitudes
+or multiple-vacancy corrections. Their conditional angular laws are normalized
+separately from the integrated EPDL rates used for interaction competition.
+
+All samplers consume explicit uniform sequences and fail on exhausted tapes
+or rejection budgets. Their input energy coverage follows the EPDL data
+domain; numeric endpoint checks are not a physical validation of the models
+across that full range. The references do not yet enable a photon tracker.
+
+`track_photon_histories` is the host ordinary-hit reference. Each queued
+flight owns a Philox stream keyed by `(seed, history, event)` and then by
+daughter ordinals, so order, chunking and batch position do not change a
+history. A flight draws two navigation uniforms, then the selected sampler's
+draws, then two isotropic-direction draws per relaxation particle. Photons
+and electrons at or below their cutoffs deposit locally; relaxation stops at
+shells bound at or below the smaller cutoff. Electrons above cutoff and every
+positron become charged handoff rows with `2 m_e c²` booked as pending rest
+energy. They are not transported here, so this is the photon-only descendant
+stage, not the full MeV coupled model. A rectangular sample-frame aperture is
+an absorbing boundary scored when its forward distance precedes the sampled
+collision; it must lie outside material.
+
+Filter plates enter as disjoint homogeneous oriented boxes in the same flight
+competition, so photons cross vacuum gaps, scatter or fluoresce in a filter
+and re-enter the target. A separating-axis check refuses boxes that overlap
+the stack (infinite slabs included) or each other, and an aperture that
+enters material. `photon_box_from_pose` and `PhotonAperture.from_pose` map a
+lab-frame `PlanarPose` [mm] into the sample frame [Å] with
+`v_sample = Rᵀ v_lab`, `R = sample_to_lab_R(tilt, azimuth)`, and no
+translation, since the lab origin is the sample entrance origin. A lineage that reaches the
+generation cap is booked as unresolved, never absorbed. Per weighted history,
+incident energy equals escaped + detected + deposited + terminal binding +
+signed transition defect + charged kinetic + positron rest + unresolved to
+roundoff. `detected_spectrum` returns weighted aperture hits per primary per
+eV, an aperture-integrated count, not the existing per-steradian spectrum.
 
 ## Ownership and input contract
 

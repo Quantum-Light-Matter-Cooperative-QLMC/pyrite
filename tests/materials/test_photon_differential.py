@@ -12,7 +12,9 @@ from pyrite.materials.photon_differential import (
     X_MAX_INV_ANG,
     _table,
     coherent_form_factor,
+    coherent_form_factor_table,
     incoherent_scattering_function,
+    incoherent_scattering_function_table,
     photoionization_subshells,
     subshell_photoionization_cross_sections_ang2,
 )
@@ -20,6 +22,27 @@ from pyrite.materials.photon_differential import (
 REPO = Path(__file__).resolve().parents[2]
 _ELEMENTS = tuple(xraydb.atomic_symbol(z) for z in range(1, 101))
 _BOHR_ANG = 0.529177210544
+
+
+@pytest.mark.parametrize(
+    "accessor,evaluate",
+    [
+        (coherent_form_factor_table, coherent_form_factor),
+        (incoherent_scattering_function_table, incoherent_scattering_function),
+    ],
+)
+def test_scattering_knot_accessors_preserve_readonly_lin_lin_data(accessor, evaluate):
+    for element in _ELEMENTS:
+        x, y = accessor(element)
+        assert x.ndim == y.ndim == 1 and x.shape == y.shape
+        assert x[0] == 0 and x[-1] == X_MAX_INV_ANG
+        assert not x.flags.writeable and not y.flags.writeable
+        assert np.all(np.diff(x) >= 0)
+        positive = np.diff(x) > 0
+        midpoints = (x[:-1] + x[1:])[positive] / 2
+        np.testing.assert_allclose(
+            evaluate(element, midpoints), ((y[:-1] + y[1:]) / 2)[positive], rtol=2e-14
+        )
 
 
 def _load_generator():

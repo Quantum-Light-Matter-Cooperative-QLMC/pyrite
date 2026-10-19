@@ -6,6 +6,7 @@ Coordinates are in the sample frame, matching the analytic stack geometry.
 """
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -65,14 +66,19 @@ def ray_layer_intervals(
     origins, directions = _validate_rays(origins, directions)
     _validate_layers(layers)
     width_ang, height_ang = validate_transverse_dimensions(width_ang, height_ang, unit="Ang")
-    shape = (origins.shape[0], len(layers))
-    start, end = np.zeros(shape), np.full(shape, np.inf)
     bounds = [
         (2, np.array([layer[0] for layer in layers]), np.array([layer[1] for layer in layers]))
     ]
     if width_ang is not None:
         assert height_ang is not None  # validated as a pair above
         bounds.extend([(0, -width_ang / 2, width_ang / 2), (1, -height_ang / 2, height_ang / 2)])
+    return _clip_axes(origins, directions, bounds, len(layers))
+
+
+def _clip_axes(origins, directions, bounds, k: int) -> tuple[np.ndarray, np.ndarray]:
+    """Intersect forward rays with per-axis [lower, upper) bands for K bodies."""
+    shape = (origins.shape[0], k)
+    start, end = np.zeros(shape), np.full(shape, np.inf)
     for axis, lower, upper in bounds:
         coordinate, direction = origins[:, axis, None], directions[:, axis, None]
         parallel = direction == 0.0
@@ -84,6 +90,57 @@ def ray_layer_intervals(
         start, end = np.maximum(start, near), np.minimum(end, far)
     hit = end > start
     return np.where(hit, start, 0.0), np.where(hit, end, 0.0)
+
+
+@dataclass(frozen=True, slots=True)
+class PhotonBox:
+    """Homogeneous oriented finite box, e.g. a filter plate, in the sample frame.
+
+    ``axes`` rows are the orthonormal local x, y, z directions; ``half_extent_ang``
+    the positive half sizes along them [Å]; ``composition`` ordered
+    ``(element, atoms/Å³)`` pairs, empty for vacuum.
+    """
+
+    center_ang: tuple[float, float, float]
+    axes: tuple[tuple[float, float, float], ...]
+    half_extent_ang: tuple[float, float, float]
+    composition: tuple[tuple[str, float], ...]
+
+    def __post_init__(self) -> None:
+        center = np.asarray(self.center_ang, dtype=float)
+        axes = np.asarray(self.axes, dtype=float)
+        half = np.asarray(self.half_extent_ang, dtype=float)
+        if center.shape != (3,) or axes.shape != (3, 3) or half.shape != (3,):
+            raise ValueError("box center, axes and half extents must be (3,), (3, 3), (3,)")
+        if not (np.isfinite(center).all() and np.isfinite(axes).all()):
+            raise ValueError("box center and axes must be finite")
+        if not np.allclose(axes @ axes.T, np.eye(3), rtol=0.0, atol=1e-12):
+            raise ValueError("box axes must be orthonormal")
+        if not np.isfinite(half).all() or np.any(half <= 0.0):
+            raise ValueError("box half extents must be finite and positive")
+        _validate_layers([(0.0, 1.0, self.composition)])
+
+
+def ray_box_intervals(origins, directions, boxes: Sequence[PhotonBox]):
+    """Forward entry/exit distances [Å] for each ray and oriented box, ``(N, B)``.
+
+    Rays are expressed in each box's local frame and clipped with the same
+    half-open [lower, upper) parallel-face rule as :func:`ray_layer_intervals`.
+    Source: analytic ray/oriented-box slab intersection; rotation preserves
+    path length. Validation: photon-scene-navigation
+    """
+    origins, directions = _validate_rays(origins, directions)
+    start = np.zeros((origins.shape[0], len(boxes)))
+    end = np.zeros_like(start)
+    for j, box in enumerate(boxes):
+        axes = np.asarray(box.axes, dtype=float)
+        half = np.asarray(box.half_extent_ang, dtype=float)
+        local_o = (origins - np.asarray(box.center_ang, dtype=float)) @ axes.T
+        local_d = directions @ axes.T
+        bounds = [(axis, -half[axis], half[axis]) for axis in range(3)]
+        lo, hi = _clip_axes(local_o, local_d, bounds, 1)
+        start[:, j], end[:, j] = lo[:, 0], hi[:, 0]
+    return start, end
 
 
 def _coefficients(composition, energies):
@@ -141,6 +198,53 @@ def photon_first_interactions(
     Production pair/annihilation sampling retains its historical entry point.
     Validation: photon-channel-first-interaction
     """
+    origins, directions, energies, uniforms = _validate_flights(
+        origins, directions, energies_eV, uniforms
+    )
+    start, end = ray_layer_intervals(
+        origins, directions, layers, width_ang=width_ang, height_ang=height_ang
+    )
+    return _interval_first_interactions(
+        start, end, [layer[2] for layer in layers], energies, uniforms
+    )
+
+
+def scene_first_interactions(
+    origins,
+    directions,
+    energies_eV,
+    uniforms,
+    layers: Sequence,
+    boxes: Sequence[PhotonBox] = (),
+    *,
+    width_ang=None,
+    height_ang=None,
+) -> dict[str, np.ndarray]:
+    """First collision through the stack/prism and non-overlapping oriented boxes.
+
+    As :func:`photon_first_interactions`, with ``layer`` indexing regions in
+    the order ``layers`` then ``boxes``. Vacuum gaps between bodies, re-entry
+    after scattering and arbitrary box orientation follow from summing optical
+    depth over every forward interval; a straight ray crosses each convex
+    region at most once. Callers validate disjointness with
+    :func:`validate_photon_regions`. With no boxes the result is identical to
+    :func:`photon_first_interactions`.
+    Validation: photon-scene-navigation
+    """
+    origins, directions, energies, uniforms = _validate_flights(
+        origins, directions, energies_eV, uniforms
+    )
+    start, end = ray_layer_intervals(
+        origins, directions, layers, width_ang=width_ang, height_ang=height_ang
+    )
+    if boxes:
+        box_start, box_end = ray_box_intervals(origins, directions, boxes)
+        start, end = np.hstack((start, box_start)), np.hstack((end, box_end))
+    compositions = [layer[2] for layer in layers] + [box.composition for box in boxes]
+    return _interval_first_interactions(start, end, compositions, energies, uniforms)
+
+
+def _validate_flights(origins, directions, energies_eV, uniforms):
     origins, directions = _validate_rays(origins, directions)
     energies, uniforms = np.asarray(energies_eV, dtype=float), np.asarray(uniforms, dtype=float)
     n = origins.shape[0]
@@ -152,18 +256,93 @@ def photon_first_interactions(
         raise ValueError("photon energy is outside the EPDL2025 attenuation domain")
     if not np.isfinite(uniforms).all() or np.any((uniforms < 0.0) | (uniforms >= 1.0)):
         raise ValueError("uniforms must be finite and in [0, 1)")
-    start, end = ray_layer_intervals(
-        origins, directions, layers, width_ang=width_ang, height_ang=height_ang
-    )
+    return origins, directions, energies, uniforms
+
+
+def _layer_regions(layers, width_ang, height_ang):
+    """Each stack layer as (center, axes, half extents), infinite laterally if unbounded."""
+    lateral = (np.inf, np.inf) if width_ang is None else (width_ang / 2, height_ang / 2)
+    return [
+        (
+            np.array([0.0, 0.0, (top + bottom) / 2]),
+            np.eye(3),
+            np.array([*lateral, (bottom - top) / 2]),
+        )
+        for top, bottom, _ in layers
+    ]
+
+
+def _project(region, axis) -> tuple[float, float]:
+    """Center projection and support radius; zero components skip infinite extents."""
+    center, axes, half = region
+    weights = np.abs(axes @ axis)
+    used = weights > 1e-12
+    return float(center @ axis), float(np.sum(half[used] * weights[used]))
+
+
+def _overlap(first, second) -> bool:
+    """Separating-axis test for convex boxes; face contact is not overlap.
+
+    Tolerance is relative to the finite extents and center distances, so
+    exact face contact far from the origin is not mistaken for overlap.
+    """
+    candidates = [*first[1], *second[1]]
+    candidates += [np.cross(a, b) for a in first[1] for b in second[1]]
+    finite = [h for region in (first, second) for h in region[2] if np.isfinite(h)]
+    centers = [float(np.max(np.abs(region[0]))) for region in (first, second)]
+    tolerance = 1e-12 * max([1.0, *finite, *centers])
+    for axis in candidates:
+        norm = float(np.linalg.norm(axis))
+        if norm < 1e-9:
+            continue
+        axis = axis / norm
+        (c1, r1), (c2, r2) = _project(first, axis), _project(second, axis)
+        if abs(c1 - c2) >= r1 + r2 - tolerance:
+            return False
+    return True
+
+
+def validate_photon_regions(
+    layers: Sequence,
+    boxes: Sequence[PhotonBox] = (),
+    *,
+    width_ang=None,
+    height_ang=None,
+    surfaces: Sequence = (),
+) -> None:
+    """Refuse boxes overlapping the stack or each other, and surfaces inside material.
+
+    ``surfaces`` are extra ``(center, axes, half_extent)`` regions (e.g. a
+    zero-thickness aperture) that may touch but not enter any body.
+    Validation: photon-scene-navigation
+    """
+    _validate_layers(layers)
+    width_ang, height_ang = validate_transverse_dimensions(width_ang, height_ang, unit="Ang")
+    stack = _layer_regions(layers, width_ang, height_ang)
+    solids = [
+        tuple(np.asarray(v, dtype=float) for v in (b.center_ang, b.axes, b.half_extent_ang))
+        for b in boxes
+    ]
+    for i, box in enumerate(solids):
+        if any(_overlap(box, other) for other in stack + solids[:i]):
+            raise ValueError("photon boxes must not overlap the target stack or each other")
+    for surface in surfaces:
+        if any(_overlap(surface, other) for other in stack + solids):
+            raise ValueError("a scoring surface must lie outside all modeled material")
+
+
+def _interval_first_interactions(start, end, compositions, energies, uniforms):
+    """Optical-depth inversion and channel/atom choice over precomputed intervals."""
+    n = energies.shape[0]
     distance = np.full(n, np.inf)
     layer, channel, element = (np.full(n, -1, dtype=np.int64) for _ in range(3))
-    if n and layers:
-        rates = [_coefficients(region[2], energies) for region in layers]
+    if n and compositions:
+        rates = [_coefficients(composition, energies) for composition in compositions]
         mu = np.stack([r.sum(axis=1) for r in rates], axis=1)
         if not np.isfinite(mu).all():
             raise ValueError("total photon rates must be finite")
         distance, layer = _collision_distances(start, end, mu, -np.log1p(-uniforms[:, 0]))
-        for region in range(len(layers)):
+        for region in range(len(compositions)):
             rows = np.flatnonzero(layer == region)
             if rows.size == 0:
                 continue
