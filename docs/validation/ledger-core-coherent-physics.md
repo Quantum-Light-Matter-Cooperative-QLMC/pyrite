@@ -540,9 +540,9 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `directional-source-rate-normalization`
 
 - **Claim:** Independent-electron directional source density per incident electron/eV/sr becomes ph/s/eV/sr by multiplication by mean current magnitude in nA times `1e-9/|e|`, with no solid-angle or sample-spacing factor; the existing incoherent PXR–CBS interference is retained
-- **Code:** `results/directional.py::DirectionalSpectrum.{current_na,rate}`; existing pulse convention `results/store.py::beam_current_na`
+- **Code:** `results/directional.py::{DirectionalSpectrum.current_na,DirectionalSpectrum.rate}`
 - **Source:** [BIPM SI ampere](https://www.bipm.org/en/si-base-units/ampere), exact elementary charge `1.602176634e-19` C; [spectral observables](../physics/radiation-physics/spectral-observables.md#detector-free-directional-rates)
 - **Status:** anchored
 - **Checks:** Units; zero current; linear current scaling; default Q×f normalization; angular-grid and acceptance independence; rejection of negative/nonfinite current
 - **Anchor:** `tests/montecarlo/test_directional_source.py::test_rate_normalization_zero_linear_default_and_no_solid_angle`; `test_invalid_mean_current_rejected`
-- **Notes:** Fresh-context independent derivation and source-to-code check agree ([write-up](radiation-physics/directional-source-rate-normalization.md)); hard-coded BIPM numeric anchors pin regression. No new PXR/CBS or target-escape model claim. Human sign-off remains pending in #277.
+- **Notes:** Fresh-context independent derivation and source-to-code check agree ([write-up](radiation-physics/directional-source-rate-normalization.md)); hard-coded BIPM numeric anchors pin regression. The default current reuses the pulse convention of `results/store.py::beam_current_na` (`beam-phase-space-metrics`). No new PXR/CBS or target-escape model claim. Human sign-off remains pending in #277.

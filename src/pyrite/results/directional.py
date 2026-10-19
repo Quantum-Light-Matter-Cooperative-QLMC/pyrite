@@ -35,7 +35,10 @@ class DirectionalSpectrum:
 
     @property
     def current_na(self) -> float:
-        """Resolved mean electron current magnitude in nA (Q[pC] f[Hz]/1000)."""
+        """Resolved mean electron current magnitude in nA (Q[pC] f[Hz]/1000).
+
+        Validation: directional-source-rate-normalization
+        """
         return beam_current_na(self.case)
 
     def rate(self, current_na: float | None = None) -> np.ndarray:

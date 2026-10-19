@@ -173,7 +173,7 @@ def _register(group, *, physics):
         emit_result(f"valid profile {name}")
 
 
-@click.group("physics")
+@click.group("physics", context_settings={"help_option_names": ["-h", "--help"]})
 def physics_command():
     """Inspect and edit PROFILE's physical models and cutoffs (API Physics).
 
@@ -196,6 +196,7 @@ def physics_command():
         "cxr-grid": "Configure PROFILE's automatic CXR photon-grid policy.",
         "energy-grid": "Derive and inspect specialist photon-grid artifacts.",
     },
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 def numerics_command():
     """Inspect and edit PROFILE's sampling, integration and photon grids.
