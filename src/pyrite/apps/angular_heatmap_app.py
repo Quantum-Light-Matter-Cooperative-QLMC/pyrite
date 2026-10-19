@@ -1,4 +1,14 @@
 # /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     # Until a release contains directional_source; then pin pyrite-mc>=VERSION.
+#     "pyrite-mc @ git+https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite@main",
+#     # Probed at import; without a usable GPU PyRITE falls back to NumPy.
+#     "cupy-cuda13x[ctk]>=14.1.1; sys_platform == 'linux'",
+#     "marimo>=0.25.1",
+#     "matplotlib>=3.11.0",
+# ]
+#
 # [tool.marimo.display]
 # theme = "light"
 # ///
@@ -16,6 +26,7 @@ def _():
 
     import marimo as mo
 
+    from pyrite import fetch_tables
     from pyrite._backend import BACKEND
     from pyrite.apps._design import context_rail, page_title, style_sheet
     from pyrite.apps.angular_heatmap import (
@@ -23,6 +34,7 @@ def _():
         calculate_maps,
         form_template,
         heatmap_figure,
+        maps_npz,
     )
 
     mo.vstack(
@@ -45,11 +57,27 @@ def _():
         MapConfig,
         calculate_maps,
         context_rail,
+        fetch_tables,
         form_template,
         heatmap_figure,
+        maps_npz,
         mo,
         time,
     )
+
+
+@app.cell
+def _(fetch_tables, mo):
+    # Fresh hosted sessions (e.g. molab) start without PyRITE's pinned data;
+    # a complete install returns without network access.
+    try:
+        with mo.status.spinner("Checking PyRITE reference data and tables…"):
+            _fetched = [r["code"] for r in fetch_tables() if r["installed"]]
+    except Exception as error:  # noqa: BLE001 - surface any fetch failure in the UI
+        mo.stop(True, mo.callout(mo.md(f"Table fetch failed: {error}"), kind="danger"))
+    tables_ready = True
+    mo.md(f"Fetched PyRITE data: {', '.join(_fetched)}.") if _fetched else None
+    return (tables_ready,)
 
 
 @app.cell
@@ -120,7 +148,8 @@ def _(MapConfig, form_template, mo):
 
 
 @app.cell
-def _(BACKEND, MapConfig, calculate_maps, mo, scene_form, time):
+def _(BACKEND, MapConfig, calculate_maps, mo, scene_form, tables_ready, time):
+    assert tables_ready
     _v = scene_form.value
     try:
         config = (
@@ -160,7 +189,7 @@ def _(BACKEND, MapConfig, calculate_maps, mo, scene_form, time):
 
 
 @app.cell
-def _(maps, mo):
+def _(config, maps, maps_npz, mo):
     current = mo.ui.number(0, 1e9, value=maps[0].current_na, label="Mean current (nA)")
     color = mo.ui.checkbox(value=True, label="Log color")
     selection = mo.ui.multiselect(
@@ -168,10 +197,23 @@ def _(maps, mo):
         value=[f"{r.case['tilt_deg']:g}°" for r in maps],
         label="Tilts shown",
     )
+    # Hosted sessions keep no generated files; the archive is built at click time.
+    download = mo.download(
+        data=lambda: maps_npz(config, maps, current_na=current.value),
+        filename="directional_source_maps.npz",
+        mimetype="application/octet-stream",
+        label="Download results (.npz)",
+    )
     mo.vstack(
         [
             mo.md("**Display** · redraws cached maps, no recompute"),
-            mo.hstack([current, color, selection], justify="start", gap=2, align="end", wrap=True),
+            mo.hstack(
+                [current, color, selection, download],
+                justify="start",
+                gap=2,
+                align="end",
+                wrap=True,
+            ),
         ]
     )
     return color, current, selection

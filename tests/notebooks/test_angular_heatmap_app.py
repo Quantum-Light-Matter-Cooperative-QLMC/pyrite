@@ -153,3 +153,20 @@ def test_initial_notebook_renders_real_bounded_maps():
         definitions["maps"][0].energy_eV[-1]
         == definitions["maps"][0].provenance["line_window_ceiling_eV"]
     )
+
+
+def test_download_archive_round_trip():
+    import io
+    import json
+
+    from pyrite.apps.angular_heatmap import maps_npz
+
+    maps = (_fake_map(30.0, np.ones((4, 2))), _fake_map(45.0, 2 * np.ones((4, 2))))
+    archive = np.load(io.BytesIO(maps_npz(MapConfig(), maps, current_na=2.0)))
+    np.testing.assert_array_equal(archive["tilt_deg"], [30.0, 45.0])
+    np.testing.assert_array_equal(archive["t1_density"], 2 * np.ones((4, 2)))
+    np.testing.assert_allclose(archive["t0_rate"], maps[0].rate(2.0))
+    metadata = json.loads(str(archive["metadata"]))
+    assert metadata["current_na"] == 2.0
+    assert metadata["config"]["thickness_ang"] == MapConfig().thickness_ang
+    assert metadata["units"]["rate"] == "ph/s/eV/sr"

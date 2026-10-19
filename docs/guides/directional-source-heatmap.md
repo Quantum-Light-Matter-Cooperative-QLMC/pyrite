@@ -156,6 +156,36 @@ spinner reports the electron × direction × energy work before it starts.
 reflection-convergence study. The existing kinematic PXR/CBS and escape model
 validity limits apply unchanged.
 
+## Run on molab
+
+[![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/src/pyrite/apps/angular_heatmap_app.py)
+
+[molab](https://docs.marimo.io/guides/molab/) opens the app straight from
+GitHub and can attach an NVIDIA GPU. The notebook's inline script metadata
+(PEP 723) declares Python 3.13+, `pyrite-mc` from `main` (until a release
+contains `directional_source`), Linux CuPy for CUDA 13, marimo and Matplotlib.
+
+1. Open the badge link (or paste the file's GitHub URL into molab) and turn on
+   the GPU in the notebook specs **before** the first run: PyRITE selects its
+   array backend at import, so a later toggle needs a kernel restart.
+2. If molab does not install the declared packages itself, install
+   `pyrite-mc @ git+https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite@main`
+   (or the branch under review) and `cupy-cuda13x[ctk]` explicitly. Do not let
+   molab guess a package for `import pyrite`: the unrelated PyPI project
+   `pyrite` is not PyRITE.
+3. Run all cells. The first cell calls `pyrite.fetch_tables()`, which downloads
+   the pinned data (about 60 MB, public GitHub Releases) into a fresh session
+   and returns immediately when it is already complete.
+4. Check the status rail: `Backend` should read `cuda`. *Share → Run as app*
+   hides the code.
+
+molab keeps no generated files, and sessions stop after 90 idle minutes or
+12 hours. Use **Download results (.npz)** for maps worth keeping: it contains
+per-tilt `density` (per incident electron), `rate` (at the displayed current),
+`supported`, lab/sample directions, the shared angle/energy/tilt coordinates,
+and JSON `metadata` (submitted config, current, units, line ceilings,
+identity digests). Static molab previews show no outputs; use a live session.
+
 ## Execution backends
 
 The array backend is fixed when PyRITE is imported, so choose it at launch:

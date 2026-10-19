@@ -1,6 +1,8 @@
 """Cache, form layout and plotting for the standalone directional-source app."""
 
-from dataclasses import dataclass
+import io
+import json
+from dataclasses import asdict, dataclass
 from functools import lru_cache
 from html import escape
 
@@ -133,6 +135,41 @@ def calculate_maps(config: MapConfig):
         )
         for tilt in config.tilts_deg
     )
+
+
+def maps_npz(config: MapConfig, maps, *, current_na: float) -> bytes:
+    """Compressed ``.npz`` of every computed tilt, for download.
+
+    Per tilt ``t<i>_*``: ``density`` (ph/incident-electron/eV/sr), ``rate``
+    (ph/s/eV/sr at ``current_na``), ``supported``, ``direction_lab`` and
+    ``direction_sample``; shared ``angle_deg``, ``energy_eV`` and ``tilt_deg``.
+    ``metadata`` is JSON: the submitted config, current, units, line ceilings
+    and each tilt's provenance identity digest.
+    """
+    arrays = {
+        "angle_deg": maps[0].angle_deg,
+        "energy_eV": maps[0].energy_eV,
+        "tilt_deg": np.array([result.case["tilt_deg"] for result in maps]),
+    }
+    for index, result in enumerate(maps):
+        arrays |= {
+            f"t{index}_density": result.density,
+            f"t{index}_rate": result.rate(current_na),
+            f"t{index}_supported": result.supported,
+            f"t{index}_direction_lab": result.direction_lab,
+            f"t{index}_direction_sample": result.direction_sample,
+        }
+    metadata = {
+        "config": asdict(config),
+        "current_na": current_na,
+        "units": {"density": maps[0].units, "rate": "ph/s/eV/sr"},
+        "component": maps[0].component,
+        "line_window_ceiling_eV": [r.provenance.get("line_window_ceiling_eV") for r in maps],
+        "identity_digest": [r.provenance.get("identity_digest") for r in maps],
+    }
+    buffer = io.BytesIO()
+    np.savez_compressed(buffer, metadata=np.array(json.dumps(metadata, default=str)), **arrays)
+    return buffer.getvalue()
 
 
 def form_template(groups: dict[str, tuple[str, ...]]) -> str:
