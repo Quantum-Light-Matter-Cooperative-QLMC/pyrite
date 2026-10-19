@@ -297,3 +297,43 @@ normal catalog/campaign support, recoil/energy-loss justification, and a
 published dynamical anchor remain open in #103/#581. This new diagnostic has
 not been run on CUDA; the hardware evidence below concerns the existing
 homogeneous TR/CTR implementation.
+
+### Compare the two-beam and Born reference fields
+
+The same alternating reference stack can be scored with both diagnostics:
+
+```bash
+UV_CACHE_DIR=/tmp/pyrite-uv-cache MPLCONFIGDIR=/tmp/pyrite-mpl \
+  uv run python -m pyrite.validation.dtr_reference --two-beam \
+  --output-dir /tmp/pyrite-dtr-two-beam
+```
+
+The default invocation and its Born columns are unchanged. `--two-beam`
+appends these photon-density columns to `spectrum.csv`:
+
+| Column | Meaning |
+| --- | --- |
+| `two_beam_transition` | Observed charge-harmonic source row, including its diffraction extinction |
+| `two_beam_line` | Second charge-harmonic source row, including PXR and DTR together |
+| `two_beam_cross` | Signed interference of those two source rows |
+| `two_beam_total` | Intensity of the summed complex fields; sum of the preceding three columns |
+| `two_beam_minus_born_total` | Signed difference from the Born `total` on the identical passage |
+
+The two-beam line row has no separate PXR-only or DTR-off interpretation.
+Its transition row also differs from ordinary homogeneous-stack TR once
+repeated diffraction matters. The figure overlays the Born and two-beam
+totals and shows their signed difference in a second panel. JSON records a
+distinct comparison model marker, hashes both transfer
+and reverse susceptibilities, and reports the maximum absolute total-density
+difference divided by the Born total's peak. The reverse susceptibility is
+evaluated from the opposite Miller indices in the same frequency convention;
+it is not obtained by conjugating the transfer susceptibility in an absorbing
+crystal.
+
+These remain **unverified CPU straight-passage diagnostics**. Comparing them
+tests the Born approximation against this implemented two-harmonic model; it
+does not establish a published extinction law, production PXR/CBS phase
+agreement, or an energy-loss bound. The weak reference and an intentionally
+thick variant have regression checks for finite output and their differing
+departure from Born. Thickness changes can introduce finer fringes and require
+a fresh spectral-grid convergence check.

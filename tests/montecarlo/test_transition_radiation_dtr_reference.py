@@ -85,3 +85,68 @@ def test_reference_writes_inspectable_artifacts(tmp_path, capsys):
     np.testing.assert_allclose(
         table["line"], table["pxr"] + table["dtr"] + table["pxr_dtr_cross"], atol=1e-20
     )
+
+
+def test_two_beam_reference_accounting_and_identity(tmp_path):
+    profile = tmp_path / "small.toml"
+    profile.write_text(
+        REFERENCE_PROFILE.read_text().replace("energy_nodes = 1201", "energy_nodes = 61")
+    )
+    born, original = reference_spectrum(profile)
+    columns, meta = reference_spectrum(profile, two_beam=True)
+    assert meta["validation_status"] == "unverified"
+    assert meta["model"] != original["model"]
+    assert meta["resolved_sha256"] != original["resolved_sha256"]
+    assert meta["profile_sha256"] == original["profile_sha256"]
+    assert 0 < meta["two_beam_born_peak_fraction"] < 0.01
+    assert "including diffraction extinction" in meta["two_beam_accounting"]
+    for name, value in born.items():
+        np.testing.assert_array_equal(columns[name], value)
+    np.testing.assert_allclose(
+        columns["two_beam_total"],
+        columns["two_beam_transition"] + columns["two_beam_line"] + columns["two_beam_cross"],
+        rtol=1e-12,
+        atol=1e-20,
+    )
+    np.testing.assert_array_equal(
+        columns["two_beam_minus_born_total"], columns["two_beam_total"] - columns["total"]
+    )
+    again, repeated = reference_spectrum(profile, two_beam=True)
+    assert meta["resolved_sha256"] == repeated["resolved_sha256"]
+    for name in columns:
+        np.testing.assert_array_equal(columns[name], again[name])
+
+
+def test_two_beam_reference_writes_comparison_artifacts(tmp_path, capsys):
+    profile = tmp_path / "small.toml"
+    profile.write_text(
+        REFERENCE_PROFILE.read_text().replace("energy_nodes = 1201", "energy_nodes = 61")
+    )
+    output = tmp_path / "comparison"
+    main(["--profile", str(profile), "--two-beam", "--output-dir", str(output)])
+    result = json.loads(capsys.readouterr().out)
+    saved = json.loads((output / "reference.json").read_text())
+    assert result["resolved_sha256"] == saved["resolved_sha256"]
+    assert result["two_beam_born_peak_fraction"] > 0
+    assert (output / "spectrum.png").read_bytes().startswith(b"\x89PNG")
+    table = np.genfromtxt(output / "spectrum.csv", delimiter=",", names=True)
+    assert len(table) == 61
+    np.testing.assert_allclose(
+        table["two_beam_total"],
+        table["two_beam_transition"] + table["two_beam_line"] + table["two_beam_cross"],
+        atol=1e-20,
+    )
+
+
+def test_two_beam_thick_reference_departs_from_born(tmp_path):
+    profile = tmp_path / "thick.toml"
+    profile.write_text(
+        REFERENCE_PROFILE.read_text()
+        .replace("energy_nodes = 1201", "energy_nodes = 61")
+        .replace("thickness_ang = 100.0", "thickness_ang = 10000.0")
+    )
+    columns, meta = reference_spectrum(profile, two_beam=True)
+    assert meta["max_born_coupling"] > 1
+    assert meta["two_beam_born_peak_fraction"] > 0.1
+    assert all(np.all(np.isfinite(value)) for value in columns.values())
+    assert np.all(columns["two_beam_total"] >= 0)

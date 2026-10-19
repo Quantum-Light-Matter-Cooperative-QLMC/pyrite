@@ -897,7 +897,10 @@ homogeneous stack's free TR waves and own-field diffraction on a straight
 passage. `validation/dtr_reference.py` reads the shipped
 `validation/reference_data/dtr_stack.toml` alternating SiO2/MoS2/SiO2 profile
 and writes paired DTR-on/off spectra, signed interference, material/profile
-provenance and a figure. No production case, CBS, dynamical extinction or
+provenance and a figure. Its opt-in `--two-beam` comparison appends repeated-
+diffraction source-row densities, their signed cross term and the difference
+from the Born total, with a separate model digest. No production case, CBS,
+validated dynamical extinction or
 validated high-energy transport is implied. Checks:
 `tests/montecarlo/test_transition_radiation_dtr*.py`. Derivation:
 [experimental DTR](physics/radiation-physics/diffracted-transition-radiation.md).
