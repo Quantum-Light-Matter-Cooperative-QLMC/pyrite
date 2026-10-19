@@ -988,7 +988,7 @@ def _accumulate_batched(st):
             if group_starts is None:
                 run_coherent_field_accumulation_kernel(
                     *line_data,
-                    _E_flat,  # ty: ignore[too-many-positional-arguments]
+                    _E_flat,
                     fields=coherent_fields,
                     delta_omega=_dom_flat,
                     **common,
@@ -996,7 +996,7 @@ def _accumulate_batched(st):
             else:
                 run_coherent_grouped_intensity_kernel(
                     *line_data,
-                    E_grid,  # ty: ignore[too-many-positional-arguments]
+                    E_grid,
                     group_starts,
                     out=grouped_out,
                     delta_omega=delta_omega_grid,
