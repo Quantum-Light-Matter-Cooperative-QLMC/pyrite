@@ -20,7 +20,8 @@ photon transport model:
 | `montecarlo/transport/relaxation.py` | Standalone CPU individual vacancy cascades with explicit draws, transition ancestry, terminal holes and signed energy defects (`eadl-sampled-relaxation`) | Isotropic emission and queue handoff live in `photon_histories`; no production caller yet |
 | `montecarlo/transport/photon_scattering.py` | Standalone CPU Rayleigh and Compton events, outgoing photon directions and free-electron recoil (`photon-rayleigh-scattering`, `photon-compton-scattering`) | Optional Doppler/binding model needs new data and validation |
 | `montecarlo/transport/photoelectric.py` | Standalone EPDL subshell absorption, Sauter–Gavrila photoelectrons and sampled EADL cascades (`photon-photoelectric-sampling`) | None for the host queue; production integration remains |
-| `montecarlo/transport/photon_histories.py` | Standalone CPU photon queue over all five channels with lineage-keyed streams, isotropic relaxation emission, charged handoff rows, an absorbing sample-frame aperture and per-history energy closure (`photon-history-queue`) | Transport handed-off charged rows and return their photons; filters; source adapters, lab-frame/mm aperture conversion and normalization |
+| `montecarlo/transport/photon_histories.py` | Standalone CPU photon queue over all five channels with lineage-keyed streams, isotropic relaxation emission, charged handoff rows, an absorbing sample-frame aperture and per-history energy closure (`photon-history-queue`) | Source adapters and normalization; positron handoff |
+| `montecarlo/transport/photon_coupling.py` | Host photon/electron round loop: photon-born electrons through the shell cascade from an explicit launch, hard bremsstrahlung returned to the queue, coupled per-history ledger (`photon-charged-coupling`) | Positron transport/annihilation handoff; vacancies from charged impact ionization; soft radiative emission; batch-invariant charged generations ≥1 |
 | `montecarlo/transport/secondaries.py` | Charged-particle generation queue, pair launches, energy balance | One owner of photon interactions and charged daughter handoff |
 | `montecarlo/transport/annihilation.py` | At-rest/in-flight two-photon emission and first-interaction sink from #295 | Hand off emission rows before sink scoring, preserving event lineage and rest-energy accounting |
 | `montecarlo/runner/emission.py` | Directional continuum and characteristic estimators with escape attenuation | An unattenuated source adapter with energy, position, direction, and statistical weight |
@@ -91,6 +92,30 @@ incident energy equals escaped + detected + deposited + terminal binding +
 signed transition defect + charged kinetic + positron rest + unresolved to
 roundoff. `detected_spectrum` returns weighted aperture hits per primary per
 eV, an aperture-integrated count, not the existing per-steradian spectrum.
+
+`track_coupled_histories` closes the electron half of the MeV loop. Each
+round hands the previous round's electrons above the stage threshold and
+inside a non-empty stack layer to a charged stage; electrons born in filter
+boxes deposit locally because the charged transport knows only the stack.
+`cascade_charged_stage` runs the existing shell soft/hard cascade from an
+explicit generation-0 `LaunchState` (beam sampling bypassed; mode-off
+callers unchanged), with pair production and positrons left to the photon
+queue so conversion has one owner. Its per-history
+`secondary_energy_balance` splits each launch into escaped, deposited,
+reserved binding and radiated energy. Every hard radiative row becomes a
+photon at its row endpoint with key `daughter_stream_key(charged key,
+emission ordinal)`, the parent's weight, history and root source label;
+photons at or below the photon cutoff deposit at their vertex. A round cap
+marks remaining launches unresolved.
+
+Limits of this stage: soft radiative loss below `radiative_cutoff_eV` stays
+in the continuous deposit; vacancies made by charged impact ionization keep
+their binding reserved and emit no fluorescence; positron kinetic energy is
+pending until the #295 emission rows are separated from their sink.
+Gen-0 tracks use lineage keys, but the cascade keys later generations and
+hard-photon directions on batch-wide track ids and generation seeds, so
+those depend on the charged batch composition (an existing cascade
+property). Charged clocks start at zero.
 
 ## Ownership and input contract
 

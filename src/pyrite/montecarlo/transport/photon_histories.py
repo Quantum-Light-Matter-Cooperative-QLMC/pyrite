@@ -337,16 +337,28 @@ def _validate_batch(position_ang, direction, energy_eV, weight, history_id, even
 
 
 def _validate_ids(history: np.ndarray, event: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Non-negative integer ids whose (history, event) pairs key unique streams."""
+    """Non-negative integer ids; uniqueness is checked on the stream keys."""
     if history.size and not (
         np.issubdtype(history.dtype, np.integer) and np.issubdtype(event.dtype, np.integer)
     ):
         raise ValueError("history and event ids must be integers")
     if history.size and (history.min() < 0 or event.min() < 0):
         raise ValueError("history and event ids must be non-negative")
-    if len({(int(h), int(e)) for h, e in zip(history, event, strict=True)}) != history.size:
-        raise ValueError("(history_id, event_id) pairs must be unique")
     return history.astype(np.int64), event.astype(np.int64)
+
+
+def _root_keys(seed, history, event, stream_key) -> np.ndarray:
+    """Lineage keys of the source photons; each must name a unique stream."""
+    if stream_key is None:
+        if len({(int(h), int(e)) for h, e in zip(history, event, strict=True)}) != history.size:
+            raise ValueError("(history_id, event_id) pairs must be unique")
+        return photon_stream_key(seed, history, event)
+    keys = np.asarray(stream_key)
+    if keys.shape != history.shape or (keys.size and keys.dtype != np.uint64):
+        raise ValueError("stream_key must be a uint64 array of shape (N,)")
+    if np.unique(keys).size != keys.size:
+        raise ValueError("stream keys must be unique")
+    return keys.astype(np.uint64)
 
 
 def _validate_options(energy, photon_cutoff_eV, electron_cutoff_eV, max_generations, source_kind):
@@ -411,6 +423,7 @@ def track_photon_histories(
     height_ang=None,
     max_generations: int = 1000,
     relaxation: Callable[[str], EADLRelaxation] = load_eadl_relaxation,
+    stream_key=None,
 ) -> PhotonHistories:
     """Transport analog photons to escape, detection, absorption or cutoff.
 
@@ -439,7 +452,9 @@ def track_photon_histories(
     terminal binding + transition defect + charged kinetic + positron rest +
     unresolved, to floating-point roundoff. Order, chunking and batch position
     do not change any history: draws depend only on (seed, history, event,
-    daughter ordinals). Source photons need ``photon_cutoff_eV < E <= 100 GeV``.
+    daughter ordinals). ``stream_key`` (uint64, unique) instead supplies the
+    source keys of photons returned by a charged stage; ids then only label
+    histories. Source photons need ``photon_cutoff_eV < E <= 100 GeV``.
     Source: PENELOPE-2024 §1.4 and §2.4 (photon histories, pair kinematics),
     ENDF-102 File 28; component samplers' own ledger claims.
     Validation: photon-history-queue, photon-scene-navigation
@@ -456,7 +471,7 @@ def track_photon_histories(
     compositions = [layer[2] for layer in layers] + [box.composition for box in boxes]
     histories, rows = np.unique(history, return_inverse=True)
     queue = _Queue(histories, float(photon_cutoff_eV), float(electron_cutoff_eV))
-    keys = photon_stream_key(seed, history, event)
+    keys = _root_keys(seed, history, event, stream_key)
     queue.pending = [
         _Photon(position[i], direction[i], float(energy[i]), int(rows[i]), float(weight[i]),
                 keys[i], int(kinds[i]), 0)
