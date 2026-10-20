@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23487183.svg)](https://doi.org/10.5281/zenodo.23487183)
+
 # PyRITE
 
 **Simulate how electrons travel through matter—and the X-rays they produce.**
