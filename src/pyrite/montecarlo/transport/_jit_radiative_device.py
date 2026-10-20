@@ -46,15 +46,15 @@ def _rad_row(incident, base, n_t, energy_eV):
         return I32_ZERO
     if log_energy >= xp.log(incident[base + n_t - I32_ONE]):
         return n_t - I32_TWO
-    lo = I32_ZERO
-    hi = n_t - I32_ONE
-    while hi - lo > I32_ONE:
-        mid = (lo + hi) // I32_TWO
-        if xp.log(incident[base + mid]) <= log_energy:
-            lo = mid
+    lower_idx = I32_ZERO
+    upper_idx = n_t - I32_ONE
+    while upper_idx - lower_idx > I32_ONE:
+        mid_idx = (lower_idx + upper_idx) // I32_TWO
+        if xp.log(incident[base + mid_idx]) <= log_energy:
+            lower_idx = mid_idx
         else:
-            hi = mid
-    return lo
+            upper_idx = mid_idx
+    return lower_idx
 
 
 @jit.rawkernel(device=True)
@@ -77,11 +77,11 @@ def _rad_row_chi(reduced, nominal, nom_base, n_red, top_r, chi, chi_row):
     lower = I32_ZERO
     upper = n_red - I32_ONE
     while upper - lower > I32_ONE:
-        mid = (lower + upper) // I32_TWO
-        if reduced >= nominal[nom_base + mid]:
-            lower = mid
+        mid_idx = (lower + upper) // I32_TWO
+        if reduced >= nominal[nom_base + mid_idx]:
+            lower = mid_idx
         else:
-            upper = mid
+            upper = mid_idx
     x0 = nominal[nom_base + lower]
     x1 = nominal[nom_base + lower + I32_ONE]
     if lower == n_red - I32_TWO:
@@ -111,17 +111,17 @@ def _rad_chi(reduced, row, fraction, nominal, nom_base, n_red, top, t_base, chi,
 @jit.rawkernel(device=True)
 def _rad_next_node(x, nominal, nom_base, n_red, top_a, top_b, cut_reduced):
     """Smallest reduced node above ``x`` in host ``_photon_nodes``' union, else inf."""
-    lo = I32_ZERO
-    hi = n_red - I32_ONE
-    while lo < hi:
-        mid = (lo + hi) // I32_TWO
-        if nominal[nom_base + mid] <= x:
-            lo = mid + I32_ONE
+    lower_idx = I32_ZERO
+    upper_idx = n_red - I32_ONE
+    while lower_idx < upper_idx:
+        mid_idx = (lower_idx + upper_idx) // I32_TWO
+        if nominal[nom_base + mid_idx] <= x:
+            lower_idx = mid_idx + I32_ONE
         else:
-            hi = mid
+            upper_idx = mid_idx
     best = F64_INF
-    if lo < n_red - I32_ONE:
-        best = nominal[nom_base + lo]
+    if lower_idx < n_red - I32_ONE:
+        best = nominal[nom_base + lower_idx]
     if top_a > x and top_a < best:
         best = top_a
     if top_b > x and top_b < best:
@@ -159,14 +159,14 @@ def _rad_moment(
 
     Validation: bremslib-radiative-partition
     """
-    t_base = slot * max_t
-    nom_base = slot * n_red
-    chi_base = slot * max_t * n_red
-    row = _rad_row(incident, t_base, n_t, energy_eV)
-    fraction = _rad_fraction(incident, t_base, n_t, energy_eV, row)
-    top_a = top[t_base + row]
-    top_b = top[t_base + row + I32_ONE]
-    cut_reduced = cutoff_eV / energy_eV
+    incident_offset = slot * max_t
+    nominal_offset = slot * n_red
+    sdcs_offset = slot * max_t * n_red
+    row = _rad_row(incident, incident_offset, n_t, energy_eV)
+    fraction = _rad_fraction(incident, incident_offset, n_t, energy_eV, row)
+    top_a = top[incident_offset + row]
+    top_b = top[incident_offset + row + I32_ONE]
+    reduced_cutoff = cutoff_eV / energy_eV
     scale = F64_MB_CM2 * z * z
     soft = F64_ZERO
     hard_rate = F64_ZERO
@@ -174,20 +174,42 @@ def _rad_moment(
     # but visits only its side of the cutoff. In particular, soft stopping
     # never evaluates the logarithmic hard-rate integrals.
     if which == RAD_SOFT:
-        red_left = _rad_next_node(-F64_ONE, nominal, nom_base, n_red, top_a, top_b, cut_reduced)
+        left_reduced_energy = _rad_next_node(
+            -F64_ONE, nominal, nominal_offset, n_red, top_a, top_b, reduced_cutoff
+        )
     else:
-        red_left = cut_reduced
-    left = _rad_photon(red_left, energy_eV, cutoff_eV, cut_reduced)
+        left_reduced_energy = reduced_cutoff
+    left = _rad_photon(left_reduced_energy, energy_eV, cutoff_eV, reduced_cutoff)
     chi_left = _rad_chi(
-        left / energy_eV, row, fraction, nominal, nom_base, n_red, top, t_base, chi, chi_base
+        left / energy_eV,
+        row,
+        fraction,
+        nominal,
+        nominal_offset,
+        n_red,
+        top,
+        incident_offset,
+        chi,
+        sdcs_offset,
     )
-    red_right = _rad_next_node(red_left, nominal, nom_base, n_red, top_a, top_b, cut_reduced)
-    while red_right < F64_INF:
-        right = _rad_photon(red_right, energy_eV, cutoff_eV, cut_reduced)
+    right_reduced_energy = _rad_next_node(
+        left_reduced_energy, nominal, nominal_offset, n_red, top_a, top_b, reduced_cutoff
+    )
+    while right_reduced_energy < F64_INF:
+        right = _rad_photon(right_reduced_energy, energy_eV, cutoff_eV, reduced_cutoff)
         if which == RAD_SOFT and right > cutoff_eV:
             break
         chi_right = _rad_chi(
-            right / energy_eV, row, fraction, nominal, nom_base, n_red, top, t_base, chi, chi_base
+            right / energy_eV,
+            row,
+            fraction,
+            nominal,
+            nominal_offset,
+            n_red,
+            top,
+            incident_offset,
+            chi,
+            sdcs_offset,
         )
         if left == F64_ZERO:
             soft += scale * F64_HALF * (chi_left + chi_right) * right
@@ -198,8 +220,10 @@ def _rad_moment(
             hard_rate += scale * _rad_cell_rate(left, right, chi_left, chi_right)
         left = right
         chi_left = chi_right
-        red_left = red_right
-        red_right = _rad_next_node(red_left, nominal, nom_base, n_red, top_a, top_b, cut_reduced)
+        left_reduced_energy = right_reduced_energy
+        right_reduced_energy = _rad_next_node(
+            left_reduced_energy, nominal, nominal_offset, n_red, top_a, top_b, reduced_cutoff
+        )
     if which == RAD_SOFT:
         return soft
     return hard_rate
@@ -225,9 +249,9 @@ def _rad_layer_moment(
 ):
     """Layer soft loss (eV/Angstrom) or hard rate (1/Angstrom); host layer moments."""
     total = F64_ZERO
-    i = I32_ZERO
-    while i < nel[layer]:
-        slot = layer * max_el + i
+    element_index = I32_ZERO
+    while element_index < nel[layer]:
+        slot = layer * max_el + element_index
         per_atom = _rad_moment(
             which,
             incident,
@@ -243,7 +267,7 @@ def _rad_layer_moment(
             cutoff_eV,
         )
         total += ncm3[slot] * F64_CM_PER_ANG * per_atom
-        i += I32_ONE
+        element_index += I32_ONE
     return total
 
 
@@ -260,47 +284,73 @@ def _rad_sample_photon_eV(
     )
     if hard_rate <= F64_ZERO:
         return energy_eV
-    t_base = slot * max_t
-    nom_base = slot * n_red
-    chi_base = slot * max_t * n_red
-    row = _rad_row(incident, t_base, n_t, energy_eV)
-    fraction = _rad_fraction(incident, t_base, n_t, energy_eV, row)
-    top_a = top[t_base + row]
-    top_b = top[t_base + row + I32_ONE]
-    cut_reduced = cutoff_eV / energy_eV
+    incident_offset = slot * max_t
+    nominal_offset = slot * n_red
+    sdcs_offset = slot * max_t * n_red
+    row = _rad_row(incident, incident_offset, n_t, energy_eV)
+    fraction = _rad_fraction(incident, incident_offset, n_t, energy_eV, row)
+    top_a = top[incident_offset + row]
+    top_b = top[incident_offset + row + I32_ONE]
+    reduced_cutoff = cutoff_eV / energy_eV
     scale = F64_MB_CM2 * z * z
     target = uniform * hard_rate
     cumulative = F64_ZERO
-    red_left = _rad_next_node(-F64_ONE, nominal, nom_base, n_red, top_a, top_b, cut_reduced)
-    left = _rad_photon(red_left, energy_eV, cutoff_eV, cut_reduced)
-    chi_left = _rad_chi(
-        left / energy_eV, row, fraction, nominal, nom_base, n_red, top, t_base, chi, chi_base
+    left_reduced_energy = _rad_next_node(
+        -F64_ONE, nominal, nominal_offset, n_red, top_a, top_b, reduced_cutoff
     )
-    red_right = _rad_next_node(red_left, nominal, nom_base, n_red, top_a, top_b, cut_reduced)
-    while red_right < F64_INF:
-        right = _rad_photon(red_right, energy_eV, cutoff_eV, cut_reduced)
+    left = _rad_photon(left_reduced_energy, energy_eV, cutoff_eV, reduced_cutoff)
+    chi_left = _rad_chi(
+        left / energy_eV,
+        row,
+        fraction,
+        nominal,
+        nominal_offset,
+        n_red,
+        top,
+        incident_offset,
+        chi,
+        sdcs_offset,
+    )
+    right_reduced_energy = _rad_next_node(
+        left_reduced_energy, nominal, nominal_offset, n_red, top_a, top_b, reduced_cutoff
+    )
+    while right_reduced_energy < F64_INF:
+        right = _rad_photon(right_reduced_energy, energy_eV, cutoff_eV, reduced_cutoff)
         chi_right = _rad_chi(
-            right / energy_eV, row, fraction, nominal, nom_base, n_red, top, t_base, chi, chi_base
+            right / energy_eV,
+            row,
+            fraction,
+            nominal,
+            nominal_offset,
+            n_red,
+            top,
+            incident_offset,
+            chi,
+            sdcs_offset,
         )
-        red_next = _rad_next_node(red_right, nominal, nom_base, n_red, top_a, top_b, cut_reduced)
+        next_reduced_energy = _rad_next_node(
+            right_reduced_energy, nominal, nominal_offset, n_red, top_a, top_b, reduced_cutoff
+        )
         if right > cutoff_eV:
             cell_mass = scale * _rad_cell_rate(left, right, chi_left, chi_right)
-            if cumulative + cell_mass >= target or red_next == F64_INF:
+            if cumulative + cell_mass >= target or next_reduced_energy == F64_INF:
                 local = target - cumulative
                 low = left
                 high = right
                 step = I32_ZERO
                 while step < I32_BISECTION_STEPS:
-                    mid = F64_HALF * (low + high)
-                    chi_mid = chi_left + (chi_right - chi_left) * (mid - left) / (right - left)
-                    if scale * _rad_cell_rate(left, mid, chi_left, chi_mid) < local:
-                        low = mid
+                    midpoint_eV = F64_HALF * (low + high)
+                    chi_mid = chi_left + (chi_right - chi_left) * (midpoint_eV - left) / (
+                        right - left
+                    )
+                    if scale * _rad_cell_rate(left, midpoint_eV, chi_left, chi_mid) < local:
+                        low = midpoint_eV
                     else:
-                        high = mid
+                        high = midpoint_eV
                     step += I32_ONE
                 return F64_HALF * (low + high)
             cumulative += cell_mass
         left = right
         chi_left = chi_right
-        red_right = red_next
+        right_reduced_energy = next_reduced_energy
     return energy_eV

@@ -28,17 +28,17 @@ def _incident_row(incident_keV, energy_eV):
         return 0, 0.0
     if log_energy >= np.log(incident_keV[-1]):
         return incident_keV.size - 2, 1.0
-    lo, hi = 0, incident_keV.size - 1
-    while hi - lo > 1:
-        mid = (lo + hi) // 2
-        if np.log(incident_keV[mid]) <= log_energy:
-            lo = mid
+    lower_idx, upper_idx = 0, incident_keV.size - 1
+    while upper_idx - lower_idx > 1:
+        mid_idx = (lower_idx + upper_idx) // 2
+        if np.log(incident_keV[mid_idx]) <= log_energy:
+            lower_idx = mid_idx
         else:
-            hi = mid
-    fraction = (log_energy - np.log(incident_keV[lo])) / (
-        np.log(incident_keV[lo + 1]) - np.log(incident_keV[lo])
+            upper_idx = mid_idx
+    fraction = (log_energy - np.log(incident_keV[lower_idx])) / (
+        np.log(incident_keV[lower_idx + 1]) - np.log(incident_keV[lower_idx])
     )
-    return lo, fraction
+    return lower_idx, fraction
 
 
 @njit(cache=True)
@@ -66,8 +66,8 @@ def _photon_nodes(energy_eV, cutoff_eV, row, nominal, top):
     # Union of both incident-row breakpoints and the cutoff. Their upper
     # reduced-energy tips differ, so both are needed for an exact linear cell.
     nodes = np.empty(nominal.size + 3, dtype=np.float64)
-    for i in range(nominal.size - 1):
-        nodes[i] = nominal[i]
+    for node_index in range(nominal.size - 1):
+        nodes[node_index] = nominal[node_index]
     start = nominal.size - 1
     nodes[start] = top[row]
     nodes[start + 1] = top[row + 1]
@@ -75,16 +75,16 @@ def _photon_nodes(energy_eV, cutoff_eV, row, nominal, top):
     nodes[start + 3] = 1.0
     nodes.sort()
     unique = 1
-    for i in range(1, nodes.size):
-        if nodes[i] > nodes[unique - 1]:
-            nodes[unique] = nodes[i]
+    for node_index in range(1, nodes.size):
+        if nodes[node_index] > nodes[unique - 1]:
+            nodes[unique] = nodes[node_index]
             unique += 1
     photon = nodes[:unique] * energy_eV
     # (kc / T) * T can round below kc. Restore the exact cutoff so the moment
     # and sampler classify the first hard cell identically.
-    for i in range(unique):
-        if nodes[i] == cutoff_eV / energy_eV:
-            photon[i] = cutoff_eV
+    for node_index in range(unique):
+        if nodes[node_index] == cutoff_eV / energy_eV:
+            photon[node_index] = cutoff_eV
     return photon
 
 
@@ -115,8 +115,8 @@ def radiative_moments_scalar(
     scale = _MB_CM2 * atomic_number * atomic_number
     soft, hard_rate, hard_first = 0.0, 0.0, 0.0
     chi_left = _scaled_sdcs_at(nodes[0] / energy_eV, row, fraction, nominal, top, scaled_sdcs)
-    for i in range(nodes.size - 1):
-        left, right = nodes[i], nodes[i + 1]
+    for interval_index in range(nodes.size - 1):
+        left, right = nodes[interval_index], nodes[interval_index + 1]
         chi_right = _scaled_sdcs_at(right / energy_eV, row, fraction, nominal, top, scaled_sdcs)
         if left == 0.0:
             soft += scale * 0.5 * (chi_left + chi_right) * right
@@ -150,23 +150,25 @@ def sample_hard_photon_energy_scalar(
     target = uniform * hard_rate
     cumulative = 0.0
     chi_left = _scaled_sdcs_at(nodes[0] / energy_eV, row, fraction, nominal, top, scaled_sdcs)
-    for i in range(nodes.size - 1):
-        left, right = nodes[i], nodes[i + 1]
+    for interval_index in range(nodes.size - 1):
+        left, right = nodes[interval_index], nodes[interval_index + 1]
         chi_right = _scaled_sdcs_at(right / energy_eV, row, fraction, nominal, top, scaled_sdcs)
         if right > cutoff_eV:
             mass, _ = _linear_cell(left, right, chi_left, chi_right)
             cell_mass = scale * mass
-            if cumulative + cell_mass >= target or i == nodes.size - 2:
+            if cumulative + cell_mass >= target or interval_index == nodes.size - 2:
                 local = target - cumulative
                 low, high = left, right
                 for _ in range(52):
-                    mid = 0.5 * (low + high)
-                    chi_mid = chi_left + (chi_right - chi_left) * (mid - left) / (right - left)
-                    partial, _ = _linear_cell(left, mid, chi_left, chi_mid)
+                    midpoint_eV = 0.5 * (low + high)
+                    chi_mid = chi_left + (chi_right - chi_left) * (midpoint_eV - left) / (
+                        right - left
+                    )
+                    partial, _ = _linear_cell(left, midpoint_eV, chi_left, chi_mid)
                     if scale * partial < local:
-                        low = mid
+                        low = midpoint_eV
                     else:
-                        high = mid
+                        high = midpoint_eV
                 return 0.5 * (low + high)
             cumulative += cell_mass
         chi_left = chi_right
@@ -190,19 +192,19 @@ def radiative_layer_moments_scalar(
 ):
     """Return (soft eV/Angstrom, hard 1/Angstrom) and fill element rates."""
     soft, hard = 0.0, 0.0
-    for i in range(n_elements[layer]):
-        nT = n_incident[layer, i]
-        s, rate, _ = radiative_moments_scalar(
-            incident_keV[layer, i, :nT],
-            nominal[layer, i],
-            top[layer, i, :nT],
-            scaled_sdcs[layer, i, :nT],
-            atomic_number[layer, i],
+    for element_index in range(n_elements[layer]):
+        incident_energy_count = n_incident[layer, element_index]
+        soft_moment, rate, _ = radiative_moments_scalar(
+            incident_keV[layer, element_index, :incident_energy_count],
+            nominal[layer, element_index],
+            top[layer, element_index, :incident_energy_count],
+            scaled_sdcs[layer, element_index, :incident_energy_count],
+            atomic_number[layer, element_index],
             energy_eV,
             cutoff_eV,
         )
-        number_per_ang = density_cm3[layer, i] * 1e-8
-        soft += number_per_ang * s
-        element_rates[i] = number_per_ang * rate
-        hard += element_rates[i]
+        number_per_ang = density_cm3[layer, element_index] * 1e-8
+        soft += number_per_ang * soft_moment
+        element_rates[element_index] = number_per_ang * rate
+        hard += element_rates[element_index]
     return soft, hard

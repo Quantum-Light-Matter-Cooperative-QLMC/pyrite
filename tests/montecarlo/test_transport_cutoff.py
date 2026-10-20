@@ -247,11 +247,14 @@ def test_cuda_source_uses_cpu_reference_cutoff_and_termination_rules():
         transport_package.joinpath(name).read_text()
         for name in ("_jit_device.py", "_jit_kernel.py")
     )
-    for source in (cpu_source, cuda_source):
-        assert "cutoff_distance = (E_cut_e - E_j) / dEds" in source
-        assert "cutoff_distance < step_j" in source
-        assert "cutoff_distance == step_j and not geometry_event" in source
-        assert "exit_side_j = False" in source
+    for source, cutoff, energy, step, exits_side in (
+        (cpu_source, "E_cut_e", "E_j", "step_j", "exit_side_j"),
+        (cuda_source, "cutoff_energy_keV", "energy_keV", "step_length_ang", "exits_side"),
+    ):
+        assert f"cutoff_distance = ({cutoff} - {energy}) / dEds" in source
+        assert f"cutoff_distance < {step}" in source
+        assert f"cutoff_distance == {step} and not geometry_event" in source
+        assert f"{exits_side} = False" in source
     assert "I8_CUTOFF_STOPPED = np.int8(0)" in cuda_source
     assert "I8_STEP_LIMITED = np.int8(4)" in cuda_source
     assert "I8_NOT_ENTERED = np.int8(5)" in cuda_source

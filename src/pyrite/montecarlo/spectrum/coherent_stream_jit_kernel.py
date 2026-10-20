@@ -63,64 +63,68 @@ DEFAULT_COHERENT_STREAM_KERNEL_CONFIG = CoherentStreamKernelConfig()
 
 
 @jit.rawkernel(device=True)
-def _interp_row(table, row, idx, frac, below, above, n_tab):
-    base = row * n_tab
+def _interp_row(table, row, upper_idx, fraction, below, above, n_samples):
+    row_offset = row * n_samples
     if below:
-        return table[base]
+        return table[row_offset]
     if above:
-        return table[base + n_tab - U32_ONE]
-    f0 = table[base + idx - U32_ONE]
-    return f0 + frac * (table[base + idx] - f0)
+        return table[row_offset + n_samples - U32_ONE]
+    lower_value = table[row_offset + upper_idx - U32_ONE]
+    return lower_value + fraction * (table[row_offset + upper_idx] - lower_value)
 
 
 @jit.rawkernel(device=True)
-def _interp_shared(table, idx, frac, below, above, n_tab):
+def _interp_shared(table, upper_idx, fraction, below, above, n_samples):
     if below:
         return table[U32_ZERO]
     if above:
-        return table[n_tab - U32_ONE]
-    f0 = table[idx - U32_ONE]
-    return f0 + frac * (table[idx] - f0)
+        return table[n_samples - U32_ONE]
+    lower_value = table[upper_idx - U32_ONE]
+    return lower_value + fraction * (table[upper_idx] - lower_value)
 
 
 @jit.rawkernel(device=True)
-def _interp_elemental_mu(log_mu_table, idx, log_frac, below, above, n_mu, n_tab):
+def _interp_elemental_mu(
+    log_mu_table, upper_idx, log_fraction, below, above, n_elements, n_samples
+):
     """Sum per-element log-log attenuation interpolation on device.
 
     Validation: line-absorption-tabulation
     """
     mu = F32_ZERO
     element = U32_ZERO
-    while element < n_mu:
-        base = element * n_tab
+    while element < n_elements:
+        row_offset = element * n_samples
         if below:
-            log_mu = log_mu_table[base]
+            log_mu = log_mu_table[row_offset]
         elif above:
-            log_mu = log_mu_table[base + n_tab - U32_ONE]
+            log_mu = log_mu_table[row_offset + n_samples - U32_ONE]
         else:
-            log0 = log_mu_table[base + idx - U32_ONE]
-            log_mu = log0 + log_frac * (log_mu_table[base + idx] - log0)
+            lower_log_mu = log_mu_table[row_offset + upper_idx - U32_ONE]
+            log_mu = lower_log_mu + log_fraction * (
+                log_mu_table[row_offset + upper_idx] - lower_log_mu
+            )
         mu += xp.exp(log_mu)
         element += U32_ONE
     return mu
 
 
 @jit.rawkernel(device=True)
-def _bracket_index(grid, x, n_tab):
-    """Equivalent to ``clip(searchsorted(grid, x), 1, n_tab - 1)``."""
-    lo = U32_ZERO
-    hi = n_tab
-    while lo < hi:
-        mid = (lo + hi) // U32_TWO
-        if grid[mid] < x:
-            lo = mid + U32_ONE
+def _bracket_index(grid, energy_eV, n_samples):
+    """Equivalent to ``clip(searchsorted(grid, energy_eV), 1, n_samples - 1)``."""
+    lower_idx = U32_ZERO
+    upper_idx = n_samples
+    while lower_idx < upper_idx:
+        mid_idx = (lower_idx + upper_idx) // U32_TWO
+        if grid[mid_idx] < energy_eV:
+            lower_idx = mid_idx + U32_ONE
         else:
-            hi = mid
-    if lo < U32_ONE:
+            upper_idx = mid_idx
+    if lower_idx < U32_ONE:
         return U32_ONE
-    if lo >= n_tab:
-        return n_tab - U32_ONE
-    return lo
+    if lower_idx >= n_samples:
+        return n_samples - U32_ONE
+    return lower_idx
 
 
 @jit.rawkernel()
@@ -169,44 +173,44 @@ def _coherent_prologue_kernel(
     pref_c1,
     use_medium,
     use_formation,
-    n_pairs,
-    n_seg,
-    n_g,
-    n_mu,
-    n_tab,
+    pair_count,
+    n_segments,
+    n_reflections,
+    n_elements,
+    n_samples,
 ):
-    # g-major fixed order: pair = g*n_seg + seg.  The reduction kernel then
+    # g-major fixed order: pair_index = reflection*n_segments + segment.  The reduction kernel then
     # reads each g row contiguously while its threads stride over segments.
     """Validation: xray-in-medium-resonance"""
-    pair = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
-    if pair >= n_pairs:
+    pair_index = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
+    if pair_index >= pair_count:
         return
 
-    g = pair // n_seg
-    seg = pair - g * n_seg
+    reflection = pair_index // n_segments
+    segment = pair_index - reflection * n_segments
 
     # A zero coefficient is a complete rejected-pair marker. Geometry buffers
     # may remain untouched on rejection because the reducer reads coefficients
     # first and only loads E/phase data for a live field contribution.
-    cs_re_out[pair] = F32_ZERO
-    cs_im_out[pair] = F32_ZERO
-    cp_re_out[pair] = F32_ZERO
-    cp_im_out[pair] = F32_ZERO
+    cs_re_out[pair_index] = F32_ZERO
+    cs_im_out[pair_index] = F32_ZERO
+    cp_re_out[pair_index] = F32_ZERO
+    cp_im_out[pair_index] = F32_ZERO
 
-    if not cxr_electron[seg]:
+    if not cxr_electron[segment]:
         return
 
-    vbase = seg * U32_THREE
-    gbase = g * U32_THREE
-    vx = v_flat[vbase]
-    vy = v_flat[vbase + U32_ONE]
-    vz = v_flat[vbase + U32_TWO]
-    gx = g_flat[gbase]
-    gy = g_flat[gbase + U32_ONE]
-    gz = g_flat[gbase + U32_TWO]
+    velocity_offset = segment * U32_THREE
+    reflection_offset = reflection * U32_THREE
+    vx = v_flat[velocity_offset]
+    vy = v_flat[velocity_offset + U32_ONE]
+    vz = v_flat[velocity_offset + U32_TWO]
+    gx = g_flat[reflection_offset]
+    gy = g_flat[reflection_offset + U32_ONE]
+    gz = g_flat[reflection_offset + U32_TWO]
 
-    dnm = denom[seg]
-    dnm_vac = dnm
+    resonance_denom = denom[segment]
+    vacuum_denom = resonance_denom
     v_dot_g = vx * gx + vy * gy + vz * gz
 
     # First-order Snell fixed point: D = 1-v.n-delta v.grad L.
@@ -214,539 +218,589 @@ def _coherent_prologue_kernel(
     # reject critical-angle gradients before producing any amplitude.
     # Validation: xray-in-medium-resonance
     n_re = F32_ONE
-    hx = grad_flat[vbase]
-    hy = grad_flat[vbase + U32_ONE]
-    hz = grad_flat[vbase + U32_TWO]
-    h2 = hx * hx + hy * hy + hz * hz
-    vdh = vx * hx + vy * hy + vz * hz
+    grad_x = grad_flat[velocity_offset]
+    grad_y = grad_flat[velocity_offset + U32_ONE]
+    grad_z = grad_flat[velocity_offset + U32_TWO]
+    gradient_norm_sq = grad_x * grad_x + grad_y * grad_y + grad_z * grad_z
+    velocity_dot_grad = vx * grad_x + vy * grad_y + vz * grad_z
     if use_medium:
-        vdn = v_dot_n[seg]
-        dnm = F32_ONE - vdn
-        previous = dnm
+        velocity_dot_n = v_dot_n[segment]
+        resonance_denom = F32_ONE - velocity_dot_n
+        previous_denominator = resonance_denom
         for _it in range(3):
-            E_it = hbarc * (v_dot_g / dnm)
-            below_it = E_it <= E_tab[U32_ZERO]
-            above_it = E_it >= E_tab[n_tab - U32_ONE]
-            idx_it = _bracket_index(E_tab, E_it, n_tab)
-            x0_it = E_tab[idx_it - U32_ONE]
-            frac_it = (E_it - x0_it) / (E_tab[idx_it] - x0_it)
-            n_re = _interp_shared(n_re_tab, idx_it, frac_it, below_it, above_it, n_tab)
-            previous = dnm
-            if vdh == -vdn:
-                dnm = F32_ONE - n_re * vdn
+            trial_energy_eV = hbarc * (v_dot_g / resonance_denom)
+            trial_below = trial_energy_eV <= E_tab[U32_ZERO]
+            trial_above = trial_energy_eV >= E_tab[n_samples - U32_ONE]
+            trial_upper = _bracket_index(E_tab, trial_energy_eV, n_samples)
+            trial_lower_eV = E_tab[trial_upper - U32_ONE]
+            trial_fraction = (trial_energy_eV - trial_lower_eV) / (
+                E_tab[trial_upper] - trial_lower_eV
+            )
+            n_re = _interp_shared(
+                n_re_tab, trial_upper, trial_fraction, trial_below, trial_above, n_samples
+            )
+            previous_denominator = resonance_denom
+            if velocity_dot_grad == -velocity_dot_n:
+                resonance_denom = F32_ONE - n_re * velocity_dot_n
             else:
-                dnm = F32_ONE - vdn - (F32_ONE - n_re) * vdh
+                resonance_denom = F32_ONE - velocity_dot_n - (F32_ONE - n_re) * velocity_dot_grad
         # `abs` is not a cupyx.jit builtin; `xp.abs` is. Written as `>` rather
         # than `not (<=)` so a NaN root falls through to the existing NaN
         # handling below instead of taking a new exit.
         if (
-            xp.abs(dnm - previous) > root_rtol * xp.abs(dnm)
-            or F32_TWO * xp.abs(F32_ONE - n_re) * h2 >= F32_ONE
+            xp.abs(resonance_denom - previous_denominator) > root_rtol * xp.abs(resonance_denom)
+            or F32_TWO * xp.abs(F32_ONE - n_re) * gradient_norm_sq >= F32_ONE
         ):
             return
 
-    omega = v_dot_g / dnm
-    E_res = hbarc * omega
-    if E_res <= lo_keep or E_res <= F32_TEN or E_res >= hi_keep:
+    omega = v_dot_g / resonance_denom
+    resonance_eV = hbarc * omega
+    if resonance_eV <= lo_keep or resonance_eV <= F32_TEN or resonance_eV >= hi_keep:
         return
 
-    below = E_res <= E_tab[U32_ZERO]
-    above = E_res >= E_tab[n_tab - U32_ONE]
-    idx = _bracket_index(E_tab, E_res, n_tab)
-    x0 = E_tab[idx - U32_ONE]
-    frac = (E_res - x0) / (E_tab[idx] - x0)
-    bounded_energy = min(max(E_res, x0), E_tab[idx])
-    log_frac = xp.log1p((bounded_energy - x0) / x0) / xp.log1p((E_tab[idx] - x0) / x0)
+    below = resonance_eV <= E_tab[U32_ZERO]
+    above = resonance_eV >= E_tab[n_samples - U32_ONE]
+    upper_idx = _bracket_index(E_tab, resonance_eV, n_samples)
+    lower_eV = E_tab[upper_idx - U32_ONE]
+    fraction = (resonance_eV - lower_eV) / (E_tab[upper_idx] - lower_eV)
+    bounded_energy = min(max(resonance_eV, lower_eV), E_tab[upper_idx])
+    log_fraction = xp.log1p((bounded_energy - lower_eV) / lower_eV) / xp.log1p(
+        (E_tab[upper_idx] - lower_eV) / lower_eV
+    )
 
-    row = table_row[g]
-    chi_re = _interp_row(chi_re_tab, row, idx, frac, below, above, n_tab)
-    chi_im = _interp_row(chi_im_tab, row, idx, frac, below, above, n_tab)
-    u_re = _interp_row(u_re_tab, row, idx, frac, below, above, n_tab)
-    u_im = _interp_row(u_im_tab, row, idx, frac, below, above, n_tab)
-    mu = _interp_elemental_mu(log_mu_tab, idx, log_frac, below, above, n_mu, n_tab)
+    row = table_row[reflection]
+    chi_re = _interp_row(chi_re_tab, row, upper_idx, fraction, below, above, n_samples)
+    chi_im = _interp_row(chi_im_tab, row, upper_idx, fraction, below, above, n_samples)
+    u_re = _interp_row(u_re_tab, row, upper_idx, fraction, below, above, n_samples)
+    u_im = _interp_row(u_im_tab, row, upper_idx, fraction, below, above, n_samples)
+    mu = _interp_elemental_mu(
+        log_mu_tab, upper_idx, log_fraction, below, above, n_elements, n_samples
+    )
 
     # Scalar products of k_eff = omega(n_hat + delta grad L).
     k_mag = omega
     if use_medium:
         delta = F32_ONE - n_re
-        if h2 != F32_ZERO:
-            k_mag = omega * xp.sqrt(F32_ONE - F32_TWO * delta + delta * delta * h2)
-    k_dot_v = omega * (F32_ONE - dnm)
-    k_dot_g = omega * (n_dot_g[g] + (F32_ONE - n_re) * (hx * gx + hy * gy + hz * gz))
+        if gradient_norm_sq != F32_ZERO:
+            k_mag = omega * xp.sqrt(F32_ONE - F32_TWO * delta + delta * delta * gradient_norm_sq)
+    k_dot_v = omega * (F32_ONE - resonance_denom)
+    k_dot_g = omega * (
+        n_dot_g[reflection] + (F32_ONE - n_re) * (grad_x * gx + grad_y * gy + grad_z * gz)
+    )
     v_dot_kg = v_dot_g + k_dot_v
-    detuning = g2[g] + F32_TWO * k_dot_g
+    detuning = g2[reflection] + F32_TWO * k_dot_g
 
-    duration = t_L[seg]
-    gm = gamma[seg]
+    duration = t_L[segment]
+    lorentz_factor = gamma[segment]
     # Formation mode (issue #181): the attenuation moves out of the amplitude
     # into the per-piece formation constants of ``_formation.
     # formation_coefficients`` -- tau at the piece ends, ordered along travel --
     # which the field kernels turn into the complex factor F.
     # Validation: coherent-formation-absorption
     transmission = F32_ONE
-    apb_v = F32_ZERO
-    bma_v = F32_ZERO
-    q_v = F32_ZERO
+    end_sum = F32_ZERO
+    end_diff = F32_ZERO
+    absorb_q = F32_ZERO
     if use_formation:
-        tau_s = L_start[seg] * mu
-        tau_e = L_end[seg] * mu
-        q_v = F32_QUARTER * (tau_e - tau_s)
-        if xp.abs(q_v) < F32_FORMATION_SMALL_Q:
-            c0 = xp.exp(-(F32_QUARTER * (tau_s + tau_e)))
-            apb_v = F32_TWO * c0 * xp.cosh(q_v)
-            bma_v = -(F32_TWO * c0 * xp.sinh(q_v))
+        start_optical_depth = L_start[segment] * mu
+        end_optical_depth = L_end[segment] * mu
+        absorb_q = F32_QUARTER * (end_optical_depth - start_optical_depth)
+        if xp.abs(absorb_q) < F32_FORMATION_SMALL_Q:
+            mid_attenuation = xp.exp(-(F32_QUARTER * (start_optical_depth + end_optical_depth)))
+            end_sum = F32_TWO * mid_attenuation * xp.cosh(absorb_q)
+            end_diff = -(F32_TWO * mid_attenuation * xp.sinh(absorb_q))
         else:
-            a_end = xp.exp(-(F32_HALF * tau_s))
-            b_end = xp.exp(-(F32_HALF * tau_e))
-            apb_v = a_end + b_end
-            bma_v = b_end - a_end
+            start_amplitude = xp.exp(-(F32_HALF * start_optical_depth))
+            end_amplitude = xp.exp(-(F32_HALF * end_optical_depth))
+            end_sum = start_amplitude + end_amplitude
+            end_diff = end_amplitude - start_amplitude
         # Written so a NaN falls through to rejection, like the root guard.
-        if not (apb_v > F32_ZERO and apb_v < F32_MAX and bma_v == bma_v):
+        if not (end_sum > F32_ZERO and end_sum < F32_MAX and end_diff == end_diff):
             return
     else:
-        transmission = xp.exp(-(L_esc[seg] * mu))
-    amp = xp.sqrt(alpha_fs * omega / pref_c1 * transmission)
-    if amp != amp or amp <= F32_ZERO or amp >= F32_MAX or duration <= F32_ZERO:
+        transmission = xp.exp(-(L_esc[segment] * mu))
+    amplitude = xp.sqrt(alpha_fs * omega / pref_c1 * transmission)
+    if (
+        amplitude != amplitude
+        or amplitude <= F32_ZERO
+        or amplitude >= F32_MAX
+        or duration <= F32_ZERO
+    ):
         return
-    coef_scale = amp * duration
+    field_scale = amplitude * duration
 
-    esx = es_flat[gbase]
-    esy = es_flat[gbase + U32_ONE]
-    esz = es_flat[gbase + U32_TWO]
-    epx = ep_flat[gbase]
-    epy = ep_flat[gbase + U32_ONE]
-    epz = ep_flat[gbase + U32_TWO]
+    esx = es_flat[reflection_offset]
+    esy = es_flat[reflection_offset + U32_ONE]
+    esz = es_flat[reflection_offset + U32_TWO]
+    epx = ep_flat[reflection_offset]
+    epy = ep_flat[reflection_offset + U32_ONE]
+    epz = ep_flat[reflection_offset + U32_TWO]
 
     # sigma polarization: A = chi*f_pxr + (U/m)*f_cbs, with both scalar
     # kinematic factors REAL. This is the real/imag expansion of the existing
     # coherent complex expression, preserving its phase information.
-    g_dot_e = g_dot_es[g]
+    g_dot_e = g_dot_es[reflection]
     v_dot_e = vx * esx + vy * esy + vz * esz
-    k_dot_e = omega * (F32_ONE - n_re) * (hx * esx + hy * esy + hz * esz)
+    k_dot_e = omega * (F32_ONE - n_re) * (grad_x * esx + grad_y * esy + grad_z * esz)
     numerator = v_dot_kg * (g_dot_e + k_dot_e) - k_mag * k_mag * v_dot_e
     braced_ge = g_dot_e - v_dot_g * v_dot_e
     braced_kg = k_dot_g - k_dot_v * v_dot_g
     bracket = braced_ge + v_dot_e * braced_kg / v_dot_g
-    cbs_den = gm * v_dot_g
+    cbs_denominator = lorentz_factor * v_dot_g
     # Preserve the coherent eager expression order as closely as scalar real/imag
-    # arithmetic allows: (chi/detuning)*numerator and (-u/cbs_den)*bracket.
-    a_re = (chi_re / detuning) * numerator + (-u_re / cbs_den) * bracket
-    a_im = (chi_im / detuning) * numerator + (-u_im / cbs_den) * bracket
-    csr = coef_scale * a_re
-    csi = coef_scale * a_im
+    # arithmetic allows: (chi/detuning)*numerator and (-u/cbs_denominator)*bracket.
+    amplitude_real = (chi_re / detuning) * numerator + (-u_re / cbs_denominator) * bracket
+    amplitude_imag = (chi_im / detuning) * numerator + (-u_im / cbs_denominator) * bracket
+    sigma_re = field_scale * amplitude_real
+    sigma_im = field_scale * amplitude_imag
 
     # pi polarization.
-    g_dot_e = g_dot_ep[g]
+    g_dot_e = g_dot_ep[reflection]
     v_dot_e = vx * epx + vy * epy + vz * epz
-    k_dot_e = omega * (F32_ONE - n_re) * (hx * epx + hy * epy + hz * epz)
+    k_dot_e = omega * (F32_ONE - n_re) * (grad_x * epx + grad_y * epy + grad_z * epz)
     numerator = v_dot_kg * (g_dot_e + k_dot_e) - k_mag * k_mag * v_dot_e
     braced_ge = g_dot_e - v_dot_g * v_dot_e
     braced_kg = k_dot_g - k_dot_v * v_dot_g
     bracket = braced_ge + v_dot_e * braced_kg / v_dot_g
-    a_re = (chi_re / detuning) * numerator + (-u_re / cbs_den) * bracket
-    a_im = (chi_im / detuning) * numerator + (-u_im / cbs_den) * bracket
-    cpr = coef_scale * a_re
-    cpi = coef_scale * a_im
+    amplitude_real = (chi_re / detuning) * numerator + (-u_re / cbs_denominator) * bracket
+    amplitude_imag = (chi_im / detuning) * numerator + (-u_im / cbs_denominator) * bracket
+    pi_re = field_scale * amplitude_real
+    pi_im = field_scale * amplitude_imag
 
-    E_r_out[pair] = E_res
+    E_r_out[pair_index] = resonance_eV
     # The sinc half-width rides on the resonance denominator, so under the
     # refractive model it stops being a per-segment hoist and is emitted here in
     # the pair layout the field reducer already understands.
     if use_medium:
-        aw_out[pair] = dnm * duration / (F32_TWO * hbarc)
+        aw_out[pair_index] = resonance_denom * duration / (F32_TWO * hbarc)
     # Formation mode centres the line on the VACUUM sinc centre and width; the
     # field kernels add the escape-path refractive slope (``_formation``).
     if use_formation:
-        E_r_out[pair] = hbarc * (v_dot_g / dnm_vac)
-        aw_out[pair] = dnm_vac * duration / (F32_TWO * hbarc)
-        apb_out[pair] = apb_v
-        bma_out[pair] = bma_v
-        q_out[pair] = q_v
-    rbase = seg * U32_THREE
-    g_phase_out[pair] = (
-        r_flat[rbase] * gx + r_flat[rbase + U32_ONE] * gy + r_flat[rbase + U32_TWO] * gz
+        E_r_out[pair_index] = hbarc * (v_dot_g / vacuum_denom)
+        aw_out[pair_index] = vacuum_denom * duration / (F32_TWO * hbarc)
+        apb_out[pair_index] = end_sum
+        bma_out[pair_index] = end_diff
+        q_out[pair_index] = absorb_q
+    position_offset = segment * U32_THREE
+    g_phase_out[pair_index] = (
+        r_flat[position_offset] * gx
+        + r_flat[position_offset + U32_ONE] * gy
+        + r_flat[position_offset + U32_TWO] * gz
     )
-    cs_re_out[pair] = csr
-    cs_im_out[pair] = csi
-    cp_re_out[pair] = cpr
-    cp_im_out[pair] = cpi
+    cs_re_out[pair_index] = sigma_re
+    cs_im_out[pair_index] = sigma_im
+    cp_re_out[pair_index] = pi_re
+    cp_im_out[pair_index] = pi_im
 
 
 @jit.rawkernel(device=True)
-def _sinc_unscaled(x):
-    if x == F32_ZERO:
-        x = F32_TINY
-    return xp.sin(x) / x
+def _sinc_unscaled(sinc_argument):
+    if sinc_argument == F32_ZERO:
+        sinc_argument = F32_TINY
+    return xp.sin(sinc_argument) / sinc_argument
 
 
 @jit.rawkernel(device=True)
-def _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff):
-    if use_sinc_cutoff and (x < -sinc_cutoff or x > sinc_cutoff):
+def _sinc_windowed(sinc_argument, sinc_cutoff, use_sinc_cutoff):
+    if use_sinc_cutoff and (sinc_argument < -sinc_cutoff or sinc_argument > sinc_cutoff):
         return F32_ZERO
-    return _sinc_unscaled(x)
+    return _sinc_unscaled(sinc_argument)
 
 
 @jit.rawkernel()
 def _field_kernel_1e(
-    E_r,
-    aw,
+    resonances_eV,
+    sinc_slopes,
     phase_slope,
     g_phase,
-    cs_re,
-    cs_im,
-    cp_re,
-    cp_im,
-    E_grid,
-    L_esc,
+    sigma_coeffs_re,
+    sigma_coeffs_im,
+    pi_coeffs_re,
+    pi_coeffs_im,
+    energies_eV,
+    escape_distances,
     delta_omega,
-    half_dL,
-    apb,
-    bma,
-    q,
+    half_escape_changes,
+    endpoint_sums,
+    endpoint_diffs,
+    attenuation_q_values,
     fs_re,
     fs_im,
     fp_re,
     fp_im,
-    aw_pair,
-    slope_pair,
+    sinc_slopes_per_pair,
+    phase_slopes_per_pair,
     use_medium,
     use_formation,
     sinc_cutoff,
     use_sinc_cutoff,
-    n_seg,
-    n_g,
-    n_E,
-    e_blocks,
+    n_segments,
+    n_reflections,
+    n_energies,
+    n_energy_blocks,
 ):
     block = jit.blockIdx.x
-    g = block // e_blocks
-    eb = block - g * e_blocks
-    if g >= n_g:
+    reflection = block // n_energy_blocks
+    energy_block = block - reflection * n_energy_blocks
+    if reflection >= n_reflections:
         return
-    k0 = eb
-    tid = jit.threadIdx.x
-    nthreads = jit.blockDim.x
-    E0 = E_grid[k0]
-    dw0 = F32_ZERO
+    energy_index0 = energy_block
+    thread_idx = jit.threadIdx.x
+    n_threads = jit.blockDim.x
+    photon0_eV = energies_eV[energy_index0]
+    medium_shift0 = F32_ZERO
     if use_medium:
-        dw0 = delta_omega[k0]
-    sr0 = F32_ZERO
-    si0 = F32_ZERO
-    pr0 = F32_ZERO
-    pi0 = F32_ZERO
+        medium_shift0 = delta_omega[energy_index0]
+    sigma_re_sum0 = F32_ZERO
+    sigma_im_sum0 = F32_ZERO
+    pi_re_sum0 = F32_ZERO
+    pi_im_sum0 = F32_ZERO
 
-    seg = tid
-    base = g * n_seg
-    while seg < n_seg:
-        line = base + seg
-        csr = cs_re[line]
-        csi = cs_im[line]
-        cpr = cp_re[line]
-        cpi = cp_im[line]
-        if csr != F32_ZERO or csi != F32_ZERO or cpr != F32_ZERO or cpi != F32_ZERO:
-            Er = E_r[line]
-            aw_i = seg
-            if aw_pair:
-                aw_i = line
-            slope_i = seg
-            if slope_pair:
-                slope_i = line
-            aa = aw[aw_i]
-            ps = phase_slope[slope_i]
-            gp = g_phase[line]
-            Lj = F32_ZERO
+    segment = thread_idx
+    line_offset = reflection * n_segments
+    while segment < n_segments:
+        line_id = line_offset + segment
+        sigma_re = sigma_coeffs_re[line_id]
+        sigma_im = sigma_coeffs_im[line_id]
+        pi_re = pi_coeffs_re[line_id]
+        pi_im = pi_coeffs_im[line_id]
+        if sigma_re != F32_ZERO or sigma_im != F32_ZERO or pi_re != F32_ZERO or pi_im != F32_ZERO:
+            resonance_eV = resonances_eV[line_id]
+            sinc_slope_index = segment
+            if sinc_slopes_per_pair:
+                sinc_slope_index = line_id
+            phase_slope_index = segment
+            if phase_slopes_per_pair:
+                phase_slope_index = line_id
+            sinc_slope = sinc_slopes[sinc_slope_index]
+            phase_rate = phase_slope[phase_slope_index]
+            lattice_phase = g_phase[line_id]
+            escape_distance = F32_ZERO
             if use_medium:
-                Lj = L_esc[seg]
-            hd = F32_ZERO
-            ab = F32_ZERO
-            bm = F32_ZERO
-            qq = F32_ZERO
+                escape_distance = escape_distances[segment]
+            half_path_change = F32_ZERO
+            end_sum = F32_ZERO
+            end_diff = F32_ZERO
+            absorb_q = F32_ZERO
             if use_formation:
-                hd = half_dL[seg]
-                ab = apb[line]
-                bm = bma[line]
-                qq = q[line]
+                half_path_change = half_escape_changes[segment]
+                end_sum = endpoint_sums[line_id]
+                end_diff = endpoint_diffs[line_id]
+                absorb_q = attenuation_q_values[line_id]
             if use_formation:
-                v = aa * (E0 - Er) - hd * dw0
-                fr = F32_ZERO
-                fi = F32_ZERO
-                if use_sinc_cutoff == U32_ZERO or (v >= -sinc_cutoff and v <= sinc_cutoff):
-                    sv = xp.sin(v)
-                    cv = xp.cos(v)
-                    fr = _formation_re(v, sv, cv, ab, bm, qq)
-                    fi = _formation_im(v, sv, cv, ab, bm, qq)
-                phase = ps * E0 - gp - Lj * dw0
-                cph = xp.cos(phase)
-                sph = xp.sin(phase)
-                er = fr * cph - fi * sph
-                ei = fr * sph + fi * cph
-                sr0 += csr * er - csi * ei
-                si0 += csr * ei + csi * er
-                pr0 += cpr * er - cpi * ei
-                pi0 += cpr * ei + cpi * er
+                phase_arg = (
+                    sinc_slope * (photon0_eV - resonance_eV) - half_path_change * medium_shift0
+                )
+                form_real = F32_ZERO
+                form_imag = F32_ZERO
+                if use_sinc_cutoff == U32_ZERO or (
+                    phase_arg >= -sinc_cutoff and phase_arg <= sinc_cutoff
+                ):
+                    sin_arg = xp.sin(phase_arg)
+                    cos_arg = xp.cos(phase_arg)
+                    form_real = _formation_re(
+                        phase_arg, sin_arg, cos_arg, end_sum, end_diff, absorb_q
+                    )
+                    form_imag = _formation_im(
+                        phase_arg, sin_arg, cos_arg, end_sum, end_diff, absorb_q
+                    )
+                phase = phase_rate * photon0_eV - lattice_phase - escape_distance * medium_shift0
+                cos_phase = xp.cos(phase)
+                sin_phase = xp.sin(phase)
+                phased_field_re = form_real * cos_phase - form_imag * sin_phase
+                phased_field_im = form_real * sin_phase + form_imag * cos_phase
+                sigma_re_sum0 += sigma_re * phased_field_re - sigma_im * phased_field_im
+                sigma_im_sum0 += sigma_re * phased_field_im + sigma_im * phased_field_re
+                pi_re_sum0 += pi_re * phased_field_re - pi_im * phased_field_im
+                pi_im_sum0 += pi_re * phased_field_im + pi_im * phased_field_re
             else:
-                x = aa * (E0 - Er)
-                s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-                phase = ps * E0 - gp
+                sinc_argument = sinc_slope * (photon0_eV - resonance_eV)
+                sinc_value = _sinc_windowed(sinc_argument, sinc_cutoff, use_sinc_cutoff)
+                phase = phase_rate * photon0_eV - lattice_phase
                 if use_medium:
-                    phase = phase - Lj * dw0
-                cph = xp.cos(phase)
-                sph = xp.sin(phase)
-                sr0 += s * (csr * cph - csi * sph)
-                si0 += s * (csr * sph + csi * cph)
-                pr0 += s * (cpr * cph - cpi * sph)
-                pi0 += s * (cpr * sph + cpi * cph)
-        seg += nthreads
+                    phase = phase - escape_distance * medium_shift0
+                cos_phase = xp.cos(phase)
+                sin_phase = xp.sin(phase)
+                sigma_re_sum0 += sinc_value * (sigma_re * cos_phase - sigma_im * sin_phase)
+                sigma_im_sum0 += sinc_value * (sigma_re * sin_phase + sigma_im * cos_phase)
+                pi_re_sum0 += sinc_value * (pi_re * cos_phase - pi_im * sin_phase)
+                pi_im_sum0 += sinc_value * (pi_re * sin_phase + pi_im * cos_phase)
+        segment += n_threads
 
     shared = jit.shared_memory(xp.float32, None)
-    o0 = U32_ZERO
-    o1 = U32_ONE * nthreads
-    o2 = U32_TWO * nthreads
-    o3 = U32_THREE * nthreads
-    shared[o0 + tid] = sr0
-    shared[o1 + tid] = si0
-    shared[o2 + tid] = pr0
-    shared[o3 + tid] = pi0
+    offset0 = U32_ZERO
+    offset1 = U32_ONE * n_threads
+    offset2 = U32_TWO * n_threads
+    offset3 = U32_THREE * n_threads
+    shared[offset0 + thread_idx] = sigma_re_sum0
+    shared[offset1 + thread_idx] = sigma_im_sum0
+    shared[offset2 + thread_idx] = pi_re_sum0
+    shared[offset3 + thread_idx] = pi_im_sum0
     jit.syncthreads()
-    stride = nthreads // U32_TWO
+    stride = n_threads // U32_TWO
     while stride > U32_ZERO:
-        if tid < stride:
-            shared[o0 + tid] += shared[o0 + tid + stride]
-            shared[o1 + tid] += shared[o1 + tid + stride]
-            shared[o2 + tid] += shared[o2 + tid + stride]
-            shared[o3 + tid] += shared[o3 + tid + stride]
+        if thread_idx < stride:
+            shared[offset0 + thread_idx] += shared[offset0 + thread_idx + stride]
+            shared[offset1 + thread_idx] += shared[offset1 + thread_idx + stride]
+            shared[offset2 + thread_idx] += shared[offset2 + thread_idx + stride]
+            shared[offset3 + thread_idx] += shared[offset3 + thread_idx + stride]
         jit.syncthreads()
         stride //= U32_TWO
-    if tid == U32_ZERO:
-        out = g * n_E + k0
-        fs_re[out] += shared[o0]
-        fs_im[out] += shared[o1]
-        fp_re[out] += shared[o2]
-        fp_im[out] += shared[o3]
+    if thread_idx == U32_ZERO:
+        field_offset = reflection * n_energies + energy_index0
+        fs_re[field_offset] += shared[offset0]
+        fs_im[field_offset] += shared[offset1]
+        fp_re[field_offset] += shared[offset2]
+        fp_im[field_offset] += shared[offset3]
 
 
 @jit.rawkernel()
 def _field_kernel_2e(
-    E_r,
-    aw,
+    resonances_eV,
+    sinc_slopes,
     phase_slope,
     g_phase,
-    cs_re,
-    cs_im,
-    cp_re,
-    cp_im,
-    E_grid,
-    L_esc,
+    sigma_coeffs_re,
+    sigma_coeffs_im,
+    pi_coeffs_re,
+    pi_coeffs_im,
+    energies_eV,
+    escape_distances,
     delta_omega,
-    half_dL,
-    apb,
-    bma,
-    q,
+    half_escape_changes,
+    endpoint_sums,
+    endpoint_diffs,
+    attenuation_q_values,
     fs_re,
     fs_im,
     fp_re,
     fp_im,
-    aw_pair,
-    slope_pair,
+    sinc_slopes_per_pair,
+    phase_slopes_per_pair,
     use_medium,
     use_formation,
     sinc_cutoff,
     use_sinc_cutoff,
-    n_seg,
-    n_g,
-    n_E,
-    e_blocks,
+    n_segments,
+    n_reflections,
+    n_energies,
+    n_energy_blocks,
 ):
     block = jit.blockIdx.x
-    g = block // e_blocks
-    eb = block - g * e_blocks
-    if g >= n_g:
+    reflection = block // n_energy_blocks
+    energy_block = block - reflection * n_energy_blocks
+    if reflection >= n_reflections:
         return
-    k0 = eb * U32_TWO
-    k1 = k0 + U32_ONE
-    has1 = k1 < n_E
-    tid = jit.threadIdx.x
-    nthreads = jit.blockDim.x
-    E0 = E_grid[k0]
-    dw0 = F32_ZERO
+    energy_index0 = energy_block * U32_TWO
+    energy_index1 = energy_index0 + U32_ONE
+    has_energy_1 = energy_index1 < n_energies
+    thread_idx = jit.threadIdx.x
+    n_threads = jit.blockDim.x
+    photon0_eV = energies_eV[energy_index0]
+    medium_shift0 = F32_ZERO
     if use_medium:
-        dw0 = delta_omega[k0]
-    E1 = F32_ZERO
-    dw1 = F32_ZERO
-    if has1:
-        E1 = E_grid[k1]
+        medium_shift0 = delta_omega[energy_index0]
+    photon1_eV = F32_ZERO
+    medium_shift1 = F32_ZERO
+    if has_energy_1:
+        photon1_eV = energies_eV[energy_index1]
         if use_medium:
-            dw1 = delta_omega[k1]
+            medium_shift1 = delta_omega[energy_index1]
 
-    sr0 = F32_ZERO
-    si0 = F32_ZERO
-    pr0 = F32_ZERO
-    pi0 = F32_ZERO
-    sr1 = F32_ZERO
-    si1 = F32_ZERO
-    pr1 = F32_ZERO
-    pi1 = F32_ZERO
+    sigma_re_sum0 = F32_ZERO
+    sigma_im_sum0 = F32_ZERO
+    pi_re_sum0 = F32_ZERO
+    pi_im_sum0 = F32_ZERO
+    sigma_re_sum1 = F32_ZERO
+    sigma_im_sum1 = F32_ZERO
+    pi_re_sum1 = F32_ZERO
+    pi_im_sum1 = F32_ZERO
 
-    seg = tid
-    base = g * n_seg
-    while seg < n_seg:
-        line = base + seg
-        csr = cs_re[line]
-        csi = cs_im[line]
-        cpr = cp_re[line]
-        cpi = cp_im[line]
-        if csr != F32_ZERO or csi != F32_ZERO or cpr != F32_ZERO or cpi != F32_ZERO:
-            Er = E_r[line]
-            aw_i = seg
-            if aw_pair:
-                aw_i = line
-            slope_i = seg
-            if slope_pair:
-                slope_i = line
-            aa = aw[aw_i]
-            ps = phase_slope[slope_i]
-            gp = g_phase[line]
-            Lj = F32_ZERO
+    segment = thread_idx
+    line_offset = reflection * n_segments
+    while segment < n_segments:
+        line_id = line_offset + segment
+        sigma_re = sigma_coeffs_re[line_id]
+        sigma_im = sigma_coeffs_im[line_id]
+        pi_re = pi_coeffs_re[line_id]
+        pi_im = pi_coeffs_im[line_id]
+        if sigma_re != F32_ZERO or sigma_im != F32_ZERO or pi_re != F32_ZERO or pi_im != F32_ZERO:
+            resonance_eV = resonances_eV[line_id]
+            sinc_slope_index = segment
+            if sinc_slopes_per_pair:
+                sinc_slope_index = line_id
+            phase_slope_index = segment
+            if phase_slopes_per_pair:
+                phase_slope_index = line_id
+            sinc_slope = sinc_slopes[sinc_slope_index]
+            phase_rate = phase_slope[phase_slope_index]
+            lattice_phase = g_phase[line_id]
+            escape_distance = F32_ZERO
             if use_medium:
-                Lj = L_esc[seg]
-            hd = F32_ZERO
-            ab = F32_ZERO
-            bm = F32_ZERO
-            qq = F32_ZERO
+                escape_distance = escape_distances[segment]
+            half_path_change = F32_ZERO
+            end_sum = F32_ZERO
+            end_diff = F32_ZERO
+            absorb_q = F32_ZERO
             if use_formation:
-                hd = half_dL[seg]
-                ab = apb[line]
-                bm = bma[line]
-                qq = q[line]
+                half_path_change = half_escape_changes[segment]
+                end_sum = endpoint_sums[line_id]
+                end_diff = endpoint_diffs[line_id]
+                absorb_q = attenuation_q_values[line_id]
 
             if use_formation:
-                v = aa * (E0 - Er) - hd * dw0
-                fr = F32_ZERO
-                fi = F32_ZERO
-                if use_sinc_cutoff == U32_ZERO or (v >= -sinc_cutoff and v <= sinc_cutoff):
-                    sv = xp.sin(v)
-                    cv = xp.cos(v)
-                    fr = _formation_re(v, sv, cv, ab, bm, qq)
-                    fi = _formation_im(v, sv, cv, ab, bm, qq)
-                phase = ps * E0 - gp - Lj * dw0
-                cph = xp.cos(phase)
-                sph = xp.sin(phase)
-                er = fr * cph - fi * sph
-                ei = fr * sph + fi * cph
-                sr0 += csr * er - csi * ei
-                si0 += csr * ei + csi * er
-                pr0 += cpr * er - cpi * ei
-                pi0 += cpr * ei + cpi * er
+                phase_arg = (
+                    sinc_slope * (photon0_eV - resonance_eV) - half_path_change * medium_shift0
+                )
+                form_real = F32_ZERO
+                form_imag = F32_ZERO
+                if use_sinc_cutoff == U32_ZERO or (
+                    phase_arg >= -sinc_cutoff and phase_arg <= sinc_cutoff
+                ):
+                    sin_arg = xp.sin(phase_arg)
+                    cos_arg = xp.cos(phase_arg)
+                    form_real = _formation_re(
+                        phase_arg, sin_arg, cos_arg, end_sum, end_diff, absorb_q
+                    )
+                    form_imag = _formation_im(
+                        phase_arg, sin_arg, cos_arg, end_sum, end_diff, absorb_q
+                    )
+                phase = phase_rate * photon0_eV - lattice_phase - escape_distance * medium_shift0
+                cos_phase = xp.cos(phase)
+                sin_phase = xp.sin(phase)
+                phased_field_re = form_real * cos_phase - form_imag * sin_phase
+                phased_field_im = form_real * sin_phase + form_imag * cos_phase
+                sigma_re_sum0 += sigma_re * phased_field_re - sigma_im * phased_field_im
+                sigma_im_sum0 += sigma_re * phased_field_im + sigma_im * phased_field_re
+                pi_re_sum0 += pi_re * phased_field_re - pi_im * phased_field_im
+                pi_im_sum0 += pi_re * phased_field_im + pi_im * phased_field_re
             else:
-                x = aa * (E0 - Er)
-                s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-                phase = ps * E0 - gp
+                sinc_argument = sinc_slope * (photon0_eV - resonance_eV)
+                sinc_value = _sinc_windowed(sinc_argument, sinc_cutoff, use_sinc_cutoff)
+                phase = phase_rate * photon0_eV - lattice_phase
                 if use_medium:
-                    phase = phase - Lj * dw0
-                cph = xp.cos(phase)
-                sph = xp.sin(phase)
-                sr0 += s * (csr * cph - csi * sph)
-                si0 += s * (csr * sph + csi * cph)
-                pr0 += s * (cpr * cph - cpi * sph)
-                pi0 += s * (cpr * sph + cpi * cph)
+                    phase = phase - escape_distance * medium_shift0
+                cos_phase = xp.cos(phase)
+                sin_phase = xp.sin(phase)
+                sigma_re_sum0 += sinc_value * (sigma_re * cos_phase - sigma_im * sin_phase)
+                sigma_im_sum0 += sinc_value * (sigma_re * sin_phase + sigma_im * cos_phase)
+                pi_re_sum0 += sinc_value * (pi_re * cos_phase - pi_im * sin_phase)
+                pi_im_sum0 += sinc_value * (pi_re * sin_phase + pi_im * cos_phase)
 
-            if has1:
+            if has_energy_1:
                 if use_formation:
-                    v = aa * (E1 - Er) - hd * dw1
-                    fr = F32_ZERO
-                    fi = F32_ZERO
-                    if use_sinc_cutoff == U32_ZERO or (v >= -sinc_cutoff and v <= sinc_cutoff):
-                        sv = xp.sin(v)
-                        cv = xp.cos(v)
-                        fr = _formation_re(v, sv, cv, ab, bm, qq)
-                        fi = _formation_im(v, sv, cv, ab, bm, qq)
-                    phase = ps * E1 - gp - Lj * dw1
-                    cph = xp.cos(phase)
-                    sph = xp.sin(phase)
-                    er = fr * cph - fi * sph
-                    ei = fr * sph + fi * cph
-                    sr1 += csr * er - csi * ei
-                    si1 += csr * ei + csi * er
-                    pr1 += cpr * er - cpi * ei
-                    pi1 += cpr * ei + cpi * er
+                    phase_arg = (
+                        sinc_slope * (photon1_eV - resonance_eV) - half_path_change * medium_shift1
+                    )
+                    form_real = F32_ZERO
+                    form_imag = F32_ZERO
+                    if use_sinc_cutoff == U32_ZERO or (
+                        phase_arg >= -sinc_cutoff and phase_arg <= sinc_cutoff
+                    ):
+                        sin_arg = xp.sin(phase_arg)
+                        cos_arg = xp.cos(phase_arg)
+                        form_real = _formation_re(
+                            phase_arg, sin_arg, cos_arg, end_sum, end_diff, absorb_q
+                        )
+                        form_imag = _formation_im(
+                            phase_arg, sin_arg, cos_arg, end_sum, end_diff, absorb_q
+                        )
+                    phase = (
+                        phase_rate * photon1_eV - lattice_phase - escape_distance * medium_shift1
+                    )
+                    cos_phase = xp.cos(phase)
+                    sin_phase = xp.sin(phase)
+                    phased_field_re = form_real * cos_phase - form_imag * sin_phase
+                    phased_field_im = form_real * sin_phase + form_imag * cos_phase
+                    sigma_re_sum1 += sigma_re * phased_field_re - sigma_im * phased_field_im
+                    sigma_im_sum1 += sigma_re * phased_field_im + sigma_im * phased_field_re
+                    pi_re_sum1 += pi_re * phased_field_re - pi_im * phased_field_im
+                    pi_im_sum1 += pi_re * phased_field_im + pi_im * phased_field_re
                 else:
-                    x = aa * (E1 - Er)
-                    s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-                    phase = ps * E1 - gp
+                    sinc_argument = sinc_slope * (photon1_eV - resonance_eV)
+                    sinc_value = _sinc_windowed(sinc_argument, sinc_cutoff, use_sinc_cutoff)
+                    phase = phase_rate * photon1_eV - lattice_phase
                     if use_medium:
-                        phase = phase - Lj * dw1
-                    cph = xp.cos(phase)
-                    sph = xp.sin(phase)
-                    sr1 += s * (csr * cph - csi * sph)
-                    si1 += s * (csr * sph + csi * cph)
-                    pr1 += s * (cpr * cph - cpi * sph)
-                    pi1 += s * (cpr * sph + cpi * cph)
-        seg += nthreads
+                        phase = phase - escape_distance * medium_shift1
+                    cos_phase = xp.cos(phase)
+                    sin_phase = xp.sin(phase)
+                    sigma_re_sum1 += sinc_value * (sigma_re * cos_phase - sigma_im * sin_phase)
+                    sigma_im_sum1 += sinc_value * (sigma_re * sin_phase + sigma_im * cos_phase)
+                    pi_re_sum1 += sinc_value * (pi_re * cos_phase - pi_im * sin_phase)
+                    pi_im_sum1 += sinc_value * (pi_re * sin_phase + pi_im * cos_phase)
+        segment += n_threads
 
     shared = jit.shared_memory(xp.float32, None)
-    o0 = U32_ZERO
-    o1 = U32_ONE * nthreads
-    o2 = U32_TWO * nthreads
-    o3 = U32_THREE * nthreads
-    o4 = U32_FOUR * nthreads
-    o5 = U32_FIVE * nthreads
-    o6 = U32_SIX * nthreads
-    o7 = U32_SEVEN * nthreads
-    shared[o0 + tid] = sr0
-    shared[o1 + tid] = si0
-    shared[o2 + tid] = pr0
-    shared[o3 + tid] = pi0
-    shared[o4 + tid] = sr1
-    shared[o5 + tid] = si1
-    shared[o6 + tid] = pr1
-    shared[o7 + tid] = pi1
+    offset0 = U32_ZERO
+    offset1 = U32_ONE * n_threads
+    offset2 = U32_TWO * n_threads
+    offset3 = U32_THREE * n_threads
+    offset4 = U32_FOUR * n_threads
+    offset5 = U32_FIVE * n_threads
+    offset6 = U32_SIX * n_threads
+    offset7 = U32_SEVEN * n_threads
+    shared[offset0 + thread_idx] = sigma_re_sum0
+    shared[offset1 + thread_idx] = sigma_im_sum0
+    shared[offset2 + thread_idx] = pi_re_sum0
+    shared[offset3 + thread_idx] = pi_im_sum0
+    shared[offset4 + thread_idx] = sigma_re_sum1
+    shared[offset5 + thread_idx] = sigma_im_sum1
+    shared[offset6 + thread_idx] = pi_re_sum1
+    shared[offset7 + thread_idx] = pi_im_sum1
     jit.syncthreads()
-    stride = nthreads // U32_TWO
+    stride = n_threads // U32_TWO
     while stride > U32_ZERO:
-        if tid < stride:
-            shared[o0 + tid] += shared[o0 + tid + stride]
-            shared[o1 + tid] += shared[o1 + tid + stride]
-            shared[o2 + tid] += shared[o2 + tid + stride]
-            shared[o3 + tid] += shared[o3 + tid + stride]
-            shared[o4 + tid] += shared[o4 + tid + stride]
-            shared[o5 + tid] += shared[o5 + tid + stride]
-            shared[o6 + tid] += shared[o6 + tid + stride]
-            shared[o7 + tid] += shared[o7 + tid + stride]
+        if thread_idx < stride:
+            shared[offset0 + thread_idx] += shared[offset0 + thread_idx + stride]
+            shared[offset1 + thread_idx] += shared[offset1 + thread_idx + stride]
+            shared[offset2 + thread_idx] += shared[offset2 + thread_idx + stride]
+            shared[offset3 + thread_idx] += shared[offset3 + thread_idx + stride]
+            shared[offset4 + thread_idx] += shared[offset4 + thread_idx + stride]
+            shared[offset5 + thread_idx] += shared[offset5 + thread_idx + stride]
+            shared[offset6 + thread_idx] += shared[offset6 + thread_idx + stride]
+            shared[offset7 + thread_idx] += shared[offset7 + thread_idx + stride]
         jit.syncthreads()
         stride //= U32_TWO
-    if tid == U32_ZERO:
-        out = g * n_E + k0
-        fs_re[out] += shared[o0]
-        fs_im[out] += shared[o1]
-        fp_re[out] += shared[o2]
-        fp_im[out] += shared[o3]
-        if has1:
-            out = g * n_E + k1
-            fs_re[out] += shared[o4]
-            fs_im[out] += shared[o5]
-            fp_re[out] += shared[o6]
-            fp_im[out] += shared[o7]
+    if thread_idx == U32_ZERO:
+        field_offset = reflection * n_energies + energy_index0
+        fs_re[field_offset] += shared[offset0]
+        fs_im[field_offset] += shared[offset1]
+        fp_re[field_offset] += shared[offset2]
+        fp_im[field_offset] += shared[offset3]
+        if has_energy_1:
+            field_offset = reflection * n_energies + energy_index1
+            fs_re[field_offset] += shared[offset4]
+            fs_im[field_offset] += shared[offset5]
+            fp_re[field_offset] += shared[offset6]
+            fp_im[field_offset] += shared[offset7]
 
 
 _FIELD_KERNELS = {1: _field_kernel_1e, 2: _field_kernel_2e}
 
 
 @jit.rawkernel()
-def _finalize_fields_kernel(fs_re, fs_im, fp_re, fp_im, wm, spec, n_g, n_E):
-    k = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
-    if k >= n_E:
+def _finalize_fields_kernel(
+    fs_re, fs_im, fp_re, fp_im, mosaic_weight, spectrum, n_reflections, n_energies
+):
+    energy_index = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
+    if energy_index >= n_energies:
         return
-    acc = F32_ZERO
-    g = U32_ZERO
-    while g < n_g:
-        i = g * n_E + k
-        sr = fs_re[i]
-        si = fs_im[i]
-        pr = fp_re[i]
-        pi = fp_im[i]
-        acc += wm[g] * (sr * sr + si * si + pr * pr + pi * pi)
-        g += U32_ONE
-    spec[k] += acc
+    intensity_sum = F32_ZERO
+    reflection = U32_ZERO
+    while reflection < n_reflections:
+        field_offset = reflection * n_energies + energy_index
+        sigma_real = fs_re[field_offset]
+        sigma_imag = fs_im[field_offset]
+        pi_real = fp_re[field_offset]
+        pi_imag = fp_im[field_offset]
+        intensity_sum += mosaic_weight[reflection] * (
+            sigma_real * sigma_real
+            + sigma_imag * sigma_imag
+            + pi_real * pi_real
+            + pi_imag * pi_imag
+        )
+        reflection += U32_ONE
+    spectrum[energy_index] += intensity_sum
 
 
 _DUMMY_F32 = None
@@ -862,7 +916,7 @@ def run_coherent_prologue_kernel(
     Formation mode (issue #181) takes the per-segment escape distances
     ``L_start``/``L_end`` at the piece ends, ordered along travel, together and
     only under the refractive model. The coefficients then carry no
-    transmission, ``E_r``/``aw`` are the vacuum sinc centre and width, and the
+    transmission, ``resonances_eV``/``aw`` are the vacuum sinc centre and width, and the
     tuple gains three pair-layout entries ``(apb, bma, q)`` of
     ``_formation.formation_coefficients`` for the field kernels.
     Validation: coherent-formation-absorption
@@ -872,18 +926,18 @@ def run_coherent_prologue_kernel(
     table row ``g``.
     Validation: line-reflection-coupling-tables
     """
-    nthreads = int(config.prologue_nthreads)
-    _validate_threads(nthreads, "prologue_nthreads")
+    n_threads = int(config.prologue_nthreads)
+    _validate_threads(n_threads, "prologue_nthreads")
     n_g = int(n_g)
     n_tab = int(E_tab.size)
     if log_mu_tab.ndim != 2 or int(log_mu_tab.shape[1]) != n_tab:
         raise ValueError("log_mu_tab must have shape (elements, E_tab.size)")
     n_mu = int(log_mu_tab.shape[0])
     log_mu_kernel = log_mu_tab.reshape(-1)
-    n_seg = int(denom.size)
+    n_segments = int(denom.size)
     if n_g <= 0 or n_tab < 2:
         raise ValueError("coherent prologue requires at least one g row and two tabulation points")
-    n_pairs = n_g * n_seg
+    n_pairs = n_g * n_segments
     if table_row is None:
         table_row = xp.arange(n_g, dtype=xp.uint32)
     else:
@@ -895,7 +949,7 @@ def run_coherent_prologue_kernel(
         raise ValueError("v_dot_n and n_re_tab must be given together")
     use_medium = n_re_tab is not None
     if use_medium:
-        if int(v_dot_n.size) != n_seg:
+        if int(v_dot_n.size) != n_segments:
             raise ValueError("v_dot_n must have one entry per segment")
         if int(n_re_tab.size) != n_tab:
             raise ValueError("n_re_tab must use the E_tab grid")
@@ -907,7 +961,7 @@ def run_coherent_prologue_kernel(
     if use_formation:
         if not use_medium:
             raise ValueError("the formation factor needs the refractive model (v_dot_n, n_re_tab)")
-        if int(L_start.size) != n_seg or int(L_end.size) != n_seg:
+        if int(L_start.size) != n_segments or int(L_end.size) != n_segments:
             raise ValueError("L_start and L_end must have one entry per segment")
 
     G = g_flat.reshape(n_g, 3)
@@ -939,18 +993,28 @@ def run_coherent_prologue_kernel(
     # model the half-width joins them.
     n_slots = (7 if use_medium else 6) + (3 if use_formation else 0)
     storage = xp.empty(n_slots * n_pairs, dtype=xp.float32)
-    E_r = storage[0 * n_pairs : 1 * n_pairs]
+    resonances_eV = storage[0 * n_pairs : 1 * n_pairs]
     g_phase = storage[1 * n_pairs : 2 * n_pairs]
-    cs_re = storage[2 * n_pairs : 3 * n_pairs]
-    cs_im = storage[3 * n_pairs : 4 * n_pairs]
-    cp_re = storage[4 * n_pairs : 5 * n_pairs]
-    cp_im = storage[5 * n_pairs : 6 * n_pairs]
+    sigma_coeffs_re = storage[2 * n_pairs : 3 * n_pairs]
+    sigma_coeffs_im = storage[3 * n_pairs : 4 * n_pairs]
+    pi_coeffs_re = storage[4 * n_pairs : 5 * n_pairs]
+    pi_coeffs_im = storage[5 * n_pairs : 6 * n_pairs]
     if use_medium:
         aw_seg = storage[6 * n_pairs : 7 * n_pairs]
     formation = ()
     if use_formation:
         formation = tuple(storage[i * n_pairs : (i + 1) * n_pairs] for i in (7, 8, 9))
-    line_data = (E_r, aw_seg, phase_slope_seg, g_phase, cs_re, cs_im, cp_re, cp_im, *formation)
+    line_data = (
+        resonances_eV,
+        aw_seg,
+        phase_slope_seg,
+        g_phase,
+        sigma_coeffs_re,
+        sigma_coeffs_im,
+        pi_coeffs_re,
+        pi_coeffs_im,
+        *formation,
+    )
     if n_pairs == 0:
         return line_data
 
@@ -963,14 +1027,14 @@ def run_coherent_prologue_kernel(
 
     if escape_gradient is None:
         # Compatibility for direct callers without escape geometry.
-        escape_gradient = xp.broadcast_to(-xp.asarray(n_hat, dtype=xp.float32), (n_seg, 3))
+        escape_gradient = xp.broadcast_to(-xp.asarray(n_hat, dtype=xp.float32), (n_segments, 3))
     grad_flat = xp.ascontiguousarray(escape_gradient, dtype=xp.float32).reshape(-1)
-    if int(grad_flat.size) != 3 * n_seg:
+    if int(grad_flat.size) != 3 * n_segments:
         raise ValueError("escape_gradient must have shape (n_seg, 3)")
-    nblocks = (n_pairs + nthreads - 1) // nthreads
+    n_blocks = (n_pairs + n_threads - 1) // n_threads
     _coherent_prologue_kernel(
-        (nblocks,),
-        (nthreads,),
+        (n_blocks,),
+        (n_threads,),
         (
             v_flat,
             denom,
@@ -998,13 +1062,13 @@ def run_coherent_prologue_kernel(
             log_mu_kernel,
             table_row,
             n_re_tab,
-            E_r,
+            resonances_eV,
             aw_seg,
             g_phase,
-            cs_re,
-            cs_im,
-            cp_re,
-            cp_im,
+            sigma_coeffs_re,
+            sigma_coeffs_im,
+            pi_coeffs_re,
+            pi_coeffs_im,
             apb_out,
             bma_out,
             q_out,
@@ -1017,7 +1081,7 @@ def run_coherent_prologue_kernel(
             np.uint32(1 if use_medium else 0),
             np.uint32(1 if use_formation else 0),
             np.uint32(n_pairs),
-            np.uint32(n_seg),
+            np.uint32(n_segments),
             np.uint32(n_g),
             np.uint32(n_mu),
             np.uint32(n_tab),
@@ -1074,24 +1138,24 @@ def run_coherent_field_accumulation_kernel(
     delta_omega`` in place of the sinc, and the cutoff bounds ``|v|``.
     Validation: coherent-formation-absorption
     """
-    nthreads = int(config.reduction_nthreads)
-    _validate_threads(nthreads, "reduction_nthreads")
-    epb = int(config.energies_per_block)
+    n_threads = int(config.reduction_nthreads)
+    _validate_threads(n_threads, "reduction_nthreads")
+    energies_per_block = int(config.energies_per_block)
     try:
-        kernel = _FIELD_KERNELS[epb]
+        kernel = _FIELD_KERNELS[energies_per_block]
     except KeyError:
         raise ValueError(f"energies_per_block must be one of {tuple(_FIELD_KERNELS)}") from None
 
     n_g = int(n_g)
     n_seg = int(n_seg)
-    n_E = int(E_grid.size)
-    if n_g == 0 or n_seg == 0 or n_E == 0:
+    n_energies = int(E_grid.size)
+    if n_g == 0 or n_seg == 0 or n_energies == 0:
         return fields
-    aw_pair = int(aw.size) != n_seg
-    if aw_pair and int(aw.size) != n_g * n_seg:
+    sinc_slopes_per_pair = int(aw.size) != n_seg
+    if sinc_slopes_per_pair and int(aw.size) != n_g * n_seg:
         raise ValueError("aw must have length n_seg or n_g*n_seg")
-    slope_pair = int(phase_slope.size) != n_seg
-    if slope_pair and int(phase_slope.size) != n_g * n_seg:
+    phase_slopes_per_pair = int(phase_slope.size) != n_seg
+    if phase_slopes_per_pair and int(phase_slope.size) != n_g * n_seg:
         raise ValueError("phase_slope must have length n_seg or n_g*n_seg")
     if (L_esc is None) != (delta_omega is None):
         raise ValueError("L_esc and delta_omega must be given together")
@@ -1099,7 +1163,7 @@ def run_coherent_field_accumulation_kernel(
     if use_medium:
         if int(L_esc.size) != n_seg:
             raise ValueError("L_esc must have one entry per segment")
-        if int(delta_omega.size) != n_E:
+        if int(delta_omega.size) != n_energies:
             raise ValueError("delta_omega must have one entry per energy bin")
     else:
         L_esc = delta_omega = _dummy()
@@ -1109,13 +1173,13 @@ def run_coherent_field_accumulation_kernel(
     use_sinc_cutoff = sinc_cutoff is not None
     cutoff = np.float32(0.0 if sinc_cutoff is None else sinc_cutoff)
 
-    e_blocks = (n_E + epb - 1) // epb
-    nblocks = n_g * e_blocks
-    shared_bytes = 4 * epb * nthreads * np.dtype(np.float32).itemsize
+    n_energy_blocks = (n_energies + energies_per_block - 1) // energies_per_block
+    n_blocks = n_g * n_energy_blocks
+    shared_memory_bytes = 4 * energies_per_block * n_threads * np.dtype(np.float32).itemsize
     fs_re, fs_im, fp_re, fp_im = fields
     kernel(
-        (nblocks,),
-        (nthreads,),
+        (n_blocks,),
+        (n_threads,),
         (
             E_r,
             aw,
@@ -1136,18 +1200,18 @@ def run_coherent_field_accumulation_kernel(
             fs_im,
             fp_re,
             fp_im,
-            np.uint32(1 if aw_pair else 0),
-            np.uint32(1 if slope_pair else 0),
+            np.uint32(1 if sinc_slopes_per_pair else 0),
+            np.uint32(1 if phase_slopes_per_pair else 0),
             np.uint32(1 if use_medium else 0),
             np.uint32(1 if use_formation else 0),
             cutoff,
             np.uint32(1 if use_sinc_cutoff else 0),
             np.uint32(n_seg),
             np.uint32(n_g),
-            np.uint32(n_E),
-            np.uint32(e_blocks),
+            np.uint32(n_energies),
+            np.uint32(n_energy_blocks),
         ),
-        shared_mem=shared_bytes,
+        shared_mem=shared_memory_bytes,
     )
     return fields
 
@@ -1161,17 +1225,17 @@ def finalize_coherent_fields(
     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
 ):
     """Square complete per-g fields and add their incoherent mosaic sum to ``out``."""
-    nthreads = int(config.finalize_nthreads)
-    _validate_threads(nthreads, "finalize_nthreads")
+    n_threads = int(config.finalize_nthreads)
+    _validate_threads(n_threads, "finalize_nthreads")
     n_g = int(n_g)
-    n_E = int(out.size)
-    if n_g == 0 or n_E == 0:
+    n_energies = int(out.size)
+    if n_g == 0 or n_energies == 0:
         return out
     fs_re, fs_im, fp_re, fp_im = fields
-    nblocks = (n_E + nthreads - 1) // nthreads
+    n_blocks = (n_energies + n_threads - 1) // n_threads
     _finalize_fields_kernel(
-        (nblocks,),
-        (nthreads,),
+        (n_blocks,),
+        (n_threads,),
         (
             fs_re,
             fs_im,
@@ -1180,7 +1244,7 @@ def finalize_coherent_fields(
             mosaic_weight,
             out,
             np.uint32(n_g),
-            np.uint32(n_E),
+            np.uint32(n_energies),
         ),
     )
     return out

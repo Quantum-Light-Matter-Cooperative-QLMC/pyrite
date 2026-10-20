@@ -39,23 +39,31 @@ def _heitler_cross_section_ang2(kinetic_keV):
     Positive kinetic energy in keV; sigma*beta tends to pi*r_e**2 at rest.
     Validation: heitler-annihilation
     """
-    g = F64_ONE + kinetic_keV / F64_MC2
-    s2 = g * g - F64_ONE
-    if not (kinetic_keV > np.float64(0.0) and s2 > np.float64(0.0) and s2 < F64_INF):
+    lorentz_factor = F64_ONE + kinetic_keV / F64_MC2
+    momentum_squared = lorentz_factor * lorentz_factor - F64_ONE
+    if not (
+        kinetic_keV > np.float64(0.0)
+        and momentum_squared > np.float64(0.0)
+        and momentum_squared < F64_INF
+    ):
         return F64_NAN
-    s = cp.sqrt(s2)
+    momentum = cp.sqrt(momentum_squared)
     return (
         F64_PI_RE2
-        / ((g + F64_ONE) * s2)
-        * ((g * g + np.float64(4.0) * g + F64_ONE) * cp.log(g + s) - (np.float64(3.0) + g) * s)
+        / ((lorentz_factor + F64_ONE) * momentum_squared)
+        * (
+            (lorentz_factor * lorentz_factor + np.float64(4.0) * lorentz_factor + F64_ONE)
+            * cp.log(lorentz_factor + momentum)
+            - (np.float64(3.0) + lorentz_factor) * momentum
+        )
     )
 
 
 @jit.rawkernel()
 def _cross_sections(kinetic, out):
-    i = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
-    if i < kinetic.size:
-        out[i] = _heitler_cross_section_ang2(kinetic[i])
+    event_index = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
+    if event_index < kinetic.size:
+        out[event_index] = _heitler_cross_section_ang2(kinetic[event_index])
 
 
 @jit.rawkernel()
@@ -66,70 +74,104 @@ def _sample(kinds, kinetic, directions, keys, max_rejections, energies, photons,
     tends to two m_e*c**2 photons as kinetic energy vanishes.
     Validation: heitler-annihilation, positron-annihilation-at-rest
     """
-    i = np.int64(jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x)
-    if i >= kinetic.size:
+    event_index = np.int64(jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x)
+    if event_index >= kinetic.size:
         return
-    key = keys[i]
+    key = keys[event_index]
     counter = U64_ZERO
-    if kinds[i] == I8_REST:
+    if kinds[event_index] == I8_REST:
         cosine = F64_TWO * _stream_uniform(key, counter) - F64_ONE
         phi = F64_TWO * F64_PI * _stream_uniform(key, counter + U64_ONE)
         counter += U64_TWO
         sine = cp.sqrt(max(np.float64(0.0), F64_ONE - cosine * cosine))
-        photons[i * 6] = sine * cp.cos(phi)
-        photons[i * 6 + 1] = sine * cp.sin(phi)
-        photons[i * 6 + 2] = cosine
-        for j in range(3):
-            photons[i * 6 + 3 + j] = -photons[i * 6 + j]
-        energies[i * 2] = F64_MC2
-        energies[i * 2 + 1] = F64_MC2
-    elif kinds[i] == I8_FLIGHT:
-        energy = kinetic[i]
-        if not (energy > np.float64(0.0) and energy < F64_INF):
+        photons[event_index * 6] = sine * cp.cos(phi)
+        photons[event_index * 6 + 1] = sine * cp.sin(phi)
+        photons[event_index * 6 + 2] = cosine
+        for component_index in range(3):
+            photons[event_index * 6 + 3 + component_index] = -photons[
+                event_index * 6 + component_index
+            ]
+        energies[event_index * 2] = F64_MC2
+        energies[event_index * 2 + 1] = F64_MC2
+    elif kinds[event_index] == I8_FLIGHT:
+        kinetic_energy_keV = kinetic[event_index]
+        if not (kinetic_energy_keV > np.float64(0.0) and kinetic_energy_keV < F64_INF):
             return
-        dx = directions[i * 3]
-        dy = directions[i * 3 + 1]
-        dz = directions[i * 3 + 2]
-        norm = cp.sqrt(dx * dx + dy * dy + dz * dz)
+        direction_x = directions[event_index * 3]
+        direction_y = directions[event_index * 3 + 1]
+        direction_z = directions[event_index * 3 + 2]
+        norm = cp.sqrt(
+            direction_x * direction_x + direction_y * direction_y + direction_z * direction_z
+        )
         if not (norm > np.float64(0.0) and norm < F64_INF):
             return
-        dx /= norm
-        dy /= norm
-        dz /= norm
-        g = F64_ONE + energy / F64_MC2
-        s2 = g * g - F64_ONE
-        if not (s2 > np.float64(0.0) and s2 < F64_INF):
+        direction_x /= norm
+        direction_y /= norm
+        direction_z /= norm
+        lorentz_factor = F64_ONE + kinetic_energy_keV / F64_MC2
+        momentum_squared = lorentz_factor * lorentz_factor - F64_ONE
+        if not (momentum_squared > np.float64(0.0) and momentum_squared < F64_INF):
             return
-        s = cp.sqrt(s2)
-        zmin = F64_ONE / (g + F64_ONE + s)
-        ratio = (F64_ONE - zmin) / zmin
-        a = g * g + np.float64(4.0) * g + F64_ONE
-        bound = g * g + F64_TWO * g - F64_ONE
+        momentum = cp.sqrt(momentum_squared)
+        min_energy_fraction = F64_ONE / (lorentz_factor + F64_ONE + momentum)
+        fraction_ratio = (F64_ONE - min_energy_fraction) / min_energy_fraction
+        rejection_coefficient = (
+            lorentz_factor * lorentz_factor + np.float64(4.0) * lorentz_factor + F64_ONE
+        )
+        rejection_bound = lorentz_factor * lorentz_factor + F64_TWO * lorentz_factor - F64_ONE
         zeta = np.float64(-1.0)
         for _attempt in range(max_rejections):
-            v = zmin * ratio ** _stream_uniform(key, counter)
-            u = _stream_uniform(key, counter + U64_ONE)
+            trial_energy_fraction = min_energy_fraction * fraction_ratio ** _stream_uniform(
+                key, counter
+            )
+            acceptance_uniform = _stream_uniform(key, counter + U64_ONE)
             counter += U64_TWO
-            if u * bound <= a - (g + F64_ONE) ** 2 * v - F64_ONE / v:
-                zeta = min(v, F64_ONE - v)
+            if (
+                acceptance_uniform * rejection_bound
+                <= rejection_coefficient
+                - (lorentz_factor + F64_ONE) ** 2 * trial_energy_fraction
+                - F64_ONE / trial_energy_fraction
+            ):
+                zeta = min(trial_energy_fraction, F64_ONE - trial_energy_fraction)
                 break
         if zeta < np.float64(0.0):
             return
         phi = F64_TWO * F64_PI * _stream_uniform(key, counter)
         counter += U64_ONE
-        total = energy + F64_TWO * F64_MC2
-        energies[i * 2] = zeta * total
-        energies[i * 2 + 1] = total - energies[i * 2]
-        c0 = min(F64_ONE, max(-F64_ONE, (g + F64_ONE - F64_ONE / zeta) / s))
-        c1 = min(F64_ONE, max(-F64_ONE, (g + F64_ONE - F64_ONE / (F64_ONE - zeta)) / s))
-        _store_rotated(photons, i * 6, dx, dy, dz, c0, phi)
-        _store_rotated(photons, i * 6 + 3, dx, dy, dz, c1, phi + F64_PI)
+        total_energy_keV = kinetic_energy_keV + F64_TWO * F64_MC2
+        energies[event_index * 2] = zeta * total_energy_keV
+        energies[event_index * 2 + 1] = total_energy_keV - energies[event_index * 2]
+        first_photon_cosine = min(
+            F64_ONE, max(-F64_ONE, (lorentz_factor + F64_ONE - F64_ONE / zeta) / momentum)
+        )
+        second_photon_cosine = min(
+            F64_ONE,
+            max(-F64_ONE, (lorentz_factor + F64_ONE - F64_ONE / (F64_ONE - zeta)) / momentum),
+        )
+        _store_rotated(
+            photons,
+            event_index * 6,
+            direction_x,
+            direction_y,
+            direction_z,
+            first_photon_cosine,
+            phi,
+        )
+        _store_rotated(
+            photons,
+            event_index * 6 + 3,
+            direction_x,
+            direction_y,
+            direction_z,
+            second_photon_cosine,
+            phi + F64_PI,
+        )
     else:
         return
-    for j in range(4):
-        uniforms[i * 4 + j] = _stream_uniform(key, counter)
+    for component_index in range(4):
+        uniforms[event_index * 4 + component_index] = _stream_uniform(key, counter)
         counter += U64_ONE
-    valid[i] = True
+    valid[event_index] = True
 
 
 def heitler_cross_section_device(kinetic_keV):
@@ -175,12 +217,12 @@ def sample_annihilation_device(
     """
     if not all(isinstance(value, cp.ndarray) for value in (kinds, kinetic_keV, directions, keys)):
         raise TypeError("all annihilation sampler inputs must be CuPy arrays")
-    n = kinetic_keV.size
+    event_count = kinetic_keV.size
     if (
-        kinetic_keV.shape != (n,)
-        or kinds.shape != (n,)
-        or keys.shape != (n,)
-        or directions.shape != (n, 3)
+        kinetic_keV.shape != (event_count,)
+        or kinds.shape != (event_count,)
+        or keys.shape != (event_count,)
+        or directions.shape != (event_count, 3)
     ):
         raise ValueError("expected kinds, kinetic_keV, keys (N,) and directions (N, 3)")
     if kinds.dtype.kind not in "iu" or keys.dtype.kind not in "iu":
@@ -193,14 +235,14 @@ def sample_annihilation_device(
     directions = cp.ascontiguousarray(directions, dtype=cp.float64)
     keys = cp.ascontiguousarray(keys, dtype=cp.uint64)
     out = {
-        "k_keV": cp.full((n, 2), cp.nan, dtype=cp.float64),
-        "direction": cp.full((n, 2, 3), cp.nan, dtype=cp.float64),
-        "uniforms": cp.full((n, 2, 2), cp.nan, dtype=cp.float64),
-        "valid": cp.zeros(n, dtype=cp.bool_),
+        "k_keV": cp.full((event_count, 2), cp.nan, dtype=cp.float64),
+        "direction": cp.full((event_count, 2, 3), cp.nan, dtype=cp.float64),
+        "uniforms": cp.full((event_count, 2, 2), cp.nan, dtype=cp.float64),
+        "valid": cp.zeros(event_count, dtype=cp.bool_),
     }
-    if n:
+    if event_count:
         _sample(
-            ((n + 127) // 128,),
+            ((event_count + 127) // 128,),
             (128,),
             (
                 kinds,

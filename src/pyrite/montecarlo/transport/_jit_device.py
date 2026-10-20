@@ -110,16 +110,16 @@ def _stream_uniform(key, counter):
 
 @jit.rawkernel(device=True)
 def _beta_from_keV(E_i):
-    g = F64_ONE + E_i * F64_ONE_OVER_511
-    g_inv_square = F64_ONE / (g * g)
-    return (F64_ONE - g_inv_square) ** F64_HALF
+    lorentz_factor = F64_ONE + E_i * F64_ONE_OVER_511
+    inverse_gamma_squared = F64_ONE / (lorentz_factor * lorentz_factor)
+    return (F64_ONE - inverse_gamma_squared) ** F64_HALF
 
 
 @jit.rawkernel(device=True)
 def _rate_mott(E_i, mott_numer, mott_denom1, mott_denom2):
     """Browning total elastic cross section [cm^2] times number density."""
-    sqrt_E_i = xp.sqrt(E_i)
-    return mott_numer / (E_i + mott_denom1 * sqrt_E_i + mott_denom2 / sqrt_E_i)
+    sqrt_energy_keV = xp.sqrt(E_i)
+    return mott_numer / (E_i + mott_denom1 * sqrt_energy_keV + mott_denom2 / sqrt_energy_keV)
 
 
 @jit.rawkernel(device=True)
@@ -166,21 +166,29 @@ def _dEds_packed(L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, E_i):
     )
 
     joy_luo_total = F64_ZERO
-    bs_total = F64_ZERO
-    i_el = I32_ZERO
-    while i_el < n_el:
-        J = L_Js[row + i_el]
-        coeff = L_coeffs[row + i_el]
-        if E_i < L_E_cross[row + i_el]:
-            k = L_ks[row + i_el]
-            joy_luo_total += coeff * xp.log(F64_JL_166 * (E_i + k * J) / J)
-        else:
-            I_rel = J / F64_MC2_KEV
-            bs_total += coeff * (
-                xp.log(tau * tau * (tau + F64_TWO) / (F64_TWO * I_rel * I_rel)) + f_minus
+    bethe_stopping_sum = F64_ZERO
+    element_index = I32_ZERO
+    while element_index < n_el:
+        mean_excitation_keV = L_Js[row + element_index]
+        stopping_coefficient = L_coeffs[row + element_index]
+        if E_i < L_E_cross[row + element_index]:
+            k = L_ks[row + element_index]
+            joy_luo_total += stopping_coefficient * xp.log(
+                F64_JL_166 * (E_i + k * mean_excitation_keV) / mean_excitation_keV
             )
-        i_el += I32_ONE
-    return -F64_JL_PREFACTOR / E_i * joy_luo_total - F64_BS_PREFACTOR / beta_sq * bs_total
+        else:
+            reduced_excitation_energy = mean_excitation_keV / F64_MC2_KEV
+            bethe_stopping_sum += stopping_coefficient * (
+                xp.log(
+                    tau
+                    * tau
+                    * (tau + F64_TWO)
+                    / (F64_TWO * reduced_excitation_energy * reduced_excitation_energy)
+                )
+                + f_minus
+            )
+        element_index += I32_ONE
+    return -F64_JL_PREFACTOR / E_i * joy_luo_total - F64_BS_PREFACTOR / beta_sq * bethe_stopping_sum
 
 
 @jit.rawkernel(device=True)
@@ -199,15 +207,15 @@ def _dEds_sbethe(L_logE, L_logS, row, count, E_i):
     if log_e >= L_logE[row + last]:
         return -xp.exp(L_logS[row + last])
 
-    lo = I32_ZERO
-    hi = last
-    while lo < hi:
-        mid = (lo + hi) // I32_TWO
-        if L_logE[row + mid] < log_e:
-            lo = mid + I32_ONE
+    lower_idx = I32_ZERO
+    upper_idx = last
+    while lower_idx < upper_idx:
+        mid_idx = (lower_idx + upper_idx) // I32_TWO
+        if L_logE[row + mid_idx] < log_e:
+            lower_idx = mid_idx + I32_ONE
         else:
-            hi = mid
-    upper = lo
+            upper_idx = mid_idx
+    upper = lower_idx
     lower = upper - I32_ONE
     log_e_lower = L_logE[row + lower]
     fraction = (log_e - log_e_lower) / (L_logE[row + upper] - log_e_lower)
@@ -262,12 +270,20 @@ def _dEds_spliced_element(J, k, coeff, E_cross, E_i):
         - beta_sq
         + (tau * tau / F64_EIGHT - (F64_TWO * tau + F64_ONE) * F64_LN2) / (gamma * gamma)
     )
-    I_rel = J / F64_MC2_KEV
+    reduced_excitation_energy = J / F64_MC2_KEV
     return (
         -F64_BS_PREFACTOR
         / beta_sq
         * coeff
-        * (xp.log(tau * tau * (tau + F64_TWO) / (F64_TWO * I_rel * I_rel)) + f_minus)
+        * (
+            xp.log(
+                tau
+                * tau
+                * (tau + F64_TWO)
+                / (F64_TWO * reduced_excitation_energy * reduced_excitation_energy)
+            )
+            + f_minus
+        )
     )
 
 
@@ -333,13 +349,17 @@ def _urban_sample_compound(
     beta_sq_u = F64_ONE - F64_ONE / (gamma_u * gamma_u)
     two_mc2_bg2_u = F64_TWO * F64_MC2_KEV * tau_u * (tau_u + F64_TWO)
     T_up_u = F64_HALF * E_j
-    i_el = I32_ZERO
-    while i_el < n_el:
-        Zc = L_Zs[row + i_el]
-        Jc = L_Js[row + i_el]
+    element_index = I32_ZERO
+    while element_index < n_el:
+        Zc = L_Zs[row + element_index]
+        Jc = L_Js[row + element_index]
         Cc = (
             -_dEds_spliced_element(
-                Jc, L_ks[row + i_el], L_coeffs[row + i_el], L_E_cross[row + i_el], E_j
+                Jc,
+                L_ks[row + element_index],
+                L_coeffs[row + element_index],
+                L_E_cross[row + element_index],
+                E_j,
             )
             * stopping_scale
         )
@@ -409,7 +429,7 @@ def _urban_sample_compound(
                 kq += I32_ONE
 
         loss += dE_elem
-        i_el += I32_ONE
+        element_index += I32_ONE
     return loss
 
 
@@ -423,23 +443,23 @@ def _lut_lerp_at(table, row_base, lut_n_energy, lut_log_E_min, lut_inv_dlogE, E_
     clamped index lookup as a callable. Same arithmetic as the host
     ``_lut_index_frac_scalar`` / ``_lut_lerp_2d`` pair -- including the branch
     order, which tests the upper clamp first so a non-finite coordinate lands on
-    the lower clamp instead of ``int(x)``; ``row_base`` is ``L * lut_n_energy``
+    the lower clamp instead of ``int(energy_coordinate)``; ``row_base`` is ``L * lut_n_energy``
     for a per-layer table and zero for a 1-D one.
     """
-    x = (xp.log(E_i) - lut_log_E_min) * lut_inv_dlogE
-    last = lut_n_energy - I32_ONE
-    if x >= last:
-        i = last - I32_ONE
-        f = F64_ONE
-    elif x > F64_ZERO:
-        i = np.int32(x)
-        f = x - i
+    energy_coordinate = (xp.log(E_i) - lut_log_E_min) * lut_inv_dlogE
+    last_index = lut_n_energy - I32_ONE
+    if energy_coordinate >= last_index:
+        lower_idx = last_index - I32_ONE
+        fraction = F64_ONE
+    elif energy_coordinate > F64_ZERO:
+        lower_idx = np.int32(energy_coordinate)
+        fraction = energy_coordinate - lower_idx
     else:
-        i = I32_ZERO
-        f = F64_ZERO
-    base = row_base + i
-    v0 = table[base]
-    return v0 + f * (table[base + I32_ONE] - v0)
+        lower_idx = I32_ZERO
+        fraction = F64_ZERO
+    table_offset = row_base + lower_idx
+    lower_value = table[table_offset]
+    return lower_value + fraction * (table[table_offset + I32_ONE] - lower_value)
 
 
 @jit.rawkernel(device=True)
@@ -452,19 +472,19 @@ def _interp_mott_log_alpha(logE_eV, logE_flat, logA_flat, start, length):
     if logE_eV >= logE_flat[last]:
         return logA_flat[last]
 
-    lo = first
-    hi = last
-    while hi - lo > I32_ONE:
-        mid = (lo + hi) // I32_TWO
-        if logE_flat[mid] <= logE_eV:
-            lo = mid
+    lower_idx = first
+    upper_idx = last
+    while upper_idx - lower_idx > I32_ONE:
+        mid_idx = (lower_idx + upper_idx) // I32_TWO
+        if logE_flat[mid_idx] <= logE_eV:
+            lower_idx = mid_idx
         else:
-            hi = mid
+            upper_idx = mid_idx
 
-    x0 = logE_flat[lo]
-    x1 = logE_flat[hi]
-    y0 = logA_flat[lo]
-    y1 = logA_flat[hi]
+    x0 = logE_flat[lower_idx]
+    x1 = logE_flat[upper_idx]
+    y0 = logA_flat[lower_idx]
+    y1 = logA_flat[upper_idx]
     return y0 + (logE_eV - x0) * (y1 - y0) / (x1 - x0)
 
 
@@ -476,41 +496,44 @@ def _elsepa_invert_row(cdf, pdf, mu, n_mu, row, xi):
     on ``(rows, n_mu)`` tables flattened C-order.
     """
     base = row * n_mu
-    lo = I32_ZERO
-    hi = n_mu - I32_ONE
-    while hi - lo > I32_ONE:
-        mid = (lo + hi) // I32_TWO
-        if cdf[base + mid] <= xi:
-            lo = mid
+    lower_idx = I32_ZERO
+    upper_idx = n_mu - I32_ONE
+    while upper_idx - lower_idx > I32_ONE:
+        mid_idx = (lower_idx + upper_idx) // I32_TWO
+        if cdf[base + mid_idx] <= xi:
+            lower_idx = mid_idx
         else:
-            hi = mid
-    dmu = mu[lo + I32_ONE] - mu[lo]
-    p0 = pdf[base + lo]
-    p1 = pdf[base + lo + I32_ONE]
-    r = xi - cdf[base + lo]
-    b = dmu * p0
-    disc = b * b + F64_TWO * dmu * (p1 - p0) * r
-    if disc < F64_ZERO:
-        disc = F64_ZERO
-    denom = b + xp.sqrt(disc)
-    t = F64_ZERO
-    if denom > F64_ZERO:
-        t = F64_TWO * r / denom
-    if t < F64_ZERO:
-        t = F64_ZERO
-    if t > F64_ONE:
-        t = F64_ONE
-    return mu[lo] + t * dmu
+            upper_idx = mid_idx
+    mu_width = mu[lower_idx + I32_ONE] - mu[lower_idx]
+    lower_pdf = pdf[base + lower_idx]
+    upper_pdf = pdf[base + lower_idx + I32_ONE]
+    interval_probability = xi - cdf[base + lower_idx]
+    scaled_lower_pdf = mu_width * lower_pdf
+    discriminant = (
+        scaled_lower_pdf * scaled_lower_pdf
+        + F64_TWO * mu_width * (upper_pdf - lower_pdf) * interval_probability
+    )
+    if discriminant < F64_ZERO:
+        discriminant = F64_ZERO
+    inversion_denominator = scaled_lower_pdf + xp.sqrt(discriminant)
+    interval_fraction = F64_ZERO
+    if inversion_denominator > F64_ZERO:
+        interval_fraction = F64_TWO * interval_probability / inversion_denominator
+    if interval_fraction < F64_ZERO:
+        interval_fraction = F64_ZERO
+    if interval_fraction > F64_ONE:
+        interval_fraction = F64_ONE
+    return mu[lower_idx] + interval_fraction * mu_width
 
 
 @jit.rawkernel(device=True)
 def _searchsorted_right(bounds, x, n):
-    lo = I32_ZERO
-    hi = n
-    while lo < hi:
-        mid = (lo + hi) // I32_TWO
-        if bounds[mid] <= x:
-            lo = mid + I32_ONE
+    lower_idx = I32_ZERO
+    upper_idx = n
+    while lower_idx < upper_idx:
+        mid_idx = (lower_idx + upper_idx) // I32_TWO
+        if bounds[mid_idx] <= x:
+            lower_idx = mid_idx + I32_ONE
         else:
-            hi = mid
-    return lo
+            upper_idx = mid_idx
+    return lower_idx

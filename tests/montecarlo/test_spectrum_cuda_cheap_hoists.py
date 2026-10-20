@@ -146,8 +146,35 @@ def _old_weighted_brem_reference(T, L, paths, mu, E, *, Z, density_cm3):
     return out
 
 
+@pytest.mark.parametrize("energies_per_block", [1, 2, 3, 4])
+def test_cxr_raw_kernel_matches_numpy_sinc_reduction(energies_per_block):
+    from pyrite.montecarlo.spectrum.cxr_jit_kernel import (
+        SpectrumKernelConfig,
+        run_reduction_kernel,
+    )
+
+    resonances = np.linspace(100.0, 300.0, 37, dtype=np.float32)
+    sinc_slopes = np.linspace(0.001, 0.01, 37, dtype=np.float32)
+    weights = np.linspace(0.0, 1.0, 37, dtype=np.float32)
+    energies = np.array([100.0, 150.0, 200.0, 250.0, 300.0], dtype=np.float32)
+    out = cp.ones(energies.size, dtype=cp.float32)
+    result = run_reduction_kernel(
+        cp.asarray(resonances),
+        cp.asarray(sinc_slopes),
+        cp.asarray(weights),
+        cp.asarray(energies),
+        out=out,
+        config=SpectrumKernelConfig(nthreads=32, energies_per_block=energies_per_block),
+    )
+    arguments = sinc_slopes.astype(np.float64)[:, None] * (energies[None, :] - resonances[:, None])
+    expected = 1.0 + weights @ np.sinc(arguments / np.pi) ** 2
+    assert result is out
+    np.testing.assert_allclose(cp.asnumpy(out), expected, rtol=2e-6, atol=1e-6)
+
+
+@pytest.mark.parametrize("energies_per_block", [1, 2, 3, 4])
 @pytest.mark.parametrize("n_layers", [1, 2])
-def test_brem_raw_kernel_incident_hoist_matches_old_formula(n_layers):
+def test_brem_raw_kernel_incident_hoist_matches_old_formula(n_layers, energies_per_block):
     from pyrite.montecarlo.spectrum.brem_jit_kernel import (
         BremKernelConfig,
         run_brem_reduction_kernel,
@@ -204,7 +231,7 @@ def test_brem_raw_kernel_incident_hoist_matches_old_formula(n_layers):
         n_layers=n_layers,
         p_i=cp.ascontiguousarray(p_i),
         incident_prefactor=cp.ascontiguousarray(pref),
-        config=BremKernelConfig(nthreads=32, energies_per_block=2),
+        config=BremKernelConfig(nthreads=32, energies_per_block=energies_per_block),
     )
     cp.cuda.Stream.null.synchronize()
 
@@ -223,7 +250,7 @@ def test_brem_raw_kernel_incident_hoist_matches_old_formula(n_layers):
         Z=Z,
         density_cm3=density,
         n_layers=n_layers,
-        config=BremKernelConfig(nthreads=32, energies_per_block=2),
+        config=BremKernelConfig(nthreads=32, energies_per_block=energies_per_block),
     )
     cp.cuda.Stream.null.synchronize()
     np.testing.assert_allclose(cp.asnumpy(got_compat), got_host, rtol=2e-6, atol=1e-15)
