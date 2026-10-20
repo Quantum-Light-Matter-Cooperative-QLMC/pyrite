@@ -52,94 +52,120 @@ DEFAULT_BREM_KERNEL_CONFIG = BremKernelConfig(nthreads=256, energies_per_block=2
 
 
 @jit.rawkernel(device=True)
-def _dsigma_weighted_scalar(T_i, k_eV, Z, p_i, incident_prefactor):
+def _dsigma_weighted_scalar(
+    incident_energy_keV, photon_energy_eV, atomic_number, incident_momentum, incident_prefactor
+):
     """Weighted Bethe-Heitler + Elwert cell with incident work hoisted.
 
     ``incident_prefactor`` already contains density, segment length, the common
-    Bethe-Heitler constant, ``Z**2``, ``1/p_i**2``, and the incident-side
-    ``beta_i * (1-exp(-2*pi*Z*alpha/beta_i))`` factor. Only final-state work
+    Bethe-Heitler constant, ``atomic_number**2``, ``1/incident_momentum**2``, and the incident-side
+    ``beta_i * (1-exp(-2*pi*atomic_number*alpha/beta_i))`` factor. Only final-state work
     remains energy dependent here.
     """
-    k = k_eV * F32_1E_M3
-    T_f = T_i - k
-    if T_f <= F32_1E_M6 or k <= F32_ZERO:
+    photon_energy_keV = photon_energy_eV * F32_1E_M3
+    final_energy_keV = incident_energy_keV - photon_energy_keV
+    if final_energy_keV <= F32_1E_M6 or photon_energy_keV <= F32_ZERO:
         return F32_ZERO
 
-    p_f = xp.sqrt(T_f * (T_f + F32_TWO * F32_MC2_KEV)) / F32_MC2_KEV
-    beta_f = p_f / (F32_ONE + T_f / F32_MC2_KEV)
+    final_momentum = (
+        xp.sqrt(final_energy_keV * (final_energy_keV + F32_TWO * F32_MC2_KEV)) / F32_MC2_KEV
+    )
+    final_beta = final_momentum / (F32_ONE + final_energy_keV / F32_MC2_KEV)
 
-    dp = p_i - p_f
-    if dp < F32_1E_M30:
-        dp = F32_1E_M30
-    born_log = xp.log((p_i + p_f) / dp)
+    momentum_difference = incident_momentum - final_momentum
+    if momentum_difference < F32_1E_M30:
+        momentum_difference = F32_1E_M30
+    born_log = xp.log((incident_momentum + final_momentum) / momentum_difference)
 
-    zi = Z * F32_TWO_PI_ALPHA
-    den_f = F32_ONE - xp.exp(-zi / beta_f)
+    coulomb_factor = atomic_number * F32_TWO_PI_ALPHA
+    final_elwert_denominator = F32_ONE - xp.exp(-coulomb_factor / final_beta)
 
-    k_eV_safe = k_eV
-    if k_eV_safe < F32_1E_M30:
-        k_eV_safe = F32_1E_M30
+    safe_photon_energy_eV = photon_energy_eV
+    if safe_photon_energy_eV < F32_1E_M30:
+        safe_photon_energy_eV = F32_1E_M30
 
-    return incident_prefactor * born_log / (k_eV_safe * beta_f * den_f)
+    return (
+        incident_prefactor
+        * born_log
+        / (safe_photon_energy_eV * final_beta * final_elwert_denominator)
+    )
 
 
 @jit.rawkernel(device=True)
-def _transmission_scalar(path_flat, mu_flat, line, k, n_layers, n_E):
-    """Segment mean of ``exp(-tau)`` at photon bin ``k`` (issue #176).
+def _transmission_scalar(path_flat, mu_flat, line_id, energy_index, n_layers, n_energies):
+    """Segment mean of ``exp(-tau)`` at photon bin ``energy_index`` (issue #176).
 
     ``path_flat`` holds the escape path per layer from both segment ends,
     C-order ``(n_seg, 2, n_layers)``; ``tau`` is linear between them, so the
-    mean is ``exp(-min tau) * (1 - exp(-d)) / d`` with ``d = |tau_1 - tau_0|``,
+    mean is ``exp(-min tau) * (1 - exp(-optical_depth_difference)) / optical_depth_difference`` with ``optical_depth_difference = |tau_1 - tau_0|``,
     as :func:`pyrite.montecarlo.spectrum.segment_escape.mean_transmission`.
     Validation: segment-escape-average
     """
-    base = line * U32_TWO * n_layers
-    tau0 = F32_ZERO
-    tau1 = F32_ZERO
+    segment_path_offset = line_id * U32_TWO * n_layers
+    start_optical_depth = F32_ZERO
+    end_optical_depth = F32_ZERO
     layer = U32_ZERO
     while layer < n_layers:
-        mu = mu_flat[layer * n_E + k]
-        tau0 += path_flat[base + layer] * mu
-        tau1 += path_flat[base + n_layers + layer] * mu
+        attenuation_coefficient = mu_flat[layer * n_energies + energy_index]
+        start_optical_depth += path_flat[segment_path_offset + layer] * attenuation_coefficient
+        end_optical_depth += (
+            path_flat[segment_path_offset + n_layers + layer] * attenuation_coefficient
+        )
         layer += U32_ONE
-    lo = tau0 if tau0 < tau1 else tau1
-    d = tau1 - tau0 if tau1 > tau0 else tau0 - tau1
-    ratio = F32_ONE - F32_ONE / F32_TWO * d + F32_ONE_SIXTH * d * d
-    if d > F32_1E_M3:
-        ratio = -xp.expm1(-d) / d
-    return xp.exp(-lo) * ratio
+    min_optical_depth = (
+        start_optical_depth if start_optical_depth < end_optical_depth else end_optical_depth
+    )
+    optical_depth_difference = (
+        end_optical_depth - start_optical_depth
+        if end_optical_depth > start_optical_depth
+        else start_optical_depth - end_optical_depth
+    )
+    mean_transmission_ratio = (
+        F32_ONE
+        - F32_ONE / F32_TWO * optical_depth_difference
+        + F32_ONE_SIXTH * optical_depth_difference * optical_depth_difference
+    )
+    if optical_depth_difference > F32_1E_M3:
+        mean_transmission_ratio = -xp.expm1(-optical_depth_difference) / optical_depth_difference
+    return xp.exp(-min_optical_depth) * mean_transmission_ratio
 
 
 @jit.rawkernel(device=True)
 def _eedl_or_bh_weighted_scalar(
-    T_i,
-    k_eV,
+    incident_energy_keV,
+    photon_energy_eV,
     k_index,
-    p_i,
+    incident_momentum,
     bethe_heitler_prefactor,
     eedl_weight,
     lower_panel,
     panel_fraction,
     available,
     panel_probability,
-    n_E,
-    Z,
+    n_energies,
+    atomic_number,
 ):
     """Weighted EEDL cell, with Bethe--Heitler for uncovered segments."""
     if available > F32_ZERO:
-        if k_eV <= F32_ZERO or k_eV > T_i * F32_1E3:
+        if photon_energy_eV <= F32_ZERO or photon_energy_eV > incident_energy_keV * F32_1E3:
             return F32_ZERO
-        lower_offset = lower_panel * n_E + k_index
-        upper_offset = lower_offset + n_E
+        lower_offset = lower_panel * n_energies + k_index
+        upper_offset = lower_offset + n_energies
         lower_pdf = panel_probability[lower_offset]
         upper_pdf = panel_probability[upper_offset]
         mixed_pdf = lower_pdf + panel_fraction * (upper_pdf - lower_pdf)
         return eedl_weight * mixed_pdf
-    return _dsigma_weighted_scalar(T_i, k_eV, Z, p_i, bethe_heitler_prefactor)
+    return _dsigma_weighted_scalar(
+        incident_energy_keV,
+        photon_energy_eV,
+        atomic_number,
+        incident_momentum,
+        bethe_heitler_prefactor,
+    )
 
 
 @jit.rawkernel(device=True)
-def _bremslib_scaled_scalar(reduced, top, line, values, nominal_ratio):
+def _bremslib_scaled_scalar(reduced, top, line_id, values, nominal_ratio):
     """Interpolate one staged 13-node BremsLib row in ``k/T``.
 
     Validation: bremslib-angular-model
@@ -147,29 +173,29 @@ def _bremslib_scaled_scalar(reduced, top, line, values, nominal_ratio):
     lower = U32_ZERO
     while lower < U32_ELEVEN and reduced >= nominal_ratio[lower + U32_ONE]:
         lower += U32_ONE
-    x0 = nominal_ratio[lower]
+    lower_reduced_energy = nominal_ratio[lower]
     if lower == U32_ELEVEN:
-        x1 = top
+        upper_reduced_energy = top
     else:
-        x1 = nominal_ratio[lower + U32_ONE]
-    fraction = (reduced - x0) / (x1 - x0)
+        upper_reduced_energy = nominal_ratio[lower + U32_ONE]
+    fraction = (reduced - lower_reduced_energy) / (upper_reduced_energy - lower_reduced_energy)
     if fraction < F32_ZERO:
         fraction = F32_ZERO
     elif fraction > F32_ONE:
         fraction = F32_ONE
-    offset = line * U32_THIRTEEN + lower
-    v0 = values[offset]
-    v1 = values[offset + U32_ONE]
-    return v0 + fraction * (v1 - v0)
+    offset = line_id * U32_THIRTEEN + lower
+    lower_scaled_sdcs = values[offset]
+    upper_scaled_sdcs = values[offset + U32_ONE]
+    return lower_scaled_sdcs + fraction * (upper_scaled_sdcs - lower_scaled_sdcs)
 
 
 @jit.rawkernel(device=True)
 def _bremslib_or_fallback_weighted_scalar(
-    T_i,
-    k_eV,
+    incident_energy_keV,
+    photon_energy_eV,
     k_index,
-    line,
-    p_i,
+    line_id,
+    incident_momentum,
     bethe_heitler_prefactor,
     eedl_weight,
     eedl_lower_panel,
@@ -184,45 +210,45 @@ def _bremslib_or_fallback_weighted_scalar(
     bremslib_lower_values,
     bremslib_upper_values,
     nominal_ratio,
-    n_E,
-    Z,
+    n_energies,
+    atomic_number,
 ):
     """Weighted directional BremsLib cell, with the normal EEDL/BH fallback.
 
     Validation: bremslib-angular-model
     """
     if bremslib_available > F32_ZERO:
-        if k_eV <= F32_ZERO or k_eV > T_i * F32_1E3:
+        if photon_energy_eV <= F32_ZERO or photon_energy_eV > incident_energy_keV * F32_1E3:
             return F32_ZERO
-        reduced = k_eV / (T_i * F32_1E3)
+        reduced = photon_energy_eV / (incident_energy_keV * F32_1E3)
         lower = _bremslib_scaled_scalar(
-            reduced, bremslib_lower_top, line, bremslib_lower_values, nominal_ratio
+            reduced, bremslib_lower_top, line_id, bremslib_lower_values, nominal_ratio
         )
         upper = _bremslib_scaled_scalar(
-            reduced, bremslib_upper_top, line, bremslib_upper_values, nominal_ratio
+            reduced, bremslib_upper_top, line_id, bremslib_upper_values, nominal_ratio
         )
         scaled = lower + bremslib_energy_fraction * (upper - lower)
-        return bremslib_weight * scaled / k_eV
+        return bremslib_weight * scaled / photon_energy_eV
     return _eedl_or_bh_weighted_scalar(
-        T_i,
-        k_eV,
+        incident_energy_keV,
+        photon_energy_eV,
         k_index,
-        p_i,
+        incident_momentum,
         bethe_heitler_prefactor,
         eedl_weight,
         eedl_lower_panel,
         eedl_panel_fraction,
         eedl_available,
         panel_probability,
-        n_E,
-        Z,
+        n_energies,
+        atomic_number,
     )
 
 
 @jit.rawkernel()
 def _eedl_kernel_1e(
-    T,
-    p_i_arr,
+    kinetic_energies_keV,
+    incident_momenta,
     bethe_heitler_prefactor,
     eedl_weight,
     lower_panel,
@@ -230,58 +256,60 @@ def _eedl_kernel_1e(
     available,
     path_flat,
     mu_flat,
-    E_grid,
+    energies_eV,
     panel_probability,
-    spec,
-    Z,
-    n_seg,
-    n_E,
+    spectrum,
+    atomic_number,
+    n_segments,
+    n_energies,
     n_layers,
 ):
     """Fuse EEDL interpolation, fallback, attenuation, and segment reduction."""
-    k = jit.blockIdx.x
-    tid = jit.threadIdx.x
-    nthreads = jit.blockDim.x
-    photon_eV = E_grid[k]
-    acc = F32_ZERO
+    energy_index = jit.blockIdx.x
+    thread_idx = jit.threadIdx.x
+    n_threads = jit.blockDim.x
+    photon_eV = energies_eV[energy_index]
+    spectrum_sum = F32_ZERO
 
-    line = tid
-    while line < n_seg:
-        weighted = _eedl_or_bh_weighted_scalar(
-            T[line],
+    line_id = thread_idx
+    while line_id < n_segments:
+        weighted_cross_section = _eedl_or_bh_weighted_scalar(
+            kinetic_energies_keV[line_id],
             photon_eV,
-            k,
-            p_i_arr[line],
-            bethe_heitler_prefactor[line],
-            eedl_weight[line],
-            lower_panel[line],
-            panel_fraction[line],
-            available[line],
+            energy_index,
+            incident_momenta[line_id],
+            bethe_heitler_prefactor[line_id],
+            eedl_weight[line_id],
+            lower_panel[line_id],
+            panel_fraction[line_id],
+            available[line_id],
             panel_probability,
-            n_E,
-            Z,
+            n_energies,
+            atomic_number,
         )
-        trans = _transmission_scalar(path_flat, mu_flat, line, k, n_layers, n_E)
-        acc += weighted * trans
-        line += nthreads
+        transmission = _transmission_scalar(
+            path_flat, mu_flat, line_id, energy_index, n_layers, n_energies
+        )
+        spectrum_sum += weighted_cross_section * transmission
+        line_id += n_threads
 
     shared = jit.shared_memory(xp.float32, None)
-    shared[tid] = acc
+    shared[thread_idx] = spectrum_sum
     jit.syncthreads()
-    stride = nthreads // U32_TWO
+    stride = n_threads // U32_TWO
     while stride > U32_ZERO:
-        if tid < stride:
-            shared[tid] += shared[tid + stride]
+        if thread_idx < stride:
+            shared[thread_idx] += shared[thread_idx + stride]
         jit.syncthreads()
         stride //= U32_TWO
-    if tid == U32_ZERO:
-        spec[k] += shared[U32_ZERO]
+    if thread_idx == U32_ZERO:
+        spectrum[energy_index] += shared[U32_ZERO]
 
 
 @jit.rawkernel()
 def _bremslib_kernel_1e(
-    T,
-    p_i_arr,
+    kinetic_energies_keV,
+    incident_momenta,
     bethe_heitler_prefactor,
     eedl_weight,
     eedl_lower_panel,
@@ -289,7 +317,7 @@ def _bremslib_kernel_1e(
     eedl_available,
     path_flat,
     mu_flat,
-    E_grid,
+    energies_eV,
     panel_probability,
     bremslib_weight,
     bremslib_lower_top,
@@ -299,285 +327,418 @@ def _bremslib_kernel_1e(
     bremslib_lower_values,
     bremslib_upper_values,
     nominal_ratio,
-    spec,
-    Z,
-    n_seg,
-    n_E,
+    spectrum,
+    atomic_number,
+    n_segments,
+    n_energies,
     n_layers,
 ):
     """Fuse BremsLib interpolation, fallback, attenuation, and reduction.
 
     Validation: bremslib-angular-model
     """
-    k = jit.blockIdx.x
-    tid = jit.threadIdx.x
-    nthreads = jit.blockDim.x
-    photon_eV = E_grid[k]
-    acc = F32_ZERO
+    energy_index = jit.blockIdx.x
+    thread_idx = jit.threadIdx.x
+    n_threads = jit.blockDim.x
+    photon_eV = energies_eV[energy_index]
+    spectrum_sum = F32_ZERO
 
-    line = tid
-    while line < n_seg:
-        weighted = _bremslib_or_fallback_weighted_scalar(
-            T[line],
+    line_id = thread_idx
+    while line_id < n_segments:
+        weighted_cross_section = _bremslib_or_fallback_weighted_scalar(
+            kinetic_energies_keV[line_id],
             photon_eV,
-            k,
-            line,
-            p_i_arr[line],
-            bethe_heitler_prefactor[line],
-            eedl_weight[line],
-            eedl_lower_panel[line],
-            eedl_panel_fraction[line],
-            eedl_available[line],
+            energy_index,
+            line_id,
+            incident_momenta[line_id],
+            bethe_heitler_prefactor[line_id],
+            eedl_weight[line_id],
+            eedl_lower_panel[line_id],
+            eedl_panel_fraction[line_id],
+            eedl_available[line_id],
             panel_probability,
-            bremslib_weight[line],
-            bremslib_lower_top[line],
-            bremslib_upper_top[line],
-            bremslib_energy_fraction[line],
-            bremslib_available[line],
+            bremslib_weight[line_id],
+            bremslib_lower_top[line_id],
+            bremslib_upper_top[line_id],
+            bremslib_energy_fraction[line_id],
+            bremslib_available[line_id],
             bremslib_lower_values,
             bremslib_upper_values,
             nominal_ratio,
-            n_E,
-            Z,
+            n_energies,
+            atomic_number,
         )
-        trans = _transmission_scalar(path_flat, mu_flat, line, k, n_layers, n_E)
-        acc += weighted * trans
-        line += nthreads
+        transmission = _transmission_scalar(
+            path_flat, mu_flat, line_id, energy_index, n_layers, n_energies
+        )
+        spectrum_sum += weighted_cross_section * transmission
+        line_id += n_threads
 
     shared = jit.shared_memory(xp.float32, None)
-    shared[tid] = acc
+    shared[thread_idx] = spectrum_sum
     jit.syncthreads()
-    stride = nthreads // U32_TWO
+    stride = n_threads // U32_TWO
     while stride > U32_ZERO:
-        if tid < stride:
-            shared[tid] += shared[tid + stride]
+        if thread_idx < stride:
+            shared[thread_idx] += shared[thread_idx + stride]
         jit.syncthreads()
         stride //= U32_TWO
-    if tid == U32_ZERO:
-        spec[k] += shared[U32_ZERO]
+    if thread_idx == U32_ZERO:
+        spectrum[energy_index] += shared[U32_ZERO]
 
 
 @jit.rawkernel()
 def _kernel_1e(
-    T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers
+    kinetic_energies_keV,
+    incident_momenta,
+    incident_prefactor,
+    path_flat,
+    mu_flat,
+    energies_eV,
+    spectrum,
+    atomic_number,
+    n_segments,
+    n_energies,
+    n_layers,
 ):
-    k0 = jit.blockIdx.x
-    tid = jit.threadIdx.x
-    nthreads = jit.blockDim.x
-    E0 = E_grid[k0]
-    acc0 = F32_ZERO
+    energy_index0 = jit.blockIdx.x
+    thread_idx = jit.threadIdx.x
+    n_threads = jit.blockDim.x
+    photon0_eV = energies_eV[energy_index0]
+    spectrum_sum_0 = F32_ZERO
 
-    line = tid
-    while line < n_seg:
-        Ti = T[line]
-        p_i = p_i_arr[line]
-        pref_i = incident_prefactor[line]
+    line_id = thread_idx
+    while line_id < n_segments:
+        incident_energy_keV = kinetic_energies_keV[line_id]
+        incident_momentum = incident_momenta[line_id]
+        segment_prefactor = incident_prefactor[line_id]
 
-        trans0 = _transmission_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
-        ds0 = _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i)
-        acc0 += ds0 * trans0
-        line += nthreads
+        transmission_0 = _transmission_scalar(
+            path_flat, mu_flat, line_id, energy_index0, n_layers, n_energies
+        )
+        ds0 = _dsigma_weighted_scalar(
+            incident_energy_keV, photon0_eV, atomic_number, incident_momentum, segment_prefactor
+        )
+        spectrum_sum_0 += ds0 * transmission_0
+        line_id += n_threads
 
     shared = jit.shared_memory(xp.float32, None)
-    shared[tid] = acc0
+    shared[thread_idx] = spectrum_sum_0
     jit.syncthreads()
-    stride = nthreads // U32_TWO
+    stride = n_threads // U32_TWO
     while stride > U32_ZERO:
-        if tid < stride:
-            shared[tid] += shared[tid + stride]
+        if thread_idx < stride:
+            shared[thread_idx] += shared[thread_idx + stride]
         jit.syncthreads()
         stride //= U32_TWO
-    if tid == U32_ZERO:
-        spec[k0] += shared[U32_ZERO]
+    if thread_idx == U32_ZERO:
+        spectrum[energy_index0] += shared[U32_ZERO]
 
 
 @jit.rawkernel()
 def _kernel_2e(
-    T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers
+    kinetic_energies_keV,
+    incident_momenta,
+    incident_prefactor,
+    path_flat,
+    mu_flat,
+    energies_eV,
+    spectrum,
+    atomic_number,
+    n_segments,
+    n_energies,
+    n_layers,
 ):
-    base = jit.blockIdx.x * U32_TWO
-    k0 = base
-    k1 = base + U32_ONE
-    tid = jit.threadIdx.x
-    nthreads = jit.blockDim.x
-    E0 = E_grid[k0]
-    has1 = k1 < n_E
-    E1 = F32_ZERO
-    if has1:
-        E1 = E_grid[k1]
-    acc0 = F32_ZERO
-    acc1 = F32_ZERO
+    energy_offset = jit.blockIdx.x * U32_TWO
+    energy_index0 = energy_offset
+    energy_index1 = energy_offset + U32_ONE
+    thread_idx = jit.threadIdx.x
+    n_threads = jit.blockDim.x
+    photon0_eV = energies_eV[energy_index0]
+    has_energy_1 = energy_index1 < n_energies
+    photon1_eV = F32_ZERO
+    if has_energy_1:
+        photon1_eV = energies_eV[energy_index1]
+    spectrum_sum_0 = F32_ZERO
+    spectrum_sum_1 = F32_ZERO
 
-    line = tid
-    while line < n_seg:
-        Ti = T[line]
-        p_i = p_i_arr[line]
-        pref_i = incident_prefactor[line]
+    line_id = thread_idx
+    while line_id < n_segments:
+        incident_energy_keV = kinetic_energies_keV[line_id]
+        incident_momentum = incident_momenta[line_id]
+        segment_prefactor = incident_prefactor[line_id]
 
-        trans0 = _transmission_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
-        acc0 += _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i) * trans0
-        if has1:
-            trans1 = _transmission_scalar(path_flat, mu_flat, line, k1, n_layers, n_E)
-            acc1 += _dsigma_weighted_scalar(Ti, E1, Z, p_i, pref_i) * trans1
-        line += nthreads
+        transmission_0 = _transmission_scalar(
+            path_flat, mu_flat, line_id, energy_index0, n_layers, n_energies
+        )
+        spectrum_sum_0 += (
+            _dsigma_weighted_scalar(
+                incident_energy_keV, photon0_eV, atomic_number, incident_momentum, segment_prefactor
+            )
+            * transmission_0
+        )
+        if has_energy_1:
+            transmission_1 = _transmission_scalar(
+                path_flat, mu_flat, line_id, energy_index1, n_layers, n_energies
+            )
+            spectrum_sum_1 += (
+                _dsigma_weighted_scalar(
+                    incident_energy_keV,
+                    photon1_eV,
+                    atomic_number,
+                    incident_momentum,
+                    segment_prefactor,
+                )
+                * transmission_1
+            )
+        line_id += n_threads
 
     shared = jit.shared_memory(xp.float32, None)
-    off0 = U32_ZERO
-    off1 = nthreads
-    shared[off0 + tid] = acc0
-    shared[off1 + tid] = acc1
+    offset0 = U32_ZERO
+    offset1 = n_threads
+    shared[offset0 + thread_idx] = spectrum_sum_0
+    shared[offset1 + thread_idx] = spectrum_sum_1
     jit.syncthreads()
-    stride = nthreads // U32_TWO
+    stride = n_threads // U32_TWO
     while stride > U32_ZERO:
-        if tid < stride:
-            shared[off0 + tid] += shared[off0 + tid + stride]
-            shared[off1 + tid] += shared[off1 + tid + stride]
+        if thread_idx < stride:
+            shared[offset0 + thread_idx] += shared[offset0 + thread_idx + stride]
+            shared[offset1 + thread_idx] += shared[offset1 + thread_idx + stride]
         jit.syncthreads()
         stride //= U32_TWO
-    if tid == U32_ZERO:
-        spec[k0] += shared[off0]
-        if has1:
-            spec[k1] += shared[off1]
+    if thread_idx == U32_ZERO:
+        spectrum[energy_index0] += shared[offset0]
+        if has_energy_1:
+            spectrum[energy_index1] += shared[offset1]
 
 
 @jit.rawkernel()
 def _kernel_3e(
-    T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers
+    kinetic_energies_keV,
+    incident_momenta,
+    incident_prefactor,
+    path_flat,
+    mu_flat,
+    energies_eV,
+    spectrum,
+    atomic_number,
+    n_segments,
+    n_energies,
+    n_layers,
 ):
-    base = jit.blockIdx.x * U32_THREE
-    k0 = base
-    k1 = base + U32_ONE
-    k2 = base + U32_TWO
-    tid = jit.threadIdx.x
-    nthreads = jit.blockDim.x
-    E0 = E_grid[k0]
-    has1 = k1 < n_E
-    has2 = k2 < n_E
-    E1 = F32_ZERO
-    E2 = F32_ZERO
-    if has1:
-        E1 = E_grid[k1]
-    if has2:
-        E2 = E_grid[k2]
-    acc0 = F32_ZERO
-    acc1 = F32_ZERO
-    acc2 = F32_ZERO
+    energy_offset = jit.blockIdx.x * U32_THREE
+    energy_index0 = energy_offset
+    energy_index1 = energy_offset + U32_ONE
+    energy_index2 = energy_offset + U32_TWO
+    thread_idx = jit.threadIdx.x
+    n_threads = jit.blockDim.x
+    photon0_eV = energies_eV[energy_index0]
+    has_energy_1 = energy_index1 < n_energies
+    has_energy_2 = energy_index2 < n_energies
+    photon1_eV = F32_ZERO
+    photon2_eV = F32_ZERO
+    if has_energy_1:
+        photon1_eV = energies_eV[energy_index1]
+    if has_energy_2:
+        photon2_eV = energies_eV[energy_index2]
+    spectrum_sum_0 = F32_ZERO
+    spectrum_sum_1 = F32_ZERO
+    spectrum_sum_2 = F32_ZERO
 
-    line = tid
-    while line < n_seg:
-        Ti = T[line]
-        p_i = p_i_arr[line]
-        pref_i = incident_prefactor[line]
+    line_id = thread_idx
+    while line_id < n_segments:
+        incident_energy_keV = kinetic_energies_keV[line_id]
+        incident_momentum = incident_momenta[line_id]
+        segment_prefactor = incident_prefactor[line_id]
 
-        trans0 = _transmission_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
-        acc0 += _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i) * trans0
-        if has1:
-            trans1 = _transmission_scalar(path_flat, mu_flat, line, k1, n_layers, n_E)
-            acc1 += _dsigma_weighted_scalar(Ti, E1, Z, p_i, pref_i) * trans1
-        if has2:
-            trans2 = _transmission_scalar(path_flat, mu_flat, line, k2, n_layers, n_E)
-            acc2 += _dsigma_weighted_scalar(Ti, E2, Z, p_i, pref_i) * trans2
-        line += nthreads
+        transmission_0 = _transmission_scalar(
+            path_flat, mu_flat, line_id, energy_index0, n_layers, n_energies
+        )
+        spectrum_sum_0 += (
+            _dsigma_weighted_scalar(
+                incident_energy_keV, photon0_eV, atomic_number, incident_momentum, segment_prefactor
+            )
+            * transmission_0
+        )
+        if has_energy_1:
+            transmission_1 = _transmission_scalar(
+                path_flat, mu_flat, line_id, energy_index1, n_layers, n_energies
+            )
+            spectrum_sum_1 += (
+                _dsigma_weighted_scalar(
+                    incident_energy_keV,
+                    photon1_eV,
+                    atomic_number,
+                    incident_momentum,
+                    segment_prefactor,
+                )
+                * transmission_1
+            )
+        if has_energy_2:
+            transmission_2 = _transmission_scalar(
+                path_flat, mu_flat, line_id, energy_index2, n_layers, n_energies
+            )
+            spectrum_sum_2 += (
+                _dsigma_weighted_scalar(
+                    incident_energy_keV,
+                    photon2_eV,
+                    atomic_number,
+                    incident_momentum,
+                    segment_prefactor,
+                )
+                * transmission_2
+            )
+        line_id += n_threads
 
     shared = jit.shared_memory(xp.float32, None)
-    off0 = U32_ZERO
-    off1 = nthreads
-    off2 = U32_TWO * nthreads
-    shared[off0 + tid] = acc0
-    shared[off1 + tid] = acc1
-    shared[off2 + tid] = acc2
+    offset0 = U32_ZERO
+    offset1 = n_threads
+    offset2 = U32_TWO * n_threads
+    shared[offset0 + thread_idx] = spectrum_sum_0
+    shared[offset1 + thread_idx] = spectrum_sum_1
+    shared[offset2 + thread_idx] = spectrum_sum_2
     jit.syncthreads()
-    stride = nthreads // U32_TWO
+    stride = n_threads // U32_TWO
     while stride > U32_ZERO:
-        if tid < stride:
-            shared[off0 + tid] += shared[off0 + tid + stride]
-            shared[off1 + tid] += shared[off1 + tid + stride]
-            shared[off2 + tid] += shared[off2 + tid + stride]
+        if thread_idx < stride:
+            shared[offset0 + thread_idx] += shared[offset0 + thread_idx + stride]
+            shared[offset1 + thread_idx] += shared[offset1 + thread_idx + stride]
+            shared[offset2 + thread_idx] += shared[offset2 + thread_idx + stride]
         jit.syncthreads()
         stride //= U32_TWO
-    if tid == U32_ZERO:
-        spec[k0] += shared[off0]
-        if has1:
-            spec[k1] += shared[off1]
-        if has2:
-            spec[k2] += shared[off2]
+    if thread_idx == U32_ZERO:
+        spectrum[energy_index0] += shared[offset0]
+        if has_energy_1:
+            spectrum[energy_index1] += shared[offset1]
+        if has_energy_2:
+            spectrum[energy_index2] += shared[offset2]
 
 
 @jit.rawkernel()
 def _kernel_4e(
-    T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers
+    kinetic_energies_keV,
+    incident_momenta,
+    incident_prefactor,
+    path_flat,
+    mu_flat,
+    energies_eV,
+    spectrum,
+    atomic_number,
+    n_segments,
+    n_energies,
+    n_layers,
 ):
-    base = jit.blockIdx.x * U32_FOUR
-    k0 = base
-    k1 = base + U32_ONE
-    k2 = base + U32_TWO
-    k3 = base + U32_THREE
-    tid = jit.threadIdx.x
-    nthreads = jit.blockDim.x
-    E0 = E_grid[k0]
-    has1 = k1 < n_E
-    has2 = k2 < n_E
-    has3 = k3 < n_E
-    E1 = F32_ZERO
-    E2 = F32_ZERO
-    E3 = F32_ZERO
-    if has1:
-        E1 = E_grid[k1]
-    if has2:
-        E2 = E_grid[k2]
-    if has3:
-        E3 = E_grid[k3]
-    acc0 = F32_ZERO
-    acc1 = F32_ZERO
-    acc2 = F32_ZERO
-    acc3 = F32_ZERO
+    energy_offset = jit.blockIdx.x * U32_FOUR
+    energy_index0 = energy_offset
+    energy_index1 = energy_offset + U32_ONE
+    energy_index2 = energy_offset + U32_TWO
+    energy_index3 = energy_offset + U32_THREE
+    thread_idx = jit.threadIdx.x
+    n_threads = jit.blockDim.x
+    photon0_eV = energies_eV[energy_index0]
+    has_energy_1 = energy_index1 < n_energies
+    has_energy_2 = energy_index2 < n_energies
+    has_energy_3 = energy_index3 < n_energies
+    photon1_eV = F32_ZERO
+    photon2_eV = F32_ZERO
+    photon3_eV = F32_ZERO
+    if has_energy_1:
+        photon1_eV = energies_eV[energy_index1]
+    if has_energy_2:
+        photon2_eV = energies_eV[energy_index2]
+    if has_energy_3:
+        photon3_eV = energies_eV[energy_index3]
+    spectrum_sum_0 = F32_ZERO
+    spectrum_sum_1 = F32_ZERO
+    spectrum_sum_2 = F32_ZERO
+    spectrum_sum_3 = F32_ZERO
 
-    line = tid
-    while line < n_seg:
-        Ti = T[line]
-        p_i = p_i_arr[line]
-        pref_i = incident_prefactor[line]
+    line_id = thread_idx
+    while line_id < n_segments:
+        incident_energy_keV = kinetic_energies_keV[line_id]
+        incident_momentum = incident_momenta[line_id]
+        segment_prefactor = incident_prefactor[line_id]
 
-        trans0 = _transmission_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
-        acc0 += _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i) * trans0
-        if has1:
-            trans1 = _transmission_scalar(path_flat, mu_flat, line, k1, n_layers, n_E)
-            acc1 += _dsigma_weighted_scalar(Ti, E1, Z, p_i, pref_i) * trans1
-        if has2:
-            trans2 = _transmission_scalar(path_flat, mu_flat, line, k2, n_layers, n_E)
-            acc2 += _dsigma_weighted_scalar(Ti, E2, Z, p_i, pref_i) * trans2
-        if has3:
-            trans3 = _transmission_scalar(path_flat, mu_flat, line, k3, n_layers, n_E)
-            acc3 += _dsigma_weighted_scalar(Ti, E3, Z, p_i, pref_i) * trans3
-        line += nthreads
+        transmission_0 = _transmission_scalar(
+            path_flat, mu_flat, line_id, energy_index0, n_layers, n_energies
+        )
+        spectrum_sum_0 += (
+            _dsigma_weighted_scalar(
+                incident_energy_keV, photon0_eV, atomic_number, incident_momentum, segment_prefactor
+            )
+            * transmission_0
+        )
+        if has_energy_1:
+            transmission_1 = _transmission_scalar(
+                path_flat, mu_flat, line_id, energy_index1, n_layers, n_energies
+            )
+            spectrum_sum_1 += (
+                _dsigma_weighted_scalar(
+                    incident_energy_keV,
+                    photon1_eV,
+                    atomic_number,
+                    incident_momentum,
+                    segment_prefactor,
+                )
+                * transmission_1
+            )
+        if has_energy_2:
+            transmission_2 = _transmission_scalar(
+                path_flat, mu_flat, line_id, energy_index2, n_layers, n_energies
+            )
+            spectrum_sum_2 += (
+                _dsigma_weighted_scalar(
+                    incident_energy_keV,
+                    photon2_eV,
+                    atomic_number,
+                    incident_momentum,
+                    segment_prefactor,
+                )
+                * transmission_2
+            )
+        if has_energy_3:
+            transmission_3 = _transmission_scalar(
+                path_flat, mu_flat, line_id, energy_index3, n_layers, n_energies
+            )
+            spectrum_sum_3 += (
+                _dsigma_weighted_scalar(
+                    incident_energy_keV,
+                    photon3_eV,
+                    atomic_number,
+                    incident_momentum,
+                    segment_prefactor,
+                )
+                * transmission_3
+            )
+        line_id += n_threads
 
     shared = jit.shared_memory(xp.float32, None)
-    off0 = U32_ZERO
-    off1 = nthreads
-    off2 = U32_TWO * nthreads
-    off3 = U32_THREE * nthreads
-    shared[off0 + tid] = acc0
-    shared[off1 + tid] = acc1
-    shared[off2 + tid] = acc2
-    shared[off3 + tid] = acc3
+    offset0 = U32_ZERO
+    offset1 = n_threads
+    offset2 = U32_TWO * n_threads
+    offset3 = U32_THREE * n_threads
+    shared[offset0 + thread_idx] = spectrum_sum_0
+    shared[offset1 + thread_idx] = spectrum_sum_1
+    shared[offset2 + thread_idx] = spectrum_sum_2
+    shared[offset3 + thread_idx] = spectrum_sum_3
     jit.syncthreads()
-    stride = nthreads // U32_TWO
+    stride = n_threads // U32_TWO
     while stride > U32_ZERO:
-        if tid < stride:
-            shared[off0 + tid] += shared[off0 + tid + stride]
-            shared[off1 + tid] += shared[off1 + tid + stride]
-            shared[off2 + tid] += shared[off2 + tid + stride]
-            shared[off3 + tid] += shared[off3 + tid + stride]
+        if thread_idx < stride:
+            shared[offset0 + thread_idx] += shared[offset0 + thread_idx + stride]
+            shared[offset1 + thread_idx] += shared[offset1 + thread_idx + stride]
+            shared[offset2 + thread_idx] += shared[offset2 + thread_idx + stride]
+            shared[offset3 + thread_idx] += shared[offset3 + thread_idx + stride]
         jit.syncthreads()
         stride //= U32_TWO
-    if tid == U32_ZERO:
-        spec[k0] += shared[off0]
-        if has1:
-            spec[k1] += shared[off1]
-        if has2:
-            spec[k2] += shared[off2]
-        if has3:
-            spec[k3] += shared[off3]
+    if thread_idx == U32_ZERO:
+        spectrum[energy_index0] += shared[offset0]
+        if has_energy_1:
+            spectrum[energy_index1] += shared[offset1]
+        if has_energy_2:
+            spectrum[energy_index2] += shared[offset2]
+        if has_energy_3:
+            spectrum[energy_index3] += shared[offset3]
 
 
 _REDUCTION_KERNELS = {1: _kernel_1e, 2: _kernel_2e, 3: _kernel_3e, 4: _kernel_4e}
@@ -608,32 +769,32 @@ def run_brem_reduction_kernel(
     All array arguments must be contiguous float32 CuPy arrays. ``path_flat`` is
     C-order ``(n_seg, 2, n_layers)``: each segment's escape path per layer from
     its start and end point and ``mu_flat`` is C-order
-    ``(n_layers, n_E)``. If ``out`` is supplied it is incremented in place;
+    ``(n_layers, n_energies)``. If ``out`` is supplied it is incremented in place;
     otherwise a zeroed float32 output is allocated.
     """
-    nthreads = int(config.nthreads)
-    epb = int(config.energies_per_block)
-    if nthreads not in (32, 64, 128, 256, 512, 1024):
+    n_threads = int(config.nthreads)
+    energies_per_block = int(config.energies_per_block)
+    if n_threads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
     try:
-        kernel = _REDUCTION_KERNELS[epb]
+        kernel = _REDUCTION_KERNELS[energies_per_block]
     except KeyError:
         raise ValueError(f"energies_per_block must be one of {tuple(_REDUCTION_KERNELS)}") from None
 
-    n_E = int(E_grid.size)
+    n_energies = int(E_grid.size)
     if out is None:
-        out = xp.zeros(n_E, dtype=xp.float32)
-    if n_E == 0 or T_keV.size == 0:
+        out = xp.zeros(n_energies, dtype=xp.float32)
+    if n_energies == 0 or T_keV.size == 0:
         return out
 
-    Z32 = np.float32(Z)
+    atomic_number_f32 = np.float32(Z)
     if p_i is None:
         p_i = xp.sqrt(T_keV * (T_keV + F32_TWO * F32_MC2_KEV)) / F32_MC2_KEV
         p_i = xp.ascontiguousarray(p_i, dtype=xp.float32)
     if incident_prefactor is None:
-        beta_i = p_i / (F32_ONE + T_keV / F32_MC2_KEV)
-        zi = Z32 * F32_TWO_PI_ALPHA
-        den_i = F32_ONE - xp.exp(-zi / beta_i)
+        incident_beta = p_i / (F32_ONE + T_keV / F32_MC2_KEV)
+        coulomb_factor = atomic_number_f32 * F32_TWO_PI_ALPHA
+        incident_elwert_denominator = F32_ONE - xp.exp(-coulomb_factor / incident_beta)
         incident_prefactor = (
             np.float32(density_cm3)
             * L_ang
@@ -641,19 +802,19 @@ def run_brem_reduction_kernel(
             * F32_16_OVER_3
             * F32_ALPHA
             * F32_R_E_CM2
-            * Z32
-            * Z32
-            * beta_i
-            * den_i
+            * atomic_number_f32
+            * atomic_number_f32
+            * incident_beta
+            * incident_elwert_denominator
             / (p_i * p_i)
         )
         incident_prefactor = xp.ascontiguousarray(incident_prefactor, dtype=xp.float32)
 
-    nblocks = (n_E + epb - 1) // epb
-    shared_bytes = epb * nthreads * np.dtype(np.float32).itemsize
+    n_blocks = (n_energies + energies_per_block - 1) // energies_per_block
+    shared_memory_bytes = energies_per_block * n_threads * np.dtype(np.float32).itemsize
     kernel(
-        (nblocks,),
-        (nthreads,),
+        (n_blocks,),
+        (n_threads,),
         (
             T_keV,
             p_i,
@@ -662,12 +823,12 @@ def run_brem_reduction_kernel(
             mu_flat,
             E_grid,
             out,
-            Z32,
+            atomic_number_f32,
             np.uint32(T_keV.size),
-            np.uint32(n_E),
+            np.uint32(n_energies),
             np.uint32(n_layers),
         ),
-        shared_mem=shared_bytes,
+        shared_mem=shared_memory_bytes,
     )
     return out
 
@@ -692,7 +853,7 @@ def run_eedl_brem_reduction_kernel(
 ):
     """Accumulate staged EEDL bremsstrahlung without dense segment-grid arrays.
 
-    ``panel_probability`` is the C-order ``(n_panel, n_E)`` probability table
+    ``panel_probability`` is the C-order ``(n_panel, n_energies)`` probability table
     already evaluated on ``E_grid``. The per-segment arrays contain the two
     adjacent-panel selector, interpolation weight, and
     ``density * length * sigma / normalization``. Rows with ``available == 0``
@@ -702,18 +863,18 @@ def run_eedl_brem_reduction_kernel(
 
     Validation: brem-spectrum
     """
-    nthreads = int(config.nthreads)
-    if nthreads not in (32, 64, 128, 256, 512, 1024):
+    n_threads = int(config.nthreads)
+    if n_threads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
-    n_E = int(E_grid.size)
+    n_energies = int(E_grid.size)
     if out is None:
-        out = xp.zeros(n_E, dtype=xp.float32)
-    if n_E == 0 or T_keV.size == 0:
+        out = xp.zeros(n_energies, dtype=xp.float32)
+    if n_energies == 0 or T_keV.size == 0:
         return out
 
     _eedl_kernel_1e(
-        (n_E,),
-        (nthreads,),
+        (n_energies,),
+        (n_threads,),
         (
             T_keV,
             p_i,
@@ -729,10 +890,10 @@ def run_eedl_brem_reduction_kernel(
             out,
             np.float32(Z),
             np.uint32(T_keV.size),
-            np.uint32(n_E),
+            np.uint32(n_energies),
             np.uint32(n_layers),
         ),
-        shared_mem=nthreads * np.dtype(np.float32).itemsize,
+        shared_mem=n_threads * np.dtype(np.float32).itemsize,
     )
     return out
 
@@ -775,18 +936,18 @@ def run_bremslib_brem_reduction_kernel(
 
     Validation: bremslib-angular-model
     """
-    nthreads = int(config.nthreads)
-    if nthreads not in (32, 64, 128, 256, 512, 1024):
+    n_threads = int(config.nthreads)
+    if n_threads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
-    n_E = int(E_grid.size)
+    n_energies = int(E_grid.size)
     if out is None:
-        out = xp.zeros(n_E, dtype=xp.float32)
-    if n_E == 0 or T_keV.size == 0:
+        out = xp.zeros(n_energies, dtype=xp.float32)
+    if n_energies == 0 or T_keV.size == 0:
         return out
 
     _bremslib_kernel_1e(
-        (n_E,),
-        (nthreads,),
+        (n_energies,),
+        (n_threads,),
         (
             T_keV,
             p_i,
@@ -810,10 +971,10 @@ def run_bremslib_brem_reduction_kernel(
             out,
             np.float32(Z),
             np.uint32(T_keV.size),
-            np.uint32(n_E),
+            np.uint32(n_energies),
             np.uint32(n_layers),
         ),
-        shared_mem=nthreads * np.dtype(np.float32).itemsize,
+        shared_mem=n_threads * np.dtype(np.float32).itemsize,
     )
     return out
 

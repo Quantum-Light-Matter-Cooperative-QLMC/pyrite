@@ -507,13 +507,16 @@ def test_cuda_stopping_keeps_the_per_element_splice():
     body = source[start : source.index("\n@", start)]
 
     # per-element branch on that element's own crossover, inside the element loop
-    assert "if E_i < L_E_cross[row + i_el]:" in body
+    assert "if E_i < L_E_cross[row + element_index]:" in body
     # both branches accumulate separately and are combined with their own prefactor
-    assert "joy_luo_total" in body and "bs_total" in body
+    assert "joy_luo_total" in body and "bethe_stopping_sum" in body
     assert "-F64_JL_PREFACTOR / E_i * joy_luo_total" in body
-    assert "F64_BS_PREFACTOR / beta_sq * bs_total" in body
+    assert "F64_BS_PREFACTOR / beta_sq * bethe_stopping_sum" in body
     # the Berger-Seltzer bracket, with tau^2 (tau + 2) / (2 (I/mc^2)^2)
-    assert "tau * tau * (tau + F64_TWO) / (F64_TWO * I_rel * I_rel)" in body
+    assert (
+        "tau * tau * (tau + F64_TWO) / (F64_TWO * reduced_excitation_energy * reduced_excitation_energy)"
+        in " ".join(body.split())
+    )
 
 
 def test_cuda_stopping_carries_the_sbethe_table_and_straggling_scale():

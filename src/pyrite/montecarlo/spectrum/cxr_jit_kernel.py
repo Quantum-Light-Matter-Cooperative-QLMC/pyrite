@@ -29,402 +29,402 @@ DEFAULT_SPECTRUM_KERNEL_CONFIG = SpectrumKernelConfig(
 
 @jit.rawkernel()
 def _kernel_1e(
-    E_r,
-    aw,
-    w,
-    E_grid,
-    spec,
+    resonances_eV,
+    sinc_slopes,
+    line_weights,
+    energies_eV,
+    spectrum,
     n_lines,
-    n_E,
+    n_energies,
 ):
-    base = jit.blockIdx.x
-    k0 = base
-    tid = jit.threadIdx.x
-    nthreads = jit.blockDim.x
+    energy_offset = jit.blockIdx.x
+    energy_index0 = energy_offset
+    thread_idx = jit.threadIdx.x
+    n_threads = jit.blockDim.x
 
-    # k0 is always valid for every launched block.
-    E0 = E_grid[k0]
+    # energy_index0 is always valid for every launched block.
+    photon0_eV = energies_eV[energy_index0]
 
     # One private accumulator per energy.
-    acc0 = F32_ZERO
+    spectrum_sum_0 = F32_ZERO
 
     # Each thread gets:
-    # tid, tid+nthreads, tid+2*nthreads, ...
-    line = tid
+    # thread_idx, thread_idx+n_threads, thread_idx+2*n_threads, ...
+    line_id = thread_idx
 
-    while line < n_lines:
-        wt = w[line]
-        if wt != F32_ZERO:
-            Er = E_r[line]
-            a = aw[line]
+    while line_id < n_lines:
+        line_weight = line_weights[line_id]
+        if line_weight != F32_ZERO:
+            resonance_eV = resonances_eV[line_id]
+            sinc_slope = sinc_slopes[line_id]
 
             # Energy 0
-            x0 = a * (E0 - Er)
-            if x0 == F32_ZERO:
-                x0 = F32_TINY
+            sinc_argument_0 = sinc_slope * (photon0_eV - resonance_eV)
+            if sinc_argument_0 == F32_ZERO:
+                sinc_argument_0 = F32_TINY
 
-            s0 = xp.sin(x0) / x0
-            acc0 += wt * s0 * s0
+            sinc_value_0 = xp.sin(sinc_argument_0) / sinc_argument_0
+            spectrum_sum_0 += line_weight * sinc_value_0 * sinc_value_0
 
-        line += nthreads
+        line_id += n_threads
 
     shared = jit.shared_memory(xp.float32, None)
 
-    off0 = U32_ZERO
-    shared[off0 + tid] = acc0
+    offset0 = U32_ZERO
+    shared[offset0 + thread_idx] = spectrum_sum_0
 
     jit.syncthreads()
 
     # Tree-reduce
-    stride = nthreads // U32_TWO
+    stride = n_threads // U32_TWO
 
     while stride > U32_ZERO:
-        if tid < stride:
-            shared[off0 + tid] += shared[off0 + tid + stride]
+        if thread_idx < stride:
+            shared[offset0 + thread_idx] += shared[offset0 + thread_idx + stride]
 
         jit.syncthreads()
         stride //= U32_TWO
 
     # Thread zero owns the final reduced values.
-    if tid == U32_ZERO:
-        spec[k0] += shared[off0]
+    if thread_idx == U32_ZERO:
+        spectrum[energy_index0] += shared[offset0]
 
 
 @jit.rawkernel()
 def _kernel_2e(
-    E_r,
-    aw,
-    w,
-    E_grid,
-    spec,
+    resonances_eV,
+    sinc_slopes,
+    line_weights,
+    energies_eV,
+    spectrum,
     n_lines,
-    n_E,
+    n_energies,
 ):
-    base = jit.blockIdx.x * U32_TWO
+    energy_offset = jit.blockIdx.x * U32_TWO
 
-    k0 = base
-    k1 = base + U32_ONE
+    energy_index0 = energy_offset
+    energy_index1 = energy_offset + U32_ONE
 
-    tid = jit.threadIdx.x
-    nthreads = jit.blockDim.x
+    thread_idx = jit.threadIdx.x
+    n_threads = jit.blockDim.x
 
-    # k0 is always valid for every launched block.
-    E0 = E_grid[k0]
-    has_k1 = k1 < n_E
+    # energy_index0 is always valid for every launched block.
+    photon0_eV = energies_eV[energy_index0]
+    has_energy_1 = energy_index1 < n_energies
 
-    E1 = F32_ZERO
+    photon1_eV = F32_ZERO
 
-    if has_k1:
-        E1 = E_grid[k1]
+    if has_energy_1:
+        photon1_eV = energies_eV[energy_index1]
 
     # One private accumulator per energy.
-    acc0 = F32_ZERO
-    acc1 = F32_ZERO
+    spectrum_sum_0 = F32_ZERO
+    spectrum_sum_1 = F32_ZERO
 
     # Each thread gets:
-    # tid, tid+nthreads, tid+2*nthreads, ...
-    line = tid
+    # thread_idx, thread_idx+n_threads, thread_idx+2*n_threads, ...
+    line_id = thread_idx
 
-    while line < n_lines:
-        wt = w[line]
-        if wt != F32_ZERO:
+    while line_id < n_lines:
+        line_weight = line_weights[line_id]
+        if line_weight != F32_ZERO:
             # Load line geometry only for a live pair.  The fused prologue
             # leaves rejected pairs in deterministic order with zero weight.
-            Er = E_r[line]
-            a = aw[line]
+            resonance_eV = resonances_eV[line_id]
+            sinc_slope = sinc_slopes[line_id]
 
             # Energy 0
-            x0 = a * (E0 - Er)
-            if x0 == F32_ZERO:
-                x0 = F32_TINY
+            sinc_argument_0 = sinc_slope * (photon0_eV - resonance_eV)
+            if sinc_argument_0 == F32_ZERO:
+                sinc_argument_0 = F32_TINY
 
-            s0 = xp.sin(x0) / x0
-            acc0 += wt * s0 * s0
+            sinc_value_0 = xp.sin(sinc_argument_0) / sinc_argument_0
+            spectrum_sum_0 += line_weight * sinc_value_0 * sinc_value_0
 
             # Energy 1
-            if has_k1:
-                x1 = a * (E1 - Er)
-                if x1 == F32_ZERO:
-                    x1 = F32_TINY
+            if has_energy_1:
+                sinc_argument_1 = sinc_slope * (photon1_eV - resonance_eV)
+                if sinc_argument_1 == F32_ZERO:
+                    sinc_argument_1 = F32_TINY
 
-                s1 = xp.sin(x1) / x1
-                acc1 += wt * s1 * s1
+                sinc_value_1 = xp.sin(sinc_argument_1) / sinc_argument_1
+                spectrum_sum_1 += line_weight * sinc_value_1 * sinc_value_1
 
-        line += nthreads
+        line_id += n_threads
 
     # Two shared-memory reduction regions:
     #
-    # [ acc0 partials ]
-    # [ acc1 partials ]
+    # [ spectrum_sum_0 partials ]
+    # [ spectrum_sum_1 partials ]
     shared = jit.shared_memory(xp.float32, None)
 
-    off0 = U32_ZERO
-    off1 = nthreads
+    offset0 = U32_ZERO
+    offset1 = n_threads
 
-    shared[off0 + tid] = acc0
-    shared[off1 + tid] = acc1
+    shared[offset0 + thread_idx] = spectrum_sum_0
+    shared[offset1 + thread_idx] = spectrum_sum_1
 
     jit.syncthreads()
 
     # Tree-reduce both energies simultaneously.
-    stride = nthreads // U32_TWO
+    stride = n_threads // U32_TWO
 
     while stride > U32_ZERO:
-        if tid < stride:
-            shared[off0 + tid] += shared[off0 + tid + stride]
-            shared[off1 + tid] += shared[off1 + tid + stride]
+        if thread_idx < stride:
+            shared[offset0 + thread_idx] += shared[offset0 + thread_idx + stride]
+            shared[offset1 + thread_idx] += shared[offset1 + thread_idx + stride]
 
         jit.syncthreads()
         stride //= U32_TWO
 
     # Thread zero owns the final reduced values.
-    if tid == U32_ZERO:
-        spec[k0] += shared[off0]
+    if thread_idx == U32_ZERO:
+        spectrum[energy_index0] += shared[offset0]
 
-        if has_k1:
-            spec[k1] += shared[off1]
+        if has_energy_1:
+            spectrum[energy_index1] += shared[offset1]
 
 
 @jit.rawkernel()
 def _kernel_3e(
-    E_r,
-    aw,
-    w,
-    E_grid,
-    spec,
+    resonances_eV,
+    sinc_slopes,
+    line_weights,
+    energies_eV,
+    spectrum,
     n_lines,
-    n_E,
+    n_energies,
 ):
-    base = jit.blockIdx.x * U32_THREE
+    energy_offset = jit.blockIdx.x * U32_THREE
 
-    k0 = base
-    k1 = base + U32_ONE
-    k2 = base + U32_TWO
+    energy_index0 = energy_offset
+    energy_index1 = energy_offset + U32_ONE
+    energy_index2 = energy_offset + U32_TWO
 
-    tid = jit.threadIdx.x
-    nthreads = jit.blockDim.x
+    thread_idx = jit.threadIdx.x
+    n_threads = jit.blockDim.x
 
-    # k0 is always valid for every launched block.
-    E0 = E_grid[k0]
+    # energy_index0 is always valid for every launched block.
+    photon0_eV = energies_eV[energy_index0]
 
     # The final block may contain fewer than three valid energies.
-    has_k1 = k1 < n_E
-    has_k2 = k2 < n_E
+    has_energy_1 = energy_index1 < n_energies
+    has_energy_2 = energy_index2 < n_energies
 
-    E1 = F32_ZERO
-    E2 = F32_ZERO
+    photon1_eV = F32_ZERO
+    photon2_eV = F32_ZERO
 
-    if has_k1:
-        E1 = E_grid[k1]
+    if has_energy_1:
+        photon1_eV = energies_eV[energy_index1]
 
-    if has_k2:
-        E2 = E_grid[k2]
+    if has_energy_2:
+        photon2_eV = energies_eV[energy_index2]
 
     # One private accumulator per energy.
-    acc0 = F32_ZERO
-    acc1 = F32_ZERO
-    acc2 = F32_ZERO
+    spectrum_sum_0 = F32_ZERO
+    spectrum_sum_1 = F32_ZERO
+    spectrum_sum_2 = F32_ZERO
 
     # Each thread gets:
-    # tid, tid+nthreads, tid+2*nthreads, ...
-    line = tid
+    # thread_idx, thread_idx+n_threads, thread_idx+2*n_threads, ...
+    line_id = thread_idx
 
-    while line < n_lines:
-        wt = w[line]
-        if wt != F32_ZERO:
+    while line_id < n_lines:
+        line_weight = line_weights[line_id]
+        if line_weight != F32_ZERO:
             # Load once and reuse for all three energies.
-            Er = E_r[line]
-            a = aw[line]
+            resonance_eV = resonances_eV[line_id]
+            sinc_slope = sinc_slopes[line_id]
 
             # Energy 0
-            x0 = a * (E0 - Er)
-            if x0 == F32_ZERO:
-                x0 = F32_TINY
+            sinc_argument_0 = sinc_slope * (photon0_eV - resonance_eV)
+            if sinc_argument_0 == F32_ZERO:
+                sinc_argument_0 = F32_TINY
 
-            s0 = xp.sin(x0) / x0
-            acc0 += wt * s0 * s0
+            sinc_value_0 = xp.sin(sinc_argument_0) / sinc_argument_0
+            spectrum_sum_0 += line_weight * sinc_value_0 * sinc_value_0
 
             # Energy 1
-            if has_k1:
-                x1 = a * (E1 - Er)
-                if x1 == F32_ZERO:
-                    x1 = F32_TINY
+            if has_energy_1:
+                sinc_argument_1 = sinc_slope * (photon1_eV - resonance_eV)
+                if sinc_argument_1 == F32_ZERO:
+                    sinc_argument_1 = F32_TINY
 
-                s1 = xp.sin(x1) / x1
-                acc1 += wt * s1 * s1
+                sinc_value_1 = xp.sin(sinc_argument_1) / sinc_argument_1
+                spectrum_sum_1 += line_weight * sinc_value_1 * sinc_value_1
 
             # Energy 2
-            if has_k2:
-                x2 = a * (E2 - Er)
-                if x2 == F32_ZERO:
-                    x2 = F32_TINY
+            if has_energy_2:
+                sinc_argument_2 = sinc_slope * (photon2_eV - resonance_eV)
+                if sinc_argument_2 == F32_ZERO:
+                    sinc_argument_2 = F32_TINY
 
-                s2 = xp.sin(x2) / x2
-                acc2 += wt * s2 * s2
+                sinc_value_2 = xp.sin(sinc_argument_2) / sinc_argument_2
+                spectrum_sum_2 += line_weight * sinc_value_2 * sinc_value_2
 
-        line += nthreads
+        line_id += n_threads
 
     # Three shared-memory reduction regions:
     #
-    # [ acc0 partials ]
-    # [ acc1 partials ]
-    # [ acc2 partials ]
+    # [ spectrum_sum_0 partials ]
+    # [ spectrum_sum_1 partials ]
+    # [ spectrum_sum_2 partials ]
     shared = jit.shared_memory(xp.float32, None)
 
-    off0 = U32_ZERO
-    off1 = nthreads
-    off2 = U32_TWO * nthreads
+    offset0 = U32_ZERO
+    offset1 = n_threads
+    offset2 = U32_TWO * n_threads
 
-    shared[off0 + tid] = acc0
-    shared[off1 + tid] = acc1
-    shared[off2 + tid] = acc2
+    shared[offset0 + thread_idx] = spectrum_sum_0
+    shared[offset1 + thread_idx] = spectrum_sum_1
+    shared[offset2 + thread_idx] = spectrum_sum_2
 
     jit.syncthreads()
 
     # Tree-reduce all three energies simultaneously.
-    stride = nthreads // U32_TWO
+    stride = n_threads // U32_TWO
 
     while stride > U32_ZERO:
-        if tid < stride:
-            shared[off0 + tid] += shared[off0 + tid + stride]
-            shared[off1 + tid] += shared[off1 + tid + stride]
-            shared[off2 + tid] += shared[off2 + tid + stride]
+        if thread_idx < stride:
+            shared[offset0 + thread_idx] += shared[offset0 + thread_idx + stride]
+            shared[offset1 + thread_idx] += shared[offset1 + thread_idx + stride]
+            shared[offset2 + thread_idx] += shared[offset2 + thread_idx + stride]
 
         jit.syncthreads()
         stride //= U32_TWO
 
     # Thread zero owns the final reduced values.
-    if tid == U32_ZERO:
-        spec[k0] += shared[off0]
+    if thread_idx == U32_ZERO:
+        spectrum[energy_index0] += shared[offset0]
 
-        if has_k1:
-            spec[k1] += shared[off1]
+        if has_energy_1:
+            spectrum[energy_index1] += shared[offset1]
 
-        if has_k2:
-            spec[k2] += shared[off2]
+        if has_energy_2:
+            spectrum[energy_index2] += shared[offset2]
 
 
 @jit.rawkernel()
 def _kernel_4e(
-    E_r,
-    aw,
-    w,
-    E_grid,
-    spec,
+    resonances_eV,
+    sinc_slopes,
+    line_weights,
+    energies_eV,
+    spectrum,
     n_lines,
-    n_E,
+    n_energies,
 ):
-    base = jit.blockIdx.x * U32_FOUR
+    energy_offset = jit.blockIdx.x * U32_FOUR
 
-    k0 = base
-    k1 = base + U32_ONE
-    k2 = base + U32_TWO
-    k3 = base + U32_THREE
+    energy_index0 = energy_offset
+    energy_index1 = energy_offset + U32_ONE
+    energy_index2 = energy_offset + U32_TWO
+    energy_index3 = energy_offset + U32_THREE
 
-    tid = jit.threadIdx.x
-    nthreads = jit.blockDim.x
+    thread_idx = jit.threadIdx.x
+    n_threads = jit.blockDim.x
 
-    # k0 is always valid for every launched block.
-    E0 = E_grid[k0]
+    # energy_index0 is always valid for every launched block.
+    photon0_eV = energies_eV[energy_index0]
 
     # The final block may contain fewer than four valid energies.
-    has_k1 = k1 < n_E
-    has_k2 = k2 < n_E
-    has_k3 = k3 < n_E
+    has_energy_1 = energy_index1 < n_energies
+    has_energy_2 = energy_index2 < n_energies
+    has_energy_3 = energy_index3 < n_energies
 
-    E1 = F32_ZERO
-    E2 = F32_ZERO
-    E3 = F32_ZERO
+    photon1_eV = F32_ZERO
+    photon2_eV = F32_ZERO
+    photon3_eV = F32_ZERO
 
-    if has_k1:
-        E1 = E_grid[k1]
+    if has_energy_1:
+        photon1_eV = energies_eV[energy_index1]
 
-    if has_k2:
-        E2 = E_grid[k2]
+    if has_energy_2:
+        photon2_eV = energies_eV[energy_index2]
 
-    if has_k3:
-        E3 = E_grid[k3]
+    if has_energy_3:
+        photon3_eV = energies_eV[energy_index3]
 
     # One private accumulator per energy.
-    acc0 = F32_ZERO
-    acc1 = F32_ZERO
-    acc2 = F32_ZERO
-    acc3 = F32_ZERO
+    spectrum_sum_0 = F32_ZERO
+    spectrum_sum_1 = F32_ZERO
+    spectrum_sum_2 = F32_ZERO
+    spectrum_sum_3 = F32_ZERO
 
     # Each thread gets:
-    # tid, tid+nthreads, tid+2*nthreads, ...
-    line = tid
+    # thread_idx, thread_idx+n_threads, thread_idx+2*n_threads, ...
+    line_id = thread_idx
 
-    while line < n_lines:
-        wt = w[line]
-        if wt != F32_ZERO:
+    while line_id < n_lines:
+        line_weight = line_weights[line_id]
+        if line_weight != F32_ZERO:
             # Load once and reuse for all four energies.
-            Er = E_r[line]
-            a = aw[line]
+            resonance_eV = resonances_eV[line_id]
+            sinc_slope = sinc_slopes[line_id]
 
             # Energy 0
-            x0 = a * (E0 - Er)
-            if x0 == F32_ZERO:
-                x0 = F32_TINY
+            sinc_argument_0 = sinc_slope * (photon0_eV - resonance_eV)
+            if sinc_argument_0 == F32_ZERO:
+                sinc_argument_0 = F32_TINY
 
-            s0 = xp.sin(x0) / x0
-            acc0 += wt * s0 * s0
+            sinc_value_0 = xp.sin(sinc_argument_0) / sinc_argument_0
+            spectrum_sum_0 += line_weight * sinc_value_0 * sinc_value_0
 
             # Energy 1
-            if has_k1:
-                x1 = a * (E1 - Er)
-                if x1 == F32_ZERO:
-                    x1 = F32_TINY
+            if has_energy_1:
+                sinc_argument_1 = sinc_slope * (photon1_eV - resonance_eV)
+                if sinc_argument_1 == F32_ZERO:
+                    sinc_argument_1 = F32_TINY
 
-                s1 = xp.sin(x1) / x1
-                acc1 += wt * s1 * s1
+                sinc_value_1 = xp.sin(sinc_argument_1) / sinc_argument_1
+                spectrum_sum_1 += line_weight * sinc_value_1 * sinc_value_1
 
             # Energy 2
-            if has_k2:
-                x2 = a * (E2 - Er)
-                if x2 == F32_ZERO:
-                    x2 = F32_TINY
+            if has_energy_2:
+                sinc_argument_2 = sinc_slope * (photon2_eV - resonance_eV)
+                if sinc_argument_2 == F32_ZERO:
+                    sinc_argument_2 = F32_TINY
 
-                s2 = xp.sin(x2) / x2
-                acc2 += wt * s2 * s2
+                sinc_value_2 = xp.sin(sinc_argument_2) / sinc_argument_2
+                spectrum_sum_2 += line_weight * sinc_value_2 * sinc_value_2
 
             # Energy 3
-            if has_k3:
-                x3 = a * (E3 - Er)
-                if x3 == F32_ZERO:
-                    x3 = F32_TINY
+            if has_energy_3:
+                sinc_argument_3 = sinc_slope * (photon3_eV - resonance_eV)
+                if sinc_argument_3 == F32_ZERO:
+                    sinc_argument_3 = F32_TINY
 
-                s3 = xp.sin(x3) / x3
-                acc3 += wt * s3 * s3
+                sinc_value_3 = xp.sin(sinc_argument_3) / sinc_argument_3
+                spectrum_sum_3 += line_weight * sinc_value_3 * sinc_value_3
 
-        line += nthreads
+        line_id += n_threads
 
     # ---------------------------------------------------------
     # BLOCK REDUCTION
     # ---------------------------------------------------------
     shared = jit.shared_memory(xp.float32, None)
 
-    off0 = U32_ZERO
-    off1 = nthreads
-    off2 = U32_TWO * nthreads
-    off3 = U32_THREE * nthreads
+    offset0 = U32_ZERO
+    offset1 = n_threads
+    offset2 = U32_TWO * n_threads
+    offset3 = U32_THREE * n_threads
 
-    shared[off0 + tid] = acc0
-    shared[off1 + tid] = acc1
-    shared[off2 + tid] = acc2
-    shared[off3 + tid] = acc3
+    shared[offset0 + thread_idx] = spectrum_sum_0
+    shared[offset1 + thread_idx] = spectrum_sum_1
+    shared[offset2 + thread_idx] = spectrum_sum_2
+    shared[offset3 + thread_idx] = spectrum_sum_3
 
     jit.syncthreads()
 
     # Tree-reduce all four energies simultaneously.
-    stride = nthreads // U32_TWO
+    stride = n_threads // U32_TWO
 
     while stride > U32_ZERO:
-        if tid < stride:
-            shared[off0 + tid] += shared[off0 + tid + stride]
-            shared[off1 + tid] += shared[off1 + tid + stride]
-            shared[off2 + tid] += shared[off2 + tid + stride]
-            shared[off3 + tid] += shared[off3 + tid + stride]
+        if thread_idx < stride:
+            shared[offset0 + thread_idx] += shared[offset0 + thread_idx + stride]
+            shared[offset1 + thread_idx] += shared[offset1 + thread_idx + stride]
+            shared[offset2 + thread_idx] += shared[offset2 + thread_idx + stride]
+            shared[offset3 + thread_idx] += shared[offset3 + thread_idx + stride]
 
         jit.syncthreads()
         stride //= U32_TWO
@@ -434,17 +434,17 @@ def _kernel_4e(
     # ---------------------------------------------------------
 
     # Thread zero owns the final reduced values.
-    if tid == U32_ZERO:
-        spec[k0] += shared[off0]
+    if thread_idx == U32_ZERO:
+        spectrum[energy_index0] += shared[offset0]
 
-        if has_k1:
-            spec[k1] += shared[off1]
+        if has_energy_1:
+            spectrum[energy_index1] += shared[offset1]
 
-        if has_k2:
-            spec[k2] += shared[off2]
+        if has_energy_2:
+            spectrum[energy_index2] += shared[offset2]
 
-        if has_k3:
-            spec[k3] += shared[off3]
+        if has_energy_3:
+            spectrum[energy_index3] += shared[offset3]
 
 
 # * ---------------------------------------------------------
@@ -468,10 +468,10 @@ def run_reduction_kernel(
     out=None,
     config,
 ):
-    nthreads = config.nthreads
+    n_threads = config.nthreads
     energies_per_block = config.energies_per_block
 
-    if nthreads not in (32, 64, 128, 256, 512, 1024):
+    if n_threads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
 
     try:
@@ -479,23 +479,23 @@ def run_reduction_kernel(
     except KeyError:
         raise ValueError(f"energies_per_block must be one of {tuple(_REDUCTION_KERNELS)}") from None
 
-    n_E = int(E_grid.size)
+    n_energies = int(E_grid.size)
 
     # Kernels accumulate so callers can stream deterministic fixed-order
     # prologue blocks directly into the final spectrum without a CuPy add
     # launch.  A fresh call retains the old return-new-array contract.
     if out is None:
-        out = xp.zeros(n_E, dtype=xp.float32)
-    if n_E == 0:
+        out = xp.zeros(n_energies, dtype=xp.float32)
+    if n_energies == 0:
         return out
 
-    # ceil(n_E / energies_per_block)
-    nblocks = (n_E + energies_per_block - 1) // energies_per_block
+    # ceil(n_energies / energies_per_block)
+    n_blocks = (n_energies + energies_per_block - 1) // energies_per_block
 
-    grid = (nblocks,)
-    block = (int(nthreads),)
+    grid = (n_blocks,)
+    block = (int(n_threads),)
 
-    shared_bytes = energies_per_block * nthreads * np.dtype(np.float32).itemsize
+    shared_memory_bytes = energies_per_block * n_threads * np.dtype(np.float32).itemsize
 
     kernel(
         grid,
@@ -507,9 +507,9 @@ def run_reduction_kernel(
             E_grid,
             out,
             np.uint32(E_r.size),
-            np.uint32(n_E),
+            np.uint32(n_energies),
         ),
-        shared_mem=shared_bytes,
+        shared_mem=shared_memory_bytes,
     )
 
     return out

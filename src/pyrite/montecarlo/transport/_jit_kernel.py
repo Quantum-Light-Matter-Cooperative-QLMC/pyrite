@@ -258,43 +258,43 @@ def _transport_kernel(
     # CUDA mode the transpiler promotes a mixed int32/uint32 expression to
     # uint32, then refuses the `same_kind` cast of the signed operand, so the
     # index is made signed once at its source rather than at each use.
-    i = np.int32(jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x)
-    if i >= e_count:
+    local_electron_index = np.int32(jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x)
+    if local_electron_index >= e_count:
         return
 
-    seg_count[i] = I32_ZERO
-    exit_code[i] = I8_NOT_ENTERED
-    e = e_start + i
+    seg_count[local_electron_index] = I32_ZERO
+    exit_code[local_electron_index] = I8_NOT_ENTERED
+    electron_index = e_start + local_electron_index
     if straggle_on == I32_ONE:
-        stragg_dE[e] = F64_ZERO
-    if alive[e] == np.uint8(0):
+        stragg_dE[electron_index] = F64_ZERO
+    if alive[electron_index] == np.uint8(0):
         return
-    exit_code[i] = I8_STEP_LIMITED
+    exit_code[local_electron_index] = I8_STEP_LIMITED
 
-    e3 = e * I32_THREE
-    key = stream_key[e]
-    draw = U64_ZERO
-    local_nseg = I32_ZERO
-    E_cut_e = E_cut_by_electrons[e]
+    electron_offset = electron_index * I32_THREE
+    elastic_stream_key = stream_key[electron_index]
+    elastic_draw_counter = U64_ZERO
+    local_segment_count = I32_ZERO
+    cutoff_energy_keV = E_cut_by_electrons[electron_index]
     # Per-thread optical-depth budget and flight identity; -1.0 marks "no flight
     # open", the only state in which a collision is drawn.
-    tau_left = -F64_ONE
+    elastic_optical_depth = -F64_ONE
     flight_id = I32_ZERO
     substep_id = I32_ZERO
     energy_controlled = max_dE_frac > F64_ZERO
     # Shell mode: hard optical depth (one draw per physical flight, like the
     # elastic one) and this electron's hard-stream counter.
-    tau_h = -F64_ONE
+    hard_optical_depth = -F64_ONE
     hard_key = U64_ZERO
-    hard_draw = U64_ZERO
+    hard_draw_counter = U64_ZERO
     if inelastic_on == I32_ONE:
-        hard_key = il_keys[e]
+        hard_key = il_keys[electron_index]
     # Radiative mode: the same per-flight optical depth on its own stream.
-    tau_rad = -F64_ONE
+    radiative_optical_depth = -F64_ONE
     rad_key = U64_ZERO
-    rad_draw = U64_ZERO
+    radiative_draw_counter = U64_ZERO
     if rad_on == I32_ONE:
-        rad_key = rad_keys[e]
+        rad_key = rad_keys[electron_index]
 
     step = I32_ZERO
     running = True
@@ -302,70 +302,89 @@ def _transport_kernel(
         step += I32_ONE
 
         if n_layers == I32_ONE:
-            L = I32_ZERO
+            layer_index = I32_ZERO
         else:
-            L = _searchsorted_right(internal_bounds, pos[e3 + I32_TWO], n_layers - I32_ONE)
+            layer_index = _searchsorted_right(
+                internal_bounds, pos[electron_offset + I32_TWO], n_layers - I32_ONE
+            )
 
-        row = L * max_el
-        n_el = L_nel[L]
-        z_top_L = L_top[L]
-        z_bot_L = L_bot[L]
-        E_j = E_keV[e]
+        element_row_offset = layer_index * max_el
+        n_elements = L_nel[layer_index]
+        layer_top_ang = L_top[layer_index]
+        layer_bottom_ang = L_bot[layer_index]
+        energy_keV = E_keV[electron_index]
 
         # 1. Sample the next elastic-collision distance.
         total_rate = F64_ZERO
-        i_el = I32_ZERO
-        log_E_eV = xp.log(E_j * np.float64(1e3))
-        while i_el < n_el:
+        element_index = I32_ZERO
+        log_E_eV = xp.log(energy_keV * np.float64(1e3))
+        while element_index < n_elements:
             if elastic_model_code == I32_TWO:
-                el_row = el_start[row + i_el]
-                el_n = el_len[row + i_el]
-                el_lo = _log_grid_lower(el_logE, el_row, el_n, log_E_eV)
-                el_f = _log_grid_fraction(el_logE, el_row, el_n, log_E_eV, el_lo)
-                el_lr = el_log_rate[el_row + el_lo]
-                total_rate += xp.exp(el_lr + el_f * (el_log_rate[el_row + el_lo + I32_ONE] - el_lr))
+                el_row = el_start[element_row_offset + element_index]
+                elastic_energy_count = el_len[element_row_offset + element_index]
+                elastic_lower_index = _log_grid_lower(
+                    el_logE, el_row, elastic_energy_count, log_E_eV
+                )
+                elastic_fraction = _log_grid_fraction(
+                    el_logE, el_row, elastic_energy_count, log_E_eV, elastic_lower_index
+                )
+                lower_log_elastic_rate = el_log_rate[el_row + elastic_lower_index]
+                total_rate += xp.exp(
+                    lower_log_elastic_rate
+                    + elastic_fraction
+                    * (el_log_rate[el_row + elastic_lower_index + I32_ONE] - lower_log_elastic_rate)
+                )
             elif elastic_model_code == I32_ONE:
                 total_rate += _rate_mott(
-                    E_j,
-                    L_mott_numer[row + i_el],
-                    L_mott_denom1[row + i_el],
-                    L_mott_denom2[row + i_el],
+                    energy_keV,
+                    L_mott_numer[element_row_offset + element_index],
+                    L_mott_denom1[element_row_offset + element_index],
+                    L_mott_denom2[element_row_offset + element_index],
                 )
             else:
-                total_rate += _rate_sr(E_j, L_sr_rate_numer[row + i_el], L_sr_joy_numer[row + i_el])
-            i_el += I32_ONE
+                total_rate += _rate_sr(
+                    energy_keV,
+                    L_sr_rate_numer[element_row_offset + element_index],
+                    L_sr_joy_numer[element_row_offset + element_index],
+                )
+            element_index += I32_ONE
 
-        lam_ang = np.float64(1e8) / total_rate
-        if tau_left < F64_ZERO:
-            tau_left = -xp.log(_stream_uniform(key, draw))
-            draw = draw + U64_ONE
-        step_j = tau_left * lam_ang
-        hard_j = False
+        mean_free_path_ang = np.float64(1e8) / total_rate
+        if elastic_optical_depth < F64_ZERO:
+            elastic_optical_depth = -xp.log(
+                _stream_uniform(elastic_stream_key, elastic_draw_counter)
+            )
+            elastic_draw_counter = elastic_draw_counter + U64_ONE
+        step_length_ang = elastic_optical_depth * mean_free_path_ang
+        is_hard_collision = False
         mu_hard = F64_ZERO
         il_row = I32_ZERO
-        il_lo = I32_ZERO
-        il_f = F64_ZERO
+        inelastic_lower_index = I32_ZERO
+        inelastic_fraction = F64_ZERO
         if inelastic_on == I32_ONE:
-            il_row = L * il_width
-            log_E_j = xp.log(E_j)
-            il_lo = _log_grid_lower(il_logE, il_row, il_n[L], log_E_j)
-            il_f = _log_grid_fraction(il_logE, il_row, il_n[L], log_E_j, il_lo)
-            mu_hard = il_rate[il_row + il_lo] + il_f * (
-                il_rate[il_row + il_lo + I32_ONE] - il_rate[il_row + il_lo]
+            il_row = layer_index * il_width
+            log_E_j = xp.log(energy_keV)
+            inelastic_lower_index = _log_grid_lower(il_logE, il_row, il_n[layer_index], log_E_j)
+            inelastic_fraction = _log_grid_fraction(
+                il_logE, il_row, il_n[layer_index], log_E_j, inelastic_lower_index
             )
-            if tau_h < F64_ZERO:
-                tau_h = -xp.log(_stream_uniform(hard_key, hard_draw))
-                hard_draw = hard_draw + U64_ONE
-            if mu_hard > F64_ZERO and tau_h / mu_hard < step_j:
-                step_j = tau_h / mu_hard
-                hard_j = True
-        rad_j = False
+            mu_hard = il_rate[il_row + inelastic_lower_index] + inelastic_fraction * (
+                il_rate[il_row + inelastic_lower_index + I32_ONE]
+                - il_rate[il_row + inelastic_lower_index]
+            )
+            if hard_optical_depth < F64_ZERO:
+                hard_optical_depth = -xp.log(_stream_uniform(hard_key, hard_draw_counter))
+                hard_draw_counter = hard_draw_counter + U64_ONE
+            if mu_hard > F64_ZERO and hard_optical_depth / mu_hard < step_length_ang:
+                step_length_ang = hard_optical_depth / mu_hard
+                is_hard_collision = True
+        is_radiative_collision = False
         rad_soft = F64_ZERO
         mu_rad = F64_ZERO
         if rad_on == I32_ONE:
             rad_soft = _rad_layer_moment(
                 RAD_SOFT,
-                L,
+                layer_index,
                 rad_nel,
                 rad_nt,
                 rad_z,
@@ -377,12 +396,12 @@ def _transport_kernel(
                 rad_max_el,
                 rad_max_t,
                 rad_n_red,
-                E_j * F64_EV_PER_KEV,
+                energy_keV * F64_EV_PER_KEV,
                 rad_cutoff_eV,
             )
             mu_rad = _rad_layer_moment(
                 RAD_HARD_RATE,
-                L,
+                layer_index,
                 rad_nel,
                 rad_nt,
                 rad_z,
@@ -394,100 +413,102 @@ def _transport_kernel(
                 rad_max_el,
                 rad_max_t,
                 rad_n_red,
-                E_j * F64_EV_PER_KEV,
+                energy_keV * F64_EV_PER_KEV,
                 rad_cutoff_eV,
             )
-            if tau_rad < F64_ZERO:
-                tau_rad = -xp.log(_stream_uniform(rad_key, rad_draw))
-                rad_draw = rad_draw + U64_ONE
-            if mu_rad > F64_ZERO and tau_rad / mu_rad < step_j:
-                step_j = tau_rad / mu_rad
-                rad_j = True
-                hard_j = False
+            if radiative_optical_depth < F64_ZERO:
+                radiative_optical_depth = -xp.log(_stream_uniform(rad_key, radiative_draw_counter))
+                radiative_draw_counter = radiative_draw_counter + U64_ONE
+            if mu_rad > F64_ZERO and radiative_optical_depth / mu_rad < step_length_ang:
+                step_length_ang = radiative_optical_depth / mu_rad
+                is_radiative_collision = True
+                is_hard_collision = False
 
         # 2. Truncate the flight at this layer's z boundaries.
-        dx = dirs[e3]
-        dy = dirs[e3 + I32_ONE]
-        dz = dirs[e3 + I32_TWO]
-        px = pos[e3]
-        py = pos[e3 + I32_ONE]
-        pz = pos[e3 + I32_TWO]
+        direction_x = dirs[electron_offset]
+        direction_y = dirs[electron_offset + I32_ONE]
+        direction_z = dirs[electron_offset + I32_TWO]
+        position_x = pos[electron_offset]
+        position_y = pos[electron_offset + I32_ONE]
+        position_z = pos[electron_offset + I32_TWO]
 
-        cross_up_j = False
-        cross_dn_j = False
-        exit_side_j = False
+        crosses_top = False
+        crosses_bottom = False
+        exits_side = False
 
         if finite_footprint == I32_ONE:
             # Nearest positive ray/prism intersection, inlined from
             # `_first_prism_exit_scalar` (device functions return one value).
-            best_t = F64_INF
+            boundary_distance = F64_INF
             best_face = FACE_NONE
-            half_w = F64_HALF * width_ang
-            half_h = F64_HALF * height_ang
-            if dx < F64_ZERO:
-                t = (-half_w - px) / dx
-                if t > F64_ZERO and t < best_t:
-                    best_t = t
+            half_width_ang = F64_HALF * width_ang
+            half_height_ang = F64_HALF * height_ang
+            if direction_x < F64_ZERO:
+                face_distance = (-half_width_ang - position_x) / direction_x
+                if face_distance > F64_ZERO and face_distance < boundary_distance:
+                    boundary_distance = face_distance
                     best_face = FACE_X_MIN
-            if dx > F64_ZERO:
-                t = (half_w - px) / dx
-                if t > F64_ZERO and t < best_t:
-                    best_t = t
+            if direction_x > F64_ZERO:
+                face_distance = (half_width_ang - position_x) / direction_x
+                if face_distance > F64_ZERO and face_distance < boundary_distance:
+                    boundary_distance = face_distance
                     best_face = FACE_X_MAX
-            if dy < F64_ZERO:
-                t = (-half_h - py) / dy
-                if t > F64_ZERO and t < best_t:
-                    best_t = t
+            if direction_y < F64_ZERO:
+                face_distance = (-half_height_ang - position_y) / direction_y
+                if face_distance > F64_ZERO and face_distance < boundary_distance:
+                    boundary_distance = face_distance
                     best_face = FACE_Y_MIN
-            if dy > F64_ZERO:
-                t = (half_h - py) / dy
-                if t > F64_ZERO and t < best_t:
-                    best_t = t
+            if direction_y > F64_ZERO:
+                face_distance = (half_height_ang - position_y) / direction_y
+                if face_distance > F64_ZERO and face_distance < boundary_distance:
+                    boundary_distance = face_distance
                     best_face = FACE_Y_MAX
-            if dz < F64_ZERO:
-                t = (z_top_L - pz) / dz
-                if t > F64_ZERO and t < best_t:
-                    best_t = t
+            if direction_z < F64_ZERO:
+                face_distance = (layer_top_ang - position_z) / direction_z
+                if face_distance > F64_ZERO and face_distance < boundary_distance:
+                    boundary_distance = face_distance
                     best_face = FACE_Z_MIN
-            if dz > F64_ZERO:
-                t = (z_bot_L - pz) / dz
-                if t > F64_ZERO and t < best_t:
-                    best_t = t
+            if direction_z > F64_ZERO:
+                face_distance = (layer_bottom_ang - position_z) / direction_z
+                if face_distance > F64_ZERO and face_distance < boundary_distance:
+                    boundary_distance = face_distance
                     best_face = FACE_Z_MAX
-            if step_j > best_t:
-                step_j = best_t
-                cross_up_j = best_face == FACE_Z_MIN
-                cross_dn_j = best_face == FACE_Z_MAX
-                exit_side_j = best_face >= FACE_X_MIN and best_face <= FACE_Y_MAX
+            if step_length_ang > boundary_distance:
+                step_length_ang = boundary_distance
+                crosses_top = best_face == FACE_Z_MIN
+                crosses_bottom = best_face == FACE_Z_MAX
+                exits_side = best_face >= FACE_X_MIN and best_face <= FACE_Y_MAX
         else:
-            if dz < F64_ZERO:
-                s_boundary = (pz - z_top_L) / (-dz)
-                if step_j > s_boundary:
-                    step_j = s_boundary
-                    cross_up_j = True
-            elif dz > F64_ZERO:
-                s_boundary = (z_bot_L - pz) / dz
-                if step_j > s_boundary:
-                    step_j = s_boundary
-                    cross_dn_j = True
+            if direction_z < F64_ZERO:
+                boundary_step_ang = (position_z - layer_top_ang) / (-direction_z)
+                if step_length_ang > boundary_step_ang:
+                    step_length_ang = boundary_step_ang
+                    crosses_top = True
+            elif direction_z > F64_ZERO:
+                boundary_step_ang = (layer_bottom_ang - position_z) / direction_z
+                if step_length_ang > boundary_step_ang:
+                    step_length_ang = boundary_step_ang
+                    crosses_bottom = True
 
-        exit_top_j = cross_up_j and z_top_L <= F64_ZERO
-        exit_bot_j = cross_dn_j and z_bot_L >= z_total
+        exits_top = crosses_top and layer_top_ang <= F64_ZERO
+        exits_bottom = crosses_bottom and layer_bottom_ang >= z_total
 
         # 3. Record the radiating material segment. An electron that overflows
         #    `cap` keeps transporting so `seg_count` reports the capacity the
         #    replay needs.
-        reference_dEds = _dEds_packed(L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, E_j)
+        reference_dEds = _dEds_packed(
+            L_Js, L_ks, L_coeffs, L_E_cross, element_row_offset, n_elements, energy_keV
+        )
         dEds = reference_dEds
         stopping_scale = F64_ONE
         if sbethe_on == I32_ONE:
-            sbethe_row = L * sbethe_width
+            sbethe_row = layer_index * sbethe_width
             dEds = _dEds_sbethe(
                 L_sbethe_logE,
                 L_sbethe_logS,
                 sbethe_row,
-                L_sbethe_n[L],
-                E_j,
+                L_sbethe_n[layer_index],
+                energy_keV,
             )
             stopping_scale = dEds / reference_dEds
         # Soft radiative stopping joins after the collision-only scale; a
@@ -496,17 +517,17 @@ def _transport_kernel(
         if rad_on == I32_ONE:
             rad_dEds = rad_soft * F64_KEV_PER_EV
             dEds -= rad_dEds
-        cutoff_j = False
+        at_energy_cutoff = False
         # The numerical energy-loss cap is the only step limit that does not
         # close a physical flight: it emits a row and resumes with the same
         # optical-depth budget, direction, and `flight_id`.
-        limited_j = False
-        geometry_event = cross_up_j or cross_dn_j or exit_side_j
+        energy_limited = False
+        geometry_event = crosses_top or crosses_bottom or exits_side
 
         # Straggling. Own disjoint key domain -- a salted rehash of this
-        # thread's own `key`, then its own counter `stragg_counter` starting
+        # thread's own `elastic_stream_key`, then its own counter `stragg_counter` starting
         # fresh at 0 for every flight -- so this draws no uniforms from
-        # `key`/`draw` above and cannot perturb the free-path /
+        # `elastic_stream_key`/`elastic_draw_counter` above and cannot perturb the free-path /
         # scattering-angle draws whether it runs or not. Slice D inlined the
         # sampler here as a diagnostic; slice F applies the loss and takes
         # slice E's crossing rule, matching
@@ -523,60 +544,61 @@ def _transport_kernel(
             # hard tail is explicit, so PENELOPE's two-moment sampler replaces
             # Urban's on the same per-(flight, substep) key domain.
             if energy_controlled:
-                step_energy = max_dE_frac * E_j / (-dEds)
-                if step_energy < step_j:
-                    step_j = step_energy
-                    limited_j = True
-                    cross_up_j = False
-                    cross_dn_j = False
-                    exit_top_j = False
-                    exit_bot_j = False
-                    exit_side_j = False
+                step_energy = max_dE_frac * energy_keV / (-dEds)
+                if step_energy < step_length_ang:
+                    step_length_ang = step_energy
+                    energy_limited = True
+                    crosses_top = False
+                    crosses_bottom = False
+                    exits_top = False
+                    exits_bottom = False
+                    exits_side = False
                     geometry_event = False
-            urban_key = _urban_stream_key(key)
+            urban_key = _urban_stream_key(elastic_stream_key)
             flight_key = _urban_flight_key(urban_key, np.uint64(flight_id), np.uint64(substep_id))
-            omega2 = il_omega2[il_row + il_lo] + il_f * (
-                il_omega2[il_row + il_lo + I32_ONE] - il_omega2[il_row + il_lo]
+            omega2 = il_omega2[il_row + inelastic_lower_index] + inelastic_fraction * (
+                il_omega2[il_row + inelastic_lower_index + I32_ONE]
+                - il_omega2[il_row + inelastic_lower_index]
             )
             stragg_loss = _soft_loss_sample_keV(
-                -(dEds + rad_dEds) * step_j, omega2 * step_j, flight_key
+                -(dEds + rad_dEds) * step_length_ang, omega2 * step_length_ang, flight_key
             )
-            stragg_loss += rad_dEds * step_j
-            stragg_dE[e] += stragg_loss
-            delta_cut = E_j - E_cut_e
+            stragg_loss += rad_dEds * step_length_ang
+            stragg_dE[electron_index] += stragg_loss
+            delta_cut = energy_keV - cutoff_energy_keV
             if stragg_loss > delta_cut or (stragg_loss == delta_cut and not geometry_event):
                 if stragg_loss > F64_ZERO:
-                    step_j = step_j * (delta_cut / stragg_loss)
+                    step_length_ang = step_length_ang * (delta_cut / stragg_loss)
                 else:
-                    step_j = F64_ZERO
-                cutoff_j = True
-                limited_j = False
-                cross_up_j = False
-                cross_dn_j = False
-                exit_top_j = False
-                exit_bot_j = False
-                exit_side_j = False
-                E_end_j = E_cut_e
+                    step_length_ang = F64_ZERO
+                at_energy_cutoff = True
+                energy_limited = False
+                crosses_top = False
+                crosses_bottom = False
+                exits_top = False
+                exits_bottom = False
+                exits_side = False
+                end_energy_keV = cutoff_energy_keV
             else:
-                E_end_j = E_j - stragg_loss
-            beta_j = _beta_from_keV(F64_HALF * (E_j + E_end_j))
+                end_energy_keV = energy_keV - stragg_loss
+            segment_beta = _beta_from_keV(F64_HALF * (energy_keV + end_energy_keV))
         elif straggle_on == I32_ONE:
             # Deterministic step control on purpose: a substep grid chosen from
             # the sampled loss would be a random partition and would forfeit
             # the infinite-divisibility invariance slice E derived.
             if energy_controlled:
-                step_energy = max_dE_frac * E_j / (-dEds)
-                if step_energy < step_j:
-                    step_j = step_energy
-                    limited_j = True
-                    cross_up_j = False
-                    cross_dn_j = False
-                    exit_top_j = False
-                    exit_bot_j = False
-                    exit_side_j = False
+                step_energy = max_dE_frac * energy_keV / (-dEds)
+                if step_energy < step_length_ang:
+                    step_length_ang = step_energy
+                    energy_limited = True
+                    crosses_top = False
+                    crosses_bottom = False
+                    exits_top = False
+                    exits_bottom = False
+                    exits_side = False
                     geometry_event = False
 
-            urban_key = _urban_stream_key(key)
+            urban_key = _urban_stream_key(elastic_stream_key)
             flight_key = _urban_flight_key(urban_key, np.uint64(flight_id), np.uint64(substep_id))
             stragg_loss = _urban_sample_compound(
                 L_Zs,
@@ -584,71 +606,71 @@ def _transport_kernel(
                 L_ks,
                 L_coeffs,
                 L_E_cross,
-                row,
-                n_el,
-                E_j,
-                step_j,
+                element_row_offset,
+                n_elements,
+                energy_keV,
+                step_length_ang,
                 stopping_scale,
                 flight_key,
             )
-            stragg_loss += rad_dEds * step_j
+            stragg_loss += rad_dEds * step_length_ang
 
             # Diagnostic, unchanged from slice D: the SAMPLED loss, which on a
             # cutoff row exceeds the applied loss by exactly the overshoot the
             # truncation discards.
-            stragg_dE[e] += stragg_loss
+            stragg_dE[electron_index] += stragg_loss
 
             # The loss process is non-decreasing, so "crosses E_cut somewhere
             # inside this row" is equivalent to "total loss over the row reaches
-            # E_j - E_cut" -- an exact test. The tie-break matches the
+            # energy_keV - E_cut" -- an exact test. The tie-break matches the
             # deterministic branch below: a crossing exactly at the row's end
             # yields to a geometry event.
-            delta_cut = E_j - E_cut_e
+            delta_cut = energy_keV - cutoff_energy_keV
             if stragg_loss > delta_cut or (stragg_loss == delta_cut and not geometry_event):
                 # Fluid interpolation at the row's own realized rate. The guard
                 # is load-bearing on the device: 0/0 is a silent NaN here, and
                 # it would propagate straight into `pos` rather than raising.
                 if stragg_loss > F64_ZERO:
-                    step_j = step_j * (delta_cut / stragg_loss)
+                    step_length_ang = step_length_ang * (delta_cut / stragg_loss)
                 else:
-                    step_j = F64_ZERO
-                cutoff_j = True
-                limited_j = False
-                cross_up_j = False
-                cross_dn_j = False
-                exit_top_j = False
-                exit_bot_j = False
-                exit_side_j = False
-                E_end_j = E_cut_e
+                    step_length_ang = F64_ZERO
+                at_energy_cutoff = True
+                energy_limited = False
+                crosses_top = False
+                crosses_bottom = False
+                exits_top = False
+                exits_bottom = False
+                exits_side = False
+                end_energy_keV = cutoff_energy_keV
             else:
-                E_end_j = E_j - stragg_loss
+                end_energy_keV = energy_keV - stragg_loss
             if energy_model_code == I32_ONE:
-                beta_j = _beta_from_keV(F64_HALF * (E_j + E_end_j))
+                segment_beta = _beta_from_keV(F64_HALF * (energy_keV + end_energy_keV))
             else:
-                beta_j = _beta_from_keV(E_j)
+                segment_beta = _beta_from_keV(energy_keV)
         else:
             if energy_model_code == I32_ONE:
                 # The midpoint rule makes E_end = E_cut at the cutoff by
                 # definition, so the truncation distance solves the scheme at
                 # E_mid = (E_start + E_cut)/2, not its left-endpoint
                 # linearization.
-                cutoff_energy = F64_HALF * (E_j + E_cut_e)
+                cutoff_energy = F64_HALF * (energy_keV + cutoff_energy_keV)
                 cutoff_rate = _dEds_packed(
-                    L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, cutoff_energy
+                    L_Js, L_ks, L_coeffs, L_E_cross, element_row_offset, n_elements, cutoff_energy
                 )
                 if sbethe_on == I32_ONE:
                     cutoff_rate = _dEds_sbethe(
                         L_sbethe_logE,
                         L_sbethe_logS,
-                        L * sbethe_width,
-                        L_sbethe_n[L],
+                        layer_index * sbethe_width,
+                        L_sbethe_n[layer_index],
                         cutoff_energy,
                     )
                 if rad_on == I32_ONE:
                     cutoff_rate -= (
                         _rad_layer_moment(
                             RAD_SOFT,
-                            L,
+                            layer_index,
                             rad_nel,
                             rad_nt,
                             rad_z,
@@ -665,53 +687,61 @@ def _transport_kernel(
                         )
                         * F64_KEV_PER_EV
                     )
-                cutoff_distance = (E_cut_e - E_j) / cutoff_rate
+                cutoff_distance = (cutoff_energy_keV - energy_keV) / cutoff_rate
             else:
-                cutoff_distance = (E_cut_e - E_j) / dEds
-            if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
-                step_j = cutoff_distance
-                cutoff_j = True
-                cross_up_j = False
-                cross_dn_j = False
-                exit_top_j = False
-                exit_bot_j = False
-                exit_side_j = False
+                cutoff_distance = (cutoff_energy_keV - energy_keV) / dEds
+            if cutoff_distance < step_length_ang or (
+                cutoff_distance == step_length_ang and not geometry_event
+            ):
+                step_length_ang = cutoff_distance
+                at_energy_cutoff = True
+                crosses_top = False
+                crosses_bottom = False
+                exits_top = False
+                exits_bottom = False
+                exits_side = False
 
-            if energy_controlled and not cutoff_j:
-                step_energy = max_dE_frac * E_j / (-dEds)
-                if step_energy < step_j:
-                    step_j = step_energy
-                    limited_j = True
-                    cross_up_j = False
-                    cross_dn_j = False
-                    exit_top_j = False
-                    exit_bot_j = False
-                    exit_side_j = False
+            if energy_controlled and not at_energy_cutoff:
+                step_energy = max_dE_frac * energy_keV / (-dEds)
+                if step_energy < step_length_ang:
+                    step_length_ang = step_energy
+                    energy_limited = True
+                    crosses_top = False
+                    crosses_bottom = False
+                    exits_top = False
+                    exits_bottom = False
+                    exits_side = False
 
             if energy_model_code == I32_ONE:
-                if cutoff_j:
-                    E_end_j = E_cut_e
+                if at_energy_cutoff:
+                    end_energy_keV = cutoff_energy_keV
                 else:
                     # Explicit midpoint RK2: predict with the start rate,
-                    # then evaluate at (E_start + E_pred)/2.
-                    E_pred = E_j + dEds * step_j
-                    midpoint_energy = F64_HALF * (E_j + E_pred)
+                    # then evaluate at (E_start + predicted_energy_keV)/2.
+                    predicted_energy_keV = energy_keV + dEds * step_length_ang
+                    midpoint_energy = F64_HALF * (energy_keV + predicted_energy_keV)
                     midpoint_rate = _dEds_packed(
-                        L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, midpoint_energy
+                        L_Js,
+                        L_ks,
+                        L_coeffs,
+                        L_E_cross,
+                        element_row_offset,
+                        n_elements,
+                        midpoint_energy,
                     )
                     if sbethe_on == I32_ONE:
                         midpoint_rate = _dEds_sbethe(
                             L_sbethe_logE,
                             L_sbethe_logS,
-                            L * sbethe_width,
-                            L_sbethe_n[L],
+                            layer_index * sbethe_width,
+                            L_sbethe_n[layer_index],
                             midpoint_energy,
                         )
                     if rad_on == I32_ONE:
                         midpoint_rate -= (
                             _rad_layer_moment(
                                 RAD_SOFT,
-                                L,
+                                layer_index,
                                 rad_nel,
                                 rad_nt,
                                 rad_z,
@@ -728,72 +758,72 @@ def _transport_kernel(
                             )
                             * F64_KEV_PER_EV
                         )
-                    E_end_j = E_j + step_j * midpoint_rate
-                beta_j = _beta_from_keV(F64_HALF * (E_j + E_end_j))
+                    end_energy_keV = energy_keV + step_length_ang * midpoint_rate
+                segment_beta = _beta_from_keV(F64_HALF * (energy_keV + end_energy_keV))
             else:
-                if cutoff_j:
-                    E_end_j = E_cut_e
+                if at_energy_cutoff:
+                    end_energy_keV = cutoff_energy_keV
                 else:
-                    E_end_j = E_j + dEds * step_j
-                beta_j = _beta_from_keV(E_j)
-        t_end_j = clock[e] + step_j / beta_j
+                    end_energy_keV = energy_keV + dEds * step_length_ang
+                segment_beta = _beta_from_keV(energy_keV)
+        end_time_ang = clock[electron_index] + step_length_ang / segment_beta
 
         # The row's end event; see `transport.events`. A winning cap or
         # cutoff has already cleared the geometry flags below it.
-        event_j = EVENT_ELASTIC
-        if limited_j:
-            event_j = EVENT_SUBSTEP
-        elif cutoff_j:
-            event_j = EVENT_CUTOFF
-        elif exit_top_j:
-            event_j = EVENT_EXIT_TOP
-        elif exit_bot_j:
-            event_j = EVENT_EXIT_BOTTOM
-        elif exit_side_j:
-            event_j = EVENT_EXIT_SIDE
-        elif cross_up_j or cross_dn_j:
-            event_j = EVENT_LAYER_BOUNDARY
-        elif hard_j:
-            event_j = EVENT_HARD_INELASTIC
-        elif rad_j:
-            event_j = EVENT_HARD_RADIATIVE
+        segment_event = EVENT_ELASTIC
+        if energy_limited:
+            segment_event = EVENT_SUBSTEP
+        elif at_energy_cutoff:
+            segment_event = EVENT_CUTOFF
+        elif exits_top:
+            segment_event = EVENT_EXIT_TOP
+        elif exits_bottom:
+            segment_event = EVENT_EXIT_BOTTOM
+        elif exits_side:
+            segment_event = EVENT_EXIT_SIDE
+        elif crosses_top or crosses_bottom:
+            segment_event = EVENT_LAYER_BOUNDARY
+        elif is_hard_collision:
+            segment_event = EVENT_HARD_INELASTIC
+        elif is_radiative_collision:
+            segment_event = EVENT_HARD_RADIATIVE
         hard_W_keV = F64_ZERO
         hard_code = I16_NO_CHANNEL
         hard_cos = F64_ONE
         hard_phi = F64_ZERO
         sec_cos = F64_ONE
         sec_phi = F64_ZERO
-        if event_j == EVENT_HARD_INELASTIC:
+        if segment_event == EVENT_HARD_INELASTIC:
             # Channel, transfer, recoil, azimuth: four hard-stream draws, all
             # at the row's start energy, where its hazard was.
-            u_ch = _stream_uniform(hard_key, hard_draw)
-            u_w = _stream_uniform(hard_key, hard_draw + U64_ONE)
-            u_q = _stream_uniform(hard_key, hard_draw + np.uint64(2))
-            u_phi = _stream_uniform(hard_key, hard_draw + np.uint64(3))
-            hard_draw = hard_draw + np.uint64(4)
+            u_ch = _stream_uniform(hard_key, hard_draw_counter)
+            u_w = _stream_uniform(hard_key, hard_draw_counter + U64_ONE)
+            u_q = _stream_uniform(hard_key, hard_draw_counter + np.uint64(2))
+            u_phi = _stream_uniform(hard_key, hard_draw_counter + np.uint64(3))
+            hard_draw_counter = hard_draw_counter + np.uint64(4)
             target = u_ch * mu_hard
-            n_ch = il_nch[L]
+            n_ch = il_nch[layer_index]
             ch = n_ch - I32_ONE
             cumulative = F64_ZERO
             k_ch = I32_ZERO
             picked_ch = False
             while k_ch < n_ch and not picked_ch:
-                c_at = (L * il_max_ch + k_ch) * il_width + il_lo
-                cumulative += il_ch_rate[c_at] + il_f * (
+                c_at = (layer_index * il_max_ch + k_ch) * il_width + inelastic_lower_index
+                cumulative += il_ch_rate[c_at] + inelastic_fraction * (
                     il_ch_rate[c_at + I32_ONE] - il_ch_rate[c_at]
                 )
                 if cumulative > target:
                     ch = k_ch
                     picked_ch = True
                 k_ch += I32_ONE
-            c_row = L * il_max_ch + ch
-            E_eV = E_j * np.float64(1.0e3)
+            c_row = layer_index * il_max_ch + ch
+            E_eV = energy_keV * np.float64(1.0e3)
             W_eV = _sample_hard_transfer_eV(
                 E_eV, il_ch_U[c_row], il_ch_W[c_row], il_ch_branch[c_row], il_cutoff_eV, u_w
             )
             if il_ch_branch[c_row] >= I32_POSITRON_BRANCH:
                 # Positron W_max = E can exceed the row-end energy; host twin in cores.py.
-                W_eV = xp.minimum(W_eV, E_end_j * np.float64(1.0e3))
+                W_eV = xp.minimum(W_eV, end_energy_keV * np.float64(1.0e3))
             hard_W_keV = W_eV * np.float64(1.0e-3)
             hard_code = il_ch_code[c_row]
             if sec_on == I32_ONE:
@@ -802,11 +832,11 @@ def _transport_kernel(
                     E_eV, il_ch_U[c_row], il_ch_W[c_row], il_ch_branch[c_row], W_eV, u_q
                 )
                 sec_phi = F64_TWO * F64_PI * u_phi + F64_PI
-            if E_end_j - hard_W_keV <= E_cut_e:
+            if end_energy_keV - hard_W_keV <= cutoff_energy_keV:
                 # The collision leaves the primary below its cutoff: absorbed
                 # at the collision point, a terminal row.
-                event_j = EVENT_CUTOFF
-                cutoff_j = True
+                segment_event = EVENT_CUTOFF
+                at_energy_cutoff = True
             else:
                 hard_cos = _hard_primary_cosine(
                     E_eV, il_ch_U[c_row], il_ch_W[c_row], il_ch_branch[c_row], W_eV, u_q
@@ -814,14 +844,14 @@ def _transport_kernel(
                 hard_phi = F64_TWO * F64_PI * u_phi
         rad_k_eV = F64_ZERO
         rad_event_Z = np.int16(0)
-        if event_j == EVENT_HARD_RADIATIVE:
+        if segment_event == EVENT_HARD_RADIATIVE:
             # The hazard used the row-start energy; the element and photon are
             # conditional on the pre-event energy at the row end. Element rates
             # are recomputed rather than buffered, like the elastic selection.
-            E_end_eV = E_end_j * F64_EV_PER_KEV
+            E_end_eV = end_energy_keV * F64_EV_PER_KEV
             mu_event = _rad_layer_moment(
                 RAD_HARD_RATE,
-                L,
+                layer_index,
                 rad_nel,
                 rad_nt,
                 rad_z,
@@ -836,17 +866,17 @@ def _transport_kernel(
                 E_end_eV,
                 rad_cutoff_eV,
             )
-            u_el = _stream_uniform(rad_key, rad_draw)
-            u_k = _stream_uniform(rad_key, rad_draw + U64_ONE)
-            rad_draw = rad_draw + np.uint64(2)
+            u_el = _stream_uniform(rad_key, radiative_draw_counter)
+            u_k = _stream_uniform(rad_key, radiative_draw_counter + U64_ONE)
+            radiative_draw_counter = radiative_draw_counter + np.uint64(2)
             target = u_el * mu_event
-            n_rad = rad_nel[L]
+            n_rad = rad_nel[layer_index]
             rad_sel = n_rad - I32_ONE
             cumulative = F64_ZERO
             k_rad = I32_ZERO
             picked_rad = False
             while k_rad < n_rad and not picked_rad:
-                rad_slot = L * rad_max_el + k_rad
+                rad_slot = layer_index * rad_max_el + k_rad
                 cumulative += (
                     rad_ncm3[rad_slot]
                     * np.float64(1e-8)
@@ -869,7 +899,7 @@ def _transport_kernel(
                     rad_sel = k_rad
                     picked_rad = True
                 k_rad += I32_ONE
-            rad_slot = L * rad_max_el + rad_sel
+            rad_slot = layer_index * rad_max_el + rad_sel
             rad_k_eV = _rad_sample_photon_eV(
                 rad_incident,
                 rad_nominal,
@@ -885,102 +915,114 @@ def _transport_kernel(
                 u_k,
             )
             rad_event_Z = np.int16(rad_z[rad_slot])
-            if E_end_j - rad_k_eV * F64_KEV_PER_EV <= E_cut_e:
-                event_j = EVENT_CUTOFF
-                cutoff_j = True
+            if end_energy_keV - rad_k_eV * F64_KEV_PER_EV <= cutoff_energy_keV:
+                segment_event = EVENT_CUTOFF
+                at_energy_cutoff = True
 
-        if local_nseg < cap:
-            slot = i * cap + local_nseg
-            s3 = slot * I32_THREE
-            seg_dir[s3] = dx
-            seg_dir[s3 + I32_ONE] = dy
-            seg_dir[s3 + I32_TWO] = dz
-            seg_mid[s3] = px + F64_HALF * step_j * dx
-            seg_mid[s3 + I32_ONE] = py + F64_HALF * step_j * dy
-            seg_mid[s3 + I32_TWO] = pz + F64_HALF * step_j * dz
-            seg_len[slot] = step_j
-            seg_E[slot] = E_j
-            seg_t0[slot] = clock[e]
-            seg_id[slot] = e
-            seg_lay[slot] = L
+        if local_segment_count < cap:
+            slot = local_electron_index * cap + local_segment_count
+            segment_offset = slot * I32_THREE
+            seg_dir[segment_offset] = direction_x
+            seg_dir[segment_offset + I32_ONE] = direction_y
+            seg_dir[segment_offset + I32_TWO] = direction_z
+            seg_mid[segment_offset] = position_x + F64_HALF * step_length_ang * direction_x
+            seg_mid[segment_offset + I32_ONE] = (
+                position_y + F64_HALF * step_length_ang * direction_y
+            )
+            seg_mid[segment_offset + I32_TWO] = (
+                position_z + F64_HALF * step_length_ang * direction_z
+            )
+            seg_len[slot] = step_length_ang
+            seg_E[slot] = energy_keV
+            seg_t0[slot] = clock[electron_index]
+            seg_id[slot] = electron_index
+            seg_lay[slot] = layer_index
             if energy_model_code == I32_ONE:
-                seg_E_end[slot] = E_end_j
-                seg_t_end[slot] = t_end_j
+                seg_E_end[slot] = end_energy_keV
+                seg_t_end[slot] = end_time_ang
                 seg_flight[slot] = flight_id
                 seg_substep[slot] = substep_id
-                seg_event[slot] = event_j
+                seg_event[slot] = segment_event
                 if inelastic_on == I32_ONE:
                     seg_hard_W[slot] = hard_W_keV
                     seg_hard_ch[slot] = hard_code
                     if sec_on == I32_ONE:
                         if hard_code != I16_NO_CHANNEL:
-                            _store_rotated(seg_hard_dir, s3, dx, dy, dz, sec_cos, sec_phi)
+                            _store_rotated(
+                                seg_hard_dir,
+                                segment_offset,
+                                direction_x,
+                                direction_y,
+                                direction_z,
+                                sec_cos,
+                                sec_phi,
+                            )
                         else:
-                            seg_hard_dir[s3] = F64_ZERO
-                            seg_hard_dir[s3 + I32_ONE] = F64_ZERO
-                            seg_hard_dir[s3 + I32_TWO] = F64_ZERO
+                            seg_hard_dir[segment_offset] = F64_ZERO
+                            seg_hard_dir[segment_offset + I32_ONE] = F64_ZERO
+                            seg_hard_dir[segment_offset + I32_TWO] = F64_ZERO
                 if rad_on == I32_ONE:
                     seg_rad_k[slot] = rad_k_eV
                     seg_rad_Z[slot] = rad_event_Z
-        local_nseg += I32_ONE
+        local_segment_count += I32_ONE
 
         # 4. Advance position, energy, transport clock, and optical depth.
-        pos[e3] = px + step_j * dx
-        pos[e3 + I32_ONE] = py + step_j * dy
-        pos[e3 + I32_TWO] = pz + step_j * dz
-        E_keV[e] = E_end_j
-        clock[e] = t_end_j
-        tau_left -= step_j / lam_ang
-        if tau_left < F64_ZERO:
-            tau_left = F64_ZERO
+        pos[electron_offset] = position_x + step_length_ang * direction_x
+        pos[electron_offset + I32_ONE] = position_y + step_length_ang * direction_y
+        pos[electron_offset + I32_TWO] = position_z + step_length_ang * direction_z
+        E_keV[electron_index] = end_energy_keV
+        clock[electron_index] = end_time_ang
+        elastic_optical_depth -= step_length_ang / mean_free_path_ang
+        if elastic_optical_depth < F64_ZERO:
+            elastic_optical_depth = F64_ZERO
         if inelastic_on == I32_ONE:
-            tau_h -= step_j * mu_hard
-            if tau_h < F64_ZERO:
-                tau_h = F64_ZERO
+            hard_optical_depth -= step_length_ang * mu_hard
+            if hard_optical_depth < F64_ZERO:
+                hard_optical_depth = F64_ZERO
         if rad_on == I32_ONE:
-            tau_rad -= step_j * mu_rad
-            if tau_rad < F64_ZERO:
-                tau_rad = F64_ZERO
+            radiative_optical_depth -= step_length_ang * mu_rad
+            if radiative_optical_depth < F64_ZERO:
+                radiative_optical_depth = F64_ZERO
 
         # 5. Exit, internal-boundary, or collision handling. A numerical
         #    substep skips all of it and resumes the same physical flight.
-        if limited_j:
+        if energy_limited:
             substep_id += I32_ONE
         else:
-            if exit_top_j:
-                exit_code[i] = I8_BACKSCATTERED
-            elif exit_bot_j:
-                exit_code[i] = I8_TRANSMITTED
-            elif exit_side_j:
-                exit_code[i] = I8_SIDE
-            elif cutoff_j:
-                exit_code[i] = I8_CUTOFF_STOPPED
+            if exits_top:
+                exit_code[local_electron_index] = I8_BACKSCATTERED
+            elif exits_bottom:
+                exit_code[local_electron_index] = I8_TRANSMITTED
+            elif exits_side:
+                exit_code[local_electron_index] = I8_SIDE
+            elif at_energy_cutoff:
+                exit_code[local_electron_index] = I8_CUTOFF_STOPPED
 
-            if exit_top_j or exit_bot_j or exit_side_j or cutoff_j:
+            if exits_top or exits_bottom or exits_side or at_energy_cutoff:
                 running = False
             else:
                 # Every remaining outcome closes the physical flight, so the
                 # next iteration opens a new one and redraws the collision.
                 flight_id += I32_ONE
                 substep_id = I32_ZERO
-                tau_left = -F64_ONE
-                tau_h = -F64_ONE
-                tau_rad = -F64_ONE
-                if cross_up_j or cross_dn_j:
-                    if dirs[e3 + I32_TWO] > F64_ZERO:
-                        pos[e3 + I32_TWO] += F64_EPS
+                elastic_optical_depth = -F64_ONE
+                hard_optical_depth = -F64_ONE
+                radiative_optical_depth = -F64_ONE
+                if crosses_top or crosses_bottom:
+                    if dirs[electron_offset + I32_TWO] > F64_ZERO:
+                        pos[electron_offset + I32_TWO] += F64_EPS
                     else:
-                        pos[e3 + I32_TWO] -= F64_EPS
-                elif event_j == EVENT_HARD_RADIATIVE:
+                        pos[electron_offset + I32_TWO] -= F64_EPS
+                elif segment_event == EVENT_HARD_RADIATIVE:
                     # A hard photon: debit its energy; the electron keeps its
                     # direction and no elastic collision is drawn.
-                    E_keV[e] -= rad_k_eV * F64_KEV_PER_EV
+                    E_keV[electron_index] -= rad_k_eV * F64_KEV_PER_EV
                 else:
-                    if event_j == EVENT_HARD_INELASTIC:
+                    if segment_event == EVENT_HARD_INELASTIC:
                         # A hard collision: the sampled loss and recoil
                         # deflection replace the elastic draw.
-                        E_keV[e] -= hard_W_keV
-                        cos_t = hard_cos
+                        E_keV[electron_index] -= hard_W_keV
+                        cos_theta = hard_cos
                         phi = hard_phi
                     else:
                         # A full flight ended in an elastic collision. Pick the element with
@@ -989,38 +1031,55 @@ def _transport_kernel(
                         # recomputation that lands exactly on the sampled boundary could
                         # select a neighbouring element, which the CPU reference reproduces
                         # because it recomputes identically.
-                        if n_el == I32_ONE:
+                        if n_elements == I32_ONE:
                             sel = I32_ZERO
                         else:
-                            u = _stream_uniform(key, draw) * total_rate
-                            draw = draw + U64_ONE
+                            u = (
+                                _stream_uniform(elastic_stream_key, elastic_draw_counter)
+                                * total_rate
+                            )
+                            elastic_draw_counter = elastic_draw_counter + U64_ONE
                             cumulative = F64_ZERO
-                            sel = n_el - I32_ONE
+                            sel = n_elements - I32_ONE
                             k_el = I32_ZERO
                             picked = False
-                            while k_el < n_el:
+                            while k_el < n_elements:
                                 if elastic_model_code == I32_TWO:
-                                    el_row = el_start[row + k_el]
-                                    el_n = el_len[row + k_el]
-                                    el_lo = _log_grid_lower(el_logE, el_row, el_n, log_E_eV)
-                                    el_f = _log_grid_fraction(
-                                        el_logE, el_row, el_n, log_E_eV, el_lo
+                                    el_row = el_start[element_row_offset + k_el]
+                                    elastic_energy_count = el_len[element_row_offset + k_el]
+                                    elastic_lower_index = _log_grid_lower(
+                                        el_logE, el_row, elastic_energy_count, log_E_eV
                                     )
-                                    el_lr = el_log_rate[el_row + el_lo]
+                                    elastic_fraction = _log_grid_fraction(
+                                        el_logE,
+                                        el_row,
+                                        elastic_energy_count,
+                                        log_E_eV,
+                                        elastic_lower_index,
+                                    )
+                                    lower_log_elastic_rate = el_log_rate[
+                                        el_row + elastic_lower_index
+                                    ]
                                     cumulative += xp.exp(
-                                        el_lr
-                                        + el_f * (el_log_rate[el_row + el_lo + I32_ONE] - el_lr)
+                                        lower_log_elastic_rate
+                                        + elastic_fraction
+                                        * (
+                                            el_log_rate[el_row + elastic_lower_index + I32_ONE]
+                                            - lower_log_elastic_rate
+                                        )
                                     )
                                 elif elastic_model_code == I32_ONE:
                                     cumulative += _rate_mott(
-                                        E_j,
-                                        L_mott_numer[row + k_el],
-                                        L_mott_denom1[row + k_el],
-                                        L_mott_denom2[row + k_el],
+                                        energy_keV,
+                                        L_mott_numer[element_row_offset + k_el],
+                                        L_mott_denom1[element_row_offset + k_el],
+                                        L_mott_denom2[element_row_offset + k_el],
                                     )
                                 else:
                                     cumulative += _rate_sr(
-                                        E_j, L_sr_rate_numer[row + k_el], L_sr_joy_numer[row + k_el]
+                                        energy_keV,
+                                        L_sr_rate_numer[element_row_offset + k_el],
+                                        L_sr_joy_numer[element_row_offset + k_el],
                                     )
                                 if cumulative > u and not picked:
                                     sel = k_el
@@ -1031,76 +1090,115 @@ def _transport_kernel(
                         if elastic_model_code == I32_TWO:
                             alpha = F64_ZERO  # tabulated angular distribution below
                         elif elastic_model_code == I32_ONE and mott_has_table[
-                            row + sel
+                            element_row_offset + sel
                         ] == np.uint8(1):
                             log_alpha = _interp_mott_log_alpha(
-                                xp.log10(E_keV[e] * np.float64(1e3)),
+                                xp.log10(E_keV[electron_index] * np.float64(1e3)),
                                 mott_logE_flat,
                                 mott_logA_flat,
-                                mott_start[row + sel],
-                                mott_len[row + sel],
+                                mott_start[element_row_offset + sel],
+                                mott_len[element_row_offset + sel],
                             )
                             alpha = F64_TEN**log_alpha
                         else:
-                            alpha = _alpha_sr_joy(L_sr_joy_numer[row + sel], E_keV[e])
+                            alpha = _alpha_sr_joy(
+                                L_sr_joy_numer[element_row_offset + sel], E_keV[electron_index]
+                            )
 
-                        R_ang = _stream_uniform(key, draw)
-                        draw = draw + U64_ONE
+                        R_ang = _stream_uniform(elastic_stream_key, elastic_draw_counter)
+                        elastic_draw_counter = elastic_draw_counter + U64_ONE
                         if elastic_model_code == I32_TWO:
                             # Quantile interpolation in ln E, as the host
                             # `_sample_cos_theta_elsepa`.
-                            el_row = el_start[row + sel]
-                            el_n = el_len[row + sel]
-                            log_E_sel = xp.log(E_keV[e] * np.float64(1e3))
-                            el_lo = _log_grid_lower(el_logE, el_row, el_n, log_E_sel)
-                            el_f = _log_grid_fraction(el_logE, el_row, el_n, log_E_sel, el_lo)
+                            el_row = el_start[element_row_offset + sel]
+                            elastic_energy_count = el_len[element_row_offset + sel]
+                            log_E_sel = xp.log(E_keV[electron_index] * np.float64(1e3))
+                            elastic_lower_index = _log_grid_lower(
+                                el_logE, el_row, elastic_energy_count, log_E_sel
+                            )
+                            elastic_fraction = _log_grid_fraction(
+                                el_logE,
+                                el_row,
+                                elastic_energy_count,
+                                log_E_sel,
+                                elastic_lower_index,
+                            )
                             mu0 = _elsepa_invert_row(
-                                el_cdf, el_pdf, el_mu, el_n_mu, el_row + el_lo, R_ang
+                                el_cdf, el_pdf, el_mu, el_n_mu, el_row + elastic_lower_index, R_ang
                             )
                             mu1 = _elsepa_invert_row(
-                                el_cdf, el_pdf, el_mu, el_n_mu, el_row + el_lo + I32_ONE, R_ang
+                                el_cdf,
+                                el_pdf,
+                                el_mu,
+                                el_n_mu,
+                                el_row + elastic_lower_index + I32_ONE,
+                                R_ang,
                             )
-                            cos_t = F64_ONE - F64_TWO * ((F64_ONE - el_f) * mu0 + el_f * mu1)
+                            cos_theta = F64_ONE - F64_TWO * (
+                                (F64_ONE - elastic_fraction) * mu0 + elastic_fraction * mu1
+                            )
                         else:
-                            cos_t = F64_ONE - F64_TWO * alpha * R_ang / (F64_ONE + alpha - R_ang)
-                        phi = F64_TWO * F64_PI * _stream_uniform(key, draw)
-                        draw = draw + U64_ONE
+                            cos_theta = F64_ONE - F64_TWO * alpha * R_ang / (
+                                F64_ONE + alpha - R_ang
+                            )
+                        phi = (
+                            F64_TWO
+                            * F64_PI
+                            * _stream_uniform(elastic_stream_key, elastic_draw_counter)
+                        )
+                        elastic_draw_counter = elastic_draw_counter + U64_ONE
 
                     # Inlined `_rotate_direction_scalar`: build an orthonormal frame
-                    # about the current direction and rotate by (cos_t, phi).
-                    odx = dirs[e3]
-                    ody = dirs[e3 + I32_ONE]
-                    odz = dirs[e3 + I32_TWO]
-                    sin2 = F64_ONE - cos_t * cos_t
-                    if sin2 < F64_ZERO:
-                        sin2 = F64_ZERO
-                    sin_t = xp.sqrt(sin2)
+                    # about the current direction and rotate by (cos_theta, phi).
+                    old_direction_x = dirs[electron_offset]
+                    old_direction_y = dirs[electron_offset + I32_ONE]
+                    old_direction_z = dirs[electron_offset + I32_TWO]
+                    sin_theta_squared = F64_ONE - cos_theta * cos_theta
+                    if sin_theta_squared < F64_ZERO:
+                        sin_theta_squared = F64_ZERO
+                    sin_theta = xp.sqrt(sin_theta_squared)
                     cos_phi = xp.cos(phi)
                     sin_phi = xp.sin(phi)
-                    if xp.abs(odx) < np.float64(0.9):
-                        refx = F64_ONE
-                        refy = F64_ZERO
+                    if xp.abs(old_direction_x) < np.float64(0.9):
+                        reference_x = F64_ONE
+                        reference_y = F64_ZERO
                     else:
-                        refx = F64_ZERO
-                        refy = F64_ONE
-                    ux = -odz * refy
-                    uy = odz * refx
-                    uz = odx * refy - ody * refx
-                    u_mag = xp.sqrt(ux * ux + uy * uy + uz * uz)
-                    ux /= u_mag
-                    uy /= u_mag
-                    uz /= u_mag
-                    wx = ody * uz - odz * uy
-                    wy = odz * ux - odx * uz
-                    wz = odx * uy - ody * ux
-                    a_rot = sin_t * cos_phi
-                    b_rot = sin_t * sin_phi
-                    outx = cos_t * odx + a_rot * ux + b_rot * wx
-                    outy = cos_t * ody + a_rot * uy + b_rot * wy
-                    outz = cos_t * odz + a_rot * uz + b_rot * wz
-                    mag = xp.sqrt(outx * outx + outy * outy + outz * outz)
-                    dirs[e3] = outx / mag
-                    dirs[e3 + I32_ONE] = outy / mag
-                    dirs[e3 + I32_TWO] = outz / mag
+                        reference_x = F64_ZERO
+                        reference_y = F64_ONE
+                    basis_u_x = -old_direction_z * reference_y
+                    basis_u_y = old_direction_z * reference_x
+                    basis_u_z = old_direction_x * reference_y - old_direction_y * reference_x
+                    basis_u_norm = xp.sqrt(
+                        basis_u_x * basis_u_x + basis_u_y * basis_u_y + basis_u_z * basis_u_z
+                    )
+                    basis_u_x /= basis_u_norm
+                    basis_u_y /= basis_u_norm
+                    basis_u_z /= basis_u_norm
+                    basis_w_x = old_direction_y * basis_u_z - old_direction_z * basis_u_y
+                    basis_w_y = old_direction_z * basis_u_x - old_direction_x * basis_u_z
+                    basis_w_z = old_direction_x * basis_u_y - old_direction_y * basis_u_x
+                    rotation_u = sin_theta * cos_phi
+                    rotation_w = sin_theta * sin_phi
+                    rotated_x = (
+                        cos_theta * old_direction_x
+                        + rotation_u * basis_u_x
+                        + rotation_w * basis_w_x
+                    )
+                    rotated_y = (
+                        cos_theta * old_direction_y
+                        + rotation_u * basis_u_y
+                        + rotation_w * basis_w_y
+                    )
+                    rotated_z = (
+                        cos_theta * old_direction_z
+                        + rotation_u * basis_u_z
+                        + rotation_w * basis_w_z
+                    )
+                    direction_norm = xp.sqrt(
+                        rotated_x * rotated_x + rotated_y * rotated_y + rotated_z * rotated_z
+                    )
+                    dirs[electron_offset] = rotated_x / direction_norm
+                    dirs[electron_offset + I32_ONE] = rotated_y / direction_norm
+                    dirs[electron_offset + I32_TWO] = rotated_z / direction_norm
 
-    seg_count[i] = local_nseg
+    seg_count[local_electron_index] = local_segment_count

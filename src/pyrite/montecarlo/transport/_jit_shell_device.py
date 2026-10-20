@@ -59,15 +59,15 @@ def _log_grid_lower(log_grid, row, n, log_e):
         return I32_ZERO
     if log_e >= log_grid[row + n - I32_ONE]:
         return n - I32_TWO
-    lo = I32_ZERO
-    hi = n - I32_ONE
-    while hi - lo > I32_ONE:
-        mid = (lo + hi) // I32_TWO
-        if log_grid[row + mid] <= log_e:
-            lo = mid
+    lower_idx = I32_ZERO
+    upper_idx = n - I32_ONE
+    while upper_idx - lower_idx > I32_ONE:
+        mid_idx = (lower_idx + upper_idx) // I32_TWO
+        if log_grid[row + mid_idx] <= log_e:
+            lower_idx = mid_idx
         else:
-            hi = mid
-    return lo
+            upper_idx = mid_idx
+    return lower_idx
 
 
 @jit.rawkernel(device=True)
@@ -163,25 +163,25 @@ def _sample_hard_transfer_eV(energy_eV, ionization_eV, resonance_eV, branch, cut
         target = u * (_moller_j0(energy_eV, prime, upper) - base_j)
     else:
         target = u * _triangle_cdf(peak_end, lower, upper)
-    lo = lower
-    hi = upper
+    lower_transfer_eV = lower
+    upper_transfer_eV = upper
     step = I32_ZERO
     while step < I32_BISECTION_STEPS:
         step += I32_ONE
-        mid = F64_HALF * (lo + hi)
-        if mid <= lo or mid >= hi:
+        mid_transfer_eV = F64_HALF * (lower_transfer_eV + upper_transfer_eV)
+        if mid_transfer_eV <= lower_transfer_eV or mid_transfer_eV >= upper_transfer_eV:
             break
         if branch == I32_TWO and positron:
-            value = _bhabha_j0(energy_eV, mid) - base_j
+            value = _bhabha_j0(energy_eV, mid_transfer_eV) - base_j
         elif branch == I32_TWO:
-            value = _moller_j0(energy_eV, prime, mid) - base_j
+            value = _moller_j0(energy_eV, prime, mid_transfer_eV) - base_j
         else:
-            value = _triangle_cdf(peak_end, lower, mid)
+            value = _triangle_cdf(peak_end, lower, mid_transfer_eV)
         if value < target:
-            lo = mid
+            lower_transfer_eV = mid_transfer_eV
         else:
-            hi = mid
-    return F64_HALF * (lo + hi)
+            upper_transfer_eV = mid_transfer_eV
+    return F64_HALF * (lower_transfer_eV + upper_transfer_eV)
 
 
 @jit.rawkernel(device=True)
@@ -284,37 +284,37 @@ def _store_rotated(out, at, dx, dy, dz, cos_t, phi):
     kernel inlines it for the primary. Returns 0 (device functions return one
     value). Validation: shell-secondary-transport
     """
-    sin2 = F64_ONE - cos_t * cos_t
-    if sin2 < F64_ZERO:
-        sin2 = F64_ZERO
-    sin_t = xp.sqrt(sin2)
+    sin_theta_squared = F64_ONE - cos_t * cos_t
+    if sin_theta_squared < F64_ZERO:
+        sin_theta_squared = F64_ZERO
+    sin_theta = xp.sqrt(sin_theta_squared)
     cos_phi = xp.cos(phi)
     sin_phi = xp.sin(phi)
     if xp.abs(dx) < np.float64(0.9):
-        refx = F64_ONE
-        refy = F64_ZERO
+        reference_x = F64_ONE
+        reference_y = F64_ZERO
     else:
-        refx = F64_ZERO
-        refy = F64_ONE
-    ux = -dz * refy
-    uy = dz * refx
-    uz = dx * refy - dy * refx
-    u_mag = xp.sqrt(ux * ux + uy * uy + uz * uz)
-    ux /= u_mag
-    uy /= u_mag
-    uz /= u_mag
-    wx = dy * uz - dz * uy
-    wy = dz * ux - dx * uz
-    wz = dx * uy - dy * ux
-    a_rot = sin_t * cos_phi
-    b_rot = sin_t * sin_phi
-    outx = cos_t * dx + a_rot * ux + b_rot * wx
-    outy = cos_t * dy + a_rot * uy + b_rot * wy
-    outz = cos_t * dz + a_rot * uz + b_rot * wz
-    mag = xp.sqrt(outx * outx + outy * outy + outz * outz)
-    out[at] = outx / mag
-    out[at + I32_ONE] = outy / mag
-    out[at + I32_TWO] = outz / mag
+        reference_x = F64_ZERO
+        reference_y = F64_ONE
+    basis_u_x = -dz * reference_y
+    basis_u_y = dz * reference_x
+    basis_u_z = dx * reference_y - dy * reference_x
+    basis_u_norm = xp.sqrt(basis_u_x * basis_u_x + basis_u_y * basis_u_y + basis_u_z * basis_u_z)
+    basis_u_x /= basis_u_norm
+    basis_u_y /= basis_u_norm
+    basis_u_z /= basis_u_norm
+    basis_w_x = dy * basis_u_z - dz * basis_u_y
+    basis_w_y = dz * basis_u_x - dx * basis_u_z
+    basis_w_z = dx * basis_u_y - dy * basis_u_x
+    rotation_u = sin_theta * cos_phi
+    rotation_w = sin_theta * sin_phi
+    rotated_x = cos_t * dx + rotation_u * basis_u_x + rotation_w * basis_w_x
+    rotated_y = cos_t * dy + rotation_u * basis_u_y + rotation_w * basis_w_y
+    rotated_z = cos_t * dz + rotation_u * basis_u_z + rotation_w * basis_w_z
+    direction_norm = xp.sqrt(rotated_x * rotated_x + rotated_y * rotated_y + rotated_z * rotated_z)
+    out[at] = rotated_x / direction_norm
+    out[at + I32_ONE] = rotated_y / direction_norm
+    out[at + I32_TWO] = rotated_z / direction_norm
     return F64_ZERO
 
 

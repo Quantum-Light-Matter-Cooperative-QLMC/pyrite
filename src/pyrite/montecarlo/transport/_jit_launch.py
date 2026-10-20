@@ -95,18 +95,18 @@ def run_transport_lut_kernel(
     ) = segments
     (seg_count, exit_code) = pe_out
     (straggle_on, stragg_dE) = straggling
-    nthreads = int(config.nthreads)
-    if nthreads not in (32, 64, 128, 256, 512, 1024):
+    n_threads = int(config.nthreads)
+    if n_threads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
     e_count = int(e_count)
     if e_count == 0:
         return
 
     max_el = int(lut_cdf.shape[1])
-    nblocks = (e_count + nthreads - 1) // nthreads
+    n_blocks = (e_count + n_threads - 1) // n_threads
     _transport_lut_kernel(
-        (nblocks,),
-        (nthreads,),
+        (n_blocks,),
+        (n_threads,),
         (
             np.int32(e_start),
             np.int32(e_count),
@@ -278,11 +278,11 @@ def run_transport_kernel(
     (seg_count, exit_code) = pe_out
     (straggle_on, stragg_dE) = straggling
     inelastic_on = bool(inelastic_args)
-    shell = _shell_kernel_args(inelastic_args if inelastic_on else None, segments[12:15])
-    rad_segments = segments[15:17] if inelastic_on else segments[12:14]
-    radiative = _radiative_kernel_args(radiative_args, rad_segments)
-    nthreads = int(config.nthreads)
-    if nthreads not in (32, 64, 128, 256, 512, 1024):
+    shell_arguments = _shell_kernel_args(inelastic_args if inelastic_on else None, segments[12:15])
+    radiative_segments = segments[15:17] if inelastic_on else segments[12:14]
+    radiative_arguments = _radiative_kernel_args(radiative_args, radiative_segments)
+    n_threads = int(config.nthreads)
+    if n_threads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
     e_count = int(e_count)
     if e_count == 0:
@@ -290,10 +290,10 @@ def run_transport_kernel(
 
     max_el = int(L_Zs.shape[1])
     sbethe_width = int(L_sbethe_logE.shape[1])
-    nblocks = (e_count + nthreads - 1) // nthreads
+    n_blocks = (e_count + n_threads - 1) // n_threads
     _transport_kernel(
-        (nblocks,),
-        (nthreads,),
+        (n_blocks,),
+        (n_threads,),
         (
             np.int32(e_start),
             np.int32(e_count),
@@ -364,8 +364,8 @@ def run_transport_kernel(
             exit_code,
             np.int32(1 if straggle_on else 0),
             stragg_dE,
-            *shell,
-            *radiative,
+            *shell_arguments,
+            *radiative_arguments,
         ),
     )
 
@@ -373,32 +373,43 @@ def run_transport_kernel(
 def _shell_kernel_args(inelastic_args, hard_segments):
     """Flattened shell soft/hard kernel arguments, or inert placeholders."""
     if inelastic_args is None:
-        f64 = xp.zeros(1, dtype=xp.float64)
-        i32 = xp.zeros(1, dtype=xp.int32)
+        dummy_float64 = xp.zeros(1, dtype=xp.float64)
+        dummy_int32 = xp.zeros(1, dtype=xp.int32)
         return (
             np.int32(0),
             xp.zeros(1, dtype=xp.uint64),
             np.float64(0.0),
-            i32,
-            f64,
-            f64,
-            f64,
+            dummy_int32,
+            dummy_float64,
+            dummy_float64,
+            dummy_float64,
             np.int32(1),
-            i32,
+            dummy_int32,
             np.int32(1),
-            f64,
-            f64,
-            f64,
-            i32,
+            dummy_float64,
+            dummy_float64,
+            dummy_float64,
+            dummy_int32,
             xp.zeros(1, dtype=xp.int16),
-            f64,
+            dummy_float64,
             xp.zeros(1, dtype=xp.int16),
             np.int32(0),
-            f64,
+            dummy_float64,
         )
-    (keys, cutoff_eV, n, log_e, rate, omega2, nch, ch_rate, ch_u, ch_w, ch_branch, ch_code) = (
-        inelastic_args
-    )
+    (
+        keys,
+        cutoff_eV,
+        energy_counts,
+        log_e,
+        rate,
+        omega2,
+        channel_counts,
+        ch_rate,
+        ch_u,
+        ch_w,
+        ch_branch,
+        ch_code,
+    ) = inelastic_args
     seg_hard_W, seg_hard_ch, seg_hard_dir = hard_segments
     # Secondary launch directions (#94): an empty column means off.
     sec_on = seg_hard_dir.shape[0] > 0
@@ -406,12 +417,12 @@ def _shell_kernel_args(inelastic_args, hard_segments):
         np.int32(1),
         keys,
         np.float64(cutoff_eV),
-        n.astype(xp.int32, copy=False),
+        energy_counts.astype(xp.int32, copy=False),
         log_e.reshape(-1),
         rate.reshape(-1),
         omega2.reshape(-1),
         np.int32(log_e.shape[1]),
-        nch.astype(xp.int32, copy=False),
+        channel_counts.astype(xp.int32, copy=False),
         np.int32(ch_rate.shape[1]),
         ch_rate.reshape(-1),
         ch_u.reshape(-1),
@@ -428,34 +439,45 @@ def _shell_kernel_args(inelastic_args, hard_segments):
 def _radiative_kernel_args(radiative_args, photon_segments):
     """Flattened coupled radiative kernel arguments, or inert placeholders."""
     if radiative_args is None:
-        f64 = xp.zeros(1, dtype=xp.float64)
-        i32 = xp.zeros(1, dtype=xp.int32)
+        dummy_float64 = xp.zeros(1, dtype=xp.float64)
+        dummy_int32 = xp.zeros(1, dtype=xp.int32)
         return (
             np.int32(0),
             xp.zeros(1, dtype=xp.uint64),
             np.float64(0.0),
-            i32,
-            i32,
-            i32,
-            f64,
-            f64,
-            f64,
-            f64,
-            f64,
+            dummy_int32,
+            dummy_int32,
+            dummy_int32,
+            dummy_float64,
+            dummy_float64,
+            dummy_float64,
+            dummy_float64,
+            dummy_float64,
             np.int32(1),
             np.int32(1),
             np.int32(1),
-            f64,
+            dummy_float64,
             xp.zeros(1, dtype=xp.int16),
         )
-    (keys, cutoff_eV, nel, n_t, z, ncm3, incident, nominal, top, chi) = radiative_args
+    (
+        keys,
+        cutoff_eV,
+        element_counts,
+        incident_energy_counts,
+        z,
+        ncm3,
+        incident,
+        nominal,
+        top,
+        chi,
+    ) = radiative_args
     seg_rad_k, seg_rad_Z = photon_segments
     return (
         np.int32(1),
         keys,
         np.float64(cutoff_eV),
-        nel.astype(xp.int32, copy=False),
-        n_t.reshape(-1).astype(xp.int32, copy=False),
+        element_counts.astype(xp.int32, copy=False),
+        incident_energy_counts.reshape(-1).astype(xp.int32, copy=False),
         z.reshape(-1).astype(xp.int32, copy=False),
         ncm3.reshape(-1),
         incident.reshape(-1),
