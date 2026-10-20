@@ -1,7 +1,12 @@
 # Multilayer stack transport — independent re-derivation
 
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
 - **id**: `multilayer-stack`
-- **anchor**: `montecarlo/transport.py::simulate_trajectories` (`layers=`)
+- **anchor**: `montecarlo/transport/api.py::simulate_trajectories` (`layers=`)
 - **source**: [Multilayer film-on-substrate materials](../../physics/materials/multilayer-materials.md) §(3) option A — CASINO-style boundary-aware multilayer transport
 - **verifier**: fresh context (did not write the implementation)
 
@@ -103,7 +108,7 @@ The two-layer carbon control reproduces bulk carbon, and the silicon substrate r
 
 ## 6. Verdict
 
-- **Claim**: `multilayer-stack` — `montecarlo/transport.py::simulate_trajectories` (`layers=`) — film-on-substrate transport.
+- **Claim**: `multilayer-stack` — `montecarlo/transport/api.py::simulate_trajectories` (`layers=`) — film-on-substrate transport.
 - **Filters**: units **pass**; limits **pass**; signs/conventions **pass**.
 - **Re-derivation**: **matches** — the boundary-truncation algorithm is the exact sampler for the inhomogeneous collision density by memorylessness, and the implementation realizes it term-for-term. No divergent factor, sign, exponent, unit, or convention found.
 - **Verdict**: `rederived`.

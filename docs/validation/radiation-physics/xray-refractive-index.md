@@ -1,5 +1,10 @@
 # xray-refractive-index
 
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
 ## Independent derivation
 
 **Cited source**: Maxwell dispersion relation in a homogeneous, linear, isotropic dielectric, `k² = (1 + χ₀) ω²`. **Claim**: complex crystal refractive index `n(E) = √(1 + χ₀(E)) ≈ 1 − δ − iβ`. **Signature**: `materials/crystal.py::refractive_index(crystal, photon_E_eV, use_henke=True)`.
@@ -146,8 +151,8 @@ The docstring states the same time-factor/propagation-phase convention used in t
 Grepping all call sites of `refractive_index` in `src/pyrite`:
 
 ```
-src/pyrite/montecarlo/spectrum/lines.py:913:  refractive_index(crystal, E_tab, use_henke).real            # -> n_re_tab_g, used as Re n(E) in k = Re n(ω) ω n̂ (xray-in-medium-resonance)
-src/pyrite/montecarlo/spectrum/lines.py:971:  1.0 - refractive_index(crystal, E_grid_eV, use_henke).real   # -> δ(E), used in delta_omega_grid = δ(E)ω(E) (xray-in-medium-propagation-phase)
+src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:913:  refractive_index(crystal, E_tab, use_henke).real            # -> n_re_tab_g, used as Re n(E) in k = Re n(ω) ω n̂ (xray-in-medium-resonance)
+src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:971:  1.0 - refractive_index(crystal, E_grid_eV, use_henke).real   # -> δ(E), used in delta_omega_grid = δ(E)ω(E) (xray-in-medium-propagation-phase)
 ```
 
 Both consumers call the *same* exact-square-root function and take `.real`; the propagation-phase δ is computed as `1 − Re(n_exact)`, not by a separate call to the linearized `optical_constants`. The CUDA kernels (`coherent_stream_jit_kernel.py`) receive `n_re_tab` and `delta_omega` as precomputed arrays from these same two call sites — they do not recompute a refractive index on-device with a different (e.g. linearized) formula, so the GPU path cannot diverge from the CPU path on this choice either.

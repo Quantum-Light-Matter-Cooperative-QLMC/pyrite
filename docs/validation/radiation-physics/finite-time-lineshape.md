@@ -1,5 +1,10 @@
 # finite-time-lineshape
 
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
 ## Independent derivation
 
 For real $P$, $T>0$, and angular phase with no hidden $2\pi$, define
@@ -72,7 +77,7 @@ The dimensionless phase requires $[P]=T^{-1}$. Thus $[Q]=T$, $[|Q|^2]=T^2$, and 
 
 ## Implementation comparison
 
-`src/pyrite/montecarlo/spectrum/lines.py::mc_cxr_spectrum` defines
+`src/pyrite/montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum` defines
 
 $$
 \omega_{\rm res}=\frac{\mathbf v\cdot\mathbf g}

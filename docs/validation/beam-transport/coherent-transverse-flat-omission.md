@@ -1,5 +1,9 @@
 # Transverse flat-term omission certificate
 
+> Ownership refresh (2026-10-20, #599): module paths below point to current
+> owners. Dated implementation excerpts, line numbers and measurements retain
+> their original revision and evidence scope; this does not revalidate physics.
+
 Validation: `coherent-transverse-flat-omission`.
 
 ## Claim and source
@@ -196,7 +200,7 @@ For $F_z\to1$ the transverse rule alone decides. Units: $\mathbf K$ is in
 ### Comparison with the implementation
 
 The derivation matches `coherent_transverse.py:179-248` and
-`lines/_per_hkl.py:255-441` term for term, with one exception described under
+`montecarlo/spectrum/cxr/_per_hkl.py:255-441` term for term, with one exception described under
 the discrepancy below.
 
 - `_interval_exponent` uses the same binary64 $\mathbf a$
@@ -226,7 +230,7 @@ the discrepancy below.
 
 ### Discrepancy: product underflow becomes a certified zero
 
-The first divergent term is at `lines/_per_hkl.py:416-417` together with
+The first divergent term is at `montecarlo/spectrum/cxr/_per_hkl.py:416-417` together with
 `passes` (line 386):
 
 ```text

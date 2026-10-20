@@ -1,64 +1,166 @@
 # `coherent-segment-midpoint-time`
 
-## Claim and source equation
+## Claim and source
 
-`mc_cxr_spectrum` stores a material flight by midpoint position `r_mid`, length `L_ang`, constant segment speed `beta`, and segment-start transport age `t_ang`. Its coherent field uses the centered finite-time integral from Feranchuk--Spence (2000), Eqs. (8), (10), (12)--(14), already derived under `coherent-emission`:
-
-$$
-\int_{-T/2}^{T/2} e^{i 2P\tau}\,d\tau
-=T\,\operatorname{sinc}(PT/\pi),
-\qquad T=L/\beta.
-$$
-
-The phase multiplying that real centered integral must be evaluated at the same center event as `r_mid`. Therefore
+A stored flight has midpoint position $\mathbf r_m$, length $L$, constant
+speed $\beta$, and segment-start transport age $t_s$ (`t_ang`). With $c=1$,
+its duration and midpoint age are
 
 $$
-\boxed{t_{\rm mid}=t_{\rm ang}+{L_{\rm ang}\over2\beta}},
+T=L/\beta,\qquad \boxed{t_m=t_s+T/2}.
+$$
+
+The phase must pair this age with the same midpoint position:
+
+$$
+\Phi_m=\omega(t_m+t_0-\hat{\mathbf n}\cdot\mathbf r_m)
+-\mathbf g\cdot\mathbf r_m.
+$$
+
+Here $t_0$ is the per-electron absolute bunch offset. Times are time-like
+lengths in Å, $\omega=E/(\hbar c)$ and $\mathbf g$ have units Å$^{-1}$,
+and every phase is dimensionless. `t_ang` remains the start age.
+
+Source context: the centered constant-amplitude finite-time field attributed
+to Feranchuk–Spence (2000), Eqs. (8), (10), (12)–(14), in
+[coherent-emission](coherent-emission.md). The 2026-10-20 fresh-context verifier
+rederived the result from this integral contract before inspecting source
+bodies. Original-paper retrieval failed, so the original equation numbering
+was not independently inspected in this pass.
+
+## Independent centered-integral derivation
+
+Write $\mathbf r(s)=\mathbf r_m+\boldsymbol\beta s$ for
+$-T/2\le s\le T/2$, with $\boldsymbol\beta=\beta\hat{\mathbf v}$.
+For a frozen complex radiation coefficient $A$,
+
+$$
+Q=\omega(1-\hat{\mathbf n}\cdot\boldsymbol\beta)
+-\mathbf g\cdot\boldsymbol\beta,
 \qquad
-\Phi_j=\omega(t_{\rm mid}+t_{0,j}-\hat{\mathbf n}\cdot\mathbf r_{\rm mid})
--\mathbf g\cdot\mathbf r_{\rm mid}.
+I_0=Ae^{i\Phi_m}\int_{-T/2}^{T/2}e^{iQs}\,ds
+=Ae^{i\Phi_m}T\operatorname{sinc}\!\left(\frac{QT}{2\pi}\right),
 $$
 
-All time-like lengths are in Angstrom with `c=1`; `omega`, `g`, and photon wavenumber are in inverse Angstrom, so the phase is dimensionless. `t0_ang` remains the per-electron absolute bunch offset. `t_ang` remains start age for trajectory ordering and compatibility.
+where $\operatorname{sinc}(x)=\sin(\pi x)/(\pi x)$. Centering the spatial
+coordinate while retaining the start time would introduce the erroneous
+phase $e^{-i\omega T/2}$. Its modulus alone hides the error; interference
+with another emitter exposes it.
 
-## Assumptions
-
-- Velocity, energy, radiation amplitude, and stopping coefficients are constant over one stored segment, matching the existing finite-time line model.
-- The segment midpoint is `r_start + 0.5 L v_hat` and the transport clock advances by `L/beta`.
-- The correction changes only coherent phase. Incoherent intensity, transport schema, RNG streams, and segment ordering are unchanged.
-- Distinct reflections and mosaic orientations continue to add incoherently as specified by `coherent-emission`.
-
-## Subdivision limiting case
-
-For one straight flight over `[0,T]` with constant amplitude, splitting at `T/2` gives
+The current scorer also integrates attenuation and the refractive escape
+phase within each affine escape piece. Let
 
 $$
-\int_0^T e^{i a t}\,dt
-=\int_0^{T/2}e^{i a t}\,dt+\int_{T/2}^{T}e^{i a t}\,dt.
+\tau(s)=\tau_m+\Delta\tau\,s/T,\qquad
+\ell(s)=\ell_m+\Delta\ell\,s/T,
+\qquad \delta(E)=1-\operatorname{Re}n(E).
 $$
 
-Writing each integral as a real sinc times its center phase makes this identity exact: the full segment uses center `T/2`; the halves use centers `T/4` and `3T/4`. Using each half's start age beside its midpoint position instead shifts its field by `exp[-i omega T/4]`, while the unsplit field is shifted by `exp[-i omega T/2]`. Their intensities in isolation can hide that global phase, but interference with a fixed reference emitter changes. The regression therefore checks both the complex field identity and the public coherent spectrum with a fixed reference.
+The independently derived field is
 
-Other limits: `L -> 0` makes the midpoint correction vanish; a single segment's self-term remains identical to the incoherent spectrum because a unit-modulus phase cancels after squaring.
+$$
+\begin{aligned}
+I&=A e^{i[\Phi_m-\delta(E)\omega\ell_m]}
+\int_{-T/2}^{T/2}
+ e^{i[Q-\delta(E)\omega\Delta\ell/T]s}
+ e^{-\tau(s)/2}\,ds\\
+&=A e^{i[\Phi_m-\delta(E)\omega\ell_m]}
+ T e^{-\tau_m/2}\frac{\sinh w}{w},\\
+w&=i\left[\frac{QT}{2}-\frac{\delta(E)\omega\Delta\ell}{2}\right]
+-\frac{\Delta\tau}{4}.
+\end{aligned}
+$$
 
-## Implementation and evidence
+The removable limit $\sinh(w)/w\to1$ is regular. Endpoint ordering follows
+travel, so $\Delta\tau=\tau_{\rm end}-\tau_{\rm start}$; absorption uses
+amplitude damping $e^{-\tau/2}$, not intensity damping $e^{-\tau}$.
+This matches [coherent-formation-absorption](coherent-formation-absorption.md).
 
-`montecarlo/spectrum/lines.py::mc_cxr_spectrum` derives one shared `seg_t_mid = seg_t + 0.5 * seg_L / beta_all` before constructing `d_all`. Both the batched coherent path (`sinc_cutoff=None`) and the per-reflection compatibility path consume that `d_all`.
+## Assumptions and exact subdivision
 
-`tests/montecarlo/test_coherent_emission.py::test_straight_flight_is_invariant_to_two_half_segments` uses a deterministic 30 keV HOPG flight. Its independently evaluated centered complex field is invariant at `rtol=1e-11`, `atol=1e-12`; the spectrum uses the backend-scaled `BATCH_RTOL`. Before the implementation correction, both spectrum routes fail across every tested energy bin by up to about 96% relative because the split flight interferes incorrectly with the fixed reference emitter.
+Velocity, frozen radiation coefficient, attenuation coefficients and material
+are constant on the compared physical flight. Every escape-face or other
+geometry breakpoint must occur in the partition, making optical depth and
+escape length affine within each piece. Piece midpoint positions and ages
+must come from one continuous trajectory and clock.
 
-## Fresh-context adjudication
+Under those conditions, integrating the same field over adjacent intervals
+is additive: one flight equals the sum of its pieces, including absorption
+and the refractive escape phase. Energy-dependent $\delta(E)$ alone does
+not spoil this identity: at each output energy the same coefficient is used
+in every piece. Active piece-dependent `sinc_cutoff` truncation can spoil it,
+as can changing frozen amplitudes or energies between pieces. Thus the
+midpoint anchor uses an inactive cutoff when testing exact subdivision.
 
-An independent fresh-context review rederived the correction from the cited finite-time phase. With $\mathbf K=\omega\hat{\mathbf n}+\mathbf g$, $T=L/\beta$, $t_m=t_s+T/2$, and $\mathbf r_m=\mathbf r_s+\mathbf vT/2$, centering the integration variable at the flight midpoint yields $\exp[i(\omega t_m-\mathbf K\cdot\mathbf r_m)]\, T\operatorname{sinc}(\Delta T/(2\pi))$, where $\Delta=\omega-\mathbf v\cdot\mathbf K=2P$. This is identical to $\sin(PT)/P$ and requires $t_m=t_{\rm ang}+L_{\rm ang}/(2\beta)$.
+As $L\to0$ the time correction vanishes. With zero absorption and dispersion
+the field reduces to the centered vacuum sinc. Uniform attenuation along a
+piece factors out as $e^{-\tau_m/2}$.
 
-Units, sign, and the repository's $c=1$ convention agree. Two half-flight centers at $T/4$ and $3T/4$ reproduce the full integral exactly; the deterministic subdivision anchor is green for both coherent reduction routes. The $L\to0$ and single-segment self-term limits also pass.
+## Coherent self-term versus incoherent spectrum
 
-Status: **rederived**. The independent derivation found no factor, sign, unit, or convention discrepancy. Human `signed-off` remains pending.
+A unit-modulus midpoint phase cancels in a self-term, but the full formation
+factor does more than change phase. For $\Delta\tau\ne0$, its squared
+modulus differs pointwise from the incoherent route's sinc squared times
+segment-mean escape probability. A single absorbed segment therefore does
+**not** give unconditional pointwise coherent/incoherent equality.
 
-## Addendum 2026-08-19: subdivision invariance is now first-order
+Writing $v=\operatorname{Im}w$ and
+$F=e^{-\tau_m/2}\sinh(w)/w$, Parseval gives
 
-The one-flight-versus-two-halves identity checked in this record is exact only for the vacuum phase, whose linear variation along a segment is precisely what the sinc finite-time factor sums. Since the in-medium dispersion became unconditional (`xray_dispersion` removed), each segment also carries `-delta(E) omega(E) L_esc,j`, whose within-segment variation the sinc does not carry, so splitting a flight moves the coherent result at first order in `delta omega dL_esc`.
+$$
+\int_{-\infty}^{\infty}|F(v)|^2\,dv
+=\pi\langle e^{-\tau}\rangle.
+$$
 
-Measured on the anchor's geometry (hopg 002, 30 keV, near-grazing exit, so `L_esc` is ~100x the depth step): 7.8e-6 of peak at a 40 Ang flight, falling to 4.0e-6 / 2.9e-6 / 1.1e-6 at 20 / 10 / 5 Ang. That is a discretization artifact that shrinks with the segment length, not a modelling error, and the anchor now gates both the bound and the shrinkage. The independent centered-segment integral in the same test carries no in-medium leg and still matches to 1e-11 rel, so the midpoint pairing this record derives is still pinned exactly.
+Converting this to equality of energy-integrated yields additionally needs
+an affine detuning coordinate with the same constant Jacobian, frozen
+prefactors and the complete line window. For full dispersion the Jacobian
+contains the derivative term
 
-Re-validation of this row against the unconditional model is warranted.
+$$
+J=D-E\delta'(E)\boldsymbol\beta\cdot\nabla\ell,\qquad
+D=1-\hat{\mathbf n}\cdot\boldsymbol\beta
+-\delta(E)\boldsymbol\beta\cdot\nabla\ell.
+$$
+
+Replacing $J$ with $D$ is not exact. Finite-window yield checks are numerical
+evidence with stated tolerances, not a proof of unconditional equality.
+
+## Current implementation and evidence
+
+- `montecarlo/spectrum/cxr/_setup.py::_prepare_spectrum` pairs the midpoint
+  position with `seg_t_mid = seg_t + 0.5 * t_L_all`.
+- `montecarlo/spectrum/cxr/_formation.py::expand_escape_pieces` shifts each
+  piece's midpoint and advances its start age by the corresponding parent
+  path offset divided by speed.
+- `montecarlo/spectrum/cxr/_formation.py::{formation_argument,formation_factor}`
+  implements the independently derived $w$ and $F$; batched and per-reflection
+  consumers are listed in `coherent-formation-absorption`.
+- `tests/montecarlo/test_coherent_emission.py::test_straight_flight_is_invariant_to_two_half_segments`
+  compares one flight with two halves and a fixed reference emitter. Both
+  routes passed in the 2026-10-20 verifier run (2 passed, 18 deselected).
+- `tests/montecarlo/test_coherent_emission.py::test_single_segment_coherent_equals_incoherent_self_term`
+  is a tolerance-based comparison; its name does not establish absorbed
+  pointwise equality. The formation tests separately cover independent
+  quadrature, Parseval, geometry breakpoints and subdivision.
+- `tests/montecarlo/test_xray_dispersion.py::test_dispersive_formation_integral_has_the_derivative_jacobian`
+  pins the derivative-Jacobian distinction.
+
+## Historical evidence and adjudication
+
+The original vacuum-only derivation correctly established midpoint pairing.
+The 2026-08-19 measurements (40/20/10/5 Å flights: residuals
+$7.8\times10^{-6}$, $4.0\times10^{-6}$, $2.9\times10^{-6}$,
+$1.1\times10^{-6}$ of peak) describe the subsequent **midpoint escape-phase
+approximation**, not a limitation of today's formation integral. Issue #181
+replaced that approximation; its recorded two-half residual was
+$1.8\times10^{-15}$ of peak. These dated measurements retain their original
+scope and are not new benchmark runs.
+
+**2026-10-20 fresh-context verdict: `rederived`.** Units, zero-length and
+transparent limits, phase sign, midpoint clock, piece clock offsets and the
+full formation expression match the current implementation. Exact subdivision
+and self-term comparisons require the conditions above. No factor, sign,
+unit or convention discrepancy was found in midpoint pairing. This refresh
+does not certify every upstream amplitude or the original paper's equation
+numbering. Human sign-off remains with #277.

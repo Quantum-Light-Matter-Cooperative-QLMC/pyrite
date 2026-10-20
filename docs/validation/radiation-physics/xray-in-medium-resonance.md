@@ -1,5 +1,10 @@
 # `xray-in-medium-resonance`
 
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
 ## Independent Snell derivation, 2026-10-05
 
 This section supersedes the historical bulk-direction claim below for an
@@ -295,7 +300,7 @@ implied.
 ## Claim and source
 
 - Claim: CXR line kinematics closed on the in-medium photon dispersion `k = Re n(ω) ω n̂`: resonance `ω_res = v·g / (1 − Re n (v·n̂))`, `k·v = ω(1 − denom)`, `k·g = Re n ω (n̂·g)`, PXR detuning `|k+g|² − k² = g² + 2 k·g`, and PXR numerator `k² = (Re n ω)²`.
-- Anchor: `montecarlo/spectrum/lines.py::_in_medium_kinematics`, `::mc_cxr_spectrum` (`xray_dispersion="refractive"`); CUDA port `montecarlo/spectrum/coherent_stream_jit_kernel.py::_coherent_prologue_kernel`.
+- Anchor: `montecarlo/spectrum/cxr/_kernels.py::_in_medium_kinematics`, `montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum` (`xray_dispersion="refractive"`); CUDA port `montecarlo/spectrum/coherent_stream_jit_kernel.py::_coherent_prologue_kernel`.
 - Source: energy–momentum conservation `ω = v·(k+g)` closed with the Maxwell dispersion relation in a homogeneous dielectric, `k² = (1+χ₀)ω²` (`xray-refractive-index`); Feranchuk–Spence 2000 Eq. (10)/(13) with `k² → εω²` rather than an ad hoc `n` inserted into the vacuum result.
 - Intended quantity/signature (from the derivation docstring, read before the implementation body): `_in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab) -> (denom, n_re)`, with `denom` and `n_re` broadcast to the shape of `v_dot_g`; the docstring states the governing implicit equation `omega_res = v.g / (1 - Re n(omega_res)(v.n_hat))`, that only `Re n` enters (`Im n` is folded into the existing Beer–Lambert `mu(E)` escape factor, so applying it again here would double-count absorption), that the equation is solved by 3-pass fixed-point iteration from the vacuum root because the map's derivative is `~delta~1e-5`, and that the caller reconstructs `k·v = omega(1-denom)` exactly while `k·g` and `k²` pick up one and two powers of `n_re` respectively. The companion `mc_cxr_spectrum` docstring adds: `xray_dispersion="vacuum"` (default) keeps `k=omega` bit-for-bit; `"refractive"` uses `n = sqrt(1+chi_0)` (`materials.crystal.refractive_index`, `xray-refractive-index`), only the real part is applied, and the model is bulk-only (no interface/Fresnel refraction, so grazing observation geometry is out of scope).
 

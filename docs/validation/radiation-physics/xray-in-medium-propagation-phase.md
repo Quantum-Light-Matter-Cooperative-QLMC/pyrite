@@ -1,8 +1,13 @@
 # `xray-in-medium-propagation-phase`
 
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
 ## Claim (from the ledger row, before reading the implementation body)
 
-`montecarlo/spectrum/lines.py::mc_cxr_spectrum` (`xray_dispersion="refractive"`, `coherent=True`): coherent segment-to-segment propagation phase on the in-medium wavevector. Segment `j` accumulates
+`montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum` (`xray_dispersion="refractive"`, `coherent=True`): coherent segment-to-segment propagation phase on the in-medium wavevector. Segment `j` accumulates
 
 ```
 -delta(E) omega(E) L_esc,j
@@ -90,7 +95,7 @@ So `Im(n)` and `Re(n)` are the imaginary and real parts of *one* complex exponen
 
 ## Comparison with the implementation (read after the derivation above)
 
-`montecarlo/spectrum/lines.py::mc_cxr_spectrum`, `coherent=True` branch (around the `delta_omega_grid` construction and its consumers):
+`montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum`, `coherent=True` branch (around the `delta_omega_grid` construction and its consumers):
 
 ```python
 delta_omega_grid = (1.0 - Re(n(E_grid))) * omega_grid  # = delta(E) * omega(E)
@@ -153,7 +158,7 @@ One accuracy finding, not a physics discrepancy: the row's notes column's statem
 - **Unchanged:** the phase formula itself, its derivation, and its agreement with the implementation. The `rederived` determination stands.
 - **Retired evidence:** the limiting-case check "`xray_dispersion="vacuum"` leaves the phase expressions untouched and is bit-for-bit" is no longer expressible in production code. The kernel-level version survives — the JIT reduction and stream-field kernels keep their optional `(L_esc, delta_omega)` pair, and the CUDA-gated tests still pin that omitting it, or feeding `Re n = 1`, reproduces the vacuum arithmetic exactly.
 - **Replacement evidence:** the host anchors no longer difference two runs. They compare the measured two-segment interference term against a CLOSED FORM built from the same source equations (`test_interference_phase_matches_the_in_medium_closed_form`), which pins the absolute phase over four depth separations rather than an increment between two code paths.
-- **New consequence:** because the in-medium leg varies WITHIN a segment in a way the sinc finite-time factor does not carry, coherent subdivision invariance became first-order rather than exact. See the addendum on `coherent-segment-midpoint-time` and the re-measured convergence figures on `substep-radiation-invariance`.
+- **Historical consequence before #181:** the midpoint escape-phase approximation made subdivision only first-order. Issue #181 replaced it with the full formation integral; the current conditions for exact subdivision are in [coherent-segment-midpoint-time](coherent-segment-midpoint-time.md). The old convergence figures are evidence for that earlier approximation.
 
 ## Issue #187: shared refracted kinematics
 

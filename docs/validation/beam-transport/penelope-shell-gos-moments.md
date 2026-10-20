@@ -1,8 +1,13 @@
 # PENELOPE shell GOS moments
 
-Validation: `penelope-shell-gos-moments`. Status: unverified. These are raw,
-uncalibrated host-side moments. Nothing samples them, and no transport mode
-uses them.
+> Ownership refresh (2026-10-20, #599): module paths below point to current
+> owners. Dated implementation excerpts, line numbers and measurements retain
+> their original revision and evidence scope; this does not revalidate physics.
+
+Validation: `penelope-shell-gos-moments`. Status: `rederived` for the scope in the linked verification record. These are raw,
+uncalibrated host-side moments. The original standalone record predates the
+separately ledgered rate closure, sampling and shell-transport consumers;
+validation of those consumers is not implied by this claim.
 
 ## Source and intended quantity
 

@@ -1,5 +1,9 @@
 # `line-window-seeding`
 
+> Ownership refresh (2026-10-20, #599): module paths below point to current
+> owners. Dated implementation excerpts, line numbers and measurements retain
+> their original revision and evidence scope; this does not revalidate physics.
+
 Ledger row: [`line-window-seeding`](../ledger-core-coherent-physics.md#line-window-seeding). Code under review: `src/pyrite/montecarlo/spectrum/cxr_seeds.py` (`kinematic_cxr_seeds`, `absorption_edge_seeds`, `characteristic_line_seeds`) and `src/pyrite/_cxr_windows.py::build_window_plan`. Acceptance evidence the row cites: [line-spectrum error budget](line-spectrum-error-budget.md).
 
 Initial fresh-context verification, 2026-09-17. The derivation below was written from the ledger row, the docstrings, and the cited upstream rows before the function bodies were read. No implementation file was modified.
@@ -115,7 +119,7 @@ The attenuation that the kernels apply is $\mu=2r_e\lambda\sum_in_if_{2,i}$, wit
 
 | Item | Seeds (`cxr_seeds.py`) | Kernels | Match |
 | --- | --- | --- | --- |
-| energy field | `E_repr_keV` else `E_keV` (l. 159) | same (`lines/_setup.py:255`) | yes |
+| energy field | `E_repr_keV` else `E_keV` (l. 159) | same (`montecarlo/spectrum/cxr/_setup.py:255`) | yes |
 | velocity | `beta_from_keV(E)[:,None]*v_hat` (l. 166–167) | `beta_all[:, None] * seg_v` (`_setup.py:262–263`) | yes |
 | electron subset | `elec_id < electron_limit` (l. 163–165); runner passes `Ne` (`runner/cxr_grid.py:95`) | `seg_elec_id < Ne` (`_setup.py:261`) | yes |
 | orientation | `_orientation_R(lattice, beam_uvw, azimuth_rad, recip_miscut_rad, surface_hkl=)` (l. 187–189); same case/radiator fallbacks (l. 439–444) | same call (`_setup.py:203–209`); runner keys (`runner/__init__.py:651–655, 672–692`) | yes |

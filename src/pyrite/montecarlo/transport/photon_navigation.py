@@ -76,7 +76,10 @@ def ray_layer_intervals(
 
 
 def _clip_axes(origins, directions, bounds, k: int) -> tuple[np.ndarray, np.ndarray]:
-    """Intersect forward rays with per-axis [lower, upper) bands for K bodies."""
+    """Intersect forward rays with per-axis [lower, upper) bands for K bodies.
+
+    Validation: photon-scene-navigation
+    """
     shape = (origins.shape[0], k)
     start, end = np.zeros(shape), np.full(shape, np.inf)
     for axis, lower, upper in bounds:
@@ -99,6 +102,8 @@ class PhotonBox:
     ``axes`` rows are the orthonormal local x, y, z directions; ``half_extent_ang``
     the positive half sizes along them [Å]; ``composition`` ordered
     ``(element, atoms/Å³)`` pairs, empty for vacuum.
+
+    Validation: photon-scene-navigation
     """
 
     center_ang: tuple[float, float, float]
@@ -285,6 +290,8 @@ def _overlap(first, second) -> bool:
 
     Tolerance is relative to the finite extents and center distances, so
     exact face contact far from the origin is not mistaken for overlap.
+
+    Validation: photon-scene-navigation
     """
     candidates = [*first[1], *second[1]]
     candidates += [np.cross(a, b) for a in first[1] for b in second[1]]
@@ -332,7 +339,10 @@ def validate_photon_regions(
 
 
 def _interval_first_interactions(start, end, compositions, energies, uniforms):
-    """Optical-depth inversion and channel/atom choice over precomputed intervals."""
+    """Optical-depth inversion and channel/atom choice over precomputed intervals.
+
+    Validation: photon-scene-navigation
+    """
     n = energies.shape[0]
     distance = np.full(n, np.inf)
     layer, channel, element = (np.full(n, -1, dtype=np.int64) for _ in range(3))

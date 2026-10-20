@@ -1,7 +1,12 @@
 # surface-hkl-orientation
 
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
 - **Claim id**: `surface-hkl-orientation`
-- **Anchor**: `src/pyrite/montecarlo/geometry.py::_orientation_R`; plumbing through `src/pyrite/campaign/sweep.py`, `src/pyrite/montecarlo/spectrum/lines.py`, `src/pyrite/montecarlo/detector.py`, `src/pyrite/montecarlo/runner/__init__.py`
+- **Anchor**: `src/pyrite/montecarlo/geometry.py::_orientation_R`; plumbing through `src/pyrite/campaign/sweep.py`, `src/pyrite/montecarlo/spectrum/cxr/_spectrum.py`, `src/pyrite/montecarlo/detector.py`, `src/pyrite/montecarlo/runner/__init__.py`
 - **Source**: standard reciprocal-lattice geometry (Ashcroft & Mermin ch. 5; International Tables A, §1.1) and the Rodrigues rotation formula
 - **Verifier**: independent fresh context (did not write the implementation), 2026-09-13. Sections 1--3 were derived **before** reading the body of `_orientation_R`; only the ledger row, the module docstring of `montecarlo/geometry.py`, and the signature + derivation docstring of `_orientation_R` were read first, per the [validation methodology](../methodology.md).
 

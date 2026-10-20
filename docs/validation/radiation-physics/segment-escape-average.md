@@ -1,5 +1,9 @@
 # segment-escape-average
 
+> Ownership refresh (2026-10-20, #599): module paths below point to current
+> owners. Dated implementation excerpts, line numbers and measurements retain
+> their original revision and evidence scope; this does not revalidate physics.
+
 ## Claim
 
 - **ID:** `segment-escape-average`
@@ -154,7 +158,7 @@ The stack's outer boundaries are $z=0$ and $z=T$. On a piece where the $z$ face 
 
 ## Fresh-context verification of the issue #181 incoherent-line extension (2026-09-26)
 
-A separate context that did not write the implementation verified the extension. It read the ledger row and the section above, derived the result below, and only then read `segment_escape.py::{segment_escape_pieces,piece_mean_transmission}`, `lines/_batched.py::_batched_incoherent_block`, `lines/_per_hkl.py::_accumulate_reflection` and `lines/_setup.py::_prepare_spectrum`.
+A separate context that did not write the implementation verified the extension. It read the ledger row and the section above, derived the result below, and only then read `segment_escape.py::{segment_escape_pieces,piece_mean_transmission}`, `montecarlo/spectrum/cxr/_batched.py::_batched_incoherent_block`, `montecarlo/spectrum/cxr/_per_hkl.py::_accumulate_reflection` and `montecarlo/spectrum/cxr/_setup.py::_prepare_spectrum`.
 
 **Parseval.** With $h(t)=e^{-\tau(t)/2}$ on $[0,t_L]$ and zero elsewhere, Plancherel gives $\int\lvert\hat h(q)\rvert^2dq=2\pi\int_0^{t_L}e^{-\tau}dt=2\pi t_L\langle e^{-\tau}\rangle$. The kept shape integrates to $\int t_L^2\operatorname{sinc}^2(qt_L/2)\,dq=2\pi t_L$. So $T=\langle e^{-\tau}\rangle$ reproduces the exact integrated yield and $T=e^{-\bar\tau}$ undercounts it (Jensen). This matches {eq}`eq-segment-escape-line`. The same identity is the coherent route's $\int\lvert F\rvert^2dv=\pi\langle e^{-\tau}\rangle$ (`coherent-formation-absorption`, verified the same day).
 

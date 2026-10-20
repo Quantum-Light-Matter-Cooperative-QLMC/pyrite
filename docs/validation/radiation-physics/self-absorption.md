@@ -1,9 +1,14 @@
 # self-absorption
 
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
 ## Claim
 
 - **ID:** `self-absorption`
-- **Symbol:** `montecarlo/spectrum/lines.py::mc_cxr_spectrum`
+- **Symbol:** `montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum`
 - **Source:** Beer--Lambert law
 - **Intended quantity:** photon survival probability from an emission point through a piecewise-homogeneous absorber stack.
 
@@ -37,7 +42,7 @@ Follow-up applied after independent verification: both `mc_cxr_spectrum` and `_s
 
 ## Verdict
 
-- **Claim**: `self-absorption` — `montecarlo/spectrum/lines.py::mc_cxr_spectrum` — Beer--Lambert piecewise path integral
+- **Claim**: `self-absorption` — `montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum` — Beer--Lambert piecewise path integral
 - **Filters**: units `pass`; limits `pass`; signs/conventions `pass`
 - **Re-derivation**: `matches` — no divergent term or convention
 - **Verdict**: `rederived`

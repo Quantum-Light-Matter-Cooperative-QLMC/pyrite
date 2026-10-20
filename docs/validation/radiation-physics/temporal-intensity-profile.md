@@ -1,5 +1,9 @@
 # `temporal-intensity-profile`
 
+> Ownership refresh (2026-10-20, #599): module paths below point to current
+> owners. Dated implementation excerpts, line numbers and measurements retain
+> their original revision and evidence scope; this does not revalidate physics.
+
 ## Claim and source equation
 
 The opt-in line temporal profile is the squared modulus of the unitary inverse transform of the coherent-emission spectral field, summed incoherently over polarization, reflection, and mosaic orientation rows:
@@ -44,7 +48,7 @@ The field $E_j(E)=c_j F_j(E)\exp\{i[\omega d_j-\mathbf g\cdot\mathbf r_j-\delta\
 
 ## Fresh-context adjudication
 
-A separate context that did not write the implementation verified the claim on 2026-10-01. It read the ledger row, this record's claim, the physics page, and the `coherent-formation-absorption` record for the field. It derived the results below before reading `lines/_temporal.py`, the `_per_hkl.py` hooks, `_setup.py` (`temporal_tau`, `temporal_tau_geo`, `d_all`, `d_all_geom`), and `_spectrum.py::_finalize_spectrum`.
+A separate context that did not write the implementation verified the claim on 2026-10-01. It read the ledger row, this record's claim, the physics page, and the `coherent-formation-absorption` record for the field. It derived the results below before reading `montecarlo/spectrum/cxr/_temporal.py`, the `_per_hkl.py` hooks, `_setup.py` (`temporal_tau`, `temporal_tau_geo`, `d_all`, `d_all_geom`), and `_spectrum.py::_finalize_spectrum`.
 
 ### Independent derivation
 

@@ -1,5 +1,9 @@
 # `line-grid-resonance-local-spacing`
 
+> Ownership refresh (2026-10-20, #599): module paths below point to current
+> owners. Dated implementation excerpts, line numbers and measurements retain
+> their original revision and evidence scope; this does not revalidate physics.
+
 Ledger row: [`line-grid-resonance-local-spacing`](../ledger-core-coherent-physics.md#line-grid-resonance-local-spacing). Status: rederived. Validation: `line-grid-resonance-local-spacing`.
 
 ## Resolution rule
@@ -208,7 +212,7 @@ Each entry is the worst relative error over 8 grid offsets, against a dense cont
 
 ### Profile compatibility with the bin-mean refusals
 
-`lines/_setup.py:371-387` refuses `bin-mean` with coherent emission, with flight-grouped substeps, and with `sinc_cutoff`. I built every `high_energy` case (hbn 128, mose2 96, mos2 96) with `build_cases`. Every one has `coherent_emission=False`, `max_dE_frac=0`, `sinc_cutoff=None` and `line_quadrature="bin-mean"`, so the profile is compatible as shipped. Adding coherent emission (`--coherent` / `--emission both`) or `max_dE_frac>0` to this profile would raise only at spectrum time, after transport. No resolve-time guard exists (`campaign/sweep.py:970-975`).
+`montecarlo/spectrum/cxr/_setup.py:371-387` refuses `bin-mean` with coherent emission, with flight-grouped substeps, and with `sinc_cutoff`. I built every `high_energy` case (hbn 128, mose2 96, mos2 96) with `build_cases`. Every one has `coherent_emission=False`, `max_dE_frac=0`, `sinc_cutoff=None` and `line_quadrature="bin-mean"`, so the profile is compatible as shipped. Adding coherent emission (`--coherent` / `--emission both`) or `max_dE_frac>0` to this profile would raise only at spectrum time, after transport. No resolve-time guard exists (`campaign/sweep.py:970-975`).
 
 ### Budget bookkeeping
 

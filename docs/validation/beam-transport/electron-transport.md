@@ -1,7 +1,12 @@
 # Electron transport — independent re-derivation
 
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
 - **id**: `electron-transport`
-- **anchor**: `montecarlo/transport.py::simulate_trajectories` (kernels `_dEds_keV_per_ang`, `_dEds_compound_scalar`, `_sigma_browning_cm2`, `_scatter_rates_sr_scalar`, `_alpha_sr_joy`, `_sample_cos_theta_from_alpha`, `_alpha_from_first_moment`, `_rotate_direction_scalar`)
+- **anchor**: `montecarlo/transport/api.py::simulate_trajectories` (kernels `_dEds_keV_per_ang`, `_dEds_compound_scalar`, `_sigma_browning_cm2`, `_scatter_rates_sr_scalar`, `_alpha_sr_joy`, `_sample_cos_theta_from_alpha`, `_alpha_from_first_moment`, `_rotate_direction_scalar`)
 - **source**: Joy & Luo, *Scanning* **11**, 176 (1989); Browning et al., *J. Appl. Phys.* **76**, 2016 (1994); Bishop/Joy screened-Rutherford screening parameter; NIST SRD 64 Mott transport cross sections
 - **verifier**: fresh context (did not write the implementation)
 
@@ -184,7 +189,7 @@ Joy–Luo is a non-relativistic Bethe modification, so this divergence is expect
 
 ## 6. Verdict
 
-- **Claim**: `electron-transport` — `montecarlo/transport.py::simulate_trajectories` — Joy–Luo slowing-down + Mott/screened-Rutherford elastic scattering → radiating segments.
+- **Claim**: `electron-transport` — `montecarlo/transport/api.py::simulate_trajectories` — Joy–Luo slowing-down + Mott/screened-Rutherford elastic scattering → radiating segments.
 - **Filters**: units **pass**; limits **pass**; signs/conventions **pass**.
 - **Re-derivation**: **matches** — every kernel reproduces its cited closed form to machine precision, and the free-path, element, deflection, and azimuth samplers are statistically exact. No divergent factor, sign, exponent, unit, or convention found.
 - **Verdict**: `rederived`, with a documented model-form validity ceiling (§5) rather than an implementation discrepancy.
