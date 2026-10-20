@@ -1,8 +1,11 @@
 # PENELOPE shell oscillators
 
-Validation: `penelope-shell-oscillators`. Status: unverified. The oscillator set
-is host-side input for a shell GOS model; no cross section or transport mode
-consumes it yet.
+> Ownership refresh (2026-10-20, #599): module paths below point to current
+> owners. Dated implementation excerpts, line numbers and measurements retain
+> their original revision and evidence scope; this does not revalidate physics.
+
+Validation: `penelope-shell-oscillators`. Status: `rederived` for the scope in the linked verification record. The oscillator set
+is host-side input for a shell GOS model; its historical standalone construction is verified in the [verification record](penelope-shell-oscillators-verification.md). Later material extensions retain their ledgered evidence limits.
 
 ## Source and equations
 

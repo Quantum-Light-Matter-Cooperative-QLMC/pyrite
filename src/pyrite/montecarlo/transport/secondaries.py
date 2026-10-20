@@ -460,7 +460,10 @@ def _harvest(result, threshold_keV):
 
 
 def _with_launch(kw, launch: LaunchState | None):
-    """Generation-0 arguments of an explicit launch: no beam, its count and energy."""
+    """Generation-0 arguments of an explicit launch: no beam, its count and energy.
+
+    Validation: photon-charged-coupling
+    """
     if launch is None:
         return kw
     energies = np.asarray(launch.E_keV, dtype=float)
@@ -476,7 +479,7 @@ def transport_secondary_cascade(simulate, kw, *, launch: LaunchState | None = No
     the launch and beam arguments are ignored. ``None`` leaves the cascade
     unchanged.
     Validation: shell-secondary-transport, photon-pair-first-interaction, bhabha-close,
-    heitler-annihilation
+    heitler-annihilation, photon-charged-coupling
     """
     kw = _with_launch(kw, launch)
     threshold_keV, max_generations, max_tracks = _validate(kw)

@@ -1,6 +1,11 @@
 # Longitudinal bunch sampling
 
-**Validation id:** `longitudinal-bunch-sampling` **Code:** `montecarlo/transport.py::_sample_bunch_offsets` **Status:** rederived in fresh context on 2026-07-28
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
+**Validation id:** `longitudinal-bunch-sampling` **Code:** `montecarlo/transport/kinematics.py::_sample_bunch_offsets` **Status:** rederived in fresh context on 2026-07-28
 
 ## Claim and convention
 
@@ -72,7 +77,7 @@ All structured-policy draws use the same dedicated `SeedSequence(seed).spawn(4)[
 
 ## Result
 
-Independent derivation and numeric probes match implementation. Verdict: `rederived`. Current radiation sums electrons incoherently, so arrival offsets are diagnostic inputs for future coherent form factors and do not change current spectral yield.
+Independent derivation and numeric probes match implementation. Verdict: `rederived`. At the original 2026-07-28 revision, radiation summed electrons incoherently. That historical observation does not describe the current coherent scorer: arrival offsets now enter its phase and form factor (`coherent-physical-bunch-population`).
 
 ## Counter-addressed draws (#361 re-verification, 2026-10-07)
 

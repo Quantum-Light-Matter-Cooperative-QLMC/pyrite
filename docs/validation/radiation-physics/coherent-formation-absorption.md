@@ -1,10 +1,14 @@
 # coherent-formation-absorption
 
+> Ownership refresh (2026-10-20, #599): module paths below point to current
+> owners. Dated implementation excerpts, line numbers and measurements retain
+> their original revision and evidence scope; this does not revalidate physics.
+
 ## Claim
 
 - **ID:** `coherent-formation-absorption`
 - **Symbols:** `montecarlo/spectrum/cxr/_formation.py::{formation_coefficients,formation_factor,formation_argument,formation_profile,formation_window_half_width,expand_escape_pieces}`; CUDA twins `montecarlo/spectrum/coherent_jit_kernel.py::{_formation_re,_formation_im,run_coherent_reduction_kernel}`, `montecarlo/spectrum/coherent_stream_jit_kernel.py::{_coherent_prologue_kernel,run_coherent_field_accumulation_kernel}`, `montecarlo/spectrum/coherent_grouped_jit_kernel.py::run_coherent_grouped_intensity_kernel`
-- **Consumers:** the phased-field line reductions of `mc_cxr_spectrum`: the coherent route (`coherent=True`; batched `lines/_batched.py::_batched_coherent_block` and its CUDA stream, per-reflection `lines/_per_hkl.py`) and the flight-grouped incoherent reduction (a coherent sum per physical flight, `lines/_per_hkl.py`). Setup: `lines/_setup.py::_prepare_spectrum` splits their rows into escape pieces.
+- **Consumers:** the phased-field line reductions of `mc_cxr_spectrum`: the coherent route (`coherent=True`; batched `montecarlo/spectrum/cxr/_batched.py::_batched_coherent_block` and its CUDA stream, per-reflection `montecarlo/spectrum/cxr/_per_hkl.py`) and the flight-grouped incoherent reduction (a coherent sum per physical flight, `montecarlo/spectrum/cxr/_per_hkl.py`). Setup: `montecarlo/spectrum/cxr/_setup.py::_prepare_spectrum` splits their rows into escape pieces.
 - **Source:** Feranchuk--Spence 2000 Eqs. (8), (10), (12)--(14) finite-time field (as derived under `coherent-emission`), with the amplitude damped by Beer--Lambert $e^{-\tau/2}$ (`self-absorption`) and phased by the in-medium escape leg $-\delta\omega L_\text{esc}$ (`xray-in-medium-propagation-phase`) *inside* the integral instead of at the segment midpoint
 - **Intended quantity:** one straight segment's coherent line field under absorption and refraction, exact for any segment length
 
@@ -104,7 +108,7 @@ The full coherent phase has local energy derivative $J=D-E\delta'\mathbf v\cdot\
 
 ## Fresh-context verification (2026-09-26)
 
-A separate context that did not write the implementation verified the claim. It read only the ledger row and this record's claim, derived the result below, and only then read `lines/_formation.py`, `lines/_setup.py`, `lines/_batched.py`, `lines/_per_hkl.py` and the three CUDA modules.
+A separate context that did not write the implementation verified the claim. It read only the ledger row and this record's claim, derived the result below, and only then read `montecarlo/spectrum/cxr/_formation.py`, `montecarlo/spectrum/cxr/_setup.py`, `montecarlo/spectrum/cxr/_batched.py`, `montecarlo/spectrum/cxr/_per_hkl.py` and the three CUDA modules.
 
 **Independent derivation.** A point emitter at $\mathbf r(t')=\mathbf r_c+\mathbf v t'$ reaches the far field along $\hat{\mathbf n}$ with the optical path $R-\hat{\mathbf n}\cdot\mathbf r+(n-1)L_\text{esc}(\mathbf r)$. With $n=1-\delta$ its Fourier phase is therefore $\omega(t-\hat{\mathbf n}\cdot\mathbf r)-\mathbf g\cdot\mathbf r-\delta\omega L_\text{esc}$. The refractive term has the sign of the vacuum retardation, because both come from one optical path. The amplitude is damped by $e^{-\mu L_\text{esc}/2}$. On a piece where $L_\text{esc}$ is affine, $L_\text{esc}=L_c+(\Delta L/T)t'$ with $\Delta L=L(t'=T/2)-L(t'=-T/2)$, i.e. end minus start along travel. Put $s=2t'/T$. Then
 
@@ -131,7 +135,7 @@ Since $\tau_c/2\pm q=\tau_\text{end/start}/2$, $e^{-\tau_c/2}e^{\pm w}$ gives $b
 - `_formation.py:64-81`: $(a+b,b-a,q)$ with the $|q|<0.5$ cosh/sinh branch.
 - `_formation.py:84-106`: the closed form and series above.
 - `_formation.py:109-118`: $v$ with $\delta\omega$ taken from `delta_omega_grid` ($=\delta(E)\,\omega(E)$, `_setup.py:460-466`).
-- `lines/_per_hkl.py::_formation_cxr` and `lines/_batched.py:568-576`: centre and width use the vacuum `denom_all` $=1-\mathbf v\cdot\hat{\mathbf n}$ (`_setup.py:429`), $\tau=\mu(E_\text{res})L$ with the bulk-root $\mu$, and the midpoint escape distance $(L_\text{start}+L_\text{end})/2$ for the inter-piece phase. That midpoint distance is exact because $L$ is affine (item f).
+- `montecarlo/spectrum/cxr/_per_hkl.py::_formation_cxr` and `montecarlo/spectrum/cxr/_batched.py:568-576`: centre and width use the vacuum `denom_all` $=1-\mathbf v\cdot\hat{\mathbf n}$ (`_setup.py:429`), $\tau=\mu(E_\text{res})L$ with the bulk-root $\mu$, and the midpoint escape distance $(L_\text{start}+L_\text{end})/2$ for the inter-piece phase. That midpoint distance is exact because $L$ is affine (item f).
 - `expand_escape_pieces`: each piece gets start age $t_\text{parent}+\text{offset}\cdot L/\beta(E_\text{repr})$ and midpoint $\mathbf r_\text{mid}+(\text{offset}+f/2-1/2)L\,\hat{\mathbf v}$. The route adds $t_L/2$ (`_setup.py:447`), so the piece-midpoint age and position are exact. Pieces are expanded after `_clip_segments_to_cutoff`, and the grouping keys are gathered with the pieces.
 - Window: $|v|\le c$ implies $|E-E_\text{vac}|\le(c+|\Delta L/2|\max\delta\omega)/a_\text{vac}$, as coded (item g).
 

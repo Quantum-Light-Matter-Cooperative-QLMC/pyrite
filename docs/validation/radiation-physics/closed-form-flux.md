@@ -1,5 +1,10 @@
 # `closed-form-flux`
 
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
 ## Claim and source
 
 - Claim: Feranchuk–Spence (2000) Eq. (12) closed-form line flux, used as the single-segment analytic reference against which the Monte Carlo pipeline is anchored.
@@ -228,7 +233,7 @@ $$
 
 At the 1 mm bulk thickness the code returns $L_{\rm eff}=1.9729\times10^{4}\ \mathrm{\AA}$ where the escape-weighted value is $9.5648\times10^{3}\ \mathrm{\AA}$ — a factor $2.063$. At the 29 nm film thickness the two agree to $0.8\%$, because $t\ll L_{\rm abs}$ makes the geometry factor cancel.
 
-The production Monte Carlo does **not** share this error. `montecarlo/spectrum/lines.py` computes the escape path as
+The production Monte Carlo does **not** share this error. `montecarlo/spectrum/cxr/_kernels.py::_escape_length` computes the slab escape path as
 
 ```text
 def _escape_length(z_mid, thickness, n_z):
@@ -262,7 +267,7 @@ The recovered $\lvert n_z\rvert = 0.4848$ is $\lvert\cos 119^\circ\rvert$ to fou
 
 - **It does not exercise the ledgered symbol.** `single_segment_anchor` calls `photons_per_electron` directly with its own argument list; it never calls `feranchuk_line_flux`. The wrapper's line-energy choice, its hardcoded `"C"`, and its absorption length are all outside the anchor.
 - **It disables the failing term by construction.** The anchor passes `L_abs_ang=1e12` with `L_seg_ang=290.0`, so $L_{\rm eff}\to L_{\rm seg}$ to ten significant figures and the escape-length geometry factor is multiplicatively $1$. The anchor is structurally incapable of detecting the $\lvert\cos\theta_{\rm obs}\rvert$ omission.
-- **For the prefactor, the two legs are genuinely independent code.** `montecarlo/spectrum/lines.py` does not import from `validation/feranchuk_spence.py`; the finite-segment lineshape, its normalisation, and the $\alpha$/$\hbar c$ bookkeeping are written twice. What the two legs *do* share is the crystallographic layer — `materials/crystal.py` (`chi_g`, `U_g`, form factors, Debye–Waller) and the same attenuation tabulation — so the anchor cannot catch an error in $\lvert A\rvert^2$ or in $\mu$, only in the radiation kinematics wrapped around them. Those inputs are covered by the separate `pxr-amplitude`, `cbs-amplitude`, and `absorption-length` rows.
+- **For the prefactor, the two legs are genuinely independent code.** `montecarlo/spectrum/cxr/_spectrum.py` does not import from `validation/feranchuk_spence.py`; the finite-segment lineshape, its normalisation, and the $\alpha$/$\hbar c$ bookkeeping are written twice. What the two legs *do* share is the crystallographic layer — `materials/crystal.py` (`chi_g`, `U_g`, form factors, Debye–Waller) and the same attenuation tabulation — so the anchor cannot catch an error in $\lvert A\rvert^2$ or in $\mu$, only in the radiation kinematics wrapped around them. Those inputs are covered by the separate `pxr-amplitude`, `cbs-amplitude`, and `absorption-length` rows.
 - **Reproduced anchor values** (`ZhaiAnchor` defaults, `L_seg = 290 Å`): ratio $0.99735$ at $17.5\ \mathrm{keV}$ and $0.99673$ at $25\ \mathrm{keV}$. Both are $\approx 1$, so the prefactor is cross-validated at the sub-percent level by a genuinely separate implementation.
 
 Net: the anchor is a real, independent confirmation of the $\alpha/2\pi$, $\omega L/\beta$, $\Delta\Omega$ and Jacobian factors, and no confirmation at all of the absorption treatment that `feranchuk_line_flux` exists to add.

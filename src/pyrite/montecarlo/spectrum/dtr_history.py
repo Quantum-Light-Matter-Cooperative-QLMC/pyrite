@@ -121,6 +121,10 @@ def _cbs_dipole(velocity, g, potential):
 
 
 def _segment_rhs(rhs, modes, media, heights, current, omega, kxy, g, potential, origin):
+    """Accumulate transported-current and CBS sources in their harmonic rows.
+
+    Validation: line-tr-phase-reconciliation
+    """
     zero = np.zeros((2, 3), complex)
     for i, position in enumerate(current.position):
         layer, history = int(current.layer[i]), int(current.history[i])

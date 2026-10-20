@@ -1,5 +1,9 @@
 # `coherent-line-grid-fringe-spacing`
 
+> Ownership refresh (2026-10-20, #599): module paths below point to current
+> owners. Dated implementation excerpts, line numbers and measurements retain
+> their original revision and evidence scope; this does not revalidate physics.
+
 Ledger row: [`coherent-line-grid-fringe-spacing`](../ledger-core-coherent-physics.md). Instrument: `montecarlo/spectrum/diagnostics.py::coherent_fringe_spacing` (estimator), `montecarlo/runner/cxr_grid.py::_refuse_coherent_resolution` (policy, non-windowed), `energy_grid/convergence_case.py` (ladder, now route-switchable). No kernel change: this row records the band limit of the existing coherent reducer and the evidence for refusing automatic resolution on that route (issue #117).
 
 ## Claim
@@ -11,7 +15,7 @@ Ledger row: [`coherent-line-grid-fringe-spacing`](../ledger-core-coherent-physic
 
 ## Derivation
 
-The coherent reducer (`lines/_per_hkl.py::_accumulate_reflection_coherent`, and the batched steps 5/7) builds one complex field per (reflection, orientation) row,
+The coherent reducer (`montecarlo/spectrum/cxr/_per_hkl.py::_accumulate_reflection_coherent`, and the batched steps 5/7) builds one complex field per (reflection, orientation) row,
 
 $$
 A(E) = \sum_j c_j \,
@@ -22,7 +26,7 @@ e^{i \phi_j(E)},
           - L_{\mathrm{esc},j}\, \Delta\omega(E),
 $$
 
-with $\omega(E) = E / \hbar c$ and $d_j = t_{\mathrm{mid},j} - \hat n \cdot \mathbf r_j$ in ångström at $c=1$ (`lines/_setup.py`). The estimator reads $d_j$ through `diagnostics.coherent_retardation`, in the reducer's own geometry: on an infinite slab with active decoherence each electron sits at its offset-free transverse position, as `lines/_setup.py` evaluates it; a finite footprint keeps the sampled positions. Every measurement below is on a finite footprint. The spectrum is $|A(E)|^2$, so it carries cross terms $j,k$ whose phase runs over the output grid at the **difference of per-segment phase slopes**
+with $\omega(E) = E / \hbar c$ and $d_j = t_{\mathrm{mid},j} - \hat n \cdot \mathbf r_j$ in ångström at $c=1$ (`montecarlo/spectrum/cxr/_setup.py`). The estimator reads $d_j$ through `diagnostics.coherent_retardation`, in the reducer's own geometry: on an infinite slab with active decoherence each electron sits at its offset-free transverse position, as `montecarlo/spectrum/cxr/_setup.py` evaluates it; a finite footprint keeps the sampled positions. Every measurement below is on a finite footprint. The spectrum is $|A(E)|^2$, so it carries cross terms $j,k$ whose phase runs over the output grid at the **difference of per-segment phase slopes**
 
 $$
 s_j = \frac{\mathrm d \phi_j}{\mathrm d E}
@@ -55,12 +59,12 @@ which is exactly the combination whose reciprocal sets the incoherent first zero
 
 ## Decoherence selects which span applies
 
-`decoherence_active` (`lines/_setup.py`) is true whenever the case carries nonzero bunch offsets or a finite footprint — including the standard `beam_fwhm_mm = 1.0` cases. The spectrum is then the blend $(1-F)\sum_e |S_e|^2 + F |\sum_e S_e|^2$ on the offset-free geometric phase:
+`decoherence_active` (`montecarlo/spectrum/cxr/_setup.py`) is true whenever the case carries nonzero bunch offsets or a finite footprint — including the standard `beam_fwhm_mm = 1.0` cases. The spectrum is then the blend $(1-F)\sum_e |S_e|^2 + F |\sum_e S_e|^2$ on the offset-free geometric phase:
 
 - the $\sum_e |S_e|^2$ floor is band-limited by the widest **single-electron** span (`coherent_fringe_spacing(..., grouped=True)`);
 - the $|\sum_e S_e|^2$ term is band-limited by the **all-electron** span.
 
-The all-electron span is set by the transverse beam extent projected on $\hat n$, so it is ~2.5 mm in every case measured below, essentially independent of material and beam energy. Those inter-electron fringes are one realization of the sampled offsets — speckle, which `lines/_setup.py` already notes "does not shrink with electron count". Whether they are an observable at all is a modelling question outside this row; it is tracked separately as issue #155.
+The all-electron span is set by the transverse beam extent projected on $\hat n$, so it is ~2.5 mm in every case measured below, essentially independent of material and beam energy. Those inter-electron fringes are one realization of the sampled offsets — speckle, which `montecarlo/spectrum/cxr/_setup.py` already notes "does not shrink with electron count". Whether they are an observable at all is a modelling question outside this row; it is tracked separately as issue #155.
 
 ## Measurements
 

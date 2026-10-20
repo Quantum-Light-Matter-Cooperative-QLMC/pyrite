@@ -96,7 +96,10 @@ class CoupledHistories:
 
 
 def stage_seed(seed: int, round_index: int) -> int:
-    """Charged-stage seed of one coupling round, under its own salt."""
+    """Charged-stage seed of one coupling round, under its own salt.
+
+    Validation: photon-charged-coupling
+    """
     with np.errstate(over="ignore"):
         x = np.uint64(seed) ^ _STAGE_SALT
         return int(_mix(x + _GOLDEN * (np.uint64(round_index) + np.uint64(1))))
@@ -151,7 +154,10 @@ def coupled_ledger_residual_eV(ledger: Mapping[str, np.ndarray]) -> np.ndarray:
 
 
 def _split_charged(charged, threshold_eV, layers, footprint):
-    """Fates of one round's charged rows: launch, local, positron."""
+    """Fates of one round's charged rows: launch, local, positron.
+
+    Validation: photon-charged-coupling
+    """
     position = charged["position_ang"].reshape(-1, 3)
     electron = charged["species"] == ELECTRON
     above = charged["kinetic_eV"] > threshold_eV
@@ -161,7 +167,10 @@ def _split_charged(charged, threshold_eV, layers, footprint):
 
 
 def _book_stage(ledger, rows, result: ChargedStageResult, cutoff_eV):
-    """Book a stage's per-row split; return the returned photon batch."""
+    """Book a stage's per-row split; return the returned photon batch.
+
+    Validation: photon-charged-coupling
+    """
     weight, history = rows["weight"], rows["history_id"]
     ledger.add("charged_escaped_eV", history, weight * result.escaped_eV)
     ledger.add("charged_deposited_eV", history, weight * result.deposited_eV)
@@ -346,6 +355,8 @@ def cascade_charged_stage(layers: Sequence, *, width_ang=None, height_ang=None, 
     ``layers`` must be the contiguous transport stack starting at z=0 (the
     photon navigator's gaps are not transportable); the footprint converts
     from Å to the transport's millimetres.
+
+    Validation: photon-charged-coupling
     """
     for name in ("pair_production_model", "positron_transport", "seed", "Ne", "E0_keV"):
         if name in transport:
@@ -378,7 +389,10 @@ def _transport_kwargs(transport: Mapping, seed: int, threshold_eV: float) -> dic
 
 
 def _hard_photons(result) -> dict[str, np.ndarray]:
-    """Hard radiative events at their row endpoints, owner and emission ordinal."""
+    """Hard radiative events at their row endpoints, owner and emission ordinal.
+
+    Validation: photon-charged-coupling
+    """
     from .secondaries import _host
 
     energy = _host(result["hard_radiative_k_eV"])

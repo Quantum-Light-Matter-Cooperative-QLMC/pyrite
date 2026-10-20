@@ -1,6 +1,11 @@
 # `substep-radiation-invariance`
 
-Ledger row: [`substep-radiation-invariance`](../ledger-transport-background.md#substep-radiation-invariance). Code: `montecarlo/spectrum/lines.py::mc_cxr_spectrum` (flight grouping, `E_repr_keV`), `montecarlo/spectrum/brem.py::mc_brem_spectrum` (`E_repr_keV`), `montecarlo/transport/api.py::simulate_trajectories` (`E_repr_keV`), `montecarlo/spectrum/diagnostics.py::subdivide_flights`. Measurement: `checks/substep_invariance.py`.
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
+Ledger row: [`substep-radiation-invariance`](../ledger-transport-background.md#substep-radiation-invariance). Code: `montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum` (flight grouping, `E_repr_keV`), `montecarlo/spectrum/brem.py::mc_brem_spectrum` (`E_repr_keV`), `montecarlo/transport/api.py::simulate_trajectories` (`E_repr_keV`), `montecarlo/spectrum/diagnostics.py::subdivide_flights`. Measurement: `checks/substep_invariance.py`.
 
 ## Claim
 

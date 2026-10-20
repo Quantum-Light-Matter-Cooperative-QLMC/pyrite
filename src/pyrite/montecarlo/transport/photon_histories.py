@@ -85,6 +85,8 @@ class PhotonAperture:
         ``sample_to_lab`` is ``R`` with ``v_lab = R v_sample`` (``geometry.sample_to_lab_R``);
         the lab origin is the sample entrance origin, so positions rotate
         without translation. The pose's downstream ``+z`` becomes ``normal``.
+
+        Validation: photon-scene-navigation
         """
         rotation = _rotation(sample_to_lab)
         width, height = (float(v) for v in size_mm)
@@ -101,13 +103,19 @@ class PhotonAperture:
         return np.cross(self.x_axis, self.y_axis)
 
     def region(self):
-        """Zero-thickness rectangle for :func:`validate_photon_regions`."""
+        """Zero-thickness rectangle for :func:`validate_photon_regions`.
+
+        Validation: photon-scene-navigation
+        """
         axes = np.array([self.x_axis, self.y_axis, self.normal])
         half = np.array([self.half_width_ang, self.half_height_ang, 0.0])
         return np.asarray(self.center_ang, dtype=float), axes, half
 
     def intersect(self, origins: np.ndarray, directions: np.ndarray):
-        """Forward hit distance [Å] (inf on a miss) and local ``(u, v)`` [Å]."""
+        """Forward hit distance [Å] (inf on a miss) and local ``(u, v)`` [Å].
+
+        Validation: photon-history-queue
+        """
         normal = self.normal
         center = np.asarray(self.center_ang, dtype=float)
         facing = directions @ normal
@@ -261,7 +269,10 @@ def _isotropic(draws: Iterator[float]) -> np.ndarray:
 
 
 def _photoabsorb(queue, parent: _Photon, channel, element, relaxation, rng, position) -> None:
-    """Photoelectron, isotropic relaxation particles and binding remainder."""
+    """Photoelectron, isotropic relaxation particles and binding remainder.
+
+    Validation: photon-history-queue
+    """
     cutoff = min(queue.photon_cutoff_eV, queue.electron_cutoff_eV)
     draws = iter(rng.random, None)
     event = sample_photoelectric(
@@ -292,6 +303,8 @@ def _interact(queue, parent: _Photon, channel, element, relaxation, rng, positio
 
     Daughter ordinals: scattered photon 0 then recoil 1; photoelectron 0 then
     relaxation particles in cascade order; pair electron 0, positron 1.
+
+    Validation: photon-history-queue
     """
     energy, direction = parent.energy, parent.direction
     name = PHOTON_CHANNEL_ORDER[channel]
@@ -348,7 +361,10 @@ def _validate_ids(history: np.ndarray, event: np.ndarray) -> tuple[np.ndarray, n
 
 
 def _root_keys(seed, history, event, stream_key) -> np.ndarray:
-    """Lineage keys of the source photons; each must name a unique stream."""
+    """Lineage keys of the source photons; each must name a unique stream.
+
+    Validation: photon-charged-coupling
+    """
     if stream_key is None:
         if len({(int(h), int(e)) for h, e in zip(history, event, strict=True)}) != history.size:
             raise ValueError("(history_id, event_id) pairs must be unique")
@@ -378,7 +394,10 @@ def _validate_options(energy, photon_cutoff_eV, electron_cutoff_eV, max_generati
 
 
 def _flight(queue, active: list[_Photon], layers, boxes, footprint, aperture, rngs):
-    """Advance one generation: record hits/escapes, return collisions and points."""
+    """Advance one generation: record hits/escapes, return collisions and points.
+
+    Validation: photon-history-queue
+    """
     origins = np.array([p.position for p in active], dtype=float).reshape(-1, 3)
     directions = np.array([p.direction for p in active], dtype=float).reshape(-1, 3)
     energies = np.array([p.energy for p in active], dtype=float)

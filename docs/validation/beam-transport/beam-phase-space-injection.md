@@ -1,6 +1,11 @@
 # Courant–Snyder transverse beam injection
 
-**Validation id:** `beam-phase-space-injection` **Code:** `montecarlo/transverse.py::resolve_transverse_distribution`; `::sample_transverse`; `montecarlo/transport.py::simulate_trajectories`; `montecarlo/geometry.py::beam_frame_basis` **Source:** Courant & Snyder, *Ann. Phys.* **3**, 1–48 (1958); standard normalized-emittance convention (e.g. Wiedemann, *Particle Accelerator Physics*). **Status:** rederived in fresh context on 2026-08-07.
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
+**Validation id:** `beam-phase-space-injection` **Code:** `montecarlo/transverse.py::resolve_transverse_distribution`; `::sample_transverse`; `montecarlo/transport/api.py::simulate_trajectories`; `montecarlo/geometry.py::beam_frame_basis` **Source:** Courant & Snyder, *Ann. Phys.* **3**, 1–48 (1958); standard normalized-emittance convention (e.g. Wiedemann, *Particle Accelerator Physics*). **Status:** rederived in fresh context on 2026-08-07.
 
 ## 1. What the code claims to compute
 
@@ -99,7 +104,7 @@ The per-electron direction assembly `dir ∝ x' ê1 + y' ê2 + ê3` (`ê1,ê2,ê
 
 ## 3. Diff against the implementation
 
-Read after the derivation above (`montecarlo/transverse.py` lines 101–219; `montecarlo/geometry.py::beam_frame_basis` lines 523–545; `montecarlo/transport.py::simulate_trajectories` transverse-injection block, ~lines 1500–1570):
+Read after the derivation above (`montecarlo/transverse.py` lines 101–219; `montecarlo/geometry.py::beam_frame_basis` lines 523–545; `montecarlo/transport/api.py::simulate_trajectories` transverse-injection block, ~lines 1500–1570):
 
 - `_resolve_plane`: `geometric = normalized_emittance_mm_mrad * _MM_MRAD_TO_MM_RAD / beta_gamma` with `_MM_MRAD_TO_MM_RAD = 1e-3` and `beta_twiss = beta_twiss_m * _M_TO_MM_PER_RAD` with `_M_TO_MM_PER_RAD = 1e3` — matches §2.4 exactly, both factor and direction.
 - `gamma_twiss = (1 + alpha_twiss**2) / beta_twiss` — matches §2.2's `γ_T = (1+α²)/β_T` exactly.

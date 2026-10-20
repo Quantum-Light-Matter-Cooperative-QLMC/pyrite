@@ -1,6 +1,10 @@
 # SBETHE atomic shell inputs
 
-Validation: `sbethe-atomic-shell-inputs`. Status: unverified. The parsed
+> Ownership refresh (2026-10-20, #599): module paths below point to current
+> owners. Dated implementation excerpts, line numbers and measurements retain
+> their original revision and evidence scope; this does not revalidate physics.
+
+Validation: `sbethe-atomic-shell-inputs`. Status: `rederived` for the scope in the linked verification record. The parsed
 inputs are host-side preparation and do not select a transport mode.
 
 ## Source and assumptions
@@ -70,7 +74,7 @@ label–orbital disagreement, invalid values, the
 signed binding difference, a spin-orbit partner merge, and ENDF P1 at
 designator 26. An optional local-source check joins all 99 elements, including
 Si M2+M3 and Cs P1, when the pinned reference data are fetched.
-Independent source-to-code verification remains pending.
+Independent source-to-code verification is recorded below; material conduction assignment remains outside that verified scope.
 
 Fresh-context re-derivation, including the ENDF-102 Appendix B designator
 table: [verification record](sbethe-atomic-shell-inputs-verification.md).

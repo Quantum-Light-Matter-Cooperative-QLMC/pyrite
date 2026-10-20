@@ -1,5 +1,9 @@
 # Positioned-filter attenuation verification packet
 
+> Ownership refresh (2026-10-20, #599): module paths below point to current
+> owners. Dated implementation excerpts, line numbers and measurements retain
+> their original revision and evidence scope; this does not revalidate physics.
+
 **Validation ID:** `positioned-filter-attenuation`
 
 **Status:** second independent fresh-context re-derivation completed 2026-09-13 (verdict `rederived`); human ledger transition still pending. The earlier 2026-08-14 re-derivation and the original author packet are retained below as [Part IV](#part-iv--retained-author-packet-and-2026-08-14-verifier-record).
@@ -581,10 +585,10 @@ Traceability finding: `ray_box_path_lengths` is named in the ledgered claim but 
 
 #### Post-validation remediation
 
-Commit `4b40378` resolved the verifier's traceability finding by adding `Validation: positioned-filter-attenuation` to the `ray_box_path_lengths` docstring. The historical finding and verdict above are retained as the validation record. The ledger remains `unverified` pending the human-applied `unverified` to `rederived` transition; this note does not claim human sign-off.
+Commit `4b40378` resolved the verifier's traceability finding by adding `Validation: positioned-filter-attenuation` to the `ray_box_path_lengths` docstring. The historical finding and verdict above are retained as the validation record. The original note awaited the owner-applied transition; the ledger now records `rederived` for the verified scope. The later #23 zero-energy extension remains separately qualified in the ledger. This is not human sign-off.
 
 The 2026-09-13 pass re-confirms the marker is present.
 
 ## Independent verification contract
 
-A fresh-context verifier must derive the equations and units without using the new public attenuation helper as its oracle, compare at least one element and one compound `MediumSpec` against an external or source-level calculation, check normal, grazing/parallel, miss, zero-filter, and plate-order limits, and audit the source-to-code sign and unit conversion. The verifier records any discrepancy here and updates the ledger status. Human sign-off remains separate.
+A fresh-context verifier must derive the equations and units without using the new public attenuation helper as its oracle, compare at least one element and one compound `MediumSpec` against an external or source-level calculation, check normal, grazing/parallel, miss, zero-filter, and plate-order limits, and audit the source-to-code sign and unit conversion. The verifier records any discrepancy here and suggests a ledger edit; the task owner applies the status. Human sign-off remains separate.

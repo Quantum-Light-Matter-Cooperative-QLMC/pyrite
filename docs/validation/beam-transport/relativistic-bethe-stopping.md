@@ -1,7 +1,15 @@
 # Relativistic (Berger–Seltzer) collision stopping — independent re-derivation
 
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+> Stopping definitions live in `montecarlo/transport/stopping.py`;
+> `build_transport_energy_lut` lives in `montecarlo/transport/lut.py`; the array
+> stopping twin lives in `montecarlo/spectrum/cxr/_kernels.py`.
+
 - **id**: `relativistic-bethe-stopping`
-- **anchor**: `montecarlo/transport.py::_dEds_bs_compound_scalar`, `::_dEds_spliced_compound_scalar`, `::_dEds_spliced_packed_scalar`, `::_bs_joy_luo_crossover_keV`, `::spliced_stopping_keV_per_ang`, `::build_transport_energy_lut`; `montecarlo/transport/_jit_device.py::_dEds_packed`; `montecarlo/spectrum/lines.py::_spliced_stopping_magnitude_xp`
+- **anchor**: `montecarlo/transport/stopping.py::_dEds_bs_compound_scalar`, `::_dEds_spliced_compound_scalar`, `::_dEds_spliced_packed_scalar`, `::_bs_joy_luo_crossover_keV`, `::spliced_stopping_keV_per_ang`, `montecarlo/transport/lut.py::build_transport_energy_lut`; `montecarlo/transport/_jit_device.py::_dEds_packed`; `montecarlo/spectrum/cxr/_kernels.py::_spliced_stopping_magnitude_xp`
 - **source**: ICRU Report 37 (1984); Berger & Seltzer, NBSIR 82-2550 (1982); PDG *Atomic and Nuclear Properties* (mean excitation energies, Sternheimer density-effect coefficients); Sternheimer, Berger & Seltzer, *At. Data Nucl. Data Tables* **30**, 261 (1984)
 - **verifier**: fresh context (did not write the implementation)
 
@@ -112,7 +120,7 @@ with the Joy–Luo prefactor $7.85\times10^{-4}$, $k_i = 0.731+0.0688\log_{10}Z_
 | $\delta$ handling | subtracted inside the bracket | `... + f_minus - delta` | identical (every call site passes `delta=0.0`; a documented, measured-bound approximation, out of scope for this claim's `Code:` list) |
 | crossover solve | bisection on $g(E)=0$, $(Z,J)$-only | `_bs_joy_luo_crossover_keV`: bisection from `lo=2J` to `hi=300`, 200 iterations | identical (bisection bracket choice differs from mine but both bracket the same root; see §5) |
 | splice routing | per-element, own crossover, additive | `_dEds_spliced_compound_scalar`/`_dEds_spliced_packed_scalar`: `if E_i < E_cross_arr[i]: joy_luo_total += ... else: bs_total += ...`, then `-7.85e-4/E_i*joy_luo_total - _BS_PREFACTOR/beta_sq*bs_total` | identical |
-| device/vector twins | same closed form, same routing | `transport/_jit_device.py::_dEds_packed` (device, float64 constants), `spectrum/lines.py::_spliced_stopping_magnitude_xp` (host/device array twin) | identical construction of $\tau,\gamma,\beta^2,F^-$ and the same two-branch sum, checked by inspection |
+| device/vector twins | same closed form, same routing | `transport/_jit_device.py::_dEds_packed` (device, float64 constants), `spectrum/cxr/_kernels.py::_spliced_stopping_magnitude_xp` (host/device array twin) | identical construction of $\tau,\gamma,\beta^2,F^-$ and the same two-branch sum, checked by inspection |
 | `build_transport_energy_lut` | tabulate the closed form on a uniform energy grid, linear-interpolate at runtime | delegates to the same per-element/spliced kernels to fill `dEds`; no new physics, a numerical-method (grid+lerp) layer only | identical (nothing to re-derive beyond §2.1–2.5) |
 
 No divergent factor, sign, exponent, unit, or convention found in any listed `Code:` symbol.
@@ -141,7 +149,7 @@ The validity-ceiling row is the one point where an existing repository anchor (`
 
 ## 6. Verdict
 
-- **Claim**: `relativistic-bethe-stopping` — `montecarlo/transport.py::_dEds_bs_compound_scalar`, `::_dEds_spliced_compound_scalar`, `::_bs_joy_luo_crossover_keV`, `::spliced_stopping_keV_per_ang`, `::build_transport_energy_lut` (+ device/ vector twins) — Berger–Seltzer/ICRU-37 relativistic collision stopping, spliced onto Joy–Luo per element at each element's own crossover.
+- **Claim**: `relativistic-bethe-stopping` — `montecarlo/transport/stopping.py::_dEds_bs_compound_scalar`, `::_dEds_spliced_compound_scalar`, `::_bs_joy_luo_crossover_keV`, `::spliced_stopping_keV_per_ang`, `montecarlo/transport/lut.py::build_transport_energy_lut` (+ device/ vector twins) — Berger–Seltzer/ICRU-37 relativistic collision stopping, spliced onto Joy–Luo per element at each element's own crossover.
 - **Filters**: units **pass**; limits **pass**; signs/conventions **pass**.
 - **Re-derivation**: **matches** — every closed form in §2 reproduces the cited ICRU-37/Berger–Seltzer and Joy–Luo forms to machine/analytic precision (prefactor to 5 significant figures from first principles, $F^-(0)$ exact, non-relativistic limit convergent, crossover bisection reproduces the ledger's stated range, validity-ceiling ratios within the anchor's own tolerance). No divergent factor, sign, exponent, unit, or convention found. Density-effect $\delta$ is correctly threaded as a parameter but is out of this claim's `Code:` scope (every call site currently passes `0.0`; the omission is measured, not assumed, elsewhere in the ledger row).
 - **Verdict**: `rederived`.

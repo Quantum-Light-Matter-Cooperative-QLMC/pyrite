@@ -1,8 +1,13 @@
 # `cbs-amplitude`
 
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
 ## Claim and source
 
-- Claim: `materials/crystal.py::U_g` returns the Fourier component of the periodic crystal potential (the coherent-bremsstrahlung / CBS coupling amplitude), and `montecarlo/spectrum/lines.py` assembles the coherent amplitude by combining the PXR term (`chi_g`) and the CBS term (`U_g`) with a relativistic factor carrying a `1/gamma` (or `1/gamma^2`) high-energy suppression.
+- Claim: `materials/crystal.py::U_g` returns the Fourier component of the periodic crystal potential (the coherent-bremsstrahlung / CBS coupling amplitude), and `montecarlo/spectrum/cxr/_spectrum.py` assembles the coherent amplitude by combining the PXR term (`chi_g`) and the CBS term (`U_g`) with a relativistic factor carrying a `1/gamma` (or `1/gamma^2`) high-energy suppression.
 - Source: Feranchuk, Ulyanenkov, Harada, Spence, "Parametric x-ray radiation and coherent bremsstrahlung from nonrelativistic electrons in crystals," *Phys. Rev. E* **62**, 4225 (2000) ("Feranchuk--Spence 2000"). Ledger cites Eq. (3) for `chi_g`, Eq. (10),(12) for the line spectrum. The implementation's braced CBS assembly additionally cites Feranchuk Eq. (13)/(14) and Zhai (2025) SI Eq. (6).
 - Intended quantity: the electron-optical potential Fourier component `U_g` (an energy) from the crystal's periodic electrostatic potential, and the braced factor that weights PXR against CBS with the `1/gamma` suppression that becomes numerically important above ~100 keV.
 

@@ -90,6 +90,10 @@ def _radiator(case):
 
 
 def _row_parameters(case, energy):
+    """Resolve transfer harmonics in the production Maxwell phase convention.
+
+    Validation: line-tr-phase-reconciliation
+    """
     layer, radiator = _radiator(case)
     crystal, hkl = radiator["crystal"], tuple(radiator["hkl_list"][0])
     lattice = CRYSTALS[crystal]["lattice"]

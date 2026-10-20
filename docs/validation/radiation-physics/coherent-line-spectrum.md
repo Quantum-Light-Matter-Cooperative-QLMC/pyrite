@@ -1,12 +1,17 @@
 # `coherent-line-spectrum`
 
+> Ownership refresh (2026-10-20, #599): current entry points replace retired
+> monolithic module paths below. Dated source excerpts, line numbers, numerical
+> evidence and verdicts describe their original revision; this reference repair
+> does not independently revalidate those equations or extend their evidence.
+
 ## Claim and scope
 
-- **Claim:** `montecarlo/spectrum/lines.py::mc_cxr_spectrum` (the incoherent, ungrooved, unlayered path) returns the per-electron line spectrum $d^2N/(dE\,d\Omega)$ in photons / (eV sr incident-electron) as a sum of $\lvert A_{\rm PXR}+A_{\rm CBS}\rvert^2$ contributions over transport segments, with an exact incoherent average over mosaic crystallite orientations.
+- **Claim:** `montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum` (the incoherent, ungrooved, unlayered path) returns the per-electron line spectrum $d^2N/(dE\,d\Omega)$ in photons / (eV sr incident-electron) as a sum of $\lvert A_{\rm PXR}+A_{\rm CBS}\rvert^2$ contributions over transport segments, with an exact incoherent average over mosaic crystallite orientations.
 - **Source:** Feranchuk, Ulyanenkov, Harada, Spence, *Phys. Rev. E* **62**, 4225 (2000), Eqs. (10) and (12); Zhai (2025) SI Eqs. (5)–(7).
 - **This row covers:** the spectral prefactor multiplying $\lvert A\rvert^2$, how per-segment squared amplitudes are accumulated into $d^2N/(dE\,d\Omega)$, which degrees of freedom are added in intensity rather than in amplitude (segments, electrons, polarizations, reflections, mosaic crystallites), the per-electron normalization, and the mosaic orientation average.
 
-**Given inputs, not re-verified here.** The constituent amplitudes and the factors they carry are separately ledgered and are taken as given: `pxr-amplitude` ($\chi_{\mathbf g}$), `cbs-amplitude` ($U_{\mathbf g}$ and the braced relativistic PXR/CBS assembly, currently `filtered`), `finite-time-lineshape` ($\lvert Q\rvert^2=t_L^2\operatorname{sinc}^2$), `coherent-emission` (the opt-in phased branch), and `line-absorption-tabulation` ($\mu(E)$ and the Beer–Lambert escape factor). The open `line-energy-dispersion` harmonic-sign discrepancy sets the *centre* $\omega_{\rm res}$ of every line; it is noted in passing and is not adjudicated here, because it does not touch the squaring/summing structure that is this row's subject.
+**Given inputs, not re-verified here.** The constituent amplitudes and the factors they carry are separately ledgered and are taken as given: `pxr-amplitude` ($\chi_{\mathbf g}$), `cbs-amplitude` ($U_{\mathbf g}$ and the braced relativistic PXR/CBS assembly, `filtered` at the original review, now `rederived` in its own record), `finite-time-lineshape` ($\lvert Q\rvert^2=t_L^2\operatorname{sinc}^2$), `coherent-emission` (the opt-in phased branch), and `line-absorption-tabulation` ($\mu(E)$ and the Beer–Lambert escape factor). The historical `line-energy-dispersion` harmonic-sign question concerned the *centre* $\omega_{\rm res}$ of every line; it was not adjudicated in this original derivation, because it did not touch the squaring/summing structure that is this row's subject.
 
 The derivation in the next section was written from the source, the ledger row, and the `mc_cxr_spectrum` signature and docstring, before the implementation body was read.
 
@@ -238,8 +243,8 @@ The last row is direct evidence for the ledger's note that the interference is n
 1. **No divergence in this row's subject.** Prefactor, squaring, summation order, per-electron normalization, and mosaic weighting all reproduce the independent expression to the level of the fine-structure-constant literal ($6.7\times10^{-10}$).
 2. **Frozen prefactor frequency.** The implementation evaluates the $\alpha\omega/(4\pi^2\hbar c)$ prefactor at $\omega_{\rm res}$, not at the grid frequency. This is consistent with the narrow-line freezing already applied to $\chi_{\mathbf g}$, $U_{\mathbf g}$, and $\mu$; the error is odd about the line centre and cancels to first order on integration. Documented, not a defect.
 3. **Peak height is segmentation dependent.** The incoherent sum is exact in integrated yield and approximate in peak height. Absolute line-peak comparisons against a paper therefore inherit an implicit dependence on the transport's segment-length distribution. This is the known boundary between this row and `coherent-emission` and should stay visible in the ledger note.
-4. **Upstream cap.** The Eq. (13)/(14) tensor structure of $A_{\rm PXR}$ and $A_{\rm CBS}$ is ledgered under `cbs-amplitude` at status `filtered`, not `rederived`. This row certifies how $\lvert A\rvert^2$ is used; it cannot raise the certainty of $A$ itself.
-5. **Open sign question, untouched.** `line-energy-dispersion` remains a `discrepancy`: the independent $\exp(+i\mathbf g\cdot\mathbf r)$ derivation gives $-\mathbf v\cdot\mathbf g/(1-\mathbf v\cdot\hat{\mathbf n})$ where production uses $+$. That fixes where each line sits, not how it is squared or summed, so it does not block this row — but a signed-off `coherent-line-spectrum` still stands on an unresolved $\omega_{\rm res}$ sign.
+4. **Upstream cap.** The Eq. (13)/(14) tensor structure of $A_{\rm PXR}$ and $A_{\rm CBS}$ is ledgered under `cbs-amplitude` at status `filtered` at the original review; its own later record now carries `rederived`. This row certifies how $\lvert A\rvert^2$ is used; it cannot raise the certainty of $A$ itself.
+5. **Historical sign question, resolved in #338.** The original derivation left the harmonic label unresolved. The later independent [line-energy-dispersion record](line-energy-dispersion.md) resolves the numerator sign as relabelling and verifies the Friedel-mate coupling correction. This refresh does not re-derive the constituent amplitudes.
 6. **`components=True` is not a decomposition.** `spec_pxr + spec_cbs` differs from `spec` by the interference term, which is $+22\%$ at the checked point. Any downstream use as an additive split is wrong; the docstring says so for the coherent path but not for the incoherent one.
 
 ## Adjudication
