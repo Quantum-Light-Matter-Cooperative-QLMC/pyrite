@@ -12,7 +12,6 @@ from scipy.constants import elementary_charge
 
 from pyrite import _backend
 from pyrite.materials.crystal import HBARC_EV_ANG
-from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner import transition_emission
 from pyrite.montecarlo.runner.transition_emission import case_transition_spectrum
 from pyrite.montecarlo.spectrum import transition_radiation_crossings
@@ -83,8 +82,13 @@ def _assert_parity(device, host):
 
 
 @pytest.fixture(scope="module")
-def bilayer_crossings():
-    return boundary_crossings(_run(_BILAYER), _BILAYER)
+def bilayer_transport():
+    return _run(_BILAYER)
+
+
+@pytest.fixture(scope="module")
+def bilayer_crossings(bilayer_transport):
+    return boundary_crossings(bilayer_transport, _BILAYER)
 
 
 @pytest.mark.parametrize("fused", [True, False], ids=["kernel", "array"])
@@ -132,15 +136,23 @@ def test_kernel_sums_are_reproducible_and_launch_geometry_only_reorders(bilayer_
 
 
 @pytest.mark.parametrize("coherence", ["history", "bunch"])
-def test_run_case_component_scores_on_the_device(coherence, monkeypatch):
-    case = _case()
+def test_run_case_component_scores_on_the_device(coherence, bilayer_transport, monkeypatch):
+    # The component consumes transported rows; SBETHE/ELSEPA installation is
+    # independent of its device dispatch. Reuse the same seeded bilayer as
+    # the crossing-parity tests instead of requiring external table downloads.
+    case = _case(abs_layers=_BILAYER, Ne=60, Ne_brem=60, thickness_ang=3000.0)
     if coherence == "bunch":  # N = M: the plain coherent sum, no undersampled excess
         case = replace(
             case,
             transition_radiation={"model": "planar-stack", "coherence": "bunch"},
             bunch_charge_pc=case.Ne_brem * elementary_charge / 1e-12,
         )
-    transport = runner._transport_case(case)
+    transport = dict(
+        segs=bilayer_transport,
+        E_grid=np.geomspace(100.0, 3000.0, 40),
+        n_hat=np.array([np.sin(0.3), 0.0, np.cos(0.3)]),
+        Ne_brem=case.Ne_brem,
+    )
     host = case_transition_spectrum(case, transport, xp=np)
     used = []
     score = transition_emission.crossing_transition_radiation

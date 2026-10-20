@@ -172,7 +172,11 @@ def resolve_pixel_scene(
             ),
             channeling_plane=cast(tuple[int, int, int] | None, transport.get("channeling_plane")),
             transition_radiation=cast(
-                Literal["off", "history", "bunch"], transport.get("transition_radiation", "off")
+                Literal["off", "history", "bunch", "two-beam"],
+                transport.get("transition_radiation", "off"),
+            ),
+            transition_lattice_origin_ang=cast(
+                tuple[float, float, float] | None, transport.get("transition_lattice_origin_ang")
             ),
             positron_transport=bool(transport.get("positron_transport", False)),
             atomic_electron_deflection=cast(

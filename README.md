@@ -68,7 +68,7 @@ If you encounter a problem, have a feature request, or would like to discuss a p
 
 ## License
 
-PyRITE is distributed under the [UCLA Academic Software License](LICENSE.txt) for educational and academic research by eligible academic or nonprofit researchers. **Commercial use requires separate permission**; see the license for details.
+PyRITE is distributed under the [UCLA Academic Software License](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE.txt) for educational and academic research by eligible academic or nonprofit researchers. **Commercial use requires separate permission**; see the license for details.
 
 ---
 

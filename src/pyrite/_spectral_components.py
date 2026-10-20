@@ -83,6 +83,11 @@ def cxr_spectrum(
     along the surface normal the cross term (and diffracted TR) is not
     included.
 
+    With ``transition_radiation.model='two-beam'``, the line slot is instead
+    the signed joint-field correction to the separate history-TR baseline.
+    Their sum retains PXR/DTR/CBS/TR interference. Setting ``transition=False``
+    removes only that baseline; it is not a DTR-disabled counterfactual.
+
     Validation: characteristic-radiation, tr-line-cross-term
     """
     total = np.asarray(record["spec_coherent" if coherent else "spec"])

@@ -887,12 +887,27 @@ receives numeric initial-state arrays through its existing backend boundary.
 
 ### Experimental DTR diagnostic
 
+`montecarlo/spectrum/dtr_two_beam.py` adds an experimental CPU two-harmonic
+Maxwell straight-passage diagnostic, with passive mode classification and
+bounded face-referenced propagators. Its `dtr-two-beam-boundary` claim is
+unverified. `spectrum/dtr_history.py` extends the boundary solve to finite
+transport currents and moving lattice-force dipoles. `runner/dtr_emission.py`
+owns the opt-in `Physics(transition_radiation="two-beam")` scorer, used by the
+shared live/directions/replay/reline line seam. It returns the signed joint-field
+correction to the separate crossing-TR component. Model/termination join identity
+only when selected. The transported-current and CBS-phase claims remain
+unverified; this CPU path supports one perfect crystal layer/reflection,
+explicit node grids and equal line/continuum populations.
+
 `montecarlo/spectrum/dtr.py` owns first-Born per-crossing diffraction of a
 homogeneous stack's free TR waves and own-field diffraction on a straight
 passage. `validation/dtr_reference.py` reads the shipped
 `validation/reference_data/dtr_stack.toml` alternating SiO2/MoS2/SiO2 profile
 and writes paired DTR-on/off spectra, signed interference, material/profile
-provenance and a figure. No production case, CBS, dynamical extinction or
+provenance and a figure. Its opt-in `--two-beam` comparison appends repeated-
+diffraction source-row densities, their signed cross term and the difference
+from the Born total, with a separate model digest. No production case, CBS,
+validated dynamical extinction or
 validated high-energy transport is implied. Checks:
 `tests/montecarlo/test_transition_radiation_dtr*.py`. Derivation:
 [experimental DTR](physics/radiation-physics/diffracted-transition-radiation.md).

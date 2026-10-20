@@ -114,6 +114,10 @@ def resolved_physics_view(
         from .montecarlo.spectrum.transition_radiation_crossings import TRANSITION_MODEL
 
         markers["transition_model"] = TRANSITION_MODEL
+        if transition["model"] == "two-beam":
+            from .montecarlo.spectrum.dtr_history import DTR_MODEL
+
+            markers["transition_model"] = DTR_MODEL
     return ResolvedPhysicsView(
         descriptor_ids=tuple(descriptor.id for descriptor in descriptors),
         model_markers=tuple(markers.items()),

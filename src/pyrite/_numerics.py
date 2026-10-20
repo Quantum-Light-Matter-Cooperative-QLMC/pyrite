@@ -66,6 +66,7 @@ TRANSPORT_KEYS = (
     "positron_transport",
     "atomic_electron_deflection",
     "transition_radiation",
+    "transition_lattice_origin_ang",
 )
 #: Collision-loss schemes a run may select: ``"auto"`` (the default) plus the
 #: ``simulate_trajectories`` schemes of
@@ -104,7 +105,7 @@ CHANNELING_MODELS = ("off", "planar")
 #: leaves every case and identity unchanged; ``"history"`` sums each primary
 #: history's boundary crossings coherently; ``"bunch"`` also keeps the
 #: cross-history (CTR) terms with the physical bunch population.
-TRANSITION_RADIATION_MODES = ("off", "history", "bunch")
+TRANSITION_RADIATION_MODES = ("off", "history", "bunch", "two-beam")
 PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
 
@@ -231,6 +232,12 @@ class Physics:
         separate ``spec_transition`` component (#103), per history or with
         coherent bunch (CTR) terms. Requires ``energy_model="midpoint"``;
         excludes channeling.
+        ``"two-beam"`` opts into experimental transported-history Maxwell
+        PXR/DTR/CBS scoring (CPU, one perfect crystal layer and reflection).
+        It replaces the line scorer and retains signed TR/line interference.
+    transition_lattice_origin_ang
+        Lattice origin relative to the entrance face, in Å, for ``"two-beam"``;
+        omitted means (0, 0, 0). It changes the surface-termination phase.
     """
 
     emission: EmissionSelection = "incoherent"
@@ -248,7 +255,8 @@ class Physics:
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
     channeling_model: Literal["off", "planar"] = "off"
     channeling_plane: tuple[int, int, int] | None = None
-    transition_radiation: Literal["off", "history", "bunch"] = "off"
+    transition_radiation: Literal["off", "history", "bunch", "two-beam"] = "off"
+    transition_lattice_origin_ang: tuple[float, float, float] | None = None
 
     def __post_init__(self) -> None:
         if self.emission == "both":
@@ -256,6 +264,10 @@ class Physics:
                 'emission="both" was removed in 0.15.0; use emission=("incoherent", "coherent")'
             )
         object.__setattr__(self, "emission", _emission_selection(self.emission))
+        if self.transition_lattice_origin_ang is not None:
+            object.__setattr__(
+                self, "transition_lattice_origin_ang", tuple(self.transition_lattice_origin_ang)
+            )
         if self.channeling_plane is not None:
             object.__setattr__(self, "channeling_plane", _miller(self.channeling_plane))
         if self.brem_source is None:
@@ -443,6 +455,14 @@ def validate_transition_physics(physics: "Physics", energy_model: str) -> None:
     precision, temporal profiles) are ``Case`` validation.
     """
     mode = physics.transition_radiation
+    origin = physics.transition_lattice_origin_ang
+    if origin is not None:
+        if mode != "two-beam":
+            raise ValueError(
+                "transition_lattice_origin_ang requires transition_radiation='two-beam'"
+            )
+        if len(origin) != 3 or not all(np.isfinite(x) for x in origin):
+            raise ValueError("transition_lattice_origin_ang must contain three finite coordinates")
     if mode not in TRANSITION_RADIATION_MODES:
         raise ValueError(
             f"transition_radiation must be one of {', '.join(TRANSITION_RADIATION_MODES)}"

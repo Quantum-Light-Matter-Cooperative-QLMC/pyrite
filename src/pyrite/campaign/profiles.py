@@ -292,6 +292,7 @@ def resolve_numerics(
         "positron_transport": physics.positron_transport,
         "atomic_electron_deflection": physics.atomic_electron_deflection,
         "transition_radiation": physics.transition_radiation,
+        "transition_lattice_origin_ang": physics.transition_lattice_origin_ang,
     }
     effective.update(
         {
@@ -591,9 +592,15 @@ def _identity_v1(
         resolved["channeling_model"] = CHANNELING_MODEL
     # Transition radiation (#103) is opt-in on the same divergence-only rule.
     transition = settings_payload.pop("transition_radiation", "off")
+    origin = settings_payload.pop("transition_lattice_origin_ang", None)
     if transition != "off":
         resolved["transition_radiation"] = transition
         resolved["transition_model"] = TRANSITION_MODEL
+        if transition == "two-beam":
+            from ..montecarlo.spectrum.dtr_history import DTR_MODEL
+
+            resolved["transition_model"] = DTR_MODEL
+            resolved["transition_lattice_origin_ang"] = origin or (0.0, 0.0, 0.0)
     # Fixed-N payloads retain their exact historical bytes. In adaptive mode
     # the requested policy owns the budget; the unused fixed defaults and the
     # realized count do not participate in dataset identity.
@@ -774,6 +781,10 @@ def case_content_key(
         payload["channeling_model"] = CHANNELING_MODEL
     if case.get("transition_radiation") is not None:
         payload["transition_model"] = TRANSITION_MODEL
+        if case["transition_radiation"]["model"] == "two-beam":
+            from ..montecarlo.spectrum.dtr_history import DTR_MODEL
+
+            payload["transition_model"] = DTR_MODEL
     if xsgen_tables:
         payload["xsgen_tables"] = {str(key): str(value) for key, value in xsgen_tables.items()}
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()

@@ -482,13 +482,22 @@ class Case(Mapping[str, Any]):
         record = self.transition_radiation
         if record is _ABSENT:
             return
-        if not isinstance(record, Mapping) or set(record) != set(TRANSITION_RECORD_KEYS):
+        keys = (
+            (*TRANSITION_RECORD_KEYS, "lattice_origin_ang")
+            if isinstance(record, Mapping) and record.get("model") == "two-beam"
+            else TRANSITION_RECORD_KEYS
+        )
+        if not isinstance(record, Mapping) or set(record) != set(keys):
             raise ValueError(
                 "transition_radiation must be a record with keys "
                 + ", ".join(TRANSITION_RECORD_KEYS)
             )
-        if record["model"] != "planar-stack":
-            raise ValueError("transition_radiation model must be 'planar-stack'")
+        if record["model"] not in ("planar-stack", "two-beam"):
+            raise ValueError("transition_radiation model must be 'planar-stack' or 'two-beam'")
+        if record["model"] == "two-beam":
+            from .runner.dtr_emission import validate_dtr_case
+
+            validate_dtr_case(self)
         if record["coherence"] not in ("history", "bunch"):
             raise ValueError("transition_radiation coherence must be 'history' or 'bunch'")
         if self.energy_model != "midpoint":
@@ -573,6 +582,8 @@ TRANSITION_RECORD_KEYS = ("model", "coherence")
 
 def transition_case_record(coherence: str) -> dict[str, object]:
     """Resolved ``Case.transition_radiation`` record for ``"history"`` or ``"bunch"``."""
+    if coherence == "two-beam":
+        return {"model": "two-beam", "coherence": "history", "lattice_origin_ang": [0.0, 0.0, 0.0]}
     return {"model": "planar-stack", "coherence": coherence}
 
 

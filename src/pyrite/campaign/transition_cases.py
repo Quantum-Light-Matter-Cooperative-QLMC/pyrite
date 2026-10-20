@@ -19,4 +19,8 @@ def resolve_transition_radiation(cases: list[Case], physics: Physics) -> list[Ca
     if physics.transition_radiation == "off":
         return cases
     record = transition_case_record(physics.transition_radiation)
+    if physics.transition_radiation == "two-beam":
+        record["lattice_origin_ang"] = list(
+            physics.transition_lattice_origin_ang or (0.0, 0.0, 0.0)
+        )
     return [replace(case, transition_radiation=record) for case in cases]
