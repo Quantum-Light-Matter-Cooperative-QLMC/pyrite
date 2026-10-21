@@ -31,6 +31,7 @@ physics/channeling-materials
 physics/dechanneling-boundary
 physics/mos2-directional-loss-sources
 physics/transition-radiation-recommendations
+physics/optical-ir-emission
 physics/photon-transport
 ```
 
