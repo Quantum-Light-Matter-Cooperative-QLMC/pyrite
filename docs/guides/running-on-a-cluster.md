@@ -10,15 +10,9 @@
 The project is uv-managed with a committed lockfile. On the login node:
 
 ```bash
-git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
-cd pyrite
-uv sync                       # CPU-only base environment
-# or exactly one: --extra nvidia | --extra amd | --extra intel
-source .venv/bin/activate
-pyrite --help                 # sanity check
+uv tool install "pyrite-mc[nvidia]"  # ROCm and Intel support are unmaintained
+pyrite --help  # sanity check
 ```
-
-No GPU stack is installed by default. NVIDIA nodes use `uv sync --extra nvidia` and a CUDA runtime matching `cupy-cuda13x`. Intel nodes use `uv sync --extra intel`. AMD nodes currently require a ROCm toolchain and `CUPY_INSTALL_USE_HIP=1 uv sync --extra amd`; AMD-hosted wheels do not yet support PyRITE's Python version. Keep ROCm deployment provisional until validated on the target cluster.
 
 Set `PYRITE_MC_BACKEND` explicitly in production jobs when silently changing hardware would be wrong. Automatic selection may fall back to CPU; explicit `cuda`, `rocm`, or `sycl` errors if unavailable or over budget.
 

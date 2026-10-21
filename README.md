@@ -1,8 +1,8 @@
 # PyRITE
 
-**Simulate how electrons travel through matter—and the X-rays they produce.**
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23487183.svg)](https://doi.org/10.5281/zenodo.23487183)  [![PyPI](https://img.shields.io/pypi/v/pyrite-mc)](https://pypi.org/project/pyrite-mc/) [![Documentation](https://readthedocs.org/projects/pyrite/badge/?version=latest)](https://pyrite.readthedocs.io/en/latest/) ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FQuantum-Light-Matter-Cooperative-QLMC%2Fpyrite%2Fmain%2Fpyproject.toml) [![Downloads](https://img.shields.io/pypi/dm/pyrite-mc?label=downloads%2Fmonth)](https://pypistats.org/packages/pyrite-mc) [![License](https://img.shields.io/badge/License-UCLA-blue)](LICENSE.txt)
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23487183.svg)](https://doi.org/10.5281/zenodo.23487183)  [![PyPI](https://img.shields.io/pypi/v/pyrite-mc)](https://pypi.org/project/pyrite-mc/) [![Documentation](https://readthedocs.org/projects/pyrite/badge/?version=latest)](https://pyrite.readthedocs.io/en/latest/) [![Python](https://img.shields.io/pypi/pyrequires/pyrite-mc)](https://img.shields.io/pypi/v/pyrite-mc) [![License](https://img.shields.io/github/license/Quantum-Light-Matter-Cooperative-QLMC/pyrite)](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE.txt)
+**Simulate how electrons travel through matter—and the X-rays they produce.**
 
 PyRITE (**Py**thon toolkit for **R**adiation from **I**nteractions and **T**ransport of **E**lectrons) is a Python-based Monte Carlo simulation toolkit for electron transport and radiation in solids. It is designed for researchers studying electron–matter interactions, crystal-based X-ray sources, and related experiments.
 
@@ -29,8 +29,6 @@ PyRITE is especially useful for investigating **tunable, crystal-based X-ray sou
 The **[interactive results demo](https://pyrite.readthedocs.io/en/latest/demo/index.html)** lets you explore sample X-ray spectra and electron trajectories without installing Python or downloading any datasets. It's the easiest way to see what PyRITE produces.
 
 ## Get started locally
-
-PyRITE is published on [PyPI as `pyrite-mc`](https://pypi.org/project/pyrite-mc/) and requires **Python 3.13 or newer**.
 
 To install the command-line tool with [uv](https://docs.astral.sh/uv/):
 
