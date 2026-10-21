@@ -1,13 +1,17 @@
 [project]
 name = "pyrite-mc"
-version = "0.16.3"
+version = "0.16.4"
 description = "Monte Carlo electron transport and X-ray emission in crystalline and amorphous solids."
 readme = "PYPI.md"
 license = { file = "LICENSE.txt" }
 license-files = ["LICENSE.txt", "THIRD-PARTY-NOTICES.md"]
 classifiers = [
     "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
+
 requires-python = ">=3.13"
 dependencies = [
     "backports.zstd>=1.7; python_version < '3.14'",

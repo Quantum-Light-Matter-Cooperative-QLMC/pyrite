@@ -1,8 +1,8 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23487183.svg)](https://doi.org/10.5281/zenodo.23487183)
-
 # PyRITE
 
 **Simulate how electrons travel through matter—and the X-rays they produce.**
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23487183.svg)](https://doi.org/10.5281/zenodo.23487183)  [![PyPI](https://img.shields.io/pypi/v/pyrite-mc)](https://pypi.org/project/pyrite-mc/) [![Documentation](https://readthedocs.org/projects/pyrite/badge/?version=latest)](https://pyrite.readthedocs.io/en/latest/) [![Python](https://img.shields.io/pypi/pyrequires/pyrite-mc)](https://img.shields.io/pypi/v/pyrite-mc) [![License](https://img.shields.io/github/license/Quantum-Light-Matter-Cooperative-QLMC/pyrite)](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE.txt)
 
 PyRITE (**Py**thon toolkit for **R**adiation from **I**nteractions and **T**ransport of **E**lectrons) is a Python-based Monte Carlo simulation toolkit for electron transport and radiation in solids. It is designed for researchers studying electron–matter interactions, crystal-based X-ray sources, and related experiments.
 
