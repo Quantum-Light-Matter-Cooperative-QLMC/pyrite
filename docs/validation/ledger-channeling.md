@@ -2,6 +2,36 @@
 
 Part of the [physics validation ledger](physics-validation-ledger.md). See the [validation methodology](methodology.md) for the status lifecycle and the [domain inventories](domain-inventories.md) for a claim-by-claim index. Design: [ADR-0018](../adr/0018-quantum-channeling-zone.md) and the [channeling radiation walkthrough](../research/physics/channeling-radiation-physics.md). These rows cover the static, scattering-free planar profile (#503), open-system depth evolution (#504) and channeling-radiation emission (#505), and the transport handoff (#506). Angles are plane-local; `cr-plane-incidence` maps the laboratory tilt and #25 `CrystalCut` orientation onto them.
 
+## `cr-axial-phase-space-instrument`
+
+- **Claim:** normalized finite-grid Weyl translations of any unit discrete window resolve the identity with factor `1/M`. Applying that positive joint position/momentum measurement to a selected outgoing state preserves its squared norm and position/momentum correlations. Together with complementary orthogonal retained/outgoing projectors the instrument is trace preserving. This is measurement algebra, not a physical escape or native-launch model.
+- **Code:** `montecarlo/channeling/axial_phase_space.py::{phase_space_weights,sample_phase_space}`
+- **Source:** finite Weyl orthogonality; continuous coherent-state POVM analogue in Brody, Graefe & Melanathuru, Phys. Rev. Lett. 134, 120201 (2025).
+- **Status:** anchored
+- **Checks:** direct complex-exponential Weyl overlaps on a rectangular grid; complementary-projector mixed-state closure; joint conditional probabilities; delta-window and uniform-wave limits; zero state and recording-budget refusals.
+- **Anchor:** `tests/montecarlo/test_channeling_axial_phase_space.py`
+- **Notes:** Research prerequisite for #620. No physical dechanneling interpretation, frame/energy-shell prescription, stopping or native transport continuation. Phase-space smoothing and return-flux convergence remain required under `cr-axial-zone-handoff-accounting`. **2026-10-21 fresh-context verdict `rederived`** ([write-up](channeling/cr-axial-phase-space-instrument.md)): finite Fourier orthogonality, complex window conjugation, forward FFT sign, mixed-state closure and correlated conditional sampling independently verified before code inspection. All ten independent direct-mode and limiting-case regressions pass. This scoped measurement claim is `anchored`; the physical handoff claim remains unverified. Human sign-off remains in #277.
+
+## `cr-quantum-regression-correlation`
+
+- **Claim:** for a supplied finite time-independent GKSL model, the quantum-regression correlation is `G_ab(z,z') = Tr[J_a exp(L(z-z'))(rho(z') J_b†)]` for `z >= z'`, with conjugate component-transposed reversal. Its double-depth quadratic form with positive spectral phase and complex amplitude weights preserves interference and places a lowering transition at positive conjugate frequency. Attenuation belongs at both amplitudes, rather than on a local yield after integration.
+- **Code:** `montecarlo/channeling/quantum_regression.py::{_generator,regression_correlation,spectral_quadratic_form}`
+- **Source:** Lax, Phys. Rev. 129, 2342 (1963) (quantum regression); Gorini, Kossakowski & Sudarshan, JMP 17, 821 (1976), Lindblad, CMP 48, 119 (1976) (GKSL generator); Landi et al., PRX Quantum 5, 020201 (2024), Eq. (95) (regression formula).
+- **Status:** anchored
+- **Checks:** exact damped two-level complex correlation; pure-dephasing delay law; current-component interference; positive-energy finite-time sinc limit; amplitude attenuation; ground/zero density; mixture linearity; positive quadratic forms and allocation refusals.
+- **Anchor:** `tests/montecarlo/test_channeling_quantum_regression.py`
+- **Notes:** Bounded CPU reference, with incident normalization and explicit dense/spectral-memory admission. Output is a supplied-current correlation/quadratic form, not photons/eV/sr. It supplies no material-specific current operator, finite-grid completeness, frame mapping, boundary matching or persisted channel. **2026-10-21 fresh-context verdict `rederived`** ([write-up](channeling/cr-quantum-regression-correlation.md)): derived before implementation; column-major GKSL factors, non-Hermitian intermediate, complex component ordering, positive spectral phase and amplitude attenuation match. All 15 independent analytic/budget regressions pass; this scoped reference is `anchored`. The physical axial source remains unverified/unimplemented. Human sign-off remains in #277.
+
+## `cr-axial-persisted-channel`
+
+- **Claim:** proposed standard-run axial source: incident-normalized photons/eV/sr from a complete declared emitting subspace, physical finite-path/scattering correlations, consistent frames and depth attenuation, and exactly-once optional result/checkpoint persistence. All strings, represented capture and unresolved spectral weight require explicit coverage or bounds.
+- **Code:** research proposal only; no production axial source or persistence adapter.
+- **Source:** [standard-run source contract](../research/physics/axial-run-integration.md#expected-value-spectral-source); `cr-axial-helicity-emission` for the existing local-level polarization scope; `cr-quantum-regression-correlation` for the finite Markov reference algebra. None establishes the complete material source.
+- **Status:** unverified
+- **Checks:** planned: complete emitting-subspace/capture convergence, correct photon units and angular frames, finite-path/scattering line shapes, amplitude attenuation, mixed-state linearity, exactly-once combination, cache separation, persisted round-trip and early unsupported-consumer refusal.
+- **Anchor:** no production anchor; finite correlation and diagnostic local-line anchors do not cover this claim.
+- **Notes:** Registered for #620 before production source implementation. Actual axial electronic jumps change carrier/Bloch sectors; a one-sector finite Liouvillian and the one-string flat-level catalog are insufficient. Source/native radiation partition and physical handoff remain open. Target `anchored`; human sign-off remains in #277.
+
 ## `diamond-valence-oscillator`
 
 - **Claim:** the existing PENELOPE effective-oscillator model for undoped diamond assigns four valence electrons per C formula unit to the approximately 34 eV bulk plasmon, retaining two K-core electrons; this is not a free-carrier or boron-doped intervalence oscillator.
@@ -321,24 +351,28 @@ change the eigenproblem or introduce a new physical selection rule.
 ## `cr-axial-realspace-propagation`
 
 - **Claim:** the axial transverse state obeys `iħv ∂ψ/∂z = [−(ħ²/2γm)∇⊥² + U(r) − iW(r)]ψ` on a periodic `L_x × L_y` grid, advanced by Strang splitting `K(dz/2)V(dz)K(dz/2)`, `K = exp(−iħ|k + k_t|²dz/2γmv)`, `V = exp(−i(U − iW)dz/ħv)`: unitary for `W = 0`, local error `O(dz³)`. The carrier tilt `k_t = pθ` is factored out (`ψ = e^{ik_t·r}φ`, periodic `φ`), so any tilt is exact. An isolated entry state is its periodization `φ = A⁻¹Σ_k ψ̃(k)e^{ik·r}` on the grid momenta (Poisson summation).
-- **Code:** `montecarlo/channeling/realspace.py::{RealSpaceGrid,RealSpaceGrid.sample,SplitStepPropagator}`
+- **Code:** `montecarlo/channeling/realspace.py::{RealSpaceGrid,RealSpaceGrid.sample,SplitStepPropagator}`; `montecarlo/channeling/_axial_cuda.py`
 - **Source:** Strang, SIAM J. Numer. Anal. 5, 506 (1968); Kirkland, *Advanced Computing in Electron Microscopy* (2010), §6 (multislice/split-step); proposal §9 (real-space representation for axial jumps)
 - **Status:** anchored
 - **Checks:** Axial eigenstates (`cr-axial-2d-eigenproblem`) stay stationary: fidelity > 1 − 1e-6 over 2000 Å, phase error 6.6e-3 → 1.65e-3 rad when `dz` halves 5 → 2.5 Å (second order); Norm conserved to 1e-12 for `W = 0`; uniform `W` decays the norm as `e^{−2Wz/ħv}` exactly; Free space reproduces the finite-energy Airy closed form to 1e-6 and the LG Gouy phase to 1e-10 rad; Planar limit: a plane wave aligned with Si (110) and tilted by θ along the plane from ⟨001⟩ at 10 MeV converges to the planar evolution, max x-density error 9.6%, 1.6%, 0.42% at θ = 20, 50, 100 mrad (∝ θ⁻²); tilt within the plane leaves planar evolution unchanged to 1e-10.
 - **Anchor:** `tests/montecarlo/test_channeling_axial.py::{test_split_step_holds_eigenstates_stationary,test_absorption_decays_norm,test_free_space_airy_self_acceleration,test_free_space_laguerre_gauss_gouy_phase,test_tilt_along_plane_converges_to_planar}`
 - **Notes:** Issue #508, slice 2: coherent evolution plus an optional absorptive potential. Scattering jumps (pointwise in real space), observables `P_ℓ(z)`, `⟨L_z⟩(z)` and the MCWF driver are later slices; production statistics need the separate CUDA issue. **2026-10-16 fresh-context verdict `rederived`** ([write-up](channeling/cr-axial-realspace-propagation.md)): sampling, tilt carrier (exact to 1e-13 at `k_t` ≫ Nyquist), Strang `O(dz²)` against `expm`, and the absorptive sign and rate all match. `anchored` on the closed-form Airy and Gouy-phase tests. Splitting error grows with tilt (`θ·dz` must resolve string features; θ = 100 mrad needs `dz ≲ 1 Å` for 1e-4). The planar-limit Checks use `dz = 2 Å`; converged at `dz = 0.5 Å` they are 9.62/1.57/0.387% (θ⁻² ratio 4.06). Human sign-off pending (#277).
 
+- **CUDA backend follow-up (2026-10-21):** the [fresh-context backend verification](channeling/cr-axial-cuda-backend.md) rederives carrier-aware kinetic phases, lagged KVK, Parseval norms and loss signs before source inspection. Deterministic CPU/CUDA and fused-operator anchors in `tests/montecarlo/test_channeling_axial_cuda.py` pass on the RTX5080. `anchored` covers the same finite-grid model on both backends, with existing step/tilt and convergence limitations; it does not establish physical escape or a main-run source.
+
 ## `cr-axial-realspace-dissipator`
 
 - **Claim:** the planar Lindblad kernels carried to the axial real-space grid. TDS: per-atom phase-covariance unravelling `L_{s,R,u}(r) = φ_u(r) − ⟨φ⟩(r)`, rate `λ_s p(u)d²u`, `u ~ N(0, a²I)`, phase band-limited to the grid; full diagonal `C(r,r) = Σ_G n_{s,G} T_s(|G|)e^{iG·r}/(2πħv)²` with the planar transform; `C(r,r) − C_grid(r,r)` (clamped ≥ 0) is a sink, so the no-jump loss is `max(C, C_grid)`. Electronic: `L_q = sqrt(w(q)ρ_q(r))e^{iq·r}` on the planar quadrature nodes, kick added to the carrier tilt. MCWF: waiting-time jumps, mechanism ∝ `∫|ψ|²C`, exact rejection sampling of `u` (Lipschitz annulus envelope).
-- **Code:** `montecarlo/channeling/axial_dissipator.py::axial_dissipator`; `montecarlo/channeling/axial_mcwf.py::AxialMCWF`
+- **Code:** `montecarlo/channeling/axial_dissipator.py::axial_dissipator`; `montecarlo/channeling/axial_mcwf.py::AxialMCWF`; `montecarlo/channeling/_axial_cuda.py`; `montecarlo/channeling/_axial_cuda_dissipator.py`; `montecarlo/channeling/_axial_cuda_jumps.py`
 - **Source:** `cr-lindblad-jump-operators`; Dalibard, Castin & Mølmer, PRL 68, 580 (1992)
-- **Status:** rederived
+- **Status:** anchored
 - **Checks:** y-averaged TDS and electronic diagonals equal the planar `ScatteringKernel.diagonal` to 1e-9 (Si ⟨001⟩ → (110), 10 MeV); in-grid variance equals 2D Gauss–Hermite quadrature over `u` to 1e-10; the displacement-weight expansion is exact (1e-15); MCWF ensemble reproduces a direct Strang-split Lindblad integration on a 12² grid within 4σ (16 000-electron run: 1.1σ, 0.4σ, 0.65σ at 0.5/2/6 kÅ); runs are batch-independent; electronic jumps localize as `ρ_q` and sample `q` by weight.
 - **Anchor:** `tests/montecarlo/test_channeling_axial_dissipator.py`
 - **Notes:** Issue #508, slice 3 (WIP checkpoint). Supercell images move together on a 1-cell grid (few-% change of the in-grid variance); use ≥ 2–3 cells. Anisotropic in-plane displacements raise. Cost: 128 e⁻ × 1 µm on a 3×3-cell 64² grid ≈ 22 s on 24 cores (CPU); production statistics need the CUDA issue. **2026-10-16 fresh-context verdict `rederived`** ([write-up](channeling/cr-axial-realspace-dissipator.md)): in-grid variance matches 40×40 Gauss–Hermite to 4e-14, `T(|G|)` to 1e-6, y-average to the planar diagonal to 2e-11; electronic node weights equal the loss to 1e-8 on production grids; the rejection envelope bounds the weight (max ratio 0.92 over 2e5 draws) and 20 000 draws reproduce the target moments (|z| ≤ 1.7). The clamp is a band-limit artefact: the no-jump loss is `max(C, C_grid)`, adding ≤ 0.6% integrated loss at 3×3/64² and 4% at the 12² anchor grid, carried by real in-grid jumps. The MCWF↔Lindblad ensemble anchor covers TDS only; electronic jumps are checked per jump. `smoothed_density` now returns `ρ_q` in Å⁻³ (it was scaled by `1/(n_x n_y)`; no output change, states are renormalized). Cost ≈ 25 ms per TDS jump on a 24² grid. Human sign-off pending (#277).
 
 - **Regression follow-up:** Electronic MCWF now has a homogeneous-density ensemble oracle: 1024 electrons, seed 508, mean jump counts one and three, against the exact compound-Poisson Lindblad characteristic function. See the [derivation and scope](channeling/cr-axial-realspace-dissipator.md#electronic-ensemble-regression-follow-up). The earlier fresh-context verdict remains unchanged; inhomogeneous electronic propagation still has per-jump checks only. `AxialMCWF.run(jump_hook=...)` (2026-10-18, #548) calls a hook at entry and after each normalized jump; it may replace the state or absorb the electron (`jumps["absorbed"]`). An identity hook leaves TDS-jump trajectories unchanged to 1e-12 (electronic jumps untested locally: SBETHE data); the hook draws no Philox numbers.
+
+- **CUDA backend adjudication (2026-10-21):** [independent re-derivation and source/hash review](channeling/cr-axial-cuda-backend.md) matches the coherent mean-subtracted TDS phase, shell/proposal/acceptance sampling, electronic carrier sign, separate sink and full-width Philox mapping, including final fused kernels. The focused CPU module's direct TDS master-equation and homogeneous electronic compound-Poisson anchors pass; final real-CUDA job 1629 passes all ten operator/RNG/stride/batch/ensemble regressions. These pin the existing scoped model at `anchored` on both backends. Inhomogeneous electronic evolution retains per-jump coverage, numerical sinks remain unresolved flux, and material/supercell/long-depth convergence is not newly established. Human sign-off remains in #277.
 
 ## `cr-vortex-string-coupling`
 
@@ -376,3 +410,39 @@ change the eigenproblem or introduce a new physical selection rule.
 - **Checks:** sphere integral of `Σ|E|²` is 1 to 1e-4 at γ = 1.6, 10.8 for `d = x̂`, `(x̂ + iŷ)/√2` and a generic complex `d`; `d = x̂` reproduces `boosted_dipole_pattern` to 1e-9 and gives `E₋ = E₊*` (real field); `d ∝ x̂ + iŷ` (`J_z = +1`) has `E₋ = E_z = 0` on axis, `E₊` winding 0 and `E₋` winding +2 on circles γθ = 0.3, 1, 2.5 (`J_z = −1` mirrors to −2); paraxial `|E_±|²` agree with `helicity_pattern(m = 1, Λ = ±1)` to 2% for γθ ≤ 1 at γ = 10.8 (deviation `O(θ²)`, 26% at γ = 1.6).
 - **Anchor:** `tests/montecarlo/test_channeling_axial_emission.py::{test_far_field_amplitude_normalizes_and_reduces_to_the_planar_dipole,test_far_field_of_a_jz_plus_line_winds_only_the_opposite_circular_component}`
 - **Notes:** Display diagnostic for the channeling app (planar and axial far-field phase/intensity maps); no transport or scoring consumer. The fixed lab circular basis differs from the local helicity basis `(ê_θ ± iê_φ)/√2` at `O(θ)`, so `|E_±|²` are polarizer-selected intensities, not helicities, away from the axis; `|E_z|²` is the dropped longitudinal part (`O(θ²)`). The phase carries the global phase of `d` and is undefined at intensity zeros. Dipole order only. **2026-10-18 fresh-context verdict `rederived`** ([write-up](channeling/cr-dipole-far-field-amplitude.md)): direct boost of rest-frame dipole fields agrees to 6e-11 for 2000 random complex `d`, γ = 1.0001–400; adaptive sphere integrals are 1 to 4e-16; `d = x̂` matches `boosted_dipole_pattern` to 1.4e-12; windings `(E₊, E₋, E_z) = (0, 2, 1)` for `J_z = +1`; `far_field_maps` matches an explicit incoherent sum to 6e-16. Human sign-off pending (#277).
+
+## `cr-quantum-ensemble-metrics`
+
+- **Claim:** retained-ensemble purity is `Tr(rho²)/Tr(rho)²`; squared Hilbert–Schmidt coherence subtracts the chosen basis diagonal squared. Transverse-energy mean/variance use the first two moments of the instantaneous transverse Hamiltonian. Axial full-grid purity uses independent fixed random-probe density actions with a reported probe standard error.
+- **Code:** `montecarlo/channeling/metrics.py`
+- **Source:** density-operator Born rule and spectral trace identities; Hutchinson, *Communications in Statistics—Simulation and Computation* 19 (1990), 433–450 (random trace estimator).
+- **Assumptions:** Hermitian positive semidefinite retained density; orthonormal discrete position or Bloch eigenbasis; independent isotropic probes; survivor conditioning excludes physical escape and numerical loss.
+- **Limiting cases:** pure state purity one; equally populated orthogonal pair purity one half; zero retained trace leaves conditional quantities undefined; Hamiltonian eigenstate has zero transverse-energy spread.
+- **Status:** anchored
+- **Checks:** independent finite-dimensional complex density-action and dense Fourier Hamiltonian oracles; analytic pure/mixed and all-lost ensembles.
+- **Anchor:** `tests/montecarlo/test_channeling_metrics.py`
+- **Notes:** registered before implementation for #620; fresh-context verdict `rederived`, followed by focused anchors. [Independent derivation and source comparison](channeling/cr-quantum-ensemble-metrics.md). Empirical finite-ensemble purity includes finite-trajectory bias; probe SEM excludes trajectory sampling uncertainty. Coherence is squared off-diagonal Frobenius norm in the named basis. Human sign-off remains in #277.
+
+## `cr-axial-qrt-source-normalization`
+
+- **Claim:** the on-axis finite represented transverse velocity-current correlation gives photons per eV per sr per incident electron with prefactor `alpha E/(4 pi² (hbar v)²)` and depth phase `E(1-beta)/(hbar v)`, summed incoherently over the two transverse photon polarizations. Global finite-grid positive-Bohr-frequency currents retain all represented transitions and multiplet coherences.
+- **Code:** `montecarlo/channeling/axial_qrt_source.py`
+- **Source:** quantized transverse electromagnetic field and first-order emission amplitude; density-operator quantum regression. [Independent derivation and source-to-code comparison](channeling/cr-axial-qrt-source-normalization.md).
+- **Assumptions:** on-axis observation only, constant longitudinal velocity, finite global periodic Hilbert space; positive-frequency/RWA lowering current; supplied time-independent GKSL jumps. No completeness beyond the admitted represented grid or physical axial dissipator is claimed.
+- **Limiting cases:** no excited population gives zero; finite-time two-level emission is sinc-squared; long-time frequency-integrated yield agrees with the golden-rule rate; constant potential shifts change neither currents nor gaps; degeneracies do not create zero-frequency emission.
+- **Status:** anchored
+- **Checks:** exact finite-time oscillator sinc-squared spectrum including actual photon energy; independent rest-dipole/aberration golden-rule oracle with analytic finite-window coverage (relative tolerance 2e-4); independent dense Fourier Hamiltonian/current oracle; degenerate multiplet interference and basis covariance; free/constant-shift, zero density, high-gamma phase, supplied GKSL jumps and bounded admission regressions.
+- **Anchor:** `tests/montecarlo/test_axial_qrt_source.py`
+- **Notes:** registered before implementation for #620; fresh-context verdict `rederived`, followed by independent focused anchors. Research reference only, not standard-run source admission. Human sign-off remains in #277.
+
+## `cr-mcwf-regression-estimator`
+
+- **Claim:** the right-inserted regression operator `|psi><psi| B†` equals `(R_1-R_-1+i R_i-i R_-i)/4`, where `R_s=|psi+s Bpsi><psi+s Bpsi|`. Evolving normalized auxiliary states with their original norms and incident-normalized expectations estimates the supplied common linear map's complex correlation. Errors are computed from independent combined replicas, not independently combined branch errors.
+- **Code:** `montecarlo/channeling/axial_mcwf_regression.py`
+- **Source:** Landi et al., PRX Quantum 5, 020201 (2024), Eq. (95), and the rank-one polarization identity; [independent pre-code derivation](channeling/cr-mcwf-regression-estimator.md).
+- **Assumptions:** a common supplied block-linear Markov map; on-axis insertion preserves the starting carrier; auxiliary future observations use their current carrier. Incident parent normalization is retained; no survivor conditioning. Versioned auxiliary streams must be independent of primary streams within the documented bounded address domain.
+- **Limiting cases:** zero auxiliary norm skips work; pure unitary two-level correlation has the correct complex phase; damping agrees with a supplied dense map; lost parents contribute zero; subnormalized parents scale linearly.
+- **Status:** unverified
+- **Checks:** pending independent dense-map and actual zero-scattering axial adapter oracles.
+- **Anchor:** `tests/montecarlo/test_axial_mcwf_regression.py`
+- **Notes:** registered before implementation for #620. Conditional supplied-parent estimator only; not all-history parent sampling, a physical axial source, or independent validation of material jump closures. Human sign-off remains in #277.

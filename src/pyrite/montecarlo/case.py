@@ -34,6 +34,31 @@ def _restore_absent() -> _Absent:
     return _ABSENT
 
 
+def _case_values_equal(left: object, right: object) -> bool:
+    """Compare case payload values, including NumPy grid coordinates."""
+    if isinstance(left, np.ndarray) or isinstance(right, np.ndarray):
+        return (
+            isinstance(left, np.ndarray)
+            and isinstance(right, np.ndarray)
+            and np.array_equal(left, right, equal_nan=True)
+        )
+    if isinstance(left, Mapping) or isinstance(right, Mapping):
+        if (
+            not isinstance(left, Mapping)
+            or not isinstance(right, Mapping)
+            or left.keys() != right.keys()
+        ):
+            return False
+        return all(_case_values_equal(left[key], right[key]) for key in left)
+    if isinstance(left, (list, tuple)) or isinstance(right, (list, tuple)):
+        if not isinstance(left, (list, tuple)) or not isinstance(right, (list, tuple)):
+            return False
+        return len(left) == len(right) and all(
+            _case_values_equal(a, b) for a, b in zip(left, right, strict=True)
+        )
+    return bool(left == right)
+
+
 _CASE_KEY_ORDER = (
     "name",
     "crystal",
@@ -549,6 +574,10 @@ class Case(Mapping[str, Any]):
             if value is not _ABSENT:
                 payload[key] = value
         return payload
+
+    def __eq__(self, other: object) -> bool:
+        """Value equality for mappings whose energy coordinates are arrays."""
+        return isinstance(other, Case) and _case_values_equal(self.to_dict(), other.to_dict())
 
     def __getitem__(self, key: str) -> Any:
         value = getattr(self, key, _ABSENT)

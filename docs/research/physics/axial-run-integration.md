@@ -171,6 +171,14 @@ Derive and anchor the entrance-zone map before exposing the selector. Use
 full-slab diagnostics to study convergence, without presenting them as an
 integrated run or substituting a different architecture.
 
+The finite-grid research helper `channeling.axial_phase_space` now supplies a
+positive, correlated position/momentum measurement after an outgoing projector
+has been chosen. Its finite Weyl-frame resolution and conditional sampler are
+[independently anchored](../../validation/channeling/cr-axial-phase-space-instrument.md).
+This solves the measurement algebra, not selection of a physical matching
+surface. It neither treats numerical sinks as escape nor supplies stopping,
+on-shell launch directions, omitted-coherence bounds or a return-flux budget.
+
 For the zone architecture, the proposed accounting contract is incident weight
 equals retained quantum weight plus cumulative physical handoff weight plus
 separately reported unresolved numerical weight. Report the signed balance
@@ -223,6 +231,17 @@ Use `Result.channeling` and optional `channeling.h5` only after this source
 contract is anchored. Common component combination adds it once; brem-only
 repair preserves it. Stokes/OAM diagnostics are separate from the scalar photon
 component and must not be added to totals.
+
+`channeling.quantum_regression` provides a bounded dense reference for the
+full complex two-time correlation of a supplied finite GKSL model. Its
+[independent derivation and analytic anchors](../../validation/channeling/cr-quantum-regression-correlation.md)
+pin current-component interference, positive spectral phase, finite residence
+time, damping and amplitude-level attenuation. It returns a current quadratic
+form, not photons/eV/sr. This avoids assuming that a finite-time line shape
+times an integrated local yield reproduces a two-time source: an evolving
+ensemble and depth attenuation generally make that factorization invalid.
+Material-specific currents, Hilbert-space and scattering convergence, photon
+prefactors/frames, matching and persisted source remain to be established.
 
 ## Consumer audit and initial support policy
 

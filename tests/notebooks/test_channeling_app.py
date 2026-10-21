@@ -84,11 +84,14 @@ def test_axial_app_executes_same_api_and_reuses_solve(mode):
         axis="001",
         energy=5,
         mode=mode,
+        backend="cpu",
         cells=1,
         grid=16,
         depth=50,
         step=5,
         electrons=2,
+        samples=11,
+        metrics=True,
         seed=547,
         preset="Gaussian",
         waist=0.5,
@@ -97,6 +100,13 @@ def test_axial_app_executes_same_api_and_reuses_solve(mode):
         tilt_x=0,
         tilt_y=0,
         oam=False,
+        spectral=0,
+        spectral_repr="energy_bins",
+        electronic=False,
+        coherence=False,
+        ref_auto=True,
+        ref_x=0,
+        ref_y=0,
     )
     _, definitions = app.run(
         defs={
@@ -107,7 +117,7 @@ def test_axial_app_executes_same_api_and_reuses_solve(mode):
     result = definitions["axial_result"]
     direct = axial_diagnostic(result.config, entry=result.entry)
     np.testing.assert_allclose(result.density_per_ang2, direct.density_per_ang2)
-    assert solve_axial_demo(result.config, "Gaussian", 0.5, (0, 0)) is result
+    assert solve_axial_demo(result.config, "Gaussian", 0.5, (0, 0), record_metrics=True) is result
     assert (
         result.wavefunctions_per_ang is None
         if mode == "mcwf"
@@ -237,3 +247,36 @@ def test_ring_winding_reads_the_orbital_index():
     assert ring_winding(10.0, np.array([[1.0, 1j], [-1j, 1.0]])) == (-2, 0)  # J_z = -1
     assert ring_winding(10.0, np.diag([1.0, 0.0])) == (-2, 2)  # planar, outside the nulls
     assert ring_winding(10.0, np.diag([1.0, 0.0]), radius=0.5) == (0, 0)
+
+
+@pytest.mark.slow
+def test_stored_population_views_preserve_normalization_and_empty_ensembles():
+    import matplotlib.pyplot as plt
+
+    from pyrite.apps.channeling_metrics import population_figure
+
+    depths = np.array([0.0, 10.0])
+    populations = np.array([[0.2, 0.1], [0.0, 0.0]])
+    survival = np.array([0.5, 0.0])
+    figure = population_figure(depths, populations, survival, 0, conditional=True)
+    np.testing.assert_allclose([bar.get_height() for bar in figure.axes[0].patches], [0.4, 0.2])
+    np.testing.assert_allclose(figure.axes[2].lines[2].get_ydata(), [0.2, 0.0])
+    empty = population_figure(depths, populations, survival, 1, conditional=True)
+    np.testing.assert_array_equal([bar.get_height() for bar in empty.axes[0].patches], [0.0, 0.0])
+    plt.close(figure)
+    plt.close(empty)
+
+
+def test_metric_views_are_cached_array_consumers():
+    tree = ast.parse(APP.read_text())
+    views = []
+    for cell in (node for node in tree.body if isinstance(node, ast.FunctionDef)):
+        calls = {
+            node.func.id
+            for node in ast.walk(cell)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        }
+        if calls & {"metric_figure", "axial_metric_figure"}:
+            views.append(cell)
+            assert not calls & {"solve_axial_demo", "axial_diagnostic", "DensityMatrixSolver"}
+    assert len(views) == 2

@@ -21,18 +21,24 @@ from pyrite.montecarlo.channeling.dipole import dipole_rate_per_ang
 from pyrite.montecarlo.channeling.realspace import RealSpaceGrid
 from pyrite.montecarlo.channeling.states import MixedState, gaussian, laguerre_gauss, mixture
 
-#: Interactive budget in grid samples x split steps x trajectories (<= ~1 min on one core).
+#: Keep the original interactive CPU budget. Larger CUDA runs remain explicitly bounded.
 APP_WORK_LIMIT = 1.1e9
-#: Recorded depths kept per app solve.
+CUDA_APP_WORK_LIMIT = 4.0e10
+#: Maximum number of recorded depths for each backend.
 APP_MAX_DEPTHS = 41
+CUDA_APP_MAX_DEPTHS = 81
 
 
-def axial_demo_depths(depth_ang: float, step_ang: float) -> tuple[float, ...]:
-    """Return up to ``APP_MAX_DEPTHS`` evenly spaced step multiples from 0 to ``depth_ang``."""
+def axial_demo_depths(
+    depth_ang: float, step_ang: float, samples: int = APP_MAX_DEPTHS
+) -> tuple[float, ...]:
+    """Evenly spaced, exact step multiples, including entrance and exit."""
+    if not isinstance(samples, int) or not 2 <= samples <= CUDA_APP_MAX_DEPTHS:
+        raise ValueError(f"recorded depth samples must be 2..{CUDA_APP_MAX_DEPTHS}")
     steps = round(depth_ang / step_ang)
     if steps < 1:
         raise ValueError("depth must span at least one step")
-    index = np.unique(np.rint(np.linspace(0, steps, APP_MAX_DEPTHS)).astype(int))
+    index = np.unique(np.rint(np.linspace(0, steps, samples)).astype(int))
     return tuple(float(i * step_ang) for i in index)
 
 
@@ -42,17 +48,31 @@ def solve_axial_demo(
     preset: str = "Gaussian",
     waist_ang: float = 0.5,
     impact_ang: tuple[float, float] = (0.0, 0.0),
+    record_metrics: bool = True,
 ) -> AxialDiagnosticResult:
-    """Reuse completed small solves; larger statistics belong on remote compute."""
+    """Cache app runs while keeping explicit backend-dependent resource bounds."""
+    cuda = config.backend == "cuda"
+    if cuda and config.mode != "mcwf":
+        raise ValueError("CUDA currently supports axial MCWF, not coherent propagation")
+    if cuda and config.oam_string is not None:
+        raise ValueError(
+            "CUDA disk-OAM projection is not implemented; disable the OAM checkbox or switch to CPU"
+        )
+    max_grid, max_cells, max_electrons, max_depths, min_step, work_limit = (
+        (192, 8, 4096, CUDA_APP_MAX_DEPTHS, 0.25, CUDA_APP_WORK_LIMIT)
+        if cuda
+        else (48, 3, 32, APP_MAX_DEPTHS, 1.0, APP_WORK_LIMIT)
+    )
     if (
-        max(config.shape) > 48
-        or max(config.cells) > 3
-        or config.step_ang < 1
-        or config.n_electrons > 32
-        or len(config.depths_ang) > APP_MAX_DEPTHS
+        max(config.shape) > max_grid
+        or max(config.cells) > max_cells
+        or config.step_ang < min_step
+        or config.n_electrons > max_electrons
+        or len(config.depths_ang) > max_depths
     ):
         raise ValueError(
-            f"app limit: 48² grid, 3² cells, step >= 1 Å, 32 electrons, {APP_MAX_DEPTHS} depths"
+            f"{config.backend.upper()} app limit: {max_grid}² grid, {max_cells}² cells, "
+            f"step >= {min_step:g} Å, {max_electrons} electrons, {max_depths} depths"
         )
     if not np.isfinite(waist_ang) or waist_ang <= 0 or not np.all(np.isfinite(impact_ang)):
         raise ValueError("waist must be positive and impact finite")
@@ -76,13 +96,14 @@ def solve_axial_demo(
     else:
         trajectories = len(entry.components) if isinstance(entry, MixedState) else 1
     steps = config.depths_ang[-1] / config.step_ang
-    if config.shape[0] * config.shape[1] * steps * trajectories > APP_WORK_LIMIT:
+    if config.shape[0] * config.shape[1] * steps * trajectories > work_limit:
         raise ValueError(
-            f"app limit: grid samples x steps x trajectories <= {APP_WORK_LIMIT:.1e}; "
-            "use a coarser step, fewer electrons, or remote compute"
+            f"{config.backend.upper()} app limit: work "
+            f"grid samples x steps x trajectories <= {work_limit:.1e}; "
+            "use a coarser step, fewer electrons, or run the diagnostic outside the app"
         )
     levels = _level_observable(config)
-    return axial_diagnostic(config, entry=entry, observable=levels)
+    return axial_diagnostic(config, entry=entry, observable=levels, record_metrics=record_metrics)
 
 
 @lru_cache(maxsize=4)
@@ -101,6 +122,8 @@ class _RolledLevelDensity:
     grid; the carrier phase it shifts is global, so ``rho`` is unchanged.
     """
 
+    cuda_compatible = True
+
     def __init__(self, catalog: AxialLineCatalog, grid: RealSpaceGrid) -> None:
         self.shift = (grid.shape[0] // 2, grid.shape[1] // 2)
         center = tuple(
@@ -109,7 +132,10 @@ class _RolledLevelDensity:
         self.levels = LevelDensity(catalog, grid, center)
 
     def __call__(self, phi, tilt_inv_ang=(0.0, 0.0)):
-        return self.levels(np.roll(phi, self.shift, axis=(0, 1)), tilt_inv_ang)
+        xp = np
+        if hasattr(phi, "__cuda_array_interface__"):
+            import cupy as xp
+        return self.levels(xp.roll(phi, self.shift, axis=(0, 1)), tilt_inv_ang)
 
 
 def _level_observable(config: AxialDiagnosticConfig) -> _RolledLevelDensity | None:
@@ -182,7 +208,7 @@ def _centered(values: np.ndarray, grid):
 
 
 def axial_demo_figure(result: AxialDiagnosticResult, sample: int, conditional: bool = False):
-    """Draw stored arrays only; phase is available solely for a coherent pure state."""
+    """Draw recorded arrays; phase is a coherent envelope or ensemble relative phase."""
     import matplotlib.pyplot as plt
 
     fig, axes = plt.subplots(1, 4, figsize=(16, 4), constrained_layout=True)
@@ -211,6 +237,25 @@ def axial_demo_figure(result: AxialDiagnosticResult, sample: int, conditional: b
         )
         axes[2].set(title="Coherent envelope phase", xlabel="x (Å)", ylabel="y (Å)")
         fig.colorbar(mesh, ax=axes[2], label="rad; carrier tilt factored out")
+    elif result.coherence_numerator_per_ang2 is not None:
+        from pyrite.montecarlo.channeling.axial_state_diagnostics import coherence_maps
+
+        assert result.coherence_second_moment is not None
+        phase, _, _ = coherence_maps(
+            result.coherence_numerator_per_ang2[sample],
+            result.coherence_second_moment[sample],
+            result.density_per_ang2[sample],
+            result.coherence_reference_index,
+            result.config.n_electrons if result.config.mode == "mcwf" else None,
+        )
+        shown, extent = _centered(phase, result.grid)
+        mesh = axes[2].imshow(
+            shown, origin="lower", extent=extent, cmap="twilight", vmin=-np.pi, vmax=np.pi
+        )
+        axes[2].set(
+            title="Ensemble relative phase (physical carrier)", xlabel="x (Å)", ylabel="y (Å)"
+        )
+        fig.colorbar(mesh, ax=axes[2], label="arg g¹(r,r₀) (rad)")
     else:
         axes[2].text(0.5, 0.5, "Ensemble density\nNo unique phase", ha="center", va="center")
         axes[2].set_axis_off()
@@ -223,6 +268,70 @@ def axial_demo_figure(result: AxialDiagnosticResult, sample: int, conditional: b
         ylim=(0, 1.05),
     )
     return fig
+
+
+def axial_coherence_figure(result: AxialDiagnosticResult, sample: int):
+    """Plot cached normalized spatial coherence; never reconstruct from density."""
+    import matplotlib.pyplot as plt
+
+    from pyrite.montecarlo.channeling.axial_state_diagnostics import coherence_maps
+
+    if result.coherence_numerator_per_ang2 is None:
+        raise ValueError("coherence was not recorded; rerun with record_coherence=True")
+    assert result.coherence_second_moment is not None
+    phase, visibility, sem = coherence_maps(
+        result.coherence_numerator_per_ang2[sample],
+        result.coherence_second_moment[sample],
+        result.density_per_ang2[sample],
+        result.coherence_reference_index,
+        result.config.n_electrons if result.config.mode == "mcwf" else None,
+    )
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4), constrained_layout=True)
+    for ax, values, title, cmap, bounds in (
+        (axes[0], phase, "Relative phase arg g¹", "twilight", (-np.pi, np.pi)),
+        (axes[1], visibility, "Coherence visibility |g¹|", "viridis", (0, 1)),
+    ):
+        shown, extent = _centered(values, result.grid)
+        image = ax.imshow(
+            shown,
+            origin="lower",
+            extent=extent,
+            aspect="equal",
+            cmap=cmap,
+            vmin=bounds[0],
+            vmax=bounds[1],
+        )
+        ax.set(xlabel="x (Å)", ylabel="y (Å)", title=title)
+        fig.colorbar(image, ax=ax)
+    ref = result.coherence_reference_index
+    purity = float(result.metrics.purity[sample]) if result.metrics is not None else float("nan")
+    fig.suptitle(
+        f"r₀ = pixel {ref}; survival={result.surviving[sample]:.3g}; "
+        f"empirical purity={purity:.3g}; "
+        + ("2σ MC sampling mask" if sem is not None else "deterministic ensemble")
+    )
+    return fig
+
+
+def axial_spectral_population_data(result: AxialDiagnosticResult):
+    """Return orthonormal spectral populations, independently of local line weights."""
+    if result.spectral_populations is None:
+        return None
+    mode = result.config.spectral_representation
+    basis = (
+        "trajectory-sector transverse-energy bins"
+        if mode == "energy_bins"
+        else "fixed-carrier orthonormal transverse eigenspace projectors"
+    )
+    return (
+        result.spectral_populations,
+        result.spectral_labels,
+        (
+            f"{basis}; periodic FFT Hamiltonian, reference q={result.config.tilt_rad}; "
+            f"barrier Umax={result.spectral_barrier_eV:.4g} eV; omitted survival may "
+            "include uncomputed bound AND above-barrier states; neither is physical escape"
+        ),
+    )
 
 
 def catalog_rate(catalog: AxialLineCatalog, line, polarization: np.ndarray) -> np.ndarray:
@@ -294,3 +403,42 @@ def axial_line_options(radiation: AxialRadiation) -> tuple[dict[str, int], str]:
     ]
     strongest = int(np.argmax(radiation.photons(len(radiation.depths_ang) - 1)))
     return dict(zip(labels, range(len(labels)), strict=True)), labels[strongest]
+
+
+def axial_population_data(result: AxialDiagnosticResult):
+    """Stored string-0 level weights, retaining degeneracy labels and residuals."""
+    observable = _level_observable(result.config)
+    if observable is None or result.observables is None:
+        # A complete orthonormal finite-position basis remains available when
+        # the string-local level catalog is unsupported.
+        return (
+            (
+                result.density_per_ang2.reshape(len(result.depths_ang), -1)
+                * result.grid.cell_area_ang2
+            ),
+            None,
+            "finite position-grid basis",
+        )
+    levels = observable.levels.catalog.levels
+    populations = np.array(
+        [
+            [np.trace(block).real for block in observable.levels.unpack(row)]
+            for row in result.observables
+        ]
+    )
+    labels = [
+        f"L{i}: {level.energy_eV:.3g} eV (g={len(level.states)})" for i, level in enumerate(levels)
+    ]
+    orbitals = np.concatenate(observable.levels._orbitals).reshape(
+        -1, int(np.prod(result.grid.shape))
+    )
+    gram = orbitals.conj() @ orbitals.T * result.grid.cell_area_ang2
+    defect = np.linalg.norm(gram - np.eye(len(gram)), ord=2)
+    return (
+        populations,
+        labels,
+        (
+            f"string-0 local projection weights; incomplete/nonorthogonal sampling, "
+            f"Gram defect ||G-I||₂={defect:.3g}; signed residual is not loss"
+        ),
+    )

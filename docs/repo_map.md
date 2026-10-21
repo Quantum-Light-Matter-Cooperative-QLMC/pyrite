@@ -801,9 +801,21 @@ launcher on tunnel port 2723; `tr_demo`/`ctr_demo` are its catalog references.
 The channeling app also offers a bounded experimental axial mode through
 `apps/axial_channeling.py` (entry presets, cached solves, stored-array plotting,
 string-0 level densities and helicity-split line yields via `axial_radiation`).
-`montecarlo/channeling/axial_diagnostic.py` assembles existing coherent/MCWF
-solvers with typed configuration/results, incident-normalized density, optional
-string-centered OAM and an optional caller observable; no standard run integration.
+`montecarlo/channeling/axial_diagnostic.py` assembles coherent/MCWF solvers with
+typed configuration/results, incident-normalized density, optional string-centred
+OAM and bounded ensemble metrics. `AxialMCWF` selects CPU or lazy CUDA execution;
+`_axial_cuda*` owns device propagation, jumps and incident-addressed Philox draws.
+`channeling/metrics.py` owns exact planar ensemble reductions and finite-grid
+axial density-action sketches; `apps/channeling_metrics.py` renders stored
+population/depth and evolution/accounting views without rerunning solvers.
+There is no standard-run axial integration. Research helpers
+`channeling/axial_phase_space.py` and `channeling/quantum_regression.py` supply
+independently anchored finite-grid measurement and two-time correlation algebra,
+with explicit allocation limits; physical escape and a persisted axial photon
+source remain separate unimplemented contracts.
+`channeling/axial_qrt_source.py` adds a bounded global-grid eigensystem/current
+factory and normalized on-axis finite RWA photon reference; it refuses oblique
+directions and does not supply the actual material carrier-bath closure.
 `apps/channeling.py::far_field_maps` draws fixed-basis circular far-field
 intensity/phase of a planar or axial dipole line from `dipole.dipole_far_field`.
 

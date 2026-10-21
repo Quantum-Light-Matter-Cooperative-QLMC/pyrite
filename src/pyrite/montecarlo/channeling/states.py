@@ -264,7 +264,10 @@ class SampledState(TransverseState):
         for axis, (k, a) in enumerate(zip(ks, self.axes, strict=True)):
             step = a[1] - a[0]
             kernel = np.exp(-1j * np.outer(k, a)) * step
-            kernel[np.abs(k) > np.pi / step] = 0.0
+            # Keep the discrete Nyquist bin.  ``fftfreq`` can round that bin
+            # just beyond ``pi / step`` on an even grid, which otherwise
+            # breaks exact array-state round trips.
+            kernel[np.abs(k) > np.pi / step * (1.0 + 1e-12)] = 0.0
             out = np.moveaxis(np.tensordot(kernel, out, axes=([1], [axis])), 0, axis)
         return out
 

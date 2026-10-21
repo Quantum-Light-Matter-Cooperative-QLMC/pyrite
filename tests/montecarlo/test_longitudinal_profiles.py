@@ -77,7 +77,14 @@ def test_three_campaign_policies_have_16_cases_and_only_longitudinal_differences
             {key: value for key, value in case.items() if key != "longitudinal_distribution"}
             for case in group
         ]
-        assert common[0] == common[1] == common[2]
+        assert common[0].keys() == common[1].keys() == common[2].keys()
+        for key in common[0]:
+            values = [payload[key] for payload in common]
+            if isinstance(values[0], np.ndarray):
+                np.testing.assert_array_equal(values[0], values[1])
+                np.testing.assert_array_equal(values[0], values[2])
+            else:
+                assert values[0] == values[1] == values[2]
         gaussian, train, compressed = (case["longitudinal_distribution"] for case in group)
         assert gaussian["rms_duration_fs"] == 200.0
         assert train["envelope_rms_fs"] == 200.0

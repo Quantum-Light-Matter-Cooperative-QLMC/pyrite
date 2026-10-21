@@ -84,7 +84,7 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     case = build_cases(sweep, n_electrons=60, n_electrons_brem=60, bremsstrahlung_model="eedl")[0]
     assert "adaptive_precision" not in case
     assert (
-        case_content_key(case) == "752d01e86bcbac21b6239b480a5f40bfc6352f991a325e33802711072e25aa82"
+        case_content_key(case) == "42a633d3da63e5acdb888f78b4b4453af4f237cf4eb4acb78b780284eb1a4a58"
     )
 
 

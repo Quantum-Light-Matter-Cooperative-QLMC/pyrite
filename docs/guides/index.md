@@ -16,6 +16,8 @@ planar-channeling
 transition-radiation-demo
 directional-source-heatmap
 axial-diagnostics
+axial-state-coherence
+axial-cuda
 analysis-tutorial
 running-on-a-cluster
 sweep-profiles

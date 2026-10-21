@@ -10,6 +10,35 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      quantum: ${{ steps.filter.outputs.quantum || 'false' }}
+    steps:
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        if: github.event_name == 'pull_request'
+        id: filter
+        with:
+          filters: |
+            quantum:
+              - '.github/workflows/ci.yml'
+              - 'src/pyrite/montecarlo/channeling/**'
+              - 'src/pyrite/apps/axial_channeling.py'
+              - 'src/pyrite/apps/channeling_app.py'
+              - 'src/pyrite/materials/channeling/**'
+              - 'tests/montecarlo/test_axial_*.py'
+              - 'tests/montecarlo/test_channeling_*.py'
+              - 'tests/materials/test_channeling_*.py'
+              - 'tests/notebooks/test_channeling_app.py'
+              - 'checks/axial_*.py'
+              - 'docs/guides/axial-*.md'
+              - 'docs/guides/planar-channeling.md'
+              - 'docs/research/physics/axial-*.md'
+              - 'docs/validation/channeling/**'
+              - 'docs/validation/ledger-channeling.md'
+
   format:
     if: >-
       github.event_name == 'pull_request' &&
@@ -60,6 +89,7 @@ jobs:
         run: gh workflow run ci.yml --ref "$PR_BRANCH"
 
   focused:
+    needs: changes
     strategy:
       fail-fast: false
       matrix:
@@ -72,7 +102,6 @@ jobs:
           - spectrum
           - spectrum-coherent
           - spectrum-brem
-          - quantum
           - channeling
           - energy-grid
           - materials
@@ -118,6 +147,45 @@ jobs:
         env:
           PYRITE_SLOW_TESTS: "1"
         run: uv run pyrite-dev test-suite "${{ matrix.suite }}" --durations=30 --durations-min=0.5
+
+  quantum:
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.quantum == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.13", "3.14"]
+    env:
+      UV_PYTHON: ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install dependencies
+        run: uv sync --all-groups --locked
+
+      - name: Cache pinned data
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/pyrite/datasets
+            ~/.local/share/pyrite/xsgen/tables
+            ~/.local/share/pyrite/xsgen/reference-data
+          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
+
+      - name: Fetch pinned data
+        run: uv run pyrite tables fetch
+
+      - name: Test quantum suite
+        env:
+          PYRITE_SLOW_TESTS: "1"
+        run: uv run pyrite-dev test-suite quantum --durations=30 --durations-min=0.5
 
   full:
     runs-on: ubuntu-latest

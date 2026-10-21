@@ -1,0 +1,937 @@
+{
+  "allocation": {
+    "OMP_NUM_THREADS": 8,
+    "OPENBLAS_NUM_THREADS": 8,
+    "cpus": 8,
+    "gpus": 1,
+    "time_limit_minutes": 10
+  },
+  "comparability": "Same workload and precision across CPU/CUDA; independent per-electron random draws, statistical accuracy comparison. Initial port source was uncommitted; final source is pinned above. First-run timings include process/library warmup but are not a cold driver/compiler-cache claim.",
+  "final_correctness": {
+    "failed": 0,
+    "passed": 10,
+    "slurm_job": 1629,
+    "warning": "existing crystal.E_grid deprecation"
+  },
+  "final_source_sha256": {
+    "checks/axial_mcwf_cuda.py": "255f715c54f32e70e0701dd06e4bf05de14742678060e9072418ac43a6902627",
+    "src/pyrite/montecarlo/channeling/_axial_cuda.py": "fb300c65d55cfb1bf0cf7138f77fa76d6103961b9de7c4c86cceda356f7660d8",
+    "src/pyrite/montecarlo/channeling/_axial_cuda_dissipator.py": "ece0849cd18fa3d001699bf8eb7429684df0af1133a36db3b2829c063dfddb9d",
+    "src/pyrite/montecarlo/channeling/_axial_cuda_jumps.py": "37b8f9ffa3eb35720d9ed1e93342382b9fa0dd51dab4e54cf3c3738f02ec5e79",
+    "src/pyrite/montecarlo/channeling/_axial_cuda_rng.py": "c6e85d7a1a014d02f30dd96b283aa5cad91820e84ee58ba09f95d7cdb8f27414",
+    "src/pyrite/montecarlo/channeling/axial_mcwf.py": "784fffe202d851039c16d4949219bcbcca3e3a8060cb67d9cf8e8b3f628f80eb",
+    "tests/montecarlo/test_channeling_axial_cuda.py": "601036cb21c74aa19dec893721dbe2a1a28156d9a272b47d1ec6906c8025f1bb"
+  },
+  "memory_scope": "CuPy pool reserved high-water footprint, excluding allocations made directly by CUDA libraries; host RSS is process peak including setup. Not a whole-device peak-memory guarantee.",
+  "remote_source_sha256": {
+    "checks/axial_mcwf_return_flux.py": "59c650901bdaf21e90792ec275f6e8bba41b2ef71853d485c998913d2405d660",
+    "src/pyrite/montecarlo/channeling/_axial_cuda.py": "fb300c65d55cfb1bf0cf7138f77fa76d6103961b9de7c4c86cceda356f7660d8",
+    "src/pyrite/montecarlo/channeling/_axial_cuda_dissipator.py": "ece0849cd18fa3d001699bf8eb7429684df0af1133a36db3b2829c063dfddb9d",
+    "src/pyrite/montecarlo/channeling/_axial_cuda_jumps.py": "37b8f9ffa3eb35720d9ed1e93342382b9fa0dd51dab4e54cf3c3738f02ec5e79",
+    "src/pyrite/montecarlo/channeling/_axial_cuda_rng.py": "c6e85d7a1a014d02f30dd96b283aa5cad91820e84ee58ba09f95d7cdb8f27414",
+    "src/pyrite/montecarlo/channeling/axial_mcwf.py": "784fffe202d851039c16d4949219bcbcca3e3a8060cb67d9cf8e8b3f628f80eb"
+  },
+  "revision": "c6fb07ebf942030d6dab435ce50ee6d8edf09cf2",
+  "schema": 1,
+  "stages": [
+    {
+      "log_sha256": "2b651b9787206c648ebce254de12090223e78bf7c5c5726de811af4dd6d70e76",
+      "measurement": {
+        "cpu": "x86_64",
+        "cuda_runtime": 13020,
+        "cupy": "14.2.0",
+        "device": "NVIDIA GeForce RTX 5080",
+        "peak_host_rss_kib": 1348308,
+        "repeats": 3,
+        "target_warm_speedup": 2,
+        "timestamp_utc": "2026-10-21T07:18:47.664506+00:00",
+        "warmup": 1,
+        "workloads": [
+          {
+            "depth_ang": 100,
+            "electrons": 8,
+            "pool_reserved_bytes": 771072,
+            "pool_used_bytes": 4096,
+            "precision": "complex128",
+            "result_download_s": 4.0850136429071426e-05,
+            "result_upload_s": 6.239092908799648e-05,
+            "results": {
+              "cpu": {
+                "jumps": {
+                  "electronic": 0,
+                  "sink": 0,
+                  "tds": 0
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  1.0
+                ]
+              },
+              "cuda": {
+                "jumps": {
+                  "electronic": 1,
+                  "sink": 0,
+                  "tds": 0
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  1.0
+                ]
+              }
+            },
+            "seed": 17,
+            "setup_s": 0.14564873301424086,
+            "shape": [
+              12,
+              12
+            ],
+            "step_ang": 10,
+            "timings": {
+              "cpu": {
+                "cold_s": 0.00197847792878747,
+                "warm_median_s": 0.0006465860642492771,
+                "warm_s": [
+                  0.0007475169841200113,
+                  0.0006465860642492771,
+                  0.0006404861342161894
+                ]
+              },
+              "cuda": {
+                "cold_s": 0.09876451385207474,
+                "warm_median_s": 0.009583206847310066,
+                "warm_s": [
+                  0.01019253395497799,
+                  0.009381375974044204,
+                  0.009583206847310066
+                ]
+              }
+            },
+            "warm_speedup": 0.06747074069790833
+          },
+          {
+            "depth_ang": 1000,
+            "electrons": 128,
+            "pool_reserved_bytes": 42240000,
+            "pool_used_bytes": 55808,
+            "precision": "complex128",
+            "result_download_s": 3.741099499166012e-05,
+            "result_upload_s": 7.378007285296917e-05,
+            "results": {
+              "cpu": {
+                "jumps": {
+                  "electronic": 69,
+                  "sink": 2,
+                  "tds": 61
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  0.984375
+                ]
+              },
+              "cuda": {
+                "jumps": {
+                  "electronic": 71,
+                  "sink": 2,
+                  "tds": 74
+                },
+                "surviving": [
+                  1.0,
+                  0.9921875,
+                  0.984375
+                ]
+              }
+            },
+            "seed": 17,
+            "setup_s": 0.10705591202713549,
+            "shape": [
+              48,
+              48
+            ],
+            "step_ang": 10,
+            "timings": {
+              "cpu": {
+                "cold_s": 0.4149237258825451,
+                "warm_median_s": 0.41139802685938776,
+                "warm_s": [
+                  0.4116523750126362,
+                  0.40939656691625714,
+                  0.41139802685938776
+                ]
+              },
+              "cuda": {
+                "cold_s": 4.701285915914923,
+                "warm_median_s": 0.6158112599514425,
+                "warm_s": [
+                  0.6125848800875247,
+                  0.6158112599514425,
+                  0.6159200221300125
+                ]
+              }
+            },
+            "warm_speedup": 0.668058630320964
+          }
+        ]
+      },
+      "slurm_job": 1620,
+      "stage": "initial port"
+    },
+    {
+      "log_sha256": "459f5f439ee9b5bc34ad6cd49c74b98f87d979365e186ad25e181d2bc655f2ac",
+      "measurement": {
+        "cpu": "x86_64",
+        "cuda_runtime": 13020,
+        "cupy": "14.2.0",
+        "device": "NVIDIA GeForce RTX 5080",
+        "peak_host_rss_kib": 1271392,
+        "repeats": 3,
+        "target_warm_speedup": 2,
+        "timestamp_utc": "2026-10-21T07:22:16.706798+00:00",
+        "warmup": 1,
+        "workloads": [
+          {
+            "depth_ang": 100,
+            "electrons": 8,
+            "pool_reserved_bytes": 772096,
+            "pool_used_bytes": 4096,
+            "precision": "complex128",
+            "result_download_s": 3.7471065297722816e-05,
+            "result_upload_s": 6.510992534458637e-05,
+            "results": {
+              "cpu": {
+                "jumps": {
+                  "electronic": 0,
+                  "sink": 0,
+                  "tds": 0
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  1.0
+                ]
+              },
+              "cuda": {
+                "jumps": {
+                  "electronic": 1,
+                  "sink": 0,
+                  "tds": 0
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  1.0
+                ]
+              }
+            },
+            "seed": 17,
+            "setup_s": 0.14276409009471536,
+            "shape": [
+              12,
+              12
+            ],
+            "step_ang": 10,
+            "timings": {
+              "cpu": {
+                "cold_s": 0.002041260013356805,
+                "warm_median_s": 0.0007636069785803556,
+                "warm_s": [
+                  0.0007636069785803556,
+                  0.0007673981599509716,
+                  0.0006258760113269091
+                ]
+              },
+              "cuda": {
+                "cold_s": 0.09990597190335393,
+                "warm_median_s": 0.009690569015219808,
+                "warm_s": [
+                  0.010097492951899767,
+                  0.009390337159857154,
+                  0.009690569015219808
+                ]
+              }
+            },
+            "warm_speedup": 0.0787989825345705
+          },
+          {
+            "depth_ang": 1000,
+            "electrons": 128,
+            "pool_reserved_bytes": 42241024,
+            "pool_used_bytes": 55808,
+            "precision": "complex128",
+            "result_download_s": 5.7609984651207924e-05,
+            "result_upload_s": 7.290090434253216e-05,
+            "results": {
+              "cpu": {
+                "jumps": {
+                  "electronic": 69,
+                  "sink": 2,
+                  "tds": 61
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  0.984375
+                ]
+              },
+              "cuda": {
+                "jumps": {
+                  "electronic": 71,
+                  "sink": 2,
+                  "tds": 74
+                },
+                "surviving": [
+                  1.0,
+                  0.9921875,
+                  0.984375
+                ]
+              }
+            },
+            "seed": 17,
+            "setup_s": 0.10476718889549375,
+            "shape": [
+              48,
+              48
+            ],
+            "step_ang": 10,
+            "timings": {
+              "cpu": {
+                "cold_s": 0.43374149897135794,
+                "warm_median_s": 0.4191117179580033,
+                "warm_s": [
+                  0.4213591730222106,
+                  0.4191117179580033,
+                  0.4176240270026028
+                ]
+              },
+              "cuda": {
+                "cold_s": 0.5631636229809374,
+                "warm_median_s": 0.37617621198296547,
+                "warm_s": [
+                  0.37617621198296547,
+                  0.3778360188007355,
+                  0.3749544369056821
+                ]
+              }
+            },
+            "warm_speedup": 1.11413668543449
+          }
+        ]
+      },
+      "slurm_job": 1622,
+      "stage": "vectorized cached TDS shell envelope"
+    },
+    {
+      "log_sha256": "04d77074c76e6f34185540037c12caa167ebce62e7cdb914b85f3a1721f71e06",
+      "measurement": {
+        "cpu": "x86_64",
+        "cuda_runtime": 13020,
+        "cupy": "14.2.0",
+        "device": "NVIDIA GeForce RTX 5080",
+        "peak_host_rss_kib": 1271240,
+        "repeats": 3,
+        "target_warm_speedup": 2,
+        "timestamp_utc": "2026-10-21T07:25:24.835669+00:00",
+        "warmup": 1,
+        "workloads": [
+          {
+            "depth_ang": 100,
+            "electrons": 8,
+            "pool_reserved_bytes": 772096,
+            "pool_used_bytes": 4096,
+            "precision": "complex128",
+            "result_download_s": 3.348011523485184e-05,
+            "result_upload_s": 6.355112418532372e-05,
+            "results": {
+              "cpu": {
+                "jumps": {
+                  "electronic": 0,
+                  "sink": 0,
+                  "tds": 0
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  1.0
+                ]
+              },
+              "cuda": {
+                "jumps": {
+                  "electronic": 1,
+                  "sink": 0,
+                  "tds": 0
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  1.0
+                ]
+              }
+            },
+            "seed": 17,
+            "setup_s": 0.14995780494064093,
+            "shape": [
+              12,
+              12
+            ],
+            "step_ang": 10,
+            "timings": {
+              "cpu": {
+                "cold_s": 0.0020620820578187704,
+                "warm_median_s": 0.0006907540373504162,
+                "warm_s": [
+                  0.0006907540373504162,
+                  0.0005797129124403,
+                  0.0007517740596085787
+                ]
+              },
+              "cuda": {
+                "cold_s": 0.09721152810379863,
+                "warm_median_s": 0.008370566880330443,
+                "warm_s": [
+                  0.008728933986276388,
+                  0.008305826922878623,
+                  0.008370566880330443
+                ]
+              }
+            },
+            "warm_speedup": 0.08252177507518432
+          },
+          {
+            "depth_ang": 1000,
+            "electrons": 128,
+            "pool_reserved_bytes": 42241024,
+            "pool_used_bytes": 55808,
+            "precision": "complex128",
+            "result_download_s": 3.879005089402199e-05,
+            "result_upload_s": 7.624109275639057e-05,
+            "results": {
+              "cpu": {
+                "jumps": {
+                  "electronic": 69,
+                  "sink": 2,
+                  "tds": 61
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  0.984375
+                ]
+              },
+              "cuda": {
+                "jumps": {
+                  "electronic": 71,
+                  "sink": 2,
+                  "tds": 74
+                },
+                "surviving": [
+                  1.0,
+                  0.9921875,
+                  0.984375
+                ]
+              }
+            },
+            "seed": 17,
+            "setup_s": 0.10518128192052245,
+            "shape": [
+              48,
+              48
+            ],
+            "step_ang": 10,
+            "timings": {
+              "cpu": {
+                "cold_s": 0.4260957329533994,
+                "warm_median_s": 0.4113902628887445,
+                "warm_s": [
+                  0.40815044986084104,
+                  0.4113902628887445,
+                  0.41653358610346913
+                ]
+              },
+              "cuda": {
+                "cold_s": 0.45567977894097567,
+                "warm_median_s": 0.2860401349607855,
+                "warm_s": [
+                  0.2865356169641018,
+                  0.2860401349607855,
+                  0.2854276089929044
+                ]
+              }
+            },
+            "warm_speedup": 1.4382256634899986
+          }
+        ]
+      },
+      "slurm_job": 1623,
+      "stage": "cached TDS spectra and fused categorical sampling"
+    },
+    {
+      "log_sha256": "da2bb044e16d44f81b640c65fcd7355cb6b02ead3477e1fd9aa35a101ad47436",
+      "measurement": {
+        "cpu": "x86_64",
+        "cuda_runtime": 13020,
+        "cupy": "14.2.0",
+        "device": "NVIDIA GeForce RTX 5080",
+        "peak_host_rss_kib": 1271124,
+        "repeats": 3,
+        "target_warm_speedup": 2,
+        "timestamp_utc": "2026-10-21T14:56:02.134760+00:00",
+        "warmup": 1,
+        "workloads": [
+          {
+            "depth_ang": 100,
+            "electrons": 8,
+            "pool_reserved_bytes": 775168,
+            "pool_used_bytes": 4096,
+            "precision": "complex128",
+            "result_download_s": 3.351992927491665e-05,
+            "result_upload_s": 6.429082714021206e-05,
+            "results": {
+              "cpu": {
+                "jumps": {
+                  "electronic": 0,
+                  "sink": 0,
+                  "tds": 0
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  1.0
+                ]
+              },
+              "cuda": {
+                "jumps": {
+                  "electronic": 1,
+                  "sink": 0,
+                  "tds": 0
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  1.0
+                ]
+              }
+            },
+            "seed": 17,
+            "setup_s": 0.15663059707731009,
+            "shape": [
+              12,
+              12
+            ],
+            "step_ang": 10,
+            "timings": {
+              "cpu": {
+                "cold_s": 0.0020268599037081003,
+                "warm_median_s": 0.0006714730989187956,
+                "warm_s": [
+                  0.0006914730183780193,
+                  0.0006714730989187956,
+                  0.0006147529929876328
+                ]
+              },
+              "cuda": {
+                "cold_s": 0.09572310815565288,
+                "warm_median_s": 0.007569912122562528,
+                "warm_s": [
+                  0.007901503005996346,
+                  0.007349451072514057,
+                  0.007569912122562528
+                ]
+              }
+            },
+            "warm_speedup": 0.0887028921930856
+          },
+          {
+            "depth_ang": 1000,
+            "electrons": 128,
+            "pool_reserved_bytes": 42244096,
+            "pool_used_bytes": 55808,
+            "precision": "complex128",
+            "result_download_s": 4.8269983381032944e-05,
+            "result_upload_s": 0.00012791086919605732,
+            "results": {
+              "cpu": {
+                "jumps": {
+                  "electronic": 69,
+                  "sink": 2,
+                  "tds": 61
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  0.984375
+                ]
+              },
+              "cuda": {
+                "jumps": {
+                  "electronic": 71,
+                  "sink": 2,
+                  "tds": 74
+                },
+                "surviving": [
+                  1.0,
+                  0.9921875,
+                  0.984375
+                ]
+              }
+            },
+            "seed": 17,
+            "setup_s": 0.10474544181488454,
+            "shape": [
+              48,
+              48
+            ],
+            "step_ang": 10,
+            "timings": {
+              "cpu": {
+                "cold_s": 0.42105510202236474,
+                "warm_median_s": 0.4086151849478483,
+                "warm_s": [
+                  0.4080374171026051,
+                  0.4086151849478483,
+                  0.40865184599533677
+                ]
+              },
+              "cuda": {
+                "cold_s": 0.42524021910503507,
+                "warm_median_s": 0.24484487692825496,
+                "warm_s": [
+                  0.24130441900342703,
+                  0.24484487692825496,
+                  0.2526802180800587
+                ]
+              }
+            },
+            "warm_speedup": 1.668873737830266
+          }
+        ]
+      },
+      "slurm_job": 1626,
+      "stage": "cached electronic gather and fused acceptance"
+    },
+    {
+      "log_sha256": "01750d150129f6a18535dd06e385332333d71b10b58c955b5e75a9499ecfcace",
+      "measurement": {
+        "cpu": "x86_64",
+        "cuda_runtime": 13020,
+        "cupy": "14.2.0",
+        "device": "NVIDIA GeForce RTX 5080",
+        "peak_host_rss_kib": 1270212,
+        "repeats": 3,
+        "target_warm_speedup": 2,
+        "timestamp_utc": "2026-10-21T14:57:52.510726+00:00",
+        "warmup": 1,
+        "workloads": [
+          {
+            "depth_ang": 100,
+            "electrons": 8,
+            "pool_reserved_bytes": 779776,
+            "pool_used_bytes": 5120,
+            "precision": "complex128",
+            "result_download_s": 4.574982449412346e-05,
+            "result_upload_s": 0.00014196103438735008,
+            "results": {
+              "cpu": {
+                "jumps": {
+                  "electronic": 0,
+                  "sink": 0,
+                  "tds": 0
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  1.0
+                ]
+              },
+              "cuda": {
+                "jumps": {
+                  "electronic": 1,
+                  "sink": 0,
+                  "tds": 0
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  1.0
+                ]
+              }
+            },
+            "seed": 17,
+            "setup_s": 0.14158037584275007,
+            "shape": [
+              12,
+              12
+            ],
+            "step_ang": 10,
+            "timings": {
+              "cpu": {
+                "cold_s": 0.001996830105781555,
+                "warm_median_s": 0.0006842028815299273,
+                "warm_s": [
+                  0.0006842028815299273,
+                  0.0006587738171219826,
+                  0.0007009629625827074
+                ]
+              },
+              "cuda": {
+                "cold_s": 0.0950865380000323,
+                "warm_median_s": 0.0060854710172861814,
+                "warm_s": [
+                  0.006791488965973258,
+                  0.0060854710172861814,
+                  0.006025798851624131
+                ]
+              }
+            },
+            "warm_speedup": 0.11243219786708439
+          },
+          {
+            "depth_ang": 1000,
+            "electrons": 128,
+            "pool_reserved_bytes": 42248704,
+            "pool_used_bytes": 56832,
+            "precision": "complex128",
+            "result_download_s": 3.936002030968666e-05,
+            "result_upload_s": 7.758080027997494e-05,
+            "results": {
+              "cpu": {
+                "jumps": {
+                  "electronic": 69,
+                  "sink": 2,
+                  "tds": 61
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  0.984375
+                ]
+              },
+              "cuda": {
+                "jumps": {
+                  "electronic": 71,
+                  "sink": 2,
+                  "tds": 74
+                },
+                "surviving": [
+                  1.0,
+                  0.9921875,
+                  0.984375
+                ]
+              }
+            },
+            "seed": 17,
+            "setup_s": 0.10712764388881624,
+            "shape": [
+              48,
+              48
+            ],
+            "step_ang": 10,
+            "timings": {
+              "cpu": {
+                "cold_s": 0.4213168420828879,
+                "warm_median_s": 0.39772894280031323,
+                "warm_s": [
+                  0.40974534698762,
+                  0.39396005496382713,
+                  0.39772894280031323
+                ]
+              },
+              "cuda": {
+                "cold_s": 0.3840911011211574,
+                "warm_median_s": 0.2073370278812945,
+                "warm_s": [
+                  0.20963251707144082,
+                  0.2050433959811926,
+                  0.2073370278812945
+                ]
+              }
+            },
+            "warm_speedup": 1.918272615675878
+          }
+        ]
+      },
+      "slurm_job": 1627,
+      "stage": "cached jump constants and host scalar control"
+    },
+    {
+      "log_sha256": "ead493d87cf08d2109d4e26352bdb9a784f8beb8a5c878139455d13166f1af3f",
+      "measurement": {
+        "cpu": "x86_64",
+        "cuda_runtime": 13020,
+        "cupy": "14.2.0",
+        "device": "NVIDIA GeForce RTX 5080",
+        "peak_host_rss_kib": 1270824,
+        "repeats": 3,
+        "target_warm_speedup": 2,
+        "timestamp_utc": "2026-10-21T15:00:04.366953+00:00",
+        "warmup": 1,
+        "workloads": [
+          {
+            "depth_ang": 100,
+            "electrons": 8,
+            "pool_reserved_bytes": 779776,
+            "pool_used_bytes": 5120,
+            "precision": "complex128",
+            "result_download_s": 4.079006612300873e-05,
+            "result_upload_s": 7.806112989783287e-05,
+            "results": {
+              "cpu": {
+                "jumps": {
+                  "electronic": 0,
+                  "sink": 0,
+                  "tds": 0
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  1.0
+                ]
+              },
+              "cuda": {
+                "jumps": {
+                  "electronic": 1,
+                  "sink": 0,
+                  "tds": 0
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  1.0
+                ]
+              }
+            },
+            "seed": 17,
+            "setup_s": 0.14558439212851226,
+            "shape": [
+              12,
+              12
+            ],
+            "step_ang": 10,
+            "timings": {
+              "cpu": {
+                "cold_s": 0.0020289591047912836,
+                "warm_median_s": 0.0006796130910515785,
+                "warm_s": [
+                  0.0006796130910515785,
+                  0.0005796928890049458,
+                  0.0007080729119479656
+                ]
+              },
+              "cuda": {
+                "cold_s": 0.09562341589480639,
+                "warm_median_s": 0.006130723049864173,
+                "warm_s": [
+                  0.006523216143250465,
+                  0.006127082975581288,
+                  0.006130723049864173
+                ]
+              }
+            },
+            "warm_speedup": 0.11085366041231229
+          },
+          {
+            "depth_ang": 1000,
+            "electrons": 128,
+            "pool_reserved_bytes": 42248704,
+            "pool_used_bytes": 56832,
+            "precision": "complex128",
+            "result_download_s": 3.924104385077953e-05,
+            "result_upload_s": 8.218013681471348e-05,
+            "results": {
+              "cpu": {
+                "jumps": {
+                  "electronic": 69,
+                  "sink": 2,
+                  "tds": 61
+                },
+                "surviving": [
+                  1.0,
+                  1.0,
+                  0.984375
+                ]
+              },
+              "cuda": {
+                "jumps": {
+                  "electronic": 71,
+                  "sink": 2,
+                  "tds": 74
+                },
+                "surviving": [
+                  1.0,
+                  0.9921875,
+                  0.984375
+                ]
+              }
+            },
+            "seed": 17,
+            "setup_s": 0.10612695990130305,
+            "shape": [
+              48,
+              48
+            ],
+            "step_ang": 10,
+            "timings": {
+              "cpu": {
+                "cold_s": 0.4212888141628355,
+                "warm_median_s": 0.4098489561583847,
+                "warm_s": [
+                  0.4098489561583847,
+                  0.407001850893721,
+                  0.41019814810715616
+                ]
+              },
+              "cuda": {
+                "cold_s": 0.3632043809629977,
+                "warm_median_s": 0.19585570716299117,
+                "warm_s": [
+                  0.1986893629655242,
+                  0.1950125079602003,
+                  0.19585570716299117
+                ]
+              }
+            },
+            "warm_speedup": 2.092606654639419
+          }
+        ]
+      },
+      "slurm_job": 1629,
+      "stage": "fused displacement inverse CDF"
+    }
+  ],
+  "target_declared_before_tuning": {
+    "axis": [
+      0,
+      0,
+      1
+    ],
+    "cells": [
+      1,
+      1
+    ],
+    "crystal": "silicon",
+    "depths_ang": [
+      0,
+      500,
+      1000
+    ],
+    "electrons": 128,
+    "kinetic_energy_eV": 1000000.0,
+    "mechanisms": [
+      "tds",
+      "electronic"
+    ],
+    "precision": "complex128",
+    "seed": 17,
+    "shape": [
+      48,
+      48
+    ],
+    "step_ang": 10,
+    "warm_speedup": 2
+  },
+  "validation_ids": [
+    "cr-axial-realspace-propagation",
+    "cr-axial-realspace-dissipator"
+  ]
+}

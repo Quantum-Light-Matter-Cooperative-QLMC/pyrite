@@ -117,11 +117,14 @@ TEST_SUITE_PATTERNS = {
     # domains; keep specialized physics before each family catch-all.
     "quantum": (
         "materials/test_channeling_profile.py",
+        "montecarlo/test_axial_*.py",
         "montecarlo/test_channeling_axial*.py",
         "montecarlo/test_channeling_density.py",
         "montecarlo/test_channeling_emission.py",
+        "montecarlo/test_channeling_metrics.py",
         "montecarlo/test_channeling_mcwf.py",
         "montecarlo/test_channeling_operators.py",
+        "montecarlo/test_channeling_quantum_regression.py",
         "montecarlo/test_channeling_states.py",
         "montecarlo/test_channeling_vortex.py",
     ),
