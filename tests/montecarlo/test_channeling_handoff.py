@@ -49,7 +49,15 @@ def _case(plane=(1, -1, 0), *, n=N, numerics=SMALL, thickness_ang=10000.0):
         pr.Detector(),
         physics=physics,
     )
-    return api.build_case(scene, pr.Numerics(cxr_trials=n, brem_trials=n, **numerics))
+    return api.build_case(
+        scene,
+        pr.Numerics(
+            cxr_trials=n,
+            brem_trials=n,
+            energy_bins=pr.EnergyBins(cxr=np.linspace(1e3, 2e3, 9)),
+            **numerics,
+        ),
+    )
 
 
 def _ensemble(**changes):

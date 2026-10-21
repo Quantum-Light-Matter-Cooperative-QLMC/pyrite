@@ -21,18 +21,24 @@ from pyrite.montecarlo.channeling.dipole import dipole_rate_per_ang
 from pyrite.montecarlo.channeling.realspace import RealSpaceGrid
 from pyrite.montecarlo.channeling.states import MixedState, gaussian, laguerre_gauss, mixture
 
-#: Interactive budget in grid samples x split steps x trajectories (<= ~1 min on one core).
+#: Keep the original interactive CPU budget. Larger CUDA runs remain explicitly bounded.
 APP_WORK_LIMIT = 1.1e9
-#: Recorded depths kept per app solve.
+CUDA_APP_WORK_LIMIT = 4.0e10
+#: Maximum number of recorded depths for each backend.
 APP_MAX_DEPTHS = 41
+CUDA_APP_MAX_DEPTHS = 81
 
 
-def axial_demo_depths(depth_ang: float, step_ang: float) -> tuple[float, ...]:
-    """Return up to ``APP_MAX_DEPTHS`` evenly spaced step multiples from 0 to ``depth_ang``."""
+def axial_demo_depths(
+    depth_ang: float, step_ang: float, samples: int = APP_MAX_DEPTHS
+) -> tuple[float, ...]:
+    """Evenly spaced, exact step multiples, including entrance and exit."""
+    if not isinstance(samples, int) or not 2 <= samples <= CUDA_APP_MAX_DEPTHS:
+        raise ValueError(f"recorded depth samples must be 2..{CUDA_APP_MAX_DEPTHS}")
     steps = round(depth_ang / step_ang)
     if steps < 1:
         raise ValueError("depth must span at least one step")
-    index = np.unique(np.rint(np.linspace(0, steps, APP_MAX_DEPTHS)).astype(int))
+    index = np.unique(np.rint(np.linspace(0, steps, samples)).astype(int))
     return tuple(float(i * step_ang) for i in index)
 
 
@@ -42,17 +48,31 @@ def solve_axial_demo(
     preset: str = "Gaussian",
     waist_ang: float = 0.5,
     impact_ang: tuple[float, float] = (0.0, 0.0),
+    record_metrics: bool = True,
 ) -> AxialDiagnosticResult:
-    """Reuse completed small solves; larger statistics belong on remote compute."""
+    """Cache app runs while keeping explicit backend-dependent resource bounds."""
+    cuda = config.backend == "cuda"
+    if cuda and config.mode != "mcwf":
+        raise ValueError("CUDA currently supports axial MCWF, not coherent propagation")
+    if cuda and config.oam_string is not None:
+        raise ValueError(
+            "CUDA disk-OAM projection is not implemented; disable the OAM checkbox or switch to CPU"
+        )
+    max_grid, max_cells, max_electrons, max_depths, min_step, work_limit = (
+        (192, 8, 4096, CUDA_APP_MAX_DEPTHS, 0.25, CUDA_APP_WORK_LIMIT)
+        if cuda
+        else (48, 3, 32, APP_MAX_DEPTHS, 1.0, APP_WORK_LIMIT)
+    )
     if (
-        max(config.shape) > 48
-        or max(config.cells) > 3
-        or config.step_ang < 1
-        or config.n_electrons > 32
-        or len(config.depths_ang) > APP_MAX_DEPTHS
+        max(config.shape) > max_grid
+        or max(config.cells) > max_cells
+        or config.step_ang < min_step
+        or config.n_electrons > max_electrons
+        or len(config.depths_ang) > max_depths
     ):
         raise ValueError(
-            f"app limit: 48² grid, 3² cells, step >= 1 Å, 32 electrons, {APP_MAX_DEPTHS} depths"
+            f"{config.backend.upper()} app limit: {max_grid}² grid, {max_cells}² cells, "
+            f"step >= {min_step:g} Å, {max_electrons} electrons, {max_depths} depths"
         )
     if not np.isfinite(waist_ang) or waist_ang <= 0 or not np.all(np.isfinite(impact_ang)):
         raise ValueError("waist must be positive and impact finite")
@@ -76,13 +96,14 @@ def solve_axial_demo(
     else:
         trajectories = len(entry.components) if isinstance(entry, MixedState) else 1
     steps = config.depths_ang[-1] / config.step_ang
-    if config.shape[0] * config.shape[1] * steps * trajectories > APP_WORK_LIMIT:
+    if config.shape[0] * config.shape[1] * steps * trajectories > work_limit:
         raise ValueError(
-            f"app limit: grid samples x steps x trajectories <= {APP_WORK_LIMIT:.1e}; "
-            "use a coarser step, fewer electrons, or remote compute"
+            f"{config.backend.upper()} app limit: work "
+            f"grid samples x steps x trajectories <= {work_limit:.1e}; "
+            "use a coarser step, fewer electrons, or run the diagnostic outside the app"
         )
     levels = _level_observable(config)
-    return axial_diagnostic(config, entry=entry, observable=levels, record_metrics=True)
+    return axial_diagnostic(config, entry=entry, observable=levels, record_metrics=record_metrics)
 
 
 @lru_cache(maxsize=4)
@@ -101,6 +122,8 @@ class _RolledLevelDensity:
     grid; the carrier phase it shifts is global, so ``rho`` is unchanged.
     """
 
+    cuda_compatible = True
+
     def __init__(self, catalog: AxialLineCatalog, grid: RealSpaceGrid) -> None:
         self.shift = (grid.shape[0] // 2, grid.shape[1] // 2)
         center = tuple(
@@ -109,7 +132,10 @@ class _RolledLevelDensity:
         self.levels = LevelDensity(catalog, grid, center)
 
     def __call__(self, phi, tilt_inv_ang=(0.0, 0.0)):
-        return self.levels(np.roll(phi, self.shift, axis=(0, 1)), tilt_inv_ang)
+        xp = np
+        if hasattr(phi, "__cuda_array_interface__"):
+            import cupy as xp
+        return self.levels(xp.roll(phi, self.shift, axis=(0, 1)), tilt_inv_ang)
 
 
 def _level_observable(config: AxialDiagnosticConfig) -> _RolledLevelDensity | None:
@@ -182,7 +208,7 @@ def _centered(values: np.ndarray, grid):
 
 
 def axial_demo_figure(result: AxialDiagnosticResult, sample: int, conditional: bool = False):
-    """Draw stored arrays only; phase is available solely for a coherent pure state."""
+    """Draw recorded arrays; phase is a coherent envelope or ensemble relative phase."""
     import matplotlib.pyplot as plt
 
     fig, axes = plt.subplots(1, 4, figsize=(16, 4), constrained_layout=True)
@@ -214,6 +240,7 @@ def axial_demo_figure(result: AxialDiagnosticResult, sample: int, conditional: b
     elif result.coherence_numerator_per_ang2 is not None:
         from pyrite.montecarlo.channeling.axial_state_diagnostics import coherence_maps
 
+        assert result.coherence_second_moment is not None
         phase, _, _ = coherence_maps(
             result.coherence_numerator_per_ang2[sample],
             result.coherence_second_moment[sample],
@@ -246,10 +273,12 @@ def axial_demo_figure(result: AxialDiagnosticResult, sample: int, conditional: b
 def axial_coherence_figure(result: AxialDiagnosticResult, sample: int):
     """Plot cached normalized spatial coherence; never reconstruct from density."""
     import matplotlib.pyplot as plt
+
     from pyrite.montecarlo.channeling.axial_state_diagnostics import coherence_maps
 
     if result.coherence_numerator_per_ang2 is None:
         raise ValueError("coherence was not recorded; rerun with record_coherence=True")
+    assert result.coherence_second_moment is not None
     phase, visibility, sem = coherence_maps(
         result.coherence_numerator_per_ang2[sample],
         result.coherence_second_moment[sample],

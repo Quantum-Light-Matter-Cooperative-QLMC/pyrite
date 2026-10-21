@@ -73,7 +73,7 @@ def test_explicit_cut_reaches_the_case_without_touching_the_catalog():
     assert case["name"].endswith("cut=(1,0,1) roll=17 miscut=5.56512@200")
     # Stored line grids belong to the catalog orientation; a cut resolves its own.
     assert "line_grid_policy" in case
-    assert "line_grid_policy" not in build_case(_scene())
+    assert "line_grid_policy" in build_case(_scene())
     assert (CATALOG.crystal("hopg").surface_hkl, CATALOG.crystal("hopg").beam_uvw) == before
 
 

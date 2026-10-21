@@ -341,23 +341,45 @@ class LevelDensity:
     Validation: cr-axial-helicity-emission
     """
 
+    cuda_compatible = True
+
     catalog: AxialLineCatalog
     grid: RealSpaceGrid
     center_ang: tuple[float, float]
     _orbitals: list[np.ndarray] = field(init=False, repr=False)
+    _cuda_cache: tuple | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "_orbitals", self.catalog.orbitals(self.grid, self.center_ang))
 
     def __call__(self, phi: np.ndarray, tilt_inv_ang=(0.0, 0.0)) -> np.ndarray:
-        x = self.grid.x[:, None]
-        y = self.grid.y[None, :]
-        psi = np.exp(1j * (tilt_inv_ang[0] * x + tilt_inv_ang[1] * y)) * phi
+        xp = np
+        if hasattr(phi, "__cuda_array_interface__"):
+            import cupy as xp
+
+            # Copy static projection orbitals to VRAM only once per observable.
+            if self._cuda_cache is None:
+                object.__setattr__(
+                    self,
+                    "_cuda_cache",
+                    (
+                        xp.asarray(self.grid.x)[:, None],
+                        xp.asarray(self.grid.y)[None, :],
+                        tuple(xp.asarray(orbitals) for orbitals in self._orbitals),
+                    ),
+                )
+            assert self._cuda_cache is not None
+            x, y, all_orbitals = self._cuda_cache
+        else:
+            x = self.grid.x[:, None]
+            y = self.grid.y[None, :]
+            all_orbitals = self._orbitals
+        psi = xp.exp(1j * (tilt_inv_ang[0] * x + tilt_inv_ang[1] * y)) * phi
         blocks = []
-        for orbitals in self._orbitals:
-            amplitude = np.einsum("sij,ij->s", orbitals.conj(), psi) * self.grid.cell_area_ang2
-            blocks.append(np.outer(amplitude, amplitude.conj()).ravel())
-        return np.concatenate(blocks)
+        for orbitals in all_orbitals:
+            amplitude = xp.einsum("sij,ij->s", orbitals.conj(), psi) * self.grid.cell_area_ang2
+            blocks.append(xp.outer(amplitude, amplitude.conj()).ravel())
+        return xp.concatenate(blocks)
 
     def unpack(self, values: np.ndarray) -> list[np.ndarray]:
         """Split an observable vector into per-level density matrices."""

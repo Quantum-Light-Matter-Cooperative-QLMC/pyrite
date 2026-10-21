@@ -28,6 +28,9 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # as physical validation verdicts.
     "checks/axial_escape_accounting.py": (),
     "checks/axial_matching_study.py": (),
+    # Hardware performance evidence accompanies the CUDA backend validation;
+    # it does not add a separate pass/fail ledger claim.
+    "checks/axial_mcwf_cuda.py": (),
     "checks/axial_mcwf_return_flux.py": (),
     "checks/quantum_decoherence_budget.py": ("quantum-decoherence-budget",),
     "checks/channeling_material_survey.py": (),

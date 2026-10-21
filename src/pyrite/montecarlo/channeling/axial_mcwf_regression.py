@@ -303,11 +303,11 @@ def axial_mcwf_regression(
             raise ValueError("array-state reconstruction changed the auxiliary grid state")
         result = solver.run(
             entry,
-            depths,
+            tuple(float(depth) for depth in depths),
             count,
             seed=seed,
             step_ang=step_ang,
-            tilt_rad=tuple(v / solver.momentum for v in tilt_pair),
+            tilt_rad=(tilt_pair[0] / solver.momentum, tilt_pair[1] / solver.momentum),
             observable=current_expectation,
             batch_size=batch_size,
         )

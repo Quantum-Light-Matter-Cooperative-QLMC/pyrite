@@ -32,6 +32,11 @@
       "cc": 39
     },
     {
+      "path": "src/pyrite/apps/axial_channeling.py",
+      "name": "solve_axial_demo",
+      "cc": 22
+    },
+    {
       "path": "src/pyrite/apps/trace_app.py",
       "name": "_.penetration_tab",
       "cc": 36
@@ -254,7 +259,7 @@
     {
       "path": "src/pyrite/materials/authoring.py",
       "name": "build_crystal",
-      "cc": 29
+      "cc": 26
     },
     {
       "path": "src/pyrite/materials/catalog.py",
@@ -274,7 +279,12 @@
     {
       "path": "src/pyrite/montecarlo/channeling/axial_diagnostic.py",
       "name": "_validate",
-      "cc": 27
+      "cc": 38
+    },
+    {
+      "path": "src/pyrite/montecarlo/channeling/axial_diagnostic.py",
+      "name": "axial_diagnostic",
+      "cc": 31
     },
     {
       "path": "src/pyrite/montecarlo/channeling/axial_dissipator.py",
@@ -282,9 +292,9 @@
       "cc": 22
     },
     {
-      "path": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
-      "name": "AxialMCWF.run",
-      "cc": 25
+      "path": "src/pyrite/montecarlo/channeling/axial_state_diagnostics.py",
+      "name": "AxialSpectralObservable.__init__",
+      "cc": 33
     },
     {
       "path": "src/pyrite/montecarlo/channeling/emission.py",

@@ -399,7 +399,6 @@ def axial_diagnostic(
     extra = None if observable is None else stacked[:, stop:extra_stop]
     spec_values = None
     spec_represented = None
-    spec_omitted = None
     coh_numerator = None
     coh_second = None
     if spectral is not None:
@@ -441,7 +440,11 @@ def axial_diagnostic(
         spectral_represented=spec_represented,
         spectral_omitted=None if spectral is None else np.maximum(surviving - spec_represented, 0),
         spectral_barrier_eV=None if spectral is None else spectral.barrier_eV,
-        coherence_reference_index=None if coherence is None else coherence.reference_index,
+        coherence_reference_index=(
+            None
+            if coherence is None
+            else (int(coherence.reference_index[0]), int(coherence.reference_index[1]))
+        ),
         coherence_numerator_per_ang2=coh_numerator,
         coherence_second_moment=coh_second,
     )

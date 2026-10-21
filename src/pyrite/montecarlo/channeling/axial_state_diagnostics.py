@@ -15,8 +15,10 @@ import numpy as np
 from scipy.linalg import eigh
 from scipy.sparse.linalg import LinearOperator, eigsh
 
-from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2, longitudinal_kinematics
-
+from pyrite.materials.channeling.transverse import (
+    HBAR2_2M_EV_ANG2,
+    longitudinal_kinematics,
+)
 
 MAX_DENSE_DIMENSION = 256
 MAX_SPECTRAL_STATES = 64
@@ -74,7 +76,7 @@ def transverse_spectrum(grid, potential_eV, kinetic_energy_eV, tilt_inv_ang, cou
         h = (h + h.conj().T) / 2
         energies, vectors = eigh(h, subset_by_index=(0, count - 1), check_finite=False)
     else:
-        h = LinearOperator((n, n), matvec=apply, dtype=np.complex128)
+        h = LinearOperator((n, n), matvec=apply, dtype=np.complex128)  # type: ignore
         energies, vectors = eigsh(h, k=count, which="SA", tol=1e-10)
         order = np.argsort(energies)
         energies, vectors = energies[order], vectors[:, order]
@@ -169,7 +171,9 @@ class AxialSpectralObservable:
                 if self.energies_eV[i] - self.energies_eV[i - 1] > degeneracy_tol_eV:
                     group_edges.append(i)
             group_edges.append(count)
-            self.groups = [slice(a, b) for a, b in zip(group_edges[:-1], group_edges[1:])]
+            self.groups = [
+                slice(a, b) for a, b in zip(group_edges[:-1], group_edges[1:], strict=True)
+            ]
             self.labels = []
             for group in self.groups:
                 energy = float(np.mean(self.energies_eV[group]))
@@ -193,7 +197,7 @@ class AxialSpectralObservable:
             self.edges_eV = edges
             self.width = edges.size - 1
             self.labels = []
-            for a, b in zip(edges[:-1], edges[1:]):
+            for a, b in zip(edges[:-1], edges[1:], strict=True):
                 category = (
                     "below barrier"
                     if b <= self.barrier_eV
@@ -245,6 +249,7 @@ class AxialSpectralObservable:
         if self.cutoff_eV is not None:
             valid &= spec.energies_eV[: self.count] <= self.cutoff_eV
         if self.representation == "states":
+            assert self.groups is not None
             values = xp.stack([xp.sum(pop[s] * xp.asarray(valid[s])) for s in self.groups])
         else:
             e = spec.energies_eV[: self.count]
@@ -270,7 +275,7 @@ class ReferenceCoherenceObservable:
         self.grid = grid
         self.reference_index = tuple(int(i) for i in reference_index)
         if len(self.reference_index) != 2 or any(
-            not 0 <= i < n for i, n in zip(self.reference_index, grid.shape)
+            not 0 <= i < n for i, n in zip(self.reference_index, grid.shape, strict=True)
         ):
             raise ValueError("reference pixel must be inside the spectral grid")
         self.delta_x = grid.x[:, None] - grid.x[self.reference_index[0]]

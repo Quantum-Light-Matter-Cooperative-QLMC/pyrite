@@ -326,9 +326,11 @@ def test_ci_runs_every_primary_suite_once(dev_module) -> None:
     workflow = yaml.safe_load((dev_module.ROOT / ".github/workflows/ci.yml").read_text())
     matrix = workflow["jobs"]["focused"]["strategy"]["matrix"]
 
-    assert set(matrix["suite"]) == set(dev_module.PRIMARY_TEST_SUITE_NAMES)
+    assert set(matrix["suite"]) == set(dev_module.PRIMARY_TEST_SUITE_NAMES) - {"quantum"}
     assert len(matrix["suite"]) == len(set(matrix["suite"]))
     assert matrix["python"] == ["3.13", "3.14"]
+    quantum = workflow["jobs"]["quantum"]["strategy"]["matrix"]
+    assert quantum["python"] == matrix["python"]
 
 
 @pytest.mark.parametrize(

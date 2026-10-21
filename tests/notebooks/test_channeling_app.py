@@ -84,11 +84,14 @@ def test_axial_app_executes_same_api_and_reuses_solve(mode):
         axis="001",
         energy=5,
         mode=mode,
+        backend="cpu",
         cells=1,
         grid=16,
         depth=50,
         step=5,
         electrons=2,
+        samples=11,
+        metrics=True,
         seed=547,
         preset="Gaussian",
         waist=0.5,
@@ -97,6 +100,13 @@ def test_axial_app_executes_same_api_and_reuses_solve(mode):
         tilt_x=0,
         tilt_y=0,
         oam=False,
+        spectral=0,
+        spectral_repr="energy_bins",
+        electronic=False,
+        coherence=False,
+        ref_auto=True,
+        ref_x=0,
+        ref_y=0,
     )
     _, definitions = app.run(
         defs={
@@ -107,7 +117,7 @@ def test_axial_app_executes_same_api_and_reuses_solve(mode):
     result = definitions["axial_result"]
     direct = axial_diagnostic(result.config, entry=result.entry)
     np.testing.assert_allclose(result.density_per_ang2, direct.density_per_ang2)
-    assert solve_axial_demo(result.config, "Gaussian", 0.5, (0, 0)) is result
+    assert solve_axial_demo(result.config, "Gaussian", 0.5, (0, 0), record_metrics=True) is result
     assert (
         result.wavefunctions_per_ang is None
         if mode == "mcwf"

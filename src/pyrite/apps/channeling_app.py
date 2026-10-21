@@ -36,7 +36,7 @@ def _():
                 wrap=True,
             ),
             mo.md(
-                "Choose the planar quantum model or experimental axial diagnostics on the CPU. "
+                "Choose the planar quantum model or experimental axial diagnostics on CPU/CUDA. "
                 "The plots below describe model states and probabilities; they are not detector measurements. "
                 "Trajectory replay is not available for channeling cases."
             ),
@@ -496,14 +496,13 @@ def _(mo, mode_ui):
     axial_form = (
         mo.md(
             """
-        **Experimental axial diagnostic** — periodic supercell (not a visualization crop);
-        enlarging cells at fixed shape lowers samples per crystal cell. For
-        individual degenerate-level populations choose 'states' and disable electronic
-        jumps; with electronic kicks use carrier-sector energy bins. No campaign integration.
+        **Experimental axial diagnostic** — CPU or CUDA MCWF. The periodic supercell
+        is the *simulation domain*, not a crop; increasing cell count at fixed shape
+        reduces samples per crystal cell. No campaign integration.
 
-        {crystal} {axis} {energy} {mode} {grid} {cells}
+        {crystal} {axis} {energy} {mode} {backend} {grid} {cells}
 
-        {depth} {step} {electrons} {seed} {preset}
+        {depth} {step} {electrons} {samples} {metrics} {seed} {preset}
 
         {waist} {impact_x} {impact_y} {tilt_x} {tilt_y} {oam}
 
@@ -511,10 +510,14 @@ def _(mo, mode_ui):
 
         Waist w means exp(-r²/w²); impact is relative to the projected cell origin,
         drawn at the center of each map. The equal ±1 mixture adds probabilities,
-        with equal incident weights. Tilt is a separate carrier angle. The app
-        records 41 depths and caps grid samples × steps × trajectories at 1.1e9
-        (1 mm coherent at 32² and 10 Å steps, about a minute; ~300 µm MCWF with
-        32 electrons). Larger studies belong on remote compute.
+        with equal incident weights. Tilt is a separate carrier angle.
+        CPU retains the 48²/3²/32-electron/41-depth demonstration limits.
+        CUDA MCWF permits up to 192²/8²/4096 electrons/81 depths, subject to a
+        separate work cap and the device/recording-memory admission checks.
+        Uncheck ensemble metrics or reference-point coherence to reduce recording
+        memory at large grids. Disk-local OAM remains CPU-only.
+        State-index eigenpopulations require a fixed carrier sector: disable
+        electronic jumps, or select carrier-sector energy bins instead.
         """
         )
         .batch(
@@ -522,8 +525,11 @@ def _(mo, mode_ui):
             axis=mo.ui.dropdown(["001", "110"], value="001", label="Axis"),
             energy=mo.ui.slider(1, 10, value=5, label="Energy (MeV)"),
             mode=mo.ui.dropdown(["coherent", "mcwf"], value="coherent", label="Evolution"),
-            grid=mo.ui.dropdown([16, 32, 48], value=32, label="Grid samples per axis"),
-            cells=mo.ui.slider(1, 3, value=1, label="Cells per axis"),
+            backend=mo.ui.dropdown(["cpu", "cuda"], value="cpu", label="MCWF backend"),
+            grid=mo.ui.dropdown(
+                [16, 32, 48, 64, 96, 128, 192], value=32, label="Grid samples per axis"
+            ),
+            cells=mo.ui.slider(1, 8, value=1, label="Cells per axis"),
             depth=mo.ui.dropdown(
                 {
                     "10 nm": 100,
@@ -544,8 +550,10 @@ def _(mo, mode_ui):
                 value="1 µm",
                 label="Depth",
             ),
-            step=mo.ui.dropdown([1, 2, 5, 10, 20], value=5, label="Step (Å)"),
-            electrons=mo.ui.slider(1, 32, value=16, label="MCWF electrons"),
+            step=mo.ui.dropdown([0.25, 0.5, 1, 2, 5, 10, 20, 50], value=5, label="Step (Å)"),
+            electrons=mo.ui.number(1, 4096, value=16, label="MCWF electrons"),
+            samples=mo.ui.dropdown([11, 21, 41, 61, 81], value=41, label="Recorded depths"),
+            metrics=mo.ui.checkbox(value=True, label="Record ensemble metrics (128 MiB cap)"),
             seed=mo.ui.number(0, 100000, value=0, label="Seed"),
             preset=mo.ui.dropdown(
                 ["Gaussian", "Vortex +1", "Vortex -1", "Equal ±1 mixture"],
@@ -567,8 +575,8 @@ def _(mo, mode_ui):
             electronic=mo.ui.checkbox(value=True, label="Include electronic jumps"),
             coherence=mo.ui.checkbox(value=True, label="Record reference-point spatial coherence"),
             ref_auto=mo.ui.checkbox(value=True, label="Auto-select nonzero reference density"),
-            ref_x=mo.ui.number(0, 47, value=0, label="Reference x pixel (manual)"),
-            ref_y=mo.ui.number(0, 47, value=0, label="Reference y pixel (manual)"),
+            ref_x=mo.ui.number(0, 191, value=0, label="Reference x pixel (manual)"),
+            ref_y=mo.ui.number(0, 191, value=0, label="Reference y pixel (manual)"),
         )
         .form(submit_button_label="Run axial diagnostic")
     )
@@ -578,6 +586,7 @@ def _(mo, mode_ui):
 
 @app.cell
 def _(axial_form, mo):
+    from pyrite._backend import BackendError
     from pyrite.apps.axial_channeling import (
         axial_demo_depths,
         axial_demo_figure,
@@ -593,26 +602,31 @@ def _(axial_form, mo):
         kinetic_energy_eV=_v["energy"] * 1e6,
         cells=(_v["cells"],) * 2,
         shape=(_v["grid"],) * 2,
-        depths_ang=axial_demo_depths(_v["depth"], _v["step"]),
+        depths_ang=axial_demo_depths(_v["depth"], _v["step"], _v["samples"]),
         step_ang=_v["step"],
         tilt_rad=(_v["tilt_x"] * 1e-3, _v["tilt_y"] * 1e-3),
         mode=_v["mode"],
+        backend=_v["backend"],
         mechanisms=("tds", "electronic") if _v["electronic"] else ("tds",),
-        n_electrons=_v["electrons"],
-        seed=int(_v["seed"]),
-        oam_string=0 if _v["oam"] else None,
         spectral_states=int(_v["spectral"]),
         spectral_representation=_v["spectral_repr"],
         record_coherence=bool(_v["coherence"]),
         coherence_reference_index=(
             None if _v["ref_auto"] else (int(_v["ref_x"]), int(_v["ref_y"]))
         ),
+        n_electrons=int(_v["electrons"]),
+        seed=int(_v["seed"]),
+        oam_string=0 if _v["oam"] else None,
     )
     try:
         axial_result = solve_axial_demo(
-            axial_config, _v["preset"], _v["waist"], (_v["impact_x"], _v["impact_y"])
+            axial_config,
+            _v["preset"],
+            _v["waist"],
+            (_v["impact_x"], _v["impact_y"]),
+            record_metrics=_v["metrics"],
         )
-    except ValueError as _error:
+    except (ValueError, BackendError, ImportError) as _error:
         mo.stop(True, mo.md(f"**Not run:** {_error}"))
     return axial_demo_figure, axial_result
 
@@ -870,17 +884,24 @@ def _(axial_conditional_ui, axial_result, axial_sample_ui, mo):
         conditional=axial_conditional_ui.value,
         labels=_labels,
     )
-    _metrics = axial_metric_figure(axial_result.depths_ang, axial_result.metrics)
+    if axial_result.metrics is None:
+        _metrics = mo.md("**Ensemble metrics disabled for this run.**")
+        _metric_note = "Enable ensemble metrics to record purity, coherence, and energy moments. "
+    else:
+        _metrics = axial_metric_figure(axial_result.depths_ang, axial_result.metrics)
+        _metric_note = (
+            "Purity estimates the full position-grid ensemble, conditioned on survival. "
+            "Error bars are one probe SEM (32 fixed probes), excluding finite-trajectory "
+            "sampling error and empirical-ensemble bias. Raw estimates can exceed physical "
+            "bounds. Squared coherence uses the fixed position grid. "
+            "Conditional metrics are undefined when all electrons are lost. "
+        )
     mo.vstack(
         [
             mo.md(
                 f"**Population basis:** {_basis}. Degenerate levels are summed, not split arbitrarily. "
-                "Purity estimates the full finite physical-position-grid ensemble, conditioned "
-                "on survival. Error bars are one probe SEM (32 fixed probes), **excluding** "
-                "finite-trajectory sampling error and empirical-ensemble bias. Raw estimates "
-                "can exceed physical bounds. Squared coherence uses the fixed position grid. "
-                "Conditional metrics are undefined when all electrons are lost. Numerical "
-                "grid sinks are not physical escape; total jump counts are shown below."
+                f"{_metric_note}"
+                "Numerical grid sinks are not physical escape; total jump counts are shown below."
             ),
             _pop,
             _metrics,
