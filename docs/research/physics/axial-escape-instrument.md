@@ -538,7 +538,33 @@ X_{\rm ref}\rangle$, with a delete-one-chunk jackknife SEM. The default
 lab-box job; `--smoke` is a seconds-long TDS-only plumbing check. A
 `--mechanisms tds` run is comparable with the secular table above only at
 matched plane-wave orders and Bloch sampling; the default ($\pm8$ orders per
-cell, $c=2$) matches no row there. Results are pending.
+cell, $c=2$) matches no row there.
+
+**Electronic-jump pilot (2026-10-21; research only).** The first lab-box run
+of the 2 × 2 cell, 16-point-per-cell grid stopped because the gap selector
+required a *gap midpoint* within 2 eV of the nominal cut. A cut may lie in a
+wide level-free interval even when its midpoint is farther away. The
+diagnostic now selects the largest symmetric level-free interval centred
+within the allowed cut window and reports its width; outside the represented
+spectrum the retained projector is trivially empty or full. This repairs the
+measurement diagnostic, not the physical matching model.
+
+A pilot with only the high candidate cut used `--cut-eV 178 --workers 4
+--chunks 4 --electrons-per-chunk 16 --depth-max-ang 10000
+--depth-step-ang 1000 --step-ang 10` (SLURM job 1640, both TDS and electronic
+jumps, seed chunks 0–3). The zero-tilt gap cut was 179.532 eV. The reference
+64-electron ensemble counted 46 TDS jumps, 207 electronic jumps and 24
+numerical sinks; the measured model absorbed 12 electrons. At 10,000 Å the
+pooled bound-exposure deficit was $-0.0060\pm0.0151$ (delete-one-chunk
+jackknife standard error). The minimum reported centred level-free width was
+0.593 eV, only 0.296 eV clearance on either side; the median chunk median
+width was 1.413 eV. The earlier non-Hermitian cross-cut estimate reaches
+2.2 eV after some electronic kicks, so a small coherent-leakage error is not
+established by this pilot. The uncertainty also exceeds the provisional 1%
+exposure criterion. There is no validated depth budget or admitted case from
+these numbers. Reproduction requires cut/clearance distributions, coherent
+projected evolution, more histories, and independent grid and supercell
+convergence before a physical matching threshold can be selected.
 
 ## Matching prescription still to establish
 
