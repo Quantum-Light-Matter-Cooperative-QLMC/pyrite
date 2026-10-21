@@ -2,6 +2,26 @@
 
 Part of the [physics validation ledger](physics-validation-ledger.md). See the [validation methodology](methodology.md) for the status lifecycle and the [domain inventories](domain-inventories.md) for a claim-by-claim index. Design: [ADR-0018](../adr/0018-quantum-channeling-zone.md) and the [channeling radiation walkthrough](../research/physics/channeling-radiation-physics.md). These rows cover the static, scattering-free planar profile (#503), open-system depth evolution (#504) and channeling-radiation emission (#505), and the transport handoff (#506). Angles are plane-local; `cr-plane-incidence` maps the laboratory tilt and #25 `CrystalCut` orientation onto them.
 
+## `cr-axial-phase-space-instrument`
+
+- **Claim:** normalized finite-grid Weyl translations of any unit discrete window resolve the identity with factor `1/M`. Applying that positive joint position/momentum measurement to a selected outgoing state preserves its squared norm and position/momentum correlations. Together with complementary orthogonal retained/outgoing projectors the instrument is trace preserving. This is measurement algebra, not a physical escape or native-launch model.
+- **Code:** `montecarlo/channeling/axial_phase_space.py::{phase_space_weights,sample_phase_space}`
+- **Source:** finite Weyl orthogonality; continuous coherent-state POVM analogue in Brody, Graefe & Melanathuru, Phys. Rev. Lett. 134, 120201 (2025).
+- **Status:** anchored
+- **Checks:** direct complex-exponential Weyl overlaps on a rectangular grid; complementary-projector mixed-state closure; joint conditional probabilities; delta-window and uniform-wave limits; zero state and recording-budget refusals.
+- **Anchor:** `tests/montecarlo/test_channeling_axial_phase_space.py`
+- **Notes:** Research prerequisite for #620. No physical dechanneling interpretation, frame/energy-shell prescription, stopping or native transport continuation. Phase-space smoothing and return-flux convergence remain required under `cr-axial-zone-handoff-accounting`. **2026-10-21 fresh-context verdict `rederived`** ([write-up](channeling/cr-axial-phase-space-instrument.md)): finite Fourier orthogonality, complex window conjugation, forward FFT sign, mixed-state closure and correlated conditional sampling independently verified before code inspection. All ten independent direct-mode and limiting-case regressions pass. This scoped measurement claim is `anchored`; the physical handoff claim remains unverified. Human sign-off remains in #277.
+
+## `cr-quantum-regression-correlation`
+
+- **Claim:** for a supplied finite time-independent GKSL model, the quantum-regression correlation is `G_ab(z,z') = Tr[J_a exp(L(z-z'))(rho(z') J_b†)]` for `z >= z'`, with conjugate component-transposed reversal. Its double-depth quadratic form with positive spectral phase and complex amplitude weights preserves interference and places a lowering transition at positive conjugate frequency. Attenuation belongs at both amplitudes, rather than on a local yield after integration.
+- **Code:** `montecarlo/channeling/quantum_regression.py::{_generator,regression_correlation,spectral_quadratic_form}`
+- **Source:** Lax, Phys. Rev. 129, 2342 (1963) (quantum regression); Gorini, Kossakowski & Sudarshan, JMP 17, 821 (1976), Lindblad, CMP 48, 119 (1976) (GKSL generator); Landi et al., PRX Quantum 5, 020201 (2024), Eq. (95) (regression formula).
+- **Status:** anchored
+- **Checks:** exact damped two-level complex correlation; pure-dephasing delay law; current-component interference; positive-energy finite-time sinc limit; amplitude attenuation; ground/zero density; mixture linearity; positive quadratic forms and allocation refusals.
+- **Anchor:** `tests/montecarlo/test_channeling_quantum_regression.py`
+- **Notes:** Bounded CPU reference, with incident normalization and explicit dense/spectral-memory admission. Output is a supplied-current correlation/quadratic form, not photons/eV/sr. It supplies no material-specific current operator, finite-grid completeness, frame mapping, boundary matching or persisted channel. **2026-10-21 fresh-context verdict `rederived`** ([write-up](channeling/cr-quantum-regression-correlation.md)): derived before implementation; column-major GKSL factors, non-Hermitian intermediate, complex component ordering, positive spectral phase and amplitude attenuation match. All 15 independent analytic/budget regressions pass; this scoped reference is `anchored`. The physical axial source remains unverified/unimplemented. Human sign-off remains in #277.
+
 ## `diamond-valence-oscillator`
 
 - **Claim:** the existing PENELOPE effective-oscillator model for undoped diamond assigns four valence electrons per C formula unit to the approximately 34 eV bulk plasmon, retaining two K-core electrons; this is not a free-carrier or boron-doped intervalence oscillator.
@@ -376,3 +396,15 @@ change the eigenproblem or introduce a new physical selection rule.
 - **Checks:** sphere integral of `Σ|E|²` is 1 to 1e-4 at γ = 1.6, 10.8 for `d = x̂`, `(x̂ + iŷ)/√2` and a generic complex `d`; `d = x̂` reproduces `boosted_dipole_pattern` to 1e-9 and gives `E₋ = E₊*` (real field); `d ∝ x̂ + iŷ` (`J_z = +1`) has `E₋ = E_z = 0` on axis, `E₊` winding 0 and `E₋` winding +2 on circles γθ = 0.3, 1, 2.5 (`J_z = −1` mirrors to −2); paraxial `|E_±|²` agree with `helicity_pattern(m = 1, Λ = ±1)` to 2% for γθ ≤ 1 at γ = 10.8 (deviation `O(θ²)`, 26% at γ = 1.6).
 - **Anchor:** `tests/montecarlo/test_channeling_axial_emission.py::{test_far_field_amplitude_normalizes_and_reduces_to_the_planar_dipole,test_far_field_of_a_jz_plus_line_winds_only_the_opposite_circular_component}`
 - **Notes:** Display diagnostic for the channeling app (planar and axial far-field phase/intensity maps); no transport or scoring consumer. The fixed lab circular basis differs from the local helicity basis `(ê_θ ± iê_φ)/√2` at `O(θ)`, so `|E_±|²` are polarizer-selected intensities, not helicities, away from the axis; `|E_z|²` is the dropped longitudinal part (`O(θ²)`). The phase carries the global phase of `d` and is undefined at intensity zeros. Dipole order only. **2026-10-18 fresh-context verdict `rederived`** ([write-up](channeling/cr-dipole-far-field-amplitude.md)): direct boost of rest-frame dipole fields agrees to 6e-11 for 2000 random complex `d`, γ = 1.0001–400; adaptive sphere integrals are 1 to 4e-16; `d = x̂` matches `boosted_dipole_pattern` to 1.4e-12; windings `(E₊, E₋, E_z) = (0, 2, 1)` for `J_z = +1`; `far_field_maps` matches an explicit incoherent sum to 6e-16. Human sign-off pending (#277).
+
+## `cr-quantum-ensemble-metrics`
+
+- **Claim:** retained-ensemble purity is `Tr(rho²)/Tr(rho)²`; squared Hilbert–Schmidt coherence subtracts the chosen basis diagonal squared. Transverse-energy mean/variance use the first two moments of the instantaneous transverse Hamiltonian. Axial full-grid purity uses independent fixed random-probe density actions with a reported probe standard error.
+- **Code:** `montecarlo/channeling/metrics.py`
+- **Source:** density-operator Born rule and spectral trace identities; Hutchinson, *Communications in Statistics—Simulation and Computation* 19 (1990), 433–450 (random trace estimator).
+- **Assumptions:** Hermitian positive semidefinite retained density; orthonormal discrete position or Bloch eigenbasis; independent isotropic probes; survivor conditioning excludes physical escape and numerical loss.
+- **Limiting cases:** pure state purity one; equally populated orthogonal pair purity one half; zero retained trace leaves conditional quantities undefined; Hamiltonian eigenstate has zero transverse-energy spread.
+- **Status:** anchored
+- **Checks:** independent finite-dimensional complex density-action and dense Fourier Hamiltonian oracles; analytic pure/mixed and all-lost ensembles.
+- **Anchor:** `tests/montecarlo/test_channeling_metrics.py`
+- **Notes:** registered before implementation for #620; fresh-context verdict `rederived`, followed by focused anchors. [Independent derivation and source comparison](channeling/cr-quantum-ensemble-metrics.md). Empirical finite-ensemble purity includes finite-trajectory bias; probe SEM excludes trajectory sampling uncertainty. Coherence is squared off-diagonal Frobenius norm in the named basis. Human sign-off remains in #277.

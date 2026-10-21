@@ -48,6 +48,7 @@ from scipy.linalg import expm
 from ...materials.channeling.potential import PlanarProfile
 from ...materials.channeling.transverse import _hamiltonian, longitudinal_kinematics
 from ...materials.crystal import HBARC_EV_ANG, M_E_EV
+from .metrics import EnsembleMetrics, density_metrics
 from .operators import ScatteringKernel
 from .spatial import spatial_density
 
@@ -129,6 +130,9 @@ class DensityMatrixResult:
     final_density: np.ndarray
     spatial_x_ang: np.ndarray | None = None
     spatial_density_per_ang: np.ndarray | None = None
+
+    metrics: EnsembleMetrics | None = None
+    retained_band_populations: np.ndarray | None = None
 
     @property
     def total_flux(self) -> np.ndarray:
@@ -400,6 +404,7 @@ class DensityMatrixSolver:
         energy_edges_eV: np.ndarray | None = None,
         initial: tuple[np.ndarray, float] | None = None,
         spatial_x_ang: np.ndarray | None = None,
+        record_metrics: bool = False,
     ) -> DensityMatrixResult:
         """Integrate the entry state to ``thickness_ang`` with steps ``dz_ang``.
 
@@ -414,6 +419,11 @@ class DensityMatrixSolver:
         steps, including entrance and exit. Reconstruction uses the current
         basis after any energy reprojection; no matrix history is retained.
         Storage is ``O(n_recorded * n_x)``; default integration is unchanged.
+        ``record_metrics`` additionally records exact retained-ensemble purity,
+        instantaneous Bloch-basis squared coherence and transverse H moments,
+        plus all retained band populations. Zero-trace conditional metrics are NaN.
+
+        Validation: cr-quantum-ensemble-metrics
 
         Validation: cr-density-matrix-split-operator, cr-dechanneling-collapse
         """
@@ -424,6 +434,7 @@ class DensityMatrixSolver:
         spatial_x = (
             None if spatial_x_ang is None else np.array(spatial_x_ang, dtype=float, copy=True)
         )
+        metric_history = []
         spatial_history = [] if spatial_x is not None else None
         steps = max(1, int(round(thickness_ang / dz_ang)))
         dz = thickness_ang / steps
@@ -459,6 +470,8 @@ class DensityMatrixSolver:
         }
 
         def record(z: float) -> None:
+            if record_metrics:
+                metric_history.append(density_metrics(rho, self.basis.energies))
             if spatial_history is not None and spatial_x is not None:
                 spatial_history.append(
                     spatial_density(
@@ -523,6 +536,17 @@ class DensityMatrixSolver:
             barrier_eV=self.barrier_eV,
             cutoff_eV=self.cutoff_eV,
             final_density=rho,
+            metrics=None
+            if not record_metrics
+            else EnsembleMetrics(
+                purity=np.asarray(metric_history)[:, 0],
+                coherence_squared=np.asarray(metric_history)[:, 1],
+                energy_mean_eV=np.asarray(metric_history)[:, 2],
+                energy_std_eV=np.asarray(metric_history)[:, 3],
+                purity_probe_sem=np.zeros(len(metric_history)),
+                basis="instantaneous Bloch eigenbasis",
+            ),
+            retained_band_populations=bands if record_metrics else None,
             spatial_x_ang=spatial_x,
             spatial_density_per_ang=None
             if spatial_history is None

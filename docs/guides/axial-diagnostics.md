@@ -153,3 +153,44 @@ They document finite-grid sink/clamp effects, isotropic displacement limits,
 and the remaining inhomogeneous electronic-ensemble validation gap. The
 [ledger](../validation/ledger-channeling.md#cr-axial-realspace-dissipator)
 remains the validation owner; this diagnostic surface does not promote it.
+
+## Stored quantum evolution metrics
+
+Both app modes show instantaneous state-population bars and depth heatmaps.
+Planar bars include all retained Bloch bands, summed over blocks. Axial bars
+sum each degenerate string-0 local level. These are local squared projection
+weights: sampled orbitals need not be orthogonal. The Gram-matrix spectral
+defect is displayed; survival minus their sum is a signed coverage diagnostic,
+which can be negative and must not be interpreted as loss or unrepresented
+probability. Without a supported local catalog,
+the app labels and displays the complete finite position-grid basis instead.
+Incident normalization is the default. Survivor conditioning divides each depth
+by its surviving weight, giving zero populations for all-lost ensembles.
+Controls only redraw stored arrays.
+
+Purity uses the **ensemble** density, conditioned on its retained trace. Planar
+purity is exact for the retained block-diagonal ensemble. Axial purity uses
+32 fixed independent complex random probes of the full physical-position-grid
+density. Error bars show one probe standard error, conditional on the empirical
+finite-electron ensemble; they exclude trajectory sampling uncertainty and
+finite-ensemble purity bias. The result records the number of electrons. Small
+ensembles need independent seed/convergence studies. Raw estimates can exceed
+one. Squared off-diagonal Frobenius coherence subtracts the exact squared
+diagonal and depends on basis: instantaneous Bloch eigenstates for planar,
+physical position grid for axial. Raw noisy coherence estimates can be negative.
+These two basis-dependent quantities should not be compared as an invariant
+coherence measure.
+
+Transverse-energy mean and standard deviation are conditional Hamiltonian
+moments in eV. Axial moments include both kinetic directions, carrier tilt and
+the real potential. All conditional metrics are NaN when no weight survives.
+Axial OAM curves remain truncated disk-local populations per incident electron,
+not whole-cell angular momentum. Numerical grid sinks are not physical escape.
+
+Use `record_metrics=True` with `axial_diagnostic` or
+`DensityMatrixSolver.propagate` to request reductions. The app enables them.
+Density-sketch output exceeding 128 MiB is refused before computation. The app
+also limits recording to 41 depths. Metric recording retains no electron
+wavefunction histories. See the
+[metric derivation](../validation/channeling/cr-quantum-ensemble-metrics.md)
+for normalization, uncertainty and validation limits.

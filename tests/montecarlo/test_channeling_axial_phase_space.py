@@ -1,0 +1,137 @@
+"""Independent finite-Weyl oracles; these do not validate physical escape."""
+
+import numpy as np
+import pytest
+
+from pyrite.montecarlo.channeling.axial_phase_space import (
+    phase_space_stream,
+    phase_space_weights,
+    sample_phase_space,
+)
+
+
+def _direct_weights(phi, window):
+    """Explicit complex exponentials, independently of FFT conventions."""
+    shape = phi.shape
+    x, y = np.indices(shape)
+    out = np.empty((*shape, *shape))
+    for position in np.ndindex(shape):
+        shifted = window[(x - position[0]) % shape[0], (y - position[1]) % shape[1]]
+        for momentum in np.ndindex(shape):
+            carrier = np.exp(2j * np.pi * (momentum[0] * x / shape[0] + momentum[1] * y / shape[1]))
+            mode = shifted * carrier
+            out[(*position, *momentum)] = abs(np.vdot(mode, phi)) ** 2 / phi.size
+    return out
+
+
+def _case():
+    rng = np.random.default_rng(620)
+    phi = rng.normal(size=(3, 4)) + 1j * rng.normal(size=(3, 4))
+    phi *= np.sqrt(0.7 / np.vdot(phi, phi).real)
+    window = rng.normal(size=phi.shape) + 1j * rng.normal(size=phi.shape)
+    window /= np.linalg.norm(window)
+    return phi, window
+
+
+def test_weyl_weights_match_direct_modes_and_preserve_outgoing_mass():
+    phi, window = _case()
+    actual = phase_space_weights(phi, window)
+    np.testing.assert_allclose(actual, _direct_weights(phi, window), atol=2e-16)
+    assert np.min(actual) >= 0
+    assert np.sum(actual) == pytest.approx(0.7, abs=1e-15)
+
+
+def test_retained_and_outgoing_instrument_closes_for_mixed_density():
+    rng = np.random.default_rng(3)
+    _, window = _case()
+    basis, _ = np.linalg.qr(rng.normal(size=(12, 12)) + 1j * rng.normal(size=(12, 12)))
+    p = basis[:, :4] @ basis[:, :4].conj().T
+    f = np.eye(12) - p
+    retained = 0.0
+    outgoing = np.zeros((3, 4, 3, 4))
+    for weight, psi in zip((0.2, 0.8), basis.T[:2], strict=True):
+        retained += weight * np.linalg.norm(p @ psi) ** 2
+        outgoing += weight * phase_space_weights((f @ psi).reshape(3, 4), window)
+    assert retained + outgoing.sum() == pytest.approx(1.0, abs=2e-15)
+    assert outgoing.min() >= 0
+
+
+def test_conditional_sampler_preserves_joint_correlations():
+    phi, window = _case()
+    expected = _direct_weights(phi, window)
+
+    class Choices:
+        def __init__(self, position):
+            self.position = position
+            self.probabilities = []
+
+        def choice(self, size, p):
+            self.probabilities.append(p)
+            return self.position if len(self.probabilities) == 1 else 0
+
+    for index in np.ndindex(phi.shape):
+        choices = Choices(np.ravel_multi_index(index, phi.shape))
+        outcome = sample_phase_space(phi, window, choices)
+        np.testing.assert_allclose(
+            choices.probabilities[0], expected.sum(axis=(2, 3)).ravel() / 0.7, atol=2e-15
+        )
+        np.testing.assert_allclose(
+            choices.probabilities[1], expected[index].ravel() / expected[index].sum(), atol=2e-15
+        )
+        assert outcome.position_index == index
+        assert outcome.momentum_index == (0, 0)
+        assert outcome.state_weight == pytest.approx(0.7)
+
+
+def test_delta_window_and_plane_wave_limits():
+    phi, _ = _case()
+    delta = np.zeros_like(phi)
+    delta[0, 0] = 1
+    q = phase_space_weights(phi, delta)
+    np.testing.assert_allclose(
+        q, np.broadcast_to(np.abs(phi[:, :, None, None]) ** 2 / phi.size, q.shape)
+    )
+    plane = np.ones_like(phi) / np.sqrt(phi.size)
+    q = phase_space_weights(plane, plane)
+    assert q[:, :, 0, 0].sum() == pytest.approx(1)
+    assert q[:, :, 1:, :].sum() == pytest.approx(0, abs=1e-30)
+
+
+def test_measurement_stream_is_incident_addressed_and_reproducible():
+    phi, window = _case()
+    direct = {i: sample_phase_space(phi, window, phase_space_stream(17, i)) for i in range(8)}
+    shuffled = {
+        i: sample_phase_space(phi, window, phase_space_stream(17, i))
+        for i in (7, 2, 1, 5, 4, 6, 3, 0)
+    }
+    assert direct == shuffled
+    assert not np.array_equal(
+        phase_space_stream(17, 0).random(8), phase_space_stream(17, 1).random(8)
+    )
+
+
+def test_zero_state_and_recording_budget():
+    phi, window = _case()
+    assert phase_space_weights(np.zeros_like(phi), window).sum() == 0
+    with pytest.raises(ValueError, match="zero-weight"):
+        sample_phase_space(np.zeros_like(phi), window, phase_space_stream(0, 0))
+    with pytest.raises(ValueError, match="max_outcomes"):
+        phase_space_weights(phi, window, max_outcomes=phi.size**2 - 1)
+
+
+@pytest.mark.parametrize("bad", [True, -1, 0.5])
+def test_invalid_measurement_keys(bad):
+    with pytest.raises(ValueError, match="nonnegative integer"):
+        phase_space_stream(bad, 0)
+    with pytest.raises(ValueError, match="nonnegative integer"):
+        phase_space_stream(0, bad)
+
+
+def test_invalid_window_and_nonfinite_state():
+    phi, window = _case()
+    with pytest.raises(ValueError, match="unit discrete"):
+        phase_space_weights(phi, 2 * window)
+    with pytest.raises(ValueError, match="finite"):
+        phase_space_weights(phi * np.nan, window)
+    with pytest.raises(ValueError, match="same nonempty"):
+        phase_space_weights(phi, window[:1])

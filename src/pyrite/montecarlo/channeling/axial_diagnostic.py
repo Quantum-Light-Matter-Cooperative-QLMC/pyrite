@@ -1,4 +1,4 @@
-"""Experimental diagnostic assembly of the existing axial solvers; CPU only."""
+"""Experimental diagnostic assembly of the existing axial solvers and bounded ensemble recording."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from pyrite.materials.channeling.axial import AxialProfile, axial_profile
 
 from .axial_dissipator import axial_dissipator
 from .axial_mcwf import AxialMCWF
+from .metrics import RECORDING_BUDGET_BYTES, AxialMetricsObservable, EnsembleMetrics
 from .realspace import RealSpaceGrid, SplitStepPropagator
 from .states import EntryState, MixedState, gaussian, momentum_inv_ang
 from .vortex import CylindricalProjection
@@ -44,6 +45,7 @@ class AxialDiagnosticConfig:
     mechanisms: tuple[str, ...] = ("tds", "electronic")
     oam_string: int | None = None
     oam_radius_ang: float = 0.5
+    backend: Literal["cpu", "cuda"] = "cpu"
 
 
 def _validate(config: AxialDiagnosticConfig) -> None:
@@ -117,6 +119,9 @@ class AxialDiagnosticResult:
     oam_populations: np.ndarray | None
     oam_origin_ang: tuple[float, float] | None
     observables: np.ndarray | None = None
+    metrics: EnsembleMetrics | None = None
+    numerical_sink: np.ndarray | None = None
+    jump_history: dict[str, np.ndarray] | None = None
     experimental_model: str = "experimental axial diagnostic; existing #508 solvers"
 
     def density(self, *, conditional: bool = False) -> np.ndarray:
@@ -153,13 +158,62 @@ def _coherent(config, grid, potential, components, norms, observe):
     return stacked, history
 
 
+class _DiagnosticRecording:
+    """Compose bounded recorded observables and declare device resource needs."""
+
+    def __init__(self, grid, potential, config, projection, observable, record_metrics):
+        self.metrics = (
+            AxialMetricsObservable(
+                grid, potential, config.kinetic_energy_eV, len(config.depths_ang)
+            )
+            if record_metrics
+            else None
+        )
+        self.observers = [f for f in (projection, observable, self.metrics) if f is not None]
+        self.cuda_compatible = all(getattr(f, "cuda_compatible", False) for f in self.observers)
+        self.width = 0 if self.metrics is None else self.metrics.width
+        extras = (0 if projection is None else len(projection.ells)) + (
+            0 if observable is None else getattr(observable, "recording_width", 4096)
+        )
+        self.recording_bytes = (
+            len(config.depths_ang) * 48 * (int(np.prod(grid.shape)) + self.width + extras)
+        )
+        if record_metrics and self.recording_bytes // 3 > RECORDING_BUDGET_BYTES:
+            raise ValueError("combined ensemble recording exceeds 128 MiB budget")
+        self.scratch_bytes = 16 * int(np.prod(grid.shape)) * 100
+        self.electrons = config.n_electrons if config.mode == "mcwf" else None
+
+    def __call__(self, phi, tilt):
+        xp = np
+        if hasattr(phi, "__cuda_array_interface__"):
+            import cupy as xp
+        parts = [xp.abs(phi).ravel() ** 2]
+        parts.extend(xp.asarray(observer(phi, tilt)) for observer in self.observers)
+        return xp.concatenate(parts)
+
+    def finish(self, stacked, surviving, density):
+        if self.metrics is None:
+            return None
+        return self.metrics.finish(
+            stacked[:, -self.width :], surviving, density, electrons=self.electrons
+        )
+
+
+def _validate_backend(config):
+    if config.backend not in ("cpu", "cuda") or (
+        config.backend == "cuda" and config.mode != "mcwf"
+    ):
+        raise ValueError("CUDA diagnostic backend requires MCWF mode")
+
+
 def axial_diagnostic(
     config: AxialDiagnosticConfig = AxialDiagnosticConfig(),
     *,
     entry: EntryState | None = None,
     observable: Callable[[np.ndarray, tuple[float, float]], np.ndarray] | None = None,
+    record_metrics: bool = False,
 ) -> AxialDiagnosticResult:
-    """Assemble and run the existing experimental axial diagnostic on the CPU.
+    """Assemble the experimental axial diagnostic with optional stored ensemble metrics.
 
     ``entry`` uses the existing 2D pure/mixture interface; omitted means a
     Gaussian of waist 0.5 Å at the coordinate origin. No amplitudes are averaged
@@ -169,10 +223,17 @@ def axial_diagnostic(
     it is averaged with the same weights as the density. See the axial diagnostic
     guide for periodic boundaries, convergence and validation limits.
 
-    Validation: cr-axial-realspace-propagation, cr-axial-realspace-dissipator
+    ``record_metrics`` records full-grid empirical ensemble purity (probe SEM),
+    position-basis squared coherence and conditional transverse H moments;
+    undefined conditional values are NaN. ``backend="cuda"`` is MCWF-only;
+    optional caller/OAM observables must support device arrays explicitly.
+
+    Validation: cr-quantum-ensemble-metrics,
+    cr-axial-realspace-propagation, cr-axial-realspace-dissipator
     (existing solvers; their ledger statuses are unchanged).
     """
     _validate(config)
+    _validate_backend(config)
     entry = gaussian(waist_ang=0.5) if entry is None else entry
     if entry.dimension != 2:
         raise ValueError("entry must be a 2D state")
@@ -195,16 +256,9 @@ def axial_diagnostic(
             raise ValueError("oam_string must index a profile string")
         origin = profile.strings[config.oam_string].position_ang
         projection = CylindricalProjection(grid, origin, config.oam_radius_ang, 8)
-    observers: list[Callable[[np.ndarray, tuple[float, float]], np.ndarray]] = [
-        lambda phi, tilt: np.abs(phi).ravel() ** 2
-    ]
-    if projection is not None:
-        observers.append(projection)
-    if observable is not None:
-        observers.append(observable)
-
-    def observe(phi, tilt):
-        return np.concatenate([np.asarray(f(phi, tilt)) for f in observers])
+    observe = _DiagnosticRecording(grid, potential, config, projection, observable, record_metrics)
+    numerical_sink = np.zeros(len(config.depths_ang))
+    jump_history = None
 
     if config.mode == "coherent":
         stacked, waves = _coherent(config, grid, potential, components, norms, observe)
@@ -218,7 +272,8 @@ def axial_diagnostic(
             config.shape,
             mechanisms=config.mechanisms,
         )
-        mcwf = AxialMCWF(dissipator, config.kinetic_energy_eV, potential).run(
+        backend = {} if config.backend == "cpu" else {"backend": config.backend}
+        mcwf = AxialMCWF(dissipator, config.kinetic_energy_eV, potential, **backend).run(
             entry,
             config.depths_ang,
             config.n_electrons,
@@ -228,12 +283,18 @@ def axial_diagnostic(
             observable=observe,
         )
         stacked, waves, jumps = mcwf.observables, None, mcwf.jumps
+        numerical_sink = (
+            np.searchsorted(np.sort(mcwf.sink_depths_ang), config.depths_ang, side="right")
+            / config.n_electrons
+        )
+        jump_history = getattr(mcwf, "jump_history", None)
     count = grid.shape[0] * grid.shape[1]
     stop = count if projection is None else count + len(projection.ells)
     # A complex caller observable promotes the stack; density and OAM are real.
     density = stacked[:, :count].real.reshape(-1, *grid.shape)
     oam = None if projection is None else stacked[:, count:stop].real
-    extra = None if observable is None else stacked[:, stop:]
+    extra_stop = -observe.width if observe.width else stacked.shape[1]
+    extra = None if observable is None else stacked[:, stop:extra_stop]
     if config.mode == "coherent":
         surviving = density.sum(axis=(1, 2)) * grid.cell_area_ang2
     else:
@@ -254,4 +315,7 @@ def axial_diagnostic(
         oam,
         origin,
         extra,
+        observe.finish(stacked, surviving, density),
+        numerical_sink,
+        jump_history,
     )

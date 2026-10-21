@@ -82,7 +82,7 @@ def solve_axial_demo(
             "use a coarser step, fewer electrons, or remote compute"
         )
     levels = _level_observable(config)
-    return axial_diagnostic(config, entry=entry, observable=levels)
+    return axial_diagnostic(config, entry=entry, observable=levels, record_metrics=True)
 
 
 @lru_cache(maxsize=4)
@@ -294,3 +294,42 @@ def axial_line_options(radiation: AxialRadiation) -> tuple[dict[str, int], str]:
     ]
     strongest = int(np.argmax(radiation.photons(len(radiation.depths_ang) - 1)))
     return dict(zip(labels, range(len(labels)), strict=True)), labels[strongest]
+
+
+def axial_population_data(result: AxialDiagnosticResult):
+    """Stored string-0 level weights, retaining degeneracy labels and residuals."""
+    observable = _level_observable(result.config)
+    if observable is None or result.observables is None:
+        # A complete orthonormal finite-position basis remains available when
+        # the string-local level catalog is unsupported.
+        return (
+            (
+                result.density_per_ang2.reshape(len(result.depths_ang), -1)
+                * result.grid.cell_area_ang2
+            ),
+            None,
+            "finite position-grid basis",
+        )
+    levels = observable.levels.catalog.levels
+    populations = np.array(
+        [
+            [np.trace(block).real for block in observable.levels.unpack(row)]
+            for row in result.observables
+        ]
+    )
+    labels = [
+        f"L{i}: {level.energy_eV:.3g} eV (g={len(level.states)})" for i, level in enumerate(levels)
+    ]
+    orbitals = np.concatenate(observable.levels._orbitals).reshape(
+        -1, int(np.prod(result.grid.shape))
+    )
+    gram = orbitals.conj() @ orbitals.T * result.grid.cell_area_ang2
+    defect = np.linalg.norm(gram - np.eye(len(gram)), ord=2)
+    return (
+        populations,
+        labels,
+        (
+            f"string-0 local projection weights; incomplete/nonorthogonal sampling, "
+            f"Gram defect ||G-I||₂={defect:.3g}; signed residual is not loss"
+        ),
+    )

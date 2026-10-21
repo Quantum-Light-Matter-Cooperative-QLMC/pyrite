@@ -81,6 +81,9 @@ class AxialMCWFResult:
         ``absorbed`` (hook absorptions) when a ``jump_hook`` is given.
     n_electrons
         Trajectories run.
+    jump_history
+        Cumulative raw ensemble jump counts at each recorded depth, by
+        mechanism. Divide by ``n_electrons`` for counts per incident electron.
     """
 
     depths_ang: np.ndarray
@@ -89,6 +92,7 @@ class AxialMCWFResult:
     sink_depths_ang: np.ndarray
     jumps: dict[str, int]
     n_electrons: int
+    jump_history: dict[str, np.ndarray] | None = None
 
 
 class AxialMCWF:
@@ -102,6 +106,10 @@ class AxialMCWF:
         Electron kinetic energy [eV].
     potential_eV
         Real ``U`` on the dissipator's grid [eV] (``None``: free space).
+    backend
+        ``cpu`` (default) or explicit ``cuda``. CUDA uses complex128 and
+        independent counter-addressed per-electron Philox streams; CPU draw
+        order is preserved. CUDA imports are lazy.
 
     Validation: cr-axial-realspace-dissipator
     """
@@ -111,7 +119,12 @@ class AxialMCWF:
         dissipator: AxialDissipator,
         kinetic_energy_eV: float,
         potential_eV: np.ndarray | None = None,
+        *,
+        backend: str = "cpu",
     ) -> None:
+        if backend not in ("cpu", "cuda"):
+            raise ValueError("axial MCWF backend must be 'cpu' or 'cuda'")
+        self.backend = backend
         self.dissipator = dissipator
         self.grid: RealSpaceGrid = dissipator.grid
         self.kinetic_energy_eV = float(kinetic_energy_eV)
@@ -207,6 +220,8 @@ class AxialMCWF:
         tilt_rad: tuple[float, float] = (0.0, 0.0),
         observable: Observable = density_observable,
         jump_hook: JumpHook | None = None,
+        batch_size: int | None = None,
+        memory_budget_bytes: int | None = None,
     ) -> AxialMCWFResult:
         """Run ``n_electrons`` trajectories from ``entry`` and average ``observable``.
 
@@ -217,16 +232,64 @@ class AxialMCWF:
         continue, or ``None`` to absorb the electron (counted as ``absorbed``).
         It must draw from its own random streams; ``None`` leaves every
         trajectory unchanged.
+
+        ``batch_size`` caps the number of simultaneously advanced electrons;
+        CUDA also admits batches against the existing resource policy and
+        optional ``memory_budget_bytes``. CUDA callbacks must advertise
+        ``cuda_compatible = True`` and consume/return CuPy arrays. Observable
+        ``recording_bytes`` and ``scratch_bytes`` declarations reserve custom
+        reductions before device allocation. Results contain host arrays.
         """
-        if n_electrons < 1 or step_ang <= 0.0:
-            raise ValueError("n_electrons must be >= 1 and step_ang positive")
-        steps = np.rint(np.asarray(depths_ang, dtype=float) / step_ang).astype(int)
-        if np.any(np.diff(steps) < 0) or np.any(steps < 0):
-            raise ValueError("depths must be ascending and non-negative")
-        if isinstance(entry, MixedState):
-            components = [(float(w), self.grid.sample(s)) for w, s in entry.components]
-        else:
-            components = [(1.0, self.grid.sample(entry))]
+        if batch_size is not None and (
+            isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1
+        ):
+            raise ValueError("batch_size must be a positive integer")
+        if self.backend == "cuda":
+            from ._axial_cuda import run_cuda
+
+            return run_cuda(
+                self,
+                entry,
+                depths_ang,
+                n_electrons,
+                seed=seed,
+                step_ang=step_ang,
+                tilt_rad=tilt_rad,
+                observable=observable,
+                jump_hook=jump_hook,
+                batch_size=batch_size,
+                memory_budget_bytes=memory_budget_bytes,
+            )
+        if memory_budget_bytes is not None:
+            raise ValueError("memory_budget_bytes is only supported for CUDA axial MCWF")
+        return self._run_cpu(
+            entry,
+            depths_ang,
+            n_electrons,
+            seed=seed,
+            step_ang=step_ang,
+            tilt_rad=tilt_rad,
+            observable=observable,
+            jump_hook=jump_hook,
+            batch_size=batch_size or BATCH,
+        )
+
+    def _run_cpu(
+        self,
+        entry,
+        depths_ang,
+        n_electrons,
+        *,
+        seed,
+        step_ang,
+        tilt_rad,
+        observable,
+        jump_hook,
+        batch_size,
+    ) -> AxialMCWFResult:
+        """Historical NumPy trajectory loop; preserves CPU RNG draws/event order."""
+        steps = _depth_steps(depths_ang, n_electrons, step_ang)
+        components = _sample_components(self.grid, entry)
         mix = np.array([w for w, _ in components])
         base_tilt = (self.momentum * tilt_rad[0], self.momentum * tilt_rad[1])
         potential_phase = np.exp(-1j * step_ang * self._complex_potential / self.hbar_v)
@@ -234,12 +297,14 @@ class AxialMCWF:
         alive = np.zeros(steps.size)
         sinks: list[float] = []
         jumps = {"tds": 0, "sink": 0, "electronic": 0}
+        history = {kind: np.zeros(steps.size, dtype=np.int64) for kind in jumps}
         absorbed = 0
         area = self.grid.cell_area_ang2
         cells = self.grid.shape[0] * self.grid.shape[1]
 
-        for start in range(0, n_electrons, BATCH):
-            rngs = [_rng(seed, e) for e in range(start, min(start + BATCH, n_electrons))]
+        batch = batch_size
+        for start in range(0, n_electrons, batch):
+            rngs = [_rng(seed, e) for e in range(start, min(start + batch, n_electrons))]
             size = len(rngs)
             phi = np.empty((size, *self.grid.shape), dtype=complex)
             for b, rng in enumerate(rngs):
@@ -255,6 +320,7 @@ class AxialMCWF:
             # physical = half * lagged, so consecutive half steps fuse into one.
             lagged = _fft2(phi) * half.conj()
             step = 0
+            local_jumps = dict.fromkeys(jumps, 0)
             for index, target in enumerate(steps):
                 while step < target and live.any():
                     lagged *= full
@@ -265,6 +331,7 @@ class AxialMCWF:
                         state = _ifft2(lagged[b] * half[b]) / np.sqrt(norms[b])
                         kind, state, tilts[b] = self._jump(state, tilts[b], rngs[b])
                         jumps[kind] += 1
+                        local_jumps[kind] += 1
                         if kind == "sink":
                             sinks.append(step * step_ang)
                         elif kind == "electronic":
@@ -282,6 +349,7 @@ class AxialMCWF:
                         thresholds[b] = rngs[b].random()
                 sums[index] = _observe(observable, lagged, half, live, tilts, area, sums[index])
                 alive[index] += live.sum()
+                _record_jumps(history, index, local_jumps)
 
         if jump_hook is not None:
             jumps["absorbed"] = absorbed
@@ -298,7 +366,30 @@ class AxialMCWF:
             sink_depths_ang=np.asarray(sinks),
             jumps=jumps,
             n_electrons=int(n_electrons),
+            jump_history=history,
         )
+
+
+def _depth_steps(depths, n_electrons, step):
+    if n_electrons < 1 or not np.isfinite(step) or step <= 0:
+        raise ValueError("n_electrons must be >= 1 and step_ang positive")
+    depths = np.asarray(depths, dtype=float)
+    if depths.ndim != 1 or not depths.size or not np.all(np.isfinite(depths)):
+        raise ValueError("depths must be nonempty finite one-dimensional samples")
+    steps = np.rint(depths / step).astype(int)
+    if np.any(np.diff(steps) < 0) or np.any(steps < 0):
+        raise ValueError("depths must be ascending and non-negative")
+    return steps
+
+
+def _sample_components(grid, entry):
+    components = entry.components if isinstance(entry, MixedState) else [(1.0, entry)]
+    return [(float(weight), grid.sample(state)) for weight, state in components]
+
+
+def _record_jumps(history, index, jumps):
+    for kind, counts in history.items():
+        counts[index] += jumps[kind]
 
 
 def _enter(hook, start, phi, tilt, area):

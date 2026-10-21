@@ -118,11 +118,14 @@ channeling/channeling-modulated-incoherent-emission
 channeling/cr-entry-state-projection
 channeling/cr-axial-2d-eigenproblem
 channeling/cr-axial-zone-handoff-accounting
+channeling/cr-axial-phase-space-instrument
+channeling/cr-quantum-regression-correlation
 channeling/cr-axial-realspace-propagation
 channeling/cr-axial-realspace-dissipator
 channeling/cr-vortex-string-coupling
 channeling/cr-axial-helicity-emission
 channeling/cr-dipole-far-field-amplitude
+channeling/cr-quantum-ensemble-metrics
 ```
 
 ```{toctree}

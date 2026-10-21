@@ -170,6 +170,7 @@ def _(
         divergence_rad=divergence_rad,
         record_every=5,
         spatial_x_ang=position_ang,
+        record_metrics=True,
     )
     return basis_order, position_ang, result, solver
 
@@ -766,6 +767,70 @@ def _(
             ]
         )
     mo.vstack(_items)
+    return
+
+
+@app.cell
+def _(conditional_ui, mo, result, sample_ui):
+    from pyrite.apps.channeling_metrics import metric_figure, population_figure
+
+    _pop = population_figure(
+        result.z_ang,
+        result.retained_band_populations,
+        result.trace,
+        sample_ui.value,
+        conditional=conditional_ui.value,
+    )
+    _metrics = metric_figure(result.z_ang, result.metrics)
+    mo.vstack(
+        [
+            mo.md(
+                "**Instantaneous Bloch bands**, summed over blocks; all retained bands. "
+                "Purity uses the full block-diagonal retained ensemble, conditioned on its trace. "
+                "Coherence is the squared off-diagonal Frobenius norm in the instantaneous "
+                "eigenbasis; it depends on that basis. Empty conditional metrics are undefined."
+            ),
+            _pop,
+            _metrics,
+        ]
+    )
+    return
+
+
+@app.cell
+def _(axial_conditional_ui, axial_result, axial_sample_ui, mo):
+    from pyrite.apps.axial_channeling import axial_population_data
+    from pyrite.apps.channeling_metrics import axial_accounting_figure
+    from pyrite.apps.channeling_metrics import metric_figure as axial_metric_figure
+    from pyrite.apps.channeling_metrics import population_figure as axial_population_figure
+
+    _populations, _labels, _basis = axial_population_data(axial_result)
+    _pop = axial_population_figure(
+        axial_result.depths_ang,
+        _populations,
+        axial_result.surviving,
+        axial_sample_ui.value,
+        conditional=axial_conditional_ui.value,
+        labels=_labels,
+    )
+    _metrics = axial_metric_figure(axial_result.depths_ang, axial_result.metrics)
+    mo.vstack(
+        [
+            mo.md(
+                f"**Population basis:** {_basis}. Degenerate levels are summed, not split arbitrarily. "
+                "Purity estimates the full finite physical-position-grid ensemble, conditioned "
+                "on survival. Error bars are one probe SEM (32 fixed probes), **excluding** "
+                "finite-trajectory sampling error and empirical-ensemble bias. Raw estimates "
+                "can exceed physical bounds. Squared coherence uses the fixed position grid. "
+                "Conditional metrics are undefined when all electrons are lost. Numerical "
+                "grid sinks are not physical escape; total jump counts are shown below."
+            ),
+            _pop,
+            _metrics,
+            axial_accounting_figure(axial_result),
+            mo.md(f"**Total jumps:** {axial_result.jumps}"),
+        ]
+    )
     return
 
 

@@ -237,3 +237,36 @@ def test_ring_winding_reads_the_orbital_index():
     assert ring_winding(10.0, np.array([[1.0, 1j], [-1j, 1.0]])) == (-2, 0)  # J_z = -1
     assert ring_winding(10.0, np.diag([1.0, 0.0])) == (-2, 2)  # planar, outside the nulls
     assert ring_winding(10.0, np.diag([1.0, 0.0]), radius=0.5) == (0, 0)
+
+
+@pytest.mark.slow
+def test_stored_population_views_preserve_normalization_and_empty_ensembles():
+    import matplotlib.pyplot as plt
+
+    from pyrite.apps.channeling_metrics import population_figure
+
+    depths = np.array([0.0, 10.0])
+    populations = np.array([[0.2, 0.1], [0.0, 0.0]])
+    survival = np.array([0.5, 0.0])
+    figure = population_figure(depths, populations, survival, 0, conditional=True)
+    np.testing.assert_allclose([bar.get_height() for bar in figure.axes[0].patches], [0.4, 0.2])
+    np.testing.assert_allclose(figure.axes[2].lines[2].get_ydata(), [0.2, 0.0])
+    empty = population_figure(depths, populations, survival, 1, conditional=True)
+    np.testing.assert_array_equal([bar.get_height() for bar in empty.axes[0].patches], [0.0, 0.0])
+    plt.close(figure)
+    plt.close(empty)
+
+
+def test_metric_views_are_cached_array_consumers():
+    tree = ast.parse(APP.read_text())
+    views = []
+    for cell in (node for node in tree.body if isinstance(node, ast.FunctionDef)):
+        calls = {
+            node.func.id
+            for node in ast.walk(cell)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        }
+        if calls & {"metric_figure", "axial_metric_figure"}:
+            views.append(cell)
+            assert not calls & {"solve_axial_demo", "axial_diagnostic", "DensityMatrixSolver"}
+    assert len(views) == 2
