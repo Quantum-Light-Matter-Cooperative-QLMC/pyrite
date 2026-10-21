@@ -181,7 +181,7 @@ Grid-source precedence per case, highest first:
 1. A profile policy. Any stored selector, even one equal to its default, makes every case resolve its line grid automatically from its own trajectories. Explicit `E_grid_line`, `energy_grid_refs` and stored rows are then ignored.
 2. Without a policy: an explicit `E_grid_line` (profile or material override).
 3. A stored per-energy row from `energy_grid_refs` or the legacy `[energy_grids.MATERIAL]` store. `PYRITE_ENERGY_GRID_*` environment values outrank this layer, not layer 2.
-4. Automatic resolution with the default selectors for energies a stored mapping does not cover; the crystal's built-in `E_grid` where no mapping exists.
+4. Automatic resolution with the default selectors when no stored mapping exists or it does not cover the requested energy.
 
 Ordinary runs need no grid-preparation batch: line sizing follows the precedence above,
 and continuum bounds resolve per case with built-in 25 eV uniform spacing unless

@@ -18,8 +18,8 @@ swept axis and accepts a scalar or sequence like any other grid.
 
 are both valid and need no other code changes.
 
-Crystallography (composition, dominant reflections, zone axis, B-factor, default
-energy grid) is looked up per material; the detector geometry defaults to the
+Crystallography (composition, dominant reflections, zone axis, B-factor)
+is looked up per material; the detector geometry defaults to the
 2x2 Timepix3 quad. Only ``materials.crystal`` and the immutable material catalog
 are imported here (no GPU), so this module is cheap to import and test.
 
@@ -677,6 +677,10 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
     return replace(policy, stop_eV=float(cap), sources=tuple(sorted(sources.items())))
 
 
+BARE_SWEEP_GRID_MODEL = "automatic-v1"
+"""Bare sweeps use resolved photon grids rather than legacy crystal bands."""
+
+
 def _cxr_grid_for_energy(
     sweep: Sweep, cp: dict, energy_keV: float
 ) -> tuple[np.ndarray, dict | None]:
@@ -689,8 +693,7 @@ def _cxr_grid_for_energy(
     2. ``PYRITE_ENERGY_GRID_*`` environment policy, which turns automatic
        resolution on even where a stored row exists;
     3. the stored catalog/profile artifact -- this energy's
-       ``E_grid_line_by_energy`` row, or, when no mapping is configured at all,
-       the crystal's own ``E_grid``. Legacy v1 artifacts still decode and are
+       ``E_grid_line_by_energy`` row. Legacy v1 artifacts still decode and are
        still used here;
     4. built-in automatic resolution.
 
@@ -716,9 +719,7 @@ def _cxr_grid_for_energy(
         resolve_crystal_cut(sweep.target._crystal_cut(), cp["beam_uvw"], cp["surface_hkl"]).label
     )
     if not override and not reoriented:
-        if bins.cxr_by_energy is None:
-            return np.asarray(cp["E_grid"], dtype=float), None
-        stored = bins.cxr_by_energy.get(float(energy_keV))
+        stored = (bins.cxr_by_energy or {}).get(float(energy_keV))
         if stored is not None:
             return np.asarray(stored, dtype=float), None
     policy = _automatic_cxr_grid_policy(sweep, cp, float(energy_keV))
@@ -738,7 +739,10 @@ def _cxr_grid_for_energy(
             "No transport was started."
         )
     grid = np.linspace(policy.start_eV, policy.stop_eV, num)
-    return grid, policy.payload()
+    payload = policy.payload()
+    if bins.cxr_by_energy is None and not override and not reoriented:
+        payload["grid_model"] = BARE_SWEEP_GRID_MODEL
+    return grid, payload
 
 
 def _electron_budget(
@@ -761,9 +765,7 @@ def _case_energies(sweep: Sweep, gdf: GDFBeam | None) -> np.ndarray:
     return np.array([gdf.energy_keV.max()])
 
 
-def _brem_grid(
-    sweep: Sweep, cp: dict, energies: np.ndarray, cxr_grids: tuple[np.ndarray, ...]
-) -> np.ndarray:
+def _brem_grid(sweep: Sweep, energies: np.ndarray, cxr_grids: tuple[np.ndarray, ...]) -> np.ndarray:
     """Return the continuum grid before encoding.
 
     An explicit ``EnergyBins.brem`` is exact. Otherwise a 50 eV lattice starts
@@ -776,11 +778,8 @@ def _brem_grid(
         brem_start = float(np.atleast_1d(bins.cxr)[0])
     elif bins.cxr_by_energy:
         brem_start = min(float(np.atleast_1d(grid)[0]) for grid in bins.cxr_by_energy.values())
-    elif bins.cxr_by_energy is None:
-        brem_start = float(cp["E_grid"][0])
     else:
-        # A configured-but-empty mapping: every energy resolved
-        # automatically, so the continuum starts where those grids do.
+        # No stored rows: use the resolved automatic line grids.
         brem_start = min(float(np.atleast_1d(grid)[0]) for grid in cxr_grids)
     return np.arange(brem_start, float(energies.max()) * 1e3 + 50.0, 50.0)  # type: ignore[reportArgumentType]
 
@@ -1040,7 +1039,7 @@ def build_cases(
     # binning). brem grid: coarse + wide -- each case spans up to that case's
     # beam energy because brem cuts off at the particle energy.
     resolved_cxr = tuple(_cxr_grid_for_energy(sweep, cp, float(energy)) for energy in energies)
-    brem_grid = _brem_grid(sweep, cp, energies, tuple(grid for grid, _ in resolved_cxr))
+    brem_grid = _brem_grid(sweep, energies, tuple(grid for grid, _ in resolved_cxr))
     dtheta, domega = _detector_acceptance(sweep.detector)
     orientation = _sweep_orientation(sweep, cp)
     beam_uvw, surface_hkl = orientation.beam_uvw, orientation.surface_hkl

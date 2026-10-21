@@ -162,40 +162,43 @@ def stream_spectrum_from_artifact(
     spec = spec_characteristic = brem_wide = spec_transition = None
     n_segments = 0
     segs = {}
-    for segs in iter_electron_row_blocks(path, max_segments):
-        n_segments += int(segs["L_ang"].shape[0])
-        if segs["L_ang"].shape[0] == 0:
-            continue
-        block = _segments_on_device(segs)
-        batch = EmissionBatch(
-            block,
-            E_grid,
-            case,
-            n_hat,
-            abs_layers,
-            groove,
-            electron_limit=Ne_lines,
-            table_cache=table_cache,
-            truncation_audit=audit,
-        )
-        parts = (
-            emission.cxr.evaluate(batch, "spec").values,
-            emission.characteristic.evaluate(
-                replace(batch, electron_limit=Ne_brem), "spec_characteristic"
-            ).values,
-            emission.continuum.evaluate(
-                replace(batch, energy_eV=E_brem, electron_limit=Ne_brem), "brem_wide"
-            ).values,
-            # Per-history TR over whole-electron blocks, normalized by Ne_brem.
-            block_transition_spectrum(case, segs, E_grid, n_hat, Ne_brem),
-        )
-        if spec is None:
-            spec, spec_characteristic, brem_wide, spec_transition = parts
-        else:
-            totals = (spec, spec_characteristic, brem_wide, spec_transition)
-            spec, spec_characteristic, brem_wide, spec_transition = (
-                total + part for total, part in zip(totals, parts, strict=True)
+    from ..spectrum.cxr._coverage import collect_line_data_coverage
+
+    with collect_line_data_coverage() as line_coverage:
+        for segs in iter_electron_row_blocks(path, max_segments):
+            n_segments += int(segs["L_ang"].shape[0])
+            if segs["L_ang"].shape[0] == 0:
+                continue
+            block = _segments_on_device(segs)
+            batch = EmissionBatch(
+                block,
+                E_grid,
+                case,
+                n_hat,
+                abs_layers,
+                groove,
+                electron_limit=Ne_lines,
+                table_cache=table_cache,
+                truncation_audit=audit,
             )
+            parts = (
+                emission.cxr.evaluate(batch, "spec").values,
+                emission.characteristic.evaluate(
+                    replace(batch, electron_limit=Ne_brem), "spec_characteristic"
+                ).values,
+                emission.continuum.evaluate(
+                    replace(batch, energy_eV=E_brem, electron_limit=Ne_brem), "brem_wide"
+                ).values,
+                # Per-history TR over whole-electron blocks, normalized by Ne_brem.
+                block_transition_spectrum(case, segs, E_grid, n_hat, Ne_brem),
+            )
+            if spec is None:
+                spec, spec_characteristic, brem_wide, spec_transition = parts
+            else:
+                totals = (spec, spec_characteristic, brem_wide, spec_transition)
+                spec, spec_characteristic, brem_wide, spec_transition = (
+                    total + part for total, part in zip(totals, parts, strict=True)
+                )
     if n_segments != int(artifact.attrs["segment_count"]):
         raise TrajectoryArtifactError(f"trajectory artifact {artifact.path} segments are truncated")
     if spec is None:  # no segment at all: every estimator is zero
@@ -205,6 +208,7 @@ def stream_spectrum_from_artifact(
     assert spec_characteristic is not None and brem_wide is not None
     truncation = None if audit is None else check_cxr_truncation(case, audit)
     out = dict(
+        line_data_coverage=line_coverage,
         E_grid=E_grid,
         spec=spec,
         spec_characteristic=spec_characteristic,

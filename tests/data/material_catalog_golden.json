@@ -55,57 +55,6 @@
     "zrte3",
     "zrte5"
   ],
-  "configured_crystal_keys": [
-    "2h_tas2",
-    "2h_tase2",
-    "4h_sic",
-    "6h_sic",
-    "black_phosphorus",
-    "diamond",
-    "fes2",
-    "fete",
-    "gep",
-    "ges",
-    "gese",
-    "gese2",
-    "hbn",
-    "hfs2",
-    "hfse2",
-    "hfte2",
-    "hopg",
-    "mos2",
-    "mose2",
-    "mote2",
-    "mote2_product",
-    "nbs2",
-    "nbse2",
-    "nbte2",
-    "pds2",
-    "pdse2",
-    "pdte2",
-    "ptbi2",
-    "pts2",
-    "ptse2",
-    "ptte2",
-    "res2",
-    "rese2",
-    "sapphire",
-    "silicon",
-    "tate2",
-    "tis2",
-    "tise2",
-    "tite2",
-    "tungsten",
-    "v2o5",
-    "vse2",
-    "vte2",
-    "ws2",
-    "wse2",
-    "wte2",
-    "zrse2",
-    "zrte3",
-    "zrte5"
-  ],
   "material_keys": [
     "2h_tas2",
     "2h_tase2",
@@ -242,12 +191,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -431,12 +374,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -596,12 +533,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            984
-          ],
-          "sha256": "71ac56940f146cd15acd2e2b285a6c678e8b5ce322fcece601e70e09a101a915"
-        },
         "hkl_list": [
           [
             0,
@@ -773,12 +704,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            984
-          ],
-          "sha256": "71ac56940f146cd15acd2e2b285a6c678e8b5ce322fcece601e70e09a101a915"
-        },
         "hkl_list": [
           [
             0,
@@ -914,12 +839,6 @@
           1,
           0
         ],
-        "E_grid": {
-          "shape": [
-            1150
-          ],
-          "sha256": "756f263ed3913016289a1af592bebe4c7f524d0859c9b357904c3881bc5f2cde"
-        },
         "hkl_list": [
           [
             0,
@@ -1075,12 +994,6 @@
           0,
           0
         ],
-        "E_grid": {
-          "shape": [
-            1634
-          ],
-          "sha256": "f6dfc43bb64935aaa82ddb8a43886d7371485bd5afa95e884f8e613ebfd7d79b"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -1331,12 +1244,6 @@
           0,
           0
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -1493,12 +1400,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -1806,12 +1707,6 @@
           0,
           -1
         ],
-        "E_grid": {
-          "shape": [
-            1150
-          ],
-          "sha256": "756f263ed3913016289a1af592bebe4c7f524d0859c9b357904c3881bc5f2cde"
-        },
         "hkl_list": [
           [
             2,
@@ -1961,12 +1856,6 @@
           0,
           0
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             2,
@@ -2126,12 +2015,6 @@
           0,
           0
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             2,
@@ -2631,12 +2514,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -2754,12 +2631,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1634
-          ],
-          "sha256": "f6dfc43bb64935aaa82ddb8a43886d7371485bd5afa95e884f8e613ebfd7d79b"
-        },
         "hkl_list": [
           [
             0,
@@ -2899,12 +2770,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -3023,12 +2888,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -3147,12 +3006,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1150
-          ],
-          "sha256": "756f263ed3913016289a1af592bebe4c7f524d0859c9b357904c3881bc5f2cde"
-        },
         "hkl_list": [
           [
             0,
@@ -3276,12 +3129,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1634
-          ],
-          "sha256": "f6dfc43bb64935aaa82ddb8a43886d7371485bd5afa95e884f8e613ebfd7d79b"
-        },
         "hkl_list": [
           [
             0,
@@ -3441,7 +3288,6 @@
           0,
           0
         ],
-        "E_grid": null,
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -3614,12 +3460,6 @@
           0,
           2
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": 2
@@ -3762,12 +3602,6 @@
           0,
           2
         ],
-        "E_grid": {
-          "shape": [
-            467
-          ],
-          "sha256": "d408eb234b25a8908cc58bb2f45667febdb2fa0d8a744a11331ed2326b501558"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -3910,12 +3744,6 @@
           0,
           2
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -4038,12 +3866,6 @@
           0,
           2
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": 2
@@ -4166,12 +3988,6 @@
           0,
           2
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -4344,12 +4160,6 @@
           0,
           2
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -4618,12 +4428,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -4815,12 +4619,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -5032,12 +4830,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -5136,12 +4928,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -5309,12 +5095,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -5414,12 +5194,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -5549,12 +5323,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -5673,12 +5441,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -5966,12 +5728,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -6130,16 +5886,16 @@
           ]
         ]
       ],
-      "V_cell": 248.19409350142794,
+      "V_cell": 248.19409350142797,
       "mosaic_fwhm_deg": null,
       "composition": [
         [
           "Re",
-          0.01611641898310117
+          0.016116418983101167
         ],
         [
           "Se",
-          0.03223283796620234
+          0.032232837966202334
         ]
       ],
       "config": {
@@ -6153,12 +5909,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -6484,12 +6234,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1634
-          ],
-          "sha256": "f6dfc43bb64935aaa82ddb8a43886d7371485bd5afa95e884f8e613ebfd7d79b"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -6664,12 +6408,6 @@
           4,
           0
         ],
-        "E_grid": {
-          "shape": [
-            1634
-          ],
-          "sha256": "f6dfc43bb64935aaa82ddb8a43886d7371485bd5afa95e884f8e613ebfd7d79b"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -6968,12 +6706,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -7093,12 +6825,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            2550
-          ],
-          "sha256": "5a6773d3e998f2c1aad9be3da1e28aebe701dbc00a05a97ef095279cce5b6407"
-        },
         "hkl_list": [
           [
             0,
@@ -7228,12 +6954,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -7363,12 +7083,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -7390,7 +7104,7 @@
           0,
           1
         ],
-        "g_mag": 2.150532479874035,
+        "g_mag": 2.1505324798740353,
         "structure_factor": [
           70.37738610851294,
           44.3453111112303
@@ -7486,12 +7200,6 @@
           1,
           0
         ],
-        "E_grid": {
-          "shape": [
-            1634
-          ],
-          "sha256": "f6dfc43bb64935aaa82ddb8a43886d7371485bd5afa95e884f8e613ebfd7d79b"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -7748,12 +7456,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1317
-          ],
-          "sha256": "90e255d43fdfdce913755db6e01c6aedaa89156f501e238578a6771d59f7cee9"
-        },
         "hkl_list": [
           [
             0,
@@ -7863,12 +7565,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -8095,16 +7791,16 @@
           ]
         ]
       ],
-      "V_cell": 440.51034482646656,
+      "V_cell": 440.5103448264665,
       "mosaic_fwhm_deg": null,
       "composition": [
         [
           "Te",
-          0.02724113097667944
+          0.027241130976679444
         ],
         [
           "V",
-          0.01362056548833972
+          0.013620565488339722
         ]
       ],
       "config": {
@@ -8118,12 +7814,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -8267,12 +7957,6 @@
           0,
           2
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -8395,12 +8079,6 @@
           0,
           2
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -8621,12 +8299,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -8726,12 +8398,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [],
         "hkl_reason": null,
         "layers_per_cell": null
@@ -8890,12 +8556,6 @@
           0,
           1
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -9183,12 +8843,6 @@
           1,
           0
         ],
-        "E_grid": {
-          "shape": [
-            1050
-          ],
-          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
-        },
         "hkl_list": [
           [
             0,
@@ -12072,11 +11726,6 @@
       75.0,
       85.0
     ],
-    "mote2_E_grid_descriptor": {
-      "start": 350.0,
-      "stop": 3500.0,
-      "step": 3.0
-    },
     "mote2_tilt_deg": [
       5.0,
       15.0,

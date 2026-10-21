@@ -5,4 +5,3 @@ formula = "Al2O3"
 cod_id = 9008081
 B_ang2 = 0.25
 surface_hkl = [0, 0, 1]
-E_grid = { arange = { start = 100.0, stop = 5000.0, step = 3.0 } }

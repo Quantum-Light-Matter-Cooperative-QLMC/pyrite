@@ -46,7 +46,7 @@ def _register(kind):
             callback=create,
             params=[copy(param) for param in material_add.command.params if param.name in allowed],
             help=(
-                "Create in the user catalog from an existing crystal or fully occupied CIF. Partial occupancy is unsupported. Photon grids are in eV; lengths in angstrom."
+                "Create in the user catalog from an existing crystal or fully occupied CIF. Partial occupancy is unsupported. Lengths are in angstrom; photon grids belong to numerics."
                 if kind == "crystal"
                 else "Create a medium from formula or fractions; --density-g-cm3 is required."
             ),

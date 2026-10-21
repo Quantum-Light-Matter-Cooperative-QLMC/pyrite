@@ -23,6 +23,8 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 
 | Command | Deprecated option | Replacement | Deprecated in | Remove in | Note |
 | --- | --- | --- | --- | --- | --- |
+| `pyrite material add` | `--photon-grid` | set grids through numerics; crystal grids are ignored | 0.16.3 | 0.18.0 |  |
+| `pyrite material create crystal` | `--photon-grid` | set grids through numerics; crystal grids are ignored | 0.16.3 | 0.18.0 |  |
 | `pyrite material show` | `--profile` | use pyrite profile ranges show PROFILE MATERIAL | 0.15.0 | 0.17.0 |  |
 
 ## Implicit defaults

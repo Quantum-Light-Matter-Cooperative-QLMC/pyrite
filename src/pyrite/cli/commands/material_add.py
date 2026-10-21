@@ -6,6 +6,7 @@ import click
 
 from ...console import json as cli_json
 from ...console.output import CLIError, emit_json_result, emit_result, output_option
+from .._deprecations import DeprecatedOption
 
 
 def _fractions(values: tuple[str, ...], option: str) -> dict[str, float] | None:
@@ -77,9 +78,10 @@ def _fractions(values: tuple[str, ...], option: str) -> dict[str, float] | None:
 )
 @click.option(
     "--photon-grid",
+    cls=DeprecatedOption,
     type=(float, float, float),
     metavar="START STOP STEP",
-    help="Required new-CIF photon grid in eV; stop is exclusive.",
+    help="Deprecated and ignored; set photon grids through numerics instead.",
 )
 @click.option(
     "--mosaic-fwhm-deg",
@@ -109,7 +111,7 @@ def command(
     Default writes go to the user catalog. An explicitly selected complete
     catalog writes in place. No tables are generated or data downloaded.
     Media support transport/layers/filters, not coherent crystal emission.
-    New CIFs require formula, phase, one cut, B and a photon grid. Partial
+    New CIFs require formula, phase, one cut and B. Partial
     occupancy is unsupported. Existing-crystal configuration is reused intact.
     """
     from ...materials.authoring import build_crystal, build_medium, save_material
@@ -126,22 +128,6 @@ def command(
         if crystal is not None or cif is not None:
             if any(value is not None for value in fractions.values()):
                 raise ValueError("fraction/count options apply only to media; use formula with CIF")
-            grid = None
-            if photon_grid is not None:
-                import math
-
-                import numpy as np
-
-                start, stop, step = photon_grid
-                if (
-                    not all(math.isfinite(v) for v in photon_grid)
-                    or not 0 < start < stop
-                    or step <= 0
-                ):
-                    raise ValueError("--photon-grid requires finite 0 < START < STOP and STEP > 0")
-                if (stop - start) / step > 1_000_000:
-                    raise ValueError("--photon-grid may contain at most 1,000,000 values")
-                grid = np.arange(start, stop, step).tolist()
             definition = build_crystal(
                 name,
                 crystal=crystal,
@@ -151,7 +137,6 @@ def command(
                 surface_hkl=surface_hkl,
                 beam_uvw=beam_uvw,
                 B_ang2=b_ang2,
-                photon_energies_eV=grid,
                 mosaic_fwhm_deg=mosaic_fwhm_deg,
                 density_g_cm3=density_g_cm3,
                 catalog=path,

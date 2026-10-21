@@ -11,6 +11,7 @@ from typing import Any, Literal, cast
 import numpy as np
 
 from .. import DATA_DIR
+from .._api_deprecations import warn_api
 from .._catalog_layout import ARTIFACT_DIR, catalog_root
 from .._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS
 from .._energy_grid_artifacts import ArtifactError, load_artifact
@@ -160,6 +161,8 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
         "layers_per_cell",
     }
     required = {"cif", "validation_id", "formula", "B_ang2"}
+    if any(isinstance(row, dict) and "E_grid" in row for row in table.values()):
+        warn_api("crystal.E_grid")
     for key, value in table.items():
         path = f"crystals.{key}"
         row = _table(value, path, errors)
@@ -211,12 +214,6 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
                 errors.add(f"{path}.mosaic_fwhm_deg", "must be finite and positive")
             else:
                 mosaic = mosaic_value
-        e_grid = None
-        if "E_grid" in row:
-            e_grid = _grid(row["E_grid"], f"{path}.E_grid", errors)
-            if e_grid is not None and np.any(e_grid <= 0):
-                errors.add(f"{path}.E_grid", "values must be positive")
-                e_grid = None
         families: list[tuple[int, int, int]] = []
         hkl_raw = row.get("hkl_families")
         reason_raw = row.get("hkl_reason")
@@ -267,7 +264,6 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
                 B_ang2=B,
                 beam_uvw=beam,
                 surface_hkl=surface,
-                E_grid=e_grid,
                 hkl_families=tuple(families),
                 hkl_reason=reason_raw.strip() if isinstance(reason_raw, str) else None,
                 layers_per_cell=layers,

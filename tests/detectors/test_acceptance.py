@@ -192,10 +192,10 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     ]
     assert cases[0] == cases[1]
     assert case_content_key(cases[0]) == case_content_key(cases[1])
-    # Input captured at 86db77f5 before acceptance objects; hashes re-pinned for #513 CBS v4.
+    # Input captured at 86db77f5; case hash re-pinned for #592 automatic photon grids.
     assert (
         case_content_key(cases[1])
-        == "f1dadd1d129c3256ce7255b0df3bf3a5e56e57e3db34d9868c0defa3884e1084"
+        == "2aefdc3d9a8913f97f9cfeecdaa9d71814e048e767f02cfdfa597775aaccea7e"
     )
     sweeps = [
         LegacySweep(material="hopg", beam=beam.to_spec(), target=target, detector=d)

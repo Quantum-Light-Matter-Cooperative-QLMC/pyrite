@@ -250,6 +250,14 @@ def _flag(
 #: `RetiredOption` and `canonical_option` (renamed spellings) and
 #: `DeprecatedOption` (whole options) stay as the substrate ADR-0002 requires.
 DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
+    (command, "--photon-grid"): _flag(
+        command,
+        "--photon-grid",
+        "set grids through numerics; crystal grids are ignored",
+        since="0.16.3",
+    )
+    for command in ("material add", "material create crystal")
+} | {
     ("material show", "--profile"): _flag(
         "material show",
         "--profile",

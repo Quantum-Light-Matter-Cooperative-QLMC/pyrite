@@ -102,8 +102,9 @@ def test_existing_crystal_and_cif_cli():
             "100",
         ],
     )
-    assert_clean_result(result)
-    assert load_material_catalog().crystals["my-cif"].E_grid.tolist() == [100, 200, 300]
+    assert result.exit_code == 0
+    assert "--photon-grid" in result.stderr and "ignored" in result.stderr
+    assert not hasattr(load_material_catalog().crystals["my-cif"], "E_grid")
 
 
 def test_help_explains_units_ownership_and_limits():
