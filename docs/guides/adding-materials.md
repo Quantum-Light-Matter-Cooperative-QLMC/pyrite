@@ -71,15 +71,16 @@ pyrite material create crystal my-silicon --crystal silicon
 ```
 
 For a new fully occupied CIF, explicitly supply its formula, phase, one
-orientation, isotropic Debye–Waller factor and photon-energy grid:
+orientation and isotropic Debye–Waller factor:
 
 ```bash
 pyrite material create crystal lab-si --cif ./silicon.cif --formula Si --phase diamond \
-  --surface-hkl 1 1 1 --b-ang2 0.46 --photon-grid 100 5000 3
+  --surface-hkl 1 1 1 --b-ang2 0.46
 ```
 
 The example's physical inputs are illustrative: choose values justified for
-your sample. `--photon-grid START STOP STEP` uses eV, with an exclusive stop.
+your sample. Photon grids belong to numerics and resolve automatically unless
+explicitly configured there. Legacy `--photon-grid` arguments are deprecated and ignored.
 `--surface-hkl` specifies reciprocal Miller indices; `--beam-uvw` is the
 mutually exclusive direct-lattice alternative. An existing-crystal reference
 rejects configuration overrides; this workflow does not add an editor for cuts.
@@ -122,7 +123,7 @@ catalog = save_material(crystal)
 
 `build_medium` also accepts `mass_fractions`, `atomic_fractions` or `atom_counts`
 dictionaries. `build_crystal` accepts a local `cif`, `formula`, `phase`,
-`surface_hkl` or `beam_uvw`, `B_ang2`, `photon_energies_eV`, optional
+`surface_hkl` or `beam_uvw`, `B_ang2`, optional
 `mosaic_fwhm_deg`, and optional density consistency check. `catalog=Path(...)`
 selects an independent complete catalog for existing-crystal lookup or save.
 

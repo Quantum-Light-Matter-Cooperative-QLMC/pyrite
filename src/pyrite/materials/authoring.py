@@ -227,11 +227,16 @@ def build_crystal(
 
     Existing crystals reuse their catalog configuration; overrides are rejected.
     A new CIF requires formula, phase, exactly one orientation, nonnegative
-    ``B_ang2`` and a positive photon grid in eV. Reflections use the existing
+    ``B_ang2``. Photon grids belong to numerics; the deprecated
+    ``photon_energies_eV`` argument is ignored. Reflections use the existing
     automatic selection policy. Density is derived from the lattice; an optional
     supplied density must agree within 1e-6 relative tolerance. Partial occupancy
     and unsupported transport elements are rejected by existing validators.
     """
+    if photon_energies_eV is not None:
+        from .._api_deprecations import warn_api
+
+        warn_api("build_crystal(photon_energies_eV=...)")
     _name(name)
     if (crystal is None) == (cif is None):
         raise ValueError("supply exactly one of crystal or cif")
@@ -244,7 +249,6 @@ def build_crystal(
                 surface_hkl,
                 beam_uvw,
                 B_ang2,
-                photon_energies_eV,
                 mosaic_fwhm_deg,
             )
         ):
@@ -253,13 +257,12 @@ def build_crystal(
         if crystal not in loaded.crystals:
             raise ValueError(f"unknown crystal: {crystal}")
         spec = loaded.crystals[crystal]
-        if spec.E_grid is None:
-            raise ValueError(f"crystal {crystal!r} has no photon grid; author a CIF definition")
         composition = tuple(sorted(spec.composition))
         definition = _definition(name, "crystal", composition, {"crystal": crystal})
         # Reference identity must include the resolved structure and configuration.
         sources = layout.read_raw(layout.selected_catalog() if catalog is None else catalog)
         resolved = dict(sources["crystals"][crystal])
+        resolved.pop("E_grid", None)
         resolved["cif"] = f"cifs/{hashlib.sha256(spec.cif.read_bytes()).hexdigest()}.cif"
         identity = _definition(name, "cif", composition, resolved).identity
         definition = MaterialDefinition(
@@ -278,9 +281,6 @@ def build_crystal(
         counts = _formula(formula)
         if B_ang2 is None or isinstance(B_ang2, bool) or not math.isfinite(B_ang2) or B_ang2 < 0:
             raise ValueError("B_ang2 must be explicitly supplied, finite and nonnegative")
-        if photon_energies_eV is None or len(photon_energies_eV) == 0:
-            raise ValueError("photon_energies_eV must be an explicit nonempty positive grid")
-        grid = [_positive(value, "photon_energies_eV") for value in photon_energies_eV]
         assert cif is not None
         source = _safe_path(Path(cif))
         if not source.is_file():
@@ -293,7 +293,6 @@ def build_crystal(
             "formula": formula,
             "phase": phase.strip(),
             "B_ang2": float(B_ang2),
-            "E_grid": {"values": grid},
         }
         if surface_hkl is not None:
             record["surface_hkl"] = list(surface_hkl)

@@ -1810,8 +1810,6 @@ def test_exposed_arrays_cannot_have_writes_reenabled():
 
     arrays = []
     for crystal in CATALOG.crystals.values():
-        if crystal.E_grid is not None:
-            arrays.append(crystal.E_grid)
         arrays.extend(position for _, position in crystal.basis)
     for material in CATALOG.materials.values():
         arrays.extend(
@@ -2154,9 +2152,6 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
 
     golden = serialized_catalog_golden
     assert tuple(CATALOG.crystals) == tuple(golden["crystal_keys"])
-    assert tuple(key for key, spec in CATALOG.crystals.items() if spec.E_grid is not None) == tuple(
-        golden["configured_crystal_keys"]
-    )
     assert CATALOG.material_keys == tuple(golden["material_keys"])
 
     for key, expected in golden["crystals"].items():
@@ -2199,10 +2194,6 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
         assert list(map(list, actual.hkl_list)) == config["hkl_list"]
         assert actual.hkl_reason == config["hkl_reason"]
         assert actual.layers_per_cell == config["layers_per_cell"]
-        if config["E_grid"] is None:
-            assert actual.E_grid is None
-        else:
-            assert _array_fingerprint(actual.E_grid) == config["E_grid"]
 
     assert [element for element, _ in CATALOG.media["sio2"].composition] == [
         item[0] for item in golden["media"]["sio2"]
@@ -2261,11 +2252,6 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
         CATALOG.material("hbn").scan.thickness_ang, special["hbn_thickness_ang"]
     )
     np.testing.assert_array_equal(CATALOG.material("hbn").scan.tilt_deg, special["hbn_tilt_deg"])
-    mote2_grid = special["mote2_E_grid_descriptor"]
-    np.testing.assert_array_equal(
-        CATALOG.crystal("mote2").E_grid,
-        np.arange(mote2_grid["start"], mote2_grid["stop"], mote2_grid["step"]),
-    )
     np.testing.assert_array_equal(
         CATALOG.material("mote2").scan.tilt_deg, special["mote2_tilt_deg"]
     )
@@ -2505,3 +2491,46 @@ E_grid_brem = { values = [100.0, 300.0, 1000.0] }
         custom.material("sample").scan.E_grid_brem, [100.0, 300.0, 1000.0]
     )
     np.testing.assert_array_equal(custom.material("other").scan.E_grid_brem, expected)
+
+
+def test_legacy_crystal_grid_warns_once_and_is_ignored(tmp_path):
+    from pyrite.materials import load_material_catalog
+
+    legacy = _minimal_catalog(material_rows='[materials.sample]\ncrystal = "mos2"\n')
+    with pytest.warns(DeprecationWarning, match=r"crystal.E_grid") as caught:
+        loaded = load_material_catalog(_write_catalog(tmp_path, legacy))
+    assert len(caught) == 1
+    clean = load_material_catalog(
+        _write_catalog(tmp_path, legacy.replace("E_grid = { values = [100.0, 200.0] }\n", ""))
+    )
+    assert not hasattr(loaded.crystal("mos2"), "E_grid")
+    assert loaded.crystal("mos2").composition == clean.crystal("mos2").composition
+    np.testing.assert_array_equal(loaded.material_keys, clean.material_keys)
+
+
+@pytest.mark.slow
+def test_bare_sweep_uses_profile_automatic_line_grid():
+    from pyrite._energy_grid_encoding import decode_energy_grid
+    from pyrite.campaign.config import material_sweep
+    from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+
+    bare = Sweep(
+        material="hopg",
+        beam=BeamSpec(energy_keV=30.0),
+        thickness_ang=1e4,
+        tilt_deg=30.0,
+        tilt_azim_deg=0.0,
+    )
+    profiled = material_sweep(
+        "hopg",
+        beam=bare.beam,
+        thickness_ang=1e4,
+        tilt_deg=30.0,
+        tilt_azim_deg=0.0,
+        detector=bare.detector,
+    )
+    actual, expected = build_cases(bare)[0], build_cases(profiled)[0]
+    np.testing.assert_array_equal(
+        decode_energy_grid(actual["E_grid_line"]), decode_energy_grid(expected["E_grid_line"])
+    )
+    assert actual["line_grid_policy"]["grid_model"] == "automatic-v1"

@@ -22,7 +22,10 @@ def _api_entry(spelling: str, replacement: str, *, since: str) -> ApiDeprecation
 
 #: Keyed by the deprecated spelling as a user writes it (issue #451). Each row is
 #: held to the shipping version by ``tests/test_deprecation_schedule.py``.
-API_DEPRECATIONS: dict[str, ApiDeprecation] = {}
+API_DEPRECATIONS: dict[str, ApiDeprecation] = {
+    spelling: _api_entry(spelling, "Sweep.energy_bins (crystal grids are ignored)", since="0.16.3")
+    for spelling in ("crystal.E_grid", "build_crystal(photon_energies_eV=...)")
+}
 
 
 def warn_api(spelling: str, *, stacklevel: int = 3) -> None:

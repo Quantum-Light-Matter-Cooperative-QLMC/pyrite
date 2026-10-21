@@ -140,8 +140,6 @@ class CrystalSpec:
         Isotropic Debye--Waller ``B`` factor in square angstroms.
     beam_uvw
         Optional default crystal direction parallel to the incident beam.
-    E_grid
-        Optional legacy photon-energy grid in eV.
     hkl_families
         Pinned representative Miller-index families.
     hkl_reason
@@ -164,7 +162,6 @@ class CrystalSpec:
     mp_id: str | None
     B_ang2: float
     beam_uvw: tuple[int, int, int] | None
-    E_grid: np.ndarray | None
     hkl_families: tuple[tuple[int, int, int], ...]
     hkl_reason: str | None
     layers_per_cell: int | None

@@ -8,11 +8,11 @@ import pytest
 import pyrite as pr
 from pyrite import api
 from pyrite._physics_provenance import resolved_physics_view
+from pyrite.checkpoints import _checkpoint_store
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.spectrum.dtr_history import DTR_MODEL
 from pyrite.montecarlo.trajectories import read_trajectory_artifact, write_trajectory_artifact
 from pyrite.results.store import store_result
-from pyrite.checkpoints import _checkpoint_store
 
 
 def _scene(mode="two-beam"):

@@ -26,7 +26,7 @@ from ..._backend import BACKEND
 from ..._energy_grid_encoding import decode_energy_grid as decode_energy_grid
 from ..._env import env_value, set_canonical_env
 from .. import spectrum as _spectrum_mod
-from ..case import Case, refuse_channeling, refuse_transition_radiation
+from ..case import Case
 from ..geometry import tilted_geometry as tilted_geometry
 from ..groove import blazed_groove_spec as blazed_groove_spec
 from ..spectrum import (
@@ -114,6 +114,12 @@ from .cxr_grid import longitudinal_rms_fs as _longitudinal_rms_fs
 from .directions import directional_outputs, validated_directions
 from .host_cpus import _cgroup_cpu_quota as _cgroup_cpu_quota
 from .host_cpus import _usable_cpus
+from .transport_options import (
+    _beam_kwargs as _beam_kwargs,
+)
+from .transport_options import (
+    _check_opt_in_transport as _check_opt_in_transport,
+)
 
 _RESOURCE_POLICY.n_cpus = _usable_cpus()
 
@@ -279,38 +285,6 @@ def run_case_directions(
         keep_segments_on_device=True,
     )
     return _directional_outputs(case, transport, directions)
-
-
-def _beam_kwargs(case):
-    """Beam phase-space kwargs a case dict forwards to ``simulate_trajectories``:
-    the transverse spot (elliptical ``beam_fwhm_mm`` / ``beam_fwhm_y_mm``) and
-    the legacy longitudinal bunch (``bunch_length_fs`` / ``long_shape`` /
-    ``long_offsets_fs``) or resolved ``longitudinal_distribution`` policy, the
-    resolved ``transverse_distribution`` (Twiss) policy that replaces the spot,
-    and ``energy_spread_frac``.
-    Absent keys default to the point-bunch isotropic beam, bit-for-bit with the
-    pre-BeamSpec case dict."""
-    return dict(
-        beam_fwhm_mm=case.get("beam_fwhm_mm"),
-        beam_fwhm_y_mm=case.get("beam_fwhm_y_mm"),
-        bunch_length_fs=case.get("bunch_length_fs"),
-        long_shape=case.get("long_shape", "gaussian"),
-        long_offsets_fs=case.get("long_offsets_fs"),
-        longitudinal_distribution=case.get("longitudinal_distribution"),
-        transverse_distribution=case.get("transverse_distribution"),
-        energy_spread_frac=case.get("energy_spread_frac"),
-        bunch_front_tilt=case.get("bunch_front_tilt"),
-        **({"gdf_source": case["gdf_source"]} if "gdf_source" in case else {}),
-    )
-
-
-def _check_opt_in_transport(case, trajectory_capture, block_electrons):
-    """Refuse transport options an opt-in component lacks, before any work (ADR-0017 tier 3)."""
-    if trajectory_capture is not None:
-        refuse_channeling(case, "trajectory capture")
-    if block_electrons is not None:
-        refuse_channeling(case, "electron-block transport")
-        refuse_transition_radiation(case, "electron-block transport")
 
 
 def _transport_case(

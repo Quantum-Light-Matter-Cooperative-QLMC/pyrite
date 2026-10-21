@@ -23,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
-from pyrite._catalog_layout import bundled_catalog, read_raw
+from pyrite._catalog_layout import bundled_catalog
 from pyrite.materials import crystal as _crystal
 from pyrite.materials.catalog import load_material_catalog
 
@@ -92,7 +92,6 @@ def _serialize_crystal(spec) -> dict:
             "phase": spec.phase,
             "beam_uvw": list(spec.beam_uvw) if spec.beam_uvw is not None else None,
             "surface_hkl": list(spec.surface_hkl) if spec.surface_hkl is not None else None,
-            "E_grid": _fingerprint(spec.E_grid) if spec.E_grid is not None else None,
             "hkl_list": _hkl_list(spec.hkl_list),
             "hkl_reason": spec.hkl_reason,
             "layers_per_cell": spec.layers_per_cell,
@@ -178,16 +177,9 @@ def _serialize_resolved_stack(catalog, spec) -> dict:
 
 
 def _special_grids(catalog) -> dict:
-    raw = read_raw(bundled_catalog())
-    mote2_arange = raw["crystals"]["mote2"]["E_grid"]["arange"]
     return {
         "hbn_thickness_ang": [float(x) for x in catalog.material("hbn").scan.thickness_ang],
         "hbn_tilt_deg": [float(x) for x in catalog.material("hbn").scan.tilt_deg],
-        "mote2_E_grid_descriptor": {
-            "start": mote2_arange["start"],
-            "stop": mote2_arange["stop"],
-            "step": mote2_arange["step"],
-        },
         "mote2_tilt_deg": [float(x) for x in catalog.material("mote2").scan.tilt_deg],
         "mote2_tilt_azim_deg": [float(x) for x in catalog.material("mote2").scan.tilt_azim_deg],
     }
@@ -199,9 +191,6 @@ def build_golden() -> dict:
     return {
         "provenance": dict(_PROVENANCE),
         "crystal_keys": list(catalog.crystals),
-        "configured_crystal_keys": [
-            key for key, spec in catalog.crystals.items() if spec.E_grid is not None
-        ],
         "material_keys": list(catalog.material_keys),
         "crystals": {key: _serialize_crystal(spec) for key, spec in catalog.crystals.items()},
         "media": {

@@ -92,7 +92,6 @@ def _new_cif(name, source):
         phase="diamond",
         surface_hkl=(1, 1, 1),
         B_ang2=0.46,
-        photon_energies_eV=[100, 200, 300],
     )
 
 
@@ -127,7 +126,6 @@ def test_invalid_cif_or_density_and_symlinks(tmp_path):
             phase="diamond",
             surface_hkl=(1, 1, 1),
             B_ang2=0.46,
-            photon_energies_eV=[100],
         )
 
 

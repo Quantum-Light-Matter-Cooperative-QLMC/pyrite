@@ -925,6 +925,18 @@ def test_streamed_spectrum_matches_the_live_spectrum(tmp_path, monkeypatch, kind
         if isinstance(value, np.ndarray):
             # Only the summation order across blocks differs from the live run.
             np.testing.assert_allclose(streamed[key], value, rtol=1e-12, atol=0, err_msg=key)
+        elif key == "line_data_coverage":
+            # Replay records one audit per electron block; totals match the live population.
+            from collections import Counter
+
+            def counts(records):
+                total = Counter()
+                for record in records:
+                    total.update(record["counts"])
+                return total
+
+            assert counts(streamed[key]) == counts(value)
+            assert {r["schema"] for r in streamed[key]} == {r["schema"] for r in value}
         elif not key.startswith("_"):
             assert streamed[key] == value, key
 

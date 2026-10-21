@@ -87,7 +87,7 @@ Options:
 Usage: pyrite material create crystal [OPTIONS] NAME
 
   Create in the user catalog from an existing crystal or fully occupied CIF. Partial
-  occupancy is unsupported. Photon grids are in eV; lengths in angstrom.
+  occupancy is unsupported. Lengths are in angstrom; photon grids belong to numerics.
 
 Options:
   --formula TEXT                  Simple ASCII formula (medium: fractional counts
@@ -107,7 +107,8 @@ Options:
                                   excludes --surface-hkl.
   --b-ang2 FLOAT                  Required new-CIF isotropic Debye–Waller factor in
                                   angstrom²; nonnegative.
-  --photon-grid START STOP STEP   Required new-CIF photon grid in eV; stop is exclusive.
+  --photon-grid START STOP STEP   Deprecated and ignored; set photon grids through
+                                  numerics instead.
   --mosaic-fwhm-deg FLOAT         Optional positive new-CIF mosaic FWHM in degrees;
                                   omitted means perfect crystal.
   -o, --output [table|json]       Output format; only json is a stable automation

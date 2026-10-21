@@ -168,16 +168,13 @@ def layer_radiator(layer: LayerSpec, n_families: int = 4):
 def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
     """Fixed crystallography for a material: composition, the dominant
     reflections, exactly one direct beam axis [uvw] or reciprocal surface (hkl),
-    the isotropic B-factor, and a sensible default photon-energy grid. Override
-    the grid via ``Sweep.energy_bins``."""
+    and the isotropic B-factor."""
     crystal_key = material
     if material in CATALOG.materials:
         crystal_key = CATALOG.material(material).crystal_key
     if crystal_key not in CATALOG.crystals:
         raise ValueError(f"unknown material {material!r} (have {list(CATALOG.crystals)})")
     spec = CATALOG.crystal(crystal_key)
-    if spec.E_grid is None:
-        raise ValueError(f"crystal {crystal_key!r} has no configured photon-energy grid")
     hkl_list: list[tuple[int, ...]]
     if not spec.hkl_list:
         hkl_list = dominant_reflections(crystal_key, n_families=n_families, B_ang2=spec.B_ang2)
@@ -190,7 +187,6 @@ def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
         beam_uvw=spec.beam_uvw,
         surface_hkl=spec.surface_hkl,
         B_ang2=spec.B_ang2,
-        E_grid=spec.E_grid,
     )
 
 

@@ -91,7 +91,7 @@ pr.Beam(energy_keV=30.0, transverse=pr.PointSpot(), longitudinal=pr.PointBunch()
 pr.Beam(
     energy_keV=30.0, transverse=pr.TransverseSpot(1.0), longitudinal=pr.BunchLength(100.0)
 )  # RMS fs
-pr.Beam.from_gdf("beam.gdf", z_origin_m=0.0, time_s=1e-9)  # GPT snapshot
+# With a local GPT snapshot: pr.Beam.from_gdf("beam.gdf", z_origin_m=0.0, time_s=1e-9)
 ```
 
 `transverse` also accepts a Courant–Snyder `TransverseDistribution`, and `longitudinal` accepts `Offsets` or a `LongitudinalDistribution` policy. Divergence is derived: `beam.derived_divergence_mrad(energy_keV)`. Sweep axes address the sub-objects, for example `"beam.transverse": [pr.TransverseSpot(0.5), pr.TransverseSpot(1.0), pr.PointSpot()]`.
@@ -203,6 +203,7 @@ pixel_result = pr.simulate(
     target,
     detector,
     filters=(half_filter,),
+    numerics=pr.Numerics(cxr_trials=450, brem_trials=100),
 )
 spatial = pixel_result.spatial
 assert spatial is not None
@@ -211,7 +212,7 @@ energy_eV, selected = spatial.spectra(
     pixels=[(128, 64), (128, 192)],
     component="cxr",
 )
-line_image = spatial.image((4_000.0, 6_000.0), component="cxr")
+line_image = spatial.image((energy_eV[0], energy_eV[-1]), component="cxr")
 metadata = spatial.pixel_metadata(pixels=[(128, 64), (128, 192)])
 shadow = spatial.transmission_image(5_000.0, component="brem")
 ```
@@ -246,6 +247,7 @@ configured = pr.simulate(
     target,
     counting_detector,
     acquisition=acquisition,
+    numerics=pr.Numerics(cxr_trials=450, brem_trials=100),
 )
 selected = configured.acquire(pixels=[(0, 0), (10, 12)])
 total_image = configured.acquisition_image(pixel_chunk=1024)
@@ -262,6 +264,7 @@ native_result = pr.simulate(
     target,
     counting_detector,
     acquisition=pr.Acquisition.native(exposure_s=1.0),
+    numerics=pr.Numerics(cxr_trials=450, brem_trials=100),
 )
 native_counts = native_result.acquire(pixels=[(0, 0)])
 resolved_edges = native_counts.measured_edges_eV
